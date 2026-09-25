@@ -29,7 +29,9 @@ export function localGitAgentTools(core: ToolCore): AgentToolContribution[] {
       handler: async (_a, ctx) => {
         const wt = await worktreeFor(core, ctx.taskId)
         // The same read the pane draws from, so the agent's list and the person's cannot disagree.
-        return wt ? (await localStatus(wt)).changes : NO_WORKTREE
+        // Less `contentKey`, which is the pane's cache key and would only be hashes in the agent's
+        // context.
+        return wt ? (await localStatus(wt)).changes.map(({ contentKey: _, ...change }) => change) : NO_WORKTREE
       },
     },
     {

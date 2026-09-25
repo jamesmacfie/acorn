@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { LocalChange } from '@acorn/protocol/localGit.ts'
 import {
   buildTree, changeKey, commitMode, DEFAULT_CHANGE_VIEW, filesUnder, folderState,
-  generateReason, groupChanges, groupSections, isFolderKey, pickSelected, primaryRemote, remoteCounts,
+  generateReason, groupChanges, groupSections, isFolderKey, patchKey, pickSelected, primaryRemote, remoteCounts,
   remoteReason, sortRows, stackFor, stageableRows, stagedState, toPullFile, totals, unstagedPathsOf,
   viewNodes, visibleNodes, type ChangeView, type TreeNode,
 } from './model'
@@ -14,6 +14,28 @@ const c = (path: string, staged: boolean, status: LocalChange['status'] = 'modif
   staged,
   additions: null,
   deletions: null,
+})
+
+// What tells the viewer which patches a poll moved (DiffSource.contentKey).
+describe('patchKey', () => {
+  const keyed = { ...c('a.ts', false), additions: 2, deletions: 1, contentKey: '100644 100644 abc 33188 12 1.5 1.5' }
+
+  it('holds still across polls when the node keyed the entry', () => {
+    expect(patchKey(keyed, 1)).toBe(patchKey(keyed, 2))
+  })
+
+  it('moves with the node key, the line counts, the status and the area', () => {
+    const before = patchKey(keyed, 1)
+    expect(patchKey({ ...keyed, contentKey: '100644 100644 abc 33188 12 2.5 2.5' }, 1)).not.toBe(before)
+    expect(patchKey({ ...keyed, additions: 3 }, 1)).not.toBe(before)
+    expect(patchKey({ ...keyed, status: 'deleted' }, 1)).not.toBe(before)
+    expect(patchKey({ ...keyed, staged: true }, 1)).not.toBe(before)
+  })
+
+  // An older node sends no key, and an edit can keep both line counts, so every poll has to count.
+  it('moves on every poll for an entry the node did not key', () => {
+    expect(patchKey(c('a.ts', false), 1)).not.toBe(patchKey(c('a.ts', false), 2))
+  })
 })
 
 describe('groupChanges', () => {

@@ -362,6 +362,15 @@ export function visibleNodes(nodes: readonly TreeNode[], closed: ReadonlySet<str
 // Stable row identity: a file can appear in both groups.
 export const changeKey = (c: Pick<LocalChange, 'staged' | 'path'>): string => `${c.staged ? 'staged' : 'unstaged'}:${c.path}`
 
+// What one file's patch currently says, so the viewer can tell which files a poll moved
+// (DiffSource.contentKey). The node's `contentKey` is the objects and the stat behind the patch
+// (../server/localDiff.ts), so a poll that finds nothing new reads no patch. A node too old to send
+// one, or an entry it could not key, falls back to `poll`, the status read's count, which reads that
+// file again on every poll: the old behaviour, and the only safe one, since an edit can keep both
+// line counts.
+export const patchKey = (c: LocalChange, poll: number): string =>
+  `${changeKey(c)}:${c.status}:${c.oldPath ?? ''}:${c.additions}:${c.deletions}:${c.contentKey ?? `poll ${poll}`}`
+
 // The stack the diff column shows: every change in the selected row's staging area, in list order.
 //
 // One area at a time, not both concatenated. A file staged and then edited again appears in both

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import gitdiffParser from 'gitdiff-parser'
@@ -42,19 +42,24 @@ describe('parsePorcelainV2 (pure)', () => {
       ].join('\n'),
     )
     expect(out).toEqual([
-      { path: 'src/mod.ts', status: 'modified', staged: false, additions: null, deletions: null },
-      { path: 'src/staged-new.ts', status: 'added', staged: true, additions: null, deletions: null },
-      { path: 'src/gone.ts', status: 'deleted', staged: false, additions: null, deletions: null },
-      { path: 'src/both.ts', status: 'modified', staged: true, additions: null, deletions: null },
-      { path: 'src/both.ts', status: 'modified', staged: false, additions: null, deletions: null },
-      { path: 'notes.md', status: 'untracked', staged: false, additions: null, deletions: null },
+      { path: 'src/mod.ts', status: 'modified', staged: false, additions: null, deletions: null, contentKey: '100644 100644 def' },
+      { path: 'src/staged-new.ts', status: 'added', staged: true, additions: null, deletions: null, contentKey: '000000 100644 000 def' },
+      { path: 'src/gone.ts', status: 'deleted', staged: false, additions: null, deletions: null, contentKey: '100644 000000 abc' },
+      { path: 'src/both.ts', status: 'modified', staged: true, additions: null, deletions: null, contentKey: '100644 100644 abc def' },
+      { path: 'src/both.ts', status: 'modified', staged: false, additions: null, deletions: null, contentKey: '100644 100644 def' },
+      { path: 'notes.md', status: 'untracked', staged: false, additions: null, deletions: null, contentKey: '' },
     ])
   })
   it('parses renames with the orig path', () => {
     const { changes: out } = parsePorcelainV2('2 R. N... 100644 100644 100644 abc abc R100 src/new-name.ts\tsrc/old-name.ts')
     expect(out).toEqual([
-      { path: 'src/new-name.ts', oldPath: 'src/old-name.ts', status: 'renamed', staged: true, additions: null, deletions: null },
+      { path: 'src/new-name.ts', oldPath: 'src/old-name.ts', status: 'renamed', staged: true, additions: null, deletions: null, contentKey: '100644 100644 abc abc src/old-name.ts' },
     ])
+  })
+  it('keys each entry by the objects on its line, and a submodule not at all', () => {
+    // A submodule's new commit is not on its line, so no key could see it move.
+    expect(parsePorcelainV2('1 .M SC.. 160000 160000 160000 abc abc vendor/lib').changes[0]?.contentKey).toBeUndefined()
+    expect(parsePorcelainV2('1 .M N... 100644 100755 100755 abc abc a.ts').changes[0]?.contentKey).toBe('100755 100755 abc')
   })
   it('merges numstat per scope', () => {
     const { changes } = parsePorcelainV2('1 .M N... 100644 100644 100644 abc def a.ts')
@@ -82,7 +87,7 @@ describe('the branch headers', () => {
       upstream: 'origin/james/vnext',
       ahead: 2,
       behind: 5,
-      changes: [{ path: 'a.ts', status: 'modified', staged: false, additions: null, deletions: null }],
+      changes: [{ path: 'a.ts', status: 'modified', staged: false, additions: null, deletions: null, contentKey: '100644 100644 def' }],
     })
   })
 
@@ -106,7 +111,7 @@ describe('an unmerged file', () => {
 
   it('is conflicted rather than modified, and never staged', () => {
     expect(parsePorcelainV2(LINE).changes).toEqual([
-      { path: 'src/clash.ts', status: 'conflicted', staged: false, additions: null, deletions: null },
+      { path: 'src/clash.ts', status: 'conflicted', staged: false, additions: null, deletions: null, contentKey: '100644 100644 100644 100644 aaa bbb ccc' },
     ])
   })
 
@@ -210,7 +215,7 @@ describe('local diff over a real worktree', () => {
   it('modified file → LocalChange + a patch the existing diff parser accepts', async () => {
     writeFileSync(join(dir, 'src', 'a.ts'), 'line1\nCHANGED\nline3\n')
     const { changes } = await localStatus(dir)
-    expect(changes).toEqual([{ path: 'src/a.ts', status: 'modified', staged: false, additions: 1, deletions: 1 }])
+    expect(changes).toEqual([{ path: 'src/a.ts', status: 'modified', staged: false, additions: 1, deletions: 1, contentKey: expect.any(String) }])
     const { patch } = await localDiff(dir, 'src/a.ts', 'unstaged')
     expect(patch.startsWith('@@')).toBe(true)
     const [file] = gitdiffParser.parse(synth('src/a.ts', patch))
@@ -223,7 +228,7 @@ describe('local diff over a real worktree', () => {
   it('untracked file renders as an all-additions patch (--no-index exits 1 on success)', async () => {
     writeFileSync(join(dir, 'new.md'), 'hello\nworld\n')
     const { changes } = await localStatus(dir)
-    expect(changes).toEqual([{ path: 'new.md', status: 'untracked', staged: false, additions: null, deletions: null }])
+    expect(changes).toEqual([{ path: 'new.md', status: 'untracked', staged: false, additions: null, deletions: null, contentKey: expect.any(String) }])
     const { patch } = await localDiff(dir, 'new.md', 'unstaged')
     const [file] = gitdiffParser.parse(synth('new.md', patch))
     expect(file.hunks[0].changes.every((c) => c.type === 'insert')).toBe(true)
@@ -326,7 +331,7 @@ describe('local diff over a real worktree', () => {
     expect(git('show', 'HEAD:src/a.ts')).toContain('TRACKED')
     // Still untracked, so the commit walked past it.
     expect((await localStatus(dir)).changes).toEqual([
-      { path: 'stray.txt', status: 'untracked', staged: false, additions: null, deletions: null },
+      { path: 'stray.txt', status: 'untracked', staged: false, additions: null, deletions: null, contentKey: expect.any(String) },
     ])
     expect(Number(git('rev-list', '--count', 'HEAD').trim())).toBe(Number(before) + 1)
 
@@ -383,11 +388,76 @@ describe('local diff over a real worktree', () => {
     const status = await localStatus(dir)
     expect(status.operation).toBe('merge')
     const clash = status.changes.find((c) => c.path === 'src/a.ts')
-    expect(clash).toEqual({ path: 'src/a.ts', status: 'conflicted', staged: false, additions: null, deletions: null })
+    expect(clash).toEqual({ path: 'src/a.ts', status: 'conflicted', staged: false, additions: null, deletions: null, contentKey: expect.any(String) })
 
     // Git's own answer to "stage a conflict" is "mark it resolved".
     expect(await stageFiles(dir, ['src/a.ts'])).toEqual({ ok: true })
     expect((await localStatus(dir)).changes.find((c) => c.path === 'src/a.ts')).toMatchObject({ status: 'modified', staged: true })
+  })
+
+  // The pane re-reads a file's patch only when this key moves (DiffSource.contentKey), so it has to
+  // stay put across a read that changed nothing and move for every change a patch can show.
+  describe('contentKey', () => {
+    const keyOf = async (path: string, staged: boolean) =>
+      (await localStatus(dir)).changes.find((c) => c.path === path && c.staged === staged)?.contentKey
+
+    it('holds still across reads of a tree nobody touched, and moves for a same-size edit', async () => {
+      writeFileSync(join(dir, 'src', 'a.ts'), 'line1\nEDITED\nline3\n')
+      writeFileSync(join(dir, 'new.md'), 'hello\n')
+      const before = await localStatus(dir)
+      expect(before.changes.every((c) => typeof c.contentKey === 'string')).toBe(true)
+      expect((await localStatus(dir)).changes).toEqual(before.changes)
+
+      // Same length, same line counts: only the stat can see it.
+      writeFileSync(join(dir, 'src', 'a.ts'), 'line1\nEDITEX\nline3\n')
+      const after = await localStatus(dir)
+      const a = (status: typeof before) => status.changes.find((c) => c.path === 'src/a.ts')
+      const md = (status: typeof before) => status.changes.find((c) => c.path === 'new.md')
+      expect(a(after)).toMatchObject({ additions: 1, deletions: 1 })
+      expect(a(after)?.contentKey).not.toBe(a(before)?.contentKey)
+      expect(md(after)?.contentKey).toBe(md(before)?.contentKey)
+    })
+
+    it('moves for a mode change', async () => {
+      writeFileSync(join(dir, 'src', 'a.ts'), 'line1\nEDITED\nline3\n')
+      const before = await keyOf('src/a.ts', false)
+      chmodSync(join(dir, 'src', 'a.ts'), 0o755)
+      expect(await keyOf('src/a.ts', false)).not.toBe(before)
+    })
+
+    it('follows the index for staging, and survives a commit that leaves the working-tree patch alone', { timeout: 15_000 }, async () => {
+      const file = join(dir, 'src', 'a.ts')
+      writeFileSync(file, 'line1\nONE\nline3\n')
+      await stageFiles(dir, ['src/a.ts'])
+      writeFileSync(file, 'line1\nTWO\nline3\n')
+      const staged = await keyOf('src/a.ts', true)
+      const unstaged = await keyOf('src/a.ts', false)
+
+      // Staging the second edit moves the index: the staged patch changed, and so did what the
+      // working tree is compared against. The file on disk did not change.
+      await stageFiles(dir, ['src/a.ts'])
+      writeFileSync(file, 'line1\nTHREE\nline3\n')
+      const staged2 = await keyOf('src/a.ts', true)
+      const unstaged2 = await keyOf('src/a.ts', false)
+      expect(staged2).not.toBe(staged)
+      expect(unstaged2).not.toBe(unstaged)
+
+      // Committing moves HEAD to the index. The unstaged patch is the index against the disk, and
+      // neither moved, so neither does its key.
+      expect(await commitStaged(dir, 'feat: two')).toEqual({ ok: true })
+      expect(await keyOf('src/a.ts', true)).toBeUndefined()
+      expect(await keyOf('src/a.ts', false)).toBe(unstaged2)
+
+      // Unstaging after a second stage puts the index back, which the working-tree side sees.
+      await stageFiles(dir, ['src/a.ts'])
+      await unstageFiles(dir, ['src/a.ts'])
+      expect(await keyOf('src/a.ts', false)).toBe(unstaged2)
+    })
+
+    it('names the old path of a rename', async () => {
+      git('mv', 'src/a.ts', 'src/b.ts')
+      expect(await keyOf('src/b.ts', true)).toMatch(/ src\/a\.ts$/)
+    })
   })
 
   it('stripToHunks drops the git header only', () => {

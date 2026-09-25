@@ -1,3 +1,4 @@
+import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
@@ -13,7 +14,7 @@ import type { DiffSource } from './source'
 // `DiffPane` read every file's status through it inside one memo over all files. Now a status is a
 // store key the row itself reads. Parsed files now publish by fetch batch, and off-screen batches may
 // coalesce further in an idle turn.
-const spy = vi.hoisted(() => ({ rowBuilds: 0, tokenizes: 0 }))
+const spy = vi.hoisted(() => ({ rowBuilds: 0, tokenizes: 0, lastParsed: [] as { file: { path: string; patch?: string | null } }[] }))
 
 vi.mock('../../kit/diff/diffModel', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../kit/diff/diffModel')>()
@@ -21,6 +22,7 @@ vi.mock('../../kit/diff/diffModel', async (importOriginal) => {
     ...actual,
     buildRenderableRows: (...args: Parameters<typeof actual.buildRenderableRows>) => {
       spy.rowBuilds++
+      spy.lastParsed = args[0]
       return actual.buildRenderableRows(...args)
     },
   }
@@ -53,6 +55,7 @@ afterEach(() => {
   cleanups.splice(0).forEach((dispose) => dispose())
   spy.rowBuilds = 0
   spy.tokenizes = 0
+  spy.lastParsed = []
   vi.useRealTimers()
 })
 
@@ -97,4 +100,64 @@ describe('hydrating a large diff', () => {
     expect(spy.rowBuilds).toBeLessThanOrEqual(FILES / 4 + 12)
     expect(spy.rowBuilds).toBeGreaterThan(1)
   }, 40_000)
+})
+
+// A working tree's content signature moves on every poll (the changes pane), and a source that keys
+// each file tells the viewer which ones actually moved. Counted in patch reads, which for the changes
+// pane are two git spawns each on the node.
+describe('a content change under the same file set', () => {
+  const mountKeyed = () => {
+    const files = Array.from({ length: 5 }, (_, index) => ({ ...file(index), patch: null }))
+    const [keys, setKeys] = createSignal(new Map(files.map((entry) => [entry.path, 'k0'])))
+    const [poll, setPoll] = createSignal(0)
+    const fetched: string[] = []
+    const bodies = new Map<string, string>()
+    const source: DiffSource = {
+      scope: { routeKey: 'keyed', kind: 'test' } as unknown as DiffSource['scope'],
+      files: () => files,
+      loading: () => false,
+      signature: () => 'keyed',
+      // Moves on every poll, the way the changes pane's did before it keyed its files.
+      contentSignature: () => `${poll()}:${[...keys().values()].join()}`,
+      contentKey: (path) => keys().get(path) ?? '',
+      selectedPath: () => '',
+      cachedFile: () => null,
+      fetchPatches: async (paths) => {
+        fetched.push(...paths)
+        return paths.map((path) => ({ ...files.find((entry) => entry.path === path)!, patch: bodies.get(path) ?? file(0).patch }))
+      },
+      canComment: () => false,
+      invalidate: () => {},
+      draftPrefix: 'keyed',
+      find: { commandId: 'test.find.keyed', description: 'Find', category: 'navigation' },
+    }
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
+    const host = document.createElement('div')
+    document.body.append(host)
+    cleanups.push(render(() => (
+      <QueryClientProvider client={client}><DiffPane source={source} /></QueryClientProvider>
+    ), host))
+    cleanups.push(() => host.remove())
+    return { files, fetched, bodies, setKeys, setPoll }
+  }
+
+  it('reads nothing when no key moved, and only the file whose key did', async () => {
+    const { files, fetched, bodies, setKeys, setPoll } = mountKeyed()
+    await vi.waitFor(() => expect(fetched).toHaveLength(5), { timeout: 4_000 })
+
+    setPoll(1)
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(fetched).toHaveLength(5)
+
+    const moved = files[3]!.path
+    const builds = spy.rowBuilds
+    bodies.set(moved, '@@ -1 +1 @@\n-const a = 3\n+const a = MOVED\n')
+    setKeys((current) => new Map(current).set(moved, 'k1'))
+    await vi.waitFor(() => expect(fetched).toHaveLength(6), { timeout: 4_000 })
+    await new Promise((resolve) => setTimeout(resolve, 300))
+    expect(fetched.slice(5)).toEqual([moved])
+    // And the row model is rebuilt with it, rather than waiting for something else to rebuild the list.
+    expect(spy.rowBuilds).toBeGreaterThan(builds)
+    expect(spy.lastParsed.find((parsed) => parsed.file.path === moved)?.file.patch).toContain('MOVED')
+  })
 })

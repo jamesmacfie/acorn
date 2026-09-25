@@ -10,6 +10,11 @@ export type LocalChange = {
   staged: boolean
   additions: number | null
   deletions: number | null
+  // Moves whenever this entry's patch could have moved, so a reader holding the patch knows whether to
+  // read it again. The modes and objects git reports for the HEAD and index sides, plus a stat of the
+  // file on disk for the working-tree side, which git has not hashed. Optional: an older node does not
+  // send it, and a submodule, whose new commit git does not report, has none.
+  contentKey?: string
 }
 
 // Everything the Changes pane draws, from one `git status --porcelain=v2 --branch` read. Two reads
