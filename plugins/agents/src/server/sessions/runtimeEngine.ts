@@ -23,6 +23,7 @@ import { AgentAttachmentStore } from './attachmentStore'
 import { AgentArtifactStore } from './artifactStore'
 import { DurableAgentEventBuffer, type PendingAgentEvent } from './durableEventBuffer'
 import { AgentStore } from './store'
+import { clientEventRecord } from './rowMapping'
 import {
   decideAgentCommand,
   eventSubagentId,
@@ -729,7 +730,8 @@ export class ManagedAgentEngine {
     // `unread` back must be sent even though the last row record() sent also said `unread`.
     if (frame.channel === 'agent:session') this.sentRows.set(frame.session.id, listedRow(frame.session))
     else if (frame.channel === 'agent:deleted') this.sentRows.delete(frame.sessionId)
-    this.publish?.(frame)
+    // The socket gets the record without its search text; the node's own listeners keep it.
+    this.publish?.(frame.channel === 'agent:event' ? { ...frame, event: clientEventRecord(frame.event) } : frame)
     for (const listener of this.listeners) listener(frame)
     void this.webhooks.accept(frame).catch((error) => {
       webhookLog.warn(`failed to queue delivery: ${describeError(error).message}`)

@@ -79,6 +79,12 @@ export const mapAgentEvent = (row: typeof schema.agentEvents.$inferSelect): Agen
   createdAt: row.createdAt,
 })
 
+/** A record as a client receives it, over HTTP or the socket: without `searchText`. That column is the
+ *  search index's input, no client reads it, and on a tool row it repeats the title, input and output
+ *  the event already carries. It was a third of the agent socket's bytes. Export and the node's own
+ *  readers keep the whole record. */
+export const clientEventRecord = ({ searchText: _, ...record }: AgentEventRecord): AgentEventRecord => record
+
 export const mapAgentRequest = (row: typeof schema.agentRequests.$inferSelect): AgentRequest => ({
   id: row.id,
   sessionId: row.sessionId,

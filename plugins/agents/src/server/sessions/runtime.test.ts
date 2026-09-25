@@ -586,6 +586,7 @@ describe('managed agent runtime conformance', () => {
     const registry = new AgentDriverRegistry()
     registry.registerNative('fake', () => new FakeAgentDriver())
     const published: number[] = []
+    const searchTexts: unknown[] = []
     const lifecycle: AgentLifecycleFrame[] = []
     runtime = new ManagedAgentRuntime({
       db: pluginDb.db,
@@ -597,6 +598,7 @@ describe('managed agent runtime conformance', () => {
       registry,
       publish: (frame) => {
         if (frame.channel === 'agent:event') published.push(frame.event.seq)
+        if (frame.channel === 'agent:event' && 'searchText' in frame.event) searchTexts.push(frame.event.searchText)
         if (frame.channel.startsWith('plugin:agents:')) lifecycle.push(frame as AgentLifecycleFrame)
       },
     })
@@ -624,6 +626,9 @@ describe('managed agent runtime conformance', () => {
     )
     expect(published).toEqual([...published].sort((a, b) => a - b))
     expect(snapshot.events.some((event) => event.event.type === 'assistant_message')).toBe(true)
+    // The socket leaves the search text out; the node's own readers, like this wait, keep it.
+    expect(searchTexts).toEqual([])
+    expect(snapshot.events.some((event) => typeof event.searchText === 'string')).toBe(true)
     expect(lifecycle.filter((frame) => frame.channel === 'plugin:agents:turn-changed')).toEqual([
       { channel: 'plugin:agents:turn-changed', taskId: seed.taskId, sessionId: session.id, turnId: turn.id, source: 'interactive', status: 'queued', attempt: 0 },
       { channel: 'plugin:agents:turn-changed', taskId: seed.taskId, sessionId: session.id, turnId: turn.id, source: 'interactive', status: 'dispatching', attempt: 1 },

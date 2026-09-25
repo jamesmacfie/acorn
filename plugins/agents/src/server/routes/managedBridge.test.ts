@@ -119,6 +119,29 @@ describe('the snapshot a client reads', () => {
     expect((await store.exportSnapshot(session.id)).events).toHaveLength(6)
   })
 
+  it('leaves the search text out of both pages, and keeps it for export', async () => {
+    const session = await store.createSession({
+      taskId: randomUUID(),
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: {},
+    }, PROVIDER)
+    await store.recordEvent(session.id, null, { type: 'tool', tool: { id: 'cmd', title: 'ls', output: 'README.md' } })
+
+    const reads = [
+      await bridge().snapshot(session.id),
+      await bridge().snapshot(session.id, 0, 2_000, true),
+      await bridge().events(session.id),
+      await bridge().events(session.id, 0, 500, true),
+    ]
+    for (const read of reads) {
+      expect(read.events).toHaveLength(1)
+      expect(read.events[0]).not.toHaveProperty('searchText')
+    }
+    expect((await store.exportSnapshot(session.id)).events[0].searchText).toBe('ls README.md')
+  })
+
   it('projects delegation visibility onto the bounded session list', async () => {
     const session = await store.createSession({
       taskId: randomUUID(),

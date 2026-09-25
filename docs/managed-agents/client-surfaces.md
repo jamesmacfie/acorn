@@ -367,6 +367,12 @@ first visit: the read starts from the beginning.
 written by hand into the migrations (docs/data-layer.md § Migrations). Agent Center's search and the
 archive page's search provider (docs/plugins.md § Search providers) both read it.
 
+**The search text stays on the node.** An event record's `searchText` is the index's input, and no
+client reads it. On a tool row it repeats the title, input and output the event already carries, which
+made it a third of the agent socket's bytes. The snapshot route, the `/events` pages and the
+`agent:event` frame leave it out (`clientEventRecord` in `server/sessions/rowMapping.ts`). Export, the
+wait route and the node's own readers still get the whole record.
+
 **A streamed message is indexed once, on its first event.** A reply arrives as many `append` events,
 and indexing each one on its own meant a search for two words only matched when both landed in the
 same fragment. A measured database held 148,570 assistant rows averaging 21 characters. Now a fragment
