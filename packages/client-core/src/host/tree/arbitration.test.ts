@@ -80,13 +80,13 @@ describe('resolveSlot', () => {
   it('draws the owner’s default when nobody matches', () => {
     const declared = point()
     contributor('images', ['image/*'])
-    expect(resolveSlot(declared, 'text/csv', undefined)).toEqual({ occupants: [], overflow: 0, why: 'default' })
+    expect(resolveSlot(declared, 'text/csv', () => undefined)).toEqual({ occupants: [], overflow: 0, why: 'default' })
   })
 
   it('gives the box to a single match with nobody having to decide', () => {
     const declared = point()
     contributor('images', ['image/*'])
-    const outcome = resolveSlot(declared, 'image/png', undefined)
+    const outcome = resolveSlot(declared, 'image/png', () => undefined)
     expect(outcome.why).toBe('match')
     expect(outcome.occupants.map((entry) => entry.pluginId)).toEqual(['images'])
   })
@@ -95,7 +95,7 @@ describe('resolveSlot', () => {
     const declared = point()
     contributor('images', ['image/*'])
     contributor('thumbs', ['image/png'])
-    const outcome = resolveSlot(declared, 'image/png', undefined)
+    const outcome = resolveSlot(declared, 'image/png', () => undefined)
     expect(outcome).toMatchObject({ occupants: [], why: 'tie', overflow: 2 })
   })
 
@@ -103,10 +103,23 @@ describe('resolveSlot', () => {
     const declared = point()
     contributor('images', ['image/*'])
     contributor('thumbs', ['image/png'])
-    expect(resolveSlot(declared, 'image/png', 'thumbs').occupants.map((entry) => entry.pluginId)).toEqual(['thumbs'])
+    expect(resolveSlot(declared, 'image/png', () => 'thumbs').occupants.map((entry) => entry.pluginId)).toEqual(['thumbs'])
     // A pick naming a plugin that no longer matches. Silently promoting the other candidate would mean
     // the box changed hands because somebody uninstalled something.
-    expect(resolveSlot(declared, 'image/png', 'gone')).toMatchObject({ occupants: [], why: 'tie' })
+    expect(resolveSlot(declared, 'image/png', () => 'gone')).toMatchObject({ occupants: [], why: 'tie' })
+  })
+
+  it('asks for the pick only when a tie needs settling', () => {
+    // Reading the pick costs a host a preferences query, and a transcript has a slot per tool card.
+    const declared = point()
+    contributor('images', ['image/*'])
+    const asked: string[] = []
+    const choice = (label: string) => () => { asked.push(label); return undefined }
+    resolveSlot(declared, 'text/csv', choice('none'))
+    resolveSlot(declared, 'image/png', choice('one'))
+    contributor('thumbs', ['image/png'])
+    resolveSlot(declared, 'image/png', choice('two'))
+    expect(asked).toEqual(['two'])
   })
 
   it('stacks every match up to the owner’s ceiling and counts the rest', () => {
@@ -123,7 +136,7 @@ describe('resolveSlot', () => {
         hash: 'abc',
       } as ExtensionContribution))
     }
-    const outcome = resolveSlot(declared, undefined, undefined)
+    const outcome = resolveSlot(declared, undefined, () => undefined)
     expect(outcome.occupants.map((entry) => entry.pluginId)).toEqual(['a', 'b'])
     expect(outcome).toMatchObject({ overflow: 1, why: 'match' })
   })

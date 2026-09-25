@@ -1,11 +1,9 @@
 import { For, Show, createMemo } from 'solid-js'
-import { createQuery } from '@tanstack/solid-query'
-import { PrefKeys } from '../../infra/persistence/prefKeys'
-import { prefsOptions } from '../../infra/queries'
 import { extensionPointRegistry } from '../registries/extensionPoints/extensionPoints'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { eligiblePlugins } from '../plugins/contributions'
-import { resolveSlot, slotChoiceFor, slotChoices } from '../tree/arbitration'
+import { resolveSlot } from '../tree/arbitration'
+import { createSlotChoice } from '../tree/slotChoice'
 import PluginFrame from './PluginFrame'
 import { frameBindingFor } from './register'
 
@@ -30,13 +28,12 @@ export function InlineSlot(props: {
   taskId?: string
   projectId?: string | null
 }) {
-  const prefs = createQuery(() => prefsOptions(true))
+  const choice = createSlotChoice(() => props.point, () => props.key)
 
   const resolved = createMemo(() => {
     const point = extensionPointRegistry.get(props.point)
     if (!point || point.kind !== 'rectangle') return null
-    const choices = slotChoices(prefs.data?.[PrefKeys.remoteSlots])
-    return resolveSlot(point, props.key, slotChoiceFor(choices, props.point, props.key))
+    return resolveSlot(point, props.key, choice)
   })
 
   // How many the owner's own ceiling left out. Read here for the same reason `Slot` reads it: each

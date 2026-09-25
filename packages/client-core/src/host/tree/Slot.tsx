@@ -1,11 +1,9 @@
 import { For, Show, createEffect, createMemo, type JSX } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
-import { createQuery } from '@tanstack/solid-query'
-import { PrefKeys } from '../../infra/persistence/prefKeys'
-import { prefsOptions } from '../../infra/queries'
 import { extensionPointRegistry } from '../registries/extensionPoints/extensionPoints'
 import { RemoteTree } from './RemoteTree'
-import { resolveSlot, slotChoiceFor, slotChoices } from './arbitration'
+import { resolveSlot } from './arbitration'
+import { createSlotChoice } from './slotChoice'
 
 // A place in one plugin's tree where another plugin's tree may be grafted (docs/plugins.md §
 // Cooperative extension points, the `remote` kind).
@@ -95,21 +93,20 @@ export type SlotProps = {
 }
 
 export function Slot(props: SlotProps) {
-  const prefs = createQuery(() => prefsOptions(true))
+  const choice = createSlotChoice(() => props.point, () => props.key)
 
   const resolved = createMemo(() => {
     const point = extensionPointRegistry.get(props.point)
     // A point nobody declared, or one whose owner is not running here, has nothing to deliver into.
     // Silent, like every other unmatched contribution; the developer view is where an author finds out.
     if (!point || point.kind !== 'remote') return null
-    const choices = slotChoices(prefs.data?.[PrefKeys.remoteSlots])
     return {
       mode: point.mode ?? 'stack',
       // The owner's own declaration, read off the registry rather than off this call site: a `Slot` that
       // binds a handler the point never declared has bound nothing, which is what keeps the published
       // contract and the running one the same list.
       actions: point.actions ?? [],
-      outcome: resolveSlot(point, props.key, slotChoiceFor(choices, props.point, props.key)),
+      outcome: resolveSlot(point, props.key, choice),
     }
   })
   const outcome = () => resolved()?.outcome

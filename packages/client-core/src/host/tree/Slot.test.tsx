@@ -12,7 +12,9 @@ import type { Disposable } from '../../kit/lib/registry'
 // undecided, and a stack past `max` says how many were left out.
 
 vi.mock('../../infra/node/hostCapabilities', () => ({ hasHostCapability: () => true }))
-vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))
+// What the user picked in Settings → Plugins. When the query is created is ./slotChoice.test.tsx's.
+const prefs = vi.hoisted(() => ({ data: {} as Record<string, string> }))
+vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ get data() { return prefs.data } }) }))
 vi.mock('../../infra/queries', () => ({ prefsOptions: () => ({}) }))
 
 // The tree itself is the worker path, tested in TreeHost/workerHost. Here it only has to be
@@ -61,6 +63,7 @@ const draw = (element: () => Parameters<typeof render>[0]) => {
 afterEach(() => {
   for (const disposable of registered.reverse()) disposable.dispose()
   registered.length = 0
+  prefs.data = {}
 })
 
 describe('Slot', () => {
@@ -85,6 +88,14 @@ describe('Slot', () => {
     contributor('images', 'agents:attachment', ['image/*'])
     contributor('thumbs', 'agents:attachment', ['image/png'])
     expect(draw(() => () => <Slot point="agents:attachment" key="image/png">default</Slot>)).toBe('default')
+  })
+
+  it('draws the contributor the user picked to settle a tie', () => {
+    point()
+    contributor('images', 'agents:attachment', ['image/*'])
+    contributor('thumbs', 'agents:attachment', ['image/png'])
+    prefs.data = { remote_slots: JSON.stringify({ 'agents:attachment': 'thumbs' }) }
+    expect(draw(() => () => <Slot point="agents:attachment" key="image/png">default</Slot>)).toBe('tree:thumbs')
   })
 
   it('stacks up to the owner’s ceiling and discloses the rest as a count', () => {

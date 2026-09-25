@@ -1,19 +1,16 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createEffect, createMemo, For, Show, type JSX } from 'solid-js'
 import { Dynamic } from '../tree/renderer'
-import { createQuery } from '@tanstack/solid-query'
 import type { PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
 import type { Task } from '@acorn/client-core/infra/queries.ts'
 import type { PromoteTaskAction } from '@acorn/client-core/features/integrations'
-import { PrefKeys } from '@acorn/client-core/infra/persistence'
-import { prefsOptions } from '@acorn/client-core/infra/queries.ts'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { createFleetQuery } from '@acorn/client-core/infra/node'
 import {
   extensionDeliveries, extensionPointRegistry, type ExtensionContribution,
 } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
 import { chromeDeps, chromeKey } from '@acorn/client-core/host/chrome'
-import { resolveSlot, slotChoiceFor, slotChoices } from '@acorn/client-core/host/tree'
+import { createSlotChoice, resolveSlot } from '@acorn/client-core/host/tree'
 import type { OverlayPalette } from '@acorn/client-core/host/palette'
 import { RemoteTree } from '../plugins/RemoteTree'
 import { htmlLines } from './markdown'
@@ -222,16 +219,15 @@ export type SlotProps = {
  * of muted text rather than a `<span class="muted">`.
  */
 export function Slot(props: SlotProps) {
-  const prefs = createQuery(() => prefsOptions(true))
+  const choice = createSlotChoice(() => props.point, () => props.key)
 
   const resolved = createMemo(() => {
     const point = extensionPointRegistry.get(props.point)
     if (!point || point.kind !== 'remote') return null
-    const choices = slotChoices(prefs.data?.[PrefKeys.remoteSlots])
     return {
       mode: point.mode ?? 'stack',
       actions: point.actions ?? [],
-      outcome: resolveSlot(point, props.key, slotChoiceFor(choices, props.point, props.key)),
+      outcome: resolveSlot(point, props.key, choice),
     }
   })
   const outcome = () => resolved()?.outcome
