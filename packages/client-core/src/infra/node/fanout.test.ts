@@ -122,6 +122,22 @@ describe('fetchFleet', () => {
     expect(result.rows.find((row) => row.nodeId === 'b')?.freshness).toBe('offline')
   })
 
+  it('does not ask a local node the broker has not reported, and serves its cache instead', async () => {
+    // A relaunch: the fleet file lists the local node before the helper has adopted it, so the broker
+    // has no connection and would answer `Unknown node`.
+    _resetFleet()
+    installFleet([record('a', 'Node A', true), record('b', 'Node B')], [{ nodeId: 'b', state: 'online' }])
+    await refreshFleet()
+    clientFor('a').client.setQueryData(KEY, 'remembered')
+    const asked: string[] = []
+    const result = await fetchFleet(KEY, (nodeId) => {
+      asked.push(nodeId)
+      return Promise.resolve('fresh')
+    })
+    expect(asked).toEqual(['b'])
+    expect(result.rows.map((row) => [row.nodeId, row.data])).toEqual([['a', 'remembered'], ['b', 'fresh']])
+  })
+
   it('writes through each node\'s own cache, so a later single-node read is warm', async () => {
     await fetchFleet(KEY, (nodeId) => Promise.resolve(`from-${nodeId}`))
     expect(clientFor('a').client.getQueryData(KEY)).toBe('from-a')

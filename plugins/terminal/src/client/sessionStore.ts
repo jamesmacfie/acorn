@@ -71,10 +71,10 @@ export function initSessions(): () => void {
   const reconnect = wsOnReconnect(pull)
   const scope = onScopeEvicted((event) => {
     if (event.scope === 'task') activeByTask.delete(event.taskId)
-    if (event.scope === 'node-switched') {
-      clearSessions()
-      pull()
-    }
+    // No read here. The prime effect above reads the new node once it can answer. A read at the
+    // switch itself went out before that: at launch, when the remembered node had gone, it asked the
+    // local node before the broker had adopted it.
+    if (event.scope === 'node-switched') clearSessions()
   })
   return () => { stopPrime(); created(); scope(); channel.dispose(); reconnect(); clearSessions() }
 }

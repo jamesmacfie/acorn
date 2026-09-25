@@ -2,6 +2,7 @@
 // reactive part, and only the `hosts` project resolves Solid's browser build (plugins/vitest.shared.ts).
 import { expect, it, vi } from 'vitest'
 import { createSignal } from 'solid-js'
+import { evictScope } from '@acorn/plugin-api/testkit/client'
 
 const [testNodeId, setTestNodeId] = createSignal<string | null>('node-a')
 const [testNodeState, setTestNodeState] = createSignal<'offline' | 'online'>('offline')
@@ -35,7 +36,14 @@ it('reads once the node can answer, not at activation, and once per node', async
   await settle()
   expect(fetch).toHaveBeenCalledTimes(1)
 
+  // A switch to a node that cannot answer yet reads nothing until it can. The signal changes first
+  // and the eviction follows, which is the order setActiveNode uses.
+  setTestNodeState('offline')
   setTestNodeId('node-b')
+  evictScope({ scope: 'node-switched' })
+  await settle()
+  expect(fetch).toHaveBeenCalledTimes(1)
+  setTestNodeState('online')
   await settle()
   expect(fetch).toHaveBeenCalledTimes(2)
 
