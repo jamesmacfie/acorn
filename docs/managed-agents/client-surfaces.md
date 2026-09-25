@@ -243,7 +243,9 @@ it fails for any reason a selection can break, not only for the one it was writt
   so a name sits over its description rather than sharing a line with it. The list scrolls once it
   passes 280px, and the arrow keys scroll it themselves rather than calling `scrollIntoView`, which
   would be free to scroll the transcript behind the composer as well. Only `@` waits on a fetch, so a
-  command list that arrived with the session is never held behind the worktree walk. The `＋` picker
+  command list that arrived with the session is never held behind the worktree walk. That fetch starts
+  when the field first takes focus, not when the composer mounts: the list runs to about 145 KB, and
+  most visits to a task never type `@`. The `＋` picker
   still inserts the same tokens for anyone who would rather browse than type.
 - Hovering a coloured command or skill shows its description, through the app's `data-tip` tooltip.
   The mirror is inert except for those spans, which take the pointer and hand the caret straight back
