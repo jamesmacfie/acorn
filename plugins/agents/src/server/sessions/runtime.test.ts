@@ -204,12 +204,12 @@ class UsageLimitDriver implements AgentDriver {
           await options.onEvent({ type: 'assistant_message', text: 'Work completed before the limit.' })
           await options.onEvent({
             type: 'error',
-            code: 'usageLimitExceeded',
-            message: 'You have reached your usage limit.',
+            code: 'claude_turn_failed',
+            message: "Internal error: You've hit your session limit · resets 1:10pm (Pacific/Auckland)",
             retryable: false,
           })
           active = false
-          throw new Error('You have reached your usage limit.')
+          throw new Error("Internal error: You've hit your session limit · resets 1:10pm (Pacific/Auckland)")
         }
         await options.onEvent({ type: 'assistant_message', text: 'Finished after reset.' })
         await options.onEvent({ type: 'turn_completed', stopReason: 'end_turn' })

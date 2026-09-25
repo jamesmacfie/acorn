@@ -3,7 +3,7 @@ import type { AgentInputPart, AgentNormalizedEvent } from '../../contract/wire.t
 export const USAGE_CONTINUATION_GRACE_MS = 5_000
 
 const LIMIT_CODE = /(?:usage|rate)[_-]?limit|quota/i
-const LIMIT_MESSAGE = /(?:usage|rate) limit|usage window|quota (?:has been )?(?:reached|exceeded)|out of (?:plan )?usage/i
+const LIMIT_MESSAGE = /(?:usage|rate|session|weekly) limit|usage window|quota (?:has been )?(?:reached|exceeded)|out of (?:plan )?usage/i
 
 /** A broad provider-neutral hint. The usage collector is the authority that confirms depletion and
  * supplies the reset time, so matching an ordinary short rate limit here cannot schedule by itself. */
