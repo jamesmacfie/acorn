@@ -110,14 +110,15 @@ type PendingAttachment = { frames: ServerMsg[] }
 // **Emulation is a consequence of attachment.** There is an emulator here only while somebody is
 // watching. It used to run at full rate for every session from the moment it was spawned, and its
 // only reader is the snapshot `attach` takes — so a background build paid continuous ANSI parsing to
-// produce a screen nobody would ever ask for (docs/performance.md). The first
+// produce a screen nobody would ever ask for. The first
 // attach builds one and replays the raw ring into it; the last detach disposes it. Nothing else about
 // the ordering below changed.
 //
 // The price is scrollback: a cold attach can only rebuild from what the ring still holds, so history
 // older than the ring is gone and an alternate-screen program whose state depends on older bytes
-// redraws from its next output. That is recorded, with the reason it is the right trade, in
-// docs/performance.md § Scrollback beyond the ring.
+// redraws from its next output. That is the right trade: a megabyte of output through an unwatched
+// session costs 2.8 ms rather than 492 ms, and a cold attach pays a 20 ms rebuild once per tab
+// (measured 2026-09-03; docs/terminal.md § The screen, and who pays for it).
 export class TerminalDisplay {
   private readonly live = new Set<TerminalDisplaySink>()
   private readonly attaching = new Map<TerminalDisplaySink, PendingAttachment>()

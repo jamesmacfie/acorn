@@ -24,9 +24,6 @@ behaviour described in the owning documentation.
 4. [Reset and versioning](./reset-and-versioning.md): exact reset policy and version-1 transition.
 5. [Refused alternatives](./refused.md): what to retain and why.
 
-The desktop performance plan written after the reset lives in [performance/](./performance/README.md).
-It is a separate proposal, not one of the tickets below.
-
 ## Implementation order
 
 The tickets were implemented in order. The dependencies below are minimum prerequisites, not permission

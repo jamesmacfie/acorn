@@ -183,8 +183,10 @@ each per window rather than one per client. The node drops every entry for a pat
 it, runs in flight included, which covers a stage, a commit, a discard, a push, an editor save, a
 worktree created, and a terminal session's command going quiet. A change made outside acorn shows up
 on the next poll past the window.
-There is no filesystem watcher, and [performance.md](./performance.md) holds the argument and the
-condition that would change it.
+There is no filesystem watcher. One would be a handle per directory where recursive `fs.watch` is
+missing, a second source of truth about "dirty" beside git's, and a stream of events to debounce into
+this same coalesced read. It is worth building only when a change made outside acorn has to appear in
+under two seconds with no client asking.
 
 **The cache serves reads, never a refusal.** `removeWorktree` refuses to delete a worktree with
 uncommitted changes unless the caller forces it, and a stale "clean" reaching that guard would destroy

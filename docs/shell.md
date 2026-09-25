@@ -376,9 +376,9 @@ sets `binaryType = 'arraybuffer'`, peels the node id, and hands the rest to
 that reads the session id and the one place the bytes become text. So a busy build's output crosses two
 process boundaries with two copies and no parse, where it used to be JSON-escaped once per attached
 socket on the node and stringified again here. Request and response bodies stay base64 in the JSON
-messages: nothing else on this wire is measured in frames per second
-([performance.md](./performance.md) § Replacing base64 on the helper
-wire ahead of a measurement).
+messages: nothing else on this wire is measured in frames per second, and the largest body measured,
+the agent snapshot's first page at about 2 MB on 2026-09-03, is an order of magnitude under the
+ceiling `apps/desktop/src/shell/wire.ts` names.
 
 The file dialogs are the folder picker, `pick_files`, and `save_file`. The last two carry bytes, not
 paths: the renderer sends a byte array to save and receives one per file it picked, base64 in both

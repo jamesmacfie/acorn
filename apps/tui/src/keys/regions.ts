@@ -120,9 +120,7 @@ const groups: Group[] = []
 // And the same regions by their box and by their ref, because every question this module asks about a
 // region is one of those two lookups inside a walk of the retained tree: `stopsIn` asks "is this child
 // a region" of every node it visits, `regionOf` asks it of every ancestor, and `groupAt` resolves the
-// claim on every move. A linear scan inside a walk is O(nodes × regions) where O(depth) would do,
-// which is what phase 9 of the performance programme is about
-// (docs/performance.md § 2026-09-03 — phase 9).
+// claim on every move. A linear scan inside a walk is O(nodes × regions) where O(depth) would do.
 //
 // The array stays, because ordering is the one thing it is good at and `ordered()` is the only reader
 // that needs it (§ ordered). The maps are written where a region registers and deleted where it goes,

@@ -71,7 +71,7 @@ describe('local data permissions', () => {
     chmodSync(old, 0o644)
     // Already right, and it has to stay untouched: `chmod` on a correct file is a syscall that changes
     // nothing, and there are thousands of these on a real cache
-    // (docs/performance.md § 2026-09-03 — phase 3).
+    // (2,975 of them cost 102 ms of boot, measured 2026-09-03).
     const settled = join(dir, 'patch_settled')
     writeFileSync(settled, 'settled', { mode: 0o600 })
     const before = statSync(settled, { bigint: true }).ctimeNs

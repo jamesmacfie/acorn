@@ -35,7 +35,7 @@ export async function reconcilePluginChange(): Promise<void> {
 /** Subscribe for the life of the shell: the node's own reload broadcast, and a node becoming reachable.
  *
  * The second one is what runs the first useful pass. Every host can start its renderer before the node
- * it just spawned is up (docs/performance.md § Every host draws first), and
+ * it just spawned is up (docs/frontend.md § Startup readiness), and
  * `syncPluginDistribution` asks only nodes the broker calls reachable — at boot that is none of them,
  * and the fleet list is still empty besides.
  * So a pass fired from a composition root found no rosters, cached no bundles and registered no

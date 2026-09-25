@@ -21,8 +21,7 @@ vi.mock('../../transport/wsHub', async (importOriginal) => ({
 //
 // It used to `await getProject` inside a loop over rows, so a hundred tasks in one project was a
 // hundred identical `SELECT`s, on the node's single event loop, on every `tasks:changed` — and the
-// list is what every client refetches when one arrives
-// (docs/performance.md § 2026-09-03 — phase 5).
+// list is what every client refetches when one arrives.
 
 const makeApp = () => {
   const app = new Hono<AppEnv>()

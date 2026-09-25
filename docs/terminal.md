@@ -58,8 +58,8 @@ keep the ring alone.
 **The price is scrollback, and it is deliberate.** A cold attach can only rebuild from what the ring
 still holds, so history older than 256 KB is gone and an alternate-screen program whose state depends
 on older bytes redraws from its next output. If a class of session turns up where the full history
-matters, the answer is a bigger ring for that class, not a parser running for ever
-([performance.md](./performance.md) § Scrollback beyond the ring).
+matters, the answer is a bigger ring for that class, not a parser running for ever.
+What a cold attach pays instead is a rebuild of about 20 ms, once per tab (measured 2026-09-03).
 
 **The ring is a list of chunks, not a string.** 256 KB of recent raw output, kept as the buffers it
 arrived in with a running byte count, dropping from the head once the budget is spent. It used to be

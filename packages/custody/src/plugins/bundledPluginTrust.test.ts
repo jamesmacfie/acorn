@@ -57,9 +57,8 @@ describe('bundled plugin client trust', () => {
     expect(trust.decisionFor('rollbar', hash)?.partial).toBeUndefined()
   })
 
-  // The whole second launch, which is the shape the performance programme cared about: sweep the cache,
-  // trust the bundled roster, and write nothing at all because nothing changed
-  // (docs/performance.md § 2026-09-03 — phase 3).
+  // The whole second launch: sweep the cache, trust the bundled roster, and write nothing at all
+  // because nothing changed.
   it('writes nothing under the plugin cache on a second launch with unchanged bundles', () => {
     const resources = temporary('acorn-bundled-trust-idempotent-')
     const userData = temporary('acorn-bundled-trust-user-')

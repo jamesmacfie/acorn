@@ -50,8 +50,7 @@ export const STOP = 42
  * cache off for the whole process, and the footer, which asks per render, paid a full collect over
  * every active layer each time. Hundreds of bindings carried that matcher, one per bare key per
  * control on screen. One layer that comes and goes says the same thing and bumps the engine's cache
- * version twice per field rather than never letting it settle
- * (../../docs/performance.md § 2026-09-03 — phase 9).
+ * version twice per field rather than never letting it settle.
  *
  * The number is the whole of the design. Everything below it is a layer that reaches a focused field
  * from somewhere else — a collection around it, a viewport's page keys, the screen's own column

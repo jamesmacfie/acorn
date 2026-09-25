@@ -137,9 +137,8 @@ describe('node-adopt checks the vouched fingerprint against the certificate', ()
 // The broker opens a socket to every paired node and pushes every frame across this boundary, and the
 // renderer drops whatever is not the active node on arrival
 // (@acorn/client-core/infra/node/wsClient.ts). So an N-node fleet paid two process boundaries, a
-// stringify and a parse per frame to deliver frames that were then thrown away
-// (docs/performance.md). Nobody has to tell the helper which node is active:
-// every request the renderer makes names one.
+// stringify and a parse per frame to deliver frames that were then thrown away.
+// Nobody has to tell the helper which node is active: every request the renderer makes names one.
 describe('the helper forwards only the active node', () => {
   const connect = async () => {
     const { helper } = stubHelper()

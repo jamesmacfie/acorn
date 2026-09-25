@@ -23,7 +23,7 @@ const dist = resolve(distFlag === -1 ? resolve(import.meta.dirname, '../dist') :
 
 // Measured at 1,095,346 B on 2026-09-11, and rounded up by about 3% so an unrelated comment does not
 // turn the build red, which is the rule every ceiling here has had. The history, because each step
-// moved it for a different reason (docs/performance.md § The eager closure, and the new ceiling):
+// moved it for a different reason:
 //
 //   1,114,282 B  the performance programme's phase 0, its first measurement.
 //   1,024,422 B  its phase 1 made the GitHub plugin's PR pane a lazy contribution. The kit table this

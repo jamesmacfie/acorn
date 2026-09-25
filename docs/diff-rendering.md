@@ -191,7 +191,7 @@ its own key. It used to keep them in a `Map` behind one version counter, which m
 like a change to every file: `DiffPane` reads a status per file, so each of the two or three publishes
 per file rebuilt the row model for the whole diff. On a 200-file pull request that was 226 rebuilds of
 every file's rows during load, then 102 after status became per-file state
-([performance.md](./performance.md) § 2026-09-03 — phase 8).
+(measured 2026-09-03).
 
 The hydrator keeps a plain `Map` beside the store for its own queue, and that is deliberate: its pump
 reads statuses synchronously from whatever reactive scope called `reset()`, and reading the store there

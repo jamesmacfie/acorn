@@ -208,8 +208,7 @@ const watchLayers = (engine: { on: (name: 'state', fn: () => void) => () => void
  *  The footer draws once per render and a render happens for reasons that have nothing to do with the
  *  keyboard — a task list arriving, a terminal frame, a toast. `getActiveKeys` walks every active
  *  layer, so asking it per render was the cost this cache removes: the answer only moves when one of
- *  the four things below moves, and each of them is a signal or an identity
- *  (docs/performance.md § 2026-09-03 — phase 9). */
+ *  the four things below moves, and each of them is a signal or an identity. */
 let last: {
   node: Renderable | null
   overlays: readonly unknown[]

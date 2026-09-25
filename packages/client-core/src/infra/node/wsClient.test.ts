@@ -84,8 +84,7 @@ describe('wsClient', () => {
     expect(notices).toEqual(['repo-config-trust'])
   })
 
-  // Phase 5 split the old content-free `term:status` ping in two and gave what is left of it a plugin
-  // id (docs/performance.md § 2026-09-03 — phase 5).
+  // The old content-free `term:status` ping is split in two, and what is left of it names a plugin id.
   it('hands a status subscriber the plugin id the frame named, and nothing when it named none', () => {
     const named: (string | undefined)[] = []
     client.wsOnStatus((pluginId) => named.push(pluginId))

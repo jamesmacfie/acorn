@@ -288,7 +288,7 @@ and a child index built once, so an op is judged against the tree the ops before
 would have left. A `remove` takes its whole subtree out of that projection by walking down the index,
 which means a batch costs its own ops rather than the tree it is applied to — emptying a tree at the
 5,000-node cap is 71 ms rather than the 1.1 seconds the earlier scan-every-node walk took
-([performance.md](../performance.md) § The tree host's remove).
+(measured 2026-09-03).
 
 **Eleven events, host to sandbox**: `onPress`, `onChange` (the committed value), `onSubmit`,
 `onSelect`, `onActivate`, `onToggle`, `onOpenChange`, `onExpand`, `onDismiss`, `onPick`, `onRemove`.
