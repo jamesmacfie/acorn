@@ -228,6 +228,11 @@ schemas are created and deleted by core on every execution path.
 Profiles are separate from the managed-agent drivers. A raw terminal can work without a managed
 session, and a managed session can use a provider driver without owning a terminal tab.
 
+The node lists profiles by running `which` for tmux and each agent CLI, which blocks its event loop
+for about 20 ms. The terminal drawer therefore reads the list through the query cache with a
+five-minute stale time. Nothing reports a CLI landing on `PATH`, so a newly installed one appears
+within five minutes or on reload.
+
 ## Handoff
 
 The agents plugin owns the managed session. Terminal publishes a narrow session-roster and handoff

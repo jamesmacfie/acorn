@@ -286,7 +286,10 @@ arrives, ahead of any promise-shaped work already in flight, because a route han
 blocked realm would otherwise leave both sides waiting on each other for good. And a call that goes
 unanswered for five seconds throws instead of waiting, so a plugin worker that crashed or wedged
 costs one call rather than the whole node. Anything a plugin exposes across a synchronous seam has to
-return straight away.
+return straight away. Each end keeps the shared buffers its answers came back in and reuses one once
+its answer is read, because a fresh 4 MiB buffer per call is freed only when both threads collect, and
+on a busy node that held about 450 MB. A buffer whose call timed out is dropped, since the other realm
+may still write to it.
 
 Promise-shaped calls run concurrently. One route waiting on a slow third party does not stop the
 plugin answering anything else, which matches how a compiled plugin already behaves.

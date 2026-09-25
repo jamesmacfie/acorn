@@ -14,7 +14,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | Folder | What it is | Status |
 | --- | --- | --- |
-| [legacy/](./legacy/README.md) | Architecture review, plugin ownership, compatibility removal, and a coordinated version-1 reset. Evidence, target contracts, and 13 implementation tickets. | Tickets 01–12 implemented; ticket 13 acceptance recorded with host limits, 2026-09-23. |
 | [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; nothing blocks it. |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
@@ -31,12 +30,10 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [kimi.md](./kimi.md) | Kimi Code CLI as a contributed tier 1 harness: the manifest, the four declarations to get right, and the Kimi usage API research behind the optional probes. | Proposal, 2026-09-18. Not started. |
 | [message.md](./message.md) | Agent-to-agent messaging for delegated sessions: what six reference apps do, and what is left after reports to the owner shipped. | Reports, the role note, and sender labels shipped 2026-09-24; the blocked-request wake and the children row remain. |
 | [pluginsearch.md](./pluginsearch.md) | Search within Linear, Rollbar, and GitHub lists beyond the loaded rows while retaining project mappings and state. | Proposal, 2026-09-24. Not started. |
-| [rail-tab.md](./rail-tab.md) | Rail controls and status markers. | Slices 1 and 2 shipped; slice 3 superseded by the `core:task` annotation point. |
+| [rail-tab.md](./rail-tab.md) | Rail controls and status markers, and closing the gaps in the `core:task` annotation point that replaced loaded rail markers. | Rail control and marker allocator shipped; annotation freshness, the response budget, the node-bundle check and terminal markers remain, 2026-09-12. |
 | [remote.md](./remote.md) | Web client, mobile PWA, and a relay service. | Preparation items shipped; the rest waits on a web client. |
 | [scoll_fix.md](./scoll_fix.md) | Agent transcript scroll and focus repair: retained view state, stable row identity, consumable navigation intent, and cross-session regression coverage. | Implementation proposal, 2026-09-14. Reading position, row identity and reveal intent shipped; filter and disclosure state not built. |
-| [unarchive.md](./unarchive.md) | A page to search, preview, and restore archived tasks: what the verification found, where each part is written up, and what was left out. | Shipped, 2026-09-24. Manual smoke owed; more search providers not built. |
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
-| [data-capability.md](./data-capability.md) | Historical landing page for the host-owned `ctx.core.data` facet; the owning docs are `database.md`, `data-layer.md`, and the plugin manifest guide. | Shipped, 2026-09-16. |
 
 ## How these relate
 
@@ -192,6 +189,29 @@ the owning docs, and its decisions, refusals and numbers became a dated record. 
 `legacy/performance/`, which covered desktop startup, task switching, streaming work and memory. What
 that plan built is in the owning docs, and each change's before-and-after numbers are in its commit
 message. All three are in git history.
+
+`legacy/` was the architecture review and version-1 reset: thirteen tickets that gave each contract
+one owner and one representation, removed compatibility adoption, and reset every database to one
+initial migration. Tickets 01 to 12 shipped and ticket 13 recorded acceptance on 2026-09-23; the
+folder was deleted on 2026-09-26. The owning docs hold the contracts. What ticket 13 could not prove
+on a real host is recorded where it applies: the terminal client has no Terminal drawer receiver
+([tui.md](../tui.md) § What a plugin loses here), agent automation stages the built renderer because
+Vite's development proxy drops a cold module ([local-development.md](../local-development.md)), and
+the real-window checks the driver cannot reach (a Memory proposal approval, plugin trust, workflow
+promotion, native menus, dialogs and keychain prompts) stay manual.
+
+`unarchive.md` recorded the archive page: search, a read-only preview, and restore. Shipped
+2026-09-24 and deleted 2026-09-26. [workspaces-and-tasks.md](../workspaces-and-tasks.md) § Restoring
+a task owns the behaviour, [plugins.md](../plugins.md) § Search providers owns `ctx.search`, and
+[testing.md](../testing.md) item 79 is the manual smoke it owed. Left out on purpose: more search
+providers than core tasks and the agents plugin, a loaded-tier search route, search across active
+tasks, external-content FTS (it needs stable rowids and `agent_events` has a text key), opening an
+individually archived session in the preview, and bringing back containers, terminal sessions or
+scrollback.
+
+`data-capability.md` was the landing page for the host-owned `ctx.core.data` facet, shipped
+2026-09-16 and deleted 2026-09-26. [database.md](../database.md), [data-layer.md](../data-layer.md)
+and [the-manifest.md](../plugin-authoring/the-manifest.md) § Permissions own it.
 
 `notifications/` was six phases that stopped acorn notifying on every agent step. Shipped and deleted
 2026-09-02. [notifications.md](../notifications.md) owns all of it: the five states and the two
