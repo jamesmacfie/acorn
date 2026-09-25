@@ -5,6 +5,8 @@
 // holds 2,700 events. So everything here is about what one frame costs: it used to be two linear
 // scans, a copy of the whole array and a sort of an already-sorted array, plus a refetch of up to
 // 2,000 rows whenever a projected event arrived.
+import { readFileSync } from 'node:fs'
+import { isDeepStrictEqual } from 'node:util'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type {
   AgentEventRecord,
@@ -59,6 +61,9 @@ vi.mock('./managedClient', () => ({
 }))
 
 const { managedAgentStore } = await import('./managedStore')
+const { buildConversationItems, createConversationProjection } = await import('./conversationItems')
+const { foldToolEvents } = await import('../../shared/toolFold')
+const { foldUsageEvents } = await import('../../shared/usageFold')
 
 const SESSION = 's1'
 const session = {
@@ -509,4 +514,150 @@ describe('which snapshots the store keeps', () => {
     await new Promise((resolve) => setTimeout(resolve, 80))
     expect(snapshotCalls).not.toContain('z')
   })
+})
+
+// The transcript keeps its projection open and adds each streamed row to it rather than rebuilding
+// the whole session per event (conversationItems.ts § createConversationProjection). That is only
+// right if it always lands where a rebuild would, whatever the store did to the array: pushed a row,
+// merged a usage update into the line in place, seated a late frame behind the tail, or took a row the
+// node's fold already covered. So these drive the real store, a frame at a time, and compare the kept
+// projection with a fresh one after every frame.
+describe('the transcript projection a streaming session keeps', () => {
+  // mulberry32: a seeded stream, so a failure replays.
+  const seeded = (seed: number) => () => {
+    seed = (seed + 0x6d2b79f5) | 0
+    let t = Math.imul(seed ^ (seed >>> 15), 1 | seed)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4_294_967_296
+  }
+
+  // Shaped like a harness's stream: turns of text deltas, tool calls whose updates stream as appends
+  // and end on a whole output, subagents with their own runs, per-turn usage with a trailing turn-less
+  // update, plans, and closing lines that sometimes carry no turn.
+  const synthetic = (count: number, random: () => number): AgentEventRecord[] => {
+    const out: AgentEventRecord[] = []
+    const pick = <T,>(items: T[]): T => items[Math.floor(random() * items.length)]
+    const calls: { id: string; turnId: string | null; subagentId?: string }[] = []
+    const subagents: string[] = []
+    let turnId: string | null = null
+    let turns = 0
+    let message = 'm0'
+    const emit = (value: AgentNormalizedEvent, turn: string | null = turnId) => out.push(event(out.length + 1, value, turn))
+    while (out.length < count) {
+      const roll = random()
+      if (!turnId || roll < 0.03) {
+        if (turnId) {
+          emit({ type: 'turn_completed', stopReason: 'end_turn' }, random() < 0.5 ? null : turnId)
+          if (random() < 0.5) emit({ type: 'usage', usage: { cost: { amount: out.length, currency: 'USD' } } }, null)
+        }
+        turnId = `turn${++turns}`
+        emit({ type: 'user_message', text: 'go' })
+      } else if (roll < 0.25) {
+        if (random() < 0.1) message = `m${out.length}`
+        emit({ type: random() < 0.2 ? 'reasoning' : 'assistant_message', text: 'x', messageId: message, append: random() < 0.8,
+          ...(subagents.length && random() < 0.2 ? { subagentId: pick(subagents) } : {}) })
+      } else if (roll < 0.35) {
+        const call = { id: `call${out.length}`, turnId: random() < 0.1 ? null : turnId,
+          ...(subagents.length && random() < 0.3 ? { subagentId: pick(subagents) } : {}) }
+        calls.push(call)
+        emit({ type: 'tool', tool: { id: call.id, title: 'Run', kind: 'execute', status: 'running', subagentId: call.subagentId } }, call.turnId)
+      } else if (roll < 0.62 && calls.length) {
+        const call = pick(calls.slice(-6))
+        const shape = random()
+        emit({ type: 'tool', tool: shape < 0.6
+          ? { id: call.id, title: '', output: `o${out.length}\n`, outputAppend: true }
+          : shape < 0.8
+            ? { id: call.id, title: '', status: 'completed', output: 'whole\n' }
+            : { id: call.id, title: '', subagentId: random() < 0.5 ? call.subagentId : undefined } }, call.turnId)
+      } else if (roll < 0.74) {
+        emit({ type: 'usage', usage: { contextUsed: out.length * 10, ...(random() < 0.3 ? { contextSize: 200_000 } : {}), inputTokens: out.length } },
+          random() < 0.2 ? null : turnId)
+      } else if (roll < 0.8) {
+        const id = subagents.length && random() < 0.6 ? pick(subagents) : `sub${out.length}`
+        if (!subagents.includes(id)) subagents.push(id)
+        emit({ type: 'subagent', subagent: { id, title: random() < 0.5 ? 'Explore' : undefined, status: pick(['running', 'completed'] as const) } })
+      } else if (roll < 0.85) {
+        emit({ type: 'plan', entries: [{ id: 'p', text: `step ${out.length}`, status: 'in_progress' }] })
+      } else if (roll < 0.9) {
+        emit({ type: 'file_change', path: 'a.ts', ...(subagents.length && random() < 0.3 ? { subagentId: pick(subagents) } : {}) })
+      } else if (roll < 0.95) {
+        emit(random() < 0.5 ? { type: 'session_state', state: 'working' } : { type: 'diagnostic', level: 'info', message: 'note' })
+      } else {
+        emit({ type: 'user_message', text: 'brief', ...(subagents.length ? { subagentId: pick(subagents) } : {}) })
+      }
+    }
+    return out
+  }
+
+  // Load the first `loaded` rows the way the node serves them, folded a page at a time, then stream the
+  // rest. Now and then a frame arrives late, and now and then one the load already covered comes again.
+  // Returns how many frames it compared after.
+  const replay = async (
+    all: AgentEventRecord[],
+    { loaded, page, random, compare }: {
+      loaded: number
+      page: number
+      random: () => number
+      compare: (kept: unknown, fresh: unknown) => void
+    },
+  ): Promise<number> => {
+    const head = all.slice(0, loaded)
+    const pages: AgentEventRecord[][] = []
+    for (let at = 0; at < head.length; at += page) pages.push(foldToolEvents(foldUsageEvents(head.slice(at, at + page))))
+    servedPages = Object.fromEntries(pages.slice(1).map((events, at) => [pages[at].reduce((reach, record) =>
+      Math.max(reach, record.foldedThroughSeq ?? record.seq), 0), events]))
+    await seed({ session: { ...session, lastEventSeq: head.at(-1)?.seq ?? 0 }, events: pages[0] ?? [] })
+    const project = createConversationProjection()
+    project(events())
+
+    // The socket's copy of the load's last rows first: frames that landed while the read was out. The
+    // node folded the tail ones into earlier cards, so they seat after the array's last record and
+    // are already inside a card's reach (`foldedThroughSeq`).
+    const frames = [...head.slice(-8), ...all.slice(loaded)]
+    for (let at = 0; at + 1 < frames.length; at++) {
+      if (random() < 0.01) [frames[at], frames[at + 1]] = [frames[at + 1], frames[at]]
+    }
+    let steps = 0
+    for (const [at, record] of frames.entries()) {
+      if (head.length && random() < 0.02) frames.splice(at + 1, 0, head[Math.floor(random() * head.length)])
+      push({ channel: 'agent:event', event: record })
+      compare(project(events()), buildConversationItems(events()))
+      steps++
+    }
+    return steps
+  }
+
+  // The fast comparison first, and vitest's only for the diff when they differ: a few thousand
+  // frames each comparing a few hundred cards.
+  const exact = (kept: unknown, fresh: unknown) => {
+    if (!isDeepStrictEqual(kept, fresh)) expect(kept).toEqual(fresh)
+  }
+
+  it('matches a rebuild after every frame of a seeded stream', async () => {
+    for (const seed_ of [1, 2, 3, 4, 5]) {
+      const random = seeded(seed_)
+      const all = synthetic(1_500, random)
+      // Cut the load after a run of tool updates, so the node folds its last rows into earlier cards.
+      const update = (record: AgentEventRecord | undefined) => record?.event.type === 'tool' && record.event.tool.title === ''
+      const loaded = all.findIndex((_, at) => at >= 600 && update(all[at - 1]) && update(all[at - 2]) && update(all[at - 3]))
+      managedAgentStore.clear()
+      expect(await replay(all, { loaded, page: 170, random, compare: exact })).toBeGreaterThan(500)
+    }
+  })
+
+  it('matches a rebuild when every row streams, from an empty transcript', async () => {
+    const random = seeded(9)
+    await replay(synthetic(1_200, random), { loaded: 0, page: 1, random, compare: exact })
+  })
+
+  // A real session, when there is one to hand: a JSON array of event records, as the ledger holds them.
+  // `ACORN_TRANSCRIPT_REPLAY=/path/to/events.json`, ordered by seq. The last quarter streams.
+  const recorded = process.env.ACORN_TRANSCRIPT_REPLAY
+  it.skipIf(!recorded)('matches a rebuild after every frame of a recorded session', async () => {
+    const all = (JSON.parse(readFileSync(recorded!, 'utf8')) as AgentEventRecord[])
+      .map((record) => ({ ...record, sessionId: SESSION }))
+    const loaded = Math.floor(all.length * 0.75)
+    const steps = await replay(all, { loaded, page: 2_000, random: seeded(7), compare: exact })
+    expect(steps).toBeGreaterThanOrEqual(all.length - loaded)
+  }, 3_600_000)
 })

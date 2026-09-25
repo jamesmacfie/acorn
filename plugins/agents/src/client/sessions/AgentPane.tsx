@@ -1,4 +1,4 @@
-import { createResource, For, Show } from 'solid-js'
+import { createMemo, createResource, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { clientCapability, openPane, type Task } from '@acorn/plugin-api/client'
 import {
@@ -22,7 +22,7 @@ import { canStopAgent } from './agentActivity'
 import { managedAgentApi } from './managedClient'
 import { agentPricingOptions } from '../pricingClient'
 import { emptyAgentPricingPreferences } from '../../shared/pricing'
-import { sessionHeaderContext } from './sessionHeaderContext'
+import { sameSessionHeaderProps, sessionHeaderContext } from './sessionHeaderContext'
 
 // The Agent pane's `detail` region: the open session's header, and the conversation under it.
 //
@@ -60,18 +60,17 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
       </Show>
       <Heading level={2}>{model.selected()?.title ?? 'Agents'}</Heading>
       <Show when={model.selected()}>
-        {(session) => (
-          <Slot
-            point={AGENT_SESSION_HEADER_POINT}
-            taskId={props.task.id}
-            props={() => sessionHeaderContext(
-              props.task.id,
-              session(),
-              model.snapshot(),
-              pricing.data ?? emptyAgentPricingPreferences(),
-            ) satisfies AgentSessionHeaderProps}
-          />
-        )}
+        {(session) => {
+          // A memo that keeps an unchanged payload, because every one it hands on is posted to the
+          // plugin's worker, and the snapshot it reads is new on every streamed event.
+          const header = createMemo((): AgentSessionHeaderProps => sessionHeaderContext(
+            props.task.id,
+            session(),
+            model.snapshot(),
+            pricing.data ?? emptyAgentPricingPreferences(),
+          ), undefined, { equals: sameSessionHeaderProps })
+          return <Slot point={AGENT_SESSION_HEADER_POINT} taskId={props.task.id} props={header} />
+        }}
       </Show>
       <Show when={workflow()}>
         {(found) => (

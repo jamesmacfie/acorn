@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentSession, AgentSessionSnapshot, AgentTurn } from '../../contract/wire.ts'
 import { emptyAgentPricingPreferences } from '../../shared/pricing'
-import { sessionHeaderContext } from './sessionHeaderContext'
+import { sameSessionHeaderProps, sessionHeaderContext } from './sessionHeaderContext'
 
 const session = (): AgentSession => ({
   id: 'session-1', taskId: 'task-1', providerId: 'codex', profileId: 'codex', kind: 'interactive',
@@ -49,5 +49,19 @@ describe('agent session header context', () => {
     const row = { ...session(), providerId: 'claude', profileId: 'claude', driverKind: 'acp' }
     expect(sessionHeaderContext('task-1', row, undefined, emptyAgentPricingPreferences()))
       .toMatchObject({ tokenAccounting: 'per-turn', costAccounting: 'per-turn' })
+  })
+
+  it('attributes a turn-less usage row by seq order, whatever order the array is in', () => {
+    const row = session()
+    const usage = (seq: number, turnId: string | null, inputTokens: number) => ({
+      id: `event-${seq}`, sessionId: row.id, turnId, seq, schemaVersion: 1,
+      event: { type: 'usage' as const, usage: { inputTokens } }, searchText: null, createdAt: seq,
+    })
+    const second = { ...turn(), id: 'turn-2', ordinal: 2, usage: null }
+    const ordered = [usage(1, 'turn-1', 100), usage(2, 'turn-2', 200), usage(3, null, 300)]
+    const header = (events: typeof ordered) => sessionHeaderContext(
+      'task-1', row, { session: row, turns: [turn(), second], events, requests: [] }, emptyAgentPricingPreferences())
+    expect(header(ordered).turns.map((item) => item.usage.inputTokens)).toEqual([100, 300])
+    expect(sameSessionHeaderProps(header([...ordered].reverse()), header(ordered))).toBe(true)
   })
 })

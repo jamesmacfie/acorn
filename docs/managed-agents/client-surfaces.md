@@ -26,7 +26,9 @@ per-turn usage and resolved prices, and explicit token/cost accounting modes. Th
 The bundled `agent-cost` loaded plugin prices and formats those facts, preferring provider-reported USD
 and otherwise showing an API-equivalent estimate; disabling that plugin removes the badge without
 changing Agents. The point is not cost-specific, so independently installed plugins can fill the same
-seat with a token counter or budget warning. The complete contract lives in
+seat with a token counter or budget warning. The pane hands the point a new payload only when it says
+something new: every payload crosses to the plugin's worker, and most streamed events change no turn's
+usage. The complete contract lives in
 [cooperative extension points](../plugins/cooperative-extension-points.md#remote-trees).
 
 That is a property of the region, not of this pane, which is why the conversation reaches its region as
@@ -166,8 +168,9 @@ it fails for any reason a selection can break, not only for the one it was writt
   `agents:session-header` and already sits beside the session title, and the token counts said the
   same thing twice for a reader scrolling the thread. So the fold feeds the line that closes the turn
   instead: `Turn complete` and its stop reason on the left, the share of the model's context window
-  the turn had used on the right. `stampTurnContext` in `conversationItems.ts` copies the figure onto
-  the `turn_completed` card by position rather than by turn id, because Codex clears the current turn
+  the turn had used on the right. The fold in `conversationItems.ts` copies the figure onto the
+  `turn_completed` card by position rather than by turn id, and again when a late usage update moves
+  it, because Codex clears the current turn
   before it emits the completion and the event arrives unattributed. A turn whose harness reported no
   context window closes with its reason alone. Codex's token notification carries cumulative `total`
   counters and one model call's `last` counters: the cumulative input/output values feed session cost,
@@ -293,8 +296,9 @@ events a second per streaming session, because the Node coalesces text deltas at
 - **The event list is kept in sequence order and appended to in place.** Events arrive in order, so an
   arrival is a `push`; a reconnect replay can still deliver one out of order and that walks back from
   the tail to its seat. A set of seen ids per session answers "have I got this one" without a scan.
-  Nothing may hold the array across a change and compare it by identity: what makes the transcript
-  re-render is the store's signal, not the array's identity.
+  What makes the transcript re-render is the store's signal, not the array's identity. The one reader
+  that keeps the array's rows across a change is the transcript's projection, and it checks each of
+  them by identity rather than trusting the array to be as it was (the last rule below).
 - **A usage update folds onto the open line** rather than being appended, by the rule above.
 - **A projected event asks for a row, not a session.** `user_message`, `request`, `request_resolved`
   and `turn_completed` used to trigger a debounced refetch of the whole snapshot — up to 2,000 event
@@ -305,12 +309,17 @@ events a second per streaming session, because the Node coalesces text deltas at
   frame names that set.
 - **The turns are a map above the list, not a scan inside it.** A row used to find its turn with
   `turns.find`, once per row per render.
-- **An event wakes only the card it changed.** `buildConversationItems` builds every item again on
-  each event, so `reuseUnchangedItems` hands back the previous object for any item whose seq span did
-  not move, and each row reads its item from a signal of its own that is written only when the object
-  differs. The turn and request maps are memoised on their arrays, which the store replaces only when
-  a turn or a request changes. On a 1,240-card transcript this took a streamed event from about 34 ms
-  to about 5 ms, most of what is left being the projection itself.
+- **An event costs the projection one row, and wakes only the card it changed.** The transcript keeps
+  its fold open (`createConversationProjection` in `conversationItems.ts`) and adds the rows that
+  arrived since the last event, through the same code a full build runs, so a long session no longer
+  re-projects every row per event. It first checks, by identity, that every row it already took is
+  still in its place, and that the new ones follow in sequence order. The store's in-place merge of a
+  usage update is the one change it takes as it is; a row seated behind the tail, or a re-read that
+  replaced a record, rebuilds from the start. An item the fold did not touch keeps its object, and each
+  row reads its item from a signal of its own that is written only when the object differs, so one
+  event redraws one card. A rebuild hands out new objects throughout, because it happens exactly when
+  a card can have gained a row without its key or its sequence span moving. The turn and request maps
+  are memoised on their arrays, which the store replaces only when a turn or a request changes.
 
 A snapshot read and the socket can disagree about a usage line, because both sides fold it and both
 keep the first update's id: a frame can land while the request is in flight. `managedSnapshot.ts`

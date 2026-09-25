@@ -93,9 +93,10 @@ export default function AgentEventCard(props: {
         Every branch below uses Show's callback child form, `{(_shown) => ...}`, and reads the event
         through a getter. Solid calls that callback untracked, which is the whole point: Show reads its
         children inside its own memo, so a branch that touched `event()` while building itself made the
-        memo depend on it — and buildConversationItems hands out a fresh event object per snapshot, so
-        every arriving message rebuilt the DOM of every card. Anything the reader had opened went with
-        it: an open fold snapped shut, and the fold state below reseeded from the new event.
+        memo depend on it — and the projection hands out a fresh event object for every card an event
+        changes, and for every card on a rebuild, so arriving messages rebuilt the DOM of those cards.
+        Anything the reader had opened went with it: an open fold snapped shut, and the fold state
+        below reseeded from the new event.
       */}
       <Show when={event().type === 'user_message'}>
         {(_shown) => {
@@ -230,9 +231,9 @@ export default function AgentEventCard(props: {
                 </Button>
               }
             >
-              {/* `Index`, not `For`, for the reason AgentTranscript states: buildConversationItems
-                  rebuilds every item object on every snapshot, so reference keying would replace this
-                  DOM, and any selection in it, on each streamed event. */}
+              {/* `Index`, not `For`, for the reason AgentTranscript states: a child an event changed
+                  is a new object, and a rebuild makes every child one, so reference keying would
+                  replace this DOM, and any selection in it, as the run streams. */}
               <Stack gap="row">
                 <Index each={children()}>
                   {(child) => (

@@ -40,8 +40,15 @@ function currentSessionModel(session: AgentSession): string | null {
 function usageByTurn(turns: readonly AgentTurn[], events: readonly AgentEventRecord[]): Map<string, AgentUsage> {
   const usage = new Map<string, AgentUsage>()
   for (const turn of turns) if (turn.usage) usage.set(turn.id, turn.usage)
+  // Only the usage rows, and sorted only if they are out of order: the store keeps its array in seq
+  // order. This runs for every streamed event, and copying and sorting the whole session to read a few
+  // hundred rows was about 40% of its cost.
+  const rows = events.filter((record) => record.event.type === 'usage')
+  if (rows.some((record, at) => at > 0 && rows[at - 1].seq > record.seq)) {
+    rows.sort((left, right) => left.seq - right.seq)
+  }
   let openTurnId: string | null = null
-  for (const record of [...events].sort((left, right) => left.seq - right.seq)) {
+  for (const record of rows) {
     if (record.event.type !== 'usage') continue
     const turnId: string | null = record.turnId ?? openTurnId
     if (!turnId) continue
@@ -88,3 +95,10 @@ export function sessionHeaderContext(
     }),
   }
 }
+
+/** Whether two header payloads say the same thing. The slot's plugin draws in a worker, and every new
+ *  payload is posted there and reconciled; most streamed events change no turn's usage, so the pane
+ *  keeps the payload it has unless this says otherwise. The payload is JSON-safe by contract, and a
+ *  session's turns are few, so comparing the serialised form is both exact and cheap. */
+export const sameSessionHeaderProps = (before: AgentSessionHeaderProps, after: AgentSessionHeaderProps): boolean =>
+  JSON.stringify(before) === JSON.stringify(after)

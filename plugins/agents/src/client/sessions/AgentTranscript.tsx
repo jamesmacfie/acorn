@@ -5,7 +5,7 @@ import { prefsOptions } from '@acorn/plugin-api/client'
 import type { AgentNormalizedEvent, AgentSessionSnapshot } from '../../contract/wire.ts'
 import AgentEventCard from './AgentEventCard'
 import {
-  buildConversationItems, findSubagentItem, isChatItem, reuseUnchangedItems, visibleConversationItems,
+  createConversationProjection, findSubagentItem, isChatItem, visibleConversationItems,
   type AgentConversationItem,
 } from './conversationItems'
 import { sessionModelSummary } from '../settings/agentConfigOptions'
@@ -43,12 +43,13 @@ export default function AgentTranscript(props: {
   const queryClient = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
   const foldSetting = createAgentToolFoldSetting(() => prefs.data, queryClient, props.collapseSignal)
-  // An item no event touched keeps last time's object, so the rows below can tell which card an event
-  // changed (reuseUnchangedItems).
-  const conversation = createMemo<AgentConversationItem[]>((previous) => {
+  // Kept open across events, so a streamed row costs the fold one record rather than the whole
+  // session (createConversationProjection). An item no event touched keeps last time's object, so the
+  // rows below can tell which card an event changed.
+  const project = createConversationProjection()
+  const conversation = createMemo<AgentConversationItem[]>(() => {
     agentTelemetry.observe('agents.transcript.events', props.snapshot.events.length)
-    return reuseUnchangedItems(previous, agentTelemetry.measure('agents.transcript.project', () =>
-      buildConversationItems(props.snapshot.events)))
+    return agentTelemetry.measure('agents.transcript.project', () => project(props.snapshot.events))
   })
   // Every event brings a new snapshot object, but it holds the same `turns` and `requests` arrays: the
   // store replaces one only when a turn or a request changes. Reading each through its own memo means an
