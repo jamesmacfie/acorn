@@ -1041,6 +1041,59 @@ describe('architecture boundaries', () => {
     expect([...new Set(offenders)].sort()).toEqual([])
   })
 
+  it('a kit component module does nothing at import', () => {
+    // The renderer build declares these files side-effect-free (apps/desktop/vite.config.ts), so the
+    // bundler drops any whose exports nothing uses. Work done at module scope in one of them would be
+    // dropped with it, silently and only in a production build: a registration that never happens, a
+    // listener that is never added. So the top level may only import, declare, and hang a
+    // subcomponent on a component (`Menu.Item = ...`). A bare import is allowed only for a stylesheet,
+    // which Vite keeps whatever the rule says.
+    const inert = (node: ts.Expression | undefined): boolean => {
+      if (!node) return true
+      if (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isSatisfiesExpression(node)) return inert(node.expression)
+      if (ts.isArrowFunction(node) || ts.isFunctionExpression(node) || ts.isIdentifier(node) || ts.isLiteralExpression(node)) return true
+      if ([ts.SyntaxKind.TrueKeyword, ts.SyntaxKind.FalseKeyword, ts.SyntaxKind.NullKeyword].includes(node.kind)) return true
+      if (ts.isTaggedTemplateExpression(node)) return node.tag.getText() === 'String.raw'
+      if (ts.isArrayLiteralExpression(node)) return node.elements.every((e) => inert(e))
+      if (ts.isObjectLiteralExpression(node)) {
+        return node.properties.every((p) => ts.isPropertyAssignment(p) ? inert(p.initializer) : ts.isShorthandPropertyAssignment(p) || ts.isMethodDeclaration(p))
+      }
+      return false
+    }
+    const offenders: string[] = []
+    let scanned = 0
+    for (const file of walk(join(ROOT, 'packages/client-core/src/kit/components'))) {
+      if (!file.endsWith('.tsx') || isTestCode(file)) continue
+      scanned++
+      const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+      const declared = new Set<string>()
+      for (const statement of source.statements) {
+        if (ts.isFunctionDeclaration(statement) && statement.name) declared.add(statement.name.text)
+        if (ts.isVariableStatement(statement)) for (const d of statement.declarationList.declarations) if (ts.isIdentifier(d.name)) declared.add(d.name.text)
+      }
+      for (const statement of source.statements) {
+        if (ts.isImportDeclaration(statement)) {
+          const spec = (statement.moduleSpecifier as ts.StringLiteral).text
+          if (statement.importClause || spec.endsWith('.css')) continue
+        } else if (ts.isFunctionDeclaration(statement) || ts.isInterfaceDeclaration(statement) || ts.isTypeAliasDeclaration(statement) || ts.isExportDeclaration(statement)) {
+          continue
+        } else if (ts.isExportAssignment(statement) && ts.isIdentifier(statement.expression)) {
+          continue
+        } else if (ts.isVariableStatement(statement) && statement.declarationList.declarations.every((d) => inert(d.initializer))) {
+          continue
+        } else if (ts.isExpressionStatement(statement) && ts.isBinaryExpression(statement.expression)
+          && statement.expression.operatorToken.kind === ts.SyntaxKind.EqualsToken
+          && ts.isPropertyAccessExpression(statement.expression.left) && ts.isIdentifier(statement.expression.left.expression)
+          && declared.has(statement.expression.left.expression.text) && inert(statement.expression.right)) {
+          continue
+        }
+        offenders.push(`${rel(file)}:${source.getLineAndCharacterOfPosition(statement.getStart()).line + 1}`)
+      }
+    }
+    expect(scanned).toBeGreaterThan(30)
+    expect(offenders).toEqual([])
+  })
+
   it('the command registry and its graph draw nothing', () => {
     // docs/command-palette-and-shortcuts.md. Registration, availability, the
     // execution context and the graph projection are what the desktop and the terminal share; the

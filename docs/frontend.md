@@ -392,8 +392,8 @@ Both clients have a build check over what they load before they draw, and both f
 over a byte ceiling, and on a **chunk name**.
 
 - **The renderer.** `apps/desktop/scripts/check-renderer-budget.mjs`, run from `@acorn/desktop`'s
-  `build`, sums every script and stylesheet a cold window loads: 846,000 B for scripts, 200,000 B
-  for styles. The script ceiling is the 2026-09-25 measurement, 805,447 B, plus about 5%. A change
+  `build`, sums every script and stylesheet a cold window loads: 776,000 B for scripts, 200,000 B
+  for styles. The script ceiling is the 2026-09-25 measurement, 738,695 B, plus about 5%. A change
   that needs more raises it in the same commit, with the reason in the commit message. It reads the graph from Vite's manifest, which `vite.config.ts` moves out of the shipped
   client folder to `dist/renderer-manifest.json`. The startup set is the static closure of the entry
   chunk plus the modules in the script's `STARTUP_IMPORTS` list, and every script and stylesheet
@@ -420,6 +420,18 @@ over a byte ceiling, and on a **chunk name**.
 The architecture reset briefly pulled DOM primitives, diff virtualization, and annotation rendering
 into this closure through broad `public.ts` barrels. The TUI now imports narrow supported entrypoints
 for its model and host adapters. That restored the original ceiling without exempting those chunks.
+
+**Unused kit components drop out of the renderer.** A barrel such as `kit/components/content` used to
+pull every component it re-exports onto the startup graph, drawn or not. Solid compiles a file that
+uses a delegated event into a module-level `delegateEvents([...])` call, and the bundler must keep a
+module that does work at import. The renderer's `vite.config.ts` declares
+`packages/client-core/src/kit/components/**/*.tsx` side-effect-free, so a component nothing uses is
+left out, and one that is used keeps its own call. On 2026-09-25 that took 67 KB off the startup
+scripts, among them the graph, the timeline, the mention editor, and the virtual-list library behind
+`Grid` and `Rows`. The declaration is true only while those files do nothing at module scope, so an
+arch rule (`tools/arch/boundaries.test.ts`, "a kit component module does nothing at import") fails on
+any top-level statement that is not an import, a declaration or a subcomponent assignment. Something
+that has to run on import belongs in a `.ts` module outside `kit/components`.
 
 **Why a name test as well as a byte total.** Between 2026-08-31 and 2026-09-02 the renderer's total
 drifted from 1,317,605 B to 1,329,679 B across 31 unrelated commits while staying red, so nobody read

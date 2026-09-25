@@ -63,7 +63,18 @@ export default defineConfig({
   build: {
     outDir: resolve(import.meta.dirname, 'dist/client'),
     emptyOutDir: true,
-    rollupOptions: { input: resolve(import.meta.dirname, 'index.html') },
+    rollupOptions: {
+      input: resolve(import.meta.dirname, 'index.html'),
+      // Importing a kit component module does nothing that matters unless one of its components is
+      // drawn. The bundler cannot see that: Solid compiles each file that uses a delegated event into
+      // a module-level `delegateEvents([...])` call, and that call keeps every component behind a
+      // barrel on the startup graph, used or not. Declaring the files side-effect-free lets an unused
+      // one drop out, while one whose exports are used keeps its own `delegateEvents` call. That took
+      // about 67 KB off startup on 2026-09-25. Only the kit's `.tsx` files are named, because much of
+      // the rest of client-core creates its stores at import time. tools/arch boundaries.test.ts holds
+      // the kit to it (docs/frontend.md § Startup budget).
+      treeshake: { moduleSideEffects: [{ test: /\/packages\/client-core\/src\/kit\/components\/.*\.tsx$/, sideEffects: false }] },
+    },
   },
   // Rust edits must not retrigger the renderer, and the port is fixed so tauri.dev.json's devUrl and
   // the shell's dev-only CSP can both name it.
