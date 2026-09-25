@@ -1,7 +1,7 @@
 import { createEffect, createResource, onCleanup, type Accessor, type InitializedResourceReturn } from 'solid-js'
 import { hashKey } from '@tanstack/solid-query'
 import type { NodeRecord } from '@acorn/protocol/broker.ts'
-import { clientFor, nodes, nodeState, nodeStatus } from './fleet'
+import { clientFor, nodeIsStarting, nodes, nodeState, nodeStatus } from './fleet'
 import { freshnessOf, type Freshness } from './freshness'
 
 // The one fan-out primitive. Aggregate surfaces fan out per-node requests with per-node timeouts and
@@ -108,6 +108,10 @@ async function fetchOne<T>(
   const client = clientFor(node.nodeId).client
   const state = nodeState(node.nodeId)
   try {
+    // A supervised local node that has not reported has no broker connection yet, so a request could
+    // only fail with `Unknown node`. Its first status changes the resource's source in
+    // `createFleetQuery`, which runs the fan-out again.
+    if (nodeIsStarting(node.nodeId)) throw new Error('still starting')
     const data = await withDeadline(
       client.fetchQuery({
         queryKey,

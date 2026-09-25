@@ -238,8 +238,9 @@ listening and shows the startup loader, and the node boots behind it. The shell 
 local node's first status reaches the renderer ([frontend.md](./frontend.md) § Startup readiness). The
 two accounts meet at `[helper:boot] service.start`, which is the node reporting that it is listening,
 so `ready line` to `service.start` is the node's share of the launch. The loader is on screen for that
-interval less the time the window takes to open and load its scripts. No renderer mark records the
-shell mounting: `nodeReady` is the fleet selection, which lands before the node is up.
+interval less the time the window takes to open and load its scripts. `node selected` is the fleet
+selection, which lands before the node is up. `nodeReady` is the local node's first status reaching
+the renderer, which is when the shell mounts and its first reads go out.
 
 Two things about the node's own account are worth knowing before quoting it. Its clock starts inside
 `startServiceRuntime`, so spawning the process and evaluating the service bundle are in front of `+0ms`

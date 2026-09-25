@@ -92,13 +92,17 @@ describe('nodeGateHolds', () => {
     await selected
 
     // Fleet membership has confirmed the selection, but the supervised process has not connected.
-    expect(nodeReady()).toBe(true)
+    // The broker has no connection for it yet and answers any request with `Unknown node`, so the
+    // queries that wait on `nodeReady()` must not go out either.
+    expect(nodeReadiness().kind).toBe('ready')
     expect(activeNodeStarting()).toBe(true)
+    expect(nodeReady()).toBe(false)
     expect(nodeGateHolds()).toBe(true)
 
     stubBridge([record('node-a')], [{ nodeId: 'node-a', state: 'online' }])
     await refreshFleet()
     expect(activeNodeStarting()).toBe(false)
+    expect(nodeReady()).toBe(true)
     expect(nodeGateHolds()).toBe(false)
   })
 
@@ -107,6 +111,8 @@ describe('nodeGateHolds', () => {
     stubBridge([record('remote-a', false)], [{ nodeId: 'remote-a', state: 'offline' }])
     await selectActiveNode()
     expect(activeNodeStarting()).toBe(false)
+    // Ready, so its queries run and draw from cache when they fail.
+    expect(nodeReady()).toBe(true)
     expect(nodeGateHolds()).toBe(false)
   })
 

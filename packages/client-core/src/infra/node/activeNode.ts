@@ -51,13 +51,20 @@ const [nodeReadiness, setNodeReadiness] = createSignal<NodeReadiness>({ kind: 's
 
 export { nodeReadiness }
 
-export const nodeReady = (): boolean => nodeReadiness().kind === 'ready'
-
 /** The selected node is the supervised local process and has not reported a connection state yet. */
 export const activeNodeStarting = (): boolean => {
   const nodeId = activeNodeId()
   return nodeId !== null && nodeIsStarting(nodeId)
 }
+
+// Whether a request to the active node can reach it: the gate a query or a startup read waits on.
+//
+// Not `ready` alone. The fleet list answers from the helper's fleet file, which remembers the local
+// node before the helper has started its process and handed it to the broker. Until then the broker
+// has no connection for it and answers every request with `Unknown node`. The node's first broker
+// status is the first moment the broker holds that connection. A remote node is connected before the
+// fleet list answers, so a known-offline remote node is still ready, and its queries draw from cache.
+export const nodeReady = (): boolean => nodeReadiness().kind === 'ready' && !activeNodeStarting()
 
 // Whether the gate holds the screen, or the shell draws behind it.
 //
@@ -66,10 +73,9 @@ export const activeNodeStarting = (): boolean => {
 // existed. Hold the existing loader through fleet selection and through the local node's first broker
 // status instead. A remote node that is offline, or a node that disconnects after it has reported,
 // still draws the cached shell with its ordinary connection state.
-export const nodeGateHolds = (): boolean => {
-  const readiness = nodeReadiness().kind
-  return readiness === 'starting' || readiness === 'failed' || readiness === 'unpaired' || activeNodeStarting()
-}
+//
+// The same condition as `nodeReady`, so the shell draws at the moment its reads can go out.
+export const nodeGateHolds = (): boolean => !nodeReady()
 
 // Pick the node this window talks to. Started at boot and not awaited, so the startup loader can paint
 // during the round trip; called again when the fleet gains its first node, and by the recovery

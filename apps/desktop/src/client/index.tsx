@@ -103,11 +103,15 @@ void applyNodePlugins(activeNodeId() ?? undefined).then(() => bootMark('plugins 
 // The node's arrival is behind the loader's first paint. Startup work can still have asked for data
 // while nothing was listening, and the first usable status is when those reads are worth asking
 // again. `wsOnReconnect` above cannot do this: it deliberately ignores a node's first connect.
+//
+// `cancelRefetch: false` leaves a request that is already out alone. The shell's own queries wait on
+// `nodeReady()`, which turns true on this same status, so they can already be fetching when this runs.
+// Cancelling them cost a cancelled request and a duplicate for each one that had cached data.
 createRoot(() => {
   createEffect(() => {
     const nodeId = activeNodeId()
     if (!nodeId || nodeState(nodeId) === 'offline') return
-    void clientFor(activeCacheId()).client.invalidateQueries({ refetchType: 'active' })
+    void clientFor(activeCacheId()).client.invalidateQueries({ refetchType: 'active' }, { cancelRefetch: false })
   })
 })
 
@@ -184,7 +188,7 @@ render(
 bootMark('tree built')
 
 // After the frame the tree above produced, which is the first thing the owner sees, and separately the
-// moment a node was selected. The two are far apart on purpose: nothing between `script start` and
+// moment the node could answer. The two are far apart on purpose: nothing between `script start` and
 // this frame waits on the helper or the node (docs/performance.md § Every host draws
 // first).
 // macOS pauses `requestAnimationFrame` while the window is occluded, so this mark is the compositor's

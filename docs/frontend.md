@@ -335,7 +335,11 @@ inside that provider, so releasing it draws the correct persisted partition with
 
 `nodeGateHolds()` keeps the startup loader visible while fleet selection is in progress and while a
 selected local Node has no status. The first `online`, `degraded`, `incompatible`, or named `offline`
-status releases it. Known offline remote Nodes do not enter the startup gate because this app does not
+status releases it. `nodeReady()` is the same condition turned around, and it is the gate for reads
+that start before the shell mounts, such as the queries, schedules, and disk warning in `App.tsx`. The
+fleet list remembers the local Node before the helper has handed it to the broker, and until then the
+broker answers every request to it with `Unknown node`. The fleet fan-out skips a local Node in that
+state and serves its cache, and runs again on the Node's first status. Known offline remote Nodes do not enter the startup gate because this app does not
 supervise their processes. A later disconnect also leaves the shell mounted so cached reads, drafts,
 and the normal connection UI remain available.
 

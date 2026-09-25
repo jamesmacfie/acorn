@@ -195,10 +195,18 @@ export default function App() {
   })
 
   // The session-source owners start their own roster subscriptions at activation. The shell starts
-  // its schedules once the node can answer.
-  onMount(() => {
-    onCleanup(startClientSchedules())
+  // its schedules once the node can answer. App mounts before the startup gate releases, and each
+  // schedule runs once on start and then waits for its interval or an event. Started at mount, the
+  // first run went to a local node the broker had not adopted yet, failed, and left task statuses
+  // empty for up to 10 s and workflow run counts for up to 2 min.
+  //
+  // Started once and kept, because the gate can briefly hold again while Settings → Nodes re-reads
+  // the fleet.
+  let stopSchedules: (() => void) | undefined
+  createEffect(() => {
+    if (!stopSchedules && nodeReady()) stopSchedules = startClientSchedules()
   })
+  onCleanup(() => stopSchedules?.())
 
   // Workflow notices are broadcast over `/v1/events` by main, not by the terminal plugin, and a node
   // without a terminal still runs workflows. They were inside the guard above, which meant no gate
@@ -241,16 +249,20 @@ export default function App() {
   //
   // `warnOnceAboutDisk` swallows its own failures and records the acknowledgement before pushing, so this
   // can never be the thing that fails a boot or repeats every launch.
+  //
+  // Gated on `nodeReady()`, because a read that fails counts as "do not warn": asked at mount, before
+  // the local node was adopted, the warning never ran at all.
   createEffect(() => {
     const nodeId = activeNodeId()
-    if (!nodeId) return
+    if (!nodeId || !nodeReady()) return
     const label = nodes().find((candidate) => candidate.nodeId === nodeId)?.label ?? 'This node'
     void warnOnceAboutDisk(queryClient, nodeId, label)
   })
 
-  // Gated on having a node to ask, not on an identity: there is no login. The shell itself mounts only
-  // after the selected local node's first status, so these do not race its startup. `nodeReady()` is
-  // still the right query gate because a known offline remote node may draw cached data.
+  // Gated on having a node to ask, not on an identity: there is no login. App mounts before the startup
+  // gate releases, so these are created while the local node may still be starting. `nodeReady()` holds
+  // them until the broker has the node, which is also when the gate releases, and it still lets a
+  // known offline remote node draw cached data.
   // Always refetched on mount, because the startup restore waits for the node's answer and a cached
   // value inside its stale time would otherwise never be asked for again.
   const prefs = createQuery(() => ({ ...prefsOptions(nodeReady()), refetchOnMount: 'always' as const }))
@@ -309,7 +321,7 @@ export default function App() {
   // pickers and the rail's scope blinking through the same gap.
   const activeWorkspace = createMemo<Workspace | null>((previous) =>
     workspaceForProject(workspaces.data, contextProjectId()) ?? previous ?? null)
-  const sourceScope = createSourceScope(() => activeWorkspace()?.id)
+  const sourceScope = createSourceScope(() => activeWorkspace()?.id, nodeReady)
 
   // The one switch, read off the node and handed to the client's emitter (docs/telemetry.md § The
   // switch). An effect rather than a call at boot, because the preference arrives after the first
