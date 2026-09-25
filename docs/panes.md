@@ -249,6 +249,13 @@ codebase already declined for the agent transcript (`docs/managed-agents.md`), a
 above cover what the field was reaching for, so it was deleted rather than implemented. A test in
 `registries/panes/panes.test.tsx` fails compilation if it comes back.
 
+The one view that does outlive its task is a terminal, and it is not a pane, and the host does not keep
+it. The terminal plugin holds each open tab's xterm itself, from its first open until the tab closes,
+and lends it to whichever drawer draws it ([terminal.md](./terminal.md) § Client). A terminal is a
+running program the reader expects to keep running, and its state is the emulator's buffer rather than
+anything a query cache can hand back. Neither is true of a pane, which is why the rule above stands
+for panes.
+
 The PR pane still keeps two maps of its own. One is keyed by the pull request, because a task can be
 about several; the other is keyed by the task but holds a live subscription that must outlive the
 pane's own mounts. Neither is a copy of this seam waiting to be deleted; if a third appears with a

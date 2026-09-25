@@ -31,7 +31,7 @@ class DeferredScreen implements TerminalScreen {
   writes: string[] = []
   resizes: Array<[number, number]> = []
   disposed = false
-  private resolveSnapshot: ((value: string) => void) | null = null
+  private resolvers: ((value: string) => void)[] = []
 
   write(data: string): void {
     this.writes.push(data)
@@ -43,12 +43,12 @@ class DeferredScreen implements TerminalScreen {
 
   snapshot(): Promise<string> {
     return new Promise((resolve) => {
-      this.resolveSnapshot = resolve
+      this.resolvers.push(resolve)
     })
   }
 
   resolve(value: string): void {
-    this.resolveSnapshot?.(value)
+    for (const resolve of this.resolvers.splice(0)) resolve(value)
   }
 
   dispose(): void {
@@ -172,9 +172,11 @@ describe('TerminalDisplay', () => {
   it('keeps resize and disposal ownership with the display model', () => {
     const screen = new DeferredScreen()
     const display = new TerminalDisplay(20, 5, () => screen)
-    // Resizing reaches the emulator only while there is one, so this attaches first. A resize with
-    // nobody watching is remembered and applied to whatever the next attach builds — the case below.
-    display.attach(() => {}, session, () => '')
+    // Resizing reaches the emulator only while there is one, so this holds an attach mid-restore. A
+    // resize with no emulator is remembered and applied to whatever the next attach builds — the case
+    // below.
+    display.write('history')
+    display.attach(() => {}, session, () => 'history')
 
     display.resize(40, 10)
     display.dispose()
@@ -184,8 +186,9 @@ describe('TerminalDisplay', () => {
   })
 })
 
-// The emulator is a consequence of attachment (docs/terminal.md § The screen, and who pays for it).
-describe('TerminalDisplay emulates only while somebody is watching', () => {
+// The emulator is a consequence of restoring a screen (docs/terminal.md § The screen, and who pays
+// for it).
+describe('TerminalDisplay emulates only while an attach is restoring', () => {
   it('builds no emulator for a session nobody has attached to', () => {
     let built = 0
     const display = new TerminalDisplay(20, 5, () => {
@@ -199,30 +202,64 @@ describe('TerminalDisplay emulates only while somebody is watching', () => {
     expect(display.emulating).toBe(false)
   })
 
-  it('disposes the emulator when the last watcher leaves, and builds a new one for the next', () => {
+  it('disposes the emulator once the last snapshot is taken, however many clients stay attached', async () => {
     const screens: DeferredScreen[] = []
     const display = new TerminalDisplay(20, 5, () => {
       const screen = new DeferredScreen()
       screens.push(screen)
       return screen
     })
-    const first = () => {}
-    const second = () => {}
+    const first: ServerMsg[] = []
+    const second: ServerMsg[] = []
+    display.write('history')
 
-    display.attach(first, session, () => '')
-    display.attach(second, session, () => '')
+    // Two attaches in flight share one emulator, built from the ring once.
+    display.attach((message) => first.push(message), session, () => 'history')
+    display.attach((message) => second.push(message), session, () => 'history')
     expect(screens).toHaveLength(1)
+    expect(screens[0].writes).toEqual(['history'])
 
-    display.detach(first)
-    expect(display.emulating).toBe(true) // one client left, so the parser is still earning its keep
-    expect(screens[0].disposed).toBe(false)
+    screens[0].resolve('screen')
+    await nextTurn()
 
-    display.detach(second)
+    // Both restored, both still attached, and no parser left running behind them. A client keeps its
+    // terminal attached while the tab lives on another task, so this is the state most sessions sit in.
     expect(display.emulating).toBe(false)
     expect(screens[0].disposed).toBe(true)
+    display.write('more')
+    display.publish({ type: 'output', data: 'more' })
+    expect(first.at(-1)).toEqual({ type: 'output', data: 'more' })
+    expect(second.at(-1)).toEqual({ type: 'output', data: 'more' })
 
-    display.attach(first, session, () => '')
+    // The next attach, a reconnect or another window, rebuilds from the ring.
+    display.attach(() => {}, session, () => 'history more')
     expect(screens).toHaveLength(2)
+    expect(screens[1].writes).toEqual(['history more'])
+  })
+
+  it('disposes the emulator when an attach leaves before its snapshot', () => {
+    const screen = new DeferredScreen()
+    const display = new TerminalDisplay(20, 5, () => screen)
+    const sink = () => {}
+    display.write('history')
+    display.attach(sink, session, () => 'history')
+    expect(display.emulating).toBe(true)
+
+    display.detach(sink)
+    expect(display.emulating).toBe(false)
+    expect(screen.disposed).toBe(true)
+  })
+
+  it('builds no emulator for an attach with nothing to restore', () => {
+    let built = 0
+    const display = new TerminalDisplay(20, 5, () => {
+      built += 1
+      return new DeferredScreen()
+    })
+    display.attach(() => {}, session, () => '')
+    display.write('first output')
+
+    expect(built).toBe(0)
   })
 
   it('replays the ring at the size the session has now, not the size it was created at', () => {
@@ -235,13 +272,14 @@ describe('TerminalDisplay emulates only while somebody is watching', () => {
     })
 
     display.resize(120, 40)
+    display.write('history')
     display.attach(() => {}, session, () => 'history')
 
     expect(screens[0].resizes).toEqual([[120, 40]])
     expect(screens[0].writes).toEqual(['history'])
   })
 
-  it('rebuilds the same visible screen a session that emulated throughout would have shown', async () => {
+  it('rebuilds the same visible screen an emulator fed from the first byte would have shown', async () => {
     // A full-screen program's output: cursor moves, a line erased and rewritten, and an alternate
     // screen. Replaying raw bytes would show the erased line; the emulator must not.
     const chunks = [
@@ -251,11 +289,9 @@ describe('TerminalDisplay emulates only while somebody is watching', () => {
       'ünïcøde 🌰 and a tail\r\n',
     ]
 
-    // Watched from the first byte: one emulator, fed live, read by a second attach.
-    const watchedRing = new OutputRing()
-    const watched = new TerminalDisplay(20, 5)
-    watched.attach(() => {}, session, () => '')
-    for (const chunk of chunks) feed(watched, watchedRing, chunk)
+    // Fed from the first byte: what the display used to keep running while anybody was attached.
+    const throughout = new HeadlessTerminalScreen(20, 5)
+    for (const chunk of chunks) throughout.write(chunk)
 
     // Never watched: no emulator at all until this attach builds one from the ring.
     const coldRing = new OutputRing()
@@ -272,13 +308,13 @@ describe('TerminalDisplay emulates only while somebody is watching', () => {
     }
 
     const restored = await screenOf(cold, coldRing)
-    const live = await screenOf(watched, watchedRing)
+    const live = `${DISPLAY_RESET}${await throughout.snapshot()}`
 
     expect(restored).toContain('full screen')
     expect(restored).toContain('🌰')
     expect(restored).not.toContain('second line')
     expect(restored).toBe(live)
     cold.dispose()
-    watched.dispose()
+    throughout.dispose()
   })
 })

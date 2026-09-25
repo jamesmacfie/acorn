@@ -4,6 +4,7 @@ import { terminalApi } from './terminalClient'
 import { onTerminalSessionCreated } from '../contract/sessionsClient'
 import { activeNodeId, forgetAttentionSource, hasHostCapability, nodeState, onScopeEvicted, registerWsChannel, replaceAttentionSource, requestTerminalFocusIntent, wsOnReconnect } from '@acorn/plugin-api/client'
 import { fromTerminalSession } from './attention'
+import { releaseAllTerminals, releaseGoneTerminals } from './heldTerminals'
 
 const node = (): string => activeNodeId() ?? ''
 const [sessions, setSessions] = createSignal<TerminalSession[]>([])
@@ -20,6 +21,8 @@ export async function refreshSessions(): Promise<void> {
     if (request !== generation || requestedNode !== node()) return
     setSessionNode(requestedNode)
     setSessions(rows)
+    // After the write, so a drawer showing a session that has gone has already let its xterm go.
+    releaseGoneTerminals(requestedNode, rows.map((session) => session.id))
     replaceAttentionSource('terminal', requestedNode, rows.flatMap((session) => fromTerminalSession(session, requestedNode) ?? []))
   } catch (error) {
     if (request === generation && requestedNode === node()) { setSessions([]); forgetAttentionSource('terminal', requestedNode) }
@@ -38,6 +41,7 @@ export function clearSessions(): void {
   generation++
   setSessionNode(null)
   setSessions([])
+  releaseAllTerminals()
   activeByTask.clear()
   if (previousNode !== null) forgetAttentionSource('terminal', previousNode)
 }

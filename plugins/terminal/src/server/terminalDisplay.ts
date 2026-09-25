@@ -107,18 +107,22 @@ type PendingAttachment = { frames: ServerMsg[] }
 // serialized, live frames are retained per attaching sink. The sink receives:
 //   ready → reset + canonical snapshot → every frame published after the snapshot barrier.
 //
-// **Emulation is a consequence of attachment.** There is an emulator here only while somebody is
-// watching. It used to run at full rate for every session from the moment it was spawned, and its
-// only reader is the snapshot `attach` takes — so a background build paid continuous ANSI parsing to
-// produce a screen nobody would ever ask for. The first
-// attach builds one and replays the raw ring into it; the last detach disposes it. Nothing else about
-// the ordering below changed.
+// **Emulation is a consequence of restoring a screen.** There is an emulator here only while an
+// attach is waiting for its snapshot. Its only reader is that snapshot, so an attach builds one from
+// the raw ring, serializes it, and the emulator goes as soon as no attach is waiting. A client that is
+// already attached does not need one: it has every byte, in its own xterm.
 //
-// The price is scrollback: a cold attach can only rebuild from what the ring still holds, so history
-// older than the ring is gone and an alternate-screen program whose state depends on older bytes
-// redraws from its next output. That is the right trade: a megabyte of output through an unwatched
-// session costs 2.8 ms rather than 492 ms, and a cold attach pays a 20 ms rebuild once per tab
-// (measured 2026-09-03; docs/terminal.md § The screen, and who pays for it).
+// It used to run for every session from the moment it was spawned, and then for as long as anybody
+// was attached. The desktop client now keeps a terminal tab attached from its first open until it is
+// closed (docs/terminal.md § Client), so "while attached" came to mean "for ever" for every tab
+// anybody had opened, and a build in a tab on another task paid the node's parser for a screen no
+// attach would read.
+//
+// The price is scrollback: every attach rebuilds from what the ring still holds, so history older
+// than the ring is gone and an alternate-screen program whose state depends on older bytes redraws
+// from its next output. That is the right trade: a megabyte of output costs the node the ring's 1 to
+// 2 ms of CPU rather than the parser's 45 to 120 ms, and an attach pays a rebuild of 15 to 25 ms, once
+// per tab and again after a reconnect (docs/terminal.md § The screen, and who pays for it).
 export class TerminalDisplay {
   private readonly live = new Set<TerminalDisplaySink>()
   private readonly attaching = new Map<TerminalDisplaySink, PendingAttachment>()
@@ -148,7 +152,7 @@ export class TerminalDisplay {
     this.screen?.resize(cols, rows)
   }
 
-  /** Whether an emulator is running. The property the phase 6 tests assert on. */
+  /** Whether an emulator is running. The property the tests assert on. */
   get emulating(): boolean {
     return this.screen !== null
   }
@@ -160,19 +164,20 @@ export class TerminalDisplay {
 
   /**
    * Subscribe a client and restore its screen. `replay` hands over the session's raw ring, read only
-   * when an emulator has to be built, so an attach onto a session that already has one costs nothing
-   * extra.
+   * when an emulator has to be built, so an attach that lands while another is still restoring shares
+   * its emulator.
    */
   attach(sink: TerminalDisplaySink, session: TerminalSession, replay: () => string): void {
     const replayed = this.hasOutput
     sink({ type: 'ready', session, replayed })
-    // Before the snapshot below and before any further live write, so the replay and the live bytes
-    // meet exactly once.
-    const screen = this.ensure(replay)
+    // Nothing to restore, so nothing to emulate: the client sees every byte from here on live.
     if (!replayed) {
       this.live.add(sink)
       return
     }
+    // Before the snapshot below and before any further live write, so the replay and the live bytes
+    // meet exactly once.
+    const screen = this.ensure(replay)
 
     // snapshot() installs its barrier synchronously. Any later publish belongs after the snapshot
     // and is captured in this attachment's frame queue until activate() transfers it to live.
@@ -215,10 +220,10 @@ export class TerminalDisplay {
     return screen
   }
 
-  // The last watcher leaving is what stops the parser. A session with no emulator still fills its
-  // ring, which is what the next attach rebuilds from.
+  // The last attach waiting on a snapshot is what stops the parser, whoever is still attached. A
+  // session with no emulator still fills its ring, which is what the next attach rebuilds from.
   private release(): void {
-    if (this.live.size > 0 || this.attaching.size > 0) return
+    if (this.attaching.size > 0) return
     this.screen?.dispose()
     this.screen = null
   }
@@ -227,5 +232,6 @@ export class TerminalDisplay {
     this.attaching.delete(sink)
     this.live.add(sink)
     for (const frame of pending.frames) sink(frame)
+    this.release()
   }
 }

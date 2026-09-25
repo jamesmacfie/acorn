@@ -43,23 +43,27 @@ runs `terminal:archive-review` with task and session identities; Findings format
 
 ## The screen, and who pays for it
 
-**There is an emulator only while somebody is watching.** The canonical screen is a real terminal
-framebuffer on the node — `@xterm/headless` with a thousand lines of scrollback — because a
+**There is an emulator only while an attach is restoring a screen.** The canonical screen is a real
+terminal framebuffer on the node — `@xterm/headless` with a thousand lines of scrollback — because a
 pseudo-terminal's output is a sequence of cursor operations rather than a screen that can be replayed
-from an arbitrary offset. The first client to attach builds one and replays the session's raw ring into
-it; the last client to detach disposes it. A session nobody is looking at fills its ring and nothing
-else.
+from an arbitrary offset. An attach builds one, replays the session's raw ring into it, and serializes
+it; once no attach is waiting for a snapshot, the emulator goes, however many clients stay attached.
+An attached client does not need the node's screen, because it has every byte in its own. So a session
+costs the node its ring and nothing else, whether anybody is attached or not.
 
 It used to run from the moment the session was spawned, for every session, and the only thing that ever
 read it was an attach. So a background build paid continuous ANSI parsing to produce a screen that
-might never be asked for: a megabyte of a build's output is about 470 ms of parsing, against 3 ms to
-keep the ring alone.
+might never be asked for: a megabyte of a build's output is 45 to 120 ms of the node's CPU to parse,
+spread over about a third of a second, against 1 to 2 ms to keep the ring alone. After that it ran while anybody was attached, which stopped being a bound when
+the desktop started keeping every open tab attached (§ Client): every tab a reader had opened would
+have kept a parser running on the node, on top of the one in the reader's own xterm.
 
-**The price is scrollback, and it is deliberate.** A cold attach can only rebuild from what the ring
-still holds, so history older than 256 KB is gone and an alternate-screen program whose state depends
-on older bytes redraws from its next output. If a class of session turns up where the full history
+**The price is scrollback, and it is deliberate.** An attach can only rebuild from what the ring still
+holds, so history older than 256 KB is gone and an alternate-screen program whose state depends on
+older bytes redraws from its next output. If a class of session turns up where the full history
 matters, the answer is a bigger ring for that class, not a parser running for ever.
-What a cold attach pays instead is a rebuild of about 20 ms, once per tab (measured 2026-09-03).
+What an attach pays instead is a rebuild of 15 to 25 ms from a full ring. The desktop pays it once per
+tab and again after a reconnect, since its tabs stay attached.
 
 **The ring is a list of chunks, not a string.** 256 KB of recent raw output, kept as the buffers it
 arrived in with a running byte count, dropping from the head once the budget is spent. It used to be
@@ -256,22 +260,44 @@ launchers, status badges, and xterm rendering. It is available when the desktop 
 is present. The Agent pane shows managed sessions; the drawer is the home for shells and raw
 provider TUIs.
 
-**Every open session keeps its surface, and all but one is hidden.** Switching tabs is a repaint: the
-xterm stays alive, stays attached, and stays current, because a hidden xterm still receives its
-session's output. What it costs is one xterm per open tab, which is what a terminal application spends.
+**A terminal tab stays alive until it is closed.** Its xterm and its attachment last from the first
+frame the tab is shown until its session leaves the roster: the tab closed, the session removed or
+killed from anywhere, its task archived, or the node switched. Output that arrives while the reader is
+on another task keeps being parsed into it, so it is current when they come back, and coming back
+draws it where it was, with no new xterm, no `term:attach`, and no screen for the node to rebuild. A
+roster read that fails keeps every terminal; only a roster the node answered with lets one go.
 
-The drawer used to mount the active tab alone, keyed on its id, so the most common thing anyone does in
-it was also the most expensive: every switch destroyed an xterm and its WebGL context, sent a `term:detach`
-and a `term:attach`, posted a resize, and made the node serialize a thousand-line framebuffer — about
-18 ms of the node's loop per switch. Now the first visit to a tab costs that once and every switch after
-it touches nothing.
+Terminals are the exception to the rule that a pane's view does not outlive its task
+([panes.md](./panes.md) § Layout model), for three reasons. A terminal is a running program the reader
+expects to keep running, as it would in any terminal application. Its state is the emulator's own
+buffer, not a query the cache can hand back, so there is nothing cheaper to rebuild it from than the
+node's ring, and that rebuild loses scrollback. And rebuilding was the expensive part of going back
+to a task: a fresh xterm, a WebGL context, an attach, a rebuild on the node and a parse of the whole
+screen.
 
-Two details hold it up. A surface builds its xterm on the first frame it is actually shown on, not when
-it mounts: a tab nobody has opened costs nothing, and xterm measures its cell size from a laid-out box,
-which a hidden one is not. And the list iterates the session ids rather than the session rows — the
-roster is replaced wholesale on every refresh, so `<For>` over the rows would rebuild every surface and
-take the xterms with it, while `<Index>` would key by position and hand a closed tab's live xterm to
-whichever session moved up into its place.
+Inside the drawer, every open session gets a surface and all but one is hidden, so switching tabs is a
+repaint. Across tasks the drawer itself unmounts, because its open state is per task. So the xterms
+do not belong to the drawer. A module-level map, keyed by node and session
+(`plugins/terminal/src/client/heldTerminals.ts`), holds each one, and a surface lends it an element
+while it is drawn (`liveXterm.ts`). xterm opens once, so a move is its element changing parents, and a
+terminal nobody draws is out of the document entirely. It keeps no reference into a view that has gone,
+and xterm's renderer pauses while it is out of view.
+
+What that costs is the parse, one xterm per open tab, and a bound on the GPU. The parse runs in the
+renderer at the rate the program writes, and a terminal out of the document pays it without the paint:
+about 20 ms per megabyte of coloured output in Chromium, against about 25 ms for one on screen, with
+WebKit not yet measured. A WebKit page gets 16 live WebGL contexts and
+loses the oldest past that, so only the four terminals shown most recently keep a WebGL renderer. The
+rest fall back to the DOM renderer while nobody is looking and take a context again when they are
+shown. A lost context, from sleep or a GPU reset, falls back the same way and asks again on the next
+show.
+
+Two details hold the drawer up. A surface builds its xterm on the first frame it is actually shown on,
+not when it mounts: a tab nobody has opened costs nothing, and xterm measures its cell size from a
+laid-out box, which a hidden one is not. And the list iterates the session ids rather than the session
+rows. The roster is replaced wholesale on every refresh, so `<For>` over the rows would rebuild every
+surface, and `<Index>` would key by position and hand a closed tab's box to whichever session moved up
+into its place.
 
 Inside the drawer, everything is a kit node. `DocumentTabs` draws the session strip and carries the
 profile `Menu`, the "+" and the close control in its actions slot. `SplitHandle` is the resize grip.
