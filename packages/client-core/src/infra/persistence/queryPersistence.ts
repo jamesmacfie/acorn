@@ -1,6 +1,18 @@
 import { defaultShouldDehydrateQuery, type Query, type QueryKey } from '@tanstack/solid-query'
 
-export const PERSISTED_QUERY_MAX_AGE_MS = 24 * 60 * 60 * 1000
+const DAY_MS = 24 * 60 * 60 * 1000
+
+// How old a whole snapshot may be and still be restored: the persister's `maxAge`, measured from its
+// last write, which is roughly when the app was quit. A week, so the first launch after a weekend
+// away draws last-known rows rather than an empty shell. The per-entry age below bounds what a
+// snapshot holds, and it stays at a day.
+export const PERSISTED_SNAPSHOT_MAX_AGE_MS = 7 * DAY_MS
+
+// How long one entry is carried from snapshot to snapshot without being refetched. It matches the
+// QueryClient's `gcTime` (infra/node/fleet.ts), so an entry nobody has looked at for a day leaves
+// memory and the snapshot together. A restored week-old entry is drawn once and then dropped at the
+// next write unless its screen refetched it.
+export const PERSISTED_QUERY_MAX_AGE_MS = DAY_MS
 
 // File bodies and patch-bearing file queries are reconstructable from the loopback API/blob cache
 // and dominate IndexedDB size. Summaries remain useful offline because they contain no patch body.

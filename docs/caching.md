@@ -90,6 +90,14 @@ not mutation confirmation. When a Node is reconnecting or offline, cached respon
 with freshness badges. A WebSocket reconnect or sequence gap marks affected data stale and triggers
 normal refetching; there is no history cursor or offline mutation queue.
 
+Two ages bound the persisted cache
+(`packages/client-core/src/infra/persistence/queryPersistence.ts`). A whole
+snapshot is restored if it was written in the last seven days, so the first launch after a weekend
+away draws last-known rows instead of an empty shell. A single entry is written into the next
+snapshot only if it was fetched in the last day, which matches the query client's `gcTime`. So a
+week-old entry is drawn once and then dropped unless its screen refetched it, and the longer restore
+window does not make the snapshot any bigger.
+
 The Workflows pane follows the same rule even though its selected run and steps are Solid resources
 rather than persisted query rows. Run and child-change frames re-read the relevant task, and socket
 reconnect re-reads both the task's run list and the selected run's steps. The pane model is created
