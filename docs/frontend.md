@@ -425,7 +425,18 @@ drifted from 1,317,605 B to 1,329,679 B across 31 unrelated commits while stayin
 it. And a budget that only counts bytes lets the next heavy chunk in as long as something else shrank.
 The denylist is `shiki`, `wasm`, `DiffPane`, `prModel`, `prSections`, `viewState` and `icon-nodes`:
 each is a lazy surface that leaked into the eager graph, and a chunk with one of those names being
-fetched at startup is wrong whatever it weighs. The shape of the mistake is always the same — a
+fetched at startup is wrong whatever it weighs. The renderer's list adds plugin code a registration
+needs only when it draws: `MemorySection`, `FindingsBundleReview`, the workflow editor's `draft-` and
+`draftStore`, `stepFields`, `GithubImporter`, `PreviewTaskPane` and `PreviewPane`. All of those were
+on the renderer's startup graph until 2026-09-25.
+
+The renderer tests a name against modules as well as chunks. `vite.config.ts` writes
+`dist/renderer-modules.json` beside the manifest, listing the source modules in each chunk, and the
+check tests every folder on a startup module's path and its file name, written the way a chunk would be
+named after it (`draft.ts` as `draft-`). That second test is the one that matters most. A module that
+startup code imports statically merges into a startup chunk named after some other module, so a
+chunk-name test alone never sees it. That is how the plugin code above reached startup unnoticed. The
+terminal client's check still tests chunk names only. The shape of the mistake is always the same — a
 string-keyed table from a name to a **value** rather than to a **loader**, which pulls every value into
 whichever chunk holds the table. All five instances have been fixed: `kit/tokens/iconNodes.ts` (see
 [ui-design.md](./ui-design.md) § Which names are drawn without waiting), the DOM host's kit table (see

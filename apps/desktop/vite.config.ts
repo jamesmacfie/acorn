@@ -1,7 +1,11 @@
-import { renameSync, rmSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { renameSync, rmSync, writeFileSync } from 'node:fs'
+import { join, relative, resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import solid from 'vite-plugin-solid'
+
+const repoRoot = resolve(import.meta.dirname, '../..')
+// Filled by the acorn:renderer-graph plugin below, one list of source modules per emitted chunk.
+let chunkModules: Record<string, string[]> = {}
 
 // The renderer. Nothing here knows which shell it is in: the host global arrives as a webview
 // initialization script (`vite.bridge.config.ts`) rather than as anything the page imports, which is
@@ -23,14 +27,25 @@ export default defineConfig({
     // writes its manifest inside the output, and the output ships whole, so it is moved beside the
     // output once the bundle is written. It cannot be emitted there: Vite refuses a manifest path
     // outside outDir.
+    //
+    // Beside it, `renderer-modules.json`: the source modules in each chunk. The manifest names chunks
+    // only, and a module imported statically from startup code merges into a startup chunk named after
+    // something else, so the check's denylist needs the module list to see it.
     {
       name: 'acorn:renderer-graph',
       apply: 'build',
       config: () => ({ build: { manifest: true } }),
+      generateBundle(_options, bundle) {
+        chunkModules = {}
+        for (const [file, output] of Object.entries(bundle)) {
+          if (output.type === 'chunk') chunkModules[file] = Object.keys(output.modules).map((id) => relative(repoRoot, id.replace(/\?.*$/, '')))
+        }
+      },
       writeBundle({ dir }) {
         if (!dir) return
         renameSync(join(dir, '.vite/manifest.json'), join(dir, '../renderer-manifest.json'))
         rmSync(join(dir, '.vite'), { recursive: true })
+        writeFileSync(join(dir, '../renderer-modules.json'), JSON.stringify(chunkModules))
       },
     },
   ],
