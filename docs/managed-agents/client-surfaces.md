@@ -285,8 +285,8 @@ longer a menu item one click away from a transcript that cannot be recovered.
 ### The transcript store
 
 Because nothing is virtualised, the DOM holds every card in a session, and what a streamed event costs
-is the only lever there is. `plugins/agents/src/client/sessions/managedStore.ts` holds one snapshot per
-session — the session row, its turns, its events and its requests — and every client sees about 25
+is the only lever there is. `plugins/agents/src/client/sessions/managedStore.ts` holds one snapshot for
+each session it keeps — the session row, its turns, its events and its requests — and every client sees about 25
 events a second per streaming session, because the Node coalesces text deltas at 40 ms or 16 KB
 (`durableEventBuffer.ts`). Five rules keep that frame cheap, and all five are load-bearing.
 
@@ -339,6 +339,18 @@ another window, a request that a stop expired. So a resumed read answers what a 
 it brings no events, the held array passes through unchanged and is not indexed again. A shown
 conversation also reads on when the socket reconnects (`wsOnReconnect`), because nothing replays the
 frames a dropped socket missed. A session that is not on screen catches up when it next mounts.
+
+**The store keeps the snapshots on screen and the three drawn last, and drops the rest.** It used to
+keep every session it had read until the session was deleted or the node switched, and eight real
+sessions opened one after another came to 46 MB of JSON. A surface that reads a session's snapshot
+holds it through `managedAgentStore.hold(sessionId)` for as long as it draws it: the conversation
+holds its session, and the task sidebar holds each session waiting on the reader, whose requests it
+lists. Releasing a hold counts as the latest drawing. Past the three most recent, a snapshot that
+nothing holds and nothing is reading drops its events, its seen ids, its usage line and its
+`completeThrough` mark. The row stays in the roster, so the rail, Agent Center and notices still draw
+it, and so do its composer draft, its reading place and its live event sequence. A frame for a
+dropped session appends nothing, and an `error` frame for one reads nothing. Opening it again is a
+first visit: the read starts from the beginning.
 
 ### Transcript search
 

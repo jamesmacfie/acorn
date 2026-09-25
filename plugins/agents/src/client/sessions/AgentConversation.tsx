@@ -78,6 +78,8 @@ export default function AgentConversation(props: AgentConversationProps & {
   createEffect(on(sessionId, (id) => {
     setError('')
     if (!id) return
+    // Held while drawn, so the store's bound cannot drop the transcript from under the reader.
+    onCleanup(managedAgentStore.hold(id))
     const view = claimAgentSelection(id)
     onCleanup(view.dispose)
     // Every mount reads, a return to a session the store already holds included. That read resumes

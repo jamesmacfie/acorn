@@ -30,6 +30,9 @@ const pageCalls: number[] = []
 const sessionCalls: { taskId?: string }[] = []
 let failSessions = false
 let served: AgentSessionSnapshot
+// Per-session answers, for the tests that hold more than one session, and reads held open until let go.
+let servedBy: Record<string, AgentSessionSnapshot> = {}
+let gates: Record<string, Promise<void>> = {}
 // The rest of the ledger, keyed by the cursor the client pages from.
 let servedPages: Record<number, AgentEventRecord[]> = {}
 let servedList: AgentSessionList = { sessions: [], delegations: [], nextCursor: null }
@@ -39,7 +42,9 @@ vi.mock('./managedClient', () => ({
     snapshot: async (sessionId: string, afterSeq = 0) => {
       snapshotCalls.push(sessionId)
       snapshotCursors.push(afterSeq)
-      return { ...served, events: served.events.filter((item) => item.seq > afterSeq) }
+      await gates[sessionId]
+      const base = servedBy[sessionId] ?? served
+      return { ...base, events: base.events.filter((item) => item.seq > afterSeq) }
     },
     events: async (_sessionId: string, afterSeq: number) => {
       pageCalls.push(afterSeq)
@@ -103,6 +108,8 @@ beforeEach(() => {
   pageCalls.length = 0
   servedPages = {}
   servedList = { sessions: [], delegations: [], nextCursor: null }
+  servedBy = {}
+  gates = {}
 })
 
 // The snapshot route caps its event list, so a session past the cap arrives short. Reopening one used
@@ -420,5 +427,86 @@ describe('reading a session the store holds', () => {
     await managedAgentStore.loadSnapshot(SESSION)
     expect(snapshotCursors).toEqual([0])
     expect(events().map((item) => item.seq)).toEqual([1, 2])
+  })
+})
+
+// The store kept every transcript it read until the session was deleted: 46 MB of JSON after opening
+// eight real sessions one after another. It keeps what is drawn and the three drawn last.
+describe('which snapshots the store keeps', () => {
+  const answer = (id: string): AgentSessionSnapshot => ({
+    session: { ...session, id, lastEventSeq: 1 },
+    turns: [],
+    requests: [],
+    events: [{ ...prose(1), id: `${id}-e1`, sessionId: id }],
+  })
+  // What the conversation does when it mounts: hold, then read.
+  const open = async (id: string) => {
+    servedBy[id] ??= answer(id)
+    const release = managedAgentStore.hold(id)
+    await managedAgentStore.loadSnapshot(id)
+    return release
+  }
+  const visit = async (...ids: string[]) => {
+    for (const id of ids) (await open(id))()
+  }
+  const kept = () => Object.keys(managedAgentStore.snapshots()).sort()
+
+  it('keeps the three drawn last and drops the rest, rows and all left in the roster', async () => {
+    await visit('a', 'b', 'c', 'd', 'e')
+    expect(kept()).toEqual(['c', 'd', 'e'])
+    expect(managedAgentStore.sessions().map((item) => item.id).sort()).toEqual(['a', 'b', 'c', 'd', 'e'])
+  })
+
+  it('never drops a session something is drawing, and counts letting go as the latest drawing', async () => {
+    const releaseA = await open('a')
+    await visit('b', 'c', 'd', 'e')
+    expect(kept()).toEqual(['a', 'c', 'd', 'e'])
+    releaseA()
+    expect(kept()).toEqual(['a', 'd', 'e'])
+  })
+
+  it('holds a session for as long as any of its readers does', async () => {
+    // The Agent pane and the Workflows run pane can draw one session at once.
+    const first = await open('a')
+    const second = managedAgentStore.hold('a')
+    first()
+    first()
+    await visit('b', 'c', 'd', 'e')
+    expect(kept()).toContain('a')
+    second()
+    expect(kept()).toEqual(['a', 'd', 'e'])
+  })
+
+  it('reads a dropped session from the start, and leaves its frames alone until then', async () => {
+    await visit('a', 'b', 'c', 'd')
+    expect(kept()).not.toContain('a')
+    push({ channel: 'agent:event', event: { ...prose(2), id: 'a-e2', sessionId: 'a' } })
+    expect(kept()).not.toContain('a')
+
+    snapshotCursors.length = 0
+    const release = await open('a')
+    expect(snapshotCursors).toEqual([0])
+    release()
+  })
+
+  it('leaves a session alone while it is being read', async () => {
+    await visit('a', 'b', 'c')
+    let open_ = (): void => undefined
+    gates.a = new Promise((resolve) => { open_ = resolve })
+    const reading = managedAgentStore.loadSnapshot('a')
+    await visit('d', 'e')
+    // Past the bound, and the oldest, but its read resumes from the events it holds.
+    expect(kept()).toContain('a')
+    open_()
+    await reading
+    expect(snapshotCursors.at(-3)).toBe(1)
+    expect(kept()).toEqual(['a', 'd', 'e'])
+  })
+
+  it('does not read back a session it is not keeping when that session reports an error', async () => {
+    managedAgentStore.upsertSession({ ...session, id: 'z' })
+    push({ channel: 'agent:event', event: { ...event(1, { type: 'error', code: 'boom', message: 'boom', retryable: false }), id: 'z-e1', sessionId: 'z' } })
+    await new Promise((resolve) => setTimeout(resolve, 80))
+    expect(snapshotCalls).not.toContain('z')
   })
 })
