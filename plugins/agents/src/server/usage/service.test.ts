@@ -165,4 +165,49 @@ describe('agent usage service', () => {
     await service.read({ userId: 'james' })
     expect(calls).toBe(2)
   })
+
+  it('confirms one provider depletion and waits for its latest exhausted window', async () => {
+    let claudeCalls = 0
+    let codexCalls = 0
+    const service = createAgentUsageService({
+      probeDir: await probeDir(),
+      now: () => 1_000,
+      collectors: collectorsFor(
+        async () => {
+          claudeCalls++
+          return provider('claude')
+        },
+        async () => {
+          codexCalls++
+          return {
+            ...provider('codex', 0),
+            health: 'depleted',
+            quotas: [
+              { id: 'session', label: 'Session', percentRemaining: 0, resetsAt: 2_000, resetText: null, windowSeconds: 300, health: 'depleted' },
+              { id: 'weekly', label: 'Weekly', percentRemaining: 0, resetsAt: 3_000, resetText: null, windowSeconds: 600, health: 'depleted' },
+            ],
+          }
+        },
+      ),
+    })
+
+    expect(await service.depletedUntil({ userId: 'james', providerId: 'codex' })).toBe(3_000)
+    expect({ claudeCalls, codexCalls }).toEqual({ claudeCalls: 0, codexCalls: 1 })
+  })
+
+  it('does not schedule when a depleted quota has no exact reset time', async () => {
+    const service = createAgentUsageService({
+      probeDir: await probeDir(),
+      collectors: collectorsFor(
+        async () => provider('claude'),
+        async () => ({
+          ...provider('codex', 0),
+          health: 'depleted',
+          quotas: [{ id: 'session', label: 'Session', percentRemaining: 0, resetsAt: null, resetText: 'later', windowSeconds: null, health: 'depleted' }],
+        }),
+      ),
+    })
+
+    expect(await service.depletedUntil({ userId: 'james', providerId: 'codex' })).toBeNull()
+  })
 })

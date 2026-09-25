@@ -77,9 +77,9 @@ export default function AgentSessionDefaultsSettings() {
   return (
     <Stack gap="section">
       <Text emphasis="muted" wrap>
-        What a new agent session starts on: the model, the reasoning effort, the mode, and anything
-        else the provider offers. Acorn applies these once the provider reports its options, and
-        writes the switch into the transcript so a session reads back under the settings it ran with.
+        Defaults Acorn applies to managed agent sessions, including how a paused usage window resumes
+        and what a new session starts on. Provider option changes are written into the transcript so
+        a session reads back under the settings it ran with.
       </Text>
 
       <Show when={stored.error}>
@@ -87,6 +87,15 @@ export default function AgentSessionDefaultsSettings() {
           {stored.error instanceof Error ? stored.error.message : 'Agent defaults could not be loaded.'}
         </Alert>
       </Show>
+
+      <Section label="Usage limits">
+        <Checkbox
+          checked={record().continueAfterUsageLimit}
+          label="Continue when usage resets"
+          hint="If an agent stops because its plan usage is exhausted and reports a reset time, Acorn keeps the turn queued and continues it after that time."
+          onChange={(checked) => void save({ continueAfterUsageLimit: checked })}
+        />
+      </Section>
 
       <Checkbox
         checked={record().followLastSession}

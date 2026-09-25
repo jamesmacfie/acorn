@@ -327,6 +327,7 @@ export class AcpDriver implements AgentDriver {
         cwd: options.cwd,
         additionalDirectories: [],
         mcpServers,
+        ...(this.spec.acpSessionMeta ? { _meta: this.spec.acpSessionMeta } : {}),
       })
       providerSessionRef = created.sessionId
       configOptions = created.configOptions ?? []
@@ -342,6 +343,7 @@ export class AcpDriver implements AgentDriver {
         // it was told about, because the token in one of them is minted per start and the old one is
         // already dead.
         mcpServers,
+        ...(this.spec.acpSessionMeta ? { _meta: this.spec.acpSessionMeta } : {}),
       }
       try {
         const reconnected = supportsResume

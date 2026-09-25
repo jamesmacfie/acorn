@@ -368,6 +368,9 @@ export class AgentStore extends AgentSessionRepository {
       .limit(1)
     if (!current) throw new Error('Queued agent turn not found.')
     if (current.status !== 'queued') throw new Error('Only queued turns can be edited or reordered.')
+    if (current.continuationInputJson && patch.input) {
+      throw new Error('An automatic continuation can be cancelled, but its prompt cannot be edited.')
+    }
 
     let attachmentParts: Array<{ id: string; position: number }> | null = null
     if (patch.input) {
@@ -457,6 +460,7 @@ export class AgentStore extends AgentSessionRepository {
       .update(schema.agentTurns)
       .set({
         status: 'dispatching',
+        notBefore: null,
         attempt: sql`${schema.agentTurns.attempt} + 1`,
         startedAt: now(),
         completedAt: null,
@@ -511,6 +515,54 @@ export class AgentStore extends AgentSessionRepository {
     if (after?.status === 'queued') await this.lifecycle.announceTurn(turnId)
   }
 
+  /** Pause the same logical turn until a provider usage window resets. Keeping the turn id and its
+   * original input means workflow and delegation waiters keep waiting on the operation they started. */
+  async deferTurnForUsageLimit(
+    turnId: string,
+    notBefore: number,
+    continuationInput: AgentTurn['input'],
+  ): Promise<AgentTurn | null> {
+    const before = await this.turn(turnId)
+    if (!before || !['dispatching', 'active'].includes(before.status)) return null
+    this.db.transaction((tx) => {
+      tx
+        .update(schema.agentTurns)
+        .set({
+          status: 'queued',
+          continuationInputJson: JSON.stringify(continuationInput),
+          notBefore,
+          providerTurnRef: null,
+          stopReason: 'usage_limit',
+          startedAt: null,
+          completedAt: null,
+          errorJson: null,
+        })
+        .where(and(
+          eq(schema.agentTurns.id, turnId),
+          inArray(schema.agentTurns.status, ['dispatching', 'active']),
+        ))
+        .run()
+      const queued = tx
+        .select({ count: sql<number>`count(*)` })
+        .from(schema.agentTurns)
+        .where(and(eq(schema.agentTurns.sessionId, before.sessionId), eq(schema.agentTurns.status, 'queued')))
+        .get()
+      tx
+        .update(schema.agentSessions)
+        .set({
+          queuedTurns: Number(queued?.count ?? 0),
+          runtimeState: 'ready',
+          attention: 'none',
+          updatedAt: now(),
+        })
+        .where(eq(schema.agentSessions.id, before.sessionId))
+        .run()
+    })
+    const after = await this.turn(turnId)
+    if (after?.status === 'queued') await this.lifecycle.announceTurn(turnId)
+    return after?.status === 'queued' ? after : null
+  }
+
   async setTurnProviderRef(turnId: string, providerTurnRef: string): Promise<void> {
     await this.db
       .update(schema.agentTurns)
@@ -523,7 +575,7 @@ export class AgentStore extends AgentSessionRepository {
     if (!before || !['queued', 'dispatching', 'active'].includes(before.status)) return
     await this.db
       .update(schema.agentTurns)
-      .set({ status: 'cancelled', completedAt: now() })
+      .set({ status: 'cancelled', continuationInputJson: null, notBefore: null, completedAt: now() })
       .where(and(eq(schema.agentTurns.id, turnId), inArray(schema.agentTurns.status, ['queued', 'dispatching', 'active'])))
     if (before.status === 'queued') await this.recountQueuedTurns(before.sessionId)
     const after = await this.turn(turnId)
@@ -543,6 +595,8 @@ export class AgentStore extends AgentSessionRepository {
       .update(schema.agentTurns)
       .set({
         status: 'interrupted',
+        continuationInputJson: null,
+        notBefore: null,
         errorJson: JSON.stringify({ code: 'provider_disconnected', message }),
         completedAt: now(),
       })
