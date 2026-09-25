@@ -6,7 +6,7 @@
 
 import { lstat, readFile } from 'node:fs/promises'
 import { isAbsolute, join, resolve } from 'node:path'
-import { git, gitOrThrow, gitText, invalidateWorktreeStatus, worktreeStatusText } from '@acorn/plugin-api/node'
+import { git, gitOrThrow, gitText, invalidateWorktreeStatus, worktreeGitText, worktreeStatusText } from '@acorn/plugin-api/node'
 import type { LocalChange, LocalStatus } from '@acorn/protocol/localGit.ts'
 import type { CommitOptions, HeadCommit, PullOptions, PushOptions } from '../shared/api'
 
@@ -109,9 +109,11 @@ export function mergeNumstat(changes: LocalChange[], numstat: string, staged: bo
 // Is a merge or a rebase mid-flight? A stat rather than a git call, and not against
 // `<worktree>/.git`, which in a worktree is a file pointing at the shared repository's
 // `worktrees/<name>` directory. That directory is where these three live, so `rev-parse --git-dir`
-// is the only way to find them.
-export async function gitOperation(worktree: string): Promise<LocalStatus['operation']> {
-  const dir = await gitText(['rev-parse', '--git-dir'], { cwd: worktree, timeoutMs: 10_000 }).catch(() => '')
+// is the only way to find them. The lookup shares the status read's two-second window; the three
+// stats never do. `fresh` is for the abort verb, which refuses on this answer
+// (@acorn/plugin-api/node § worktreeStatusText: the cache serves reads, never a refusal).
+export async function gitOperation(worktree: string, opts: { fresh?: boolean } = {}): Promise<LocalStatus['operation']> {
+  const dir = (await worktreeGitText(worktree, ['rev-parse', '--git-dir'], { fresh: opts.fresh }))?.trim()
   if (!dir) return null
   const gitDir = isAbsolute(dir) ? dir : join(worktree, dir)
   const present = async (name: string) => await lstat(join(gitDir, name)).then(() => true, () => false)
@@ -132,17 +134,17 @@ export async function localStatus(worktree: string): Promise<LocalStatus> {
   // reads four, which is why the two callers can share one command.
   const stdout = (await worktreeStatusText(worktree)) ?? ''
   const parsed = parsePorcelainV2(stdout)
-  let changes = parsed.changes
-  try {
-    const [unstaged, staged] = await Promise.all([
-      gitText(['diff', '--numstat'], { cwd: worktree, timeoutMs: 15_000 }),
-      gitText(['diff', '--staged', '--numstat'], { cwd: worktree, timeoutMs: 15_000 }),
-    ])
-    changes = mergeNumstat(mergeNumstat(changes, unstaged, false), staged, true)
-  } catch {
-    // Stats are decoration. The list still renders without them.
-  }
-  return { ...parsed, changes, operation: await gitOperation(worktree) }
+  // The line counts share that window too, and are dropped with it when the node writes under the
+  // path. Not skipped when the status text is unchanged: a second edit to a file that is already
+  // modified moves its counts and leaves its porcelain line alone. A null is git failing, and stats
+  // are decoration, so the list renders without them.
+  const operation = gitOperation(worktree)
+  const [unstaged, staged] = await Promise.all([
+    worktreeGitText(worktree, ['diff', '--numstat'], { timeoutMs: 15_000 }),
+    worktreeGitText(worktree, ['diff', '--staged', '--numstat'], { timeoutMs: 15_000 }),
+  ])
+  const changes = mergeNumstat(mergeNumstat(parsed.changes, unstaged ?? '', false), staged ?? '', true)
+  return { ...parsed, changes, operation: await operation }
 }
 
 // Everything before the first hunk header is git's file header. The client re-synthesizes its

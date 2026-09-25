@@ -36,7 +36,9 @@ does not: a new commit is both, so the GitHub pane sets only `signature`.
 Behind the changes pane's two signatures is one resource, `LocalStatus`, which carries the branch, its
 upstream, and how far the branch is each way alongside the file list, so no two regions of the panel
 can describe different trees. It is one `git status --porcelain=v2 --branch --untracked-files=all`
-call plus two numstats and a filesystem check for a half-finished merge or rebase. Two reads would
+call plus two numstats and a filesystem check for a half-finished merge or rebase, and the node shares
+all of it across clients for two seconds ([workspaces-and-tasks.md](./workspaces-and-tasks.md)
+§ Worktree status reads). Two reads would
 disagree for a poll interval, which is why the header's totals, the groups, the branch bar's counts
 and the banner all derive from this one record. The last flag is what makes an untracked directory
 arrive as the files inside it: git's default collapses one to a single `dir/` entry, and a row named

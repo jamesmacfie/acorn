@@ -125,7 +125,7 @@ export function localGitBridge(
     // flight. A request that arrives after somebody finished the rebase in a terminal is refused
     // rather than guessed at (docs/security.md § Process, path, and configuration controls).
     abort: (taskId) => withRoot(taskId, async (root) => {
-      const operation = await gitOperation(root)
+      const operation = await gitOperation(root, { fresh: true })
       if (!operation) return { ok: false, reason: 'No merge or rebase is in progress.' }
       return abortOperation(root, operation)
     }),
