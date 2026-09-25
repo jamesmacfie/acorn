@@ -21,9 +21,13 @@ On that tail, each recorded event goes out as an `agent:event` frame. The sessio
 in 30 on a real ledger. `runtimeEngine.ts` compares the row with the last one broadcast, whoever sent
 it, leaving out `lastEventSeq`, `updatedAt`, and each subagent's heard-from time. A
 `session_metadata` event always sends, because it is the one event that writes `config`, and the
-comparison skips `config` for its size. The client moves `lastEventSeq` and `updatedAt` on its held
-row from each event frame (`managedStore.ts` § advanceRow). A client that doesn't do this sees those
-two fields lag until the next row.
+comparison skips `config` for its size. So a client's held row carries `lastEventSeq` and
+`updatedAt` as of its last change, and the client leaves the row alone on an event frame: rewriting
+the roster about 25 times a second woke every reader of it, and Agent Center redrew every row per
+event. The pane's read mark is the one reader that needs the live sequence, and it reads it from the
+event frames through `managedAgentStore.lastEventSeq(session)` (`managedStore.ts` § eventSeqs).
+Agent Center's age and order come from the row, so a session that streams a long turn keeps the time
+its turn started until its next change or the next list read.
 
 Session state changes and their event records are committed together. Once a turn has committed any
 events, a restart never silently resubmits it. Reconciliation marks interrupted work and leaves an

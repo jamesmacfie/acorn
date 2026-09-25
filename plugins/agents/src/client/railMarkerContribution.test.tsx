@@ -30,7 +30,7 @@ const event = (sessionId: string, seq: number): AgentEventRecord => ({
 
 describe('the agent rail marker while a session streams', () => {
   // One case, because the store is a module singleton and the rows below outlive it.
-  it('runs only the streaming task’s row, and keeps that row’s sequence and clock current', () => {
+  it('runs no row per event, and keeps the session’s live sequence off the roster', () => {
     managedAgentStore.activate()
     const TASKS = 30
     managedAgentStore.upsertSessions(Array.from({ length: 100 }, (_, index) =>
@@ -49,18 +49,20 @@ describe('the agent rail marker while a session streams', () => {
     })
     expect(markers.get('t9')?.map((marker) => marker.id)).toEqual(['working'])
     runs.clear()
+    const roster = managedAgentStore.sessions()
 
     // What the node sends per streamed event now: the event, and no row unless the event changed it
     // (server/sessions/runtimeEngine.ts § record). s0 is in t0.
     for (let seq = 1; seq <= 25; seq++) deliver({ channel: 'agent:event', event: event('s0', seq) })
 
-    expect([...runs.keys()]).toEqual(['t0'])
-    expect(runs.get('t0')).toBe(25)
-    // The event moved the row: the pane marks read up to `lastEventSeq`, and the roster sorts on
-    // `updatedAt`, which is the event's own time on the node.
-    const streamed = managedAgentStore.sessions()[0]!
-    expect(streamed).toMatchObject({ id: 's0', lastEventSeq: 25, updatedAt: 5_025 })
-    expect(managedAgentStore.sessionsForTask('t0')[0]).toBe(streamed)
+    // No row runs at all: an event frame leaves the roster alone, and the live sequence the pane
+    // marks read up to is its own per-session signal (sessions/managedStore.ts § eventSeqs).
+    expect([...runs.keys()]).toEqual([])
+    // Nor anything that reads the whole roster, such as Agent Center.
+    expect(managedAgentStore.sessions()).toBe(roster)
+    const streamed = managedAgentStore.sessionsForTask('t0').find((session) => session.id === 's0')!
+    expect(streamed).toMatchObject({ lastEventSeq: 0, updatedAt: 1_000 })
+    expect(managedAgentStore.lastEventSeq(streamed)).toBe(25)
 
     // And a row that did change still lands, on its task's rows alone.
     runs.clear()

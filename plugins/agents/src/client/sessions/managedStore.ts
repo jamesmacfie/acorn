@@ -183,6 +183,7 @@ function removeSession(sessionId: string): void {
   seenEventIds.delete(sessionId)
   usageLines.delete(sessionId)
   completeThrough.delete(sessionId)
+  eventSeqs.delete(sessionId)
   setRoster((current) => current.filter((session) => session.id !== sessionId))
   setDelegations((current) => {
     if (!(sessionId in current)) return current
@@ -258,27 +259,27 @@ function seatEvent(events: AgentEventRecord[], event: AgentEventRecord): boolean
   return false
 }
 
-// The row's sequence and clock, moved by its own event. The node sends the whole row only when an
-// event changes something else on it (server/sessions/runtimeEngine.ts § record), and these two change
-// with every event. The pane marks read up to `lastEventSeq`. The roster sorts by `updatedAt`, and
-// Agent Center shows each row's age from it. The node sets it to the event's time.
-function advanceRow(event: AgentEventRecord): void {
-  setRoster((current) => {
-    const at = current.findIndex((session) => session.id === event.sessionId)
-    const held = current[at]
-    if (!held || held.lastEventSeq >= event.seq) return current
-    const moved = { ...held, lastEventSeq: event.seq, updatedAt: Math.max(held.updatedAt, event.createdAt) }
-    // Its clock only goes forward, so the row can only move up, and a streaming session is usually
-    // first already. It steps up to its place instead of the roster being sorted per event.
-    const next = [...current]
-    let to = at
-    while (to > 0 && byRecent(moved, next[to - 1]!) < 0) {
-      next[to] = next[to - 1]!
-      to--
-    }
-    next[to] = moved
-    return next
-  })
+// Each session's newest event seq, from its event frames, and kept off the roster. The node sends the
+// whole row only when an event changes something else on it (server/sessions/runtimeEngine.ts
+// § record), so a held row's `lastEventSeq` and `updatedAt` stop at its last change. Moving them on the
+// row per event woke every reader of the roster about 25 times a second: Agent Center redrew every
+// row, and the streaming task's sidebar every one of its rows, to show nothing new. The pane's read mark
+// is the one reader that needs the live number, and it asks here (`lastEventSeq` below).
+const eventSeqs = new Map<string, Signal<number>>()
+
+function eventSeq(sessionId: string): Signal<number> {
+  let seq = eventSeqs.get(sessionId)
+  if (!seq) {
+    seq = createSignal(0)
+    eventSeqs.set(sessionId, seq)
+  }
+  return seq
+}
+
+function advanceSeq(event: AgentEventRecord): void {
+  if (deletedSessionIds.has(event.sessionId)) return
+  const [seq, setSeq] = eventSeq(event.sessionId)
+  if (event.seq > untrack(seq)) setSeq(event.seq)
 }
 
 function appendEvent(event: AgentEventRecord): void {
@@ -400,7 +401,7 @@ function onFrame(value: unknown): void {
   if (!isAgentFrame(value)) return
   if (value.channel === 'agent:event') batch(() => {
     appendEvent(value.event)
-    advanceRow(value.event)
+    advanceSeq(value.event)
   })
   else if (value.channel === 'agent:session') {
     upsertSession(value.session)
@@ -420,6 +421,11 @@ export const managedAgentStore = {
   sessions,
   /** One task's sessions, in the roster's order. Wakes its reader only when that task's rows change. */
   sessionsForTask,
+  /** The row's `lastEventSeq`, or its newest event frame's if that is further. Wakes its reader on
+   *  that session's events and no other's. */
+  lastEventSeq(session: AgentSession): number {
+    return Math.max(session.lastEventSeq, eventSeq(session.id)[0]())
+  },
   delegations,
   snapshots,
   /**
@@ -567,6 +573,7 @@ export const managedAgentStore = {
     seenEventIds.clear()
     usageLines.clear()
     completeThrough.clear()
+    eventSeqs.clear()
     taskLoads.clear() // another node's tasks, and the window would serve its answers for this one
     delegationLoads.clear()
     // An in-flight read of the old node's session. It resolves after this and merges into an empty

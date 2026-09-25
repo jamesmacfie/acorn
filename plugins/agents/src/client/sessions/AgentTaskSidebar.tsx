@@ -60,8 +60,9 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
   createEffect(() => {
     for (const session of model.taskSessions()) {
       if (['none', 'unread', 'completed', 'error'].includes(session.attention)) continue
-      if (attentionLoaded.get(session.id) === session.lastEventSeq) continue
-      attentionLoaded.set(session.id, session.lastEventSeq)
+      const seq = managedAgentStore.lastEventSeq(session)
+      if (attentionLoaded.get(session.id) === seq) continue
+      attentionLoaded.set(session.id, seq)
       void managedAgentStore.loadSnapshot(session.id).catch(() => undefined)
     }
   })
