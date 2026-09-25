@@ -30,8 +30,9 @@ describe('check-renderer-budget', () => {
   let dir: string
 
   // Writes a built client the way Vite does: each chunk and stylesheet under assets/, an index.html
-  // that loads the entry and preloads its static imports, and the manifest beside the client dir.
-  const build = (manifest: Record<string, Chunk>, bytes: Record<string, number> = {}) => {
+  // that loads the entry and preloads its static imports, and the manifest beside the client dir, with
+  // the source modules in each chunk beside that (vite.config.ts writes both).
+  const build = (manifest: Record<string, Chunk>, bytes: Record<string, number> = {}, modules: Record<string, string[]> = {}) => {
     mkdirSync(join(dir, 'assets'), { recursive: true })
     for (const chunk of Object.values(manifest)) {
       for (const file of [chunk.file, ...chunk.css ?? []]) writeFileSync(join(dir, file), 'x'.repeat(bytes[file] ?? CHUNK))
@@ -44,6 +45,7 @@ describe('check-renderer-budget', () => {
       `<!doctype html><html><head>\n<script type="module" src="/${entry.file}"></script>\n${[...preloads, ...styles].join('\n')}\n</head><body></body></html>`,
     )
     writeFileSync(join(root, 'renderer-manifest.json'), JSON.stringify(manifest))
+    writeFileSync(join(root, 'renderer-modules.json'), JSON.stringify(modules))
   }
 
   // index.html loading the app directly: the entry and its static imports are the startup set.
@@ -96,6 +98,27 @@ describe('check-renderer-budget', () => {
     const { code, output } = run(dir)
     expect(code).toBe(1)
     expect(output).toContain('viewState-cccc.js')
+  })
+
+  it('fails on a denylisted module that merged into a chunk named after something else', () => {
+    // How plugin code reached startup before 2026-09-25: a client entry imported a component
+    // statically, the component landed in the entry chunk, and every chunk name stayed innocent.
+    build({
+      'index.html': { file: 'assets/index-aaaa.js', isEntry: true, imports: ['_x'] },
+      _x: { file: 'assets/store-bbbb.js' },
+    }, {}, { 'assets/index-aaaa.js': ['apps/desktop/src/client/index.tsx', 'plugins/memory/src/client/MemorySection.tsx'] })
+    const { code, output } = run(dir)
+    expect(code).toBe(1)
+    expect(output).toContain('plugins/memory/src/client/MemorySection.tsx (in index-aaaa.js)')
+  })
+
+  it('reads a module prefix the way a chunk would be named after it', () => {
+    // `draft-` is the editor's draft.ts, not every module whose name starts with "draft".
+    build({
+      'index.html': { file: 'assets/index-aaaa.js', isEntry: true, imports: ['_x'] },
+      _x: { file: 'assets/store-bbbb.js' },
+    }, {}, { 'assets/index-aaaa.js': ['packages/client-core/src/kit/lib/draftState.ts'] })
+    expect(run(dir).code).toBe(0)
   })
 
   it('fails on a denylisted name reached through the startup guard', () => {
