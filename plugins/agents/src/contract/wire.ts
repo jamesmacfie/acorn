@@ -270,7 +270,7 @@ export type AgentNormalizedEvent =
   | { type: 'session_metadata'; providerSessionRef?: string; configOptions?: AgentConfigOption[]; commands?: AgentCommandDescriptor[]; skills?: AgentSkillDescriptor[] }
   /** `subagentId` means somebody other than the reader wrote this turn: it is the brief a subagent was
    *  handed, so it belongs in that subagent's stream rather than in the session's. */
-  | { type: 'user_message'; text: string; subagentId?: string }
+  | { type: 'user_message'; text: string; subagentId?: string; automatic?: boolean }
   | { type: 'assistant_message'; text: string; messageId?: string; append?: boolean; subagentId?: string }
   | { type: 'reasoning'; text: string; messageId?: string; append?: boolean; subagentId?: string }
   | { type: 'tool'; tool: AgentToolCall }
@@ -326,6 +326,11 @@ export type AgentTurn = {
   source: AgentTurnSource
   status: AgentTurnStatus
   input: AgentInputPart[]
+  /** The prompt used when Acorn resumes this same logical turn after a provider usage reset. The
+   *  original input stays intact for exports, attachments, and workflow identity. */
+  continuationInput?: AgentInputPart[] | null
+  /** Earliest time the durable dispatcher may send this queued turn. */
+  notBefore?: number | null
   effectivePolicy: Record<string, unknown>
   providerTurnRef: string | null
   stopReason: string | null

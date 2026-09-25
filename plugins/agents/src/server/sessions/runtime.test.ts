@@ -181,6 +181,48 @@ class SafeRetryDriver implements AgentDriver {
   }
 }
 
+class UsageLimitDriver implements AgentDriver {
+  readonly providerId = 'usage-limit-test'
+  readonly profileId = 'usage-limit-test'
+  attempts: AgentDriverTurnOptions[] = []
+
+  async probe(): Promise<AgentProviderDescriptor> {
+    return descriptor(this.providerId)
+  }
+
+  async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
+    let active = false
+    await options.onEvent({ type: 'session_metadata', providerSessionRef: 'usage-limit-session' })
+    await options.onEvent({ type: 'session_state', state: 'ready' })
+    return {
+      providerSessionRef: 'usage-limit-session',
+      get ready() { return !active },
+      sendTurn: async (turn) => {
+        active = true
+        this.attempts.push(turn)
+        if (this.attempts.length === 1) {
+          await options.onEvent({ type: 'assistant_message', text: 'Work completed before the limit.' })
+          await options.onEvent({
+            type: 'error',
+            code: 'usageLimitExceeded',
+            message: 'You have reached your usage limit.',
+            retryable: false,
+          })
+          active = false
+          throw new Error('You have reached your usage limit.')
+        }
+        await options.onEvent({ type: 'assistant_message', text: 'Finished after reset.' })
+        await options.onEvent({ type: 'turn_completed', stopReason: 'end_turn' })
+        active = false
+        return {}
+      },
+      async cancel() { active = false },
+      async resolveRequest() {},
+      async stop() { active = false },
+    }
+  }
+}
+
 /** Blocks inside start() until the test releases it, so a pump scan can be held mid-pass. */
 class GatedStartDriver implements AgentDriver {
   readonly providerId = 'gated-start'
@@ -1334,6 +1376,56 @@ describe('managed agent runtime conformance', () => {
       record.event.type === 'diagnostic' && record.event.message.includes('retrying'))).toBe(true)
   })
 
+  it('keeps a usage-limited turn open and continues that same turn after the reset', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    const driver = new UsageLimitDriver()
+    registry.registerNative(driver.providerId, () => driver)
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+      usageLimitResetAt: async () => Date.now() + 20,
+      usageContinuationGraceMs: 0,
+    })
+    const session = await runtime.createSession({
+      taskId: seed.taskId,
+      providerId: driver.providerId,
+      profileId: driver.profileId,
+      kind: 'workflow',
+      config: {},
+    })
+    const originalInput = [{ type: 'text' as const, text: 'Complete the whole task.' }]
+    const turn = await runtime.enqueueTurn(session.id, {
+      input: originalInput,
+      source: 'workflow',
+      effectivePolicy: { effort: 'high' },
+      idempotencyKey: randomUUID(),
+    })
+    const snapshot = await runtime.wait(session.id, 0, 'turn_completed', 2_000)
+    const completed = snapshot.turns.find((candidate) => candidate.id === turn.id)
+    const messages = snapshot.events.flatMap((record) =>
+      record.event.type === 'user_message' ? [record.event] : [])
+
+    expect(driver.attempts).toHaveLength(2)
+    expect(driver.attempts[0]?.input).toEqual(originalInput)
+    expect(driver.attempts[1]?.input[0]).toMatchObject({ type: 'text', text: expect.stringContaining('Continue the task') })
+    expect(completed).toMatchObject({ status: 'completed', attempt: 2, input: originalInput })
+    expect(completed?.continuationInput).toBeNull()
+    expect(completed?.notBefore).toBeNull()
+    expect(messages).toEqual([
+      expect.objectContaining({ text: 'Complete the whole task.' }),
+      expect.objectContaining({ automatic: true, text: expect.stringContaining('Continue the task') }),
+    ])
+    expect(snapshot.events.some((record) =>
+      record.event.type === 'diagnostic' && record.event.message.includes('continue this turn automatically'))).toBe(true)
+    expect(snapshot.events.some((record) => record.event.type === 'error')).toBe(false)
+  })
+
   it('dispatches a turn that arrives while a fruitless pump scan is in flight', async () => {
     const seed = await seedTask(testDb, dataDir)
     const registry = new AgentDriverRegistry()
@@ -1641,6 +1733,7 @@ describe('managed agent runtime conformance', () => {
     const seed = await seedTask(testDb, dataDir)
     const owner = 'owner-defaults'
     await writeAgentSessionDefaults(core.prefs, owner, {
+      continueAfterUsageLimit: true,
       followLastSession: false,
       pinned: { fake: { model: 'opus', reasoning: 'nonsense' } },
       last: {},

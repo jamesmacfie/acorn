@@ -105,14 +105,16 @@ export default function AgentEventCard(props: {
           // The turn's attachments belong to the reader's own turn. A subagent's brief sits inside that
           // same turn, so left ungated it drew the parent's pictures and context manifest under a
           // document the reader never wrote.
-          const attachments = () => message().subagentId
+          const attachments = () => message().subagentId || message().automatic
             ? []
             : props.turn?.input.filter((part) => part.type === 'attachment' || part.type === 'image') ?? []
           return (
             <Card pad="sm" stripe="accent">
               <Stack gap="row">
                 <Inline>
-                  <Text emphasis="eyebrow">{message().subagentId ? 'Subagent' : senderLabel(props.turn)}</Text>
+                  <Text emphasis="eyebrow">
+                    {message().subagentId ? 'Subagent' : message().automatic ? 'Acorn' : senderLabel(props.turn)}
+                  </Text>
                   <Text emphasis="eyebrow" tip={time().full} tipAt={props.item.createdAt}>{time().short}</Text>
                 </Inline>
                 <AgentMarkdown
@@ -129,7 +131,7 @@ export default function AgentEventCard(props: {
                     </Index>
                   </Inline>
                 </Show>
-                <Show when={!message().subagentId && props.turn?.input.some((part) => part.type === 'context')}>
+                <Show when={!message().subagentId && !message().automatic && props.turn?.input.some((part) => part.type === 'context')}>
                   <Fold label="Context manifest" level="sub">
                     <Stack gap="row">
                       <For each={props.turn?.input.filter((part) => part.type === 'context') ?? []}>

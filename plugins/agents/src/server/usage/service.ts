@@ -33,6 +33,9 @@ export type AgentUsageServiceOptions = {
 
 export type AgentUsageService = {
   read(options: { userId: string; force?: boolean }): Promise<AgentUsageSnapshot>
+  /** Freshly confirm that every depleted quota for one harness has a known future reset, then return
+   *  the latest of those resets. `null` means the runtime cannot schedule safely. */
+  depletedUntil(options: { userId: string; providerId: string }): Promise<number | null>
 }
 
 function normalizeError(error: unknown): AgentUsageError {
@@ -119,5 +122,23 @@ export function createAgentUsageService(options: AgentUsageServiceOptions): Agen
     inFlight = { key, promise }
     return promise
   }
-  return { read }
+
+  const depletedUntil: AgentUsageService['depletedUntil'] = async ({ userId, providerId }) => {
+    const entry = collectors.get(providerId)
+    if (!entry) return null
+    const pricing = await pricingForUser(userId)
+    let usage: AgentProviderUsageReading
+    try {
+      await mkdir(options.probeDir, { recursive: true })
+      usage = await entry.collect(pricing)
+    } catch {
+      return null
+    }
+    const depleted = usage.quotas.filter((quota) => quota.health === 'depleted' || quota.percentRemaining <= 0)
+    if (!depleted.length || depleted.some((quota) => quota.resetsAt == null)) return null
+    const resetAt = Math.max(...depleted.map((quota) => quota.resetsAt!))
+    return Number.isFinite(resetAt) && resetAt > now() ? resetAt : null
+  }
+
+  return { read, depletedUntil }
 }

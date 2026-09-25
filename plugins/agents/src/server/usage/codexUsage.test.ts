@@ -123,6 +123,13 @@ describe('Codex response and TTY parsing', () => {
     ])
   })
 
+  it('reads the current app-server window duration field', () => {
+    const provider = parseCodexRpcResponse({
+      result: { rateLimits: { primary: { usedPercent: 100, resetsAt: 2, windowDurationMins: 30 } } },
+    }, 10)
+    expect(provider.quotas[0]).toMatchObject({ resetsAt: 2_000, windowSeconds: 1_800 })
+  })
+
   it('rejects malformed and empty paid responses', () => {
     expect(() => parseCodexRpcResponse({ nope: true })).toThrowError(expect.objectContaining({ code: 'parse_failure' }))
     expect(() => parseCodexRpcResponse({ result: { rateLimits: { planType: 'plus' } } })).toThrowError(

@@ -24,6 +24,12 @@ export const claudeHarness: HarnessLaunchSpec = {
     requires: { command: 'claude', env: 'CLAUDE_CODE_EXECUTABLE' },
   },
   envPassthrough: ['CLAUDE_CODE_*'],
+  // Claude Code now waits and continues inside its own process by default. Acorn disables that
+  // session-local behavior so the durable runtime owns the timer, the opt-out setting, restart
+  // recovery, and the transcript notice consistently with Codex and contributed harnesses.
+  acpSessionMeta: {
+    claudeCode: { options: { settings: { autoContinueAtUsageLimit: false } } },
+  },
   // The CLI reloads a session from its own store, which `--resume` and the terminal handoff both rely
   // on. Compaction is the CLI's `/compact`, but ACP cannot request it, so it stays undeclared until
   // the adapter carries it.

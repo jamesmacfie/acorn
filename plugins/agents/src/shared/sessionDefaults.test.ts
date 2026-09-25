@@ -39,6 +39,7 @@ describe('optionsWithDefaults', () => {
 describe('stored defaults', () => {
   it('reads the last values while following, and the pinned ones otherwise', () => {
     const record = {
+      continueAfterUsageLimit: true,
       followLastSession: true,
       pinned: { codex: { model: 'pinned' } },
       last: { codex: { model: 'last' } },
@@ -50,7 +51,7 @@ describe('stored defaults', () => {
 
   it('merges a remembered change into the provider it came from', () => {
     const record = rememberAgentDefaults(
-      { followLastSession: true, pinned: {}, last: { codex: { model: 'a', reasoning: 'low' } } },
+      { continueAfterUsageLimit: true, followLastSession: true, pinned: {}, last: { codex: { model: 'a', reasoning: 'low' } } },
       'codex',
       { reasoning: 'high' },
     )
@@ -65,13 +66,14 @@ describe('stored defaults', () => {
 
   it('fills the fields a write left out', () => {
     expect(parseAgentSessionDefaults('{"followLastSession":false}'))
-      .toEqual({ followLastSession: false, pinned: {}, last: {} })
+      .toEqual({ continueAfterUsageLimit: true, followLastSession: false, pinned: {}, last: {} })
   })
 
   it('refuses a value that is not a string, and an over-long id', () => {
     expect(validateAgentSessionDefaults({ pinned: { codex: { model: 7 } } }).ok).toBe(false)
     expect(validateAgentSessionDefaults({ pinned: { codex: { ['x'.repeat(201)]: 'a' } } }).ok).toBe(false)
     expect(validateAgentSessionDefaults({ followLastSession: 'yes' }).ok).toBe(false)
+    expect(validateAgentSessionDefaults({ continueAfterUsageLimit: 'yes' }).ok).toBe(false)
     expect(validateAgentSessionDefaults([]).ok).toBe(false)
   })
 

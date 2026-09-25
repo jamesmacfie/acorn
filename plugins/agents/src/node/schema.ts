@@ -65,6 +65,8 @@ export const agentTurns = sqliteTable(
     source: text('source').notNull(), // interactive | workflow | delegation | delegation_report | automation | import
     status: text('status').notNull(), // queued | dispatching | active | completed | cancelled | failed | interrupted
     inputJson: text('input_json').notNull(),
+    continuationInputJson: text('continuation_input_json'),
+    notBefore: integer('not_before'),
     effectivePolicyJson: text('effective_policy_json').notNull().default('{}'),
     providerTurnRef: text('provider_turn_ref'),
     stopReason: text('stop_reason'),

@@ -13,6 +13,8 @@ export const agentSessionDefaultsPreferenceKey = 'agents:session-defaults:v1'
 export type AgentDefaultValues = Record<string, Record<string, string>>
 
 export type AgentSessionDefaults = {
+  /** Resume a paused turn when its harness reports that the account usage window has reset. */
+  continueAfterUsageLimit: boolean
   /**
    * Carry each change forward instead of using `pinned`. On, a model or effort switch inside a
    * session becomes the value the next session of that provider starts with.
@@ -27,6 +29,7 @@ export type AgentSessionDefaults = {
 // Following, because it needs no setup to be useful and it matches what a session switch means: you
 // picked that model because it is the one you want, not only for the session you were in.
 export const defaultAgentSessionDefaults = (): AgentSessionDefaults => ({
+  continueAfterUsageLimit: true,
   followLastSession: true,
   pinned: {},
   last: {},
@@ -96,6 +99,9 @@ export function validateAgentSessionDefaults(
   }
   const record = body as Record<string, unknown>
   const errors: string[] = []
+  if (record.continueAfterUsageLimit != null && typeof record.continueAfterUsageLimit !== 'boolean') {
+    errors.push('continueAfterUsageLimit must be true or false.')
+  }
   if (record.followLastSession != null && typeof record.followLastSession !== 'boolean') {
     errors.push('followLastSession must be true or false.')
   }
@@ -105,6 +111,9 @@ export function validateAgentSessionDefaults(
   return {
     ok: true,
     value: {
+      ...(typeof record.continueAfterUsageLimit === 'boolean'
+        ? { continueAfterUsageLimit: record.continueAfterUsageLimit }
+        : {}),
       ...(typeof record.followLastSession === 'boolean' ? { followLastSession: record.followLastSession } : {}),
       ...(pinned ? { pinned } : {}),
       ...(last ? { last } : {}),
