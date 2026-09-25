@@ -1,9 +1,9 @@
-// The pane's read mark while its session streams.
+// The pane's read mark while its session streams, and which session it opens first.
 //
 // A `.tsx` for the reason ./managedStore.test.tsx gives: the mark is an effect, and only the `hosts`
 // project runs Solid's browser build, where an effect runs at all.
 import { afterEach, expect, it, vi } from 'vitest'
-import { createRoot } from 'solid-js'
+import { createEffect, createRoot } from 'solid-js'
 import type { AgentEventRecord, AgentSession, AgentWsFrame } from '../../contract/wire.ts'
 
 let deliver: (frame: AgentWsFrame) => void = () => {}
@@ -20,11 +20,12 @@ const session = {
   subagents: [], queuedTurns: 0, kind: 'interactive', archivedAt: null,
 } as unknown as AgentSession
 
+const sessions = vi.fn(async () => ({ sessions: [session], delegations: [], nextCursor: null }))
 const patch = vi.fn(async (_id: string, body: { lastReadSeq: number }) => ({ ...session, lastEventSeq: body.lastReadSeq, ...body }))
 vi.mock('./managedClient', () => ({
   managedAgentApi: {
     providers: async () => [],
-    sessions: async () => ({ sessions: [session], delegations: [], nextCursor: null }),
+    sessions: () => sessions(),
     patch: (id: string, body: { lastReadSeq: number }) => patch(id, body),
   },
 }))
@@ -55,5 +56,26 @@ it('marks read up to the newest event frame, which the row no longer carries', a
   await vi.advanceTimersByTimeAsync(350)
   expect(patch).toHaveBeenCalledTimes(1)
   expect(patch).toHaveBeenCalledWith('s1', { lastReadSeq: 9 })
+  dispose()
+})
+
+it('opens the session the list will select, so a first visit reads one snapshot', async () => {
+  // `older` was started first and has been working since; `newer` was started later and left alone.
+  const older = { ...session, id: 'older', createdAt: 1, updatedAt: 50 }
+  const newer = { ...session, id: 'newer', createdAt: 10, updatedAt: 20 }
+  // The node lists a task's sessions most recently updated first.
+  sessions.mockResolvedValueOnce({ sessions: [older, newer], delegations: [], nextCursor: null })
+  // The rows are already in the store, from the roster read at launch, before the task list answers.
+  managedAgentStore.upsertSession(newer)
+  managedAgentStore.upsertSession(older)
+  const opened: (string | undefined)[] = []
+  const { model, dispose } = createRoot((dispose) => {
+    const model = createAgentPaneModel({ id: 't1' } as never, { shown: () => false })
+    createEffect(() => opened.push(model.selectedSessionId()))
+    return { model, dispose }
+  })
+  await model.sessionsLoaded
+  await Promise.resolve()
+  expect(opened).toEqual(['older'])
   dispose()
 })
