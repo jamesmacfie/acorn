@@ -471,8 +471,8 @@ export default function AgentComposer(props: {
     }
   }
 
-  // Only fetched once something asks for a file. A session whose composer never types `@` never pays
-  // for the worktree walk.
+  // Read when the field first takes focus, so the list is there by the time somebody types `@`. A
+  // visit that never writes to the agent never pays for the worktree walk.
   const files = useWorktreeFiles(() => props.session.taskId)
   const advertised = (sigil: '/' | '$', items: readonly { name: string; description?: string }[], query: string) =>
     advertisedSuggestions(items, query).map((item) => ({
@@ -606,6 +606,7 @@ export default function AgentComposer(props: {
         sources={sources()}
         segments={segments}
         onInput={setDraft}
+        onFocus={files.want}
         onFiles={addFiles}
         onSubmit={() => void send()}
         onCancel={canStopAgent(props.session) ? () => void stop() : undefined}

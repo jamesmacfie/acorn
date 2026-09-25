@@ -772,6 +772,7 @@ export function MentionTextarea(props: MentionTextareaProps) {
         placeholder={props.placeholder}
         disabled={props.disabled}
         rows={props.rows ?? 3}
+        onFocus={props.onFocus}
         // The agents composer is a `MentionTextarea` rather than a `Composer`, and it wants the same
         // send. The shared prop calls this "Enter without a modifier", which is the DOM's chat-style
         // Enter; in a terminal Enter in a text field is a newline and nothing else can be, so it is

@@ -65,6 +65,8 @@ export type MentionTextareaProps = {
    *  asynchronous upload redraws its caller. */
   onFiles?: (files: File[]) => void | Promise<void>
   onKeyDown?: (event: KeyboardEvent) => void
+  /** The field took focus: the agents composer starts reading its `@` list here. */
+  onFocus?: () => void
   /** Drawn inside the field's box, before the text: the agents composer's expand toggle. */
   overlay?: JSX.Element
   ref?: HTMLTextAreaElement | ((element: HTMLTextAreaElement) => void)
@@ -193,6 +195,7 @@ export default function MentionTextarea(props: MentionTextareaProps) {
         onFocus={() => {
           setFocused(true)
           sync()
+          props.onFocus?.()
         }}
         onBlur={() => setFocused(false)}
         onPress={sync}

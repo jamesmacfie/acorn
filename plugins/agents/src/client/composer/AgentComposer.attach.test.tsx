@@ -21,6 +21,13 @@ vi.mock('../sessions/managedClient', () => ({
   },
 }))
 
+// Every route the composer reads on its own, so a test can see which ones it asked for and when.
+const readJson = vi.fn(async (_path: string): Promise<unknown> => [])
+vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@acorn/plugin-api/client')>()),
+  readJson: (path: string) => readJson(path),
+}))
+
 const { default: AgentComposer } = await import('./AgentComposer')
 const { clearComposerDrafts } = await import('./composerState')
 
@@ -33,6 +40,7 @@ afterEach(() => {
   cleanups.splice(0).forEach((dispose) => dispose())
   vi.unstubAllGlobals()
   uploadAttachment.mockClear()
+  readJson.mockClear()
   // The draft outlives the render now: it is the session's, in a module map (./composerState.ts), so
   // one test's attachment is the next one's starting state.
   clearComposerDrafts()
@@ -107,5 +115,23 @@ describe('attaching files', () => {
     attachButton(host).click()
     await Promise.resolve()
     expect(uploadAttachment).not.toHaveBeenCalled()
+  })
+})
+
+describe('the worktree file list', () => {
+  const fileReads = () => readJson.mock.calls.filter(([path]) => path.endsWith('/editor/files'))
+
+  it('is not read until the field takes focus, and then once', async () => {
+    const host = mount()
+    await Promise.resolve()
+    expect(fileReads()).toHaveLength(0)
+
+    const field = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message agent"]')!
+    field.focus()
+    await vi.waitFor(() => expect(fileReads()).toHaveLength(1))
+    field.blur()
+    field.focus()
+    await Promise.resolve()
+    expect(fileReads()).toEqual([['/v1/p/editor/tasks/t1/editor/files']])
   })
 })
