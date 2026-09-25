@@ -262,10 +262,12 @@ those tasks cannot be restored.
 The Archive entry at the bottom of the rail lists archived tasks, newest first, with a search box over
 every search provider ([plugins.md § Search providers](./plugins.md)). Selecting a task previews it
 read-only in the ordinary pane host, without adding it to the rail. A pane that reads stored history
-declares `readsArchived` and draws as it would for an active task. Agent, Notes and PR review do.
-Every other pane shows a restore prompt instead, because it would need the worktree or would start
-work on an archived task ([panes.md § Contributions](./panes.md)). The Agent pane keeps the
-transcripts and turns its composer off.
+declares `readsArchived`; only those panes appear in the archived preview's layout and right rail.
+Agent and Notes opt in. Every other pane is absent because it would need the worktree, would start work
+on an archived task, or does not belong in the compact history view
+([panes.md § Contributions](./panes.md)). The Agent pane keeps the transcripts and turns its composer
+off. The archived-task list uses the shared browse sidebar: it starts at the default list width,
+resizes, and collapses to task icons with its state remembered on the device.
 
 Restore is `POST /v1/core/tasks/:id/restore` (`restoreTask` in `server/storage/archive.ts`). It sets the
 task active and rebuilds the worktree before answering, through the same `resolveTaskCwd` a pane would

@@ -24,8 +24,6 @@ export default function TaskPaneHost(props: {
   extraButtons?: JSX.Element
   // Absent for an archived task's preview, which has nothing left to close (features/archive).
   onCloseTask?: () => void
-  // What a pane that cannot read an archived task offers in its place.
-  onRestore?: () => void
   closing?: boolean // archive/teardown in flight → the close button shows a spinner
   shortcutFor?: (id: string) => string | null | undefined
 }) {
@@ -145,25 +143,9 @@ export default function TaskPaneHost(props: {
                     >✕</Button>
                   </Show>
                 </div>
-                {/* An archived task has no worktree and nothing should start on it, so only a pane that
-                    says it reads stored history draws (registries/panes.ts § readsArchived). */}
-                <Show
-                  when={props.task.status === 'active' || pane.readsArchived}
-                  fallback={
-                    <section class="pane pane-empty workspace-empty">
-                      <EmptyState
-                        title="This task is archived"
-                        action={props.onRestore ? <Button onPress={() => props.onRestore?.()}>Restore task</Button> : undefined}
-                      >
-                        {pane.label} needs the task's worktree. Restore the task to use it.
-                      </EmptyState>
-                    </section>
-                  }
-                >
-                  <ContributionBoundary contributionId={pane.id} owner={paneRegistry.ownerOf(pane.id)}>
-                    <pane.component task={props.task} />
-                  </ContributionBoundary>
-                </Show>
+                <ContributionBoundary contributionId={pane.id} owner={paneRegistry.ownerOf(pane.id)}>
+                  <pane.component task={props.task} />
+                </ContributionBoundary>
               </div>
               <Show when={!maximizedPane(props.task.id) && index() < visiblePanes().length - 1}>
                 {(() => {
