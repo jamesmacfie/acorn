@@ -60,6 +60,7 @@ client: ModelPick
 client: PaneContribution
 client: PaneIntent
 client: PaneLayoutContribution
+client: PaneModelContext
 client: PaneRegistration
 client: PersistedSliceKeys
 client: PersistedStateSlice
@@ -546,6 +547,7 @@ node: tmuxAvailable
 node: truncateBytes
 node: validateDataValue
 node: viaBridge
+node: worktreeGitText
 node: worktreeStatusText
 testkit/client: Disposable
 testkit/client: ExtensionContribution

@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { _resetWorktreeStatus, invalidateWorktreeStatus, parseWorktreeStatus, worktreeStatus } from './worktreeStatus'
+import { _resetWorktreeStatus, invalidateWorktreeStatus, parseWorktreeStatus, worktreeGitText, worktreeStatus } from './worktreeStatus'
 import { removeWorktree } from './worktrees'
 
 // Real git subprocesses, because what is being counted is real git subprocesses.
@@ -30,6 +30,7 @@ vi.mock('../core/proc', async () => {
 })
 
 const statuses = () => spawns.filter((s) => s === 'git status').length
+const diffs = () => spawns.filter((s) => s === 'git diff').length
 
 describe('the coalesced worktree status read', () => {
   let dir: string
@@ -119,6 +120,36 @@ describe('the coalesced worktree status read', () => {
 
     // Forced still goes through, which is the affordance the dialog offers.
     expect(await removeWorktree(checkout, worktree, true)).toEqual({ ok: true, path: worktree })
+  })
+
+  // The changes pane's line counts. Two clients on one task asked for the pair twice a poll each.
+  it('shares any other read the same way, per argument list', async () => {
+    writeFileSync(join(worktree, 'a.txt'), '1\n2\n')
+    const numstat = ['diff', '--numstat']
+    const staged = ['diff', '--staged', '--numstat']
+    const [left, right] = await Promise.all([
+      worktreeGitText(worktree, numstat), worktreeGitText(worktree, numstat),
+      worktreeGitText(worktree, staged), worktreeGitText(worktree, staged),
+    ])
+    expect(diffs()).toBe(2)
+    expect(left).toBe(right)
+    expect(left).toContain('a.txt')
+
+    // Dropped with the status when the node writes under the path.
+    await worktreeGitText(worktree, numstat)
+    expect(diffs()).toBe(2)
+    invalidateWorktreeStatus(worktree)
+    await worktreeGitText(worktree, numstat)
+    expect(diffs()).toBe(3)
+  })
+
+  // A read that started before a stage must not answer a caller who asks after it.
+  it('does not let a caller join a run that started before an invalidation', async () => {
+    const before = worktreeStatus(worktree)
+    invalidateWorktreeStatus(worktree)
+    const after = worktreeStatus(worktree)
+    await Promise.all([before, after])
+    expect(statuses()).toBe(2)
   })
 
   it('does not let a refusal join a read that is already in flight', async () => {

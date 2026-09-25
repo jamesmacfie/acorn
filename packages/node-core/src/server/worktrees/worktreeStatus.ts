@@ -1,4 +1,6 @@
-// One `git status` per worktree per two seconds, however many callers ask.
+// One `git status` per worktree per two seconds, however many callers ask. The changes pane's other
+// reads of the same tree, its line counts and where the git directory is, share the same window
+// through `worktreeGitText`.
 //
 // Before this, a status ping spawned `git status --porcelain=v2` plus two `git diff --numstat` in the
 // changes plugin's local-changes read, and `worktrees.ts` spawned a second and third `git status` for
@@ -27,10 +29,51 @@ export const WORKTREE_STATUS_TTL_MS = 2_000
 
 export type WorktreeStatus = { dirty: boolean; count: number; branch: string | null; head: string | null }
 
-type Entry = { text: string; at: number }
+// One remembered read per worktree path and argument list. Keyed by path first so a write under the
+// path drops every read of it at once, the status and the changes pane's line counts together.
+type Read = { text: string | null; at: number; running: Promise<string | null> | null }
+const reads = new Map<string, Map<string, Read>>()
 
-const warm = new Map<string, Entry>()
-const inFlight = new Map<string, Promise<string | null>>()
+const run = async (path: string, args: readonly string[], timeoutMs: number): Promise<string | null> => {
+  try {
+    return (await gitOrThrow(args, { cwd: path, timeoutMs })).stdout
+  } catch {
+    return null
+  }
+}
+
+/** The raw stdout of a read-only git command in a worktree, shared the way the status read is:
+ *  concurrent callers join the run in flight, a caller inside the window gets what that run printed,
+ *  and `invalidateWorktreeStatus(path)` drops it along with the status. Null when git could not answer,
+ *  and a failure is never remembered.
+ *
+ *  Reads only, and only reads whose answer moves when a file under the worktree moves: the node's own
+ *  writers invalidate on exactly that, and nothing else. The changes pane's `git diff --numstat` pair
+ *  and its `rev-parse --git-dir` come through here; before, two clients on one task cost four
+ *  numstat processes a poll where the status beside them cost one. */
+export async function worktreeGitText(path: string, args: readonly string[], opts: { fresh?: boolean; timeoutMs?: number } = {}): Promise<string | null> {
+  const key = args.join('\0')
+  const known = reads.get(path)?.get(key)
+  if (known && !opts.fresh) {
+    if (known.text !== null && Date.now() - known.at < WORKTREE_STATUS_TTL_MS) return known.text
+    if (known.running) return known.running
+  }
+  // A `fresh` read still shares its answer with whoever asks next: it is the newest truth there is.
+  // What it does not do is *join* one, which is the half that matters for the removal guard.
+  const read: Read = { text: null, at: 0, running: null }
+  read.running = run(path, args, opts.timeoutMs ?? 10_000).then((text) => {
+    read.running = null
+    if (text !== null) {
+      read.text = text
+      read.at = Date.now()
+    }
+    return text
+  })
+  let forPath = reads.get(path)
+  if (!forPath) reads.set(path, (forPath = new Map()))
+  forPath.set(key, read)
+  return read.running
+}
 
 // `--porcelain=v2 --branch` adds `# branch.oid` and `# branch.head` header lines ahead of the entries,
 // so one process answers "is it dirty", "how many files" and "where is HEAD"
@@ -42,36 +85,14 @@ const inFlight = new Map<string, Promise<string | null>>()
 // named `dir/`, and the changes pane can do nothing with that: there is no file to diff and no file
 // to discard. Ignored directories are still skipped, so the extra walk is over files somebody is
 // about to be asked about anyway.
-const run = async (path: string): Promise<string | null> => {
-  try {
-    return (await gitOrThrow(['status', '--porcelain=v2', '--branch', '--untracked-files=all'], { cwd: path, timeoutMs: 10_000 })).stdout
-  } catch {
-    return null
-  }
-}
+const STATUS_ARGS = ['status', '--porcelain=v2', '--branch', '--untracked-files=all']
 
 /** The raw `git status --porcelain=v2 --branch` output for a worktree, or null when git could not
  *  answer (the directory is gone, it is not a worktree, git timed out).
  *
  *  A failure is never cached: "we could not tell" must not become "clean" for the next two seconds. */
 export async function worktreeStatusText(path: string, opts?: { fresh?: boolean }): Promise<string | null> {
-  const now = Date.now()
-  if (!opts?.fresh) {
-    const cached = warm.get(path)
-    if (cached && now - cached.at < WORKTREE_STATUS_TTL_MS) return cached.text
-    const running = inFlight.get(path)
-    if (running) return running
-  }
-  const promise = run(path).then((text) => {
-    if (text !== null) warm.set(path, { text, at: Date.now() })
-    return text
-  })
-  // A `fresh` read still shares its answer with whoever asks next: it is the newest truth there is.
-  // What it does not do is *join* one, which is the half that matters for the removal guard.
-  inFlight.set(path, promise)
-  return promise.finally(() => {
-    if (inFlight.get(path) === promise) inFlight.delete(path)
-  })
+  return await worktreeGitText(path, STATUS_ARGS, { fresh: opts?.fresh, timeoutMs: 10_000 })
 }
 
 /** Pure parser, so the shape is testable without a repo. `branch` is null on a detached HEAD, `head`
@@ -97,17 +118,20 @@ export async function worktreeStatus(path: string, opts?: { fresh?: boolean }): 
 
 /** Drop what we remember about a path, because this node just wrote under it. Called by the worktree
  *  writers (create, remove) and by the plugin seam `ctx.events.worktreeStatus` reaches. With no
- *  argument, drops everything, which is what a data-root switch wants. */
+ *  argument, drops everything, which is what a data-root switch wants.
+ *
+ *  A run already in flight is dropped too, not just a finished one: it may have started before the
+ *  write, and a caller that asks after the write must not join it. The run still finishes, and its
+ *  answer goes to the callers that were already waiting on it. */
 export function invalidateWorktreeStatus(path?: string): void {
   if (path === undefined) {
-    warm.clear()
+    reads.clear()
     return
   }
-  warm.delete(path)
+  reads.delete(path)
 }
 
 /** Test seam: the maps are module singletons whose lifetime is the node's. */
 export function _resetWorktreeStatus(): void {
-  warm.clear()
-  inFlight.clear()
+  reads.clear()
 }

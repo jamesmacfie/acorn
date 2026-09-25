@@ -134,8 +134,9 @@ export { git, gitOrThrow, gitText } from '@acorn/node-core/server/core'
 // ask, so a plugin reading local changes and core reading the rail's dirty markers share one spawn
 // (docs/workspaces-and-tasks.md § Worktree status reads). `invalidateWorktreeStatus` is for a plugin
 // that has just written under a worktree itself; the ordinary announcement is
-// `ctx.events.worktreeStatus(taskId)`.
-export { invalidateWorktreeStatus, worktreeStatusText } from '@acorn/node-core/server/worktrees'
+// `ctx.events.worktreeStatus(taskId)`. `worktreeGitText` is the same window for any other read-only
+// git command against the tree, such as the changes pane's line counts.
+export { invalidateWorktreeStatus, worktreeGitText, worktreeStatusText } from '@acorn/node-core/server/worktrees'
 export { brokerEnv } from '@acorn/node-core/server/core'
 
 // ── Task, worktree and run configuration ──────────────────────────────────────────────────────
