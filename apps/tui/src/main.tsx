@@ -53,7 +53,7 @@ const { selectActiveNode, setActiveNode } = await import('@acorn/client-core/inf
 const { clientFor, nodeState, setCacheStorage } = await import('@acorn/client-core/infra/node/fleet.ts')
 const { fileCacheStorage } = await import('./node/cache')
 const { persistQueryClient } = await import('@tanstack/query-persist-client-core')
-const { PERSISTED_QUERY_MAX_AGE_MS, shouldPersistQuery } = await import('@acorn/client-core/infra/persistence/queryPersistence.ts')
+const { PERSISTED_SNAPSHOT_MAX_AGE_MS, shouldPersistQuery } = await import('@acorn/client-core/infra/persistence/queryPersistence.ts')
 const { markNodeRecovered, setNodeStarting } = await import('./chrome/nodeState')
 const { watchPluginChanges } = await import('@acorn/client-core/host/plugins/reload.ts')
 const { watchTaskChanges } = await import('@acorn/client-core/features/tasks/watchTaskChanges.ts')
@@ -98,7 +98,7 @@ const { client, persister } = clientFor(opened.nodeId)
 const [, restored] = persistQueryClient({
   queryClient: client,
   persister,
-  maxAge: PERSISTED_QUERY_MAX_AGE_MS,
+  maxAge: PERSISTED_SNAPSHOT_MAX_AGE_MS,
   dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
 })
 // Awaited, which is this host's `isRestoring`: the snapshot is one synchronous file read, and a shell

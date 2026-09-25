@@ -8,7 +8,7 @@ import { PersistQueryClientProvider } from '@tanstack/solid-query-persist-client
 import { Route, Router } from '@solidjs/router'
 import App from './App'
 import '@acorn/client-core/infra/styles/styles.css'
-import { PERSISTED_QUERY_MAX_AGE_MS, shouldPersistQuery } from '@acorn/client-core/infra/persistence/queryPersistence.ts'
+import { PERSISTED_SNAPSHOT_MAX_AGE_MS, shouldPersistQuery } from '@acorn/client-core/infra/persistence/queryPersistence.ts'
 import { activeCacheId, activeNodeId, nodeReady, selectActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 import { clientFor, nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
 import { wsOnReconnect } from '@acorn/client-core/infra/node/wsClient.ts'
@@ -153,7 +153,7 @@ render(
             onError={hydrated}
             persistOptions={{
               persister,
-              maxAge: PERSISTED_QUERY_MAX_AGE_MS,
+              maxAge: PERSISTED_SNAPSHOT_MAX_AGE_MS,
               dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
             }}
           >

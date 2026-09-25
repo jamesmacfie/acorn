@@ -7,7 +7,7 @@ import { persistQueryClient, persistQueryClientRestore } from '@tanstack/query-p
 import { lockedBy } from '@acorn/node-core/server/storage'
 import { LOCAL_TOKEN_SCOPE } from '@acorn/custody/custody/deviceTokenStore.ts'
 import { cacheKeyFor, clientFor, setCacheStorage } from '@acorn/client-core/infra/node/fleet.ts'
-import { PERSISTED_QUERY_MAX_AGE_MS, shouldPersistQuery } from '@acorn/client-core/infra/persistence/queryPersistence.ts'
+import { PERSISTED_SNAPSHOT_MAX_AGE_MS, shouldPersistQuery } from '@acorn/client-core/infra/persistence/queryPersistence.ts'
 import { tasksKey, type Task } from '@acorn/protocol/api.ts'
 import { custody, openNode, type OpenedNode } from './open'
 import { fileCacheStorage } from './cache'
@@ -136,7 +136,7 @@ describe('acorn against a node it started', () => {
     const [, restored] = persistQueryClient({
       queryClient: client,
       persister,
-      maxAge: PERSISTED_QUERY_MAX_AGE_MS,
+      maxAge: PERSISTED_SNAPSHOT_MAX_AGE_MS,
       dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
     })
     await restored
@@ -161,7 +161,7 @@ describe('acorn against a node it started', () => {
     // `acorn` does before it has heard from one. Not the same client: this asserts the file, not the
     // memory it was dehydrated from.
     const cold = new QueryClient()
-    await persistQueryClientRestore({ queryClient: cold, persister, maxAge: PERSISTED_QUERY_MAX_AGE_MS })
+    await persistQueryClientRestore({ queryClient: cold, persister, maxAge: PERSISTED_SNAPSHOT_MAX_AGE_MS })
     expect(cold.getQueryData(tasksKey)).toEqual(rows)
   }, 30_000)
 
