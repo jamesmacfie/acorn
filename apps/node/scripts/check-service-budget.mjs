@@ -22,7 +22,7 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 
 // The measured figure plus about 5%. `floor` is a lower bound, not a target: a graph that small means
 // the walk below stopped following imports, and a check that passes on that is blind.
-const limits = { ceiling: 3_080_000, floor: 1_000_000 }
+const limits = { ceiling: 2_910_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

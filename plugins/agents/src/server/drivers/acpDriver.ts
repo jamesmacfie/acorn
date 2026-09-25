@@ -1,16 +1,13 @@
 // One driver for every harness that speaks the Agent Client Protocol, built from a launch spec
 // rather than subclassed per provider. See docs/managed-agents.md § Harnesses.
-import {
-  ClientSideConnection,
-  ndJsonStream,
-  RequestError,
-  type Agent,
-  type Client,
-  type ContentBlock,
-  type CreateElicitationResponse,
-  type McpServer,
-  type RequestPermissionResponse,
-  type SessionConfigOption,
+import type {
+  Agent,
+  Client,
+  ContentBlock,
+  CreateElicitationResponse,
+  McpServer,
+  RequestPermissionResponse,
+  SessionConfigOption,
 } from '@agentclientprotocol/sdk'
 import { randomUUID } from 'node:crypto'
 import { Readable, Writable } from 'node:stream'
@@ -248,6 +245,9 @@ export class AcpDriver implements AgentDriver {
     const { id, label, quirks } = this.spec
     const launch = this.launch()
     if (launch.diagnostics.length > 0) throw new Error(launch.diagnostics[0])
+    // The SDK loads here, not at the top of the file. Building its generated schemas takes about 30 ms,
+    // the node loads this module on every boot, and most launches never start an ACP session.
+    const { ClientSideConnection, ndJsonStream, RequestError } = await import('@agentclientprotocol/sdk')
     await options.onEvent({
       type: 'session_state',
       state: options.session.providerSessionRef ? 'replaying' : 'connecting',
