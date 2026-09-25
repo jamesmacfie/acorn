@@ -1,4 +1,4 @@
-import { createEffect, createSignal, on, Show, type JSX } from 'solid-js'
+import { children, createEffect, createSignal, on, Show, type JSX } from 'solid-js'
 import { bindIntents } from '../../keys/keymapHost'
 import MentionTextarea from './MentionTextarea'
 import { Alert, Button, Textarea, Toolbar } from '../primitives'
@@ -40,6 +40,10 @@ export function Composer(props: {
     setLive(value)
     props.onInput?.(value)
   }
+
+  // Read once, for the reason on RowParts (../primitives.tsx).
+  const hint = children(() => props.hint)
+  const secondary = children(() => props.secondary)
 
   const submit = () => {
     const value = live()
@@ -83,9 +87,9 @@ export function Composer(props: {
       </Show>
       <Show when={props.error}><Alert>{props.error}</Alert></Show>
       <Toolbar variant="actions">
-        <Show when={props.hint}><span class="ui-composer-hint muted">{props.hint}</span></Show>
+        <Show when={hint()}><span class="ui-composer-hint muted">{hint()}</span></Show>
         <Toolbar.Spacer />
-        <Show when={props.secondary}>{props.secondary}</Show>
+        <Show when={secondary()}>{secondary()}</Show>
         <Button
           variant="solid"
           tone="accent"

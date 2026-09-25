@@ -1,4 +1,4 @@
-import { createEffect, createSignal, Index, onCleanup, Show, type JSX } from 'solid-js'
+import { children, createEffect, createSignal, Index, onCleanup, Show, type JSX } from 'solid-js'
 import { Input } from '../../kit/components/primitives'
 import type { PaletteView } from './overlay'
 // The component owns its stylesheet, so a consumer can't depend on some other palette having been
@@ -95,6 +95,11 @@ export function PaletteSurface<T>(props: {
     })
   })
 
+  // Read once, for the reason on the kit's RowParts (kit/components/primitives.tsx): testing a slot and
+  // then inserting it ran the caller's JSX twice.
+  const status = children(() => props.status)
+  const footer = children(() => props.footer)
+
   return (
     <Show when={props.palette.open()}>
       <div class="overlay-backdrop" onClick={props.palette.close}>
@@ -121,7 +126,7 @@ export function PaletteSurface<T>(props: {
             value={props.palette.query()}
             onInput={(value) => props.palette.setQuery(value)}
           />
-          <Show when={props.status}>{props.status}</Show>
+          <Show when={status()}>{status()}</Show>
           {/* Announced rather than drawn: the row count and the error already have a visible form,
               and a live region is how somebody not looking at the list hears them change. */}
           <div class="sr-only" role="status" aria-live="polite">{props.announce ?? ''}</div>
@@ -151,7 +156,7 @@ export function PaletteSurface<T>(props: {
               )}
             </Index>
           </ul>
-          <Show when={props.footer}><div class="palette-foot muted">{props.footer}</div></Show>
+          <Show when={footer()}><div class="palette-foot muted">{footer()}</div></Show>
         </div>
       </div>
     </Show>

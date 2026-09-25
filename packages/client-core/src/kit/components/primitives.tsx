@@ -612,6 +612,8 @@ export function SectionHeader(props: {
   // Emits the existing `.section-header` class rather than a parallel `.ui-*` one: it is already a
   // single shared rule at 18 sites, so a pack can reach it. What this adds is the count and
   // actions slots.
+  // Read once, for the reason on RowParts.
+  const actions = children(() => props.actions)
   return (
     <div
       class="section-header"
@@ -620,7 +622,7 @@ export function SectionHeader(props: {
     >
       <span class="ui-section-header-label">{props.children}</span>
       <Show when={props.count != null}><span class="ui-section-header-count">{props.count}</span></Show>
-      <Show when={props.actions}><span class="ui-section-header-actions">{props.actions}</span></Show>
+      <Show when={actions()}><span class="ui-section-header-actions">{actions()}</span></Show>
     </div>
   )
 }
@@ -879,6 +881,11 @@ export function EmptyState(props: {
   size?: 'sm' | 'md'
   children?: JSX.Element
 }) {
+  // Read once, for the reason on RowParts. The icon is not read while the spinner stands in for it,
+  // so a busy state builds none.
+  const icon = children(() => (props.busy ? undefined : props.icon))
+  const text = children(() => props.children)
+  const action = children(() => props.action)
   return (
     <div
       class="ui-empty"
@@ -886,12 +893,12 @@ export function EmptyState(props: {
       data-size={props.size ?? 'md'}
       data-busy={props.busy ? '' : undefined}
     >
-      <Show when={props.busy} fallback={<Show when={props.icon}><span class="ui-empty-icon">{props.icon}</span></Show>}>
+      <Show when={props.busy} fallback={<Show when={icon()}><span class="ui-empty-icon">{icon()}</span></Show>}>
         <Spinner size="md" />
       </Show>
       <Show when={props.title}><p class="ui-empty-title">{props.title}</p></Show>
-      <Show when={props.children}><p class="ui-empty-text">{props.children}</p></Show>
-      <Show when={props.action}><span class="ui-empty-action">{props.action}</span></Show>
+      <Show when={text()}><p class="ui-empty-text">{text()}</p></Show>
+      <Show when={action()}><span class="ui-empty-action">{action()}</span></Show>
     </div>
   )
 }
@@ -1096,9 +1103,11 @@ export function Chip(props: {
     // the colour comes off an API response: anything but a plain colour token is dropped.
     style: props.color && SAFE_COLOR.test(props.color) ? { '--chip-color': props.color } : undefined,
   })
+  // Read once, for the reason on RowParts.
+  const leading = children(() => props.leading)
   const body = (
     <>
-      <Show when={props.leading}><span class="ui-chip-leading">{props.leading}</span></Show>
+      <Show when={leading()}><span class="ui-chip-leading">{leading()}</span></Show>
       <span class="ui-chip-label">{props.children}</span>
     </>
   )

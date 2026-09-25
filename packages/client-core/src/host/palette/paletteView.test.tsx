@@ -354,3 +354,32 @@ describe('the interactive frames', () => {
     expect(document.querySelector('.ui-alert')?.textContent).toContain('Set to Loud.')
   })
 })
+
+describe('the surface', () => {
+  it('builds its status and footer once', () => {
+    // Testing a slot and then inserting it ran the caller's JSX twice (kit/components/slotReads.test.tsx).
+    let built = 0
+    const Mark = () => {
+      built++
+      return <b>mark</b>
+    }
+    const view = {
+      open: () => true, query: () => '', sel: () => 0, setSel: () => {}, setQuery: () => {}, close: () => {},
+      setInputRef: () => {}, onKeyDown: () => {}, onDialogMouseDown: () => {},
+    }
+    dispose = render(() => (
+      <PaletteSurface
+        palette={view}
+        items={[]}
+        placeholder="Find"
+        emptyText="Nothing"
+        onPick={() => {}}
+        row={() => null}
+        status={<Mark />}
+        footer={<Mark />}
+      />
+    ), host)
+    expect(document.querySelectorAll('.palette b')).toHaveLength(2)
+    expect(built).toBe(2)
+  })
+})

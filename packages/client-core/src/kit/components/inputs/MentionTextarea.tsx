@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, Index, Show, type JSX } from 'solid-js'
+import { children, createEffect, createMemo, createSignal, For, Index, Show, type JSX } from 'solid-js'
 import { activeMention, completeMention, scrollDeltaFor, type ActiveMention } from '../../lib/mentions'
 import { Alert, Textarea } from '../primitives'
 import PickerRow from './PickerRow'
@@ -141,9 +141,12 @@ export default function MentionTextarea(props: MentionTextareaProps) {
     list.scrollTop += scrollDeltaFor(list.getBoundingClientRect(), row.getBoundingClientRect())
   })
 
+  // Read once, for the reason on RowParts (../primitives.tsx).
+  const overlay = children(() => props.overlay)
+
   return (
     <div class="ui-mentionfield" data-mirrored={segments() ? '' : undefined}>
-      <Show when={props.overlay}>{props.overlay}</Show>
+      <Show when={overlay()}>{overlay()}</Show>
       <Show when={segments()}>
         {(runs) => (
           // Hidden from the accessibility tree: the textarea already carries this text, and a screen

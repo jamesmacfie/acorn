@@ -1,4 +1,4 @@
-import { Show, type JSX } from 'solid-js'
+import { children, Show, type JSX } from 'solid-js'
 import { IconButton } from './IconButton'
 import { Input, Toolbar } from '../primitives'
 
@@ -27,6 +27,9 @@ export function FindBar(props: {
   placeholder?: string
   ref?: HTMLInputElement | ((element: HTMLInputElement) => void)
 }) {
+  // Read once, for the reason on RowParts (../primitives.tsx).
+  const status = children(() => props.status)
+  const toggles = children(() => props.toggles)
   return (
     <Toolbar size="sm" ariaLabel="Find">
       <div class="ui-findbar-search" role="search">
@@ -57,7 +60,7 @@ export function FindBar(props: {
           </span>
         )}
       </Show>
-      <Show when={props.status}><span class="ui-findbar-status muted">{props.status}</span></Show>
+      <Show when={status()}><span class="ui-findbar-status muted">{status()}</span></Show>
       <Toolbar.Group>
         <IconButton
           icon="chevron-up"
@@ -76,7 +79,7 @@ export function FindBar(props: {
           onPress={() => props.onNext()}
         />
       </Toolbar.Group>
-      <Show when={props.toggles}>{props.toggles}</Show>
+      <Show when={toggles()}>{toggles()}</Show>
       <Show when={props.onClose}>
         <IconButton icon="x" tip="Close find" tipKey="Esc" label="Close find" onPress={() => props.onClose?.()} />
       </Show>
