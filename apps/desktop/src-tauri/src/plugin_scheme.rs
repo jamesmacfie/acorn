@@ -9,9 +9,9 @@ use tauri::http::{Request, Response};
 // Two things are shaped by Rust serving this rather than a Node process.
 //
 // The cache is read by path, not through `PluginCache`. That class lives in the helper process and
-// its `path()` is `<userDataDir>/plugin-cache/<hash>.js`, so the handler resolves the same file
-// itself. The store is content-addressed: a file named with a 64-hex hash is a bundle this device
-// holds, and nothing else can be named.
+// its `path()` is `<userDataDir>/<baseline>-plugin-cache/<hash>.js`, so the handler resolves the same
+// file itself. The store is content-addressed: a file named with a 64-hex hash is a bundle this
+// device holds, and nothing else can be named.
 //
 // The frame stylesheet is a staged file rather than a `?raw` import, read once at boot.
 // `scripts/stage.mjs` holds the ordered list of client-core modules that make it up, and
@@ -19,7 +19,11 @@ use tauri::http::{Request, Response};
 
 pub const PLUGIN_SCHEME: &str = "app-plugin";
 
-const CACHE_DIR: &str = "plugin-cache";
+const ACORN_BASELINE: &str = "acorn-1";
+
+fn plugin_cache_dir(user_data_dir: &Path) -> PathBuf {
+    user_data_dir.join(format!("{ACORN_BASELINE}-plugin-cache"))
+}
 
 /// The plugin frame's CSP, one header on every response. See docs/shell.md, "The plugin frame
 /// origin", for each directive. `connect-src 'none'` is the load-bearing one: fetch, XHR, WebSocket,
@@ -71,7 +75,7 @@ impl Frames {
             eprintln!("[plugin-scheme] no frame stylesheet at {}: {error}", styles_path.display());
             Vec::new()
         });
-        Self { cache_dir: user_data_dir.join(CACHE_DIR), styles }
+        Self { cache_dir: plugin_cache_dir(user_data_dir), styles }
     }
 }
 
@@ -171,5 +175,17 @@ mod tests {
         assert_eq!(response.body(), b"export const ok = 1");
         assert_eq!(response.headers().get("content-type").unwrap(), "text/javascript; charset=utf-8");
         std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn the_cache_namespace_tracks_the_protocol_baseline() {
+        const PROTOCOL_BASELINE_SOURCE: &str = include_str!("../../../../packages/protocol/src/baseline.ts");
+        assert!(
+            PROTOCOL_BASELINE_SOURCE.contains(&format!("ACORN_BASELINE = '{ACORN_BASELINE}'")),
+            "the Rust shell baseline must match packages/protocol/src/baseline.ts",
+        );
+
+        let root = PathBuf::from("/user-data");
+        assert_eq!(plugin_cache_dir(&root), root.join("acorn-1-plugin-cache"));
     }
 }

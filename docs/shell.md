@@ -439,8 +439,9 @@ and the host-owned `/ui.css` presentation kit exist there. The stylesheet is a s
 handler reads once at boot; `apps/desktop/scripts/stage.mjs` holds the ordered list of client-core
 modules that make it up, and `packages/client-core/src/infra/styles/cssHygiene.test.ts` reads that list and
 checks a frame is served a base rule for every class `primitives.css` styles. The handler resolves a
-bundle by path, `<userDataDir>/plugin-cache/<hash>.js`, because the store is content-addressed: a
-file whose name is a 64-hex hash is a bundle this device holds, and nothing else can be named.
+bundle by path, `<userDataDir>/acorn-1-plugin-cache/<hash>.js`, because the cache namespace follows
+the active Acorn baseline and the store is content-addressed: a file whose name is a 64-hex hash is a
+bundle this device holds, and nothing else can be named.
 
 Every response carries `default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline';
 img-src 'self' data:; font-src 'self'; connect-src 'none'`. `default-src 'none'` makes every
