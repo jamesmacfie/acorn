@@ -9,7 +9,7 @@ import { activateTaskSignals, pathForTask } from '../tasks/activate'
 import { restoreTask } from '../tasks/restoreTask'
 import TaskPaneHost from '../tasks/TaskPaneHost'
 import { openTarget } from '../notifications/notifications'
-import { Alert, Button, DetailColumn, EmptyState, Input, ListColumn, ListDetail, Row, SectionHeader } from '../../kit/components/primitives'
+import { Alert, Button, DetailColumn, EmptyState, Input, ListColumn, ListDetail, Row, SectionHeader, Toolbar } from '../../kit/components/primitives'
 import { Rows } from '../../kit/components/layout/Rows'
 import { Stack } from '../../kit/components/layout/Stack'
 import { Inline } from '../../kit/components/layout/Inline'
@@ -116,19 +116,22 @@ export default function ArchivePage() {
 
   return (
     <ListDetail split listLabel="Archived tasks" collapseKey={ARCHIVE_SIDEBAR_KEY}>
-      <ListColumn label="Archived tasks" scroll>
-        <Stack gap="section">
-          <Show when={!collapsed()}>
-            <Heading level={1}>Archive</Heading>
+      <ListColumn label="Archived tasks">
+        <Show when={!collapsed()}>
+          <SectionHeader>Archive</SectionHeader>
+          <Toolbar size="sm" ariaLabel="Search archived tasks">
             <Input
+              kind="filter"
               type="search"
               value={text()}
               label="Search archived tasks"
               placeholder="Search titles, branches and agent transcripts…"
               onInput={setText}
             />
-            <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
-          </Show>
+          </Toolbar>
+          <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
+        </Show>
+        <div class="scroll">
           <Show
             when={query()}
             fallback={
@@ -224,7 +227,7 @@ export default function ArchivePage() {
               </Show>
             </Show>
           </Show>
-        </Stack>
+        </div>
       </ListColumn>
       <DetailColumn>
         <Show
