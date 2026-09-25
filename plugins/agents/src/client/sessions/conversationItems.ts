@@ -3,7 +3,6 @@ import type {
   AgentNormalizedEvent,
   AgentRequest,
   AgentSubagentUpdate,
-  AgentUsage,
 } from '../../contract/wire.ts'
 // The same merge the node's snapshot fold and the transcript store apply. This fold is now defensive:
 // both sources hand the transcript one usage record a turn already, and it still runs so that a
@@ -130,16 +129,64 @@ const subagentIdOf = (event: AgentNormalizedEvent): string | undefined => {
 
 // One agent's run of cards. A usage line is per stream, so a subagent's token count cannot update the
 // parent's; tool cards are tracked across the whole transcript instead, for the reason on `toolCards`
-// below.
+// below. A subagent's stream also knows where its card sits, so the card can be handed a fresh copy
+// of the run each time the run changes.
 type Stream = {
   items: AgentConversationItem[]
   usageCardAt: number | undefined
   planCardAtByTurn: Map<string, number>
+  /** Where the card that owns this stream sits in the session's own stream. Absent on that one. */
+  cardAt?: number
 }
 
-const newStream = (): Stream => ({ items: [], usageCardAt: undefined, planCardAtByTurn: new Map() })
+const newStream = (cardAt?: number): Stream => ({ items: [], usageCardAt: undefined, planCardAtByTurn: new Map(), cardAt })
 
-export function buildConversationItems(events: AgentEventRecord[]): AgentConversationItem[] {
+// A record the node already folded (`foldedThroughSeq`) stands in for every update of its card up to
+// that seq, so the card's `lastSeq` jumps there, and a row at or below it is one that record already
+// holds: a page re-read, a socket frame the refetch overtook. Applying it twice would repeat appended
+// output.
+const reach = (record: AgentEventRecord) => record.foldedThroughSeq ?? record.seq
+
+const openItem = (record: AgentEventRecord): AgentConversationItem => ({
+  key: record.id,
+  firstSeq: record.seq,
+  lastSeq: reach(record),
+  turnId: record.turnId,
+  event: record.event,
+})
+
+const folded = (card: AgentNormalizedEvent, update: AgentNormalizedEvent): AgentNormalizedEvent => {
+  if (card.type === 'tool' && update.type === 'tool') {
+    return { type: 'tool', tool: mergeToolCall(card.tool, update.tool) }
+  }
+  if (card.type === 'usage' && update.type === 'usage') {
+    return { type: 'usage', usage: mergeUsage(card.usage, update.usage) }
+  }
+  if (card.type === 'subagent' && update.type === 'subagent') {
+    return { type: 'subagent', subagent: mergeSubagent(card.subagent, update.subagent) }
+  }
+  return update
+}
+
+// Spread, so a subagent card keeps the `children` it was last handed.
+const foldInto = (card: AgentConversationItem, record: AgentEventRecord): AgentConversationItem =>
+  ({ ...card, lastSeq: reach(record), event: folded(card.event, record.event) })
+
+type Fold = {
+  /** Take the next record. Records must come in seq order. */
+  add(record: AgentEventRecord): void
+  /** Take the last usage record again after the store merged a later update into it in place. */
+  replaceLastUsage(record: AgentEventRecord): void
+  /** The session's own stream as it stands, and which of the positions an earlier `settle` handed out
+   *  have changed since. The array is the fold's own: copy it before keeping it. */
+  settle(): { items: AgentConversationItem[]; changed: number[] }
+}
+
+// The projection as a fold that stays open. `buildConversationItems` opens one and adds every record;
+// a streaming transcript keeps its fold and adds each record as it lands
+// (`createConversationProjection` below). Both run this code, so there is no second copy of the fold
+// to drift from the first.
+function openFold(): Fold {
   const top = newStream()
   // ponytail: one level of nesting. Both harnesses let a subagent spawn a subagent, and its card
   // becomes a sibling at the top rather than a grandchild. Give the roster a parent id and recurse
@@ -153,6 +200,43 @@ export function buildConversationItems(events: AgentEventRecord[]): AgentConvers
   // titled with the raw tool id because a mid-call update carries no title either. A tool call belongs
   // to whoever opened it, and every later update folds there wherever it arrives from.
   const toolCards = new Map<string, { stream: Stream; at: number }>()
+  // What changed since the last `settle`. Positions past `settled` are new, so they need no entry.
+  let settled = 0
+  const changed = new Set<number>()
+  const grown = new Set<Stream>()
+  // The turn-closing lines since the newest usage card: the ones whose context figure that card sets.
+  let closedSinceUsage: number[] = []
+  // Where the last usage record went, and the card as it was before it, so that record can be taken
+  // again (`replaceLastUsage`).
+  let lastUsage: { at: number; before: AgentConversationItem | undefined } | undefined
+
+  const write = (stream: Stream, at: number, item: AgentConversationItem): void => {
+    stream.items[at] = item
+    if (stream !== top) grown.add(stream)
+    else if (at < settled) changed.add(at)
+  }
+
+  // Put the turn's context figure on the line that closes it. Positional rather than by turn id,
+  // because a `turn_completed` often has no turn id to match on: the Codex driver clears the current
+  // turn before it emits the event (server/drivers/codexDriver.ts), so the completion arrives
+  // unattributed. What "the context at that point" means is anyway where the reader is looking, and the
+  // usage card above the closing line is the last one before it.
+  //
+  // Only the session's own stream, which is where every usage event lands: `subagentIdOf` does not
+  // attribute one, and a subagent reports its own tokens on its roster card instead. A late usage
+  // update, one that arrives after the turn is complete, folds into the card it is updating, so the
+  // lines that card already stamped are stamped again.
+  const stamp = (at: number): void => {
+    const card = top.usageCardAt === undefined ? undefined : top.items[top.usageCardAt].event
+    if (card?.type !== 'usage' || card.usage.contextUsed === undefined) return
+    const { contextUsed: used, contextSize: size } = card.usage
+    const item = top.items[at]
+    if (item.context?.used === used && item.context.size === size) return
+    write(top, at, { ...item, context: { used, ...(size === undefined ? {} : { size }) } })
+  }
+  const restamp = (): void => {
+    for (const at of closedSinceUsage) stamp(at)
+  }
 
   // Tools, usage, subagents, and plans report evolving state rather than separate moments, so each is
   // folded into the card it started rather than appended. The event ledger still stores a row per
@@ -166,11 +250,6 @@ export function buildConversationItems(events: AgentEventRecord[]): AgentConvers
   // with only a context count, which used to render as a second, near-identical line. A subagent folds
   // like a tool call, by id, so a completion summary lands on the card the spawn opened.
   //
-  // A record the node already folded (`foldedThroughSeq`) stands in for every update of its card up to
-  // that seq, so the card's `lastSeq` jumps there, and a row at or below it is one that record already
-  // holds: a page re-read, a socket frame the refetch overtook. Applying it twice would repeat
-  // appended output.
-  const reach = (record: AgentEventRecord) => record.foldedThroughSeq ?? record.seq
   // Which existing card this record updates, and in which stream. `undefined` means it opens a new one.
   const foldTarget = (
     record: AgentEventRecord,
@@ -190,23 +269,8 @@ export function buildConversationItems(events: AgentEventRecord[]): AgentConvers
       ? { stream, at: stream.usageCardAt }
       : undefined
   }
-  const folded = (card: AgentNormalizedEvent, update: AgentNormalizedEvent): AgentNormalizedEvent => {
-    if (card.type === 'tool' && update.type === 'tool') {
-      return { type: 'tool', tool: mergeToolCall(card.tool, update.tool) }
-    }
-    if (card.type === 'usage' && update.type === 'usage') {
-      return { type: 'usage', usage: mergeUsage(card.usage, update.usage) }
-    }
-    if (card.type === 'subagent' && update.type === 'subagent') {
-      return { type: 'subagent', subagent: mergeSubagent(card.subagent, update.subagent) }
-    }
-    return update
-  }
 
-  // Copied and sorted unconditionally, and left that way after measuring it: on a 1,850-row session
-  // both this and an in-order check that would skip it come in around 0.05 ms, because V8's sort walks
-  // an already-ordered array in one pass. Guarding it buys nothing worth a branch.
-  for (const record of [...events].sort((a, b) => a.seq - b.seq)) {
+  const add = (record: AgentEventRecord): void => {
     const owner = subagentIdOf(record.event)
     // An orphan stays visible at the top rather than being dropped: the subagent card is normally the
     // event before its first child, but a truncated replay can start mid-stream.
@@ -214,20 +278,26 @@ export function buildConversationItems(events: AgentEventRecord[]): AgentConvers
     const fold = foldTarget(record, stream)
     if (fold) {
       const card = fold.stream.items[fold.at]
-      if (record.seq <= card.lastSeq) continue
-      // Spread, so a subagent card keeps the `children` array its stream is still pushing into.
-      fold.stream.items[fold.at] = { ...card, lastSeq: reach(record), event: folded(card.event, record.event) }
-      continue
+      if (record.event.type === 'usage') lastUsage = { at: fold.at, before: card }
+      if (record.seq <= card.lastSeq) return
+      write(fold.stream, fold.at, foldInto(card, record))
+      if (record.event.type === 'usage') restamp()
+      return
     }
     if (record.event.type === 'tool') {
       toolCards.set(toolCardKey(record.turnId, record.event.tool.id), { stream, at: stream.items.length })
     }
-    if (record.event.type === 'usage') stream.usageCardAt = stream.items.length
+    if (record.event.type === 'usage') {
+      stream.usageCardAt = stream.items.length
+      closedSinceUsage = []
+      lastUsage = { at: stream.items.length, before: undefined }
+    }
     if (record.event.type === 'plan' && record.turnId !== null) {
       stream.planCardAtByTurn.set(record.turnId, stream.items.length)
     }
 
-    const previous = stream.items[stream.items.length - 1]
+    const last = stream.items.length - 1
+    const previous = stream.items[last]
     if (
       previous
       && previous.turnId === record.turnId
@@ -237,97 +307,144 @@ export function buildConversationItems(events: AgentEventRecord[]): AgentConvers
       && record.event.append
       && previous.event.messageId === record.event.messageId
     ) {
-      stream.items[stream.items.length - 1] = {
+      write(stream, last, {
         ...previous,
         lastSeq: record.seq,
         event: { ...previous.event, text: previous.event.text + record.event.text },
-      }
-      continue
+      })
+      return
     }
 
-    const item: AgentConversationItem = {
-      key: record.id,
-      firstSeq: record.seq,
-      lastSeq: reach(record),
-      turnId: record.turnId,
-      event: record.event,
-    }
-    // A subagent card owns a stream, and `children` is that stream's own array, so everything the
-    // subagent does afterwards appears inside the card without another pass over the transcript.
+    const at = stream.items.length
+    const item = openItem(record)
+    // A subagent card owns a stream, and `settle` hands the card a copy of that stream's items, so
+    // everything the subagent does afterwards appears inside the card without another pass over the
+    // transcript.
     if (record.event.type === 'subagent') {
-      const child = newStream()
+      const child = newStream(at)
       streams.set(record.event.subagent.id, child)
-      subagentCardAt.set(record.event.subagent.id, top.items.length)
-      item.children = child.items
+      subagentCardAt.set(record.event.subagent.id, at)
+      item.children = []
+      grown.add(child)
     }
-    stream.items.push(item)
+    write(stream, at, item)
+    if (stream === top && record.event.type === 'turn_completed') {
+      closedSinceUsage.push(at)
+      stamp(at)
+    }
   }
-  stampTurnContext(top.items)
-  return top.items
+
+  // The store merges a streamed usage update into the line's record in place rather than adding a row
+  // (managedStore.ts § foldUsage). The record keeps its id and seq, so it lands where it landed before:
+  // this runs the same decision `add` made for it, against the card as it was before it.
+  const replaceLastUsage = (record: AgentEventRecord): void => {
+    if (!lastUsage) return
+    const { at, before } = lastUsage
+    if (before && record.seq <= before.lastSeq) return
+    write(top, at, before ? foldInto(before, record) : openItem(record))
+    restamp()
+  }
+
+  const settle = () => {
+    for (const stream of grown) {
+      const at = stream.cardAt!
+      write(top, at, { ...top.items[at], children: stream.items.slice() })
+    }
+    grown.clear()
+    const out = { items: top.items, changed: [...changed] }
+    changed.clear()
+    settled = top.items.length
+    return out
+  }
+
+  return { add, replaceLastUsage, settle }
+}
+
+const bySeq = (events: AgentEventRecord[]): AgentEventRecord[] => [...events].sort((a, b) => a.seq - b.seq)
+
+export function buildConversationItems(events: AgentEventRecord[]): AgentConversationItem[] {
+  const fold = openFold()
+  // Copied and sorted unconditionally, and left that way after measuring it: on a 1,850-row session
+  // both this and an in-order check that would skip it come in around 0.05 ms, because V8's sort walks
+  // an already-ordered array in one pass. Guarding it buys nothing worth a branch.
+  for (const record of bySeq(events)) fold.add(record)
+  return fold.settle().items
 }
 
 /**
- * Hand back the previous projection's object for every item the new one built from the same events.
+ * The projection a streaming transcript keeps, as a function of the session's event array.
  *
- * `buildConversationItems` makes a fresh object for every item on every snapshot, and a streaming
- * session changes the snapshot about 25 times a second. Every card reads its item, so every card in
- * the transcript re-ran its bindings for an event that changed one of them. Given the old object for
- * an unchanged item, the transcript's row signal sees the same value and nothing under it runs.
+ * A long session is tens of thousands of rows, and rebuilding the whole projection for each streamed
+ * event cost a few milliseconds each time, 25 times a second. So this keeps the fold open and adds the
+ * rows that arrived since the last call, which is the same fold a rebuild runs, fed the same records
+ * in the same order.
  *
- * An item is its key and the records from `firstSeq` to `lastSeq` folded together. The ledger never
- * rewrites a seq, and the node's folded record stands in for exactly the updates it covers, so the same
- * span means the same content. Two things are not in that span: the context figure, stamped from a
- * usage line that can change after the turn closed, and a subagent's `children`, which is its stream's
- * own array and grows without the card's seqs moving. The first is compared; the second is never
- * reused, and there are few of them.
+ * That only holds while the rows it already took are still there, in the same places, and the new ones
+ * come after them. So this checks every one of them by identity, which costs a pointer comparison a row,
+ * and that the new rows are in seq order. The one in-place change it takes is the store's own: a
+ * streamed usage update merged into the line's record (managedStore.ts § foldUsage). Anything else
+ * rebuilds from the start: a row seated behind the tail, or a re-read that replaced a record.
+ *
+ * An item nothing touched is handed back as the same object as last time, which is what lets the
+ * transcript's rows tell which card changed. A rebuild hands back new objects throughout, and that is
+ * deliberate: it happens when rows landed behind the tail, which is exactly when a card can hold new
+ * content under the same key and the same seqs, so there is no cheap way to tell which cards are
+ * unchanged. It costs one redraw of every card's bindings, on a reconnect or a late frame.
  */
-export function reuseUnchangedItems(
-  previous: AgentConversationItem[] | undefined,
-  next: AgentConversationItem[],
-): AgentConversationItem[] {
-  if (!previous?.length) return next
-  const held = new Map(previous.map((item) => [item.key, item]))
-  return next.map((item) => {
-    const before = held.get(item.key)
-    return before && sameItem(before, item) ? before : item
-  })
-}
+export function createConversationProjection(): (events: AgentEventRecord[]) => AgentConversationItem[] {
+  let fold: Fold | undefined
+  // The records the fold has taken, in the order it took them, and where the last usage record sits.
+  let taken: AgentEventRecord[] = []
+  let lastUsageAt = -1
+  let shown: AgentConversationItem[] = []
 
-const sameItem = (before: AgentConversationItem, item: AgentConversationItem): boolean =>
-  !before.children && !item.children
-  && before.firstSeq === item.firstSeq
-  && before.lastSeq === item.lastSeq
-  && before.turnId === item.turnId
-  && before.event.type === item.event.type
-  && before.context?.used === item.context?.used
-  && before.context?.size === item.context?.size
-
-/**
- * Put each turn's context figure on the line that closes the turn.
- *
- * Positional rather than by turn id, because a `turn_completed` often has no turn id to match on: the
- * Codex driver clears the current turn before it emits the event (server/drivers/codexDriver.ts), so
- * the completion arrives unattributed. What "the context at that point" means is anyway where the
- * reader is looking, and the usage card above the closing line is the last one before it.
- *
- * A second pass rather than a branch in the loop above, so the trailing usage update needs no special
- * case. That update lands after the turn is already complete and folds into the card it is updating,
- * which is the card this pass then reads.
- *
- * Only the session's own stream, which is where every usage event lands: `subagentIdOf` does not
- * attribute one, and a subagent reports its own tokens on its roster card instead.
- */
-function stampTurnContext(items: AgentConversationItem[]): void {
-  let latest: AgentUsage | undefined
-  for (const [at, item] of items.entries()) {
-    if (item.event.type === 'usage') latest = item.event.usage
-    if (item.event.type !== 'turn_completed' || latest?.contextUsed === undefined) continue
-    items[at] = {
-      ...item,
-      context: {
-        used: latest.contextUsed,
-        ...(latest.contextSize === undefined ? {} : { size: latest.contextSize }),
-      },
+  const rebuild = (events: AgentEventRecord[]): AgentConversationItem[] => {
+    fold = openFold()
+    taken = bySeq(events)
+    lastUsageAt = -1
+    for (const [at, record] of taken.entries()) {
+      fold.add(record)
+      if (record.event.type === 'usage') lastUsageAt = at
     }
+    shown = fold.settle().items.slice()
+    return shown
+  }
+
+  return (events) => {
+    if (!fold || events.length < taken.length) return rebuild(events)
+    let replaced: AgentEventRecord | undefined
+    for (let at = 0; at < taken.length; at++) {
+      const record = events[at]
+      if (record === taken[at]) continue
+      if (at !== lastUsageAt || !sameUsageRow(taken[at], record)) return rebuild(events)
+      replaced = record
+    }
+    for (let at = Math.max(taken.length, 1); at < events.length; at++) {
+      if (events[at].seq <= events[at - 1].seq) return rebuild(events)
+    }
+
+    if (replaced) {
+      fold.replaceLastUsage(replaced)
+      taken[lastUsageAt] = replaced
+    }
+    for (let at = taken.length; at < events.length; at++) {
+      const record = events[at]
+      fold.add(record)
+      taken.push(record)
+      if (record.event.type === 'usage') lastUsageAt = at
+    }
+    const { items, changed } = fold.settle()
+    if (!changed.length && items.length === shown.length) return shown
+    const next = shown.slice()
+    for (const at of changed) next[at] = items[at]
+    for (let at = shown.length; at < items.length; at++) next.push(items[at])
+    shown = next
+    return shown
   }
 }
+
+// The store's merge keeps the row's id, seq and turn (managedStore.ts § foldUsage). The turn decides
+// which card a usage row folds into, so a row that moved turns is not the same row.
+const sameUsageRow = (held: AgentEventRecord, now: AgentEventRecord): boolean =>
+  now.event.type === 'usage' && held.event.type === 'usage'
+  && now.id === held.id && now.seq === held.seq && now.turnId === held.turnId

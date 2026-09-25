@@ -341,10 +341,12 @@ function appendEvent(event: AgentEventRecord): void {
     }
     seen.add(event.id)
     if (completeThrough.get(event.sessionId) === event.seq - 1) completeThrough.set(event.sessionId, event.seq)
-    // The array is mutated rather than copied. Nothing holds it across a change — buildConversationItems
-    // copies before it sorts, and mergeManagedSnapshot either builds a new array or passes this one on —
-    // and what makes the transcript's memo re-run is this signal, not the array's identity. So an append
-    // costs a push and a four-field object instead of a copy of the whole session.
+    // The array is mutated rather than copied. Nothing that holds it across a change trusts it to stay
+    // as it was — the transcript's projection checks it record by record against the ones it already
+    // took (createConversationProjection), and mergeManagedSnapshot either builds a new array or passes
+    // this one on — and what makes the transcript's memo re-run is this signal, not the array's
+    // identity. So an append costs a push and a four-field object instead of a copy of the whole
+    // session.
     if (!foldUsage(event.sessionId, snapshot.events, event)) {
       const appended = seatEvent(snapshot.events, event)
       if (!appended) indexEvents(event.sessionId, snapshot.events)

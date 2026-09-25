@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { AgentEventRecord, AgentRequest } from '../../contract/wire.ts'
 import { foldToolEvents } from '../../shared/toolFold'
 import {
-  buildConversationItems, findSubagentItem, isChatItem, reuseUnchangedItems, visibleConversationItems,
+  buildConversationItems, createConversationProjection, findSubagentItem, isChatItem, visibleConversationItems,
 } from './conversationItems'
 
 const event = (seq: number, value: AgentEventRecord['event'], turnId: string | null = 'turn'): AgentEventRecord => ({
@@ -428,50 +428,91 @@ describe('a transcript the node folded', () => {
   })
 })
 
-describe('the next projection of a streaming session', () => {
+describe('the projection a streaming transcript keeps', () => {
   // What a card sees when one more event arrives: the object it already has, unless that event is its.
-  const before = [
+  // The array is the store's, which grows in place (managedStore.ts § appendEvent).
+  const before = () => [
     event(1, { type: 'user_message', text: 'go' }, 'turn-1'),
     event(2, { type: 'tool', tool: { id: 'cmd', title: 'ls', status: 'running' } }, 'turn-1'),
     event(3, { type: 'assistant_message', text: 'reading', messageId: 'm' }, 'turn-1'),
     event(4, { type: 'usage', usage: { contextUsed: 1_000 } }, 'turn-1'),
     event(5, { type: 'turn_completed', stopReason: 'end_turn' }, 'turn-1'),
   ]
-  const held = buildConversationItems(before)
-  const next = (...more: AgentEventRecord[]) => reuseUnchangedItems(held, buildConversationItems([...before, ...more]))
+  const open = () => {
+    const events = before()
+    const project = createConversationProjection()
+    const held = project(events)
+    return { events, project, held }
+  }
 
   it('keeps every item an event did not touch and adds the new one', () => {
-    const items = next(event(6, { type: 'assistant_message', text: 'next turn', messageId: 'n' }, 'turn-2'))
+    const { events, project, held } = open()
+    events.push(event(6, { type: 'assistant_message', text: 'next turn', messageId: 'n' }, 'turn-2'))
+    const items = project(events)
+    expect(items).not.toBe(held)
     expect(items.slice(0, held.length).every((item, at) => item === held[at])).toBe(true)
     expect(items).toHaveLength(held.length + 1)
   })
 
   it('hands over a new object for the item the event changed', () => {
-    const items = next(event(6, { type: 'tool', tool: { id: 'cmd', title: '', status: 'completed' } }, 'turn-1'))
+    const { events, project, held } = open()
+    events.push(event(6, { type: 'tool', tool: { id: 'cmd', title: '', status: 'completed' } }, 'turn-1'))
+    const items = project(events)
     const changed = items.findIndex((item) => item.event.type === 'tool')
     expect(items[changed]).not.toBe(held[changed])
     expect(items[changed].event.type === 'tool' && items[changed].event.tool.status).toBe('completed')
     expect(items.filter((item, at) => item !== held[at])).toHaveLength(1)
   })
 
+  it('hands back the same list when nothing changed', () => {
+    const { events, project, held } = open()
+    expect(project(events)).toBe(held)
+  })
+
   it('redraws a closed turn whose context figure a late usage update moved', () => {
-    const items = next(event(6, { type: 'usage', usage: { contextUsed: 1_500 } }, null))
+    const { events, project, held } = open()
+    events.push(event(6, { type: 'usage', usage: { contextUsed: 1_500 } }, null))
+    const items = project(events)
     const closing = items.findIndex((item) => item.event.type === 'turn_completed')
     expect(items[closing]).not.toBe(held[closing])
     expect(items[closing].context).toEqual({ used: 1_500 })
   })
 
-  it('never keeps a subagent card, whose run grows without its own seqs moving', () => {
-    const spawn = [
+  it('takes the store merging a usage update into the line in place', () => {
+    const { events, project, held } = open()
+    // What managedStore.ts § foldUsage does: same id, same seq, a new running total.
+    events[3] = { ...events[3], event: { type: 'usage', usage: { contextUsed: 1_200 } } }
+    const items = project(events)
+    expect(items).toEqual(buildConversationItems(events))
+    expect(items.find((item) => item.event.type === 'turn_completed')?.context).toEqual({ used: 1_200 })
+    expect(items.filter((item, at) => item !== held[at]).map((item) => item.event.type)).toEqual(['usage', 'turn_completed'])
+  })
+
+  it('rebuilds when a row lands behind the tail, and draws what a rebuild draws', () => {
+    const { events, project } = open()
+    events.push(event(8, { type: 'tool', tool: { id: 'cmd', title: '', output: 'b', outputAppend: true } }, 'turn-1'))
+    project(events)
+    // A late frame for the same call. The card keeps its key and its seqs and gains output, so no
+    // earlier object may be handed back for it.
+    events.splice(5, 0, event(7, { type: 'tool', tool: { id: 'cmd', title: '', output: 'a', outputAppend: true } }, 'turn-1'))
+    const items = project(events)
+    expect(items).toEqual(buildConversationItems(events))
+    expect(items.find((item) => item.event.type === 'tool')?.event).toMatchObject({ tool: { output: 'ab' } })
+  })
+
+  it('hands a subagent card a new object when its run grows, and keeps it when nothing in it changed', () => {
+    const events = [
       event(1, { type: 'subagent', subagent: { id: 'sub-1', title: 'Read', status: 'running' } }),
       event(2, { type: 'tool', tool: { id: 'grep-1', title: 'Grep', subagentId: 'sub-1' } }),
     ]
-    const first = buildConversationItems(spawn)
-    const items = reuseUnchangedItems(first, buildConversationItems([
-      ...spawn,
-      event(3, { type: 'tool', tool: { id: 'grep-2', title: 'Grep', subagentId: 'sub-1' } }),
-    ]))
-    expect(items[0]).not.toBe(first[0])
-    expect(items[0].children).toHaveLength(2)
+    const project = createConversationProjection()
+    const first = project(events)
+    events.push(event(3, { type: 'tool', tool: { id: 'grep-2', title: 'Grep', subagentId: 'sub-1' } }))
+    const grown = project(events)
+    expect(grown[0]).not.toBe(first[0])
+    expect(grown[0].children).toHaveLength(2)
+    expect(grown[0].children?.[0]).toBe(first[0].children?.[0])
+    events.push(event(4, { type: 'assistant_message', text: 'done', messageId: 'top' }))
+    expect(project(events)[0]).toBe(grown[0])
   })
 })
