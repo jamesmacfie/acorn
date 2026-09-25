@@ -322,7 +322,7 @@ graph has no ports and nothing to drag — a run froze its definition when it st
 is a record.
 
 The node list is the editor's list. Both call `graphOrder` in
-`plugins/workflows/src/client/editor/draft.ts`, over the definition the run froze when it started, so
+`plugins/workflows/src/client/editor/graphOrder.ts`, over the definition the run froze when it started, so
 the indentation in the run cannot disagree with the indentation in the editor. A node that waits on
 more than one step carries the same `⇐ n` mark. A dispatched child is a row under the step that
 spawned it.

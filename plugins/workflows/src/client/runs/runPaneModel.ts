@@ -14,7 +14,7 @@ import type { WorkflowRunRow } from '../../contract/wire.ts'
 import type { WorkflowChildRunSummary, WorkflowRunProjection, WorkflowStepProjection } from '../../shared/api'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 import { isWorkflowStepEvent } from '../../shared/stepEvents'
-import { graphOrder } from '../editor/draft'
+import { graphOrder } from '../editor/graphOrder'
 import { rowIdentity } from '../../shared/workflowIdentity'
 import { workflowApi } from '../workflowsClient'
 
@@ -95,7 +95,7 @@ export function createRunPaneModel(task: Task) {
   })
 
   // The run's frozen definition is what says which step waits on which, so the pane's indentation is
-  // the editor's: one `graphOrder`, two lists (../editor/draft.ts). A dispatched child is a row
+  // the editor's: one `graphOrder`, two lists (../editor/graphOrder.ts). A dispatched child is a row
   // under the step that spawned it, which the definition cannot know.
   const nodes = createMemo<RunNode[]>(() => {
     const rows = steps()
