@@ -33,8 +33,11 @@ export const agentPaneContribution: PaneLayoutContribution<AgentPaneModel> = {
   model: (task, pane) => createAgentPaneModel(task, pane),
   // The session list, which is the first thing the model asks for. The store deduplicates it over a
   // five-second window, so opening the task right after the hover costs nothing and the snapshot the
-  // pane opens on is the only request left. Not the snapshot itself: which session that would be is
-  // the reader's choice, and a wrong guess is a few thousand event rows.
+  // pane opens on is the only request left. Not the snapshot itself. Warming it moves a first visit's
+  // read earlier by only the part of the hover past the settle, usually 100 to 300 ms. But a hover
+  // with no click then reads the whole transcript, 11 requests and 12 MB for a 16,000-event session,
+  // and the store keeps it until the app quits. A session the store already holds draws from memory
+  // on the click anyway.
   prefetch: (task) => void managedAgentStore.loadTask(task.id).catch(() => {}),
   // The sidebar gives each row its run-state glyph back as a rail form
   // (./sessions/AgentTaskSidebar.tsx).
