@@ -42,8 +42,11 @@ afterEach(() => {
 
 const pane = () => paneRegistry.get('preview')!.component
 
-// The layout and the region are `lazy`, so the pane draws a few ticks after it is asked for.
-const drawn = (taskId: string) => vi.waitFor(() => expect(host.querySelector('.page')?.textContent).toBe(taskId))
+// The layout and the region are `lazy`, so the pane draws a few ticks after it is asked for. The
+// first draw in the file imports them cold, and under the full suite's load that took over the
+// default second.
+const drawn = (taskId: string) =>
+  vi.waitFor(() => expect(host.querySelector('.page')?.textContent).toBe(taskId), { timeout: 5_000 })
 
 it('closes the tunnels of the task being left, not the one being opened', async () => {
   const [activeId, setActiveId] = createSignal('a')
