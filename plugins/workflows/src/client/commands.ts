@@ -11,8 +11,6 @@ import {
 } from '@acorn/plugin-api/client'
 import { workflowApi, type WorkflowDefSummary } from './workflowsClient'
 import { needsStartDialog, requestWorkflowStart } from './editor/startRequest'
-import { emptyDefinition } from './editor/draft'
-import { defRefKey } from './editor/draftStore'
 import { WORKFLOWS_SOURCE_ID, workflowsSurfacePath } from './surfacePath'
 import { WORKFLOWS_PANE_ID } from './runs/runPaneModel'
 
@@ -158,6 +156,9 @@ export const workflowsCommands: readonly ContributedCommand[] = [
     run: async (context): Promise<CommandOutcome> => {
       const { workspaceId, projectId, navigate } = context
       if (!workspaceId || !projectId) return { effect: 'stay', status: 'Choose a project first.' }
+      // The editor's modules load here rather than at startup: this command is registered before the
+      // first draw, and the editor is where it goes next anyway.
+      const [{ emptyDefinition }, { defRefKey }] = await Promise.all([import('./editor/draft'), import('./editor/draftStore')])
       const row = await workflowApi.createDef({ workspaceId, projectId, def: emptyDefinition() })
       navigate?.(workflowsSurfacePath(projectId, defRefKey({ source: 'database', id: row.id })))
       return COMMAND_CLOSED

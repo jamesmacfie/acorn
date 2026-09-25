@@ -10,7 +10,6 @@ import { githubIntegrationFlow } from './integrationFlow'
 import { githubBrowsePath, githubRouteContributions } from './clientRoutes'
 import { CHANGES_PUSH_ACTIONS_POINT, GithubPushActions } from './pushActions'
 import { githubPullPromotion } from './pullTasks'
-import GithubImporter from './GithubImporter'
 
 // Two lazy chunks off one module, because the source declares its list and its detail separately and
 // a terminal shell draws them in two different panels (./GithubBrowse.tsx). Both resolve the same
@@ -19,6 +18,8 @@ const GithubBrowseList = lazy(() => import('./GithubBrowse').then((module) => ({
 const GithubBrowseDetail = lazy(() => import('./GithubBrowse').then((module) => ({ default: module.GithubBrowseDetail })))
 // Lazy: a panel nobody has opened should not be in the first paint's bundle.
 const PullRefPanel = lazy(() => import('./PullRefPanel'))
+// Lazy for the same reason: it draws only once somebody opens "add a project" and picks GitHub.
+const GithubImporter = lazy(() => import('./GithubImporter'))
 
 export const githubClientPlugin: ClientPlugin = {
   name: 'github',

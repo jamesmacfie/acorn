@@ -12,6 +12,7 @@
     "./mapping.ts": "./src/mapping.ts",
     "./model.ts": "./src/model.ts",
     "./projection": "./src/projection/public.ts",
+    "./relativeTime.ts": "./src/relativeTime.ts",
     "./render": "./src/render/public.ts",
     "./shaping.ts": "./src/shaping.ts"
   },

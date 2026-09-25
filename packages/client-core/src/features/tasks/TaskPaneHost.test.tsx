@@ -121,7 +121,7 @@ describe('TaskPaneHost', () => {
 
   it('says so when the layout has nothing left to draw', () => {
     // The seam gate, which is what the browser preview asks: a shell without preview views never
-    // offers the pane (plugins/preview/src/client/PreviewTaskPane.tsx).
+    // offers the pane (plugins/preview/src/client/paneContribution.ts).
     capabilities.preview = false
     pane({ id: 'preview', order: 0, requires: { seam: 'preview' } })
     layout.panes = ['preview']

@@ -1,16 +1,8 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
-import { clientEvents, elementRectKey, previewViews, visibleElementRect } from '@acorn/plugin-api/client'
+import { elementRectKey, previewViews, visibleElementRect } from '@acorn/plugin-api/client'
 import { EmptyState, IconButton, Input, Rectangle, Spinner, Text, Toolbar } from '@acorn/plugin-api/ui'
 
 const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
-
-// Drop an archived task's preview view (called by every archive path via the runtime event below).
-export function evictPreviewWebview(taskId: string): void {
-  previewViews()?.evict(taskId)
-}
-
-export const activatePreviewEvents = (): (() => void) =>
-  clientEvents.on('runtime:task-archived', ({ taskId }) => evictPreviewWebview(taskId))
 
 export default function PreviewPane(props: { taskId: string; url: string | null }) {
   let host!: HTMLElement

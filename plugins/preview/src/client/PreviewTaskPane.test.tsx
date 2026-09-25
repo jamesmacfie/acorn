@@ -19,7 +19,7 @@ vi.mock('@acorn/plugin-api/client', () => ({
 // The page itself is a native view the shell positions, and is not what this file is about.
 vi.mock('./PreviewPane', () => ({ default: (props: { taskId: string }) => <span class="page">{props.taskId}</span> }))
 
-const { previewPaneContribution } = await import('./PreviewTaskPane')
+const { previewPaneContribution } = await import('./paneContribution')
 
 const task = (id: string): Task => ({ id, status: 'active' } as Task)
 

@@ -3,9 +3,11 @@ import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { memoryCommands } from './commands'
 import { memoryApi } from './memoryClient'
 import { activateMemoryNoticeTargets, MEMORY_SOURCE_ID } from './proposalTarget'
-import MemorySection from './MemorySection'
 
 const MemoryCenter = lazy(() => import('./MemoryCenter'))
+// Lazy as well: the section draws only inside the Context pane, and it carries the Findings review,
+// which is most of this plugin's weight.
+const MemorySection = lazy(() => import('./MemorySection'))
 
 const reviewAttentionTitle = (ready: number, failed: number): string => {
   const readyText = `${ready} memory suggestion${ready === 1 ? '' : 's'} ready`
