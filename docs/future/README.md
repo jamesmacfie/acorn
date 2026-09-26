@@ -15,6 +15,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | Folder | What it is | Status |
 | --- | --- | --- |
 | [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; nothing blocks it. |
+| [node/](./node/README.md) | Runtime identity, fleet reconciliation, trust transitions, worker and tree authority, and availability for UI supplied by node plugins. Seven phases. | Proposal, 2026-09-26. Not started; the worker identity correction is independent. |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
 | [dashboards/](./dashboards/README.md) | Remaining taskless database and write-back proposals. Shared data discovery and authoring now belong to workflow v2. | Redesign shipped; overlapping proposals superseded, 2026-09-13. |
