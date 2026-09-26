@@ -532,7 +532,10 @@ For the full contract, see [Terminal interaction and reporting](./tui/interactio
 
 ## Chrome
 
-For the full contract, see [Terminal chrome and plugins](./tui/chrome-and-plugins.md#chrome).
+For the full contract, see [Terminal chrome and plugins](./tui/chrome-and-plugins.md#chrome). Task
+rows project the allocator's complete ordered marker legend into one dimension. When every glyph does
+not fit, the row shows `+N`; focus that row and press `Shift+F10` or the menu key to inspect every
+label in the host-owned **Task markers** list. The desktop keeps its four-corner allocation.
 
 ## Loaded plugins
 

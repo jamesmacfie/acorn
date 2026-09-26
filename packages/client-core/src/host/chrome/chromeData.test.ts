@@ -1,14 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NodeStatus } from '@acorn/protocol/broker.ts'
+import { MAX_RAW_ANNOTATION_ROWS } from '@acorn/protocol/extensionPoints.ts'
 import { setActiveNode } from '../../infra/node/activeNode'
 
 const readJson = vi.fn()
+const writeJson = vi.fn()
 vi.mock('../../infra/node/apiClient', () => ({
   readJson: (...args: unknown[]) => readJson(...args),
-  writeJson: vi.fn(),
+  writeJson: (...args: unknown[]) => writeJson(...args),
 }))
 
-const { chromeDeps, sanitizeRailItem, scopedSourceItemsPath, unwatchChrome, watchChrome } = await import('./chromeData')
+const { chromeDeps, readAnnotationMarks, sanitizeRailItem, scopedSourceItemsPath, unwatchChrome, watchChrome } = await import('./chromeData')
 const wsClient = await import('../../infra/node/wsClient')
 const { _resetPluginChannels } = await import('../plugins/pluginChannel')
 
@@ -70,6 +72,30 @@ describe('descriptor source row parsing', () => {
     })).toEqual({
       id: '142', title: 'Checkout failed', task: { origin: 'rollbar' },
     })
+  })
+})
+
+describe('annotation response budget', () => {
+  beforeEach(() => writeJson.mockReset())
+
+  it('inspects only the generic raw-row ceiling and keeps valid rows around malformed ones', async () => {
+    const rows = Array.from({ length: MAX_RAW_ANNOTATION_ROWS + 2 }, (_, index) =>
+      index === 1
+        ? { broken: true }
+        : { key: { line: index }, severity: 'info', text: `Line ${index}` })
+    writeJson.mockResolvedValue({ items: rows })
+
+    const marks = await readAnnotationMarks(
+      'coverage',
+      '/v1/p/coverage/marks',
+      'node-a',
+      [{ line: 1 }],
+      new AbortController().signal,
+    )
+
+    expect(marks).toHaveLength(MAX_RAW_ANNOTATION_ROWS - 1)
+    expect(marks.some((mark) => mark.text === 'Line 2')).toBe(true)
+    expect(marks.some((mark) => mark.text === `Line ${MAX_RAW_ANNOTATION_ROWS}`)).toBe(false)
   })
 })
 

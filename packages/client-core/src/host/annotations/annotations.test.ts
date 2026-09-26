@@ -34,24 +34,52 @@ const point = () =>
     max: 4,
   }))
 
-const contributor = (pluginId: string, marks: (keys: unknown[]) => Promise<PluginAnnotationMark[]>) => {
+type ContributorOptions = {
+  id?: string
+  order?: number
+  enabled?: () => boolean
+  scope?: () => string
+  revision?: () => number
+}
+
+const contributor = (
+  pluginId: string,
+  marks: (keys: unknown[], signal: AbortSignal) => Promise<PluginAnnotationMark[]>,
+  options: ContributorOptions = {},
+) => {
   const calls: unknown[][] = []
-  registered.push(extensionRegistry.register({
-    id: `plugin:${pluginId}:lines`,
+  const signals: AbortSignal[] = []
+  const disposable = extensionRegistry.register({
+    id: options.id ?? `plugin:${pluginId}:lines`,
     pluginId,
     point: POINT,
     label: `${pluginId} marks`,
-    order: 500,
+    order: options.order ?? 500,
     carrier: 'items',
-    marks: async (keys) => {
+    ...(options.enabled ? { when: options.enabled } : {}),
+    ...(options.scope ? { requestScope: options.scope } : {}),
+    ...(options.revision ? { freshnessRevision: options.revision } : {}),
+    marks: async (keys, signal) => {
       calls.push(keys)
-      return marks(keys)
+      signals.push(signal)
+      return marks(keys, signal)
     },
-  } as ExtensionContribution))
-  return calls
+  } as ExtensionContribution)
+  registered.push(disposable)
+  return { calls, signals, disposable }
 }
 
 const key = (line: number) => ({ file: 'src/auth.ts', line, side: 'new' })
+
+const deferred = <T>() => {
+  let resolve!: (value: T) => void
+  let reject!: (reason?: unknown) => void
+  const promise = new Promise<T>((yes, no) => {
+    resolve = yes
+    reject = no
+  })
+  return { promise, resolve, reject }
+}
 
 afterEach(() => {
   for (const disposable of registered.reverse()) disposable.dispose()
@@ -62,7 +90,7 @@ afterEach(() => {
 describe('requestAnnotations', () => {
   it('asks about two thousand keys in one request per contributor', async () => {
     point()
-    const calls = contributor('coverage', async () => [])
+    const { calls } = contributor('coverage', async () => [])
     const keys = Array.from({ length: 2_000 }, (_, index) => key(index + 1))
     requestAnnotations(POINT, keys)
     await vi.waitFor(() => expect(calls).toHaveLength(1))
@@ -71,7 +99,7 @@ describe('requestAnnotations', () => {
 
   it('does not ask again for a key set it has already asked about', async () => {
     point()
-    const calls = contributor('coverage', async () => [])
+    const { calls } = contributor('coverage', async () => [])
     requestAnnotations(POINT, [key(1), key(2)])
     await vi.waitFor(() => expect(calls).toHaveLength(1))
     // The draw site's effect re-runs on every scroll and every thread toggle. Re-asking would be a
@@ -102,7 +130,7 @@ describe('requestAnnotations', () => {
   })
 
   it('says nothing about a point that is not an annotation point, or one nobody declared', async () => {
-    const calls = contributor('coverage', async () => [])
+    const { calls } = contributor('coverage', async () => [])
     requestAnnotations(POINT, [key(1)])
     expect(calls).toHaveLength(0)
     expect(annotationsFor(POINT, key(1))).toEqual([])
@@ -115,5 +143,135 @@ describe('requestAnnotations', () => {
     ])
     requestAnnotations(POINT, [key(42)])
     await vi.waitFor(() => expect(annotationsFor(POINT, key(42))).toHaveLength(1))
+  })
+
+  it('refetches only the contributor whose freshness revision changed', async () => {
+    point()
+    let coverageRevision = 0
+    let lintRevision = 0
+    const coverage = contributor('coverage', async () => [], { revision: () => coverageRevision })
+    const lint = contributor('lint', async () => [], { revision: () => lintRevision })
+
+    requestAnnotations(POINT, [key(1)])
+    await vi.waitFor(() => expect(coverage.calls).toHaveLength(1))
+    expect(lint.calls).toHaveLength(1)
+
+    coverageRevision += 1
+    requestAnnotations(POINT, [key(1)])
+    await vi.waitFor(() => expect(coverage.calls).toHaveLength(2))
+    expect(lint.calls).toHaveLength(1)
+  })
+
+  it('removes, disables and re-enables one contributor without clearing another', async () => {
+    point()
+    let coverageEnabled = true
+    const coverage = contributor(
+      'coverage',
+      async () => [{ key: key(1), severity: 'warn', text: 'Not covered' }],
+      { enabled: () => coverageEnabled },
+    )
+    contributor('lint', async () => [{ key: key(1), severity: 'danger', text: 'Unused import' }])
+
+    requestAnnotations(POINT, [key(1)])
+    await vi.waitFor(() => expect(annotationsFor(POINT, key(1))).toHaveLength(2))
+
+    coverageEnabled = false
+    requestAnnotations(POINT, [key(1)])
+    expect(annotationsFor(POINT, key(1)).map((mark) => mark.pluginId)).toEqual(['lint'])
+
+    coverageEnabled = true
+    requestAnnotations(POINT, [key(1)])
+    await vi.waitFor(() => expect(coverage.calls).toHaveLength(2))
+    await vi.waitFor(() => expect(annotationsFor(POINT, key(1)).map((mark) => mark.pluginId)).toEqual(['coverage', 'lint']))
+
+    coverage.disposable.dispose()
+    requestAnnotations(POINT, [key(1)])
+    expect(annotationsFor(POINT, key(1)).map((mark) => mark.pluginId)).toEqual(['lint'])
+  })
+
+  it('does not reuse results when the same descriptor id is registered again', async () => {
+    point()
+    const first = contributor('coverage', async () => [{ key: key(1), severity: 'info', text: 'Old' }])
+    requestAnnotations(POINT, [key(1)])
+    await vi.waitFor(() => expect(annotationsFor(POINT, key(1))[0]?.text).toBe('Old'))
+
+    first.disposable.dispose()
+    const second = contributor('coverage', async () => [{ key: key(1), severity: 'info', text: 'New' }])
+    requestAnnotations(POINT, [key(1)])
+    expect(annotationsFor(POINT, key(1))).toEqual([])
+    await vi.waitFor(() => expect(annotationsFor(POINT, key(1))[0]?.text).toBe('New'))
+    expect(second.calls).toHaveLength(1)
+  })
+
+  it('lets the same registration refetch after an explicit clear', async () => {
+    point()
+    let text = 'Before clear'
+    const coverage = contributor('coverage', async () => [{ key: key(1), severity: 'info', text }])
+    requestAnnotations(POINT, [key(1)])
+    await vi.waitFor(() => expect(annotationsFor(POINT, key(1))[0]?.text).toBe('Before clear'))
+
+    clearAnnotations(POINT)
+    expect(annotationsFor(POINT, key(1))).toEqual([])
+
+    text = 'After clear'
+    requestAnnotations(POINT, [key(1)])
+    await vi.waitFor(() => expect(annotationsFor(POINT, key(1))[0]?.text).toBe('After clear'))
+    expect(coverage.calls).toHaveLength(2)
+  })
+
+  it('clears a previous node synchronously and ignores its late answer', async () => {
+    point()
+    let node = 'node-a'
+    const requests = [deferred<PluginAnnotationMark[]>(), deferred<PluginAnnotationMark[]>()]
+    let request = 0
+    const contribution = contributor('coverage', () => requests[request++]!.promise, { scope: () => node })
+
+    requestAnnotations(POINT, [key(1)])
+    expect(contribution.signals[0]?.aborted).toBe(false)
+    node = 'node-b'
+    requestAnnotations(POINT, [key(1)])
+    expect(contribution.signals[0]?.aborted).toBe(true)
+    expect(annotationsFor(POINT, key(1))).toEqual([])
+
+    requests[1]!.resolve([{ key: key(1), severity: 'info', text: 'Node B' }])
+    await vi.waitFor(() => expect(annotationsFor(POINT, key(1))[0]?.text).toBe('Node B'))
+    requests[0]!.resolve([{ key: key(1), severity: 'danger', text: 'Node A late' }])
+    await Promise.resolve()
+    expect(annotationsFor(POINT, key(1))[0]?.text).toBe('Node B')
+  })
+
+  it('clears only a contributor whose replacement request fails', async () => {
+    point()
+    let revision = 0
+    const coverage = contributor(
+      'coverage',
+      async () => revision === 0
+        ? [{ key: key(1), severity: 'info', text: 'Covered' }]
+        : Promise.reject(new Error('node unreachable')),
+      { revision: () => revision },
+    )
+    contributor('lint', async () => [{ key: key(1), severity: 'danger', text: 'Unused import' }])
+    requestAnnotations(POINT, [key(1)])
+    await vi.waitFor(() => expect(annotationsFor(POINT, key(1))).toHaveLength(2))
+
+    revision += 1
+    requestAnnotations(POINT, [key(1)])
+    expect(annotationsFor(POINT, key(1)).map((mark) => mark.pluginId)).toEqual(['lint'])
+    await vi.waitFor(() => expect(coverage.calls).toHaveLength(2))
+    expect(annotationsFor(POINT, key(1)).map((mark) => mark.pluginId)).toEqual(['lint'])
+  })
+
+  it('merges in registered contributor order rather than response order', async () => {
+    point()
+    const slow = deferred<PluginAnnotationMark[]>()
+    const fast = deferred<PluginAnnotationMark[]>()
+    contributor('first', () => slow.promise, { order: 10 })
+    contributor('second', () => fast.promise, { order: 20 })
+    requestAnnotations(POINT, [key(1)])
+
+    fast.resolve([{ key: key(1), severity: 'warn', text: 'Second' }])
+    await vi.waitFor(() => expect(annotationsFor(POINT, key(1)).map((mark) => mark.pluginId)).toEqual(['second']))
+    slow.resolve([{ key: key(1), severity: 'info', text: 'First' }])
+    await vi.waitFor(() => expect(annotationsFor(POINT, key(1)).map((mark) => mark.pluginId)).toEqual(['first', 'second']))
   })
 })

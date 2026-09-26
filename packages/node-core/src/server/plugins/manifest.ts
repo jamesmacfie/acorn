@@ -558,8 +558,26 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     // Both carriers that are routes are confined to this plugin's own namespace, for the reason every
     // other declared route is: a plugin must not be able to make the host call core's routes, or another
     // plugin's, on its behalf.
-    if (entry.items !== undefined) route(entry.items, [...at, 'items'])
-    if (entry.route !== undefined) route(entry.route, [...at, 'route'])
+    if (entry.items !== undefined) {
+      route(entry.items, [...at, 'items'])
+      if (!manifest.node) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [...at, 'items'],
+          message: 'an items extension calls a node route; declare `node` in the manifest',
+        })
+      }
+    }
+    if (entry.route !== undefined) {
+      route(entry.route, [...at, 'route'])
+      if (!manifest.node) {
+        ctx.addIssue({
+          code: 'custom',
+          path: [...at, 'route'],
+          message: 'a route extension calls a node route; declare `node` in the manifest',
+        })
+      }
+    }
     if (entry.onSelect) action(entry.onSelect, [...at, 'onSelect'])
     // A remote entry is a key of the object this plugin's own bundle passed to `mountTree`, so there has
     // to be a bundle. Without one the contribution parses and can never draw anything.

@@ -156,19 +156,52 @@ owner declares what its items are keyed by; the contributor answers with marks f
   "items": "/v1/p/coverage/lines" }
 ```
 
-The host POSTs the keys on screen in one request and B answers marks:
+The host POSTs the visible keys to each contributor in one request, and B answers marks:
 
 ```
 POST /v1/p/coverage/lines  { "keys": [{ "file": "src/auth.ts", "line": 42, "side": "new" }, …] }
 → { "items": [{ "key": {…}, "severity": "info" | "warn" | "danger", "text": "Not covered by any test", "icon": "shield-off" }] }
 ```
 
-Batched, so a plugin with two thousand marks answers one request. Display strings only, capped by the
-host, the same rule `PluginExtensionItem` has. The lookup is minted from the **owner's** declared
-fields in the owner's order, so a contributor cannot widen its own match by inventing a field.
-Provenance is stamped on every mark and drawn beside it. A contributor that fails draws nothing for
-itself and leaves the others alone: a mark is a note under somebody else's row, and one plugin's outage
-must not blank the row.
+Batched, so a plugin with 2,000 marks answers one request. An annotation response contains scalar key
+fields, one of three severities, up to 200 characters of text, and an optional host-resolved icon.
+It contains no markup, CSS, geometry, color, or action. The lookup is minted from the **owner's**
+declared fields in the owner's order, so a contributor cannot widen its own match by inventing a
+field. The host stamps provenance on every mark and draws it beside the mark.
+
+Annotation state belongs to one contributor at one point. Its request identity contains the point
+registration, the contributor descriptor registration, the active node scope, that plugin's chrome
+freshness revision, and the visible-key signature. A changed identity aborts the previous read and
+removes that contributor's retained marks in the same turn. The exact request generation owns its
+answer, so a late response cannot restore stale marks even when the contributor ignores its
+`AbortSignal`. The host merges completed partitions in registered contributor order rather than
+response order. A failed contributor stays empty and leaves every other contributor's marks intact.
+Reload, disable, removal, and node changes clear retained annotation state before replacement
+registrations can reuse public ids.
+
+The generic transport inspects at most 4,096 raw rows from one contributor response. It drops
+malformed rows independently and emits one overflow summary for rows beyond that ceiling. A point
+owner may set a smaller accepted-mark limit after validation. These are separate limits because a
+diff may legitimately ask about 2,000 visible lines.
+
+#### Task annotations
+
+`core:task` is the core-owned annotation point for loaded-plugin task status. Its key is
+`{ "task": "<task-id>" }`. A contributor declares an `items` extension and serves the ordinary
+batched annotation POST. The host makes one request per contributor and visible task-id set. It does
+not create a request, timer, observer, or subscription for each task row.
+
+`core:task` accepts at most 256 valid marks from one contributor in one request. The desktop converts
+accepted marks to ordinary rail markers: severity chooses the semantic tone, the optional icon is
+resolved by the host, and a missing icon becomes a status dot. The desktop allocator still assigns
+only its four corners; every accepted mark remains in the ordered tooltip legend and accessible
+description. The terminal projection uses that complete ordered legend and discloses any glyphs that
+do not fit. See [Rail controls and status markers](../ui-design.md#rail-controls-and-status-markers)
+and [Terminal chrome and plugins](../tui/chrome-and-plugins.md#task-markers).
+
+This loaded path is task-only. A real plugin that needs source or pane status must first define an
+owner-declared annotation point for that surface. It must not add a rail-specific manifest
+contribution.
 
 ### Remote trees
 

@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createMemo, For, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { Dynamic } from '../tree/renderer'
 import { activeTaskId, selectedSource, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
@@ -10,6 +10,7 @@ import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import { Icon, keyedRows, Row, Rows, StatusDot } from '../kit/showing'
 import { Line } from '../kit/cells'
 import { Panel, PanelBody } from '../panel'
+import { Modal, ModalBody } from '../kit/grouping'
 import { regionFocus } from '../keys/regions'
 import { ExclusiveSlot } from './slot'
 import { BROWSE, MENU, TASKS } from './topology'
@@ -66,25 +67,45 @@ const MENU_ORDER = -130
 const BROWSE_ORDER = -120
 const TASKS_ORDER = -110
 
-function Marks(props: { markers: ReturnType<typeof markersFor> }) {
-  const placed = () => resolveRailMarkers(props.markers).placed
+function Marks(props: { markers: ReturnType<typeof markersFor>; cells: number }) {
+  const legend = () => resolveRailMarkers(props.markers).legend
+  const visible = () => {
+    const all = legend()
+    if (all.length <= props.cells) return all
+    // Reserve the complete `+N` token first. Re-evaluate once because the omitted count can cross a
+    // digit boundary after the visible glyphs are removed.
+    let count = Math.max(0, props.cells - (`+${all.length}`).length)
+    count = Math.max(0, props.cells - (`+${all.length - count}`).length)
+    return all.slice(0, count)
+  }
+  const omitted = () => Math.max(0, legend().length - visible().length)
   return (
     <box flexDirection="row">
-      <For each={placed()}>
+      <For each={visible()}>
         {(marker) => (
-          <Show when={marker.icon} fallback={<StatusDot tone={marker.dotTone === 'bad' ? 'danger' : marker.dotTone === 'ok' ? 'ok' : marker.dotTone === 'warn' ? 'warn' : 'muted'} />}>
-            {(icon) => <Icon name={icon()} tone={marker.tone === 'neutral' ? undefined : marker.tone} />}
+          <Show when={marker.g} fallback={<StatusDot tone={marker.d === 'bad' ? 'danger' : marker.d === 'ok' ? 'ok' : marker.d === 'warn' ? 'warn' : 'muted'} />}>
+            {(icon) => <Icon name={icon()} tone={marker.t === 'neutral' ? undefined : marker.t} />}
           </Show>
         )}
       </For>
+      <Show when={omitted()}>{(count) => <Line role="muted">{`+${count()}`}</Line>}</Show>
     </box>
   )
 }
 
-function TaskList(props: { model: ShellModel }) {
+function TaskList(props: { model: ShellModel; markerCells: number }) {
   // What other plugins have to say about the rows on screen: one request for the whole list, re-asked
   // when the list changes. Nothing here reads the answers — they come back as markers.
   createEffect(() => requestTaskAnnotations(props.model.tasks().map((task) => task.id)))
+  const [inspecting, setInspecting] = createSignal<string | null>(null)
+  const inspectedMarkers = createMemo(() => {
+    const taskId = inspecting()
+    return taskId ? resolveRailMarkers(markersFor({ kind: 'task', id: taskId })).legend : []
+  })
+  const inspectedRows = createMemo(() => inspectedMarkers().map((marker, index) => ({
+    key: String(index),
+    label: marker.l,
+  })))
 
   // Kept rather than rebuilt, so a `tasks:changed` costs the rows that changed rather than all of
   // them (../kit/showing.tsx § keyedRows).
@@ -106,11 +127,15 @@ function TaskList(props: { model: ShellModel }) {
   )
 
   return (
+    <>
     <Rows
       virtual
       id="chrome.rail.tasks"
       ariaLabel="Tasks"
       items={rows()}
+      onMenu={(id) => {
+        if (resolveRailMarkers(markersFor({ kind: 'task', id })).legend.length) setInspecting(id)
+      }}
       onActivate={(id) => {
         const task = props.model.tasks().find((row) => row.id === id)
         const group = hierarchy().find(entry => entry.task.id === id)
@@ -125,7 +150,8 @@ function TaskList(props: { model: ShellModel }) {
         <Row
           item={item}
           selected={!selectedSource() && row.task.id === activeTaskId()}
-          trailing={<Marks markers={markersFor({ kind: 'task', id: row.task.id })} />}
+          keepTrailing
+          trailing={<Marks markers={markersFor({ kind: 'task', id: row.task.id })} cells={props.markerCells} />}
         >
           {row.depth
             ? `${'  '.repeat(row.depth - 1)}↳ ${row.task.title}`
@@ -135,6 +161,18 @@ function TaskList(props: { model: ShellModel }) {
         </Row>
       )}
     </Rows>
+    <Show when={inspecting()}>
+      <Modal onDismiss={() => setInspecting(null)} title="Task markers" size="sm">
+        <ModalBody>
+          <box height={3} flexShrink={0}>
+            <Rows virtual id="chrome.rail.task-markers" ariaLabel="Task markers" items={inspectedRows()}>
+              {(marker, item) => <Row item={item}>{marker.label}</Row>}
+            </Rows>
+          </box>
+        </ModalBody>
+      </Modal>
+    </Show>
+    </>
   )
 }
 
@@ -226,7 +264,7 @@ export function Rail(props: { model: ShellModel; cells: number }) {
           { x: RAIL, enterMainOnActivate: true },
         )}
       >
-        <ExclusiveSlot slot="rail.taskList" core={() => <TaskList model={props.model} />} />
+        <ExclusiveSlot slot="rail.taskList" core={() => <TaskList model={props.model} markerCells={Math.max(2, props.cells - 22)} />} />
       </Panel>
     </box>
   )

@@ -30,6 +30,7 @@ For short integration examples, see [Events and capabilities](./plugin-authoring
 <a id="requiring-another-plugin"></a>
 <a id="what-the-builder-normally-supplies-and-you-now-supply-yourself"></a>
 <a id="contributions"></a>
+<a id="add-task-annotations"></a>
 <a id="harnesses"></a>
 <a id="the-action-verbs"></a>
 <a id="permissions"></a>
