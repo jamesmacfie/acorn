@@ -5,15 +5,12 @@ import {
   buildDiffRows,
   buildDiffRowsAsync,
   buildRenderableRows,
-  estimateRowSize,
-  estimateSplitBandSize,
   expandGap,
   gapId,
   isCodeRow,
   maxLineCols,
   plainTokenize,
   rowIdentityKeys,
-  splitBandIdentityKeys,
   toBands,
   wordDiff,
   type CodeRow,
@@ -192,46 +189,6 @@ describe('diff model', () => {
     expect(new Set(hydratedKeys).size).toBe(hydratedKeys.length)
   })
 
-  it('gives split bands unique identities for repeated one-sided fallback rows', () => {
-    const rows = buildRenderableRows(
-      [
-        {
-          file: pullFile('src/fallback.txt', 'patch'),
-          diff: [
-            { kind: 'insert', path: 'src/fallback.txt', oldNo: null, newNo: null, toks: [], raw: 'same' },
-            { kind: 'insert', path: 'src/fallback.txt', oldNo: null, newNo: null, toks: [], raw: 'same' },
-          ],
-        },
-      ],
-      [],
-    )
-    const keys = splitBandIdentityKeys(toBands(rows))
-
-    expect(new Set(keys).size).toBe(keys.length)
-    expect(keys).toContain('pair:empty:code:src/fallback.txt:insert::')
-    expect(keys).toContain('pair:empty:code:src/fallback.txt:insert:::1')
-  })
-
-  it('estimates split band sizes from full rows and paired cells', () => {
-    const rows = buildRenderableRows(
-      [
-        {
-          file: pullFile('src/app.ts', 'patch'),
-          diff: [
-            { kind: 'delete', path: 'src/app.ts', oldNo: 1, newNo: null, toks: [], raw: 'old' },
-            { kind: 'insert', path: 'src/app.ts', oldNo: null, newNo: 1, toks: [], raw: 'new' },
-          ],
-        },
-      ],
-      [thread('src/app.ts', 1)],
-    )
-    const bands = toBands(rows)
-
-    expect(estimateSplitBandSize(bands[0])).toBe(36)
-    expect(estimateSplitBandSize(bands[1])).toBe(20)
-    expect(estimateSplitBandSize(bands[2])).toBe(140)
-  })
-
   it('measures the canvas width in columns, counting a tab to its next tab stop', () => {
     const code = (raw: string): Row => ({ kind: 'normal', path: 'a.ts', oldNo: 1, newNo: 1, toks: [], raw })
 
@@ -243,15 +200,6 @@ describe('diff model', () => {
     // A tab mid-column advances to the next stop rather than adding a full eight.
     expect(maxLineCols([code('ab\tx')])).toBe(9)
     expect(maxLineCols([])).toBe(0)
-  })
-
-  it('estimates resolved thread rows at their collapsed height', () => {
-    const openRow = { kind: 'thread' as const, thread: thread('src/app.ts', 1) }
-    const resolvedRow = { kind: 'thread' as const, thread: thread('src/app.ts', 1, 'RIGHT', true) }
-
-    expect(estimateRowSize(openRow)).toBe(140)
-    expect(estimateRowSize(resolvedRow)).toBe(50)
-    expect(estimateSplitBandSize({ kind: 'full', row: resolvedRow })).toBe(50)
   })
 
   it('keeps large row interleaving comfortably within the speed budget', () => {

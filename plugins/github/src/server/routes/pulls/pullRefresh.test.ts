@@ -4,7 +4,8 @@ import { patchBlobKey } from '@acorn/plugin-api/testkit'
 import { filesResource, prResource, pullsResource } from '../../resourceKeys'
 import { makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import { createTaskService } from '@acorn/plugin-api/testkit'
-import { mirrorPr, type GqlPull } from '../mirror/prMirror'
+import { mirrorPr, patchDigest } from '../mirror/prMirror'
+import type { PullComposite } from '../mirror/prFetch'
 import { announcePrSynced, refreshOpenPulls, refreshPullWithFiles } from './pullRefresh'
 import { checks, comments, prFiles, pullRequests, syncState } from '../../../node/schema'
 
@@ -12,7 +13,7 @@ const USER = 'octocat'
 const REPO_ID = 100
 const key = { userId: USER, repoId: REPO_ID, owner: 'acme', repo: 'web' }
 
-const gqlPull: GqlPull = {
+const scalars = {
   id: 'PR_5',
   number: 5,
   title: 'Fresh title',
@@ -24,16 +25,31 @@ const gqlPull: GqlPull = {
   baseRefName: 'main',
   headRefName: 'feature',
   updatedAt: '2026-07-11T00:00:00Z',
-  labels: { nodes: [{ name: 'bug', color: 'ff0000' }] },
-  reviews: { nodes: [] },
-  reviewRequests: { nodes: [] },
-  comments: { nodes: [] },
-  commitTimeline: { nodes: [] },
-  reviewThreads: { nodes: [] },
-  latestCommit: { nodes: [] },
   mergeable: 'MERGEABLE',
   mergeStateStatus: 'CLEAN',
   autoMergeRequest: null,
+}
+// The composite as prFetch hands it to the mirror, and the first GraphQL page it was fetched from.
+const composite: PullComposite = {
+  ...scalars,
+  labels: [{ name: 'bug', color: 'ff0000' }],
+  reviews: [],
+  reviewRequests: [],
+  comments: [],
+  commits: [],
+  threads: [],
+  checks: [],
+}
+const lastPage = <T,>(nodes: T[]) => ({ nodes, pageInfo: { endCursor: null, hasNextPage: false } })
+const gqlPull = {
+  ...scalars,
+  labels: lastPage([{ name: 'bug', color: 'ff0000' }]),
+  reviews: lastPage([]),
+  reviewRequests: lastPage([]),
+  comments: lastPage([]),
+  commits: lastPage([]),
+  reviewThreads: lastPage([]),
+  latestCommit: { nodes: [] },
 }
 
 const json = (body: unknown, init?: ResponseInit) =>
@@ -84,6 +100,8 @@ describe('shared pull refresh operations', () => {
       number: 4,
       path: 'private.ts',
       sha: 'old',
+      position: 0,
+      patchState: 'unavailable',
     })
     await plugin.db.insert(comments).values({
       userId: USER,
@@ -91,6 +109,7 @@ describe('shared pull refresh operations', () => {
       number: 4,
       id: 'comment-4',
       body: 'sensitive review comment',
+      position: 0,
     })
     await plugin.db.insert(checks).values({
       userId: USER,
@@ -98,6 +117,7 @@ describe('shared pull refresh operations', () => {
       number: 4,
       name: 'private-check',
       status: 'failure',
+      position: 0,
     })
     await core.db.insert(schema.tasks).values({
       id: 'task-1',
@@ -131,9 +151,9 @@ describe('shared pull refresh operations', () => {
   // `checks-changed` is the verb a consumer alerts on, so it must track the checks rows and not the
   // sync itself: a re-mirror that changes nothing announces `pr-synced` alone.
   it('reports a checks change only when the mirrored check rows differ', async () => {
-    const withCheck = (status: string): GqlPull => ({
-      ...gqlPull,
-      latestCommit: { nodes: [{ commit: { statusCheckRollup: { contexts: { nodes: [{ __typename: 'CheckRun', name: 'ci', status: 'COMPLETED', conclusion: status, detailsUrl: null, checkSuite: null }] } } } }] },
+    const withCheck = (status: string): PullComposite => ({
+      ...composite,
+      checks: [{ __typename: 'CheckRun', id: 'check-ci', name: 'ci', status: 'COMPLETED', conclusion: status, detailsUrl: null, checkSuite: null }],
     })
     const prKey = { userId: USER, repoId: REPO_ID, number: 5 }
     expect(await mirrorPr(plugin.db, prKey, withCheck('SUCCESS'), 1)).toEqual({ checksChanged: true })
@@ -213,8 +233,8 @@ describe('shared pull refresh operations', () => {
 
     expect(await refreshPullWithFiles('token', plugin.db, store, { ...key, number: 5 })).toEqual({ ok: true })
     expect((await plugin.db.select().from(pullRequests))[0]).toMatchObject({ number: 5, title: 'Fresh title', headRef: 'feature' })
-    expect((await plugin.db.select().from(prFiles))[0]).toMatchObject({ path: 'src/app.ts', sha: 'file-sha' })
-    expect(blobs.get(patchBlobKey('file-sha'))).toBe('@@ patch')
+    expect((await plugin.db.select().from(prFiles))[0]).toMatchObject({ path: 'src/app.ts', sha: 'file-sha', position: 0, patchState: 'available', patchKey: patchDigest('@@ patch') })
+    expect(blobs.get(patchBlobKey(patchDigest('@@ patch')))).toBe('@@ patch')
     const resources = (await plugin.db.select().from(syncState)).map((row) => row.resource)
     expect(resources).toEqual(expect.arrayContaining([prResource(REPO_ID, 5), filesResource(REPO_ID, 5)]))
   })

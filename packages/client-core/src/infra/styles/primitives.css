@@ -1604,6 +1604,8 @@ a.ui-row:hover { background: var(--bg-hover); }
 /* The rule between turns, not around them: a border on the turn itself would draw one under the
    last card too. */
 .ui-timeline-turn + .ui-timeline-turn { border-top: var(--divider); padding-top: var(--gap-stack); }
+/* "Show earlier" above a windowed list: the older turns exist, and this says how many. */
+.ui-timeline-earlier { display: flex; justify-content: center; padding-block: var(--space-2); }
 
 .ui-chiprow { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-inline); min-width: 0; }
 

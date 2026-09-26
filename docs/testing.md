@@ -213,6 +213,77 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
   those components and a plugin's own suite could not render one. A plugin test reaches the host
   through `@acorn/plugin-api/testkit/client`, not by importing into `client-core` (`tools/arch/
   boundaries.test.ts` § plugin tests holds the shrinking budget for that);
+- the GitHub mirror's topology tests use `plugins/github/src/server/routes/mirror/fakeGithub.helper.ts`,
+  a deterministic GitHub that paginates the way GitHub documents: 100 nodes a page, a `Link` header on
+  the files pages, and the 3,000-file cap. `prFetch.test.ts` asserts requests, cursors, order, and
+  completeness: 2,200 files in 22 requests, 3,000 of 3,000 complete, 3,000 of 3,418 capped, a full
+  page 30 with no count capped, and 400 review threads, a 250-comment thread, 150 commits, and 120
+  checks all exhausted. It also fails a repeated cursor, a duplicate path, a malformed page, a partial
+  GraphQL error, and a failed middle page, and holds thread-comment requests to four in flight.
+  `prMirror.test.ts` runs against the real migrated `github.sqlite`: a failed page 12 leaves every old
+  row, `fetched_at`, and completeness unchanged; two patches of one head blob read back apart; a
+  missing body is an integrity failure; and a summary read touches no blob. `pullFiles.test.ts`,
+  `pullsBatch.test.ts`, and `prCreate.test.ts` cover the routes, including the diff document, segment
+  and search reads by digest and the bounded refusals of a forged digest, an unknown body, a bad
+  ordinal and an oversized batch, and a compare answered as a document with its patches stored by
+  digest. `DiffForPull.test.tsx` covers the capped-list warning and that the pane reads segments and
+  never a whole patch;
+- the diff document has three tiers. `packages/diff-document/src/segment.test.ts` holds the segmenter
+  to its rules over a generated corpus: every row kept in order, the same cut every time, both
+  limits honoured except for one oversize row that is alone and marked, a gap only at a segment's
+  edge, a deletion run kept with its insertions, the raw fallback bounded, and keys that follow the
+  patch and not the file's position; `search.test.ts` pages across files and stops reading once a
+  page is full. `testkit/largeDiff.test.ts` holds every descriptor of the `scale` profile to the
+  bounded row builders the renderer draws with: rows, columns and split bands.
+  `plugins/changes/src/server/routes/localGit.test.ts` runs the Changes document over a real tree,
+  including a stale digest refused as a revision conflict and staged and unstaged kept apart.
+  `features/diff/DiffPane.test.tsx` renders the real pane over the fixture with a jsdom layout model
+  (`features/diff/layout.helper.ts`): plain rows before colour, a pane left open asking for a few
+  dozen of the `scale` profile's thousands of segments and then nothing more, a jump to the last
+  file that loads nothing in between, a new revision that reloads only the file that moved, find
+  across unloaded segments, gap expansion, and collapse. The layout helper also models a
+  `ResizeObserver`, block heights by `data-block`, and a `scrollTop` that clamps the way a browser's
+  does, so a test cannot assert a position no browser would accept;
+- the diff's dynamic-block geometry has three layers of test. `kit/diff/layoutIndex.test.ts` holds a
+  million rows as segments with 400 blocks: 2,000 random resizes leave every fixed start where it was
+  and write at most log2(items) + 1 tree nodes each, places and offsets convert both ways in both
+  projections, and a slow reference agrees through inserts, resizes, removals, collapse, expansion and
+  a change of projection. `kit/diff/measureScheduler.test.ts` models the observer and the frames: a
+  burst is one read batch and one commit a frame, a block above a scrolling reader waits for the
+  settle, a mounted dirty block is read even when its height is current, an unmounted one never is,
+  and teardown returns everything to zero. `features/diff/diffLayout.test.tsx` drives the real pane:
+  a thread growing above the reader keeps their row, one below moves nothing, a composer moves what
+  follows once in one commit, a scrolling reader holds a correction back until they stop, the pane's
+  own correction scrolls do not count as the reader, a collapsed file lands the reader on its header,
+  and a width change that resizes every block keeps the place with no fixed rebuild;
+- the diff's resident segment cache has three layers of test. `features/diff/segmentCache.test.ts`
+  holds the weight estimator, least-recently-wanted order, each ceiling alone, held segments under
+  pressure, one held oversize segment, colour going before plain rows, the key's parts, a superseded
+  patch, and one cache per query client. `features/diff/segmentLoader.test.tsx` runs the loader
+  against a cache with no room, so what stays resident is exactly what the pane holds, through a
+  success, a range change, an abort, a failure, a new revision, and unmount.
+  `features/diff/DiffPane.test.tsx` remounts a diff on the same node against a source that never
+  answers and finds its rows drawn and coloured from memory, checks that a no-op poll drops nothing
+  and a moved file drops its old patch, that a resolved thread asks for nothing, and that a
+  dehydrated query client holds no segment text. `infra/node/fleet.test.ts` checks that `dropNode`
+  clears that node's segments and no other's;
+- long timelines have three layers of test. `kit/lib/timelineWindow.test.tsx` holds the window's rules:
+  the newest page on open, appended turns joining it, a page per **Show earlier**, a page-aligned
+  reveal, keeping its size when its oldest key leaves, and trims that only move forward.
+  `kit/components/content/Timeline.test.tsx` drives a windowed followed Timeline over geometry read
+  from the DOM's order: hidden counts and `aria-posinset`, **Show earlier** keeping the reader's turn at
+  its offset and its element, a hidden reading place revealed rather than substituted, a gone one
+  substituted and counted, a trim once a page while following, no trim under a selection or focus or
+  while the reader is away, and deferred bodies built in the same element once near, with the
+  observer gone at teardown. `plugins/agents/src/client/sessions/AgentTranscript.test.tsx` opens a
+  1,000-card session on its newest page, starts another session on its own page, reveals a request a
+  notice named, draws everything on **Go to top**, and keeps a real cross-card selection while the
+  newest card streams. `toolRendererRegistry.test.tsx` checks a closed tool card builds no output, and
+  `plugins/github/src/client/pullDetail/Conversation.test.tsx` checks `kind:id` turn keys, bodies and
+  snippets arriving in the same element, only near threads reading segments, **Snippet unavailable.**
+  for a file the document lacks, and a refetch keeping every turn's element.
+  `features/diff/diffSnippets.test.tsx` checks a snippet reads only its segment, loads nothing for a
+  file with no patch, and shares uncoloured rows with the diff through the node cache;
 - four arch rules read source text rather than the import graph, because what they police is a
   global rather than an import: `window.acorn` outside the platform seam, and `console.*` outside
   each of the three loggers. Each carries a **baseline** of the files that survive, and each asserts
@@ -298,6 +369,60 @@ console line the page logged with the value it saw. Opt-in through
 `pnpm --filter @acorn/plugin-browser test:smoke`, because launching a browser is not something every
 `pnpm test` should pay for. On a machine with no Chrome it takes the other branch and asserts the
 tools reported why.
+
+## Large-surface fixture
+
+Large diffs and long transcripts are tested against one generated fixture, built from a seed at run
+time so nothing a million lines long is checked in. It has three profiles:
+
+| Profile | Files | Fixed rows | Threads and notes | Agent session | Use |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `small` | 22 | 9,048 | 20 each | 19 turns, 280 events, about 135 cards | Fast tests and a quick real-window run |
+| `scale` | 220 | 104,234 | 100 each | 94 turns, 1,384 events, about 670 cards | The scaling comparison |
+| `canonical` | 2,200 | 1,077,852 | 400 each | 476 turns, 7,012 events, about 3,400 cards | Real-engine acceptance and profiling |
+
+The counts are for seed 1. Two generators own the data:
+
+- `packages/client-core/src/testkit/largeDiff.ts`, exported as `@acorn/client-core/testkit/large-diff`,
+  streams the files one at a time. Each file carries both sides, the unified patch between them, the
+  source's threads, and review notes. The files include very large ones, binary, renamed, added and
+  removed files, tabs, very long lines, many hunks with gaps, and text that repeats across files.
+  Threads sit on both sides, resolved and not, with several comments, Markdown, images, `<details>`,
+  and suggestions. `largeDiffSource` turns the files into a `DiffSource` for rendering the real
+  `DiffPane` in a test: it cuts the patches with `@acorn/diff-document` as a provider's node does and
+  answers segments and search from them, and it can record every segment request or hold each answer
+  back.
+- `plugins/agents/src/testkit/largeSession.ts` generates the session's turns and writes them through
+  the plugin's own store, the way an imported transcript is written. The session ends stopped with
+  every request resolved, so a booting node has nothing to recover.
+
+The tests that hold the fixture and the health probes to their contract:
+
+- `largeDiff.test.ts` pins the small profile's digest, checks that every file's row count matches what
+  the diff model builds, that every thread and note sits on a drawn line, that the segmented document
+  describes each file with the counts its rows have, and streams the canonical profile to check its
+  size without holding it;
+- `largeSession.test.ts` seeds a session into a migrated database, reads it back page by page, and
+  projects it into cards;
+- `plugins/changes/src/testkit/reviewNotes.test.ts` checks that seeded notes are the rows the route
+  returns;
+- `kit/lib/surfaceHealth.test.ts` covers the registry and its privacy rule,
+  `features/diff/diffHealth.test.tsx` renders the real pane over the small profile, and
+  `Timeline.test.tsx` checks projected against mounted turns, the window's counts, and exact teardown;
+- `apps/desktop/scripts/agent/flow.test.mjs` checks that a flow file with an unknown action, a
+  script, an unbounded loop, or no assertions is refused, and runs a flow against a fake window.
+
+The real-window run is the large-surface flow
+([local-development.md](./local-development.md) § Large-surface flow). It is not part of `pnpm test`,
+because it needs a visible window on a graphical host and minutes of real rendering. It asserts
+invariants that do not depend on the machine: no blank or uncovered block in a settled viewport, at
+most one geometry commit per frame, no source topology after ready, mounted rows under a fixed
+ceiling at every profile, the transcript under the same 400-turn ceiling on open and after one
+**Show earlier**, and teardown back to zero. It records, and does not gate, time to first
+content, time to ready, preparation and measurement time, correction pixels, and resident bytes,
+with the host, engine, build, and fixture beside them. The segmented document was built after the
+first partial run, which was the unsegmented baseline; a visible run at `scale` and at `canonical`
+is still owed for both. Run it on the host used for release checks and keep both JSON reports.
 
 ## Continuous integration
 
@@ -794,16 +919,58 @@ bindings rather than the prose.
     every line printed while you were away. Open more than four terminals across tasks and switch
     between them: each draws, and none goes blank after its GPU context is given to another. Close the
     tab and check that switching back does not bring it back.
-81. On two paired Nodes with different accepted versions of one loaded plugin, switch between them.
+81. With GitHub connected, open a pull request with more than 100 files, more than 100 commits, or a
+    review thread with more than 100 comments. Every file, commit, and comment is there in GitHub's
+    order. Open one with more than 3,000 files: the diff and the file list both say GitHub returned
+    3,000 of its total. Compare two branches with more than 300 changed files in the create form: the
+    count reads "first 300 files" and the preview says the comparison may have more.
+82. Open the diff of the largest pull request to hand, in unified and then split. The scrollbar is its
+    final length at once, file headers and the widest line are in place before their rows, rows appear
+    plain and then take colour, and a thread's space is there before its segment loads. Drag the
+    scrollbar to the end and back: every segment you land on draws within a moment and nothing between
+    loads. Find a word that appears only near the end and step to it. Expand a gap, collapse a file from
+    the sticky header, and leave the pane open for a minute: the health snapshot shows nothing queued.
+    In split mode, scroll a long line sideways before its colour arrives: it stays scrolled when the
+    colour lands. Find a match in split mode: the view lands on the band that holds it. With find
+    open, expand a gap above the match: the view does not jump back to the match.
+    Then do the same in the Changes pane while an agent edits a file: only that file's segments
+    reload, and the reader stays where they were. Run `git config diff.noprefix true` in the task's
+    worktree and reopen the Changes pane: every changed file still shows its diff. Unset it afterwards,
+    because the setting is the whole repository's.
+83. In that pull request, scroll to a place with a thread a screen above you and one below. Expand
+    and collapse the one above, reply in it so the box grows, and resolve it: the line you are reading
+    does not move. Open a `<details>` block and wait for a late image in the one below: nothing on
+    screen moves. Open a line composer on screen: what follows moves down once, with no frame where the
+    composer overlaps the next line. Flick-scroll through several threads: nothing jumps while you
+    move, and the view settles without a correction you can see. Narrow the pane by dragging the
+    sidebar, then widen it: the same line stays at the top. Leave the pane and take a health snapshot:
+    no observers, no scheduled frames, and `maxAnchorDrift` under a pixel.
+84. Open that pull request's diff, scroll to the middle, and switch to another task and back: the
+    rows you left are on screen, coloured, before any segment request, and the health snapshot's
+    `resident.hits` rose. Open a dozen other large diffs one after another: `resident.rows` and
+    `resident.estimatedBytes` stay under `rowCeiling` and `byteCeiling`. In the Changes pane, let an
+    agent save the same file several times: `resident.segments` does not grow with each save.
+85. Open the `canonical` fixture's Agent pane: it opens on the newest cards with **Show earlier** above
+    them, and the health snapshot shows 200 mounted of about 3,400 turns. Scroll a little way up and
+    press **Show earlier**: the card you were reading stays put. Select text across two cards, scroll
+    to the foot, and let a live session stream past 400 cards: the selection survives, and once you
+    clear it the next page of cards trims the window back to 200. The console shows no
+    `ResizeObserver loop` error while the stream passes 400 cards. Press **Go to top**: the oldest turn
+    is on screen, and the page's find matches its text. Open a notice for an old request: its card is
+    drawn and focused. With VoiceOver, a card reads its place in the whole session. In a pull request
+    with many threads, open the conversation and scroll: each comment's HTML and each thread's snippet
+    appear before you reach them, a capped file's thread says **Snippet unavailable.**, and nothing
+    already drawn is rebuilt when the pull refetches.
+86. On two paired Nodes with different accepted versions of one loaded plugin, switch between them.
     Each Node shows contributions from its own running version. Update the inactive Node, reject then
     reconsider its new client hash, and switch again: its old runtime remains visible until its Node
     commits the update. After restart, the new version appears only when its exact bytes are accepted.
     Disconnect, reconnect, and unpair one Node; stale or removed observations authorize no loaded UI.
-82. Open two remote trees from one loaded bundle with different task or project scopes. Select in one,
+87. Open two remote trees from one loaded bundle with different task or project scopes. Select in one,
     invoke a scoped action in each, then unmount the first. The second remains functional and never
     receives the first tree's selection, document effects, or gesture authority. Revoke the accepted
     hash while a tree is mounted; its worker and registrations disappear immediately.
-83. On a Node without a loaded plugin, check its settings page, project importer, task footer, command,
+88. On a Node without a loaded plugin, check its settings page, project importer, task footer, command,
     shortcut, and cooperative slot. They are absent or disabled, and a previously open importer closes.
     Repeat with a failed load and with an unaccepted active runtime. In the terminal client, confirm
     the same selection and trust behavior for a remote tree.

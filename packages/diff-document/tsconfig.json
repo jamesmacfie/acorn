@@ -1,0 +1,9 @@
+{
+  // No DOM and no node types: the node's GitHub and Changes routes and the renderer's diff viewer
+  // import the same functions, so anything reaching for `window` or `node:` here would break one side.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": []
+  },
+  "include": ["src"]
+}

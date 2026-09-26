@@ -29,6 +29,13 @@
    ask them rather than the column count, since there is no virtual window here to make that unstable. */
 .compare-diff .diff-rows { position: static; min-width: max-content; }
 .compare-diff .diff-row { position: static; transform: none; }
+/* One virtual item: a file header, a segment of up to 64 rows, or a slice of an expanded gap. The
+   item is positioned; the rows inside it are in normal flow, so a segment is as tall as its rows and
+   any thread or note among them (docs/diff-rendering.md § Row geometry). */
+.diff-item { position: absolute; top: 0; left: 0; width: 100%; }
+.diff-item .diff-row, .diff-item .diff-split-band { position: relative; }
+/* A segment on screen whose rows are still loading holds its exact height and says so. */
+.diff-segment-pending { display: flex; align-items: flex-start; padding-top: 2px; background: var(--bg-subtle); }
 .diff-row {
   position: absolute;
   top: 0;
@@ -86,12 +93,13 @@
 .diff-hunk { background: var(--hunk-bg); color: var(--hunk-text); padding-left: var(--pane-pad); font-weight: 500; }
 
 /* Clickable band that reveals hidden unchanged context (GitHub-style expand). Full-width in both
-   the flex unified row and the .diff-split-full wrapper. */
+   the flex unified row and the .diff-split-full wrapper. 4px above and below a 20px line is the 28px
+   the layout counts a gap row as (DIFF_GAP_ROW_HEIGHT); the geometry is exact, so this must be too. */
 .diff-gap {
   flex: 1 0 100%;
   display: block;
   width: 100%;
-  padding: 3px var(--pane-pad);
+  padding: 4px var(--pane-pad);
   border: none;
   background: var(--hunk-bg);
   color: var(--hunk-text);
@@ -196,9 +204,11 @@
 .diff-add-btn:focus-visible, .diff-open-btn:focus-visible { visibility: visible; }
 .diff-add-btn:hover, .diff-open-btn:hover { color: var(--text); background: var(--bg-hover); border-color: var(--accent); }
 
-/* Thread / composer rows opt out of the single-line flex layout used by code rows. */
+/* Thread / composer rows opt out of the single-line flex layout used by code rows. `flow-root` keeps
+   the thread card's margins inside the row, so the row's own box is the space it takes: the layout
+   measures that box as the thread's height (features/diff/diffLayout.ts). */
 .diff-thread-row {
-  display: block;
+  display: flow-root;
   align-items: stretch;
   width: 100%;
   min-width: 100%;

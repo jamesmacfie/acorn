@@ -53,7 +53,7 @@ rung-2 containment is recorded in `blockers.md` and sandbox's
 `phased-review-steps/`, `user-extensions/`, `node-first/`, `node/`, `acp/`, `tauri/`, `events/` and the later
 `events.md` follow-up (shipped on 2026-09-11), `layout/`, `structure/`,
 `structure-followup/`, `before-terminal-ui/`, `terminal/`, `terminal-updates/`, `terminal-rewrite/`,
-`notifications/`, and
+`notifications/`, `git-inspired/`, and
 the single files `live-qa.md`, `dx.md` and `web_search_run.md` are in git history. Each ended by saying
 where its behaviour moved.
 
@@ -64,6 +64,30 @@ and [shell](../shell.md) own per-tree bridge authority; [security](../security.m
 [caching](../caching.md) own exact-hash custody; [testing](../testing.md) retains the multi-node and
 multi-tree manual checks. The proposal's global winner terminology was replaced with selection from
 each Node's running identity. No persisted trust, cache, layout, or plugin state was cleared.
+
+`git-inspired/` was six phases of bounded large-surface rendering, after GitHub's 2026 account of
+rendering a 2,200-file, million-line pull request: complete GitHub topology, segmented diff
+documents, dynamic-block geometry, a resident segment cache, and bounded timelines. Shipped and
+deleted 2026-09-27 on branch `large-render`. [diff-rendering.md](../diff-rendering.md) owns the
+viewer: § The document, § The source port, § Data flow, § Parsing and highlighting, § Resident
+segments, § Row geometry, and § What large-surface rendering refuses, which holds the eighteen
+decisions. [github-integration.md](../github-integration.md) § Pull request detail and files has the
+full walk, the stage-then-swap, the 3,000-file and 300-file ceilings, and the unconfirmed 250-commit
+cap; § Diff documents has the descriptor blobs, the two repository routes, and the node-wide digest
+limit; § Conversation has turn identity, near-viewport bodies, and snippets.
+[client-surfaces.md](../managed-agents/client-surfaces.md) has the transcript's fixed window, why it
+shipped, its three refusals including `content-visibility`, and its known limits.
+[caching.md](../caching.md) has the digest-keyed blobs, the unpruned cache, and the resident cache;
+[telemetry.md](../telemetry.md) § Rendered-surface health has the probes;
+[state-ownership.md](../state-ownership.md) has the reading places and the per-node cache;
+[api-reference.md](../api-reference.md) and [data-layer.md](../data-layer.md) have the routes and the
+mirror columns; [package-shape.md](../plugins/package-shape.md) § The plugin API and
+[plugin-authoring.md](../plugin-authoring.md) § Drawing a diff have plugin API major 2; and
+[tui/interaction.md](../tui/interaction.md) has the terminal's diff pane. The fixture and the flow are
+[testing.md](../testing.md) § Large-surface fixture and
+[local-development.md](../local-development.md) § Large-surface flow. Smoke items 81 to 85 in
+[testing.md](../testing.md) are the real-window acceptance it still owes: none has run on a visible
+WebKit window.
 
 `web_search_run.md` made a managed transcript show what an agent searched for, which pages it opened,
 and which sources came back, the same way whichever harness ran it. Shipped and deleted 2026-09-15.
