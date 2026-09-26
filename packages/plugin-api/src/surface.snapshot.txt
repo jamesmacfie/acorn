@@ -927,6 +927,7 @@ ui: Textarea
 ui: ThreadCollapseController
 ui: Timeline
 ui: TimelineControls
+ui: TimelineWindow
 ui: ToggleButton
 ui: Toolbar
 ui: ToolbarSpacer
@@ -935,6 +936,7 @@ ui: UserAvatar
 ui: attachPty
 ui: createArmedConfirm
 ui: createSplitDrag
+ui: createTimelineWindow
 ui: defaultModelIdFor
 ui: paneCollapseKey
 ui: renderMarkdown

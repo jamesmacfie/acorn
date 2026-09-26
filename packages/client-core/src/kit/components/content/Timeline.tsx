@@ -1,9 +1,11 @@
-import { createEffect, on, onCleanup, onMount, type JSX } from 'solid-js'
+import { createContext, createEffect, createSignal, on, onCleanup, onMount, Show, untrack, useContext, type Accessor, type JSX } from 'solid-js'
 import { createDomCollection } from '../../keys/collection'
 import { LIVE, placeAfterScroll, resolveAnchor, samePlace, type ReadingPlace } from '../../lib/readingPlace'
 import { createScrollAuthor } from '../../lib/scrollAuthor'
 import { reportScrollPlace } from '../../lib/scrollPlace'
 import { registerSurfaceHealth } from '../../lib/surfaceHealth'
+import { TIMELINE_PAGE } from '../../lib/timelineWindow'
+import { Button } from '../primitives'
 
 /* Timeline: a sequence of turns. The agents transcript and github's PR conversation are the same
    shape, and both drew it themselves.
@@ -18,8 +20,10 @@ import { registerSurfaceHealth } from '../../lib/surfaceHealth'
    the agents transcript used to run called `measure()` on every new event, which clears the item size
    cache, so every row fell back to the estimate, the canvas jumped, and the rows re-measured — on
    every event. It also rebuilt its rows from `getVirtualItems()`, which returns fresh objects on each
-   scroll, replacing the DOM under any selection. If a transcript ever feels slow to open, render only
-   the last N behind a "show earlier" control: a fixed window has no measurement feedback loop.
+   scroll, replacing the DOM under any selection. A long list is instead drawn as its newest turns
+   behind a "Show earlier" control (../../lib/timelineWindow.ts): a fixed window counts turns, measures
+   none, and has no feedback loop. The caller decides which turns exist in the DOM; this component
+   keeps the reader's place by identity while that changes.
 
    At 80×24: the cards in sequence, a dim rule between turns. */
 
@@ -38,6 +42,24 @@ export type TimelineControls = {
  *  re-arm it, so this bounds a burst rather than the whole restore: a transcript whose highlighting
  *  lands three seconds late gets another go when it does, without a frame loop running in between. */
 const CORRECTIONS = 24
+
+/** How far from the viewport a deferred turn body is built: one scroller height either side, so a
+ *  reader scrolling at an ordinary pace finds it drawn. */
+const NEAR_MARGIN = '100% 0px'
+
+/** What a timeline hands its turns: watch this element and say once when it comes near the viewport.
+ *  Returns the stop. Absent outside a timeline, where a deferred body is simply built. */
+const NearTurns = createContext<(element: Element, seen: () => void) => () => void>()
+
+/** The element that scrolls this one, or null for the page. Read once, when the first deferred turn
+ *  asks, because a timeline without `follow` scrolls in whatever region holds it. */
+const scrollParent = (element: Element): Element | null => {
+  for (let node = element.parentElement; node; node = node.parentElement) {
+    const overflow = getComputedStyle(node).overflowY
+    if (overflow === 'auto' || overflow === 'scroll') return node
+  }
+  return null
+}
 
 export function Timeline(props: {
   ariaLabel?: string
@@ -72,36 +94,136 @@ export function Timeline(props: {
    *  the difference between the turns that exist and the turns in the DOM; omit it and the two are
    *  reported as the same. */
   total?: number
+  /**
+   * How many older turns the caller holds and is not drawing (../../lib/timelineWindow.ts). Above
+   * zero, a followed timeline draws a "Show earlier" control above its first turn, so hidden history
+   * is always stated rather than left for a page find to miss.
+   */
+  hidden?: number
+  /** The reader pressed "Show earlier". Draw more older turns; the reader stays on the turn they were
+   *  looking at. */
+  onShowEarlier?: () => void
+  /**
+   * Make a hidden turn present, for a reading place whose turn the window is not drawing. True when
+   * the caller drew it; false when it is not in the list at all, which is the only case where the
+   * reader is moved to another turn. Asked before any substitute, because a turn the window hides has
+   * not gone. A plain function rather than a kit event, so it only works for a caller in this realm.
+   */
+  reveal?: (key: string) => boolean
+  /**
+   * Following the live end with at least twice a page of turns drawn, the timeline hands the oldest
+   * back: called with the key of the oldest turn worth keeping, and the caller stops drawing the ones
+   * before it. Never past a turn holding the reader's selection or focus.
+   */
+  onTrim?: (key: string) => void
   children: JSX.Element
 }) {
   const collection = createDomCollection({ selector: '.ui-timeline-turn > .ui-card[data-interactive]' })
-  const list = (
-    <ol class="ui-timeline" aria-label={props.ariaLabel} {...collection.containerProps}>
-      {props.children}
-    </ol>
-  ) as HTMLOListElement
+  // The scroller, when `follow` makes one. Declared here because the deferred-body observer below is
+  // rooted on it.
+  let scroller: HTMLDivElement | undefined
 
   // What this timeline says about itself (../../lib/surfaceHealth.ts). Registered before the early
   // return, so a plain run of cards counts too, and before every cleanup below, so the final reading
   // sees the observers disconnected and the frames cancelled. Observers count up when constructed and
   // down when disconnected, which is how a teardown check sees them go without waiting on the collector.
-  const counts = { observers: 0, observed: 0, corrections: 0, failed: 0, maxPixels: 0 }
+  const counts = {
+    observers: 0, observed: 0, corrections: 0, failed: 0, substituted: 0, maxPixels: 0, drift: 0,
+    expansions: 0, trims: 0, pinned: 0,
+  }
   let scheduledFrames = () => 0
+  let bodies = 0
+  let list!: HTMLOListElement
   const health = registerSurfaceHealth('timeline', () => {
     const mounted = list.childElementCount
+    // An opened disclosure has built its body, and a closed one that never opened has only its summary
+    // (../layout/Fold.tsx). Counted when asked, like everything else here.
+    let folds = 0
+    for (const fold of list.querySelectorAll('.ui-fold')) if (fold.childElementCount > 1) folds += 1
     return {
       topology: { dynamicBlocks: props.total ?? mounted, ready: true },
-      mounted: { dynamicBlocks: mounted },
+      mounted: { dynamicBlocks: mounted, bodies: bodies + folds },
       work: { scheduledFrames: scheduledFrames() },
       measurement: { activeObservers: counts.observers, observedElements: counts.observed },
-      correction: { count: counts.corrections, failed: counts.failed, maxPixels: counts.maxPixels },
+      correction: {
+        count: counts.corrections, failed: counts.failed, substituted: counts.substituted,
+        maxPixels: counts.maxPixels, maxAnchorDrift: counts.drift,
+      },
+      window: { hiddenEarlier: props.hidden ?? 0, expansions: counts.expansions, trims: counts.trims, pinned: counts.pinned },
     }
   })
   onCleanup(health.dispose)
 
+  // Deferred turn bodies (`Timeline.Turn`'s function child), and the one observer that says when each
+  // comes near. Made at mount, when the region that scrolls this list can be found, and only if a turn
+  // asked; a list with none of them pays for nothing. Without an IntersectionObserver every body is
+  // built at once, which is the right answer for a host that cannot say what is near.
+  const waiting = new Map<Element, () => void>()
+  let near: IntersectionObserver | undefined
+  let mounted = false
+  const observe = (element: Element) => {
+    if (!near) {
+      near = new IntersectionObserver((entries) => {
+        for (const entry of entries) {
+          const run = entry.isIntersecting ? waiting.get(entry.target) : undefined
+          if (!run) continue
+          waiting.delete(entry.target)
+          near?.unobserve(entry.target)
+          counts.observed -= 1
+          run()
+        }
+      }, { root: props.follow ? scroller ?? null : scrollParent(list), rootMargin: NEAR_MARGIN })
+      counts.observers += 1
+    }
+    near.observe(element)
+    counts.observed += 1
+  }
+  const watchNear = (element: Element, seen: () => void) => {
+    let built = false
+    const build = () => {
+      built = true
+      bodies += 1
+      seen()
+    }
+    if (typeof IntersectionObserver === 'undefined') build()
+    else {
+      waiting.set(element, build)
+      if (mounted) observe(element)
+    }
+    return () => {
+      if (built) bodies -= 1
+      if (waiting.delete(element) && near) {
+        near.unobserve(element)
+        counts.observed -= 1
+      }
+    }
+  }
+  onMount(() => {
+    mounted = true
+    for (const element of waiting.keys()) observe(element)
+  })
+  onCleanup(() => {
+    if (!near) return
+    near.disconnect()
+    near = undefined
+    counts.observers -= 1
+    counts.observed -= waiting.size
+    waiting.clear()
+  })
+
+  list = (
+    <ol class="ui-timeline" aria-label={props.ariaLabel} {...collection.containerProps}>
+      <NearTurns.Provider value={watchNear}>{props.children}</NearTurns.Provider>
+    </ol>
+  ) as HTMLOListElement
+
+  // The window growing, whatever grew it: "Show earlier", a reveal, or the caller showing everything.
+  createEffect(on(() => props.hidden ?? 0, (next, previous) => {
+    if (previous !== undefined && next < previous) counts.expansions += 1
+  }))
+
   if (!props.follow) return list
 
-  let scroller: HTMLDivElement | undefined
   // The reader's place, as this component last understood it. `props.place` is the truth; this is what
   // the corrections below are aimed at.
   let place: ReadingPlace = LIVE
@@ -158,6 +280,43 @@ export function Timeline(props: {
     return row ? { at: 'turn', key: row.dataset.turn ?? '', index, offset: top - row.getBoundingClientRect().top } : null
   }
 
+  /** The earliest drawn turn holding the reader's selection or focus, or -1. Those are the turns a
+   *  trim must never take out of the DOM: removing them would drop the selection or the focus. */
+  const held = (rows: HTMLElement[]): number => {
+    const nodes: Node[] = []
+    const selection = document.getSelection()
+    if (selection && !selection.isCollapsed) {
+      if (selection.anchorNode) nodes.push(selection.anchorNode)
+      if (selection.focusNode) nodes.push(selection.focusNode)
+    }
+    const active = document.activeElement
+    if (active && list.contains(active)) nodes.push(active)
+    let earliest = -1
+    for (const node of nodes) {
+      const index = rows.findIndex((row) => row.contains(node))
+      if (index >= 0 && (earliest < 0 || index < earliest)) earliest = index
+    }
+    return earliest
+  }
+
+  /**
+   * Hand the oldest turns back to the caller. Only while following the live end, which is the one
+   * place a reader is not looking at them, and only once twice a page is drawn, so a streaming session
+   * trims once a page rather than once an event.
+   */
+  const trim = () => {
+    if (!props.onTrim || list.childElementCount < 2 * TIMELINE_PAGE) return
+    const rows = turns()
+    const normal = rows.length - TIMELINE_PAGE
+    const holding = held(rows)
+    const cut = holding >= 0 && holding < normal ? holding : normal
+    counts.pinned = normal - cut
+    const key = cut > 0 ? rows[cut]?.dataset.turn : undefined
+    if (!key) return
+    counts.trims += 1
+    props.onTrim(key)
+  }
+
   const write = (top: number) => {
     if (!scroller) return
     author.write(scroller, top)
@@ -202,7 +361,14 @@ export function Timeline(props: {
     // Nothing drawn yet. The resizes that follow re-arm this, so a list still arriving gets another go
     // without a frame budget of its own.
     if (!rows.length) return
-    const found = resolveAnchor(place, rows.map((row) => row.dataset.turn ?? ''))
+    const keys = rows.map((row) => row.dataset.turn ?? '')
+    // A turn the caller's window is hiding has not gone. Ask for it, and put the reader on it next
+    // frame, rather than handing them a neighbour.
+    if (!keys.includes(place.key) && props.reveal?.(place.key)) {
+      schedule()
+      return
+    }
+    const found = resolveAnchor(place, keys)
     if (!found) {
       counts.failed += 1
       report('took', scroller.scrollTop)
@@ -224,10 +390,14 @@ export function Timeline(props: {
       // Asked and refused: this list cannot bring that turn any closer, so this is as near as the
       // reader can be put and there is nothing to gain by asking again.
       settled = scroller.scrollTop === before
+      if (settled) counts.drift = Math.max(counts.drift, Math.abs(delta))
     }
     if (!settled) {
       if (++corrections < CORRECTIONS) schedule()
-      else corrections = 0
+      else {
+        corrections = 0
+        counts.drift = Math.max(counts.drift, Math.abs(delta))
+      }
       return
     }
     corrections = 0
@@ -237,6 +407,7 @@ export function Timeline(props: {
     // worth adopting is a substitute, because the turn the reader chose has left the list for good and
     // chasing its key would cost a correction on every resize from here on.
     if (found.key === place.key) return
+    counts.substituted += 1
     report('took', scroller.scrollTop)
     adopt({ at: 'turn', key: found.key, index: rows.indexOf(row), offset: found.offset })
   }
@@ -296,12 +467,23 @@ export function Timeline(props: {
   const toBottom = () => { adopt(LIVE); pin() }
   props.controls?.({ toTop, toBottom })
 
+  // The reader's own press, so the turn they are looking at becomes their place, and the older turns
+  // arriving above it are growth to correct for like any other.
+  const showEarlier = () => {
+    const current = measure()
+    if (current) adopt(current)
+    props.onShowEarlier?.()
+    correct()
+  }
+
   // The list grows for two reasons and the response is the same rule either way: sit on the foot, or
   // put the anchor turn back under the reader. The scroller is observed too, because something
   // appearing above it shortens the viewport without touching the list.
   const growth = new ResizeObserver(() => {
-    if (place.at === 'live') pin()
-    else schedule()
+    if (place.at === 'live') {
+      trim()
+      pin()
+    } else schedule()
   })
   counts.observers += 1
   growth.observe(list)
@@ -390,6 +572,15 @@ export function Timeline(props: {
         if ((event.target as HTMLElement | null)?.closest('.ui-timeline-turn')) noteInput()
       }}
     >
+      <Show when={props.hidden}>
+        {(hidden) => (
+          <div class="ui-timeline-earlier">
+            <Button variant="ghost" size="sm" onPress={showEarlier}>
+              Show earlier ({hidden().toLocaleString()})
+            </Button>
+          </div>
+        )}
+      </Show>
       {list}
     </div>
   )
@@ -399,7 +590,37 @@ export function Timeline(props: {
  *  rather than remembering to write an `<li>`.
  *
  *  `key` is what a followed timeline puts the reader back on. Without it the list can still be drawn
- *  and followed, but it has no places to remember, so give one to every turn or to none. */
-Timeline.Turn = (props: { key?: string; children: JSX.Element }) => (
-  <li class="ui-timeline-turn" data-turn={props.key}>{props.children}</li>
-)
+ *  and followed, but it has no places to remember, so give one to every turn or to none.
+ *
+ *  `position` and `setSize` are the turn's place in the whole conversation, one-based, for a caller
+ *  drawing only part of it: without them a screen reader counts the drawn turns and calls the first
+ *  one "1 of 200" when it is the 3,188th of 3,387.
+ *
+ *  Children may be a function of `near`, which turns true once the turn comes within a screen of the
+ *  viewport and stays true. A caller builds its expensive body there and draws a summary until then,
+ *  so a long conversation opens without building every body in it. */
+Timeline.Turn = (props: {
+  key?: string
+  position?: number
+  setSize?: number
+  children: JSX.Element | ((near: Accessor<boolean>) => JSX.Element)
+}) => {
+  const watch = useContext(NearTurns)
+  const [near, setNear] = createSignal(false)
+  let item!: HTMLLIElement
+  let stop: (() => void) | undefined
+  onCleanup(() => stop?.())
+  // Read once per evaluation, the way `Show` reads its children: a function child is called, anything
+  // else is what the caller wrote.
+  const content = () => {
+    const child = props.children
+    if (typeof child !== 'function' || child.length === 0) return child as JSX.Element
+    if (!stop) stop = watch ? watch(item, () => setNear(true)) : (setNear(true), undefined)
+    return untrack(() => (child as (near: Accessor<boolean>) => JSX.Element)(near))
+  }
+  return (
+    <li ref={item} class="ui-timeline-turn" data-turn={props.key} aria-posinset={props.position} aria-setsize={props.setSize}>
+      {content()}
+    </li>
+  )
+}
