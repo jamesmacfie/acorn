@@ -56,7 +56,8 @@ bodies under the same `patch:` keys, so its segments are served the same way.
 A GitHub file row says whether its patch is available. An available patch whose body is missing from
 the cache is an integrity failure, and the files route repairs it with a blocking refresh rather than
 serving the file as having no diff. A summary read touches no blob at all. A cache miss fetches the provider body, verifies the expected digest where available,
-and writes it atomically. The cache is local to a Node and stores both public and private repository
+and writes it atomically: to a staged file beside the entry, renamed over it, so a reader never gets
+half a body. The cache is local to a Node and stores both public and private repository
 content because it is not shared storage.
 
 Blob pruning must respect references retained by plugin records. Worktrees are not part of the blob

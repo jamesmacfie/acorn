@@ -24,10 +24,14 @@ const parsed = documentCache(64 * 1024 * 1024)
 /** Topology reads fan out over every file, a few at a time. */
 const READ_CONCURRENCY = 16
 
-/** Cut a patch and store its descriptors beside its body. Called where the body is written. */
+/** Cut a patch and store its descriptors beside its body. Called where the body is written. A patch
+ *  already cut is skipped: its key is its digest, and a refresh every 45 seconds would otherwise cut
+ *  every file of an unchanged pull request again on the node's own thread. */
 export async function writePatchDocument(blobs: PatchBlobStore, patchKey: string, path: string, patch: string): Promise<void> {
+  const key = diffDocumentBlobKey(DIFF_DOCUMENT_VERSION, patchKey)
+  if (await blobs.get(key) != null) return
   const doc = fileDocument(path, patch)
-  await blobs.put(diffDocumentBlobKey(DIFF_DOCUMENT_VERSION, patchKey), JSON.stringify(doc.descriptors))
+  await blobs.put(key, JSON.stringify(doc.descriptors))
 }
 
 /** The parsed patch, or null when its body is not in the blob cache. */
