@@ -69,6 +69,8 @@ describe('the diff health probe', () => {
       expect(now.resident.rows).toBeGreaterThan(0)
       expect(now.work.queuedSegments).toBe(0)
       expect(now.measurement.activeObservers).toBeGreaterThan(0)
+      // The first measure pass runs on a frame, which a loaded machine can put after the rows land.
+      expect(now.measurement.candidates).toBeGreaterThan(0)
     }, { timeout: 5_000 })
     const mounted = diff()!
     expect(mounted.resident.estimatedBytes).toBeGreaterThan(0)
