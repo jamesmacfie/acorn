@@ -1,7 +1,7 @@
 import type { DiffDocumentTopology } from '@acorn/diff-document/document'
 import { registerSurfaceHealth, type SurfaceHealthReading } from '../../kit/lib/surfaceHealth'
-import { isCodeRow, type CodeRow, type DiffThread, type Row, type ViewMode } from '../../kit/diff/diffModel'
-import type { DiffMeasureCounters } from '../../kit/diff/virtualization'
+import { isCodeRow, type CodeRow, type DiffThread, type Row } from '../../kit/diff/diffModel'
+import type { DiffLayout } from './diffLayout'
 import type { DiffItem } from './documentView'
 import type { SegmentLoader } from './segmentLoader'
 
@@ -9,14 +9,10 @@ import type { SegmentLoader } from './segmentLoader'
 // when a snapshot is asked for, from state the pane already holds, so an open diff pays nothing for
 // it between requests.
 //
-// The document's size comes from its topology, the mounted counts from the items in the virtual
-// range, and the work owed from the segment loader, whose queue is only ever what the reader can see
-// and what is near it. The queue distance is in segments from the items on screen.
-
-type HealthVirtualizer = {
-  getVirtualItems: () => readonly { index: number; start: number; end: number }[]
-  elementsCache: ReadonlyMap<unknown, Element>
-}
+// The document's size comes from its topology, the mounted counts from the items in the layout's
+// range, the work owed from the segment loader, whose queue is only ever what the reader can see and
+// what is near it, and the measurement and correction counts from the layout (./diffLayout.ts). The
+// queue distance is in segments from the items on screen.
 
 export type DiffHealthInputs = {
   topology: () => DiffDocumentTopology | undefined
@@ -24,12 +20,8 @@ export type DiffHealthInputs = {
   /** Source threads that land in a segment of this document. */
   placedThreads: () => number
   threads: () => readonly DiffThread[] | undefined
-  viewMode: () => ViewMode
-  virt: HealthVirtualizer
-  splitVirt: HealthVirtualizer
+  layout: Pick<DiffLayout, 'range' | 'health'>
   scrollEl: () => HTMLElement | undefined
-  counters: DiffMeasureCounters
-  scheduledFrames: () => number
   loader: SegmentLoader
   /** A mounted item's rows with its threads placed, or undefined while it is not loaded. */
   itemRows: (item: Extract<DiffItem, { kind: 'segment' | 'overlay' }>) => readonly Row[] | undefined
@@ -66,16 +58,10 @@ function coverage(scroller: HTMLElement, selector: string): { blank: number; unc
   return { blank, uncovered }
 }
 
-const connected = (virtualizer: HealthVirtualizer) => {
-  let count = 0
-  for (const element of virtualizer.elementsCache.values()) if (element.isConnected) count++
-  return count
-}
-
 /**
  * Register the pane as a `diff` surface. Call it first in the pane, before anything that registers a
- * cleanup, and `attach` its inputs once they exist: disposal then runs after the virtualizers, the
- * loader and the measure schedulers have stopped, and the final reading shows that they did.
+ * cleanup, and `attach` its inputs once they exist: disposal then runs after the layout, its measure
+ * scheduler and the loader have stopped, and the final reading shows that they did.
  */
 export function createDiffHealth() {
   let inputs: DiffHealthInputs | null = null
@@ -86,13 +72,12 @@ export function createDiffHealth() {
 
   const read = (): SurfaceHealthReading => {
     if (!inputs) return {}
-    const { counters, loader } = inputs
+    const { loader } = inputs
+    const geometry = inputs.layout.health()
     const topology = inputs.topology()
     const items = inputs.items()
     const noDiff = topology?.files.filter((file) => !file.patchKey || !file.segments.length).length ?? 0
 
-    const split = inputs.viewMode() === 'split'
-    const virtualizer = split ? inputs.splitVirt : inputs.virt
     const scroller = inputs.scrollEl()
     const viewTop = scroller?.scrollTop ?? 0
     const viewBottom = viewTop + (scroller?.clientHeight ?? 0)
@@ -107,7 +92,7 @@ export function createDiffHealth() {
     items.forEach((item, index) => {
       if (item.kind === 'segment') segmentAt.set(item.segment.contentKey, positions[index]!)
     })
-    for (const vi of virtualizer.getVirtualItems()) {
+    for (const vi of inputs.layout.range()) {
       const item = items[vi.index]
       if (!item) continue
       if (vi.end > viewTop && vi.start < viewBottom) {
@@ -120,8 +105,8 @@ export function createDiffHealth() {
       }
       if (item.kind === 'segment') mountedSegments++
       for (const row of inputs.itemRows(item) ?? []) {
+        if (row.kind !== 'thread') mountedFixed++
         if (row.kind === 'thread' || (isCodeRow(row) && inputs.hasLineExtra(row))) mountedDynamic++
-        else mountedFixed++
       }
     }
     const shown = scroller ? coverage(scroller, '.diff-item[data-index]') : { blank: 0, uncovered: 0 }
@@ -151,20 +136,12 @@ export function createDiffHealth() {
         queuedEnrichment: stats.enrichment,
         furthestQueueDistance: furthest,
         unvisitedSegments: stats.unvisited,
-        scheduledFrames: inputs.scheduledFrames() + counters.pendingFrames(),
+        scheduledFrames: geometry.pendingFrames,
         heldPublications: 0,
         prepareMs,
       },
-      measurement: {
-        candidates: counters.counts.candidates,
-        reads: counters.counts.reads,
-        commits: counters.counts.commits,
-        maxCommitsInFrame: counters.counts.maxCommitsInFrame,
-        readMs: counters.counts.readMs,
-        activeObservers: counters.counts.activeObservers,
-        observedElements: connected(inputs.virt) + connected(inputs.splitVirt),
-      },
-      correction: { count: counters.counts.corrections, maxPixels: counters.counts.maxCorrectionPixels },
+      measurement: geometry.measurement,
+      correction: geometry.correction,
       // UTF-16 code units of the row text held, plus a flat allowance per row: a lower bound, since
       // the tokens built from it weigh several times that.
       resident: { documents: topology ? 1 : 0, segments: stats.segments, rows: stats.rows, estimatedBytes: stats.bytes },

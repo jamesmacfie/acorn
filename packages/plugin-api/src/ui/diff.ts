@@ -1,7 +1,7 @@
-// The diff toolkit: the model that turns a patch into rows, the virtualizer, the highlighter and the
-// find pass, and the document a `DiffSource` hands the viewer. Its own entrypoint because it's a
-// domain toolkit rather than a primitive, and because its `Row` type would collide with the `Row`
-// layout component on ./ui.
+// The diff toolkit: the model that turns a patch into rows, the highlighter and the find pass, and
+// the document a `DiffSource` hands the viewer. Its own entrypoint because it's a domain toolkit
+// rather than a primitive, and because its `Row` type would collide with the `Row` layout component
+// on ./ui.
 //
 // The row components are on ./ui, by the same rule that governs ./client: anything from a .tsx module
 // goes there, so a plugin's node-environment test can still load this model.
@@ -35,7 +35,6 @@ export type { TokenizeDocument } from '@acorn/client-core/infra/highlight'
 export { collectMatches } from '@acorn/client-core/kit/diff'
 export type { FindHighlight } from '@acorn/client-core/kit/diff'
 export { synth } from '@acorn/client-core/kit/diff'
-export { createDiffMeasureSchedulers, createDiffVirtualizer } from '@acorn/client-core/kit/diff'
 export { createSplitScrollSync } from '@acorn/client-core/kit/diff'
 
 // The port DiffPane (on ./ui, since it is a component) is driven through. A plugin that owns a diff

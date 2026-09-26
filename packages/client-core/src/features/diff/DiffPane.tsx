@@ -38,8 +38,8 @@ import { createDiffScrollRestoration } from './scrollRestoration'
 import type { CommentSide, DiffSource } from './source'
 import { createDiffStickyFile } from './stickyFile'
 import { diffCollapsed, rememberDiffCollapsed } from './viewState'
-import { createDiffMeasureCounters, createDiffMeasureSchedulers, createDiffVirtualizer } from '../../kit/diff/virtualization'
 import { createDiffHealth } from './diffHealth'
+import { bandBlock, createDiffLayout, lineBlock, rowBlocks, threadBlock, type DiffBlockInputs } from './diffLayout'
 import { createDocumentView, threadAnchor, type DiffItem, type GapOverlay, type SegmentRef } from './documentView'
 import { createSegmentLoader } from './segmentLoader'
 import { createLogger } from '../../infra/telemetry/logger'
@@ -89,8 +89,6 @@ export function DiffPane(props: {
   // (./diffHealth.ts).
   const health = createDiffHealth()
   onCleanup(health.dispose)
-  const measureCounters = createDiffMeasureCounters()
-  onCleanup(measureCounters.dispose)
   const queryClient = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
   // A memo, because a prop is a getter: `source={makeSource()}` in a caller's JSX would otherwise build
@@ -177,25 +175,69 @@ export function DiffPane(props: {
     return withThreads(loaded.slice(item.skipFirst ? 1 : 0, item.skipLast ? loaded.length - 1 : loaded.length))
   }
 
-  // What the source draws under a line, known up front, plus any other plugin's marks.
+  // What the source draws under a line, known up front, plus any other plugin's marks. As a
+  // fingerprint, because whether a line's block can reuse a height measured earlier depends on it.
   const extraLines = createMemo(() => new Set((source().lineExtra?.anchors() ?? []).map((anchor) => lineKey(anchor.path, anchor.side, anchor.line))))
-  const hasLineExtra = (row: CodeRow) => {
+  const lineExtraPrint = (row: CodeRow): string | null => {
     const side = row.kind === 'delete' ? 'old' : 'new'
     const line = side === 'old' ? row.oldNo : row.newNo
-    if (line != null && extraLines().has(lineKey(row.path, side, line))) return true
+    const own = line != null && extraLines().has(lineKey(row.path, side, line))
     const point = props.annotations
-    return !!point && annotationsFor(point, annotationKey(row)).length > 0
+    const marks = point ? annotationsFor(point, annotationKey(row)).length : 0
+    return own || marks ? `${own ? 1 : 0}.${marks}` : null
   }
+  const hasLineExtra = (row: CodeRow) => lineExtraPrint(row) != null
   const lineExtra = (row: CodeRow) => {
     const point = props.annotations
     return [source().lineExtra?.render(row), point ? <AnnotationMarks point={point} itemKey={annotationKey(row)} /> : null]
   }
+
+  // The dynamic blocks: threads, and whatever a line draws under itself (./diffLayout.ts).
+  const openComposer = createMemo(() => lineComposer()?.key ?? null)
+  const blockInputs: DiffBlockInputs = {
+    extra: lineExtraPrint,
+    composer: (row, side) => {
+      const open = openComposer()
+      if (!open) return false
+      if (side === null) {
+        const comment = lineComment(row)
+        return comment.canAdd && comment.key === open
+      }
+      const lineNo = side === 'LEFT' ? row.oldNo : row.newNo
+      return canComment() && lineNo != null && commentTargetKey(row.path, side, lineNo) === open
+    },
+    collapsed: (thread) => threadCollapsed[thread.threadId] ?? thread.resolved,
+  }
+  const itemBlocks = (item: DiffItem, mode: ViewMode) => {
+    if (item.kind !== 'segment' && item.kind !== 'overlay') return []
+    const rows = itemRows(item)
+    if (rows) return rowBlocks(rows, mode, blockInputs)
+    // Not loaded yet: the segment's threads, known from their line numbers, reserved at its end until
+    // its rows say where each one goes.
+    const at = view.fixedHeight(item, mode)
+    return (view.threadsIn().get(item.key) ?? []).map((thread) => threadBlock(thread, at, blockInputs.collapsed(thread)))
+  }
+  const sourceItems = createMemo(() => [...view.threadsIn().keys()])
+
+  // Scroll element as a signal so the layout re-attaches when it (re)mounts; it lives behind a
+  // `<Show>` (no files, or split mode) so it is absent at this component's onMount. Published inside
+  // requestAnimationFrame, after layout, so the viewport's height is real when it is first read.
+  const [scrollEl, setScrollEl] = createSignal<HTMLDivElement>()
+  const layout = createDiffLayout({
+    items,
+    mode: viewMode,
+    fixedHeight: view.fixedHeight,
+    blocks: itemBlocks,
+    sourceItems,
+    scrollEl,
+  })
 
   // A different set of files: nothing about the old view survives.
   createEffect(on(signature, (next, previous) => {
     lastTarget = ''
     health.reset()
     loader.reset()
+    layout.reset()
     setOverlays(new Map())
     // Restore the scope's collapsed files if they were saved against this same file set; a changed
     // signature means a different diff, and a collapse decision about the old one does not carry over.
@@ -228,58 +270,15 @@ export function DiffPane(props: {
     if (!next.delete(path)) next.add(path)
     setCollapsedFiles(next)
     rememberDiffCollapsed(source().scope, { filesSignature: signature(), paths: [...next] })
-    // The file's header is the reading place: collapsing a file from the sticky header would
-    // otherwise leave the reader somewhere in the next file with no idea how they got there.
-    const index = view.indexByKey().get(`f:${path}`)
-    const top = activeVirt().measurementsCache[index ?? -1]?.start
-    if (index != null && top != null && top < scrollTop()) queueMicrotask(() => activeVirt().scrollToIndex(index, { align: 'start' }))
+    // Collapsing a file from the sticky header removes the item the reader was in, and the layout
+    // puts them on the file's header instead, so they stay on the file they collapsed.
   }
-
-  const itemKeys = createMemo(() => items().map((item) => item.key))
-  // Scroll element as a signal so the virtualizer re-attaches when it (re)mounts; it lives behind a
-  // `<Show>` (no files, or split mode) so it is absent at this component's onMount. The virtualizer
-  // reads the element's size only when getScrollElement first returns it. Publishing the ref inside
-  // requestAnimationFrame guarantees that read happens after layout, when offsetHeight is real,
-  // rather than in the same tick a cached query fills the list; otherwise it freezes a 0-height
-  // viewport and the range stays empty. measure() then drives the post-layout re-read.
-  const [scrollEl, setScrollEl] = createSignal<HTMLDivElement>()
-  const virt = createDiffVirtualizer({
-    items,
-    keys: itemKeys,
-    keyPrefix: 'item',
-    estimateSize: (item) => view.estimate(item, 'unified'),
-    estimates: view.reserved,
-    scrollEl,
-    counters: measureCounters,
-  })
-  const splitVirt = createDiffVirtualizer({
-    items,
-    keys: itemKeys,
-    keyPrefix: 'item',
-    estimateSize: (item) => view.estimate(item, 'split'),
-    estimates: view.reserved,
-    scrollEl,
-    counters: measureCounters,
-  })
-  const activeVirt = () => (viewMode() === 'split' ? splitVirt : virt)
-
-  const { scheduleElementMeasure, cancel: cancelMeasures, pendingFrames: pendingMeasureFrames } = createDiffMeasureSchedulers(
-    { unified: virt, split: splitVirt },
-    scrollEl,
-    measureCounters,
-  )
-  onCleanup(cancelMeasures)
-
-  // Every mounted item is measured, and TanStack observes it from then on: a segment's height is
-  // exact from its counts, so measuring one with no threads or notes commits nothing, and one that
-  // has them corrects its reservation when its rows arrive or a thread opens.
-  const measureItem = (element: HTMLElement) => scheduleElementMeasure(viewMode() === 'split' ? 'split' : 'unified', element)
 
   // What the reader can see, what is near, and nothing else: the loader's whole demand. Recomputed as
   // the range moves, which drops queued work the reader has scrolled away from.
   createEffect(() => {
     const all = items()
-    const range = activeVirt().getVirtualItems()
+    const range = layout.range()
     if (!range.length) return
     const first = range[0]!.index
     const last = range[range.length - 1]!.index
@@ -304,7 +303,7 @@ export function DiffPane(props: {
     if (!point) return
     const all = items()
     const keys = []
-    for (const vi of activeVirt().getVirtualItems()) {
+    for (const vi of layout.range()) {
       const item = all[vi.index]
       if (item?.kind !== 'segment' && item?.kind !== 'overlay') continue
       for (const row of itemRows(item) ?? []) if (isCodeRow(row)) keys.push(annotationKey(row))
@@ -369,15 +368,15 @@ export function DiffPane(props: {
     onCleanup(() => { bindings.dispose(); commands.dispose() })
   })
 
-  // Take the reader to a match: its segment's item, then the row inside it by the fixed row height.
-  // The segment loads because it is now on screen; the highlight draws when its rows arrive.
+  // Take the reader to a match: its segment's item, then the row inside it by the fixed row height,
+  // below whatever blocks sit above it. The segment loads because it is now on screen; the highlight
+  // draws when its rows arrive.
   const revealMatch = (match: DiffSearchMatch) => {
     const index = view.indexByKey().get(`s:${match.path}:${match.ordinal}`)
-    const start = index == null ? undefined : activeVirt().measurementsCache[index]?.start
+    const at = index == null ? null : layout.offsetOf(index, match.row * DIFF_LINE_HEIGHT)
     const element = scrollEl()
-    if (index == null || start == null || !element) return
-    const offset = Math.max(0, start + match.row * DIFF_LINE_HEIGHT - element.clientHeight / 2)
-    activeVirt().scrollToOffset(offset)
+    if (at == null || !element) return
+    layout.scrollToOffset(at - element.clientHeight / 2)
   }
   const findController = createDiffFindController({ search: (request, signal) => source().search(request, signal), revision, reveal: revealMatch })
   const findHighlight = (row: CodeRow) => {
@@ -390,19 +389,14 @@ export function DiffPane(props: {
     items,
     placedThreads: view.placedThreads,
     threads,
-    viewMode,
-    virt,
-    splitVirt,
+    layout,
     scrollEl,
-    counters: measureCounters,
-    scheduledFrames: pendingMeasureFrames,
     loader,
     itemRows,
     hasLineExtra,
   })
 
-  const [scrollTop, setScrollTop] = createSignal(0)
-  const stickyFile = createDiffStickyFile({ items, virtualizer: activeVirt, scrollTop })
+  const stickyFile = createDiffStickyFile({ items, range: layout.range, scrollTop: layout.scrollTop })
   const stickyHead = () => (
     <Show when={stickyFile()}>
       {(f) => (
@@ -437,12 +431,6 @@ export function DiffPane(props: {
     })
   })
 
-  createEffect(() => {
-    if (scrollEl()) {
-      virt.measure()
-      if (viewMode() === 'split') splitVirt.measure()
-    }
-  })
   const scrollRestoration = createDiffScrollRestoration({
     scope: props.source.scope,
     viewMode,
@@ -450,12 +438,11 @@ export function DiffPane(props: {
     selectedPath,
     scrollEl,
     setScrollEl,
-    setScrollTop,
-    measure: (mode) => mode === 'split' ? splitVirt.measure() : virt.measure(),
+    layout,
   })
   const resetScrollPosition = scrollRestoration.reset
-  // The document's height is known from the first topology, but a position saved before the topology
-  // arrived waits for it rather than accepting the browser's clamp against an empty canvas.
+  // The document's layout is known from the first topology, but a place saved before the topology
+  // arrived waits for it rather than landing on an empty canvas.
   createEffect(() => {
     items()
     scrollRestoration.retry()
@@ -466,7 +453,7 @@ export function DiffPane(props: {
     if (index == null) return false
     if (!force && path === lastTarget) return true
     lastTarget = path
-    activeVirt().scrollToIndex(index, { align: 'start' })
+    layout.scrollToIndex(index)
     return true
   }
 
@@ -538,12 +525,11 @@ export function DiffPane(props: {
       <DiffCanvas
         viewMode={viewMode}
         items={items}
-        virtualizer={activeVirt}
+        layout={layout}
         stickyHead={stickyHead}
-        publishScrollEl={(element, mode) => scrollRestoration.publish(element, mode)}
+        publishScrollEl={(element) => scrollRestoration.publish(element)}
         onScroll={(element) => scrollRestoration.onScroll(element)}
         maxCols={maxCols}
-        measure={measureItem}
         itemRows={itemRows}
         segmentStatus={loader.status}
         retrySegment={loader.retry}
@@ -566,6 +552,9 @@ export function DiffPane(props: {
           lineExtra,
           lineAction: source().lineAction,
           openLine: source().openLine,
+          lineBlock: (row) => lineBlock(row, blockInputs)?.id ?? null,
+          bandBlock: (left, right) => bandBlock(left, right, blockInputs)?.id ?? null,
+          observeBlock: layout.observeBlock,
         }}
       />
     </Show>
