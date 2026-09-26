@@ -59,6 +59,9 @@ const modes = {
 } & { core: { [K in keyof CoreServices]: Methods<NonNullable<CoreServices[K]>> } }
 
 export function hostFunctionMode(path: string): Mode {
+  // The provider fetch handler is the second argument to providers.integration. Its request context
+  // lends a provider-owned item store synchronously; the store's reads still cross as async RPC.
+  if (path === 'remote.sync.args[1].args[1].providers.items') return 'sync'
   const prefix = path.startsWith('plugin.init.args[0].') ? 'plugin.init.args[0].'
     : path.startsWith('plugin.ready.args[0].') ? 'plugin.ready.args[0].' : null
   if (!prefix) return 'async'
