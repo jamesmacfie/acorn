@@ -59,15 +59,42 @@ export type TaskPullRelationsResponse = { pulls: TaskPullRelation[] }
 // Closed PRs are paginated on demand (one GitHub page per fetch); nextPage is null at the end.
 export type ClosedPullsPage = { pulls: Pull[]; nextPage: number | null }
 
+// Whether a mirrored resource holds everything GitHub has. The only way to be incomplete is an
+// upstream ceiling: the pull files endpoint stops at 3,000 files and compare at 300. A failed refresh
+// is not incomplete; it keeps the previous mirror and serves it stale.
+export type PullTopologyCompleteness =
+  | { kind: 'complete' }
+  | {
+      kind: 'incomplete'
+      cause: 'upstream-cap'
+      resource: 'files' | 'compare-files'
+      received: number
+      // GitHub's own count when it gave one. Null means GitHub hit its ceiling without saying how
+      // many files there are, so there may be more.
+      reportedTotal: number | null
+      limit: number
+    }
+
 export type PullFile = {
   path: string
   status: string | null
   additions: number | null
   deletions: number | null
+  // The new-side file blob, for whole-file context. Not the patch's identity: see patchKey.
   sha: string | null
   viewed: boolean
+  // Zero-based order in GitHub's file list. The only ordering used when the mirror is read back.
+  position: number
+  // 'available': patchKey names the patch body by content. A summary read still sends `patch: null`
+  // because it did not ask for bodies. 'unavailable': GitHub sent no patch (binary, too large, a pure
+  // rename), so patchKey and patch are null and the viewer draws its no-diff row.
+  patchState: 'available' | 'unavailable'
+  patchKey: string | null
   patch: string | null
 }
+// The files route's response. The list is in `position` order, and whether it is everything GitHub
+// has is stated here rather than guessed from its length.
+export type PullFilesResponse = { files: PullFile[]; completeness: PullTopologyCompleteness }
 export type PullFilesPatchRequest = { paths: string[] }
 // Conflicting files for a PR. `available` is false when the repo isn't mapped to a local checkout
 // (or the trial merge couldn't run), the UI then can't enumerate files, only say conflicts exist.
@@ -101,15 +128,18 @@ export type PullDetail = {
   checks: Check[]
   threads: Thread[]
 }
-// One PR's full warmed payload, returned by the batch prefetch endpoint.
-export type PullBatchItem = { number: number; detail: PullDetail; files: PullFile[] }
+// One PR's full warmed payload, returned by the batch prefetch endpoint. `files` is absent when the
+// request asked for none, or when that pull's files could not be fetched or read.
+export type PullBatchItem = { number: number; detail: PullDetail; files?: PullFilesResponse }
 export type PullBatchFilesMode = 'full' | 'summary' | 'none'
 export type PullBatchRequest = { numbers: number[]; files?: PullBatchFilesMode }
 
 // Create-PR support: branch picker list + base..head compare (diff preview + commits for prefill).
 export type Branch = { name: string }
 export type CompareCommit = { sha: string; message: string }
-export type Compare = { aheadBy: number; files: PullFile[]; commits: CompareCommit[] }
+// Compare files carry their patch inline, so `patch: null` can only mean GitHub sent none.
+export type CompareFile = Pick<PullFile, 'path' | 'status' | 'additions' | 'deletions' | 'sha' | 'viewed' | 'patch'>
+export type Compare = { aheadBy: number; files: CompareFile[]; completeness: PullTopologyCompleteness; commits: CompareCommit[] }
 
 // Full head-blob body, fetched on demand to expand unchanged context around diff hunks.
 export type FileBlob = { text: string }
@@ -161,11 +191,14 @@ export const pullPrefixKey = (owner: string, repo: string) => ['pull', owner, re
 export const repoLabelsKey = (owner: string, repo: string) => ['labels', owner, repo] as const
 export const filesKey = (owner: string, repo: string, number: string) => ['files', owner, repo, number] as const
 export const conflictsKey = (owner: string, repo: string, number: string, base: string) => ['conflicts', owner, repo, number, base] as const
-export const fileSummariesKey = (owner: string, repo: string, number: string) => ['files', owner, repo, number, 'summary'] as const
+// 'v2': the response became PullFilesResponse, and a persisted summary array from before must not
+// hydrate into it.
+export const fileSummariesKey = (owner: string, repo: string, number: string) => ['files', owner, repo, number, 'summary', 'v2'] as const
 export const filePatchKey = (owner: string, repo: string, number: string, path: string) => ['files', owner, repo, number, 'patch', path] as const
 export const fileBlobKey = (owner: string, repo: string, sha: string) => ['blob', owner, repo, sha] as const
 export const branchesKey = (owner: string, repo: string) => ['branches', owner, repo] as const
-export const compareKey = (owner: string, repo: string, base: string, head: string) => ['compare', owner, repo, base, head] as const
+// 'v2': Compare gained `completeness`.
+export const compareKey = (owner: string, repo: string, base: string, head: string) => ['compare', owner, repo, base, head, 'v2'] as const
 export const pinsKey = ['pins'] as const
 export const mentionsKey = (owner: string, repo: string) => ['mentions', owner, repo] as const
 export const runJobsKey = (owner: string, repo: string, runId: number) => ['run-jobs', owner, repo, runId] as const

@@ -34,7 +34,7 @@ describe('github query options', () => {
   })
 
   it('applies cancellation to heavy PR file and compare reads', async () => {
-    const fetchMock = vi.fn(async () => jsonResponse({ aheadBy: 1, files: [], commits: [] }))
+    const fetchMock = vi.fn(async () => jsonResponse({ aheadBy: 1, files: [], completeness: { kind: 'complete' }, commits: [] }))
     vi.stubGlobal('fetch', fetchMock)
     const signal = new AbortController().signal
 
@@ -47,20 +47,22 @@ describe('github query options', () => {
 
   it('force-refreshes PR detail and changed files together', async () => {
     const detail = { pull: null, labels: [], reviews: [], requestedReviewers: [], comments: [], commits: [], checks: [], threads: [] }
-    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(detail)).mockResolvedValueOnce(jsonResponse([]))
+    const files = { files: [], completeness: { kind: 'complete' } }
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse(detail)).mockResolvedValueOnce(jsonResponse(files))
     vi.stubGlobal('fetch', fetchMock)
 
-    await expect(forceRefreshPull('acorn', 'web', '42')).resolves.toEqual({ detail, files: [] })
+    await expect(forceRefreshPull('acorn', 'web', '42')).resolves.toEqual({ detail, files })
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/v1/p/github/repos/acorn/web/pulls/42?force=true', expect.anything())
     expect(fetchMock).toHaveBeenNthCalledWith(2, '/v1/p/github/repos/acorn/web/pulls/42/files?force=true', expect.anything())
   })
 
   it('fetches file summaries and a single patch through distinct cache entries', async () => {
-    const patchFile = { path: 'src/app file.ts', status: 'modified', additions: 1, deletions: 0, sha: 'abc', viewed: false, patch: '@@' }
+    const patchFile = { path: 'src/app file.ts', status: 'modified', additions: 1, deletions: 0, sha: 'abc', viewed: false, position: 0, patchState: 'available', patchKey: 'sha256:x', patch: '@@' }
+    const complete = { kind: 'complete' }
     const fetchMock = vi
       .fn()
-      .mockResolvedValueOnce(jsonResponse([{ ...patchFile, patch: null }]))
-      .mockResolvedValueOnce(jsonResponse([patchFile]))
+      .mockResolvedValueOnce(jsonResponse({ files: [{ ...patchFile, patch: null }], completeness: complete }))
+      .mockResolvedValueOnce(jsonResponse({ files: [patchFile], completeness: complete }))
       .mockResolvedValueOnce(jsonResponse([patchFile]))
     vi.stubGlobal('fetch', fetchMock)
     const signal = new AbortController().signal
@@ -69,7 +71,7 @@ describe('github query options', () => {
     await expect(filePatchOptions('acorn', 'web', '42', 'src/app file.ts').queryFn({ signal })).resolves.toEqual(patchFile)
     await expect(fetchFilePatches('acorn', 'web', '42', ['src/app file.ts'], signal)).resolves.toEqual([patchFile])
 
-    expect(fileSummariesOptions('acorn', 'web', '42', true).queryKey).toEqual(['files', 'acorn', 'web', '42', 'summary'])
+    expect(fileSummariesOptions('acorn', 'web', '42', true).queryKey).toEqual(['files', 'acorn', 'web', '42', 'summary', 'v2'])
     expect(filePatchOptions('acorn', 'web', '42', 'src/app file.ts').queryKey).toEqual(['files', 'acorn', 'web', '42', 'patch', 'src/app file.ts'])
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/v1/p/github/repos/acorn/web/pulls/42/files?summary=1', expect.objectContaining({ signal }))
     expect(fetchMock).toHaveBeenNthCalledWith(2, '/v1/p/github/repos/acorn/web/pulls/42/files?path=src%2Fapp%20file.ts', expect.objectContaining({ signal }))

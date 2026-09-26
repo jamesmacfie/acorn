@@ -1,6 +1,8 @@
 # Phase 1: complete and honest GitHub topology
 
-Status: not started, 2026-09-26. Waits on phase 0.
+Status: shipped 2026-09-26, tested against a mocked GitHub. A check against a real large pull request
+is owed (smoke checklist item 81 in [testing.md](../../testing.md)). See
+[What shipped differently](#what-shipped-differently).
 
 ## Goal
 
@@ -323,3 +325,85 @@ Per [docs-migration.md](./docs-migration.md): `docs/github-integration.md`, `doc
   query key whose successful data gains a required field.
 - Run `pnpm db:generate` according to the current reset-era migration policy; do not assume the
   migration filename in this document still exists.
+
+## What shipped differently
+
+The owning docs describe what runs: [github-integration.md](../../github-integration.md) § Pull
+request detail and files, [api-reference.md](../../api-reference.md) § GitHub,
+[data-layer.md](../../data-layer.md) § Plugin databases, and [caching.md](../../caching.md) § Immutable
+blob cache. Where this file and those disagree, they win.
+
+Where the pieces live, for phase 2 to consume:
+
+- `PullTopologyCompleteness`, `PullFile` (`position`, `patchState`, `patchKey`), `PullFilesResponse`,
+  `PullBatchItem`, `CompareFile`, and `Compare` are in `plugins/github/src/shared/api.ts`.
+- The fetchers, the cursor walker, and the staged `PullComposite` and `FilesFetch` types are in
+  `plugins/github/src/server/routes/mirror/prFetch.ts`. The swap, `patchDigest`, `filesCompleteness`,
+  and `readFiles` with its integrity result are in `prMirror.ts` beside it.
+- `refreshPullDetail` and `refreshPullFiles` in `plugins/github/src/server/routes/pulls/pullRefresh.ts`
+  are the one detail helper and the one files helper. The single-PR routes, the batch route, and the
+  stale-while-revalidate path all call them.
+- `mapLimited` in `plugins/github/src/server/mapLimited.ts` bounds every fan-out.
+- The fake GitHub the tests use is `plugins/github/src/server/routes/mirror/fakeGithub.helper.ts`.
+
+Deviations from the plan:
+
+1. **The detail response has no envelope.** Every GraphQL connection is walked to its end or the
+   refresh fails, so the detail is always complete and a `completeness` field there would always say
+   so. `PullDetail` keeps its shape and its query key. The completeness union is used for the two
+   resources with a real ceiling, `files` and `compare-files`. If GitHub is found to cap a pull's
+   commits connection at 250, as its REST endpoint does, the detail would need one. That was not
+   confirmed from GitHub's documentation.
+2. **`PullFilesResponse` has no top-level `reportedTotal`.** The count only matters when the list is
+   capped, and there it is on the incomplete variant.
+3. **The files walk trusts GitHub's `Link` header before page 30.** A full page with no `rel="next"`
+   ends the walk, which is how 2,200 files take 22 requests rather than 23. `changed_files` is read
+   only after a full page 30, with one extra request, instead of being added to the GraphQL scalars;
+   the files refresh runs without the detail.
+4. **The batch route has no multi-alias query.** Each stale pull goes through the single-PR detail
+   helper, three pulls at a time. A batch refresh that fails with 401, 403, or 429 fails the batch, as
+   the whole-response error did before; any other failure leaves that pull's previous mirror and the
+   batch carries on.
+5. **Patch bodies are written after the last page, not as pages arrive.** Every page is fetched
+   first, then bodies are hashed and written eight at a time, then the batch swaps. The order of
+   outcomes is the same and the code is simpler.
+6. **No `AbortSignal` and no telemetry counts.** Nothing that calls a refresh holds a signal: the
+   engine's refreshes run to the end, and the route modules have no `ctx.telemetry` in reach. Adding
+   either means threading a parameter through five route factories for a reading nobody consumes yet.
+   Failures log through the scrubbed logger as before.
+7. **Every PR child table got a `position`, not only the conversation's.** Labels, review requests,
+   and checks keep GitHub's order too, so one rule covers every read. `review_threads` counts across
+   all comments of all threads, which orders both threads and comments with one column. Duplicate check
+   names keep the last entry in the first one's place. Duplicate review-request logins are dropped.
+8. **Completeness is four nullable columns on `sync_state`.** Only the files resource sets them. All
+   null is complete. The other `sync_state` writers upsert `fetched_at` alone and never touch them.
+9. **The migration empties the mirror's PR children.** SQLite cannot add a `NOT NULL` column without a
+   default to a table with rows, and old rows have no provider order or patch state to carry over.
+   `0001_silent_risque.sql` deletes them and the `pr:` and `files:` sync rows, so every pull refetches
+   once. `viewed_files` is kept.
+10. **An integrity failure repairs through the engine's cold path.** `readFiles` returns
+    `{ ok: false, missing }`, the files route's read reports the mirror as cold, and the engine blocks
+    on a refresh that rewrites the bodies. If the body is still missing after that, the route answers
+    `502 sync_empty`. The batch route leaves `files` out for that pull.
+11. **`patchBlobKey` kept its name.** Its argument is the digest, `sha256:<hex>`, so the key is
+    `patch:sha256:<hex>`. The plugin API surface did not change and no major bump was needed. Old
+    `patch:<sha>` bodies stay on disk until the cache is pruned.
+12. **The patches `POST` answers with a plain array.** It is a lookup by path, in request order, so it
+    carries no completeness. Every `GET` on the files route answers with the envelope, including
+    `?path=`.
+13. **`prActions.ts` also writes mirror children.** Posting a comment appends it after the last
+    `position`. Label and reviewer changes write GitHub's returned list in order.
+14. **The compare preview's files are `CompareFile`, not `PullFile`.** Their bodies arrive inline and
+    are never blob-keyed, so `patch: null` already means GitHub sent none.
+15. **Query keys.** The file summaries key and the compare key gained a trailing `'v2'`. The full
+    files key is not persisted, so it kept its shape.
+
+Not built or not verified:
+
+- No run against a real GitHub pull request. The worktree has no credentials, so smoke checklist item
+  81 is owed: a pull with more than 100 files, commits, or thread comments; one with more than 3,000
+  files; and a comparison with more than 300.
+- The before and after measurements with the phase 0 fixture. The fixture drives the Changes pane,
+  which this phase does not touch.
+- Whether GitHub's GraphQL `commits` connection stops at 250, as noted above.
+

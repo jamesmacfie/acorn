@@ -348,8 +348,8 @@ const pullFiles = () => {
 }
 
 const PULL_FILES = [
-  { path: 'src/login.ts', status: 'modified', additions: 12, deletions: 3, sha: 'a', viewed: false, patch: LOGIN_PATCH },
-  { path: 'src/session.ts', status: 'modified', additions: 4, deletions: 0, sha: 'b', viewed: false, patch: null },
+  { path: 'src/login.ts', status: 'modified', additions: 12, deletions: 3, sha: 'a', viewed: false, position: 0, patchState: 'available', patchKey: 'sha256:login', patch: LOGIN_PATCH },
+  { path: 'src/session.ts', status: 'modified', additions: 4, deletions: 0, sha: 'b', viewed: false, position: 1, patchState: 'unavailable', patchKey: null, patch: null },
 ]
 
 const EDITOR_ENTRIES = [
@@ -465,7 +465,10 @@ const json = (value: unknown) => ({
       // Any number, not only 42, so a test that walks a long list gets a loaded detail on every row
       // rather than "Not found" on all but the first.
       if (/^\/v1\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+$/.test(path)) return json(PULL_DETAIL)
-      if (/^\/v1\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+\/files/.test(path)) return json(pullFiles())
+      // The patches lookup answers with the files alone; every GET on the files route answers with
+      // the list and whether it is all of them (plugins/github/src/shared/api.ts § PullFilesResponse).
+      if (/^\/v1\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+\/files\/patches/.test(path)) return json(pullFiles())
+      if (/^\/v1\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+\/files/.test(path)) return json({ files: pullFiles(), completeness: { kind: 'complete' } })
       if (path.startsWith('/v1/p/github/repos/runn-fast/acorn/pulls?')) return json(pulls())
       if (path === '/v1/p/github/repos/runn-fast/acorn/labels') return json([])
       if (path === '/v1/p/github/repos/runn-fast/acorn/mentions') return json([])

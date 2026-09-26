@@ -76,9 +76,9 @@ export type RuntimeBindings = {
 // at the app.fetch() seam (server/transport/listener.ts); tests and non-HTTP callers don't provide them.
 export type Env = RuntimeBindings & Partial<HttpBindings>
 
-// Immutable blob and patch bodies keyed by sha (docs/caching.md § Immutable blob cache). One file
-// per key under `dir`; keys are `filebody:<sha>` and `patch:<sha>`, with the colon sanitized for a
-// safe filename.
+// Immutable file and patch bodies keyed by content (docs/caching.md § Immutable blob cache). One
+// file per key under `dir`; keys are `filebody:<sha>` and `patch:sha256:<hex>` (server/blobs.ts),
+// with each colon sanitized for a safe filename.
 export type BlobCache = {
   get(key: string): Promise<string | null>
   put(key: string, value: string): Promise<void>

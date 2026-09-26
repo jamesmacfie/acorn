@@ -41,9 +41,15 @@ the mirrored resource and gets serve-then-revalidate as normal.
 
 ## Immutable blob cache
 
-`BLOBS` is an on-disk, content-addressed cache under `<data-root>/blobs/`. GitHub patch bodies and
-file bodies are keyed by SHA; attachments and agent artifacts use the same immutable storage
-mechanism. A cache miss fetches the provider body, verifies the expected digest where available,
+`BLOBS` is an on-disk, content-addressed cache under `<data-root>/blobs/`. A GitHub patch body is
+keyed by a SHA-256 digest of the patch text, `patch:sha256:<hex>`, because a head blob SHA does not
+identify a patch: the same new file has a different patch against a different base. A new-side file
+body stays keyed by its blob SHA, `filebody:<sha>`. Attachments and agent artifacts use the same
+immutable storage mechanism.
+
+A GitHub file row says whether its patch is available. An available patch whose body is missing from
+the cache is an integrity failure, and the files route repairs it with a blocking refresh rather than
+serving the file as having no diff. A summary read touches no blob at all. A cache miss fetches the provider body, verifies the expected digest where available,
 and writes it atomically. The cache is local to a Node and stores both public and private repository
 content because it is not shared storage.
 
@@ -105,7 +111,9 @@ Identical task or run IDs on two Nodes therefore cannot invalidate or navigate i
 
 The persisted cache has no version buster. An entry written before a response type gained a required
 field survives a relaunch as-is, so change the query key whenever the shape it caches gains a
-required field. Nothing else invalidates an old entry.
+required field. Nothing else invalidates an old entry. GitHub's file summaries and compare keys end in
+`'v2'` for that reason: both responses gained `completeness`, and file rows gained `position` and
+patch state.
 
 ## Fan-out cache safety
 

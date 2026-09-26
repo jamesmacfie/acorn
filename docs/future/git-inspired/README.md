@@ -1,7 +1,8 @@
 # Large rendered surfaces: bounded work for diffs and timelines
 
-Status: phase 0 partly shipped 2026-09-26 (its visible real-window run is owed). Phases 1 to 5 have
-not started.
+Status: phase 0 partly shipped 2026-09-26 (its visible real-window run is owed). Phase 1 shipped
+2026-09-26, tested against a mocked GitHub; a check against a real large pull request is owed. Phases
+2 to 5 have not started.
 
 This programme applies the useful parts of GitHub's 2026 account of rendering a pull request with
 2,200 files, more than one million changed lines, and more than 400 inline review comments. The

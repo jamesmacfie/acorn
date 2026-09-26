@@ -213,6 +213,18 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
   those components and a plugin's own suite could not render one. A plugin test reaches the host
   through `@acorn/plugin-api/testkit/client`, not by importing into `client-core` (`tools/arch/
   boundaries.test.ts` § plugin tests holds the shrinking budget for that);
+- the GitHub mirror's topology tests use `plugins/github/src/server/routes/mirror/fakeGithub.helper.ts`,
+  a deterministic GitHub that paginates the way GitHub documents: 100 nodes a page, a `Link` header on
+  the files pages, and the 3,000-file cap. `prFetch.test.ts` asserts requests, cursors, order, and
+  completeness: 2,200 files in 22 requests, 3,000 of 3,000 complete, 3,000 of 3,418 capped, a full
+  page 30 with no count capped, and 400 review threads, a 250-comment thread, 150 commits, and 120
+  checks all exhausted. It also fails a repeated cursor, a duplicate path, a malformed page, a partial
+  GraphQL error, and a failed middle page, and holds thread-comment requests to four in flight.
+  `prMirror.test.ts` runs against the real migrated `github.sqlite`: a failed page 12 leaves every old
+  row, `fetched_at`, and completeness unchanged; two patches of one head blob read back apart; a
+  missing body is an integrity failure; and a summary read touches no blob. `pullFiles.test.ts`,
+  `pullsBatch.test.ts`, and `prCreate.test.ts` cover the routes, and `DiffForPull.test.tsx` covers the
+  capped-list warning and the unavailable-patch path;
 - four arch rules read source text rather than the import graph, because what they police is a
   global rather than an import: `window.acorn` outside the platform seam, and `console.*` outside
   each of the three loggers. Each carries a **baseline** of the files that survive, and each asserts
@@ -844,6 +856,11 @@ bindings rather than the prose.
     every line printed while you were away. Open more than four terminals across tasks and switch
     between them: each draws, and none goes blank after its GPU context is given to another. Close the
     tab and check that switching back does not bring it back.
+81. With GitHub connected, open a pull request with more than 100 files, more than 100 commits, or a
+    review thread with more than 100 comments. Every file, commit, and comment is there in GitHub's
+    order. Open one with more than 3,000 files: the diff and the file list both say GitHub returned
+    3,000 of its total. Compare two branches with more than 300 changed files in the create form: the
+    count reads "first 300 files" and the preview says the comparison may have more.
 
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as

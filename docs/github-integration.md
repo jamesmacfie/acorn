@@ -74,8 +74,47 @@ inserted by a live lookup after a mirror miss. A `304 Not Modified` response upd
 and does not send the event. Node-side plugins can use the user-scoped `github.mirror` capability to
 list the same repository inventory without calling GitHub.
 
-Patch bodies and full file bodies use the Node's immutable on-disk blob cache. A blob miss fetches
-from GitHub and stores the result by SHA. The cache is per Node and can hold private repository data.
+Patch bodies and full file bodies use the Node's immutable on-disk blob cache. A patch body is keyed
+by a SHA-256 digest of its own text. A full file body is keyed by its blob SHA. A blob miss fetches
+from GitHub and stores the result. The cache is per Node and can hold private repository data.
+
+### Pull request detail and files
+
+A pull request's mirror is two resources, each with its own `sync_state` row: the detail
+(`pr:<repoId>:<number>`) and the files (`files:<repoId>:<number>`). Both are fetched in full before
+anything is written, in `plugins/github/src/server/routes/mirror/prFetch.ts`, and swapped in by
+`prMirror.ts` in one `db.batch` with their sync row. A failure on any page leaves the previous rows,
+the stored completeness, and `fetched_at` exactly as they were, and the route serves the old mirror
+stale or, cold, reports the provider failure.
+
+The detail is one GraphQL query for the scalars and the first page of every connection, then cursor
+continuations through `node(id:)` until each connection is exhausted. The connections are labels,
+reviews, review requests, issue comments, commits, review threads, each thread's comments, and the
+latest commit's status and check contexts. Every page asks for 100 nodes and `pageInfo`. One walker
+handles every connection. It fails on a page of the wrong shape, a node with no identity, or a
+repeated or missing cursor while `hasNextPage` is true. It keeps a node that appears on two pages
+once, where it first appeared. Thread comments continue four threads at a time. A GraphQL response
+with `errors` is a failed refresh even when it carries partial data. There is no batch-only query:
+the batch route refreshes each stale pull through the same helper, three at a time, because a
+multi-alias query would stop at each connection's first page.
+
+The files come from the REST files endpoint, 100 a page, in order. The walk stops at a short page, at
+a full page with no `rel="next"` link, or after page 30, which is GitHub's 3,000-file ceiling. After a
+full page 30 the plugin reads the pull's `changed_files`. If that is more than 3,000, or GitHub gives
+no count, the resource is stored as incomplete with cause `upstream-cap`; 3,000 of 3,000 is complete.
+A repeated path or a malformed page fails the refresh. Nothing works around the ceiling with a clone
+or an archive download.
+
+Every mirrored child row has a `position`, its zero-based place in GitHub's order, and every read
+orders by it. File rows carry a patch state. `available` means `patch_key` names a body in the blob
+cache. `unavailable` means GitHub sent no patch, which happens for binary files, very large diffs,
+and pure renames. Patch bodies are written, eight at a time, before the swap; an orphaned body is
+only cache data. A read that finds an available body missing is an integrity failure, not a file
+without a diff: the files route treats the mirror as cold and blocks on a refresh that rewrites it.
+
+The client states what the files route reports. When the list is capped, the diff and the PR's file
+list both show a warning above the files, with GitHub's count when it gave one. File counts are the
+files received.
 
 ## Reads and writes
 
@@ -91,6 +130,12 @@ was committed or invalidated, so consumers re-read the identified pull request. 
 after a background refresh and after a successful PR mutation updates or invalidates mirror state.
 A provider refresh after a mutation can send a second event. This replaces signed HTML and keeps
 other clients and plugins in sync with the initiating client.
+
+The create-PR compare preview reads GitHub's compare endpoint directly and mirrors nothing. GitHub
+lists at most 300 changed files for a whole comparison, on the first page only, and gives no total.
+So a comparison with 300 files reports `upstream-cap` for resource `compare-files`, and the preview
+and the create form's file count say that only the first 300 files are shown. The commits come from
+the first page too, which is enough for the title prefill.
 
 Creating a pull request sends `plugin:github:pulls-changed` after the plugin invalidates the owning
 repository's open-pull list. The interactive route and `github_pull_create` agent tool share this

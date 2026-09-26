@@ -49,7 +49,11 @@ const makePullFilesDb = (selectRows: unknown[][]) => {
   const queue = [...selectRows]
   const select = vi.fn(() => ({
     from: vi.fn(() => ({
-      where: vi.fn(async () => queue.shift() ?? []),
+      // Awaitable as it is, or after `.orderBy`, the way the mirror reads use it.
+      where: vi.fn(() => {
+        const rows = Promise.resolve(queue.shift() ?? [])
+        return Object.assign(rows, { orderBy: () => rows })
+      }),
     })),
   }))
   const db = {
@@ -140,6 +144,9 @@ describe('pull files stale-while-revalidate', () => {
       additions: 3,
       deletions: 1,
       sha: 'abc123',
+      position: 0,
+      patchState: 'available',
+      patchKey: 'sha256:abc',
     }
     const db = makePullFilesDb([
       [{ id: 19847 }],
@@ -174,19 +181,25 @@ describe('pull files stale-while-revalidate', () => {
     ])
 
     expect(response).toBeInstanceOf(Response)
-    expect(response && (await response.json())).toEqual([
-      {
-        path: 'src/app.ts',
-        status: 'modified',
-        additions: 3,
-        deletions: 1,
-        sha: 'abc123',
-        viewed: false,
-        patch: null,
-      },
-    ])
+    expect(response && (await response.json())).toEqual({
+      files: [
+        {
+          path: 'src/app.ts',
+          status: 'modified',
+          additions: 3,
+          deletions: 1,
+          sha: 'abc123',
+          viewed: false,
+          position: 0,
+          patchState: 'available',
+          patchKey: 'sha256:abc',
+          patch: null,
+        },
+      ],
+      completeness: { kind: 'complete' },
+    })
     expect(blobGet).not.toHaveBeenCalled()
-    expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100')
+    expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100&page=1')
 
     resolveGh(responseJson([{ filename: 'src/app.ts', status: 'modified', additions: 3, deletions: 1, sha: 'abc123', patch: '@@' }]))
     await settleBackground()
@@ -202,6 +215,9 @@ describe('pull files stale-while-revalidate', () => {
       additions: 3,
       deletions: 1,
       sha: 'abc123',
+      position: 0,
+      patchState: 'available',
+      patchKey: 'sha256:abc',
     }
     const freshSync = { userId: 'james', resource: 'files:19847:12', etag: null, fetchedAt: Date.now() }
     const db = makePullFilesDb([
@@ -229,7 +245,7 @@ describe('pull files stale-while-revalidate', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100')
+    expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100&page=1')
   })
 
   it('returns stale requested patches in request order and refreshes in the background', async () => {
@@ -242,6 +258,9 @@ describe('pull files stale-while-revalidate', () => {
       additions: 2,
       deletions: 0,
       sha: 'sha-a',
+      position: 0,
+      patchState: 'available',
+      patchKey: 'sha256:a',
     }
     const rowB = {
       userId: 'james',
@@ -252,6 +271,9 @@ describe('pull files stale-while-revalidate', () => {
       additions: 1,
       deletions: 1,
       sha: 'sha-b',
+      position: 1,
+      patchState: 'available',
+      patchKey: 'sha256:b',
     }
     const db = makePullFilesDb([
       [{ id: 19847 }],
@@ -275,7 +297,7 @@ describe('pull files stale-while-revalidate', () => {
     })
     app.route('/api/repos', pullFiles(db))
 
-    const blobGet = vi.fn(async (key: string) => (key === 'patch:sha-a' ? '@@ a' : '@@ b'))
+    const blobGet = vi.fn(async (key: string) => (key === 'patch:sha256:a' ? '@@ a' : '@@ b'))
 
     const response = await Promise.race([
       app.fetch(
@@ -298,6 +320,9 @@ describe('pull files stale-while-revalidate', () => {
         deletions: 0,
         sha: 'sha-a',
         viewed: false,
+        position: 0,
+        patchState: 'available',
+        patchKey: 'sha256:a',
         patch: '@@ a',
       },
       {
@@ -307,11 +332,14 @@ describe('pull files stale-while-revalidate', () => {
         deletions: 1,
         sha: 'sha-b',
         viewed: false,
+        position: 1,
+        patchState: 'available',
+        patchKey: 'sha256:b',
         patch: '@@ b',
       },
     ])
     expect(blobGet).toHaveBeenCalledTimes(2)
-    expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100')
+    expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100&page=1')
 
     resolveGh(
       responseJson([

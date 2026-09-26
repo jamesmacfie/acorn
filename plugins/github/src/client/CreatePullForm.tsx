@@ -8,6 +8,7 @@ import { Alert, Button, Checkbox, EmptyState, Field, Inline, Input, MentionTexta
 import { createPr } from './mutations'
 import { clearPullDraft, prefillFromCompare, readPullDraft, writePullDraft } from './createPull/model'
 import { githubBrowsePath } from './clientRoutes'
+import { fileCountLabel } from './completeness'
 
 // The navigator column in create mode: base and head pickers, title, body, draft and Create. base and
 // head live in the URL (?base=&head=) so they're shareable and reactive, and the compare query and the
@@ -160,7 +161,7 @@ export default function CreatePullForm() {
           <Show when={!compare.isLoading} fallback={<Text emphasis="muted">Comparing…</Text>}>
             <Text emphasis="muted">
               {aheadBy() > 0
-                ? `${aheadBy()} commit${aheadBy() === 1 ? '' : 's'} · ${compare.data?.files.length ?? 0} files`
+                ? `${aheadBy()} commit${aheadBy() === 1 ? '' : 's'} · ${fileCountLabel(compare.data?.files.length ?? 0, compare.data?.completeness)}`
                 : 'Nothing to compare — branches are identical.'}
             </Text>
           </Show>
