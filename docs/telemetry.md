@@ -527,8 +527,9 @@ queues, or holds can be shown without hand-added logging. One registry owns them
 `packages/client-core/src/kit/lib/surfaceHealth.ts`. A surface registers when it mounts, hands over a
 reader, and disposes the registration when it unmounts. Two surfaces register today:
 
-- The shared diff viewer, as `diff` (`packages/client-core/src/features/diff/diffHealth.ts`). The
-  virtualizers and their measure schedulers count through `kit/diff/virtualization.ts`.
+- The shared diff viewer, as `diff` (`packages/client-core/src/features/diff/diffHealth.ts`). Its
+  layout counts measurement and corrections in `features/diff/diffLayout.ts` and
+  `kit/diff/measureScheduler.ts`.
 - Every `Timeline`, as `timeline` (`packages/client-core/src/kit/components/content/Timeline.tsx`).
   A caller passes `total`, the number of turns in its list, drawn or not. The agent transcript passes
   its projected card count.
@@ -543,13 +544,13 @@ zero, without waiting on garbage collection.
 | `topology` | `files`, `segments`, `fixedRows`, `dynamicBlocks`, `ready`, `lateSourceBlocks` | The document as a whole. Fixed rows are code and structural rows with exact heights. Segments are the diff document's bounded pieces. Dynamic blocks are the source's threads a diff places in some segment, and the projected turns in a timeline. `ready` means the source-owned structure is complete: for a diff, its topology and its threads have both arrived. `lateSourceBlocks` counts source threads that arrived after that. |
 | `mounted` | `segments`, `fixedRows`, `dynamicBlocks`, `blankBlocks`, `uncoveredRanges` | What is in the DOM now: segment items in the virtual range, and the rows drawn in them. A blank block is a visible mounted item with neither a placeholder nor content. An uncovered range is visible space that no mounted item covers, measured from real rects. |
 | `work` | `queuedSegments`, `queuedEnrichment`, `furthestQueueDistance`, `unvisitedSegments`, `scheduledFrames`, `heldPublications`, `prepareMs` | Work still owed. For a diff, queued and loading segments, segments loaded but not yet coloured, and how far, in segments, the furthest queued one is from the ones on screen, never by path. `unvisitedSegments` counts held segments the reader has never had on screen, which is the runway the loader keeps and should stay a few segments. `prepareMs` sums the time spent building segments' rows and applying their colour. |
-| `measurement` | `candidates`, `reads`, `commits`, `maxCommitsInFrame`, `readMs`, `activeObservers`, `observedElements` | Size reads and the geometry commits they caused, counted since mount. A commit is a read that changed a row's held size. Observers count up when created and down when disconnected. |
-| `correction` | `count`, `failed`, `maxPixels`, `maxAnchorDrift` | Scroll writes made to keep a reading place. `failed` counts corrections whose anchor had gone. |
+| `measurement` | `candidates`, `reads`, `commits`, `maxCommitsInFrame`, `readMs`, `commitMs`, `fixedRebuilds`, `activeObservers`, `observedElements` | Size reads and the geometry commits they caused, counted since mount. A candidate is a dirty block a pass looked at, and a commit is one batch of changed heights. `commitMs` is the time spent applying commits. `fixedRebuilds` counts rebuilds of the exact fixed geometry, which only a change to the list of items may cause. Observers count up when created and down when disconnected, and observed elements are what they watch. |
+| `correction` | `count`, `failed`, `substituted`, `maxPixels`, `maxAnchorDrift` | Scroll writes made to keep a reading place. `failed` counts corrections whose anchor had gone and that fell back to the live end. `substituted` counts places whose anchor had gone and a neighbour stood in. `maxAnchorDrift` is the furthest the browser left the view from the place it was put back at. |
 | `resident` | `documents`, `segments`, `rows`, `estimatedBytes` | Parsed content held for the surface: for a diff, the segments the loader holds and their rows. The byte count is a lower bound: the row text and a flat allowance per row, not the tokens built from it. |
 
-A field a surface has no concept of yet stays zero. The timeline has no segments, and neither surface
-measures anchor drift yet. Those are the fields later work on large surfaces reports into
-(`docs/future/git-inspired/`). `heldPublications` is always zero for the diff now: nothing is held
+A field a surface has no concept of stays zero. The timeline has no segments, rebuilds no fixed
+geometry, substitutes no place, and does not measure anchor drift. The diff has no live end, so it
+never fails a correction; it substitutes instead. `heldPublications` is always zero for the diff now: nothing is held
 back during a scroll, because a segment publishes when it arrives and it only arrives if it is near.
 
 The snapshot holds numbers, one boolean, and the two kind labels. The registry copies only the fields
@@ -578,12 +579,30 @@ mark, so a long automated loop leaves one entry. Nothing is put on `window`, and
 exposes it. The large-surface flow reads it this way ([local-development.md](./local-development.md)
 § Large-surface flow).
 
-What the numbers say about today's diff: its topology is complete before any row loads, its queue is
+What the numbers say about the diff: its topology is complete before any row loads, its queue is
 only ever the segments on screen and the two either side, and a pane left open settles with nothing
-queued, so the queue distance stays at a few segments however large the document is. What they do
-not yet show is dynamic geometry: a segment with threads in it corrects its reservation when it
-mounts, and those corrections are still ordinary commits (phase 3 of
-[docs/future/git-inspired/](./future/git-inspired/README.md)).
+queued, so the queue distance stays at a few segments however large the document is.
+
+#### Diff measurement
+
+The diff measures only its dynamic blocks, threads and whatever a line draws under itself, through one
+observer ([diff-rendering.md](./diff-rendering.md) § Row geometry). Read its numbers this way:
+
+- `activeObservers` is 1 while the pane is mounted and 0 after, and `observedElements` is the
+  scroller plus the mounted blocks, so it tracks `mounted.dynamicBlocks` rather than the document.
+- `candidates` and `reads` grow with blocks mounted and resized, not with rows. A read that finds the
+  height the geometry holds commits nothing.
+- `maxCommitsInFrame` stays at 1: a pass that would be a frame's second commit waits for the next.
+- `fixedRebuilds` rises when the list of items changes (the first topology, a collapsed file, an
+  opened gap, the other projection) and never when a block resizes.
+- `correction.count` and `maxPixels` are the scroll writes that kept the reader's row in place as
+  blocks above it changed height. A commit while the reader scrolls never needs one, because blocks
+  above the reader wait until the scroll settles. `substituted` rises when a collapsed file takes the
+  reader's item away. `maxAnchorDrift` should stay under a pixel; more means the browser refused a
+  correction the layout asked for.
+- `mounted.blankBlocks` and `uncoveredRanges` are measured from real rects, so a fixed row height
+  that `diff.css` stopped honouring shows up there first: the layout does not measure code rows, and
+  a row one pixel taller than it counts leaves items overlapping.
 
 ## The terminal client, the helper, and the shell
 

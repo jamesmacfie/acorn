@@ -445,10 +445,10 @@ export function createDiffLayout(props: {
     observeBlock: (element: HTMLElement, block: Accessor<{ id: string; base: number } | null>) => {
       const named = createMemo(block, null, { equals: (a, b) => a?.id === b?.id && a?.base === b?.base })
       createEffect(() => {
-        const current = named()
-        if (!current) return
-        element.dataset.block = current.id
-        scheduler.observe(element, current.id, current.base)
+        const watched = named()
+        if (!watched) return
+        element.dataset.block = watched.id
+        scheduler.observe(element, watched.id, watched.base)
         onCleanup(() => {
           scheduler.unobserve(element)
           delete element.dataset.block

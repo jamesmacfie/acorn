@@ -257,7 +257,8 @@ Where the probes live, for later phases to report into:
   `surfaceHealthSnapshot`, and the `SurfaceHealth` field groups. It sits in `kit/`, not the telemetry
   folder, because the Timeline registers and `kit/` may not import the emitter.
 - The diff's reading is `packages/client-core/src/features/diff/diffHealth.ts`. Its measurement
-  counters are `createDiffMeasureCounters` in `packages/client-core/src/kit/diff/virtualization.ts`.
+  counters were in `packages/client-core/src/kit/diff/virtualization.ts`, deleted in phase 3; the
+  diff's layout counts them now.
 - The Timeline registers itself in `packages/client-core/src/kit/components/content/Timeline.tsx`.
 - The local snapshot is `packages/client-core/src/infra/telemetry/surfaceHealth.ts`, and the
   telemetry samples are installed in `emitter.ts`.
