@@ -533,8 +533,9 @@ reader, and disposes the registration when it unmounts. Two surfaces register to
   layout counts measurement and corrections in `features/diff/diffLayout.ts` and
   `kit/diff/measureScheduler.ts`.
 - Every `Timeline`, as `timeline` (`packages/client-core/src/kit/components/content/Timeline.tsx`).
-  A caller passes `total`, the number of turns in its list, drawn or not. The agent transcript passes
-  its projected card count.
+  A caller passes `total`, the number of turns in its list, drawn or not, and `hidden`, the older turns
+  its window is not drawing. The agent transcript passes its projected card count and its window's
+  start.
 
 The reader runs only when someone asks for a snapshot. An open surface pays nothing between
 requests. Disposal takes one final reading after the surface's own cleanups have run and keeps it as
@@ -544,14 +545,15 @@ zero, without waiting on garbage collection.
 | Group | Fields | Meaning |
 | --- | --- | --- |
 | `topology` | `files`, `segments`, `fixedRows`, `dynamicBlocks`, `ready`, `lateSourceBlocks` | The document as a whole. Fixed rows are code and structural rows with exact heights. Segments are the diff document's bounded pieces. Dynamic blocks are the source's threads a diff places in some segment, and the projected turns in a timeline. `ready` means the source-owned structure is complete: for a diff, its topology and its threads have both arrived. `lateSourceBlocks` counts source threads that arrived after that. |
-| `mounted` | `segments`, `fixedRows`, `dynamicBlocks`, `blankBlocks`, `uncoveredRanges` | What is in the DOM now: segment items in the virtual range, and the rows drawn in them. A blank block is a visible mounted item with neither a placeholder nor content. An uncovered range is visible space that no mounted item covers, measured from real rects. |
+| `mounted` | `segments`, `fixedRows`, `dynamicBlocks`, `blankBlocks`, `uncoveredRanges`, `bodies` | What is in the DOM now: segment items in the virtual range, and the rows drawn in them. A blank block is a visible mounted item with neither a placeholder nor content. An uncovered range is visible space that no mounted item covers, measured from real rects. `bodies` is deferred content a timeline has built: disclosures that have been opened, and turn bodies drawn once their turn came near the viewport. |
 | `work` | `queuedSegments`, `queuedEnrichment`, `furthestQueueDistance`, `unvisitedSegments`, `scheduledFrames`, `heldPublications`, `prepareMs` | Work still owed. For a diff, queued and loading segments, segments loaded but not yet coloured, and how far, in segments, the furthest queued one is from the ones on screen, never by path. `unvisitedSegments` counts held segments the reader has never had on screen, which is the runway the loader keeps and should stay a few segments. `prepareMs` sums the time spent building segments' rows and applying their colour. |
 | `measurement` | `candidates`, `reads`, `commits`, `maxCommitsInFrame`, `readMs`, `commitMs`, `fixedRebuilds`, `activeObservers`, `observedElements` | Size reads and the geometry commits they caused, counted since mount. A candidate is a dirty block a pass looked at, and a commit is one batch of changed heights. `commitMs` is the time spent applying commits. `fixedRebuilds` counts rebuilds of the exact fixed geometry, which only a change to the list of items may cause. Observers count up when created and down when disconnected, and observed elements are what they watch. |
 | `correction` | `count`, `failed`, `substituted`, `maxPixels`, `maxAnchorDrift` | Scroll writes made to keep a reading place. `failed` counts corrections whose anchor had gone and that fell back to the live end. `substituted` counts places whose anchor had gone and a neighbour stood in. `maxAnchorDrift` is the furthest the browser left the view from the place it was put back at. |
 | `resident` | `documents`, `segments`, `rows`, `estimatedBytes`, `plainBytes`, `enrichmentBytes`, `hits`, `misses`, `inserts`, `evictions`, `oversize`, `rowCeiling`, `byteCeiling` | Parsed content held in memory. For a diff, this is the node's segment cache, shared by every diff on the node: the distinct patches, segments, and rows it holds, its estimated bytes split into plain rows and colour, and the two ceilings they are held under. `inserts`, `evictions`, and `oversize` count since the cache was made. `hits` and `misses` are this pane's own since mount: segments that came into its range already held, or that it had to ask for. The bytes are the cache's budget estimate, not the heap. |
+| `window` | `hiddenEarlier`, `expansions`, `trims`, `pinned` | A timeline drawn through a fixed window (`kit/lib/timelineWindow.ts`). `hiddenEarlier` is the older turns not drawn now. `expansions` counts the window growing since mount, whether from **Show earlier**, a reveal, or a caller drawing everything. `trims` counts the window handing its oldest turns back while the reader followed the live end. `pinned` is how many turns the last trim kept past its page because they held the reader's selection or focus. |
 
-A field a surface has no concept of stays zero. The timeline has no segments, rebuilds no fixed
-geometry, substitutes no place, and does not measure anchor drift. The diff has no live end, so it
+A field a surface has no concept of stays zero. The timeline has no segments and rebuilds no fixed
+geometry. The diff has no window and builds no deferred bodies. The diff has no live end, so it
 never fails a correction; it substitutes instead. `heldPublications` is always zero for the diff now: nothing is held
 back during a scroll, because a segment publishes when it arrives and it only arrives if it is near.
 
@@ -584,6 +586,24 @@ exposes it. The large-surface flow reads it this way ([local-development.md](./l
 What the numbers say about the diff: its topology is complete before any row loads, its queue is
 only ever the segments on screen and the two either side, and a pane left open settles with nothing
 queued, so the queue distance stays at a few segments however large the document is.
+
+#### Timeline
+
+Read a timeline's numbers this way:
+
+- `topology.dynamicBlocks` is the caller's logical turns and `mounted.dynamicBlocks` the turns in the
+  DOM. With a window, the two differ by `window.hiddenEarlier`. The large-surface flow counts a
+  timeline as mounted when every turn is drawn or hidden, and asserts the 400-turn ceiling on open.
+- A followed transcript opens on 200 turns and trims back to 200 once it draws 400 while following, so
+  `mounted.dynamicBlocks` stays under 400 unless the reader pressed **Show earlier**, went to the top,
+  or held a selection or focus. `window.pinned` says how many turns a hold kept.
+- `mounted.bodies` grows as disclosures open and as deferred turn bodies come near, never with the
+  length of the list.
+- `correction.substituted` counts reading places whose turn left the list, so a neighbour stood in. A
+  turn the window hides is revealed instead and never counts here. `maxAnchorDrift` is the distance a
+  correction was left from its place when the list refused to move any further.
+- `measurement.activeObservers` is 2 on a followed timeline, plus 1 while any turn has a deferred body,
+  and 0 after teardown.
 
 #### Diff measurement
 

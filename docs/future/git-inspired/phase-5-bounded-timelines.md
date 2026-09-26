@@ -1,6 +1,7 @@
 # Phase 5: bounded Agent and pull-request timelines
 
-Status: not started, 2026-09-26. Waits on phase 0. PR snippet work also waits on phase 2.
+Status: shipped 2026-09-26, tested in jsdom with modelled geometry. Stage B shipped for the Agent
+transcript. The real-window run and the WebKit containment check are owed.
 
 ## Goal
 
@@ -288,3 +289,96 @@ contract changes, `docs/ui-design.md` or the plugin UI authoring reference that 
 - Check phase 2's actual segment lookup API before designing PR snippet loading.
 - Measure Stage A on the canonical fixture before implementing Stage B; if it passes, record the
   evidence and leave the simpler full logical DOM in place.
+
+## What shipped differently
+
+The owning docs describe what runs: [client-surfaces.md](../../managed-agents/client-surfaces.md)
+§ Client surfaces, [github-integration.md](../../github-integration.md) § Conversation,
+[telemetry.md](../../telemetry.md) § Rendered-surface health, [ui-design.md](../../ui-design.md)
+§ Grouping, [package-shape.md](../../plugins/package-shape.md) § The plugin API, and
+[testing.md](../../testing.md) § Test layers and smoke item 85. Where this file and those disagree,
+they win.
+
+Where the pieces live:
+
+- The window is `packages/client-core/src/kit/lib/timelineWindow.ts`: `createTimelineWindow`,
+  `windowStart`, `revealStart`, and `TIMELINE_PAGE` (200). It is on `@acorn/plugin-api/ui` and the
+  terminal's `ui.ts`.
+- The Timeline's side is in `kit/components/content/Timeline.tsx`: the `hidden`, `onShowEarlier`,
+  `reveal`, and `onTrim` props, `Timeline.Turn`'s `position`, `setSize`, and `near` function child,
+  and the new health counts.
+- Snippets are `packages/client-core/src/features/diff/diffSnippets.ts`, `createDiffSnippets` on
+  `@acorn/plugin-api/ui/diff`.
+
+**Why Stage B shipped.** Measured with the real `AgentTranscript` and `AgentEventCard` in jsdom, over
+the fixture's sessions, before the window:
+
+| Profile | Events | Cards built | Elements | Build time |
+| --- | ---: | ---: | ---: | ---: |
+| `small` | 280 | 135 | 1,196 | about 110 ms |
+| `scale` | 1,384 | 668 | 5,905 | about 180 ms |
+| `canonical` | 7,012 | 3,387 | 29,918 | about 840 ms |
+
+Mounted cards and elements grew linearly with the session. At `canonical`, 3,387 mounted turns are
+eight times the 400-turn ceiling that phase 0 asserts at every profile, and Stage A's changes do not
+reduce card construction. That count rule, not a timing, is what decided it. With the window,
+`canonical` builds 200 cards and 1,769 elements in about 60 ms, and `scale` about the same. jsdom has
+no layout or paint, so these are construction numbers only.
+
+Deviations from the plan:
+
+1. **No CSS containment.** `content-visibility: auto` brings paint containment, which clips anything
+   drawn outside the turn's box. An interactive card's focus ring (`outline-offset: 2px`) and a
+   disclosure summary's ring both sit outside it at the turn's edge. The hidden automation window
+   cannot run WebKit, so none of the acceptance checks could run. Stage B bounds what is laid out
+   anyway. Reopen with a real-WebKit run and a ring drawn inside the card.
+2. **The PR conversation has no window.** Its turns cost a byline until they come near, which is
+   Stage A's lazy body, and it scrolls in the navigator's region. There is no PR conversation fixture
+   to show it over budget. The capture and restore helper for a region scroller was not built.
+3. **No topology/body split and no body route.** The PR detail is complete and already holds every
+   body. The diff's inline threads and the Linear reference scan read those bodies, so a separate
+   route would fetch them twice. Bodies are built lazily instead: GitHub's HTML is built once a turn
+   comes within a screen of the viewport, through an `IntersectionObserver` the Timeline owns.
+4. **The all-file snippet index was already empty.** Since phase 2 the file summaries carry no patch
+   text, so `buildThreadSnippetIndex` parsed nothing and no thread showed code. Phase 5 restores the
+   snippets from segments. `gitdiff-parser` left the GitHub plugin.
+5. **The snippet is cut within one segment.** A line at a segment's edge gets fewer than two lines of
+   context on that side, where the old index spanned hunks.
+6. **No hidden-later count and no tail sliding.** The window is held by its oldest drawn key, so new
+   turns always join it. It shrinks only by a trim, which the Timeline makes while following the live
+   end once it draws twice a page. A reader away from the live end is never trimmed, so they see new
+   turns arrive rather than a count at the foot. `window.hiddenEarlier` is the only hidden count.
+7. **"Show all" is "Go to top".** The composer's existing jump draws every card and then goes to the
+   oldest. There is no separate **Show all** button.
+8. **Reveal is by page.** A hidden reading place or a named request reveals the whole pages between
+   the window and that card, so **Show earlier** keeps its page boundaries. The request reveal runs in
+   the transcript before the card mounts. The Timeline's `reveal` hook handles a remembered place.
+9. **A reset per list.** Switching session or subagent resets the window to its newest page. A
+   chats-only toggle does not reset it; when the oldest drawn card is filtered out, the window keeps
+   its size in the new list.
+10. **The substitute index is still the drawn index.** A reading place stores its turn's index among
+    the drawn turns. When the turn has gone for good, the neighbour is chosen from what is drawn, which
+    can differ from the logical neighbour after the window changed.
+11. **Pins are only selection and focus.** No composer lives inside the transcript list, and the
+    reading anchor is only at risk away from the live end, where nothing trims. `window.pinned` is a
+    gauge of the turns the last trim kept, not a cumulative count.
+12. **Health.** New fields are `mounted.bodies` and a `window` group (`hiddenEarlier`, `expansions`,
+    `trims`, `pinned`). The Timeline now reports `correction.substituted` and `maxAnchorDrift`, which
+    is the residual when a correction is refused or runs out of frames. No new telemetry histograms.
+13. **Remote tool cards.** A loaded plugin's remote tree builds its whole tree for every drawn card,
+    closed body included. The host cannot defer inside it; the window bounds how many.
+14. **The flow.** A timeline counts as mounted when every turn is drawn or hidden. The flow asserts
+    the 400-turn ceiling on open and after an optional **Show earlier**.
+15. **Plugin API.** `createTimelineWindow` on `/ui` and `createDiffSnippets` on `/ui/diff` are
+    additions folded into major 2. The Timeline props are not in the surface snapshot.
+
+Not built or not verified:
+
+- The real-window run: open, **Show earlier**, streaming past 400 cards with a selection held, **Go to
+  top**, an old request's notice, VoiceOver positions, and teardown, on WebKit. Smoke item 85 in
+  [testing.md](../../testing.md) is owed. The window in jsdom is the only evidence for the page size.
+- `content-visibility` in WebKit, including find, selection, focus traversal, and the accessibility
+  tree.
+- A live stream in the automation window, which has no agent to stream.
+- The PR conversation on a real large pull request.
+

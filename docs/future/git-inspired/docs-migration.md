@@ -1,9 +1,10 @@
 # Docs migration: owners after each phase
 
-Status: the rows for phases 0 to 3 are done (2026-09-26). No owning document has changed for phases 4
-and 5. Phase 3's `docs/state-ownership.md` row landed in § Which mechanism holds a given fact, beside
-the Timeline's reading place, and its `docs/telemetry.md` row in § Rendered-surface health, under
-Diff measurement. Phase 2's `docs/plugins.md` row landed in `docs/plugins/package-shape.md` § The
+Status: the rows for phases 0 to 5 are done (2026-09-26). Phase 5's `docs/github-integration.md` row
+landed in a new § Conversation under § Surfaces. Its `docs/ui-design.md` row landed in § Grouping.
+`docs/api-reference.md` did not change, because phase 5 added no route. Phase 3's
+`docs/state-ownership.md` row landed in § Which mechanism holds a given fact, beside the Timeline's
+reading place, and its `docs/telemetry.md` row in § Rendered-surface health, under Diff measurement. Phase 2's `docs/plugins.md` row landed in `docs/plugins/package-shape.md` § The
 plugin API, which `docs/plugins.md` links to, and the terminal's diff pane in `docs/tui/interaction.md`.
 
 Part of [docs/future/git-inspired/](./README.md). A phase is incomplete until the document that owns
