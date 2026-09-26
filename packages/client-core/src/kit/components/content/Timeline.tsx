@@ -1,4 +1,4 @@
-import { batch, createContext, createEffect, createSignal, on, onCleanup, onMount, Show, untrack, useContext, type Accessor, type JSX } from 'solid-js'
+import { batch, createContext, createEffect, createSignal, on, onCleanup, onMount, Show, untrack, useContext, type Accessor, type Context, type JSX } from 'solid-js'
 import { createDomCollection } from '../../keys/collection'
 import { LIVE, placeAfterScroll, resolveAnchor, samePlace, type ReadingPlace } from '../../lib/readingPlace'
 import { createScrollAuthor } from '../../lib/scrollAuthor'
@@ -49,7 +49,11 @@ const NEAR_MARGIN = '100% 0px'
 
 /** What a timeline hands its turns: watch this element and say once when it comes near the viewport.
  *  Returns the stop. Absent outside a timeline, where a deferred body is simply built. */
-const NearTurns = createContext<(element: Element, seen: () => void) => () => void>()
+type WatchNear = (element: Element, seen: () => void) => () => void
+/** Made on first use rather than at module scope, where a kit component may do nothing: the renderer
+ *  build treats these files as free of side effects (tools/arch/boundaries.test.ts says why). */
+let nearTurns: Context<WatchNear | undefined> | undefined
+const NearTurns = () => (nearTurns ??= createContext<WatchNear>())
 
 /** The element that scrolls this one, or null for the page. Read once, when the first deferred turn
  *  asks, because a timeline without `follow` scrolls in whatever region holds it. */
@@ -213,9 +217,10 @@ export function Timeline(props: {
     waiting.clear()
   })
 
+  const Near = NearTurns()
   list = (
     <ol class="ui-timeline" aria-label={props.ariaLabel} {...collection.containerProps}>
-      <NearTurns.Provider value={watchNear}>{props.children}</NearTurns.Provider>
+      <Near.Provider value={watchNear}>{props.children}</Near.Provider>
     </ol>
   ) as HTMLOListElement
 
@@ -607,7 +612,7 @@ Timeline.Turn = (props: {
   setSize?: number
   children: JSX.Element | ((near: Accessor<boolean>) => JSX.Element)
 }) => {
-  const watch = useContext(NearTurns)
+  const watch = useContext(NearTurns())
   const [near, setNear] = createSignal(false)
   let item!: HTMLLIElement
   let stop: (() => void) | undefined
