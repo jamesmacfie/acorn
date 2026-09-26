@@ -300,7 +300,8 @@ it fails for any reason a selection can break, not only for the one it was writt
   two share every property that decides where a glyph lands, and above 20,000 characters the mirror is
   dropped and the field paints itself. A command or skill is coloured only when the session advertises
   that name, so `9/11` stays prose and a misspelled `/reviw` stays visibly plain. File mentions come
-  from the same walk that builds the turn's file parts, so what is coloured is what is sent.
+  from the same worktree file list that builds the turn's file parts, so what is coloured is what is
+  sent. An `@` token with no exact file match stays plain message text and does not block sending.
 - Typing any of the three sigils opens the same dropdown: `@` lists worktree files, `/` the commands
   and `$` the skills the session advertises. Rows are `PickerRow`, the row the context picker draws,
   so a name sits over its description rather than sharing a line with it. The list scrolls once it

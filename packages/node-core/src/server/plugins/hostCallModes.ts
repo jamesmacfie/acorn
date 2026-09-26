@@ -38,7 +38,7 @@ const modes = {
     proc: { brokerEnv: 'sync', runProcess: 'async', runProcessOrThrow: 'async' },
     secrets: { use: 'async', useOptional: 'async', seal: 'async', reveal: 'async' },
     tasks: {
-      load: 'async', root: 'async', resolveCwd: 'async', runConfig: 'async', active: 'async',
+      load: 'async', root: 'async', requireRoot: 'async', resolveCwd: 'async', runConfig: 'async', active: 'async',
       workspaceId: 'async', workspaceIdOrNull: 'async', idsForWorkspace: 'async', links: 'async',
       pulls: 'async', attachPull: 'async', adoptPullNumbers: 'async', createChild: 'async', cancel: 'async',
     },
