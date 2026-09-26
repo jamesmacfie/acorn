@@ -1,4 +1,4 @@
-import { createContext, createEffect, createSignal, on, onCleanup, onMount, Show, untrack, useContext, type Accessor, type JSX } from 'solid-js'
+import { batch, createContext, createEffect, createSignal, on, onCleanup, onMount, Show, untrack, useContext, type Accessor, type JSX } from 'solid-js'
 import { createDomCollection } from '../../keys/collection'
 import { LIVE, placeAfterScroll, resolveAnchor, samePlace, type ReadingPlace } from '../../lib/readingPlace'
 import { createScrollAuthor } from '../../lib/scrollAuthor'
@@ -163,7 +163,9 @@ export function Timeline(props: {
   let mounted = false
   const observe = (element: Element) => {
     if (!near) {
-      near = new IntersectionObserver((entries) => {
+      // One batch per callback, so a screenful of turns arriving together is one update and whatever
+      // they ask for is asked for once.
+      near = new IntersectionObserver((entries) => batch(() => {
         for (const entry of entries) {
           const run = entry.isIntersecting ? waiting.get(entry.target) : undefined
           if (!run) continue
@@ -172,7 +174,7 @@ export function Timeline(props: {
           counts.observed -= 1
           run()
         }
-      }, { root: props.follow ? scroller ?? null : scrollParent(list), rootMargin: NEAR_MARGIN })
+      }), { root: props.follow ? scroller ?? null : scrollParent(list), rootMargin: NEAR_MARGIN })
       counts.observers += 1
     }
     near.observe(element)

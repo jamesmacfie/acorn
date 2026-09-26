@@ -51,4 +51,8 @@ export type {
 // Session-only scroll and collapse memory, keyed by scope. `diffScopeKey` is here so a caller keying
 // its own session state by the same scope stays in step rather than writing a second spelling.
 export { diffScopeKey } from '@acorn/client-core/features/diff'
+// A few lines around one anchor, read from the segment that holds it through the viewer's own loader
+// and node cache: the quoted code on a review thread's card, without parsing any patch.
+export { createDiffSnippets } from '@acorn/client-core/features/diff'
+export type { DiffSnippet, DiffSnippetAnchor, DiffSnippetLine, DiffSnippets } from '@acorn/client-core/features/diff'
 export type { DiffCollapsedFiles, DiffScrollState, DiffViewScope } from '@acorn/client-core/features/diff'

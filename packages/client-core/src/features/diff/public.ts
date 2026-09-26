@@ -1,3 +1,5 @@
 export type { CommentSide, DiffLineAnchor, DiffSource } from './source.ts'
 export { diffScopeKey, diffScroll, rememberDiffScroll } from './viewState.ts'
 export type { DiffCollapsedFiles, DiffScrollState, DiffViewScope } from './viewState.ts'
+export { createDiffSnippets } from './diffSnippets.ts'
+export type { DiffSnippet, DiffSnippetAnchor, DiffSnippetLine, DiffSnippets } from './diffSnippets.ts'

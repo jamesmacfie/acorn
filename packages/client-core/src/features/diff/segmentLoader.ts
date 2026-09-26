@@ -36,8 +36,10 @@ const BATCH_SEGMENTS = Math.min(8, MAX_SEGMENTS_PER_REQUEST)
 export function createSegmentLoader(options: {
   cache: SegmentCache
   load: (requests: DiffSegmentRequest[], signal: AbortSignal) => Promise<DiffSegmentPayload[]>
-  /** Colour one segment's rows. Answers new rows, never rejects. */
-  enrich: (rows: readonly DiffRow[]) => Promise<DiffRow[]>
+  /** Colour one segment's rows. Answers new rows, never rejects. Left out, nothing is coloured: a
+   *  caller drawing plain text must not record plain rows as a segment's colour, or the diff viewer
+   *  would find it already coloured. */
+  enrich?: (rows: readonly DiffRow[]) => Promise<DiffRow[]>
   /** Time spent turning payloads into rows and applying colour, for the health reading. */
   prepared?: (ms: number) => void
   /** The first time this pane has plain rows on screen, and whether the cache already had them. */
@@ -153,7 +155,8 @@ export function createSegmentLoader(options: {
 
   // One segment at a time, nearest first, and only while it is still wanted.
   const enrichNext = () => {
-    if (disposed || enriching) return
+    const { enrich } = options
+    if (disposed || enriching || !enrich) return
     const next = wanted.find((ref) => {
       const entry = cache.peek(keyOf(ref))
       return entry && !entry.enriched && !ref.descriptor.oversize
@@ -164,7 +167,7 @@ export function createSegmentLoader(options: {
     enriching = key
     pin()
     const at = generation
-    void options.enrich(from).then((rows) => {
+    void enrich(from).then((rows) => {
       if (disposed || at !== generation) return
       enriching = null
       const started = performance.now()
