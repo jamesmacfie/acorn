@@ -1,6 +1,7 @@
 # Phase 0: health contract, fixtures, and unattended reproduction
 
-Status: not started, 2026-09-26. Waits on nothing.
+Status: partly shipped, 2026-09-26. The probes, fixture, flow, and tests are in; the visible real-window
+run and the `scale` and `canonical` reports are owed. See [What shipped differently](#what-shipped-differently).
 
 ## Goal
 
@@ -242,3 +243,85 @@ Per [docs-migration.md](./docs-migration.md): `docs/telemetry.md`, `docs/testing
   stress case.
 - `plugins/agents/src/client/sessions/managedStore.ts` and its testkit remain the owner of snapshot
   relationships; do not seed an imitation in core.
+
+## What shipped differently
+
+Shipped 2026-09-26. The owning docs now describe the running system: [telemetry.md](../../telemetry.md)
+§ Rendered-surface health, [testing.md](../../testing.md) § Large-surface fixture, and
+[local-development.md](../../local-development.md) § Large-surface flow. Where this file and those
+disagree, they win.
+
+Where the probes live, for later phases to report into:
+
+- The registry is `packages/client-core/src/kit/lib/surfaceHealth.ts`, with `registerSurfaceHealth`,
+  `surfaceHealthSnapshot`, and the `SurfaceHealth` field groups. It sits in `kit/`, not the telemetry
+  folder, because the Timeline registers and `kit/` may not import the emitter.
+- The diff's reading is `packages/client-core/src/features/diff/diffHealth.ts`. Its measurement
+  counters are `createDiffMeasureCounters` in `packages/client-core/src/kit/diff/virtualization.ts`.
+- The Timeline registers itself in `packages/client-core/src/kit/components/content/Timeline.tsx`.
+- The local snapshot is `packages/client-core/src/infra/telemetry/surfaceHealth.ts`, and the
+  telemetry samples are installed in `emitter.ts`.
+
+Deviations from the plan:
+
+1. **The snapshot is answered on request.** A reader dispatches `acorn:surface-health` and reads the
+   one `acorn:surface.health` mark. The desktop always answers, rather than only under `acorn.perf`,
+   because the automation window shares WebKit storage with a developer's own app. The latest
+   snapshot is kept, not a ring.
+2. **The shape grew.** It adds `work.scheduledFrames`, `work.heldPublications`, `work.prepareMs`,
+   `measurement.readMs`, `measurement.observedElements`, and `correction.failed`, and the snapshot
+   keeps a `retired` reading per kind for teardown checks.
+3. **Today's diff fills what it can.** The queue unit is files, so `segments` and `queuedEnrichment`
+   stay zero. `topology.dynamicBlocks` counts threads only; line notes count when mounted, because
+   counting them across the document would ask the source about every row. TanStack owns the diff's
+   size observers, so the observer count follows each virtualizer attaching to and detaching from its
+   scroller, which is when TanStack creates and disconnects them. Corrections are the commits to rows
+   above the viewport, which TanStack answers by moving the scroll position. Neither surface measures
+   `maxAnchorDrift` yet; that is phase 3's for the diff and phase 5's for the timeline.
+4. **`lateSourceBlocks` counts every new source thread after ready.** That includes a comment the
+   reader posts, because the renderer cannot tell it from a thread the source had all along.
+5. **The Timeline takes a `total` prop.** The agent transcript passes its projected card count, and
+   the Timeline counts mounted turns from the DOM. The terminal host's Timeline accepts and ignores
+   it. No plugin API name changed. The Timeline measures no blank or uncovered space. The probe found
+   one real teardown leak: the frame that clears the Timeline's own-write guard was never cancelled.
+   It now is.
+6. **The real window shows the diff through the Changes pane, over a generated Git repository.**
+   The plan had a fixture `DiffSource` registered only for automation. The renderer bundle is the
+   same for automation and release, so no registration could be kept out of production. The fixture
+   port implementation, `largeDiffSource`, drives the real `DiffPane` in jsdom tests instead. So in
+   the real window the dynamic blocks are review notes, and GitHub-style threads (resolved, replies,
+   images, `<details>`) are exercised only in tests. Git shows a renamed file as a deletion and a new
+   file, so the window's row count differs a little from the generator's: 8,934 against 9,048 for
+   `small`.
+7. **The diff generator lives in client-core.** It is `packages/client-core/src/testkit/largeDiff.ts`,
+   exported as `@acorn/client-core/testkit/large-diff`, because `DiffFile` and `DiffSource` are
+   client-core types and the desktop seeder imports it directly.
+8. **The agent session is history.** It is written through `AgentStore` the way an imported
+   transcript is, and it ends stopped. With no live agent in the automation window, the flow cannot
+   let a streamed update arrive, so that step is not in it. The canonical session projects to about
+   3,400 cards, above the 1,200 floor.
+9. **The seeder writes the core task row itself,** as the node-core testkit allows for fixtures, and
+   `tools/arch/boundaries.test.ts` lets `apps/desktop/scripts/agent/seed.ts` import testkits.
+10. **The dynamic-content stage fits Changes.** It opens the line composer, types, and deletes a
+    note. It does not resolve a thread or complete a delayed image, because Changes has neither. The
+    file navigator is the Changes list. Controls that exist only on mounted rows are optional steps.
+11. **Invariants are recorded, not thrown.** The runner finishes the flow, writes the report, then
+    exits non-zero if any failed. The additive band is a fixed mounted ceiling of 400 rows and blocks,
+    asserted at every profile, rather than a comparison between two reports.
+12. **No real-window smoke joined the desktop test lane.** It needs a visible window on a graphical
+    host, which CI does not have. The flow runner is tested against a fake window instead.
+
+The real-window run happened only in part. The `small` fixture session launched from this worktree,
+but the window sat behind the developer's own Acorn window, so WebKit reported it hidden and ran no
+animation frames. The diff rows never mounted, and the window was not raised over someone's work.
+What the hidden window did confirm in real WebKit:
+
+- The request-and-mark snapshot path works.
+- The transcript mounted all 135 projected cards, then retired with no observers or frames left.
+- The diff registered and reached ready at 22 files and 8,934 rows. Mid-hydration, its queue reached
+  21 files from anything visible, which is the first known unhealthy behavior: an open diff works
+  through the whole document.
+- Leaving the task retired the diff with no observers, frames, or queued work left.
+
+The runner now refuses a hidden window and says why. Still owed on a visible host: the full flow,
+the commits-per-frame and coverage readings, and the `scale` and `canonical` JSON reports.

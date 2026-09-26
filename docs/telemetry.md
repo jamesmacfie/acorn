@@ -497,6 +497,7 @@ bridge both use it to group `/v1/p/<plugin>` requests by plugin without recordin
 | Every plugin channel frame | `host/plugins/pluginChannel.ts` | histogram `plugin.frame` |
 | Every contribution that throws while rendering | `kit/components/content/ContributionBoundary.tsx` | a handled error with its stack, contribution id, and owner |
 | Every place a followed timeline puts the reader | `kit/components/content/Timeline.tsx` | event `ui.scroll.place` with the cause, the turn the reader is anchored to, the offsets it moved between, the list and viewport heights, and whether it was following. `opened` is a list mounting or swapping, which is the only trace a remount leaves; `unasked` is a move neither the reader nor the timeline made; `took` is the reader's place changing without the reader, which happens only when the turn they were on has left the list |
+| Every large diff or timeline becoming ready or going away | `kit/lib/surfaceHealth.ts`, installed by `infra/telemetry/emitter.ts` | histograms `ui.surface.*`, labelled only by surface kind and checkpoint. See [Rendered-surface health](#rendered-surface-health) |
 | Every delivered notice | `features/notifications/deliver.ts` | event `notice.delivered` with the kind and whether it landed read |
 | The boot account | `apps/desktop/src/client/boot.ts` | span `renderer.boot` from navigation to `nodeReady`, with a `renderer.boot.mark` child per mark. Built after the fact, once the switch is on and the node is ready, because the switch is not known while the marks are taken |
 | Uncaught error, unhandled rejection | `apps/desktop/src/client/index.tsx` | a fatal, unhandled error with its stack |
@@ -518,6 +519,67 @@ Two writes inside one change collapse into one span. Opening a task writes both 
 spans would report one click as a navigation to nothing followed by a navigation to the task. A
 region that is still fetching at that second frame is not covered by this; `pane.region` measures
 that to content.
+
+### Rendered-surface health
+
+A large diff or timeline keeps numbers about itself, so a regression in how much it mounts, measures,
+queues, or holds can be shown without hand-added logging. One registry owns them:
+`packages/client-core/src/kit/lib/surfaceHealth.ts`. A surface registers when it mounts, hands over a
+reader, and disposes the registration when it unmounts. Two surfaces register today:
+
+- The shared diff viewer, as `diff` (`packages/client-core/src/features/diff/diffHealth.ts`). The
+  virtualizers and their measure schedulers count through `kit/diff/virtualization.ts`.
+- Every `Timeline`, as `timeline` (`packages/client-core/src/kit/components/content/Timeline.tsx`).
+  A caller passes `total`, the number of turns in its list, drawn or not. The agent transcript passes
+  its projected card count.
+
+The reader runs only when someone asks for a snapshot. An open surface pays nothing between
+requests. Disposal takes one final reading after the surface's own cleanups have run and keeps it as
+that kind's `retired` entry. That reading shows whether observers, frames, and queued work reached
+zero, without waiting on garbage collection.
+
+| Group | Fields | Meaning |
+| --- | --- | --- |
+| `topology` | `files`, `fixedRows`, `dynamicBlocks`, `ready`, `lateSourceBlocks` | The document as a whole. Fixed rows are code and structural rows with exact heights. Dynamic blocks are the source's threads in a diff and the projected turns in a timeline. `ready` means the source-owned structure is complete. `lateSourceBlocks` counts source threads that arrived after that. |
+| `mounted` | `segments`, `fixedRows`, `dynamicBlocks`, `blankBlocks`, `uncoveredRanges` | What is in the DOM now. A blank block is a visible mounted row with neither a skeleton nor content. An uncovered range is visible space that no mounted row covers, measured from real rects. |
+| `work` | `queuedSegments`, `queuedEnrichment`, `furthestQueueDistance`, `scheduledFrames`, `heldPublications`, `prepareMs` | Work still owed. Distance is counted in files from the visible ones, never by path. `prepareMs` sums parse and row-model time, the work that grows with the whole diff. |
+| `measurement` | `candidates`, `reads`, `commits`, `maxCommitsInFrame`, `readMs`, `activeObservers`, `observedElements` | Size reads and the geometry commits they caused, counted since mount. A commit is a read that changed a row's held size. Observers count up when created and down when disconnected. |
+| `correction` | `count`, `failed`, `maxPixels`, `maxAnchorDrift` | Scroll writes made to keep a reading place. `failed` counts corrections whose anchor had gone. |
+| `resident` | `documents`, `segments`, `rows`, `estimatedBytes` | Parsed content held for the surface. The byte count is a lower bound: the patch text, not the rows built from it. |
+
+A field a surface has no concept of yet stays zero. The diff has no segments and no separate
+enrichment queue, and the timeline measures no anchor drift. Those are the fields later work on
+large surfaces reports into (`docs/future/git-inspired/`).
+
+The snapshot holds numbers, one boolean, and the two kind labels. The registry copies only the fields
+the template names and only when they are finite numbers, so a reader that returned a path, a line
+of code, a comment, or an ID would lose it before it left. `surfaceHealth.test.ts` and the diff
+probe test feed canary strings through both paths and check that none comes out.
+
+Telemetry gets a fixed handful of these numbers as histograms at two checkpoints: a diff's `ready`,
+and any surface's `teardown`. The seams are `ui.surface.topology.fixed_rows`,
+`ui.surface.mounted.fixed_rows`, `ui.surface.mounted.dynamic_blocks`,
+`ui.surface.measurement.max_commits_in_frame`, `ui.surface.measurement.active_observers`,
+`ui.surface.correction.max_pixels`, `ui.surface.work.prepare_ms`, and
+`ui.surface.resident.estimated_bytes`. Their only labels are `surface` and `checkpoint`.
+
+The whole snapshot is a local read on the performance timeline. Dispatch an `acorn:surface-health`
+event on `window`, then read the `detail` of the one `acorn:surface.health` mark:
+
+```js
+dispatchEvent(new Event('acorn:surface-health'))
+performance.getEntriesByName('acorn:surface.health').at(-1).detail
+```
+
+The desktop answers that request from boot, whatever the `acorn.perf` switch says
+(`packages/client-core/src/infra/telemetry/surfaceHealth.ts`). Each answer replaces the previous
+mark, so a long automated loop leaves one entry. Nothing is put on `window`, and no HTTP route
+exposes it. The large-surface flow reads it this way ([local-development.md](./local-development.md)
+§ Large-surface flow).
+
+What the numbers say about today's diff: its topology is known only after the hydrator has parsed
+every file, the queue distance shows the hydrator working through files the reader is nowhere near,
+and every row measured in a frame is its own geometry commit.
 
 ## The terminal client, the helper, and the shell
 
@@ -581,6 +643,7 @@ Fixed operation/outcome labels keep the number of series bounded.
 | Is history size driving the cost? | `agents.snapshot.merge`, `agents.snapshot.index`, `agents.transcript.project`, `agents.transcript.visible`, with event/item counts. `agents.center.rows`, `agents.center.filter`, and `agents.sidebar.rows` cover roster work. |
 | Are cheap updates repeating too often? | `agents.snapshot.load` and `agents.roster.load` distinguish inflight/cache hits from misses, and a snapshot read that resumed from the events the store holds reports `resume`. Session updates, appended events, cache actions, `rows.reconcile`, `rows.item.mount`, and `pane.region.mount` count churn. `ui.interaction.work` reports up to five most frequently observed operations per interaction with trace IDs and call counts. |
 | Is rendering the content expensive? | `agents.transcript.cards` emits one initial `ui.render.batch` span with visible-card count, summed factory time, and wall time to the turn checkpoint. `markdown.parse`, `markdown.render`, `highlight.html.render`, and their character counts/cache outcomes cover shared markdown and code fences. `diff.parse`, `diff.rows`, file/row counts, `diff.hydrator.reset` (a whole diff read again), and `diff.hydrator.refresh` (how many files one content change read again) cover diff preparation. `editor.language.load`, `editor.state.create`, `editor.view.create`, and document character counts cover the shared editor; `editor.state.skipped` counts responses discarded after the pane unmounts. |
+| Does a large diff or timeline do work in proportion to its size? | `ui.surface.*` at a diff's `ready` and every surface's `teardown`, and the exact local snapshot in [Rendered-surface health](#rendered-surface-health): mounted versus total rows, queue distance, commits per frame, observers left at teardown. |
 | Is a worker falling behind or falling back? | `highlight.pending`, `highlight.queue.wait`, `highlight.worker.execute`, `highlight.timeout`, `highlight.result`, and `highlight.fallback`; `highlight.main_thread` measures the fallback. Worker execution includes grammar-loading waits; queue time is measured from posting to worker receipt. |
 | Is the client cache responsible? | `cache.read`, `cache.deserialize`, `cache.serialize`, `cache.write`, cache character/entry counts, and `cache.restore_to_hydrated` on the desktop. `cache.updates` labels only the fixed query-cache action, never query keys. |
 | Is a plugin flooding the UI? | Existing `tree.apply` plus `tree.queue.wait`, `tree.batch.operations`, `tree.batch.merged`, `tree.nodes`, and `tree.batch.refused`, attributed to the owning plugin. |

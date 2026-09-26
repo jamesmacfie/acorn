@@ -2,6 +2,7 @@ import { createEffect, on, onCleanup, onMount, type JSX } from 'solid-js'
 import { createDomCollection } from '../../keys/collection'
 import { LIVE, placeAfterScroll, resolveAnchor, samePlace, type ReadingPlace } from '../../lib/readingPlace'
 import { reportScrollPlace } from '../../lib/scrollPlace'
+import { registerSurfaceHealth } from '../../lib/surfaceHealth'
 
 /* Timeline: a sequence of turns. The agents transcript and github's PR conversation are the same
    shape, and both drew it themselves.
@@ -77,6 +78,10 @@ export function Timeline(props: {
   /** Handed the scroll jumps once the scroller exists, for a control that lives outside this element.
    *  Only called on a followed timeline; a plain run of cards has no scroll of its own to drive. */
   controls?: (api: TimelineControls) => void
+  /** How many turns the caller's list holds, drawn or not. Only the health reading uses it, and it is
+   *  the difference between the turns that exist and the turns in the DOM; omit it and the two are
+   *  reported as the same. */
+  total?: number
   children: JSX.Element
 }) {
   const collection = createDomCollection({ selector: '.ui-timeline-turn > .ui-card[data-interactive]' })
@@ -85,6 +90,24 @@ export function Timeline(props: {
       {props.children}
     </ol>
   ) as HTMLOListElement
+
+  // What this timeline says about itself (../../lib/surfaceHealth.ts). Registered before the early
+  // return, so a plain run of cards counts too, and before every cleanup below, so the final reading
+  // sees the observers disconnected and the frames cancelled. Observers count up when constructed and
+  // down when disconnected, which is how a teardown check sees them go without waiting on the collector.
+  const counts = { observers: 0, observed: 0, corrections: 0, failed: 0, maxPixels: 0 }
+  let scheduledFrames = () => 0
+  const health = registerSurfaceHealth('timeline', () => {
+    const mounted = list.childElementCount
+    return {
+      topology: { dynamicBlocks: props.total ?? mounted, ready: true },
+      mounted: { dynamicBlocks: mounted },
+      work: { scheduledFrames: scheduledFrames() },
+      measurement: { activeObservers: counts.observers, observedElements: counts.observed },
+      correction: { count: counts.corrections, failed: counts.failed, maxPixels: counts.maxPixels },
+    }
+  })
+  onCleanup(health.dispose)
 
   if (!props.follow) return list
 
@@ -102,7 +125,9 @@ export function Timeline(props: {
   // arrives after the write that caused it, and telling ours from the reader's by comparing positions
   // does not survive the fractional device pixels a WebView reports.
   let applying = false
-  let releasing = false
+  // The frame that clears `applying`, held so teardown can cancel it rather than leave it to run
+  // against a list that has gone.
+  let releasing = 0
   // Armed by the reader's own input and spent on the next scroll event, which is how a decision to
   // scroll up is told apart from the browser clamping scrollTop under a shrinking list. Momentum
   // keeps delivering scroll events long after the gesture, but the place is already captured by then.
@@ -155,8 +180,7 @@ export function Timeline(props: {
     // clear the guard while a later write's scroll event is still on its way, and that event would then
     // read as the reader moving.
     if (releasing) return
-    releasing = true
-    requestAnimationFrame(() => { applying = false; releasing = false })
+    releasing = requestAnimationFrame(() => { applying = false; releasing = 0 })
   }
   const pin = () => { if (scroller) write(scroller.scrollHeight) }
 
@@ -199,6 +223,7 @@ export function Timeline(props: {
     if (!rows.length) return
     const found = resolveAnchor(place, rows.map((row) => row.dataset.turn ?? ''))
     if (!found) {
+      counts.failed += 1
       report('took', scroller.scrollTop)
       adopt(LIVE)
       pin()
@@ -212,6 +237,8 @@ export function Timeline(props: {
     const before = scroller.scrollTop
     let settled = Math.abs(delta) <= 1
     if (!settled) {
+      counts.corrections += 1
+      counts.maxPixels = Math.max(counts.maxPixels, Math.abs(delta))
       write(before + delta)
       // Asked and refused: this list cannot bring that turn any closer, so this is as near as the
       // reader can be put and there is nothing to gain by asking again.
@@ -295,7 +322,9 @@ export function Timeline(props: {
     if (place.at === 'live') pin()
     else schedule()
   })
+  counts.observers += 1
   growth.observe(list)
+  counts.observed += 1
 
   /**
    * Taken off the page and put back by something outside, which is a move like any other.
@@ -313,12 +342,23 @@ export function Timeline(props: {
    * this file already runs.
    */
   const replaced = new MutationObserver(() => { if (scroller?.isConnected) schedule() })
-  onMount(() => { if (scroller?.parentElement) replaced.observe(scroller.parentElement, { childList: true }) })
+  counts.observers += 1
+  onMount(() => {
+    if (!scroller?.parentElement) return
+    replaced.observe(scroller.parentElement, { childList: true })
+    counts.observed += 1
+  })
+  scheduledFrames = () => (frame ? 1 : 0) + (releasing ? 1 : 0)
 
   onCleanup(() => {
     growth.disconnect()
     replaced.disconnect()
+    counts.observers -= 2
+    counts.observed = 0
     if (frame) cancelAnimationFrame(frame)
+    if (releasing) cancelAnimationFrame(releasing)
+    frame = 0
+    releasing = 0
     scroller = undefined
   })
 
@@ -354,6 +394,7 @@ export function Timeline(props: {
       ref={(element) => {
         scroller = element
         growth.observe(element)
+        counts.observed += 1
       }}
       onScroll={noteScroll}
       onWheel={noteInput}

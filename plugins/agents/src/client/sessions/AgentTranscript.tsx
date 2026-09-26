@@ -184,6 +184,9 @@ export default function AgentTranscript(props: {
           onChange={(next) => rememberReadingPlace(viewId(), next)}
           ariaLabel="Agent transcript"
           controls={props.onControls}
+          // The projected count, for the timeline's health reading. Every projected card is drawn
+          // today; a window that drew fewer would make this and the mounted count differ.
+          total={items().length}
         >
           {/*
             `For` over the rows' keys, not `Index` over their positions. An item that changed is a new

@@ -299,6 +299,56 @@ console line the page logged with the value it saw. Opt-in through
 `pnpm test` should pay for. On a machine with no Chrome it takes the other branch and asserts the
 tools reported why.
 
+## Large-surface fixture
+
+Large diffs and long transcripts are tested against one generated fixture, built from a seed at run
+time so nothing a million lines long is checked in. It has three profiles:
+
+| Profile | Files | Fixed rows | Threads and notes | Agent session | Use |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `small` | 22 | 9,048 | 20 each | 19 turns, 280 events, about 135 cards | Fast tests and a quick real-window run |
+| `scale` | 220 | 104,234 | 100 each | 94 turns, 1,384 events, about 670 cards | The scaling comparison |
+| `canonical` | 2,200 | 1,077,852 | 400 each | 476 turns, 7,012 events, about 3,400 cards | Real-engine acceptance and profiling |
+
+The counts are for seed 1. Two generators own the data:
+
+- `packages/client-core/src/testkit/largeDiff.ts`, exported as `@acorn/client-core/testkit/large-diff`,
+  streams the files one at a time. Each file carries both sides, the unified patch between them, the
+  source's threads, and review notes. The files include very large ones, binary, renamed, added and
+  removed files, tabs, very long lines, many hunks with gaps, and text that repeats across files.
+  Threads sit on both sides, resolved and not, with several comments, Markdown, images, `<details>`,
+  and suggestions. `largeDiffSource` turns the files into a `DiffSource` for rendering the real
+  `DiffPane` in a test.
+- `plugins/agents/src/testkit/largeSession.ts` generates the session's turns and writes them through
+  the plugin's own store, the way an imported transcript is written. The session ends stopped with
+  every request resolved, so a booting node has nothing to recover.
+
+The tests that hold the fixture and the health probes to their contract:
+
+- `largeDiff.test.ts` pins the small profile's digest, checks that every file's row count matches what
+  the diff model builds, that every thread and note sits on a drawn line, and streams the canonical
+  profile to check its size without holding it;
+- `largeSession.test.ts` seeds a session into a migrated database, reads it back page by page, and
+  projects it into cards;
+- `plugins/changes/src/testkit/reviewNotes.test.ts` checks that seeded notes are the rows the route
+  returns;
+- `kit/lib/surfaceHealth.test.ts` covers the registry and its privacy rule,
+  `features/diff/diffHealth.test.tsx` renders the real pane over the small profile, and
+  `Timeline.test.tsx` checks projected against mounted turns and exact teardown;
+- `apps/desktop/scripts/agent/flow.test.mjs` checks that a flow file with an unknown action, a
+  script, an unbounded loop, or no assertions is refused, and runs a flow against a fake window.
+
+The real-window run is the large-surface flow
+([local-development.md](./local-development.md) § Large-surface flow). It is not part of `pnpm test`,
+because it needs a visible window on a graphical host and minutes of real rendering. It asserts
+invariants that do not depend on the machine: no blank or uncovered block in a settled viewport, at
+most one geometry commit per frame, no source topology after ready, mounted rows under a fixed
+ceiling at every profile, and teardown back to zero. It records, and does not gate, time to first
+content, time to ready, preparation and measurement time, correction pixels, and resident bytes,
+with the host, engine, build, and fixture beside them. Some invariants fail against today's diff,
+which is the baseline later work is measured from. Run it at `scale` and at `canonical` on the host
+used for release checks and keep both JSON reports.
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs `pnpm lint` and `pnpm test` on every pull request and on push to

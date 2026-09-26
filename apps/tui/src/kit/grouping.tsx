@@ -210,6 +210,9 @@ export function Timeline(props: {
   place?: () => ReadingPlace
   onChange?: (place: ReadingPlace) => void
   controls?: (api: TimelineControls) => void
+  /** The DOM timeline's health-reading count (client-core kit/lib/surfaceHealth.ts). Cells report no
+   *  rendered-surface health, so it is accepted and ignored. */
+  total?: number
   children: JSX.Element
 }) {
   if (!props.follow) return <box flexDirection="column" flexGrow={1}>{props.children}</box>

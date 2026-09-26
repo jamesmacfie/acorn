@@ -99,5 +99,8 @@ export function createParsedFilePublisher(options: {
 
   const dispose = reset
 
-  return { dispose, enqueue, flush, markScrolling, reset }
+  /** How many parsed files are waiting for an idle turn, for the diff's health reading. */
+  const held = () => pending.size
+
+  return { dispose, enqueue, flush, held, markScrolling, reset }
 }
