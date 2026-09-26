@@ -102,3 +102,15 @@ it('still draws a historic status-only row as the flat one it has always been', 
   expect(host.querySelector('details')).toBeNull()
   expect(host.textContent).toContain('Web search')
 })
+
+it('builds nothing behind a closed card until the reader opens it', () => {
+  // A transcript holds hundreds of tool calls, most of them closed. Their output is the expensive part,
+  // and a closed disclosure has not built it (client-core kit/components/layout/Fold.tsx).
+  const host = draw({ id: 't', title: 'Run tests', status: 'completed', input: '{"cmd":"pnpm test"}', output: 'PASS 412 tests' }, false)
+  const details = host.querySelector('details')!
+  expect(details.querySelector('.ui-code')).toBeNull()
+  expect(host.textContent).not.toContain('PASS 412 tests')
+  details.open = true
+  details.dispatchEvent(new Event('toggle'))
+  expect(host.textContent).toContain('PASS 412 tests')
+})

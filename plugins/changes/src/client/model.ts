@@ -1,6 +1,6 @@
 // ChangesPane model: pure grouping, ordering and selection over LocalChange[], plus the adapter
-// that feeds a local patch into the shared diff pipeline (DiffFile shape, diff.ts).
-import type { DiffFile } from '@acorn/plugin-api/ui/diff'
+// that feeds a local patch into the shared diff pipeline (the document's file shape).
+import type { DiffDocumentFile } from '@acorn/plugin-api/ui/diff'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { LocalChange, LocalStatus } from '@acorn/protocol/localGit.ts'
 
@@ -362,8 +362,8 @@ export function visibleNodes(nodes: readonly TreeNode[], closed: ReadonlySet<str
 // Stable row identity: a file can appear in both groups.
 export const changeKey = (c: Pick<LocalChange, 'staged' | 'path'>): string => `${c.staged ? 'staged' : 'unstaged'}:${c.path}`
 
-// What one file's patch currently says, so the viewer can tell which files a poll moved
-// (DiffSource.contentKey). The node's `contentKey` is the objects and the stat behind the patch
+// What one file's patch currently says, so the node can tell which files a poll moved
+// (../server/localDocument.ts). The node's `contentKey` is the objects and the stat behind the patch
 // (../server/localDiff.ts), so a poll that finds nothing new reads no patch. A node too old to send
 // one, or an entry it could not key, falls back to `poll`, the status read's count, which reads that
 // file again on every poll: the old behaviour, and the only safe one, since an edit can keep both
@@ -397,14 +397,14 @@ export function pickSelected(groups: ChangesGroups, selectedKey: string | null):
   return groups.unstaged[0] ?? groups.staged[0] ?? null
 }
 
-// Local change + patch → the DiffFile shape the diff model consumes.
+// Local change + what the node cut its patch into → one file of the viewer's document.
 //
 // `sha` carries the staging area rather than a blob hash. The viewer never reads it; it hands it
 // straight back through DiffSource.fileText, which is how a gap gets filled, and for a working tree
 // "which side" is the staging area (the index for staged, the file on disk for unstaged). It stays
 // null for a deletion, which is how the viewer knows to draw that file's gaps inert: there is no new
 // side of a file that is gone.
-export function toPullFile(change: LocalChange, patch: string | null): DiffFile {
+export function documentFile(change: LocalChange, cut: Pick<DiffDocumentFile, 'patchKey' | 'segments'> | undefined): DiffDocumentFile {
   return {
     path: change.path,
     // The viewer's vocabulary has no conflict: what it is being handed is the working copy with the
@@ -414,6 +414,7 @@ export function toPullFile(change: LocalChange, patch: string | null): DiffFile 
     deletions: change.deletions,
     sha: change.status === 'deleted' ? null : change.staged ? 'staged' : 'unstaged',
     viewed: false,
-    patch,
+    patchKey: cut?.patchKey ?? null,
+    segments: cut?.segments ?? [],
   }
 }

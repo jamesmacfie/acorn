@@ -11,7 +11,7 @@ import { pathToFileURL } from 'node:url'
  * published standalone and can't import the constant; see docs/plugin-authoring.md § Start from the
  * scaffold for how index.test.ts keeps the copy honest.
  */
-export const API_VERSION = '1'
+export const API_VERSION = '2'
 export const BASELINE = 'acorn-1'
 
 /**

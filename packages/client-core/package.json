@@ -148,6 +148,7 @@
     "./kit/lib/markdown": "./src/kit/lib/markdown.ts",
     "./kit/tokens": "./src/kit/tokens/public.ts",
     "./testkit/notifications": "./src/testkit/notifications.client.ts",
+    "./testkit/large-diff": "./src/testkit/largeDiff.ts",
     "./testkit/ws-client": "./src/testkit/wsClient.client.ts"
   },
   "scripts": {
@@ -157,6 +158,7 @@
   },
   "dependencies": {
     "@acorn/dashboards-core": "workspace:*",
+    "@acorn/diff-document": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "@codemirror/autocomplete": "^6.20.3",
     "@codemirror/lang-cpp": "^6.0.3",
@@ -186,7 +188,6 @@
     "@xterm/xterm": "^5.5.0",
     "codemirror": "^6.0.2",
     "diff": "^9.0.0",
-    "gitdiff-parser": "^0.3.1",
     "idb-keyval": "^6.2.5",
     "lucide-static": "^1.27.0",
     "shiki": "^4.2.0",
@@ -195,6 +196,7 @@
   "devDependencies": {
     "@types/diff": "^8.0.0",
     "@types/node": "^26.0.0",
+    "gitdiff-parser": "^0.3.1",
     "jsdom": "^30.0.1",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",

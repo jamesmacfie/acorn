@@ -1,10 +1,12 @@
-import { createSignal, For } from 'solid-js'
+import { createSignal, For, Show } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Card } from '../primitives'
 import { Timeline } from './Timeline'
 import { LIVE, type ReadingPlace } from '../../lib/readingPlace'
 import { setScrollPlaceHandler, type ScrollPlaceReport } from '../../lib/scrollPlace'
+import { _resetSurfaceHealth, surfaceHealthSnapshot } from '../../lib/surfaceHealth'
+import { createTimelineWindow, TIMELINE_PAGE } from '../../lib/timelineWindow'
 
 // The transcript's guardrails, at the node that owns them: appending a turn must not replace the ones
 // already drawn, following the newest turn must stop when the reader scrolls away from it, and a
@@ -410,5 +412,316 @@ describe('Timeline', () => {
     const [turns] = createSignal(['a', 'b'])
     mount(turns)
     expect(seen.map((report) => report.cause)).toEqual(['opened'])
+  })
+})
+
+// The numbers a timeline reports about itself (kit/lib/surfaceHealth.ts): the caller's projected turns
+// and the turns in the DOM are separate fields, and teardown leaves no observer or frame behind.
+describe('Timeline health', () => {
+  afterEach(() => _resetSurfaceHealth())
+
+  it('reports projected and mounted turns apart, and returns its observers and frames on teardown', () => {
+    const [turns, setTurns] = createSignal(['a', 'b', 'c'])
+    for (const key of ['a', 'b', 'c', 'd']) heights.set(key, 100)
+    dispose = render(() => (
+      <Timeline follow total={40}>
+        <For each={turns()}>
+          {(key) => <Timeline.Turn key={key}><Card>{key}</Card></Timeline.Turn>}
+        </For>
+      </Timeline>
+    ), host)
+    settle()
+
+    let [entry] = surfaceHealthSnapshot().surfaces
+    expect(entry?.kind).toBe('timeline')
+    expect(entry?.topology.dynamicBlocks).toBe(40)
+    expect(entry?.mounted.dynamicBlocks).toBe(3)
+    expect(entry?.measurement.activeObservers).toBe(2)
+    // The list and the scroller for size, the scroller's parent for being re-parented.
+    expect(entry?.measurement.observedElements).toBe(3)
+
+    // A new turn arrives and the timeline pins the reader to it: one write, one frame still owed.
+    setTurns(['a', 'b', 'c', 'd'])
+    layout()
+    observers.forEach((run) => run())
+    ;[entry] = surfaceHealthSnapshot().surfaces
+    expect(entry?.mounted.dynamicBlocks).toBe(4)
+    expect(entry?.work.scheduledFrames).toBeGreaterThan(0)
+
+    dispose?.()
+    dispose = undefined
+    const snapshot = surfaceHealthSnapshot()
+    expect(snapshot.surfaces).toEqual([])
+    expect(snapshot.retired.timeline?.measurement.activeObservers).toBe(0)
+    expect(snapshot.retired.timeline?.measurement.observedElements).toBe(0)
+    expect(snapshot.retired.timeline?.work.scheduledFrames).toBe(0)
+  })
+
+  it('counts a plain run of cards, which has no observers of its own', () => {
+    dispose = render(() => <Timeline><Timeline.Turn><Card>one</Card></Timeline.Turn></Timeline>, host)
+    const [entry] = surfaceHealthSnapshot().surfaces
+    expect(entry?.mounted.dynamicBlocks).toBe(1)
+    expect(entry?.topology.dynamicBlocks).toBe(1)
+    expect(entry?.measurement.activeObservers).toBe(0)
+  })
+})
+
+// A long list drawn through a window (kit/lib/timelineWindow.ts): the caller draws the newest page, the
+// timeline says how many older turns there are, and the reader's place is kept by identity while the
+// window grows and shrinks. The geometry here is read from the DOM's order at every call, so a turn
+// prepended or trimmed moves every turn after it the way a browser's layout would.
+describe('Timeline window', () => {
+  const sizes = new Map<string, number>()
+  const drawn = () => [...host.querySelectorAll<HTMLElement>('.ui-timeline-turn')]
+  const size = (row: HTMLElement) => sizes.get(row.dataset.turn ?? '') ?? 100
+  const total = () => drawn().reduce((sum, row) => sum + size(row), 0)
+  const originalRect = HTMLLIElement.prototype.getBoundingClientRect
+  const originalHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')
+
+  beforeEach(() => {
+    sizes.clear()
+    HTMLLIElement.prototype.getBoundingClientRect = function (this: HTMLElement) {
+      let top = -scrollTop
+      for (const row of drawn()) {
+        if (row === this) return { top, bottom: top + size(row), height: size(row) } as DOMRect
+        top += size(row)
+      }
+      return { top: 0, bottom: 0, height: 0 } as DOMRect
+    }
+    Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+      configurable: true,
+      get(this: HTMLElement) { return this.classList.contains('ui-timeline-turn') ? size(this) : 0 },
+    })
+  })
+  afterEach(() => {
+    HTMLLIElement.prototype.getBoundingClientRect = originalRect
+    if (originalHeight) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', originalHeight)
+    document.getSelection()?.removeAllRanges()
+    _resetSurfaceHealth()
+  })
+
+  const box = () => {
+    const element = scroller()!
+    Object.defineProperty(element, 'scrollHeight', { configurable: true, get: () => total() })
+    Object.defineProperty(element, 'clientHeight', { configurable: true, get: () => viewport })
+    Object.defineProperty(element, 'scrollTop', {
+      configurable: true,
+      get: () => scrollTop,
+      set: (to: number) => { scrollTop = Math.max(0, Math.min(Math.round(to), Math.max(0, total() - viewport))) },
+    })
+    element.getBoundingClientRect = () => ({ top: 0, bottom: viewport, height: viewport }) as DOMRect
+    return element
+  }
+
+  /** The browser reporting a resize, then the frames that follow. */
+  const run = (rounds = 6) => {
+    observers.forEach((notify) => notify())
+    for (let i = 0; i < rounds; i++) {
+      const queued = frames
+      frames = []
+      for (const next of queued) next()
+    }
+  }
+
+  const keysOf = (count: number) => Array.from({ length: count }, (_, index) => `k${index}`)
+
+  function mountWindowed(initial: string[], opening: ReadingPlace = LIVE) {
+    const [keys, setKeys] = createSignal(initial)
+    let held: ReadingPlace = opening
+    const [place, setPlace] = createSignal<ReadingPlace>(opening)
+    dispose = render(() => {
+      const window = createTimelineWindow(keys)
+      return (
+        <Timeline
+          follow
+          place={place}
+          onChange={(next) => { held = next; setPlace(next) }}
+          total={keys().length}
+          hidden={window.start()}
+          onShowEarlier={window.showEarlier}
+          reveal={window.reveal}
+          onTrim={window.trim}
+        >
+          <For each={window.keys()}>
+            {(key, index) => (
+              <Timeline.Turn key={key} position={window.start() + index() + 1} setSize={keys().length}>
+                <Card><span>{key}</span><button type="button">{`act ${key}`}</button></Card>
+              </Timeline.Turn>
+            )}
+          </For>
+        </Timeline>
+      )
+    }, host)
+    box()
+    run()
+    return { keys, setKeys, place: () => held }
+  }
+
+  const earlier = () => [...host.querySelectorAll('button')].find((button) => button.textContent?.startsWith('Show earlier'))
+
+  it('draws the newest page, says how many turns it hides, and numbers each in the whole list', () => {
+    mountWindowed(keysOf(1000))
+    expect(drawn()).toHaveLength(TIMELINE_PAGE)
+    expect(earlier()?.textContent).toBe('Show earlier (800)')
+    expect(drawn()[0]?.getAttribute('aria-posinset')).toBe('801')
+    expect(drawn()[0]?.getAttribute('aria-setsize')).toBe('1000')
+    const [entry] = surfaceHealthSnapshot().surfaces
+    expect(entry?.topology.dynamicBlocks).toBe(1000)
+    expect(entry?.mounted.dynamicBlocks).toBe(TIMELINE_PAGE)
+    expect(entry?.window.hiddenEarlier).toBe(800)
+  })
+
+  it('keeps the turn the reader was looking at where it was when "Show earlier" prepends a page', () => {
+    const view = mountWindowed(keysOf(1000))
+    reader(scroller()!, 250)
+    expect(view.place()).toMatchObject({ at: 'turn', key: 'k802', offset: 50 })
+    const before = drawn().find((row) => row.dataset.turn === 'k802')
+    earlier()!.click()
+    run()
+    expect(drawn()).toHaveLength(2 * TIMELINE_PAGE)
+    expect(turnTop('k802')).toBe(-50)
+    // The same element: prepending drew new turns and replaced none.
+    expect(drawn().find((row) => row.dataset.turn === 'k802')).toBe(before)
+    expect(drawn()[0]?.getAttribute('aria-posinset')).toBe('601')
+    expect(surfaceHealthSnapshot().surfaces[0]?.window.expansions).toBe(1)
+  })
+
+  it('opens a place in the hidden part of the list on that turn, not on a neighbour', () => {
+    mountWindowed(keysOf(1000), { at: 'turn', key: 'k100', index: 3, offset: 20 })
+    expect(drawn().some((row) => row.dataset.turn === 'k100')).toBe(true)
+    expect(turnTop('k100')).toBe(-20)
+    expect(surfaceHealthSnapshot().surfaces[0]?.correction.substituted).toBe(0)
+  })
+
+  it('lands on a neighbour only when the turn has left the list, and counts it', () => {
+    const view = mountWindowed(keysOf(1000), { at: 'turn', key: 'gone', index: 3, offset: 0 })
+    expect(view.place()).toMatchObject({ at: 'turn', key: 'k803' })
+    expect(surfaceHealthSnapshot().surfaces[0]?.correction.substituted).toBe(1)
+  })
+
+  it('trims back to a page while following, once a page rather than once an event', () => {
+    const view = mountWindowed(keysOf(1000))
+    view.setKeys(keysOf(1000 + TIMELINE_PAGE - 1))
+    run()
+    expect(drawn()).toHaveLength(2 * TIMELINE_PAGE - 1)
+    view.setKeys(keysOf(1000 + TIMELINE_PAGE))
+    run()
+    expect(drawn()).toHaveLength(TIMELINE_PAGE)
+    expect(scrollTop).toBe(total() - viewport)
+    const [entry] = surfaceHealthSnapshot().surfaces
+    expect(entry?.window.trims).toBe(1)
+    expect(entry?.window.hiddenEarlier).toBe(1000)
+  })
+
+  it('never trims a turn holding the selection or focus, and trims once they let go', () => {
+    const view = mountWindowed(keysOf(1000))
+    // Focus in the second drawn turn, then a selection in the oldest one. That order, because jsdom
+    // puts a caret in whatever takes focus, and a selection only takes a range once that is cleared.
+    const oldest = drawn()[0]!
+    drawn()[1]!.querySelector('button')!.focus()
+    const range = document.createRange()
+    range.selectNodeContents(oldest.querySelector('span')!)
+    document.getSelection()!.removeAllRanges()
+    document.getSelection()!.addRange(range)
+
+    view.setKeys(keysOf(1000 + TIMELINE_PAGE))
+    run()
+    expect(drawn()[0]).toBe(oldest)
+    expect(document.getSelection()?.toString()).toBe('k800')
+    expect(surfaceHealthSnapshot().surfaces[0]?.window.pinned).toBe(TIMELINE_PAGE)
+
+    // The selection goes; the focus alone still holds its own turn, one below.
+    document.getSelection()!.removeAllRanges()
+    view.setKeys(keysOf(1000 + TIMELINE_PAGE + 1))
+    run()
+    expect(drawn()[0]?.dataset.turn).toBe('k801')
+
+    ;(document.activeElement as HTMLElement).blur()
+    view.setKeys(keysOf(1000 + TIMELINE_PAGE + 2))
+    run()
+    expect(drawn()).toHaveLength(TIMELINE_PAGE)
+    expect(surfaceHealthSnapshot().surfaces[0]?.window.pinned).toBe(0)
+  })
+
+  it('leaves the window alone while the reader is away from the live end', () => {
+    const view = mountWindowed(keysOf(1000))
+    reader(scroller()!, 250)
+    view.setKeys(keysOf(1000 + 2 * TIMELINE_PAGE))
+    run()
+    expect(drawn()).toHaveLength(3 * TIMELINE_PAGE)
+    expect(turnTop('k802')).toBe(-50)
+  })
+})
+
+// A turn whose body is a function of `near`: built once the turn comes near the viewport, drawn as
+// the caller's summary until then, and the same list item either way.
+describe('Timeline deferred bodies', () => {
+  let watched: Element[] = []
+  let notify: ((entries: { target: Element; isIntersecting: boolean }[]) => void) | undefined
+  class TestIntersectionObserver {
+    constructor(run: (entries: { target: Element; isIntersecting: boolean }[]) => void) { notify = run }
+    observe(element: Element) { watched.push(element) }
+    unobserve(element: Element) { watched = watched.filter((item) => item !== element) }
+    disconnect() { watched = [] }
+  }
+  beforeEach(() => {
+    watched = []
+    ;(globalThis as { IntersectionObserver?: unknown }).IntersectionObserver = TestIntersectionObserver
+  })
+  afterEach(() => {
+    delete (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver
+    _resetSurfaceHealth()
+  })
+
+  it('builds a body when its turn comes near, in the same list item, and counts it', () => {
+    let built = 0
+    dispose = render(() => (
+      <Timeline>
+        <For each={['a', 'b', 'c']}>
+          {(key) => (
+            <Timeline.Turn key={key}>
+              {(near) => (
+                <Card>
+                  <Show when={near()} fallback={<span>summary {key}</span>}>
+                    {(() => { built += 1; return <span>body {key}</span> })()}
+                  </Show>
+                </Card>
+              )}
+            </Timeline.Turn>
+          )}
+        </For>
+      </Timeline>
+    ), host)
+    const item = host.querySelector('[data-turn="b"]')!
+    expect(watched).toHaveLength(3)
+    expect(item.textContent).toBe('summary b')
+    expect(built).toBe(0)
+
+    notify!([{ target: item, isIntersecting: true }])
+    expect(host.querySelector('[data-turn="b"]')).toBe(item)
+    expect(item.textContent).toBe('body b')
+    expect(built).toBe(1)
+    expect(watched).toHaveLength(2)
+    const [entry] = surfaceHealthSnapshot().surfaces
+    expect(entry?.mounted.bodies).toBe(1)
+    expect(entry?.measurement.activeObservers).toBe(1)
+    expect(entry?.measurement.observedElements).toBe(2)
+
+    dispose?.()
+    dispose = undefined
+    const retired = surfaceHealthSnapshot().retired.timeline
+    expect(retired?.measurement.activeObservers).toBe(0)
+    expect(retired?.measurement.observedElements).toBe(0)
+    expect(retired?.mounted.bodies).toBe(0)
+  })
+
+  it('builds every body at once where nothing can say what is near', () => {
+    delete (globalThis as { IntersectionObserver?: unknown }).IntersectionObserver
+    dispose = render(() => (
+      <Timeline>
+        <Timeline.Turn key="a">{(near) => <Card>{near() ? 'body' : 'summary'}</Card>}</Timeline.Turn>
+      </Timeline>
+    ), host)
+    expect(host.textContent).toBe('body')
   })
 })

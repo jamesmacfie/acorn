@@ -44,9 +44,67 @@ The timeline is not virtualised, and that is the kit's rule rather than this pan
 this transcript used to run called `measure()` on every new event, which clears the item size cache,
 so every row fell back to the estimate, the canvas height jumped, and the rows re-measured, on every
 event. It also rebuilt its rows from `getVirtualItems()`, which hands back fresh objects on each
-scroll, replacing the DOM under any text selection. If a session ever feels slow to open, render the
-last N behind a "show earlier" control: a fixed window has no measurement feedback loop. Two more
-guardrails hold in the same place. A card seeds its fold state at mount and then leaves it alone, so
+scroll, replacing the DOM under any text selection.
+
+**A long session is drawn through a fixed window instead.** The projection covers every event, and the
+transcript draws the newest 200 cards of it, with **Show earlier (N)** above the first card
+(`createTimelineWindow`, `packages/client-core/src/kit/lib/timelineWindow.ts`, from
+`@acorn/plugin-api/ui`). The window counts cards and never measures one, so it has no feedback loop.
+The canonical 7,012-event session projects to 3,387 cards. Drawing all of them built about 30,000
+elements in about 840 ms in jsdom before anything painted. The window builds about 1,800 elements in
+about 60 ms (2026-09-26, jsdom, no real-window timing). Its rules:
+
+- The window is held by its oldest drawn card, so a streamed card joins it and never pushes a card
+  out. **Show earlier** adds 200 older cards and keeps the card the reader was looking at at the
+  same offset.
+- **Go to top** above the composer draws every card, then jumps to the oldest. That is the explicit
+  way to reach the start in one step, and to let the page's own find see the whole session. Until the
+  reader asks, the page's find cannot match a hidden card, and the count on **Show earlier** says so.
+- A remembered reading place in a hidden card, and a request a notice or the sidebar names, reveal
+  the page that holds the card before anything is focused or scrolled. Only a card that has left the
+  list for good hands the reader a neighbour, and the Timeline's health counts that as a
+  substitution. A named request is revealed once per view, so a later trim can drop it again.
+- While the reader follows the live end, the Timeline trims back to 200 once it draws 400, which is
+  once a page of new cards rather than once an event. It never trims a card holding the selection or
+  focus, and it never trims while the reader is away from the live end. The trim runs in the frame
+  after the list grows, not inside the resize callback, so the browser never reports a resize loop.
+- Switching session or subagent starts that list on its own newest page. The window is not kept per
+  session.
+- Each card carries `aria-posinset` and `aria-setsize` for its place in the whole session, so a screen
+  reader hears "3,188 of 3,387" rather than "1 of 200".
+
+The terminal client draws the same window and the same control and never trims.
+
+The window shipped because of a count, not a timing. At `canonical` the transcript mounted 3,387
+turns, eight times the 400-turn ceiling the large-surface flow asserts ([testing.md](../testing.md)
+§ Large-surface fixture), and stable keys and lazy bodies alone did not reduce card construction. The
+200-card page comes from that jsdom construction count. No WebKit sample has refined it.
+
+What the transcript refuses, and what would reopen it:
+
+- **A variable-height virtualizer.** The last one cleared its measurement cache on every event and
+  replaced the DOM under a selection. Reopen it only if a product requirement rejects **Show
+  earlier**, and a prototype keeps selection, focus, reading place, streaming and measurement intact
+  on the `canonical` fixture in the real window.
+- **Dropping old events or cards to meet a budget.** The projection stays complete. The window changes
+  which cards are mounted and always offers a way to draw the hidden ones.
+- **`content-visibility` on turns.** `content-visibility: auto` brings paint containment, which clips
+  anything drawn outside the turn's box. An interactive card's focus ring (`outline-offset: 2px`) and
+  a disclosure summary's ring both sit outside that box at the turn's edge. The window already bounds
+  what is laid out. Reopen it with a real-WebKit run that checks find, selection, focus traversal and
+  the accessibility tree, and with the rings drawn inside the card.
+
+Known limits of the window:
+
+- Turning **Chats only** off keeps the oldest drawn card, so the window can grow to about 600 cards
+  until the next trim.
+- After **Go to top** on a stopped session, returning to the live end does not trim. A trim runs only
+  when the list grows, and a stopped session does not grow.
+- A reading place stores its turn's index among the drawn turns. When that turn has gone for good,
+  the neighbour is picked from what is drawn, which can differ from the logical neighbour after the
+  window changed.
+
+Two more guardrails hold in the same place. A card seeds its fold state at mount and then leaves it alone, so
 a call finishing does not slam its card shut, and the sidebar's rows are keyed by session id rather
 than by object identity, so the roster rebuilding on every socket frame does not replace the row
 somebody is reading.
@@ -107,6 +165,11 @@ it fails for any reason a selection can break, not only for the one it was writt
 - On the desktop, a closed disclosure defers its contents until first opened. Opening a task's
   Agent pane therefore does not render hidden tool output or the nested transcript of a completed
   subagent. Once opened, those contents stay mounted across toggles so their local state survives.
+  The Timeline's health counts built bodies apart from cards (`mounted.bodies`,
+  [telemetry.md](../telemetry.md) § Rendered-surface health). A compiled contributor's card, such as
+  `changes`' file tool card, uses the same disclosure and defers the same way. A loaded plugin's remote
+  tree is the exception: the worker builds its whole tree, closed body included, for every card the
+  window draws, because the host cannot see inside it to defer anything.
 - **The card body is a slot.** Three things can draw it, in order: a compiled plugin's renderer that
   matched the call, then a loaded plugin's remote tree that declared the call's tool name, then the
   built-in card. A compiled renderer wins because it draws in the transcript's own realm and costs

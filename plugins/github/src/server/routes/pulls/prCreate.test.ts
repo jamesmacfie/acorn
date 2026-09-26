@@ -6,6 +6,7 @@ import { gh } from '../../githubApi'
 import type { AppEnv, Principal } from '@acorn/plugin-api/testkit'
 import { prCreate } from './prCreate'
 import type { Env } from '@acorn/plugin-api/testkit'
+import type { Compare } from '../../../shared/api'
 
 vi.mock('../../githubApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../githubApi')>()
@@ -74,5 +75,42 @@ describe('prCreate auth + ApiError envelope', () => {
       code: 'validation_failed',
       message: 'A pull request already exists for acme:feat.',
     })
+  })
+})
+
+describe('compare preview completeness', () => {
+  beforeEach(() => {
+    plugin = makeTestPluginDb('github')
+    vi.mocked(gh).mockReset()
+  })
+  afterEach(() => plugin.cleanup())
+
+  const compare = async (fileCount: number) => {
+    vi.mocked(gh).mockResolvedValue(new Response(JSON.stringify({
+      ahead_by: 2,
+      files: Array.from({ length: fileCount }, (_, i) => ({ filename: `f${i}.ts`, status: 'modified', additions: 1, deletions: 0, sha: `s${i}`, patch: '@@' })),
+      commits: [],
+    }), { headers: { 'content-type': 'application/json' } }))
+    const app = new Hono<AppEnv>().use('/api/*', ...testGate(PRINCIPAL)).route('/api/repos', prCreate(plugin.db))
+    const res = await app.fetch(new Request('http://acorn.test/api/repos/acme/widget/compare?base=main&head=feat'), { DB: noIntegrations, BLOBS: blobStore(), ...testSecretEnv('0'.repeat(64)) } as Env)
+    return (await res.json()) as Compare
+  }
+  const blobs = new Map<string, string>()
+  const blobStore = () => ({ get: async (key: string) => blobs.get(key) ?? null, put: async (key: string, value: string) => void blobs.set(key, value) })
+
+  // GitHub gives compare no total and stops at 300, so 300 files never claims to be all of them.
+  it('calls a 300-file comparison capped and a smaller one complete', async () => {
+    expect((await compare(300)).completeness).toEqual({ kind: 'incomplete', cause: 'upstream-cap', resource: 'compare-files', received: 300, reportedTotal: null, limit: 300 })
+    expect((await compare(12)).completeness).toEqual({ kind: 'complete' })
+  })
+
+  // The preview reads segments like a pull's diff: descriptors in the answer, bodies stored by digest.
+  it('answers the comparison as a document and stores each patch under its digest', async () => {
+    const answer = await compare(3)
+    expect(answer.document.files.map((file) => file.path)).toEqual(['f0.ts', 'f1.ts', 'f2.ts'])
+    const key = answer.document.files[0]!.patchKey!
+    expect(key).toMatch(/^sha256:[0-9a-f]{64}$/)
+    expect(blobs.get(`patch:${key}`)).toBe('@@')
+    expect(JSON.stringify(answer)).not.toContain('"patch"')
   })
 })
