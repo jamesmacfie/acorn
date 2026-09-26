@@ -1,4 +1,4 @@
-import { batch } from 'solid-js'
+import { batch, untrack } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { MAX_SEGMENTS_PER_REQUEST, segmentContentKey, type DiffSegmentPayload, type DiffSegmentRequest } from '@acorn/diff-document/document'
 import { recordSample } from '../../infra/telemetry/emitter'
@@ -53,7 +53,7 @@ export function createSegmentLoader(options: {
   const [statuses, setStatuses] = createStore<Record<string, SegmentStatus | undefined>>({})
   /** Which segment and plain row each built row came from, so find can mark a match on the row it
    *  names. */
-  const places = new WeakMap<object, { contentKey: string; index: number }>()
+  const places = new WeakMap<object, { path: string; contentKey: string; index: number }>()
 
   let wanted: SegmentRef[] = []
   let wantedKeys = new Set<string>()
@@ -95,8 +95,8 @@ export function createSegmentLoader(options: {
   }
 
   const remember = (key: string, rows: readonly DiffRow[]) => {
-    const contentKey = key.slice(0, key.indexOf('\u0000'))
-    rows.forEach((row, index) => places.set(row, { contentKey, index }))
+    const [contentKey = '', path = ''] = key.split('\u0000')
+    rows.forEach((row, index) => places.set(row, { path, contentKey, index }))
   }
 
   const painted = (outcome: 'hit' | 'miss') => {
@@ -119,7 +119,9 @@ export function createSegmentLoader(options: {
       for (const key of keys) loading.add(key)
       pin()
       batch(() => { for (const key of keys) setStatuses(key, 'loading') })
-      const byContent = new Map(refs.map((ref) => [ref.contentKey, ref]))
+      // By path and content: two files with the same patch, such as one version bump in several
+      // manifests, have the same content key and are still two segments to answer.
+      const byContent = new Map(refs.map((ref) => [`${ref.file.path}\u0000${ref.contentKey}`, ref]))
       const requests = refs.map((ref): DiffSegmentRequest => ({ path: ref.file.path, patchKey: ref.file.patchKey!, ordinal: ref.ordinal }))
       const at = generation
       void options.load(requests, controller.signal).then(
@@ -129,7 +131,7 @@ export function createSegmentLoader(options: {
           const answered = new Set<string>()
           const inserted: { key: string; path: string; patchKey: string; plain: DiffRow[] }[] = []
           for (const payload of payloads) {
-            const ref = byContent.get(segmentContentKey(payload.patchKey, payload.ordinal))
+            const ref = byContent.get(`${payload.path}\u0000${segmentContentKey(payload.patchKey, payload.ordinal)}`)
             if (!ref) continue
             const key = keyOf(ref)
             answered.add(key)
@@ -203,12 +205,14 @@ export function createSegmentLoader(options: {
       return rows
     },
     status: (ref: SegmentAddress): SegmentStatus | undefined => statuses[keyOf(ref)],
-    place: (row: object): { contentKey: string; index: number } | undefined => places.get(row),
+    place: (row: object): { path: string; contentKey: string; index: number } | undefined => places.get(row),
     /**
      * What the reader can see and what is near it, nearest first. Queued work for anything else is
      * dropped, and a request whose every segment has left the range is aborted.
      */
-    demand: (visible: readonly SegmentRef[], near: readonly SegmentRef[]) => {
+    demand: (visible: readonly SegmentRef[], near: readonly SegmentRef[]) => untrack(() => {
+      // Untracked: a caller's effect should re-run when its range moves, not whenever a status or
+      // version this reads along the way changes.
       if (disposed) return
       visibleKeys = new Set(visible.map(keyOf))
       const seen = new Set<string>()
@@ -249,7 +253,7 @@ export function createSegmentLoader(options: {
       pin()
       pump()
       enrichNext()
-    },
+    }),
     retry: (ref: SegmentAddress) => {
       setStatuses(keyOf(ref), undefined)
       pump()

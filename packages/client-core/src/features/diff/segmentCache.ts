@@ -206,16 +206,12 @@ export function createSegmentCache(limits: { rows: number; bytes: number } = { r
      * nothing left to evict is the oversize case: it stays while it is held and goes when it is not.
      */
     insert: (batch: readonly { key: string; path: string; patchKey: string; plain: DiffRow[] }[]) => {
-      if (!batch.length) return
+      let added = 0
       for (const item of batch) {
-        const previous = entries.get(item.key)
-        if (previous) {
-          entries.delete(item.key)
-          rows -= previous.rows
-          plainBytes -= previous.plainBytes
-          enrichmentBytes -= previous.enrichmentBytes
-          changed(item.key)
-        }
+        // Two panes can ask for the same segment at once. Rows are a pure function of the key, so the
+        // entry already held stays, with any colour it has; replacing it would grey out a segment
+        // another pane is showing until that pane next asks for colour.
+        if (entries.has(item.key)) continue
         const entry: Entry = {
           path: item.path,
           patchKey: item.patchKey,
@@ -229,9 +225,11 @@ export function createSegmentCache(limits: { rows: number; bytes: number } = { r
         entries.set(item.key, entry)
         rows += entry.rows
         plainBytes += entry.plainBytes
+        added++
       }
-      inserts += batch.length
-      recordSample('core', 'diff.segment_cache.insert', batch.length)
+      if (!added) return
+      inserts += added
+      recordSample('core', 'diff.segment_cache.insert', added)
       trim()
       if (over()) {
         oversize++

@@ -21,11 +21,13 @@ import { annotationsFor, requestAnnotations } from '../../host/annotations/annot
 import { DiffToolbar } from './DiffToolbar'
 import { createDiffFindController } from './findController'
 import {
+  DIFF_GAP_ROW_HEIGHT,
   DIFF_LINE_HEIGHT,
   enrichDiffRows,
   expandGapAsync,
   isCodeRow,
   maxLineCols,
+  toBands,
   type CodeRow,
   type DiffRow,
   type DiffThread,
@@ -40,7 +42,7 @@ import { createDiffStickyFile } from './stickyFile'
 import { diffCollapsed, rememberDiffCollapsed } from './viewState'
 import { createDiffHealth } from './diffHealth'
 import { bandBlock, createDiffLayout, lineBlock, rowBlocks, threadBlock, type DiffBlockInputs } from './diffLayout'
-import { createDocumentView, threadAnchor, type DiffItem, type GapOverlay, type SegmentRef } from './documentView'
+import { createDocumentView, overlayKey, threadAnchor, type DiffItem, type GapOverlay, type SegmentRef } from './documentView'
 import { createSegmentLoader, type SegmentAddress } from './segmentLoader'
 import { segmentCacheFor } from './segmentCache'
 import { createLogger } from '../../infra/telemetry/logger'
@@ -358,7 +360,7 @@ export function DiffPane(props: {
       if (!loader.rows(at.segment)) return
       setOverlays((current) => {
         const next = new Map(current)
-        const key = at.segment.contentKey
+        const key = overlayKey(gap.path, at.segment.contentKey)
         next.set(key, [...(current.get(key) ?? []), { edge: at.edge, rows: lines }])
         return next
       })
@@ -394,20 +396,48 @@ export function DiffPane(props: {
     onCleanup(() => { bindings.dispose(); commands.dispose() })
   })
 
-  // Take the reader to a match: its segment's item, then the row inside it by the fixed row height,
+  // Take the reader to a match: its segment's item, then the row inside it by the fixed row heights,
   // below whatever blocks sit above it. The segment loads because it is now on screen; the highlight
   // draws when its rows arrive.
   const revealMatch = (match: DiffSearchMatch) => {
     const index = view.indexByKey().get(`s:${match.path}:${match.ordinal}`)
-    const at = index == null ? null : layout.offsetOf(index, match.row * DIFF_LINE_HEIGHT)
+    const item = index == null ? undefined : items()[index]
+    const at = index == null || item?.kind !== 'segment' ? null : layout.offsetOf(index, matchPixel(item, match.row))
     const element = scrollEl()
     if (at == null || !element) return
     layout.scrollToOffset(at - element.clientHeight / 2)
   }
+  // A search counts rows of the unified list. Split mode draws bands, a deletion and its insertion side
+  // by side, and a gap row is taller than a code row, so the pixel is walked from the rows once they
+  // are loaded, and scaled from the descriptor until then.
+  const matchPixel = (item: Extract<DiffItem, { kind: 'segment' }>, row: number): number => {
+    const split = viewMode() === 'split'
+    const loaded = loader.rows(item.segment)
+    const target = loaded?.[row]
+    if (!loaded || !target) {
+      const { rows, bands } = item.segment.descriptor
+      return Math.round(row * (split && rows ? bands / rows : 1)) * DIFF_LINE_HEIGHT
+    }
+    const drawn = loaded.slice(item.skipFirst ? 1 : 0, item.skipLast ? loaded.length - 1 : loaded.length) as Row[]
+    const height = (unit: Row) => (unit.kind === 'gap' ? DIFF_GAP_ROW_HEIGHT : DIFF_LINE_HEIGHT)
+    let px = 0
+    if (split) {
+      for (const band of toBands(drawn)) {
+        if (band.kind === 'full' ? band.row === target : band.left === target || band.right === target) return px
+        px += band.kind === 'full' ? height(band.row) : DIFF_LINE_HEIGHT
+      }
+      return px
+    }
+    for (const unit of drawn) {
+      if (unit === target) return px
+      px += height(unit)
+    }
+    return px
+  }
   const findController = createDiffFindController({ search: (request, signal) => source().search(request, signal), revision, reveal: revealMatch })
   const findHighlight = (row: CodeRow) => {
     const place = loader.place(row)
-    return place ? findController.findHighlight(place.contentKey, place.index) : undefined
+    return place ? findController.findHighlight(place.path, place.contentKey, place.index) : undefined
   }
 
   health.attach({

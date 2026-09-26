@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, on, onCleanup } from 'solid-js'
+import { createEffect, createMemo, createSignal, on, onCleanup, untrack } from 'solid-js'
 import type { Accessor } from 'solid-js'
 import { segmentContentKey, type DiffSearchMatch, type DiffSearchPage, type DiffSearchRequest } from '@acorn/diff-document/document'
 import type { FindHighlight } from '../../kit/diff/find'
@@ -72,11 +72,13 @@ export function createDiffFindController(props: {
     }, SEARCH_DEBOUNCE_MS)
   }))
 
-  // Match ranges by segment content and row, for the rows that happen to be mounted.
+  // Match ranges by file, segment content and row, for the rows that happen to be mounted. The path is
+  // part of the key because two files with the same patch share a content key.
+  const rowKey = (path: string, contentKey: string, row: number) => `${path}\u0000${contentKey}#${row}`
   const rangesByRow = createMemo(() => {
     const map = new Map<string, [number, number][]>()
     for (const match of matches()) {
-      const key = `${segmentContentKey(match.patchKey, match.ordinal)}#${match.row}`
+      const key = rowKey(match.path, segmentContentKey(match.patchKey, match.ordinal), match.row)
       const ranges = map.get(key)
       if (ranges) ranges.push([match.start, match.end])
       else map.set(key, [[match.start, match.end]])
@@ -84,11 +86,11 @@ export function createDiffFindController(props: {
     return map
   })
   const currentMatch = () => matches()[matchIdx()] ?? null
-  const findHighlight = (contentKey: string, row: number): FindHighlight | undefined => {
-    const ranges = rangesByRow().get(`${contentKey}#${row}`)
+  const findHighlight = (path: string, contentKey: string, row: number): FindHighlight | undefined => {
+    const ranges = rangesByRow().get(rowKey(path, contentKey, row))
     if (!ranges) return undefined
     const current = currentMatch()
-    const isCurrent = current && segmentContentKey(current.patchKey, current.ordinal) === contentKey && current.row === row
+    const isCurrent = current && current.path === path && segmentContentKey(current.patchKey, current.ordinal) === contentKey && current.row === row
     return { ranges, current: isCurrent ? [current.start, current.end] : null }
   }
 
@@ -118,7 +120,9 @@ export function createDiffFindController(props: {
   createEffect(() => {
     if (!findOpen()) return
     const current = currentMatch()
-    if (current) props.reveal(current)
+    // Only a change of match moves the reader. What reveal reads, the item index and the scroller,
+    // changes when the reader expands a gap or collapses a file, and that must not pull them back.
+    if (current) untrack(() => props.reveal(current))
   })
 
   return {
