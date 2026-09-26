@@ -4,12 +4,14 @@ import { registerEditorWsChannel } from '../server/wsChannel'
 import { searchBridge } from '../server/search'
 import { editor, EDITOR } from '../server/routes/editor'
 import { search, SEARCH } from '../server/routes/search'
+import { EDITOR_LINE_MARKERS } from '../contract/lineMarkers'
 
 export const editorPlugin = (): NodePlugin => {
   let routeDisposables: { dispose(): void }[] = []
   return {
     name: 'editor',
     init: (ctx) => {
+      ctx.extensionPoints.declare(EDITOR_LINE_MARKERS, 'Editor line markers')
       // The one decision this plugin opens to other plugins (docs/plugins.md § Hooks): a formatter's
       // turn at the text on its way to disk. A veto is allowed too, so a lint-on-save can refuse.
       ctx.hooks.declare({
@@ -22,7 +24,12 @@ export const editorPlugin = (): NodePlugin => {
         timeoutMs: 2_000,
       })
       routeDisposables = [
-        ctx.capabilities.provide(EDITOR, editorBridge(ctx.core, ctx.events.worktreeStatus, ctx.hooks)),
+        ctx.capabilities.provide(EDITOR, editorBridge(
+          ctx.core,
+          ctx.events.worktreeStatus,
+          ctx.hooks,
+          () => ctx.extensionPoints.handlers(EDITOR_LINE_MARKERS).map((entry) => entry.value),
+        )),
         ctx.capabilities.provide(SEARCH, searchBridge(ctx.core)),
       ]
       // `$EDITOR` in a throwaway PTY, for a reader who edits in terminal mode. It rides the one

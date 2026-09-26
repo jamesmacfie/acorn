@@ -154,9 +154,14 @@ function parseClockReset(resetText: string, now: number): number | null {
   // Month and day together, or setting the month alone would overflow out of a short one on the 31st.
   if (day) at.setMonth(MONTHS.indexOf(day[1].toLowerCase().slice(0, 3)), Number(day[2]))
   at.setHours(hour, Number(clock[2] ?? 0), 0, 0)
-  // A reset is always ahead, and no year is printed. A bare time that has already passed is
-  // tomorrow's; a date long past is last December's reading of a January reset.
-  if (!day && at.getTime() <= now) at.setDate(at.getDate() + 1)
+  // A reset is always ahead, and no year is printed. Claude omits seconds, so a probe taken during
+  // the displayed reset minute must wait for that minute to finish rather than moving the reset to
+  // tomorrow. A genuinely earlier bare time is tomorrow's; a date long past is last December's
+  // reading of a January reset.
+  if (!day && at.getTime() <= now) {
+    if (now - at.getTime() < 60_000) return at.getTime() + 60_000
+    at.setDate(at.getDate() + 1)
+  }
   if (day && at.getTime() <= now - 86_400_000) at.setFullYear(at.getFullYear() + 1)
   return at.getTime()
 }

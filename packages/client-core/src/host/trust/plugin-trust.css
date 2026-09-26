@@ -85,5 +85,7 @@
 
 /* .ui-modal-actions has no top padding, so the separator that anchors the buttons needs one. */
 .plugin-trust-actions { border-top: var(--chrome-divider); padding-top: var(--pane-pad); }
-.plugin-trust-escape { margin: 0 auto 0 0; max-width: 26ch; font-size: var(--fs-xs); color: var(--text-muted); }
+.plugin-trust-actions-with-hint { flex-direction: column; align-items: stretch; }
+.plugin-trust-escape { margin: 0; font-size: var(--fs-xs); color: var(--text-muted); }
+.plugin-trust-buttons { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: var(--space-3); }
 /* Kbd owns the cap. */

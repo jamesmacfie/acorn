@@ -91,6 +91,11 @@ describe('Claude usage parsing', () => {
   it('reads the absolute reset forms the CLI prints, and keeps the words when it cannot', () => {
     // Noon on 24 July 2026 is `capturedAt`.
     expect(parseClaudeReset('Resets 4:59pm (Pacific/Auckland)', capturedAt)).toBe(new Date(2026, 6, 24, 16, 59).getTime())
+    // The CLI prints no seconds. Reading a reset during that same minute waits for the minute to end
+    // instead of incorrectly scheduling it for tomorrow.
+    const withinResetMinute = new Date(2026, 6, 24, 16, 59, 5).getTime()
+    expect(parseClaudeReset('Resets 4:59pm (Pacific/Auckland)', withinResetMinute))
+      .toBe(new Date(2026, 6, 24, 17, 0).getTime())
     // A time already gone today is tomorrow's.
     expect(parseClaudeReset('Resets 9am', capturedAt)).toBe(new Date(2026, 6, 25, 9).getTime())
     expect(parseClaudeReset('Resets Sep 24 at 11:59pm', capturedAt)).toBe(new Date(2026, 8, 24, 23, 59).getTime())

@@ -1,4 +1,5 @@
 import { Hono } from 'hono'
+import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Task } from '@acorn/protocol/api.ts'
 import { getDb, schema } from '../../db'
@@ -131,5 +132,26 @@ describe('the active-task list route', () => {
     expect((await patch('Renamed task')).status).toBe(200)
 
     expect(broadcasts).toEqual([{ channel: 'tasks:changed', taskId: task.id }])
+  })
+
+  it('stores setup opt-out per task and defaults other task seeds to setup enabled', async () => {
+    await seed(1, 0)
+    const create = (body: Record<string, unknown>) => app.request('http://acorn.test/api/tasks', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ origin: 'local', projectId: 'project-0', branch: 'feature', ...body }),
+    })
+
+    const skipped = await create({ title: 'Skip setup', skipSetup: true })
+    const ordinary = await create({ title: 'Run setup' })
+    expect(skipped.status).toBe(200)
+    expect(ordinary.status).toBe(200)
+    const skippedId = ((await skipped.json()) as Task).id
+    const ordinaryId = ((await ordinary.json()) as Task).id
+    const rows = await t.db.select({ id: schema.tasks.id, skipSetup: schema.tasks.skipSetup }).from(schema.tasks)
+      .where(eq(schema.tasks.projectId, 'project-0'))
+    expect(rows).toContainEqual({ id: skippedId, skipSetup: true })
+    expect(rows).toContainEqual({ id: ordinaryId, skipSetup: false })
+    expect((await create({ skipSetup: 'yes' })).status).toBe(400)
   })
 })

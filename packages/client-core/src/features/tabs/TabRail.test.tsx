@@ -8,6 +8,16 @@ import { railMarkerRegistry } from '../../host/registries/rail/railMarkerFeed'
 import type { Disposable } from '../../kit/lib/registry'
 import { activeTaskId, setActiveTaskId, setSelectedSource } from '../tasks/tasks'
 
+const { createTaskMock } = vi.hoisted(() => ({ createTaskMock: vi.fn() }))
+vi.mock('../tasks/taskMutations', () => ({
+  archiveTask: vi.fn(),
+  createTask: createTaskMock,
+  patchTask: vi.fn(),
+}))
+vi.mock('../tasks/taskBridge', () => ({
+  taskBridge: () => ({ project: { get: async () => ({ config: { branchPrefix: null } }) } }),
+}))
+
 // The rail's hover prefetch. A task switch disposes the whole task scope, so what makes coming back
 // cheap is the cache being warm before the click (docs/panes.md § Contributions).
 //
@@ -55,6 +65,7 @@ const registered: Disposable[] = []
 
 beforeEach(() => {
   vi.useFakeTimers()
+  createTaskMock.mockReset()
   localStorage.clear()
   host = document.createElement('div')
   document.body.append(host)
@@ -72,11 +83,11 @@ afterEach(() => {
   vi.useRealTimers()
 })
 
-const mount = (tasks = [task('t1', 'First'), task('t2', 'Second')]) => {
+const mount = (tasks = [task('t1', 'First'), task('t2', 'Second')], gitProject = false) => {
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
   queryClient.setQueryData(tasksKey, tasks)
-  queryClient.setQueryData(workspacesKey, [])
-  queryClient.setQueryData(projectsKey, [{ id: 'p1', name: 'acorn', color: null, hidden: false }])
+  queryClient.setQueryData(workspacesKey, gitProject ? [{ id: 'w1', name: 'Workspace', projects: [{ id: 'p1' }] }] : [])
+  queryClient.setQueryData(projectsKey, [{ id: 'p1', name: 'acorn', workspaceId: 'w1', vcs: gitProject ? 'git' : null, color: null, hidden: false }])
   queryClient.setQueryData(integrationsKey, { integrations: [] })
   queryClient.setQueryData(prefsKey, {})
   dispose = render(() => <QueryClientProvider client={queryClient}><TabRail /></QueryClientProvider>, host)
@@ -308,5 +319,29 @@ describe('a row whose markers are read again', () => {
 
     setLabel('2 agents working')
     expect(host.querySelector('.tabrail-task')?.getAttribute('data-tip-legend')).toContain('2 agents working')
+  })
+})
+
+describe('new task setup choice', () => {
+  it('defaults to running setup, submits the opt-out, and resets it for the next task', async () => {
+    setActiveTaskId('t1')
+    mount(undefined, true)
+    createTaskMock.mockResolvedValue(task('created', 'Skip setup'))
+
+    host.querySelector<HTMLButtonElement>('.tabrail-bottom')!.click()
+    const checkbox = () => [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
+      .find((input) => input.closest('label')?.textContent?.includes('Skip setup script'))
+    expect(checkbox()?.checked).toBe(false)
+
+    const title = host.querySelector<HTMLInputElement>('input[placeholder="Task title"]')!
+    title.value = 'Skip setup'
+    title.dispatchEvent(new InputEvent('input', { bubbles: true }))
+    checkbox()!.click()
+    expect(checkbox()?.checked).toBe(true)
+    host.querySelector<HTMLFormElement>('form.integration-key-row')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ skipSetup: true })))
+
+    host.querySelector<HTMLButtonElement>('.tabrail-bottom')!.click()
+    expect(checkbox()?.checked).toBe(false)
   })
 })

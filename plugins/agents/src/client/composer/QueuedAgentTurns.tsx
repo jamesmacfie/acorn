@@ -7,7 +7,7 @@ import { agentConcurrencyOptions } from '../settings/concurrencyClient'
 import { managedAgentApi } from '../sessions/managedClient'
 
 const promptText = (turn: AgentTurn): string =>
-  turn.input.find((part) => part.type === 'text')?.text ?? ''
+  (turn.continuationInput ?? turn.input).find((part) => part.type === 'text')?.text ?? ''
 
 // Follow-ups typed while the session was busy, in the order they will be sent. Editable and
 // reorderable until the dispatcher takes one (docs/managed-agents.md § The turn queue).
@@ -20,12 +20,13 @@ export default function QueuedAgentTurns(props: {
 }) {
   const queued = createMemo(() =>
     props.turns.filter((turn) => turn.status === 'queued').sort((a, b) => a.ordinal - b.ordinal))
+  const scheduled = createMemo(() => queued().find((turn) => turn.notBefore != null && turn.notBefore > Date.now()))
   const [editing, setEditing] = createSignal<string | null>(null)
   const [text, setText] = createSignal('')
   const [pending, setPending] = createSignal<string | null>(null)
   // A ready session with a queued turn is the dispatcher's concurrency ceilings holding it, which is
   // the one wait with no other sign of itself: the transcript is empty and the session reads as idle.
-  const blockedByLimits = createMemo(() => props.runtimeState === 'ready')
+  const blockedByLimits = createMemo(() => props.runtimeState === 'ready' && !scheduled())
   const limits = createQuery(() => ({ ...agentConcurrencyOptions(), enabled: blockedByLimits() }))
 
   const run = async (actionId: string, operation: () => Promise<unknown>): Promise<boolean> => {
@@ -63,7 +64,9 @@ export default function QueuedAgentTurns(props: {
               when={blockedByLimits()}
               fallback={
                 <Text emphasis="muted" wrap>
-                  {props.runtimeState === 'working' || props.runtimeState === 'waiting'
+                  {scheduled()
+                    ? `Usage limit reached. Continues automatically at ${new Date(scheduled()!.notBefore!).toLocaleString()}.`
+                    : props.runtimeState === 'working' || props.runtimeState === 'waiting'
                     ? 'Sends when the current turn finishes.'
                     : 'Sends when the provider is ready.'}
                 </Text>
@@ -104,7 +107,7 @@ export default function QueuedAgentTurns(props: {
                           icon="pencil"
                           title="Edit queued prompt"
                           label="Edit queued prompt"
-                          disabled={pending() != null}
+                          disabled={pending() != null || turn.continuationInput != null}
                           onPress={() => {
                             setEditing(turn.id)
                             setText(promptText(turn))

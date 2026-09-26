@@ -613,6 +613,33 @@ derives dirty, the save chord — so a state built by an earlier mount is reconf
 screen. CodeMirror keeps the value of a state field that is present in both configurations, which is
 what makes the document and its undo history survive; the closures pointing at a destroyed view do not.
 
+## Line provenance markers
+
+Shipped 2026-09-25. The graphical editor draws up to two 2 px bars inside the existing left inset of
+each line. The accent-coloured bar means the line belongs to the task branch's committed pull-request
+diff against the pull request's base branch. The add-coloured bar means the line differs between
+`HEAD` and the file currently on disk. A line in both sets draws the two bars beside each other without
+moving the code horizontally. Pure deletions have no current line to decorate and therefore draw no
+bar.
+
+The editor owns the `editor:line-markers` Node extension point and the line-range wire shape
+(`plugins/editor/src/contract/lineMarkers.ts`). Changes contributes the uncommitted set and GitHub
+contributes the pull-request set. The editor depends on neither plugin: an absent provider produces no
+bar, and one failed provider does not suppress the other. Each provider returns positions in the
+working-tree document, which keeps the CodeMirror extension concerned only with pixels.
+
+GitHub takes the PR's base ref and head SHA from its mirror, resolves the local merge base, and compares
+that with the mirrored PR head. It then translates those PR line ranges through later local commits and
+the working-tree patch. Local insertions therefore shift later PR markers, and a local replacement of a
+PR line keeps both markers on its replacement. Changes compares `HEAD` directly with the working tree,
+so its set includes staged and unstaged edits and treats an untracked file as an addition from an empty
+document.
+
+Marker reads run beside text and grammar reads when a file first opens. The pane refreshes them after
+its own save, after a focus reload, and when a cached tab has been away for more than the two-second
+Git status coalescing window. Marker failures remain presentation failures: text still opens and stays
+editable.
+
 ## Editing in your own editor
 
 Shipped 2026-08-31. Some people have spent fifteen years

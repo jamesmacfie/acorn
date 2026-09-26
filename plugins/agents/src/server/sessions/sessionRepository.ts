@@ -262,7 +262,13 @@ export class AgentSessionRepository {
         .where(eq(schema.agentTurns.id, turnId))
         .get()
       tx.update(schema.agentTurns)
-        .set({ status: 'completed', stopReason: event.stopReason ?? null, completedAt: timestamp })
+        .set({
+          status: 'completed',
+          continuationInputJson: null,
+          notBefore: null,
+          stopReason: event.stopReason ?? null,
+          completedAt: timestamp,
+        })
         .where(and(
           eq(schema.agentTurns.id, turnId),
           inArray(schema.agentTurns.status, ['dispatching', 'active']),
@@ -286,6 +292,8 @@ export class AgentSessionRepository {
       tx.update(schema.agentTurns)
         .set({
           status: event.retryable ? 'interrupted' : 'failed',
+          continuationInputJson: null,
+          notBefore: null,
           errorJson: JSON.stringify({ code: event.code, message: event.message }),
           completedAt: timestamp,
         })

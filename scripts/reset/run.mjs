@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { spawnSync } from 'node:child_process'
 import { chmodSync, copyFileSync, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readFileSync, readdirSync, renameSync, rmdirSync, rmSync, writeFileSync, closeSync } from 'node:fs'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
-import { explicitRoot, inside, inventoryRoots } from './inventory.mjs'
+import { explicitRoot, inside, inventoryRoots, isDeviceTokenFile } from './inventory.mjs'
 
 const VERSION = 'acorn-reset-snapshot-1'
 const json = value => `${JSON.stringify(value, null, 2)}\n`
@@ -59,7 +59,7 @@ function verifiedDesktopStage(recoveryDir, desktopRoot, files) {
     const stat = lstatSync(exported)
     if (!stat.isFile() || stat.nlink !== 1 || (stat.mode & 0o077) !== 0 || digest(exported) !== entry.sha256) throw new Error(`Desktop host export failed verification: ${entry.path}`)
   }
-  const encryptedTokens = files.some(file => dirname(file.path) === desktopRoot && basename(file.path).startsWith('device-token-'))
+  const encryptedTokens = files.some(file => dirname(file.path) === desktopRoot && isDeviceTokenFile(basename(file.path)))
   if (encryptedTokens) {
     const keyFile = join(recoveryDir, 'desktop-key.txt')
     if (!stage.files.some(file => file.path === 'desktop-key.txt')) throw new Error('Desktop token key is absent from the host stage')

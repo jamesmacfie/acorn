@@ -1,7 +1,9 @@
 import { Hono } from 'hono'
+import { execFileSync } from 'node:child_process'
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { Env } from '../../bindings'
 import type { AppEnv } from '../../middleware/auth'
@@ -9,6 +11,7 @@ import { requireUser } from '../../middleware/requireUser'
 import { schema } from '../../db'
 import { makeTestDb, testSecretEnv, type TestDb } from '../../../testkit/db'
 import { setTaskSessionsBridge, worktree, type TaskSessionsBridge } from './worktree'
+import { loadTask, setWorktreesRoot } from '../../worktrees/taskWorktree'
 
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {
@@ -70,6 +73,32 @@ afterEach(() => {
 })
 
 describe('worktree routes', () => {
+  it('still prepares a worktree for a task that skips setup', async () => {
+    const git = (...args: string[]) => execFileSync('git', ['-C', dir, ...args], { stdio: 'pipe' })
+    execFileSync('git', ['init', '-b', 'main', dir], { stdio: 'pipe' })
+    git('config', 'user.email', 'test@acorn.invalid')
+    git('config', 'user.name', 'Acorn Test')
+    writeFileSync(join(dir, 'README.md'), 'test\n')
+    git('add', 'README.md')
+    git('commit', '-m', 'Initial commit')
+    const worktrees = mkdtempSync(join(tmpdir(), 'acorn-on-created-'))
+    setWorktreesRoot(worktrees)
+    try {
+      await testDb.db.update(schema.projects).set({ setupScript: 'true', setupScriptTrigger: 'created' })
+        .where(eq(schema.projects.id, 'project-widget'))
+      await testDb.db.update(schema.tasks).set({ branch: 'feature', worktreePath: null, skipSetup: true })
+        .where(eq(schema.tasks.id, 'task1'))
+
+      const app = authed()
+      const skipped = await app.fetch(req('/core/tasks/task1/on-created', 'POST'), env())
+      expect(skipped.status).toBe(200)
+      expect((await loadTask(testDb.db, 'task1'))?.worktreePath).toBeTruthy()
+    } finally {
+      setWorktreesRoot('')
+      rmSync(worktrees, { recursive: true, force: true })
+    }
+  })
+
   it('captures a preview URL from the last non-empty stdout line', async () => {
     const app = authed()
     const res = await app.fetch(req('/core/tasks/task1/preview-url', 'POST', { script: 'echo noise; echo http://localhost:3000' }), env())

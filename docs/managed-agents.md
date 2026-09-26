@@ -515,6 +515,13 @@ The transcript labels a `delegation` turn "From" and the owner's title, and a `d
 turn "From" and the child's title, using the matching context part
 (`plugins/agents/src/client/sessions/turnSender.ts`). Every other user turn is "You".
 
+Message headers show a small time in the reader's device timezone, styled like the sender label.
+Hovering or focusing that time shows the full local date and time with its timezone and relative age.
+Expanded built-in tool calls show the local date, timezone, and relative age below the command input;
+the collapsed row has no time tooltip. The Node stamps every event when it records it. The conversation
+projection keeps the first event's time when message fragments or tool updates fold into one card, so a
+streaming card's time stays fixed.
+
 ## Web activity
 
 A reader should be able to answer, from the transcript alone, what an agent searched for, which pages
@@ -621,11 +628,12 @@ when a session starts, so a default is a value keyed by the provider id and the 
 from. A harness added later is defaultable the moment it advertises anything, and a new kind of
 option, a fast mode say, needs no change on the acorn side to be remembered.
 
-One `prefs` row (`agents:session-defaults:v1`) holds three fields. `followLastSession`, on by
-default, decides which of the other two applies. `last` is written by the runtime whenever a session's
+One `prefs` row (`agents:session-defaults:v1`) holds four fields. `followLastSession`, on by
+default, decides which of `last` and `pinned` applies. `last` is written by the runtime whenever a session's
 option changes, and `pinned` is written by the owner under Settings > Agent defaults. Neither writer
 sends the other's field, and the write merges server-side, so the Settings page cannot flatten a
-switch made while it was open.
+switch made while it was open. `continueAfterUsageLimit`, also on by default, controls the durable
+usage-window continuation described under Operations and failure.
 
 Both halves hang off `ManagedAgentRuntime`, which is where every path that opens a session and every
 path that changes one already meets:
@@ -811,6 +819,30 @@ and when a turn settles. A scan that starts nothing rescans when a call arrived 
 because that call's turn cannot be in the snapshot the scan is working from, and the reconcile pass
 runs one scan at boot. Without both, a turn queued at the wrong moment waits for an unrelated session
 to finish a turn before anything looks at it again.
+
+**A plan usage limit pauses the same logical turn until the account resets.** The runtime first needs
+two independent facts: a provider error that looks like a usage or rate limit, and that harness's
+fresh usage collector reporting every depleted quota with an exact reset time. It waits for the
+latest depleted window, adds a short boundary grace period, stores that time and a continuation prompt
+on the active turn, and moves the turn back to the durable queue. The original input, turn id, source,
+and effective policy stay intact, so workflow and delegation callers continue waiting for the same
+operation. At the stored time the dispatcher sends the continuation prompt into the existing provider
+session; the attempt counter advances and the final provider completion settles the turn normally.
+
+The queue time survives a Node restart and the transcript says when Acorn will continue. The queued
+card shows the same time and may be removed by the owner. Settings > Agent defaults exposes
+`continueAfterUsageLimit`; turning it off leaves later limit errors on the ordinary failure path.
+Harnesses do not need a continuation-specific hook. A built-in or contributed harness gets this
+behavior when its normalized failure names the limit and its registered usage collector returns
+depleted quotas with `resetsAt`. A collector with no exact reset cannot schedule safely and the error
+remains a failure. This also keeps short transient rate limits out of the hours-long queue unless the
+plan collector confirms that an account window is exhausted.
+
+Claude Code has its own process-local automatic continuation. The Claude harness disables that for
+ACP sessions through the adapter's session metadata, so the Acorn setting is authoritative and a Node
+restart cannot lose the wait. This does not change Claude Code sessions launched directly in a
+terminal; they continue to use the owner's Claude setting.
+
 Cancellation, timeout, provider disconnect, and restart are explicit states. A live stream can be
 lost without killing the provider process, and the client reattaches from the session sequence or
 terminal replay tail.

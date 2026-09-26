@@ -27,6 +27,7 @@ describe('conversation projection', () => {
       'hello world',
       'separate',
     ])
+    expect(items.map((item) => item.createdAt)).toEqual([1, 3])
   })
 
   it('folds a tool call\u2019s updates into one card and keeps the last reported status', () => {
@@ -50,6 +51,7 @@ describe('conversation projection', () => {
       paths: undefined,
     })
     expect(card.lastSeq).toBe(4)
+    expect(card.createdAt).toBe(1)
   })
 
   it('folds a turn\u2019s usage updates into one line, including a trailing one with no turn', () => {

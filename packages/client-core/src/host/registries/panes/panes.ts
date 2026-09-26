@@ -41,7 +41,7 @@ type PaneCommon = {
   /**
    * This pane can draw an archived task: it reads the task's stored history and needs no worktree
    * (docs/panes.md § Contributions). The archive page previews an archived task in the ordinary pane
-   * host, and a pane without this shows a restore prompt there instead of itself.
+   * host, and a pane without this is omitted from both its layout and switcher.
    *
    * Opt in, because the safe default is not to run. An editor, a diff, a container or a run target
    * would find no worktree, and a pane that can start work would start it on a task that is archived.
@@ -247,7 +247,9 @@ export const paneContribution = (id: PaneId): PaneContribution | undefined => pa
 export const paneIds = (): PaneId[] => paneContributions().map((pane) => pane.id)
 export const paneLabel = (id: PaneId): string => paneContribution(id)?.label ?? id
 export const paneAvailable = (pane: PaneContribution, task?: Task): boolean =>
-  hasHostCapability(pane.requires) && (!task || !pane.when || pane.when(task))
+  hasHostCapability(pane.requires)
+  && (!task || task.status !== 'archived' || pane.readsArchived === true)
+  && (!task || !pane.when || pane.when(task))
 
 /** A hover shorter than this is the pointer crossing the rail, not a reader looking at a row. */
 export const PANE_PREFETCH_HOVER_MS = 150

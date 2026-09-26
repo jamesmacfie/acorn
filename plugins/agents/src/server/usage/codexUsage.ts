@@ -173,8 +173,9 @@ function quota(
     typeof window.resetsAt === 'number' && Number.isFinite(window.resetsAt) ? window.resetsAt : null
   // Codex sends the window length with some payloads and not others, so its own number wins and the
   // usual five hours or week stands in when it is absent.
+  const reportedWindowMinutes = window.windowDurationMins ?? window.windowMinutes
   const windowMinutes =
-    typeof window.windowMinutes === 'number' && window.windowMinutes > 0 ? window.windowMinutes : null
+    typeof reportedWindowMinutes === 'number' && reportedWindowMinutes > 0 ? reportedWindowMinutes : null
   return {
     id,
     label,

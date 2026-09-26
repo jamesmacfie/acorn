@@ -363,7 +363,7 @@ function startIdleWatch() {
 // path creates the worktree. Ordered before any requested session, so a setup spawned from create() is
 // tab #1.
 async function maybeRunSetup(t: TaskRef, cwd: string): Promise<void> {
-  if (!t.projectId) return
+  if (!t.projectId || t.skipSetup) return
   const { script, trigger } = await services().projects.setup(t.projectId)
   if (trigger === 'off' || !script?.trim()) return
   await spawnOne({ taskId: t.id, command: script, title: 'Setup' }, cwd, true, taskContext(t), t)

@@ -11,7 +11,7 @@ import { AgentToolFoldContext, type AgentToolFoldSetting } from './toolFoldPrefs
 const hosts: Array<() => void> = []
 afterEach(() => { for (const dispose of hosts.splice(0).reverse()) dispose() })
 
-const draw = (tool: AgentToolCall, startsOpen = true) => {
+const draw = (tool: AgentToolCall, startsOpen = true, createdAt = Date.parse('2026-09-25T03:24:18Z')) => {
   const host = document.createElement('div')
   document.body.append(host)
   const setting: AgentToolFoldSetting = { startsOpen: () => startsOpen, onToggle: () => {} }
@@ -20,13 +20,28 @@ const draw = (tool: AgentToolCall, startsOpen = true) => {
   const dispose = render(() => (
     <QueryClientProvider client={new QueryClient()}>
       <AgentToolFoldContext.Provider value={setting}>
-        <AgentToolCallCard tool={tool} taskId="task-1" />
+        <AgentToolCallCard tool={tool} taskId="task-1" createdAt={createdAt} />
       </AgentToolFoldContext.Provider>
     </QueryClientProvider>
   ), host)
   hosts.push(() => { dispose(); host.remove() })
   return host
 }
+
+it('shows the local and relative time below an expanded command, with no row hover time', () => {
+  const at = Date.now() - 2 * 60_000
+  const host = draw({ id: 't', title: 'Run command', status: 'completed', input: 'pwd', output: '/repo' }, false, at)
+  const fold = host.querySelector('details')!
+  expect(fold.open).toBe(false)
+  expect(host.querySelector('[data-tip]')).toBeNull()
+  fold.open = true
+  fold.dispatchEvent(new Event('toggle'))
+  const body = fold.querySelector('.ui-fold-body') ?? fold
+  expect(body.textContent).toContain('Started ')
+  expect(body.textContent).toContain(Intl.DateTimeFormat().resolvedOptions().timeZone)
+  expect(body.textContent).toContain('2m ago')
+  expect(body.textContent?.indexOf('pwd')).toBeLessThan(body.textContent!.indexOf('Started '))
+})
 
 it('gives a call with a web payload the web body, however its kind is spelled', () => {
   for (const kind of ['search', 'fetch', undefined]) {

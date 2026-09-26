@@ -377,6 +377,16 @@ describe('pane layouts', () => {
       .toContain('collapsible is only valid on a list-detail pane')
   })
 
+  it('allows only a task pane to opt into archived-task previews', () => {
+    const parsed = manifest({ frames: [{ ...PANE, readsArchived: true }] })
+    expect(parsed.success && parsed.data.contributions.frames[0].readsArchived).toBe(true)
+    expect(messages(manifest({
+      frames: [{ target: 'settings', id: 'board', label: 'Board', layout: 'single', regions: { body: 'frame' }, readsArchived: true }],
+    }))).toContain('readsArchived is only valid on a task pane')
+    expect(messages(manifest({ frames: [{ ...PANE, scope: 'project', readsArchived: true }] })))
+      .toContain('readsArchived is only valid on a task pane')
+  })
+
   it('refuses a layout name this build does not draw, and a region the layout does not have', () => {
     expect(manifest({ frames: [{ ...PANE, layout: 'carousel', regions: { body: doc({ read: '/v1/p/board/doc' }) } }] }).success).toBe(false)
     expect(messages(manifest({ frames: [{ ...PANE, layout: 'single', regions: { body: 'frame', sidebar: 'frame' } }] })))

@@ -192,6 +192,10 @@ const frameSurface = z.object({
   order: z.number().int().min(0).max(100_000).default(500),
   // A diagnostic pane can stay addressable by a command without occupying the everyday switcher.
   showInSwitcher: z.boolean().optional(),
+  // A task pane that can draw entirely from stored history may opt into archived-task previews.
+  // Absent is deliberately false: archived tasks have no worktree, and mounting an ordinary pane
+  // may otherwise start work that the owner did not restore.
+  readsArchived: z.boolean().optional(),
   // Lets a mobile shell skip a desktop-shaped pane instead of rendering it unusably.
   formFactor: z.array(z.enum(['desktop', 'mobile'])).min(1).max(2).default(['desktop']),
   // `refPanel` and task-scoped `pane`. The client adapter checks it against the plugin id: a surface
@@ -245,6 +249,9 @@ const frameSurface = z.object({
   }
   if (surface.collapsible && (surface.target !== 'pane' || surface.layout !== 'list-detail')) {
     ctx.addIssue({ code: 'custom', path: ['collapsible'], message: 'collapsible is only valid on a list-detail pane' })
+  }
+  if (surface.readsArchived && (surface.target !== 'pane' || surface.scope !== 'task')) {
+    ctx.addIssue({ code: 'custom', path: ['readsArchived'], message: 'readsArchived is only valid on a task pane' })
   }
   if (!surface.layout) return
   const problem = regionProblem(surface.layout, Object.keys(surface.regions ?? {}))
