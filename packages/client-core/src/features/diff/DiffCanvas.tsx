@@ -48,7 +48,7 @@ export function DiffCanvas(props: {
   /** The geometry for the mode on screen: what is mounted, and where. */
   layout: CanvasLayout
   stickyHead: () => JSX.Element
-  // The scroller must be handed back: the virtualizer only produces items once it has this element.
+  // The scroller must be handed back: the layout mounts no items until it has this element.
   publishScrollEl: (element: HTMLDivElement, mode: ViewMode) => void
   onScroll: (element: HTMLDivElement) => void
   /** Widest code line in columns: the row canvas's width, since code lines don't wrap. */

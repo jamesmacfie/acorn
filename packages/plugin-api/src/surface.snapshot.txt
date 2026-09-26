@@ -630,7 +630,6 @@ ui/data-sources: SourceQueryEditor
 ui/data-sources: TypedBindingPicker
 ui/diff: CodeRow
 ui/diff: CommentSide
-ui/diff: DIFF_LOAD_ROW_HEIGHT
 ui/diff: DiffCollapsedFiles
 ui/diff: DiffDocumentFile
 ui/diff: DiffDocumentTopology
@@ -661,13 +660,10 @@ ui/diff: ViewMode
 ui/diff: buildDiffRows
 ui/diff: buildDiffRowsAsync
 ui/diff: buildRenderableRows
-ui/diff: collectMatches
 ui/diff: createDiffSnippets
 ui/diff: createSplitScrollSync
 ui/diff: diffScopeKey
 ui/diff: documentTopology
-ui/diff: estimateRowSize
-ui/diff: estimateSplitBandSize
 ui/diff: expandGap
 ui/diff: expandGapAsync
 ui/diff: gapId
@@ -676,7 +672,6 @@ ui/diff: isCodeRow
 ui/diff: maxLineCols
 ui/diff: plainTokenize
 ui/diff: rowIdentityKeys
-ui/diff: splitBandIdentityKeys
 ui/diff: synth
 ui/diff: toBands
 ui/diff: tokenizeDocument

@@ -182,7 +182,8 @@ when the diff viewer stopped taking whole patches. `DiffSource` lost `files`, `c
 `fetchPatches`, `contentSignature`, `contentKey`, `hasLineExtra` and `lineExtraSignature`, and gained
 `topology`, `loadSegments` and `search`; `lineExtra` became `{ anchors, render }`, so a source names
 the lines it draws under before any row is built. `createDiffHydrator` came off `/ui/diff` with the
-hydrator. What a provider now builds on its node is a diff document from `@acorn/diff-document`, and
+hydrator, and so did the helpers only the whole-document viewer used: `estimateRowSize`,
+`estimateSplitBandSize`, `splitBandIdentityKeys`, `DIFF_LOAD_ROW_HEIGHT` and `collectMatches`. What a provider now builds on its node is a diff document from `@acorn/diff-document`, and
 `/ui/diff` carries the document types the port is written in. A type change to a port is a break
 whether or not a name vanishes, so the major moved for the port as much as for the name
 ([plugin-authoring.md](../plugin-authoring.md) § Drawing a diff says how to move a source).
