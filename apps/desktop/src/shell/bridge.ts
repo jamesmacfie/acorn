@@ -304,6 +304,7 @@ const acorn = {
     state: () => call('plugins-state'),
     cachePut: (request: unknown) => call('plugins-cache-put', request),
     trustRecord: (request: unknown) => call<void>('plugins-trust-record', request),
+    trustForget: (request: unknown) => call<void>('plugins-trust-forget', request),
     devGrant: (request: unknown) => call<void>('plugins-dev-grant', request),
   },
 

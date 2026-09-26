@@ -1,7 +1,7 @@
 import type { HttpBindings } from '@hono/node-server'
 import { randomUUID } from 'node:crypto'
 import { chmodSync, closeSync, existsSync, lstatSync, mkdirSync, openSync, readdirSync, readFileSync, writeFileSync } from 'node:fs'
-import { readFile, writeFile } from 'node:fs/promises'
+import { readFile, rename, rm, writeFile } from 'node:fs/promises'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
@@ -76,9 +76,9 @@ export type RuntimeBindings = {
 // at the app.fetch() seam (server/transport/listener.ts); tests and non-HTTP callers don't provide them.
 export type Env = RuntimeBindings & Partial<HttpBindings>
 
-// Immutable blob and patch bodies keyed by sha (docs/caching.md § Immutable blob cache). One file
-// per key under `dir`; keys are `filebody:<sha>` and `patch:<sha>`, with the colon sanitized for a
-// safe filename.
+// Immutable file and patch bodies keyed by content (docs/caching.md § Immutable blob cache). One
+// file per key under `dir`; keys are `filebody:<sha>` and `patch:sha256:<hex>` (server/blobs.ts),
+// with each colon sanitized for a safe filename.
 export type BlobCache = {
   get(key: string): Promise<string | null>
   put(key: string, value: string): Promise<void>
@@ -113,10 +113,20 @@ export function diskBlobCache(dir: string): BlobCache {
         return null // ENOENT (cache miss) and any read error → treat as miss
       }
     },
+    // Written beside the entry and renamed over it, so a reader never sees half a body. A mirror
+    // refresh rewrites entries that other requests are reading, and the diff parse cache keeps what
+    // it read under the patch digest as if it could never be wrong.
     async put(key, value) {
       const path = fileFor(key)
-      await writeFile(path, value, { encoding: 'utf8', mode: 0o600 })
-      chmodSync(path, 0o600) // writeFile preserves an existing inode's prior mode
+      const staged = `${path}.${randomUUID()}.tmp`
+      try {
+        await writeFile(staged, value, { encoding: 'utf8', mode: 0o600 })
+        chmodSync(staged, 0o600) // the mode a new file gets is narrowed by the umask
+        await rename(staged, path)
+      } catch (error) {
+        await rm(staged, { force: true })
+        throw error
+      }
     },
   }
 }

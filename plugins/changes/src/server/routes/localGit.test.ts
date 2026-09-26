@@ -1,6 +1,6 @@
 import { createTaskService } from '@acorn/plugin-api/testkit'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
@@ -12,6 +12,9 @@ import type { AppEnv } from '@acorn/plugin-api/testkit'
 import { requireUser } from '@acorn/plugin-api/testkit'
 import { onServerError } from '@acorn/plugin-api/testkit'
 import { localGit, setLocalGitBridge, type GitActionResult } from './localGit'
+import { _resetLocalDocuments } from '../localDocument'
+import type { LocalDocumentResponse } from '../../shared/api'
+import type { DiffSearchPage, DiffSegmentPayload } from '@acorn/diff-document/document'
 import { ProviderOperationError, type GenerateTextRequest } from '@acorn/plugin-api/node'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { Env } from '@acorn/plugin-api/testkit'
@@ -90,13 +93,14 @@ describe('local-git routes over a real worktree', () => {
     expect((await statusOf(app)).changes.find((c) => c.path === 'new.txt')?.staged).toBe(true)
   })
 
-  it('400s an empty path list, the old single-path body, and a diff with no path query', async () => {
+  it('400s an empty path list, the old single-path body, and a document with no scope', async () => {
     const app = authed()
     expect((await app.fetch(req('/api/tasks/task1/local/stage', 'POST', { paths: [] }), {} as Env)).status).toBe(400)
     expect((await app.fetch(req('/api/tasks/task1/local/stage', 'POST', { path: 'new.txt' }), {} as Env)).status).toBe(400)
     expect((await app.fetch(req('/api/tasks/task1/local/unstage', 'POST', { path: 'new.txt' }), {} as Env)).status).toBe(400)
     expect((await app.fetch(req('/api/tasks/task1/local/stage', 'POST', {}), {} as Env)).status).toBe(400)
-    expect((await app.fetch(req('/api/tasks/task1/local/diff'), {} as Env)).status).toBe(400)
+    expect((await app.fetch(req('/api/tasks/task1/local/document', 'POST', { files: [] }), {} as Env)).status).toBe(400)
+    expect((await app.fetch(req('/api/tasks/task1/local/document/segments', 'POST', { scope: 'unstaged', requests: [] }), {} as Env)).status).toBe(400)
   })
 
   // Each commit flag is strictly a boolean. `'yes'` is a caller bug, and coercing it would amend a
@@ -398,5 +402,121 @@ describe('the generated commit message', () => {
   it('503s without a bridge', async () => {
     setLocalGitBridge(null)
     expect((await authed().fetch(req('/api/tasks/task1/local/model-connections'), {} as Env)).status).toBe(503)
+  })
+})
+
+// The diff document over a real tree: descriptors for the stack, segments by digest, find across it,
+// and the refusal that keeps the viewer from drawing one file from two states of the tree.
+describe('the local diff document', () => {
+  let t: TestDb
+  let work: string
+  const git = (...args: string[]) => execFileSync('git', args, { cwd: work })
+  const lines = (count: number, word: string) => Array.from({ length: count }, (_, i) => `${word} ${i}`).join('\n') + '\n'
+
+  beforeEach(async () => {
+    _resetLocalDocuments()
+    work = mkdtempSync(join(tmpdir(), 'acorn-localdoc-'))
+    git('init', '-q')
+    git('config', 'user.email', 'test@acorn.dev')
+    git('config', 'user.name', 'Acorn Test')
+    writeFileSync(join(work, 'a.txt'), lines(200, 'alpha'), 'utf8')
+    writeFileSync(join(work, 'b.txt'), lines(10, 'beta'), 'utf8')
+    git('add', '.')
+    git('commit', '-qm', 'base')
+    t = makeTestDb()
+    setLocalGitBridge(localGitBridge({ tasks: createTaskService(t.db), models: noModels }))
+    const now = Date.now()
+    await t.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db.insert(schema.projects).values({
+      id: 'project-doc', name: 'doc', path: work, workspaceId: 'workspace-1', sort: 0, hidden: false,
+      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
+      createdAt: now, updatedAt: now,
+    })
+    await t.db.insert(schema.tasks).values({
+      id: 'task1', title: 'T', origin: 'local', projectId: 'project-doc', branch: 'main',
+      worktreePath: work, pullNumber: null, status: 'active', sort: 0, createdAt: now, updatedAt: now, archivedAt: null,
+    })
+  })
+  afterEach(() => {
+    setLocalGitBridge(null)
+    t.cleanup()
+    rmSync(work, { recursive: true, force: true })
+  })
+
+  const post = async <T,>(path: string, body: unknown): Promise<{ status: number; body: T }> => {
+    const res = await authed().fetch(req(`/api/tasks/task1/local/${path}`, 'POST', body), {} as Env)
+    return { status: res.status, body: (await res.json()) as T }
+  }
+  const documentOf = (scope: 'staged' | 'unstaged', key = 'k1') =>
+    post<LocalDocumentResponse>('document', { scope, files: ['a.txt', 'b.txt', 'c.txt'].map((path) => ({ path, key })) })
+
+  it('answers descriptors for the stack, in order, with untracked files and no-diff files included', async () => {
+    writeFileSync(join(work, 'a.txt'), lines(200, 'alpha').replace('alpha 5\n', 'ALPHA five\n').replace('alpha 150\n', 'ALPHA 150\n'), 'utf8')
+    writeFileSync(join(work, 'c.txt'), lines(3, 'gamma'), 'utf8')
+    const { status, body } = await documentOf('unstaged')
+    expect(status).toBe(200)
+    expect(body.files.map((file) => file.path)).toEqual(['a.txt', 'b.txt', 'c.txt'])
+    const [a, b, c] = body.files
+    // Two hunks far apart: two segments, because a gap between hunks always opens a segment.
+    expect(a!.patchKey).toMatch(/^sha256:/)
+    expect(a!.segments.map((segment) => segment.rows)).toEqual([expect.any(Number), expect.any(Number)])
+    expect(b).toEqual({ path: 'b.txt', patchKey: null, segments: [] })
+    expect(c!.segments[0]).toMatchObject({ rows: 5, lines: [0, 0, 1, 3] })
+
+    const segments = await post<DiffSegmentPayload[]>('document/segments', { scope: 'unstaged', requests: [{ path: 'c.txt', patchKey: c!.patchKey, ordinal: 0 }] })
+    expect(segments.body[0]!.rows.filter((row) => row.kind === 'insert').map((row) => 'raw' in row && row.raw)).toEqual(['gamma 0', 'gamma 1', 'gamma 2'])
+
+    const found = await post<DiffSearchPage>('document/search', {
+      scope: 'unstaged', query: 'alpha', caseSensitive: true, cursor: null,
+      files: body.files.flatMap((file) => (file.patchKey ? [{ path: file.path, patchKey: file.patchKey }] : [])),
+    })
+    expect(found.body.matches.length).toBeGreaterThan(0)
+    expect(found.body.matches.every((match) => match.path === 'a.txt')).toBe(true)
+  })
+
+  it('refuses a segment cut from a state of the tree the last document no longer describes', async () => {
+    writeFileSync(join(work, 'a.txt'), lines(200, 'alpha').replace('alpha 5\n', 'first edit\n'), 'utf8')
+    const before = (await documentOf('unstaged')).body.files[0]!
+    writeFileSync(join(work, 'a.txt'), lines(200, 'alpha').replace('alpha 5\n', 'second edit\n'), 'utf8')
+    const after = (await documentOf('unstaged', 'k2')).body.files[0]!
+    expect(after.patchKey).not.toBe(before.patchKey)
+    const stale = await post('document/segments', { scope: 'unstaged', requests: [{ path: 'a.txt', patchKey: before.patchKey, ordinal: 0 }] })
+    expect(stale.status).toBe(409)
+    const fresh = await post<DiffSegmentPayload[]>('document/segments', { scope: 'unstaged', requests: [{ path: 'a.txt', patchKey: after.patchKey, ordinal: 0 }] })
+    expect(fresh.status).toBe(200)
+    // The same status key again reads nothing new and answers the same digest.
+    expect((await documentOf('unstaged', 'k2')).body.files[0]!.patchKey).toBe(after.patchKey)
+  })
+
+  it('reads each file its own patch whatever the diff prefixes, and when a path contains " b/"', async () => {
+    mkdirSync(join(work, 'Plan b'), { recursive: true })
+    writeFileSync(join(work, 'c.md'), 'one\n', 'utf8')
+    writeFileSync(join(work, 'Plan b', 'c.md'), 'two\n', 'utf8')
+    git('add', '.')
+    git('commit', '-qm', 'twins')
+    git('config', 'diff.noprefix', 'true')
+    writeFileSync(join(work, 'c.md'), 'one edited\n', 'utf8')
+    writeFileSync(join(work, 'Plan b', 'c.md'), 'two edited\n', 'utf8')
+    const { body } = await post<LocalDocumentResponse>('document', { scope: 'unstaged', files: ['c.md', 'Plan b/c.md'].map((path) => ({ path, key: 'k1' })) })
+    for (const [file, text] of [[body.files[0]!, 'one edited'], [body.files[1]!, 'two edited']] as const) {
+      expect(file.patchKey).toMatch(/^sha256:/)
+      const rows = (await post<DiffSegmentPayload[]>('document/segments', { scope: 'unstaged', requests: [{ path: file.path, patchKey: file.patchKey, ordinal: 0 }] })).body[0]!.rows
+      expect(rows.filter((row) => row.kind === 'insert').map((row) => 'raw' in row && row.raw)).toEqual([text])
+    }
+  })
+
+  it('keeps the staged and unstaged stacks apart for a file in both', async () => {
+    writeFileSync(join(work, 'a.txt'), lines(200, 'alpha').replace('alpha 5\n', 'staged edit\n'), 'utf8')
+    git('add', 'a.txt')
+    writeFileSync(join(work, 'a.txt'), lines(200, 'alpha').replace('alpha 5\n', 'staged edit\n').replace('alpha 9\n', 'unstaged edit\n'), 'utf8')
+    const staged = (await documentOf('staged')).body.files[0]!
+    const unstaged = (await documentOf('unstaged')).body.files[0]!
+    expect(staged.patchKey).not.toBe(unstaged.patchKey)
+    const read = async (scope: 'staged' | 'unstaged', file: typeof staged) =>
+      (await post<DiffSegmentPayload[]>('document/segments', { scope, requests: [{ path: 'a.txt', patchKey: file.patchKey, ordinal: 0 }] })).body[0]!.rows
+    expect(JSON.stringify(await read('staged', staged))).not.toContain('unstaged edit')
+    expect(JSON.stringify(await read('unstaged', unstaged))).toContain('unstaged edit')
+    // A staged digest asked for as unstaged is not that stack's revision.
+    expect((await post('document/segments', { scope: 'unstaged', requests: [{ path: 'a.txt', patchKey: staged.patchKey, ordinal: 0 }] })).status).toBe(409)
   })
 })

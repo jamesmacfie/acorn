@@ -322,7 +322,7 @@ describe('architecture boundaries', () => {
     const CALLS_CONSOLE = /\bconsole\s*\.\s*(?:log|warn|error|info|debug)\s*\(/
     const callsConsole = (source: string): boolean =>
       CALLS_CONSOLE.test(source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''))
-    // Baseline, not an allowlist: entries may only be removed. Six files, all deliberate.
+    // Baseline, not an allowlist: entries may only be removed. Five files, all deliberate.
     const CONSOLE_BASELINE = [
       // IS the logger.
       'packages/client-core/src/infra/telemetry/logger.ts',
@@ -330,9 +330,6 @@ describe('architecture boundaries', () => {
       // scripts/build-plugin.mjs, it has no API client and no telemetry emitter to reach, and its
       // console is the one a plugin author opens on their own frame.
       'packages/client-core/src/host/frames/sdk.ts',
-      // `kit/` may import `kit/` and the highlighter and nothing else, which is the design-system
-      // contract the rule above this one holds. One line, in the diff hydrator.
-      'packages/client-core/src/kit/diff/hydration.ts',
       // The terminal client's three deliberate ones. Its stderr is the screen, so none of these is
       // a log line (docs/tui.md § What the terminal client reports).
       //
@@ -487,9 +484,13 @@ describe('architecture boundaries', () => {
       // Core-owned CSS for a core-owned component the plugin renders.
       '@acorn/client-core/features/workspaces/onboarding.css',
     ])
+    // `@acorn/diff-document` beside protocol: a runtime-neutral contract with no host state in it,
+    // which a provider's node builds diff documents with and its client hands the viewer
+    // (docs/diff-rendering.md § The document).
+    const SHARED = new Set(['@acorn/plugin-api', '@acorn/protocol', '@acorn/diff-document'])
     const offenders = crossPackage
       .filter((e) => e.fromPkg.kind === 'plugin' && !isTestCode(e.fromFile))
-      .filter((e) => e.target.pkg!.name !== '@acorn/plugin-api' && e.target.pkg!.name !== '@acorn/protocol')
+      .filter((e) => !SHARED.has(e.target.pkg!.name))
       .filter((e) => !isContract(e.target.pkg, e.target.file))
       .filter((e) => !ALLOWED_CSS.has(e.spec))
       .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
@@ -510,7 +511,10 @@ describe('architecture boundaries', () => {
     // Keeps a production file from importing test scaffolding, which is how a tmp-dir SQLite factory
     // ends up shipped. Any package's testkit/, not just node-core's: the rule immediately found the
     // same shape in plugins/github.
-    const offenders = EDGES.filter((e) => !isTestCode(e.fromFile))
+    // One exception: the agent-automation seeder, which writes fixtures into a throwaway data root
+    // before the window starts and is test scaffolding by purpose (docs/testing.md § Large-surface
+    // fixture). It never ships: apps/desktop/scripts/ is build and dev tooling.
+    const offenders = EDGES.filter((e) => !isTestCode(e.fromFile) && rel(e.fromFile) !== 'apps/desktop/scripts/agent/seed.ts')
       .filter((e) => e.target.file?.includes('/src/testkit/') || e.target.file?.endsWith('/src/testkit.ts'))
       .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
     expect([...new Set(offenders)].sort()).toEqual([])
@@ -574,6 +578,7 @@ describe('architecture boundaries', () => {
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 10,
+      '@acorn/diff-document': 2,
     }
     const problems: string[] = []
     for (const [name, limit] of Object.entries(limits)) {
@@ -956,11 +961,12 @@ describe('architecture boundaries', () => {
     expect([...new Set(crossed)].sort()).toEqual([])
   })
 
-  it('plugin-api is a facade: re-exports only, and only of the three core packages', () => {
-    // The moment the facade grows behaviour of its own it becomes a fourth core package with its own
-    // bugs.
+  it('plugin-api is a facade: re-exports only, and only of the core packages', () => {
+    // The moment the facade grows behaviour of its own it becomes another core package with its own
+    // bugs. `@acorn/diff-document` is on the list because `ui/diff` publishes the document types the
+    // viewer's port is written in (docs/diff-rendering.md § The document).
     const api = PACKAGES.find((p) => p.name === '@acorn/plugin-api')!
-    const CORE = new Set(['@acorn/node-core', '@acorn/client-core', '@acorn/protocol', '@acorn/plugin-api'])
+    const CORE = new Set(['@acorn/node-core', '@acorn/client-core', '@acorn/protocol', '@acorn/plugin-api', '@acorn/diff-document'])
     const foreign = EDGES.filter((e) => e.fromPkg.name === api.name && e.target.pkg && !CORE.has(e.target.pkg.name))
       .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
     // Re-exports only: no plain imports, and no declarations. `export … from` is the whole file.

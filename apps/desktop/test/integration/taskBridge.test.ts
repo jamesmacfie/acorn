@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest'
-import { hasHostCapability } from '@acorn/client-core/infra/node'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { hasHostCapability, refreshNodePlugins } from '@acorn/client-core/infra/node'
 import { canPickFolder, pickFolder } from '@acorn/client-core/infra/platform'
 import { taskBridge } from '@acorn/client-core/features/tasks'
 import { terminalApi } from '@acorn/plugin-terminal/testkit/client'
@@ -24,11 +24,18 @@ const setHost = (folderPath: unknown) => {
 
 afterEach(() => {
   delete (globalThis as { window?: unknown }).window
+  vi.unstubAllGlobals()
 })
 
 describe('the folder picker is a desktop extra, not a feature gate', () => {
-  it('reports itself absent without a host, and takes nothing else down with it', () => {
+  it('reports itself absent without a host, and takes nothing else down with it', async () => {
     setHost(undefined)
+    // In a browser-origin client the running Node roster, rather than a native picker, proves the
+    // terminal service exists. Unknown rosters must remain unavailable.
+    vi.stubGlobal('fetch', async () => new Response(JSON.stringify({ plugins: [
+      { name: 'terminal', required: false, disabled: false, running: true, state: 'active', active: null },
+    ] }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    await refreshNodePlugins()
     expect(canPickFolder()).toBe(false)
     expect(hasHostCapability('desktop')).toBe(false)
     // The regression this whole split exists to prevent.

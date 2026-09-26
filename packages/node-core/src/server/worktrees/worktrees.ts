@@ -1,4 +1,5 @@
 import { gitOrThrow } from '../core/git'
+import { ProcessError } from '../core/proc'
 import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { isValidBranch } from '@acorn/protocol/branch.ts'
@@ -56,6 +57,13 @@ export const staleWorktreeReason = (path: string, branch: string, on: string | n
 // path runs setup (docs/terminal-and-agents.md).
 type EnsureWorktreeResult = { ok: true; path: string; created: boolean } | { ok: false; reason: string }
 
+// Git stderr can contain remote URLs with credentials. Surface the one actionable local setup
+// failure without forwarding arbitrary command output to a task pane or plugin caller.
+const gitFailure = (summary: string, error: unknown): string =>
+  error instanceof ProcessError && /You have not agreed to the Xcode license agreements/.test(error.result.stderr)
+    ? `${summary} Accept the Xcode license in Terminal, or install the standalone Command Line Tools.`
+    : summary
+
 export async function ensureWorktree(
   worktreesRoot: string,
   checkout: string,
@@ -92,8 +100,8 @@ export async function ensureWorktree(
     const head = `refs/acorn/pull/${pullNumber}`
     try {
       await gitOrThrow(['fetch', '--no-tags', '--quiet', 'origin', `+pull/${pullNumber}/head:${head}`], { cwd: checkout, timeoutMs: 60_000 })
-    } catch {
-      return { ok: false, reason: `Could not fetch pull/${pullNumber}/head.` }
+    } catch (error) {
+      return { ok: false, reason: gitFailure(`Could not fetch pull/${pullNumber}/head.`, error) }
     }
     const exists = await branchExists(checkout, branch)
     const args = exists
@@ -101,8 +109,8 @@ export async function ensureWorktree(
       : ['worktree', 'add', '-b', branch, '--', path, head]
     try {
       await gitOrThrow(args, { cwd: checkout, timeoutMs: 60_000 })
-    } catch {
-      return { ok: false, reason: 'Could not create the worktree.' }
+    } catch (error) {
+      return { ok: false, reason: gitFailure('Could not create the worktree.', error) }
     }
     invalidateWorktreeStatus(path)
     return { ok: true, path, created: true }
@@ -119,8 +127,8 @@ export async function ensureWorktree(
     : ['worktree', 'add', '-b', branch, '--', path]
   try {
     await gitOrThrow(args, { cwd: checkout, timeoutMs: 60_000 })
-  } catch {
-    return { ok: false, reason: `Could not create a worktree for ${branch}.` }
+  } catch (error) {
+    return { ok: false, reason: gitFailure(`Could not create a worktree for ${branch}.`, error) }
   }
   invalidateWorktreeStatus(path)
   return { ok: true, path, created: true }

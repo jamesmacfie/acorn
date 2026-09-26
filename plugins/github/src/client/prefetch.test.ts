@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/solid-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fileSummariesKey, filesKey, pullKey } from '../shared/api'
+import { fileSummariesKey, pullDiffKey, pullKey } from '../shared/api'
 import { INITIAL_PREFETCH_LIMIT, prefetchOpenPulls, prefetchPullSummary } from './prefetch'
 
 // Bodies cross the transport as bytes now, so assert the decoded payload rather than a JSON string.
@@ -35,17 +35,23 @@ const detail = {
   threads: [],
 }
 
-const files = [
-  {
-    path: 'src/app.ts',
-    status: 'modified',
-    additions: 10,
-    deletions: 2,
-    sha: 'sha-app',
-    viewed: false,
-    patch: null,
-  },
-]
+const files = {
+  files: [
+    {
+      path: 'src/app.ts',
+      status: 'modified',
+      additions: 10,
+      deletions: 2,
+      sha: 'sha-app',
+      viewed: false,
+      position: 0,
+      patchState: 'available',
+      patchKey: 'sha256:app',
+      patch: null,
+    },
+  ],
+  completeness: { kind: 'complete' },
+}
 
 describe('open PR warmup', () => {
   afterEach(() => {
@@ -75,7 +81,7 @@ describe('open PR warmup', () => {
     expect(batchBodyOf(fetchMock, 1)).toEqual({ numbers: [42], files: 'summary' })
     expect(queryClient.getQueryData(pullKey('acorn', 'web', '42'))).toEqual(detail)
     expect(queryClient.getQueryData(fileSummariesKey('acorn', 'web', '42'))).toEqual(files)
-    expect(queryClient.getQueryData(filesKey('acorn', 'web', '42'))).toBeUndefined()
+    expect(queryClient.getQueryData(pullDiffKey('acorn', 'web', '42'))).toBeUndefined()
   })
 
   it('prefetches one hovered PR through the same summary-only batch path', async () => {
@@ -97,7 +103,7 @@ describe('open PR warmup', () => {
     expect(batchBodyOf(fetchMock, 0)).toEqual({ numbers: [42], files: 'summary' })
     expect(queryClient.getQueryData(pullKey('acorn', 'web', '42'))).toEqual(detail)
     expect(queryClient.getQueryData(fileSummariesKey('acorn', 'web', '42'))).toEqual(files)
-    expect(queryClient.getQueryData(filesKey('acorn', 'web', '42'))).toBeUndefined()
+    expect(queryClient.getQueryData(pullDiffKey('acorn', 'web', '42'))).toBeUndefined()
   })
 
   it('bounds automatic warm-up and leaves the remaining PRs intent-driven', async () => {
@@ -144,5 +150,14 @@ describe('open PR warmup', () => {
     await prefetchPullSummary(queryClient, 'acorn', 'web', 42, new AbortController().signal)
 
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('seeds no summary for a pull the batch returned without files', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse([{ number: 42, detail }]))
+    vi.stubGlobal('fetch', fetchMock)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    await prefetchPullSummary(queryClient, 'acorn', 'web', 42, new AbortController().signal)
+    expect(queryClient.getQueryData(pullKey('acorn', 'web', '42'))).toEqual(detail)
+    expect(queryClient.getQueryState(fileSummariesKey('acorn', 'web', '42'))).toBeUndefined()
   })
 })

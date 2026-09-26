@@ -171,6 +171,19 @@ describe('wsClient', () => {
     channel.dispose()
   })
 
+  it('delivers inactive-node plugin changes only to the fleet lifecycle subscriber', () => {
+    const active: string[] = []
+    const fleet: string[] = []
+    client.wsOnPluginsChanged(() => active.push('changed'))
+    client.wsOnFleetPluginsChanged((nodeId) => fleet.push(nodeId))
+    bridge.emitFrame({ channel: 'plugins:changed' }, 'n2')
+    expect(active).toEqual([])
+    expect(fleet).toEqual(['n2'])
+    bridge.emitFrame({ channel: 'plugins:changed' }, 'n1')
+    expect(active).toEqual(['changed'])
+    expect(fleet).toEqual(['n2', 'n1'])
+  })
+
   it('replays each channel owner only on a genuine reconnect of the active node', () => {
     const reconnects: number[] = []
     const owner = registerWsChannel('probe', () => {}, () => [{ channel: 'probe:attach', id: 's1' }])

@@ -21,6 +21,7 @@ import { readBundledPluginState } from './bundledState'
 import { disposeUnstartedPlugin, isolateNodePlugin } from './isolation'
 import type { NodePlugin, PluginStorage } from '../pluginHost/types'
 import { createLogger } from '../telemetry/logger'
+import type { PluginRuntimeIdentity } from '@acorn/protocol/api.ts'
 
 const log = createLogger('plugins')
 
@@ -163,6 +164,28 @@ export const installedPluginInfo = (entry: InstalledPlugin): InstalledPluginInfo
   ...(entry.bundled === undefined ? {} : { bundled: entry.bundled }),
   ...(entry.unknown.length ? { unknown: entry.unknown } : {}),
 })
+
+export type ActivePluginSnapshot = {
+  id: string
+  identity: PluginRuntimeIdentity
+  bundle: { bytes: Uint8Array<ArrayBuffer>; hash: string } | null
+}
+
+/** Retain the manifest and the exact client bytes as one boot or reload candidate. The reported
+ * digest is computed from these retained bytes, never from a later disk scan. */
+export async function snapshotActivePlugin(entry: InstalledPlugin): Promise<ActivePluginSnapshot> {
+  const { id, hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...declaration } = installedPluginInfo(entry)
+  const bundle = await readClientBundle([entry], id)
+  return {
+    id,
+    identity: {
+      ...declaration,
+      client: bundle ? { hash: bundle.hash, bytes: bundle.bytes.byteLength } : null,
+      activation: hasNode || declaration.contributions.harnesses.length > 0 ? 'node' : 'client-only',
+    },
+    bundle,
+  }
+}
 
 // The bytes behind GET /v1/core/plugins/:id/client.js. Re-confines the path rather than trusting the
 // one resolved at boot, and re-hashes rather than reporting the boot hash: the two disagree exactly

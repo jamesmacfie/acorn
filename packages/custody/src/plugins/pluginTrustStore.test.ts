@@ -42,6 +42,14 @@ afterEach(() => {
 })
 
 describe('acknowledging a bundle', () => {
+  it('withdraws only the named exact-hash decision', () => {
+    const trust = store()
+    trust.record(ack({ hash: HASH_A }))
+    trust.record(ack({ hash: HASH_B }))
+    trust.forgetDecision('sparkline', HASH_A)
+    expect(trust.decisionFor('sparkline', HASH_A)).toBeUndefined()
+    expect(trust.decisionFor('sparkline', HASH_B)?.decision).toBe('accepted')
+  })
   it('has no decision on first sight, which is the prompt condition', () => {
     expect(store().decisionFor('sparkline', HASH_A)).toBeUndefined()
   })

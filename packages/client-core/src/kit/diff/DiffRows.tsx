@@ -99,7 +99,8 @@ export function NonCodeRow(props: {
 // Per-file header bar: opens each file's section in the stacked diff, and doubles as the sticky
 // current-file header DiffView pins to the top of the scroller (no anchor id there).
 export function FileHead(props: {
-  file: DiffFile
+  /** Only what the header draws, so a document's file and a whole-patch file both fit. */
+  file: Pick<DiffFile, 'path' | 'status' | 'additions' | 'deletions'>
   anchorId?: string
   collapsed?: boolean
   onToggleCollapse?: (path: string) => void
@@ -247,11 +248,14 @@ function OpenLineButton(props: { row: CodeRow; onOpen?: (row: CodeRow) => void }
 
 function CodeContent(props: { r: CodeRow; highlight?: FindHighlight }) {
   const hl = () => (props.highlight && props.highlight.ranges.length ? props.highlight : null)
+  // One `.diff-code` for both branches. In split mode it is the element that scrolls sideways, and a
+  // row's word spans arrive after its plain text: a span per branch would be replaced when they land,
+  // back at column 0.
   return (
-    <Show
-      when={props.r.words}
-      fallback={
-        <span class="diff-code">
+    <span class="diff-code">
+      <Show
+        when={props.r.words}
+        fallback={
           <Show
             when={hl()}
             fallback={<For each={props.r.toks}>{(t) => <span style={{ '--l': t.light, '--r': t.dark }}>{t.content}</span>}</For>}
@@ -267,11 +271,9 @@ function CodeContent(props: { r: CodeRow; highlight?: FindHighlight }) {
               </For>
             )}
           </Show>
-        </span>
-      }
-    >
-      {(words) => (
-        <span class="diff-code">
+        }
+      >
+        {(words) => (
           <Show
             when={hl()}
             fallback={
@@ -293,9 +295,9 @@ function CodeContent(props: { r: CodeRow; highlight?: FindHighlight }) {
               </For>
             )}
           </Show>
-        </span>
-      )}
-    </Show>
+        )}
+      </Show>
+    </span>
   )
 }
 

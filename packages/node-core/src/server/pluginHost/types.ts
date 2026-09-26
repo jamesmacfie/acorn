@@ -81,8 +81,8 @@ export type PluginProviderRuntime = {
   // across every connection before there's a connectionId to key a resource call on.
   //
   // The host checks the plugin owns `providerId` at the ask, and the store it returns is built for that
-  // provider. One live-object exception: it returns a store synchronously rather than plain data, so it
-  // needs a proxy before loaded plugins can move out of process.
+  // provider. The loaded-plugin worker receives the store through a synchronous RPC proxy; its
+  // read and write methods remain asynchronous.
   items(providerId: string): ExternalItemStore
 }
 

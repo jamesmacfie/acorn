@@ -1,7 +1,7 @@
-// One Web Worker per plugin bundle, and the lifecycle around it (docs/plugins.md § The tree contract
-// § The sandbox: one worker per bundle).
+// One Web Worker per accepted plugin bundle identity, and the lifecycle around it
+// (docs/plugins.md § The tree contract § The sandbox: one worker per bundle).
 //
-// What the worker has: the plugin's bundle, whatever framework it brought, and the bridge. What it
+// What the worker has: the plugin's bundle, whatever framework it brought, and a bridge per tree. What it
 // does not have: a DOM, `fetch`, `importScripts` after boot, or any handle to another plugin's worker.
 // The first two are the shell's CSP on the worker script's own response (app_scheme.rs); the last is
 // arithmetic, since a worker is reached only through the port that created it.
@@ -10,10 +10,11 @@
 // the same prompt, and a withheld bundle mounts nothing. A worker is the same bytes with a different
 // host, which is why nothing here asks a second question.
 import { PLUGIN_BRIDGE_VERSION } from '@acorn/protocol/plugin/bridge.ts'
+import type { PluginBridgeAppearance, PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
 import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import { TREE_LIMITS, batchBytes, sandboxMessage, type TreeHostOp } from '@acorn/protocol/tree/messages.ts'
 import type { KitEvent } from '@acorn/protocol/tree/nodes.ts'
-import type { FrameBridge } from '../frames/broker'
+import { postAppearance, postSelect, postSurfaceAction, type FrameBridge } from '../frames/broker'
 import { createLogger } from '../../infra/telemetry/logger'
 import type { TreeTransport } from './TreeHost'
 
@@ -46,18 +47,14 @@ export type TreeHostResult = { ok: true; body: unknown } | { ok: false; error: {
 export type TreeWorkerHandle = {
   /** Mount, or update: a second mount for the same slot is a props change, which is what keeps a tool
    *  card's redraw one message rather than a teardown. */
-  mount(slot: string, entry: string, props: unknown): void
+  mount(slot: string, entry: string, props: unknown, authority?: () => TreeSlotBridge): void
   unmount(slot: string): void
   transport(slot: string): TreeTransport
-  /**
-   * The bridge port this bundle is connected on, for the three host-to-plugin pushes that are not tree
-   * mutations: a rail-row selection, a surface-scoped command, an appearance change (frames/broker.ts).
-   *
-   * One port per bundle, not per tree, because one worker holds one bridge. That is why the pushes
-   * carry their own addressing and the plugin's own listener decides whether the message was for the
-   * tree it drew — the same re-check a frame does, one rung up.
-   */
+  /** The bundle's compatibility bridge. Modern tree effects use the per-slot bridge. */
   bridgePort(): MessagePort | null
+  select(slot: string, item: string): void
+  surfaceAction(slot: string, command: string): void
+  appearance(slot: string, value: Omit<PluginBridgeAppearance, 'kind'>): void
   /**
    * Answer this slot's host requests. Returns the detach.
    *
@@ -72,6 +69,12 @@ export type TreeWorkerHandle = {
   release(): void
 }
 
+/** Host-owned bridge for one visible tree. The worker receives only its context and transferred port. */
+export type TreeSlotBridge = {
+  context: PluginFrameContext
+  connect(port: MessagePort): FrameBridge
+}
+
 type Slot = {
   batch: ((ops: readonly TreeMutation[]) => void)[]
   failed: ((message: string) => void)[]
@@ -79,14 +82,23 @@ type Slot = {
   hostRequest: ((request: TreeHostRequest) => Promise<TreeHostResult>) | null
   /** Requests this slot has outstanding, against TREE_LIMITS.hostRequestsPerSlot. */
   inFlight: number
+  mount: { entry: string; props: unknown } | null
+  authority: TreeSlotBridge | null
+  bridge: FrameBridge | null
+  bridgeSide: MessagePort | null
+  appearance: Omit<PluginBridgeAppearance, 'kind'> | null
 }
 
 type Live = {
+  key: TreeWorkerKey
   worker: Worker
   port: MessagePort
   /** The other half of the handshake: the bridge's port, kept so `bridgePort()` can hand it out. */
   bridgeSide: MessagePort
   bridge: FrameBridge
+  protocol: 'pending' | 'scoped' | 'legacy'
+  legacySlot: string | null
+  firstSlot: string | null
   slots: Map<string, Slot>
   refs: number
   grace: ReturnType<typeof setTimeout> | null
@@ -97,6 +109,12 @@ type Live = {
   failEverything(reason: string): void
 }
 
+/** Content can be shared across plugins, but a bridge is authority granted to one plugin id. */
+export type TreeWorkerKey = { pluginId: string; hash: string }
+
+// JSON array encoding is unambiguous even when a plugin id contains punctuation. The worker URL and
+// device cache remain hash-addressed; only the live authority uses this pair.
+const workerKey = ({ pluginId, hash }: TreeWorkerKey): string => JSON.stringify([pluginId, hash])
 const workers = new Map<string, Live>()
 
 // The seam the jsdom suite spawns through: jsdom has no `Worker`, and a real one would need a real
@@ -109,19 +127,18 @@ export function _setWorkerFactory(factory: ((url: string) => Worker) | null): vo
 
 export type AcquireInput = {
   pluginId: string
-  /** The bundle this device accepted. One worker per hash, so two plugins never share one and one
-   *  plugin's two versions never do either. */
+  /** The bundle this device accepted. Workers are shared only for the same plugin id and hash. */
   hash: string
-  /** Wire the bridge onto the worker's port. Called once per worker, by whichever tree mounts first;
-   *  every later tree from the same bundle rides the same bridge, exactly as two frames of one plugin
-   *  each ride their own. */
-  connect(port: MessagePort): FrameBridge
+  /** Bootstrap the bundle's compatibility bridge. It has no effects unless the SDK is legacy and its
+   * first slot is mounted. Modern SDKs use the bridge supplied with each mount. */
+  connect(port: MessagePort, authorized: () => boolean): FrameBridge
   /** A one-line reason something was refused, for the roster row. */
   onRefused(reason: string): void
 }
 
 export function acquireTreeWorker(input: AcquireInput): TreeWorkerHandle {
-  const live = workers.get(input.hash) ?? start(input)
+  const key: TreeWorkerKey = { pluginId: input.pluginId, hash: input.hash }
+  const live = workers.get(workerKey(key)) ?? start(input, key)
   live.refs++
   if (live.grace) {
     clearTimeout(live.grace)
@@ -132,22 +149,46 @@ export function acquireTreeWorker(input: AcquireInput): TreeWorkerHandle {
     const existing = live.slots.get(id)
     if (existing) return existing
     if (live.slots.size >= TREE_LIMITS.slotsPerWorker) throw new Error(`${input.pluginId} asked for more than ${TREE_LIMITS.slotsPerWorker} trees at once`)
-    const slot: Slot = { batch: [], failed: [], hostRequest: null, inFlight: 0 }
+    const slot: Slot = { batch: [], failed: [], hostRequest: null, inFlight: 0, mount: null, authority: null, bridge: null, bridgeSide: null, appearance: null }
     live.slots.set(id, slot)
+    live.firstSlot ??= id
     return slot
   }
 
   let released = false
   return {
-    mount: (slot, entry, props) => {
-      slotFor(slot)
-      if (!live.dead) live.port.postMessage({ kind: 'tree:mount', slot, entry, props })
+    mount: (slot, entry, props, authority) => {
+      const target = slotFor(slot)
+      target.mount = { entry, props }
+      target.authority ??= authority?.() ?? null
+      if (!live.dead) sendMount(live, slot, target, input.onRefused)
     },
     unmount: (slot) => {
-      live.slots.delete(slot)
+      const target = live.slots.get(slot)
+      if (target) {
+        target.bridge?.dispose()
+        target.bridgeSide?.close()
+        live.slots.delete(slot)
+      }
+      if (live.legacySlot === slot) live.legacySlot = null
       if (!live.dead) live.port.postMessage({ kind: 'tree:unmount', slot })
     },
     bridgePort: () => (live.dead ? null : live.bridgeSide),
+    select: (slot, item) => {
+      const port = live.slots.get(slot)?.bridgeSide ?? (live.legacySlot === slot ? live.bridgeSide : null)
+      if (!live.dead && port) postSelect(port, item)
+    },
+    surfaceAction: (slot, command) => {
+      const port = live.slots.get(slot)?.bridgeSide ?? (live.legacySlot === slot ? live.bridgeSide : null)
+      if (!live.dead && port) postSurfaceAction(port, command)
+    },
+    appearance: (slot, value) => {
+      const target = live.slots.get(slot)
+      if (!target || live.dead) return
+      target.appearance = value
+      const port = target.bridgeSide ?? (live.legacySlot === slot ? live.bridgeSide : null)
+      if (port) postAppearance(port, value)
+    },
     onHostRequest: (slot, handler) => {
       const target = slotFor(slot)
       target.hostRequest = handler
@@ -176,31 +217,74 @@ export function acquireTreeWorker(input: AcquireInput): TreeWorkerHandle {
     release: () => {
       if (released) return
       released = true
+      if (live.dead) return
       if (--live.refs > 0) return
       // Not stopped on the spot: a reader scrolling a transcript unmounts and remounts these
       // constantly, and restarting a bundle per scroll is how a tool card becomes a stutter.
       //
-      // The timer names this worker, not the hash. A handle outlives the worker it was taken from — the
+      // The timer names this worker, not just its key. A handle outlives the worker it was taken from — the
       // bundle stops answering, the host stops it, and the next tree starts a fresh one under the same
-      // hash — so a late release from the old generation was arming a timer that stopped the new
+      // key — so a late release from the old generation was arming a timer that stopped the new
       // worker thirty seconds later and told every tree on it there were no trees left.
       live.grace = setTimeout(() => {
-        if (workers.get(input.hash) === live) stop(input.hash, 'no trees left')
+        stop(key, 'no trees left', live)
       }, GRACE_MS)
     },
   }
 }
 
-function start(input: AcquireInput): Live {
+function sendMount(live: Live, id: string, slot: Slot, onRefused: (reason: string) => void): void {
+  if (!slot.mount || live.protocol === 'pending') return
+  if (live.protocol === 'legacy') {
+    // An old SDK has one unaddressed bridge. Only the first slot may use it. Once that slot goes away,
+    // this worker cannot be rebound to a different component's services safely.
+    if (id !== live.firstSlot || (live.legacySlot && live.legacySlot !== id)) {
+      const reason = 'this plugin bundle uses an older tree SDK and can draw only one tree at a time'
+      for (const listener of slot.failed) listener(reason)
+      onRefused(reason)
+      return
+    }
+    const firstMount = live.legacySlot !== id
+    live.legacySlot = id
+    if (firstMount && slot.authority) live.bridge.setContext?.(slot.authority.context)
+    if (firstMount && slot.appearance) postAppearance(live.bridgeSide, slot.appearance)
+    live.port.postMessage({ kind: 'tree:mount', slot: id, ...slot.mount })
+    return
+  }
+  if (!slot.authority) {
+    const reason = 'this tree has no mounted bridge authority'
+    for (const listener of slot.failed) listener(reason)
+    onRefused(reason)
+    return
+  }
+  if (!slot.bridgeSide) {
+    const channel = new MessageChannel()
+    slot.bridgeSide = channel.port1
+    slot.bridge = slot.authority.connect(channel.port1)
+    if (slot.appearance) postAppearance(channel.port1, slot.appearance)
+    live.port.postMessage({
+      kind: 'tree:mount', slot: id, ...slot.mount,
+      context: slot.authority.context, bridgePort: channel.port2,
+    }, [channel.port2])
+    return
+  }
+  live.port.postMessage({ kind: 'tree:mount', slot: id, ...slot.mount })
+}
+
+function start(input: AcquireInput, key: TreeWorkerKey): Live {
   const log = createLogger('plugins', input.pluginId)
   const worker = spawn(pluginWorkerUrl(input.hash))
   const bridgeChannel = new MessageChannel()
   const treeChannel = new MessageChannel()
   const live: Live = {
+    key,
     worker,
     port: treeChannel.port1,
     bridgeSide: bridgeChannel.port1,
-    bridge: input.connect(bridgeChannel.port1),
+    bridge: null as unknown as FrameBridge,
+    protocol: 'pending',
+    legacySlot: null,
+    firstSlot: null,
     slots: new Map(),
     refs: 0,
     grace: null,
@@ -211,7 +295,8 @@ function start(input: AcquireInput): Live {
       for (const slot of live.slots.values()) for (const listener of slot.failed) listener(reason)
     },
   }
-  workers.set(input.hash, live)
+  live.bridge = input.connect(bridgeChannel.port1, () => live.protocol === 'legacy' && live.legacySlot !== null && live.slots.has(live.legacySlot))
+  workers.set(workerKey(key), live)
 
   live.port.onmessage = (event: MessageEvent) => {
     const parsed = sandboxMessage.safeParse(event.data)
@@ -222,6 +307,9 @@ function start(input: AcquireInput): Live {
         live.awaitingPong = false
         return
       case 'tree:ready':
+        if (live.protocol !== 'pending') return
+        live.protocol = message.scopedBridge ? 'scoped' : 'legacy'
+        for (const [id, slot] of live.slots) sendMount(live, id, slot, input.onRefused)
         return
       case 'tree:failed': {
         const slot = live.slots.get(message.slot)
@@ -257,7 +345,7 @@ function start(input: AcquireInput): Live {
           slot.inFlight--
           // The slot going away mid-request is the ordinary case, not an error: the sandbox rejects its
           // own copy on unmount, so there is nobody left to tell.
-          if (live.dead || !live.slots.has(message.slot)) return
+          if (live.dead || live.slots.get(message.slot) !== slot) return
           live.port.postMessage({ kind: 'tree:host-reply', slot: message.slot, id: message.id, ...result })
         }
         // `owner.invoke` only. An overlay is settled by a person closing a modal, and ten seconds is
@@ -305,14 +393,14 @@ function start(input: AcquireInput): Live {
   worker.onerror = (event: ErrorEvent | Event) => {
     const message = 'message' in event && typeof event.message === 'string' ? event.message : 'the plugin worker threw'
     input.onRefused(message)
-    stop(input.hash, message)
+    stop(key, message, live)
   }
 
   live.beat = setInterval(() => {
     if (live.awaitingPong) {
       const reason = 'this plugin stopped responding'
       log.warn(reason, undefined, { 'plugin.id': input.pluginId })
-      return stop(input.hash, reason)
+      return stop(key, reason, live)
     }
     live.awaitingPong = true
     live.port.postMessage({ kind: 'tree:ping' })
@@ -321,21 +409,38 @@ function start(input: AcquireInput): Live {
   return live
 }
 
-function stop(hash: string, reason: string): void {
-  const live = workers.get(hash)
-  if (!live || live.dead) return
+function stop(key: TreeWorkerKey, reason: string, expected?: Live): void {
+  const id = workerKey(key)
+  const live = workers.get(id)
+  if (!live || live.dead || (expected && live !== expected)) return
   live.dead = true
-  workers.delete(hash)
+  workers.delete(id)
   if (live.beat) clearInterval(live.beat)
   if (live.grace) clearTimeout(live.grace)
-  live.failEverything(reason)
-  live.bridge.dispose()
-  live.port.onmessage = null
-  live.port.close()
-  live.worker.terminate()
+  try {
+    live.failEverything(reason)
+  } finally {
+    try {
+      for (const slot of live.slots.values()) {
+        slot.bridge?.dispose()
+        slot.bridgeSide?.close()
+      }
+      live.bridge.dispose()
+    } finally {
+      live.bridgeSide.close()
+      live.port.onmessage = null
+      live.port.close()
+      live.worker.terminate()
+    }
+  }
+}
+
+/** Withdraw this exact plugin bundle's runtime authority now, including during its idle grace. */
+export function stopTreeWorker(key: TreeWorkerKey, reason: string): void {
+  stop(key, reason)
 }
 
 /** Test seam, and the teardown a node switch would want: stop every worker now. */
 export function _stopAllTreeWorkers(): void {
-  for (const hash of [...workers.keys()]) stop(hash, 'the host stopped every plugin worker')
+  for (const live of [...workers.values()]) stop(live.key, 'the host stopped every plugin worker', live)
 }

@@ -406,6 +406,30 @@ describe('managed agent runtime conformance', () => {
     })
   }
 
+  it('shows the worktree failure when a new session cannot get its task root', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    core.tasks.requireRoot = vi.fn().mockRejectedValue(new Error('Git could not create the worktree.'))
+    const registry = new AgentDriverRegistry()
+    registry.registerNative('fake', () => new FakeAgentDriver())
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+
+    await expect(runtime.acceptSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: {},
+    })).rejects.toThrow('Git could not create the worktree.')
+  })
+
   it('acknowledges an interactive session once durable while its provider keeps connecting', async () => {
     const seed = await seedTask(testDb, dataDir)
     const registry = new AgentDriverRegistry()

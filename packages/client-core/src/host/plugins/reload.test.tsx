@@ -17,8 +17,23 @@ vi.mock('../../infra/node/fleet', () => ({
   nodeState: (nodeId: string) => states()[nodeId] ?? 'offline',
 }))
 vi.mock('../../infra/node/nodePlugins', () => ({ refreshNodePlugins: async () => null }))
-vi.mock('../../infra/node/wsClient', () => ({ wsOnPluginsChanged: () => () => {} }))
-vi.mock('./distribution', () => ({ syncPluginDistribution: vi.fn(async () => {}) }))
+let pluginChange: ((nodeId: string) => void) | undefined
+vi.mock('../../infra/node/wsClient', () => ({
+  wsOnFleetPluginsChanged: (callback: (nodeId: string) => void) => {
+    pluginChange = callback
+    return () => { pluginChange = undefined }
+  },
+}))
+const forgetPluginNode = vi.fn()
+const markPluginNodeStale = vi.fn()
+vi.mock('./distribution', () => ({
+  distribution: () => ({ byNode: new Map() }),
+  forgetPluginNode: (...args: unknown[]) => forgetPluginNode(...args),
+  markPluginNodeStale: (...args: unknown[]) => markPluginNodeStale(...args),
+  notifyActivePluginNodeChanged: vi.fn(),
+  onPluginDistributionCommit: () => () => {},
+  syncPluginDistribution: vi.fn(async () => {}),
+}))
 vi.mock('./syncContributions', () => ({ syncPluginContributions: vi.fn() }))
 
 const { watchPluginChanges } = await import('./reload')
@@ -30,8 +45,8 @@ const node = (nodeId: string): NodeRecord => ({ nodeId, label: nodeId, local: tr
 describe('the first pass', () => {
   // One watcher for the whole sequence, because the real one is never disposed: it holds a root for the
   // life of the host, so a second `watchPluginChanges()` in a second test would still be watching.
-  it('waits for a node that could answer it, then asks each node once', () => {
-    watchPluginChanges()
+  it('reads first arrival, reconnect, inactive change, and removes unpaired observations', () => {
+    const off = watchPluginChanges()
     expect(passes()).toBe(0)
 
     // Membership lands before the connection does, which is the boot order this used to fire in.
@@ -40,15 +55,21 @@ describe('the first pass', () => {
     setStates({ a: 'online' })
     expect(passes()).toBe(1)
 
-    // A connection that flaps is not news: the bundles were hashed on the pass above.
+    // A reconnect is news: the node may have changed while offline.
     setStates({ a: 'degraded' })
     setStates({ a: 'offline' })
     setStates({ a: 'online' })
-    expect(passes()).toBe(1)
+    expect(passes()).toBe(3)
+    expect(markPluginNodeStale).toHaveBeenCalledWith('a')
 
     // A node paired later is, and it carries plugins of its own.
     setNodes([node('a'), node('b')])
     setStates({ a: 'online', b: 'online' })
-    expect(passes()).toBe(2)
+    expect(passes()).toBe(4)
+    pluginChange?.('b')
+    expect(passes()).toBe(5)
+    setNodes([node('a')])
+    expect(forgetPluginNode).toHaveBeenCalledWith('b')
+    off()
   })
 })

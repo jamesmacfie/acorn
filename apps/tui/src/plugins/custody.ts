@@ -1,4 +1,5 @@
 import { join } from 'node:path'
+import { z } from 'zod'
 import { PluginCache, type BundleFetcher } from '@acorn/custody/plugins'
 import { PluginTrustStore } from '@acorn/custody/plugins'
 import {
@@ -29,6 +30,7 @@ let trust: PluginTrustStore | null = null
 /** Where a bundle this device holds lives on disk. The one path-shaped answer anything outside this
  *  module gets, and its one caller is the worker factory, which needs a file to point a thread at. */
 export const bundlePath = (hash: string): string | null => cache?.path(hash) ?? null
+export const forgetNodePluginProvenance = (nodeId: string): void => { cache?.forgetNode(nodeId) }
 
 /** Build the four members of the `plugins` seam group. Called once, by the composition root. */
 export function createPluginCustody(broker: BundleFetcher): PluginCustody {
@@ -67,6 +69,13 @@ export function createPluginCustody(broker: BundleFetcher): PluginCustody {
       // diff (docs/security.md § The dev grant).
       log.warn(`the disclosure recorded with ${decision.decision} for ${decision.pluginId} could not be parsed; storing a partial record`, undefined, { 'plugin.id': decision.pluginId })
       store.record({ ...decision, ...NO_DISCLOSURE, partial: true, decidedAt: Date.now() })
+    },
+    trustForget: async (raw) => {
+      const { pluginId, hash } = z.object({
+        pluginId: z.string().min(1),
+        hash: z.string().regex(/^[0-9a-f]{64}$/),
+      }).parse(raw)
+      store.forgetDecision(pluginId, hash)
     },
     devGrant: async (raw) => {
       const { pluginId, nodeId, path, grant } = devGrantSchema.parse(raw)

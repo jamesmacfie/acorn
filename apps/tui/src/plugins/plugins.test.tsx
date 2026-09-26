@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
 import { createComponent } from 'solid-js'
-import { afterEach, beforeEach, expect, test } from 'vitest'
+import { afterEach, beforeEach, expect, test, vi } from 'vitest'
 import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import { renderCells } from '../kit/render'
 import { Text } from '../kit/showing'
@@ -127,6 +127,7 @@ try {
 }
 addEventListener('message', (event) => {
   const tree = event.ports[1]
+  tree.postMessage({ kind: 'tree:ready', version: 1, entries: ['main'] })
   tree.onmessage = (message) => {
     if (message.data.kind !== 'tree:mount') return
     tree.postMessage({
@@ -140,6 +141,28 @@ addEventListener('message', (event) => {
       }],
     })
   }
+})
+`
+
+const SCOPED_PROBE_BUNDLE = `
+addEventListener('message', (event) => {
+  const tree = event.ports[1]
+  const draw = (slot, value) => tree.postMessage({
+    kind: 'tree:batch', slot,
+    ops: [{ op: 'insert', parent: null, index: 0,
+      node: { id: 'n1', type: 'Text', props: {}, children: [{ id: 't1', type: '#text', props: { value }, children: [] }] } }],
+  })
+  tree.onmessage = (event) => {
+    const message = event.data
+    if (message.kind !== 'tree:mount') return
+    const { slot, bridgePort, context } = message
+    bridgePort.onmessage = (event) => {
+      if (event.data.kind === 'select') draw(slot, context.taskId + ':' + event.data.item)
+    }
+    bridgePort.start()
+    draw(slot, context.taskId)
+  }
+  tree.postMessage({ kind: 'tree:ready', version: 1, entries: ['main'], scopedBridge: true })
 })
 `
 
@@ -251,6 +274,43 @@ test('a plugin worker draws its tree and cannot read a file it was not granted',
   // (docs/security.md § Rung 0 — The client sandbox).
   expect(text).toContain('ERR_ACCESS_DENIED')
   expect(text).toContain('no net')
+}, 30_000)
+
+test('the terminal worker adapter keeps two tree bridge ports separate', async () => {
+  const { createPluginCustody } = await import('./custody')
+  const { installPluginWorkers } = await import('./workerFactory')
+  const { acquireTreeWorker } = await import('@acorn/client-core/host/tree/workerHost.ts')
+  const hash = createHash('sha256').update(SCOPED_PROBE_BUNDLE).digest('hex')
+  const custody = createPluginCustody(brokerServing(SCOPED_PROBE_BUNDLE))
+  expect(await custody.cachePut({ nodeId: 'node-1', pluginId: 'scoped-probe', hash, version: '1.0.0' })).toEqual({ hash })
+  installPluginWorkers()
+  const refusals: string[] = []
+  const worker = acquireTreeWorker({
+    pluginId: 'scoped-probe', hash, connect: () => ({ dispose: () => {} }),
+    onRefused: (reason) => refusals.push(reason),
+  })
+  const batches = new Map<string, TreeMutation[]>()
+  for (const [slot, taskId] of [['s1', 'task-a'], ['s2', 'task-b']] as const) {
+    worker.transport(slot).onBatch((ops) => batches.set(slot, [...ops]))
+    worker.mount(slot, 'main', {}, () => ({
+      context: { surface: 'main', target: 'remote', nodeId: 'node-1', taskId, theme: 'terminal', style: 'terminal' },
+      connect: () => ({ dispose: () => {} }),
+    }))
+  }
+  await vi.waitFor(() => expect(batches.size).toBe(2), { timeout: 10_000 })
+  const text = (slot: string) => {
+    const op = batches.get(slot)?.[0]
+    return op?.op === 'insert' ? op.node.children[0]?.props.value : undefined
+  }
+  expect(text('s1')).toBe('task-a')
+  expect(text('s2')).toBe('task-b')
+  worker.select('s2', 'selected')
+  await vi.waitFor(() => expect(text('s2')).toBe('task-b:selected'))
+  expect(text('s1')).toBe('task-a')
+  expect(refusals).toEqual([])
+  worker.unmount('s1')
+  worker.unmount('s2')
+  worker.release()
 }, 30_000)
 
 test('a worker that dies at module scope fails its slot rather than hanging', async () => {
