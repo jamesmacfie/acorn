@@ -239,6 +239,14 @@ parses as JSON is the worst answer available.
 Development proxies the Vite dev server through this same handler rather than loading `devUrl`
 directly, so developers exercise the origin the shipped app uses.
 
+Before it opens a development window, the shell requests `src/client/index.tsx` from Vite and waits
+for that entry module to settle. Tauri's own `devUrl` check requests only `index.html`, which Vite can
+serve while it is still rebuilding the optimized dependency graph; opening on that weaker signal let
+the entry request receive Vite's transient 504, and the window worked only after a manual reload. The
+shell retries that 504 and a temporarily unavailable socket for up to 30 seconds. Any other HTTP
+status ends the wait so the real Vite transform error reaches the startup guard instead of becoming a
+readiness timeout. The same check covers `tauri dev` and isolated automation sessions.
+
 **The proxy forwards what Vite said, including a refusal.** A non-2xx is an answer, not a transport
 failure, and `ureq` reports both as `Err`. Two of them turn up on a cold launch: 504 is how Vite asks
 the page to reload after re-bundling a dependency it only discovered when a lazily imported plugin
