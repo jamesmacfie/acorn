@@ -98,6 +98,8 @@ export declare const CopyButton: (props: KitNodeProps) => JSX.Element
 export declare const ModelBackendPicker: (props: KitNodeProps) => JSX.Element
 export declare const Only: (props: KitNodeProps) => JSX.Element
 export declare const Fallback: (props: KitNodeProps) => JSX.Element
+/** Places the one host-filled slot reference a selected rail or topbar replacement receives. */
+export declare const Slot: (props: { slotRef: string }) => JSX.Element
 /** Every node above, keyed by name, for code that picks one at runtime. */
 export declare const KIT_NODE_COMPONENTS: Record<string, (props: KitNodeProps) => JSX.Element>
 

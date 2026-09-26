@@ -75,6 +75,8 @@ export type TreeWorkerHandle = {
 type Slot = {
   batch: ((ops: readonly TreeMutation[]) => void)[]
   failed: ((message: string) => void)[]
+  pending: (readonly TreeMutation[])[]
+  pendingFailure: string | null
   /** The owner's answer to `TreeMount.host`, set by the component that drew this slot. */
   hostRequest: ((request: TreeHostRequest) => Promise<TreeHostResult>) | null
   /** Requests this slot has outstanding, against TREE_LIMITS.hostRequestsPerSlot. */
@@ -132,7 +134,7 @@ export function acquireTreeWorker(input: AcquireInput): TreeWorkerHandle {
     const existing = live.slots.get(id)
     if (existing) return existing
     if (live.slots.size >= TREE_LIMITS.slotsPerWorker) throw new Error(`${input.pluginId} asked for more than ${TREE_LIMITS.slotsPerWorker} trees at once`)
-    const slot: Slot = { batch: [], failed: [], hostRequest: null, inFlight: 0 }
+    const slot: Slot = { batch: [], failed: [], pending: [], pendingFailure: null, hostRequest: null, inFlight: 0 }
     live.slots.set(id, slot)
     return slot
   }
@@ -159,6 +161,10 @@ export function acquireTreeWorker(input: AcquireInput): TreeWorkerHandle {
       onBatch: (listener) => {
         const target = slotFor(slot)
         target.batch.push(listener)
+        // A worker can answer its first mount before Solid finishes mounting TreeHost. Preserve
+        // those initial inserts; losing them leaves a live provider with an empty surface.
+        for (const ops of target.pending) listener(ops)
+        target.pending = []
         return () => { target.batch.splice(target.batch.indexOf(listener), 1) }
       },
       onFailed: (listener) => {
@@ -166,6 +172,7 @@ export function acquireTreeWorker(input: AcquireInput): TreeWorkerHandle {
         // A worker that died before this tree subscribed still has to reach it, or the reader gets a
         // blank card with nothing to say why.
         if (live.dead) queueMicrotask(() => listener('this plugin stopped responding'))
+        if (target.pendingFailure) queueMicrotask(() => listener(target.pendingFailure!))
         target.failed.push(listener)
         return () => { target.failed.splice(target.failed.indexOf(listener), 1) }
       },
@@ -290,6 +297,18 @@ function start(input: AcquireInput): Live {
         // A batch for a tree nobody is showing any more. Dropped silently: unmount and a batch in
         // flight cross constantly, and it is not a fault.
         if (!slot) return
+        if (!slot.batch.length) {
+          // Only the mount gap is buffered. A plugin flooding a tree without a host cannot keep
+          // unbounded mutations in the renderer.
+          if (slot.pending.length >= 4) {
+            slot.pending = []
+            slot.pendingFailure = 'this plugin sent tree updates before its surface was ready'
+            for (const listener of slot.failed) listener(slot.pendingFailure)
+            return input.onRefused(slot.pendingFailure)
+          }
+          slot.pending.push(message.ops as readonly TreeMutation[])
+          return
+        }
         for (const listener of slot.batch) listener(message.ops as readonly TreeMutation[])
         return
       }

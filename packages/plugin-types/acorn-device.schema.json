@@ -1,0 +1,189 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://acorn.sh/schemas/acorn-device.schema.json",
+  "title": "acorn device configuration",
+  "type": "object",
+  "properties": {
+    "theme": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "themeLight": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "themeDark": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "themeFollowSystem": {
+      "type": "boolean"
+    },
+    "style": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "keybindings": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 160
+      },
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "type": "string",
+            "maxLength": 64
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "railOrder": {
+      "type": "object",
+      "properties": {
+        "pinned": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          }
+        },
+        "order": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          }
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          }
+        }
+      },
+      "required": [
+        "pinned",
+        "order"
+      ],
+      "additionalProperties": false
+    },
+    "leftCollapsed": {
+      "type": "boolean"
+    },
+    "exclusiveSlots": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "enum": [
+          "rail.taskList",
+          "pane.switcher",
+          "rail",
+          "topbar"
+        ]
+      },
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 160
+      }
+    },
+    "plugins": {
+      "maxItems": 128,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "github": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "tag": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "github"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "npm": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "version": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "npm"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "url": {
+                    "type": "string",
+                    "format": "uri",
+                    "pattern": "^https:\\/\\/.*"
+                  }
+                },
+                "required": [
+                  "url"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "path"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "source"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": {}
+}

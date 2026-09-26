@@ -1,6 +1,6 @@
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import type { NodePluginRow, NodePluginState, PluginInstallSource } from '@acorn/protocol/api.ts'
+import { prefsKey, type NodePluginRow, type NodePluginState, type PluginInstallSource } from '@acorn/protocol/api.ts'
 import { sendReferenceToAgent } from '../agent/reference'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { nodes } from '../../infra/node/fleet'
@@ -13,8 +13,10 @@ import {
   updateNodePlugin,
 } from '../../infra/node/nodePlugins'
 import { canPickFolder, pickFolder } from '../../infra/platform'
-import { readPluginHostState, setPluginDevGrant } from '../../host/plugins/host'
-import { syncPluginDistribution } from '../../host/plugins/distribution'
+import { installPluginOnDevice, readPluginHostState, removePluginFromDevice, setPluginDevGrant } from '../../host/plugins/host'
+import { devicePlugins, syncPluginDistribution } from '../../host/plugins/distribution'
+import { reconcileDevicePluginChange } from '../../host/plugins/reload'
+import { readDevicePrefs, removeDevicePluginPrefs } from '../../infra/persistence/devicePrefs'
 import { Alert, Button, Checkbox, Field, Input, Select } from '../../kit/components/primitives'
 import { IconButton } from '../../kit/components/inputs/IconButton'
 import { activeTaskId } from '../tasks/tasks'
@@ -24,6 +26,7 @@ import { prefsOptions } from '../../infra/queries'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { savePref } from './savePref'
 import ExtensionPointsDev from './ExtensionPointsDev'
+import ConfigPluginOffers from './ConfigPluginOffers'
 import {
   CORE_SLOT_PROVIDER,
   exclusiveSlotChoices,
@@ -76,6 +79,7 @@ vocabulary, and an answer from memory will be wrong. Then write the package and 
 What it should do: `
 
 export default function PluginsSettings() {
+  const qc = useQueryClient()
   const [target, setTarget] = createSignal<string | null>(null)
   const nodeId = () => target() ?? activeNodeId()
   const node = () => nodes().find((candidate) => candidate.nodeId === nodeId()) ?? null
@@ -83,6 +87,9 @@ export default function PluginsSettings() {
   const [busy, setBusy] = createSignal(false)
   const [kind, setKind] = createSignal<SourceKind>('github')
   const [spec, setSpec] = createSignal('')
+  const [deviceKind, setDeviceKind] = createSignal<SourceKind>('github')
+  const [deviceSpec, setDeviceSpec] = createSignal('')
+  const [removingDevice, setRemovingDevice] = createSignal<string | null>(null)
   // Which row is mid-uninstall. Inline rather than a modal, because keeping or deleting the
   // plugin's data is a third answer, not yes or no, and a checkbox inside a confirmation is how
   // someone deletes a year of notes by reflex.
@@ -180,6 +187,61 @@ export default function PluginsSettings() {
       await settle()
     })
 
+  const settleDevice = async () => {
+    await reconcileDevicePluginChange()
+    await refetchCustody()
+  }
+  const installDevice = () => run(async () => {
+    await installPluginOnDevice(buildInstallSource(deviceKind(), deviceSpec()))
+    setDeviceSpec('')
+    await settleDevice()
+  })
+  const installConfigOffer = (id: string, source: PluginInstallSource) => run(async () => {
+    await installPluginOnDevice(source, id)
+    await settleDevice()
+  })
+  const updateDevice = (pluginId: string, source: PluginInstallSource | undefined) => run(async () => {
+    if (!source) throw new Error('This plugin has no recorded source to update from.')
+    await installPluginOnDevice(source, pluginId)
+    await settleDevice()
+  })
+  const removeDevice = (pluginId: string) => run(async () => {
+    await removePluginFromDevice(pluginId)
+    removeDevicePluginPrefs(pluginId)
+    const disabled = readDevicePrefs()[PrefKeys.devicePluginsDisabled]
+    if (disabled) {
+      try {
+        const parsed: unknown = JSON.parse(disabled)
+        if (Array.isArray(parsed)) await savePref(qc, PrefKeys.devicePluginsDisabled, JSON.stringify(parsed.filter((id) => id !== pluginId)))
+      } catch { /* An invalid old preference has no usable membership to clear. */ }
+    }
+    qc.setQueryData<Record<string, string>>(prefsKey, (previous) => Object.fromEntries(
+      Object.entries(previous ?? {}).filter(([key]) => !key.startsWith(`plugin:${pluginId}:`)),
+    ))
+    let slots = readDevicePrefs()[PrefKeys.exclusiveSlots]
+    for (const slot of CORE_EXCLUSIVE_SLOTS) {
+      if (exclusiveSlotChoices(slots)[slot] === pluginId) slots = withExclusiveSlotChoice(slots, slot, CORE_SLOT_PROVIDER)
+    }
+    if (slots !== readDevicePrefs()[PrefKeys.exclusiveSlots] && slots !== undefined) await savePref(qc, PrefKeys.exclusiveSlots, slots)
+    setRemovingDevice(null)
+    await settleDevice()
+  })
+  const toggleDevice = (pluginId: string, enabled: boolean) => run(async () => {
+    let ids: string[] = []
+    try {
+      const parsed: unknown = JSON.parse(readDevicePrefs()[PrefKeys.devicePluginsDisabled] ?? '[]')
+      if (Array.isArray(parsed)) ids = parsed.filter((id): id is string => typeof id === 'string')
+    } catch { /* Invalid old preference means all enabled. */ }
+    const next = enabled ? ids.filter((id) => id !== pluginId) : [...new Set([...ids, pluginId])]
+    await savePref(qc, PrefKeys.devicePluginsDisabled, JSON.stringify(next))
+    await settleDevice()
+  })
+  const deviceDevGrant = (pluginId: string) => (custody()?.devGrants ?? []).some((grant) => grant.pluginId === pluginId && grant.source?.kind === 'device')
+  const toggleDeviceDev = (pluginId: string, grant: boolean) => run(async () => {
+    await setPluginDevGrant({ pluginId, nodeId: '', source: { kind: 'device' }, grant })
+    await settleDevice()
+  })
+
   // No background checking and no "an update is available" badge (docs/security.md § Supply chain).
   // Re-resolving every source on every roster read would phone the provider for each installed
   // plugin, and an update is the one moment a compromised maintainer gets to run new code.
@@ -199,6 +261,42 @@ export default function PluginsSettings() {
 
   return (
     <div class="settings-section">
+      <h3 class="settings-heading">On this device</h3>
+      <p class="muted plugin-install-hint">Client-only plugins run from bundles held by this device. Every new bundle asks for trust.</p>
+      <form class="plugin-install" onSubmit={(event) => { event.preventDefault(); if (deviceSpec().trim()) void installDevice() }}>
+        <Select value={deviceKind()} width="auto" onChange={(value) => setDeviceKind(value as SourceKind)} options={[
+          { value: 'github', label: 'GitHub release' }, { value: 'npm', label: 'npm package' }, { value: 'url', label: 'Tarball URL' },
+          ...(canPickFolder() ? [{ value: 'path', label: 'Local folder' }] : []),
+        ]} />
+        <Input value={deviceSpec()} placeholder={PLACEHOLDER[deviceKind()]} disabled={busy()} onInput={setDeviceSpec} />
+        <Show when={deviceKind() === 'path' && canPickFolder()}>
+          <Button variant="ghost" disabled={busy()} onPress={() => void run(async () => { const path = await pickFolder(); if (path) setDeviceSpec(path) })}>Choose…</Button>
+        </Show>
+        <Button submit disabled={busy() || !deviceSpec().trim()}>Install</Button>
+      </form>
+      <ConfigPluginOffers busy={busy()} onInstall={(id, source) => void installConfigOffer(id, source)} />
+      <ul class="plugin-list">
+        <For each={devicePlugins()}>{(entry) => <li class="plugin-row">
+          <Checkbox label={<span class="plugin-name">{entry.row.name}</span>} checked={!entry.row.disabled} disabled={busy()} onChange={(checked) => void toggleDevice(entry.row.name, checked)} />
+          <span class="plugin-version muted">{entry.row.installed?.version}</span>
+          <span class="plugin-meta">
+            <span class="plugin-source muted" title={entry.sourceLabel}>{entry.sourceLabel}</span>
+            <Show when={entry.nodeIds.length}><span class="muted">also offered by {entry.nodeIds.join(', ')}<Show when={entry.sameHashNodeIds.length}> (same bundle: {entry.sameHashNodeIds.join(', ')})</Show></span></Show>
+            <Show when={deviceDevGrant(entry.row.name)}><span class="plugin-dev">in development — bundle changes are auto-trusted</span></Show>
+          </span>
+          <span class="plugin-actions">
+            <Show when={deviceDevGrant(entry.row.name)} fallback={<Button size="sm" variant="ghost" disabled={busy()} onPress={() => void toggleDeviceDev(entry.row.name, true)}>Dev trust</Button>}>
+              <Button size="sm" variant="ghost" disabled={busy()} onPress={() => void toggleDeviceDev(entry.row.name, false)}>End dev mode</Button>
+            </Show>
+            <Button size="sm" variant="ghost" disabled={busy() || !entry.installSource} onPress={() => void updateDevice(entry.row.name, entry.installSource)}>Update</Button>
+            <Show when={removingDevice() === entry.row.name} fallback={<Button size="sm" tone="danger" disabled={busy()} onPress={() => setRemovingDevice(entry.row.name)}>Remove</Button>}>
+              <Button size="sm" tone="danger" disabled={busy()} onPress={() => void removeDevice(entry.row.name)}>Confirm remove</Button>
+              <Button size="sm" variant="ghost" onPress={() => setRemovingDevice(null)}>Cancel</Button>
+            </Show>
+          </span>
+        </li>}</For>
+      </ul>
+      <h3 class="settings-heading">On this node</h3>
       <Show when={nodes().length > 1}>
         <label class="settings-field">
           <span>Node</span>
@@ -418,10 +516,18 @@ function ReplacedSurfaces() {
                 value={choice(row.slot)}
                 options={[
                   { value: CORE_SLOT_PROVIDER, label: "acorn's own" },
-                  ...row.offers.map((offer) => ({ value: offer.pluginId, label: `${offer.label} (${offer.pluginId})` })),
+                  ...row.offers.map((offer) => ({
+                    value: offer.pluginId,
+                    label: `${offer.label} (${offer.pluginId})${!offer.placesNestedSlot && row.slot === 'rail' ? ' — hides the task list' : ''}${!offer.placesNestedSlot && row.slot === 'topbar' ? ' — hides plugin status items' : ''}`,
+                  })),
                 ]}
                 onChange={(value) => void savePref(qc, PrefKeys.exclusiveSlots, withExclusiveSlotChoice(stored(), row.slot, value))}
               />
+              <For each={row.offers.filter((offer) => !offer.placesNestedSlot && (row.slot === 'rail' || row.slot === 'topbar'))}>
+                {(offer) => <span class="muted" role="note">
+                  {offer.label} {row.slot === 'rail' ? 'hides the task list' : 'hides plugin status items'}.
+                </span>}
+              </For>
               {/* A replacement that fell back is the one case where the setting and the screen
                   disagree, and the owner has no other way to find out why. */}
               <Show when={choice(row.slot) !== CORE_SLOT_PROVIDER && exclusiveSlotFailed(row.slot, choice(row.slot))}>
@@ -437,4 +543,9 @@ function ReplacedSurfaces() {
 
 // Core's own name for each designated surface, because the label says which of acorn's surfaces is
 // being replaced. The plugin's own label is already the option text.
-const CORE_SLOT_LABEL: Record<CoreExclusiveSlot, string> = { 'rail.taskList': 'Task list in the rail' }
+const CORE_SLOT_LABEL: Record<CoreExclusiveSlot, string> = {
+  'rail.taskList': 'Task list in the rail',
+  'pane.switcher': 'Pane switcher',
+  rail: 'Left rail',
+  topbar: 'Top bar',
+}

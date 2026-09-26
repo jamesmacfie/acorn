@@ -14,6 +14,7 @@ const fullHost = () => ({
   onClosePane: vi.fn(() => () => {}),
   onCommandPalette: vi.fn(() => () => {}),
   onWillQuit: vi.fn(() => () => {}),
+  openConfigFile: vi.fn(async () => {}),
   nodeFetch: vi.fn(async () => ({ status: 200, headers: {}, body: new Uint8Array() })),
   nodeAbort: vi.fn(),
   nodeSend: vi.fn(),
@@ -29,7 +30,8 @@ const fullHost = () => ({
   nodeRestartLocal: vi.fn(),
   nodeTunnelOpen: vi.fn(),
   nodeTunnelClose: vi.fn(),
-  plugins: { state: vi.fn(), cachePut: vi.fn(), trustRecord: vi.fn(), devGrant: vi.fn() },
+  plugins: { state: vi.fn(), cachePut: vi.fn(), install: vi.fn(), remove: vi.fn(), trustRecord: vi.fn(), devGrant: vi.fn() },
+  config: { read: vi.fn(), write: vi.fn(), onChange: vi.fn(), location: vi.fn() },
   recovery: { openDataFolder: vi.fn(), quit: vi.fn() },
   folderPath: { pick: vi.fn(async () => '/tmp/picked') },
   files: { pick: vi.fn(async () => []), save: vi.fn(async () => true) },
@@ -82,6 +84,20 @@ describe('the platform seam contract', () => {
     const { onEvent: _onEvent, ...preview } = host.preview
     install({ ...host, preview })
     expect(seamProblems(SEAM_GROUPS)).toEqual(['preview.onEvent: not a function'])
+  })
+
+  it('refuses a plugin host missing device installation', () => {
+    const host = fullHost()
+    const { install: _install, ...plugins } = host.plugins
+    install({ ...host, plugins })
+    expect(seamProblems(SEAM_GROUPS)).toEqual(['plugins.install: not a function'])
+  })
+
+  it('refuses a partial config group', () => {
+    const host = fullHost()
+    const { onChange: _onChange, ...config } = host.config
+    install({ ...host, config })
+    expect(seamProblems(SEAM_GROUPS)).toEqual(['config.onChange: not a function'])
   })
 
   it('fails a group that resolves on a host which does not declare it', () => {
@@ -164,6 +180,7 @@ describe('the platform seam contract', () => {
       'fleet',
       'pairing',
       'plugins',
+      'config',
       'desktopExtras',
       'folderPicker',
       'files',

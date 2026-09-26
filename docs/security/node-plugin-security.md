@@ -162,10 +162,10 @@ reasonable:
   is validated against a declared shape. Two plugin origins talking directly cannot be gated, capped,
   logged, or described in a trust prompt. The remote tree, hooks, and rectangle slots all carry
   messages the host checks.
-- **Nested slots.** A contributor's subtree grafted into an owner's slot does not itself open slots.
-  One level. `Slot` is not one of the node names a tree may emit, so this is enforced by the wire and
-  not by convention. A tree of grafts makes the trust prompt a tree and makes "who is drawing this"
-  unanswerable.
+- **Nested cooperative slots.** A contributor's subtree grafted into an owner's slot does not itself
+  open slots. The special chrome `Slot` tree node works only with an opaque reference minted for the
+  selected rail or topbar provider; the host clears that reference before mounting its child. A tree
+  of grafts would make "who is drawing this" unanswerable at trust time.
 - **Reopening `frame-src`**, for any reason. The Rust test in `plugin_scheme.rs` that pins the policy
   stays green for the life of the design.
 

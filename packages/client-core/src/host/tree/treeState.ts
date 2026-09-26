@@ -24,9 +24,45 @@ export type StoredNode = { type: string; props: Record<string, unknown>; childre
  *  Node process has neither, so the default is the next timer turn. */
 export type TreeScheduler = { schedule(run: () => void): number; cancel(handle: number): void }
 
+/** A hidden or unfocused WebKit window may suspend animation frames while still delivering worker
+ * messages. Keep frame coalescing when frames run, but let a short timer draw the first tree when
+ * they do not. Whichever fires first cancels the other. */
+export function createFrameScheduler(
+  requestFrame: (run: () => void) => number,
+  cancelFrame: (handle: number) => void,
+  fallbackMs = 100,
+): TreeScheduler {
+  let next = 0
+  const pending = new Map<number, { frame: number; timer: ReturnType<typeof setTimeout> }>()
+  return {
+    schedule(run) {
+      const id = ++next
+      const finish = (): void => {
+        const scheduled = pending.get(id)
+        if (!scheduled) return
+        pending.delete(id)
+        cancelFrame(scheduled.frame)
+        clearTimeout(scheduled.timer)
+        run()
+      }
+      const frame = requestFrame(finish)
+      const timer = setTimeout(finish, fallbackMs)
+      pending.set(id, { frame, timer })
+      return id
+    },
+    cancel(id) {
+      const scheduled = pending.get(id)
+      if (!scheduled) return
+      pending.delete(id)
+      cancelFrame(scheduled.frame)
+      clearTimeout(scheduled.timer)
+    },
+  }
+}
+
 const defaultScheduler: TreeScheduler =
   typeof requestAnimationFrame === 'function'
-    ? { schedule: (run) => requestAnimationFrame(run), cancel: (handle) => cancelAnimationFrame(handle) }
+    ? createFrameScheduler(requestAnimationFrame, cancelAnimationFrame)
     : { schedule: (run) => setTimeout(run, 0) as unknown as number, cancel: (handle) => clearTimeout(handle) }
 
 export type TreeStateInput = {

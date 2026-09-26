@@ -342,8 +342,22 @@
               "coreSlot": {
                 "type": "string",
                 "enum": [
-                  "rail.taskList"
+                  "rail.taskList",
+                  "pane.switcher",
+                  "rail",
+                  "topbar"
                 ]
+              },
+              "placesSlots": {
+                "maxItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "rail.taskList",
+                    "topbar.right"
+                  ]
+                }
               },
               "url": {
                 "type": "string",
@@ -583,6 +597,26 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 256
+              },
+              "tree": {
+                "type": "object",
+                "properties": {
+                  "list": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "detail": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": [
+                  "list",
+                  "detail"
+                ],
+                "additionalProperties": false
               },
               "projectScoped": {
                 "type": "boolean"
@@ -904,8 +938,7 @@
             "required": [
               "id",
               "label",
-              "order",
-              "items"
+              "order"
             ]
           }
         },
@@ -2265,6 +2298,45 @@
                   "--shadow-popover"
                 ],
                 "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "tokens"
+            ]
+          }
+        },
+        "styles": {
+          "default": [],
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 240
+              },
+              "tokens": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
               }
             },
             "required": [

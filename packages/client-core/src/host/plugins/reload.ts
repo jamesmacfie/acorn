@@ -32,6 +32,12 @@ export async function reconcilePluginChange(): Promise<void> {
   syncPluginContributions()
 }
 
+/** A device install, update, toggle, or removal needs no node roster request. */
+export async function reconcileDevicePluginChange(): Promise<void> {
+  await syncPluginDistribution({ repin: true, deviceOnly: true })
+  syncPluginContributions()
+}
+
 /** Subscribe for the life of the shell: the node's own reload broadcast, and a node becoming reachable.
  *
  * The second one is what runs the first useful pass. Every host can start its renderer before the node
@@ -47,12 +53,17 @@ export async function reconcilePluginChange(): Promise<void> {
  * unsubscribe for the broadcast half, for symmetry with the other watchers; the app never calls it. */
 export function watchPluginChanges(): () => void {
   const asked = new Set<string>()
+  // A device bundle is usable before any node is reachable. Complete that local pass before the
+  // first fleet pass so an arriving node cannot race it when choosing the active bundle.
+  const initialDevicePass = reconcileDevicePluginChange().catch((error: unknown) => {
+    log.warn('could not read device plugins', error)
+  })
   createRoot(() => {
     createEffect(() => {
       const arrived = nodes().filter((node) => nodeState(node.nodeId) !== 'offline' && !asked.has(node.nodeId))
       if (!arrived.length) return
       for (const node of arrived) asked.add(node.nodeId)
-      void syncPluginDistribution()
+      void initialDevicePass.then(() => syncPluginDistribution())
         .then(syncPluginContributions)
         .catch((error: unknown) => log.warn("could not read the fleet's plugins", error))
     })

@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { PLUGIN_API_MAJOR, type NodePluginRow, type PluginContributions, type PluginFrameSurface } from '@acorn/protocol/api.ts'
 import { declaredSurfaces, eligiblePlugins, hasWithheldCode, isTaskPane } from './contributions'
-import { _resetPluginDistribution, _seedPluginDistribution } from './distribution'
+import { _resetPluginDistribution, _seedDevicePluginDistribution, _seedPluginDistribution } from './distribution'
 
 // The questions that used to be answered twice, once in each register module. Both callers are plain
 // `.ts` and have their own suites now (chrome/register.test.ts, frames/register.test.ts); this one
@@ -39,6 +39,22 @@ const row = (name: string, over: Partial<NodePluginRow['installed']> = {}, frame
 afterEach(() => _resetPluginDistribution())
 
 describe('eligiblePlugins', () => {
+  it('withdraws every device contribution on disable while retaining device precedence', () => {
+    _seedPluginDistribution([['node-a', [row('board', { version: '2.0.0', client: { hash: HASH_B, bytes: 12 } })]]], [
+      `board ${HASH}`, `board ${HASH_B}`,
+    ])
+    const device = row('board', {
+      version: '1.9.0', client: { hash: HASH, bytes: 12 },
+      contributions: { frames: [], themes: [{ id: 'warm', label: 'Warm', dark: false, tokens: {} }], styles: [] } as PluginContributions,
+    })
+    const entry = { hash: HASH, row: device, sourceLabel: 'this device', nodeIds: ['node-a'], sameHashNodeIds: [] }
+    _seedDevicePluginDistribution([entry])
+    expect(eligiblePlugins()[0]).toMatchObject({ hash: HASH, trusted: true, installed: { version: '1.9.0' } })
+
+    _seedDevicePluginDistribution([{ ...entry, row: { ...device, disabled: true, running: false, state: 'disabled' } }])
+    expect(eligiblePlugins()).toEqual([])
+  })
+
   it('skips a roster row with no manifest, and takes the first node offering an id', () => {
     _seedPluginDistribution([
       ['node-a', [{ name: 'terminal', required: true, disabled: false, running: true, state: 'active' }, row('board')]],

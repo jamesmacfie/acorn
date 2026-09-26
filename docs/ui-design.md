@@ -36,9 +36,11 @@ pane, for the same reason: rail, pane strip, the pane's own regions, and back. A
 pane rather than replacing it, so opening the palette does not tear down the pane's queries and its
 model.
 
-The rail's task list goes through the same `rail.taskList` exclusive slot the desktop's does, so a
-plugin that offers to replace it replaces it on both hosts. The topbar and the pane strip are bespoke
-on both until `docs/future/client-plugins/04-replaceable-surfaces.md` gives them contracts.
+The desktop topbar, left rail, pane switcher, and rail task list each have a core provider in an
+exclusive slot. A selected plugin provider can draw one of these surfaces using the host's data and
+verbs. The rail provider places the host's task-list slot; the topbar provider places the host's
+right-side status slot. Settings warns when a provider declares that it omits either placement.
+The terminal currently hosts `rail.taskList`; its own chrome stays native to cells.
 
 The topbar spans the window. The rails and the panes all begin under its bottom border, so that
 border is one unbroken line across the app: the left TabRail is the first thing in `.shell-body`, the

@@ -21,7 +21,7 @@ vi.mock('../../infra/node/wsClient', () => ({ wsOnPluginsChanged: () => () => {}
 vi.mock('./distribution', () => ({ syncPluginDistribution: vi.fn(async () => {}) }))
 vi.mock('./syncContributions', () => ({ syncPluginContributions: vi.fn() }))
 
-const { watchPluginChanges } = await import('./reload')
+const { watchPluginChanges, reconcileDevicePluginChange } = await import('./reload')
 const { syncPluginDistribution } = await import('./distribution')
 const passes = () => vi.mocked(syncPluginDistribution).mock.calls.length
 
@@ -30,25 +30,31 @@ const node = (nodeId: string): NodeRecord => ({ nodeId, label: nodeId, local: tr
 describe('the first pass', () => {
   // One watcher for the whole sequence, because the real one is never disposed: it holds a root for the
   // life of the host, so a second `watchPluginChanges()` in a second test would still be watching.
-  it('waits for a node that could answer it, then asks each node once', () => {
+  it('reads device bundles before a node arrives, then asks each node once', async () => {
     watchPluginChanges()
-    expect(passes()).toBe(0)
+    expect(passes()).toBe(1)
+    expect(syncPluginDistribution).toHaveBeenLastCalledWith({ repin: true, deviceOnly: true })
 
     // Membership lands before the connection does, which is the boot order this used to fire in.
     setNodes([node('a')])
-    expect(passes()).toBe(0)
-    setStates({ a: 'online' })
     expect(passes()).toBe(1)
+    setStates({ a: 'online' })
+    await vi.waitFor(() => expect(passes()).toBe(2))
 
     // A connection that flaps is not news: the bundles were hashed on the pass above.
     setStates({ a: 'degraded' })
     setStates({ a: 'offline' })
     setStates({ a: 'online' })
-    expect(passes()).toBe(1)
+    expect(passes()).toBe(2)
 
     // A node paired later is, and it carries plugins of its own.
     setNodes([node('a'), node('b')])
     setStates({ a: 'online', b: 'online' })
-    expect(passes()).toBe(2)
+    await vi.waitFor(() => expect(passes()).toBe(3))
   })
+})
+
+it('reconciles device changes without requesting node rosters', async () => {
+  await reconcileDevicePluginChange()
+  expect(syncPluginDistribution).toHaveBeenLastCalledWith({ repin: true, deviceOnly: true })
 })

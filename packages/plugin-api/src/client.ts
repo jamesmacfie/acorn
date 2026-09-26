@@ -296,3 +296,5 @@ export type { DataSourceRef, DataSourceDescriptor, DataSourceRegistration, DataS
 export type { QueryScope, QueryContent, QueryReference, QueryConsumer, QueryRevision, QueryDraft, QueryBindingContext, QueryBindings, ResolvedQuery, QueryRecovery, QuerySaveState } from '@acorn/protocol/dataQueries.ts'
 export { queryContentSchema, queryReferenceSchema, queryScopeSchema } from '@acorn/protocol/dataQueries.ts'
 export { resolveDataBinding, resolveQueryParameters, resolveQueryContent } from '@acorn/protocol/dataQueryResolution.ts'
+export type { PaneSwitcherData, PaneSwitcherPane, PaneSwitcherProps } from '@acorn/protocol/paneSwitcher.ts'
+export type { RailData, RailProps, TopbarData, TopbarProps, SlotRef } from '@acorn/protocol/chrome.ts'

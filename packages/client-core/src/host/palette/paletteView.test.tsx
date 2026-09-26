@@ -170,6 +170,7 @@ describe('the keyboard', () => {
           return () => { emit = () => {} }
         },
         onWillQuit: () => () => {},
+        openConfigFile: async () => {},
       },
     })
     register(leaf('cmd.one', { title: 'One' }))

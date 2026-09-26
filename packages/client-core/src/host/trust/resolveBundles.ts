@@ -1,4 +1,5 @@
 import { speaksApiVersion } from '@acorn/protocol/plugin/apiVersion.ts'
+import type { BundleSource } from '@acorn/protocol/plugin/bundles.ts'
 // Which client bundle wins when a fleet disagrees (docs/plugins.md).
 //
 // Two nodes may carry different versions of one plugin. Contribution IDs are not namespaced (`pr`,
@@ -16,9 +17,10 @@ export type BundleCandidate = {
   apiVersion: string
   hash: string
   nodeId: string
+  source?: BundleSource
 }
 
-export type ActiveBundle = { pluginId: string; version: string; hash: string; nodeIds: string[] }
+export type ActiveBundle = { pluginId: string; version: string; hash: string; source: BundleSource; nodeIds: string[] }
 
 // Dotted numeric compare, ignoring anything after the first non-numeric segment. No `semver`
 // dependency exists in this repo and adding one to answer "is 2.10.0 newer than 2.9.0" would be a
@@ -49,22 +51,21 @@ export function resolveActiveBundles(
 ): Map<string, ActiveBundle> {
   const winners = new Map<string, ActiveBundle>()
   const supported = candidates.filter((candidate) => speaksApiVersion(candidate.apiVersion, options.apiVersion))
+  const byPlugin = new Map<string, BundleCandidate[]>()
   for (const candidate of supported) {
-    const current = winners.get(candidate.pluginId)
-    if (!current) {
-      winners.set(candidate.pluginId, { pluginId: candidate.pluginId, version: candidate.version, hash: candidate.hash, nodeIds: [candidate.nodeId] })
-      continue
-    }
-    if (current.hash === candidate.hash) {
-      // The same bytes from a second node. One bundle, two sources, and the plugin's UI renders
-      // against both, which is why the node list is plural.
-      if (!current.nodeIds.includes(candidate.nodeId)) current.nodeIds.push(candidate.nodeId)
-      continue
-    }
-    const better = compareVersions(candidate.version, current.version) || current.hash.localeCompare(candidate.hash)
-    if (better > 0) {
-      winners.set(candidate.pluginId, { pluginId: candidate.pluginId, version: candidate.version, hash: candidate.hash, nodeIds: [candidate.nodeId] })
-    }
+    const group = byPlugin.get(candidate.pluginId) ?? []
+    group.push(candidate)
+    byPlugin.set(candidate.pluginId, group)
+  }
+  for (const [pluginId, group] of byPlugin) {
+    const device = group.filter((candidate) => candidate.source?.kind === 'device')
+    const pool = device.length ? device : group
+    const winner = [...pool].sort((a, b) => compareVersions(b.version, a.version) || b.hash.localeCompare(a.hash))[0]!
+    winners.set(pluginId, {
+      pluginId, version: winner.version, hash: winner.hash,
+      source: winner.source ?? { kind: 'node', nodeId: winner.nodeId },
+      nodeIds: [...new Set(group.filter((candidate) => candidate.hash === winner.hash && candidate.source?.kind !== 'device').map((candidate) => candidate.nodeId))],
+    })
   }
   return winners
 }

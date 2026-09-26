@@ -67,6 +67,8 @@
     "./host/annotations/taskAnnotations.ts": "./src/host/annotations/taskAnnotations.ts",
     "./host/annotations/annotations.ts": "./src/host/annotations/annotations.ts",
     "./host/chrome": "./src/host/chrome/public.ts",
+    "./host/plugins/trustQueue.ts": "./src/host/plugins/trustQueue.ts",
+    "./host/chrome/Topbar.tsx": "./src/host/chrome/Topbar.tsx",
     "./host/components/ProviderHtml.tsx": "./src/host/components/ProviderHtml.tsx",
     "./host/components/RefPanelBox.tsx": "./src/host/components/RefPanelBox.tsx",
     "./host/components/RefPanelTaskLink.tsx": "./src/host/components/RefPanelTaskLink.tsx",
@@ -86,6 +88,8 @@
     "./host/palette/PaletteSurface.tsx": "./src/host/palette/PaletteSurface.tsx",
     "./host/palette/WorkspacePalette.tsx": "./src/host/palette/WorkspacePalette.tsx",
     "./host/plugins": "./src/host/plugins/public.ts",
+    "./host/plugins/ExclusiveSlotHost.tsx": "./src/host/plugins/ExclusiveSlotHost.tsx",
+    "./host/plugins/NestedChromeSlot.tsx": "./src/host/plugins/NestedChromeSlot.tsx",
     "./host/plugins/distribution.ts": "./src/host/plugins/distribution.ts",
     "./host/plugins/reload.ts": "./src/host/plugins/reload.ts",
     "./host/registries/commands": "./src/host/registries/commands/public.ts",
@@ -117,9 +121,11 @@
     "./infra/node/wsClient.ts": "./src/infra/node/wsClient.ts",
     "./infra/persistence": "./src/infra/persistence/public.ts",
     "./infra/persistence/queryPersistence.ts": "./src/infra/persistence/queryPersistence.ts",
+    "./infra/persistence/deviceConfigSync.ts": "./src/infra/persistence/deviceConfigSync.ts",
     "./infra/platform": "./src/infra/platform/public.ts",
     "./infra/queries.ts": "./src/infra/queries.ts",
     "./infra/styles/styles.css": "./src/infra/styles/styles.css",
+    "./infra/styles/themeColorTokens.ts": "./src/infra/styles/themeColorTokens.ts",
     "./infra/telemetry": "./src/infra/telemetry/public.ts",
     "./infra/telemetry/emitter.ts": "./src/infra/telemetry/emitter.ts",
     "./infra/telemetry/post.ts": "./src/infra/telemetry/post.ts",
@@ -152,7 +158,7 @@
   },
   "scripts": {
     "icons": "node scripts/icon-census.mjs",
-    "lint": "node scripts/icon-census.mjs --check && tsc --noEmit",
+    "lint": "node scripts/icon-census.mjs --check && node scripts/theme-cell-tokens.mjs --check && tsc --noEmit",
     "test": "vitest run"
   },
   "dependencies": {

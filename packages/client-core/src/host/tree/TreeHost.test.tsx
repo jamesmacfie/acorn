@@ -4,6 +4,7 @@ import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import { TREE_LIMITS } from '@acorn/protocol/tree/messages.ts'
 import type { KitEvent } from '@acorn/protocol/tree/nodes.ts'
 import { TreeHost, type TreeTransport } from './TreeHost'
+import { mintSlotRef, NestedChromeSlot, WithNestedChromeSlots } from '../plugins/NestedChromeSlot'
 
 // The host half. Every test here is a stranger's message going in and the shell's own DOM coming out,
 // which is the only property the remote root has to have: a tree names components, and what it gets is
@@ -61,6 +62,22 @@ afterEach(() => {
 })
 
 describe('a tree becomes the host’s own components', () => {
+  it('places only the host-minted nested chrome slot, with one nesting level', async () => {
+    const h = harness()
+    const ref = mintSlotRef()
+    dispose = render(() => (
+      <WithNestedChromeSlots slots={[{ ref, render: () => <span data-task-list>Tasks<NestedChromeSlot slotRef={ref} /></span> }]}>
+        <TreeHost pluginId="stranger" transport={h.transport} />
+      </WithNestedChromeSlots>
+    ), host)
+    h.apply([{ op: 'insert', parent: null, index: 0, node: node('slot', 'Slot', { slotRef: ref }) }])
+    await frame()
+    expect(host.querySelectorAll('[data-task-list]')).toHaveLength(1)
+    h.apply([{ op: 'patch', id: 'slot', props: { slotRef: 'forged' } }])
+    await frame()
+    expect(host.querySelector('[data-task-list]')).toBeNull()
+  })
+
   it('mounts the components a batch names', async () => {
     const h = harness()
     h.mount()

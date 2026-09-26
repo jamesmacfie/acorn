@@ -1,4 +1,5 @@
 import { pluginCustody, type PluginDevGrantRequest, type PluginHostState, type PluginPutResult, type PluginTrustDecision } from '../../infra/platform'
+import type { PluginInstallSource } from '@acorn/protocol/api.ts'
 
 // The client's platform adapter for third-party plugin bundles
 // (docs/plugins.md).
@@ -35,6 +36,23 @@ export const cachePluginBundle = async (request: {
   const host = bridge()
   if (!host) return { error: 'unreachable' }
   return host.cachePut(request)
+}
+
+export const installPluginOnDevice = async (source: PluginInstallSource, expectedPluginId?: string) => {
+  const host = bridge()
+  if (!host) throw new Error('This host cannot install device plugins.')
+  const result = await host.install({ source, ...(expectedPluginId ? { expectedPluginId } : {}) })
+  if ('error' in result) {
+    if (result.error === 'plugin-id-mismatch') throw new Error(`The source does not contain ${expectedPluginId}.`)
+    throw new Error(`Plugin install failed: ${result.error}`)
+  }
+  return result
+}
+
+export const removePluginFromDevice = async (pluginId: string): Promise<void> => {
+  const host = bridge()
+  if (!host) throw new Error('This host cannot remove device plugins.')
+  await host.remove({ pluginId })
 }
 
 export const recordPluginTrust = async (decision: PluginTrustDecision): Promise<void> => {

@@ -47,6 +47,10 @@ export type KitNodeName = (typeof KIT_NODES)[number]
  *  the sandbox adapter, so the wire has a single node shape rather than two. */
 export const TEXT_NODE = '#text'
 
+/** Host-filled chrome mount. Recognised only inside a rail or topbar replacement with a minted ref;
+ * it is intentionally outside KIT_NODES, so ordinary plugin trees cannot create nested slots. */
+export const CHROME_SLOT_NODE = 'Slot'
+
 const kitNodeSet: ReadonlySet<string> = new Set<string>(KIT_NODES)
 export const isKitNode = (value: string): value is KitNodeName => kitNodeSet.has(value)
 

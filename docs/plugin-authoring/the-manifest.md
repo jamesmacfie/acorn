@@ -159,11 +159,15 @@ row's id. A contribution to a point that is not there — owner not installed, d
 the point in an update — delivers nothing, silently; that is the designed outcome, not a failure to
 chase. **Call `plugin_authoring` for the current location list.**
 
-A `coreSlot` frame is the related pattern for acorn's *own* surfaces:
-`{ target: "coreSlot", id, label, coreSlot }` plus a client bundle, where `coreSlot` names one of the
-designated surfaces (`rail.taskList` today). Declaring one **seizes nothing** — the user picks the
-provider in Settings → Plugins, and acorn draws its own again the moment your plugin is disabled or your
-surface throws. It is not a pane, so no verb can name it and it never appears in the pane switcher.
+A `coreSlot` surface is the related pattern for acorn's *own* surfaces:
+`{ target: "coreSlot", id, label, coreSlot }` plus a client bundle. The designated surfaces are
+`rail.taskList`, `pane.switcher`, `rail`, and `topbar`. The last three require a `single` layout with
+one remote-tree `body`; the host gives that tree data and named actions. A rail or topbar tree can
+place its one nested host slot with the `Slot` node and the `slotRef` in its props. Declare
+`placesSlots: ["rail.taskList"]` or `["topbar.right"]` when you place it; Settings warns when the
+declaration is absent. Declaring a replacement **seizes nothing** — the user picks the provider in
+Settings → Plugins, and acorn draws its own again when your plugin is disabled or its surface fails.
+It is not a pane, so no pane verb can name it.
 
 A `taskChecks` entry is the one contribution that runs when a person is about to lose something.
 Archiving a task removes its worktree, so the host asks every plugin first and draws the answers in one

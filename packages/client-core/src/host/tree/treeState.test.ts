@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
-import { createTreeState } from './treeState'
+import { createFrameScheduler, createTreeState } from './treeState'
 
 // The pre-flight check in treeState.ts, which decides whether a whole batch may be applied
 // (docs/plugins.md § The tree contract). The drawing half is TreeHost.test.tsx and Slot.test.tsx;
@@ -17,6 +17,23 @@ const host = () => {
 
 type TreeNode = Extract<TreeMutation, { op: 'insert' }>['node']
 const leaf = (id: string, children: TreeNode[] = []): TreeNode => ({ id, type: 'Text', props: {}, children })
+
+it('draws through a timer when the browser never delivers an animation frame', () => {
+  vi.useFakeTimers()
+  try {
+    const cancelFrame = vi.fn()
+    const scheduler = createFrameScheduler(() => 7, cancelFrame, 100)
+    const draw = vi.fn()
+    scheduler.schedule(draw)
+    vi.advanceTimersByTime(99)
+    expect(draw).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(1)
+    expect(draw).toHaveBeenCalledOnce()
+    expect(cancelFrame).toHaveBeenCalledWith(7)
+  } finally {
+    vi.useRealTimers()
+  }
+})
 
 describe('a remove takes its whole subtree with it', () => {
   it('refuses a later op addressing a grandchild of a removed node', () => {

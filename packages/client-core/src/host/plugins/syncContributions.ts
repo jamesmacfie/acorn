@@ -2,7 +2,6 @@ import { syncChromeContributions } from '../chrome/chromeRegister'
 import { syncFrameContributions } from '../frames/register'
 
 /**
-/**
  * Both registration passes, in order. They must always run as a pair, since the frames pass draws the
  * rectangles and the chrome pass registers the commands and rail rows that open them, and that pairing
  * used to exist only as a comment beside two call sites.

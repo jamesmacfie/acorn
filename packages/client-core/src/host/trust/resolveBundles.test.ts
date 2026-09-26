@@ -34,7 +34,7 @@ describe('picking one bundle per plugin', () => {
       candidate({ version: '2.10.0', hash: 'b'.repeat(64), nodeId: 'node-b' }),
       candidate({ version: '2.9.0', hash: 'c'.repeat(64), nodeId: 'node-c' }),
     ])
-    expect(winners.get('sparkline')).toEqual({ pluginId: 'sparkline', version: '2.10.0', hash: 'b'.repeat(64), nodeIds: ['node-b'] })
+    expect(winners.get('sparkline')).toEqual({ pluginId: 'sparkline', version: '2.10.0', hash: 'b'.repeat(64), source: { kind: 'node', nodeId: 'node-b' }, nodeIds: ['node-b'] })
   })
 
   it('treats the same bytes from two nodes as one bundle with two sources', () => {
@@ -49,6 +49,30 @@ describe('picking one bundle per plugin', () => {
     // otherwise moves the failure from here to an import that throws.
     const winners = resolve([candidate({ version: '9.0.0', apiVersion: '99', hash: 'b'.repeat(64) }), candidate({ version: '1.0.0' })])
     expect(winners.get('sparkline')?.version).toBe('1.0.0')
+  })
+
+  it('keeps an installed device bundle ahead of a newer node offer', () => {
+    const winners = resolve([
+      candidate({ version: '2.0.0', hash: 'b'.repeat(64), nodeId: 'node-a' }),
+      candidate({ version: '1.9.0', hash: 'a'.repeat(64), nodeId: '', source: { kind: 'device' } }),
+    ])
+    expect(winners.get('sparkline')).toMatchObject({ version: '1.9.0', source: { kind: 'device' }, hash: 'a'.repeat(64) })
+  })
+
+  it('records nodes offering the winning device hash', () => {
+    const winners = resolve([
+      candidate({ nodeId: '', source: { kind: 'device' } }),
+      candidate({ nodeId: 'node-a' }), candidate({ nodeId: 'node-b' }),
+    ])
+    expect(winners.get('sparkline')?.nodeIds).toEqual(['node-a', 'node-b'])
+  })
+
+  it('drops an incompatible device bundle before choosing a node bundle', () => {
+    const winners = resolve([
+      candidate({ nodeId: '', source: { kind: 'device' }, apiVersion: '99' }),
+      candidate({ nodeId: 'node-a', version: '2.0.0', hash: 'b'.repeat(64) }),
+    ])
+    expect(winners.get('sparkline')?.source).toEqual({ kind: 'node', nodeId: 'node-a' })
   })
 
   it('has no winner when every candidate is for another API major', () => {

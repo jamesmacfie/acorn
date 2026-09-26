@@ -5,6 +5,8 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 import { MAX_BUNDLE_BYTES, PluginCache } from './pluginCache'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
+import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
 
 // Nothing to mock: the cache takes userDataDir as a parameter, the way fleetStore does, and touches
 // no shell API. That is what makes the hashing rules, the part that carries the security property,
@@ -76,6 +78,83 @@ describe('fetching a bundle from a node', () => {
     served = { status: 404, body: '' }
     expect(await store.putFromNode('node-a', 'sparkline', claim())).toEqual({ error: 'not-found' })
     expect(store.list()).toEqual({})
+  })
+})
+
+describe('installing a device bundle', () => {
+  const packageFolder = () => {
+    const folder = join(dir, 'package')
+    mkdirSync(folder)
+    writeFileSync(join(folder, 'client.js'), BUNDLE)
+    writeFileSync(join(folder, 'acorn-plugin.json'), JSON.stringify({
+      id: 'sparkline', name: 'Sparkline', version: '1.2.0', baseline: ACORN_BASELINE,
+      apiVersion: PLUGIN_API_MAJOR, client: 'client.js',
+    }))
+    return folder
+  }
+
+  it('hashes a folder bundle and re-reads it on update', async () => {
+    const folder = packageFolder()
+    const store = cache()
+    expect(await store.putFromSource({ path: folder })).toEqual({ hash: sha256(BUNDLE), pluginId: 'sparkline', version: '1.2.0' })
+    expect(store.list()[sha256(BUNDLE)]).toMatchObject({ source: { kind: 'device' }, installSource: { path: folder } })
+    writeFileSync(join(folder, 'client.js'), 'export default 2')
+    const updated = await store.putFromSource({ path: folder })
+    expect(updated).toMatchObject({ hash: sha256('export default 2') })
+    expect(store.has(sha256(BUNDLE))).toBe(false)
+    store.removeDevice('sparkline')
+    expect(store.list()).toEqual({})
+  })
+
+  it('refuses a manifest with node execution before writing a bundle', async () => {
+    const folder = packageFolder()
+    const manifest = JSON.parse(readFileSync(join(folder, 'acorn-plugin.json'), 'utf8')) as Record<string, unknown>
+    manifest.node = 'node.js'
+    writeFileSync(join(folder, 'acorn-plugin.json'), JSON.stringify(manifest))
+    writeFileSync(join(folder, 'node.js'), 'export default {}')
+    const store = cache()
+    expect(await store.putFromSource({ path: folder })).toEqual({ error: 'has-node-half' })
+    expect(store.list()).toEqual({})
+  })
+
+  it('checks a config offer or update identity before changing the cache', async () => {
+    const folder = packageFolder()
+    const store = cache()
+    expect(await store.putFromSource({ path: folder }, 'sparkline')).toMatchObject({ pluginId: 'sparkline' })
+    const before = store.list()
+    const manifest = JSON.parse(readFileSync(join(folder, 'acorn-plugin.json'), 'utf8')) as Record<string, unknown>
+    manifest.id = 'different-plugin'
+    writeFileSync(join(folder, 'acorn-plugin.json'), JSON.stringify(manifest))
+    writeFileSync(join(folder, 'client.js'), 'export default "different-plugin"')
+
+    expect(await store.putFromSource({ path: folder }, 'sparkline')).toEqual({ error: 'plugin-id-mismatch' })
+    expect(store.list()).toEqual(before)
+    expect(store.has(sha256('export default "different-plugin"'))).toBe(false)
+  })
+
+  it('accepts a remote-tree source and refuses a source that needs a Node route', async () => {
+    const folder = packageFolder()
+    const file = join(folder, 'acorn-plugin.json')
+    const manifest = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
+    manifest.contributions = { sources: [{ id: 'sparkline', label: 'Sparkline', order: 50, tree: { list: 'list', detail: 'detail' } }] }
+    writeFileSync(file, JSON.stringify(manifest))
+    const store = cache()
+    expect(await store.putFromSource({ path: folder })).toMatchObject({ pluginId: 'sparkline' })
+    manifest.contributions = { sources: [{ id: 'sparkline', label: 'Sparkline', order: 50, items: '/v1/p/sparkline/items' }] }
+    writeFileSync(file, JSON.stringify(manifest))
+    expect(await store.putFromSource({ path: folder })).toEqual({ error: 'has-node-half' })
+  })
+
+  it('reports a manifest parse failure to the install caller', async () => {
+    const folder = packageFolder()
+    writeFileSync(join(folder, 'acorn-plugin.json'), '{ broken json')
+    await expect(cache().putFromSource({ path: folder })).rejects.toThrow()
+  })
+
+  it('refuses a client bundle over the size limit', async () => {
+    const folder = packageFolder()
+    writeFileSync(join(folder, 'client.js'), Buffer.alloc(MAX_BUNDLE_BYTES + 1))
+    expect(await cache().putFromSource({ path: folder })).toEqual({ error: 'too-large' })
   })
 })
 

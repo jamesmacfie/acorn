@@ -33,6 +33,12 @@ Drawn by the shell. A loaded plugin's UI is an iframe (`frames`), a tree of the 
 emitted from a worker (`remote`), or a descriptor the host renders. It never hands the shell a
 component: a tree names one, and the host mounts its own.
 
+A device-held client-only package may declare client contributions that need no Node handler. A rail
+source uses `tree: { list, detail }`, with both names pointing at entries in its remote-tree worker;
+the route-backed `items` form needs a Node half. Route-backed slots, attention, node stats, agent
+contexts, reference resolvers, commands, document regions, and extension carriers are also refused.
+See [Device-held plugins](./plugins/activation.md#device-held-plugins).
+
 | Kind | Tier | Where | Host |
 | --- | --- | --- | --- |
 | Panes | Both | `ctx.panes` / `contributions.frames` (`target: 'pane'`) | A task's pane layout |
@@ -53,6 +59,7 @@ component: a tree names one, and the host mounts its own.
 | Agent contexts | Both | `ctx.agentContexts` / `contributions.agentContexts` | The context tray on an agent launch |
 | Ref resolvers | Both | `ctx.contribute(refResolverRegistry)` / `contributions.refResolvers` | External-item label resolution |
 | Themes | Both | `ctx.contribute(themeRegistry)` / `contributions.themes` | The appearance picker |
+| Style packs | Loaded | `contributions.styles` | Settings → Appearance; the host validates token data and generates the CSS block. No plugin selector enters the shell. **Direction: shipped as validated data.** |
 | Context menus | Both | `ctx.contribute(contextMenuRegistry)` / `contributions.contextMenus` | Host-drawn context menus, at one of two locations: `task.row` is a row in the tab rail and matches on `origin`, `projectId` and `pinned`; `item.row` is a row in an integration's list — Rollbar, Linear, GitHub — and matches on `providerId` and `projectId` (docs/plugins.md § Context menus) |
 | Extension points | Both | `ctx.extensionPoints` / `contributions.extensionPoints` | A surface a plugin opens to others, in one of five kinds: rows, annotations, remote trees, rectangles, hooks (docs/plugins.md § Cooperative extension points). The host mints `<pluginId>:<id>` from the plugin doing the registering, either way in. A `remote` point may also declare `actions`, the closed list of things a contributor's tree may ask it to do (docs/plugins.md § Asking the owner); the owner binds a handler of the same name per `Slot`, and a name missing from either list is refused. |
 | Extensions | Both | `ctx.extensions` / `contributions.extensions` | A contribution into someone else's point. A compiled plugin's carrier is a `component` the host mounts where it would mount a worker's tree; a loaded plugin's is `items`, `remote`, `frame` or `route`. A `remote` one may name `overlay`, one of its own manifest's overlay frames that this tree may ask the host to present (docs/plugins.md § Companion overlays). That is a qualifier on the carrier, not a sixth carrier: a descriptor still names exactly one. |

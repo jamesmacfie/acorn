@@ -1,11 +1,16 @@
 import { createSignal } from 'solid-js'
 import { corePluginsRoute, PLUGIN_API_MAJOR, type NodePluginRow, type NodePluginState } from '@acorn/protocol/api.ts'
-import type { PluginAckRecord } from '../../infra/platform'
+import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
+import { hasNodeHalf } from '@acorn/protocol/plugin/bundles.ts'
+import type { PluginHostState } from '../../infra/platform'
+import { PrefKeys } from '../../infra/persistence/prefKeys'
+import { readDevicePrefs, setDevicePluginIds } from '../../infra/persistence/devicePrefs'
 import { readJson } from '../../infra/node/apiClient'
 import { nodes, nodeState } from '../../infra/node/fleet'
 import { cachePluginBundle, pluginHostAvailable, readPluginHostState } from './host'
 import { resolveActiveBundles, type ActiveBundle, type BundleCandidate } from '../trust/resolveBundles'
 import { createLogger } from '../../infra/telemetry/logger'
+import { pendingTrust, setPendingTrust, type PluginTrustRequest } from './trustQueue'
 
 const log = createLogger('plugins')
 
@@ -21,14 +26,17 @@ const log = createLogger('plugins')
 // the time it can, the bytes are cached, the hash was computed locally, and the owner has said yes.
 
 const [installedByNode, setInstalledByNode] = createSignal<ReadonlyMap<string, readonly NodePluginRow[]>>(new Map())
-const [pendingTrust, setPendingTrust] = createSignal<readonly PluginTrustRequest[]>([])
 const [activeBundles, setActiveBundles] = createSignal<ReadonlyMap<string, ActiveBundle> | null>(null)
+export type DevicePluginEntry = { hash: string; row: NodePluginRow; sourceLabel: string; nodeIds: string[]; sameHashNodeIds: string[]; installSource?: import('@acorn/protocol/api.ts').PluginInstallSource }
+const [devicePlugins, setDevicePlugins] = createSignal<readonly DevicePluginEntry[]>([])
+export { devicePlugins }
 // `<pluginId> <hash>` for every bundle this device has said yes to. Held here because it is read on the
 // same pass that reads it from main, and phase 3 needs it as a gate rather than a round trip: a bundle
 // with no acceptance must not get so far as registering a contribution.
 const [acceptedBundles, setAcceptedBundles] = createSignal<ReadonlySet<string>>(new Set())
 
 export { installedByNode, pendingTrust, activeBundles }
+export type { PluginTrustRequest } from './trustQueue'
 
 /** Has this device agreed to run these exact bytes? Keyed on the pair, because consent was given to a
  * hash and not to a name (@acorn/custody/plugins/pluginTrustStore.ts). */
@@ -41,25 +49,21 @@ export function noteBundleAccepted(pluginId: string, hash: string): void {
   setAcceptedBundles(new Set([...acceptedBundles(), `${pluginId} ${hash}`]))
 }
 
-// What the trust dialog renders. `previous` is the last bundle of this plugin the owner accepted,
-// present only when this is an update: it turns "do you trust this?" into "here is what changed".
-export type PluginTrustRequest = {
-  row: NodePluginRow
-  hash: string
-  nodeId: string
-  previous?: PluginAckRecord
-}
-
 // The predicate phases 3 and 4 gate their surfaces on: does this node run this plugin? Deliberately
 // per-node and never ambient. A plugin enabled on the node you are looking at says nothing about the
 // node whose pane is open beside it. Sits alongside the `providerId` gate in tabs/sources.ts, which
 // answers the same shape of question for integrations.
-export const pluginEnabledOnNode = (nodeId: string, pluginId: string): boolean =>
-  (installedByNode().get(nodeId) ?? []).some((row) => row.name === pluginId && row.running)
+export const pluginEnabledOnNode = (nodeId: string, pluginId: string): boolean => {
+  const local = devicePlugins().find((entry) => entry.row.name === pluginId)
+  if (local) return !local.row.disabled
+  return (installedByNode().get(nodeId) ?? []).some((row) => row.name === pluginId && row.running)
+}
 
 export type LoadedPluginState = 'enabled' | 'disabled' | 'absent'
 
 export const loadedPluginStateOnNode = (nodeId: string, pluginId: string): LoadedPluginState => {
+  const local = devicePlugins().find((entry) => entry.row.name === pluginId)
+  if (local) return local.row.disabled ? 'disabled' : 'enabled'
   const row = (installedByNode().get(nodeId) ?? []).find((candidate) => candidate.name === pluginId && candidate.installed)
   if (!row) return 'absent'
   return row.running ? 'enabled' : 'disabled'
@@ -73,10 +77,42 @@ const candidatesFrom = (rosters: ReadonlyMap<string, readonly NodePluginRow[]>):
   [...rosters].flatMap(([nodeId, rows]) =>
     rows.flatMap((row) =>
       row.installed?.client
-        ? [{ pluginId: row.name, version: row.installed.version, apiVersion: row.installed.apiVersion, hash: row.installed.client.hash, nodeId }]
+        ? [{ pluginId: row.name, version: row.installed.version, apiVersion: row.installed.apiVersion, hash: row.installed.client.hash, nodeId, source: { kind: 'node' as const, nodeId } }]
         : [],
     ),
   )
+
+const disabledDeviceIds = (): Set<string> => {
+  try {
+    const list: unknown = JSON.parse(readDevicePrefs()[PrefKeys.devicePluginsDisabled] ?? '[]')
+    return new Set(Array.isArray(list) ? list.filter((id): id is string => typeof id === 'string') : [])
+  } catch { return new Set() }
+}
+
+export function deviceEntries(state: PluginHostState): DevicePluginEntry[] {
+  const disabled = disabledDeviceIds()
+  const entries: DevicePluginEntry[] = []
+  for (const [hash, cached] of Object.entries(state.cached)) {
+    if (cached.source?.kind !== 'device') continue
+    const parsed = pluginManifestShape.safeParse(cached.manifest)
+    if (!parsed.success || hasNodeHalf(cached.manifest) || parsed.data.id !== cached.pluginId || !parsed.data.client) {
+      log.warn(`invalid device manifest for ${cached.pluginId}; skipping bundle`)
+      continue
+    }
+    const manifest = parsed.data
+    entries.push({ hash, row: {
+      name: manifest.id, required: false, disabled: disabled.has(manifest.id),
+      running: !disabled.has(manifest.id), state: disabled.has(manifest.id) ? 'disabled' : 'active',
+      emits: manifest.emits,
+      installed: {
+        version: manifest.version, apiVersion: manifest.apiVersion, permissions: manifest.permissions,
+        contributions: manifest.contributions, client: { hash, bytes: cached.bytes },
+        source: cached.sourceLabel, icon: manifest.icon, icons: manifest.icons, emits: manifest.emits,
+      },
+    }, sourceLabel: cached.sourceLabel ?? 'this device', nodeIds: cached.nodeIds ?? [], sameHashNodeIds: [], installSource: cached.installSource })
+  }
+  return entries
+}
 
 // Read one node's roster. A node that does not answer contributes nothing rather than clearing what
 // we already knew about it, the same stance node/nodePlugins.ts takes for the same reason: an
@@ -101,29 +137,34 @@ const rosterFor = async (nodeId: string): Promise<readonly NodePluginRow[] | nul
 //
 // Fire-and-forget from the composition root. It must never fail a boot: a fleet where every node is
 // offline, or a build with no plugin host at all, simply ends with nothing pending.
-export async function syncPluginDistribution(options: { repin?: boolean } = {}): Promise<void> {
+export async function syncPluginDistribution(options: { repin?: boolean; deviceOnly?: boolean } = {}): Promise<void> {
   if (!pluginHostAvailable()) return
 
   const rosters = new Map(installedByNode())
-  await Promise.all(
-    nodes().map(async (node) => {
-      const rows = await rosterFor(node.nodeId)
-      if (rows) rosters.set(node.nodeId, rows)
-    }),
-  )
-  setInstalledByNode(rosters)
+  if (!options.deviceOnly) {
+    await Promise.all(
+      nodes().map(async (node) => {
+        const rows = await rosterFor(node.nodeId)
+        if (rows) rosters.set(node.nodeId, rows)
+      }),
+    )
+    setInstalledByNode(rosters)
+  }
 
   // Fetch first, decide second. The hash the owner is asked about has to be one this device computed
   // from bytes it holds, not one a node asserted, so a bundle is cached before it is ever named in a
   // prompt and a node that lies about its hash is refused here rather than at the dialog.
-  const cached = new Set(Object.keys((await readPluginHostState()).cached))
-  for (const [nodeId, rows] of rosters) {
-    for (const row of rows) {
-      const client = row.installed?.client
-      if (!client || cached.has(client.hash)) continue
-      const result = await cachePluginBundle({ nodeId, pluginId: row.name, hash: client.hash, version: row.installed!.version })
-      if ('hash' in result) cached.add(result.hash)
-      else log.warn(`${row.name} from ${nodeId} was not cached: ${result.error}`, undefined, { 'plugin.id': row.name })
+  const initialState = await readPluginHostState()
+  const cached = new Set(Object.keys(initialState.cached))
+  if (!options.deviceOnly) {
+    for (const [nodeId, rows] of rosters) {
+      for (const row of rows) {
+        const client = row.installed?.client
+        if (!client || cached.has(client.hash)) continue
+        const result = await cachePluginBundle({ nodeId, pluginId: row.name, hash: client.hash, version: row.installed!.version })
+        if ('hash' in result) cached.add(result.hash)
+        else log.warn(`${row.name} from ${nodeId} was not cached: ${result.error}`, undefined, { 'plugin.id': row.name })
+      }
     }
   }
 
@@ -131,22 +172,42 @@ export async function syncPluginDistribution(options: { repin?: boolean } = {}):
   // place this pin is deliberately dropped). `repin` is that exception: only the node's own
   // "plugins changed" event asks for it (plugins/reload.ts), because a reload replaces the bytes
   // behind a plugin id and the pinned winner would otherwise name a bundle the node no longer offers.
+  const hostState = await readPluginHostState()
+  const nodeOffers = candidatesFrom(rosters)
+  const local = deviceEntries(hostState).map((entry) => ({
+    ...entry,
+    nodeIds: [...new Set(nodeOffers.filter((candidate) => candidate.pluginId === entry.row.name).map((candidate) => candidate.nodeId))],
+    sameHashNodeIds: [...new Set(nodeOffers.filter((candidate) => candidate.pluginId === entry.row.name && candidate.hash === entry.hash).map((candidate) => candidate.nodeId))],
+  }))
+  setDevicePlugins(local)
+  setDevicePluginIds(local.map((entry) => entry.row.name))
   if (options.repin || !activeBundles()) {
-    setActiveBundles(resolveActiveBundles(candidatesFrom(rosters), { apiVersion: PLUGIN_API_MAJOR }))
+    setActiveBundles(resolveActiveBundles([
+      ...nodeOffers,
+      ...local.map((entry) => ({ pluginId: entry.row.name, version: entry.row.installed!.version, apiVersion: entry.row.installed!.apiVersion, hash: entry.hash, nodeId: '', source: { kind: 'device' as const } })),
+    ], { apiVersion: PLUGIN_API_MAJOR }))
   }
 
-  await refreshPendingTrust(rosters)
+  await refreshPendingTrust(rosters, hostState, local)
 }
 
 // Everything cached that this device has never answered for. Read from the host rather than tracked
 // locally, so a decision made in a previous session is honoured without the renderer keeping its own
 // copy of the answer.
-async function refreshPendingTrust(rosters: ReadonlyMap<string, readonly NodePluginRow[]>): Promise<void> {
-  const { cached, acks } = await readPluginHostState()
+async function refreshPendingTrust(rosters: ReadonlyMap<string, readonly NodePluginRow[]>, { cached, acks }: PluginHostState, local: readonly DevicePluginEntry[]): Promise<void> {
   const decided = new Set(acks.map((ack) => `${ack.pluginId}\0${ack.hash}`))
   setAcceptedBundles(new Set(acks.filter((ack) => ack.decision === 'accepted').map((ack) => `${ack.pluginId} ${ack.hash}`)))
   const requests: PluginTrustRequest[] = []
   const queued = new Set<string>()
+
+  for (const entry of local) {
+    if (!(entry.hash in cached)) continue
+    const key = `${entry.row.name}\0${entry.hash}`
+    if (decided.has(key)) continue
+    queued.add(key)
+    const previous = acks.filter((ack) => ack.pluginId === entry.row.name && ack.hash !== entry.hash && ack.decision === 'accepted' && !ack.partial).sort((a, b) => b.decidedAt - a.decidedAt)[0]
+    requests.push({ row: entry.row, hash: entry.hash, nodeId: '', source: { kind: 'device' }, sourceLabel: entry.sourceLabel, ...(previous ? { previous } : {}) })
+  }
 
   for (const [nodeId, rows] of rosters) {
     for (const row of rows) {
@@ -164,7 +225,7 @@ async function refreshPendingTrust(rosters: ReadonlyMap<string, readonly NodePlu
       const previous = acks
         .filter((ack) => ack.pluginId === row.name && ack.hash !== client.hash && ack.decision === 'accepted' && !ack.partial)
         .sort((a, b) => b.decidedAt - a.decidedAt)[0]
-      requests.push({ row, hash: client.hash, nodeId, ...(previous ? { previous } : {}) })
+      requests.push({ row, hash: client.hash, nodeId, source: { kind: 'node', nodeId }, ...(previous ? { previous } : {}) })
     }
   }
   setPendingTrust(requests)
@@ -193,6 +254,23 @@ export function _seedPluginDistribution(
   setActiveBundles(resolveActiveBundles(candidatesFrom(seeded), { apiVersion: PLUGIN_API_MAJOR }))
 }
 
+/** Test seam for provenance arbitration and device enablement at the shared contribution gate. */
+export function _seedDevicePluginDistribution(entries: readonly DevicePluginEntry[]): void {
+  setDevicePlugins(entries)
+  setDevicePluginIds(entries.map((entry) => entry.row.name))
+  setActiveBundles(resolveActiveBundles([
+    ...candidatesFrom(installedByNode()),
+    ...entries.map((entry) => ({
+      pluginId: entry.row.name,
+      version: entry.row.installed!.version,
+      apiVersion: entry.row.installed!.apiVersion,
+      hash: entry.hash,
+      nodeId: '',
+      source: { kind: 'device' as const },
+    })),
+  ], { apiVersion: PLUGIN_API_MAJOR }))
+}
+
 // Test seam, for the half of the boot pass above that `_seedPluginDistribution` does not stand in for:
 // the queue the trust dialog drains. What is worth asserting about an answer is which entry it
 // removes, and, when the host could not store it, that it removes none.
@@ -204,6 +282,8 @@ export function _seedPendingTrust(requests: readonly PluginTrustRequest[]): void
 // asserts on one run must not inherit the previous one's fleet.
 export function _resetPluginDistribution(): void {
   setInstalledByNode(new Map())
+  setDevicePlugins([])
+  setDevicePluginIds([])
   setPendingTrust([])
   setActiveBundles(null)
   setAcceptedBundles(new Set<string>())
