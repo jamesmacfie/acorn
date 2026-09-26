@@ -1,5 +1,5 @@
 import { agentTelemetry } from './agentTelemetry'
-import { createComputed, createMemo, createSignal, For, onCleanup, Show, untrack, type Setter } from 'solid-js'
+import { createComputed, createMemo, createSignal, For, on, onCleanup, Show, untrack, type Setter } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions } from '@acorn/plugin-api/client'
 import type { AgentNormalizedEvent, AgentSessionSnapshot } from '../../contract/wire.ts'
@@ -9,7 +9,9 @@ import {
   type AgentConversationItem,
 } from './conversationItems'
 import { sessionModelSummary } from '../settings/agentConfigOptions'
-import { Button, EmptyState, Icon, Inline, Text, Timeline, Toolbar, type TimelineControls } from '@acorn/plugin-api/ui'
+import {
+  Button, createTimelineWindow, EmptyState, Icon, Inline, Text, Timeline, Toolbar, type TimelineControls,
+} from '@acorn/plugin-api/ui'
 import { subagentSummary } from './subagentDisplay'
 import { agentSessionIsStarting } from '../composer/agentComposerState'
 import { AgentToolFoldContext, createAgentToolFoldSetting } from './toolFoldPrefs'
@@ -90,6 +92,11 @@ export default function AgentTranscript(props: {
   // UUID, so a key is unique across sessions and subagents and never collides when the list swaps.
   const itemKeys = createMemo(() => items().map((item) => item.key))
   const itemsByKey = createMemo(() => new Map(items().map((item) => [item.key, item])))
+  // The rows drawn are the newest page of those keys and as many older pages as the reader asked for
+  // (docs/managed-agents/client-surfaces.md § Client surfaces). The canonical 7,000-event session
+  // projects to 3,387 cards, and building all of them on open was the cost the window removes. The
+  // projection above still covers the whole session: only the drawing is windowed.
+  const drawn = createTimelineWindow(itemKeys)
   const sessionId = createMemo(() => props.snapshot.session.id)
   const sessionModel = createMemo(() => sessionModelSummary(props.snapshot.session))
   // The scroll memory is per view, not per session: the parent's stream and each subagent's run are
@@ -98,6 +105,16 @@ export default function AgentTranscript(props: {
   const viewId = createMemo(() => {
     const view = focused() ? `${sessionId()}:${props.focusSubagentId}` : sessionId()
     return props.viewKeyPrefix ? `${props.viewKeyPrefix}:${view}` : view
+  })
+  // A different list starts on its own newest page. How far back the reader went in one session says
+  // nothing about the next, and keeping it would draw a thousand cards of a transcript nobody asked for.
+  createComputed(on(viewId, () => drawn.reset(), { defer: true }))
+  // A request a notice or the sidebar named has to be drawn before its card can take focus.
+  createComputed(() => {
+    const requestId = props.focusRequestId
+    if (!requestId) return
+    const target = items().find((item) => item.event.type === 'request' && item.event.requestId === requestId)
+    if (target) drawn.reveal(target.key)
   })
   // Initial rows are one batch: aggregate their factory time and the wall time to the next
   // microtask, then stay out of the 25 Hz streaming path. This is deliberately a turn-scoped probe,
@@ -116,15 +133,15 @@ export default function AgentTranscript(props: {
       if (item) set(item)
     }
   })
-  const row = (key: string) => {
+  const row = (key: string, index: () => number) => {
     const [item, set] = createSignal(untrack(itemsByKey).get(key)!)
     rows.set(key, set)
     onCleanup(() => rows.delete(key))
-    return renderCard(item)
+    return renderCard(item, index)
   }
-  const renderCard = (item: () => AgentConversationItem) => {
+  const renderCard = (item: () => AgentConversationItem, index: () => number) => {
     const draw = () => (
-      <Timeline.Turn key={item().key}>
+      <Timeline.Turn key={item().key} position={drawn.start() + index() + 1} setSize={items().length}>
         <AgentEventCard
           item={item()}
           taskId={props.taskId}
@@ -183,10 +200,15 @@ export default function AgentTranscript(props: {
           place={() => readingPlace(viewId())}
           onChange={(next) => rememberReadingPlace(viewId(), next)}
           ariaLabel="Agent transcript"
-          controls={props.onControls}
-          // The projected count, for the timeline's health reading. Every projected card is drawn
-          // today; a window that drew fewer would make this and the mounted count differ.
+          // "Go to top" means the oldest turn, which the window may be hiding, so it draws every turn
+          // first. That is the explicit way to reach the start of a long session in one step.
+          controls={(api) => props.onControls?.({ ...api, toTop: () => { drawn.showAll(); api.toTop() } })}
+          // The projected count, for the timeline's health reading, against the drawn count.
           total={items().length}
+          hidden={drawn.start()}
+          onShowEarlier={drawn.showEarlier}
+          reveal={drawn.reveal}
+          onTrim={drawn.trim}
         >
           {/*
             `For` over the rows' keys, not `Index` over their positions. An item that changed is a new
@@ -201,8 +223,8 @@ export default function AgentTranscript(props: {
           {/* One fold setting for the whole list, read by every tool card below it. See the note on
               createAgentToolFoldSetting for why it is not resolved per card. */}
           <AgentToolFoldContext.Provider value={foldSetting}>
-            <For each={itemKeys()}>
-              {(key) => row(key)}
+            <For each={drawn.keys()}>
+              {(key, index) => row(key, index)}
             </For>
           </AgentToolFoldContext.Provider>
         </Timeline>
