@@ -7,7 +7,7 @@ import type { FindHighlight } from '../../kit/diff/find'
 import { DIFF_LINE_HEIGHT, isCodeRow, toBands, type CodeRow, type DiffThread, type GapRow, type Row, type SplitBand, type ViewMode } from '../../kit/diff/diffModel'
 import { createSplitScrollSync } from '../../kit/diff/splitScrollSync'
 import { threadBlockId, type DiffRangeItem } from './diffLayout'
-import type { DiffItem } from './documentView'
+import type { DiffItem, SegmentRef } from './documentView'
 import type { SegmentStatus } from './segmentLoader'
 
 /** What the canvas needs from the geometry (./diffLayout.ts). */
@@ -55,8 +55,8 @@ export function DiffCanvas(props: {
   maxCols: Accessor<number>
   /** A mounted segment's or slice's rows with its threads placed, or undefined while not loaded. */
   itemRows: (item: Extract<DiffItem, { kind: 'segment' | 'overlay' }>) => readonly Row[] | undefined
-  segmentStatus: (contentKey: string) => SegmentStatus | undefined
-  retrySegment: (contentKey: string) => void
+  segmentStatus: (segment: SegmentRef) => SegmentStatus | undefined
+  retrySegment: (segment: SegmentRef) => void
   fileCollapsed: (path: string) => boolean
   onToggleFileCollapse: (path: string) => void
   rows: DiffRowContext
@@ -95,16 +95,19 @@ export function DiffCanvas(props: {
       <Match when={item().kind === 'segment' || item().kind === 'overlay' ? (item() as Extract<DiffItem, { kind: 'segment' | 'overlay' }>) : null}>
         {(content) => {
           const rows = () => props.itemRows(content())
-          const contentKey = () => {
+          const segment = () => {
             const current = content()
-            return current.kind === 'segment' ? current.segment.contentKey : ''
+            return current.kind === 'segment' ? current.segment : null
           }
           return (
             <Show when={rows()} fallback={(
               <SegmentPlaceholder
                 height={size()}
-                failed={props.segmentStatus(contentKey()) === 'error'}
-                onRetry={() => props.retrySegment(contentKey())}
+                failed={!!segment() && props.segmentStatus(segment()!) === 'error'}
+                onRetry={() => {
+                  const current = segment()
+                  if (current) props.retrySegment(current)
+                }}
               />
             )}>
               {(loaded) => (

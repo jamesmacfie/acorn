@@ -142,9 +142,23 @@ export function createDiffHealth() {
       },
       measurement: geometry.measurement,
       correction: geometry.correction,
-      // UTF-16 code units of the row text held, plus a flat allowance per row: a lower bound, since
-      // the tokens built from it weigh several times that.
-      resident: { documents: topology ? 1 : 0, segments: stats.segments, rows: stats.rows, estimatedBytes: stats.bytes },
+      // The node's segment cache as a whole, which this pane shares with every other diff on the node,
+      // and this pane's own hits and misses since mount (./segmentCache.ts).
+      resident: {
+        documents: stats.cache.documents,
+        segments: stats.cache.segments,
+        rows: stats.cache.rows,
+        estimatedBytes: stats.cache.plainBytes + stats.cache.enrichmentBytes,
+        plainBytes: stats.cache.plainBytes,
+        enrichmentBytes: stats.cache.enrichmentBytes,
+        hits: stats.hits,
+        misses: stats.misses,
+        inserts: stats.cache.inserts,
+        evictions: stats.cache.evictions,
+        oversize: stats.cache.oversize,
+        rowCeiling: stats.cache.rowCeiling,
+        byteCeiling: stats.cache.byteCeiling,
+      },
     }
   }
 

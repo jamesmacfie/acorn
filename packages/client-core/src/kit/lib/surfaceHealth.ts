@@ -37,8 +37,14 @@ export type SurfaceHealth = {
   /** Scroll writes the surface made to keep a reading place, cumulative since mount. `substituted`
    *  counts places whose anchor had gone and a neighbour stood in. */
   correction: { count: number; failed: number; substituted: number; maxPixels: number; maxAnchorDrift: number }
-  /** Parsed content held in memory for this surface. `estimatedBytes` is a lower bound. */
-  resident: { documents: number; segments: number; rows: number; estimatedBytes: number }
+  /** Parsed content held in memory for this surface, and for the diff every other diff on the node:
+   *  the weight now against its two ceilings, and the cache's inserts, evictions and oversize
+   *  inserts since it was made. `hits` and `misses` are this surface's own, since mount. Bytes are
+   *  the cache's estimate, not the heap's. */
+  resident: {
+    documents: number; segments: number; rows: number; estimatedBytes: number; plainBytes: number; enrichmentBytes: number
+    hits: number; misses: number; inserts: number; evictions: number; oversize: number; rowCeiling: number; byteCeiling: number
+  }
 }
 
 export type SurfaceHealthEntry = { kind: SurfaceKind } & SurfaceHealth
@@ -66,7 +72,10 @@ const TEMPLATE: SurfaceHealth = {
   work: { queuedSegments: 0, queuedEnrichment: 0, furthestQueueDistance: 0, unvisitedSegments: 0, scheduledFrames: 0, heldPublications: 0, prepareMs: 0 },
   measurement: { candidates: 0, reads: 0, commits: 0, maxCommitsInFrame: 0, readMs: 0, commitMs: 0, fixedRebuilds: 0, activeObservers: 0, observedElements: 0 },
   correction: { count: 0, failed: 0, substituted: 0, maxPixels: 0, maxAnchorDrift: 0 },
-  resident: { documents: 0, segments: 0, rows: 0, estimatedBytes: 0 },
+  resident: {
+    documents: 0, segments: 0, rows: 0, estimatedBytes: 0, plainBytes: 0, enrichmentBytes: 0,
+    hits: 0, misses: 0, inserts: 0, evictions: 0, oversize: 0, rowCeiling: 0, byteCeiling: 0,
+  },
 }
 
 const KINDS: readonly SurfaceKind[] = ['diff', 'timeline']
