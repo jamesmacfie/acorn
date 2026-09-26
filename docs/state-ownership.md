@@ -249,6 +249,24 @@ cleared or seen, and its own comment said as much, bounding itself at fifty entr
 not import the eviction store. Hold a reading place outside the thing that draws it, keyed by identity
 rather than by position, and clear it where you clear everything else about that entity.
 
+The diff keeps its reading place the same way. `DiffReadingPlace` in
+`client-core/features/diff/diffLayout.ts` is the item the viewport starts in (a file header, a segment
+by path and ordinal, a slice of revealed context) and a point in that item's code rows, or a thread or
+line block and an offset into it. `diff/viewState.ts` holds it per scope for the session, with the
+horizontal offset, the projection, and the file signature it was taken against, and evicts a task's
+entries when the task is archived. A place is put back only in the projection and file set it was
+taken in; a place whose item has gone lands on that file's header. A new revision of the same files
+keeps the place by its item key, so an agent saving the file under the reader leaves them at the same
+segment and depth rather than at the top of the file.
+
+The heights measured for the diff's threads and line blocks belong to the mounted pane and to nothing
+else. They are held per projection, keyed by block id, with the fingerprint of the state they were
+measured in and the width bucket they were measured at, and a height is reused only while the
+fingerprint matches. A new revision discards nothing: a thread keeps its id across revisions and its
+fingerprint says whether its height still holds, and a mounted block is measured again anyway. A new
+file signature clears every height, and so does leaving the pane. None of it is persisted: a height
+is a fact about one window's fonts and width.
+
 **A slice reads its own keys and nothing else.** Every slice used to carry a `legacy` reader as well,
 a second function that pulled the pre-scoped aggregate key the scoped keys replaced —
 `task_layouts` and `task_panes` for the layout slice, `editor_open_files`, `pr_filters`. Those went on

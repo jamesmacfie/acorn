@@ -10,7 +10,8 @@ It arrives in three layers, and the split is enforced (`tools/arch/boundaries.te
   segmenter, the descriptors, search, and a parse cache. It has no DOM, node, Solid, database, or
   transport dependency, because the node builds documents and the renderer reads them
   ([architecture-overview.md](./architecture-overview.md) § Node API and client flow).
-- `kit/diff/` is the toolkit: the row model, the row components, the virtualizer, the find marks.
+- `kit/diff/` is the toolkit: the row model, the row components, the layout index and its measure
+  scheduler, the find marks.
   Props in, DOM out, no application state, so a plugin can reach for a piece of it to build a simpler
   surface.
 - `features/diff/` is the viewer: `DiffPane` and the parts only it uses. This layer reads
@@ -277,29 +278,80 @@ lifecycle. One segment's pairs are sent as one batch so the comparison cannot bl
 Code lines do not soft-wrap. A long line scrolls sideways instead, and the line numbers and the +/-
 marker stay pinned to the left edge while it does.
 
-The virtualizer depends on that. It positions items, not rows: a segment's container is absolutely
+The layout depends on that. It positions items, not rows: a segment's container is absolutely
 positioned and its rows are in normal flow inside it. Every code row and hunk header is exactly one
-line tall and a gap row is 28px, so a segment's height is exact from its descriptor before its rows
-arrive, plus a reservation for each inline thread its line span covers (50px resolved, 140px open). A
-segment on screen whose rows are still loading draws a placeholder of exactly that height that says
-so, so nothing below it moves when they arrive and the scrollbar never collapses. When lines wrapped,
-a row's height was a layout question: each one painted at its estimate and was corrected a frame
-later, and a first correction above the scroll offset makes the virtualizer write `scrollTop` to
-compensate. Scrolling flashed and stuttered.
+line tall and a gap row is 28px, so a segment's code is an exact height from its descriptor before its
+rows arrive. `diff.css` holds each of those heights to the pixel, because nothing measures them. A
+segment on screen whose rows are still loading draws a placeholder of exactly its height that says so,
+so nothing below it moves when they arrive and the scrollbar never collapses. When lines wrapped, a
+row's height was a layout question: each one painted at its estimate and was corrected a frame later,
+and a first correction above the scroll offset moved `scrollTop` to compensate. Scrolling flashed and
+stuttered.
 
-Every mounted item is measured once and observed from then on. A segment with no thread, note, or mark
-in it measures what its descriptor said, so the measurement commits nothing; one with threads corrects
-its reservation when its rows arrive or a thread opens. Phase 3 moves those dynamic heights into their
-own index. The item keys are the file path and the segment ordinal, so an item that stays in range
-keeps its DOM while the range moves and a composer typing inside it keeps its focus.
+The height of the document is two sums kept apart:
 
-The list mounts 800px beyond each edge of the viewport, in pixels rather than items, because an item
-is a 36px header in one place and a 64-row segment in another. That is at most a few hundred rows
-mounted at any size of document. The Solid adapter uses a release that preserves measured item sizes
-when reactive options change; the item keys are handed to it through a getter, so a new key list, or a
-thread arriving for a segment not yet measured, makes it recompute offsets while keeping every
-measured size. Full measurement is reserved for attaching a newly laid out scroller and restoring its
-position.
+```text
+document height = exact fixed height of every item + every dynamic block's height
+```
+
+The fixed side is code rows, hunk headers, gaps, file headers and no-diff rows, from the topology. The
+dynamic side is whatever can change height: an inline thread, and whatever a line draws under itself
+(the source's note, another plugin's marks, an open comment composer), which is one block per line.
+`kit/diff/layoutIndex.ts` holds the fixed heights in a prefix array, rebuilt only when the list of
+items changes: a new document, a collapsed file, an opened gap, or the other projection. Each item's
+dynamic total sits in a Fenwick tree, so a block that resizes updates one item's total in O(log
+items), and nothing is done for the code below it. Inside an item, a block sits at a point in the
+item's code rows (a note after its line, a thread after the line it is anchored to), so a place in the
+document is either a point in an item's code rows or an offset into a block. The health reading's
+`fixedRebuilds` counts the rebuilds, so a resize that caused one would show.
+
+`features/diff/diffLayout.ts` is the range and scroll authority built on that index. It derives each
+item's blocks from its rows when they are loaded, and from its threads' line numbers when they are
+not, reserving 140px for an open thread and 50px for a collapsed one until they are measured. It
+decides which items are mounted, 800px beyond each edge of the viewport, in pixels rather than items,
+because an item is a 36px header in one place and a 64-row segment in another. That is at most a few
+hundred rows mounted at any size of document. The item keys are the file path and the segment ordinal,
+so an item that stays in range keeps its DOM while the range moves and a composer typing inside it
+keeps its focus. It sets the canvas height itself, so a scroll correction is never clamped against a
+canvas the renderer has not grown yet. TanStack Virtual is no longer in the diff: its single-lane path
+rebuilds every offset after the earliest resized item and writes `scrollTop` from inside its measure
+callback, which is the cost this layout exists to avoid.
+
+Only dynamic blocks are measured, by `kit/diff/measureScheduler.ts`. One `ResizeObserver` per pane
+watches the scroller and every mounted block, marked with `data-block`, and nothing else. Its callback
+marks blocks dirty and reads nothing. A pass then reads every dirty, connected block in one batch,
+compares each reading with the height the geometry holds, and commits the changes as one. At most one
+commit lands in a frame; a second waits for the next. The pass runs inside the observer's callback,
+after layout and before paint, so a thread opening on screen and the content it pushes down move in
+the same frame. While the reader is scrolling, a block wholly above the place they are reading stays
+dirty until the scroll settles (150ms after the last scroll event), because its commit would have to
+move `scrollTop` in the middle of the gesture. Everything else commits at once, since it moves nothing
+under the reader. A block that is not mounted keeps its estimate or its last measured height, and
+makes no DOM.
+
+A measured height is reused only while the block's fingerprint matches: for a thread, whether it is
+collapsed or resolved and its comments; for a line, what it draws and whether its composer is open.
+Typing is not in the fingerprint, because typing only happens in a mounted block, which is measured.
+Heights are kept per projection, with the width bucket (80px of scroller width) they were measured
+at. A pane resize re-measures every mounted block, because each one reports its own new size; one
+that is not mounted keeps its old height as an estimate until it is.
+
+Every geometry change keeps the reader where they were by identity. Before the change the layout
+notes the reader's place: the item the viewport starts in and a point in its code rows, or the block
+and an offset into it. After it, it resolves that place in the new geometry and makes at most one
+scroll write:
+
+- A block wholly above the viewport that changes height moves the view by the change, so the reader's
+  row stays put.
+- A change below the viewport moves nothing.
+- A block the reader is inside keeps its own top where it was, and grows or shrinks below it.
+- A place whose item has gone, as a collapsed file's segments do, lands on that file's header, and the
+  health reading counts it as substituted.
+
+Its scroll writes are marked as its own until the frame after them (`kit/lib/scrollAuthor.ts`, which
+the `Timeline` shares), and the reader's wheel, touch, pointer and key input is timestamped, so a
+correction's own scroll event never reads as the reader moving, and never keeps the settling window
+open.
 
 Because nothing wraps, something has to be wide enough to hold the widest line, and unified and split
 answer that differently.
@@ -358,11 +410,13 @@ offset is exact before any of its rows load. The GitHub pane reads it from `?fil
 drops its segments from the list and keeps its header; collapsing one from the sticky header scrolls
 back to that header, so the reader stays on the file they collapsed.
 
-Scroll position and collapsed files are remembered per scope for the session (`diff/viewState.ts`): a
-task and the classic browser keep separate entries for the same content, and a task's entries are
-evicted when it is archived. Both are tied to the source's signature, so new commits drop the stale
-position and collapse choices instead of restoring them against a different diff. An explicit file
-navigation wins over a saved scroll position.
+The reading place and collapsed files are remembered per scope for the session (`diff/viewState.ts`):
+a task and the classic browser keep separate entries for the same content, and a task's entries are
+evicted when it is archived. The place is the identity described in § Row geometry, not a pixel
+offset, so it survives a thread measured above it or a narrower pane. Both are tied to the source's
+signature and the place to its projection, so new commits drop the stale place and collapse choices
+instead of restoring them against a different diff. An explicit file navigation wins over a saved
+place.
 
 ### Marks from other plugins
 
@@ -410,7 +464,7 @@ hand that task's agent another branch's files. The branch in the bar is a label.
 branch, start a task.
 
 **Hunk and line staging.** Deferred, with the door named. The viewer is shared with the pull-request
-pane, renders unified rows through one virtualizer, and has no gutter control. Adding one means a kit
+pane, renders unified rows through one layout, and has no gutter control. Adding one means a kit
 affordance on a diff row, a `git apply --cached` path built from the viewer's row model, and a terminal
 rendering for the control, and each of those is its own design. `DiffSource` already has `lineAction`,
 and a `hunkAction` beside it is where a stage-this-hunk verb would land.

@@ -1,6 +1,7 @@
 # Phase 3: separate dynamic-block geometry and identity anchoring
 
-Status: not started, 2026-09-26. Waits on phase 2.
+Status: shipped 2026-09-26, tested in jsdom with a modelled layout. The real-window run is owed, and
+WebKit has not seen the new geometry.
 
 ## Goal
 
@@ -319,3 +320,97 @@ Per [docs-migration.md](./docs-migration.md): `docs/diff-rendering.md`, `docs/te
 - Re-run WebKit resize and fractional-scroll probes before choosing the width bucket and tolerance.
 - Check whether `Timeline.tsx` input-state semantics can be extracted without importing application
   state into `kit`; share only the truly generic part.
+
+## What shipped differently
+
+The owning docs describe what runs: [diff-rendering.md](../../diff-rendering.md) § Row geometry and
+§ Review threads and state, [state-ownership.md](../../state-ownership.md) § Which mechanism holds a
+given fact, [telemetry.md](../../telemetry.md) § Rendered-surface health, and
+[testing.md](../../testing.md) § Test layers and smoke item 83. Where this file and those disagree,
+they win.
+
+Where the pieces live, for phase 4:
+
+- The pure index is `packages/client-core/src/kit/diff/layoutIndex.ts`, and the scheduler is
+  `kit/diff/measureScheduler.ts`. The reactive layer is `features/diff/diffLayout.ts`:
+  `createDiffLayout`, `DiffDynamicBlock`, `DiffReadingPlace`, `rowBlocks`, and the block ids
+  (`t:<threadId>`, `l:<side>:<line>:<path>`, `b:<old>:<new>:<path>`).
+- The height cache is the `heights` map of each projection in `createDiffLayout`: block id to
+  `{ height, fingerprint, bucket }`, one map for unified and one for split. A height is reused while
+  the block's fingerprint matches. `bucket` is `floor(scroller width / DIFF_WIDTH_BUCKET_PX)` at
+  measurement. `reset()` clears it on a new file signature, and it goes with the pane. Nothing hands
+  it to another cache.
+- The shared own-write guard and input clock is `kit/lib/scrollAuthor.ts`.
+
+Deviations from the plan:
+
+1. **The index is per item, not per segment with a local row table.** An item (a file header, a
+   segment, a slice of revealed context) is a leaf of the Fenwick tree, and its local geometry is its
+   block list, each block at a pixel of the item's code rows. Rows inside a segment are 20px apart,
+   gaps 28px, so a fixed pixel identifies a row as well as an index would and needs no rows loaded.
+2. **Two block kinds, `thread` and `line`.** A line's note, another plugin's marks and its open
+   composer draw inside one row box, so they are one block. A thread's reply box, disclosures,
+   suggestions, reactions and images are inside its block. Measuring them apart would mean reading
+   the margins between them.
+3. **No `layoutRevision`.** Typing only happens in a mounted block, which is measured, and a
+   remembered height only matters for a block that is not mounted, whose state a keystroke cannot
+   change.
+4. **The validity key is the block id and fingerprint, in a map per projection.** The width bucket is
+   recorded but not required: a height from another bucket is the plan's temporary estimate, and
+   every mounted block reports its own size on mount and on resize, so the bucket changes no outcome.
+   The document revision is not in the key. A thread keeps its id across revisions and its
+   fingerprint says whether the height holds; a new file signature clears the map.
+5. **No offscreen measurer.** The 800px mounted runway is the near range, so a block is mounted and
+   measured before a reader scrolling toward it reaches it. Rendering thread cards off screen would
+   run their draft persistence and mention inputs a second time. The offscreen tests do not apply.
+6. **One lane, before paint.** Every pass the observer starts runs inside its callback, after layout
+   and before paint, capped at one commit a frame; an animation frame takes only the overflow, and
+   the first read where there is no observer. A block the reader opens is on screen, so it is never
+   wholly above the reading place, and a separate direct-interaction cause would change no outcome.
+   It was built and taken out.
+7. **Reader scrolling holds back only what would move the reader.** The plan held every commit. A
+   block wholly above the reading place waits for the scroll to settle; everything else commits,
+   because it moves nothing under the reader, and holding it would leave a mounted thread overlapping
+   the next item for the length of a momentum scroll. The test became "no commit that would move the
+   reader runs while they scroll". There is no idle handle.
+8. **One shared helper, narrow.** `scrollAuthor.ts` holds what the Timeline and the diff do
+   identically: the own-write mark with its single release frame, and the input clock with
+   `GESTURE_MS`. The Timeline keeps its one-shot arm. The diff keeps a settling window,
+   `DIFF_SCROLL_SETTLE_MS` (150ms), that a reader's scroll events keep open through momentum.
+   `DIFF_WIDTH_BUCKET_PX` (80) and the settling window were chosen by hand, because no WebKit resize
+   or momentum probe could run.
+9. **`DiffReadingPlace` has no `end`.** The diff has no live end to follow, and at the foot of the
+   document a row place already holds the last row. `fixed` is a pixel in the item's code rows, and a
+   block place keeps its row as the fallback when the block has gone. `failed` stays 0 for the diff;
+   a gone anchor is `substituted`.
+10. **Scroll restoration stores the place, the horizontal offset, the projection and the file
+    signature, not the revision.** A new revision keeps the place by item key, so an agent saving the
+    file under the reader leaves them at the same segment and depth.
+11. **Model changes use the same correction.** A thread arriving, rows loading and a composer opening
+    change block lists, not measurements. They go through the same capture, change and put-back as a
+    measurement commit, but are not counted as commits.
+12. **Fixed geometry was not exact.** Measured in headless Chromium, not WebKit: a gap row drew 26px
+    against the 28px counted, and a thread card's 6px margins collapsed out of its row. TanStack's
+    item measurement had been absorbing both. `diff.css` now gives the gap 4px of padding and thread
+    rows `flow-root`.
+13. **A thread in an unloaded segment is reserved at the segment's end** until its rows say where it
+    goes. Collapsing a file from the sticky header needs no special case any more: the reader's item
+    goes, and the substitute is the file's header.
+14. **Health.** `measurement.commitMs`, `measurement.fixedRebuilds` and `correction.substituted` are
+    new. `fixedRebuilds` counts the pane's first build over an empty list too, so a test compares it
+    before and after.
+15. **Plugin API.** `createDiffVirtualizer` and `createDiffMeasureSchedulers` left
+    `@acorn/plugin-api/ui/diff`, and `DiffScrollState` holds a place instead of `top`. No plugin used
+    them. The removal folds into major 2, which has not shipped; the snapshot was edited by hand,
+    because `UPDATE_SURFACE` refuses a removal under an unchanged major. TanStack Virtual stays for
+    `Rows`, `Grid` and the plugins that use it.
+
+Not built or not verified:
+
+- The real-window run: delayed images, `<details>`, reply typing, resolve and collapse, file collapse,
+  sidebar resize, unified and split, deep sweeps and teardown on WebKit. The worktree's window sits
+  hidden behind the developer's own app, and WebKit runs no animation frames there. Smoke item 83 in
+  [testing.md](../../testing.md) is owed, and so is phase 0's run at `scale` and `canonical`.
+- No anchor-drift budget is recorded, and the flow runner asserts none. It has no evidence to set one
+  from.
+- The phase 0 before and after measurements.

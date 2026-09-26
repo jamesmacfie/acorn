@@ -241,7 +241,21 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
   (`features/diff/layout.helper.ts`): plain rows before colour, a pane left open asking for a few
   dozen of the `scale` profile's thousands of segments and then nothing more, a jump to the last
   file that loads nothing in between, a new revision that reloads only the file that moved, find
-  across unloaded segments, gap expansion, and collapse;
+  across unloaded segments, gap expansion, and collapse. The layout helper also models a
+  `ResizeObserver`, block heights by `data-block`, and a `scrollTop` that clamps the way a browser's
+  does, so a test cannot assert a position no browser would accept;
+- the diff's dynamic-block geometry has three layers of test. `kit/diff/layoutIndex.test.ts` holds a
+  million rows as segments with 400 blocks: 2,000 random resizes leave every fixed start where it was
+  and write at most log2(items) + 1 tree nodes each, places and offsets convert both ways in both
+  projections, and a slow reference agrees through inserts, resizes, removals, collapse, expansion and
+  a change of projection. `kit/diff/measureScheduler.test.ts` models the observer and the frames: a
+  burst is one read batch and one commit a frame, a block above a scrolling reader waits for the
+  settle, a mounted dirty block is read even when its height is current, an unmounted one never is,
+  and teardown returns everything to zero. `features/diff/diffLayout.test.tsx` drives the real pane:
+  a thread growing above the reader keeps their row, one below moves nothing, a composer moves what
+  follows once in one commit, a scrolling reader holds a correction back until they stop, the pane's
+  own correction scrolls do not count as the reader, a collapsed file lands the reader on its header,
+  and a width change that resizes every block keeps the place with no fixed rebuild;
 - four arch rules read source text rather than the import graph, because what they police is a
   global rather than an import: `window.acorn` outside the platform seam, and `console.*` outside
   each of the three loggers. Each carries a **baseline** of the files that survive, and each asserts
@@ -889,6 +903,14 @@ bindings rather than the prose.
     the sticky header, and leave the pane open for a minute: the health snapshot shows nothing queued.
     Then do the same in the Changes pane while an agent edits a file: only that file's segments
     reload, and the reader stays where they were.
+83. In that pull request, scroll to a place with a thread a screen above you and one below. Expand
+    and collapse the one above, reply in it so the box grows, and resolve it: the line you are reading
+    does not move. Open a `<details>` block and wait for a late image in the one below: nothing on
+    screen moves. Open a line composer on screen: what follows moves down once, with no frame where the
+    composer overlaps the next line. Flick-scroll through several threads: nothing jumps while you
+    move, and the view settles without a correction you can see. Narrow the pane by dragging the
+    sidebar, then widen it: the same line stays at the top. Leave the pane and take a health snapshot:
+    no observers, no scheduled frames, and `maxAnchorDrift` under a pixel.
 
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as
