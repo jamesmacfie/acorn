@@ -267,6 +267,23 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
   and a moved file drops its old patch, that a resolved thread asks for nothing, and that a
   dehydrated query client holds no segment text. `infra/node/fleet.test.ts` checks that `dropNode`
   clears that node's segments and no other's;
+- long timelines have three layers of test. `kit/lib/timelineWindow.test.tsx` holds the window's rules:
+  the newest page on open, appended turns joining it, a page per **Show earlier**, a page-aligned
+  reveal, keeping its size when its oldest key leaves, and trims that only move forward.
+  `kit/components/content/Timeline.test.tsx` drives a windowed followed Timeline over geometry read
+  from the DOM's order: hidden counts and `aria-posinset`, **Show earlier** keeping the reader's turn at
+  its offset and its element, a hidden reading place revealed rather than substituted, a gone one
+  substituted and counted, a trim once a page while following, no trim under a selection or focus or
+  while the reader is away, and deferred bodies built in the same element once near, with the
+  observer gone at teardown. `plugins/agents/src/client/sessions/AgentTranscript.test.tsx` opens a
+  1,000-card session on its newest page, starts another session on its own page, reveals a request a
+  notice named, draws everything on **Go to top**, and keeps a real cross-card selection while the
+  newest card streams. `toolRendererRegistry.test.tsx` checks a closed tool card builds no output, and
+  `plugins/github/src/client/pullDetail/Conversation.test.tsx` checks `kind:id` turn keys, bodies and
+  snippets arriving in the same element, only near threads reading segments, **Snippet unavailable.**
+  for a file the document lacks, and a refetch keeping every turn's element.
+  `features/diff/diffSnippets.test.tsx` checks a snippet reads only its segment, loads nothing for a
+  file with no patch, and shares uncoloured rows with the diff through the node cache;
 - four arch rules read source text rather than the import graph, because what they police is a
   global rather than an import: `window.acorn` outside the platform seam, and `console.*` outside
   each of the three loggers. Each carries a **baseline** of the files that survive, and each asserts
@@ -391,7 +408,7 @@ The tests that hold the fixture and the health probes to their contract:
   returns;
 - `kit/lib/surfaceHealth.test.ts` covers the registry and its privacy rule,
   `features/diff/diffHealth.test.tsx` renders the real pane over the small profile, and
-  `Timeline.test.tsx` checks projected against mounted turns and exact teardown;
+  `Timeline.test.tsx` checks projected against mounted turns, the window's counts, and exact teardown;
 - `apps/desktop/scripts/agent/flow.test.mjs` checks that a flow file with an unknown action, a
   script, an unbounded loop, or no assertions is refused, and runs a flow against a fake window.
 
@@ -400,7 +417,8 @@ The real-window run is the large-surface flow
 because it needs a visible window on a graphical host and minutes of real rendering. It asserts
 invariants that do not depend on the machine: no blank or uncovered block in a settled viewport, at
 most one geometry commit per frame, no source topology after ready, mounted rows under a fixed
-ceiling at every profile, and teardown back to zero. It records, and does not gate, time to first
+ceiling at every profile, the transcript under the same 400-turn ceiling on open and after one
+**Show earlier**, and teardown back to zero. It records, and does not gate, time to first
 content, time to ready, preparation and measurement time, correction pixels, and resident bytes,
 with the host, engine, build, and fixture beside them. The segmented document was built after the
 first partial run, which was the unsegmented baseline; a visible run at `scale` and at `canonical`
@@ -927,6 +945,16 @@ bindings rather than the prose.
     `resident.hits` rose. Open a dozen other large diffs one after another: `resident.rows` and
     `resident.estimatedBytes` stay under `rowCeiling` and `byteCeiling`. In the Changes pane, let an
     agent save the same file several times: `resident.segments` does not grow with each save.
+85. Open the `canonical` fixture's Agent pane: it opens on the newest cards with **Show earlier** above
+    them, and the health snapshot shows 200 mounted of about 3,400 turns. Scroll a little way up and
+    press **Show earlier**: the card you were reading stays put. Select text across two cards, scroll
+    to the foot, and let a live session stream past 400 cards: the selection survives, and once you
+    clear it the next page of cards trims the window back to 200. Press **Go to top**: the oldest turn
+    is on screen, and the page's find matches its text. Open a notice for an old request: its card is
+    drawn and focused. With VoiceOver, a card reads its place in the whole session. In a pull request
+    with many threads, open the conversation and scroll: each comment's HTML and each thread's snippet
+    appear before you reach them, a capped file's thread says **Snippet unavailable.**, and nothing
+    already drawn is rebuilt when the pull refetches.
 
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as

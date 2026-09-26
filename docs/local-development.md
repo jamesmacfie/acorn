@@ -130,7 +130,9 @@ project, so it refuses `--project`, `--onboarding`, and `--smoke`.
 flow opens the task's Changes pane cold and sweeps the diff from top to bottom and back. It opens a
 comment composer and deletes a note, resizes the window, collapses the file list and a file,
 switches to split and back, and jumps to a file. Then it leaves and returns, opens the transcript,
-jumps to its oldest and newest turns, and leaves the task. After each stage it reads the
+checks it mounted no more than 400 turns, presses **Show earlier** once and checks again, jumps to
+its oldest and newest turns, and leaves the task. The transcript counts as mounted when every turn
+is drawn or hidden behind **Show earlier**. After each stage it reads the
 rendered-surface health snapshot ([telemetry.md](./telemetry.md) § Rendered-surface health). It
 waits on health conditions and animation frames, not fixed sleeps.
 

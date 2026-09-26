@@ -304,6 +304,36 @@ keyed by file, line and side, the same shape the changes pane opens over the wor
 `github:summary-badges` is a `stack` slot on the overview, so github's own facts stay and up to four
 contributors are added beside them ([plugins.md](./plugins.md) § Cooperative extension points).
 
+### Conversation
+
+The conversation is `PrConversation` in `plugins/github/src/client/pullDetail/Conversation.tsx`, a kit
+`Timeline` over `buildConversationEntries` in `model.ts`. Its topology is the PR detail, which is
+complete when it is served (§ Pull request detail and files), and no route was added for it. Bodies stay
+in that detail, because the diff's inline threads and the Linear reference scan read the same bodies
+anyway, so a separate body route would fetch them twice.
+
+- **Turn identity.** Every entry's key is `kind:id`: `review:<node id>`, `comment:<id>`,
+  `commit:<sha>`, `thread:<thread id>`. The kind stops a SHA, a review id, and a comment id from sharing
+  a namespace. An id seen twice in one kind gets `#2`, `#3` in list order. The sort is stable, so a tie
+  keeps the order reviews, comments, commits, and threads are listed in. Turns are drawn by key, each
+  reading its entry from a signal of its own, so a refetch, a reply, an edited body, or an older comment
+  arriving keeps every existing turn's element.
+- **Bodies near the viewport.** Each turn's byline, state, and path are drawn at once. GitHub's rendered
+  HTML is built only when the turn comes within one screen of the viewport, through `Timeline.Turn`'s
+  `near` child, and it stays built after that. Until then the card says the body is shown on scroll.
+  Browser find cannot match a body that is not built yet. The terminal client builds every body at once.
+- **Thread snippets.** A thread quotes five lines around its line, from the one segment of the pull's
+  diff document that holds it (§ Diff documents). The conversation loads the document when any thread
+  has a line, and `createDiffSnippets` from `@acorn/plugin-api/ui/diff` reads a thread's segment through
+  the diff viewer's loader and node cache once its turn comes near. A segment already seen in the diff
+  costs no request, and one read here is resident when the diff opens. A file missing from the document
+  because GitHub capped the list, a file with no patch, a line in no segment, and a failed load all
+  draw **Snippet unavailable.** and load nothing else. An outdated thread has no line and draws no
+  snippet. No patch is parsed on the client.
+- **No window.** The conversation draws every turn. Its cost per turn is a byline until a turn comes
+  near, and it scrolls in the navigator's region rather than a followed timeline of its own, so it does
+  not use the transcript's "Show earlier" window.
+
 Keyboard navigation comes from the tree rather than from this plugin: the pull list, the file list,
 the check list and the pull strip are kit collections, so the arrows, `j` and `k`, Home, End and
 type-ahead all work without a binding of github's own. What is left in `Shortcuts.tsx` is the keyboard
