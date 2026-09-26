@@ -8,9 +8,9 @@
 // What is particular to this point is the drawing. A rail row is a 52-pixel square, so a mark cannot
 // be a line of text the way it is on a diff line: the icon takes a free corner and the words go in
 // the hover legend, which is what the rail already does for core's own states and for docker's
-// (../tabs/railMarkers.ts). So this module is a rail-marker contribution rather than a draw site, and
-// it is the reason docs/future/rail-tab.md § Slice 3 is superseded — a plugin publishes facts about a
-// task, and where they land on the row is the host's business.
+// (../tabs/railMarkers.ts). So this module is a rail-marker contribution rather than a draw site: a
+// plugin publishes facts about a task, and where they land on the row is the host's business
+// (docs/plugins/cooperative-extension-points.md § Task annotations).
 //
 // Registered at module scope, and the lazy-import property is the same feature ../registries/
 // scopeEviction.ts names: the rail is the only thing that imports this, so the point exists exactly
@@ -27,9 +27,10 @@ extensionPointRegistry.register({
   label: 'Task row',
   kind: 'annotation',
   key: CORE_TASK_KEY,
-  // Four corners, so four is also the ceiling. A fifth mark is not dropped: it stays in the hover
-  // legend, which is where an overflowing state survives on this rail.
+  // Four corners, so four is the placement ceiling. A fifth mark is not dropped: it stays in the
+  // hover legend, which is where an overflowing state survives on this rail.
   max: 4,
+  acceptedMarks: 256,
 })
 
 const TONE: Record<AnnotationSeverity, RailTone> = { info: 'neutral', warn: 'warn', danger: 'danger' }

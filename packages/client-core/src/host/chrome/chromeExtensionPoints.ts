@@ -36,6 +36,8 @@ export type PluginExtensionBinding = {
   nodeId: () => string
   /** Is the declaring plugin installed and running there? */
   enabled: () => boolean
+  /** Freshness for this plugin's descriptor reads: global status plus plugin-specific pushes. */
+  freshnessRevision?: () => number
   /** The bundle this device accepted, for a `remote` contribution. Absent for a plugin with no client
    *  bundle, which is refused below rather than mounted from nothing. */
   hash?: string
@@ -121,6 +123,8 @@ export function pluginExtension(
     return {
       ...base,
       carrier: 'items',
+      requestScope: binding.nodeId,
+      ...(binding.freshnessRevision ? { freshnessRevision: binding.freshnessRevision } : {}),
       // Both readers, because the same route shape serves rows and annotations and only the owner's
       // point says which is asked for. Binding both here means the delivery site picks without a
       // second pass over the manifest.

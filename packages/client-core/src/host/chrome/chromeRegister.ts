@@ -23,6 +23,7 @@ import { pluginCommand, usablePluginCommands } from './chromeCommands'
 import { suppliedSourcePanel } from './sourcePanel'
 import {
   captureAgentContext,
+  chromeDeps,
   ownsRoute,
   readAgentContextOptions,
   readAttention,
@@ -41,6 +42,7 @@ import { refResolverRegistry } from '../registries/panes/refResolvers'
 import { registerNoticeTargetHandler } from '../../features/notifications/notifications'
 import { setSelectedSource } from '../../features/tasks/tasks'
 import { createLogger } from '../../infra/telemetry/logger'
+import { clearAnnotations } from '../annotations/annotations'
 
 const log = createLogger('plugin-chrome')
 
@@ -323,7 +325,11 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
   // Both halves ride this pass rather than the frames pass, and both are gated on the same
   // `hasWithheldCode` question every other descriptor is, because both are descriptors: a point is a
   // manifest line and a contribution is a route plus a verb. No plugin code executes on either side.
-  const pointBinding = { nodeId: chromeNode, enabled: () => pluginEnabledOnNode(chromeNode(), pluginId) }
+  const pointBinding = {
+    nodeId: chromeNode,
+    enabled: () => pluginEnabledOnNode(chromeNode(), pluginId),
+    freshnessRevision: () => chromeDeps(pluginId),
+  }
   for (const descriptor of contributions.extensionPoints ?? []) {
     // The surface is re-checked here rather than inside the adapter, because this is where the
     // manifest's own declared frames are in scope. A point hanging off a surface this manifest doesn't
@@ -450,6 +456,9 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
  * again when a trust decision lands, and each call replaces what the previous one contributed.
  */
 export function syncChromeContributions(): void {
+  // Descriptor registrations are replaced below. Clear their retained answers before any replacement
+  // can reuse the same public id, and notify existing readers in this turn.
+  clearAnnotations()
   disposeAll()
   const refreshes: number[] = []
   // Gated on `hasWithheldCode`, not `!trusted` (docs/plugins.md § One shared eligibility and trust

@@ -99,10 +99,17 @@ and activity, because it sits under the main glyph rather than in a corner. Two 
 opposite ends of a task's life: a pulsing dot while its setup script prepares the new worktree, and a
 spinner while teardown removes it.
 
-Core's markers come from `tasks/railStatus.ts`. Plugins publish theirs through
-`features/tabs/railMarkers.ts` ([plugins.md § Rail markers](./plugins.md)); contributed priorities are
-clamped below core's, so a plugin can order its own markers among themselves but can never push a
-core lifecycle state out of its corner. Placement requests are preferences, never guarantees.
+Core's markers come from `tasks/railStatus.ts`. Compiled plugins publish theirs through
+`features/tabs/railMarkers.ts` ([plugins.md § Rail markers](./plugins.md)). Loaded plugins publish task
+facts through the generic `core:task` annotation point, and the host converts each accepted fact to a
+marker. The plugin supplies severity, bounded text, and an optional host-resolved icon; it supplies no
+placement, color, geometry, or action. For the batched request and lifecycle contract, see
+[Task annotations](./plugins/cooperative-extension-points.md#task-annotations).
+
+Contributed priorities are clamped below core's, so a plugin can order its own markers among
+themselves but can never push a core lifecycle state out of its corner. Placement requests are
+preferences, never guarantees. The annotation path does not change this desktop allocator: four
+corners may carry pixels, and the complete ordered legend carries every accepted state.
 
 A CSS selector in a feature or plugin stylesheet that positions a rail marker is the regression
 signal that placement escaped the host.

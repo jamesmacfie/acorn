@@ -5,7 +5,7 @@ import type {
   PluginRailItem,
   PluginSlotBadge,
 } from '@acorn/protocol/api.ts'
-import { isAnnotationSeverity, type PluginAnnotationKey, type PluginAnnotationMark, type PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
+import { isAnnotationSeverity, MAX_RAW_ANNOTATION_ROWS, type PluginAnnotationKey, type PluginAnnotationMark, type PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
 import {
   agentContextBudget,
   MAX_AGENT_CONTEXT_BYTES,
@@ -452,7 +452,14 @@ export async function readAnnotationMarks(
     signal,
   })
   const rows = Array.isArray(body?.items) ? body.items : []
-  return rows.flatMap((row) => {
+  if (rows.length > MAX_RAW_ANNOTATION_ROWS) {
+    log.warn(`${pluginId} returned too many annotation marks; ignored ${rows.length - MAX_RAW_ANNOTATION_ROWS}`, undefined, {
+      'plugin.id': pluginId,
+      'annotation.rows': rows.length,
+      'annotation.limit': MAX_RAW_ANNOTATION_ROWS,
+    })
+  }
+  return rows.slice(0, MAX_RAW_ANNOTATION_ROWS).flatMap((row) => {
     const mark = sanitizeAnnotationMark(row)
     if (mark) return [mark]
     drop(pluginId, 'annotation mark', row)
