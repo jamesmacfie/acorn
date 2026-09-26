@@ -492,9 +492,9 @@ viewport, because a wheel step runs each node's own handler from the node under 
 — so a listener above the viewport sees the scroll after the viewport has already moved its offset,
 and one on the viewport itself would see it before (`apps/tui/src/tree/hit.ts`). The known ceiling
 is that a spacer is one line per row and an annotated row draws two, so the content is as many lines
-taller than the model as there are marked rows inside the window. A second known limit: the pane
-never aborts a segment load. Each request gets a fresh `AbortController` signal that nothing aborts,
-so leaving the pane lets its requests finish into a pane nobody draws.
+taller than the model as there are marked rows inside the window. Loaded rows are keyed by path as
+well as content key, so two files with the same patch each keep their own path for annotations and
+the grammar, and leaving the pane aborts the segment loads still in flight.
 
 Virtual `Rows` deliberately do not sit inside that mechanism: they render only their visible slice,
 so there is no offscreen child for a scroll viewport to move. Their own `top` offset handles wheel

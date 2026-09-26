@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createMemo, createSignal, For, Index, Show, untrack, type JSX } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Index, onCleanup, Show, untrack, type JSX } from 'solid-js'
 import type { Renderable } from '../tree/compat'
 import type { Wheel } from '../tree/hit'
 import type { Size, TextRole, Tone } from '@acorn/client-core/kit/tokens'
@@ -1024,9 +1024,16 @@ export function DiffPane(props: { source: TuiDiffSource; annotations?: string })
     return { out, total: at }
   })
 
-  // Loaded segments' rows by content key. A new revision keeps any segment whose content survived.
+  // Loaded segments' rows by path and content key. Two files with the same patch share a content key,
+  // but each row carries its file's path, which annotations and the grammar read. A new revision
+  // keeps any segment whose content survived.
   const [loaded, setLoaded] = createSignal<ReadonlyMap<string, DiffRowT[]>>(new Map())
   const asked = new Set<string>()
+  const keyOf = (path: string, patchKey: string, ordinal: number): string => `${path}\u0000${segmentContentKey(patchKey, ordinal)}`
+  const blockKey = (block: DiffBlock): string => keyOf(block.file.path, block.file.patchKey!, block.ordinal)
+  // Leaving the pane aborts the loads still in flight.
+  const abort = new AbortController()
+  onCleanup(() => abort.abort())
   let viewport: (Renderable & Viewport) | undefined
   const [top, setTop] = createSignal(0)
   const [fit, setFit] = createSignal(0)
@@ -1054,8 +1061,7 @@ export function DiffPane(props: { source: TuiDiffSource; annotations?: string })
         rows.push({ head: block.file })
         continue
       }
-      const key = segmentContentKey(block.file.patchKey!, block.ordinal)
-      const segment = loaded().get(key)
+      const segment = loaded().get(blockKey(block))
       if (!segment) wanted.push(block)
       for (let line = Math.max(block.start, from); line < Math.min(block.start + block.lines, until); line++) {
         const row = segment?.[line - block.start]
@@ -1067,17 +1073,17 @@ export function DiffPane(props: { source: TuiDiffSource; annotations?: string })
 
   // The segments the window reaches and does not have, asked for once each.
   createEffect(() => {
-    const wanted = window().wanted.filter((block) => !asked.has(segmentContentKey(block.file.patchKey!, block.ordinal)))
+    const wanted = window().wanted.filter((block) => !asked.has(blockKey(block)))
     if (!wanted.length) return
-    for (const block of wanted) asked.add(segmentContentKey(block.file.patchKey!, block.ordinal))
-    const byKey = new Map(wanted.map((block) => [segmentContentKey(block.file.patchKey!, block.ordinal), block]))
+    for (const block of wanted) asked.add(blockKey(block))
+    const byKey = new Map(wanted.map((block) => [blockKey(block), block]))
     void props.source.loadSegments(
       wanted.map((block) => ({ path: block.file.path, patchKey: block.file.patchKey!, ordinal: block.ordinal })),
-      new AbortController().signal,
+      abort.signal,
     ).then((payloads) => {
       const next = new Map(untrack(loaded))
       for (const payload of payloads) {
-        const key = segmentContentKey(payload.patchKey, payload.ordinal)
+        const key = keyOf(payload.path, payload.patchKey, payload.ordinal)
         const block = byKey.get(key)
         if (block) next.set(key, diffRowsFromPlain(block.file.path, block.file.sha, payload.rows))
       }
