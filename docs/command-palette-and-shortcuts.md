@@ -375,6 +375,10 @@ inside of a rectangle. A pane that wants a chord registers a command and a bindi
 reaches Settings → Shortcuts, the palette, and the cheat sheet at once; a handler installed beside the
 engine reaches none of them and cannot be rebound, overridden, or shown to the reader in a conflict.
 
+The `pane.switcher` replacement receives the resolved shortcut labels and calls host-owned layout
+verbs. The host still handles F6 focus navigation and Cmd/Ctrl+1 through Cmd/Ctrl+9 pane selection,
+so changing the switcher does not change keyboard behavior.
+
 **Keys become intents before a component sees one.** The closed set is in
 `client-core/kit/keys/intents.ts`: `next`, `prev`, `first`, `last`, `pageNext`, `pagePrev`, `expand`,
 `collapse`, `activate`, `dismiss`, `commit`, `search`, `menu`, `delete`, and the four region and pane

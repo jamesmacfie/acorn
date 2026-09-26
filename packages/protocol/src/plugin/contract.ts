@@ -34,6 +34,7 @@ import { PLUGIN_API_RANGE_RE } from './apiVersion.ts'
 import { LANGUAGE_IDS } from '../languageIds.ts'
 import { cadenceSchema } from '../schedules.ts'
 import { isThemeColorValue, THEME_COLOR_VALUE_MAX, THEME_PALETTE_TOKENS } from '../themeTokens.ts'
+import { styleValueProblem } from '../styleValues.ts'
 import { normalizeWebviewHost, WEBVIEW_HOST_MAX_COUNT, WEBVIEW_HOST_MAX_LENGTH } from '../webview.ts'
 
 // This id becomes the plugin's route namespace and `<dataRoot>/plugins/<id>.sqlite`. An architecture
@@ -206,6 +207,9 @@ const frameSurface = z.object({
   group: z.enum(['general', 'workspace']).optional(),
   // `coreSlot` only, and required there. An unknown slot is a parse error.
   coreSlot: z.enum(CORE_EXCLUSIVE_SLOTS).optional(),
+  // A chrome replacement declares whether it places the one host-filled nested slot. Settings can
+  // warn before selection when it deliberately leaves task navigation or status items out.
+  placesSlots: z.array(z.enum(['rail.taskList', 'topbar.right'])).max(1).optional(),
   // `webview` only. The declared hosts are the grant the device records and Electron enforces across
   // redirects.
   url: z.string().min(1).max(2_048).optional(),
@@ -252,6 +256,22 @@ const frameSurface = z.object({
   }
   if (surface.readsArchived && (surface.target !== 'pane' || surface.scope !== 'task')) {
     ctx.addIssue({ code: 'custom', path: ['readsArchived'], message: 'readsArchived is only valid on a task pane' })
+  }
+  // These host-driven surfaces carry changing data and verbs. A rectangle cannot receive that
+  // contract, so only a remote tree may offer them; the original task-list slot remains compatible
+  // with its existing iframe providers.
+  if (surface.target === 'coreSlot' && surface.coreSlot && surface.coreSlot !== 'rail.taskList') {
+    const body = surface.regions?.body
+    if (surface.layout !== 'single' || !body || typeof body !== 'object' || body.kind !== 'remote') {
+      ctx.addIssue({ code: 'custom', path: ['regions'], message: `${surface.coreSlot} needs a single remote-tree body` })
+    }
+  }
+  if (surface.placesSlots?.length) {
+    const expected = surface.coreSlot === 'rail' ? 'rail.taskList'
+      : surface.coreSlot === 'topbar' ? 'topbar.right' : null
+    if (!expected || surface.placesSlots.some((slot) => slot !== expected)) {
+      ctx.addIssue({ code: 'custom', path: ['placesSlots'], message: 'placesSlots must name the nested slot for this chrome surface' })
+    }
   }
   if (!surface.layout) return
   const problem = regionProblem(surface.layout, Object.keys(surface.regions ?? {}))
@@ -371,8 +391,13 @@ const sourceDescriptor = z.object({
   order: z.number().int().min(0).max(100_000),
   // Optional gate on a connected integration, same as a first-party source.
   providerId: z.string().min(1).max(64).optional(),
-  // GET → { items: PluginRailItem[] }
-  items: pluginRoute,
+  // A Node-backed source reads the plugin's route. A client-only source supplies both browse
+  // regions from its remote-tree worker instead, so no Node handler is needed.
+  items: pluginRoute.optional(),
+  tree: z.object({
+    list: z.string().min(1).max(64),
+    detail: z.string().min(1).max(64),
+  }).strict().optional(),
   // Does this rail read the routed project? Opt in, so an older manifest and a plugin that never
   // thought about projects both land on `false`, which is true of most of them. Declaring it turns on
   // the shell's project picker for this source and adds `?project=` to the items route
@@ -391,6 +416,13 @@ const sourceDescriptor = z.object({
   // detail half of a master/detail browse occupies the same rectangle.
   panels: panelRegion.optional(),
   refresh,
+}).superRefine((source, ctx) => {
+  if (Number(source.items !== undefined) + Number(source.tree !== undefined) !== 1) {
+    ctx.addIssue({ code: 'custom', message: 'a source needs either an items route or a remote tree' })
+  }
+  if (source.tree && (source.onSelect || source.emptyState || source.panels)) {
+    ctx.addIssue({ code: 'custom', message: 'a remote-tree source owns its selection, empty state, and detail region' })
+  }
 })
 
 const slotDescriptor = z.object({
@@ -823,6 +855,18 @@ const themeDescriptor = z.object({
   ]))),
 })
 
+const styleDescriptor = z.object({
+  id: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9-]*$/, 'style id must be lower-case alphanumeric with dashes'),
+  label: z.string().min(1).max(80),
+  description: z.string().max(240).optional(),
+  tokens: z.record(z.string(), z.string()).superRefine((tokens, ctx) => {
+    for (const [token, value] of Object.entries(tokens)) {
+      const problem = styleValueProblem(token, value)
+      if (problem) ctx.addIssue({ code: 'custom', path: [token], message: problem })
+    }
+  }),
+})
+
 // A check the host runs before it archives a task, and the cleanup the owner may opt into. The pair to
 // `ctx.taskChecks.register`. Node-side, because the question is about a worktree and the processes
 // around it. See docs/plugins.md § Task checks.
@@ -988,6 +1032,7 @@ const contributionsShape = z.looseObject({
   agentContexts: z.array(agentContextDescriptor).max(4).default([]),
   refResolvers: z.array(refResolverDescriptor).max(4).default([]),
   themes: z.array(themeDescriptor).max(8).default([]),
+  styles: z.array(styleDescriptor).max(8).default([]),
   contextMenus: z.array(contextMenuDescriptor).max(8).default([]),
   // Raised from four and eight when the one key grew from rows to five kinds: a plugin that opens a
   // pane, a slot in it, a hook before it acts and an annotation on its rows is describing one
@@ -1230,6 +1275,7 @@ export type PluginRefResolverDescriptor = z.infer<typeof refResolverDescriptor>
 export type PluginThemeDescriptor = Omit<z.infer<typeof themeDescriptor>, 'tokens'> & {
   tokens: Record<string, string>
 }
+export type PluginStyleDescriptor = z.infer<typeof styleDescriptor>
 // `location` is wider than the parse: the client re-checks it and every `when` key against its own
 // copy of the vocabulary before registering anything.
 export type PluginContextMenuDescriptor = Omit<z.infer<typeof contextMenuDescriptor>, 'location'> & {
@@ -1283,6 +1329,7 @@ export type PluginContributions = {
   refResolvers?: PluginRefResolverDescriptor[]
   routes?: PluginClientRouteDescriptor[]
   themes?: PluginThemeDescriptor[]
+  styles?: PluginStyleDescriptor[]
   contextMenus?: PluginContextMenuDescriptor[]
   extensionPoints?: PluginExtensionPointDescriptor[]
   extensions?: PluginExtensionDescriptor[]

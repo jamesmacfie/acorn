@@ -9,6 +9,7 @@
     "./broker/nodePairing.ts": "./src/broker/nodePairing.ts",
     "./custody/deviceTokenStore.ts": "./src/custody/deviceTokenStore.ts",
     "./plugins": "./src/plugins/public.ts",
+    "./config": "./src/config/deviceConfig.ts",
     "./runtime": "./src/runtime/public.ts"
   },
   "scripts": {

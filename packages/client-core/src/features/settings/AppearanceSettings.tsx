@@ -1,4 +1,4 @@
-import { Show } from 'solid-js'
+import { createResource, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions } from '../../infra/queries'
 import {
@@ -15,7 +15,8 @@ import {
   themeChoices,
   themeFollowsSystem,
 } from './appearancePrefs'
-import { Checkbox, Field, Select } from '../../kit/components/primitives'
+import { Button, Checkbox, Field, Select } from '../../kit/components/primitives'
+import { desktopExtras, deviceConfigBridge } from '../../infra/platform'
 
 // Settings → Appearance. Two orthogonal axes (docs/ui-design.md § Token axes): style owns shape,
 // typography, spacing and density; theme owns colour. They compose freely, because the two token sets
@@ -30,6 +31,7 @@ import { Checkbox, Field, Select } from '../../kit/components/primitives'
 export default function AppearanceSettings() {
   const qc = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
+  const [configPath] = createResource(async () => deviceConfigBridge()?.location() ?? null)
 
   return (
     <>
@@ -40,6 +42,14 @@ export default function AppearanceSettings() {
           onChange={(value) => void saveAppearanceStyle(qc, value)}
         />
       </Field>
+      <Show when={configPath()}>{(path) =>
+        <Field label="Device config file" hint="Edit this file to change appearance, shortcuts and replacement surfaces on this device.">
+          <code>{path()}</code>
+          <Show when={desktopExtras()}>{(desktop) =>
+            <Button size="sm" onPress={() => void desktop().openConfigFile()}>Open config file</Button>
+          }</Show>
+        </Field>
+      }</Show>
 
       <Checkbox
         label="Follow system light/dark setting"

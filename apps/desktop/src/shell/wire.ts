@@ -27,9 +27,14 @@ export type HelperMethod =
   | 'node-tunnel-close'
   | 'plugins-state'
   | 'plugins-cache-put'
+  | 'plugins-install'
+  | 'plugins-remove'
   | 'plugins-trust-record'
   | 'plugins-trust-forget'
   | 'plugins-dev-grant'
+  | 'config-read'
+  | 'config-write'
+  | 'config-location'
 
 export type HelperRequest = { id: number; method: HelperMethod; params: unknown }
 export type HelperReplyTiming = {
@@ -52,6 +57,7 @@ export type HelperPush =
   | { push: 'node-frame'; nodeId: string; frame: unknown }
   | { push: 'node-status'; status: unknown }
   | { push: 'node-replaced' }
+  | { push: 'config-changed'; state: unknown }
 
 export type HelperMessage = HelperReply | HelperPush
 

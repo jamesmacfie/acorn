@@ -1,3 +1,4 @@
 export { eligiblePlugins, isTaskPane } from './contributions.ts'
 export { ensurePluginChannel, onPluginFrame } from './pluginChannel.ts'
 export { recordSurfaceFailure } from './surfaceFailures.ts'
+export { installPluginOnDevice, readPluginHostState, removePluginFromDevice, setPluginDevGrant } from './host.ts'

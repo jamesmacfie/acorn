@@ -42,9 +42,21 @@ back to Light/Dark and is never rewritten** — a disabled plugin, an untrusted 
 node all arrive as the same absence, and a preference erased on the third cannot be recovered when the
 node comes back. The theme returns by itself when the plugin does.
 
-**Style packs are deliberately not contributable.** Style tokens touch layout and density, where
-"cannot break the app" is a much weaker promise than it is for colour. The mechanism would be the same;
-the judgement is not, and one contribution never spans both axes.
+### Plugin style packs
+
+`contributions.styles` contains an id, label, optional description, and a partial `tokens` map. The
+host gives each pack a `plugin:<pluginId>:<styleId>` id and generates a namespaced
+`:root[data-style="…"]` block. The manifest parser and the client both call
+`@acorn/protocol/styleValues.ts`: every supported token has a family and each family has a bounded
+value alphabet. Unknown and host-derived tokens, CSS declaration syntax, `url()` and `expression()`
+are refused. Shadows may name `var(--shadow-popover)` for their colour, never a literal colour.
+Plugin CSS never enters the shell.
+
+Packs are partial. Unset tokens retain the Terminal defaults, and a rejected value refuses the
+whole pack. Settings lists accepted packs with their owner. A stored choice falls back to Terminal
+while its plugin is absent or untrusted and returns when it becomes available; the preference is
+never erased. The first-party packs retain their 25-selector escape hatch. Plugin packs have no
+selector escape hatch and cannot change icons.
 
 Feature-owned styles live beside the feature components that consume them. For example, the GitHub
 pull list, pull detail, and checks panel import their own plugin styles; genuinely shared integration

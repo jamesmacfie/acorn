@@ -63,7 +63,9 @@ export function TrustPrompt() {
         <Modal onDismiss={dismiss} role="alertdialog" title={`Run ${current().row.name}?`} size="wide">
           <ModalBody>
             <Line role="muted">
-              {`${current().row.installed?.version ?? '?'} from ${nodeLabel(current().nodeId)}${current().previous ? `, an update from ${current().previous!.version}` : ''}`}
+              {`${current().row.installed?.version ?? '?'} ${current().source?.kind === 'device'
+                ? `installed on this device from ${current().sourceLabel ?? 'a package'}${current().sourceLabel?.startsWith('path:') ? ' (folder bytes are not pinned)' : ''}`
+                : `from ${nodeLabel(current().nodeId)}`}${current().previous ? `, an update from ${current().previous!.version}` : ''}`}
             </Line>
             <Show when={added().length}>
               <SectionHeader level="group">What this version asks for that the last one did not</SectionHeader>

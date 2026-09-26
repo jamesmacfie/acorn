@@ -1,6 +1,8 @@
 import type { QueryClient } from '@tanstack/solid-query'
 import { prefsKey, prefsRoute } from '@acorn/protocol/api.ts'
 import { writeJson } from '../../infra/node/apiClient'
+import { deviceConfigBridge } from '../../infra/platform'
+import { configPatchForPref } from '../../infra/persistence/deviceConfigPrefs'
 import { pushBackgroundError } from '../notifications/notifications'
 import { isDevicePref, writeDevicePref } from '../../infra/persistence/devicePrefs'
 import { persistedStateRegistry, utf8Bytes } from '../../infra/persistence/persistedState'
@@ -34,7 +36,7 @@ export async function savePref(
   qc: QueryClient,
   key: string,
   value: string,
-  options: { surfaceFailure?: boolean } = {},
+  options: { surfaceFailure?: boolean; skipConfigWrite?: boolean } = {},
 ): Promise<boolean> {
   const descriptor = persistedStateRegistry.entries().find((slice) =>
     key === slice.key || (slice.scope !== 'app' && key.startsWith(`${slice.key}:`)),
@@ -55,6 +57,15 @@ export async function savePref(
   if (isDevicePref(key)) {
     writeDevicePref(key, value)
     qc.setQueryData<Record<string, string>>(prefsKey, (old) => ({ ...old, [key]: value }))
+    const patch = options.skipConfigWrite ? null : configPatchForPref(key, value)
+    if (patch) {
+      try { await deviceConfigBridge()?.write(patch) }
+      catch (error) {
+        if (options.surfaceFailure === false) log.error(`could not write acorn.json for ${key}`, error, { 'pref.key': key })
+        else pushBackgroundError('', 'Could not write acorn.json', error instanceof Error ? error.message : String(error))
+        return false
+      }
+    }
     return true
   }
 

@@ -1,5 +1,5 @@
 import type { NodePluginPermissions, PluginAgentToolGrant, PluginContextSectionGrant, PluginContributions, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
-import { isExtensionPointKind, isHookMode, type ExtensionPointKind, type HookMode } from '@acorn/protocol/extensionPoints.ts'
+import { isExtensionPointKind, isHookMode, type CoreExclusiveSlot, type ExtensionPointKind, type HookMode } from '@acorn/protocol/extensionPoints.ts'
 import { pluginAgentToolGrants, pluginContextSectionGrants, pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginNavigationDestinationGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/plugin/grants.ts'
 import { describeCadence } from '@acorn/protocol/schedules.ts'
 import { formatChord } from '../../features/tasks/paneShortcuts'
@@ -258,6 +258,13 @@ const EXTENSION_KIND_ICON: Record<PluginExtensionGrant['kind'], string> = {
   replaces: 'replace',
 }
 
+const CORE_SURFACE_COPY: Record<CoreExclusiveSlot, string> = {
+  'rail.taskList': 'Draws the task list in the rail',
+  'pane.switcher': 'Draws the pane switcher for every task',
+  rail: 'Draws the left rail and places the task list',
+  topbar: 'Draws the top bar and places plugin status items',
+}
+
 /**
  * What the owner's half of each kind reads as, and what the contributor's does.
  *
@@ -308,7 +315,7 @@ export function extensionPermissionLine(grant: PluginExtensionGrant): Permission
   const kind = isExtensionPointKind(grant.pointKind) ? grant.pointKind : null
   const mode = grant.kind === 'extends' && kind === 'hook' && isHookMode(grant.mode) ? grant.mode : null
   const template = grant.kind === 'replaces'
-    ? 'Offer to replace acorn’s own %t — you choose in Settings'
+    ? `${CORE_SURFACE_COPY[grant.target as CoreExclusiveSlot] ?? `Offers to draw ${grant.target}`} — you choose in Settings`
     : mode
       ? HOOK_MODE_COPY[mode]
       : kind

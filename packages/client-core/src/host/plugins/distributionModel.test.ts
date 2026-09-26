@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { PLUGIN_API_MAJOR, type InstalledPluginRow, type NodePluginRow, type PluginRuntimeIdentity } from '@acorn/protocol/api.ts'
 import type { PluginHostState } from '../../infra/platform'
-import { decisionKey, derivePluginDistribution, type NodePluginObservation } from './distributionModel'
+import { decisionKey, derivePluginDistribution, type DevicePluginEntry, type NodePluginObservation } from './distributionModel'
 
 const identity = (version: string, hash: string): PluginRuntimeIdentity => ({
   version,
@@ -38,6 +38,39 @@ const selected = (result: ReturnType<typeof derivePluginDistribution>, nodeId: s
   result.selectionsByNode.get(nodeId)?.get(pluginId)?.hash
 
 describe('fleet selection policy', () => {
+  it('prefers an older device bundle while retaining the newer node runtime observation', () => {
+    const newer = identity('2.0.0', 'node-hash')
+    const byNode = new Map([['a', observation('a', [row('reports', newer, installed(newer))])]])
+    const deviceRuntime = identity('1.9.0', 'device-hash')
+    const device: DevicePluginEntry = {
+      hash: 'device-hash', sourceLabel: 'github:owner/reports', nodeIds: ['a'], sameHashNodeIds: [],
+      row: { ...row('reports', null, installed(deviceRuntime)), running: true, state: 'active' },
+    }
+    const state = host(['node-hash', 'device-hash'], [
+      { pluginId: 'reports', hash: 'node-hash', decision: 'accepted' },
+      { pluginId: 'reports', hash: 'device-hash', decision: 'accepted' },
+    ])
+    const result = derivePluginDistribution(byNode, state, 1, PLUGIN_API_MAJOR, [device])
+    expect(result.selectedDevice.get('reports')?.hash).toBe('device-hash')
+    expect(selected(result, 'a', 'reports')).toBe('node-hash')
+
+    const untrusted = derivePluginDistribution(byNode, host(['node-hash', 'device-hash']), 2, PLUGIN_API_MAJOR, [device])
+    expect(untrusted.pendingTrust).toMatchObject([{ hash: 'device-hash', source: { kind: 'device' }, sourceLabel: 'github:owner/reports' }])
+  })
+
+  it('drops an incompatible device bundle so the node runtime remains available', () => {
+    const runtime = identity('2.0.0', 'node-hash')
+    const device: DevicePluginEntry = {
+      hash: 'device-hash', sourceLabel: 'npm:reports', nodeIds: ['a'], sameHashNodeIds: [],
+      row: { ...row('reports', null, installed({ ...identity('1.9.0', 'device-hash'), apiVersion: '99' })), running: true, state: 'active' },
+    }
+    const result = derivePluginDistribution(new Map([['a', observation('a', [row('reports', runtime, installed(runtime))])]]),
+      host(['node-hash', 'device-hash'], [{ pluginId: 'reports', hash: 'node-hash', decision: 'accepted' }]),
+      1, PLUGIN_API_MAJOR, [device])
+    expect(result.selectedDevice.size).toBe(0)
+    expect(selected(result, 'a', 'reports')).toBe('node-hash')
+  })
+
   it('selects each node’s running identity without a fleet-wide version winner', () => {
     const one = identity('1.0.0', 'hash-one')
     const two = identity('2.0.0', 'hash-two')
