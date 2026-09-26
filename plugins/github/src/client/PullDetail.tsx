@@ -6,7 +6,7 @@ import { EmptyState, IconButton, Sections } from '@acorn/plugin-api/ui'
 import { useChangedFiles } from './changedFiles'
 import { makeContentLinkHandler } from './contentLinks'
 import { requestFileScroll, routeKey } from './fileNavigation'
-import { filesKey, pullKey, pullsPrefixKey } from '../shared/api'
+import { fileSummariesKey, pullDiffKey, pullKey, pullsPrefixKey } from '../shared/api'
 import { forceRefreshPull } from './queries'
 import ChecksPanel from './checks/ChecksPanel'
 import { DiffForPull } from './DiffForPull'
@@ -49,10 +49,12 @@ export default function PullDetail() {
     if (!ready()) return
     setRefreshing(true)
     try {
-      const { detail, files } = await forceRefreshPull(owner(), repo(), number())
+      const { detail, diff } = await forceRefreshPull(owner(), repo(), number())
       queryClient.setQueryData(pullKey(owner(), repo(), number()), detail)
-      queryClient.setQueryData(filesKey(owner(), repo(), number()), files)
+      queryClient.setQueryData(pullDiffKey(owner(), repo(), number()), diff)
       await Promise.all([
+        // The file list reads summaries of the mirror that refresh just rewrote.
+        queryClient.invalidateQueries({ queryKey: fileSummariesKey(owner(), repo(), number()) }),
         queryClient.invalidateQueries({ queryKey: pullsPrefixKey(owner(), repo()) }),
         // Linked tickets, both list enrichment and any open detail, refetch too. Keyed by string
         // rather than by importing the plugin that supplies them, so a force-refresh of a pull does

@@ -243,9 +243,11 @@ describe('the structural grants', () => {
     // `document.read()` would land on nothing for the life of the pane.
     let editor: { read(): string; write(text: string): void; flush(): Promise<void> } | null = null
     const services = build({ document: () => editor })
-    expect(services.document!.read()).toBe('')
+    expect(services.document).toBeUndefined()
     editor = { read: () => 'hello', write: () => {}, flush: async () => {} }
     expect(services.document!.read()).toBe('hello')
+    editor = null
+    expect(services.document).toBeUndefined()
   })
 
   it('answers a webview verb with false when there is no webview', () => {

@@ -1,10 +1,13 @@
-import { createMemo, ErrorBoundary, For, onCleanup, Show, Suspense, type JSX } from 'solid-js'
+import { createEffect, createMemo, ErrorBoundary, For, onCleanup, Show, Suspense, type JSX } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
-import { TEXT_NODE, isKitNode, type KitEvent } from '@acorn/protocol/tree/nodes.ts'
+import { CHROME_SLOT_NODE, TEXT_NODE, isKitNode, type KitEvent } from '@acorn/protocol/tree/nodes.ts'
 import { KIT_COMPONENTS } from './components'
 import { kitComponent } from './kitEntry'
 import { createTreeState } from './treeState'
+import { NestedChromeSlot } from '../plugins/NestedChromeSlot'
+import type { SlotRef } from '@acorn/protocol/chrome.ts'
+import { useExclusiveSlotFailure } from '../plugins/ExclusiveSlotFailure'
 
 // The DOM host's end of the remote tree (docs/plugins.md § The tree contract).
 //
@@ -35,12 +38,17 @@ export type TreeHostProps = {
 }
 
 export function TreeHost(props: TreeHostProps) {
+  const reportExclusiveFailure = useExclusiveSlotFailure()
   const state = createTreeState({
     pluginId: props.pluginId,
     transport: props.transport,
     ...(props.onRefused ? { onRefused: props.onRefused } : {}),
   })
   onCleanup(() => state.dispose())
+  createEffect(() => {
+    const failed = state.failed()
+    if (failed) reportExclusiveFailure?.(failed)
+  })
 
   const NodeView = (own: { id: string }): JSX.Element => {
     const stored = () => state.nodes[own.id]
@@ -49,10 +57,14 @@ export function TreeHost(props: TreeHostProps) {
     return (
       <Show when={stored()} keyed={false}>
         <Show when={type() !== TEXT_NODE} fallback={<>{String(stored()!.props.value ?? '')}</>}>
-          <Show when={isKitNode(type())}>
-            <Dynamic component={kitComponent(KIT_COMPONENTS[type() as keyof typeof KIT_COMPONENTS])} {...resolved()}>
-              <For each={stored()!.children}>{(child) => <NodeView id={child} />}</For>
-            </Dynamic>
+          <Show when={type() === CHROME_SLOT_NODE} fallback={
+            <Show when={isKitNode(type())}>
+              <Dynamic component={kitComponent(KIT_COMPONENTS[type() as keyof typeof KIT_COMPONENTS])} {...resolved()}>
+                <For each={stored()!.children}>{(child) => <NodeView id={child} />}</For>
+              </Dynamic>
+            </Show>
+          }>
+            <NestedChromeSlot slotRef={resolved().slotRef as SlotRef} />
           </Show>
         </Show>
       </Show>
@@ -64,7 +76,7 @@ export function TreeHost(props: TreeHostProps) {
       {/* One boundary per tree, not per node: a kit component that throws on a stranger's props takes
           its own tree down and nothing else. A failed optional contribution stays out of the owner's
           UI rather than replacing it with an error. */}
-      <ErrorBoundary fallback={null}>
+      <ErrorBoundary fallback={(error) => { reportExclusiveFailure?.(String(error)); return null }}>
         {/* One boundary per root, not per node and not one for the whole slot. A heavy node is a
             loader (./kitEntry.ts), and a pending `lazy()` renders as an empty string — invisible on
             the DOM, refused by a cell host, so `fallback={null}` is the shape the pane registry

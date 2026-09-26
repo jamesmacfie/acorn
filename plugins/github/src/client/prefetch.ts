@@ -113,7 +113,7 @@ async function fetchPullSummaries(
   // this only makes first paint instant; it does not suppress on-visit refresh.
   for (const { number, detail, files } of items) {
     seedIfNotNewer(qc, pullKey(owner, repo, String(number)), detail, requestStartedAt)
-    seedIfNotNewer(qc, fileSummariesKey(owner, repo, String(number)), files, requestStartedAt)
+    if (files) seedIfNotNewer(qc, fileSummariesKey(owner, repo, String(number)), files, requestStartedAt)
   }
 }
 

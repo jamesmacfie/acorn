@@ -35,6 +35,7 @@ import { ATTRS_MAX, ATTR_KEY_MAX, ATTR_VALUE_MAX, LOG_BODY_MAX, formatTraceparen
 import { setContributionErrorHandler } from '../../kit/lib/contributionErrors'
 import { setWorkTelemetry } from '../../kit/lib/workTelemetry'
 import { setScrollPlaceHandler } from '../../kit/lib/scrollPlace'
+import { setSurfaceHealthHandler, type SurfaceHealthEntry } from '../../kit/lib/surfaceHealth'
 import { beginInteractionWork, clearInteractionWork, recordInteractionWork, takeInteractionWork } from './interactionWork'
 import { telemetryQueue, type TelemetryQueue } from './queue'
 
@@ -691,8 +692,28 @@ export function startClientTelemetry(options: StartTelemetryOptions): void {
       following: place.following,
     })
   })
+  // What a large diff or timeline said about itself when it became ready and when it went away
+  // (kit/lib/surfaceHealth.ts). A fixed handful of its numbers, as samples, so the label set stays one
+  // row per surface kind and checkpoint. The full snapshot is a local read
+  // (./surfaceHealth.ts), not a telemetry record.
+  setSurfaceHealthHandler((entry, checkpoint) => {
+    for (const [seam, value, unit] of surfaceSamples(entry)) {
+      recordSample('core', seam, value, unit, { surface: entry.kind, checkpoint })
+    }
+  })
   if (state.enabled) arm()
 }
+
+const surfaceSamples = (entry: SurfaceHealthEntry): [string, number, string][] => [
+  ['ui.surface.topology.fixed_rows', entry.topology.fixedRows, '1'],
+  ['ui.surface.mounted.fixed_rows', entry.mounted.fixedRows, '1'],
+  ['ui.surface.mounted.dynamic_blocks', entry.mounted.dynamicBlocks, '1'],
+  ['ui.surface.measurement.max_commits_in_frame', entry.measurement.maxCommitsInFrame, '1'],
+  ['ui.surface.measurement.active_observers', entry.measurement.activeObservers, '1'],
+  ['ui.surface.correction.max_pixels', entry.correction.maxPixels, '1'],
+  ['ui.surface.work.prepare_ms', entry.work.prepareMs, 'ms'],
+  ['ui.surface.resident.estimated_bytes', entry.resident.estimatedBytes, '1'],
+]
 
 /** Test seam: forget the poster, the queue and the open trace. */
 export function _resetClientTelemetry(): void {
@@ -701,6 +722,7 @@ export function _resetClientTelemetry(): void {
   activity = null
   setContributionErrorHandler(null)
   setScrollPlaceHandler(null)
+  setSurfaceHealthHandler(null)
   disarm()
   state.generation += 1
   state.enabled = false

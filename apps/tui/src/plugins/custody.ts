@@ -1,8 +1,9 @@
 import { join } from 'node:path'
+import { z } from 'zod'
 import { PluginCache, type BundleFetcher } from '@acorn/custody/plugins'
 import { PluginTrustStore } from '@acorn/custody/plugins'
 import {
-  decisionSchema, devGrantSchema, disclosureSchema, NO_DISCLOSURE, putSchema,
+  decisionSchema, devGrantSchema, disclosureSchema, NO_DISCLOSURE, putSchema, installSchema, removeSchema,
 } from '@acorn/custody/plugins'
 import type { PluginCustody } from '@acorn/client-core/infra/platform'
 import { configDir } from '../node/paths'
@@ -29,6 +30,7 @@ let trust: PluginTrustStore | null = null
 /** Where a bundle this device holds lives on disk. The one path-shaped answer anything outside this
  *  module gets, and its one caller is the worker factory, which needs a file to point a thread at. */
 export const bundlePath = (hash: string): string | null => cache?.path(hash) ?? null
+export const forgetNodePluginProvenance = (nodeId: string): void => { cache?.forgetNode(nodeId) }
 
 /** Build the four members of the `plugins` seam group. Called once, by the composition root. */
 export function createPluginCustody(broker: BundleFetcher): PluginCustody {
@@ -46,7 +48,7 @@ export function createPluginCustody(broker: BundleFetcher): PluginCustody {
     // renderer by default.
     state: async () => ({
       cached: Object.fromEntries(
-        Object.entries(bundles.list()).map(([hash, entry]) => [hash, { pluginId: entry.pluginId, version: entry.version, bytes: entry.bytes }]),
+        Object.entries(bundles.list()).map(([hash, entry]) => [hash, { pluginId: entry.pluginId, version: entry.version, bytes: entry.bytes, source: entry.source ?? (entry.nodeIds[0] ? { kind: 'node' as const, nodeId: entry.nodeIds[0] } : undefined), nodeIds: entry.nodeIds, installSource: entry.installSource, sourceLabel: entry.sourceLabel, manifest: entry.manifest }]),
       ),
       acks: store.list(),
       devGrants: store.listDevGrants(),
@@ -56,6 +58,17 @@ export function createPluginCustody(broker: BundleFetcher): PluginCustody {
       const result = await bundles.putFromNode(nodeId, pluginId, { hash, version })
       if ('hash' in result) store.recordDevAccept({ pluginId, nodeId, hash: result.hash, version })
       return result
+    },
+    install: async (raw) => {
+      const { source, expectedPluginId } = installSchema.parse(raw)
+      const result = await bundles.putFromSource(source, expectedPluginId)
+      if ('hash' in result) store.recordDevAccept({ pluginId: result.pluginId, nodeId: '', source: { kind: 'device' }, hash: result.hash, version: result.version })
+      return result
+    },
+    remove: async (raw) => {
+      const { pluginId } = removeSchema.parse(raw)
+      bundles.removeDevice(pluginId)
+      store.forgetDevGrant(pluginId, { kind: 'device' })
     },
     trustRecord: async (raw) => {
       const decision = decisionSchema.parse(raw)
@@ -68,12 +81,26 @@ export function createPluginCustody(broker: BundleFetcher): PluginCustody {
       log.warn(`the disclosure recorded with ${decision.decision} for ${decision.pluginId} could not be parsed; storing a partial record`, undefined, { 'plugin.id': decision.pluginId })
       store.record({ ...decision, ...NO_DISCLOSURE, partial: true, decidedAt: Date.now() })
     },
+    trustForget: async (raw) => {
+      const { pluginId, hash } = z.object({
+        pluginId: z.string().min(1),
+        hash: z.string().regex(/^[0-9a-f]{64}$/),
+      }).parse(raw)
+      store.forgetDecision(pluginId, hash)
+    },
     devGrant: async (raw) => {
-      const { pluginId, nodeId, path, grant } = devGrantSchema.parse(raw)
-      if (!grant) return store.revokeDev(pluginId, nodeId)
+      const { pluginId, nodeId, source, path, grant } = devGrantSchema.parse(raw)
+      if (!grant) return store.revokeDev(pluginId, source ?? nodeId)
       // `{ path }` is a device-provenance install: a person at a terminal installing a plugin is
       // installing it here (docs/future/client-plugins/03-device-provenance.md).
-      store.grantDev({ pluginId, nodeId, ...(path ? { path } : {}), grantedAt: Date.now() })
+      store.grantDev({ pluginId, nodeId, source: source ?? { kind: 'node', nodeId }, ...(path ? { path } : {}), grantedAt: Date.now() })
+      if (source?.kind === 'device') {
+        for (const [hash, entry] of Object.entries(bundles.list())) {
+          if (entry.pluginId === pluginId && entry.source?.kind === 'device') {
+            store.recordDevAccept({ pluginId, nodeId: '', source, hash, version: entry.version })
+          }
+        }
+      }
     },
   }
 }

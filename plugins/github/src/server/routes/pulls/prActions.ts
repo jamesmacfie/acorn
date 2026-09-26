@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm'
+import { and, eq, max } from 'drizzle-orm'
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import { gh, ghError, ghGraphQL, ghGraphQLResult } from '../../githubApi'
@@ -174,6 +174,11 @@ export const prActions = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new
     const err = ghError(res)
     if (err) return respondError(c, err.status, err.error)
     const ct = (await res.json()) as { node_id: string; user: { login: string } | null; body_html?: string; created_at: string }
+    // The newest comment, so it goes after every mirrored one until the next sync re-reads GitHub's order.
+    const [last] = await r.db
+      .select({ position: max(comments.position) })
+      .from(comments)
+      .where(and(eq(comments.userId, r.userId), eq(comments.repoId, r.repoId), eq(comments.number, r.number)))
     const row = {
       userId: r.userId,
       repoId: r.repoId,
@@ -182,6 +187,7 @@ export const prActions = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new
       author: ct.user?.login ?? null,
       body: ct.body_html ?? body,
       createdAt: Date.parse(ct.created_at),
+      position: (last?.position ?? -1) + 1,
     }
     const inserted = await r.db.insert(comments).values(row).onConflictDoNothing().returning({ id: comments.id })
     if (inserted.length) emit('pr-synced', prChangedPayload(r))
@@ -330,7 +336,7 @@ async function mutateReviewers(db: PluginDatabase, c: Context<AppEnv>, op: 'add'
   const err = ghError(res)
   if (err) return respondError(c, err.status, err.error)
   const pr = (await res.json()) as { requested_reviewers?: { login: string }[] }
-  const rows = (pr.requested_reviewers ?? []).map((u) => ({ userId: r.userId, repoId: r.repoId, number: r.number, login: u.login }))
+  const rows = (pr.requested_reviewers ?? []).map((u, position) => ({ userId: r.userId, repoId: r.repoId, number: r.number, login: u.login, position }))
   const where = and(
     eq(reviewRequests.userId, r.userId),
     eq(reviewRequests.repoId, r.repoId),
@@ -363,7 +369,7 @@ async function mutateLabels(db: PluginDatabase, c: Context<AppEnv>, op: 'add' | 
   const err = ghError(res)
   if (err) return respondError(c, err.status, err.error)
   const labels = (await res.json()) as { name: string; color: string | null }[]
-  const rows = labels.map((l) => ({ userId: r.userId, repoId: r.repoId, number: r.number, name: l.name, color: l.color }))
+  const rows = labels.map((l, position) => ({ userId: r.userId, repoId: r.repoId, number: r.number, name: l.name, color: l.color, position }))
   const where = and(
     eq(prLabels.userId, r.userId),
     eq(prLabels.repoId, r.repoId),

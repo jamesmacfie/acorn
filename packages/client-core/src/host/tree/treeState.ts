@@ -24,9 +24,43 @@ export type StoredNode = { type: string; props: Record<string, unknown>; childre
  *  Node process has neither, so the default is the next timer turn. */
 export type TreeScheduler = { schedule(run: () => void): number; cancel(handle: number): void }
 
+/** A hidden WebKit window pauses animation frames. The timer keeps a remote tree's first batch from
+ * staying blank until the window is foregrounded, while visible trees still coalesce at paint time. */
+export function createTreeScheduler(
+  frame: (run: () => void) => number,
+  cancelFrame: (handle: number) => void,
+  hidden: () => boolean,
+): TreeScheduler {
+  let sequence = 0
+  const pending = new Map<number, { frame: number | null; timer: ReturnType<typeof setTimeout> | null }>()
+  const cancel = (id: number): void => {
+    const scheduled = pending.get(id)
+    if (!scheduled) return
+    pending.delete(id)
+    if (scheduled.frame !== null) cancelFrame(scheduled.frame)
+    if (scheduled.timer !== null) clearTimeout(scheduled.timer)
+  }
+  return {
+    schedule(run): number {
+      const id = ++sequence
+      const scheduled = { frame: null as number | null, timer: null as ReturnType<typeof setTimeout> | null }
+      pending.set(id, scheduled)
+      const flush = (): void => {
+        if (!pending.has(id)) return
+        cancel(id)
+        run()
+      }
+      if (!hidden()) scheduled.frame = frame(flush)
+      scheduled.timer = setTimeout(flush, hidden() ? 0 : 100)
+      return id
+    },
+    cancel,
+  }
+}
+
 const defaultScheduler: TreeScheduler =
   typeof requestAnimationFrame === 'function'
-    ? { schedule: (run) => requestAnimationFrame(run), cancel: (handle) => cancelAnimationFrame(handle) }
+    ? createTreeScheduler(requestAnimationFrame, cancelAnimationFrame, () => typeof document !== 'undefined' && document.hidden)
     : { schedule: (run) => setTimeout(run, 0) as unknown as number, cancel: (handle) => clearTimeout(handle) }
 
 export type TreeStateInput = {

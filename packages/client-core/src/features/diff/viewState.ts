@@ -1,4 +1,5 @@
 import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
+import type { DiffReadingPlace } from './diffLayout'
 
 // Session-only view position for a diff surface, so returning to one lands where you left it.
 // A task's diff is a different scope from the same files opened outside a task, even when both show
@@ -12,12 +13,16 @@ export type DiffViewScope = {
   taskId?: string
 }
 
-export type DiffScrollPosition = {
-  top: number
+/**
+ * Where the reader was, by identity: an item of the document and a point in its code rows, or a
+ * dynamic block and an offset into it (./diffLayout.ts). Not a pixel offset, which a thread measured
+ * above the reader or a narrower pane would make wrong. Valid for the projection and the file set it
+ * was taken in; a place whose item has gone lands on that file's header.
+ */
+export type DiffScrollState = {
+  place: DiffReadingPlace
+  /** Horizontal scroll, in pixels: code does not wrap, so nothing above the reader can move it. */
   left: number
-}
-
-export type DiffScrollState = DiffScrollPosition & {
   viewMode: 'unified' | 'split'
   filesSignature: string
 }

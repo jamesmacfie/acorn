@@ -2,9 +2,11 @@ import { routeCapability } from '../bridge'
 import { pendingPluginRequests } from '../agentTools/pluginRequests'
 import type { PluginRosterEntry } from './host'
 import type { InstalledPluginInfo, PluginLoadFailure } from '../plugins/loader'
+import type { ActivePluginSnapshot } from '../plugins/loader'
 import type {
   InstalledPluginRow,
   NodePluginRow,
+  PluginRuntimeIdentity,
   PluginApprovalRequest,
   PluginInstallResult,
   PluginInstallSource,
@@ -38,7 +40,7 @@ export type PluginsBridge = {
   installed(): readonly InstalledPluginInfo[]
   // What this process actually loaded, at the version it loaded. The counterpart to `installed()`, and
   // the only way to tell "installed and running" from "installed since the last restart".
-  booted(): readonly { id: string; version: string }[]
+  booted(): readonly ActivePluginSnapshot[]
   // Why a package on disk produced no plugin at this boot: a manifest that does not parse, an apiVersion
   // mismatch, an id collision, a bundle that threw on import, a wrong default export. The loader has
   // always built these and then printed them to a stdout the packaged app shows to nobody; this is the
@@ -49,7 +51,7 @@ export type PluginsBridge = {
   loadFailures(): readonly PluginLoadFailure[]
   // The client bundle's bytes, hashed at read time. Kept on the bridge rather than done in the route
   // because the file lives under the data root, which the server layer has no handle on.
-  clientBundle(id: string): Promise<{ bytes: Uint8Array<ArrayBuffer>; hash: string } | null>
+  clientBundle(id: string, hash: string): Promise<{ bytes: Uint8Array<ArrayBuffer>; hash: string } | null>
   // The names the owner currently has turned off, which is not derivable from the roster after a
   // restart-pending write: the roster describes the running process.
   disabled(): readonly string[]
@@ -88,6 +90,18 @@ type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false
 const DECLARED_ROW_IS_EXACTLY_THE_WIRE_ROW: Exact<keyof DeclaredRow, keyof InstalledPluginRow> = true
 void DECLARED_ROW_IS_EXACTLY_THE_WIRE_ROW
 
+type RuntimeDeclaration = Omit<InstalledPluginInfo, 'id' | 'hasNode' | 'source' | 'installedAt' | 'bundled'>
+const RUNTIME_DECLARATION_IS_EXACTLY_THE_WIRE_ROW: Exact<keyof RuntimeDeclaration, keyof Omit<PluginRuntimeIdentity, 'activation'>> = true
+void RUNTIME_DECLARATION_IS_EXACTLY_THE_WIRE_ROW
+
+const runtimeFromInstalled = (entry: InstalledPluginInfo): PluginRuntimeIdentity => {
+  const { id: _id, hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...declaration } = entry
+  return {
+    ...declaration,
+    activation: hasNode || declaration.contributions.harnesses.length > 0 ? 'node' : 'client-only',
+  }
+}
+
 // The ceiling on failure text leaving this node. A thrown message can be a whole stack, a Zod dump or
 // whatever a third-party bundle chose to put in an Error; this row is read by a notification row and a
 // settings line, and one sentence is what either can render. Capped here rather than at the two render
@@ -110,12 +124,28 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
   // What this process loaded, at the version it loaded. A package on disk that is absent here, or here at
   // a different version, arrived after the last start; one here but no longer on disk was uninstalled and
   // is still serving. Both are the same answer for the owner: restart.
-  const booted = new Map(bridge.booted().map((entry) => [entry.id, entry.version]))
+  const booted = new Map(bridge.booted().map((entry) => [entry.id, entry]))
+  const activeFor = (id: string): PluginRuntimeIdentity | null => {
+    // A process that booted a node half keeps serving it until restart or successful reload,
+    // even if the replacement package on disk has since become client-only.
+    const serving = booted.get(id)?.identity
+    if (serving) return serving
+    const onDisk = installed.get(id)
+    // A package with no process registrations can take effect immediately. Its declaration and
+    // candidate bundle were read in the same installed scan, and the hash route verifies the bytes.
+    if (onDisk && !pending.has(id) && !loadFailed.has(id)) {
+      const candidate = runtimeFromInstalled(onDisk)
+      if (candidate.activation === 'client-only') return candidate
+    }
+    return null
+  }
   const stale = (id: string): boolean => {
-    const running = booted.get(id)
-    const onDisk = installed.get(id)?.version
+    const running = booted.get(id)?.identity
+    const onDisk = installed.get(id)
     if (!onDisk) return running !== undefined
-    return running !== onDisk
+    const candidate = runtimeFromInstalled(onDisk)
+    if (!running) return candidate.activation === 'node'
+    return JSON.stringify(running) !== JSON.stringify(candidate)
   }
   // Present only for a package that came off disk. A built-in's version is the app's, and it has no
   // manifest and no bundle to distribute, so the whole block is absent rather than filled with nulls.
@@ -133,7 +163,8 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
   // `disabled` is what will be true after a restart; `running` is what is true now. A required plugin is
   // never disabled either way, whatever the file says.
   const rows: NodePluginRow[] = bridge.roster().map((entry) => {
-    const emits = entry.emits ?? installed.get(entry.name)?.emits
+    const active = activeFor(entry.name)
+    const emits = active?.emits ?? entry.emits ?? installed.get(entry.name)?.emits
     return {
       name: entry.name,
       ...(emits?.length ? { emits } : {}),
@@ -143,6 +174,7 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
       // it is running the old code. Either way `running` describes this process, and `state` is what says
       // the disk has moved on.
       running: !entry.disabled,
+      active,
       // The outcome for this boot, passed through untouched, except that a package the disk no longer agrees
       // with outranks it. A failed row still reports `running: true` on purpose (see the note on
       // NodePluginRow), and 'failed' is deliberately not overridden: a restart cannot fix a plugin whose init
@@ -170,7 +202,8 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
     if (known.has(entry.id)) continue
     const off = pending.has(entry.id)
     const failure = loadFailed.get(entry.id)
-    const waiting = entry.hasNode && !off && !failure && booted.get(entry.id) !== entry.version
+    const active = off || failure ? null : activeFor(entry.id)
+    const waiting = runtimeFromInstalled(entry).activation === 'node' && !off && !failure && !active
     rows.push({
       name: entry.id,
       ...(entry.emits?.length ? { emits: entry.emits } : {}),
@@ -179,6 +212,7 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
       // `true` for a failed row, matching what the roster does with a contained plugin: `running` is what
       // `restartRequired` is computed from, and a restart cannot fix a bundle that will not import.
       running: !off && !waiting,
+      active,
       state: off ? 'disabled' : failure ? 'failed' : waiting ? 'pending-restart' : 'active',
       ...(failure && !off ? { stage: 'load' as const, failedAt: failure.at, ...trimReason(failure.reason) } : {}),
       ...declared(entry.id),
@@ -216,6 +250,7 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
       required: false,
       disabled: off,
       running: !off,
+      active: null,
       state: off ? 'disabled' : 'failed',
       ...(off ? {} : { stage: 'load' as const, failedAt: failure.at, ...trimReason(failure.reason) }),
     })
@@ -223,7 +258,8 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
   // A restart is needed exactly where what would run differs from what is running. That covers the toggle
   // in both directions, a plugin just turned off but still serving, one turned back on that has not
   // loaded, and, since phase 5, every way the install directory can disagree with this process.
-  const restartRequired = rows.some((row) => !row.disabled !== row.running || row.state === 'pending-restart')
+  const restartRequired = rows.some((row) =>
+    !row.disabled !== row.running || row.state === 'pending-restart' || (row.active !== null && stale(row.name)))
   // The agent-raised approval queue rides the roster rather than getting a GET of its own: it is read by
   // the same device-only mount, refreshed by the same `plugins:changed` reconcile, and a second route
   // would be a second thing to remember to gate (docs/plugins.md § Approval-mediated install).

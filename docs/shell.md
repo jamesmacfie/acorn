@@ -92,6 +92,19 @@ the same fail-quiet stance `deviceTokenStore.ts` takes and the same blast radius
 The helper opens only this installation's custody root. Its handshake carries the current data key
 and paths; it does not read credentials from another application root.
 
+### Device config file
+
+The helper also owns `<userDataDir>/acorn.json`, a data-only projection of covered device
+preferences and requested device plugin sources. It watches the directory for edits and sends a
+`config-changed` push to the renderer. A read or write crosses the same helper socket as plugin
+custody through `config-read` and `config-write`; `config-location` supplies the path for Settings.
+Settings can ask the native shell to open that file; the shell creates an empty object first when
+the file does not yet exist.
+The helper writes atomically and preserves unknown keys from the last valid file. A parse error
+returns its line and column and leaves the last valid configuration active. The schema is generated
+from `@acorn/protocol/deviceConfig.ts` and committed as
+`packages/plugin-types/acorn-device.schema.json`.
+
 ## Node child
 
 The helper starts the staged `service.js` under the runtime it is itself running, the bundled Node:
@@ -350,8 +363,7 @@ than a fall-through to the client root — a Worker handed the shell's `index.ht
 failure to debug.
 
 The bytes are identical to what the frame origin serves as `/client.js`, and so is the trust decision:
-the owner accepted a bundle hash, and a worker is that hash with a different host. Nothing about the
-worker path asks a second question.
+the owner accepted the exact `(pluginId, hash)` pair. The worker path asks no second question.
 
 Its policy is its own, for the reason the highlighter's is (above): a same-origin worker takes its CSP
 from its own script's response headers. `PLUGIN_WORKER_CSP` is
@@ -362,13 +374,21 @@ WebSocket and `sendBeacon` all fail inside the worker, so the transferred `Messa
 out of it. The document's `worker-src` names `'self' blob:` and never the plugin scheme.
 
 The renderer's half is `packages/client-core/src/host/tree/`: `workerHost.ts` owns one worker per
-bundle hash, shared by every tree that bundle draws and stopped a grace period after the last one
-unmounts; `TreeHost.tsx` validates and applies each batch and is the only thing that turns a handler id
-into a function. A worker that misses two heartbeats is terminated and every tree it served is removed
-from the UI. The failure remains in the plugin diagnostics instead of replacing the contribution with
-an inline error.
+accepted `(pluginId, hash)`, shared by that identity's trees and stopped a grace period after the last
+unmount. Each mounted tree has a distinct slot and scoped bridge port, including its own focus,
+document, and selection context. `TreeHost.tsx` validates and applies each batch and is the only thing
+that turns a handler id into a function. A worker that misses two heartbeats is terminated and every
+tree it served is removed from the UI. The failure remains in the plugin diagnostics instead of
+replacing the contribution with an inline error.
 
 ### The renderer bridge
+
+The `plugins` group exposes `plugins-install` and `plugins-remove` beside state, cache put, trust
+recording, and development grants. The helper validates the source, reads the manifest, hashes the
+bundle, and returns metadata; no executable bytes cross into the renderer over this bridge.
+`plugins-state` includes source provenance, the source label, and the validated device manifest so
+the client can re-check admission. A host that omits either install or remove fails platform contract
+validation.
 
 `apps/desktop/src/shell/bridge.ts` is built as one IIFE and injected as the window's initialization
 script, which runs before any page script. It assembles the narrow, validated `window.acorn` surface

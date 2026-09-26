@@ -41,7 +41,7 @@ describe('scoped lifecycle eviction', () => {
     setEditorTreeDirectoryOpen(taskId, 'src', true)
     const diffScope = { taskId, routeKey: 'oak/acorn#42' }
     rememberDiffScroll(diffScope, {
-      top: 4_800,
+      place: { at: 'row', key: 's:src/a.ts:0', path: 'src/a.ts', index: 1, fixed: 4_800 },
       left: 0,
       viewMode: 'unified',
       filesSignature: 'src/a.ts:sha',

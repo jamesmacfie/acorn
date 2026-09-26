@@ -14,11 +14,14 @@ compose their own experience — dashboards, plugins, plugins talking to each ot
 authors get developer experience good enough that building a quality acorn plugin is an afternoon,
 not a week.
 
+Device-held client-only bundles are a separate provenance for this installer. They do not change
+the signing or discovery work assessed here.
+
 ## Where this stands (2026-08-16)
 
 Much of the original assessment has shipped. The agent-authored dev loop is real: the authoring
 contract is `docs/plugin-authoring.md`; a loaded plugin hot-reloads in place
-(`POST /v2/core/plugins/:id/reload`, candidate-then-commit, a `plugins:changed` event the client
+(`POST /v1/core/plugins/:id/reload`, candidate-then-commit, a `plugins:changed` event the client
 re-syncs on); the agent raises installs through an approval-mediated tool and iterates under a
 per-(plugin, node) dev grant; plugin themes, declarative chrome, context menus, cooperative
 extension points and exclusive slots are manifest vocabulary (`docs/plugins.md`,

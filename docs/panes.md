@@ -63,6 +63,14 @@ The layout reducer owns show/add, close/unpin, pin, move, resize, equalize, maxi
 replacement. Pinned panes survive a switcher selection; a normal selection focuses the target. Closing
 the last unpinned pane falls back to the PR pane when one is available.
 
+The pane switcher is the `pane.switcher` exclusive slot. Core registers the default provider; a
+selected client plugin may replace its rendering. The host passes available panes, labels, icons,
+visibility, pinning, shortcuts, task identity, and maximized state through
+`@acorn/protocol/paneSwitcher.ts`. The provider invokes host verbs for show, add, close, pin,
+maximize, and equalize. The provider owns no layout row or keyboard listener. A missing, disabled,
+untrusted, incompatible, or failed provider falls back to core. Three rendering failures disable
+that provider for the session until plugin state is synchronized again.
+
 Widths are clamped to pane minimums and normalized on load. Unknown IDs become placeholders so a
 disabled plugin or a stale layout cannot crash the task view. Maximize/focus is session UI state and
 does not rewrite the durable row.

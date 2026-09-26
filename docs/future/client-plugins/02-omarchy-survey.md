@@ -70,7 +70,7 @@ injects; there is no plugin-facing theme contract.
 | `shell.json` | Settings UI over `localStorage` (`persistence/devicePrefs.ts`); no client config file | **Gap, deferred.** [06-user-config.md](./06-user-config.md). |
 | `when:` / `action:` bash in menu config | none, and none wanted | Refused. [refused.md](./refused.md). |
 | starts disabled, updates show a diff | per-device `(plugin, hash)` consent, a diff over stable grant keys, three tiers never merged | acorn's is better. |
-| hot reload on save | dev grant per `(plugin, node)` auto-accepts new hashes; `POST /v2/core/plugins/:id/reload` for the node half | Covered for node plugins. A device plugin needs the same dev grant keyed on the device; phase 0 does that. |
+| hot reload on save | dev grant per `(plugin, node)` auto-accepts new hashes; `POST /v1/core/plugins/:id/reload` for the node half | Covered for node plugins. A device plugin needs the same dev grant keyed on the device; phase 0 does that. |
 | `summon` from outside the shell | none | Small gap. A command id is the right unit; a CLI or URL that runs one is a later single-file design, not part of this folder. |
 | theming for plugins | `contributions.themes` as validated token data, generated CSS, namespaced ids | acorn's exists and Omarchy's does not. Style packs are the remaining axis; [05-appearance-and-icons.md](./05-appearance-and-icons.md). |
 | icons | `brand:` marks as one SVG `d` in a 24-box; Lucide by name; no replacement | Parked. The door is in 05. |

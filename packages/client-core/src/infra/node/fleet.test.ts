@@ -10,6 +10,7 @@ vi.mock('idb-keyval', () => idb)
 const { _resetFleet, cacheKeyFor, clientFor, dropNode, homeNodeId, nodeState, nodes, refreshFleet } =
   await import('./fleet')
 const { activeCacheId, activeNodeId, nodeReadiness, selectActiveNode, setActiveNode } = await import('./activeNode')
+const { segmentCacheFor } = await import('../../features/diff/segmentCache')
 
 const record = (nodeId: string, local = false): NodeRecord => ({
   nodeId,
@@ -166,5 +167,19 @@ describe('dropNode', () => {
     expect(nodeState('remote')).toBe('offline')
     // A fresh client, not the cleared one: the removed node's cache is gone, not reusable.
     expect(clientFor('remote').client).not.toBe(client)
+  })
+
+  it('clears the node\'s resident diff segments with it, and no other node\'s', () => {
+    const plain = [{ kind: 'hunk' as const, text: '@@ -1 +1 @@' }]
+    const gone = segmentCacheFor(clientFor('remote').client)
+    const kept = segmentCacheFor(clientFor('other').client)
+    gone.insert([{ key: 'same-key', path: 'a.ts', patchKey: 'p', plain }])
+    kept.insert([{ key: 'same-key', path: 'a.ts', patchKey: 'p', plain }])
+
+    dropNode('remote')
+
+    expect(gone.stats().segments).toBe(0)
+    expect(segmentCacheFor(clientFor('remote').client).has('same-key')).toBe(false)
+    expect(kept.has('same-key')).toBe(true)
   })
 })

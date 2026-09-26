@@ -12,13 +12,14 @@ import type { AgentSession, AgentSessionSnapshot } from '../../contract/wire.ts'
 // file holds, because it is invisible to every other test and to tsc.
 
 vi.mock('@tanstack/solid-query', () => ({
-  createQuery: () => ({ data: undefined }),
+  createQuery: () => ({ data: [{ id: 't1', title: 'Parent task' }, { id: 't2', title: 'Child task' }] }),
   useQueryClient: () => ({ setQueryData: () => {} }),
 }))
+vi.mock('@solidjs/router', () => ({ useNavigate: () => () => {} }))
 
 // The composer walks a worktree and the queue reads a concurrency route; neither is what this asks
 // about, and both would need a node.
-vi.mock('../composer/AgentComposer', () => ({ default: () => null }))
+vi.mock('../composer/AgentComposer', () => ({ default: () => <textarea aria-label="Prompt" /> }))
 vi.mock('../composer/QueuedAgentTurns', () => ({ default: () => null }))
 vi.mock('./AgentEventCard', () => ({ default: () => null }))
 
@@ -57,10 +58,12 @@ const snapshot = {
   requests: [],
 } as unknown as AgentSessionSnapshot
 
+let listedSessions: AgentSession[] = [session]
+let listedDelegations: unknown[] = []
 vi.mock('./managedClient', () => ({
   managedAgentApi: {
     snapshot: async () => snapshot,
-    sessions: async () => ({ sessions: [session], delegations: [], nextCursor: null }),
+    sessions: async () => ({ sessions: listedSessions, delegations: listedDelegations, nextCursor: null }),
   },
 }))
 vi.mock('./wsChannel', () => ({ wsOnAgentFrame: () => () => {} }))
@@ -77,6 +80,8 @@ const hosts: Array<() => void> = []
 afterEach(() => {
   for (const teardown of hosts.splice(0).reverse()) teardown()
   managedAgentStore.clear()
+  listedSessions = [session]
+  listedDelegations = []
 })
 
 const draw = () => {
@@ -98,5 +103,29 @@ describe('the conversation in a pane region', () => {
     const scroller = host.querySelector('.ui-timeline-scroll')
     expect(scroller).not.toBeNull()
     expect(scroller?.parentElement).toBe(host)
+  })
+
+  it('keeps the composer node, focus, draft and selection while a child changes', async () => {
+    const child = { ...session, id: 'child', taskId: 't2', title: 'Child', kind: 'delegated' as const,
+      runtimeState: 'working' as const }
+    listedSessions = [session, child]
+    listedDelegations = [{ sessionId: child.id, depth: 1, isolation: 'shared',
+      owner: { kind: 'managed', parentSessionId: SESSION } }]
+    managedAgentStore.upsertSession(session)
+    const host = draw()
+    await managedAgentStore.loadSnapshot(SESSION)
+    await managedAgentStore.loadAll()
+    const composer = host.querySelector('textarea[aria-label="Prompt"]') as HTMLTextAreaElement
+    composer.value = 'Keep this draft'
+    composer.focus()
+    composer.setSelectionRange(5, 9)
+
+    managedAgentStore.upsertSession({ ...child, runtimeState: 'waiting', attention: 'permission' })
+    await Promise.resolve()
+    expect(host.textContent).toContain('Child')
+    expect(host.querySelector('textarea[aria-label="Prompt"]')).toBe(composer)
+    expect(document.activeElement).toBe(composer)
+    expect(composer.value).toBe('Keep this draft')
+    expect([composer.selectionStart, composer.selectionEnd]).toEqual([5, 9])
   })
 })

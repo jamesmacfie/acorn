@@ -4,6 +4,12 @@ import { setActiveNode } from '@acorn/plugin-api/testkit/client'
 import { addSession, clearSessions, refreshSessions, sessionNode, sessions } from './sessionStore'
 import type { TerminalSession } from '../contract/wire'
 
+// This suite supplies a running terminal service; its subject is the session roster lifecycle.
+vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@acorn/plugin-api/client')>(),
+  hasHostCapability: () => true,
+}))
+
 const row = (id: string): TerminalSession => ({
   id, taskId: 'task', title: 'Agent', kind: 'agent', profileId: 'codex', backend: 'node-pty',
   status: 'running', idle: false, agentState: 'working', isWorktree: true,

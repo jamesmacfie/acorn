@@ -169,6 +169,7 @@ const RULES: readonly RouteRule[] = [
   { path: shape(`/v1/core/devices/${SEG}`), scopes: {} },
   { path: shape('/v1/core/plugins'), scopes: {}, note: 'Which code a device runs is an owner decision, not a plugin one.' },
   { path: shape(`/v1/core/plugins/${SEG}/client.js`), scopes: {}, note: 'Another plugin’s bundle bytes.' },
+  { path: shape(`/v1/core/plugins/${SEG}/bundles/${SEG}`), scopes: {}, note: 'Another plugin’s bundle bytes.' },
   // Permanently unmapped, and the sharpest case in this table. A frame that could reach these would let
   // a sandboxed plugin fetch and install arbitrary code that runs unsandboxed inside the node. Every
   // other line here would stop mattering (docs/security.md).

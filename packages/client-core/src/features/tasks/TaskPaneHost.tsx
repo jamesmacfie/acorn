@@ -1,4 +1,5 @@
 import { For, Show, type JSX } from 'solid-js'
+import type { PaneSwitcherProps } from '@acorn/protocol/paneSwitcher.ts'
 import type { Task } from '../../infra/queries'
 import { paneAvailable, paneContribution, paneContributions, paneRegistry, type PaneContribution, type PaneId } from '../../host/registries/panes/panes'
 import { activeNodeId } from '../../infra/node/activeNode'
@@ -11,13 +12,17 @@ import { ContributionBoundary } from '../../kit/components/content/ContributionB
 // The linter cannot see that use, hence the suppression.
 // eslint-disable-next-line no-unused-vars -- used by the `use:paneFocus` directive on the pane element.
 import { paneFocus } from './paneFocus'
-import { dispatchLayout, layoutForTask, maximizedPane } from './tasks'
+import { dispatchLayout, layoutForTask, maximizedPane, setMaximizedPane } from './tasks'
 import { defaultLayout, type LayoutAction } from './taskLayout'
 import { formatChord } from './paneShortcuts'
 import { Button, EmptyState } from '../../kit/components/primitives'
 import { RailTab } from '../tabs/RailTab'
-import { markersFor } from '../../host/registries/rail/railMarkerFeed'
 import { createSplitDrag } from '../../kit/lib/split'
+import PaneSwitcher from './PaneSwitcher'
+import ExclusiveSlotHost from '../../host/plugins/ExclusiveSlotHost'
+import { registerCoreExclusiveSlot } from '../../host/registries/extensionPoints/exclusiveSlots'
+
+registerCoreExclusiveSlot('pane.switcher', (props) => <PaneSwitcher {...(props.value as PaneSwitcherProps)} />)
 
 export default function TaskPaneHost(props: {
   task: Task
@@ -45,10 +50,28 @@ export default function TaskPaneHost(props: {
     const maximized = maximizedPane(props.task.id)
     return maximized ? panes.filter((pane) => pane.id === maximized) : panes
   }
-  const showsPane = (id: PaneId) => layout().panes.includes(id)
   const isPinned = (id: PaneId) => layout().pinned?.includes(id) ?? false
-  const onSwitch = (pane: PaneId, event: MouseEvent) =>
-    dispatch(event.metaKey || event.ctrlKey ? { type: 'add', pane } : { type: 'show', pane })
+  const switcherProps = (): PaneSwitcherProps => ({
+    panes: switcherPanes().map((pane) => ({
+      id: pane.id,
+      label: pane.label,
+      description: pane.description,
+      icon: pane.glyph,
+      shown: layout().panes.includes(pane.id),
+      pinned: isPinned(pane.id),
+      shortcut: props.shortcutFor?.(`pane.show.${pane.id}`)
+        ? formatChord(props.shortcutFor(`pane.show.${pane.id}`)!)
+        : pane.defaultChord ? formatChord(pane.defaultChord) : undefined,
+    })),
+    task: { id: props.task.id, title: props.task.title, projectId: props.task.projectId },
+    maximized: maximizedPane(props.task.id) ?? null,
+    show: (id) => dispatch({ type: 'show', pane: id }),
+    add: (id) => dispatch({ type: 'add', pane: id }),
+    close: (id) => dispatch({ type: 'close', pane: id }),
+    pin: (id) => dispatch({ type: 'pin', pane: id }),
+    toggleMaximize: (id) => setMaximizedPane(props.task.id, maximizedPane(props.task.id) === id ? null : id),
+    equalize: () => dispatch({ type: 'equalize' }),
+  })
 
   // Hidden while everything is fine, so a healthy node adds no noise to a pane header. One value
   // for the whole task view, because it reports the node's state rather than a per-pane query
@@ -165,20 +188,7 @@ export default function TaskPaneHost(props: {
       </div>
 
       <nav class="pane-switcher" aria-label="Task panes">
-        <For each={switcherPanes()}>
-          {(pane) => (
-            <RailTab
-              label={pane.label}
-              glyph={pane.glyph}
-              active={showsPane(pane.id)}
-              markers={markersFor({ kind: 'pane', id: pane.id, taskId: props.task.id })}
-              data-tip-key={props.shortcutFor?.(`pane.show.${pane.id}`) ? formatChord(props.shortcutFor(`pane.show.${pane.id}`)!) : pane.defaultChord ? formatChord(pane.defaultChord) : undefined}
-              data-tip-sub={`${pane.description ?? pane.label} · ⌘-click to open beside`}
-              aria-pressed={showsPane(pane.id)}
-              onClick={(event) => onSwitch(pane.id, event)}
-            />
-          )}
-        </For>
+        <ExclusiveSlotHost slot="pane.switcher" value={switcherProps()} />
         {props.extraButtons}
         {/* Whole-control busy rather than a marker: while the teardown runs there is no close
             action left to offer, so the glyph itself becomes the spinner. RailTab keeps it hoverable

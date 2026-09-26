@@ -23,11 +23,9 @@ import { createSlotChoice } from './slotChoice'
 // Neither plugin sees the other's nodes. The contributor's code has exactly the permissions its own
 // manifest declared: sitting inside somebody else's pane grants it nothing of theirs.
 //
-// Slots are one level, and nothing here enforces it because nothing has to: a contributor's tree is a
-// stream of kit node names (@acorn/protocol/tree/nodes.ts), `Slot` is not one of them, and so a grafted
-// subtree has no way to open a slot of its own. See docs/security.md § Rung 0 — The client sandbox for why nesting was
-// refused rather than left to a runtime guard — it turns "who draws this" into a graph nobody can
-// answer at trust time.
+// Cooperative slots remain one level. The special `Slot` tree node for replaceable chrome is outside
+// KIT_NODES and needs a host-minted reference; a cooperative contributor receives no such reference.
+// The chrome host clears that reference before mounting the child. See docs/security.md § Rung 0.
 
 export type SlotProps = {
   /** `<owner>:<point>`, the id the host minted from the owner's manifest. */

@@ -5,6 +5,8 @@ import { paneRegistry, type PaneContribution } from '../../host/registries/panes
 import type { Disposable } from '../../kit/lib/registry'
 import TaskPaneHost from './TaskPaneHost'
 
+vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))
+
 // The busiest host in the shell: it decides which panes a task shows, drops the ones this task or
 // this environment cannot offer, and contains a pane that throws. The layout reducer has its own unit
 // tests; what a render adds is that the reducer's answer reaches the screen, and that the fallbacks

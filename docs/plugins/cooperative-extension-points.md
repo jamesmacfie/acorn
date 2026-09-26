@@ -230,8 +230,9 @@ A contributor names the point, the entry its bundle registered with `mountTree`,
 
 The host grafts the contributor's subtree at the slot node. Neither plugin sees the other's nodes, and
 the contributor's code has exactly the permissions its own manifest declares — sitting inside A's pane
-grants it nothing of A's. **One level only**: a contributor's tree is a stream of kit node names, and
-`Slot` is not one of them, so a grafted subtree has no way to open a slot of its own.
+grants it nothing of A's. **One level only**: a contributor receives no host-minted chrome slot
+reference, so a grafted subtree cannot open a slot of its own. The `Slot` tree node used by rail and
+topbar replacements accepts only that opaque reference and is outside the general kit vocabulary.
 
 **The first-party remote points, and what each hands over.** Props are the owner's own data in the
 owner's own words, which is why no two of these agree on a shape:

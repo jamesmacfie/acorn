@@ -17,6 +17,10 @@ import { suppliedRemoteTree } from '../tree/table'
 import { projectImporterRegistry } from '../registries/sources/projectImporters'
 import { projectSurfaceRegistry } from '../registries/panes/projectSurfaces'
 import { clearExclusiveSlotFailures, exclusiveSlotRegistry } from '../registries/extensionPoints/exclusiveSlots'
+import type { PaneSwitcherProps } from '@acorn/protocol/paneSwitcher.ts'
+import { PANE_SWITCHER_ACTIONS, paneSwitcherRemote } from '../plugins/paneSwitcherRemote'
+import type { RailProps, TopbarProps } from '@acorn/protocol/chrome.ts'
+import { RAIL_ACTIONS, TOPBAR_ACTIONS, railRemote, topbarRemote } from '../plugins/chromeRemote'
 import { refPanelRegistry } from '../registries/panes/refPanels'
 import type { Disposable } from '../../kit/lib/registry'
 import { settingsRegistry } from '../registries/shell/settings'
@@ -427,6 +431,57 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         throw new Error(`coreSlot surface '${surface.id}' names an unknown core surface '${surface.coreSlot}'`)
       }
       const slot = surface.coreSlot
+      if (slot === 'pane.switcher') {
+        const tree = singleRegionTree(surface)
+        if (!tree) throw new Error(`pane switcher '${surface.id}' needs a remote-tree region`)
+        return own(exclusiveSlotRegistry, {
+          id: `plugin:${pluginId}:${surface.id}`,
+          pluginId,
+          slot,
+          label: surface.label,
+          when: () => pluginEnabledOnNode(frameNode(), pluginId),
+          component: (props) => {
+            const value = () => props.value as PaneSwitcherProps
+            return createComponent(RemoteTree, {
+              contribution: tree,
+              props: () => paneSwitcherRemote(value()).data,
+              actions: () => paneSwitcherRemote(value()).actions,
+              declaredActions: () => PANE_SWITCHER_ACTIONS,
+              scope: () => ({ taskId: value().task.id, projectId: value().task.projectId }),
+            })
+          },
+        })
+      }
+      if (slot === 'rail' || slot === 'topbar') {
+        const tree = singleRegionTree(surface)
+        if (!tree) throw new Error(`${slot} surface '${surface.id}' needs a remote-tree region`)
+        return own(exclusiveSlotRegistry, {
+          id: `plugin:${pluginId}:${surface.id}`,
+          pluginId,
+          slot,
+          label: surface.label,
+          placesNestedSlot: surface.placesSlots?.includes(slot === 'rail' ? 'rail.taskList' : 'topbar.right') ?? false,
+          when: () => pluginEnabledOnNode(frameNode(), pluginId),
+          component: (props) => {
+            if (slot === 'rail') {
+              const value = () => props.value as RailProps
+              return createComponent(RemoteTree, {
+                contribution: tree,
+                props: () => railRemote(value()).data,
+                actions: () => railRemote(value()).actions,
+                declaredActions: () => RAIL_ACTIONS,
+              })
+            }
+            const value = () => props.value as TopbarProps
+            return createComponent(RemoteTree, {
+              contribution: tree,
+              props: () => topbarRemote(value()).data,
+              actions: () => topbarRemote(value()).actions,
+              declaredActions: () => TOPBAR_ACTIONS,
+            })
+          },
+        })
+      }
       return own(exclusiveSlotRegistry, {
         id: `plugin:${pluginId}:${surface.id}`,
         pluginId,
@@ -534,6 +589,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         label: surface.label,
         group: surface.group ?? 'general',
         order: surface.order,
+        requires: { loadedPlugin: pluginId },
         component: () => settingsTree
           ? createComponent(RemoteTree, { contribution: settingsTree, props: () => ({}) })
           : createComponent(PluginFrame, { binding: frameBindingFor(pluginId, surface, row), hash }),
@@ -544,6 +600,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         id: surface.id,
         label: surface.label,
         glyph: surface.glyph,
+        requires: { loadedPlugin: pluginId },
         component: (props) => createComponent(PluginFrame, {
           binding: frameBindingFor(pluginId, surface, row),
           hash,
@@ -561,12 +618,10 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
 /**
 /**
  * Register every accepted plugin's declared surfaces. Idempotent: called after the distribution pass and
- * again when a trust decision lands, and each call replaces what the previous one contributed. Not called
- * on a node switch, and doesn't need to be, since nothing registered here holds a node id.
+ * again when a trust decision or active node changes. Each call replaces the previous registrations.
  */
 export function syncFrameContributions(): void {
-  // Still gated on the distribution pass having run: a frame mounts bytes, and until one bundle has won
-  // per plugin id there's nothing to mount. The chrome pass has no such gate.
+  // A frame mounts bytes, so wait until the distribution pass has selected this node's runtime.
   if (!activeBundles()) return
 
   for (const disposables of registered.values()) for (const disposable of disposables.reverse()) disposable.dispose()
@@ -581,9 +636,8 @@ export function syncFrameContributions(): void {
   // Driven by the roster rather than the bundle map, because not every surface needs a bundle: a document
   // surface is host-drawn and executes nothing, so the loop has to reach a plugin with no client half.
   //
-  // Trust binds to bytes, and ../contributions.ts decided which bytes: the resolved winner's, never a
-  // hash a roster row merely claims. An untrusted row is kept here rather than dropped the way the chrome
-  // pass drops it, because acceptance withholds only the code-bearing surfaces.
+  // Trust binds to bytes, and ../contributions.ts selects the active node's runtime hash. An untrusted
+  // row stays here because acceptance withholds code-bearing surfaces, not host-drawn descriptors.
   //
   // A package with no client half is `trusted: false` for the same reason, and that's load-bearing: its
   // webview surfaces would otherwise mount external web content with no prompt ever firing, because the

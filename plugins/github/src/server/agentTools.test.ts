@@ -95,12 +95,12 @@ describe('the pull-request read tools', () => {
 
   it('groups inline comments into their threads and leaves resolved ones out by default', async () => {
     await testDb.db.insert(reviewThreads).values([
-      { userId: USER, repoId: 1, number: 7, threadId: 't1', id: 'c1', path: 'src/a.ts', line: 10, side: 'RIGHT', resolved: false, author: 'reviewer', body: 'rename this', createdAt: 2 },
-      { userId: USER, repoId: 1, number: 7, threadId: 't1', id: 'c2', path: 'src/a.ts', line: 10, side: 'RIGHT', resolved: false, author: 'author', body: 'done', createdAt: 3 },
-      { userId: USER, repoId: 1, number: 7, threadId: 't2', id: 'c3', path: 'src/b.ts', line: 4, side: 'RIGHT', resolved: true, author: 'reviewer', body: 'settled', createdAt: 1 },
+      { userId: USER, repoId: 1, number: 7, threadId: 't1', id: 'c1', path: 'src/a.ts', line: 10, side: 'RIGHT', resolved: false, author: 'reviewer', body: 'rename this', createdAt: 2, position: 0 },
+      { userId: USER, repoId: 1, number: 7, threadId: 't1', id: 'c2', path: 'src/a.ts', line: 10, side: 'RIGHT', resolved: false, author: 'author', body: 'done', createdAt: 3, position: 1 },
+      { userId: USER, repoId: 1, number: 7, threadId: 't2', id: 'c3', path: 'src/b.ts', line: 4, side: 'RIGHT', resolved: true, author: 'reviewer', body: 'settled', createdAt: 1, position: 2 },
     ])
-    await testDb.db.insert(reviews).values({ userId: USER, repoId: 1, number: 7, id: 'r1', author: 'reviewer', state: 'CHANGES_REQUESTED', body: 'one thing', submittedAt: 4 })
-    await testDb.db.insert(comments).values({ userId: USER, repoId: 1, number: 7, id: 'g1', author: 'bot', body: 'deployed', createdAt: 5 })
+    await testDb.db.insert(reviews).values({ userId: USER, repoId: 1, number: 7, id: 'r1', author: 'reviewer', state: 'CHANGES_REQUESTED', body: 'one thing', submittedAt: 4, position: 0 })
+    await testDb.db.insert(comments).values({ userId: USER, repoId: 1, number: 7, id: 'g1', author: 'bot', body: 'deployed', createdAt: 5, position: 0 })
 
     const open = await tools().reviewComments.handler({}, { taskId: 'task-1', userLogin: USER }) as {
       number: number
@@ -123,9 +123,9 @@ describe('the pull-request read tools', () => {
 
   it('calls out the failing checks and treats a check with no status as still running', async () => {
     await testDb.db.insert(checks).values([
-      { userId: USER, repoId: 1, number: 7, name: 'lint', status: 'success', url: null, runId: null },
-      { userId: USER, repoId: 1, number: 7, name: 'test', status: 'failure', url: 'https://example.com/run', runId: 42 },
-      { userId: USER, repoId: 1, number: 7, name: 'deploy', status: null, url: null, runId: null },
+      { userId: USER, repoId: 1, number: 7, name: 'lint', status: 'success', url: null, runId: null, position: 0 },
+      { userId: USER, repoId: 1, number: 7, name: 'test', status: 'failure', url: 'https://example.com/run', runId: 42, position: 1 },
+      { userId: USER, repoId: 1, number: 7, name: 'deploy', status: null, url: null, runId: null, position: 2 },
     ])
 
     const result = await tools().checks.handler({}, { taskId: 'task-1', userLogin: USER }) as { number: number; checks: { name: string }[]; failing: string[] }

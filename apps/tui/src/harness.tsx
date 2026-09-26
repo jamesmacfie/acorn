@@ -49,6 +49,15 @@ export async function bootFixture(): Promise<{ task: typeof TASK }> {
   }
   const { selectActiveNode } = await import('@acorn/client-core/infra/node/activeNode.ts')
   await selectActiveNode()
+  // Production loads the trust dialog after the first frame. The fixture has no main.tsx boot pass,
+  // so supply that deferred component before rendering a test that queues trust.
+  const [{ TrustPrompt }, { setTrustPromptComponent }] = await Promise.all([
+    import('./plugins/TrustPrompt'),
+    import('./plugins/trustPromptLoader'),
+  ])
+  setTrustPromptComponent(() => TrustPrompt)
+  const { refreshNodePlugins } = await import('@acorn/client-core/infra/node')
+  await refreshNodePlugins('node-1')
   return { task: TASK }
 }
 

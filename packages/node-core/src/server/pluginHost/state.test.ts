@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { InstalledPluginInfo, PluginLoadFailure } from '../plugins/loader'
+import type { ActivePluginSnapshot, InstalledPluginInfo, PluginLoadFailure } from '../plugins/loader'
 import type { PluginRosterEntry } from './host'
 import { pluginState, type PluginsBridge } from './state'
 
@@ -9,7 +9,7 @@ import { pluginState, type PluginsBridge } from './state'
 const NO_PERMISSIONS = { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } }
 const NO_CONTRIBUTIONS = {
   frames: [], remote: [], sources: [], slots: [], commands: [], keybindings: [],
-  attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [],
+  attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [],
   contextMenus: [], extensionPoints: [], extensions: [],
   schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [],
 }
@@ -24,6 +24,10 @@ const installed = (id: string, over: Partial<InstalledPluginInfo> = {}): Install
   hasNode: true,
   ...over,
 })
+const activeSnapshot = (id: string, version: string): ActivePluginSnapshot => {
+  const { id: _id, hasNode: _hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...identity } = installed(id, { version })
+  return { id, identity: { ...identity, activation: 'node' }, bundle: null }
+}
 
 type Situation = {
   roster?: PluginRosterEntry[]
@@ -45,7 +49,8 @@ const bridge = (situation: Situation): PluginsBridge => {
     installed: () => onDisk,
     // The steady state is "what is on disk is what booted"; a test says otherwise only when it is
     // about the gap between the two.
-    booted: () => situation.booted ?? onDisk.map((entry) => ({ id: entry.id, version: entry.version })),
+    booted: () => (situation.booted ?? onDisk.map((entry) => ({ id: entry.id, version: entry.version })))
+      .map((entry) => activeSnapshot(entry.id, entry.version)),
     disabled: () => situation.disabled ?? [],
     loadFailures: () => (situation.loadFailures ?? []).map((failure) => ({ ...failure, at: FAILED_AT })),
     clientBundle: async () => null,
@@ -99,6 +104,8 @@ describe('pluginState', () => {
       }),
     )
     expect(row(result, 'ntfy')?.state).toBe('pending-restart')
+    expect(row(result, 'ntfy')?.active).toMatchObject({ version: '1.0.0', client: { hash: 'a'.repeat(64) } })
+    expect(row(result, 'ntfy')?.installed?.version).toBe('2.0.0')
     expect(result.restartRequired).toBe(true)
   })
 
@@ -110,8 +117,11 @@ describe('pluginState', () => {
         booted: [{ id: 'ntfy', version: '1.0.0' }],
       }),
     )
-    // A restart cannot fix a plugin whose init throws, so it must not raise the banner.
+    // A failed reload leaves the old runtime serving, while the newer disk candidate will be tried
+    // at restart. The failure remains visible beside the honest restart requirement.
     expect(row(result, 'ntfy')?.state).toBe('failed')
+    expect(row(result, 'ntfy')?.active?.version).toBe('1.0.0')
+    expect(result.restartRequired).toBe(true)
   })
 
   it('adds a just-installed package the host never saw, waiting on a restart', () => {
@@ -235,5 +245,15 @@ describe('pluginState', () => {
     const result = pluginState(bridge({ installed: [installed('theme', { hasNode: false })], booted: [] }))
     expect(row(result, 'theme')).toMatchObject({ running: true, state: 'active' })
     expect(result.restartRequired).toBe(false)
+  })
+
+  it('keeps a serving node half authoritative when its disk replacement is client-only', () => {
+    const result = pluginState(bridge({
+      roster: [{ name: 'theme', required: false, disabled: false, state: 'active' }],
+      installed: [installed('theme', { version: '2.0.0', hasNode: false })],
+      booted: [{ id: 'theme', version: '1.0.0' }],
+    }))
+    expect(row(result, 'theme')).toMatchObject({ state: 'pending-restart', active: { version: '1.0.0', activation: 'node' }, installed: { version: '2.0.0' } })
+    expect(result.restartRequired).toBe(true)
   })
 })

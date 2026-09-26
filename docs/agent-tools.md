@@ -288,6 +288,9 @@ A managed owner does not have to stay in its turn to wait. When a turn it gave a
 Agents plugin queues one `delegation_report` turn on the owner with the child's final message, and
 withdraws it if the owner reads that result with `agent_read` first. See
 [managed-agents.md](./managed-agents.md#reports-back-to-the-owner).
+If a delegated turn pauses on a permission, question, or elicitation request, the owner receives an
+informational report. A human opens the child session and resolves the request there; these tools do
+not approve or answer child requests.
 
 ## Context sections
 

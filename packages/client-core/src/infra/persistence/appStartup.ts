@@ -5,6 +5,7 @@ import type { Project } from '../queries'
 // Also the module that seeds the built-in twelve into the theme registry, which is what makes
 // `resolveTheme` able to answer at all before Settings → Appearance has ever been opened.
 import { resolveTheme } from '../../features/settings/builtInThemes'
+import { resolveStyle } from '../../features/settings/uiStyles'
 import { PrefKeys } from './prefKeys'
 import { persistedStateRegistry, type PersistedStateSlice } from './persistedState'
 import { lastWorkspaceSlice } from './stateSlices'
@@ -36,7 +37,7 @@ function applyTheme(prefs: Readonly<Record<string, string>>): () => void {
 // (colour). No disposer and no media listener: unlike light/dark there is no OS signal to follow.
 // 'terminal' is the attribute-less :root default, so this only ever writes a non-default pack.
 function applyStyle(prefs: Readonly<Record<string, string>>): void {
-  document.documentElement.dataset.style = prefs[PrefKeys.style] ?? 'terminal'
+  document.documentElement.dataset.style = resolveStyle(prefs[PrefKeys.style])
 }
 
 export type AppStartupOptions = {

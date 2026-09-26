@@ -2,11 +2,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PLUGIN_API_MAJOR, type NodePluginPermissions, type NodePluginRow, type PluginContributions } from '@acorn/protocol/api.ts'
 import type { PluginAckRecord } from '../../infra/platform'
 
-const recordPluginTrust = vi.fn(async (..._args: unknown[]) => undefined)
+let hostAcks: PluginAckRecord[] = []
+const recordPluginTrust = vi.fn(async (decision: unknown) => {
+  hostAcks.push({ ...(decision as PluginAckRecord), decidedAt: Date.now() })
+})
 vi.mock('../plugins/host', () => ({
-  recordPluginTrust: (...args: unknown[]) => recordPluginTrust(...args),
+  recordPluginTrust: (decision: unknown) => recordPluginTrust(decision),
   pluginHostAvailable: () => true,
-  readPluginHostState: async () => ({ cached: {}, acks: [] }),
+  readPluginHostState: async () => ({ cached: { ['a'.repeat(64)]: { pluginId: 'board', version: '2.0.0', bytes: 12 } }, acks: hostAcks, devGrants: [] }),
   cachePluginBundle: async () => ({ error: 'unreachable' }),
 }))
 
@@ -15,7 +18,7 @@ vi.mock('../plugins/syncContributions', () => ({ syncPluginContributions: () => 
 
 vi.mock('../../infra/node/apiClient', () => ({ readJson: vi.fn(), sendRaw: vi.fn(), writeJson: vi.fn() }))
 
-const { bundleAccepted, pendingTrust, _resetPluginDistribution, _seedPendingTrust } = await import('../plugins/distribution')
+const { bundleAccepted, pendingTrust, onPluginDistributionCommit, _resetPluginDistribution, _seedPluginDistribution, _seedPendingTrust } = await import('../plugins/distribution')
 const { recordTrustDecision, trustTiers } = await import('./trustModel')
 
 // What the trust prompt says, and what answering it does (PluginTrustDialog.tsx draws it).
@@ -25,6 +28,13 @@ const { recordTrustDecision, trustTiers } = await import('./trustModel')
 // half lend credibility to the weak one (docs/security.md § Design rules, rule 6).
 
 const HASH = 'a'.repeat(64)
+
+describe('device provenance', () => {
+  it('omits the node execution tier for a device bundle', () => {
+    const device = { ...request(), nodeId: '', source: { kind: 'device' as const }, sourceLabel: 'github:owner/board' }
+    expect(trustTiers(device).some((tier) => tier.key === 'declared')).toBe(false)
+  })
+})
 
 const permissions = (over: Partial<NodePluginPermissions> = {}): NodePluginPermissions => ({
   api: [],
@@ -55,6 +65,8 @@ const request = (over: {
   } as NodePluginRow,
   hash: HASH,
   nodeId: 'node-a',
+  sourceNodeIds: ['node-a'],
+  relation: 'active' as const,
   ...(over.previous
     ? {
       previous: {
@@ -81,6 +93,7 @@ const keysIn = (tiers: ReturnType<typeof trustTiers>, tier: string) =>
 beforeEach(() => {
   recordPluginTrust.mockClear()
   syncPluginContributions.mockClear()
+  hostAcks = []
 })
 
 afterEach(() => {
@@ -228,10 +241,14 @@ describe('trustTiers', () => {
 })
 
 describe('recordTrustDecision', () => {
+  const rowFor = () => request().row
   it('records an acceptance against the bytes and lets the surfaces appear at once', async () => {
     const current = request()
+    _seedPluginDistribution([['node-a', [rowFor()]]])
     _seedPendingTrust([current])
+    const off = onPluginDistributionCommit(syncPluginContributions)
     await recordTrustDecision(current, 'accepted')
+    off()
     expect(recordPluginTrust).toHaveBeenCalledWith(expect.objectContaining({
       pluginId: 'board', hash: HASH, nodeId: 'node-a', version: '2.0.0', decision: 'accepted',
       navigationDestinations: [], agentTools: [], contextSections: [],
@@ -244,8 +261,11 @@ describe('recordTrustDecision', () => {
 
   it('records a rejection and registers nothing', async () => {
     const current = request()
+    _seedPluginDistribution([['node-a', [rowFor()]]])
     _seedPendingTrust([current])
+    const off = onPluginDistributionCommit(syncPluginContributions)
     await recordTrustDecision(current, 'rejected')
+    off()
     expect(recordPluginTrust).toHaveBeenCalledWith(expect.objectContaining({ decision: 'rejected' }))
     expect(bundleAccepted('board', HASH)).toBe(false)
     // Nothing was registered, so there is nothing to take away.

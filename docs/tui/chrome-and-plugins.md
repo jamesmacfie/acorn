@@ -116,8 +116,9 @@ The rail's task list goes through the same `rail.taskList` exclusive slot the de
 plugin that offers to replace it replaces it on both hosts. `ExclusiveSlotHost` is host-supplied like
 the component table, because the DOM's copy reaches for `Dynamic` from `solid-js/web` and pulling that
 in would put a second Solid renderer in the graph to render one child. The arbitration rule in
-`exclusiveSlots.ts` is shared unchanged. The topbar and the pane strip are bespoke until the
-client-plugins programme gives each a contract.
+`exclusiveSlots.ts` is shared unchanged. The topbar and pane strip remain terminal-owned drawings;
+the desktop's `rail`, `topbar`, and `pane.switcher` replacement contracts apply only to providers
+that declare support for the host's form factor.
 
 #### Task markers
 
@@ -243,9 +244,9 @@ owns the shape.
 ### The sandbox
 
 A `node:worker_threads` worker started with `execArgv: ['--permission', '--allow-fs-read=<bootstrap>',
-'--allow-fs-read=<bundle>']`, receiving the same two ports the DOM's Web Worker does: the bridge port
-carrying the SDK verbs and the three host pushes, and the tree port carrying `tree:mount`,
-`tree:batch` and the rest. `workerHost.ts`'s `_setWorkerFactory` is the seam, and
+'--allow-fs-read=<bundle>']`, receiving the tree port for `tree:mount`, `tree:batch`, and the rest,
+plus a scoped bridge port for each mounted tree's SDK verbs. Host selection and surface actions target
+one mount; appearance updates reach every live mount. `workerHost.ts`'s `_setWorkerFactory` is the seam, and
 `apps/tui/src/plugins/workerFactory.ts` is what it substitutes. Everything else in that file — slot
 bookkeeping, the 30-second grace, the heartbeat, the fail-fanout — is shared.
 
@@ -287,6 +288,12 @@ The schemas are `@acorn/protocol`'s; no custody type is defined in this package.
 natural here and `{ path }` is an allowed source form, though nothing offers it yet: a person at a
 terminal installing a plugin is installing it here.
 
+The shared distribution snapshot selects only the active runtime of the current Node after custody
+accepts its exact bytes. Installed updates remain separate offers. A stale or unreachable Node retains
+its last roster for explanation while withholding its loaded UI. TUI custody can forget one recorded
+decision for reconsideration, and ending development mode withdraws its auto-accepted hashes through
+the same shared reconciliation as desktop.
+
 No module outside `packages/client-core/src/host/plugins/host.ts` calls `pluginCustody()`, and this
 host does not add a second caller.
 
@@ -323,7 +330,7 @@ lives.
 | `hook` | Runs on the node | Runs on the node | Nothing to draw on either host |
 | `pane.aside` | A dashboard grid the user composed, beside the pane | One muted line naming the point | [future/dashboards/README.md](../future/dashboards/README.md) |
 | `rail.taskList` (exclusive slot) | The replacement draws in place of core's list | The same, through the same arbitration | `apps/tui/src/chrome/slot.tsx` |
-| `overlay`, `drawer`, `task.footer`, `task.switcher.extra`, `topbar.*` | Host UI slots a plugin fills | Not drawn | [future/client-plugins/04-replaceable-surfaces.md](../future/client-plugins/04-replaceable-surfaces.md) |
+| `overlay`, `drawer`, `task.footer`, `task.switcher.extra`, `topbar.*` | Host UI slots a plugin fills | Not drawn | [Plugin extension points](../plugins.md) |
 
 The last row costs five first-party registrations, and two of them draw nothing: github's and agents'
 `overlay` entries are where a command that needs the router or a query client gets mounted, and

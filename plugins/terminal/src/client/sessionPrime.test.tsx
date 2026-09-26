@@ -10,6 +10,7 @@ vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   activeNodeId: () => testNodeId(),
   nodeState: () => testNodeState(),
+  hasHostCapability: () => true,
 }))
 
 const { initSessions } = await import('./sessionStore')

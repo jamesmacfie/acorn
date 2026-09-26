@@ -1,9 +1,12 @@
-import { and, eq, inArray } from 'drizzle-orm'
+import { createHash } from 'node:crypto'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
-import type { Check, Comment, Label, PullCommit, PullDetail, PullFile, Review, Thread } from '../../../shared/api'
-import { chunkRowsByColumnBudget, patchBlobKey, type PluginDatabase, type RouteResult } from '@acorn/plugin-api/node'
+import type { Check, Comment, Label, PullCommit, PullDetail, PullFile, PullTopologyCompleteness, Review, Thread } from '../../../shared/api'
+import { chunkRowsByColumnBudget, createLogger, patchBlobKey, type PluginDatabase } from '@acorn/plugin-api/node'
 import { filesResource, prResource } from '../../resourceKeys'
-import { gh, ghError } from '../../githubApi'
+import { mapLimited } from '../../mapLimited'
+import { COMPLETE, type FilesFetch, type PullComposite } from './prFetch'
+import { writePatchDocument } from './prDocument'
 import { checks as checksTable, comments as commentsTable, prCommits as prCommitsTable, prFiles as prFilesTable, prLabels as prLabelsTable, pullRequests as pullRequestsTable, reviewRequests as reviewRequestsTable, reviewThreads as reviewThreadsTable, reviews as reviewsTable, syncState as syncStateTable, viewedFiles as viewedFilesTable } from '../../../node/schema'
 
 // Shared PR mirror helpers: the GraphQL detail mirror and the REST files mirror (SQLite rows +
@@ -11,100 +14,23 @@ import { checks as checksTable, comments as commentsTable, prCommits as prCommit
 // and the batch route (pullsBatch) read+write the same mirror tables, so the logic lives here
 // once to avoid drift. PR data is "fast-changing" (docs/caching.md); freshness is a TTL gate in
 // sync_state (PULLS_STALE_AFTER_MS, server/syncPolicy.ts).
+//
+// Writers take a value prFetch.ts has already fetched in full, and swap it in with one db.batch, so
+// the rows, their order, and sync_state move together or not at all. Every child row carries its
+// provider `position`, and every read orders by it.
 
 // Every exported helper here already took the handle as a parameter, which is why this module needed
 // no reshaping when the tables moved. Only the type of the thing being passed in changed.
 type Db = PluginDatabase
+const log = createLogger('github', 'github')
 export type PrKey = { userId: string; repoId: number; number: number }
 
 // ─── Detail (GraphQL composite) ──────────────────────────────────────────────
 
-// The per-PR selection set, shared by the single-PR query and the batch multi-alias query.
-export const PR_FRAGMENT = `
-fragment PrFields on PullRequest {
-  id number title state isDraft bodyHTML headRefOid
-  author { login }
-  baseRefName headRefName updatedAt
-  labels(first: 20) { nodes { name color } }
-  reviews(first: 50) { nodes { id author { login } state bodyHTML submittedAt } }
-  reviewRequests(first: 50) { nodes { requestedReviewer { ... on User { login } } } }
-  comments(first: 50) { nodes { id author { login } bodyHTML createdAt } }
-  commitTimeline: commits(first: 100) { nodes { commit { oid messageHeadline committedDate author { name user { login } } } } }
-  reviewThreads(first: 50) { nodes {
-    id isResolved path line originalLine diffSide
-    comments(first: 50) { nodes { id databaseId author { login } bodyHTML createdAt } }
-  } }
-  latestCommit: commits(last: 1) { nodes { commit { statusCheckRollup { contexts(first: 50) { nodes {
-    __typename
-    ... on CheckRun { name status conclusion detailsUrl checkSuite { workflowRun { databaseId } } }
-    ... on StatusContext { context state targetUrl }
-  } } } } } }
-  mergeable
-  mergeStateStatus
-  autoMergeRequest { mergeMethod }
-}`
-export type GqlPull = {
-  id: string
-  number: number
-  title: string
-  state: string
-  isDraft: boolean
-  bodyHTML: string | null
-  headRefOid: string | null
-  author: { login: string } | null
-  baseRefName: string | null
-  headRefName: string | null
-  updatedAt: string | null
-  labels: { nodes: { name: string; color: string | null }[] }
-  reviews: { nodes: { id: string; author: { login: string } | null; state: string; bodyHTML: string | null; submittedAt: string | null }[] }
-  reviewRequests: { nodes: { requestedReviewer: { login?: string } | null }[] }
-  comments: { nodes: { id: string; author: { login: string } | null; bodyHTML: string | null; createdAt: string | null }[] }
-  commitTimeline: {
-    nodes: {
-      commit: {
-        oid: string
-        messageHeadline: string
-        committedDate: string | null
-        author: { name: string | null; user: { login: string } | null } | null
-      }
-    }[]
-  }
-  reviewThreads: { nodes: GqlThread[] }
-  latestCommit: { nodes: { commit: { statusCheckRollup: { contexts: { nodes: GqlContext[] } } | null } }[] }
-  mergeable: string | null
-  mergeStateStatus: string | null
-  autoMergeRequest: { mergeMethod: string } | null
-}
-type GqlThreadComment = {
-  id: string
-  databaseId: number | null
-  author: { login: string } | null
-  bodyHTML: string | null
-  createdAt: string | null
-}
-type GqlThread = {
-  id: string
-  isResolved: boolean
-  path: string | null
-  line: number | null
-  originalLine: number | null
-  diffSide: string | null
-  comments: { nodes: GqlThreadComment[] }
-}
-type GqlContext =
-  | {
-      __typename: 'CheckRun'
-      name: string
-      status: string | null
-      conclusion: string | null
-      detailsUrl: string | null
-      checkSuite: { workflowRun: { databaseId: number | null } | null } | null
-    }
-  | { __typename: 'StatusContext'; context: string; state: string | null; targetUrl: string | null }
-
 const ms = (s: string | null) => (s ? Date.parse(s) : null)
 
-// A commit can carry duplicate context names across check runs; keep the last (PK is name).
+// A commit can carry duplicate context names across check runs; keep the last (PK is name), in the
+// place the first one held.
 const dedupeByName = <T extends { name: string }>(rows: T[]) => [...new Map(rows.map((r) => [r.name, r])).values()]
 
 const childWhere = (t: { userId: SQLiteColumn; repoId: SQLiteColumn; number: SQLiteColumn }, key: PrKey) =>
@@ -116,7 +42,7 @@ const childWhere = (t: { userId: SQLiteColumn; repoId: SQLiteColumn; number: SQL
 //
 // Reports whether the checks rows differ from what was mirrored before, so the caller can announce
 // `checks-changed` only when a check actually flipped rather than on every sync.
-export const mirrorPr = async (db: Db, key: PrKey, pr: GqlPull, now: number): Promise<{ checksChanged: boolean }> => {
+export const mirrorPr = async (db: Db, key: PrKey, pr: PullComposite, now: number): Promise<{ checksChanged: boolean }> => {
   const pullRow = {
     ...key,
     nodeId: pr.id,
@@ -134,56 +60,61 @@ export const mirrorPr = async (db: Db, key: PrKey, pr: GqlPull, now: number): Pr
     autoMergeEnabled: pr.autoMergeRequest != null,
     fetchedAt: now,
   }
-  const labelRows = pr.labels.nodes.map((l) => ({ ...key, name: l.name, color: l.color }))
-  const reviewRows = pr.reviews.nodes.map((r) => ({
+  const labelRows = pr.labels.map((l, position) => ({ ...key, name: l.name, color: l.color, position }))
+  const reviewRows = pr.reviews.map((r, position) => ({
     ...key,
     id: r.id,
     author: r.author?.login ?? null,
     state: r.state,
     body: r.bodyHTML,
     submittedAt: ms(r.submittedAt),
+    position,
   }))
-  const reviewRequestRows = pr.reviewRequests.nodes
+  const reviewRequestRows = [...new Set(pr.reviewRequests
     .map((rr) => rr.requestedReviewer?.login)
-    .filter((login): login is string => !!login)
-    .map((login) => ({ ...key, login }))
-  const commentRows = pr.comments.nodes.map((m) => ({
+    .filter((login): login is string => !!login))]
+    .map((login, position) => ({ ...key, login, position }))
+  const commentRows = pr.comments.map((m, position) => ({
     ...key,
     id: m.id,
     author: m.author?.login ?? null,
     body: m.bodyHTML,
     createdAt: ms(m.createdAt),
+    position,
   }))
-  const commitRows = pr.commitTimeline.nodes.map(({ commit }) => ({
+  const commitRows = pr.commits.map(({ commit }, position) => ({
     ...key,
     sha: commit.oid,
     message: commit.messageHeadline,
     author: commit.author?.name ?? commit.author?.user?.login ?? null,
     authorLogin: commit.author?.user?.login ?? null,
     committedAt: ms(commit.committedDate),
+    position,
   }))
-  const threadRows = pr.reviewThreads.nodes.flatMap((t) =>
-    t.comments.nodes.map((cm) => ({
-      ...key,
-      threadId: t.id,
-      id: cm.id,
-      databaseId: cm.databaseId,
-      path: t.path,
-      line: t.line ?? t.originalLine,
-      side: t.diffSide,
-      resolved: t.isResolved,
-      author: cm.author?.login ?? null,
-      body: cm.bodyHTML,
-      createdAt: ms(cm.createdAt),
-    })),
-  )
+  const threadRows = pr.threads
+    .flatMap((t) =>
+      t.comments.map((cm) => ({
+        ...key,
+        threadId: t.id,
+        id: cm.id,
+        databaseId: cm.databaseId,
+        path: t.path,
+        line: t.line ?? t.originalLine,
+        side: t.diffSide,
+        resolved: t.isResolved,
+        author: cm.author?.login ?? null,
+        body: cm.bodyHTML,
+        createdAt: ms(cm.createdAt),
+      })),
+    )
+    .map((row, position) => ({ ...row, position }))
   const checkRows = dedupeByName(
-    (pr.latestCommit.nodes[0]?.commit.statusCheckRollup?.contexts.nodes ?? []).map((ctx) =>
+    pr.checks.map((ctx) =>
       ctx.__typename === 'CheckRun'
         ? { ...key, name: ctx.name, status: ctx.conclusion ?? ctx.status, url: ctx.detailsUrl, runId: ctx.checkSuite?.workflowRun?.databaseId ?? null }
         : { ...key, name: ctx.context, status: ctx.state, url: ctx.targetUrl, runId: null },
     ),
-  )
+  ).map((row, position) => ({ ...row, position }))
 
   const chunk = <T,>(table: Parameters<typeof db.insert>[0], rows: T[]) => {
     if (rows.length === 0) return []
@@ -261,13 +192,13 @@ export const readComposite = async (db: Db, key: PrKey): Promise<PullDetail> => 
   )
   const [pull] = await db.select().from(pullRequestsTable).where(prWhere)
   const [labels, reviewRows, reviewRequestRows, commentRows, commits, checkRows, threadRows] = await Promise.all([
-    db.select().from(prLabelsTable).where(childWhere(prLabelsTable, key)),
-    db.select().from(reviewsTable).where(childWhere(reviewsTable, key)),
-    db.select().from(reviewRequestsTable).where(childWhere(reviewRequestsTable, key)),
-    db.select().from(commentsTable).where(childWhere(commentsTable, key)),
-    db.select().from(prCommitsTable).where(childWhere(prCommitsTable, key)),
-    db.select().from(checksTable).where(childWhere(checksTable, key)),
-    db.select().from(reviewThreadsTable).where(childWhere(reviewThreadsTable, key)),
+    db.select().from(prLabelsTable).where(childWhere(prLabelsTable, key)).orderBy(asc(prLabelsTable.position)),
+    db.select().from(reviewsTable).where(childWhere(reviewsTable, key)).orderBy(asc(reviewsTable.position)),
+    db.select().from(reviewRequestsTable).where(childWhere(reviewRequestsTable, key)).orderBy(asc(reviewRequestsTable.position)),
+    db.select().from(commentsTable).where(childWhere(commentsTable, key)).orderBy(asc(commentsTable.position)),
+    db.select().from(prCommitsTable).where(childWhere(prCommitsTable, key)).orderBy(asc(prCommitsTable.position)),
+    db.select().from(checksTable).where(childWhere(checksTable, key)).orderBy(asc(checksTable.position)),
+    db.select().from(reviewThreadsTable).where(childWhere(reviewThreadsTable, key)).orderBy(asc(reviewThreadsTable.position)),
   ])
   const tmap = new Map<string, ReturnType<typeof toThread>>()
   for (const row of threadRows) {
@@ -289,86 +220,107 @@ export const readComposite = async (db: Db, key: PrKey): Promise<PullDetail> => 
 
 // ─── Files (REST /files → SQLite rows + BLOBS patch bodies) ──────────────────
 
-export type GitHubFile = {
-  filename: string
-  status: string
-  additions: number
-  deletions: number
-  sha: string
-  patch?: string // omitted for binary / too-large / pure-rename files
-}
-
-export const fetchFiles = async (token: string, owner: string, repo: string, number: number): Promise<RouteResult<GitHubFile[]>> => {
-  const res = await gh(token, `/repos/${owner}/${repo}/pulls/${number}/files?per_page=100`)
-  const err = ghError(res)
-  if (err) return { ok: false, failure: err }
-  return { ok: true, value: (await res.json()) as GitHubFile[] }
-}
-
-// Re-mirror one PR's files: patch bodies go to on-disk BLOBS by immutable sha (deduped, cached
-// forever, see server/blobs.ts); only the metadata rows go to the DB. Bodies resolve back from
-// BLOBS on read.
-//
 // Stated structurally rather than as `Pick<Env['BLOBS'], …>`: naming core's runtime bindings put
 // `SECRETS`, `ACTIVE_IDENTITY` and `INTERNAL_TOKEN` on the plugin contract to reach one blob cache, and
 // a plugin should be reading what it needs off `ctx` or off the two methods it actually calls.
 export type PatchBlobStore = { get(key: string): Promise<string | null>; put(key: string, value: string): Promise<void> }
 
-export const mirrorFiles = async (blobs: PatchBlobStore, db: Db, key: PrKey, body: GitHubFile[]) => {
-  const now = Date.now()
-  await Promise.all(body.filter((f) => f.patch != null).map((f) => blobs.put(patchBlobKey(f.sha), f.patch as string)))
-  const rows = body.map((f) => ({
-    ...key,
-    path: f.filename,
-    status: f.status,
-    additions: f.additions,
-    deletions: f.deletions,
-    sha: f.sha,
-  }))
-  const fileWhere = and(eq(prFilesTable.userId, key.userId), eq(prFilesTable.repoId, key.repoId), eq(prFilesTable.number, key.number))
+// Patch bodies are written a few at a time; a 2,200-file pull is 2,200 files on disk.
+const BLOB_WRITE_CONCURRENCY = 8
+
+// A patch's identity is its own text. The head blob sha is not: the same new file has a different
+// patch against a different base, so a sha-keyed patch could serve another pull's diff.
+export const patchDigest = (patch: string) => `sha256:${createHash('sha256').update(patch).digest('hex')}`
+
+// Re-mirror one PR's files from a fetch that already holds every page. Patch bodies go to on-disk
+// BLOBS first, keyed by their digest, each with its segment descriptors beside it. That is safe before the swap because an orphaned body is only
+// cache data. Only when every write has landed do the rows, their order, and the files sync row
+// (with its completeness) replace the old ones in one db.batch. A failed write throws and leaves the
+// previous mirror untouched.
+export const mirrorFiles = async (blobs: PatchBlobStore, db: Db, key: PrKey, fetched: FilesFetch, now = Date.now()) => {
+  const rows = fetched.files.map((f, position) => {
+    const patchKey = f.patch != null ? patchDigest(f.patch) : null
+    return {
+      ...key,
+      path: f.filename,
+      status: f.status,
+      additions: f.additions,
+      deletions: f.deletions,
+      sha: f.sha,
+      position,
+      patchState: patchKey ? 'available' : 'unavailable',
+      patchKey,
+    }
+  })
+  await mapLimited(fetched.files, BLOB_WRITE_CONCURRENCY, async (f, i) => {
+    const patchKey = rows[i]!.patchKey
+    if (!patchKey) return
+    await blobs.put(patchBlobKey(patchKey), f.patch as string)
+    // Cut once here, so a topology read never parses (./prDocument.ts).
+    await writePatchDocument(blobs, patchKey, f.filename, f.patch as string)
+  })
+  const c = fetched.completeness
+  const state = c.kind === 'complete'
+    ? { incompleteCause: null, received: null, reportedTotal: null, upstreamLimit: null }
+    : { incompleteCause: c.cause, received: c.received, reportedTotal: c.reportedTotal, upstreamLimit: c.limit }
   const resource = filesResource(key.repoId, key.number)
   await db.batch([
-    db.delete(prFilesTable).where(fileWhere),
-    ...rows.map((r) => db.insert(prFilesTable).values(r)),
+    db.delete(prFilesTable).where(childWhere(prFilesTable, key)),
+    ...chunkRowsByColumnBudget(rows).map((part) => db.insert(prFilesTable).values(part)),
     db
       .insert(syncStateTable)
-      .values({ userId: key.userId, resource, etag: null, fetchedAt: now })
-      .onConflictDoUpdate({ target: [syncStateTable.userId, syncStateTable.resource], set: { fetchedAt: now } }),
+      .values({ userId: key.userId, resource, etag: null, fetchedAt: now, ...state })
+      .onConflictDoUpdate({ target: [syncStateTable.userId, syncStateTable.resource], set: { fetchedAt: now, ...state } }),
   ])
 }
 
+// The stored outcome of the last files refresh. A files sync row with no cause is complete.
+export const filesCompleteness = (row: typeof syncStateTable.$inferSelect): PullTopologyCompleteness =>
+  row.incompleteCause === 'upstream-cap' && row.received != null && row.upstreamLimit != null
+    ? { kind: 'incomplete', cause: 'upstream-cap', resource: 'files', received: row.received, reportedTotal: row.reportedTotal, limit: row.upstreamLimit }
+    : COMPLETE
+
 type ReadFilesOptions = { includePatches?: boolean; paths?: string[] }
 
-// Read one PR's files back out of the mirror. `viewed` is app-state (viewed_files), merged in
-// fresh on every read so it survives mirror re-syncs. Callers can skip patch bodies for cheap
-// summary reads; patch bodies resolve from the on-disk BLOBS cache by sha when requested.
-export const readFiles = async (blobs: PatchBlobStore, db: Db, key: PrKey, options: ReadFilesOptions = {}): Promise<PullFile[]> => {
+// `missing` counts available patches whose body was not in BLOBS. That is a broken cache, not a file
+// without a diff, so the caller repairs it with a refresh rather than serving `patch: null`.
+export type ReadFilesResult = { ok: true; files: PullFile[] } | { ok: false; missing: number }
+
+// Read one PR's files back out of the mirror, in provider order. `viewed` is app-state
+// (viewed_files), merged in fresh on every read so it survives mirror re-syncs. Callers can skip
+// patch bodies for cheap summary reads, which touch no blob at all.
+export const readFiles = async (blobs: PatchBlobStore, db: Db, key: PrKey, options: ReadFilesOptions = {}): Promise<ReadFilesResult> => {
   const includePatches = options.includePatches ?? true
   const paths = options.paths?.length ? Array.from(new Set(options.paths)) : undefined
-  const fileWhere = and(
-    eq(prFilesTable.userId, key.userId),
-    eq(prFilesTable.repoId, key.repoId),
-    eq(prFilesTable.number, key.number),
-    ...(paths ? [inArray(prFilesTable.path, paths)] : []),
-  )
-  const viewedWhere = and(eq(viewedFilesTable.userId, key.userId), eq(viewedFilesTable.repoId, key.repoId), eq(viewedFilesTable.number, key.number))
+  const fileWhere = and(childWhere(prFilesTable, key), ...(paths ? [inArray(prFilesTable.path, paths)] : []))
   const [files, viewed] = await Promise.all([
-    db.select().from(prFilesTable).where(fileWhere),
-    db.select({ path: viewedFilesTable.path }).from(viewedFilesTable).where(viewedWhere),
+    db.select().from(prFilesTable).where(fileWhere).orderBy(asc(prFilesTable.position)),
+    db.select({ path: viewedFilesTable.path }).from(viewedFilesTable).where(childWhere(viewedFilesTable, key)),
   ])
   const seen = new Set(viewed.map((v) => v.path))
-  return Promise.all(
-    files.map(
-      async (f) =>
-        ({
-          path: f.path,
-          status: f.status,
-          additions: f.additions,
-          deletions: f.deletions,
-          sha: f.sha,
-          viewed: seen.has(f.path),
-          patch: includePatches && f.sha ? await blobs.get(patchBlobKey(f.sha)) : null,
-        }) satisfies PullFile,
-    ),
+  let missing = 0
+  const out = await Promise.all(
+    files.map(async (f): Promise<PullFile> => {
+      const available = f.patchState === 'available' && !!f.patchKey
+      const patch = includePatches && available ? await blobs.get(patchBlobKey(f.patchKey!)) : null
+      if (includePatches && available && patch == null) missing++
+      return {
+        path: f.path,
+        status: f.status,
+        additions: f.additions,
+        deletions: f.deletions,
+        sha: f.sha,
+        viewed: seen.has(f.path),
+        position: f.position,
+        patchState: available ? 'available' : 'unavailable',
+        patchKey: available ? f.patchKey : null,
+        patch,
+      }
+    }),
   )
+  if (missing) {
+    log.warn(`pull files read found ${missing} available patch bodies missing from the blob cache`)
+    return { ok: false, missing }
+  }
+  return { ok: true, files: out }
 }

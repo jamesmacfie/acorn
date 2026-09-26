@@ -310,10 +310,12 @@ sandbox's own sequence and the host only quotes it back, exactly as the bridge's
 rung up. A payload or a reply body over 64 KiB is refused, eight may be outstanding per slot, and an
 owner has ten seconds to answer. The failure arm is a code and a sentence, never a host stack.
 
-The whole reason it rides here rather than the bridge is the slot. One worker holds one bridge, so a
-request that crossed the bridge could not say which of a bundle's mounted trees sent it; a request that
-crosses this channel is addressed by the port and the slot the host already trusts, and plugin code
-supplies no identifier at all.
+This request rides the tree channel because its slot is the host's authority for the extension point.
+The host binds the request to the channel and slot that mounted it; plugin code supplies no authority
+identifier. Other SDK calls use a separate bridge port and context for each mounted tree, so two trees
+sharing one worker do not share document, scope, focus, or gesture authority. Selection and surface
+actions target a slot; appearance updates reach every live slot. An older SDK without the per-tree
+bridge handshake may mount only one tree in a worker.
 
 **Every message is validated**, because the host is the only thing between a stranger's code and the
 shell's DOM:
@@ -341,7 +343,7 @@ into a stranger's
 plugin; `messages.ts` holds the schemas the host parses with. The lists are duplicated from
 client-core's kit, which owns them, and a test over there fails the moment the two disagree.
 
-The sandbox itself — one Web Worker per bundle, what it has and what it does not, and what happens
+The sandbox itself — one Web Worker per accepted `(pluginId, hash)`, what it has and what it does not, and what happens
 when it throws — is `docs/shell.md § The plugin worker`.
 
 ## One shared eligibility and trust check
@@ -355,16 +357,14 @@ updates only one of them, and `tsc` stays quiet because each copy is locally con
 `packages/client-core/src/host/plugins/contributions.ts` now owns that shared half; the passes keep their
 own job, rendering a sandboxed iframe versus registering a command.
 
-`eligiblePlugins()` returns one row per plugin id, and each row's `hash` and `trusted` come from the
-same place: the bundle that **won fleet resolution**, not the first one a roster happened to list. In a
-mixed-version fleet, node A might offer v1 while node B's v2 wins; taking the manifest from one row and
-the hash from another would register contributions declared by bytes nobody accepted. A package with no
-client half anywhere in the fleet never enters resolution, so it falls back to the first row seen; such
-a package contributes only descriptors and host-drawn surfaces, whose behaviour does not depend on which
-node described them. `trusted` is true only when the device has accepted the exact bytes that won
-resolution, never the row's own claimed hash: a candidate dropped at resolution can still carry a
-`client.hash` in its roster row, and honoring that would let an acceptance recorded against an older,
-runnable build clear a bundle this device has already decided not to run.
+`eligiblePlugins()` reads the active Node's observation and pairs its running declaration with that
+Node's selected hash. An installed update on the same Node, or a newer version on a different Node,
+does not change those registrations. `trusted` is true only when custody has cached and accepted the
+exact client bytes matching the active runtime. A declaration with no client half can still contribute
+host-drawn descriptors. Command and keybinding metadata may remain visible for an inactive plugin so
+saved bindings are explainable, but invocation checks current availability. A stale or unreachable
+observation supplies no live contribution. The snapshot and its per-Node availability selector own
+the reasons a loaded contribution is withheld.
 
 Frames and chrome ask different-strength questions of the same row. Frames gate code-bearing surfaces
 on `trusted` outright. Chrome asks the weaker `hasWithheldCode`: does this package carry code the device

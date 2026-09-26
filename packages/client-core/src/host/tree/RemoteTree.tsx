@@ -4,13 +4,14 @@ import { useQueryClient } from '@tanstack/solid-query'
 import type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
 import { TREE_LIMITS, batchBytes } from '@acorn/protocol/tree/messages.ts'
 import { answerOwnerInvoke, unknownHostOp, unsupportedOverlay, type OwnerActions } from './hostRequests'
-import { createFrameBridge, postSelect, postSurfaceAction, type FrameBinding } from '../frames/broker'
+import { createFrameBridge, type FrameBinding } from '../frames/broker'
 import { closePluginOverlayFrom, openPluginOverlayInvocation } from '../frames/overlays'
 import { createFrameServices } from '../frames/frameServices'
 import { eligiblePlugins, isTaskPane } from '../plugins/contributions'
 import { qualifiedContributionId } from '../plugins/contributionIds'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { createLogger } from '../../infra/telemetry/logger'
+import { watchAppearance } from '../../kit/tokens/appearance'
 import { clientEvents, consumePaneIntent } from '../registries/commands/clientEvents'
 import { TreeHost } from './TreeHost'
 import type { RemoteContribution } from './treeRegistry'
@@ -51,11 +52,8 @@ export type RemoteTreeProps = {
   /**
    * The task or project this tree is inside, for a tree that is a pane rather than a slot.
    *
-   * An accessor, not a value, and read on every bridge call rather than captured at connect: one worker
-   * serves every tree its bundle draws and therefore holds one bridge, so a scope frozen at connect
-   * would be whichever tree happened to start the worker. Reading it live means `openPane` and the
-   * task-active gate answer for the task on screen, which is the only task a tree can be interacted
-   * with from.
+   * An accessor, read by this slot's own bridge. A scope change can update the visible tree without
+   * borrowing the task or project from another mount of the same plugin.
    */
   scope?: () => TreeScope
   /**
@@ -118,7 +116,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
       // task-scoped panes and nothing else, exactly as it is for a frame.
       panes: (owner?.installed.contributions.frames ?? []).filter(isTaskPane).map((frame) => frame.id),
       claimsKeys: [],
-      // Getters, for the reason `scope` above states at length: the binding outlives any one tree.
+      // Getters keep this slot's task and project current through a props update.
       get taskId() {
         return scope().taskId
       },
@@ -128,53 +126,58 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     }
   }
 
+  const contextFor = (bound: FrameBinding): PluginFrameContext => {
+    // A pane intent is consumed once, when its own slot first mounts. It is never part of the
+    // bundle-wide bootstrap handshake, which may belong to another visible tree.
+    const opened = scope().item
+      ?? (bound.taskId ? consumePaneIntent(bound.taskId, contribution.id) : undefined)
+    const item = typeof opened === 'string' ? opened : opened?.kind === 'plugin:select' ? opened.item : undefined
+    return {
+      surface: bound.surface,
+      target: 'remote',
+      nodeId: bound.nodeId,
+      ...(bound.taskId ? { taskId: bound.taskId } : {}),
+      ...(bound.projectId ? { projectId: bound.projectId } : {}),
+      ...(item ? { item } : {}),
+      theme: document.documentElement.dataset.theme ?? 'light',
+      style: document.documentElement.dataset.style ?? 'terminal',
+      claimsKeys: [],
+    }
+  }
+
+  const connectBridge = (port: MessagePort, bound: FrameBinding, context: PluginFrameContext, authorize?: () => boolean) =>
+    createFrameBridge({
+      port,
+      binding: bound,
+      services: createFrameServices(
+        {
+          binding: bound,
+          hash: contribution.hash,
+          ...(componentProps.document ? { document: componentProps.document } : {}),
+        },
+        {
+          qc,
+          frameHasFocus: () => (container !== undefined && container.contains(document.activeElement))
+            || (lastGestureAt > 0 && Date.now() - lastGestureAt <= GESTURE_WINDOW_MS),
+          navigate,
+        },
+      ),
+      context,
+      ...(authorize ? { authorize } : {}),
+      onMisbehaving: (reason) => refuse(`misbehaved on the bridge: ${reason}`),
+    })
+
   const worker = acquireTreeWorker({
     pluginId: contribution.pluginId,
     hash: contribution.hash,
     onRefused: refuse,
-    connect: (port) => {
+    // Older bundles have only this one port. It remains inert until the worker identifies itself as
+    // legacy and its first slot mounts. New bundles receive a separate bridge for every tree below.
+    connect: (port, authorize) => {
       const bound = binding()
-      // The row that opened this pane, when a row did. Retained by `openPane` until the pane consumes
-      // it, so a tree mounting for the first time gets its selection in `context` rather than racing
-      // its own mount against an event that has already fired — the same split a frame region makes
-      // (../frames/PluginFrame.tsx). A routed item wins, because for a project-scoped surface it IS the
-      // current selection rather than a one-shot.
-      const opened = scope().item
-        ?? (bound.taskId ? consumePaneIntent(bound.taskId, contribution.id) : undefined)
-      const item = typeof opened === 'string' ? opened : opened?.kind === 'plugin:select' ? opened.item : undefined
-      const context: PluginFrameContext = {
-        surface: bound.surface,
-        target: 'remote',
-        nodeId: bound.nodeId,
-        ...(bound.taskId ? { taskId: bound.taskId } : {}),
-        ...(bound.projectId ? { projectId: bound.projectId } : {}),
-        ...(item ? { item } : {}),
-        theme: document.documentElement.dataset.theme ?? 'light',
-        style: document.documentElement.dataset.style ?? 'terminal',
-        claimsKeys: [],
-      }
-      return createFrameBridge({
-        port,
-        binding: bound,
-        // The same fourteen effects a frame's bridge gets. A tree has no iframe to check focus
-        // against, so the gate is whether the shell's focus is inside the element this tree drew into,
-        // which is the same question one rung down.
-        services: createFrameServices(
-          {
-            binding: bound,
-            hash: contribution.hash,
-            // Present only where the host handed one down, which is a composed pane's other region.
-            ...(componentProps.document ? { document: componentProps.document } : {}),
-          },
-          {
-            qc,
-            frameHasFocus: () => container !== undefined && container.contains(document.activeElement),
-            navigate,
-          },
-        ),
-        context,
-        onMisbehaving: (reason) => refuse(`misbehaved on the bridge: ${reason}`),
-      })
+      return connectBridge(port, bound, {
+        surface: '', target: 'remote', nodeId: '', theme: 'light', style: 'terminal', claimsKeys: [],
+      }, authorize)
     },
   })
 
@@ -254,38 +257,45 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   })
 
   const transport = worker.transport(slot)
+  const pushAppearance = (): void => worker.appearance(slot, {
+    theme: document.documentElement.dataset.theme ?? 'light',
+    style: document.documentElement.dataset.style ?? 'terminal',
+    tokens: {},
+  })
+  pushAppearance()
+  const unwatchAppearance = watchAppearance(pushAppearance)
   // Mount is also update: the first call starts the tree, every later one carries new props. Solid's
   // effect gives the "later one" for free, because `props()` is the caller's accessor.
-  createEffect(() => worker.mount(slot, contribution.entry, componentProps.props()))
+  createEffect(() => worker.mount(slot, contribution.entry, componentProps.props(), () => {
+    const bound = binding()
+    const context = contextFor(bound)
+    return { context, connect: (port: MessagePort) => connectBridge(port, bound, context) }
+  }))
 
-  // The three pushes that are not tree mutations. They ride the bridge rather than the tree channel,
-  // because they are the same messages a frame gets and the plugin listens for them with the same
-  // `bridge.onSelect` and `bridge.onSurfaceAction` either way (frames/sdk.ts).
+  // These pushes go to this slot's bridge, never the bundle's bootstrap bridge.
   //
   // A rail row picked while the pane is already open. `defer`, because the selection that opened the
   // pane crossed in the mount props and posting it again would restart a load already in flight.
   createEffect(on(() => scope().item, (next, previous) => {
-    const port = worker.bridgePort()
-    if (!port || !next || next === previous) return
-    postSelect(port, next)
+    if (!next || next === previous) return
+    worker.select(slot, next)
   }, { defer: true }))
   const unselect = clientEvents.on('presentation:pane-intent', (event) => {
-    const port = worker.bridgePort()
-    if (!port || event.taskId !== scope().taskId || event.paneId !== contribution.id) return
+    if (event.taskId !== scope().taskId || event.paneId !== contribution.id) return
     if (event.intent.kind !== 'plugin:select') return
     // Consumed here so the retained copy does not reach a later remount as a stale selection.
     consumePaneIntent(event.taskId, event.paneId)
-    postSelect(port, event.intent.item)
+    worker.select(slot, event.intent.item)
   })
   // A surface-scoped command the host resolved on this tree's behalf: the chord landed in the sibling
   // editor of a composed pane, or the row was picked in the palette.
   const unaction = clientEvents.on('plugin:surface-action', (event) => {
-    const port = worker.bridgePort()
-    if (!port || event.pluginId !== contribution.pluginId || event.surface !== contribution.id) return
-    postSurfaceAction(port, event.command)
+    if (event.pluginId !== contribution.pluginId || event.surface !== contribution.id) return
+    worker.surfaceAction(slot, event.command)
   })
 
   onCleanup(() => {
+    unwatchAppearance()
     detachGestures()
     unaction()
     unselect()

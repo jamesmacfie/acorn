@@ -35,7 +35,7 @@ import {
 
 // Re-exported so this file stays the one import for everything manifest-shaped. The declarations
 // themselves live in @acorn/protocol: the node uses them to decide what to load, the client to decide
-// which of a fleet's bundles it can run (client-core/host/trust/resolveBundles.ts), and one compatibility
+// which device-held bundle it can run (client-core/host/plugins/distributionModel.ts), and one compatibility
 // contract cannot live on one side.
 export { PLUGIN_API_MAJOR, speaksApiVersion } from '@acorn/protocol/plugin/apiVersion.ts'
 export type {
@@ -223,12 +223,12 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
       //
       // Everything else has no rectangle to arrange: an importer and an overlay are host-drawn chrome
       // around a frame, and a webview's pixels are not the renderer's at all.
-      if (frame.target === 'refPanel' || frame.target === 'settings') {
+      if (frame.target === 'refPanel' || frame.target === 'settings' || frame.target === 'coreSlot') {
         if (frame.layout !== 'single') {
           ctx.addIssue({
             code: 'custom',
             path: [...at, 'layout'],
-            message: `a ${frame.target === 'refPanel' ? 'reference panel' : 'settings page'}'s only layout is 'single': the host draws everything around it`,
+            message: `a ${frame.target === 'refPanel' ? 'reference panel' : frame.target === 'settings' ? 'settings page' : 'core replacement'}'s only layout is 'single': the host draws everything around it`,
           })
         }
       } else if (frame.target !== 'pane') {
@@ -289,7 +289,10 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     }
   })
   sources.forEach((entry, i) => {
-    route(entry.items, ['contributions', 'sources', i, 'items'])
+    if (entry.items !== undefined) route(entry.items, ['contributions', 'sources', i, 'items'])
+    if (entry.tree && !manifest.client) {
+      ctx.addIssue({ code: 'custom', path: ['contributions', 'sources', i, 'tree'], message: 'a remote-tree source requires a client bundle' })
+    }
     if (entry.onSelect) action(entry.onSelect, ['contributions', 'sources', i, 'onSelect'])
     if (entry.emptyState?.action) action(entry.emptyState.action, ['contributions', 'sources', i, 'emptyState', 'action'])
     // Same rule as a content link's `openPane`: the pane a task first opens on has to be one this

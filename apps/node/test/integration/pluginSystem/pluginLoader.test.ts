@@ -211,7 +211,7 @@ describe('loading rollbar from disk', () => {
       // And the whole point: what the owner is told. The route is parse, call, respond over this
       // (docs/plugins.md § Loaded plugins covers why a load failure used to read as a permanently
       // stuck Restart banner).
-      const state = pluginState(buildPluginStateBridge({
+      const state = pluginState(await buildPluginStateBridge({
         dataDir: broken,
         db: core.db,
         roster: () => [],

@@ -175,8 +175,8 @@ describe('cooperative extension points', () => {
       row('tracker', GUEST_PLUGIN),
     ]]])
     syncChromeContributions()
-    // Both rows are registered (the roster still describes them), and the gate is at delivery.
-    expect(pointIds()).toEqual(['board:card-links'])
+    // Inactive plugins retain command metadata, but no extension point authority.
+    expect(pointIds()).toEqual([])
     expect(extensionDeliveries('board:card-links')).toEqual([])
 
     _resetChromeContributions()

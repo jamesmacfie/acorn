@@ -13,7 +13,7 @@ disk and the client registers contributions from the same shape. Its top-level k
 | `name` | yes | Display name, 1–120 characters. |
 | `version` | yes | Free-form string, 1–64 characters. Compared on update by the installer's downgrade guard. |
 | `baseline` | yes | Exactly `"acorn-1"`. A missing or different marker is rejected before the plugin runs, including on an old API-1 package. |
-| `apiVersion` | yes | A range over plugin API majors that has to cover this node's current major, `"1"` (`packages/protocol/src/plugin/apiVersion.ts`). Anything the range does not cover is a failed roster row with both versions in its reason. |
+| `apiVersion` | yes | A range over plugin API majors that has to cover this node's current major, `"2"` (`packages/protocol/src/plugin/apiVersion.ts`). Anything the range does not cover is a failed roster row with both versions in its reason. |
 | `icon` / `icons` | no | One SVG path `d` string, or a map of them, authored in a 24×24 box. Not an SVG document — a document would mean `<script>`, `<use href>`, `on*` handlers and an allowlist parser, for a logo. Registered as `brand:<id>` and `brand:<id>/<key>` and nameable as any contribution's `glyph`. |
 | `node` | no | Relative path to the ESM entrypoint the node imports. Omit it for a client-only or descriptor-only plugin. |
 | `client` | no | Relative path to the single client file. Omit it for a plugin that ships only descriptors and document surfaces — it then has no bytes to trust and no trust prompt. |
@@ -236,11 +236,15 @@ The node requirement applies only to the route-backed `items` and `route` carrie
 `frame` keep their client-bundle checks, and a descriptor-only harness can still omit `node` unless it
 declares a probe route.
 
-A `coreSlot` frame is the related pattern for acorn's *own* surfaces:
-`{ target: "coreSlot", id, label, coreSlot }` plus a client bundle, where `coreSlot` names one of the
-designated surfaces (`rail.taskList` today). Declaring one **seizes nothing** — the user picks the
-provider in Settings → Plugins, and acorn draws its own again the moment your plugin is disabled or your
-surface throws. It is not a pane, so no verb can name it and it never appears in the pane switcher.
+A `coreSlot` surface is the related pattern for acorn's *own* surfaces:
+`{ target: "coreSlot", id, label, coreSlot }` plus a client bundle. The designated surfaces are
+`rail.taskList`, `pane.switcher`, `rail`, and `topbar`. The last three require a `single` layout with
+one remote-tree `body`; the host gives that tree data and named actions. A rail or topbar tree can
+place its one nested host slot with the `Slot` node and the `slotRef` in its props. Declare
+`placesSlots: ["rail.taskList"]` or `["topbar.right"]` when you place it; Settings warns when the
+declaration is absent. Declaring a replacement **seizes nothing** — the user picks the provider in
+Settings → Plugins, and acorn draws its own again when your plugin is disabled or its surface fails.
+It is not a pane, so no pane verb can name it.
 
 A `taskChecks` entry is the one contribution that runs when a person is about to lose something.
 Archiving a task removes its worktree, so the host asks every plugin first and draws the answers in one
@@ -308,7 +312,7 @@ This is the whole plugin that adds OpenCode:
   "name": "OpenCode",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "1",
+  "apiVersion": "2",
   "icon": { "d": "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" },
   "contributions": {
     "harnesses": [

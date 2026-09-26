@@ -42,6 +42,44 @@ afterEach(() => {
 })
 
 describe('acknowledging a bundle', () => {
+  it('reads a pre-provenance acknowledgement as node sourced', () => {
+    writeFileSync(join(dir, 'acorn-1-plugin-trust.json'), JSON.stringify({ version: 1, acks: [ack()], devGrants: [] }))
+    expect(store().decisionFor('sparkline', HASH_A)?.source).toEqual({ kind: 'node', nodeId: 'node-a' })
+  })
+
+  it('keeps one decision for identical bytes offered by a device and a node', () => {
+    const first = store()
+    first.record(ack({ source: { kind: 'device' }, nodeId: '' }))
+    expect(first.decisionFor('sparkline', HASH_A)?.decision).toBe('accepted')
+    expect(first.list()).toHaveLength(1)
+  })
+
+  it('limits a device development grant to device provenance', () => {
+    const first = store()
+    first.grantDev({ pluginId: 'sparkline', nodeId: '', source: { kind: 'device' }, grantedAt: Date.now() })
+    expect(first.recordDevAccept({ pluginId: 'sparkline', nodeId: 'node-a', hash: HASH_A, version: '2.0.0' })).toBe(false)
+    expect(first.recordDevAccept({ pluginId: 'sparkline', nodeId: '', source: { kind: 'device' }, hash: HASH_A, version: '2.0.0' })).toBe(true)
+    expect(first.decisionFor('sparkline', HASH_A)).toMatchObject({ dev: true, partial: true, source: { kind: 'device' } })
+  })
+
+  it('keeps device acknowledgements after uninstall while ending future development trust', () => {
+    const first = store()
+    first.grantDev({ pluginId: 'sparkline', nodeId: '', source: { kind: 'device' }, grantedAt: Date.now() })
+    first.recordDevAccept({ pluginId: 'sparkline', nodeId: '', source: { kind: 'device' }, hash: HASH_A, version: '1.0.0' })
+    first.forgetDevGrant('sparkline', { kind: 'device' })
+    expect(first.devGrantFor('sparkline', { kind: 'device' })).toBeUndefined()
+    expect(first.decisionFor('sparkline', HASH_A)?.decision).toBe('accepted')
+    expect(first.recordDevAccept({ pluginId: 'sparkline', nodeId: '', source: { kind: 'device' }, hash: HASH_B, version: '2.0.0' })).toBe(false)
+  })
+
+  it('withdraws only the named exact-hash decision', () => {
+    const trust = store()
+    trust.record(ack({ hash: HASH_A }))
+    trust.record(ack({ hash: HASH_B }))
+    trust.forgetDecision('sparkline', HASH_A)
+    expect(trust.decisionFor('sparkline', HASH_A)).toBeUndefined()
+    expect(trust.decisionFor('sparkline', HASH_B)?.decision).toBe('accepted')
+  })
   it('has no decision on first sight, which is the prompt condition', () => {
     expect(store().decisionFor('sparkline', HASH_A)).toBeUndefined()
   })

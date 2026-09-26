@@ -67,6 +67,10 @@ in the frame — with a complete worked example.
 
 [The client half of a loaded plugin](plugins/activation.md#the-client-half-of-a-loaded-plugin)
 
+## Device-held plugins
+
+[Device-held plugins](plugins/activation.md#device-held-plugins)
+
 ## Frames
 
 <a id="binary-bridge-calls"></a>
