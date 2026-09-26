@@ -8,7 +8,7 @@ import { fakeGithub, makeFakePull } from './fakeGithub.helper'
 import { filesCompleteness, mirrorFiles, patchDigest, readComposite, readFiles, type PatchBlobStore } from './prMirror'
 import { COMPLETE } from './prFetch'
 
-// The mirror half of phase 1, against the real migrated github.sqlite: a refresh either swaps in a
+// The mirror's swap, against the real migrated github.sqlite: a refresh either swaps in a
 // complete, ordered resource with its sync row, or changes nothing at all.
 
 const USER = 'ada'

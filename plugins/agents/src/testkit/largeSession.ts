@@ -16,7 +16,7 @@ import { AgentStore } from '../server/sessions/store'
 export type LargeSessionProfile = 'small' | 'scale' | 'canonical'
 
 /** Turns per profile, or a floor of events for the canonical one: the managed-agent docs' 7,000-event
- *  session, which projects to well over the 1,200 cards the programme asks for. */
+ *  session, which projects to well over 1,200 cards, three times the flow's 400-turn mounted ceiling. */
 export const LARGE_SESSION_PROFILES: Record<LargeSessionProfile, { turns: number; events?: number }> = {
   small: { turns: 19 },
   scale: { turns: 94 },

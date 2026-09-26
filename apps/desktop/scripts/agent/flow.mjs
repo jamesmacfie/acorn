@@ -6,8 +6,8 @@
 // so a flow cannot smuggle a script in. Loops exist only as a `repeat` with a small stated count.
 //
 // The runner waits on stated health conditions and animation frames, never a fixed sleep. Invariants
-// are recorded rather than thrown: a phase-0 baseline is expected to fail some of them, and the report
-// is only useful if the flow runs to the end and says which.
+// are recorded rather than thrown: a baseline run can fail some of them, and the report is only useful
+// if the flow runs to the end and says which.
 import { cpus, arch, platform, release, totalmem } from 'node:os'
 
 const MAX_TIMEOUT_MS = 600_000

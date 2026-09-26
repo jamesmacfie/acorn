@@ -1,6 +1,6 @@
 {
   "name": "large-surfaces",
-  "description": "The phase 0 sweep over the large-surface fixture: the Changes diff cold and warm, deep scrolling, dynamic content, layout changes, the long agent transcript, and teardown. Start the session with --fixture large-surfaces.",
+  "description": "The sweep over the large-surface fixture: the Changes diff cold and warm, deep scrolling, dynamic content, layout changes, the long agent transcript, and teardown. Start the session with --fixture large-surfaces.",
   "stages": [
     {
       "name": "cold-diff",

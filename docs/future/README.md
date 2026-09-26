@@ -19,7 +19,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
 | [dashboards/](./dashboards/README.md) | Remaining taskless database and write-back proposals. Shared data discovery and authoring now belong to workflow v2. | Redesign shipped; overlapping proposals superseded, 2026-09-13. |
-| [git-inspired/](./git-inspired/README.md) | Bounded large-surface rendering: complete GitHub topology, segmented diffs, dynamic-block geometry, resident segment caching, and long timelines. Six phases. | Phase 0 partly shipped 2026-09-26: probes, fixture, and flow are in; the visible real-window run is owed. Phase 1 shipped 2026-09-26 on mocked-provider tests; its live GitHub check is owed. Phase 2 shipped 2026-09-26 on jsdom, real-Git and mocked-provider tests; its real-window run is owed. Phase 3 shipped 2026-09-26 on jsdom tests with a modelled layout; its real-window run is owed. Phase 4 shipped 2026-09-26 on unit and jsdom tests; its real-window warm-revisit run is owed. Phase 5 shipped 2026-09-26 on jsdom tests, with the Agent transcript's fixed window; its real-window run and a WebKit containment check are owed. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
 
 ## The single files
@@ -55,9 +54,33 @@ rung-2 containment is recorded in `blockers.md` and sandbox's
 `phased-review-steps/`, `user-extensions/`, `node-first/`, `acp/`, `tauri/`, `events/` and the later
 `events.md` follow-up (shipped on 2026-09-11), `layout/`, `structure/`,
 `structure-followup/`, `before-terminal-ui/`, `terminal/`, `terminal-updates/`, `terminal-rewrite/`,
-`notifications/`, and
+`notifications/`, `git-inspired/`, and
 the single files `live-qa.md`, `dx.md` and `web_search_run.md` are in git history. Each ended by saying
 where its behaviour moved.
+
+`git-inspired/` was six phases of bounded large-surface rendering, after GitHub's 2026 account of
+rendering a 2,200-file, million-line pull request: complete GitHub topology, segmented diff
+documents, dynamic-block geometry, a resident segment cache, and bounded timelines. Shipped and
+deleted 2026-09-27 on branch `large-render`. [diff-rendering.md](../diff-rendering.md) owns the
+viewer: § The document, § The source port, § Data flow, § Parsing and highlighting, § Resident
+segments, § Row geometry, and § What large-surface rendering refuses, which holds the eighteen
+decisions. [github-integration.md](../github-integration.md) § Pull request detail and files has the
+full walk, the stage-then-swap, the 3,000-file and 300-file ceilings, and the unconfirmed 250-commit
+cap; § Diff documents has the descriptor blobs, the two repository routes, and the node-wide digest
+limit; § Conversation has turn identity, near-viewport bodies, and snippets.
+[client-surfaces.md](../managed-agents/client-surfaces.md) has the transcript's fixed window, why it
+shipped, its three refusals including `content-visibility`, and its known limits.
+[caching.md](../caching.md) has the digest-keyed blobs, the unpruned cache, and the resident cache;
+[telemetry.md](../telemetry.md) § Rendered-surface health has the probes;
+[state-ownership.md](../state-ownership.md) has the reading places and the per-node cache;
+[api-reference.md](../api-reference.md) and [data-layer.md](../data-layer.md) have the routes and the
+mirror columns; [package-shape.md](../plugins/package-shape.md) § The plugin API and
+[plugin-authoring.md](../plugin-authoring.md) § Drawing a diff have plugin API major 2; and
+[tui/interaction.md](../tui/interaction.md) has the terminal's diff pane. The fixture and the flow are
+[testing.md](../testing.md) § Large-surface fixture and
+[local-development.md](../local-development.md) § Large-surface flow. Smoke items 81 to 85 in
+[testing.md](../testing.md) are the real-window acceptance it still owes: none has run on a visible
+WebKit window.
 
 `web_search_run.md` made a managed transcript show what an agent searched for, which pages it opened,
 and which sources came back, the same way whichever harness ran it. Shipped and deleted 2026-09-15.
