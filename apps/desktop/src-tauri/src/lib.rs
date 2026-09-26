@@ -1,6 +1,7 @@
 mod app_scheme;
 mod commands;
 mod crash;
+mod dev_server;
 mod helper;
 mod keychain;
 mod menu;
@@ -181,6 +182,9 @@ pub fn run() {
                     println!("[shell] helper ready on {} under Node {}", helper.ready.port, helper.ready.node_version);
                     if let Some(shell) = handle.try_state::<Shell>() {
                         *shell.helper.lock().unwrap() = Some(helper);
+                    }
+                    if let Some(origin) = dev_server.as_deref() {
+                        dev_server::wait_for_entry(origin);
                     }
                     open_window(&handle)?;
                 }
