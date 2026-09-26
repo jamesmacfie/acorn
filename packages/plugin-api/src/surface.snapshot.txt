@@ -658,8 +658,6 @@ ui/diff: buildDiffRows
 ui/diff: buildDiffRowsAsync
 ui/diff: buildRenderableRows
 ui/diff: collectMatches
-ui/diff: createDiffMeasureSchedulers
-ui/diff: createDiffVirtualizer
 ui/diff: createSplitScrollSync
 ui/diff: diffScopeKey
 ui/diff: documentTopology

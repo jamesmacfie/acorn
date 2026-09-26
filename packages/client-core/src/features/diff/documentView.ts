@@ -1,15 +1,15 @@
 import { createMemo, type Accessor } from 'solid-js'
 import { segmentContentKey, type DiffDocumentFile, type DiffDocumentTopology, type DiffSegmentDescriptor } from '@acorn/diff-document/document'
 import {
-  DIFF_FILE_HEADER_HEIGHT, DIFF_GAP_ROW_HEIGHT, DIFF_LINE_HEIGHT, DIFF_RESOLVED_THREAD_HEIGHT, DIFF_THREAD_HEIGHT,
+  DIFF_FILE_HEADER_HEIGHT, DIFF_GAP_ROW_HEIGHT, DIFF_LINE_HEIGHT,
   type CodeRow, type DiffThread, type ViewMode,
 } from '../../kit/diff/diffModel'
 
 // The document as the viewer scrolls it: one item per file header, per segment, and per slice of an
 // expanded gap, built from the topology alone (docs/diff-rendering.md § Data flow). No row exists here.
-// A segment item's height is exact from its counts before its rows load, and a segment's inline
-// threads are reserved for from their line numbers, so the scrollbar and every file's offset are
-// right from the first frame.
+// A segment item's code rows have an exact height from its counts before its rows load, and a
+// segment's inline threads are known from their line numbers, so ./diffLayout.ts can reserve for them
+// and the scrollbar and every file's offset are right from the first frame.
 
 /** One segment of one file, and the key its content is cached and requested under. */
 export type SegmentRef = { file: DiffDocumentFile; ordinal: number; descriptor: DiffSegmentDescriptor; contentKey: string }
@@ -86,9 +86,9 @@ export function createDocumentView(props: {
 
   const indexByKey = createMemo(() => new Map(items().map((item, index) => [item.key, index])))
 
-  // Threads reserved for per segment item, from their line numbers alone.
-  const threadHeights = createMemo(() => {
-    const byKey = new Map<string, number>()
+  // Each segment item's threads, from their line numbers alone, in the source's order.
+  const threadsIn = createMemo(() => {
+    const byKey = new Map<string, DiffThread[]>()
     for (const thread of props.threads() ?? []) {
       const anchor = threadAnchor(thread)
       const file = thread.path ? fileByPath().get(thread.path) : undefined
@@ -96,15 +96,16 @@ export function createDocumentView(props: {
       const ordinal = segmentOfLine(file, anchor.side, anchor.line)
       if (ordinal < 0) continue
       const key = `s:${file.path}:${ordinal}`
-      byKey.set(key, (byKey.get(key) ?? 0) + (thread.resolved ? DIFF_RESOLVED_THREAD_HEIGHT : DIFF_THREAD_HEIGHT))
+      const bucket = byKey.get(key)
+      if (bucket) bucket.push(thread)
+      else byKey.set(key, [thread])
     }
     return byKey
   })
 
-  /** An item's height before it is measured. Exact for everything but the threads in a segment,
-   *  which are estimates until the segment mounts and is measured. */
-  const estimate = (item: DiffItem | undefined, mode: ViewMode): number => {
-    if (!item) return DIFF_LINE_HEIGHT
+  /** An item's code rows, headers and gaps: exact, because none of them wraps. Threads and whatever a
+   *  line draws under itself are dynamic blocks on top of this (./diffLayout.ts). */
+  const fixedHeight = (item: DiffItem, mode: ViewMode): number => {
     if (item.kind === 'file') return DIFF_FILE_HEADER_HEIGHT
     if (item.kind === 'nodiff') return DIFF_GAP_ROW_HEIGHT
     if (item.kind === 'overlay') return item.rows.length * DIFF_LINE_HEIGHT
@@ -112,7 +113,7 @@ export function createDocumentView(props: {
     const skipped = (item.skipFirst ? 1 : 0) + (item.skipLast ? 1 : 0)
     const lines = (mode === 'split' ? descriptor.bands : descriptor.rows) - descriptor.gaps
     const gaps = descriptor.gaps - skipped
-    return lines * DIFF_LINE_HEIGHT + gaps * DIFF_GAP_ROW_HEIGHT + (threadHeights().get(item.key) ?? 0)
+    return lines * DIFF_LINE_HEIGHT + gaps * DIFF_GAP_ROW_HEIGHT
   }
 
   /** Threads the source has that land in some segment of this document. */
@@ -126,7 +127,7 @@ export function createDocumentView(props: {
     return count
   })
 
-  return { files, fileByPath, items, indexByKey, estimate, reserved: threadHeights, placedThreads }
+  return { files, fileByPath, items, indexByKey, fixedHeight, threadsIn, placedThreads }
 }
 
 export type DocumentView = ReturnType<typeof createDocumentView>

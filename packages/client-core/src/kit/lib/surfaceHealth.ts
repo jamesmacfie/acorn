@@ -31,10 +31,12 @@ export type SurfaceHealth = {
   /** Work still owed. Distance is in the surface's own unit (segments for the diff), never a path.
    *  `unvisitedSegments` is content prepared for a part of the surface the reader has not reached. */
   work: { queuedSegments: number; queuedEnrichment: number; furthestQueueDistance: number; unvisitedSegments: number; scheduledFrames: number; heldPublications: number; prepareMs: number }
-  /** Size reads and the geometry writes they caused, cumulative since mount, plus live observers. */
-  measurement: { candidates: number; reads: number; commits: number; maxCommitsInFrame: number; readMs: number; activeObservers: number; observedElements: number }
-  /** Scroll writes the surface made to keep a reading place, cumulative since mount. */
-  correction: { count: number; failed: number; maxPixels: number; maxAnchorDrift: number }
+  /** Size reads and the geometry writes they caused, cumulative since mount, plus live observers.
+   *  `fixedRebuilds` counts rebuilds of the exact fixed geometry, which a dynamic resize must never cause. */
+  measurement: { candidates: number; reads: number; commits: number; maxCommitsInFrame: number; readMs: number; commitMs: number; fixedRebuilds: number; activeObservers: number; observedElements: number }
+  /** Scroll writes the surface made to keep a reading place, cumulative since mount. `substituted`
+   *  counts places whose anchor had gone and a neighbour stood in. */
+  correction: { count: number; failed: number; substituted: number; maxPixels: number; maxAnchorDrift: number }
   /** Parsed content held in memory for this surface. `estimatedBytes` is a lower bound. */
   resident: { documents: number; segments: number; rows: number; estimatedBytes: number }
 }
@@ -62,8 +64,8 @@ const TEMPLATE: SurfaceHealth = {
   topology: { files: 0, segments: 0, fixedRows: 0, dynamicBlocks: 0, ready: false, lateSourceBlocks: 0 },
   mounted: { segments: 0, fixedRows: 0, dynamicBlocks: 0, blankBlocks: 0, uncoveredRanges: 0 },
   work: { queuedSegments: 0, queuedEnrichment: 0, furthestQueueDistance: 0, unvisitedSegments: 0, scheduledFrames: 0, heldPublications: 0, prepareMs: 0 },
-  measurement: { candidates: 0, reads: 0, commits: 0, maxCommitsInFrame: 0, readMs: 0, activeObservers: 0, observedElements: 0 },
-  correction: { count: 0, failed: 0, maxPixels: 0, maxAnchorDrift: 0 },
+  measurement: { candidates: 0, reads: 0, commits: 0, maxCommitsInFrame: 0, readMs: 0, commitMs: 0, fixedRebuilds: 0, activeObservers: 0, observedElements: 0 },
+  correction: { count: 0, failed: 0, substituted: 0, maxPixels: 0, maxAnchorDrift: 0 },
   resident: { documents: 0, segments: 0, rows: 0, estimatedBytes: 0 },
 }
 

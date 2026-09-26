@@ -4,15 +4,18 @@ import type { DiffDocumentFile } from '@acorn/diff-document/document'
 import { Button } from '../../kit/components/primitives'
 import { DiffLine, FileHead, NonCodeRow, SplitCell, type LineComposerController, type ThreadCollapseController } from '../../kit/diff/DiffRows'
 import type { FindHighlight } from '../../kit/diff/find'
-import { isCodeRow, toBands, type CodeRow, type DiffThread, type GapRow, type Row, type SplitBand, type ViewMode } from '../../kit/diff/diffModel'
+import { DIFF_LINE_HEIGHT, isCodeRow, toBands, type CodeRow, type DiffThread, type GapRow, type Row, type SplitBand, type ViewMode } from '../../kit/diff/diffModel'
 import { createSplitScrollSync } from '../../kit/diff/splitScrollSync'
+import { threadBlockId, type DiffRangeItem } from './diffLayout'
 import type { DiffItem } from './documentView'
 import type { SegmentStatus } from './segmentLoader'
 
-type VirtualItem = { index: number; start: number; end: number; key: unknown }
-type DiffVirtualizer = {
-  getTotalSize: () => number
-  getVirtualItems: () => VirtualItem[]
+/** What the canvas needs from the geometry (./diffLayout.ts). */
+type CanvasLayout = {
+  range: Accessor<readonly DiffRangeItem[]>
+  attachCanvas: (element: HTMLElement) => void
+  observeBlock: (element: HTMLElement, block: Accessor<{ id: string; base: number } | null>) => void
+  input: () => void
 }
 
 /** What a row needs from the pane: the comment layer, gap expansion, find and the source's seams. */
@@ -33,20 +36,23 @@ export type DiffRowContext = {
   lineExtra?: (row: CodeRow) => JSX.Element
   lineAction?: { title: string; run: (row: CodeRow, event: MouseEvent) => void }
   openLine?: (row: CodeRow) => void
+  /** The dynamic block a code row or a split band carries now, or null for none (./diffLayout.ts). */
+  lineBlock: (row: CodeRow) => string | null
+  bandBlock: (left: CodeRow | null, right: CodeRow | null) => string | null
+  observeBlock: CanvasLayout['observeBlock']
 }
 
 export function DiffCanvas(props: {
   viewMode: Accessor<ViewMode>
   items: Accessor<DiffItem[]>
-  /** The virtualizer for the mode on screen. */
-  virtualizer: Accessor<DiffVirtualizer>
+  /** The geometry for the mode on screen: what is mounted, and where. */
+  layout: CanvasLayout
   stickyHead: () => JSX.Element
   // The scroller must be handed back: the virtualizer only produces items once it has this element.
   publishScrollEl: (element: HTMLDivElement, mode: ViewMode) => void
   onScroll: (element: HTMLDivElement) => void
   /** Widest code line in columns: the row canvas's width, since code lines don't wrap. */
   maxCols: Accessor<number>
-  measure: (element: HTMLElement) => void
   /** A mounted segment's or slice's rows with its threads placed, or undefined while not loaded. */
   itemRows: (item: Extract<DiffItem, { kind: 'segment' | 'overlay' }>) => readonly Row[] | undefined
   segmentStatus: (contentKey: string) => SegmentStatus | undefined
@@ -56,12 +62,12 @@ export function DiffCanvas(props: {
   rows: DiffRowContext
 }) {
   // Mounted items by key, so an item that stays in range keeps its DOM while the range moves and a
-  // composer typing inside it keeps its focus. `For` over the keys, not over the virtual items: the
-  // virtualizer mints new item objects whenever an offset changes.
+  // composer typing inside it keeps its focus. `For` over the keys, not over the range: the range
+  // mints new entries whenever an offset changes.
   const mounted = createMemo(() => {
     const all = props.items()
-    const byKey = new Map<string, { vi: VirtualItem; item: DiffItem }>()
-    for (const vi of props.virtualizer().getVirtualItems()) {
+    const byKey = new Map<string, { vi: DiffRangeItem; item: DiffItem }>()
+    for (const vi of props.layout.range()) {
       const item = all[vi.index]
       if (item) byKey.set(item.key, { vi, item })
     }
@@ -124,7 +130,6 @@ export function DiffCanvas(props: {
               class="diff-item"
               data-index={entry()!.vi.index}
               data-kind={item().kind}
-              ref={(element) => props.measure(element)}
               style={{ transform: `translateY(${entry()!.vi.start}px)` }}
             >
               {itemBody(item, () => entry()!.vi.end - entry()!.vi.start)}
@@ -135,19 +140,38 @@ export function DiffCanvas(props: {
     </For>
   )
 
+  // The reader's own input, so a scroll that follows it is told apart from this pane's corrections.
+  // The canvas height is the layout's to set, not a style binding here (./diffLayout.ts says why).
+  const input = () => props.layout.input()
   return (
     <Show when={split()} fallback={
-      <div class="diff" ref={(el) => props.publishScrollEl(el, 'unified')} onScroll={(e) => props.onScroll(e.currentTarget)}>
+      <div
+        class="diff"
+        ref={(el) => props.publishScrollEl(el, 'unified')}
+        onScroll={(e) => props.onScroll(e.currentTarget)}
+        onWheel={input}
+        onTouchMove={input}
+        onPointerDown={input}
+        onKeyDown={input}
+      >
         {/* Inside the canvas, not the scroller: the sticky head needs a canvas-wide containing
             block to stay put when the wide unified canvas scrolls sideways. */}
-        <div class="diff-rows" style={{ height: `${props.virtualizer().getTotalSize()}px`, '--diff-cols': props.maxCols() }}>
+        <div class="diff-rows" style={{ '--diff-cols': props.maxCols() }} ref={(el) => props.layout.attachCanvas(el)}>
           {props.stickyHead()}
           {canvas()}
         </div>
       </div>
     }>
-      <div class="diff diff-split" ref={(el) => props.publishScrollEl(el, 'split')} onScroll={(e) => props.onScroll(e.currentTarget)}>
-        <div class="diff-split-rows" style={{ height: `${props.virtualizer().getTotalSize()}px` }} ref={(el) => splitScroll.attach(el)}>
+      <div
+        class="diff diff-split"
+        ref={(el) => props.publishScrollEl(el, 'split')}
+        onScroll={(e) => props.onScroll(e.currentTarget)}
+        onWheel={input}
+        onTouchMove={input}
+        onPointerDown={input}
+        onKeyDown={input}
+      >
+        <div class="diff-split-rows" ref={(el) => { splitScroll.attach(el); props.layout.attachCanvas(el) }}>
           {props.stickyHead()}
           {canvas()}
         </div>
@@ -194,8 +218,17 @@ function SegmentPlaceholder(props: { height: number; failed: boolean; onRetry: (
 
 function UnifiedRow(props: { row: Row; ctx: DiffRowContext }) {
   const code = () => (isCodeRow(props.row) ? props.row : null)
+  // A thread row is all dynamic block; a code row is one when something is drawn under its line, and
+  // that line is the fixed part of it.
+  const block = () => {
+    if (props.row.kind === 'thread') return { id: threadBlockId(props.row.thread), base: 0 }
+    const row = code()
+    const id = row && props.ctx.lineBlock(row)
+    return id ? { id, base: DIFF_LINE_HEIGHT } : null
+  }
   return (
     <div
+      ref={(element) => props.ctx.observeBlock(element, block)}
       class="diff-row"
       classList={{
         'diff-hunk': props.row.kind === 'hunk',
@@ -269,8 +302,14 @@ function SplitBandView(props: { band: SplitBand; ctx: DiffRowContext; adopt: (ba
   const pair = () => (props.band.kind === 'pair' ? props.band : null)
   const full = () => (props.band as Extract<SplitBand, { kind: 'full' }>).row
   const extra = (row: CodeRow | null) => !!row && props.ctx.hasLineExtra(row)
+  const block = () => {
+    const band = props.band
+    if (band.kind === 'full') return band.row.kind === 'thread' ? { id: threadBlockId(band.row.thread), base: 0 } : null
+    const id = props.ctx.bandBlock(band.left, band.right)
+    return id ? { id, base: DIFF_LINE_HEIGHT } : null
+  }
   return (
-    <div class="diff-split-band" ref={bandEl}>
+    <div class="diff-split-band" ref={(element) => { bandEl = element; props.ctx.observeBlock(element, block) }}>
       <Show
         when={pair()}
         fallback={

@@ -1,6 +1,7 @@
 import { createEffect, on, onCleanup, onMount, type JSX } from 'solid-js'
 import { createDomCollection } from '../../keys/collection'
 import { LIVE, placeAfterScroll, resolveAnchor, samePlace, type ReadingPlace } from '../../lib/readingPlace'
+import { createScrollAuthor } from '../../lib/scrollAuthor'
 import { reportScrollPlace } from '../../lib/scrollPlace'
 import { registerSurfaceHealth } from '../../lib/surfaceHealth'
 
@@ -37,17 +38,6 @@ export type TimelineControls = {
  *  re-arm it, so this bounds a burst rather than the whole restore: a transcript whose highlighting
  *  lands three seconds late gets another go when it does, without a frame loop running in between. */
 const CORRECTIONS = 24
-
-/** How long the reader's input stays the explanation for a move.
- *
- *  Input arms a gesture and the next scroll event spends it, which is right when the input scrolls.
- *  Plenty of it does not: a click to put the caret in a card, a drag to select a line, a key the list
- *  ignores. That arm then sat there, and whatever moved the view next — a clamp, a card re-rendering
- *  shorter, the browser putting something on screen — was written down as the place the reader chose.
- *
- *  A scroll caused by input arrives within a frame or two. A second is long enough to cover a slow one
- *  and short enough that a click the reader has forgotten about cannot claim the next move. */
-const GESTURE_MS = 1000
 
 export function Timeline(props: {
   ariaLabel?: string
@@ -121,23 +111,20 @@ export function Timeline(props: {
   let generation = 0
   let frame = 0
   let corrections = 0
-  // Set while this component is the one writing scrollTop, and cleared a frame later. A scroll event
-  // arrives after the write that caused it, and telling ours from the reader's by comparing positions
-  // does not survive the fractional device pixels a WebView reports.
-  let applying = false
-  // The frame that clears `applying`, held so teardown can cancel it rather than leave it to run
-  // against a list that has gone.
-  let releasing = 0
+  // Our own writes, marked until the frame after them, and when the reader last touched this
+  // (../../lib/scrollAuthor.ts). A scroll event arrives after the write that caused it, and telling
+  // ours from the reader's by comparing positions does not survive the fractional device pixels a
+  // WebView reports.
+  const author = createScrollAuthor()
   // Armed by the reader's own input and spent on the next scroll event, which is how a decision to
   // scroll up is told apart from the browser clamping scrollTop under a shrinking list. Momentum
   // keeps delivering scroll events long after the gesture, but the place is already captured by then.
   let userDriven = false
-  // When the reader last touched this, which is a different question from `userDriven`: that says an
-  // input has not been spent yet, this says how long ago it was. A scrollbar drag and a flick of
-  // momentum both deliver many scroll events for one gesture, and `userDriven` is spent on the first of
-  // them, so the rest would read as moves nobody made. Nothing scrolls a second after the reader
-  // stopped touching it (`GESTURE_MS`).
-  let lastInput = 0
+  // How long ago the reader last touched this is `author.fresh()`, which is a different question from
+  // `userDriven`: that says an input has not been spent yet, this says how recent it was. A scrollbar
+  // drag and a flick of momentum both deliver many scroll events for one gesture, and `userDriven` is
+  // spent on the first of them, so the rest would read as moves nobody made. Nothing scrolls a second
+  // after the reader stopped touching it (`GESTURE_MS`).
   // Where the view was the last time anything here looked, so a report can say what the move was from
   // as well as to.
   let at = 0
@@ -173,14 +160,8 @@ export function Timeline(props: {
 
   const write = (top: number) => {
     if (!scroller) return
-    applying = true
-    scroller.scrollTop = top
+    author.write(scroller, top)
     at = scroller.scrollTop
-    // One release for however many writes are in flight. Scheduling one each would let the first frame
-    // clear the guard while a later write's scroll event is still on its way, and that event would then
-    // read as the reader moving.
-    if (releasing) return
-    releasing = requestAnimationFrame(() => { applying = false; releasing = 0 })
   }
   const pin = () => { if (scroller) write(scroller.scrollHeight) }
 
@@ -276,11 +257,11 @@ export function Timeline(props: {
   const noteScroll = () => {
     // Our own write, echoing back. Also the guard that stops a scroll arriving while this subtree is
     // torn down from being read as the reader moving: cleanup drops the scroller first.
-    if (!scroller || applying) return
+    if (!scroller || author.applying()) return
     // Armed, and recently enough to be about this move. Without the second half a click that scrolled
     // nothing stayed armed until something else moved the view, and that move was then adopted as the
     // reader's place and written to the caller's store, where it outlived the mount that invented it.
-    const fresh = Date.now() - lastInput < GESTURE_MS
+    const fresh = author.fresh()
     const gesture = userDriven && fresh
     const top = scroller.scrollTop
     const geometry = { scrollTop: top, scrollHeight: scroller.scrollHeight, clientHeight: scroller.clientHeight }
@@ -301,7 +282,7 @@ export function Timeline(props: {
 
   const noteInput = () => {
     userDriven = true
-    lastInput = Date.now()
+    author.input()
   }
 
   // Driven from outside, so they set the place by hand rather than inferring it from position: a jump
@@ -348,7 +329,7 @@ export function Timeline(props: {
     replaced.observe(scroller.parentElement, { childList: true })
     counts.observed += 1
   })
-  scheduledFrames = () => (frame ? 1 : 0) + (releasing ? 1 : 0)
+  scheduledFrames = () => (frame ? 1 : 0) + author.pendingFrames()
 
   onCleanup(() => {
     growth.disconnect()
@@ -356,9 +337,8 @@ export function Timeline(props: {
     counts.observers -= 2
     counts.observed = 0
     if (frame) cancelAnimationFrame(frame)
-    if (releasing) cancelAnimationFrame(releasing)
+    author.dispose()
     frame = 0
-    releasing = 0
     scroller = undefined
   })
 
