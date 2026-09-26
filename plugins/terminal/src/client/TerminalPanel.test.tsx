@@ -62,6 +62,12 @@ class StubWebgl {
 vi.mock('@xterm/xterm', () => ({ Terminal: StubTerminal }))
 vi.mock('@xterm/addon-fit', () => ({ FitAddon: class { fit(): void {} } }))
 vi.mock('@xterm/addon-webgl', () => ({ WebglAddon: StubWebgl }))
+// These tests exercise terminal rendering and session lifetime with a running terminal service.
+// The shared host gate now withholds an unknown roster, so supply that premise explicitly.
+vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@acorn/plugin-api/client')>(),
+  hasHostCapability: () => true,
+}))
 // Shiki sits behind the real one, and an ANSI palette is not what this file is about.
 vi.mock('./theme', () => ({ baseTheme: () => ({}), monoFont: () => 'monospace', xtermTheme: async () => ({}) }))
 

@@ -1,4 +1,4 @@
-# plugin API major: 1
+# plugin API major: 2
 client: AttentionItem
 client: AttentionSourceContribution
 client: BindingCandidate
@@ -485,6 +485,7 @@ node: dataFieldsSchema
 node: dataPointerSchema
 node: defaultBudgets
 node: describeError
+node: diffDocumentBlobKey
 node: encodeCached
 node: envFlags
 node: extensionPointId
@@ -637,15 +638,28 @@ ui/data-sources: SourceQueryEditor
 ui/data-sources: TypedBindingPicker
 ui/diff: CodeRow
 ui/diff: CommentSide
-ui/diff: DIFF_LOAD_ROW_HEIGHT
 ui/diff: DiffCollapsedFiles
+ui/diff: DiffDocumentFile
+ui/diff: DiffDocumentTopology
 ui/diff: DiffFile
+ui/diff: DiffLineAnchor
 ui/diff: DiffScrollState
+ui/diff: DiffSearchMatch
+ui/diff: DiffSearchPage
+ui/diff: DiffSearchRequest
+ui/diff: DiffSegmentDescriptor
+ui/diff: DiffSegmentPayload
+ui/diff: DiffSegmentRequest
+ui/diff: DiffSnippet
+ui/diff: DiffSnippetAnchor
+ui/diff: DiffSnippetLine
+ui/diff: DiffSnippets
 ui/diff: DiffSource
 ui/diff: DiffViewScope
 ui/diff: FindHighlight
 ui/diff: GapRow
 ui/diff: ParsedFile
+ui/diff: PlainDiffRow
 ui/diff: Row
 ui/diff: SplitBand
 ui/diff: TokenizeDocument
@@ -654,14 +668,10 @@ ui/diff: ViewMode
 ui/diff: buildDiffRows
 ui/diff: buildDiffRowsAsync
 ui/diff: buildRenderableRows
-ui/diff: collectMatches
-ui/diff: createDiffHydrator
-ui/diff: createDiffMeasureSchedulers
-ui/diff: createDiffVirtualizer
+ui/diff: createDiffSnippets
 ui/diff: createSplitScrollSync
 ui/diff: diffScopeKey
-ui/diff: estimateRowSize
-ui/diff: estimateSplitBandSize
+ui/diff: documentTopology
 ui/diff: expandGap
 ui/diff: expandGapAsync
 ui/diff: gapId
@@ -670,7 +680,6 @@ ui/diff: isCodeRow
 ui/diff: maxLineCols
 ui/diff: plainTokenize
 ui/diff: rowIdentityKeys
-ui/diff: splitBandIdentityKeys
 ui/diff: synth
 ui/diff: toBands
 ui/diff: tokenizeDocument
@@ -927,6 +936,7 @@ ui: Textarea
 ui: ThreadCollapseController
 ui: Timeline
 ui: TimelineControls
+ui: TimelineWindow
 ui: ToggleButton
 ui: Toolbar
 ui: ToolbarSpacer
@@ -935,6 +945,7 @@ ui: UserAvatar
 ui: attachPty
 ui: createArmedConfirm
 ui: createSplitDrag
+ui: createTimelineWindow
 ui: defaultModelIdFor
 ui: paneCollapseKey
 ui: renderMarkdown

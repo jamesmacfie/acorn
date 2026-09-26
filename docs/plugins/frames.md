@@ -169,6 +169,11 @@ place it contributed.
 The wire is `@acorn/protocol/tree/`, the host is `client-core/src/host/tree/`, and
 `docs/shell.md § The plugin worker` has the sandbox.
 
+The worker belongs to one accepted `(pluginId, hash)` pair, while authority belongs to each mounted
+tree. The host supplies a separate bridge port and context for every mount, routes selection and
+surface actions to that mount, and stops the worker immediately if trust for its pair is revoked.
+An older SDK can mount one tree per worker so its single bridge never grants another tree's scope.
+
 Two things a tree is not for. Anything that must react per keystroke — a live filter over a large list,
 a query editor with completions — is a message hop per key and should be a frame. And a surface whose
 pixels are the product, an image editor or a charting library, is a frame by definition.

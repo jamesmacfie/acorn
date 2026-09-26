@@ -25,6 +25,9 @@ vi.mock('./workerHost', () => ({
     unmount: () => {},
     release: () => {},
     bridgePort: () => null,
+    select: () => {},
+    surfaceAction: () => {},
+    appearance: () => {},
     onHostRequest: (_slot: string, bound: (request: TreeHostRequest) => Promise<TreeHostResult>) => {
       handler = bound
       return () => { handler = null }

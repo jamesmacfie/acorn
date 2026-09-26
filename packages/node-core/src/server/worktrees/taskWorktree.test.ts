@@ -6,7 +6,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { schema } from '../db'
 import { clearHooks, registerHookHandler } from '../pluginHost/hooks'
 import { makeTestDb, type TestDb } from '../../testkit/db'
-import { computeTaskStatuses, loadTask, resolveTaskCwd, setWorktreesRoot } from './taskWorktree'
+import { computeTaskStatuses, loadTask, requireTaskRoot, resolveTaskCwd, setWorktreesRoot, taskRoot } from './taskWorktree'
 import { _resetWorktreeStatus, invalidateWorktreeStatus } from './worktreeStatus'
 
 const broadcasts: Record<string, unknown>[] = []
@@ -97,6 +97,15 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
     expect(fresh).toMatchObject({ cwd: a.cwd, created: false })
     expect(stale).toMatchObject({ cwd: a.cwd, created: false })
     expect(created).toHaveLength(1)
+  })
+
+  it('reports a worktree failure separately from a missing checkout for execution', async () => {
+    await t.db.update(schema.tasks).set({ branch: '-invalid' })
+    await expect(requireTaskRoot(t.db, TASK)).rejects.toThrow('Invalid branch name.')
+    await expect(taskRoot(t.db, TASK)).resolves.toBeNull()
+
+    await t.db.update(schema.projects).set({ path: null })
+    await expect(requireTaskRoot(t.db, TASK)).rejects.toThrow('The task has no mapped checkout.')
   })
 
   it('a failing handler does not break worktree resolution', async () => {

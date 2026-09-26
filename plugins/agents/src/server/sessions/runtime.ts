@@ -123,9 +123,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     if (input.profileId !== provider.profileId) {
       throw new Error(`Provider '${provider.id}' requires profile '${provider.profileId}'.`)
     }
-    if (!(await this.core.tasks.root(input.taskId))) {
-      throw new Error('The task has no mapped checkout.')
-    }
+    await this.core.tasks.requireRoot(input.taskId)
     const session = await this.store.createSession(input, provider)
     if (idempotencyKey) await this.store.saveOperation(idempotencyKey, 'session.create', session, session.id)
     return { session, created: true }
@@ -282,9 +280,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     if (provider.profileId !== input.profileId) {
       throw new Error(`Provider '${provider.id}' requires profile '${provider.profileId}'.`)
     }
-    if (!(await this.core.tasks.root(input.taskId))) {
-      throw new Error('The task has no mapped checkout.')
-    }
+    await this.core.tasks.requireRoot(input.taskId)
     const parsed = parseAgentTranscript(input.content)
     const session = await this.store.createSession({
       taskId: input.taskId,
@@ -364,8 +360,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     const session = await this.store.requireSession(sessionId)
     if (session.controller !== 'acorn') throw new Error(`Session input is controlled by ${session.controller}.`)
     if (session.archivedAt) throw new Error('Archived sessions cannot accept turns.')
-    const cwd = await this.core.tasks.root(session.taskId)
-    if (!cwd) throw new Error('The task has no mapped checkout.')
+    const cwd = await this.core.tasks.requireRoot(session.taskId)
     await validateAgentInputFiles(cwd, input.input)
     assertBoundedJson('Effective agent policy', input.effectivePolicy, MAX_AGENT_POLICY_BYTES)
     // Every turn this node accepts passes here, whichever surface enqueued it, so this is where another
@@ -603,8 +598,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
   ): Promise<AgentTurn> {
     if (patch.input) {
       const session = await this.store.requireSession(sessionId)
-      const cwd = await this.core.tasks.root(session.taskId)
-      if (!cwd) throw new Error('The task has no mapped checkout.')
+      const cwd = await this.core.tasks.requireRoot(session.taskId)
       await validateAgentInputFiles(cwd, patch.input)
     }
     return this.store.patchQueuedTurn(sessionId, turnId, patch)

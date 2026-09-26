@@ -1,5 +1,5 @@
 import { emitSpan, newSpanId, newTraceId, setSpansOnTimeline, telemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
-import { createLogger } from '@acorn/client-core/infra/telemetry'
+import { answerSurfaceHealthRequests, createLogger } from '@acorn/client-core/infra/telemetry'
 
 // The renderer's half of a cold-start timeline, and the two readers it has.
 //
@@ -33,6 +33,13 @@ const printing = (() => {
 // The same switch puts every renderer span on the performance timeline, which is how a task switch is
 // timed locally (docs/local-development.md § Timing a task switch). Spans still need telemetry on.
 setSpansOnTimeline(printing)
+
+// Large diffs and timelines count their own mounted rows, observers and queued work, and this is how
+// a WebDriver flow reads those counts: it dispatches the request event and reads one performance mark
+// back (docs/telemetry.md § Rendered-surface health). Always on, because the snapshot is numbers only
+// and a flow should not need a switch that the automation window shares with a developer's own app.
+// Guarded because this module is also imported by a test in bare Node, which has no `window`.
+if (typeof window !== 'undefined') answerSurfaceHealthRequests(window)
 
 /** The mark the account ends on. Everything before it is the window getting from nothing to a
  *  node it can use, which is the launch an owner waits through. */

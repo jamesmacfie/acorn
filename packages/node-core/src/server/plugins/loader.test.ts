@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PLUGIN_API_MAJOR } from './manifest'
-import { installedPluginInfo, loadExternalPlugins, pluginInstallDir, readClientBundle } from './loader'
+import { installedPluginInfo, loadExternalPlugins, pluginInstallDir, readClientBundle, snapshotActivePlugin } from './loader'
 import { PluginMigrationsError } from './migrations'
 
 // A minimal ESM node half. Written as source rather than bundled, because the loader's contract is
@@ -332,6 +332,16 @@ describe('the installed enumeration', () => {
     // against the listing, and refuses. Fail closed.
     expect(served!.hash).toBe(sha256('export default { changed: true }'))
     expect(served!.hash).not.toBe(installed[0].client!.hash)
+  })
+
+  it('keeps an active declaration and its bytes together after the package changes', async () => {
+    const dir = install('ntfy', manifest('ntfy', { client: './dist/client.js' }), BUNDLE('ntfy'), 'export default { version: 1 }')
+    const { installed } = await loadExternalPlugins(root, { builtins: [] })
+    const active = await snapshotActivePlugin(installed[0]!)
+    writeFileSync(join(dir, 'dist', 'client.js'), 'export default { version: 2 }')
+    expect(active.identity).toMatchObject({ version: '1.0.0', activation: 'node', client: { hash: sha256('export default { version: 1 }') } })
+    expect(new TextDecoder().decode(active.bundle!.bytes)).toBe('export default { version: 1 }')
+    expect((await readClientBundle(installed, 'ntfy'))?.hash).toBe(sha256('export default { version: 2 }'))
   })
 
   it('has nothing to serve for an unknown id or a package with no client half', async () => {

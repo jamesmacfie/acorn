@@ -171,6 +171,7 @@ itself is broken, and marking it retryable would invite a client to hammer it.
 | `GET` | `/v1/core/devices` | List paired devices |
 | `DELETE` | `/v1/core/devices/:id` | Revoke a device |
 | `GET` | `/v1/core/plugins` | List plugin status and capabilities |
+| `GET` | `/v1/core/plugins/:id/bundles/:hash` | Read the exact active or installed client bundle for device custody |
 | `PUT` | `/v1/core/plugins/:name` | Enable/disable an optional plugin |
 | `POST` | `/v1/core/plugins/:id/reload` | Swap a loaded plugin's node half in the running process |
 | `POST` | `/v1/core/plugins/requests/:requestId` | Answer an agent-raised install request (`approved`/`denied`) |
@@ -197,6 +198,12 @@ These routes are device-only. Backup uses Node filesystem paths, so an internal 
 reach it. Schedules are the same class for a different reason: a schedule is code the node runs
 unattended, so declaring one is a way to make code run later. For more information, see
 [the schedules doc](./schedules.md).
+
+Each plugin roster row may contain `active`, the declaration and client hash captured with its running
+loaded runtime, alongside `installed`, the current package on disk. `active: null` says no loaded
+runtime is active; an omitted field is an older response. `running` and `state` still describe the
+Node's activation and restart status. The bundle route resolves by the requested hash, including
+retained active bytes after an on-disk update, so custody can verify the hash before any trust decision.
 
 `GET /v1/core/plugins` also carries `requests`, the queue of installs an agent has asked for and the
 owner has not answered, and the decision route closes one. A task-scoped agent can raise a request
@@ -319,6 +326,43 @@ are authoritative.
 
 GitHub reads use the plugin SQLite mirror with TTL/ETag revalidation where supported. Patch and file
 bodies use the shared immutable blob cache. GitHub writes update or invalidate the affected mirror.
+
+The pull request read routes, with types in `plugins/github/src/shared/api.ts`:
+
+| Route | Response |
+| --- | --- |
+| `GET …/pulls/:number` | `PullDetail`, with every GraphQL connection exhausted and child lists in GitHub's order |
+| `GET …/pulls/:number/files` | `PullFilesResponse`: `{ files, completeness }`, files in `position` order with patch bodies |
+| `GET …/pulls/:number/files?summary=1` | `PullFilesResponse` with `patch: null` on every file and no blob reads |
+| `GET …/pulls/:number/files?path=P` | `PullFilesResponse` holding that one file, when the pull has it |
+| `GET …/pulls/:number/diff` | `PullDiffResponse`: `{ document, completeness }`, the files as a diff document with no patch text |
+| `POST …/pulls/batch` | `PullBatchItem[]`: `{ number, detail, files? }`; `files` is absent for mode `none` or a failed files refresh |
+| `GET …/compare?base=&head=` | `Compare`: `{ aheadBy, document, completeness, commits }` |
+| `POST …/:owner/:repo/diff/segments` | `DiffSegmentPayload[]` for 1 to 32 `requests` of `{ path, patchKey, ordinal }`, in request order |
+| `POST …/:owner/:repo/diff/search` | `DiffSearchPage`: up to 500 matches over the named `files`, reading at most 1,000 segments, with a `nextCursor`. A page can be empty and still carry a cursor |
+
+`completeness` is `PullTopologyCompleteness`. `{ kind: 'complete' }` means the list is everything
+GitHub has. `{ kind: 'incomplete', cause: 'upstream-cap', resource, received, reportedTotal, limit }`
+means GitHub's own ceiling cut it short: resource `files` at 3,000 or `compare-files` at 300.
+`reportedTotal` is GitHub's count, or null when it gave none. A failed refresh is not incomplete: the
+route serves the previous mirror stale, or fails cold.
+
+`PullFile` has `position`, its zero-based place in GitHub's list, and `patchState`. With
+`patchState: 'available'`, `patchKey` is the `sha256:<hex>` digest of the patch text, and `patch` is
+the body unless the read was a summary. With `patchState: 'unavailable'`, GitHub sent no patch, and
+`patchKey` and `patch` are null. `sha` stays the new-side blob, for `blobs/:sha`. `?force=true` on the
+detail, files and diff reads blocks on a full refresh. A batch refresh that fails with `401`, `403`, or
+`429` fails the batch; any other failure leaves that pull's previous mirror.
+
+A diff document is `DiffDocumentTopology` from `@acorn/diff-document` ([diff-rendering.md](./diff-rendering.md)
+§ The document): every file with its segment descriptors, totals, and a revision. The two repository
+routes read what a pull's diff or a compare preview named. A segment request's `patchKey` must be a
+`sha256:<hex>` digest; a digest whose body this node does not hold answers `404 segment_not_found`,
+an ordinal past the file's last segment `400 bad_ordinal`, and more than 32 requests, none, or a
+malformed body `400 bad_request`. A search body is `{ query, caseSensitive, cursor, files }` with a
+query of at most 256 characters and at most 5,000 files; a cursor this node did not write answers
+`400 bad_cursor`. The query is never logged. A path in either body is at most 4,096 characters, as
+it is on the Changes document routes.
 
 ### Agents
 
@@ -501,7 +545,7 @@ task-scoped credentials can reach only their own task notes.
 
 | Plugin | Route surface |
 | --- | --- |
-| `changes` | task-local Git actions, a model-written commit message, and review notes |
+| `changes` | task-local Git actions, the working tree's diff document, a model-written commit message, and review notes |
 | `database` | task-scoped PostgreSQL schema/query operations |
 | `docker` | Node inventory and task container actions |
 | `editor` | task file reads/writes and search |
@@ -511,6 +555,25 @@ task-scoped credentials can reach only their own task notes.
 | `linear` | projects, issues, comments, reference resolution, and rail rows (loaded package) |
 | `rollbar` | normalized items, occurrences, and details |
 | `preview` | preview rules, node-owned URL resolution, and recipe selection |
+
+### Changes diff document
+
+The Changes pane reads its stacked diff as a document ([diff-rendering.md](./diff-rendering.md)
+§ Data flow), one staging area at a time, with types in `plugins/changes/src/shared/api.ts`:
+
+| Route | Body | Response |
+| --- | --- | --- |
+| `POST /v1/p/changes/tasks/:id/local/document` | `{ scope, files: { path, key }[] }`, at most 5,000 files | `{ files: { path, patchKey, segments }[] }`, in request order |
+| `POST /v1/p/changes/tasks/:id/local/document/segments` | `{ scope, requests }`, 1 to 32 | `DiffSegmentPayload[]` |
+| `POST /v1/p/changes/tasks/:id/local/document/search` | `{ scope, query, caseSensitive, cursor, files }` | `DiffSearchPage` |
+
+`scope` is `staged` or `unstaged`. `key` is the pane's status key for the file; the node diffs again
+only the files whose key moved. A null `patchKey` means the file has no diff in that scope. A segment
+or search request naming a digest that is not the one the last document gave that file, or not what
+git produces now when the node holds no document for it, answers `409 revision_conflict`, and the
+pane reads the document again. A path is validated where it reaches git, as the other routes do. A
+file git cannot read answers a null `patchKey` rather than failing the document. A task with no
+worktree answers `404 not_found`.
 
 ### Command palette routes
 

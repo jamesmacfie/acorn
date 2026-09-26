@@ -35,7 +35,7 @@ import {
 
 // Re-exported so this file stays the one import for everything manifest-shaped. The declarations
 // themselves live in @acorn/protocol: the node uses them to decide what to load, the client to decide
-// which of a fleet's bundles it can run (client-core/host/trust/resolveBundles.ts), and one compatibility
+// which device-held bundle it can run (client-core/host/plugins/distributionModel.ts), and one compatibility
 // contract cannot live on one side.
 export { PLUGIN_API_MAJOR, speaksApiVersion } from '@acorn/protocol/plugin/apiVersion.ts'
 export type {

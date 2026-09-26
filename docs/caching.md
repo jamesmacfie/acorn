@@ -1,6 +1,6 @@
 # Caching
 
-acorn has three independent cache layers. None of them replaces the source of truth that owns the
+acorn has four independent cache layers. None of them replaces the source of truth that owns the
 data.
 
 ## Provider mirrors
@@ -41,14 +41,45 @@ the mirrored resource and gets serve-then-revalidate as normal.
 
 ## Immutable blob cache
 
-`BLOBS` is an on-disk, content-addressed cache under `<data-root>/blobs/`. GitHub patch bodies and
-file bodies are keyed by SHA; attachments and agent artifacts use the same immutable storage
-mechanism. A cache miss fetches the provider body, verifies the expected digest where available,
-and writes it atomically. The cache is local to a Node and stores both public and private repository
+`BLOBS` is an on-disk, content-addressed cache under `<data-root>/blobs/`. A GitHub patch body is
+keyed by a SHA-256 digest of the patch text, `patch:sha256:<hex>`, because a head blob SHA does not
+identify a patch: the same new file has a different patch against a different base. A new-side file
+body stays keyed by its blob SHA, `filebody:<sha>`. Attachments and agent artifacts use the same
+immutable storage mechanism.
+
+Beside each patch body, the GitHub plugin stores the segment descriptors it cuts into,
+`diffdoc:v<version>:sha256:<hex>`, so a diff document's topology is read from small blobs rather than
+parsed ([diff-rendering.md](./diff-rendering.md) § The document). A new segmenter version reads new
+keys and cuts again; the old ones are only cache data. A compare preview writes its inline patch
+bodies under the same `patch:` keys, so its segments are served the same way.
+
+A GitHub file row says whether its patch is available. An available patch whose body is missing from
+the cache is an integrity failure, and the files route repairs it with a blocking refresh rather than
+serving the file as having no diff. A summary read touches no blob at all. A cache miss fetches the provider body, verifies the expected digest where available,
+and writes it atomically: to a staged file beside the entry, renamed over it, so a reader never gets
+half a body. The cache is local to a Node and stores both public and private repository
 content because it is not shared storage.
 
-Blob pruning must respect references retained by plugin records. Worktrees are not part of the blob
+Nothing prunes the cache. `BlobCache` has `get` and `put` and no delete, so every body stays on disk:
+superseded patches, `patch:<sha>` bodies from before patches were keyed by digest, and descriptor
+blobs from older segmenter versions. A compare preview writes up to 300 patch bodies each time it
+loads. A patch seen before lands on its old key, but every new comparison adds its own. A pruner must respect the references plugin records keep. Worktrees are not part of the blob
 cache.
+
+## Plugin bundle custody
+
+The device keeps client bundles by the SHA-256 it computes from received bytes. An advertised Node hash
+is a lookup hint and is verified before caching; the trust decision is a separate durable record keyed
+by `(pluginId, hash)`. A single cache file may serve equivalent bytes offered by several Nodes, while
+offer provenance records which Nodes supplied them. Reconciliation visits both the Node's active
+runtime and its installed disk candidate so an update can be reviewed without displacing running UI.
+The Node retains its active client bundle independently of the mutable package directory and serves
+it through the hash-addressed bundle route after an update or uninstall until that runtime stops.
+
+The cache does not persist a selected fleet winner. Each client session derives per-Node selections
+from current runtime observations, locally cached bytes, and custody decisions. Stale or unreachable
+observations remain available for explanation but cannot authorize a contribution. Existing cache
+files and trust records need no reset for the additive `active` protocol field.
 
 Opening the cache sweeps the directory once, and the sweep is a permission migration: `put` writes
 mode 0600, so a file with any other mode was written by an older build under a permissive umask. The
@@ -103,9 +134,33 @@ reconnect re-reads both the task's run list and the selected run's steps. The pa
 inside the active Node shell, and the task-run index subscribes through that same Node connection.
 Identical task or run IDs on two Nodes therefore cannot invalidate or navigate into each other.
 
+No diff segment, parsed row, token, or whole patch is in the query cache. Segments are fetched
+outside it and held in the resident segment cache below, and a pull request's document is under a
+`files` key that is not persisted (`['files', owner, repo, number, 'diff']`). The providers keep their own parse caches on the node: 64 MB of parsed patches per plugin
+process, by digest, which are content-addressed and so can be gone but never wrong. The Changes
+plugin's also records which digest the last document gave each file, and a segment request for any
+other is refused rather than answered from the cache.
+
 The persisted cache has no version buster. An entry written before a response type gained a required
 field survives a relaunch as-is, so change the query key whenever the shape it caches gains a
-required field. Nothing else invalidates an old entry.
+required field. Nothing else invalidates an old entry. GitHub's file summaries key ends in `'v2'` for that
+reason: the response gained `completeness`, and file rows gained `position` and patch state. The
+compare key ends in `'v3'`: it gained `completeness`, then its `files` became a diff `document`.
+
+## Resident diff segments
+
+The diff viewer keeps the node's recently read segments in memory, one cache per query client
+(`packages/client-core/src/features/diff/segmentCache.ts`). It is a separate store from the query
+cache: segments never pass through a query, so the persisted snapshot cannot contain one, and
+`DiffPane.test.tsx` checks that a dehydrated client holds no segment text. The cache is never written
+to IndexedDB or to a file.
+
+It is a weighted least-recently-used cache with two ceilings, 40,000 rows and 32 MiB of estimated
+bytes. Plain rows and colour are weighed apart, and colour goes first. Segments a pane shows, holds
+near, or is loading are never evicted. One held segment over a ceiling stays until nothing holds it.
+A working tree that saves a file drops that file's superseded patch at once. `dropNode` clears it with
+the node's query client, and a node switch reads the other node's. The keys, the weights, and the
+eviction order are in [diff-rendering.md](./diff-rendering.md) § Resident segments.
 
 ## Fan-out cache safety
 

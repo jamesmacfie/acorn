@@ -140,7 +140,7 @@ const MEASURED_KINDS: ReadonlySet<string> = new Set([
 // longer window here.
 const OPEN_URL_MIN_GAP_MS = 1000
 
-export type FrameBridge = { dispose(): void }
+export type FrameBridge = { dispose(): void; setContext?(context: PluginFrameContext): void }
 
 const denied = (id: number, message: string): PluginBridgeReply => ({
   id,
@@ -189,6 +189,8 @@ export function createFrameBridge(input: {
   // request from a bundle built before that ack existed. It is the host's only evidence that the bundle
   // evaluated, and it cancels the handshake deadline in PluginFrame.
   onConnected?(): void
+  /** The bundle bootstrap port has no tree authority until a single legacy slot is mounted. */
+  authorize?(): boolean
 }): FrameBridge {
   const { port, binding, services, onMisbehaving } = input
   let spoke = false
@@ -602,6 +604,11 @@ export function createFrameBridge(input: {
       reportOverBudget(budget)
       return kill(budget)
     }
+    if (input.authorize && !input.authorize()) {
+      const shape = requestShape(data)
+      if (shape) post(denied(shape.id, 'this bridge is not bound to a mounted tree'))
+      return
+    }
     // A histogram and never a span: a frame doing real work sends a handful of messages per
     // interaction, and one drawing a chart sends thousands (docs/telemetry.md § Hot seams are
     // metrics). The kind is in the seam name rather than an attribute, because a histogram is
@@ -679,6 +686,9 @@ export function createFrameBridge(input: {
   post({ kind: 'ready', context: input.context })
 
   return {
+    setContext(context): void {
+      post({ kind: 'ready', context })
+    },
     dispose(): void {
       if (!alive) return
       alive = false

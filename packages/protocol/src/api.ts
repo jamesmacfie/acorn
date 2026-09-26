@@ -343,6 +343,9 @@ export type NodePluginRow = {
   // Present exactly when this plugin came off the node's disk rather than the app binary, which makes
   // it the client's answer to "is this third-party?" (docs/third-party).
   installed?: InstalledPluginRow
+  /** The declaration committed with the service this process runs. `null` means this node has no
+   * active loaded runtime; omission identifies a response cached from a node predating this field. */
+  active?: PluginRuntimeIdentity | null
 }
 
 // The major of @acorn/plugin-api a bundle was built against. A manifest that doesn't name exactly this
@@ -603,6 +606,11 @@ export type InstalledPluginRow = {
   // Epoch millis.
   installedAt?: number
 }
+/** Manifest-derived fields that must travel together with the running node half and its client bytes.
+ * Installation source and timestamps belong only to the disk candidate. */
+export type PluginRuntimeIdentity = Omit<InstalledPluginRow, 'source' | 'bundled' | 'installedAt'> & {
+  activation: 'node' | 'client-only'
+}
 // An install the agent asked for and the owner hasn't answered yet (docs/plugins.md §
 // Approval-mediated install). Raised by the `plugin_request` agent tool, which can't install anything:
 // the record is inert until a device reads it and installs over the device-gated route with its own
@@ -665,6 +673,8 @@ export const corePluginRequestRoute = (requestId: string) => `/v1/core/plugins/r
 // The bundle bytes. Device-only like the roster: this is an owner surface, not a task surface, so a
 // task-scoped internal token can't reach it (server/index.ts mounts requireDevice over both forms).
 export const corePluginBundleRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/client.js`
+export const corePluginBundleByHashRoute = (id: string, hash: string) =>
+  `/v1/core/plugins/${encodeURIComponent(id)}/bundles/${encodeURIComponent(hash)}`
 // Every client paired with a node, and the revoke for one of them. Device-only, like the plugin list:
 // this is node administration.
 export const coreDevicesRoute = '/v1/core/devices'

@@ -107,11 +107,11 @@ const schedulerCapability = capabilities.provide(SCHEDULER, scheduler)
 const plugins = await initPlugins(graph.plugins, { capabilities, core, env: runtime, dataDir: root.dir, disabled: disabled(), loaded: graph.loaded })
 const pluginStateCapability = capabilities.provide(
   PLUGIN_STATE,
-  buildPluginStateBridge({
+  await buildPluginStateBridge({
     dataDir: root.dir,
     db: runtime.DB,
     roster: () => plugins.roster,
-    booted: () => graph.installed.map((entry) => ({ id: entry.manifest.id, version: entry.manifest.version })),
+    booted: () => graph.installed,
     loadFailures: () => graph.failures,
     disabled,
     setDisabled: (names) => disabledPlugins.set(names),

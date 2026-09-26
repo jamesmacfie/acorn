@@ -6,7 +6,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { pluginManifestSchema } from './manifest'
 import { hostFunctionMode } from './hostCallModes'
 import { isolateNodePlugin } from './isolation'
-import type { CompiledNodePluginContext } from '../pluginHost/types'
+import type { CompiledNodePluginContext, PluginFetchHandler } from '../pluginHost/types'
 import type { ModelProviderAdapter } from '../modelProviders/types'
 
 const roots: string[] = []
@@ -19,6 +19,8 @@ it('classifies init and ready public paths and refuses an unclassified host meth
   expect(hostFunctionMode('plugin.ready.args[0].core.tasks.load')).toBe('async')
   expect(hostFunctionMode('plugin.init.args[0].core.proc.brokerEnv')).toBe('sync')
   expect(hostFunctionMode('plugin.init.args[0].providers.model')).toBe('sync')
+  expect(hostFunctionMode('remote.sync.args[1].args[1].providers.items')).toBe('sync')
+  expect(hostFunctionMode('remote.sync.args[1].args[1].providers.connections')).toBe('async')
   expect(() => hostFunctionMode('plugin.init.args[0].core.tasks.newMethod')).toThrow('Unclassified host context method')
   expect(() => hostFunctionMode('plugin.init.args[0].newGroup.method')).toThrow('Unclassified host context method')
 })
@@ -30,6 +32,7 @@ it('keeps loaded worker calls in their declared modes across registration and di
   const parsed = pluginManifestSchema.parse({ id: 'host-modes', name: 'Host modes', version: '1', baseline: 'acorn-1', apiVersion: '1' })
   let listener: ((frame: unknown) => unknown) | undefined
   let modelAdapter: ModelProviderAdapter | undefined
+  let integrationRoute: PluginFetchHandler | undefined
   const disposed = vi.fn()
   const registered = vi.fn()
   const ctx = {
@@ -47,6 +50,7 @@ it('keeps loaded worker calls in their declared modes across registration and di
     hooks: { declare: registered },
     providers: {
       connection: registered,
+      integration: (_provider: unknown, route: PluginFetchHandler) => { integrationRoute = route },
       model: (adapter: ModelProviderAdapter) => { modelAdapter = adapter },
     },
     capabilities: {
@@ -89,6 +93,14 @@ it('keeps loaded worker calls in their declared modes across registration and di
       secret: 'credential', config: {},
       input: { system: '', prompt: 'hello', maxOutputTokens: 10 },
     })).toEqual({ text: 'credential:hello', modelId: 'probe-model' })
+    const response = await integrationRoute?.(new Request('https://acorn.invalid/issues'), {
+      userId: 'owner',
+      principal: { kind: 'device', userId: 'owner' },
+      providers: {
+        items: () => ({ listByIdentifier: async (identifiers: string[]) => identifiers }),
+      },
+    } as never)
+    expect(await response?.json()).toEqual(['ENG-42'])
   } finally {
     await plugin.dispose?.()
   }

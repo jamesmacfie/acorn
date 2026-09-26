@@ -230,9 +230,9 @@ owns the shape.
 ### The sandbox
 
 A `node:worker_threads` worker started with `execArgv: ['--permission', '--allow-fs-read=<bootstrap>',
-'--allow-fs-read=<bundle>']`, receiving the same two ports the DOM's Web Worker does: the bridge port
-carrying the SDK verbs and the three host pushes, and the tree port carrying `tree:mount`,
-`tree:batch` and the rest. `workerHost.ts`'s `_setWorkerFactory` is the seam, and
+'--allow-fs-read=<bundle>']`, receiving the tree port for `tree:mount`, `tree:batch`, and the rest,
+plus a scoped bridge port for each mounted tree's SDK verbs. Host selection and surface actions target
+one mount; appearance updates reach every live mount. `workerHost.ts`'s `_setWorkerFactory` is the seam, and
 `apps/tui/src/plugins/workerFactory.ts` is what it substitutes. Everything else in that file — slot
 bookkeeping, the 30-second grace, the heartbeat, the fail-fanout — is shared.
 
@@ -273,6 +273,12 @@ Bytes are hashed on arrival and a mismatch is refused and never re-keyed, which 
 The schemas are `@acorn/protocol`'s; no custody type is defined in this package. Device provenance is
 natural here and `{ path }` is an allowed source form, though nothing offers it yet: a person at a
 terminal installing a plugin is installing it here.
+
+The shared distribution snapshot selects only the active runtime of the current Node after custody
+accepts its exact bytes. Installed updates remain separate offers. A stale or unreachable Node retains
+its last roster for explanation while withholding its loaded UI. TUI custody can forget one recorded
+decision for reconsideration, and ending development mode withdraws its auto-accepted hashes through
+the same shared reconciliation as desktop.
 
 No module outside `packages/client-core/src/host/plugins/host.ts` calls `pluginCustody()`, and this
 host does not add a second caller.

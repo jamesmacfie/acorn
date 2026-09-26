@@ -56,6 +56,8 @@ export async function bootFixture(): Promise<{ task: typeof TASK }> {
     import('./plugins/trustPromptLoader'),
   ])
   setTrustPromptComponent(() => TrustPrompt)
+  const { refreshNodePlugins } = await import('@acorn/client-core/infra/node')
+  await refreshNodePlugins('node-1')
   return { task: TASK }
 }
 

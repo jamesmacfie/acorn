@@ -1,5 +1,6 @@
 import type { Component } from 'solid-js'
 import { Registry } from '../../../kit/lib/registry'
+import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 
 export type ProjectImporterProps = {
   onClose: () => void
@@ -23,8 +24,16 @@ export type ProjectImporterContribution = {
   label: string
   glyph: string
   component: Component<ProjectImporterProps>
+  requires?: HostCapabilityRequirement
 }
 
 // Project discovery is provider-owned. The shell supplies the host surface and lifecycle callbacks;
 // each plugin owns its candidate list, action protocol, and result presentation.
 export const projectImporterRegistry = new Registry<ProjectImporterContribution>('project importer')
+
+/** Both the chooser and an open importer read this gate, so a node change cannot leave an old
+ * importer mounted after its route disappears. */
+export const projectImporterContributions = (): readonly ProjectImporterContribution[] =>
+  [...projectImporterRegistry.entries()]
+    .filter((entry) => hasHostCapability(entry.requires))
+    .sort((a, b) => a.label.localeCompare(b.label) || a.id.localeCompare(b.id))

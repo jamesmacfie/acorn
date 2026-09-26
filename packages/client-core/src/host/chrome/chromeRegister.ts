@@ -113,7 +113,7 @@ export const usableEmptyState = (
   // button would be the worse trade.
   empty?.action && !contextFreeActionUsable(pluginId, surfaces, empty.action) ? { message: empty.message } : empty
 
-function registerChrome(pluginId: string, hash: string, row: NodePluginRow, refreshes: number[]): Disposable[] {
+function registerChrome(pluginId: string, hash: string, row: NodePluginRow, refreshes: number[], metadataOnly = false): Disposable[] {
   const installed = row.installed!
   const contributions = installed.contributions
   const disposables: Disposable[] = []
@@ -197,6 +197,10 @@ function registerChrome(pluginId: string, hash: string, row: NodePluginRow, refr
       },
     }))
   }
+
+  // An inactive plugin keeps its command and shortcut identities for Settings and saved bindings.
+  // Its node routes and client code have no authority; nothing else is registered.
+  if (metadataOnly) return disposables
 
   for (const descriptor of contributions.contentLinks ?? []) {
     // `openPane` is optional: a plugin whose only home for a matched item is its own reference panel
@@ -290,6 +294,7 @@ function registerChrome(pluginId: string, hash: string, row: NodePluginRow, refr
         id: descriptor.id,
         slot: 'task.footer',
         order: 500,
+        requires: { loadedPlugin: pluginId },
         component: () => createComponent(ChromeBadge, { pluginId, descriptor }),
       }))
     } else if (descriptor.slot === 'topbar') {
@@ -463,9 +468,12 @@ export function syncChromeContributions(): void {
   // Gated on `hasWithheldCode`, not `!trusted` (docs/plugins.md § One shared eligibility and trust
   // check): a descriptor-only package, as model-providers ships, has no bytes to accept and must still
   // contribute, so a rail row that opens a pane which will never mount is worse than no rail row.
-  for (const entry of eligiblePlugins()) {
-    if (hasWithheldCode(entry)) continue
-    registered.set(entry.pluginId, registerChrome(entry.pluginId, entry.hash, entry.row, refreshes))
+  for (const entry of eligiblePlugins({ includeInactive: true })) {
+    if (entry.inactive) {
+      registered.set(entry.pluginId, registerChrome(entry.pluginId, entry.hash, entry.row, refreshes, true))
+    } else if (!hasWithheldCode(entry)) {
+      registered.set(entry.pluginId, registerChrome(entry.pluginId, entry.hash, entry.row, refreshes))
+    }
   }
   // One timer at the smallest declared interval rather than one per descriptor. The polling fallback is
   // for data that changes with no node-side trigger; the primary path is still the status ping.

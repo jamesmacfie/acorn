@@ -67,6 +67,7 @@ export type PluginCustody = {
   install(request: { source: import('@acorn/protocol/api.ts').PluginInstallSource; expectedPluginId?: string }): Promise<PluginDeviceInstallResult>
   remove(request: { pluginId: string }): Promise<void>
   trustRecord(request: PluginTrustDecision): Promise<void>
+  trustForget(request: { pluginId: string; hash: string }): Promise<void>
   // Enter or leave development mode for one plugin on one node. See docs/security.md § The dev
   // grant.
   devGrant(request: PluginDevGrantRequest): Promise<void>

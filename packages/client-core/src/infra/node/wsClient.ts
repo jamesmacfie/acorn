@@ -32,6 +32,9 @@ type StepChangedCb = (event: { runId: string; stepId: string; status: string }) 
 
 const statusSubs = new Set<StatusCb>()
 const pluginsSubs = new Set<() => void>()
+// Plugin lifecycle is fleet control data. Keep its source before the ordinary active-node stream
+// filter, without widening task, terminal, or other application subscriptions.
+const fleetPluginsSubs = new Set<(nodeId: string) => void>()
 const tasksSubs = new Set<(event: TaskChangedEvent) => void>()
 const connectionSubs = new Set<(event: ConnectionChangedEvent) => void>()
 // The node events after the first three, keyed by channel. One registry rather than one Set per event,
@@ -100,6 +103,9 @@ function connect(): void {
   // Dropping rather than routing works because only the active node's surfaces are subscribed. A
   // fleet-wide live surface would need a nodeId in the subscription key, not a wider filter here.
   transport.onFrame((nodeId, raw) => {
+    if (raw && typeof raw === 'object' && (raw as { channel?: unknown }).channel === 'plugins:changed') {
+      for (const cb of fleetPluginsSubs) cb(nodeId)
+    }
     if (nodeId !== activeNodeId()) return
     dispatch(raw)
   })
@@ -224,6 +230,7 @@ export function _resetWsClient(): void {
   binaryHandler = null
   statusSubs.clear()
   pluginsSubs.clear()
+  fleetPluginsSubs.clear()
   tasksSubs.clear()
   connectionSubs.clear()
   nodeEventSubs.clear()
@@ -247,6 +254,13 @@ export function wsOnPluginsChanged(cb: () => void): () => void {
   pluginsSubs.add(cb)
   connect()
   return () => void pluginsSubs.delete(cb)
+}
+
+/** A content-free plugin change from any paired node, carrying the broker's authenticated source id. */
+export function wsOnFleetPluginsChanged(cb: (nodeId: string) => void): () => void {
+  fleetPluginsSubs.add(cb)
+  connect()
+  return () => void fleetPluginsSubs.delete(cb)
 }
 
 // The node's task list moved. Same subscriber shape and the same reason: tasks/mutations.ts would be a

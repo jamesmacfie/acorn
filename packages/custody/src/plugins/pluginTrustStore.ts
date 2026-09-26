@@ -210,6 +210,16 @@ export class PluginTrustStore {
     return this.list().find((ack) => ack.pluginId === pluginId && ack.hash === hash)
   }
 
+  /** Withdraw one exact decision. The caller controls whether the now-undecided offer is prompted
+   * immediately or deferred for this session. Other versions keep their independent decisions. */
+  forgetDecision(pluginId: string, hash: string): void {
+    if (!this.decisionFor(pluginId, hash)) return
+    this.write(
+      this.list().filter((ack) => !(ack.pluginId === pluginId && ack.hash === hash)),
+      this.listDevGrants(),
+    )
+  }
+
   // The most recent bundle of this plugin the owner accepted, when it is not the one being asked
   // about. It turns a bare "do you trust this?" into "this plugin has been updated, and here is what
   // its permissions gained".

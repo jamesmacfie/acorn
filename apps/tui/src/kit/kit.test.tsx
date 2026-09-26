@@ -8,6 +8,7 @@ import { NODE_SUPPORT } from '@acorn/client-core/kit/tokens'
 import { NODE_FOCUS } from '@acorn/client-core/kit/tokens'
 import { HeaderBodyFooter } from '../layouts/HeaderBodyFooter'
 import { renderCells, type Cells, type Frame } from './render'
+import { fixtureDocument } from '../fixture'
 import {
   Card, DetailColumn, DocumentTabs, Fold, Inline, ListColumn, ListDetail, Menu, Modal, ModalActions,
   ModalBody, Popover, Section, SectionHeader, Sections, SplitHandle, Stack, TabPanel, Tabs, Timeline,
@@ -547,7 +548,10 @@ const CASES: Case[] = [
   {
     node: 'DiffPane',
     draws: 'reduced: unified only',
-    render: () => <DiffPane source={{ files: () => [noteFile], loading: () => false }} />,
+    render: () => {
+      const { topology, segments } = fixtureDocument([noteFile])
+      return <DiffPane source={{ topology: () => topology, loading: () => false, loadSegments: async () => segments }} />
+    },
     size: { width: 40, height: 10 },
     check: (frame) => {
       has(frame, 'src/login.ts')
