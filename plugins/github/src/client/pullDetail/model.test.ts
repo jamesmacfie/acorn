@@ -31,6 +31,9 @@ const file = (patch: string): PullFile => ({
   deletions: 1,
   sha: 'sha',
   viewed: false,
+  position: 0,
+  patchState: 'available',
+  patchKey: 'sha256:test',
   patch,
 })
 

@@ -6,6 +6,7 @@ import { gh } from '../../githubApi'
 import type { AppEnv, Principal } from '@acorn/plugin-api/testkit'
 import { prCreate } from './prCreate'
 import type { Env } from '@acorn/plugin-api/testkit'
+import type { Compare } from '../../../shared/api'
 
 vi.mock('../../githubApi', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../githubApi')>()
@@ -74,5 +75,30 @@ describe('prCreate auth + ApiError envelope', () => {
       code: 'validation_failed',
       message: 'A pull request already exists for acme:feat.',
     })
+  })
+})
+
+describe('compare preview completeness', () => {
+  beforeEach(() => {
+    plugin = makeTestPluginDb('github')
+    vi.mocked(gh).mockReset()
+  })
+  afterEach(() => plugin.cleanup())
+
+  const compare = async (fileCount: number) => {
+    vi.mocked(gh).mockResolvedValue(new Response(JSON.stringify({
+      ahead_by: 2,
+      files: Array.from({ length: fileCount }, (_, i) => ({ filename: `f${i}.ts`, status: 'modified', additions: 1, deletions: 0, sha: `s${i}`, patch: '@@' })),
+      commits: [],
+    }), { headers: { 'content-type': 'application/json' } }))
+    const app = new Hono<AppEnv>().use('/api/*', ...testGate(PRINCIPAL)).route('/api/repos', prCreate(plugin.db))
+    const res = await app.fetch(new Request('http://acorn.test/api/repos/acme/widget/compare?base=main&head=feat'), { DB: noIntegrations, ...testSecretEnv('0'.repeat(64)) } as Env)
+    return (await res.json()) as Compare
+  }
+
+  // GitHub gives compare no total and stops at 300, so 300 files never claims to be all of them.
+  it('calls a 300-file comparison capped and a smaller one complete', async () => {
+    expect((await compare(300)).completeness).toEqual({ kind: 'incomplete', cause: 'upstream-cap', resource: 'compare-files', received: 300, reportedTotal: null, limit: 300 })
+    expect((await compare(12)).completeness).toEqual({ kind: 'complete' })
   })
 })

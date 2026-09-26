@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { gh, ghError, ghGraphQL, ghGraphQLResult } from '../../githubApi'
-import type { Branch, Compare } from '../../../shared/api'
+import type { Branch, Compare, PullTopologyCompleteness } from '../../../shared/api'
 import { type AppEnv, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
 import { githubToken } from '../../githubToken'
 import { createPullRequest } from '../../createPull'
@@ -22,6 +22,15 @@ const createBody = z.object({
   head: z.string().min(1),
   draft: z.boolean().optional(),
 })
+
+// GitHub's compare lists at most 300 changed files for the whole comparison, on the first page only,
+// and gives no total. So 300 files means there may be more.
+export const COMPARE_FILES_LIMIT = 300
+
+export const compareCompleteness = (received: number): PullTopologyCompleteness =>
+  received >= COMPARE_FILES_LIMIT
+    ? { kind: 'incomplete', cause: 'upstream-cap', resource: 'compare-files', received, reportedTotal: null, limit: COMPARE_FILES_LIMIT }
+    : { kind: 'complete' }
 
 type GitHubCompareFile = {
   filename: string
@@ -79,8 +88,9 @@ export const prCreate = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new 
     collected.sort((a, b) => b.date - a.date)
     return c.json(collected.slice(0, 100).map((b) => ({ name: b.name }) satisfies Branch))
   })
-  // Compare base..head → diff preview (PullFile[]) + commits (for title prefill) + aheadBy.
-  // Branch names with slashes go straight into the path (GitHub accepts them literally).
+  // Compare base..head → diff preview (CompareFile[]) + commits (for title prefill) + aheadBy.
+  // Branch names with slashes go straight into the path (GitHub accepts them literally). Only the
+  // first page is read: it carries the whole file list, and its 100 commits are enough to prefill.
   .get('/:owner/:repo/compare', async (c) => {
     ownerId(c) // gate on auth; the credential itself comes from the stored integration
     const token = await githubToken(c)
@@ -93,9 +103,11 @@ export const prCreate = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new 
     const err = ghError(res)
     if (err) return respondError(c, err.status, err.error)
     const data = (await res.json()) as GitHubCompare
+    const files = data.files ?? []
     return c.json({
       aheadBy: data.ahead_by ?? 0,
-      files: (data.files ?? []).map((f) => ({
+      completeness: compareCompleteness(files.length),
+      files: files.map((f) => ({
         path: f.filename,
         status: f.status,
         additions: f.additions,

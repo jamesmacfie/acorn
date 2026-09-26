@@ -48,6 +48,7 @@ import {
   type PullDetail,
   type PullFile,
   type PullFilesPatchRequest,
+  type PullFilesResponse,
   type Repo,
   type RunJobs,
   type TaskPullRelationsResponse,
@@ -97,10 +98,10 @@ export const forceRefreshPull = async (
   owner: string,
   repo: string,
   number: string,
-): Promise<{ detail: PullDetail; files: PullFile[] }> => {
+): Promise<{ detail: PullDetail; files: PullFilesResponse }> => {
   const [detail, files] = await Promise.all([
     readJson<PullDetail>(`${pullRoute(owner, repo, number)}?force=true`),
-    readJson<PullFile[]>(`${pullRoute(owner, repo, number, 'files')}?force=true`),
+    readJson<PullFilesResponse>(`${pullRoute(owner, repo, number, 'files')}?force=true`),
   ])
   return { detail, files }
 }
@@ -121,7 +122,7 @@ export const pinsOptions = (enabled: boolean) => ({
 export const filesOptions = (owner: string, repo: string, number: string, enabled: boolean) => ({
   queryKey: filesKey(owner, repo, number),
   enabled,
-  queryFn: async ({ signal }: QueryContext): Promise<PullFile[]> => readJson<PullFile[]>(pullRoute(owner, repo, number, 'files'), { signal }),
+  queryFn: async ({ signal }: QueryContext): Promise<PullFilesResponse> => readJson<PullFilesResponse>(pullRoute(owner, repo, number, 'files'), { signal }),
 })
 
 export const pullConflictsOptions = (owner: string, repo: string, number: string, base: string, enabled: boolean) => ({
@@ -134,13 +135,13 @@ export const pullConflictsOptions = (owner: string, repo: string, number: string
 export const fileSummariesOptions = (owner: string, repo: string, number: string, enabled: boolean) => ({
   queryKey: fileSummariesKey(owner, repo, number),
   enabled,
-  queryFn: async ({ signal }: QueryContext): Promise<PullFile[]> => readJson<PullFile[]>(fileSummariesRoute(owner, repo, number), { signal }),
+  queryFn: async ({ signal }: QueryContext): Promise<PullFilesResponse> => readJson<PullFilesResponse>(fileSummariesRoute(owner, repo, number), { signal }),
 })
 
 export const filePatchOptions = (owner: string, repo: string, number: string, path: string) => ({
   queryKey: filePatchKey(owner, repo, number, path),
   queryFn: async ({ signal }: QueryContext): Promise<PullFile> => {
-    const [file] = await readJson<PullFile[]>(filePatchRoute(owner, repo, number, path), { signal })
+    const [file] = (await readJson<PullFilesResponse>(filePatchRoute(owner, repo, number, path), { signal })).files
     if (!file) throw new Error('file_not_found')
     return file
   },

@@ -1,6 +1,7 @@
 # Docs migration: owners after each phase
 
-Status: phase 0's rows are done (2026-09-26). No owning document has changed for phases 1 to 5.
+Status: phase 0's and phase 1's rows are done (2026-09-26). No owning document has changed for
+phases 2 to 5.
 
 Part of [docs/future/git-inspired/](./README.md). A phase is incomplete until the document that owns
 its shipped behavior states the new contract. Future files explain intent; owning docs describe the

@@ -2,11 +2,12 @@ import { and, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { Hono } from 'hono'
 import { z } from 'zod'
-import type { PullFile, PullFilesPatchRequest } from '../../../shared/api'
+import type { PullFilesPatchRequest, PullFilesResponse } from '../../../shared/api'
 import { filesResource } from '../../resourceKeys'
-import { type AppEnv, type Cached, ownerId, type PluginDatabase, type RefreshResult, respondError, serveThenRevalidate } from '@acorn/plugin-api/node'
+import { type AppEnv, type Cached, ownerId, type PluginDatabase, respondError, serveThenRevalidate } from '@acorn/plugin-api/node'
 import { PULLS_STALE_AFTER_MS } from '../../syncPolicy'
-import { fetchFiles, mirrorFiles, readFiles } from '../mirror/prMirror'
+import { filesCompleteness, readFiles } from '../mirror/prMirror'
+import { refreshPullFiles } from './pullRefresh'
 import { resolveRepoForUser } from '../mirror/repoMirror'
 import { githubToken } from '../../githubToken'
 import { syncState } from '../../../node/schema'
@@ -45,7 +46,7 @@ const handleFilesRead = async (
   db: PluginDatabase,
   c: Context<AppEnv>,
   emit: GithubEmit,
-  options: { summaryOnly?: boolean; paths?: string[] } = {},
+  options: { summaryOnly?: boolean; paths?: string[]; lookup?: boolean } = {},
 ) => {
   const uid = ownerId(c)
   const token = await githubToken(c)
@@ -65,25 +66,23 @@ const handleFilesRead = async (
   const includePatches = !options.summaryOnly || !!paths
 
   const resource = filesResource(repoId, number)
-  const readCached = async () => orderedByRequest(await readFiles(c.env.BLOBS, db, key, { includePatches, paths }), paths)
 
-  // Cold only when the files were never fetched (no sync row); a PR with zero changed files still
-  // has a sync row → serves `{ data: [], fetchedAt }`.
-  const read = async (): Promise<Cached<PullFile[]> | null> => {
+  // Cold when the files were never fetched (no sync row); a PR with zero changed files still has a
+  // sync row and serves an empty list. Also cold when an available patch's body is missing from
+  // BLOBS: that is a broken cache, so the read blocks on a refresh that rewrites it rather than
+  // serving the file as if it had no diff.
+  const read = async (): Promise<Cached<PullFilesResponse> | null> => {
     const [sync] = await db
       .select()
       .from(syncState)
       .where(and(eq(syncState.userId, userId), eq(syncState.resource, resource)))
     if (!sync) return null
-    return { data: await readCached(), fetchedAt: sync.fetchedAt }
+    const files = await readFiles(c.env.BLOBS, db, key, { includePatches, paths })
+    if (!files.ok) return null
+    return { data: { files: orderedByRequest(files.files, paths), completeness: filesCompleteness(sync) }, fetchedAt: sync.fetchedAt }
   }
 
-  const refresh = async (): Promise<RefreshResult> => {
-    const files = await fetchFiles(token, owner, repo, number)
-    if (!files.ok) return files
-    await mirrorFiles(c.env.BLOBS, db, key, files.value)
-    return { ok: true }
-  }
+  const refresh = () => refreshPullFiles(token, db, c.env.BLOBS, { userId, repoId, owner, repo, number })
 
   const result = await serveThenRevalidate({
     resource,
@@ -94,12 +93,18 @@ const handleFilesRead = async (
     refresh,
   })
   if (!result.ok) return respondError(c, result.failure.status, result.failure.error, result.failure.detail)
-  return c.json(result.value)
+  // The patches POST is a lookup by path, so it answers with the files alone.
+  return c.json(options.lookup ? result.value.files : result.value)
 }
 
 // PR changed-files + patches. REST /pulls/{n}/files is the single writer of pr_files (it carries
 // path/status/+/−/sha/patch in one call, richer than the GraphQL composite, which dropped files).
 // Mirror logic is shared with the batch route, see prMirror.ts.
+//
+// GET answers with PullFilesResponse: the files in provider order and whether that is all of them.
+// `?path=` narrows it to one file. The patches POST answers with the requested files alone, in
+// request order; a path the pull does not have is absent, while a file GitHub sent no patch for is
+// present with `patchState: 'unavailable'`.
 // Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
 // databases).
 export const pullFiles = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/files', async (c) => {
@@ -112,5 +117,5 @@ export const pullFiles = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new
   if (!paths) return respondError(c, 400, 'bad_paths')
   if (paths.length > MAX_PATCH_PATHS) return respondError(c, 400, 'too_many_paths')
   if (paths.length === 0) return c.json([])
-  return handleFilesRead(db, c, emit, { paths })
+  return handleFilesRead(db, c, emit, { paths, lookup: true })
 })

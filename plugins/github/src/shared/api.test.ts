@@ -56,7 +56,7 @@ describe('github wire contract', () => {
     expect(pullPrefixKey('octo', 'repo')).toEqual(['pull', 'octo', 'repo'])
     expect(repoLabelsKey('octo', 'repo')).toEqual(['labels', 'octo', 'repo'])
     expect(filesKey('octo', 'repo', '12')).toEqual(['files', 'octo', 'repo', '12'])
-    expect(fileSummariesKey('octo', 'repo', '12')).toEqual(['files', 'octo', 'repo', '12', 'summary'])
+    expect(fileSummariesKey('octo', 'repo', '12')).toEqual(['files', 'octo', 'repo', '12', 'summary', 'v2'])
     expect(filePatchKey('octo', 'repo', '12', 'src/app.ts')).toEqual(['files', 'octo', 'repo', '12', 'patch', 'src/app.ts'])
     expect(pinsKey).toEqual(['pins'])
   })

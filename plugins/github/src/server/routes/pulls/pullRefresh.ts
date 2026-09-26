@@ -1,15 +1,12 @@
 import { and, eq, sql } from 'drizzle-orm'
-import { chunkRowsByColumnBudget, type CoreServices, createLogger, type PluginDatabase, type RefreshResult, type RouteResult } from '@acorn/plugin-api/node'
+import { chunkRowsByColumnBudget, type CoreServices, type PluginDatabase, type RefreshResult } from '@acorn/plugin-api/node'
 import { pullsResource } from '../../resourceKeys'
-import { gh, ghError, ghGraphQL, ghGraphQLResult } from '../../githubApi'
-import { fetchFiles, mirrorFiles, mirrorPr, PR_FRAGMENT, type GqlPull, type PatchBlobStore } from '../mirror/prMirror'
+import { gh, ghError } from '../../githubApi'
+import { mirrorFiles, mirrorPr, type PatchBlobStore } from '../mirror/prMirror'
+import { fetchFiles, fetchPullComposite } from '../mirror/prFetch'
 import { deletePullMirrorStatements } from '../../mirrorRetention'
 import { pullRequests, syncState } from '../../../node/schema'
 import { type GithubEmit, NO_EMIT } from '../../events'
-
-// A module with no `ctx` in reach, so the owner is stated here (docs/plugin-authoring.md §
-// Telemetry and logging).
-const log = createLogger('github', 'github')
 
 type GitHubFetcher = (token: string, path: string, init?: RequestInit) => Promise<Response>
 
@@ -31,13 +28,6 @@ export type PullRefreshKey = {
   owner: string
   repo: string
 }
-
-const COMPOSITE_QUERY = `
-query PR($owner: String!, $repo: String!, $number: Int!) {
-  repository(owner: $owner, name: $repo) {
-    pullRequest(number: $number) { ...PrFields }
-  }
-}${PR_FRAGMENT}`
 
 /** Force-refresh the mirrored open-PR list for one repository. */
 export async function refreshOpenPulls(
@@ -139,28 +129,7 @@ export async function refreshOpenPulls(
   return { ok: true }
 }
 
-async function fetchPullComposite(
-  token: string,
-  owner: string,
-  repo: string,
-  number: number,
-): Promise<RouteResult<GqlPull>> {
-  const res = await ghGraphQL(token, COMPOSITE_QUERY, { owner, repo, number })
-  const result = await ghGraphQLResult<{ repository?: { pullRequest?: GqlPull | null } }>(res)
-  if (!result.ok) {
-    if (result.kind === 'graphql') {
-      log.error(`pullDetail GraphQL errors: ${result.messages.join('; ')}`)
-      return { ok: false, failure: { error: 'graphql', status: 502, detail: result.messages } }
-    }
-    return { ok: false, failure: result.failure }
-  }
-  const pull = result.data?.repository?.pullRequest
-  return pull
-    ? { ok: true, value: pull }
-    : { ok: false, failure: { error: 'pull_not_found', status: 404 } }
-}
-
-/** Force-refresh one PR's GraphQL composite. */
+/** Force-refresh one PR's GraphQL composite. Every connection is walked before anything is written. */
 export async function refreshPullDetail(
   token: string,
   db: PluginDatabase,
@@ -174,7 +143,7 @@ export async function refreshPullDetail(
   return { ok: true }
 }
 
-/** Force-refresh one PR's composite and changed files, fetching both before mirror writes begin. */
+/** Force-refresh one PR's composite and changed files, fetching both in full before mirror writes begin. */
 export async function refreshPullWithFiles(
   token: string,
   db: PluginDatabase,
@@ -193,6 +162,19 @@ export async function refreshPullWithFiles(
   const { checksChanged } = await mirrorPr(db, mirrorKey, pull.value, Date.now())
   await mirrorFiles(blobs, db, mirrorKey, files.value)
   announcePrSynced(emit, key, pull.value.headRefOid, checksChanged)
+  return { ok: true }
+}
+
+/** Force-refresh one PR's changed files: every page GitHub lists, then one swap. */
+export async function refreshPullFiles(
+  token: string,
+  db: PluginDatabase,
+  blobs: PatchBlobStore,
+  key: PullRefreshKey & { number: number },
+): Promise<RefreshResult> {
+  const files = await fetchFiles(token, key.owner, key.repo, key.number)
+  if (!files.ok) return files
+  await mirrorFiles(blobs, db, { userId: key.userId, repoId: key.repoId, number: key.number }, files.value)
   return { ok: true }
 }
 

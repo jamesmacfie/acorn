@@ -104,7 +104,7 @@ function build(scope: PrScope) {
   const conflicts = createQuery(() =>
     pullConflictsOptions(owner, repo, number, detail.data?.pull?.baseRef ?? '', has() && conflicting()))
 
-  const fileList = () => files.data ?? []
+  const fileList = () => files.data?.files ?? []
   const fileSummary = createMemo(() => summarizeFileStats(fileList()))
   const conversationEntries = createMemo(() => buildConversationEntries(detail.data))
   const threadSnippetIndex = createMemo(() => buildThreadSnippetIndex(fileList()))
@@ -225,6 +225,7 @@ function build(scope: PrScope) {
     checks: () => detail.data?.checks ?? [],
     reviewers: () => detail.data?.requestedReviewers ?? [],
     files: fileList,
+    filesCompleteness: () => files.data?.completeness,
     filesLoading: () => files.isLoading,
     fileSummary,
     conversationEntries,

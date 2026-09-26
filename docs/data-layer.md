@@ -126,11 +126,21 @@ These plugins own SQLite files and migrations:
 | `plugins/database.sqlite` | project-scoped saved SQL queries, and the per-task scratch document behind the pane's editor (a loaded plugin, same binding as `http.sqlite` below) |
 | `plugins/browser.sqlite` | browser captures and screenshot bytes |
 | `plugins/findings.sqlite` | immutable observations and candidate revisions, durable preparation jobs and lifecycle checkpoints, grouping outcomes, suppressions, review history, and notification receipts |
-| `plugins/github.sqlite` | repository/PR mirror, PR children, GitHub freshness, viewed files, pinned repos |
+| `plugins/github.sqlite` | repository/PR mirror, PR children in provider order, PR file patch state and digest, GitHub freshness and files completeness, viewed files, pinned repos |
 | `plugins/http.sqlite` | project-scoped requests and variables, encrypted request fields (a loaded plugin, so this file is bound from its manifest id and its chain ships inside the package) |
 | `plugins/memory.sqlite` | project-scoped derived memory index, proposals, FTS |
 | `plugins/terminal.sqlite` | terminal session metadata; PTY output is not persisted there |
 | `plugins/workflows.sqlite` | Workflow drafts and immutable revisions, dependency/publication journals, recoverable repository-file drafts and write journals, runs, steps, gates, dispatches, approved schedule bindings and occurrences, processing scopes, selections, record states, attempts, and committed source boundaries |
+
+The GitHub mirror replaces a pull request's detail, and separately its files, in one `db.batch`
+each, together with that resource's `sync_state` row. Every PR child table has a `position` column:
+the row's zero-based place in GitHub's order for that pull, which reads order by. `review_threads`
+counts across every comment of every thread, so one ordering recovers both the thread order and the
+comment order. `pr_files` also holds `patch_state` and `patch_key`, the digest the patch body is
+stored under. `sync_state` has four nullable columns, `incomplete_cause`, `received`,
+`reported_total`, and `upstream_limit`, that only a files resource sets, and only when GitHub's
+3,000-file ceiling cut the list short. The mirror's second migration empties the PR child tables and
+drops the `pr:` and `files:` sync rows, so every pull refetches once after the upgrade.
 
 Docker, editor, Linear, Rollbar, model providers, preview, onboarding, and the built-in agents
 profiles use core services or provider registries without their own database file. Notes has no

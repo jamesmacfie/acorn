@@ -35,17 +35,23 @@ const detail = {
   threads: [],
 }
 
-const files = [
-  {
-    path: 'src/app.ts',
-    status: 'modified',
-    additions: 10,
-    deletions: 2,
-    sha: 'sha-app',
-    viewed: false,
-    patch: null,
-  },
-]
+const files = {
+  files: [
+    {
+      path: 'src/app.ts',
+      status: 'modified',
+      additions: 10,
+      deletions: 2,
+      sha: 'sha-app',
+      viewed: false,
+      position: 0,
+      patchState: 'available',
+      patchKey: 'sha256:app',
+      patch: null,
+    },
+  ],
+  completeness: { kind: 'complete' },
+}
 
 describe('open PR warmup', () => {
   afterEach(() => {
@@ -144,5 +150,14 @@ describe('open PR warmup', () => {
     await prefetchPullSummary(queryClient, 'acorn', 'web', 42, new AbortController().signal)
 
     expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('seeds no summary for a pull the batch returned without files', async () => {
+    const fetchMock = vi.fn().mockResolvedValueOnce(jsonResponse([{ number: 42, detail }]))
+    vi.stubGlobal('fetch', fetchMock)
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+    await prefetchPullSummary(queryClient, 'acorn', 'web', 42, new AbortController().signal)
+    expect(queryClient.getQueryData(pullKey('acorn', 'web', '42'))).toEqual(detail)
+    expect(queryClient.getQueryState(fileSummariesKey('acorn', 'web', '42'))).toBeUndefined()
   })
 })

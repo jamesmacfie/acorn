@@ -16,7 +16,7 @@ import { githubCommands, type GithubCommandDeps } from './commands'
 // the pull request's own file order, picking one writes `?file=`, and every PR command is gated on a
 // pull request actually being open.
 
-const file = (path: string): PullFile => ({ path, status: 'modified', additions: 1, deletions: 0, sha: null, viewed: false, patch: null })
+const file = (path: string): PullFile => ({ path, status: 'modified', additions: 1, deletions: 0, sha: null, viewed: false, position: 0, patchState: 'unavailable', patchKey: null, patch: null })
 
 const pull = (number: number, title: string, author: string | null = 'ada', draft = false): Pull => ({
   number, title, state: 'open', draft, author, headRef: null, baseRef: null,

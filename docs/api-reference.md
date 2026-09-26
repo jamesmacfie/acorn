@@ -320,6 +320,31 @@ are authoritative.
 GitHub reads use the plugin SQLite mirror with TTL/ETag revalidation where supported. Patch and file
 bodies use the shared immutable blob cache. GitHub writes update or invalidate the affected mirror.
 
+The pull request read routes, with types in `plugins/github/src/shared/api.ts`:
+
+| Route | Response |
+| --- | --- |
+| `GET …/pulls/:number` | `PullDetail`, with every GraphQL connection exhausted and child lists in GitHub's order |
+| `GET …/pulls/:number/files` | `PullFilesResponse`: `{ files, completeness }`, files in `position` order with patch bodies |
+| `GET …/pulls/:number/files?summary=1` | `PullFilesResponse` with `patch: null` on every file and no blob reads |
+| `GET …/pulls/:number/files?path=P` | `PullFilesResponse` holding that one file, when the pull has it |
+| `POST …/pulls/:number/files/patches` | `PullFile[]` for up to 20 `paths`, in request order; an unknown path is left out |
+| `POST …/pulls/batch` | `PullBatchItem[]`: `{ number, detail, files? }`; `files` is absent for mode `none` or a failed files refresh |
+| `GET …/compare?base=&head=` | `Compare`: `{ aheadBy, files, completeness, commits }` |
+
+`completeness` is `PullTopologyCompleteness`. `{ kind: 'complete' }` means the list is everything
+GitHub has. `{ kind: 'incomplete', cause: 'upstream-cap', resource, received, reportedTotal, limit }`
+means GitHub's own ceiling cut it short: resource `files` at 3,000 or `compare-files` at 300.
+`reportedTotal` is GitHub's count, or null when it gave none. A failed refresh is not incomplete: the
+route serves the previous mirror stale, or fails cold.
+
+`PullFile` has `position`, its zero-based place in GitHub's list, and `patchState`. With
+`patchState: 'available'`, `patchKey` is the `sha256:<hex>` digest of the patch text, and `patch` is
+the body unless the read was a summary. With `patchState: 'unavailable'`, GitHub sent no patch, and
+`patchKey` and `patch` are null. `sha` stays the new-side blob, for `blobs/:sha`. `?force=true` on the
+detail and files reads blocks on a full refresh. A batch refresh that fails with `401`, `403`, or `429`
+fails the batch; any other failure leaves that pull's previous mirror.
+
 ### Agents
 
 ```text
