@@ -163,6 +163,9 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           if (frame.channel === 'plugin:agents:turn-changed' && frame.source === 'delegation') {
             delegation?.reports.deliverSafely(frame.turnId)
           }
+          if (frame.channel === 'plugin:agents:request-changed' && frame.status === 'pending') {
+            delegation?.reports.deliverRequestSafely(frame.sessionId, frame.requestId)
+          }
         },
         startTerminalHandoff: async (session) => {
           if (!session.providerSessionRef) throw new Error('The provider session cannot be resumed in a terminal.')
