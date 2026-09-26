@@ -256,6 +256,17 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
   follows once in one commit, a scrolling reader holds a correction back until they stop, the pane's
   own correction scrolls do not count as the reader, a collapsed file lands the reader on its header,
   and a width change that resizes every block keeps the place with no fixed rebuild;
+- the diff's resident segment cache has three layers of test. `features/diff/segmentCache.test.ts`
+  holds the weight estimator, least-recently-wanted order, each ceiling alone, held segments under
+  pressure, one held oversize segment, colour going before plain rows, the key's parts, a superseded
+  patch, and one cache per query client. `features/diff/segmentLoader.test.tsx` runs the loader
+  against a cache with no room, so what stays resident is exactly what the pane holds, through a
+  success, a range change, an abort, a failure, a new revision, and unmount.
+  `features/diff/DiffPane.test.tsx` remounts a diff on the same node against a source that never
+  answers and finds its rows drawn and coloured from memory, checks that a no-op poll drops nothing
+  and a moved file drops its old patch, that a resolved thread asks for nothing, and that a
+  dehydrated query client holds no segment text. `infra/node/fleet.test.ts` checks that `dropNode`
+  clears that node's segments and no other's;
 - four arch rules read source text rather than the import graph, because what they police is a
   global rather than an import: `window.acorn` outside the platform seam, and `console.*` outside
   each of the three loggers. Each carries a **baseline** of the files that survive, and each asserts
@@ -911,6 +922,11 @@ bindings rather than the prose.
     move, and the view settles without a correction you can see. Narrow the pane by dragging the
     sidebar, then widen it: the same line stays at the top. Leave the pane and take a health snapshot:
     no observers, no scheduled frames, and `maxAnchorDrift` under a pixel.
+84. Open that pull request's diff, scroll to the middle, and switch to another task and back: the
+    rows you left are on screen, coloured, before any segment request, and the health snapshot's
+    `resident.hits` rose. Open a dozen other large diffs one after another: `resident.rows` and
+    `resident.estimatedBytes` stay under `rowCeiling` and `byteCeiling`. In the Changes pane, let an
+    agent save the same file several times: `resident.segments` does not grow with each save.
 
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as
