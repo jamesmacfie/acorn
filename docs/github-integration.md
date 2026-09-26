@@ -149,6 +149,12 @@ page of matches over the files the request names. Access is the repository's, re
 blob route resolves it, and a digest must be one this plugin could have written before it becomes
 part of a blob key.
 
+A known limit: patch blobs are keyed by digest across the whole node, not per repository, and neither
+route checks that a digest belongs to the repository in its path. Anyone who can read one repository
+and knows a digest can read that patch from any repository the node has mirrored. With one identity
+per node that grants nothing new. It matters if one node serves several identities with different
+access, and the fix is to check the digest against that repository's file rows or compare record.
+
 Inline threads are not in the document. They come with the PR detail, which is complete when it is
 served, and the viewer places each one by its line number from the document's segment line spans, so
 its space is reserved before its segment loads. The diff source reports loading until both the
@@ -331,8 +337,12 @@ anyway, so a separate body route would fetch them twice.
   HTML is built only when the turn comes within one screen of the viewport, through `Timeline.Turn`'s
   `near` child, and it stays built after that. Until then the card says the body is shown on scroll.
   Browser find cannot match a body that is not built yet. The terminal client builds every body at once.
+  The observer's root is the region scroller found when the first body asks, and it stays that
+  element. If the navigator's region were rebuilt around a mounted conversation, bodies would wait
+  for a scroller that no longer moves.
 - **Thread snippets.** A thread quotes five lines around its line, from the one segment of the pull's
-  diff document that holds it (§ Diff documents). The conversation loads the document when any thread
+  diff document that holds it (§ Diff documents), so a line at a segment's edge gets less context on
+  that side. The conversation loads the document when any thread
   has a line, and `createDiffSnippets` from `@acorn/plugin-api/ui/diff` reads a thread's segment through
   the diff viewer's loader and node cache once its turn comes near. A segment already seen in the diff
   costs no request, and one read here is resident when the diff opens. A file missing from the document

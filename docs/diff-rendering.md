@@ -343,8 +343,7 @@ and so a new key. What differs is when old entries go:
 
 **Not cached here.** Heights stay with the pane (§ Row geometry), and so do DOM nodes, Solid state,
 composers, drafts, observers, and requests. Nothing in this cache is written to disk or to the query
-cache's persisted snapshot. A colouring that fell back to plain text, after a highlight worker timed
-out, is kept as the segment's colour until the segment is evicted.
+cache's persisted snapshot.
 
 The health reading's `resident` group reports the cache's weight against both ceilings and its
 inserts, evictions, and oversize inserts, plus the pane's own hits and misses. The telemetry samples
@@ -411,7 +410,8 @@ collapsed or resolved and its comments; for a line, what it draws and whether it
 Typing is not in the fingerprint, because typing only happens in a mounted block, which is measured.
 Heights are kept per projection, with the width bucket (80px of scroller width) they were measured
 at. A pane resize re-measures every mounted block, because each one reports its own new size; one
-that is not mounted keeps its old height as an estimate until it is.
+that is not mounted keeps its old height as an estimate until it is. The 150ms settling window and
+the 80px bucket were chosen by hand, because no WebKit momentum or resize probe has run.
 
 Every geometry change keeps the reader where they were by identity. Before the change the layout
 notes the reader's place: the item the viewport starts in and a point in its code rows, or the block
@@ -529,6 +529,84 @@ The pull-request navigator keeps no scroll entry of its own any more. It used to
 `reviewViewState.ts` beside the pane; the navigator is a region of a host layout now, and the diff
 column's own position and collapsed files are still the viewer's, in `diff/viewState.ts`, keyed by the
 same scope.
+
+## What large-surface rendering refuses
+
+The document, the segment loader, the dynamic-block layout, and the resident cache were built on
+2026-09-26 to keep a 2,200-file, million-row pull request bounded, after GitHub's account of
+[rendering huge pull requests](https://github.blog/engineering/user-experience/rendering-huge-pull-requests-in-the-github-copilot-app/).
+These are the alternatives that work refused. Each one will be suggested again, so reopen it with new
+evidence against the reason, not beside it. The timeline's share is in
+[client-surfaces.md](./managed-agents/client-surfaces.md).
+
+**Reading a provider's first page as the whole.** Refused. A fast view of a truncated pull request is
+wrong. Every connection is walked to its end, the pages are staged and swapped in at once rather than
+published as they arrive, and an upstream ceiling is reported as incomplete
+([github-integration.md](./github-integration.md) § Pull request detail and files).
+
+**Keying a patch by the head blob SHA.** Refused. Two bases can produce different patches that end at
+the same blob. Patch and segment keys come from the patch text. Only new-side file bodies keep the
+blob SHA.
+
+**Fixing only the DOM.** Refused. The DOM was already virtualized. The cost was parsing, colouring,
+keying and scanning every file, and changing overscan or the row components leaves all of that in
+place.
+
+**Letting idle time drain the document.** Refused. Idle work delays the cost without bounding it, and
+it competes with the next interaction. Work outside the demand range is dropped, not deferred.
+
+**Waiting for colour before showing text.** Refused. Plain rows are correct and readable. Colour is
+enrichment under the same row identity, so a dead or slow worker cannot leave a segment blank.
+
+**One variable-height table for every row.** Refused. A comment changing height must not rebuild exact
+code geometry. Dynamic blocks have their own index, and fixed rows keep theirs.
+
+**Fixed-height comment slots.** Refused. Markdown, images, disclosures, suggestions and composers
+combine without limit. A large slot leaves whitespace and a small one clips. An estimate is only a
+reservation until the block is measured.
+
+**A `ResizeObserver` that writes heights.** Refused. Reading and writing around the same element feeds
+back, and a burst of blocks would commit many times in one frame. The observer marks blocks dirty and
+one pass reads and commits.
+
+**Inferring reader input from `scroll` events.** Refused. Corrections, navigation and browser clamps all
+emit `scroll`. Input events say the reader moved, and the layout marks its own writes.
+
+**A pixel as the reading place.** Refused. Loading, resizing, disclosure and collapse all invalidate a
+pixel. The place is an item or block identity and an offset into it.
+
+**An imperative recycled-DOM renderer.** Refused. The Solid row components own accessibility, comment
+interactions, annotations, editor actions, plugin seams and two projections, and a second renderer
+would have to rebuild all of them. Reopen only if a real-window profile of the `canonical` fixture
+puts the remaining cost in mounted component overhead.
+
+**Provider types in client-core.** Refused. The document describes files, rows, anchors and threads.
+GitHub's cursor, review and REST types stay in the GitHub plugin, and staging and worktree types stay
+in Changes.
+
+**An old-and-new `DiffSource` adapter.** Refused. Building whole patches and segmented documents side
+by side doubles memory and keeps two behaviours alive. The port moved once, in plugin API major 2
+([package-shape.md](./plugins/package-shape.md) § The plugin API).
+
+**Caching whole documents by count.** Refused. One document is 50 rows and another is a million. The
+resident cache weighs segments by rows and bytes.
+
+**Persisting parsed rows, tokens, heights or DOM.** Refused. They are large, cheap to rebuild, and tied
+to the parser, tokenizer, width and rendering version. The node's patch and descriptor blobs are the
+durable layer ([caching.md](./caching.md) § Immutable blob cache).
+
+**Document content in diagnostics.** Refused. Diffs hold proprietary source and comments. Health
+numbers carry fixed labels and no path, line, body or query
+([telemetry.md](./telemetry.md) § Rendered-surface health).
+
+**Timing budgets from GitHub or one machine, or a stress test only in jsdom.** Refused. Hardware,
+WebKit and build mode move the milliseconds, and jsdom has no momentum, layout or paint. The tests
+assert scaling and lifecycle invariants, and absolute budgets wait for a real-window run on a
+supported host ([testing.md](./testing.md) § Large-surface fixture).
+
+**A streaming transport for the topology.** Refused as a starting point. The `canonical` topology is
+about 2.5 MB over the ordinary JSON route, and it is not paged. Add a stream only if a real-window run
+shows people waiting on that transfer, and keep one revision and one ready point when you do.
 
 ## What the Changes panel refuses
 

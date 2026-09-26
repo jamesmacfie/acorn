@@ -930,8 +930,13 @@ bindings rather than the prose.
     scrollbar to the end and back: every segment you land on draws within a moment and nothing between
     loads. Find a word that appears only near the end and step to it. Expand a gap, collapse a file from
     the sticky header, and leave the pane open for a minute: the health snapshot shows nothing queued.
+    In split mode, scroll a long line sideways before its colour arrives: it stays scrolled when the
+    colour lands. Find a match in split mode: the view lands on the band that holds it. With find
+    open, expand a gap above the match: the view does not jump back to the match.
     Then do the same in the Changes pane while an agent edits a file: only that file's segments
-    reload, and the reader stays where they were.
+    reload, and the reader stays where they were. Run `git config diff.noprefix true` in the task's
+    worktree and reopen the Changes pane: every changed file still shows its diff. Unset it afterwards,
+    because the setting is the whole repository's.
 83. In that pull request, scroll to a place with a thread a screen above you and one below. Expand
     and collapse the one above, reply in it so the box grows, and resolve it: the line you are reading
     does not move. Open a `<details>` block and wait for a late image in the one below: nothing on
@@ -949,7 +954,8 @@ bindings rather than the prose.
     them, and the health snapshot shows 200 mounted of about 3,400 turns. Scroll a little way up and
     press **Show earlier**: the card you were reading stays put. Select text across two cards, scroll
     to the foot, and let a live session stream past 400 cards: the selection survives, and once you
-    clear it the next page of cards trims the window back to 200. Press **Go to top**: the oldest turn
+    clear it the next page of cards trims the window back to 200. The console shows no
+    `ResizeObserver loop` error while the stream passes 400 cards. Press **Go to top**: the oldest turn
     is on screen, and the page's find matches its text. Open a notice for an old request: its card is
     drawn and focused. With VoiceOver, a card reads its place in the whole session. In a pull request
     with many threads, open the conversation and scroll: each comment's HTML and each thread's snippet

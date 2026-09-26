@@ -60,7 +60,10 @@ and writes it atomically: to a staged file beside the entry, renamed over it, so
 half a body. The cache is local to a Node and stores both public and private repository
 content because it is not shared storage.
 
-Blob pruning must respect references retained by plugin records. Worktrees are not part of the blob
+Nothing prunes the cache. `BlobCache` has `get` and `put` and no delete, so every body stays on disk:
+superseded patches, `patch:<sha>` bodies from before patches were keyed by digest, and descriptor
+blobs from older segmenter versions. A compare preview writes up to 300 patch bodies each time it
+loads. A patch seen before lands on its old key, but every new comparison adds its own. A pruner must respect the references plugin records keep. Worktrees are not part of the blob
 cache.
 
 Opening the cache sweeps the directory once, and the sweep is a permission migration: `put` writes

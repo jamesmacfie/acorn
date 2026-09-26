@@ -578,7 +578,9 @@ performance.getEntriesByName('acorn:surface.health').at(-1).detail
 ```
 
 The desktop answers that request from boot, whatever the `acorn.perf` switch says
-(`packages/client-core/src/infra/telemetry/surfaceHealth.ts`). Each answer replaces the previous
+(`packages/client-core/src/infra/telemetry/surfaceHealth.ts`). It does not wait for that switch
+because the automation window shares WebKit storage with a developer's own app, so turning the
+switch on for one would turn it on for both. Each answer replaces the previous
 mark, so a long automated loop leaves one entry. Nothing is put on `window`, and no HTTP route
 exposes it. The large-surface flow reads it this way ([local-development.md](./local-development.md)
 § Large-surface flow).
