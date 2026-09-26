@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentSession, AgentSessionDelegation, AgentSubagent } from '../../contract/wire.ts'
-import { agentSessionRoster, delegationSummary } from './sessionRoster'
+import { agentSessionRoster, delegationSummary, liveDelegatedChildren } from './sessionRoster'
 
 const session = (id: string, over: Partial<AgentSession> = {}): AgentSession => ({
   id,
@@ -105,5 +105,21 @@ describe('managed session roster', () => {
     )
     expect(rows.map((row) => [row.key, row.depth])).toEqual([['a', 0], ['b', 0]])
     expect(rows.every((row) => row.kind !== 'managed' || row.managedParent === null)).toBe(true)
+  })
+
+  it('projects only live direct children across task boundaries', () => {
+    const sessions = [
+      session('one', { taskId: 'other-task', runtimeState: 'working' }),
+      session('two', { attention: 'permission' }),
+      session('unrelated'),
+      session('stopped', { runtimeState: 'stopped' }),
+      session('archived', { archivedAt: 2 }),
+    ]
+    const lineage = {
+      one: managed('one', 'parent', 1), two: managed('two', 'parent', 1),
+      unrelated: managed('unrelated', 'another-parent', 1),
+      stopped: managed('stopped', 'parent', 1), archived: managed('archived', 'parent', 1),
+    }
+    expect(liveDelegatedChildren('parent', sessions, lineage).map((child) => child.id)).toEqual(['one', 'two'])
   })
 })

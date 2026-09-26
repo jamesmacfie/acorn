@@ -474,6 +474,10 @@ children below an available managed parent and marks that ownership with the sam
 provider-native subagents, labels terminal-owned children without inventing a parent row, shows depth
 and isolation, and links a selected child back to its managed parent.
 Provider-native subagent rows keep their original place under the provider session.
+Above a managed parent's composer, one row per live direct child shows its title, runtime and
+attention state, and the task title when the child belongs to another task. The rows use the same
+session-list lineage projection and live session roster as the sidebar. Activating one opens its task
+and managed session. Child updates do not remount the parent's composer.
 
 Only a direct owner can address a child. A child may create one more level, but a third level is
 refused. Each root admits at most 12 live delegated sessions in the reservation transaction, counting
@@ -500,7 +504,17 @@ turn. The owner answers by calling `agent_prompt`, and that turn reports in its 
 The idempotency key `delegation-report:<child turn id>` makes delivery exactly-once. The trigger is
 the post-commit `turn-changed` broadcast, which every settle path already sends. It is not durable,
 so the startup reconcile pass looks for settled `reportTo` turns with no report and queues the
-missing ones. No report is queued in these cases:
+missing ones.
+
+When a delegated turn pauses on a pending permission, question, or elicitation request, the
+post-commit `request-changed` lifecycle event queues a separate informational report keyed by
+`delegation-request:<request id>`. It names the child, the request kind, and bounded request text,
+and links back to the child session. The parent can inspect the child, but a human resolves the
+request in the child pane; no agent tool grants approval or response authority. Only a direct managed
+owner whose turn carries `reportTo` receives this wake. Pending requests expire on restart, so the
+startup reconciliation pass remains limited to settled-turn reports.
+
+No report is queued in these cases:
 
 - The owner cancelled the turn itself with `agent_cancel`.
 - The owner session is archived or failed.
