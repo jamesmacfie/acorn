@@ -1,12 +1,16 @@
 import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
-import type { DiffSegmentRequest } from '@acorn/diff-document/document'
+import { dehydrate, QueryClient, QueryClientProvider } from '@tanstack/solid-query'
+import { segmentContentKey, type DiffDocumentFile, type DiffSegmentRequest } from '@acorn/diff-document/document'
+import type { DiffThread } from '../../kit/diff/diffModel'
+import { _resetSurfaceHealth, surfaceHealthSnapshot } from '../../kit/lib/surfaceHealth'
+import { shouldPersistQuery } from '../../infra/persistence/queryPersistence'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { commandRegistry } from '../../host/registries/commands/commands'
 import { largeDiffFiles, largeDiffSource, type LargeDiffFile } from '../../testkit/largeDiff'
 import { installDiffLayout } from './layout.helper'
+import { residentKey, segmentCacheFor } from './segmentCache'
 import type { DiffSource } from './source'
 
 // The viewer against the generated fixture, with the source playing the node's part in-process
@@ -38,17 +42,26 @@ afterEach(() => {
   tokenizer.calls = 0
   tokenizer.hold = false
   tokenizer.waiting.splice(0).forEach((resolve) => resolve())
+  _resetSurfaceHealth()
 })
 
-const mount = (source: DiffSource) => {
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
+const newClient = () => new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
+
+const mount = (source: DiffSource, client = newClient()) => {
   const host = document.createElement('div')
   document.body.append(host)
-  cleanups.push(render(() => (
+  const dispose = render(() => (
     <QueryClientProvider client={client}><DiffPane source={source} /></QueryClientProvider>
-  ), host))
-  cleanups.push(() => host.remove())
-  return host
+  ), host)
+  let mounted = true
+  const unmount = () => {
+    if (!mounted) return
+    mounted = false
+    dispose()
+    host.remove()
+  }
+  cleanups.push(unmount)
+  return Object.assign(host, { client, unmount })
 }
 
 const settle = (ms = 150) => new Promise((resolve) => setTimeout(resolve, ms))
@@ -124,11 +137,25 @@ describe('a segmented diff', () => {
     const host = mount(source)
     await vi.waitFor(() => expect(host.textContent).toContain('compute'), { timeout: 5_000 })
     await settle()
+    const cache = segmentCacheFor(host.client)
+    const held = (file: DiffDocumentFile) => file.segments.filter((_, ordinal) => cache.has(residentKey(segmentContentKey(file.patchKey!, ordinal), file.path, file.sha))).length
+    const [before, other] = current().topology()!.files
+    expect(held(before!)).toBeGreaterThan(0)
+    const otherHeld = held(other!)
+    // A poll that found nothing new: the same revision, so nothing is asked for and nothing goes.
     requests.length = 0
+    setCurrent(largeDiffSource(files, { onLoad }))
+    await settle()
+    expect(requests).toEqual([])
+    expect(held(before!)).toBeGreaterThan(0)
+
     setCurrent(next)
     await vi.waitFor(() => expect(host.textContent).toContain('MOVED'), { timeout: 5_000 })
     // Only the first file's segments were asked for again; the others kept their rows.
     expect(new Set(requests.map((request) => request.path))).toEqual(new Set([moved.path]))
+    // And the patch it moved from is gone from the cache, while the other files' stay.
+    expect(held(before!)).toBe(0)
+    expect(held(other!)).toBe(otherHeld)
   })
 
   it('finds across the whole document and loads the segment a match is in', async () => {
@@ -170,4 +197,69 @@ describe('a segmented diff', () => {
     const next = items.sort((a, b) => Number(a.dataset.index) - Number(b.dataset.index))[1]
     expect(next?.textContent).toContain(files[1]!.path)
   }, 20_000)
+})
+
+describe('resident segments', () => {
+  const diff = () => surfaceHealthSnapshot().surfaces.find((entry) => entry.kind === 'diff')
+
+  it('paints a revisited diff from memory, coloured, before any segment request answers', async () => {
+    const files = [...largeDiffFiles('small', 1)]
+    const first = mount(largeDiffSource(files))
+    await vi.waitFor(() => expect(first.querySelector<HTMLElement>('.diff-item .diff-row .diff-code span')?.style.getPropertyValue('--l')).toBe('#111'), { timeout: 5_000 })
+    await settle()
+    first.unmount()
+
+    // The same node, a new pane, and a source that never answers: whatever it draws came from memory.
+    const { requests, onLoad } = recorded()
+    const calls = tokenizer.calls
+    const again = mount(largeDiffSource(files, { onLoad, delay: () => new Promise(() => {}) }), first.client)
+    await vi.waitFor(() => expect(again.querySelectorAll('.diff-item .diff-row .diff-code').length).toBeGreaterThan(10), { timeout: 5_000 })
+    expect(again.querySelector<HTMLElement>('.diff-item .diff-row .diff-code span')!.style.getPropertyValue('--l')).toBe('#111')
+    expect(tokenizer.calls).toBe(calls)
+    const reading = diff()!
+    expect(reading.resident.hits).toBeGreaterThan(0)
+    expect(reading.resident.rows).toBeLessThanOrEqual(reading.resident.rowCeiling)
+    expect(reading.resident.estimatedBytes).toBeLessThanOrEqual(reading.resident.byteCeiling)
+    // Anything it did ask for is beyond what it had held, never a segment it drew.
+    const drawn = new Set([...again.querySelectorAll<HTMLElement>('.diff-item[data-kind="segment"]')].map((item) => item.dataset.key))
+    expect(requests.filter((request) => drawn.has(`s:${request.path}:${request.ordinal}`))).toEqual([])
+  }, 20_000)
+
+  it('shares nothing between two nodes', async () => {
+    const files = [...largeDiffFiles('small', 1)]
+    const first = mount(largeDiffSource(files))
+    await vi.waitFor(() => expect(first.querySelectorAll('.diff-item .diff-row').length).toBeGreaterThan(10), { timeout: 5_000 })
+    first.unmount()
+    const { requests, onLoad } = recorded()
+    mount(largeDiffSource(files, { onLoad }))
+    await vi.waitFor(() => expect(requests.length).toBeGreaterThan(0), { timeout: 5_000 })
+  })
+
+  it('keeps code rows when a thread resolves, and asks for nothing', async () => {
+    const files = [...largeDiffFiles('small', 1)]
+    const own = files.flatMap((file) => file.threads)
+    const [threads, setThreads] = createSignal<DiffThread[]>(own)
+    const { requests, onLoad } = recorded()
+    const host = mount(largeDiffSource(files, { onLoad, threads }))
+    await vi.waitFor(() => expect(host.querySelectorAll('.diff-item .diff-row').length).toBeGreaterThan(10), { timeout: 5_000 })
+    await settle()
+    const cache = segmentCacheFor(host.client)
+    const { inserts, evictions } = cache.stats()
+    requests.length = 0
+    setThreads(own.map((thread) => ({ ...thread, resolved: !thread.resolved })))
+    await settle()
+    expect(requests).toEqual([])
+    expect(cache.stats()).toMatchObject({ inserts, evictions })
+  })
+
+  it('never puts a segment into the persisted query snapshot', async () => {
+    const CANARY = 'CANARY9d2e'
+    const files = [...largeDiffFiles('small', 1)].map((file): LargeDiffFile => ({ ...file, patch: file.patch?.replace(/compute/g, `compute_${CANARY}`) ?? null }))
+    const host = mount(largeDiffSource(files))
+    await vi.waitFor(() => expect(host.textContent).toContain(CANARY), { timeout: 5_000 })
+    host.client.setQueryData(['tasks'], [{ id: 'kept' }])
+    const snapshot = JSON.stringify(dehydrate(host.client, { shouldDehydrateQuery: shouldPersistQuery }))
+    expect(snapshot).toContain('kept')
+    expect(snapshot).not.toContain(CANARY)
+  })
 })
