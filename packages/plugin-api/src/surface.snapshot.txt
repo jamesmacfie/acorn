@@ -643,6 +643,10 @@ ui/diff: DiffSearchRequest
 ui/diff: DiffSegmentDescriptor
 ui/diff: DiffSegmentPayload
 ui/diff: DiffSegmentRequest
+ui/diff: DiffSnippet
+ui/diff: DiffSnippetAnchor
+ui/diff: DiffSnippetLine
+ui/diff: DiffSnippets
 ui/diff: DiffSource
 ui/diff: DiffViewScope
 ui/diff: FindHighlight
@@ -658,6 +662,7 @@ ui/diff: buildDiffRows
 ui/diff: buildDiffRowsAsync
 ui/diff: buildRenderableRows
 ui/diff: collectMatches
+ui/diff: createDiffSnippets
 ui/diff: createSplitScrollSync
 ui/diff: diffScopeKey
 ui/diff: documentTopology
