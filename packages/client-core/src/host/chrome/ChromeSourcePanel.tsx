@@ -102,7 +102,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
     ({ projectId }) => chromeKey(props.pluginId, props.descriptor.id, projectId),
     (node, { projectId }, signal) => readRailItems(
       props.pluginId,
-      scopedSourceItemsPath(props.descriptor.items, projectId),
+      scopedSourceItemsPath(props.descriptor.items!, projectId),
       node,
       signal,
     ),

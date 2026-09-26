@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { writePrivateAtomic } from '@acorn/node-core/server/storage'
 import { join } from 'node:path'
 import { z } from 'zod'
@@ -7,6 +7,12 @@ import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { corePluginBundleRoute } from '@acorn/protocol/api.ts'
 import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
+import { withPluginPackage } from '@acorn/node-core/server/plugins'
+import { hasNodeHalf, bundleSourceSchema } from '@acorn/protocol/plugin/bundles.ts'
+import type { PluginInstallSource } from '@acorn/protocol/api.ts'
+import { describePluginSource } from '@acorn/protocol/plugin/source.ts'
+import { resolveInRoot } from '@acorn/node-core/server/core/fs.ts'
+import { installSchema } from './pluginRequests'
 
 const log = createLogger('plugins')
 
@@ -40,6 +46,10 @@ const entrySchema = z.strictObject({
   // Every node that has offered this bundle. Two nodes carrying the same plugin version serve
   // byte-identical bundles, so they share one cache entry.
   nodeIds: z.array(z.string().min(1)),
+  source: bundleSourceSchema.optional(),
+  installSource: installSchema.shape.source.optional(),
+  sourceLabel: z.string().optional(),
+  manifest: z.unknown().optional(),
   firstSeen: z.number().int(),
   lastSeen: z.number().int(),
 })
@@ -47,7 +57,7 @@ export type PluginCacheEntry = z.infer<typeof entrySchema>
 
 const indexSchema = z.strictObject({ version: z.literal(1), entries: z.record(z.string(), entrySchema) })
 
-export type PutFailure = 'unreachable' | 'not-found' | 'too-large' | 'hash-mismatch'
+export type PutFailure = 'unreachable' | 'not-found' | 'too-large' | 'hash-mismatch' | 'has-node-half' | 'invalid-manifest' | 'plugin-id-mismatch'
 export type PutResult = { hash: string } | { error: PutFailure }
 
 // Just enough of NodeBroker to fetch. Narrow so the tests can exercise the hashing rules without a
@@ -147,11 +157,67 @@ export class PluginCache {
         version: claim.version,
         bytes: response.body.byteLength,
         nodeIds: [...new Set([...(existing?.nodeIds ?? []), nodeId])],
+        source: existing?.source ?? { kind: 'node', nodeId },
+        ...(existing?.installSource ? { installSource: existing.installSource } : {}),
+        ...(existing?.sourceLabel ? { sourceLabel: existing.sourceLabel } : {}),
+        ...(existing?.manifest ? { manifest: existing.manifest } : {}),
         firstSeen: existing?.firstSeen ?? now,
         lastSeen: now,
       },
     })
     return { hash }
+  }
+
+  /** Validate the package before any entry is added. A folder is re-read for every update. */
+  async putFromSource(source: PluginInstallSource, expectedPluginId?: string): Promise<{ hash: string; pluginId: string; version: string } | { error: PutFailure }> {
+    try {
+      return await withPluginPackage(this.userDataDir, source, (root, manifest) => {
+        const rawManifest: unknown = JSON.parse(readFileSync(join(root, 'acorn-plugin.json'), 'utf8'))
+        if (expectedPluginId && manifest.id !== expectedPluginId) return { error: 'plugin-id-mismatch' as const }
+        if (hasNodeHalf(rawManifest)) return { error: 'has-node-half' as const }
+        if (!manifest.client) return { error: 'invalid-manifest' as const }
+        const path = resolveInRoot(root, manifest.client)
+        if (!path) return { error: 'invalid-manifest' as const }
+        if (statSync(path).size > MAX_BUNDLE_BYTES) return { error: 'too-large' as const }
+        const bytes = readFileSync(path)
+        const hash = createHash('sha256').update(bytes).digest('hex')
+        this.writeBundle(hash, bytes)
+        const now = Date.now()
+        const existing = this.entries()[hash]
+        this.writeIndex({ ...this.entries(), [hash]: {
+          pluginId: manifest.id,
+          version: manifest.version,
+          bytes: bytes.byteLength,
+          nodeIds: existing?.nodeIds ?? [],
+          source: { kind: 'device' },
+          installSource: source,
+          sourceLabel: describePluginSource(source),
+          manifest: rawManifest,
+          firstSeen: existing?.firstSeen ?? now,
+          lastSeen: now,
+        } })
+        this.removeDevice(manifest.id, hash)
+        return { hash, pluginId: manifest.id, version: manifest.version }
+      })
+    } catch (error) {
+      log.warn(`device plugin install failed: ${describeError(error).message}`)
+      throw error
+    }
+  }
+
+  removeDevice(pluginId: string, keepHash?: string): void {
+    const entries = { ...this.entries() }
+    for (const [hash, entry] of Object.entries(entries)) {
+      if (hash === keepHash || entry.pluginId !== pluginId || entry.source?.kind !== 'device') continue
+      if (entry.nodeIds.length) {
+        const { installSource: _installSource, sourceLabel: _sourceLabel, manifest: _manifest, ...rest } = entry
+        entries[hash] = { ...rest, source: { kind: 'node', nodeId: entry.nodeIds[0]! } }
+      } else {
+        delete entries[hash]
+        rmSync(join(this.dir, `${hash}.js`), { force: true })
+      }
+    }
+    this.writeIndex(entries)
   }
 
   // A node still offers this bundle. Keeps the eviction clock honest for a plugin installed and
@@ -179,7 +245,7 @@ export class PluginCache {
     const cutoff = Date.now() - EVICT_AFTER_MS
     let dropped = 0
     for (const [hash, entry] of Object.entries(entries)) {
-      if (entry.nodeIds.length > 0 || entry.lastSeen >= cutoff) continue
+      if (entry.source?.kind === 'device' || entry.nodeIds.length > 0 || entry.lastSeen >= cutoff) continue
       delete entries[hash]
       dropped++
     }

@@ -116,8 +116,9 @@ The rail's task list goes through the same `rail.taskList` exclusive slot the de
 plugin that offers to replace it replaces it on both hosts. `ExclusiveSlotHost` is host-supplied like
 the component table, because the DOM's copy reaches for `Dynamic` from `solid-js/web` and pulling that
 in would put a second Solid renderer in the graph to render one child. The arbitration rule in
-`exclusiveSlots.ts` is shared unchanged. The topbar and the pane strip are bespoke until the
-client-plugins programme gives each a contract.
+`exclusiveSlots.ts` is shared unchanged. The topbar and pane strip remain terminal-owned drawings;
+the desktop's `rail`, `topbar`, and `pane.switcher` replacement contracts apply only to providers
+that declare support for the host's form factor.
 
 The palette is a `Modal` over the same session the desktop's runs on
 (`client-core/host/registries/commands/sessionStore.ts`). The query, the order, the cursor, the frame stack
@@ -309,7 +310,7 @@ lives.
 | `hook` | Runs on the node | Runs on the node | Nothing to draw on either host |
 | `pane.aside` | A dashboard grid the user composed, beside the pane | One muted line naming the point | [future/dashboards/README.md](../future/dashboards/README.md) |
 | `rail.taskList` (exclusive slot) | The replacement draws in place of core's list | The same, through the same arbitration | `apps/tui/src/chrome/slot.tsx` |
-| `overlay`, `drawer`, `task.footer`, `task.switcher.extra`, `topbar.*` | Host UI slots a plugin fills | Not drawn | [future/client-plugins/04-replaceable-surfaces.md](../future/client-plugins/04-replaceable-surfaces.md) |
+| `overlay`, `drawer`, `task.footer`, `task.switcher.extra`, `topbar.*` | Host UI slots a plugin fills | Not drawn | [Plugin extension points](../plugins.md) |
 
 The last row costs five first-party registrations, and two of them draw nothing: github's and agents'
 `overlay` entries are where a command that needs the router or a query client gets mounted, and

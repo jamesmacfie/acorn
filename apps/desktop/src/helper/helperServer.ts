@@ -2,6 +2,7 @@ import { createServer, type Server } from 'node:http'
 import { timingSafeEqual } from 'node:crypto'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { z } from 'zod'
+import type { DeviceConfig } from '@acorn/protocol/deviceConfig.ts'
 import {
   nodeAdoptRequestSchema,
   nodeFetchRequestSchema,
@@ -25,6 +26,8 @@ import {
   devGrantSchema,
   disclosureSchema,
   NO_DISCLOSURE,
+  installSchema,
+  removeSchema,
   putSchema,
   type PluginsState,
 } from '@acorn/custody/plugins'
@@ -115,6 +118,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
     const payload = JSON.stringify(message)
     for (const socket of sockets) if (socket.readyState === socket.OPEN) socket.send(payload)
   }
+  const stopConfigWatch = helper.config.watch((state) => push({ push: 'config-changed', state }))
 
   // The same filter as `push` above, and the same reason: an N-node fleet used to deliver every node's
   // terminal output to a renderer that drops all but the active one's. Tagged with the node id rather
@@ -141,6 +145,11 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
   let pending: Awaited<ReturnType<typeof probeNode>> | null = null
 
   const handlers: Record<HelperMethod, (params: unknown) => unknown | Promise<unknown>> = {
+    'config-read': () => helper.config.read(),
+    // DeviceConfigStore validates the merged document, including the schema's refinement. Zod
+    // cannot derive .partial() from a refined object, so only assert the patch's wire shape here.
+    'config-write': (raw) => helper.config.write(z.record(z.string(), z.unknown()).parse(raw) as Partial<DeviceConfig>),
+    'config-location': () => helper.config.path,
     'renderer-pulse': () => undefined,
     'node-fetch': async (raw) => {
       const { nodeId, request } = z.object({ nodeId: z.string().min(1), request: z.unknown() }).parse(raw)
@@ -292,7 +301,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
       // Projected rather than passed through: `nodeIds` and the eviction timestamps are the helper's
       // bookkeeping, and a field added to the cache entry must not reach the renderer by default.
       cached: Object.fromEntries(
-        Object.entries(helper.pluginCache.list()).map(([hash, entry]) => [hash, { pluginId: entry.pluginId, version: entry.version, bytes: entry.bytes }]),
+        Object.entries(helper.pluginCache.list()).map(([hash, entry]) => [hash, { pluginId: entry.pluginId, version: entry.version, bytes: entry.bytes, source: entry.source ?? (entry.nodeIds[0] ? { kind: 'node' as const, nodeId: entry.nodeIds[0] } : undefined), nodeIds: entry.nodeIds, installSource: entry.installSource, sourceLabel: entry.sourceLabel, manifest: entry.manifest }]),
       ),
       acks: helper.pluginTrust.list(),
       devGrants: helper.pluginTrust.listDevGrants(),
@@ -303,10 +312,28 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
       if ('hash' in result) helper.pluginTrust.recordDevAccept({ pluginId, nodeId, hash: result.hash, version })
       return result
     },
+    'plugins-install': async (raw) => {
+      const { source, expectedPluginId } = installSchema.parse(raw)
+      const result = await helper.pluginCache.putFromSource(source, expectedPluginId)
+      if ('hash' in result) helper.pluginTrust.recordDevAccept({ pluginId: result.pluginId, nodeId: '', source: { kind: 'device' }, hash: result.hash, version: result.version })
+      return result
+    },
+    'plugins-remove': (raw): void => {
+      const { pluginId } = removeSchema.parse(raw)
+      helper.pluginCache.removeDevice(pluginId)
+      helper.pluginTrust.forgetDevGrant(pluginId, { kind: 'device' })
+    },
     'plugins-dev-grant': (raw): void => {
-      const { pluginId, nodeId, path, grant } = devGrantSchema.parse(raw)
-      if (!grant) return helper.pluginTrust.revokeDev(pluginId, nodeId)
-      helper.pluginTrust.grantDev({ pluginId, nodeId, ...(path ? { path } : {}), grantedAt: Date.now() })
+      const { pluginId, nodeId, source, path, grant } = devGrantSchema.parse(raw)
+      if (!grant) return helper.pluginTrust.revokeDev(pluginId, source ?? nodeId)
+      helper.pluginTrust.grantDev({ pluginId, nodeId, source: source ?? { kind: 'node', nodeId }, ...(path ? { path } : {}), grantedAt: Date.now() })
+      if (source?.kind === 'device') {
+        for (const [hash, entry] of Object.entries(helper.pluginCache.list())) {
+          if (entry.pluginId === pluginId && entry.source?.kind === 'device') {
+            helper.pluginTrust.recordDevAccept({ pluginId, nodeId: '', source, hash, version: entry.version })
+          }
+        }
+      }
     },
     'plugins-trust-record': (raw): void => {
       const decision = decisionSchema.parse(raw)
@@ -348,8 +375,8 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
   }
 
   const http = createServer((_request, response) => response.writeHead(426).end())
-  http.on('close', () => { clearInterval(watchdogTimer); watchdogs.clear() })
-  http.on('error', () => clearInterval(watchdogTimer))
+  http.on('close', () => { stopConfigWatch(); clearInterval(watchdogTimer); watchdogs.clear() })
+  http.on('error', () => { stopConfigWatch(); clearInterval(watchdogTimer) })
   const wss = new WebSocketServer({ noServer: true })
 
   http.on('upgrade', (request, socket, head) => {

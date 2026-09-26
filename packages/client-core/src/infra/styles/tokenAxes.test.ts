@@ -8,6 +8,8 @@ import {
   SELF_DESCRIPTION_TOKENS,
   SERIES_TOKENS,
   STYLE_TOKENS,
+  STYLE_TOKEN_FAMILIES,
+  DERIVED_STYLE_TOKENS,
   THEME_TOKENS,
   Z_ORDER_INVARIANTS,
 } from '../../kit/tokens/tokenAxes'
@@ -97,6 +99,21 @@ describe('token axes are complete', () => {
 
 describe('style packs stay in their lane', () => {
   const packs = readStylePacks()
+
+  it('assigns every style token one value family and keeps derived tokens in the axis', () => {
+    expect(STYLE_TOKENS.filter((token) => !STYLE_TOKEN_FAMILIES[token])).toEqual([])
+    expect(Object.keys(STYLE_TOKEN_FAMILIES).filter((token) => !style.has(token))).toEqual([])
+    expect(DERIVED_STYLE_TOKENS.filter((token) => !style.has(token))).toEqual([])
+  })
+
+  it('keeps built-in shadows on the theme shadow token', () => {
+    for (const file of [sheet('tokens-style.css'), ...packs.map((pack) => pack.text)]) {
+      const stripped = file.replace(/\/\*[\s\S]*?\*\//g, '')
+      for (const [, value] of stripped.matchAll(/^\s*--shadow-[a-z0-9-]+:\s*([^;]+);/gm)) {
+        if (value.trim() !== 'none') expect(value).toContain('var(--shadow-popover)')
+      }
+    }
+  })
 
   it('sets no palette token', () => {
     for (const pack of packs) {

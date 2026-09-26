@@ -10,6 +10,7 @@ import type {
 } from '@acorn/protocol/broker.ts'
 import type { NodePluginPermissions, PluginAgentToolGrant, PluginContextSectionGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import type { WsClientFrame } from '@acorn/protocol/ws.ts'
+import type { DeviceConfig } from '@acorn/protocol/deviceConfig.ts'
 
 // The platform seam: the renderer's one door to whatever is hosting it. See
 // docs/architecture-overview.md § Node API and client flow for the seam's shape, its nullable
@@ -63,10 +64,20 @@ export type FleetBridge = {
 export type PluginCustody = {
   state(): Promise<PluginHostState>
   cachePut(request: { nodeId: string; pluginId: string; hash: string; version: string }): Promise<PluginPutResult>
+  install(request: { source: import('@acorn/protocol/api.ts').PluginInstallSource; expectedPluginId?: string }): Promise<PluginDeviceInstallResult>
+  remove(request: { pluginId: string }): Promise<void>
   trustRecord(request: PluginTrustDecision): Promise<void>
   // Enter or leave development mode for one plugin on one node. See docs/security.md § The dev
   // grant.
   devGrant(request: PluginDevGrantRequest): Promise<void>
+}
+
+export type DeviceConfigState = { config: DeviceConfig; error?: { message: string; line: number; column: number } }
+export type DeviceConfigBridge = {
+  read(): Promise<DeviceConfigState>
+  write(patch: Partial<DeviceConfig>): Promise<DeviceConfigState>
+  onChange(cb: (state: DeviceConfigState) => void): () => void
+  location(): Promise<string>
 }
 
 // Native actions with no in-page equivalent. Absent everywhere but a desktop shell; every consumer
@@ -79,6 +90,7 @@ export type DesktopExtras = {
   // its registered toggle command after this event arrives.
   onCommandPalette(cb: () => void): () => void
   onWillQuit(cb: () => boolean | Promise<boolean>): () => void
+  openConfigFile(): Promise<void>
 }
 
 // The native folder dialog. Its own group rather than part of `DesktopExtras`, because gating the
@@ -159,6 +171,7 @@ export type PluginTrustDecision = {
   pluginId: string
   hash: string
   nodeId: string
+  source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource
   version: string
   permissions: NodePluginPermissions
   webviews: PluginWebviewGrant[]
@@ -189,14 +202,15 @@ export type PluginAckRecord = PluginTrustDecision & {
 }
 // Which plugins this device is developing, and against which node. See docs/security.md § The dev
 // grant for why the key is the pair rather than the plugin id alone.
-export type PluginDevGrant = { pluginId: string; nodeId: string; path?: string; grantedAt: number }
-export type PluginDevGrantRequest = { pluginId: string; nodeId: string; path?: string; grant: boolean }
+export type PluginDevGrant = { pluginId: string; nodeId: string; source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource; path?: string; grantedAt: number }
+export type PluginDevGrantRequest = { pluginId: string; nodeId: string; source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource; path?: string; grant: boolean }
 export type PluginHostState = {
-  cached: Record<string, { pluginId: string; version: string; bytes: number }>
+  cached: Record<string, { pluginId: string; version: string; bytes: number; source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource; installSource?: import('@acorn/protocol/api.ts').PluginInstallSource; sourceLabel?: string; manifest?: unknown; nodeIds?: string[] }>
   acks: PluginAckRecord[]
   devGrants: PluginDevGrant[]
 }
-export type PluginPutResult = { hash: string } | { error: 'unreachable' | 'not-found' | 'too-large' | 'hash-mismatch' }
+export type PluginPutResult = { hash: string } | { error: 'unreachable' | 'not-found' | 'too-large' | 'hash-mismatch' | 'has-node-half' | 'invalid-manifest' | 'plugin-id-mismatch' }
+export type PluginDeviceInstallResult = { hash: string; pluginId: string; version: string } | { error: string }
 
 // ── The desktop implementation ────────────────────────────────────────────────────────────────
 
@@ -208,6 +222,7 @@ type AcornPreload = {
   onClosePane?: DesktopExtras['onClosePane']
   onCommandPalette?: DesktopExtras['onCommandPalette']
   onWillQuit?: DesktopExtras['onWillQuit']
+  openConfigFile?: DesktopExtras['openConfigFile']
   reportResponsiveness?: (pulse: ResponsivenessPulse) => void
   nodeFetch?: NodeTransport['fetch']
   nodeAbort?: NodeTransport['abort']
@@ -226,6 +241,7 @@ type AcornPreload = {
   nodeTunnelOpen?: FleetBridge['tunnelOpen']
   nodeTunnelClose?: FleetBridge['tunnelClose']
   plugins?: PluginCustody
+  config?: DeviceConfigBridge
   recovery?: RecoveryActions
   folderPath?: FolderPicker
   files?: FileDialogs
@@ -322,11 +338,12 @@ export const fleetBridge = (): FleetBridge | null => {
 }
 
 export const pluginCustody = (): PluginCustody | null => acornGlobal()?.plugins ?? null
+export const deviceConfigBridge = (): DeviceConfigBridge | null => acornGlobal()?.config ?? null
 export const desktopExtras = (): DesktopExtras | null => {
   const acorn = acornGlobal()
-  if (!acorn?.onClosePane || !acorn.onCommandPalette || !acorn.onWillQuit) return null
-  const { onClosePane, onCommandPalette, onWillQuit } = acorn
-  return { onClosePane, onCommandPalette, onWillQuit }
+  if (!acorn?.onClosePane || !acorn.onCommandPalette || !acorn.onWillQuit || !acorn.openConfigFile) return null
+  const { onClosePane, onCommandPalette, onWillQuit, openConfigFile } = acorn
+  return { onClosePane, onCommandPalette, onWillQuit, openConfigFile }
 }
 export const recoveryActions = (): RecoveryActions | null => acornGlobal()?.recovery ?? null
 export const previewViews = (): PreviewViews | null => acornGlobal()?.preview ?? null

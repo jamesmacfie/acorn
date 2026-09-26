@@ -9,7 +9,7 @@ import { pluginState, type PluginsBridge } from './state'
 const NO_PERMISSIONS = { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } }
 const NO_CONTRIBUTIONS = {
   frames: [], remote: [], sources: [], slots: [], commands: [], keybindings: [],
-  attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [],
+  attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [],
   contextMenus: [], extensionPoints: [], extensions: [],
   schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [],
 }

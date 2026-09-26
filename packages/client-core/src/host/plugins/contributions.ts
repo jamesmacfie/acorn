@@ -1,7 +1,7 @@
 import type { InstalledPluginRow, NodePluginRow, PluginContributions } from '@acorn/protocol/api.ts'
 import { hasFrameRegion, hasRemoteRegion, isOverlaySurface, isProjectPaneSurface, isTaskPaneSurface } from '@acorn/protocol/plugin/contract.ts'
 import { namespaceContributions } from './contributionIds'
-import { activeBundles, bundleAccepted, installedByNode } from './distribution'
+import { activeBundles, bundleAccepted, installedByNode, devicePlugins } from './distribution'
 
 // Who may contribute, and what they declared: the shared identity-and-trust check both registration
 // passes need before either can draw anything (docs/plugins.md § One shared eligibility and trust
@@ -20,12 +20,15 @@ export type EligiblePlugin = {
   trusted: boolean
 }
 
-/**
 /** Every plugin whose contributions this device may draw, one row per plugin id, already labelled with
  *  its trust state (docs/plugins.md § One shared eligibility and trust check). */
 export function eligiblePlugins(): EligiblePlugin[] {
   const bundles = activeBundles()
   const rowsById = new Map<string, { row: NodePluginRow; installed: InstalledPluginRow }[]>()
+  for (const entry of devicePlugins()) {
+    if (!entry.row.installed) continue
+    rowsById.set(entry.row.name, [{ row: entry.row, installed: entry.row.installed }])
+  }
   for (const roster of installedByNode().values()) {
     for (const row of roster) {
       if (!row.installed) continue
@@ -39,7 +42,11 @@ export function eligiblePlugins(): EligiblePlugin[] {
   const eligible: EligiblePlugin[] = []
   for (const [pluginId, rows] of rowsById) {
     const winner = bundles?.get(pluginId)
-    const chosen = (winner && rows.find((entry) => entry.installed.client?.hash === winner.hash)) ?? rows[0]!
+    const chosen = (winner && rows.find((entry) => entry.installed.client?.hash === winner.hash && (winner.source.kind !== 'device' || devicePlugins().some((device) => device.row === entry.row)))) ?? rows[0]!
+    // A disabled device bundle still wins provenance arbitration, so it must suppress all of its
+    // contributions here. Individual registries gate most visible surfaces, but theme and style
+    // data have no `when` callback and would otherwise remain applied after disable.
+    if (chosen.row.disabled && devicePlugins().some((device) => device.row === chosen.row)) continue
     // No fallback to the row's own claimed hash (docs/plugins.md § One shared eligibility and trust
     // check explains why).
     const hash = winner && chosen.installed.client?.hash === winner.hash ? winner.hash : ''
@@ -59,12 +66,10 @@ export function eligiblePlugins(): EligiblePlugin[] {
   return eligible
 }
 
-/**
 /** Does this package carry code this device has not been cleared to run? See docs/plugins.md § One
  *  shared eligibility and trust check for how this differs from `trusted`. */
 export const hasWithheldCode = (entry: EligiblePlugin): boolean => entry.installed.client !== null && !entry.trusted
 
-/**
 /**
  * A task-scoped pane, which is the only kind of surface a task's layout can hold.
  *

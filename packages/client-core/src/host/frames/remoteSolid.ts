@@ -19,7 +19,7 @@
 import { createRenderer } from 'solid-js/universal'
 import { createStore, reconcile } from 'solid-js/store'
 import type { JSX } from 'solid-js'
-import { KIT_NODES, type KitNodeName } from '@acorn/protocol/tree/nodes.ts'
+import { CHROME_SLOT_NODE, KIT_NODES, type KitNodeName } from '@acorn/protocol/tree/nodes.ts'
 import type { AcornBridge, TreeMount, TreeRender } from './sdk'
 import {
   createNode, createText, firstChild, insertNode as attach, isTextNode, nextSibling, parentOf,
@@ -69,7 +69,7 @@ export type KitNodeProps = Record<string, unknown> & { children?: unknown }
  * would use on a DOM element — a prop that changes patches one node, and a list that grows inserts
  * one child.
  */
-const kitNode = (type: KitNodeName) => {
+const kitNode = (type: KitNodeName | typeof CHROME_SLOT_NODE) => {
   const node = (props: KitNodeProps): RemoteNode => {
     const own = createNode(type)
     spread(own, props, false)
@@ -85,6 +85,9 @@ const kitNode = (type: KitNodeName) => {
 export const KIT_NODE_COMPONENTS = Object.fromEntries(
   KIT_NODES.map((name) => [name, kitNode(name)]),
 ) as Record<KitNodeName, (props: KitNodeProps) => JSX.Element>
+
+/** Only a rail or topbar replacement receives a host-minted slotRef that this can place. */
+export const Slot = kitNode(CHROME_SLOT_NODE)
 
 // Destructured rather than written out one `export const` at a time, so the list cannot drift from
 // `KIT_NODES`: a name here that the kit does not have is a type error, and a name the kit has that is

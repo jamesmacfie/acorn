@@ -90,6 +90,19 @@ describe('one worker per bundle', () => {
 })
 
 describe('what reaches a tree', () => {
+  it('replays the first batch when the worker answers before the host subscribes', async () => {
+    start()
+    const handle = acquire()
+    handle.mount('s1', 'topbar', {})
+    const ops: TreeMutation[] = [{ op: 'insert', parent: null, index: 0, node: { id: 'n1', type: 'Heading', props: {}, children: [] } }]
+    sandbox!.port.postMessage({ kind: 'tree:batch', slot: 's1', ops })
+    await settle()
+
+    const received: TreeMutation[][] = []
+    handle.transport('s1').onBatch((batch) => received.push([...batch]))
+    expect(received).toEqual([ops])
+  })
+
   it('routes a batch to the slot it names and nowhere else', async () => {
     start()
     const handle = acquire()

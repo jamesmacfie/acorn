@@ -444,6 +444,9 @@ A loaded plugin's UI is not registered by its own code. The Node hands each devi
 manifest and the hash of its client bundle in the roster (`GET /v1/core/plugins`); the device
 decides what to render from that, and the plugin's JavaScript never touches a shell registry.
 
+A device may also install a client-only package itself. Its manifest and bundle come from the device
+cache instead of a Node roster, but the same contribution registration and sandbox paths handle both.
+
 Five kinds of contribution come out of that one manifest, and each has its own section below:
 frames, remote trees, document surfaces, webviews, and descriptors. The wire format behind the
 second one is in [The tree contract](descriptors.md#the-tree-contract).
@@ -451,7 +454,32 @@ second one is in [The tree contract](descriptors.md#the-tree-contract).
 **When the device asks.** Every host draws before the node it just started is up, so the pass that reads
 the fleet's rosters, caches the bundles and registers those contributions cannot run from a composition
 root: at that moment the fleet list is still empty and every node reads `offline`, and the pass asks
-nobody. `watchPluginChanges` (`host/plugins/reload.ts`) owns it instead, and runs it the first time each
-node becomes reachable — once per node, so a connection that flaps does not re-hash the fleet's bundles.
+nobody. `watchPluginChanges` (`host/plugins/reload.ts`) first reads cached device bundles without a
+Node request, then runs a fleet pass the first time each node becomes reachable — once per node, so a
+connection that flaps does not re-hash the fleet's bundles.
 The same watcher then keeps it reconciled for the rest of the session, off the node's `plugins:changed`
 broadcast. Both hosts call it and neither runs a pass of its own.
+
+## Device-held plugins
+
+Settings → Plugins → On this device installs a GitHub release, npm package, HTTPS tarball, or local
+folder when the host has a folder picker. The helper resolves and validates the package, hashes its
+client bundle, and holds the manifest with that bundle. A folder is re-read on update; it pins no
+source bytes. Installation and update enter the ordinary per-hash trust prompt. The plugin appears
+after acceptance without restarting the application.
+
+A device package cannot declare a Node entry, migration, Node permission, or any contribution whose
+handler needs Node execution: routes, schedules, tools, context sections, providers, harnesses, task
+checks, audit actions, data sources, and discovery handlers. It also rejects descriptors that point at
+plugin-owned Node routes, including the `items` form of a rail source. A client-only source declares
+`tree: { list, detail }` with two remote-tree entries; the host mounts them in its browse layout. The
+helper rejects invalid packages before caching, and
+the client repeats the rule before registering contributions. Its code runs through the same sandboxed
+iframe or remote-tree worker as a Node-delivered bundle, never in the shell process.
+
+One active bundle exists per plugin ID. A compatible device bundle wins over any Node offer of that
+ID, even if the Node version is newer; version and hash order still choose among device candidates.
+Settings lists Nodes offering the same bundle. Device enablement and `plugin:<id>:*` state stay on the
+device. Removing a device plugin drops its cached bundle, preferences, and live contributions, and
+returns selected exclusive slots to core. Manual trust acknowledgements survive removal so reinstalling
+the same bytes does not ask again.

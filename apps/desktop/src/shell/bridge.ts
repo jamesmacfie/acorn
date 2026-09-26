@@ -62,6 +62,7 @@ const pending = new Map<number, Pending>()
 const frameListeners = new Set<(nodeId: string, frame: unknown) => void>()
 const byteListeners = new Set<(nodeId: string, frame: Uint8Array) => void>()
 const statusListeners = new Set<(status: unknown) => void>()
+const configListeners = new Set<(state: unknown) => void>()
 let nextId = 1
 let socket: Promise<WebSocket> | null = null
 let liveSocket: WebSocket | null = null
@@ -114,6 +115,7 @@ const receive = (message: HelperMessage, receipt?: ReplyReceipt): void => {
   if (isPush(message)) {
     if (message.push === 'node-frame') for (const cb of frameListeners) cb(message.nodeId, message.frame)
     else if (message.push === 'node-status') for (const cb of statusListeners) cb(message.status)
+    else if (message.push === 'config-changed') for (const cb of configListeners) cb(message.state)
     // The node this renderer was talking to has been replaced by a restart or crash recovery. Its
     // endpoint, certificate and token are all new, so everything in memory is about a process that is
     // gone. Electron reloads the window from main; here the page reloads itself.
@@ -265,6 +267,7 @@ const acorn = {
         .then((approved) => invoke('quit_approved', { approved }))
         .catch(() => invoke('quit_approved', { approved: false }))
     }),
+  openConfigFile: () => invoke<void>('open_config_file'),
 
   nodeFetch: async (nodeId: string, request: unknown) => {
     const { body, ...rest } = request as { body?: unknown }
@@ -303,8 +306,16 @@ const acorn = {
   plugins: {
     state: () => call('plugins-state'),
     cachePut: (request: unknown) => call('plugins-cache-put', request),
+    install: (request: unknown) => call('plugins-install', request),
+    remove: (request: unknown) => call<void>('plugins-remove', request),
     trustRecord: (request: unknown) => call<void>('plugins-trust-record', request),
     devGrant: (request: unknown) => call<void>('plugins-dev-grant', request),
+  },
+  config: {
+    read: () => call('config-read'),
+    write: (patch: unknown) => call('config-write', patch),
+    onChange: (cb: (state: unknown) => void) => { configListeners.add(cb); return () => void configListeners.delete(cb) },
+    location: () => call('config-location'),
   },
 
   // The recovery screen's two native actions. Both are Rust's, not the helper's: they are reachable

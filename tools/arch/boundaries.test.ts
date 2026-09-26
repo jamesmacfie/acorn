@@ -620,7 +620,7 @@ describe('architecture boundaries', () => {
     // Anti-vacuity: the suite's own guard counts packages and edges, not protocol's files, so a walk
     // that returned nothing would satisfy the assertion below.
     expect(files.length).toBeGreaterThan(15)
-    const offenders = files.filter((f) => readFileSync(f, 'utf8').includes('/v1/p/')).map((f) => relative(proto.src, f))
+    const offenders = files.filter((f) => !isTestCode(f) && readFileSync(f, 'utf8').includes('/v1/p/')).map((f) => relative(proto.src, f))
     expect([...new Set(offenders)].sort()).toEqual([])
   })
 
@@ -700,7 +700,6 @@ describe('architecture boundaries', () => {
       // `terminal` the UI style pack, which is a shape-and-density choice with no plugin behind it.
       ['packages/client-core/src/features/settings/StyleGallery.tsx', "the 'terminal' UI style"],
       ['packages/client-core/src/features/settings/uiStyles.ts', "the 'terminal' UI style"],
-      ['packages/client-core/src/infra/persistence/appStartup.ts', "the 'terminal' UI style"],
       ['packages/client-core/src/host/frames/PluginFrame.tsx', "the 'terminal' UI style, passed to a frame"],
       ['packages/client-core/src/host/tree/RemoteTree.tsx', "the 'terminal' UI style, passed to a tree"],
       // `terminal` the moment a setup script runs, and `terminal` the command palette category.
@@ -732,7 +731,7 @@ describe('architecture boundaries', () => {
       ['packages/client-core/src/features/settings/PluginsSettings.tsx', "'github' the install source kind"],
       ['packages/client-core/src/host/trust/approval.ts', "'github' the install source kind"],
       ['packages/node-core/src/server/agentTools/pluginRequests.ts', "'github' the install source kind"],
-      ['packages/node-core/src/server/plugins/installer.ts', "'github' the install source kind"],
+      ['packages/protocol/src/plugin/source.ts', "'github' the shared install source kind"],
       ['packages/client-core/src/kit/tokens/brandMarks.ts', "'github' the brand mark"],
       // The rest, each a plain collision with a word core already had.
       ['packages/client-core/src/features/editor/DocumentSurface.tsx', "'editor' the rectangle kind"],

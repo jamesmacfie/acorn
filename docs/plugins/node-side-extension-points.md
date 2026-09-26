@@ -303,14 +303,24 @@ are named after installed plugins and exist only because something is installed.
 entirely when nobody has offered a replacement, since a select with one option cannot do anything and
 a permanent "no plugin replaces your task list" row would be chrome earning nothing.
 
-**Core is the fallback in the strong sense**: not "when nothing is set" but whenever anything at all is
-off. Nobody chosen, the chosen plugin not installed on this node, installed but disabled or untrusted,
-or its surface threw while rendering — all four draw core's own implementation, and the settings row
-says so when the last one is why. A provider that threw gets another attempt at the next contribution
-sync, which is the one moment its bytes can have changed.
+The designated surfaces are `rail.taskList`, `pane.switcher`, `rail`, and `topbar`. Core is registered as
+the provider for each. `pane.switcher`, `rail`, and `topbar` require a `single` layout with one remote
+tree region; these surfaces receive changing host data and verbs that cannot be passed to an iframe.
+The tree receives data only. It invokes named host actions to change panes, choose a source, switch a
+workspace or node, or navigate. A device plugin can offer these client surfaces without a Node half.
 
-`rail.taskList` is the only designated surface, and the list grows the way every other vocabulary in
-this document does: when a second surface has both a reason and a fallback worth writing.
+The rail receives sources after the host's capability, integration, workspace-link, and contribution
+gates. Its `slots.taskList` value is an opaque host-minted reference. A tree places it with a `Slot`
+node whose `slotRef` prop is that value. The topbar similarly receives `slots.right` for plugin status
+items. Neither nested occupant receives another reference. A chrome surface may declare
+`placesSlots: ["rail.taskList"]` or `placesSlots: ["topbar.right"]` respectively. Settings warns when
+the declaration omits its nested slot, since selecting that provider hides task navigation or status
+items. The host checks the reference when the tree renders; a declaration alone creates no slot.
+
+**Core is the fallback in the strong sense**: nobody chosen, an absent or disabled plugin, an
+untrusted bundle, or a failing component or worker restores core immediately. A failing provider is
+skipped after three failures in the session until the contribution set is synchronized again. The
+notice names the plugin, and the settings row shows when the selected provider is unavailable.
 
 ## There is no uncooperative extension
 

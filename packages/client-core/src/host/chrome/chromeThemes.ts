@@ -75,7 +75,6 @@ function flush(): void {
 }
 
 /**
-/**
  * Validate, generate, install and register one plugin theme. The returned disposable removes the
  * generated CSS as well as the picker entry: the chrome pass disposes then re-registers on every sync,
  * and a block left behind would outlive the plugin that declared it.

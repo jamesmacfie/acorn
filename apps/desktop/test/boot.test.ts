@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createInterface } from 'node:readline'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -8,6 +9,8 @@ import { fileURLToPath } from 'node:url'
 import { WebSocket } from 'ws'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { HELPER_PROTOCOL, type HelperMethod } from '../src/shell/wire'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
+import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
 
 // The boot test (docs/testing.md § The desktop boot test): does the shell's world come up.
 //
@@ -47,6 +50,9 @@ let nextId = 1
 const bootMarks: string[] = []
 const markOffsets = new Map<string, number>()
 const markIndex = (label: string): number => bootMarks.indexOf(label)
+const devicePluginId = 'boot-probe'
+const deviceBundle = 'export default {}'
+const deviceHash = createHash('sha256').update(deviceBundle).digest('hex')
 
 // One round trip on the same channel the renderer uses. Not a shared client: the point is that the
 // wire works, so this test speaks it directly rather than through the bridge, which cannot run outside
@@ -70,6 +76,22 @@ beforeAll(async () => {
     if (!existsSync(required)) throw new Error(`${required} is missing — run \`pnpm run stage\` first.`)
   }
   dataDir = mkdtempSync(join(tmpdir(), 'acorn-tauri-boot-'))
+  // The cache predates this launch. The helper must retain device bytes without a node roster, and
+  // return an unacknowledged manifest so the renderer can queue its trust prompt at first paint.
+  const cacheDir = join(dataDir, 'shell', `${ACORN_BASELINE}-plugin-cache`)
+  mkdirSync(cacheDir, { recursive: true })
+  writeFileSync(join(cacheDir, `${deviceHash}.js`), deviceBundle)
+  writeFileSync(join(cacheDir, 'index.json'), JSON.stringify({ version: 1, entries: {
+    [deviceHash]: {
+      pluginId: devicePluginId, version: '1.0.0', bytes: Buffer.byteLength(deviceBundle),
+      nodeIds: [], source: { kind: 'device' }, sourceLabel: 'https://example.com/boot-probe.tgz',
+      manifest: {
+        id: devicePluginId, name: 'Boot Probe', version: '1.0.0', baseline: ACORN_BASELINE,
+        apiVersion: PLUGIN_API_MAJOR, client: 'client.js',
+      },
+      firstSeen: Date.now(), lastSeen: Date.now(),
+    },
+  } }))
 
   // stderr piped rather than inherited, because that is where the boot marks are and the order of
   // them is an assertion below. They are still echoed, so a failing run reads the same as before.
@@ -155,6 +177,12 @@ afterAll(async () => {
 }, 30_000)
 
 describe('the Tauri shell boots its world', () => {
+  it('keeps a cached device bundle untrusted for the renderer to prompt', async () => {
+    const state = await call<{ cached: Record<string, { source?: { kind: string }; manifest?: { id: string } }>; acks: { pluginId: string }[] }>('plugins-state')
+    expect(state.cached[deviceHash]).toMatchObject({ source: { kind: 'device' }, manifest: { id: devicePluginId } })
+    expect(state.acks.some((ack) => ack.pluginId === devicePluginId)).toBe(false)
+  })
+
   it('runs the helper under the pinned Node runtime', () => {
     const pin = JSON.parse(readFileSync(resolve(PKG, '../../node-runtime.json'), 'utf8')) as { version: string }
     // The whole point of shipping a binary: `process.execPath` in the helper is what the node service,

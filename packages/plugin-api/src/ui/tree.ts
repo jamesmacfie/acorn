@@ -17,7 +17,7 @@ export {
   NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon, Button, IconButton, Input, Textarea,
   Select, Checkbox, SegmentedControl, ToggleButton, Picker, PickerRow, Composer, MentionTextarea,
   KeyValueEditor, FindBar, Field, ConfirmButton, CopyButton, ModelBackendPicker, Rectangle, Only,
-  Fallback,
+  Fallback, Slot,
 } from '@acorn/client-core/host/frames/remoteSolid.ts'
 // The universal-renderer surface. Solid's JSX preset emits calls to these by name; you do not write
 // them, and their names are Solid's rather than acorn's.

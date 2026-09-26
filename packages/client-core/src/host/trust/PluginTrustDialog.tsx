@@ -106,7 +106,11 @@ export default function PluginTrustDialog() {
                       {previousVersion() ? `${previousVersion()} → ${current().row.installed?.version}` : current().row.installed?.version}
                     </Badge>
                     <Badge size="xs">
-                      <Icon name="monitor" /> from {nodeLabel(current().nodeId)}
+                      <Icon name="monitor" /> {current().source?.kind === 'device'
+                        ? current().sourceLabel?.startsWith('path:')
+                          ? `installed on this device from ${current().sourceLabel}; a folder pins nothing`
+                          : `installed on this device from ${current().sourceLabel ?? 'a package'}`
+                        : `from ${nodeLabel(current().nodeId)}`}
                     </Badge>
                     <Show when={!previousVersion()}><Badge size="xs">first time</Badge></Show>
                   </p>
@@ -116,7 +120,7 @@ export default function PluginTrustDialog() {
               <p class="muted plugin-trust-intro">
                 <Show
                   when={previousVersion()}
-                  fallback="None of its code has run yet. Review what it asks for below — you’ll only be asked once for this version."
+                  fallback="None of its code has run yet. Review what it asks for below — acorn asks again if the bundle changes."
                 >
                   {(version) => (
                     <Show
@@ -167,7 +171,9 @@ export default function PluginTrustDialog() {
               {/* The vocabulary, once, matching docs/security.md § Node-half plugin security. */}
               <p class="muted plugin-trust-legend">
                 <Show when={has('enforced')}>
-                  <span><strong>Enforced</strong> — acorn checks these in the sandboxed interface and isolated server realm; anything not listed is refused.</span>
+                  <span><strong>Enforced</strong> — {current().source?.kind === 'device'
+                    ? 'acorn checks these in the sandboxed interface; anything not listed is refused.'
+                    : 'acorn checks these in the sandboxed interface and isolated server realm; anything not listed is refused.'}</span>
                 </Show>
                 <Show when={has('declared')}>
                   <span>

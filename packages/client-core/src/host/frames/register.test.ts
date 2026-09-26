@@ -23,7 +23,7 @@ const { uiSlotRegistry } = await import('../registries/extensionPoints/slots')
 const { _resetPluginDistribution, _seedPluginDistribution } = await import('../plugins/distribution')
 const { surfaceFailures } = await import('../plugins/surfaceFailures')
 const { openPluginOverlay, closePluginOverlay } = await import('./overlays')
-const { exclusiveSlotOffers, exclusiveSlotRegistry, resolveExclusiveSlot } = await import('../registries/extensionPoints/exclusiveSlots')
+const { exclusiveSlotOffers, exclusiveSlotRegistry, registerCoreExclusiveSlot, resolveExclusiveSlot } = await import('../registries/extensionPoints/exclusiveSlots')
 const { _resetFrameContributions, frameBindingFor, syncFrameContributions } = await import('./register')
 
 // The frame host pass (docs/plugins.md § Frame contribution kind).
@@ -132,11 +132,13 @@ describe('syncFrameContributions', () => {
     seedTrusted(row('board', {
       frames: [surface({ target: 'coreSlot', id: 'board-rail', coreSlot: 'rail.taskList' })],
     }))
+    const core = registerCoreExclusiveSlot('rail.taskList', () => null)
     syncFrameContributions()
     expect(ids().panes).toEqual([])
     expect(exclusiveSlotOffers('rail.taskList').map((entry) => entry.pluginId)).toEqual(['board'])
-    expect(resolveExclusiveSlot('rail.taskList', undefined)).toBeNull()
+    expect(resolveExclusiveSlot('rail.taskList', undefined).pluginId).toBe('core')
     expect(resolveExclusiveSlot('rail.taskList', 'board')?.pluginId).toBe('board')
+    core.dispose()
   })
 
   it('refuses a coreSlot surface naming a core surface this shell has no host for', () => {
