@@ -1,4 +1,4 @@
-import { noteBundleAccepted, resolvePendingTrust, type PluginTrustRequest } from '../plugins/distribution'
+import { refreshPluginTrust, type PluginTrustRequest } from '../plugins/distribution'
 import {
   agentToolGrants,
   agentToolPermissionLines,
@@ -23,7 +23,6 @@ import {
   webviewPermissionLines,
 } from './permissions'
 import { recordPluginTrust } from '../plugins/host'
-import { syncPluginContributions } from '../plugins/syncContributions'
 
 // What the trust prompt says, and what answering it does (PluginTrustDialog.tsx draws it).
 //
@@ -167,14 +166,7 @@ export async function recordTrustDecision(request: PluginTrustRequest, decision:
     contextSections: contextSectionGrants(installed.contributions),
     decision,
   })
-  resolvePendingTrust(request.row.name, request.hash)
-  // An acceptance is what lets the plugin's surfaces exist at all (frames/register.ts gates on it), so
-  // register them now rather than at the next boot. A rejection needs no counterpart: nothing was
-  // registered to take away.
-  if (decision === 'accepted') {
-    noteBundleAccepted(request.row.name, request.hash)
-    // Both passes, because a bundle-bearing plugin's chrome is gated on the same acceptance as its
-    // rectangles, so it appears with the rest of its surfaces rather than at the next boot.
-    syncPluginContributions()
-  }
+  // The host's durable write succeeded. One snapshot read now changes the accepted selection and
+  // pending queue together; its commit listener updates both contribution registries.
+  await refreshPluginTrust()
 }

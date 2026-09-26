@@ -198,15 +198,13 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
     // there is no scope to declare, because the grant is structural. The indirection through the
     // accessor is what makes the two regions' mount order a non-issue: the frame can connect before the
     // editor has loaded its document, and its first `document.read()` still lands on the real thing.
-    ...(props.document
-      ? {
-        document: {
-          read: () => props.document?.()?.read() ?? '',
-          write: (text: string) => props.document?.()?.write(text),
-          flush: async () => void (await props.document?.()?.flush()),
-        },
-      }
-      : {}),
+    get document() {
+      // A composed region has a structural grant, but the sibling editor may arrive later or go
+      // away first. Read the accessor for each request so a missing editor cannot read as an empty
+      // document or silently discard a write.
+      const document = props.document?.()
+      return document ?? undefined
+    },
     webviewNavigate: (url) => props.webview?.navigate(url) ?? Promise.resolve(false),
     webviewCommand: (action) => props.webview?.command(action) ?? Promise.resolve(false),
     keydown: (chord) => {

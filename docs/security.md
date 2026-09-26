@@ -441,6 +441,15 @@ machine's to make. This mirrors repo-config trust one level out: that binds a pr
 a config the Node will execute and is stored on the Node; this binds a plugin to the hash of a bundle
 the device will execute and is stored beside the device token.
 
+The Node reports its running declaration separately from the package currently on disk. Custody can
+cache both hashes, but the renderer executes only an accepted bundle matching the current Node's
+running identity. A pending or rejected disk update cannot replace accepted UI while the older node
+half still runs. Acceptance is recorded before the distribution snapshot enables contributions;
+revoking an exact hash or ending a development grant removes its registrations and stops its worker.
+The same `(pluginId, hash)` decision can cover equivalent offers from two Nodes. If those Nodes attach
+conflicting enforced declarations to that key, the client withholds it instead of treating one
+acknowledgement as consent to both.
+
 **What "gained" means.** Each rendered permission line carries a stable grant key, separate from its
 sentence (`packages/client-core/src/host/trust/permissions.ts`). The update diff compares keys, not
 copy, so tightening a sentence's wording never re-prompts an existing owner as though the plugin had
@@ -563,9 +572,8 @@ own; for a remote node the owner types a path they know. That is a correctness g
 Per-hash consent is right for distribution and wrong for iteration, so a plugin the owner is actively
 developing can be put into **development mode**: a grant stored per `(pluginId, nodeId)` on the device,
 beside the acknowledgements, that auto-accepts future bundles of that plugin from that node. The node half
-of the key is not in the design note and is deliberate — fleet resolution picks a winner across every
-paired node, so a grant keyed on the plugin name alone would auto-trust a bundle a *different* node started
-serving under it.
+of the key is not in the design note and is deliberate: a grant keyed on the plugin name alone would
+auto-trust a bundle a *different* node offered under it.
 
 The grant writes ordinary accepted acknowledgements, in the helper, beside the hash it computed
 itself; nothing in the renderer can turn a bundle into an accepted one with or without a grant. Each such

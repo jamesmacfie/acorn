@@ -28,6 +28,7 @@ export type HelperMethod =
   | 'plugins-state'
   | 'plugins-cache-put'
   | 'plugins-trust-record'
+  | 'plugins-trust-forget'
   | 'plugins-dev-grant'
 
 export type HelperRequest = { id: number; method: HelperMethod; params: unknown }

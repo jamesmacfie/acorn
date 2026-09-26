@@ -50,6 +50,21 @@ content because it is not shared storage.
 Blob pruning must respect references retained by plugin records. Worktrees are not part of the blob
 cache.
 
+## Plugin bundle custody
+
+The device keeps client bundles by the SHA-256 it computes from received bytes. An advertised Node hash
+is a lookup hint and is verified before caching; the trust decision is a separate durable record keyed
+by `(pluginId, hash)`. A single cache file may serve equivalent bytes offered by several Nodes, while
+offer provenance records which Nodes supplied them. Reconciliation visits both the Node's active
+runtime and its installed disk candidate so an update can be reviewed without displacing running UI.
+The Node retains its active client bundle independently of the mutable package directory and serves
+it through the hash-addressed bundle route after an update or uninstall until that runtime stops.
+
+The cache does not persist a selected fleet winner. Each client session derives per-Node selections
+from current runtime observations, locally cached bytes, and custody decisions. Stale or unreachable
+observations remain available for explanation but cannot authorize a contribution. Existing cache
+files and trust records need no reset for the additive `active` protocol field.
+
 Opening the cache sweeps the directory once, and the sweep is a permission migration: `put` writes
 mode 0600, so a file with any other mode was written by an older build under a permissive umask. The
 mode comes off the `lstat` the sweep already does, and only a file that is actually wrong is

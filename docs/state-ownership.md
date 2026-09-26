@@ -39,7 +39,16 @@ client that pairs with a Node renders that Node's arrangements and the agent can
 Each Node has an independent data root and database set. A Node ID is part of every renderer query,
 selection scope, layout scope, and fleet aggregate input.
 
+The Node's loaded plugin runtime identity is process-owned: `active` records the declaration and
+client hash captured with the running service. The installed package is a separate disk candidate.
+Neither an install nor a cached roster response can change what the process is serving.
+
 ## Client-owned durable state
+
+Plugin bundle bytes and exact `(pluginId, hash)` trust decisions belong to device custody, which
+verifies bytes before it writes them. The renderer's per-Node distribution snapshot is transient:
+it derives current selections from Node observations and custody decisions and is never persisted as
+a second winner record. Revoking a decision updates that snapshot and withdraws the selected code.
 
 Saved query drafts are Node-owned, with compare-and-swap revisions. Their device-local recovery
 copies are keyed by Node, entity, and base revision and remain until acknowledgment or explicit

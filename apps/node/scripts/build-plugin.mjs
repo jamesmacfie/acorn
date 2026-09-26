@@ -32,7 +32,7 @@
 // The default target is the development data root. `--package-root` is the generic staging seam used
 // by the desktop build: the same validated package shape is copied into application resources and
 // reconciled into the writable data root on boot.
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { builtinModules } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -130,13 +130,14 @@ if (!baseline) throw new Error('The Acorn baseline is unavailable')
 // does. Client-only and descriptor-only plugins need no stand-in: their absence of a node half is a
 // real manifest capability, not a reason to manufacture an empty lifecycle.
 //
-// One directory per plugin id, because the cleanup below removes the directory whole: two builds
-// running at once used to share `.plugin-build`, and the first to finish deleted the other's entry.
-const entryDir = join(NODE_APP, '.plugin-build', id)
+// A private directory per invocation. Desktop staging and a Node integration test can build the
+// same plugin concurrently; cleanup must not remove the other build's temporary entry.
+const scratchRoot = join(NODE_APP, '.plugin-build')
+mkdirSync(scratchRoot, { recursive: true })
+const entryDir = mkdtempSync(join(scratchRoot, `${id}-`))
 const entryFile = join(entryDir, `${id}.js`)
 if (spec.entry) {
   if (!spec.factory) throw new Error(`${id} declares a node entry but no factory`)
-  mkdirSync(entryDir, { recursive: true })
   writeFileSync(entryFile, `import { ${spec.factory} } from '${spec.entry}'\nexport default ${spec.factory}()\n`)
 }
 // A descriptor-only package has no Vite build to create its directory. Clear the previous package

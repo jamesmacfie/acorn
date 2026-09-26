@@ -92,6 +92,29 @@ rather than stubbed. See [the terminal client doc](./tui.md).
 Only serializable values cross a boundary. Product requests and streams use the broker and `/v1`.
 The service protocol is reserved for lifecycle messages.
 
+## Node-provided plugin UI
+
+A loaded plugin has separate runtime, distribution, custody, and presentation facts. The Node's
+`GET /v1/core/plugins` response reports `active`, the declaration and client hash captured with the
+running node half, beside `installed`, the current disk candidate. Install, update, and uninstall can
+change `installed` without changing `active`. The Node retains the active client bytes and serves them
+by exact hash until that runtime stops. An omitted `active` field is an older protocol response and is
+adapted conservatively; `null` explicitly means no loaded runtime is active.
+
+The client reconciles one observation per paired Node. Custody fetches and hashes both active and
+installed offers, then reads its durable decision for each `(pluginId, hash)`. The client selects only
+an accepted, cached bundle matching that Node's active runtime. A disk candidate can prompt for trust
+without replacing the running version. Source-aware plugin events, arrivals, reconnects, switches,
+stale reads, and unpairing update one distribution snapshot; the active Node's disposable
+registrations follow that snapshot. A stale or unreachable Node retains its last observation for
+explanation but supplies no live loaded UI.
+
+Availability checks combine the Node runtime state with the exact accepted selection. They gate
+loaded panes, settings, importers, footer slots, commands, and other contributions before use. The
+shell still owns placement and fallback. A remote tree worker is keyed by `(pluginId, hash)`; each
+mounted tree has its own slot and bridge authority. See [activation](./plugins/activation.md),
+[descriptors](./plugins/descriptors.md), and [security](./security.md).
+
 ## Package boundaries
 
 `tools/arch/boundaries.test.ts` enforces the rules below over the import graph of every package in

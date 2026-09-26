@@ -20,7 +20,7 @@ the provenance field into the types before phase 1 and 2 contracts are written a
 
 In:
 
-- `BundleSource` in `@acorn/protocol` and `source` on `BundleCandidate`, `ActiveBundle`,
+- `BundleSource` in `@acorn/protocol` and `source` on offered candidates and selections,
   `PluginTrustDecision`, `PluginAckRecord`, `PluginDevGrant`, `PluginDevGrantRequest`, and the cache
   entry schema. `nodeId` stays as an accessor for `kind: 'node'`.
 - A shared source resolver package, extracted from `packages/node-core/src/server/plugins/installer.ts`,
@@ -30,7 +30,8 @@ In:
 - Two helper wire verbs, `plugins-install` and `plugins-remove`, and provenance on `plugins-state`.
   `PluginCustody` gains `install()` and `remove()`; `platform/contract.ts` lists them in the
   `plugins` group so `seamProblems()` catches a half-built host.
-- The resolution rule in `resolveBundles.ts`: device candidates win.
+- A device-held override in the per-Node distribution snapshot; it takes priority over a Node's
+  selected client bundle for that plugin id without changing the Node's active service.
 - The provenance line in `trustModel.ts` and an empty `declared` tier for device bundles.
 - Device dev grants keyed on `(pluginId, { kind: 'device' })`.
 - Device-scoped `plugin:<id>:*` state: a prefix rule in `devicePrefs.ts` and a route in the broker's
@@ -77,8 +78,8 @@ uses for fields added after rows were written.
 
 - `packages/protocol/src/plugin/bundles.ts` (new): `BundleSource`, `bundleSourceSchema`,
   `hasNodeHalf(manifest)`.
-- `packages/client-core/src/host/trust/resolveBundles.ts`: `source` on candidates and winners; the
-  device-wins sort key.
+- `packages/client-core/src/host/plugins/{distributionModel.ts,distribution.ts}`: device offers,
+  provenance, and the device-held override over per-Node selections.
 - `packages/client-core/src/host/plugins/distribution.ts`: device candidates from
   `PluginHostState.cached`; `eligiblePlugins()` merge.
 - `packages/client-core/src/host/trust/trustModel.ts`: provenance line; empty `declared` tier.
@@ -101,9 +102,9 @@ uses for fields added after rows were written.
 
 ## Tests
 
-- `resolveBundles.test.ts`: node offers 2.0, device holds 1.9, device wins; two nodes and a device
-  offer the same hash, one winner with all three recorded; a device bundle outside the API major is
-  dropped.
+- `distributionModel.test.ts`: node A runs 2.0, device holds 1.9, and the device-held override is
+  selected for presentation; node B still has its own runtime observation. Equal bytes from two
+  Nodes and the device retain all provenance; an incompatible device bundle is withheld.
 - `pluginCache.test.ts`: `putFromSource` hashes what arrived; a package with a `node` entry is
   refused whole with `'has-node-half'`; a `{ path }` put re-reads the folder.
 - `pluginTrustStore.test.ts`: a row written before `source` reads back as `{ kind: 'node' }`; a
@@ -151,8 +152,8 @@ Against [07-hosts.md](./07-hosts.md):
   `cachePut`, `trustRecord`, `devGrant`, and `contract.ts` lists the same four in `SEAM_GROUPS`.
 - `packages/custody/src/plugins/pluginCache.ts` has `putFromNode` and `MAX_BUNDLE_BYTES`;
   `pluginTrustStore.ts` keys `decisionFor` on `(pluginId, hash)` and carries `nodeId` on rows.
-- `packages/client-core/src/host/trust/resolveBundles.ts` exports `resolveActiveBundles` with
-  `BundleCandidate.nodeId` and `ActiveBundle.nodeIds`.
+- `packages/client-core/src/host/plugins/distributionModel.ts` derives per-Node selections from
+  `NodePluginRow.active`, cached bytes, and exact-hash trust decisions.
 - `packages/node-core/src/server/routes/plugins/plugins.ts` has the four-form `installSource` union and
   `server/plugins/installer.ts` resolves it.
 - `apps/desktop/src/shell/wire.ts` lists `plugins-state`, `plugins-cache-put`,
