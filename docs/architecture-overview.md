@@ -92,6 +92,29 @@ rather than stubbed. See [the terminal client doc](./tui.md).
 Only serializable values cross a boundary. Product requests and streams use the broker and `/v1`.
 The service protocol is reserved for lifecycle messages.
 
+## Node-provided plugin UI
+
+A loaded plugin has separate runtime, distribution, custody, and presentation facts. The Node's
+`GET /v1/core/plugins` response reports `active`, the declaration and client hash captured with the
+running node half, beside `installed`, the current disk candidate. Install, update, and uninstall can
+change `installed` without changing `active`. The Node retains the active client bytes and serves them
+by exact hash until that runtime stops. An omitted `active` field is an older protocol response and is
+adapted conservatively; `null` explicitly means no loaded runtime is active.
+
+The client reconciles one observation per paired Node. Custody fetches and hashes both active and
+installed offers, then reads its durable decision for each `(pluginId, hash)`. The client selects only
+an accepted, cached bundle matching that Node's active runtime. A disk candidate can prompt for trust
+without replacing the running version. Source-aware plugin events, arrivals, reconnects, switches,
+stale reads, and unpairing update one distribution snapshot; the active Node's disposable
+registrations follow that snapshot. A stale or unreachable Node retains its last observation for
+explanation but supplies no live loaded UI.
+
+Availability checks combine the Node runtime state with the exact accepted selection. They gate
+loaded panes, settings, importers, footer slots, commands, and other contributions before use. The
+shell still owns placement and fallback. A remote tree worker is keyed by `(pluginId, hash)`; each
+mounted tree has its own slot and bridge authority. See [activation](./plugins/activation.md),
+[descriptors](./plugins/descriptors.md), and [security](./security.md).
+
 ## Package boundaries
 
 `tools/arch/boundaries.test.ts` enforces the rules below over the import graph of every package in
@@ -107,7 +130,7 @@ its map enumerates its public modules one per line. That buys two things over th
 not importable from another package, and a new module is public only when someone adds the line, which
 is the decision the map exists to record.
 
-The other four libraries also publish enumerated subpaths. Their boundary map is:
+The other five libraries also publish enumerated subpaths. Their boundary map is:
 
 | Library | Public paths | Keep private |
 | --- | --- | --- |
@@ -115,6 +138,7 @@ The other four libraries also publish enumerated subpaths. Their boundary map is
 | `node-core` | Server service and composition seams; `testkit` for fixtures | Runtime implementations not named by the map |
 | `custody` | Broker, plugin custody, device, and startup seams | Store and supervision internals |
 | `dashboards-core` | Contract, projection, and rendering math | Individual pipeline modules not named by the map |
+| `diff-document` | One entrypoint, `./document`: the diff document's types, parser, segmenter, search, and parse cache | Its modules behind that entrypoint |
 
 Direct paths remain where a lazy component import, a side-effect stylesheet, a mock target, a
 composition entrypoint, or two same-named exports need their own loading boundary. Public files
@@ -277,7 +301,8 @@ reads them. Copy `plugins/docker/src/shared/model.ts`. Two boundary rules in
 protocol modules named for a plugin is an enumerated, shrinking list. That lets a plugin define its
 wire contract without editing core, which is the precondition for third-party plugins.
 
-`packages/dashboards-core` is the only other package both runtimes import. It holds the pure
+`packages/dashboards-core` and `packages/diff-document` are the other two packages both runtimes
+import. `dashboards-core` holds the pure
 dashboard pipeline: the panel model and its codec, shaping, cross-source mapping, layout, and chart
 and cell arithmetic, with no Solid, no registries, and no fetch. It exists because the node's measure
 sampler must compute a panel's number with the same functions the renderer draws it with. See
@@ -286,6 +311,16 @@ the day one changed, and the point of recording history is that a stored number 
 on screen means. Client-core re-exports every module it moved, so the components there still say
 `./model`, and the node imports it directly. Like protocol it declares no DOM and no node types,
 which keeps the standalone node's graph clean.
+
+`diff-document` is the diff viewer's document ([diff rendering](./diff-rendering.md) § The document):
+parsing a hunks-only patch into plain rows, cutting them into bounded segments, the descriptors that
+lay a document out without its text, and search across one. It exists because the document is built
+on the node and read in the renderer. GitHub's and Changes' routes cut patches into segments and
+answer descriptors, the plugins' client sources pass those through the `DiffSource` port, and
+client-core's viewer loads the segments near the reader. No provider type enters it, and it has no
+DOM, node, Solid, database, or transport dependency. It is the one library besides protocol and the
+facade a plugin may import directly, because it holds no host state; `@acorn/plugin-api/ui/diff`
+re-exports the types the port is written in.
 
 The renderer reaches the host through one seam, `packages/client-core/src/infra/platform/`. It groups what
 a host provides, namely node transport, fleet membership, plugin custody, and the native extras, into
@@ -380,6 +415,9 @@ tiers are permanent, and the line between them is what a contribution needs. Any
 data plus async messages can be sandboxed, while PTY stream ownership and components the shell renders
 inside its own tree at a place it has not opened as an extension point need the shared realm and stay
 first-party.
+A device can also hold a client-only loaded plugin. Its bundle has device provenance, wins over a Node
+offer of the same plugin ID, and uses the same client sandbox and trust gate. The device installer
+rejects any Node entry or Node-dependent contribution.
 [The plugins doc](./plugins.md) describes both tiers,
 [first-party plugins](./first-party-plugins.md) says which shipped plugins are in the first tier
 because they must be, and [extensibility](./extensibility.md) is why the split exists at all.

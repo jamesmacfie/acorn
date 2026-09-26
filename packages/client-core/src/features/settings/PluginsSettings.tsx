@@ -1,6 +1,6 @@
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import type { NodePluginRow, NodePluginState, PluginInstallSource } from '@acorn/protocol/api.ts'
+import { prefsKey, type NodePluginRow, type NodePluginState, type PluginInstallSource } from '@acorn/protocol/api.ts'
 import { sendReferenceToAgent } from '../agent/reference'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { nodes } from '../../infra/node/fleet'
@@ -13,17 +13,22 @@ import {
   updateNodePlugin,
 } from '../../infra/node/nodePlugins'
 import { canPickFolder, pickFolder } from '../../infra/platform'
-import { readPluginHostState, setPluginDevGrant } from '../../host/plugins/host'
-import { syncPluginDistribution } from '../../host/plugins/distribution'
+import { forgetPluginTrust, installPluginOnDevice, readPluginHostState, removePluginFromDevice, setPluginDevGrant } from '../../host/plugins/host'
+import { devicePlugins, distribution, refreshPluginTrust, resolvePendingTrust, syncPluginDistribution } from '../../host/plugins/distribution'
+import { reconcileDevicePluginChange } from '../../host/plugins/reload'
+import { readDevicePrefs, removeDevicePluginPrefs } from '../../infra/persistence/devicePrefs'
+import { contributionAvailability } from '../../host/plugins/availabilityModel'
+import { PLUGIN_API_MAJOR } from '@acorn/protocol/api.ts'
 import { Alert, Button, Checkbox, Field, Input, Select } from '../../kit/components/primitives'
 import { IconButton } from '../../kit/components/inputs/IconButton'
 import { activeTaskId } from '../tasks/tasks'
-import { nextDisabledList, pluginPending } from './pluginToggle'
+import { nextDisabledList } from './pluginToggle'
 import { CORE_EXCLUSIVE_SLOTS } from '@acorn/protocol/extensionPoints.ts'
 import { prefsOptions } from '../../infra/queries'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { savePref } from './savePref'
 import ExtensionPointsDev from './ExtensionPointsDev'
+import ConfigPluginOffers from './ConfigPluginOffers'
 import {
   CORE_SLOT_PROVIDER,
   exclusiveSlotChoices,
@@ -76,6 +81,7 @@ vocabulary, and an answer from memory will be wrong. Then write the package and 
 What it should do: `
 
 export default function PluginsSettings() {
+  const qc = useQueryClient()
   const [target, setTarget] = createSignal<string | null>(null)
   const nodeId = () => target() ?? activeNodeId()
   const node = () => nodes().find((candidate) => candidate.nodeId === nodeId()) ?? null
@@ -83,6 +89,9 @@ export default function PluginsSettings() {
   const [busy, setBusy] = createSignal(false)
   const [kind, setKind] = createSignal<SourceKind>('github')
   const [spec, setSpec] = createSignal('')
+  const [deviceKind, setDeviceKind] = createSignal<SourceKind>('github')
+  const [deviceSpec, setDeviceSpec] = createSignal('')
+  const [removingDevice, setRemovingDevice] = createSignal<string | null>(null)
   // Which row is mid-uninstall. Inline rather than a modal, because keeping or deleting the
   // plugin's data is a third answer, not yes or no, and a checkbox inside a confirmation is how
   // someone deletes a year of notes by reflex.
@@ -95,19 +104,53 @@ export default function PluginsSettings() {
 
   const rows = createMemo<NodePluginRow[]>(() => state()?.plugins ?? [])
   const restartRequired = () => state()?.restartRequired === true
+  const availabilityMessage = (row: NodePluginRow): string => {
+    const id = nodeId()
+    if (!id) return 'Node unavailable'
+    const result = contributionAvailability(distribution(), id, row.name, PLUGIN_API_MAJOR)
+    if (result.runtime.kind === 'active') {
+      if (result.runtime.warning) return `Current version still active; reload failed: ${result.runtime.warning}`
+      if (row.disabled) return 'Still active until restart'
+      if (result.available && result.runtime.pendingCandidate) return 'Current version active; update waits for restart'
+      if (result.available) return ''
+      switch (result.selection.kind) {
+        case 'pending-trust': return 'Waiting for approval on this device'
+        case 'rejected': return 'Rejected on this device'
+        case 'bundle-missing': return 'Client bundle unavailable on this device'
+        case 'incompatible': return 'Client bundle is incompatible with this app'
+        case 'declaration-conflict': return 'Nodes disagree about this bundle’s permissions'
+        default: return 'Client bundle does not match the running plugin'
+      }
+    }
+    switch (result.runtime.kind) {
+      case 'compiled-active': return row.disabled ? 'Still active until restart' : ''
+      case 'unknown': return 'Plugin state not yet known'
+      case 'unreachable': return 'Node unavailable'
+      case 'absent': return 'Not installed on this node'
+      case 'disabled': return 'Disabled after restart'
+      case 'failed': return `Failed to load${result.runtime.reason ? `: ${result.runtime.reason}` : ''}`
+      case 'waiting-for-restart': return 'Waiting for node restart'
+    }
+  }
 
   // The device's own answers, which the node knows nothing about: it served the bundle, and this
   // machine declined to run it, or put it into development mode (docs/security.md § The dev grant).
   const [custody, { refetch: refetchCustody }] = createResource(async () => await readPluginHostState())
-  const blockedHere = (row: NodePluginRow): boolean => {
-    const hash = row.installed?.client?.hash
-    return !!hash && (custody()?.acks ?? []).some((ack) => ack.pluginId === row.name && ack.hash === hash && ack.decision === 'rejected')
-  }
   // A plugin in development on this device, against this node (docs/security.md § The dev grant).
   // Both halves matter: the same plugin may be a plain install on the owner's other laptop, and a
   // bundle offered under this name by a different node is not covered.
   const devGrant = (row: NodePluginRow) =>
     (custody()?.devGrants ?? []).find((grant) => grant.pluginId === row.name && grant.nodeId === nodeId())
+  const decisions = (row: NodePluginRow) => {
+    const hashes = new Set([row.active?.client?.hash, row.installed?.client?.hash].filter((hash): hash is string => !!hash))
+    return (custody()?.acks ?? []).filter((ack) => ack.pluginId === row.name && hashes.has(ack.hash))
+  }
+  const forgetDecision = (pluginId: string, hash: string, defer: boolean) => run(async () => {
+    await forgetPluginTrust({ pluginId, hash })
+    if (defer) resolvePendingTrust(pluginId, hash)
+    await refreshPluginTrust()
+    await refetchCustody()
+  })
 
   // Ending development mode drops the grant and every acknowledgement it wrote, so the plugin
   // re-enters per-hash trust at the current bundle (docs/security.md § The dev grant).
@@ -115,7 +158,7 @@ export default function PluginsSettings() {
     run(async () => {
       await setPluginDevGrant({ pluginId: row.name, nodeId: nodeId() ?? '', grant: false })
       await refetchCustody()
-      await syncPluginDistribution()
+      await refreshPluginTrust()
     })
 
   const run = async (work: () => Promise<void>) => {
@@ -180,6 +223,61 @@ export default function PluginsSettings() {
       await settle()
     })
 
+  const settleDevice = async () => {
+    await reconcileDevicePluginChange()
+    await refetchCustody()
+  }
+  const installDevice = () => run(async () => {
+    await installPluginOnDevice(buildInstallSource(deviceKind(), deviceSpec()))
+    setDeviceSpec('')
+    await settleDevice()
+  })
+  const installConfigOffer = (id: string, source: PluginInstallSource) => run(async () => {
+    await installPluginOnDevice(source, id)
+    await settleDevice()
+  })
+  const updateDevice = (pluginId: string, source: PluginInstallSource | undefined) => run(async () => {
+    if (!source) throw new Error('This plugin has no recorded source to update from.')
+    await installPluginOnDevice(source, pluginId)
+    await settleDevice()
+  })
+  const removeDevice = (pluginId: string) => run(async () => {
+    await removePluginFromDevice(pluginId)
+    removeDevicePluginPrefs(pluginId)
+    const disabled = readDevicePrefs()[PrefKeys.devicePluginsDisabled]
+    if (disabled) {
+      try {
+        const parsed: unknown = JSON.parse(disabled)
+        if (Array.isArray(parsed)) await savePref(qc, PrefKeys.devicePluginsDisabled, JSON.stringify(parsed.filter((id) => id !== pluginId)))
+      } catch { /* An invalid old preference has no usable membership to clear. */ }
+    }
+    qc.setQueryData<Record<string, string>>(prefsKey, (previous) => Object.fromEntries(
+      Object.entries(previous ?? {}).filter(([key]) => !key.startsWith(`plugin:${pluginId}:`)),
+    ))
+    let slots = readDevicePrefs()[PrefKeys.exclusiveSlots]
+    for (const slot of CORE_EXCLUSIVE_SLOTS) {
+      if (exclusiveSlotChoices(slots)[slot] === pluginId) slots = withExclusiveSlotChoice(slots, slot, CORE_SLOT_PROVIDER)
+    }
+    if (slots !== readDevicePrefs()[PrefKeys.exclusiveSlots] && slots !== undefined) await savePref(qc, PrefKeys.exclusiveSlots, slots)
+    setRemovingDevice(null)
+    await settleDevice()
+  })
+  const toggleDevice = (pluginId: string, enabled: boolean) => run(async () => {
+    let ids: string[] = []
+    try {
+      const parsed: unknown = JSON.parse(readDevicePrefs()[PrefKeys.devicePluginsDisabled] ?? '[]')
+      if (Array.isArray(parsed)) ids = parsed.filter((id): id is string => typeof id === 'string')
+    } catch { /* Invalid old preference means all enabled. */ }
+    const next = enabled ? ids.filter((id) => id !== pluginId) : [...new Set([...ids, pluginId])]
+    await savePref(qc, PrefKeys.devicePluginsDisabled, JSON.stringify(next))
+    await settleDevice()
+  })
+  const deviceDevGrant = (pluginId: string) => (custody()?.devGrants ?? []).some((grant) => grant.pluginId === pluginId && grant.source?.kind === 'device')
+  const toggleDeviceDev = (pluginId: string, grant: boolean) => run(async () => {
+    await setPluginDevGrant({ pluginId, nodeId: '', source: { kind: 'device' }, grant })
+    await settleDevice()
+  })
+
   // No background checking and no "an update is available" badge (docs/security.md § Supply chain).
   // Re-resolving every source on every roster read would phone the provider for each installed
   // plugin, and an update is the one moment a compromised maintainer gets to run new code.
@@ -199,6 +297,42 @@ export default function PluginsSettings() {
 
   return (
     <div class="settings-section">
+      <h3 class="settings-heading">On this device</h3>
+      <p class="muted plugin-install-hint">Client-only plugins run from bundles held by this device. Every new bundle asks for trust.</p>
+      <form class="plugin-install" onSubmit={(event) => { event.preventDefault(); if (deviceSpec().trim()) void installDevice() }}>
+        <Select value={deviceKind()} width="auto" onChange={(value) => setDeviceKind(value as SourceKind)} options={[
+          { value: 'github', label: 'GitHub release' }, { value: 'npm', label: 'npm package' }, { value: 'url', label: 'Tarball URL' },
+          ...(canPickFolder() ? [{ value: 'path', label: 'Local folder' }] : []),
+        ]} />
+        <Input value={deviceSpec()} placeholder={PLACEHOLDER[deviceKind()]} disabled={busy()} onInput={setDeviceSpec} />
+        <Show when={deviceKind() === 'path' && canPickFolder()}>
+          <Button variant="ghost" disabled={busy()} onPress={() => void run(async () => { const path = await pickFolder(); if (path) setDeviceSpec(path) })}>Choose…</Button>
+        </Show>
+        <Button submit disabled={busy() || !deviceSpec().trim()}>Install</Button>
+      </form>
+      <ConfigPluginOffers busy={busy()} onInstall={(id, source) => void installConfigOffer(id, source)} />
+      <ul class="plugin-list">
+        <For each={devicePlugins()}>{(entry) => <li class="plugin-row">
+          <Checkbox label={<span class="plugin-name">{entry.row.name}</span>} checked={!entry.row.disabled} disabled={busy()} onChange={(checked) => void toggleDevice(entry.row.name, checked)} />
+          <span class="plugin-version muted">{entry.row.installed?.version}</span>
+          <span class="plugin-meta">
+            <span class="plugin-source muted" title={entry.sourceLabel}>{entry.sourceLabel}</span>
+            <Show when={entry.nodeIds.length}><span class="muted">also offered by {entry.nodeIds.join(', ')}<Show when={entry.sameHashNodeIds.length}> (same bundle: {entry.sameHashNodeIds.join(', ')})</Show></span></Show>
+            <Show when={deviceDevGrant(entry.row.name)}><span class="plugin-dev">in development — bundle changes are auto-trusted</span></Show>
+          </span>
+          <span class="plugin-actions">
+            <Show when={deviceDevGrant(entry.row.name)} fallback={<Button size="sm" variant="ghost" disabled={busy()} onPress={() => void toggleDeviceDev(entry.row.name, true)}>Dev trust</Button>}>
+              <Button size="sm" variant="ghost" disabled={busy()} onPress={() => void toggleDeviceDev(entry.row.name, false)}>End dev mode</Button>
+            </Show>
+            <Button size="sm" variant="ghost" disabled={busy() || !entry.installSource} onPress={() => void updateDevice(entry.row.name, entry.installSource)}>Update</Button>
+            <Show when={removingDevice() === entry.row.name} fallback={<Button size="sm" tone="danger" disabled={busy()} onPress={() => setRemovingDevice(entry.row.name)}>Remove</Button>}>
+              <Button size="sm" tone="danger" disabled={busy()} onPress={() => void removeDevice(entry.row.name)}>Confirm remove</Button>
+              <Button size="sm" variant="ghost" onPress={() => setRemovingDevice(null)}>Cancel</Button>
+            </Show>
+          </span>
+        </li>}</For>
+      </ul>
+      <h3 class="settings-heading">On this node</h3>
       <Show when={nodes().length > 1}>
         <label class="settings-field">
           <span>Node</span>
@@ -314,32 +448,20 @@ export default function PluginsSettings() {
                     </>
                   )}
                 </Show>
-                {/* This device has seen these exact bytes and said no. The same plugin may be running
-                    happily on the owner's other laptop, hence the wording. */}
-                <Show when={blockedHere(row)}>
-                  <span class="plugin-failed" role="status">blocked on this device</span>
+                <Show when={!row.installed?.bundled && !devGrant(row)}>
+                  <For each={decisions(row)}>
+                    {(ack) => <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy()}
+                      onPress={() => void forgetDecision(row.name, ack.hash, ack.decision === 'accepted')}
+                    >
+                      {ack.decision === 'accepted' ? `Revoke approval for ${ack.version}` : `Review ${ack.version} again`}
+                    </Button>}
+                  </For>
                 </Show>
-                {/* The install directory and this process disagree: something was installed, updated,
-                    or uninstalled since the node last started. A restart is the fix. */}
-                <Show when={row.state === 'pending-restart'}>
-                  <span class="plugin-pending muted">waiting for a restart</span>
-                </Show>
-                <Show when={row.state !== 'pending-restart' && pluginPending(row)}>
-                  <span class="plugin-pending muted">{row.running ? 'still running' : 'not loaded'}</span>
-                </Show>
-                {/* A restart fixes neither a throw nor a failed load, so this does not raise the
-                    restart banner. The owner has to turn the plugin off or fix it.
-
-                    `reason` is the node's verbatim account of what broke, so it is loaded-plugin text
-                    crossing into the owner's UI: interpolated as text, and capped by the node. An
-                    older node does not send it, which is why the label stands alone. */}
-                <Show when={row.state === 'failed'}>
-                  <span class="plugin-failed" role="status">
-                    failed to {row.stage === 'load' ? 'load' : 'start'}
-                  </span>
-                  <Show when={row.reason}>
-                    {(reason) => <span class="plugin-failed-reason muted" title={reason()}>{reason()}</span>}
-                  </Show>
+                <Show when={availabilityMessage(row)}>
+                  {(message) => <span class="plugin-pending muted" role="status">{message()}</span>}
                 </Show>
                 <Show when={row.emits?.length}>
                   <details class="plugin-emits">
@@ -418,10 +540,18 @@ function ReplacedSurfaces() {
                 value={choice(row.slot)}
                 options={[
                   { value: CORE_SLOT_PROVIDER, label: "acorn's own" },
-                  ...row.offers.map((offer) => ({ value: offer.pluginId, label: `${offer.label} (${offer.pluginId})` })),
+                  ...row.offers.map((offer) => ({
+                    value: offer.pluginId,
+                    label: `${offer.label} (${offer.pluginId})${!offer.placesNestedSlot && row.slot === 'rail' ? ' — hides the task list' : ''}${!offer.placesNestedSlot && row.slot === 'topbar' ? ' — hides plugin status items' : ''}`,
+                  })),
                 ]}
                 onChange={(value) => void savePref(qc, PrefKeys.exclusiveSlots, withExclusiveSlotChoice(stored(), row.slot, value))}
               />
+              <For each={row.offers.filter((offer) => !offer.placesNestedSlot && (row.slot === 'rail' || row.slot === 'topbar'))}>
+                {(offer) => <span class="muted" role="note">
+                  {offer.label} {row.slot === 'rail' ? 'hides the task list' : 'hides plugin status items'}.
+                </span>}
+              </For>
               {/* A replacement that fell back is the one case where the setting and the screen
                   disagree, and the owner has no other way to find out why. */}
               <Show when={choice(row.slot) !== CORE_SLOT_PROVIDER && exclusiveSlotFailed(row.slot, choice(row.slot))}>
@@ -437,4 +567,9 @@ function ReplacedSurfaces() {
 
 // Core's own name for each designated surface, because the label says which of acorn's surfaces is
 // being replaced. The plugin's own label is already the option text.
-const CORE_SLOT_LABEL: Record<CoreExclusiveSlot, string> = { 'rail.taskList': 'Task list in the rail' }
+const CORE_SLOT_LABEL: Record<CoreExclusiveSlot, string> = {
+  'rail.taskList': 'Task list in the rail',
+  'pane.switcher': 'Pane switcher',
+  rail: 'Left rail',
+  topbar: 'Top bar',
+}

@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PLUGIN_API_MAJOR } from './manifest'
-import { installedPluginInfo, loadExternalPlugins, pluginInstallDir, readClientBundle } from './loader'
+import { installedPluginInfo, loadExternalPlugins, pluginInstallDir, readClientBundle, snapshotActivePlugin } from './loader'
 import { PluginMigrationsError } from './migrations'
 
 // A minimal ESM node half. Written as source rather than bundled, because the loader's contract is
@@ -334,6 +334,16 @@ describe('the installed enumeration', () => {
     expect(served!.hash).not.toBe(installed[0].client!.hash)
   })
 
+  it('keeps an active declaration and its bytes together after the package changes', async () => {
+    const dir = install('ntfy', manifest('ntfy', { client: './dist/client.js' }), BUNDLE('ntfy'), 'export default { version: 1 }')
+    const { installed } = await loadExternalPlugins(root, { builtins: [] })
+    const active = await snapshotActivePlugin(installed[0]!)
+    writeFileSync(join(dir, 'dist', 'client.js'), 'export default { version: 2 }')
+    expect(active.identity).toMatchObject({ version: '1.0.0', activation: 'node', client: { hash: sha256('export default { version: 1 }') } })
+    expect(new TextDecoder().decode(active.bundle!.bytes)).toBe('export default { version: 1 }')
+    expect((await readClientBundle(installed, 'ntfy'))?.hash).toBe(sha256('export default { version: 2 }'))
+  })
+
   it('has nothing to serve for an unknown id or a package with no client half', async () => {
     install('plain', manifest('plain'), BUNDLE('plain'))
     const { installed } = await loadExternalPlugins(root, { builtins: [] })
@@ -367,7 +377,7 @@ describe('declared frame contributions', () => {
     // Present-and-empty rather than absent, so no adapter on the device has to distinguish "declared
     // none" from "did not know about this kind".
     expect(installedPluginInfo(installed[0]).contributions)
-      .toEqual({ frames: [], sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [] })
+      .toEqual({ frames: [], sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [] })
   })
 
   it('keeps keys it does not understand, so a manifest written for a newer acorn still loads', async () => {

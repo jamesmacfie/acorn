@@ -46,6 +46,8 @@ const caretLine = (lines: string[]): string => lines.find((line) => line.include
 // the smallest one `trustTiers` can describe: a version, no permissions, no contributions.
 const TRUST: PluginTrustRequest = {
   nodeId: 'node-1',
+  sourceNodeIds: ['node-1'],
+  relation: 'active',
   hash: 'a'.repeat(64),
   row: {
     name: 'board',

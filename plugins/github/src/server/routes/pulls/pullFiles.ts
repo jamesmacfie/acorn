@@ -1,18 +1,17 @@
 import { and, eq } from 'drizzle-orm'
 import type { Context } from 'hono'
 import { Hono } from 'hono'
-import { z } from 'zod'
-import type { PullFile, PullFilesPatchRequest } from '../../../shared/api'
+import type { PullDiffResponse, PullFilesResponse } from '../../../shared/api'
 import { filesResource } from '../../resourceKeys'
-import { type AppEnv, type Cached, ownerId, type PluginDatabase, type RefreshResult, respondError, serveThenRevalidate } from '@acorn/plugin-api/node'
+import { type AppEnv, type Cached, ownerId, type PluginDatabase, respondError, serveThenRevalidate } from '@acorn/plugin-api/node'
 import { PULLS_STALE_AFTER_MS } from '../../syncPolicy'
-import { fetchFiles, mirrorFiles, readFiles } from '../mirror/prMirror'
+import { filesCompleteness, readFiles } from '../mirror/prMirror'
+import { topologyOf } from '../mirror/prDocument'
+import { refreshPullFiles } from './pullRefresh'
 import { resolveRepoForUser } from '../mirror/repoMirror'
 import { githubToken } from '../../githubToken'
 import { syncState } from '../../../node/schema'
 import { type GithubEmit, NO_EMIT } from '../../events'
-
-const MAX_PATCH_PATHS = 20
 
 const orderedByRequest = <T extends { path: string }>(files: T[], paths: string[] | undefined) => {
   if (!paths) return files
@@ -23,34 +22,14 @@ const orderedByRequest = <T extends { path: string }>(files: T[], paths: string[
   })
 }
 
-// Shape first, then the de-duplication the caller wants. The schema answers "is this a list of
-// non-empty strings"; `uniqueStringPaths` answers "in what order, with duplicates dropped", which is
-// not a shape question.
-const patchBody = z.object({ paths: z.array(z.string().min(1)) }) satisfies z.ZodType<PullFilesPatchRequest>
+type FilesRead<T> = (sync: typeof syncState.$inferSelect, key: { userId: string; repoId: number; number: number }) => Promise<T | null>
 
-const uniqueStringPaths = (paths: unknown): string[] | null => {
-  if (!Array.isArray(paths)) return null
-  const out: string[] = []
-  const seen = new Set<string>()
-  for (const path of paths) {
-    if (typeof path !== 'string' || !path) return null
-    if (seen.has(path)) continue
-    seen.add(path)
-    out.push(path)
-  }
-  return out
-}
-
-const handleFilesRead = async (
-  db: PluginDatabase,
-  c: Context<AppEnv>,
-  emit: GithubEmit,
-  options: { summaryOnly?: boolean; paths?: string[] } = {},
-) => {
-  const uid = ownerId(c)
+// The files resource behind both the files route and the diff route: resolve the pull, then serve the
+// mirror, refreshing it first when it is cold or stale. `read` answers null for a mirror that cannot
+// serve, which the engine treats as cold.
+const serveFiles = async <T,>(db: PluginDatabase, c: Context<AppEnv>, emit: GithubEmit, read: FilesRead<T>) => {
+  const userId = ownerId(c)
   const token = await githubToken(c)
-
-  const userId = uid
   const owner = c.req.param('owner')
   const repo = c.req.param('repo')
   const number = Number(c.req.param('number'))
@@ -61,28 +40,18 @@ const handleFilesRead = async (
   if (!resolved.ok) return respondError(c, resolved.failure.status, resolved.failure.error)
   const { repoId } = resolved.value
   const key = { userId, repoId, number }
-  const paths = options.paths?.length ? options.paths : undefined
-  const includePatches = !options.summaryOnly || !!paths
-
   const resource = filesResource(repoId, number)
-  const readCached = async () => orderedByRequest(await readFiles(c.env.BLOBS, db, key, { includePatches, paths }), paths)
 
-  // Cold only when the files were never fetched (no sync row); a PR with zero changed files still
-  // has a sync row → serves `{ data: [], fetchedAt }`.
-  const read = async (): Promise<Cached<PullFile[]> | null> => {
+  // Cold when the files were never fetched (no sync row); a PR with zero changed files still has a
+  // sync row and serves an empty list.
+  const cached = async (): Promise<Cached<T> | null> => {
     const [sync] = await db
       .select()
       .from(syncState)
       .where(and(eq(syncState.userId, userId), eq(syncState.resource, resource)))
     if (!sync) return null
-    return { data: await readCached(), fetchedAt: sync.fetchedAt }
-  }
-
-  const refresh = async (): Promise<RefreshResult> => {
-    const files = await fetchFiles(token, owner, repo, number)
-    if (!files.ok) return files
-    await mirrorFiles(c.env.BLOBS, db, key, files.value)
-    return { ok: true }
+    const data = await read(sync, key)
+    return data == null ? null : { data, fetchedAt: sync.fetchedAt }
   }
 
   const result = await serveThenRevalidate({
@@ -90,27 +59,52 @@ const handleFilesRead = async (
     userId,
     ttlMs: PULLS_STALE_AFTER_MS,
     force: c.req.query('force') === 'true',
-    read,
-    refresh,
+    read: cached,
+    refresh: () => refreshPullFiles(token, db, c.env.BLOBS, { userId, repoId, owner, repo, number }),
   })
   if (!result.ok) return respondError(c, result.failure.status, result.failure.error, result.failure.detail)
-  return c.json(result.value)
+  return result.value
+}
+
+const handleFilesRead = async (
+  db: PluginDatabase,
+  c: Context<AppEnv>,
+  emit: GithubEmit,
+  options: { summaryOnly?: boolean; paths?: string[] } = {},
+) => {
+  const paths = options.paths?.length ? options.paths : undefined
+  const includePatches = !options.summaryOnly || !!paths
+  // Also cold when an available patch's body is missing from BLOBS: that is a broken cache, so the
+  // read blocks on a refresh that rewrites it rather than serving the file as if it had no diff.
+  const served = await serveFiles<PullFilesResponse>(db, c, emit, async (sync, key) => {
+    const files = await readFiles(c.env.BLOBS, db, key, { includePatches, paths })
+    return files.ok ? { files: orderedByRequest(files.files, paths), completeness: filesCompleteness(sync) } : null
+  })
+  return served instanceof Response ? served : c.json(served)
 }
 
 // PR changed-files + patches. REST /pulls/{n}/files is the single writer of pr_files (it carries
 // path/status/+/−/sha/patch in one call, richer than the GraphQL composite, which dropped files).
 // Mirror logic is shared with the batch route, see prMirror.ts.
+//
+// GET answers with PullFilesResponse: the files in provider order and whether that is all of them.
+// `?path=` narrows it to one file. GET `/diff` answers with the same files as a segmented document
+// (PullDiffResponse) for the diff viewer, whose segments come from ./diffDocument.ts. There is no
+// batch patch read any more: the viewer reads segments, never whole patches.
 // Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
 // databases).
 export const pullFiles = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/files', async (c) => {
   const path = c.req.query('path')
   const summaryOnly = c.req.query('summary') === '1' && !path
   return handleFilesRead(db, c, emit, { summaryOnly, paths: path ? [path] : undefined })
-}).post('/:owner/:repo/pulls/:number/files/patches', async (c) => {
-  const parsed = patchBody.safeParse(await c.req.json().catch(() => null))
-  const paths = parsed.success ? uniqueStringPaths(parsed.data.paths) : null
-  if (!paths) return respondError(c, 400, 'bad_paths')
-  if (paths.length > MAX_PATCH_PATHS) return respondError(c, 400, 'too_many_paths')
-  if (paths.length === 0) return c.json([])
-  return handleFilesRead(db, c, emit, { paths })
+}).get('/:owner/:repo/pulls/:number/diff', async (c) => {
+  // The document: every file in provider order with its segment descriptors and no patch text. A
+  // missing patch body is the same integrity failure the files read repairs, and repairs the same way.
+  const served = await serveFiles<PullDiffResponse>(db, c, emit, async (sync, key) => {
+    const files = await readFiles(c.env.BLOBS, db, key, { includePatches: false })
+    if (!files.ok) return null
+    const topology = await topologyOf(c.env.BLOBS, files.files)
+    return topology.ok ? { document: topology.document, completeness: filesCompleteness(sync) } : null
+  })
+  return served instanceof Response ? served : c.json(served)
 })

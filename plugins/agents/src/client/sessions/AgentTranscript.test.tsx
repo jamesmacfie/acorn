@@ -2,6 +2,7 @@ import { createRenderEffect, createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentEventRecord, AgentNormalizedEvent, AgentSessionSnapshot, AgentTurn } from '../../contract/wire.ts'
+import type { TimelineControls } from '@acorn/plugin-api/ui'
 
 // How a row finds its turn.
 //
@@ -23,7 +24,7 @@ vi.mock('./AgentEventCard', () => ({
   default: (props: { item: { key: string; turnId: string | null }; turn?: AgentTurn }) => {
     drawn.push({ turnId: props.item.turnId, turn: props.turn })
     createRenderEffect(() => woken.push(props.item.key))
-    return <div data-item={props.item.key} tabindex={-1} />
+    return <div data-item={props.item.key} tabindex={-1}>{props.item.key}</div>
   },
 }))
 
@@ -213,5 +214,95 @@ describe('a streamed event reaching the transcript', () => {
     // More text for the last message, the way a harness streams it.
     setSnapshot(snapshotOf([...events, record(4, 'a', { type: 'assistant_message', text: ' more', messageId: 'm3', append: true })]))
     expect(woken).toEqual(['e3'])
+  })
+})
+
+// A long session is drawn through a window (docs/managed-agents/client-surfaces.md § Client surfaces):
+// the projection covers every event, and the DOM holds the newest page and whatever the reader asked
+// for on top of it.
+describe('a long transcript', () => {
+  const PAGE = 200
+  const snapshotOf = (id: string, count: number, extra: AgentEventRecord[] = []) => ({
+    session: { id, title: 'A session', config: {} },
+    turns: [turn('a', 0)],
+    events: [...Array.from({ length: count }, (_, index) => message(index + 1, 'a')), ...extra],
+    requests: [],
+  }) as unknown as AgentSessionSnapshot
+  const rows = (host: HTMLElement) => [...host.querySelectorAll<HTMLElement>('.ui-timeline-turn')]
+  const earlier = (host: HTMLElement) =>
+    [...host.querySelectorAll('button')].find((button) => button.textContent?.startsWith('Show earlier'))
+
+  const mount = (snapshot: () => AgentSessionSnapshot, extra: { focusRequestId?: () => string | undefined; onControls?: (api: TimelineControls) => void } = {}) => {
+    ;(globalThis as { ResizeObserver?: unknown }).ResizeObserver = TestResizeObserver
+    const host = document.createElement('div')
+    document.body.append(host)
+    const dispose = render(() => (
+      <AgentTranscript
+        taskId="t1"
+        snapshot={snapshot()}
+        focusRequestId={extra.focusRequestId?.()}
+        onControls={extra.onControls}
+        onExitSubagent={() => {}}
+        onRequestResolved={() => {}}
+      />
+    ), host)
+    hosts.push(() => { dispose(); host.remove() })
+    return host
+  }
+
+  it('draws the newest page, says how many cards it hides, and numbers each in the whole session', () => {
+    const host = mount(() => snapshotOf('s1', 1000))
+    expect(rows(host)).toHaveLength(PAGE)
+    expect(rows(host)[0]?.dataset.turn).toBe('e801')
+    expect(rows(host)[0]?.getAttribute('aria-posinset')).toBe('801')
+    expect(rows(host)[0]?.getAttribute('aria-setsize')).toBe('1000')
+    expect(earlier(host)?.textContent).toBe('Show earlier (800)')
+  })
+
+  it('starts another session on its own newest page, however far back the reader went in this one', () => {
+    const [snapshot, setSnapshot] = createSignal(snapshotOf('s1', 1000))
+    const host = mount(snapshot)
+    earlier(host)!.click()
+    expect(rows(host)).toHaveLength(2 * PAGE)
+    setSnapshot(snapshotOf('s2', 900))
+    expect(rows(host)).toHaveLength(PAGE)
+    expect(earlier(host)?.textContent).toBe('Show earlier (700)')
+  })
+
+  it('draws a request a notice named, even when it is older than the window', () => {
+    const question = record(0, 'a', { type: 'request', requestId: 'q1', kind: 'question', title: 'Which one?' } as AgentNormalizedEvent)
+    const events = [question, ...snapshotOf('s1', 1000).events]
+    const [focus, setFocus] = createSignal<string>()
+    const host = mount(() => ({ ...snapshotOf('s1', 0), events }) as AgentSessionSnapshot, { focusRequestId: focus })
+    expect(host.querySelector('[data-item="e0"]')).toBeNull()
+    setFocus('q1')
+    expect(host.querySelector('[data-item="e0"]')).not.toBeNull()
+  })
+
+  it('draws every card when the reader goes to the top, which is the oldest turn', () => {
+    let api: TimelineControls | undefined
+    const host = mount(() => snapshotOf('s1', 1000), { onControls: (next) => { api = next } })
+    api!.toTop()
+    expect(rows(host)).toHaveLength(1000)
+    expect(earlier(host)).toBeUndefined()
+  })
+
+  it('keeps a selection across two cards while the newest one streams', () => {
+    const events = Array.from({ length: 300 }, (_, index) => message(index + 1, 'a'))
+    const [snapshot, setSnapshot] = createSignal(snapshotOf('s1', 0, events))
+    const host = mount(snapshot)
+    const first = host.querySelector('[data-item="e150"]')!.firstChild!
+    const second = host.querySelector('[data-item="e151"]')!.firstChild!
+    const range = document.createRange()
+    range.setStart(first, 1)
+    range.setEnd(second, 2)
+    document.getSelection()!.removeAllRanges()
+    document.getSelection()!.addRange(range)
+    const selected = document.getSelection()!.toString()
+
+    setSnapshot(snapshotOf('s1', 0, [...events, record(301, 'a', { type: 'assistant_message', text: ' more', messageId: 'm300', append: true })]))
+    expect(first.isConnected && second.isConnected).toBe(true)
+    expect(document.getSelection()!.toString()).toBe(selected)
+    document.getSelection()!.removeAllRanges()
   })
 })

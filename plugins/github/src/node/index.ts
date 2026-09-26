@@ -10,6 +10,7 @@ import { pins } from '../server/routes/pulls/pins'
 import { prActions } from '../server/routes/pulls/prActions'
 import { prCreate } from '../server/routes/pulls/prCreate'
 import { pullBlob } from '../server/routes/pulls/pullBlob'
+import { diffDocument } from '../server/routes/pulls/diffDocument'
 import { pullConflicts } from '../server/routes/pulls/pullConflicts'
 import { pullDetail } from '../server/routes/pulls/pullDetail'
 import { pullFiles } from '../server/routes/pulls/pullFiles'
@@ -89,6 +90,8 @@ export const githubPlugin = (): NodePlugin => {
       ctx.routes.register(pullConflicts(ctx.core), { prefix: '/repos', note: '/:owner/:repo/pulls/:number/conflicts' })
       ctx.routes.register(pullFiles(store, emit), { prefix: '/repos' })
       ctx.routes.register(pullBlob(store, emit), { prefix: '/repos' })
+      // A diff document's segment and search reads, shared by pull requests and compare previews.
+      ctx.routes.register(diffDocument(store, emit), { prefix: '/repos' })
       ctx.routes.register(pullsBatch(store, emit), { prefix: '/repos' })
       ctx.routes.register(prActions(store, emit), { prefix: '/repos' })
       // Workflow-run and job reads and re-runs. It resolves everything from the GitHub API and the

@@ -142,6 +142,7 @@ pub fn run() {
             commands::pick_files,
             commands::save_file,
             commands::reveal_data_folder,
+            commands::open_config_file,
             commands::force_quit,
             commands::quit_approved,
             commands::show_notification,
@@ -341,6 +342,7 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
     app.manage(Shell {
         helper: Mutex::new(None),
         data_dir,
+        user_data_dir,
         quit_approved: AtomicBool::new(false),
         quit_pending: AtomicBool::new(false),
     });

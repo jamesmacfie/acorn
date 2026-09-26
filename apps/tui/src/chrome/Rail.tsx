@@ -13,6 +13,7 @@ import { Panel, PanelBody } from '../panel'
 import { Modal, ModalBody } from '../kit/grouping'
 import { regionFocus } from '../keys/regions'
 import { ExclusiveSlot } from './slot'
+import { registerCoreExclusiveSlot } from '@acorn/client-core/host/registries/extensionPoints'
 import { BROWSE, MENU, TASKS } from './topology'
 import type { ShellModel } from './model'
 import { workflowTaskHierarchy } from '@acorn/client-core/features/tasks'
@@ -176,6 +177,19 @@ function TaskList(props: { model: ShellModel; markerCells: number }) {
   )
 }
 
+type TaskListSlotValue = {
+  model: ShellModel
+  markerCells: number
+}
+
+// The terminal can mount more than one shell during tests or a renderer handoff. Core is one
+// provider in the shared registry; the current shell model and available marker width travel as
+// host-owned slot data.
+registerCoreExclusiveSlot('rail.taskList', (props) => {
+  const value = props.value as TaskListSlotValue
+  return <TaskList model={value.model} markerCells={value.markerCells} />
+})
+
 export function Rail(props: { model: ShellModel; cells: number }) {
   // Three panels and nothing else: which sources this workspace has, and which of them the session
   // starts on, are both the model's (./model.ts § defaultSource). A component that draws is a
@@ -264,7 +278,10 @@ export function Rail(props: { model: ShellModel; cells: number }) {
           { x: RAIL, enterMainOnActivate: true },
         )}
       >
-        <ExclusiveSlot slot="rail.taskList" core={() => <TaskList model={props.model} markerCells={Math.max(2, props.cells - 22)} />} />
+        <ExclusiveSlot
+          slot="rail.taskList"
+          value={{ model: props.model, markerCells: Math.max(2, props.cells - 22) } satisfies TaskListSlotValue}
+        />
       </Panel>
     </box>
   )

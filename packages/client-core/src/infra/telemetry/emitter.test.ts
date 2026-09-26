@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
 import { parseTraceparent } from '@acorn/protocol/telemetry.ts'
 import { reportContributionError } from '../../kit/lib/contributionErrors'
+import { _resetSurfaceHealth, registerSurfaceHealth } from '../../kit/lib/surfaceHealth'
 import {
   _resetClientTelemetry,
   currentTraceparent,
@@ -420,4 +421,22 @@ it('summarizes repeated work per interaction without treating the frame monitor 
   const summary = posted.flat().filter((r) => r.kind === 'event' && r.name === 'ui.interaction.work')
   expect(summary).toHaveLength(1)
   expect(summary[0]).toMatchObject({ attrs: { traceId: span.traceId, operation: 'agents.snapshot.load', calls: 10 } })
+})
+
+describe('rendered-surface checkpoints', () => {
+  afterEach(() => _resetSurfaceHealth())
+
+  it('records a fixed handful of numbers per checkpoint, labelled by kind and checkpoint only', async () => {
+    start()
+    setTelemetryEnabled(true)
+    const probe = registerSurfaceHealth('diff', () => ({ topology: { fixedRows: 1_000 }, measurement: { maxCommitsInFrame: 3 } }))
+    probe.checkpoint('ready')
+    probe.dispose()
+    await flushTelemetry()
+    const rows = posted[0].filter((record): record is Extract<TelemetryRecord, { kind: 'metric' }> => record.kind === 'metric' && record.name.startsWith('ui.surface.'))
+    expect(new Set(rows.map((row) => `${row.attrs.surface}:${row.attrs.checkpoint}`))).toEqual(new Set(['diff:ready', 'diff:teardown']))
+    const commits = rows.find((row) => row.name === 'ui.surface.measurement.max_commits_in_frame' && row.attrs.checkpoint === 'ready')
+    expect(commits?.kind === 'metric' && typeof commits.value === 'object' && commits.value.max).toBe(3)
+    for (const row of rows) expect(Object.keys(row.attrs).sort()).toEqual(['checkpoint', 'owner', 'runtime', 'seam', 'surface'])
+  })
 })

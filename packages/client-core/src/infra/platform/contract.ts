@@ -9,6 +9,7 @@ import {
   nodeTransport,
   notifyHost,
   pluginCustody,
+  deviceConfigBridge,
   pluginWebviews,
   previewViews,
   recoveryActions,
@@ -18,6 +19,7 @@ import {
   type NodeTransport,
   type Notify,
   type PluginCustody,
+  type DeviceConfigBridge,
   type PluginWebviews,
   type PreviewViews,
   type RecoveryActions,
@@ -57,11 +59,15 @@ const GROUPS = {
   pairing: { resolve: () => (canPairNodes() ? {} : null), members: [] },
   plugins: {
     resolve: pluginCustody,
-    members: members<PluginCustody>()(['state', 'cachePut', 'trustRecord', 'devGrant']),
+    members: members<PluginCustody>()(['state', 'cachePut', 'install', 'remove', 'trustRecord', 'trustForget', 'devGrant']),
+  },
+  config: {
+    resolve: deviceConfigBridge,
+    members: members<DeviceConfigBridge>()(['read', 'write', 'onChange', 'location']),
   },
   desktopExtras: {
     resolve: desktopExtras,
-    members: members<DesktopExtras>()(['onClosePane', 'onCommandPalette', 'onWillQuit']),
+    members: members<DesktopExtras>()(['onClosePane', 'onCommandPalette', 'onWillQuit', 'openConfigFile']),
   },
   // Checked by its probe alone: calling `pickFolder` would open a dialog on a real host.
   folderPicker: { resolve: () => (canPickFolder() ? {} : null), members: [] },

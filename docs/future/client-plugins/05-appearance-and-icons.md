@@ -1,7 +1,7 @@
 # Appearance and icons: style packs as data, and the parked icon door
 
-Part of [docs/future/client-plugins/](./README.md). Phase 3 builds style packs. Nothing builds icon
-sets; this file holds the door open.
+Historical style-pack design from [client plugins](./README.md). Phase 3 shipped; current behavior
+lives in [appearance](../../ui-design/appearance.md). Icon packs remain parked below.
 
 ## What exists
 

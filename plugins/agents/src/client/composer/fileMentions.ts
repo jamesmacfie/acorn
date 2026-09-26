@@ -2,15 +2,17 @@ import type { AgentInputPart } from '../../contract/wire.ts'
 import { fuzzyScore } from '@acorn/plugin-api/client'
 
 // Composer file mentions are deliberately conservative: a token must begin with @ at a word
-// boundary, use a workspace-relative path, and may end in :line or :line-line. Email addresses,
-// absolute paths and parent traversal remain ordinary text and are not promoted to provider files.
+// boundary, name a file in the worktree list, and may end in :line or :line-line. Unmatched text,
+// email addresses, absolute paths and parent traversal remain ordinary text.
 //
 // Yielded with offsets rather than returned as a list, because the composer's highlighter colours
 // exactly the spans this promotes (composerTokens.ts). Two readings of "is that a file mention"
 // would drift, and the visible one would start lying about what the turn actually sends.
 export function* fileMentionMatches(
   text: string,
+  files: readonly string[],
 ): Generator<Extract<AgentInputPart, { type: 'file' }> & { start: number; end: number }> {
+  const available = new Set(files)
   const expression = /(?:^|\s)@(?:"((?:[^"\\]|\\.)+)"((?::\d+(?:-\d+)?)?)|([^\s]+))/g
   for (const match of text.matchAll(expression)) {
     const quotedPath = match[1]?.replace(/\\(["\\])/g, '$1')
@@ -19,7 +21,7 @@ export function* fileMentionMatches(
       : `${quotedPath}${match[2] ?? ''}`
     const lines = /:(\d+)(?:-(\d+))?$/.exec(token)
     const path = lines ? token.slice(0, lines.index) : token
-    if (!path || path.startsWith('/') || path.split('/').includes('..') || path.includes('\\')) continue
+    if (!available.has(path) || path.startsWith('/') || path.split('/').includes('..') || path.includes('\\')) continue
     // The leading space belongs to the sentence, not the mention. Trailing punctuation the loop
     // above trimmed is likewise left uncoloured, so `@a/b.ts,` highlights everything but the comma.
     const start = match.index + match[0].indexOf('@')
@@ -34,10 +36,10 @@ export function* fileMentionMatches(
   }
 }
 
-export function parseFileMentions(text: string): Extract<AgentInputPart, { type: 'file' }>[] {
+export function parseFileMentions(text: string, files: readonly string[]): Extract<AgentInputPart, { type: 'file' }>[] {
   const output: Extract<AgentInputPart, { type: 'file' }>[] = []
   const seen = new Set<string>()
-  for (const { start: _start, end: _end, ...mention } of fileMentionMatches(text)) {
+  for (const { start: _start, end: _end, ...mention } of fileMentionMatches(text, files)) {
     const key = `${mention.path}:${mention.lineStart ?? ''}:${mention.lineEnd ?? ''}`
     if (seen.has(key)) continue
     seen.add(key)

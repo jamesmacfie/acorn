@@ -3,7 +3,7 @@ import { createEffect, createMemo, on, onCleanup } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
 import type { Renderable } from '../tree/compat'
 import type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
-import { createFrameBridge, postSelect, postSurfaceAction, type FrameBinding } from '@acorn/client-core/host/frames/broker.ts'
+import { createFrameBridge, type FrameBinding } from '@acorn/client-core/host/frames/broker.ts'
 import { createFrameServices } from '@acorn/client-core/host/frames/frameServices.ts'
 import { eligiblePlugins, isTaskPane } from '@acorn/client-core/host/plugins'
 import { recordSurfaceFailure } from '@acorn/client-core/host/plugins'
@@ -31,8 +31,7 @@ export type RemoteTreeProps = {
   contribution: RemoteContribution
   /** What this tree is for. Reactive: a second mount for the same slot is a props update. */
   props: () => unknown
-  /** The task or project this tree is inside. An accessor, read on every bridge call, because one
-   *  worker serves every tree its bundle draws and therefore holds one bridge. */
+  /** The task or project this tree is inside. This slot's own bridge reads it on each call. */
   scope?: () => { taskId?: string; projectId?: string; item?: string }
   /** The sibling host editor's document, for a tree that is one region of a composed pane. An accessor
    *  because the two regions mount independently; its absence is the whole permission check for the
@@ -90,62 +89,40 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     }
   }
 
+  const contextFor = (bound: FrameBinding): PluginFrameContext => {
+    const opened = scope().item
+      ?? (bound.taskId ? consumePaneIntent(bound.taskId, contribution.id) : undefined)
+    const item = typeof opened === 'string' ? opened : opened?.kind === 'plugin:select' ? opened.item : undefined
+    return {
+      surface: bound.surface, target: 'remote', nodeId: bound.nodeId,
+      ...(bound.taskId ? { taskId: bound.taskId } : {}),
+      ...(bound.projectId ? { projectId: bound.projectId } : {}),
+      ...(item ? { item } : {}),
+      theme: 'terminal', style: 'terminal', claimsKeys: [],
+    }
+  }
+
+  const connectBridge = (port: MessagePort, bound: FrameBinding, context: PluginFrameContext, authorize?: () => boolean) =>
+    createFrameBridge({
+      port, binding: bound,
+      services: createFrameServices(
+        { binding: bound, hash: contribution.hash, ...(componentProps.document ? { document: componentProps.document } : {}) },
+        {
+          qc, frameHasFocus: holdsFocus, navigate: () => {},
+          copy: (text) => { if (!copyToTerminal(text)) toast(`Copy by hand: ${text}`) },
+          openExternal: (url) => toast(`Open in a browser: ${url}`),
+        },
+      ),
+      context,
+      ...(authorize ? { authorize } : {}),
+      onMisbehaving: (reason) => refuse(`misbehaved on the bridge: ${reason}`),
+    })
+
   const worker = acquireTreeWorker({
-    pluginId: contribution.pluginId,
-    hash: contribution.hash,
-    onRefused: refuse,
-    connect: (port) => {
-      const bound = binding()
-      // The row that opened this pane, when a row did. Retained by `openPane` until the pane consumes
-      // it, so a tree mounting for the first time gets its selection in `context` rather than racing
-      // its own mount against an event that has already fired — the same split a frame region makes
-      // (../frames/PluginFrame.tsx). A routed item wins, because for a project-scoped surface it IS the
-      // current selection rather than a one-shot.
-      const opened = scope().item
-        ?? (bound.taskId ? consumePaneIntent(bound.taskId, contribution.id) : undefined)
-      const item = typeof opened === 'string' ? opened : opened?.kind === 'plugin:select' ? opened.item : undefined
-      const context: PluginFrameContext = {
-        surface: bound.surface,
-        target: 'remote',
-        nodeId: bound.nodeId,
-        ...(bound.taskId ? { taskId: bound.taskId } : {}),
-        ...(bound.projectId ? { projectId: bound.projectId } : {}),
-        ...(item ? { item } : {}),
-        // This host has one appearance and it is the reader's own terminal: no stylesheet, no tokens,
-        // and no theme id to resolve until the appearance layer publishes its colours as data
-        // (../appearance.ts, docs/tui.md).
-        theme: 'terminal',
-        style: 'terminal',
-        claimsKeys: [],
-      }
-      return createFrameBridge({
-        port,
-        binding: bound,
-        services: createFrameServices(
-          {
-            binding: bound,
-            hash: contribution.hash,
-            // Present only where the host handed one down, which is a composed pane's other region.
-            ...(componentProps.document ? { document: componentProps.document } : {}),
-          },
-          {
-            qc,
-            frameHasFocus: holdsFocus,
-            // No router here, so the route rung of a content link has nothing to navigate. The pane and
-            // panel rungs above it still resolve, and what neither claims falls to `openExternal`.
-            navigate: () => {},
-            // OSC 52 where the terminal takes it, and the value on screen where it does not
-            // (../kit/copy.ts). `navigator.clipboard` is the DOM's answer and there is none here.
-            copy: (text) => { if (!copyToTerminal(text)) toast(`Copy by hand: ${text}`) },
-            // There is no window to open one in, and shelling out to a browser from a terminal a person
-            // may be reaching over ssh would open it on the wrong machine.
-            openExternal: (url) => toast(`Open in a browser: ${url}`),
-          },
-        ),
-        context,
-        onMisbehaving: (reason) => refuse(`misbehaved on the bridge: ${reason}`),
-      })
-    },
+    pluginId: contribution.pluginId, hash: contribution.hash, onRefused: refuse,
+    connect: (port, authorize) => connectBridge(port, binding(), {
+      surface: '', target: 'remote', nodeId: '', theme: 'terminal', style: 'terminal', claimsKeys: [],
+    }, authorize),
   })
 
   // The fifth answer a terminal gives differently. An owner action is host-agnostic and goes through
@@ -166,27 +143,28 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   })
 
   const transport = worker.transport(slot)
+  worker.appearance(slot, { theme: 'terminal', style: 'terminal', tokens: {} })
   // Mount is also update: the first call starts the tree, every later one carries new props.
-  createEffect(() => worker.mount(slot, contribution.entry, componentProps.props()))
+  createEffect(() => worker.mount(slot, contribution.entry, componentProps.props(), () => {
+    const bound = binding()
+    const context = contextFor(bound)
+    return { context, connect: (port: MessagePort) => connectBridge(port, bound, context) }
+  }))
 
-  // The three pushes that are not tree mutations, exactly as the DOM host sends them: they ride the
-  // bridge rather than the tree channel, because they are the same messages a frame gets.
+  // Selection and actions go to this slot's bridge, as they do in the DOM host.
   createEffect(on(() => scope().item, (next, previous) => {
-    const port = worker.bridgePort()
-    if (!port || !next || next === previous) return
-    postSelect(port, next)
+    if (!next || next === previous) return
+    worker.select(slot, next)
   }, { defer: true }))
   const unselect = clientEvents.on('presentation:pane-intent', (event) => {
-    const port = worker.bridgePort()
-    if (!port || event.taskId !== scope().taskId || event.paneId !== contribution.id) return
+    if (event.taskId !== scope().taskId || event.paneId !== contribution.id) return
     if (event.intent.kind !== 'plugin:select') return
     consumePaneIntent(event.taskId, event.paneId)
-    postSelect(port, event.intent.item)
+    worker.select(slot, event.intent.item)
   })
   const unaction = clientEvents.on('plugin:surface-action', (event) => {
-    const port = worker.bridgePort()
-    if (!port || event.pluginId !== contribution.pluginId || event.surface !== contribution.id) return
-    postSurfaceAction(port, event.command)
+    if (event.pluginId !== contribution.pluginId || event.surface !== contribution.id) return
+    worker.surfaceAction(slot, event.command)
   })
 
   onCleanup(() => {

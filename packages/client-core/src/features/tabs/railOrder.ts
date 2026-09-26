@@ -1,6 +1,7 @@
 export type RailOrder = {
   pinned: string[] // task ids pinned to the top, in pinned order
   order: string[] // manual order for the rest; unknown ids keep their tasks.sort order after these
+  sources?: string[] // source ids, independent of the task order above
 }
 
 export type RailDropPosition = 'before' | 'after'
@@ -14,6 +15,7 @@ export function parseRailOrder(json: string | undefined): RailOrder {
     return {
       pinned: Array.isArray(v.pinned) ? v.pinned.filter((x): x is string => typeof x === 'string') : [],
       order: Array.isArray(v.order) ? v.order.filter((x): x is string => typeof x === 'string') : [],
+      ...(Array.isArray(v.sources) ? { sources: v.sources.filter((x): x is string => typeof x === 'string') } : {}),
     }
   } catch {
     return EMPTY_RAIL_ORDER
@@ -47,6 +49,13 @@ export function applyRailOrder<T extends { id: string }>(tasks: T[], order: Rail
 }
 
 export const isPinned = (order: RailOrder, id: string): boolean => order.pinned.includes(id)
+
+/** Keep newly installed sources after the saved order, in their registry order. */
+export function applySourceOrder<T extends { id: string }>(sources: T[], order: RailOrder): T[] {
+  if (!order.sources?.length) return sources
+  const positions = new Map(order.sources.map((id, index) => [id, index]))
+  return [...sources].sort((a, b) => (positions.get(a.id) ?? Infinity) - (positions.get(b.id) ?? Infinity))
+}
 
 export function pinTask(order: RailOrder, id: string): RailOrder {
   if (order.pinned.includes(id)) return order
@@ -95,5 +104,6 @@ export function moveTask(
   return {
     pinned: replaceVisible(order.pinned, targetPinned ? insert(pinnedHere) : withoutId(pinnedHere)),
     order: replaceVisible(order.order, targetPinned ? withoutId(rest) : insert(rest)),
+    ...(order.sources ? { sources: order.sources } : {}),
   }
 }

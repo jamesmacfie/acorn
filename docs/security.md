@@ -400,6 +400,18 @@ design all three constraints exist to prevent.
 
 ## Third-party plugin bundles
 
+A device-held plugin has no Node half. The desktop helper fetches a package from the source the owner
+entered, applies the Node installer's archive and manifest checks, refuses Node entries and
+Node-dependent contributions, and hashes the client bundle before adding it to the cache. The client
+checks the manifest again before registering any surface. Device-held and Node-delivered bundles use
+the same sandboxed iframe and remote-tree worker paths; neither executes in the shell process.
+
+Bundle cache entries and acknowledgement records carry `{ kind: 'node', nodeId }` or
+`{ kind: 'device' }` provenance. Old acknowledgement rows with `nodeId` and no source read as
+Node-sourced. The acknowledgement key remains `(pluginId, hash)`: identical bytes from both sources
+share one decision. The prompt names the source as the owner entered it, warns that a folder is not
+pinned, and omits the Node execution disclosure for device bundles. An updated hash asks again.
+
 A plugin installed on a Node is distributed by that Node: its client bundle travels the existing
 broker pipe to every paired device. That makes a Node a source of executable code, so the bundle is
 gated twice — once on content, once on consent.
@@ -440,6 +452,15 @@ re-prompts, exactly as it re-pairs — the decision is about code this machine w
 machine's to make. This mirrors repo-config trust one level out: that binds a project to the hash of
 a config the Node will execute and is stored on the Node; this binds a plugin to the hash of a bundle
 the device will execute and is stored beside the device token.
+
+The Node reports its running declaration separately from the package currently on disk. Custody can
+cache both hashes, but the renderer executes only an accepted bundle matching the current Node's
+running identity. A pending or rejected disk update cannot replace accepted UI while the older node
+half still runs. Acceptance is recorded before the distribution snapshot enables contributions;
+revoking an exact hash or ending a development grant removes its registrations and stops its worker.
+The same `(pluginId, hash)` decision can cover equivalent offers from two Nodes. If those Nodes attach
+conflicting enforced declarations to that key, the client withholds it instead of treating one
+acknowledgement as consent to both.
 
 **What "gained" means.** Each rendered permission line carries a stable grant key, separate from its
 sentence (`packages/client-core/src/host/trust/permissions.ts`). The update diff compares keys, not
@@ -560,12 +581,15 @@ own; for a remote node the owner types a path they know. That is a correctness g
 
 ### The dev grant
 
+A device-held plugin uses a grant for `(pluginId, { kind: 'device' })`. It cannot auto-accept a
+Node-delivered bundle with the same ID. Removing the device plugin revokes this grant and its automatic
+acknowledgements; decisions the owner made in the prompt remain.
+
 Per-hash consent is right for distribution and wrong for iteration, so a plugin the owner is actively
 developing can be put into **development mode**: a grant stored per `(pluginId, nodeId)` on the device,
 beside the acknowledgements, that auto-accepts future bundles of that plugin from that node. The node half
-of the key is not in the design note and is deliberate — fleet resolution picks a winner across every
-paired node, so a grant keyed on the plugin name alone would auto-trust a bundle a *different* node started
-serving under it.
+of the key is not in the design note and is deliberate: a grant keyed on the plugin name alone would
+auto-trust a bundle a *different* node offered under it.
 
 The grant writes ordinary accepted acknowledgements, in the helper, beside the hash it computed
 itself; nothing in the renderer can turn a bundle into an accepted one with or without a grant. Each such

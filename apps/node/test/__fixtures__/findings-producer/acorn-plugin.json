@@ -2,7 +2,7 @@
   "id": "architecture-review",
   "name": "Architecture review producer",
   "version": "1.0.0",
-  "apiVersion": "1",
+  "apiVersion": "2",
   "node": "./node.js",
   "requires": {
     "plugins": [

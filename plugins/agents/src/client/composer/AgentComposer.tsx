@@ -281,7 +281,7 @@ export default function AgentComposer(props: {
       }
       const input: AgentInputPart[] = [
         ...(text ? [{ type: 'text' as const, text }] : []),
-        ...parseFileMentions(text),
+        ...parseFileMentions(text, files.paths()),
         ...attachments().map((attachment): AgentInputPart => attachment.mediaType.startsWith('image/')
           ? { type: 'image', attachmentId: attachment.id, alt: attachment.filename }
           : { type: 'attachment', attachmentId: attachment.id }),
@@ -520,7 +520,7 @@ export default function AgentComposer(props: {
   const segments = (value: string): MentionSegment[] | null =>
     value.length > MAX_HIGHLIGHT_LENGTH
       ? null
-      : composerSegments(value, advertisedNames()).map((segment) => segment.token
+      : composerSegments(value, advertisedNames(), files.paths()).map((segment) => segment.token
         ? {
           text: segment.text,
           tone: TOKEN_TONE[segment.token.kind],

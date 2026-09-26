@@ -14,7 +14,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | Folder | What it is | Status |
 | --- | --- | --- |
-| [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; nothing blocks it. |
+| [client-plugins/](./client-plugins/README.md) | Delivered design record for device-held plugins, replacement chrome, style packs, and device configuration. Icon packs remain parked. | Five phases shipped 2026-09; web custody remains future-host work. |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
 | [dashboards/](./dashboards/README.md) | Remaining taskless database and write-back proposals. Shared data discovery and authoring now belong to workflow v2. | Redesign shipped; overlapping proposals superseded, 2026-09-13. |
@@ -28,7 +28,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [compiled-tier.md](./compiled-tier.md) | Which compiled plugin moves to the loaded tier next and what blocks it. | Standing map. Three of its four couplings dissolved when the remote component tree shipped. |
 | [integration-ideas.md](./integration-ideas.md) | The catalogue of integrations a workspace could hold, and the four shapes they collapse into. | Research notes. |
 | [kimi.md](./kimi.md) | Kimi Code CLI as a contributed tier 1 harness: the manifest, the four declarations to get right, and the Kimi usage API research behind the optional probes. | Proposal, 2026-09-18. Not started. |
-| [message.md](./message.md) | Agent-to-agent messaging for delegated sessions: what six reference apps do, and what is left after reports to the owner shipped. | Reports, the role note, and sender labels shipped 2026-09-24; the blocked-request wake and the children row remain. |
+| [message.md](./message.md) | Delivery record for delegated-session messaging, with reference-app research and the optional queued-report merge. | Owner reports, blocked-request wakes, and live child rows shipped by 2026-09-26; merging awaits evidence of noise. |
 | [pluginsearch.md](./pluginsearch.md) | Search within Linear, Rollbar, and GitHub lists beyond the loaded rows while retaining project mappings and state. | Proposal, 2026-09-24. Not started. |
 | [remote.md](./remote.md) | Web client, mobile PWA, and a relay service. | Preparation items shipped; the rest waits on a web client. |
 | [scoll_fix.md](./scoll_fix.md) | Agent transcript scroll and focus repair: retained view state, stable row identity, consumable navigation intent, and cross-session regression coverage. | Implementation proposal, 2026-09-14. Reading position, row identity and reveal intent shipped; filter and disclosure state not built. |
@@ -49,15 +49,47 @@ rung-2 containment is recorded in `blockers.md` and sandbox's
 
 ## Retired folders
 
-`phased-review-steps/`, `user-extensions/`, `node-first/`, `acp/`, `tauri/`, `events/` and the later
+`phased-review-steps/`, `user-extensions/`, `node-first/`, `node/`, `acp/`, `tauri/`, `events/` and the later
 `events.md` follow-up (shipped on 2026-09-11), `layout/`, `structure/`,
 `structure-followup/`, `before-terminal-ui/`, `terminal/`, `terminal-updates/`, `terminal-rewrite/`,
-`notifications/`, and
+`notifications/`, `git-inspired/`, and
 the single files `live-qa.md`, `dx.md`, `web_search_run.md`, and `rail-tab.md` are in git history. The
 rail component and compiled marker contract live in [ui-design.md](../ui-design.md), and loaded task
 annotations live in
 [Cooperative extension points](../plugins/cooperative-extension-points.md#task-annotations). Each ended by saying
 where its behaviour moved.
+
+`node/` shipped on 2026-09-26. [Architecture overview](../architecture-overview.md) owns the
+runtime-to-client data flow; [plugin activation](../plugins/activation.md) owns active versus installed
+identity, per-Node selection, trust transitions, and availability; [descriptors](../plugins/descriptors.md)
+and [shell](../shell.md) own per-tree bridge authority; [security](../security.md) and
+[caching](../caching.md) own exact-hash custody; [testing](../testing.md) retains the multi-node and
+multi-tree manual checks. The proposal's global winner terminology was replaced with selection from
+each Node's running identity. No persisted trust, cache, layout, or plugin state was cleared.
+
+`git-inspired/` was six phases of bounded large-surface rendering, after GitHub's 2026 account of
+rendering a 2,200-file, million-line pull request: complete GitHub topology, segmented diff
+documents, dynamic-block geometry, a resident segment cache, and bounded timelines. Shipped and
+deleted 2026-09-27 on branch `large-render`. [diff-rendering.md](../diff-rendering.md) owns the
+viewer: § The document, § The source port, § Data flow, § Parsing and highlighting, § Resident
+segments, § Row geometry, and § What large-surface rendering refuses, which holds the eighteen
+decisions. [github-integration.md](../github-integration.md) § Pull request detail and files has the
+full walk, the stage-then-swap, the 3,000-file and 300-file ceilings, and the unconfirmed 250-commit
+cap; § Diff documents has the descriptor blobs, the two repository routes, and the node-wide digest
+limit; § Conversation has turn identity, near-viewport bodies, and snippets.
+[client-surfaces.md](../managed-agents/client-surfaces.md) has the transcript's fixed window, why it
+shipped, its three refusals including `content-visibility`, and its known limits.
+[caching.md](../caching.md) has the digest-keyed blobs, the unpruned cache, and the resident cache;
+[telemetry.md](../telemetry.md) § Rendered-surface health has the probes;
+[state-ownership.md](../state-ownership.md) has the reading places and the per-node cache;
+[api-reference.md](../api-reference.md) and [data-layer.md](../data-layer.md) have the routes and the
+mirror columns; [package-shape.md](../plugins/package-shape.md) § The plugin API and
+[plugin-authoring.md](../plugin-authoring.md) § Drawing a diff have plugin API major 2; and
+[tui/interaction.md](../tui/interaction.md) has the terminal's diff pane. The fixture and the flow are
+[testing.md](../testing.md) § Large-surface fixture and
+[local-development.md](../local-development.md) § Large-surface flow. Smoke items 81 to 85 in
+[testing.md](../testing.md) are the real-window acceptance it still owes: none has run on a visible
+WebKit window.
 
 `web_search_run.md` made a managed transcript show what an agent searched for, which pages it opened,
 and which sources came back, the same way whichever harness ran it. Shipped and deleted 2026-09-15.

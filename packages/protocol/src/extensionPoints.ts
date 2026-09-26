@@ -314,7 +314,7 @@ export const CORE_TASK_KEY = ['task'] as const
  *
  * One member, and it stays one until a second surface has both a reason and a fallback worth writing.
  */
-export const CORE_EXCLUSIVE_SLOTS = ['rail.taskList'] as const
+export const CORE_EXCLUSIVE_SLOTS = ['rail.taskList', 'pane.switcher', 'rail', 'topbar'] as const
 
 export type CoreExclusiveSlot = (typeof CORE_EXCLUSIVE_SLOTS)[number]
 

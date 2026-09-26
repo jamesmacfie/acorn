@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, Index, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Index, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { Project, Workspace } from '@acorn/protocol/api.ts'
@@ -6,7 +6,7 @@ import { PROJECT_COLORS, resolveProjectColor } from '@acorn/protocol/projectColo
 import { projectsKey, projectsOptions, tasksKey, tasksOptions, workspacesKey, workspacesOptions } from '../../infra/queries'
 import { createProject, createWorkspace, deleteProject, deleteWorkspace, patchProject, renameWorkspace } from './workspaceMutations'
 import { canPickFolder, pickFolder } from '../../infra/platform'
-import { projectImporterRegistry } from '../../host/registries/sources/projectImporters'
+import { projectImporterContributions } from '../../host/registries/sources/projectImporters'
 import { Alert, Button, Input, Select } from '../../kit/components/primitives'
 import { IconButton } from '../../kit/components/inputs/IconButton'
 import Icon from '../../kit/components/content/Icon'
@@ -54,8 +54,13 @@ export default function WorkspaceProjectAssignments() {
   const [movingToNew, setMovingToNew] = createSignal<Project | null>(null)
   const importer = () => {
     const id = activeImporter()
-    return id ? projectImporterRegistry.get(id) : undefined
+    return id ? projectImporterContributions().find((entry) => entry.id === id) : undefined
   }
+  createEffect(() => {
+    if (!activeImporter() || importer()) return
+    setActiveImporter(null)
+    setError('This importer is no longer available on this node.')
+  })
 
   const refresh = () => Promise.all([
     qc.invalidateQueries({ queryKey: projectsKey }),
@@ -156,7 +161,7 @@ export default function WorkspaceProjectAssignments() {
           <Show when={canPickFolder()}>
             <Button onPress={() => void addFolder()}>Add folder…</Button>
           </Show>
-          <For each={projectImporterRegistry.entries()}>
+          <For each={projectImporterContributions()}>
             {/* Through Icon, not raw text: an importer's glyph is an icon name like every other
                 registry's, so a Lucide name or a `brand:` mark both resolve here. */}
             {(entry) => (

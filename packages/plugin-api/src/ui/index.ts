@@ -109,6 +109,10 @@ export { Heading } from '@acorn/client-core/kit/components/content'
 export { Section } from '@acorn/client-core/kit/components/layout'
 export { Timeline, type TimelineControls } from '@acorn/client-core/kit/components/content'
 export type { ReadingPlace } from '@acorn/client-core/kit/lib'
+// Which of a long timeline's turns to draw: the newest page, and more on "Show earlier". A rule, not a
+// rendering, so both hosts share it (docs/managed-agents/client-surfaces.md § Client surfaces).
+export { createTimelineWindow } from '@acorn/client-core/kit/lib'
+export type { TimelineWindow } from '@acorn/client-core/kit/lib'
 export { Facts } from '@acorn/client-core/kit/components/content'
 export { ChipRow } from '@acorn/client-core/kit/components/layout'
 export { Log } from '@acorn/client-core/kit/components/content'

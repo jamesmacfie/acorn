@@ -478,9 +478,12 @@ two stops is not a place the keys can be.
 
 The diff pane is the third shape, and it is a viewport with a window inside it. `DiffPane` in
 `apps/tui/src/kit/showing.tsx` used to build one `<text>` per line of every file, which for a
-five-thousand-line patch is five thousand renderables in a pane that shows twenty. It keeps its rows
-as one flat list — a file's header is a row in it, so an anchor is an index — and draws the slice
-around the viewport's offset with a box above and below standing in for the rest. The spacers are
+five-thousand-line patch is five thousand renderables in a pane that shows twenty. It draws from the
+same diff document the DOM viewer does ([diff rendering](../diff-rendering.md) § The document): a
+file's header is one line and each segment is as many lines as its descriptor says, so the slice
+around the viewport's offset is found without any row existing, and only the segments that slice
+reaches are asked for, once each. A line whose segment has not arrived reads `loading…`. A box above
+and below stands in for the rest. The spacers are
 what keep it a `ScrollViewport`: the scrollbox still owns the offset, the bar, the wheel and the
 page keys, and it is still the focus stop a document with no controls needs. The offset reaches the
 window two ways, because the viewport raises an event for one of them and not the other: its own key
@@ -489,7 +492,9 @@ viewport, because a wheel step runs each node's own handler from the node under 
 — so a listener above the viewport sees the scroll after the viewport has already moved its offset,
 and one on the viewport itself would see it before (`apps/tui/src/tree/hit.ts`). The known ceiling
 is that a spacer is one line per row and an annotated row draws two, so the content is as many lines
-taller than the model as there are marked rows inside the window.
+taller than the model as there are marked rows inside the window. Loaded rows are keyed by path as
+well as content key, so two files with the same patch each keep their own path for annotations and
+the grammar, and leaving the pane aborts the segment loads still in flight.
 
 Virtual `Rows` deliberately do not sit inside that mechanism: they render only their visible slice,
 so there is no offscreen child for a scroll viewport to move. Their own `top` offset handles wheel

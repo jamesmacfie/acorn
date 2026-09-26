@@ -36,9 +36,11 @@ pane, for the same reason: rail, pane strip, the pane's own regions, and back. A
 pane rather than replacing it, so opening the palette does not tear down the pane's queries and its
 model.
 
-The rail's task list goes through the same `rail.taskList` exclusive slot the desktop's does, so a
-plugin that offers to replace it replaces it on both hosts. The topbar and the pane strip are bespoke
-on both until `docs/future/client-plugins/04-replaceable-surfaces.md` gives them contracts.
+The desktop topbar, left rail, pane switcher, and rail task list each have a core provider in an
+exclusive slot. A selected plugin provider can draw one of these surfaces using the host's data and
+verbs. The rail provider places the host's task-list slot; the topbar provider places the host's
+right-side status slot. Settings warns when a provider declares that it omits either placement.
+The terminal currently hosts `rail.taskList`; its own chrome stays native to cells.
 
 The topbar spans the window. The rails and the panes all begin under its bottom border, so that
 border is one unbroken line across the app: the left TabRail is the first thing in `.shell-body`, the
@@ -704,6 +706,19 @@ The DOM `Fold` mounts its body on first open and retains it thereafter. Native `
 only hides an already-rendered body; deferring that first mount avoids building hidden transcripts
 and code blocks while preserving child state on subsequent toggles.
 
+`Timeline` draws whatever turns its caller hands it and keeps the reader's place by turn identity.
+A caller with a long list draws part of it through `createTimelineWindow` and passes the window to
+the Timeline: `hidden` (older turns not drawn, which puts **Show earlier (N)** above the first turn),
+`onShowEarlier`, `reveal` (asked before a hidden reading place is swapped for a neighbour), and
+`onTrim` (called while following the live end, never past a turn holding the selection or focus).
+`Timeline.Turn` takes a stable `key`, and `position` and `setSize` for `aria-posinset` and
+`aria-setsize`, so a screen reader hears a turn's place in the whole list. Its child may be a function
+of `near`, which turns true once the turn comes within a screen of the viewport and stays true; a
+caller builds an expensive body there and a summary until then. `reveal` returns a value, so it only
+works for a caller in the host's realm, not across a sandboxed tree. Timeline turns are not given CSS
+containment (`content-visibility`): paint containment would clip a card's focus ring at the turn's
+edge, and no real-WebKit run has accepted it.
+
 | Node | Focus | At 80×24 |
 | --- | --- | --- |
 | `Stack` | none | children on successive lines, `gap` as 0 or 1 blank lines. `grow` means the stack is the region rather than a run of content in one: it takes what is left of the box, so a scroller or a canvas inside it has a height to work against |
@@ -711,7 +726,7 @@ and code blocks while preserving child state on subsequent toggles.
 | `Section` | conditional | label in grey uppercase, children below |
 | `Fold` | stop | `▸ label` or `▾ label`, children indented two cells |
 | `Card` | conditional | a box-drawing frame, or a blank line above and below in compact density |
-| `Timeline` | collection | cards in sequence, a grey rule between turns. `follow` makes it the scroller and holds it on the last turn until the reader scrolls away, which is what leaves a pane's header and composer pinned around it; without `follow` it is a plain column and whatever is around it scrolls. `place` and `onChange` are dropped, and `Timeline.Turn` ignores its `key`: the reader is not put back on the turn they left, because a viewport here knows its own offset and nothing about where each turn sits, so a redrawn list opens at the newest turn. `Timeline.Turn` is a node of its own on both hosts |
+| `Timeline` | collection | cards in sequence, a grey rule between turns. `follow` makes it the scroller and holds it on the last turn until the reader scrolls away, which is what leaves a pane's header and composer pinned around it; without `follow` it is a plain column and whatever is around it scrolls. `place` and `onChange` are dropped, and `Timeline.Turn` ignores its `key`: the reader is not put back on the turn they left, because a viewport here knows its own offset and nothing about where each turn sits, so a redrawn list opens at the newest turn. `hidden` draws the same **Show earlier** button above the turns, `reveal` and `onTrim` are ignored, and a `near` child is told it is near at once. `Timeline.Turn` is a node of its own on both hosts |
 | `Tabs` | collection | `Tab  [Tab]  Tab` on one line, the selected one in brackets. A tab's `icon` becomes the glyph in front of its label, and drops out where the name has no glyph; its `title` has nowhere to hover |
 | `Toolbar` | none | children on one line where they fit and wrapped onto the next where they do not, because a bar written for a window is drawn here in a pane column and a row that shrinks its children cuts their labels to nothing |
 | `Modal` | trap | a centred box with its title; Escape dismisses, which `keys/keys.test.tsx` drives. `Modal.Body` and `Modal.Actions` answer to their flat spellings too, on both hosts |

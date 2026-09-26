@@ -53,6 +53,8 @@ afterEach(() => {
 })
 
 describe('the frame histogram', () => {
+  // The first full-shell render also primes loaded plugin trees. Under the bounded workspace suite
+  // it can take longer than Vitest's five-second unit-test default before TASK is painted.
   it('reports one series per phase and a total, from the shell drawing itself', async () => {
     const screen = await renderFixture({ pane: 'notes', ...withTelemetry })
     await screen.until('TASK')
@@ -75,7 +77,7 @@ describe('the frame histogram', () => {
     const total = frames.find((metric) => metric.attrs.phase === 'total')!
     const layout = frames.find((metric) => metric.attrs.phase === 'layout')!
     expect((total.value as { count: number }).count).toBe((layout.value as { count: number }).count)
-  })
+  }, 15_000)
 
   it('builds nothing at all with the switch off', async () => {
     const screen = await renderFixture({ pane: 'notes' })

@@ -105,6 +105,55 @@ Working on a loaded plugin is `pnpm dev:plugin <id>` beside one of those. It reb
 package on every save. [plugins.md](./plugins.md) § The dev loop has the whole loop, including which
 target to build into and why the node restarts.
 
+### Large-surface flow
+
+The large-surface fixture puts a very large diff and a long agent transcript in front of the real
+window without GitHub ([testing.md](./testing.md) § Large-surface fixture):
+
+```sh
+pnpm dev:agent -- --session large-surfaces --fixture large-surfaces --profile scale
+pnpm dev:agent:ui -- --session large-surfaces flow large-surfaces
+pnpm dev:agent:ui -- --session large-surfaces stop
+```
+
+`--fixture large-surfaces` replaces the checkout as the project. The launcher generates a Git
+repository under the session directory at `fixture/repo`, commits the base side of every file, and
+leaves the head side in the working tree. It then adds that repository as the project, adds a task
+that runs in the project folder, and writes the review notes and a stopped agent session into the
+Changes and Agents databases through their testkits (`apps/desktop/scripts/agent/seed.ts`).
+`--profile` is `small` (the default), `scale`, or `canonical`, and `--seed` picks the data (default
+1). The manifest's `fixture` block records the profile, seed, digest, counts, and the task and session
+IDs. `--reuse` keeps a session's fixture rather than generating it again. A fixture brings its own
+project, so it refuses `--project`, `--onboarding`, and `--smoke`.
+
+`flow NAME` runs the file of that name in `apps/desktop/scripts/agent/flows/`. The `large-surfaces`
+flow opens the task's Changes pane cold and sweeps the diff from top to bottom and back. It opens a
+comment composer and deletes a note, resizes the window, collapses the file list and a file,
+switches to split and back, and jumps to a file. Then it leaves and returns, opens the transcript,
+checks it mounted no more than 400 turns, presses **Show earlier** once and checks again, jumps to
+its oldest and newest turns, and leaves the task. The transcript counts as mounted when every turn
+is drawn or hidden behind **Show earlier**. After each stage it reads the
+rendered-surface health snapshot ([telemetry.md](./telemetry.md) § Rendered-surface health). It
+waits on health conditions and animation frames, not fixed sleeps.
+
+A flow file is data. Each step is one action from a fixed list (`click`, `fill`, `wait`, `scroll`,
+`resize`, `frames`, `checkpoint`, `assert`, `repeat`). It targets controls by role and accessible
+name, and names its wait conditions and invariants. A field the runner does not know is refused, so a
+flow cannot carry a script. `repeat` is capped at 20 and cannot nest.
+`apps/desktop/scripts/agent/flow.mjs` owns the list.
+
+The report is written to `reports/` in the session directory as JSON, named for the flow, the
+profile, and the start time, and a short summary is printed. The report holds the environment (OS,
+CPU, memory, engine user agent, build), the fixture, each stage's waits in milliseconds, each
+checkpoint's snapshot, every invariant with the numbers it was decided on, and the `acorn:` spans on
+the performance timeline. The command exits non-zero when an invariant failed, after the whole flow
+has run and the report is saved.
+
+The window must stay visible for the whole run, for the reason in
+[Timing a task switch](#timing-a-task-switch): a covered window runs no animation frames, so the diff
+never draws. The runner checks `document.visibilityState` first and stops with that explanation
+rather than timing out.
+
 ## Native ABI
 
 `node-pty` is the only native module. SQLite is the runtime's own `node:sqlite`

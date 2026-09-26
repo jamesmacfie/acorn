@@ -206,6 +206,50 @@ Settings → Plugins uses that to show neither update nor uninstall on a bundled
 ever error, and the checkbox already covers "stop running this" without the tombstone that uninstall
 leaves behind.
 
+### Running identity, distribution, and availability
+
+The roster distinguishes the `installed` disk candidate from `active`, the immutable declaration
+captured when this Node's loaded runtime started. `active` includes its version, permissions,
+contributions, API version, activation kind, and client hash. Installing, updating, or uninstalling a
+package changes disk state; it does not silently change the running node half. A successful live reload
+commits a new active identity only after the replacement initializes. A failed reload retains the old
+one. The Node keeps active bundle bytes separately from the package directory and serves
+`GET /v1/core/plugins/:id/bundles/:hash` for that identity, including after an on-disk update or
+uninstall. A client-only package can replace its active identity without a Node restart because it
+has no node half to swap.
+
+The client holds one distribution snapshot for the fleet. Each Node's last valid roster is an
+observation with freshness and reachability. Source-aware plugin events re-read only their Node;
+arrival, reconnect, switch, and unpair also reconcile. Reads and trust refreshes run in a serial
+queue, and a response from an unpaired Node cannot restore its authority. An unreadable Node keeps a
+stale observation for explanation, but contributes no live UI. There is no fleet-wide version winner:
+the active Node's registrations come from its own running identity. An installed update is an offer to
+cache and review, not a replacement for that selection.
+
+A compatible device-held bundle takes precedence for its plugin ID in the client registries, even
+when the active Node reports a newer version. Disabling or withholding trust from that device bundle
+withdraws its contributions; it does not expose the Node bundle under the same ID. Node runtime
+observations remain intact for service availability and Settings.
+
+Device custody hashes the bytes it receives and stores decisions for exact `(pluginId, hash)` pairs.
+Caching alone grants nothing. A pending or rejected update leaves an accepted older runtime visible
+while that runtime still runs. When the Node commits unaccepted bytes, its loaded UI is withheld until
+acceptance. Trust writes complete before registration changes; revoking an exact acceptance or ending
+a development grant withdraws affected registrations and stops their workers immediately. Dismissing
+a prompt makes no durable decision; Settings → Plugins can show the pending offer. Reconsidering a
+rejection removes that exact recorded decision so the offer can be reviewed again.
+
+The same snapshot exposes structured reasons for withheld UI: unknown or unreachable Node, absent,
+disabled or failed runtime, waiting for restart, missing bundle, incompatible API, declaration
+conflict, pending trust, or rejection. Loaded panes, settings, importers (including one already open),
+footer slots, commands, and other declarations use those reasons and the current Node's selection.
+Compiled contributions with a `{ plugin: id }` requirement check that Node's running service; a
+saved disable that still awaits restart does not make a running compiled service disappear.
+
+Older Nodes omit `active`. The client accepts an old roster row only when `running` and its installed
+declaration coherently describe an active package; pending, failed, or disabled rows are withheld.
+The optional field preserves old query-cache responses without clearing per-Node caches.
+
 ## The dev loop
 
 Seeing a change to a loaded plugin run used to be four steps and a page of host knowledge: rebuild by
@@ -272,9 +316,8 @@ Four properties, all deliberate:
   What candidate-then-commit protects is `init` *throwing*, which is the failure a dev loop produces.
 
 The client half is one event and no new machinery. The node broadcasts a content-free `plugins:changed`
-frame; the shell re-reads the roster, re-resolves which bundle wins per plugin id — the one place the
-once-per-session pin is deliberately dropped — and re-runs both contribution passes, which already
-dispose-then-register. Trust is not bypassed: consent is keyed to a hash, so a plugin whose winning hash
+frame; the shell re-reads that Node's roster and re-runs both contribution passes, which already
+dispose-then-register. Trust is not bypassed: consent is keyed to a hash, so a plugin whose active hash
 moved to bytes this device has never accepted comes back untrusted, its code-bearing surfaces are
 withheld, and the distribution pass queues the usual prompt. A plugin frame is an iframe whose ORIGIN is
 its bundle hash, so a new hash is a new origin and a new document with nothing carried over.
@@ -379,13 +422,12 @@ and the device stores a **dev trust grant**.
 The grant lives in the device's existing trust file (`packages/custody/src/plugins/pluginTrustStore.ts`),
 beside the acknowledgements, as `{ pluginId, nodeId, path?, grantedAt }`. It is keyed on the **pair**.
 The design note says "per (pluginId, device)" and the device half is the file itself; the node half is an
-addition, because fleet resolution picks the highest version across every paired node and a grant keyed on
-the name alone would auto-trust a bundle a *different* node started serving under it.
+addition because a grant keyed only on the name would auto-trust a bundle a *different* node offered.
 
 What it does: when the helper caches a bundle for a plugin under grant, it records an ordinary accepted
 acknowledgement for those bytes right there — beside the hash it computed itself, in the process that
 holds the grant. The renderer therefore never queues a prompt, and nothing about eligibility changes:
-`bundleAccepted` and `eligiblePlugins().trusted` see an acceptance and behave exactly as they would for
+`bundleAccepted` and the active Node's selection see an acceptance and behave exactly as they would for
 one the owner clicked. A dev-written row is marked `dev: true` (so revocation can find it) and
 `partial: true` (nobody read a disclosure, so it must never become the baseline of a later "what changed"
 diff).
@@ -444,6 +486,9 @@ A loaded plugin's UI is not registered by its own code. The Node hands each devi
 manifest and the hash of its client bundle in the roster (`GET /v1/core/plugins`); the device
 decides what to render from that, and the plugin's JavaScript never touches a shell registry.
 
+A device may also install a client-only package itself. Its manifest and bundle come from the device
+cache instead of a Node roster, but the same contribution registration and sandbox paths handle both.
+
 Five kinds of contribution come out of that one manifest, and each has its own section below:
 frames, remote trees, document surfaces, webviews, and descriptors. The wire format behind the
 second one is in [The tree contract](descriptors.md#the-tree-contract).
@@ -451,7 +496,31 @@ second one is in [The tree contract](descriptors.md#the-tree-contract).
 **When the device asks.** Every host draws before the node it just started is up, so the pass that reads
 the fleet's rosters, caches the bundles and registers those contributions cannot run from a composition
 root: at that moment the fleet list is still empty and every node reads `offline`, and the pass asks
-nobody. `watchPluginChanges` (`host/plugins/reload.ts`) owns it instead, and runs it the first time each
-node becomes reachable — once per node, so a connection that flaps does not re-hash the fleet's bundles.
+nobody. `watchPluginChanges` (`host/plugins/reload.ts`) first reads cached device bundles without a
+Node request, then reads each node when it becomes reachable or reconnects.
 The same watcher then keeps it reconciled for the rest of the session, off the node's `plugins:changed`
 broadcast. Both hosts call it and neither runs a pass of its own.
+
+## Device-held plugins
+
+Settings → Plugins → On this device installs a GitHub release, npm package, HTTPS tarball, or local
+folder when the host has a folder picker. The helper resolves and validates the package, hashes its
+client bundle, and holds the manifest with that bundle. A folder is re-read on update; it pins no
+source bytes. Installation and update enter the ordinary per-hash trust prompt. The plugin appears
+after acceptance without restarting the application.
+
+A device package cannot declare a Node entry, migration, Node permission, or any contribution whose
+handler needs Node execution: routes, schedules, tools, context sections, providers, harnesses, task
+checks, audit actions, data sources, and discovery handlers. It also rejects descriptors that point at
+plugin-owned Node routes, including the `items` form of a rail source. A client-only source declares
+`tree: { list, detail }` with two remote-tree entries; the host mounts them in its browse layout. The
+helper rejects invalid packages before caching, and
+the client repeats the rule before registering contributions. Its code runs through the same sandboxed
+iframe or remote-tree worker as a Node-delivered bundle, never in the shell process.
+
+One active bundle exists per plugin ID. A compatible device bundle wins over any Node offer of that
+ID, even if the Node version is newer; version and hash order still choose among device candidates.
+Settings lists Nodes offering the same bundle. Device enablement and `plugin:<id>:*` state stay on the
+device. Removing a device plugin drops its cached bundle, preferences, and live contributions, and
+returns selected exclusive slots to core. Manual trust acknowledgements survive removal so reinstalling
+the same bytes does not ask again.

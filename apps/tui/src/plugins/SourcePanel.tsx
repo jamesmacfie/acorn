@@ -68,7 +68,7 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
     ({ projectId }) => chromeKey(props.pluginId, props.descriptor.id, projectId),
     (node, { projectId }, signal) => readRailItems(
       props.pluginId,
-      scopedSourceItemsPath(props.descriptor.items, projectId),
+      scopedSourceItemsPath(props.descriptor.items!, projectId),
       node,
       signal,
     ),

@@ -28,6 +28,14 @@ graph and loses its preloads.
 appearance. It selects a Node-aware cache scope and keys task content by Node/task identity so a
 switch disposes the previous task scope.
 
+The top bar, left rail, pane switcher, and task list are exclusive slots. Each has a registered core
+provider and may have plugin offers; the device preference selects one. `App.tsx` builds the topbar's
+serializable workspace, project, breadcrumb, and fleet data, while `TabRail.tsx` builds the rail's
+available source list and markers. Host verbs keep navigation, source ordering, rail collapse, and
+preference writes outside plugin code. The rail and topbar each lend one opaque nested slot reference:
+`rail.taskList` and `topbar.right`. A remote tree can place only the reference it was given; the child
+surface cannot open another nested slot.
+
 **Four folders under `packages/client-core/src`, and the order is the dependency order.** `kit/` is
 the design system: components, role tokens, the diff toolkit, the key primitives. Props in, DOM out,
 and an arch test holds it there, because `kit/` is what `@acorn/plugin-api/ui` re-exports. `infra/`

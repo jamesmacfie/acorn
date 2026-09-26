@@ -1,7 +1,7 @@
 import { performance } from 'node:perf_hooks'
 import { describe, expect, it } from 'vitest'
-import type { PullDetail, PullFile, Thread } from '../../shared/api'
-import { buildConversationEntries, buildThreadSnippetIndex, hasRenderableBody, reviewAction, threadSnippet, threadSnippetFromIndex } from './model'
+import type { PullDetail, Thread } from '../../shared/api'
+import { buildConversationEntries, hasRenderableBody, reviewAction } from './model'
 
 const baseDetail = (overrides: Partial<PullDetail> = {}): PullDetail => ({
   pull: null,
@@ -22,16 +22,6 @@ const thread = (id: string, path = 'src/app.ts', line = 2, side: 'LEFT' | 'RIGHT
   side,
   resolved: false,
   comments: [{ id: `${id}:c1`, databaseId: 1, author: 'octo', body: '<p>note</p>', createdAt: 30 }],
-})
-
-const file = (patch: string): PullFile => ({
-  path: 'src/app.ts',
-  status: 'modified',
-  additions: 1,
-  deletions: 1,
-  sha: 'sha',
-  viewed: false,
-  patch,
 })
 
 describe('pull detail model', () => {
@@ -66,20 +56,26 @@ describe('pull detail model', () => {
     expect(entries.map((entry) => entry.kind)).toEqual(['comment', 'review', 'commit', 'thread'])
   })
 
-  it('extracts thread snippets on the requested diff side', () => {
-    const patch = ['@@ -1,4 +1,4 @@', ' const a = 1', '-const oldName = a', '+const newName = a', ' export { a }'].join('\n')
+  it('keys every turn by its kind and id, whatever arrives, changes or ties around it', () => {
+    const review = { id: 'x1', author: 'a', state: 'APPROVED', body: null, submittedAt: 20 }
+    const comment = { id: 'x1', author: 'c', body: '<p>one</p>', createdAt: 20 }
+    const first = buildConversationEntries(baseDetail({ reviews: [review], comments: [comment], threads: [thread('t1')] }))
+    // The same id in two kinds is two turns, and a tie keeps the order the kinds are listed in.
+    expect(first.map((entry) => entry.key)).toEqual(['review:x1', 'comment:x1', 'thread:t1'])
 
-    expect(threadSnippet(thread('left', 'src/app.ts', 2, 'LEFT'), [file(patch)]).map((row) => row.kind)).toContain('delete')
-    expect(threadSnippet(thread('right', 'src/app.ts', 2, 'RIGHT'), [file(patch)]).map((row) => row.kind)).toContain('insert')
+    // An older comment arrives, a body changes, and a reply lands on the thread: every key holds.
+    const next = buildConversationEntries(baseDetail({
+      reviews: [review],
+      comments: [{ id: 'c0', author: 'd', body: '<p>early</p>', createdAt: 1 }, { ...comment, body: '<p>edited</p>' }],
+      threads: [{ ...thread('t1'), comments: [...thread('t1').comments, { id: 't1:c2', databaseId: 2, author: 'b', body: '<p>reply</p>', createdAt: 40 }] }],
+    }))
+    expect(next.map((entry) => entry.key)).toEqual(['comment:c0', 'review:x1', 'comment:x1', 'thread:t1'])
   })
 
-  it('serves multiple thread snippets from one parsed file index', () => {
-    const patch = ['@@ -1,6 +1,6 @@', ' const a = 1', '-const oldName = a', '+const newName = a', ' export { a }', '-oldTail()', '+newTail()'].join('\n')
-    const index = buildThreadSnippetIndex([file(patch)])
-
-    expect(index.get('src/app.ts')).toHaveLength(6)
-    expect(threadSnippetFromIndex(thread('right-name', 'src/app.ts', 2, 'RIGHT'), index).map((row) => row.kind)).toContain('insert')
-    expect(threadSnippetFromIndex(thread('right-tail', 'src/app.ts', 4, 'RIGHT'), index).map((row) => row.text)).toContain('newTail()')
+  it('numbers a provider id it sees twice rather than letting two turns share a key', () => {
+    const commit = { sha: 'abc', message: 'ship it', author: 'Ada', authorLogin: 'ada', committedAt: 5 }
+    const entries = buildConversationEntries(baseDetail({ commits: [commit, { ...commit, committedAt: 6 }] }))
+    expect(entries.map((entry) => entry.key)).toEqual(['commit:abc', 'commit:abc#2'])
   })
 
   it('keeps large conversation merging within the speed budget', () => {

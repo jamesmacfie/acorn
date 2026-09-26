@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { workspacesOptions } from '../../infra/queries'
 import { settingsContributions, settingsRegistry } from '../../host/registries/shell/settings'
@@ -11,12 +11,19 @@ import { Button } from '../../kit/components/primitives'
 export default function SettingsModal(props: { onClose: () => void; initialTab?: string }) {
   const workspaces = createQuery(() => workspacesOptions(true))
   const [tab, setTab] = createSignal(props.initialTab ?? 'workspaces')
+  const [pageStatus, setPageStatus] = createSignal('')
   const generalPages = () => settingsContributions().filter((page) => page.group === 'general')
   const workspacePage = () => settingsContributions().find((page) => page.group === 'workspace')
   const activeWorkspace = () => workspaces.data?.find((workspace) => workspace.id === tab())
   const activePage = createMemo(() => {
     if (activeWorkspace()) return workspacePage()
     return generalPages().find((page) => page.id === tab()) ?? generalPages()[0]
+  })
+  createEffect(() => {
+    const fallback = activePage()
+    if (!fallback || activeWorkspace() || workspaces.isLoading || tab() === fallback.id) return
+    setTab(fallback.id)
+    setPageStatus('The selected settings page is no longer available on this node.')
   })
   let dialog!: HTMLDivElement
   const dismiss = createDismissable({ onDismiss: () => props.onClose(), container: () => dialog })
@@ -61,6 +68,7 @@ export default function SettingsModal(props: { onClose: () => void; initialTab?:
 
         <div class="settings-pane">
           <Button variant="bare" onPress={props.onClose} title="Close" label="Close">✕</Button>
+          <Show when={pageStatus()}><p class="muted" role="status">{pageStatus()}</p></Show>
           <Show when={activePage()}>
             {(page) => (
               <ContributionBoundary contributionId={`settings:${page().id}`} owner={settingsRegistry.ownerOf(page().id)}>

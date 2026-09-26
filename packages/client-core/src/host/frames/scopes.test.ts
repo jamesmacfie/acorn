@@ -79,6 +79,7 @@ describe('the route table covers every core route', () => {
       api.coreDeviceRoute(ID),
       api.corePluginsRoute,
       api.corePluginBundleRoute(ID),
+      api.corePluginBundleByHashRoute(ID, 'a'.repeat(64)),
       api.corePluginInstallRoute,
       api.corePluginUpdateRoute(ID),
       api.corePluginReloadRoute(ID),

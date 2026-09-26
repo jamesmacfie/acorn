@@ -23,6 +23,10 @@ const litRuns = async (screen: { spans: () => Promise<{ text: string; fg: { r: n
     .filter((run) => run.text.trim() && run.fg.r < run.fg.g && (run.attributes & 1) === 1)
     .map((run) => run.text)
 
+/** What the pane asked the node to do, as distinct from what it read. The diff reads its segments
+ *  with a POST, because a batch of them is a body, so method alone no longer says "a write". */
+const posted = () => recordedRequests().filter((request) => request.method === 'POST' && !request.path.endsWith('/diff/segments'))
+
 describe('the pull request from the keyboard', () => {
   it('lands the keys on a control in the Details panel, and says which one has them', async () => {
     const screen = await renderFixture({ pane: 'pr', width: 100, height: 32 })
@@ -102,7 +106,7 @@ describe('the pull request from the keyboard', () => {
       // Escape leaves the field for the strip that owns the panel and sends nothing, which is how a
       // reader gets out of a composer without posting.
       await screen.press('ESCAPE')
-      expect(recordedRequests().filter((request) => request.method === 'POST')).toEqual([])
+      expect(posted()).toEqual([])
 
       // Back in, on the field, with the draft still in it.
       await screen.press('ARROW_DOWN')
@@ -111,7 +115,7 @@ describe('the pull request from the keyboard', () => {
       // Ctrl+Return is a chord only because the app asks the terminal for the kitty keyboard
       // protocol; without it a terminal sends one byte for Return either way (./main.tsx).
       await screen.press('RETURN', { ctrl: true })
-      expect(recordedRequests().filter((request) => request.method === 'POST')).toEqual([
+      expect(posted()).toEqual([
         { path: '/v1/p/github/repos/runn-fast/acorn/pulls/42/comments', method: 'POST' },
       ])
     } finally {

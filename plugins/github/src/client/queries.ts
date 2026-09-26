@@ -2,6 +2,7 @@
 // (../shared/api.ts) rather than in client-core, so the shell no longer carries a feature's read
 // layer.
 import { readJson, writeJson } from '@acorn/plugin-api/client'
+import type { DiffDocumentTopology, DiffSearchPage, DiffSearchRequest, DiffSegmentPayload, DiffSegmentRequest } from '@acorn/plugin-api/ui/diff'
 import {
   branchesKey,
   branchesRoute,
@@ -9,22 +10,22 @@ import {
   closedPullsRoute,
   compareKey,
   compareRoute,
+  diffSearchRoute,
+  diffSegmentsRoute,
   conflictsKey,
   conflictsRoute,
   fileBlobKey,
   fileBlobRoute,
-  filePatchKey,
-  filePatchRoute,
-  filePatchesRoute,
   fileSummariesKey,
   fileSummariesRoute,
-  filesKey,
   jobLogKey,
   jobLogRoute,
   mentionsKey,
   mentionsRoute,
   pinsKey,
   pinsRoute,
+  pullDiffKey,
+  pullDiffRoute,
   pullKey,
   pullRoute,
   pullsKey,
@@ -40,14 +41,16 @@ import {
   type Branch,
   type ClosedPullsPage,
   type Compare,
+  type DiffSearchBody,
+  type DiffSegmentsBody,
   type FileBlob,
   type JobLog,
   type Label,
   type Pull,
   type PullConflicts,
   type PullDetail,
-  type PullFile,
-  type PullFilesPatchRequest,
+  type PullDiffResponse,
+  type PullFilesResponse,
   type Repo,
   type RunJobs,
   type TaskPullRelationsResponse,
@@ -93,16 +96,18 @@ export const pullDetailOptions = (owner: string, repo: string, number: string, e
   queryFn: async ({ signal }: QueryContext): Promise<PullDetail> => readJson<PullDetail>(pullRoute(owner, repo, number), { signal }),
 })
 
+// The pull and its files from GitHub again. The files come back as the diff's document, which is
+// the only whole-file read left; the file list's summaries refetch from the refreshed mirror.
 export const forceRefreshPull = async (
   owner: string,
   repo: string,
   number: string,
-): Promise<{ detail: PullDetail; files: PullFile[] }> => {
-  const [detail, files] = await Promise.all([
+): Promise<{ detail: PullDetail; diff: PullDiffResponse }> => {
+  const [detail, diff] = await Promise.all([
     readJson<PullDetail>(`${pullRoute(owner, repo, number)}?force=true`),
-    readJson<PullFile[]>(`${pullRoute(owner, repo, number, 'files')}?force=true`),
+    readJson<PullDiffResponse>(`${pullDiffRoute(owner, repo, number)}?force=true`),
   ])
-  return { detail, files }
+  return { detail, diff }
 }
 
 export const repoLabelsOptions = (owner: string, repo: string, enabled: boolean) => ({
@@ -118,10 +123,11 @@ export const pinsOptions = (enabled: boolean) => ({
   queryFn: async ({ signal }: QueryContext): Promise<number[]> => readJson<number[]>(pinsRoute, { signal }),
 })
 
-export const filesOptions = (owner: string, repo: string, number: string, enabled: boolean) => ({
-  queryKey: filesKey(owner, repo, number),
+// The pull's files as the diff viewer's document: descriptors only, no patch text.
+export const pullDiffOptions = (owner: string, repo: string, number: string, enabled: boolean) => ({
+  queryKey: pullDiffKey(owner, repo, number),
   enabled,
-  queryFn: async ({ signal }: QueryContext): Promise<PullFile[]> => readJson<PullFile[]>(pullRoute(owner, repo, number, 'files'), { signal }),
+  queryFn: async ({ signal }: QueryContext): Promise<PullDiffResponse> => readJson<PullDiffResponse>(pullDiffRoute(owner, repo, number), { signal }),
 })
 
 export const pullConflictsOptions = (owner: string, repo: string, number: string, base: string, enabled: boolean) => ({
@@ -134,28 +140,38 @@ export const pullConflictsOptions = (owner: string, repo: string, number: string
 export const fileSummariesOptions = (owner: string, repo: string, number: string, enabled: boolean) => ({
   queryKey: fileSummariesKey(owner, repo, number),
   enabled,
-  queryFn: async ({ signal }: QueryContext): Promise<PullFile[]> => readJson<PullFile[]>(fileSummariesRoute(owner, repo, number), { signal }),
+  queryFn: async ({ signal }: QueryContext): Promise<PullFilesResponse> => readJson<PullFilesResponse>(fileSummariesRoute(owner, repo, number), { signal }),
 })
 
-export const filePatchOptions = (owner: string, repo: string, number: string, path: string) => ({
-  queryKey: filePatchKey(owner, repo, number, path),
-  queryFn: async ({ signal }: QueryContext): Promise<PullFile> => {
-    const [file] = await readJson<PullFile[]>(filePatchRoute(owner, repo, number, path), { signal })
-    if (!file) throw new Error('file_not_found')
-    return file
-  },
-})
-
-export const fetchFilePatches = (owner: string, repo: string, number: string, paths: string[], signal?: AbortSignal): Promise<PullFile[]> =>
-  writeJson<PullFile[]>(
-    filePatchesRoute(owner, repo, number),
+// A batch of a document's segments, by patch digest. The same route serves a pull's diff and a
+// compare preview's.
+export const fetchDiffSegments = (owner: string, repo: string, requests: DiffSegmentRequest[], signal?: AbortSignal): Promise<DiffSegmentPayload[]> =>
+  writeJson<DiffSegmentPayload[]>(
+    diffSegmentsRoute(owner, repo),
     {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ paths } satisfies PullFilesPatchRequest),
+      body: JSON.stringify({ requests } satisfies DiffSegmentsBody),
       signal,
     },
-    'files_patch_failed',
+    'diff_segments_failed',
+  )
+
+// One page of find matches over a document's files. The files ride along because a compare preview
+// has no mirror on the node to look them up in.
+export const searchDiff = (owner: string, repo: string, document: DiffDocumentTopology, request: DiffSearchRequest, signal?: AbortSignal): Promise<DiffSearchPage> =>
+  writeJson<DiffSearchPage>(
+    diffSearchRoute(owner, repo),
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        ...request,
+        files: document.files.flatMap((file) => (file.patchKey ? [{ path: file.path, patchKey: file.patchKey }] : [])),
+      } satisfies DiffSearchBody),
+      signal,
+    },
+    'diff_search_failed',
   )
 
 // Branch names for the create-PR pickers; enabled once the repo is known.

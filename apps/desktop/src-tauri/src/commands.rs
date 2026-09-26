@@ -18,6 +18,7 @@ use crate::helper::Helper;
 pub struct Shell {
     pub helper: Mutex<Option<Helper>>,
     pub data_dir: PathBuf,
+    pub user_data_dir: PathBuf,
     /// The renderer has answered the will-quit prompt, or something has decided not to ask.
     pub quit_approved: AtomicBool,
     /// A prompt is out with the renderer. Guards against a second Cmd-Q stacking another one.
@@ -249,6 +250,16 @@ pub fn reveal_data_folder(shell: State<'_, Shell>) {
         // to their data.
         let _ = tauri_plugin_opener::open_path(shell.data_dir.to_string_lossy().to_string(), None::<&str>);
     }
+}
+
+#[tauri::command]
+pub fn open_config_file(shell: State<'_, Shell>) -> Result<(), String> {
+    let path = shell.user_data_dir.join("acorn.json");
+    if !path.exists() {
+        std::fs::write(&path, "{}\n").map_err(|error| error.to_string())?;
+    }
+    tauri_plugin_opener::open_path(path.to_string_lossy().to_string(), None::<&str>)
+        .map_err(|error| error.to_string())
 }
 
 /// The recovery screen's Quit. Skips the will-quit round trip, because it is reachable only when
