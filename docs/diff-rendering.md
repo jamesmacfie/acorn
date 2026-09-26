@@ -319,7 +319,8 @@ loading or colouring, and replaces that claim on every range change. A held segm
 A batch is held from its request until the request ends, however it ends. A request that the reader
 scrolled away from is aborted and its claim dropped. A new revision keeps the old claim until the next
 range change replaces it, so rows that survive the revision are not evicted in between. Unmounting
-releases everything the pane held.
+releases everything the pane held. When two panes ask for the same segment at once, the entry that
+landed first stays, with any colour it has, because the rows are a pure function of the key.
 
 **Oversize.** If what panes hold is over a ceiling after an insert, nothing unheld is left and the
 cache counts an oversize insert. It keeps the held segments, however large, and the next change to a
@@ -460,13 +461,18 @@ shift+wheel.
 - Word-level spans are attached only to paired delete/insert runs, preserving unchanged text, and
   their comparison runs in `wordDiff.worker.ts`.
 - Gap rows reveal context from the new side the source reads by `fileText`. The revealed lines are
-  keyed by the content key of the segment the gap sat at the edge of, so a new revision of that file
-  leaves them behind by construction, and they are drawn as 64-row slices beside that segment so
+  keyed by the file's path and the content key of the segment the gap sat at the edge of, so a new
+  revision of that file leaves them behind by construction. The path is in the key because two files
+  with the same patch, such as one version bump in several manifests, share a content key, and they are drawn as 64-row slices beside that segment so
   opening a five-thousand-line gap mounts no more than any other part of the document.
 - Find (Cmd+F) asks the source for a page of matches across the whole document
-  (`features/diff/findController.ts`) and takes the reader to one by its segment and row. Only that
-  segment loads; the marks draw on whichever matched rows are mounted. The next page is fetched when
-  the reader steps past the last match, and a page with no matches but a cursor is read past at once. The query goes to the source and nowhere else.
+  (`features/diff/findController.ts`) and takes the reader to one by its segment and row. The row's
+  pixel is walked from the segment's loaded rows in the current projection, so split mode lands on
+  the band that holds the row, and is scaled from the descriptor before the rows load. Only that
+  segment loads; the marks draw on whichever matched rows are mounted, keyed by path as well as
+  segment. Only a change of match moves the reader. The next page is fetched when the reader steps
+  past the last match, and a page with no matches but a cursor is read past at once. The query goes
+  to the source and nowhere else.
 
 ## Review threads and state
 

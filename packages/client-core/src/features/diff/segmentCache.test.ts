@@ -110,10 +110,21 @@ describe('the segment cache', () => {
     expect(changed).toContain('a')
   })
 
+  it('keeps the entry it holds when the same segment arrives twice', () => {
+    const cache = createSegmentCache()
+    const first = rows(3)
+    put(cache, 'a', first)
+    expect(cache.enrich('a', first, coloured(first))).toBe(true)
+    put(cache, 'a', rows(3))
+    expect(cache.peek('a')?.plain).toBe(first)
+    expect(cache.peek('a')?.enriched).not.toBeNull()
+  })
+
   it('refuses colour built from rows it no longer holds', () => {
     const cache = createSegmentCache()
     const first = rows(3)
     put(cache, 'a', first)
+    cache.clear()
     put(cache, 'a', rows(3))
     expect(cache.enrich('a', first, coloured(first))).toBe(false)
     expect(cache.peek('a')?.enriched).toBeNull()

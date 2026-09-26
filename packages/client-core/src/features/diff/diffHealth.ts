@@ -3,6 +3,7 @@ import { registerSurfaceHealth, type SurfaceHealthReading } from '../../kit/lib/
 import { isCodeRow, type CodeRow, type DiffThread, type Row } from '../../kit/diff/diffModel'
 import type { DiffLayout } from './diffLayout'
 import type { DiffItem } from './documentView'
+import { residentKey } from './segmentCache'
 import type { SegmentLoader } from './segmentLoader'
 
 // The diff's health reading (docs/telemetry.md § Rendered-surface health). Everything here is read
@@ -90,7 +91,8 @@ export function createDiffHealth() {
     let ordinal = 0
     const positions = items.map((item) => (item.kind === 'segment' ? ordinal++ : ordinal))
     items.forEach((item, index) => {
-      if (item.kind === 'segment') segmentAt.set(item.segment.contentKey, positions[index]!)
+      // Keyed as the loader's queue is, so a queued segment finds its position.
+      if (item.kind === 'segment') segmentAt.set(residentKey(item.segment.contentKey, item.file.path, item.file.sha), positions[index]!)
     })
     for (const vi of inputs.layout.range()) {
       const item = items[vi.index]

@@ -17,6 +17,9 @@ export type SegmentRef = { file: DiffDocumentFile; ordinal: number; descriptor: 
 /** The context lines a gap revealed, and which edge of its segment the gap was on. A gap only ever
  *  sits at a segment's first row, or the bottom gap at its last (@acorn/diff-document § segmentRows). */
 export type GapOverlay = { edge: 'first' | 'last'; rows: CodeRow[] }
+/** Where a segment's revealed context is kept. The path is part of it because two files with the same
+ *  patch share a content key and still reveal different lines. */
+export const overlayKey = (path: string, contentKey: string) => `${path}\u0000${contentKey}`
 
 export type DiffItem =
   | { kind: 'file'; key: string; file: DiffDocumentFile }
@@ -67,7 +70,7 @@ export function createDocumentView(props: {
       file.segments.forEach((descriptor, ordinal) => {
         const contentKey = segmentContentKey(file.patchKey!, ordinal)
         const segment: SegmentRef = { file, ordinal, descriptor, contentKey }
-        const opened = overlays.get(contentKey) ?? []
+        const opened = overlays.get(overlayKey(file.path, contentKey)) ?? []
         const first = opened.find((overlay) => overlay.edge === 'first')
         const last = opened.find((overlay) => overlay.edge === 'last')
         const slices = (overlay: GapOverlay) => {

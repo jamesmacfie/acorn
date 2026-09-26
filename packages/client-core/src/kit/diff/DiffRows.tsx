@@ -248,11 +248,14 @@ function OpenLineButton(props: { row: CodeRow; onOpen?: (row: CodeRow) => void }
 
 function CodeContent(props: { r: CodeRow; highlight?: FindHighlight }) {
   const hl = () => (props.highlight && props.highlight.ranges.length ? props.highlight : null)
+  // One `.diff-code` for both branches. In split mode it is the element that scrolls sideways, and a
+  // row's word spans arrive after its plain text: a span per branch would be replaced when they land,
+  // back at column 0.
   return (
-    <Show
-      when={props.r.words}
-      fallback={
-        <span class="diff-code">
+    <span class="diff-code">
+      <Show
+        when={props.r.words}
+        fallback={
           <Show
             when={hl()}
             fallback={<For each={props.r.toks}>{(t) => <span style={{ '--l': t.light, '--r': t.dark }}>{t.content}</span>}</For>}
@@ -268,11 +271,9 @@ function CodeContent(props: { r: CodeRow; highlight?: FindHighlight }) {
               </For>
             )}
           </Show>
-        </span>
-      }
-    >
-      {(words) => (
-        <span class="diff-code">
+        }
+      >
+        {(words) => (
           <Show
             when={hl()}
             fallback={
@@ -294,9 +295,9 @@ function CodeContent(props: { r: CodeRow; highlight?: FindHighlight }) {
               </For>
             )}
           </Show>
-        </span>
-      )}
-    </Show>
+        )}
+      </Show>
+    </span>
   )
 }
 

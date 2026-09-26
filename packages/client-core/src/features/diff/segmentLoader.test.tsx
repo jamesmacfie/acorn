@@ -123,6 +123,18 @@ describe('the segment loader', () => {
     expect(tiny.cache.stats().segments).toBe(0)
   })
 
+  it('answers two files with the same patch as two segments', async () => {
+    const twin: DiffDocumentFile = { ...file, path: 'b.ts', sha: 'other' }
+    const twinRef: SegmentRef = { file: twin, ordinal: 0, descriptor: twin.segments[0]!, contentKey: ref(0).contentKey }
+    const roomy = createSegmentCache()
+    const { loader } = createRoot((dispose) => ({ dispose, loader: createSegmentLoader({ cache: roomy, load: async (requests) => answer(requests) }) }))
+    loader.demand([ref(0), twinRef], [])
+    await flush()
+    expect(loader.status(twinRef)).toBeUndefined()
+    expect(loader.rows(ref(0))?.[0]).toMatchObject({ path: 'a.ts' })
+    expect(loader.rows(twinRef)?.[0]).toMatchObject({ path: 'b.ts' })
+  })
+
   it('does not keep a fallback colour as final: its pane stops, and the next pane colours again', async () => {
     const roomy = createSegmentCache()
     const load = (requests: DiffSegmentRequest[]) => Promise.resolve(answer(requests))
