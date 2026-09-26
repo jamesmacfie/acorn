@@ -25,6 +25,9 @@ export const SEGMENT_MAX_BYTES = 32 * 1024
 export const MAX_SEGMENTS_PER_REQUEST = 32
 /** The most matches one search page carries. */
 export const SEARCH_PAGE_MATCHES = 500
+/** The most segments one search page reads, about 64,000 rows. A query that matches little answers a
+ *  short or empty page with a cursor, so no single request scans the whole of a large document. */
+export const SEARCH_PAGE_SEGMENTS = 1_000
 /** The longest query a search accepts. */
 export const SEARCH_MAX_QUERY = 256
 /** The most files one document, or one request listing a document's files, may hold. GitHub stops a

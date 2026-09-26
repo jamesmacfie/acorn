@@ -38,12 +38,18 @@ export function createDiffFindController(props: {
   }
   onCleanup(stop)
 
+  // A source reads a bounded stretch of the document per page, so a page can hold no matches and
+  // still say there is more. Keep reading until one holds a match or the document ends.
   const fetchPage = async (cursor: string | null): Promise<DiffSearchPage | null> => {
     controller?.abort()
     const current = new AbortController()
     controller = current
     try {
-      const page = await props.search({ query: findQuery(), caseSensitive: findCase(), cursor }, current.signal)
+      const request = { query: findQuery(), caseSensitive: findCase() }
+      let page = await props.search({ ...request, cursor }, current.signal)
+      while (!page.matches.length && page.nextCursor && !current.signal.aborted) {
+        page = await props.search({ ...request, cursor: page.nextCursor }, current.signal)
+      }
       return current.signal.aborted ? null : page
     } catch {
       // A failed search finds nothing; the bar says 0 and the reader can type again.

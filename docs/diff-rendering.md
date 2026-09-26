@@ -61,7 +61,10 @@ source reads the new side by.
 
 Find is a document operation too. `searchDocument` walks a document's code rows in order and answers
 a page of up to 500 matches by path, patch key, segment and row, with a cursor to the next page. It
-only reads as many files as the page needs.
+only reads as many files as the page needs, and at most 1,000 segments (`SEARCH_PAGE_SEGMENTS`), so a
+query that matches little answers a short or empty page with a cursor instead of scanning the whole
+document in one request. Ignoring case goes through a case-insensitive regular expression rather than
+lowercasing each line, because lowercasing can lengthen a line and shift the offsets after it.
 
 The limits a route enforces are in the same module: 32 segments per request, 5,000 files per
 document, a 256-character query.
@@ -463,7 +466,7 @@ shift+wheel.
 - Find (Cmd+F) asks the source for a page of matches across the whole document
   (`features/diff/findController.ts`) and takes the reader to one by its segment and row. Only that
   segment loads; the marks draw on whichever matched rows are mounted. The next page is fetched when
-  the reader steps past the last match. The query goes to the source and nowhere else.
+  the reader steps past the last match, and a page with no matches but a cursor is read past at once. The query goes to the source and nowhere else.
 
 ## Review threads and state
 

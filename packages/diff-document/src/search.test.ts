@@ -46,6 +46,31 @@ describe('searching a document', () => {
     expect(all).toEqual(whole!.matches)
   })
 
+  it('stops at its segment budget with a cursor, and the pages that follow find the rest', async () => {
+    const whole = await searchDocument(files, load, { query: 'needle', caseSensitive: false, cursor: null }, 1_000)
+    const all = []
+    let cursor: string | null = null
+    let pages = 0
+    do {
+      const page = await searchDocument(files, load, { query: 'needle', caseSensitive: false, cursor }, 1_000, 1)
+      all.push(...page!.matches)
+      cursor = page!.nextCursor
+      pages++
+    } while (cursor)
+    expect(pages).toBeGreaterThan(2)
+    expect(all).toEqual(whole!.matches)
+    // A query that matches nothing still answers after one budget, not the whole document.
+    const none = await searchDocument(files, load, { query: 'absent', caseSensitive: false, cursor: null }, 1_000, 1)
+    expect(none).toMatchObject({ matches: [] })
+    expect(none!.nextCursor).not.toBeNull()
+  })
+
+  it('reports offsets into the line itself when ignoring case changes its length', async () => {
+    const turkish = [{ path: 't.ts', patchKey: 'sha256:t', patch: '@@ -0,0 +1 @@\n+İİ needle' }]
+    const page = await searchDocument(turkish, async () => fileDocument('t.ts', turkish[0]!.patch).segments, { query: 'NEEDLE', caseSensitive: false, cursor: null })
+    expect(page?.matches.map((match) => [match.start, match.end])).toEqual([[3, 9]])
+  })
+
   it('refuses a cursor it did not write', async () => {
     expect(await searchDocument(files, load, { query: 'needle', caseSensitive: false, cursor: 'nonsense' })).toBeNull()
   })

@@ -1,4 +1,4 @@
-import { SEARCH_PAGE_MATCHES, type DiffSearchMatch, type DiffSearchPage, type DiffSearchRequest, type PlainDiffRow } from './model'
+import { SEARCH_PAGE_MATCHES, SEARCH_PAGE_SEGMENTS, type DiffSearchMatch, type DiffSearchPage, type DiffSearchRequest, type PlainDiffRow } from './model'
 
 // Find across a whole document without the renderer holding it. The provider runs this over the
 // segments it can produce and answers a page of matches by segment and row; the viewer loads only the
@@ -6,6 +6,9 @@ import { SEARCH_PAGE_MATCHES, type DiffSearchMatch, type DiffSearchPage, type Di
 //
 // Code rows only, the text a line shows, and occurrences in one line never overlap because the scan
 // steps past each hit. That is what the in-pane find always did over the rows it had.
+//
+// A page stops at its match limit or its segment budget, whichever comes first, so a page can be
+// empty and still carry a cursor. The caller keeps reading until it has matches or the cursor ends.
 
 /** Where the next page starts: a file's index in the request, then a segment, a row, and an offset
  *  into that row's text. */
@@ -34,12 +37,14 @@ export async function searchDocument(
   load: (file: FileRef & { patchKey: string }) => Promise<readonly (readonly PlainDiffRow[])[]>,
   request: DiffSearchRequest,
   limit = SEARCH_PAGE_MATCHES,
+  budget = SEARCH_PAGE_SEGMENTS,
 ): Promise<DiffSearchPage | null> {
   const from = decodeSearchCursor(request.cursor)
   if (!from) return null
   if (!request.query) return { matches: [], nextCursor: null }
-  const needle = request.caseSensitive ? request.query : request.query.toLowerCase()
+  const find = finder(request.query, request.caseSensitive)
   const matches: DiffSearchMatch[] = []
+  let read = 0
   for (let f = from.file; f < files.length; f++) {
     const file = files[f]!
     if (!file.patchKey) continue
@@ -47,24 +52,43 @@ export async function searchDocument(
     const segments = await load({ path: file.path, patchKey })
     const first = f === from.file
     for (let ordinal = first ? from.ordinal : 0; ordinal < segments.length; ordinal++) {
+      const resumed = first && ordinal === from.ordinal
+      if (read === budget) return { matches, nextCursor: encodeSearchCursor({ file: f, ordinal, row: resumed ? from.row : 0, offset: resumed ? from.offset : 0 }) }
+      read++
       const rows = segments[ordinal]!
-      const startRow = first && ordinal === from.ordinal ? from.row : 0
-      for (let row = startRow; row < rows.length; row++) {
+      for (let row = resumed ? from.row : 0; row < rows.length; row++) {
         const entry = rows[row]!
         if (entry.kind === 'hunk' || entry.kind === 'gap') continue
-        const hay = request.caseSensitive ? entry.raw : entry.raw.toLowerCase()
-        let at = first && ordinal === from.ordinal && row === from.row ? from.offset : 0
+        let at = resumed && row === from.row ? from.offset : 0
         for (;;) {
-          const hit = hay.indexOf(needle, at)
-          if (hit < 0) break
+          const hit = find(entry.raw, at)
+          if (!hit) break
           if (matches.length === limit) {
-            return { matches, nextCursor: encodeSearchCursor({ file: f, ordinal, row, offset: hit }) }
+            return { matches, nextCursor: encodeSearchCursor({ file: f, ordinal, row, offset: hit.start }) }
           }
-          matches.push({ path: file.path, patchKey, ordinal, row, start: hit, end: hit + needle.length })
-          at = hit + needle.length
+          matches.push({ path: file.path, patchKey, ordinal, row, start: hit.start, end: hit.end })
+          at = hit.end
         }
       }
     }
   }
   return { matches, nextCursor: null }
+}
+
+/** The next occurrence at or after `at`, as offsets into the line itself. Ignoring case goes through
+ *  a regular expression rather than lowercasing the line, because lowercasing can change a line's
+ *  length (`İ` becomes two characters) and move every offset after it. */
+function finder(query: string, caseSensitive: boolean): (text: string, at: number) => { start: number; end: number } | null {
+  if (caseSensitive) {
+    return (text, at) => {
+      const start = text.indexOf(query, at)
+      return start < 0 ? null : { start, end: start + query.length }
+    }
+  }
+  const pattern = new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'giu')
+  return (text, at) => {
+    pattern.lastIndex = at
+    const hit = pattern.exec(text)
+    return hit ? { start: hit.index, end: hit.index + hit[0].length } : null
+  }
 }
