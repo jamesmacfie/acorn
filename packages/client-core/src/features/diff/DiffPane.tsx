@@ -3,7 +3,7 @@ import { batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, 
 import { createStore, unwrap } from 'solid-js/store'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { segmentContentKey, type DiffDocumentTopology, type DiffSearchMatch } from '@acorn/diff-document/document'
-import { tokenizeDocument } from '../../infra/highlight/worker'
+import { highlightDocument, tokenizeDocument, type TokenizeDocument } from '../../infra/highlight/worker'
 import { diffWordsDocument } from '../../infra/highlight/wordDiffWorker'
 import { readDraft, writeDraft } from '../../kit/lib/draftState'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
@@ -135,7 +135,15 @@ export function DiffPane(props: {
       recordSample('core', 'diff.segments.requested', requests.length)
       return measure('core', 'diff.segments.load', () => source().loadSegments(requests, signal))
     },
-    enrich: (rows) => measure('core', 'diff.segments.enrich', () => enrichDiffRows(rows, tokenizeDocument, diffWordsDocument)),
+    enrich: (rows) => measure('core', 'diff.segments.enrich', async () => {
+      let timedOut = false
+      const tokenize: TokenizeDocument = async (path, code) => {
+        const result = await highlightDocument(path, code)
+        if (result.timedOut) timedOut = true
+        return result.lines
+      }
+      return { rows: await enrichDiffRows(rows, tokenize, diffWordsDocument), provisional: timedOut }
+    }),
     prepared: health.prepared,
     firstPlain: (outcome) => recordDuration('core', 'diff.first_plain', performance.now() - mountedAt, { cache: outcome }),
   })

@@ -36,10 +36,11 @@ const BATCH_SEGMENTS = Math.min(8, MAX_SEGMENTS_PER_REQUEST)
 export function createSegmentLoader(options: {
   cache: SegmentCache
   load: (requests: DiffSegmentRequest[], signal: AbortSignal) => Promise<DiffSegmentPayload[]>
-  /** Colour one segment's rows. Answers new rows, never rejects. Left out, nothing is coloured: a
-   *  caller drawing plain text must not record plain rows as a segment's colour, or the diff viewer
-   *  would find it already coloured. */
-  enrich?: (rows: readonly DiffRow[]) => Promise<DiffRow[]>
+  /** Colour one segment's rows. Answers new rows, never rejects, and says `provisional` when the
+   *  colour is a fallback worth trying again later. Left out, nothing is coloured: a caller drawing
+   *  plain text must not record plain rows as a segment's colour, or the diff viewer would find it
+   *  already coloured. */
+  enrich?: (rows: readonly DiffRow[]) => Promise<{ rows: DiffRow[]; provisional: boolean }>
   /** Time spent turning payloads into rows and applying colour, for the health reading. */
   prepared?: (ms: number) => void
   /** The first time this pane has plain rows on screen, and whether the cache already had them. */
@@ -69,6 +70,15 @@ export function createSegmentLoader(options: {
   let firstPainted = false
   /** Segments this pane loaded ahead of the reader and has not yet shown. */
   const unvisited = new Set<string>()
+  /** Segments this pane coloured and got only a fallback for. It does not try them again, so a
+   *  grammar that always times out costs one attempt a visit; a later pane tries once more. */
+  const fellBack = new Set<string>()
+  const owesColour = (ref: SegmentRef) => {
+    if (ref.descriptor.oversize) return false
+    const key = keyOf(ref)
+    const entry = cache.peek(key)
+    return !!entry && (!entry.enriched || (entry.provisional && !fellBack.has(key)))
+  }
 
   const bump = (key: string) => setVersions(key, (versions[key] ?? 0) + 1)
 
@@ -157,24 +167,22 @@ export function createSegmentLoader(options: {
   const enrichNext = () => {
     const { enrich } = options
     if (disposed || enriching || !enrich) return
-    const next = wanted.find((ref) => {
-      const entry = cache.peek(keyOf(ref))
-      return entry && !entry.enriched && !ref.descriptor.oversize
-    })
+    const next = wanted.find(owesColour)
     if (!next) return
     const key = keyOf(next)
     const from = cache.peek(key)!.plain
     enriching = key
     pin()
     const at = generation
-    void enrich(from).then((rows) => {
+    void enrich(from).then(({ rows, provisional }) => {
       if (disposed || at !== generation) return
       enriching = null
       const started = performance.now()
+      if (provisional) fellBack.add(key)
       // Kept only if the segment still holds the rows the colouring started from. Otherwise it was
       // evicted or replaced meanwhile, and this colouring belongs to nothing on screen.
       remember(key, rows)
-      if (cache.enrich(key, from, rows)) bump(key)
+      if (cache.enrich(key, from, rows, provisional)) bump(key)
       options.prepared?.(performance.now() - started)
       pin()
       enrichNext()
@@ -270,10 +278,7 @@ export function createSegmentLoader(options: {
       const queued = wanted
         .map(keyOf)
         .filter((key) => !cache.has(key) && !loading.has(key) && statuses[key] !== 'error')
-      const enrichment = wanted.filter((ref) => {
-        const entry = cache.peek(keyOf(ref))
-        return entry && !entry.enriched && !ref.descriptor.oversize
-      }).length
+      const enrichment = wanted.filter(owesColour).length
       for (const key of unvisited) if (!cache.has(key)) unvisited.delete(key)
       return { queued, loading: loading.size, enrichment, unvisited: unvisited.size, hits, misses, cache: cache.stats() }
     },

@@ -11,9 +11,10 @@ import { installDiffLayout } from './layout.helper'
 // has no layout, so the scroller is given a height and every other element a row's, which is enough
 // for the virtualizer to mount a window of rows; coverage by rect is the real window's to check.
 
-vi.mock('../../infra/highlight/worker', () => ({
-  tokenizeDocument: async (_path: string, code: string) => code.split('\n').map((line) => [{ content: line, light: '', dark: '' }]),
-}))
+vi.mock('../../infra/highlight/worker', () => {
+  const tokenizeDocument = async (_path: string, code: string) => code.split('\n').map((line) => [{ content: line, light: '', dark: '' }])
+  return { tokenizeDocument, highlightDocument: async (path: string, code: string) => ({ lines: await tokenizeDocument(path, code), timedOut: false }) }
+})
 
 const { DiffPane } = await import('./DiffPane')
 

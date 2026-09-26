@@ -20,14 +20,15 @@ import type { DiffSource } from './source'
 //
 // jsdom has no layout, so ./layout.helper.ts models one.
 
-const tokenizer = vi.hoisted(() => ({ calls: 0, hold: false, waiting: [] as (() => void)[] }))
-vi.mock('../../infra/highlight/worker', () => ({
-  tokenizeDocument: async (_path: string, code: string) => {
+const tokenizer = vi.hoisted(() => ({ calls: 0, hold: false, timedOut: false, waiting: [] as (() => void)[] }))
+vi.mock('../../infra/highlight/worker', () => {
+  const tokenizeDocument = async (_path: string, code: string) => {
     tokenizer.calls++
     if (tokenizer.hold) await new Promise<void>((resolve) => tokenizer.waiting.push(resolve))
     return code.split('\n').map((line) => [{ content: line, light: '#111', dark: '#eee' }])
-  },
-}))
+  }
+  return { tokenizeDocument, highlightDocument: async (path: string, code: string) => ({ lines: await tokenizeDocument(path, code), timedOut: tokenizer.timedOut }) }
+})
 
 const { DiffPane } = await import('./DiffPane')
 
@@ -41,6 +42,7 @@ afterEach(() => {
   cleanups.splice(0).reverse().forEach((dispose) => dispose())
   tokenizer.calls = 0
   tokenizer.hold = false
+  tokenizer.timedOut = false
   tokenizer.waiting.splice(0).forEach((resolve) => resolve())
   _resetSurfaceHealth()
 })
@@ -223,6 +225,30 @@ describe('resident segments', () => {
     // Anything it did ask for is beyond what it had held, never a segment it drew.
     const drawn = new Set([...again.querySelectorAll<HTMLElement>('.diff-item[data-kind="segment"]')].map((item) => item.dataset.key))
     expect(requests.filter((request) => drawn.has(`s:${request.path}:${request.ordinal}`))).toEqual([])
+  }, 20_000)
+
+  it('draws colour a timeout decided, and colours it again on the next visit', async () => {
+    const files = [...largeDiffFiles('small', 1)]
+    tokenizer.timedOut = true
+    const first = mount(largeDiffSource(files))
+    await vi.waitFor(() => expect(first.querySelector<HTMLElement>('.diff-item .diff-row .diff-code span')?.style.getPropertyValue('--l')).toBe('#111'), { timeout: 5_000 })
+    await settle()
+    // The pane that fell back does not try again while it is open.
+    const stalled = tokenizer.calls
+    await settle()
+    expect(tokenizer.calls).toBe(stalled)
+    first.unmount()
+
+    tokenizer.timedOut = false
+    const again = mount(largeDiffSource(files), first.client)
+    await vi.waitFor(() => expect(tokenizer.calls).toBeGreaterThan(stalled), { timeout: 5_000 })
+    await settle()
+    const cache = segmentCacheFor(again.client)
+    const coloured = largeDiffSource(files).topology()!.files.flatMap((file) => file.segments
+      .map((_, ordinal) => cache.peek(residentKey(segmentContentKey(file.patchKey!, ordinal), file.path, file.sha)))
+      .filter((entry) => entry?.enriched))
+    expect(coloured.length).toBeGreaterThan(0)
+    expect(coloured.every((entry) => entry!.provisional === false)).toBe(true)
   }, 20_000)
 
   it('shares nothing between two nodes', async () => {

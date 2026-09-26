@@ -296,7 +296,10 @@ persisted, so there is no separate enrichment version.
 
 **Plain rows and colour.** An entry holds its plain rows and, once colouring lands, its coloured
 rows beside them. `plainWeight` and `enrichmentWeight` weigh the two apart. A reader returning to a
-segment whose colour was evicted sees plain rows at once, and the loader colours it again.
+segment whose colour was evicted sees plain rows at once, and the loader colours it again. When the
+highlight worker timed out on a segment, its colour is the main thread's fallback and the entry marks
+it `provisional`. The pane that got it draws it and does not try again. The next pane to show the
+segment colours it once more, because a timeout can come from a busy worker rather than the code.
 
 **Budget.** Two ceilings, both counted over every entry: 40,000 rows (`SEGMENT_CACHE_ROWS`) and
 32 MiB of estimated bytes (`SEGMENT_CACHE_BYTES`). The byte estimate is a budget, not the engine's
