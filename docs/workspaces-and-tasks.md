@@ -150,6 +150,12 @@ it. A worktree that cannot be created is refused with `worktree-unavailable` rat
 to the main checkout. Either fallback hands the task another branch's files, which is the tree its
 agent then reads and edits.
 
+Read-only panes can treat an unavailable worktree as an empty root. Execution surfaces, including
+managed agents, use the core task service's `requireRoot` call so a missing project mapping and a Git
+worktree failure remain distinct errors. On macOS, the Node retries Git with the standalone Command
+Line Tools binary when Apple's selected Xcode Git refuses a command solely because its license has
+not been accepted.
+
 A new task branch starts from the branch checked out in the mapped project folder. Acorn runs
 `git worktree add -b` from that folder without an explicit start point, so Git uses the folder's
 current `HEAD`. Remote-tracking refs such as `origin/main` do not take precedence over local commits.

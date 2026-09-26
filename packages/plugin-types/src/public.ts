@@ -724,6 +724,9 @@ export type CoreTaskService = {
   /** The task's worktree root, creating it lazily. `null` when no checkout is mapped, the task is
    *  archiving, or it is not active. */
   root(taskId: string): Promise<string | null>
+  /** The worktree root for execution. Throws a distinct error for an inactive task, an unmapped
+   *  checkout, or a worktree failure instead of returning `null`. */
+  requireRoot(taskId: string): Promise<string>
   resolveCwd(
     task: TaskRef | undefined,
     baseCheckout: string | undefined,

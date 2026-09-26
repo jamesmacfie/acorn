@@ -367,8 +367,7 @@ export class ManagedAgentEngine {
       return existing
     }
     if (session.controller !== 'acorn') throw new Error(`Session input is controlled by ${session.controller}.`)
-    const cwd = await this.core.tasks.root(session.taskId)
-    if (!cwd) throw new Error('The task has no mapped checkout.')
+    const cwd = await this.core.tasks.requireRoot(session.taskId)
     const workspaceId = await this.core.tasks.workspaceId(session.taskId)
     const driver = this.registry.create(session.providerId)
     if (!driver) throw new Error(`Managed provider is not registered: ${session.providerId}`)
