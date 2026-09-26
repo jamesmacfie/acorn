@@ -11,7 +11,7 @@
 
 /** Bumped whenever parsing or segmenting would turn the same patch into different segments. It is
  *  part of every segment's content key, so a new version never serves an old cut. */
-export const DIFF_DOCUMENT_VERSION = 1
+export const DIFF_DOCUMENT_VERSION = 2
 
 /** A segment holds at most this many rows. Sized so that the viewport plus one segment of runway each
  *  way mounts a few hundred rows at most, which is the bound the health probe asserts. */

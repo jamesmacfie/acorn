@@ -122,7 +122,9 @@ The diff viewer reads a pull request as a document ([diff-rendering.md](./diff-r
 document), not as patches. When the files mirror writes a patch body, it also cuts the patch into
 segments with `@acorn/diff-document` and writes the segment descriptors as a small blob beside it,
 `diffdoc:v<version>:<patch digest>` (`plugins/github/src/server/routes/mirror/prDocument.ts`). Both
-blobs are written before the swap, so the swap still publishes a complete revision or nothing.
+blobs are written before the swap, so the swap still publishes a complete revision or nothing. A patch
+whose descriptor blob already exists is not cut again. The cut runs on the node's own thread, and a
+refresh of an unchanged pull request every 45 seconds would otherwise repeat it for every file.
 
 `GET /repos/:owner/:repo/pulls/:number/diff` is the document. It is served from the same files
 resource and the same refresh as the files route, reads the file rows in provider order and each

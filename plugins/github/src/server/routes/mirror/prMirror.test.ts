@@ -94,6 +94,13 @@ describe('files mirror', () => {
     expect(await fileRows()).toHaveLength(40)
   })
 
+  it('cuts an unchanged patch once, however often the pull refreshes', async () => {
+    const fetched = { files: [{ filename: 'src/app.ts', status: 'modified', additions: 1, deletions: 1, sha: 'head', patch: '@@ -1 +1 @@\n-a\n+b' }], completeness: COMPLETE }
+    await mirrorFiles(store, plugin.db, key, fetched)
+    await mirrorFiles(store, plugin.db, key, fetched)
+    expect(puts.filter((k) => k.startsWith('diffdoc:'))).toHaveLength(1)
+  })
+
   it('keys two different patches of the same head blob apart', async () => {
     const fetched = (patch: string) => ({
       files: [{ filename: 'src/app.ts', status: 'modified', additions: 1, deletions: 1, sha: 'same-head-blob', patch }],

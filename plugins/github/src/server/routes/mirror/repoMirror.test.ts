@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestDb, testSecretEnv, type TestDb } from '@acorn/plugin-api/testkit'
 import { Hono } from 'hono'
+import { DIFF_DOCUMENT_VERSION } from '@acorn/diff-document/document'
 import { settleBackground } from '@acorn/plugin-api/testkit'
 import { gh } from '../../githubApi'
 import type { PullDiffResponse } from '../../../shared/api'
@@ -319,7 +320,7 @@ describe('pull files stale-while-revalidate', () => {
       ['src/b.ts', 'sha256:b', 1],
     ])
     expect(JSON.stringify(body)).not.toContain('+a')
-    expect(blobPut).toHaveBeenCalledWith('diffdoc:v1:sha256:a', expect.any(String))
+    expect(blobPut).toHaveBeenCalledWith(`diffdoc:v${DIFF_DOCUMENT_VERSION}:sha256:a`, expect.any(String))
     expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100&page=1')
 
     resolveGh(

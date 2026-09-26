@@ -153,12 +153,18 @@ export function segmentRows(rows: readonly PlainDiffRow[], limits: SegmentLimits
       }
       if (current.length + 1 > limits.rows || currentBytes + size > limits.bytes) {
         let cut = current.length
+        let carriedBytes = 0
         if (!safeStart(unit, i)) {
-          // Walk back to where the run began, within the back half of this segment.
+          // Walk back to where the run began, within the back half of this segment, as long as the
+          // rows carried forward still leave room for this one.
           const offset = i - current.length
+          let back = 0
           for (let at = current.length - 1; at >= Math.ceil(current.length / 2); at--) {
+            back += sizes[offset + at]!
+            if (back + size > limits.bytes) break
             if (safeStart(unit, offset + at)) {
               cut = at
+              carriedBytes = back
               break
             }
           }
@@ -167,7 +173,7 @@ export function segmentRows(rows: readonly PlainDiffRow[], limits: SegmentLimits
         current = current.slice(0, cut)
         flush()
         current = carried
-        currentBytes = carried.reduce((sum, row) => sum + rowBytes(row), 0)
+        currentBytes = carriedBytes
       }
       current.push(unit[i]!)
       currentBytes += size

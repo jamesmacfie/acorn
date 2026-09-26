@@ -67,6 +67,17 @@ describe('segmenting a patch', () => {
     }
   })
 
+  it('keeps a split within the byte limit when walking back to the start of a change run', () => {
+    const wide = 'x'.repeat(15_000)
+    const patch = `@@ -1,3 +1,3 @@\n same\n-${wide}\n-${wide}\n+${wide}\n+${wide}`
+    const doc = fileDocument('wide.txt', patch)
+    expect(doc.segments.flat()).toEqual(parsePatch('wide.txt', patch))
+    doc.segments.forEach((segment, ordinal) => {
+      if (doc.descriptors[ordinal]!.oversize) return
+      expect(segment.reduce((sum, row) => sum + rowBytes(row), 0)).toBeLessThanOrEqual(SEGMENT_MAX_BYTES)
+    })
+  })
+
   it('describes each segment exactly: rows, bands, gaps, columns and line span', () => {
     for (const { path, patch } of corpus) {
       const doc = fileDocument(path, patch)
