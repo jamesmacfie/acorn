@@ -52,6 +52,11 @@ const press = async (label: string) => {
 }
 
 beforeEach(async () => {
+  // The preview shows the next runs in Pacific/Auckland from the current date, so a real clock would
+  // flip the expected offset to +13 whenever New Zealand is on daylight time. Only Date is faked, so
+  // the timers `settle` waits on still run.
+  vi.useFakeTimers({ toFake: ['Date'] })
+  vi.setSystemTime(new Date('2026-07-01T00:00:00Z'))
   host = document.createElement('div')
   document.body.append(host)
   dispose = render(() => <ScheduleDialogHost />, host)
@@ -64,6 +69,7 @@ afterEach(() => {
   dispose?.()
   host.remove()
   vi.clearAllMocks()
+  vi.useRealTimers()
 })
 
 describe('workflow schedule setup', () => {
