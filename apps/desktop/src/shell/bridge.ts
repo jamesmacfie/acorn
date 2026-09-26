@@ -309,6 +309,7 @@ const acorn = {
     install: (request: unknown) => call('plugins-install', request),
     remove: (request: unknown) => call<void>('plugins-remove', request),
     trustRecord: (request: unknown) => call<void>('plugins-trust-record', request),
+    trustForget: (request: unknown) => call<void>('plugins-trust-forget', request),
     devGrant: (request: unknown) => call<void>('plugins-dev-grant', request),
   },
   config: {

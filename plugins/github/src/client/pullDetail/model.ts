@@ -1,6 +1,4 @@
-import gitdiffParser from 'gitdiff-parser'
-import { synth } from '@acorn/plugin-api/ui/diff'
-import type { Comment, PullCommit, PullDetail, PullFile, Review, Thread } from '../../shared/api'
+import type { Comment, PullCommit, PullDetail, Review, Thread } from '../../shared/api'
 
 export function hasRenderableBody(body: string | null | undefined): boolean {
   if (!body) return false
@@ -39,71 +37,38 @@ export function firstThreadComment(thread: Thread): Thread['comments'][number] |
 }
 export const threadCreatedAt = (thread: Thread) => firstThreadComment(thread)?.createdAt ?? null
 
+// `key` is the turn's identity in the conversation's Timeline: the kind and the provider's id, so a
+// commit SHA, a review's node id and a comment's id can never collide. It survives a refetch, a body
+// arriving and a sort tie, which is what lets a turn keep its element (docs/github-integration.md §
+// Conversation).
 export type ConversationEntry =
-  | { kind: 'review'; id: string; createdAt: number | null; review: Review }
-  | { kind: 'comment'; id: string; createdAt: number | null; comment: Comment }
-  | { kind: 'commit'; id: string; createdAt: number | null; commit: PullCommit }
-  | { kind: 'thread'; id: string; createdAt: number | null; thread: Thread }
+  | { kind: 'review'; id: string; key: string; createdAt: number | null; review: Review }
+  | { kind: 'comment'; id: string; key: string; createdAt: number | null; comment: Comment }
+  | { kind: 'commit'; id: string; key: string; createdAt: number | null; commit: PullCommit }
+  | { kind: 'thread'; id: string; key: string; createdAt: number | null; thread: Thread }
 
-export type SnippetLine = {
-  kind: 'normal' | 'insert' | 'delete'
-  oldNo: number | null
-  newNo: number | null
-  text: string
-}
-export type ThreadSnippetIndex = Map<string, SnippetLine[]>
+type Unkeyed<T> = T extends unknown ? Omit<T, 'key'> : never
 
+/**
+ * Every turn of a pull request's conversation, oldest first. The sort is stable, so turns with the
+ * same time keep the order they are listed in here. A provider id seen twice in one kind gets a
+ * numbered key rather than a duplicate one, numbered by that same order, so the list never falls back
+ * to keying by position.
+ */
 export function buildConversationEntries(data: PullDetail | undefined): ConversationEntry[] {
   if (!data) return []
-  return [
+  const entries: Unkeyed<ConversationEntry>[] = [
     ...data.reviews.filter(shouldShowReviewSummary).map((review) => ({ kind: 'review' as const, id: review.id, createdAt: review.submittedAt, review })),
     ...data.comments.map((comment) => ({ kind: 'comment' as const, id: comment.id, createdAt: comment.createdAt, comment })),
     ...data.commits.map((commit) => ({ kind: 'commit' as const, id: commit.sha, createdAt: commit.committedAt, commit })),
     ...data.threads.filter((thread) => thread.comments.length > 0).map((thread) => ({ kind: 'thread' as const, id: thread.threadId, createdAt: threadCreatedAt(thread), thread })),
-  ].sort((a, b) => (a.createdAt ?? Number.MAX_SAFE_INTEGER) - (b.createdAt ?? Number.MAX_SAFE_INTEGER))
-}
-
-export function buildThreadSnippetIndex(files: PullFile[] | undefined): ThreadSnippetIndex {
-  const index: ThreadSnippetIndex = new Map()
-  for (const file of files ?? []) {
-    if (!file.patch) continue
-    index.set(file.path, parseSnippetRows(file, file.patch))
-  }
-  return index
-}
-
-function parseSnippetRows(file: PullFile, patch: string): SnippetLine[] {
-  try {
-    const [parsed] = gitdiffParser.parse(synth(file.path, patch))
-    const rows: SnippetLine[] = []
-    for (const hunk of parsed?.hunks ?? []) {
-      for (const change of hunk.changes) {
-        if (change.type === 'normal') {
-          rows.push({ kind: 'normal', oldNo: change.oldLineNumber, newNo: change.newLineNumber, text: change.content })
-        } else if (change.type === 'insert') {
-          rows.push({ kind: 'insert', oldNo: null, newNo: change.lineNumber, text: change.content })
-        } else {
-          rows.push({ kind: 'delete', oldNo: change.lineNumber, newNo: null, text: change.content })
-        }
-      }
-    }
-    return rows
-  } catch {
-    return []
-  }
-}
-
-export function threadSnippetFromIndex(thread: Thread, index: ThreadSnippetIndex): SnippetLine[] {
-  if (!thread.path || thread.line == null) return []
-  const rows = index.get(thread.path)
-  if (!rows?.length) return []
-
-  const targetSide = thread.side === 'LEFT' ? 'LEFT' : 'RIGHT'
-  const lineIndex = rows.findIndex((row) => (targetSide === 'LEFT' ? row.oldNo : row.newNo) === thread.line)
-  if (lineIndex < 0) return []
-  return rows.slice(Math.max(lineIndex - 2, 0), lineIndex + 3)
-}
-
-export function threadSnippet(thread: Thread, files: PullFile[] | undefined): SnippetLine[] {
-  return threadSnippetFromIndex(thread, buildThreadSnippetIndex(files))
+  ]
+  const seen = new Map<string, number>()
+  const keyed = entries.map((entry) => {
+    const base = `${entry.kind}:${entry.id}`
+    const count = (seen.get(base) ?? 0) + 1
+    seen.set(base, count)
+    return { ...entry, key: count === 1 ? base : `${base}#${count}` } as ConversationEntry
+  })
+  return keyed.sort((a, b) => (a.createdAt ?? Number.MAX_SAFE_INTEGER) - (b.createdAt ?? Number.MAX_SAFE_INTEGER))
 }

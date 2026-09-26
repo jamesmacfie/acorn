@@ -111,8 +111,8 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
       fetchedAt: now,
     })
     await gh.db.insert(prFiles).values([
-      { userId: 'james', repoId: 99, number: 813, path: 'src/auth/login.ts', status: 'modified', additions: 3, deletions: 1, sha: 's1' },
-      { userId: 'james', repoId: 99, number: 813, path: 'src/auth/token.ts', status: 'modified', additions: 1, deletions: 0, sha: 's2' },
+      { userId: 'james', repoId: 99, number: 813, path: 'src/auth/login.ts', status: 'modified', additions: 3, deletions: 1, sha: 's1', position: 0, patchState: 'unavailable' },
+      { userId: 'james', repoId: 99, number: 813, path: 'src/auth/token.ts', status: 'modified', additions: 1, deletions: 0, sha: 's2', position: 1, patchState: 'unavailable' },
     ])
     await t.db.insert(schema.taskLinks).values([
       { taskId: 'task1', integrationId: 'lin1', provider: 'linear', identifier: 'ENG-42', createdAt: now },

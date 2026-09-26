@@ -278,6 +278,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
       }
       helper.broker.remove(nodeId)
       helper.fleet.forget(nodeId)
+      helper.pluginCache.forgetNode(nodeId)
       // A pipe to a node we have just stopped trusting must not outlive the pairing.
       helper.tunnels.closeFor({ nodeId })
     },
@@ -345,6 +346,13 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
         { 'plugin.id': decision.pluginId },
       )
       helper.pluginTrust.record({ ...decision, ...NO_DISCLOSURE, partial: true, decidedAt: Date.now() })
+    },
+    'plugins-trust-forget': (raw): void => {
+      const { pluginId, hash } = z.object({
+        pluginId: z.string().min(1),
+        hash: z.string().regex(/^[0-9a-f]{64}$/),
+      }).parse(raw)
+      helper.pluginTrust.forgetDecision(pluginId, hash)
     },
   }
 

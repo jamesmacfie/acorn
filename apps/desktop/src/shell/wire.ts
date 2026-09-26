@@ -30,6 +30,7 @@ export type HelperMethod =
   | 'plugins-install'
   | 'plugins-remove'
   | 'plugins-trust-record'
+  | 'plugins-trust-forget'
   | 'plugins-dev-grant'
   | 'config-read'
   | 'config-write'

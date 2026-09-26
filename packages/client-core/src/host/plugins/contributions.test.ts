@@ -55,6 +55,27 @@ describe('eligiblePlugins', () => {
     expect(eligiblePlugins()).toEqual([])
   })
 
+  it('uses one active declaration when the installed package has moved ahead of the node half', () => {
+    const old = row('board', { version: '1.0.0', client: { hash: HASH, bytes: 12 } }, [surface({ id: 'old', target: 'pane' })])
+    const candidate = row('board', { version: '2.0.0', client: { hash: HASH_B, bytes: 12 } }, [surface({ id: 'new', target: 'pane' })])
+    candidate.state = 'pending-restart'
+    candidate.active = { ...old.installed!, activation: 'node' }
+    _seedPluginDistribution([['node-a', [candidate]]], [`board ${HASH}`])
+    const entry = eligiblePlugins()[0]!
+    expect(entry).toMatchObject({ hash: HASH, trusted: true })
+    expect(entry.installed.version).toBe('1.0.0')
+    expect(entry.installed.client?.hash).toBe(HASH)
+    expect(entry.installed.contributions.frames.map((frame) => frame.id)).toEqual(['board.old'])
+  })
+
+  it('withholds legacy failed and pending rows whose running declaration cannot be proven', () => {
+    _seedPluginDistribution([['node-a', [
+      { ...row('pending', { client: { hash: HASH, bytes: 12 } }), state: 'pending-restart' },
+      { ...row('failed', { client: { hash: HASH_B, bytes: 12 } }), state: 'failed' },
+    ]]])
+    expect(eligiblePlugins()).toEqual([])
+  })
+
   it('skips a roster row with no manifest, and takes the first node offering an id', () => {
     _seedPluginDistribution([
       ['node-a', [{ name: 'terminal', required: true, disabled: false, running: true, state: 'active' }, row('board')]],
@@ -89,11 +110,9 @@ describe('eligiblePlugins', () => {
     expect(eligiblePlugins()[0]!.trusted).toBe(false)
   })
 
-  it('does not let a stale acceptance clear a bundle that lost resolution', () => {
-    // The apiVersion bump case. resolveBundles drops a candidate this shell cannot speak, so there is
-    // no runnable bundle, but the roster row still carries its `client.hash`, and an acceptance
-    // recorded against those bytes in an older shell is still on file. Falling back to the row's own
-    // claimed hash would mark it trusted and mount a bundle that was never re-fetched.
+  it('does not let a stale acceptance clear an incompatible runtime', () => {
+    // The runtime still claims client bytes and an older shell accepted them. An incompatible API
+    // version cannot select a bundle, regardless of that existing acceptance.
     _seedPluginDistribution(
       [['node-a', [row('board', { apiVersion: '99', client: { hash: HASH, bytes: 12 } })]]],
       [`board ${HASH}`],
@@ -104,10 +123,7 @@ describe('eligiblePlugins', () => {
     expect(hasWithheldCode(entry)).toBe(true)
   })
 
-  it('takes manifest, hash and trust from the row whose bundle won resolution', () => {
-    // A mixed-version fleet. Node A offers v1 first and node B's v2 wins resolution, so the manifest
-    // registered has to be v2's: taking v1's contributions while trusting v2's bytes means drawing
-    // surfaces declared by bytes nobody accepted.
+  it('keeps node A on its own runtime when node B offers a newer version', () => {
     _seedPluginDistribution(
       [
         ['node-a', [row('board', { version: '1.0.0', client: { hash: HASH, bytes: 12 } }, [surface({ id: 'old', target: 'pane' })])]],
@@ -116,15 +132,14 @@ describe('eligiblePlugins', () => {
       [`board ${HASH_B}`],
     )
     const entry = eligiblePlugins()[0]!
-    expect(entry).toMatchObject({ hash: HASH_B, trusted: true })
-    expect(entry.installed.version).toBe('2.0.0')
+    expect(entry).toMatchObject({ hash: HASH, trusted: false })
+    expect(entry.installed.version).toBe('1.0.0')
     // 'board.new', not 'new': a declared id outside the plugin's own namespace is bound to it here
     // (./contributionIds.ts).
-    expect(entry.installed.contributions.frames.map((frame) => frame.id)).toEqual(['board.new'])
+    expect(entry.installed.contributions.frames.map((frame) => frame.id)).toEqual(['board.old'])
   })
 
-  it('withholds the winner when only the LOSING bundle was ever accepted', () => {
-    // The other half of the same fleet: an acceptance on file for v1's bytes says nothing about v2's.
+  it('keeps node A trusted when only its own bundle was accepted', () => {
     _seedPluginDistribution(
       [
         ['node-a', [row('board', { version: '1.0.0', client: { hash: HASH, bytes: 12 } })]],
@@ -133,8 +148,8 @@ describe('eligiblePlugins', () => {
       [`board ${HASH}`],
     )
     const entry = eligiblePlugins()[0]!
-    expect(entry).toMatchObject({ hash: HASH_B, trusted: false })
-    expect(hasWithheldCode(entry)).toBe(true)
+    expect(entry).toMatchObject({ hash: HASH, trusted: true })
+    expect(hasWithheldCode(entry)).toBe(false)
   })
 
   it('marks a bundle the owner has not accepted as untrusted, without dropping the row', () => {

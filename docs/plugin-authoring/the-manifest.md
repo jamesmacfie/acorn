@@ -13,7 +13,7 @@ disk and the client registers contributions from the same shape. Its top-level k
 | `name` | yes | Display name, 1–120 characters. |
 | `version` | yes | Free-form string, 1–64 characters. Compared on update by the installer's downgrade guard. |
 | `baseline` | yes | Exactly `"acorn-1"`. A missing or different marker is rejected before the plugin runs, including on an old API-1 package. |
-| `apiVersion` | yes | A range over plugin API majors that has to cover this node's current major, `"1"` (`packages/protocol/src/plugin/apiVersion.ts`). Anything the range does not cover is a failed roster row with both versions in its reason. |
+| `apiVersion` | yes | A range over plugin API majors that has to cover this node's current major, `"2"` (`packages/protocol/src/plugin/apiVersion.ts`). Anything the range does not cover is a failed roster row with both versions in its reason. |
 | `icon` / `icons` | no | One SVG path `d` string, or a map of them, authored in a 24×24 box. Not an SVG document — a document would mean `<script>`, `<use href>`, `on*` handlers and an allowlist parser, for a logo. Registered as `brand:<id>` and `brand:<id>/<key>` and nameable as any contribution's `glyph`. |
 | `node` | no | Relative path to the ESM entrypoint the node imports. Omit it for a client-only or descriptor-only plugin. |
 | `client` | no | Relative path to the single client file. Omit it for a plugin that ships only descriptors and document surfaces — it then has no bytes to trust and no trust prompt. |
@@ -234,7 +234,7 @@ This is the whole plugin that adds OpenCode:
   "name": "OpenCode",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "1",
+  "apiVersion": "2",
   "icon": { "d": "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" },
   "contributions": {
     "harnesses": [

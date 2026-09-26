@@ -315,6 +315,18 @@ export async function taskRoot(db: AppDatabase, taskId: string): Promise<string 
   }
 }
 
+// Execution cannot degrade to "no root" after a worktree failure: agents and workflows need the
+// actual cause so they can refuse to run without claiming the project's checkout is unmapped.
+export async function requireTaskRoot(db: AppDatabase, taskId: string): Promise<string> {
+  const t = await loadTask(db, taskId)
+  if (!t || t.status !== 'active' || isTaskArchiving(taskId)) throw new Error('The task is not active.')
+  const project = await projectForTask(db, t)
+  const baseCheckout = project?.path && isDir(project.path) ? project.path : undefined
+  if (!baseCheckout) throw new Error('The task has no mapped checkout.')
+  const { cwd } = await resolveTaskCwd(db, t, baseCheckout)
+  return resolve(cwd)
+}
+
 export { resolveInRoot } from '../core/fs'
 
 // The setup script and trigger configured for this project. 'off' never runs, 'created' pre-creates

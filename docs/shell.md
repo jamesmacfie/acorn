@@ -363,8 +363,7 @@ than a fall-through to the client root — a Worker handed the shell's `index.ht
 failure to debug.
 
 The bytes are identical to what the frame origin serves as `/client.js`, and so is the trust decision:
-the owner accepted a bundle hash, and a worker is that hash with a different host. Nothing about the
-worker path asks a second question.
+the owner accepted the exact `(pluginId, hash)` pair. The worker path asks no second question.
 
 Its policy is its own, for the reason the highlighter's is (above): a same-origin worker takes its CSP
 from its own script's response headers. `PLUGIN_WORKER_CSP` is
@@ -375,11 +374,12 @@ WebSocket and `sendBeacon` all fail inside the worker, so the transferred `Messa
 out of it. The document's `worker-src` names `'self' blob:` and never the plugin scheme.
 
 The renderer's half is `packages/client-core/src/host/tree/`: `workerHost.ts` owns one worker per
-bundle hash, shared by every tree that bundle draws and stopped a grace period after the last one
-unmounts; `TreeHost.tsx` validates and applies each batch and is the only thing that turns a handler id
-into a function. A worker that misses two heartbeats is terminated and every tree it served is removed
-from the UI. The failure remains in the plugin diagnostics instead of replacing the contribution with
-an inline error.
+accepted `(pluginId, hash)`, shared by that identity's trees and stopped a grace period after the last
+unmount. Each mounted tree has a distinct slot and scoped bridge port, including its own focus,
+document, and selection context. `TreeHost.tsx` validates and applies each batch and is the only thing
+that turns a handler id into a function. A worker that misses two heartbeats is terminated and every
+tree it served is removed from the UI. The failure remains in the plugin diagnostics instead of
+replacing the contribution with an inline error.
 
 ### The renderer bridge
 

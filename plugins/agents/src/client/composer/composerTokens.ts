@@ -26,19 +26,20 @@ const SIGIL = /(?:^|\s)([/$])([A-Za-z0-9][\w.:-]*)/g
  * the session actually advertises rather than by shape, so `9/11` and `and/or` stay prose and a
  * misremembered `/reviw` stays visibly uncoloured, which is the useful half of the feedback.
  *
- * File mentions come from `fileMentionMatches`, so what is coloured is exactly what the turn sends
- * as a file part.
+ * File mentions come from `fileMentionMatches` with the same worktree list used on send, so what is
+ * coloured is exactly what the turn sends as a file part.
  */
 export function composerTokens(
   text: string,
   advertised: { commands?: readonly string[]; skills?: readonly string[] } = {},
+  files: readonly string[] = [],
 ): ComposerToken[] {
   if (!text || text.length > MAX_HIGHLIGHT_LENGTH) return []
   const commands = new Set(advertised.commands ?? [])
   const skills = new Set(advertised.skills ?? [])
   const tokens: ComposerToken[] = []
 
-  for (const match of fileMentionMatches(text)) {
+  for (const match of fileMentionMatches(text, files)) {
     tokens.push({ kind: 'file', name: match.path, start: match.start, end: match.end })
   }
 
@@ -64,10 +65,11 @@ export function composerTokens(
 export function composerSegments(
   text: string,
   advertised: { commands?: readonly string[]; skills?: readonly string[] } = {},
+  files: readonly string[] = [],
 ): ComposerSegment[] {
   const segments: ComposerSegment[] = []
   let cursor = 0
-  for (const token of composerTokens(text, advertised)) {
+  for (const token of composerTokens(text, advertised, files)) {
     if (token.start < cursor) continue
     if (token.start > cursor) segments.push({ text: text.slice(cursor, token.start), token: null })
     segments.push({ text: text.slice(token.start, token.end), token })

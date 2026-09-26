@@ -59,7 +59,7 @@ const GROUPS = {
   pairing: { resolve: () => (canPairNodes() ? {} : null), members: [] },
   plugins: {
     resolve: pluginCustody,
-    members: members<PluginCustody>()(['state', 'cachePut', 'install', 'remove', 'trustRecord', 'devGrant']),
+    members: members<PluginCustody>()(['state', 'cachePut', 'install', 'remove', 'trustRecord', 'trustForget', 'devGrant']),
   },
   config: {
     resolve: deviceConfigBridge,

@@ -74,8 +74,93 @@ inserted by a live lookup after a mirror miss. A `304 Not Modified` response upd
 and does not send the event. Node-side plugins can use the user-scoped `github.mirror` capability to
 list the same repository inventory without calling GitHub.
 
-Patch bodies and full file bodies use the Node's immutable on-disk blob cache. A blob miss fetches
-from GitHub and stores the result by SHA. The cache is per Node and can hold private repository data.
+Patch bodies and full file bodies use the Node's immutable on-disk blob cache. A patch body is keyed
+by a SHA-256 digest of its own text. A full file body is keyed by its blob SHA. A blob miss fetches
+from GitHub and stores the result. The cache is per Node and can hold private repository data.
+
+### Pull request detail and files
+
+A pull request's mirror is two resources, each with its own `sync_state` row: the detail
+(`pr:<repoId>:<number>`) and the files (`files:<repoId>:<number>`). Both are fetched in full before
+anything is written, in `plugins/github/src/server/routes/mirror/prFetch.ts`, and swapped in by
+`prMirror.ts` in one `db.batch` with their sync row. A failure on any page leaves the previous rows,
+the stored completeness, and `fetched_at` exactly as they were, and the route serves the old mirror
+stale or, cold, reports the provider failure.
+
+The detail is one GraphQL query for the scalars and the first page of every connection, then cursor
+continuations through `node(id:)` until each connection is exhausted. The connections are labels,
+reviews, review requests, issue comments, commits, review threads, each thread's comments, and the
+latest commit's status and check contexts. Every page asks for 100 nodes and `pageInfo`. One walker
+handles every connection. It fails on a page of the wrong shape, a node with no identity, or a
+repeated or missing cursor while `hasNextPage` is true. It keeps a node that appears on two pages
+once, where it first appeared. Thread comments continue four threads at a time. A GraphQL response
+with `errors` is a failed refresh even when it carries partial data. There is no batch-only query:
+the batch route refreshes each stale pull through the same helper, three at a time, because a
+multi-alias query would stop at each connection's first page.
+
+One gap in that honesty is not closed. GitHub's REST endpoint lists at most 250 commits for a pull,
+and whether the GraphQL `commits` connection stops there too, with `hasNextPage` false, is not
+confirmed. If it does, the walker takes the first 250 as the whole list, because it compares the
+walked list against nothing. The fix is to ask for the connection's `totalCount` and carry a
+shortfall to the conversation, which needs a mirror column; the checks would also have to be read
+from `headRefOid` rather than `commits(last: 1)`, which would then name the 250th commit.
+
+The files come from the REST files endpoint, 100 a page, in order. The walk stops at a short page, at
+a full page with no `rel="next"` link, or after page 30, which is GitHub's 3,000-file ceiling. After a
+full page 30 the plugin reads the pull's `changed_files`. If that is more than 3,000, or GitHub gives
+no count, the resource is stored as incomplete with cause `upstream-cap`; 3,000 of 3,000 is complete.
+A repeated path or a malformed page fails the refresh. Nothing works around the ceiling with a clone
+or an archive download.
+
+Every mirrored child row has a `position`, its zero-based place in GitHub's order, and every read
+orders by it. File rows carry a patch state. `available` means `patch_key` names a body in the blob
+cache. `unavailable` means GitHub sent no patch, which happens for binary files, very large diffs,
+and pure renames. Patch bodies are written, eight at a time, before the swap; an orphaned body is
+only cache data. A read that finds an available body missing is an integrity failure, not a file
+without a diff: the files route treats the mirror as cold and blocks on a refresh that rewrites it.
+
+The client states what the files route reports. When the list is capped, the diff and the PR's file
+list both show a warning above the files, with GitHub's count when it gave one. File counts are the
+files received.
+
+### Diff documents
+
+The diff viewer reads a pull request as a document ([diff-rendering.md](./diff-rendering.md) § The
+document), not as patches. When the files mirror writes a patch body, it also cuts the patch into
+segments with `@acorn/diff-document` and writes the segment descriptors as a small blob beside it,
+`diffdoc:v<version>:<patch digest>` (`plugins/github/src/server/routes/mirror/prDocument.ts`). Both
+blobs are written before the swap, so the swap still publishes a complete revision or nothing. A patch
+whose descriptor blob already exists is not cut again. The cut runs on the node's own thread, and a
+refresh of an unchanged pull request every 45 seconds would otherwise repeat it for every file.
+
+`GET /repos/:owner/:repo/pulls/:number/diff` is the document. It is served from the same files
+resource and the same refresh as the files route, reads the file rows in provider order and each
+available file's descriptor blob, and parses nothing. A descriptor blob that is missing, which is
+every file of a mirror written before documents existed, is cut from the patch body and stored on
+that read. A missing patch body is the same integrity failure the files route repairs, and it repairs
+the same way. The answer is `{ document, completeness }`, with no patch text in it. A 2,200-file,
+million-row pull request is about 27,000 segments and a 2.5 MB document.
+
+Segments and search are two repository routes, because a segment is addressed by its patch digest and
+a compare preview stores its patches the same way: `POST /repos/:owner/:repo/diff/segments` answers up
+to 32 segments by path, digest, and ordinal, cut from the patch body again, with parsed patches held
+in a 64 MB process-local cache for the next batch; `POST /repos/:owner/:repo/diff/search` answers a
+page of matches over the files the request names. Access is the repository's, resolved the way the
+blob route resolves it, and a digest must be one this plugin could have written before it becomes
+part of a blob key.
+
+A known limit: patch blobs are keyed by digest across the whole node, not per repository, and neither
+route checks that a digest belongs to the repository in its path. Anyone who can read one repository
+and knows a digest can read that patch from any repository the node has mirrored. With one identity
+per node that grants nothing new. It matters if one node serves several identities with different
+access, and the fix is to check the digest against that repository's file rows or compare record.
+
+Inline threads are not in the document. They come with the PR detail, which is complete when it is
+served, and the viewer places each one by its line number from the document's segment line spans, so
+its space is reserved before its segment loads. The diff source reports loading until both the
+document and the detail are in. The two mirrors refresh separately, so for one refresh interval the
+threads can describe an older head than the files; the thread whose line no longer exists in any
+segment is simply not drawn.
 
 ## Reads and writes
 
@@ -91,6 +176,15 @@ was committed or invalidated, so consumers re-read the identified pull request. 
 after a background refresh and after a successful PR mutation updates or invalidates mirror state.
 A provider refresh after a mutation can send a second event. This replaces signed HTML and keeps
 other clients and plugins in sync with the initiating client.
+
+The create-PR compare preview reads GitHub's compare endpoint directly and mirrors no rows. GitHub
+lists at most 300 changed files for a whole comparison, on the first page only, and gives no total.
+So a comparison with 300 files reports `upstream-cap` for resource `compare-files`, and the preview
+and the create form's file count say that only the first 300 files are shown. The commits come from
+the first page too, which is enough for the title prefill. GitHub sends every patch inline; the route
+stores each under its digest in the blob cache, as the files mirror does, and answers a diff document
+rather than the patches, so the preview reads its segments through the same two repository routes as
+a pull's diff (§ Diff documents).
 
 Creating a pull request sends `plugin:github:pulls-changed` after the plugin invalidates the owning
 repository's open-pull list. The interactive route and `github_pull_create` agent tool share this
@@ -224,6 +318,40 @@ Two places let another plugin in. `github:diff-line` takes marks on a line of a 
 keyed by file, line and side, the same shape the changes pane opens over the working tree.
 `github:summary-badges` is a `stack` slot on the overview, so github's own facts stay and up to four
 contributors are added beside them ([plugins.md](./plugins.md) § Cooperative extension points).
+
+### Conversation
+
+The conversation is `PrConversation` in `plugins/github/src/client/pullDetail/Conversation.tsx`, a kit
+`Timeline` over `buildConversationEntries` in `model.ts`. Its topology is the PR detail, which is
+complete when it is served (§ Pull request detail and files), and no route was added for it. Bodies stay
+in that detail, because the diff's inline threads and the Linear reference scan read the same bodies
+anyway, so a separate body route would fetch them twice.
+
+- **Turn identity.** Every entry's key is `kind:id`: `review:<node id>`, `comment:<id>`,
+  `commit:<sha>`, `thread:<thread id>`. The kind stops a SHA, a review id, and a comment id from sharing
+  a namespace. An id seen twice in one kind gets `#2`, `#3` in list order. The sort is stable, so a tie
+  keeps the order reviews, comments, commits, and threads are listed in. Turns are drawn by key, each
+  reading its entry from a signal of its own, so a refetch, a reply, an edited body, or an older comment
+  arriving keeps every existing turn's element.
+- **Bodies near the viewport.** Each turn's byline, state, and path are drawn at once. GitHub's rendered
+  HTML is built only when the turn comes within one screen of the viewport, through `Timeline.Turn`'s
+  `near` child, and it stays built after that. Until then the card says the body is shown on scroll.
+  Browser find cannot match a body that is not built yet. The terminal client builds every body at once.
+  The observer's root is the region scroller found when the first body asks, and it stays that
+  element. If the navigator's region were rebuilt around a mounted conversation, bodies would wait
+  for a scroller that no longer moves.
+- **Thread snippets.** A thread quotes five lines around its line, from the one segment of the pull's
+  diff document that holds it (§ Diff documents), so a line at a segment's edge gets less context on
+  that side. The conversation loads the document when any thread
+  has a line, and `createDiffSnippets` from `@acorn/plugin-api/ui/diff` reads a thread's segment through
+  the diff viewer's loader and node cache once its turn comes near. A segment already seen in the diff
+  costs no request, and one read here is resident when the diff opens. A file missing from the document
+  because GitHub capped the list, a file with no patch, a line in no segment, and a failed load all
+  draw **Snippet unavailable.** and load nothing else. An outdated thread has no line and draws no
+  snippet. No patch is parsed on the client.
+- **No window.** The conversation draws every turn. Its cost per turn is a byline until a turn comes
+  near, and it scrolls in the navigator's region rather than a followed timeline of its own, so it does
+  not use the transcript's "Show earlier" window.
 
 Keyboard navigation comes from the tree rather than from this plugin: the pull list, the file list,
 the check list and the pull strip are kit collections, so the arrows, `j` and `k`, Home, End and

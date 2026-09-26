@@ -26,6 +26,7 @@
   },
   "dependencies": {
     "@acorn/client-core": "workspace:*",
+    "@acorn/diff-document": "workspace:*",
     "@acorn/node-core": "workspace:*",
     "@acorn/protocol": "workspace:*"
   },

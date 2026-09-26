@@ -1,5 +1,6 @@
 import { onCleanup, type Accessor } from 'solid-js'
-import { diffScroll, rememberDiffScroll, type DiffScrollPosition, type DiffScrollState, type DiffViewScope } from './viewState'
+import type { DiffLayout } from './diffLayout'
+import { diffScroll, rememberDiffScroll, type DiffScrollState, type DiffViewScope } from './viewState'
 
 type DiffScrollRestorationOptions = {
   scope: DiffViewScope
@@ -8,71 +9,59 @@ type DiffScrollRestorationOptions = {
   selectedPath: () => string
   scrollEl: Accessor<HTMLDivElement | undefined>
   setScrollEl: (element: HTMLDivElement) => void
-  setScrollTop: (top: number) => void
-  measure: (mode: DiffScrollState['viewMode']) => void
+  layout: Pick<DiffLayout, 'attach' | 'goTo' | 'onScroll' | 'place' | 'scrollToOffset'>
 }
 
-// The virtual diff starts as short loading rows, then grows as patches are parsed and tokenized.
-// Restoration therefore stays pending and is retried by DiffPane after each row-model update instead
-// of accepting the browser's temporarily clamped scrollTop.
+// Where the reader was in this diff, kept for the session and put back when they return
+// (docs/diff-rendering.md § Review threads and state).
+//
+// The place is an identity, not a pixel offset (./diffLayout.ts): the item the viewport started in and
+// how far into its code rows, or the thread it started in and how far into that. The layout is exact
+// from the topology, so a place is put back as soon as the topology and the scroller both exist, and
+// the corrections that follow as threads are measured keep it there.
 export function createDiffScrollRestoration(options: DiffScrollRestorationOptions) {
   let publishFrame = 0
-  let restoreFrame = 0
-  let releaseFrame = 0
-  let applyingRestore = false
   let pending: DiffScrollState | null = null
-  let position: DiffScrollPosition = { top: 0, left: 0 }
+  let left = 0
   let hasCurrentPosition = false
 
   const remember = () => {
+    const place = options.layout.place()
+    if (!place) return
     rememberDiffScroll(options.scope, {
-      ...position,
+      place,
+      left,
       viewMode: options.viewMode(),
       filesSignature: options.filesSignature(),
     })
   }
   const onScroll = (element: HTMLDivElement) => {
-    position = { top: element.scrollTop, left: element.scrollLeft }
-    options.setScrollTop(position.top)
-    if (pending && !applyingRestore) pending = null
+    const cause = options.layout.onScroll(element)
+    left = element.scrollLeft
+    // The reader moved before the saved place could be put back: where they went wins.
+    if (pending && cause === 'reader') pending = null
     if (!pending) {
       hasCurrentPosition = true
       remember()
     }
   }
+  /** Put a pending place back, once there is a layout to put it against. */
   const retry = () => {
-    if (!options.scrollEl() || !pending) return
-    cancelAnimationFrame(restoreFrame)
-    restoreFrame = requestAnimationFrame(() => {
-      const element = options.scrollEl()
-      if (!element || !pending) return
-      const target = pending
-      applyingRestore = true
-      element.scrollTop = target.top
-      element.scrollLeft = target.left
-      position = { top: element.scrollTop, left: element.scrollLeft }
-      options.setScrollTop(position.top)
-      if (element.scrollHeight - element.clientHeight >= target.top - 1) {
-        pending = null
-        hasCurrentPosition = true
-        remember()
-      }
-      cancelAnimationFrame(releaseFrame)
-      releaseFrame = requestAnimationFrame(() => {
-        applyingRestore = false
-      })
-    })
+    const element = options.scrollEl()
+    if (!element || !pending || !options.layout.goTo(pending.place)) return
+    element.scrollLeft = pending.left
+    left = element.scrollLeft
+    pending = null
+    hasCurrentPosition = true
+    remember()
   }
   const reset = (rememberReset = false) => {
     pending = null
-    position = { top: 0, left: 0 }
+    left = 0
     hasCurrentPosition = rememberReset
-    options.setScrollTop(0)
+    options.layout.scrollToOffset(0)
     const element = options.scrollEl()
-    if (element) {
-      element.scrollTop = 0
-      element.scrollLeft = 0
-    }
+    if (element) element.scrollLeft = 0
     if (rememberReset) remember()
   }
   const prepare = () => {
@@ -92,22 +81,20 @@ export function createDiffScrollRestoration(options: DiffScrollRestorationOption
       return
     }
     // Explicit file navigation wins. A mode mismatch can be the prefs query settling from its
-    // default, so do not overwrite the other mode's saved position unless the user scrolls.
+    // default, so do not overwrite the other mode's saved place unless the user scrolls.
     reset()
   }
-  const publish = (element: HTMLDivElement, mode: DiffScrollState['viewMode']) => {
+  const publish = (element: HTMLDivElement) => {
     cancelAnimationFrame(publishFrame)
     publishFrame = requestAnimationFrame(() => {
       options.setScrollEl(element)
-      options.measure(mode)
+      options.layout.attach(element)
       prepare()
     })
   }
 
   onCleanup(() => {
     cancelAnimationFrame(publishFrame)
-    cancelAnimationFrame(restoreFrame)
-    cancelAnimationFrame(releaseFrame)
     if (!pending && hasCurrentPosition) remember()
   })
 

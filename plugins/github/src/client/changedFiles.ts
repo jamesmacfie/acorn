@@ -22,7 +22,7 @@ export function useChangedFiles(
     return fileSummariesOptions(r?.owner ?? '', r?.repo ?? '', r?.number ?? '', !!r)
   })
 
-  const files = (): PullFile[] => query.data ?? []
+  const files = (): PullFile[] => query.data?.files ?? []
   const isLoading = () => query.isLoading
   const currentFile = () => {
     const value = router?.[0].file

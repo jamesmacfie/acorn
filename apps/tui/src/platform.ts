@@ -6,7 +6,7 @@ import type { NodePairRequest, NodeProbeResult, NodeRecord, NodeStatus } from '@
 import type { OpenedNode } from './node/open'
 import { startNode } from './node/supervise'
 import { configDir, dataRootDir } from './node/paths'
-import { createPluginCustody } from './plugins/custody'
+import { createPluginCustody, forgetNodePluginProvenance } from './plugins/custody'
 import { installDevicePreferenceStorage } from './plugins/devicePreferenceStorage'
 import { setTerminalBadge, showInTerminal } from './kit/notify'
 import { createLogger } from '@acorn/client-core/infra/telemetry'
@@ -141,6 +141,7 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
       }
       broker.remove(nodeId)
       fleet.forget(nodeId)
+      forgetNodePluginProvenance(nodeId)
     },
     nodeReconnect: (nodeId: string) => connect(nodeId),
     nodeRestartLocal: async (): Promise<void> => {

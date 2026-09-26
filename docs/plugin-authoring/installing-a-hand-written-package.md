@@ -61,7 +61,7 @@ default scaffold, which inlines the tree protocol.
   "name": "Hello Acorn",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "1",
+  "apiVersion": "2",
   "node": "./node/index.js",
   "client": "./client.js",
   "permissions": {

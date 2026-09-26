@@ -39,7 +39,16 @@ client that pairs with a Node renders that Node's arrangements and the agent can
 Each Node has an independent data root and database set. A Node ID is part of every renderer query,
 selection scope, layout scope, and fleet aggregate input.
 
+The Node's loaded plugin runtime identity is process-owned: `active` records the declaration and
+client hash captured with the running service. The installed package is a separate disk candidate.
+Neither an install nor a cached roster response can change what the process is serving.
+
 ## Client-owned durable state
+
+Plugin bundle bytes and exact `(pluginId, hash)` trust decisions belong to device custody, which
+verifies bytes before it writes them. The renderer's per-Node distribution snapshot is transient:
+it derives current selections from Node observations and custody decisions and is never persisted as
+a second winner record. Revoking a decision updates that snapshot and withdraws the selected code.
 
 Saved query drafts are Node-owned, with compare-and-swap revisions. Their device-local recovery
 copies are keyed by Node, entity, and base revision and remain until acknowledgment or explicit
@@ -263,6 +272,32 @@ transcript does continuously. And the owner was wrong: a map inside a kit compon
 cleared or seen, and its own comment said as much, bounding itself at fifty entries because `kit/` may
 not import the eviction store. Hold a reading place outside the thing that draws it, keyed by identity
 rather than by position, and clear it where you clear everything else about that entity.
+
+The diff keeps its reading place the same way. `DiffReadingPlace` in
+`client-core/features/diff/diffLayout.ts` is the item the viewport starts in (a file header, a segment
+by path and ordinal, a slice of revealed context) and a point in that item's code rows, or a thread or
+line block and an offset into it. `diff/viewState.ts` holds it per scope for the session, with the
+horizontal offset, the projection, and the file signature it was taken against, and evicts a task's
+entries when the task is archived. A place is put back only in the projection and file set it was
+taken in; a place whose item has gone lands on that file's header. A new revision of the same files
+keeps the place by its item key, so an agent saving the file under the reader leaves them at the same
+segment and depth rather than at the top of the file.
+
+The heights measured for the diff's threads and line blocks belong to the mounted pane and to nothing
+else. They are held per projection, keyed by block id, with the fingerprint of the state they were
+measured in and the width bucket they were measured at, and a height is reused only while the
+fingerprint matches. A new revision discards nothing: a thread keeps its id across revisions and its
+fingerprint says whether its height still holds, and a mounted block is measured again anyway. A new
+file signature clears every height, and so does leaving the pane. None of it is persisted: a height
+is a fact about one window's fonts and width.
+
+The diff's parsed rows are not the pane's. They are a node's, held in memory beside that node's query
+client by `client-core/features/diff/segmentCache.ts`, so a pane mounted again on the same node draws
+them without a request. The rule is the query cache's: one partition per node, cleared when the node is
+dropped, and a node switch reads the other node's. Unlike the query cache, none of it is persisted,
+and it holds no reader state. Heights, drafts, collapse, and the reading place stay where this section
+puts them, so a thread resolving changes a height and never a cached row
+([diff-rendering.md](./diff-rendering.md) § Resident segments).
 
 **A slice reads its own keys and nothing else.** Every slice used to carry a `legacy` reader as well,
 a second function that pulled the pre-scoped aggregate key the scoped keys replaced —

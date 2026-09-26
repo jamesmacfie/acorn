@@ -13,14 +13,16 @@ import {
   updateNodePlugin,
 } from '../../infra/node/nodePlugins'
 import { canPickFolder, pickFolder } from '../../infra/platform'
-import { installPluginOnDevice, readPluginHostState, removePluginFromDevice, setPluginDevGrant } from '../../host/plugins/host'
-import { devicePlugins, syncPluginDistribution } from '../../host/plugins/distribution'
+import { forgetPluginTrust, installPluginOnDevice, readPluginHostState, removePluginFromDevice, setPluginDevGrant } from '../../host/plugins/host'
+import { devicePlugins, distribution, refreshPluginTrust, resolvePendingTrust, syncPluginDistribution } from '../../host/plugins/distribution'
 import { reconcileDevicePluginChange } from '../../host/plugins/reload'
 import { readDevicePrefs, removeDevicePluginPrefs } from '../../infra/persistence/devicePrefs'
+import { contributionAvailability } from '../../host/plugins/availabilityModel'
+import { PLUGIN_API_MAJOR } from '@acorn/protocol/api.ts'
 import { Alert, Button, Checkbox, Field, Input, Select } from '../../kit/components/primitives'
 import { IconButton } from '../../kit/components/inputs/IconButton'
 import { activeTaskId } from '../tasks/tasks'
-import { nextDisabledList, pluginPending } from './pluginToggle'
+import { nextDisabledList } from './pluginToggle'
 import { CORE_EXCLUSIVE_SLOTS } from '@acorn/protocol/extensionPoints.ts'
 import { prefsOptions } from '../../infra/queries'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
@@ -102,19 +104,53 @@ export default function PluginsSettings() {
 
   const rows = createMemo<NodePluginRow[]>(() => state()?.plugins ?? [])
   const restartRequired = () => state()?.restartRequired === true
+  const availabilityMessage = (row: NodePluginRow): string => {
+    const id = nodeId()
+    if (!id) return 'Node unavailable'
+    const result = contributionAvailability(distribution(), id, row.name, PLUGIN_API_MAJOR)
+    if (result.runtime.kind === 'active') {
+      if (result.runtime.warning) return `Current version still active; reload failed: ${result.runtime.warning}`
+      if (row.disabled) return 'Still active until restart'
+      if (result.available && result.runtime.pendingCandidate) return 'Current version active; update waits for restart'
+      if (result.available) return ''
+      switch (result.selection.kind) {
+        case 'pending-trust': return 'Waiting for approval on this device'
+        case 'rejected': return 'Rejected on this device'
+        case 'bundle-missing': return 'Client bundle unavailable on this device'
+        case 'incompatible': return 'Client bundle is incompatible with this app'
+        case 'declaration-conflict': return 'Nodes disagree about this bundle’s permissions'
+        default: return 'Client bundle does not match the running plugin'
+      }
+    }
+    switch (result.runtime.kind) {
+      case 'compiled-active': return row.disabled ? 'Still active until restart' : ''
+      case 'unknown': return 'Plugin state not yet known'
+      case 'unreachable': return 'Node unavailable'
+      case 'absent': return 'Not installed on this node'
+      case 'disabled': return 'Disabled after restart'
+      case 'failed': return `Failed to load${result.runtime.reason ? `: ${result.runtime.reason}` : ''}`
+      case 'waiting-for-restart': return 'Waiting for node restart'
+    }
+  }
 
   // The device's own answers, which the node knows nothing about: it served the bundle, and this
   // machine declined to run it, or put it into development mode (docs/security.md § The dev grant).
   const [custody, { refetch: refetchCustody }] = createResource(async () => await readPluginHostState())
-  const blockedHere = (row: NodePluginRow): boolean => {
-    const hash = row.installed?.client?.hash
-    return !!hash && (custody()?.acks ?? []).some((ack) => ack.pluginId === row.name && ack.hash === hash && ack.decision === 'rejected')
-  }
   // A plugin in development on this device, against this node (docs/security.md § The dev grant).
   // Both halves matter: the same plugin may be a plain install on the owner's other laptop, and a
   // bundle offered under this name by a different node is not covered.
   const devGrant = (row: NodePluginRow) =>
     (custody()?.devGrants ?? []).find((grant) => grant.pluginId === row.name && grant.nodeId === nodeId())
+  const decisions = (row: NodePluginRow) => {
+    const hashes = new Set([row.active?.client?.hash, row.installed?.client?.hash].filter((hash): hash is string => !!hash))
+    return (custody()?.acks ?? []).filter((ack) => ack.pluginId === row.name && hashes.has(ack.hash))
+  }
+  const forgetDecision = (pluginId: string, hash: string, defer: boolean) => run(async () => {
+    await forgetPluginTrust({ pluginId, hash })
+    if (defer) resolvePendingTrust(pluginId, hash)
+    await refreshPluginTrust()
+    await refetchCustody()
+  })
 
   // Ending development mode drops the grant and every acknowledgement it wrote, so the plugin
   // re-enters per-hash trust at the current bundle (docs/security.md § The dev grant).
@@ -122,7 +158,7 @@ export default function PluginsSettings() {
     run(async () => {
       await setPluginDevGrant({ pluginId: row.name, nodeId: nodeId() ?? '', grant: false })
       await refetchCustody()
-      await syncPluginDistribution()
+      await refreshPluginTrust()
     })
 
   const run = async (work: () => Promise<void>) => {
@@ -412,32 +448,20 @@ export default function PluginsSettings() {
                     </>
                   )}
                 </Show>
-                {/* This device has seen these exact bytes and said no. The same plugin may be running
-                    happily on the owner's other laptop, hence the wording. */}
-                <Show when={blockedHere(row)}>
-                  <span class="plugin-failed" role="status">blocked on this device</span>
+                <Show when={!row.installed?.bundled && !devGrant(row)}>
+                  <For each={decisions(row)}>
+                    {(ack) => <Button
+                      size="sm"
+                      variant="ghost"
+                      disabled={busy()}
+                      onPress={() => void forgetDecision(row.name, ack.hash, ack.decision === 'accepted')}
+                    >
+                      {ack.decision === 'accepted' ? `Revoke approval for ${ack.version}` : `Review ${ack.version} again`}
+                    </Button>}
+                  </For>
                 </Show>
-                {/* The install directory and this process disagree: something was installed, updated,
-                    or uninstalled since the node last started. A restart is the fix. */}
-                <Show when={row.state === 'pending-restart'}>
-                  <span class="plugin-pending muted">waiting for a restart</span>
-                </Show>
-                <Show when={row.state !== 'pending-restart' && pluginPending(row)}>
-                  <span class="plugin-pending muted">{row.running ? 'still running' : 'not loaded'}</span>
-                </Show>
-                {/* A restart fixes neither a throw nor a failed load, so this does not raise the
-                    restart banner. The owner has to turn the plugin off or fix it.
-
-                    `reason` is the node's verbatim account of what broke, so it is loaded-plugin text
-                    crossing into the owner's UI: interpolated as text, and capped by the node. An
-                    older node does not send it, which is why the label stands alone. */}
-                <Show when={row.state === 'failed'}>
-                  <span class="plugin-failed" role="status">
-                    failed to {row.stage === 'load' ? 'load' : 'start'}
-                  </span>
-                  <Show when={row.reason}>
-                    {(reason) => <span class="plugin-failed-reason muted" title={reason()}>{reason()}</span>}
-                  </Show>
+                <Show when={availabilityMessage(row)}>
+                  {(message) => <span class="plugin-pending muted" role="status">{message()}</span>}
                 </Show>
                 <Show when={row.emits?.length}>
                   <details class="plugin-emits">

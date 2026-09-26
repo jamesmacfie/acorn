@@ -39,6 +39,13 @@ the route-backed `items` form needs a Node half. Route-backed slots, attention, 
 contexts, reference resolvers, commands, document regions, and extension carriers are also refused.
 See [Device-held plugins](./plugins/activation.md#device-held-plugins).
 
+Every loaded client kind is registered from the current Node's active declaration and selected exact
+bundle. Its availability gate follows that Node's runtime and trust state, so a failed, stale, absent,
+or unaccepted runtime cannot leave a visible settings page, importer, footer row, command, or tree
+calling routes that do not exist. A compiled contribution's `{ plugin: id }` requirement checks that
+Node's running service instead. [Activation](./plugins/activation.md) owns the selection and reason
+model; the table below owns the kinds themselves.
+
 | Kind | Tier | Where | Host |
 | --- | --- | --- | --- |
 | Panes | Both | `ctx.panes` / `contributions.frames` (`target: 'pane'`) | A task's pane layout |

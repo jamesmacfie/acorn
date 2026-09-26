@@ -9,6 +9,7 @@ import {
 } from './composerTokens'
 
 const advertised = { commands: ['review', 'compact'], skills: ['readable', 'code-review:codex'] }
+const files = ['src/app.ts', 'a b/c.ts']
 const spans = (text: string, tokens: ComposerToken[]) =>
   tokens.map((token) => `${token.kind}:${text.slice(token.start, token.end)}`)
 
@@ -31,23 +32,26 @@ describe('composerTokens', () => {
 
   it('colours exactly the file mentions the turn sends as file parts', () => {
     const text = 'read @src/app.ts:12-20 and @"a b/c.ts", not @not-an-email@example.com or @/etc/passwd'
-    const tokens = composerTokens(text, advertised)
+    const tokens = composerTokens(text, advertised, files)
     expect(spans(text, tokens)).toEqual([
       'file:@src/app.ts:12-20',
       'file:@"a b/c.ts"',
-      'file:@not-an-email@example.com',
     ])
     // The highlighter and the sender agree on what counts, which is the point of sharing the walk.
-    expect(parseFileMentions(text).map((part) => part.path)).toEqual([
+    expect(parseFileMentions(text, files).map((part) => part.path)).toEqual([
       'src/app.ts',
       'a b/c.ts',
-      'not-an-email@example.com',
     ])
+  })
+
+  it('leaves unmatched @ text uncoloured while retaining known file colour', () => {
+    const text = 'Ask @someone about @missing.ts and @src/app.ts'
+    expect(spans(text, composerTokens(text, advertised, files))).toEqual(['file:@src/app.ts'])
   })
 
   it('leaves trailing sentence punctuation outside the span', () => {
     const text = 'open @src/app.ts.'
-    expect(spans(text, composerTokens(text, advertised))).toEqual(['file:@src/app.ts'])
+    expect(spans(text, composerTokens(text, advertised, files))).toEqual(['file:@src/app.ts'])
   })
 
   it('gives up on a draft too long to mirror', () => {
@@ -58,7 +62,7 @@ describe('composerTokens', () => {
 describe('composerSegments', () => {
   it('rebuilds the draft exactly, so the mirror cannot drift from the textarea', () => {
     const text = 'run /review on @src/app.ts\nthen $readable it'
-    expect(composerSegments(text, advertised).map((segment) => segment.text).join('')).toBe(`${text}\n`)
+    expect(composerSegments(text, advertised, files).map((segment) => segment.text).join('')).toBe(`${text}\n`)
   })
 
   it('marks only the token pieces, and carries the name a tooltip is keyed by', () => {

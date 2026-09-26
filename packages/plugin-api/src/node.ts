@@ -200,7 +200,8 @@ export type { PluginContextSection } from '@acorn/node-core/server/agentTools'
 export type { InternalEnvFactory } from '@acorn/node-core/server/auth'
 
 // ── Blobs and the sync engine ─────────────────────────────────────────────────────────────────
-export { fileBodyBlobKey, patchBlobKey } from '@acorn/node-core/server/blobs.ts'
+export { diffDocumentBlobKey, fileBodyBlobKey, patchBlobKey } from '@acorn/node-core/server/blobs.ts'
+
 export { serveThenRevalidate } from '@acorn/node-core/server/sync/engine.ts'
 export type { Cached, RefreshResult, RouteFailure, RouteResult } from '@acorn/node-core/server/sync/engine.ts'
 

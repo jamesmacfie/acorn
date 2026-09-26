@@ -17,14 +17,16 @@ const sha256 = (text: string) => createHash('sha256').update(Buffer.from(text)).
 
 let dir = ''
 let served: { status: number; body: string | Uint8Array<ArrayBuffer> } | Error = { status: 200, body: BUNDLE }
+let legacyServed: typeof served | null = null
 let requests: Array<{ nodeId: string; request: NodeFetchRequest }> = []
 
 const broker = {
   fetch: async (nodeId: string, request: NodeFetchRequest): Promise<NodeFetchResponse> => {
     requests.push({ nodeId, request })
-    if (served instanceof Error) throw served
-    const body = typeof served.body === 'string' ? new TextEncoder().encode(served.body) : served.body
-    return { status: served.status, headers: {}, body }
+    const answer = request.path.endsWith('/client.js') && legacyServed ? legacyServed : served
+    if (answer instanceof Error) throw answer
+    const body = typeof answer.body === 'string' ? new TextEncoder().encode(answer.body) : answer.body
+    return { status: answer.status, headers: {}, body }
   },
 }
 
@@ -35,6 +37,7 @@ const cacheDir = () => join(dir, 'acorn-1-plugin-cache')
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'acorn-plugin-cache-'))
   served = { status: 200, body: BUNDLE }
+  legacyServed = null
   requests = []
   vi.spyOn(console, 'warn').mockImplementation(() => {})
   vi.spyOn(console, 'error').mockImplementation(() => {})
@@ -49,7 +52,7 @@ describe('fetching a bundle from a node', () => {
   it('stores under the hash of the bytes and reports it', async () => {
     const store = cache()
     expect(await store.putFromNode('node-a', 'sparkline', claim())).toEqual({ hash: sha256(BUNDLE) })
-    expect(requests[0].request.path).toBe('/v1/core/plugins/sparkline/client.js')
+    expect(requests[0].request.path).toBe(`/v1/core/plugins/sparkline/bundles/${sha256(BUNDLE)}`)
     expect(store.has(sha256(BUNDLE))).toBe(true)
     expect(readFileSync(join(cacheDir(), `${sha256(BUNDLE)}.js`), 'utf8')).toBe(BUNDLE)
     expect(store.list()[sha256(BUNDLE)]).toMatchObject({ pluginId: 'sparkline', version: '1.2.0', bytes: BUNDLE.length, nodeIds: ['node-a'] })
@@ -60,6 +63,18 @@ describe('fetching a bundle from a node', () => {
     // The offline-first property. Nothing has connected in this second store's lifetime.
     expect(cache().has(sha256(BUNDLE))).toBe(true)
     expect(cache().list()[sha256(BUNDLE)].pluginId).toBe('sparkline')
+  })
+
+  it('uses the legacy route for an older node and still verifies its bytes', async () => {
+    served = { status: 404, body: '' }
+    legacyServed = { status: 200, body: BUNDLE }
+    expect(await cache().putFromNode('old-node', 'sparkline', claim())).toEqual({ hash: sha256(BUNDLE) })
+    expect(requests.map(({ request }) => request.path)).toEqual([
+      `/v1/core/plugins/sparkline/bundles/${sha256(BUNDLE)}`,
+      '/v1/core/plugins/sparkline/client.js',
+    ])
+    legacyServed = { status: 200, body: 'other bytes' }
+    expect(await cache().putFromNode('old-node', 'changed', claim(sha256('different')))).toEqual({ error: 'hash-mismatch' })
   })
 
   it('does not re-fetch a bundle it already holds', async () => {
