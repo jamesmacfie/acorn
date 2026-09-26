@@ -2,12 +2,12 @@ import { describe, expect, it } from 'vitest'
 import * as api from './api'
 import {
   closedPullsRoute,
-  filePatchKey,
-  filePatchRoute,
-  filePatchesRoute,
   fileSummariesKey,
   fileSummariesRoute,
-  filesKey,
+  pullDiffKey,
+  pullDiffRoute,
+  diffSegmentsRoute,
+  diffSearchRoute,
   pinsKey,
   pullKey,
   pullPrefixKey,
@@ -40,8 +40,9 @@ describe('github wire contract', () => {
     expect(pullRoute('octo', 'repo', '12')).toBe('/v1/p/github/repos/octo/repo/pulls/12')
     expect(pullRoute('octo', 'repo', '12', 'files')).toBe('/v1/p/github/repos/octo/repo/pulls/12/files')
     expect(fileSummariesRoute('octo', 'repo', '12')).toBe('/v1/p/github/repos/octo/repo/pulls/12/files?summary=1')
-    expect(filePatchRoute('octo', 'repo', '12', 'src/app file.ts')).toBe('/v1/p/github/repos/octo/repo/pulls/12/files?path=src%2Fapp%20file.ts')
-    expect(filePatchesRoute('octo', 'repo', '12')).toBe('/v1/p/github/repos/octo/repo/pulls/12/files/patches')
+    expect(pullDiffRoute('octo', 'repo', '12')).toBe('/v1/p/github/repos/octo/repo/pulls/12/diff')
+    expect(diffSegmentsRoute('octo', 'repo')).toBe('/v1/p/github/repos/octo/repo/diff/segments')
+    expect(diffSearchRoute('octo', 'repo')).toBe('/v1/p/github/repos/octo/repo/diff/search')
     expect(pullRoute('octo', 'repo', '12', 'review-comments/99/replies'))
       .toBe('/v1/p/github/repos/octo/repo/pulls/12/review-comments/99/replies')
     expect(resolveThreadRoute('octo', 'repo', '12', 'THREAD/id')).toBe('/v1/p/github/repos/octo/repo/pulls/12/threads/THREAD%2Fid/resolve')
@@ -55,9 +56,8 @@ describe('github wire contract', () => {
     expect(pullKey('octo', 'repo', '12')).toEqual(['pull', 'octo', 'repo', '12'])
     expect(pullPrefixKey('octo', 'repo')).toEqual(['pull', 'octo', 'repo'])
     expect(repoLabelsKey('octo', 'repo')).toEqual(['labels', 'octo', 'repo'])
-    expect(filesKey('octo', 'repo', '12')).toEqual(['files', 'octo', 'repo', '12'])
     expect(fileSummariesKey('octo', 'repo', '12')).toEqual(['files', 'octo', 'repo', '12', 'summary', 'v2'])
-    expect(filePatchKey('octo', 'repo', '12', 'src/app.ts')).toEqual(['files', 'octo', 'repo', '12', 'patch', 'src/app.ts'])
+    expect(pullDiffKey('octo', 'repo', '12')).toEqual(['files', 'octo', 'repo', '12', 'diff'])
     expect(pinsKey).toEqual(['pins'])
   })
 

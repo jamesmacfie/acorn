@@ -1,6 +1,7 @@
 # Phase 2: a structure-first segmented diff document
 
-Status: not started, 2026-09-26. Waits on phases 0 and 1.
+Status: shipped 2026-09-26, tested in jsdom and against real Git and a mocked GitHub. The real-window run
+at `scale` and `canonical` is owed.
 
 ## Goal
 
@@ -431,3 +432,123 @@ Per [docs-migration.md](./docs-migration.md): `docs/architecture-overview.md`,
   selected-file navigation through current tests; they are easy to lose in a renderer-only rewrite.
 - Check the current `PLUGIN_API_MAJOR` and surface snapshot rule. Do not infer compatibility from the
   fact that a changed member is a TypeScript type rather than a runtime export.
+
+## What shipped differently
+
+The owning docs describe what runs: [diff-rendering.md](../../diff-rendering.md) § The document, § The
+source port, § Data flow, § Parsing and highlighting and § Row geometry;
+[github-integration.md](../../github-integration.md) § Diff documents;
+[api-reference.md](../../api-reference.md) § GitHub and § Changes diff document;
+[architecture-overview.md](../../architecture-overview.md) § Node API and client flow; and
+[telemetry.md](../../telemetry.md) § Rendered-surface health. Where this file and those disagree, they
+win.
+
+Where the pieces live, for phase 3:
+
+- The pure package is `packages/diff-document` (`@acorn/diff-document/document`): `model.ts` (types,
+  limits, `segmentContentKey`), `parse.ts`, `segment.ts` (`segmentRows`, `describeSegment`,
+  `bandCount`, `documentTopology`), `search.ts`, `cache.ts`.
+- **Segment and row geometry** is `packages/client-core/src/features/diff/documentView.ts`. `items()`
+  is the virtual list: a `file` header, a `segment` (with `skipFirst`/`skipLast` when an edge gap is
+  expanded), a `nodiff` row, or an `overlay` slice of revealed context. `estimate(item, mode)` is the
+  exact fixed height from the descriptor (`(rows or bands − gaps) × 20 + gaps × 28`, 36 for a header,
+  28 for no diff, 20 a row for an overlay) plus `reserved()`, the thread reservation per segment item
+  (140px open, 50px resolved) found from the segment's line span by `segmentOfLine`.
+- **Thread and dynamic rows today**: threads are `{ kind: 'thread' }` rows interleaved into a
+  mounted segment's rows by `withThreads` in `DiffPane.tsx`, one cached row object per thread. Source
+  line extras (review notes) and other plugins' marks are drawn inside the code row, under
+  `.diff-line-extra`, and `hasLineExtra` decides whether a row has any. None of these has a height of
+  its own anywhere: the segment container is the unit that is measured. `DiffCanvas.tsx` hands every
+  mounted `.diff-item` to `scheduleElementMeasure`, TanStack observes it from then on, and a change in
+  a thread, composer, note or mark reaches geometry only as that container's new height.
+- **The virtualizer wiring** is two `createDiffVirtualizer` calls in `DiffPane.tsx` (`virt`,
+  `splitVirt`), both over `view.items` with `itemKeys` (`f:path`, `s:path:ordinal`, `n:path`,
+  `o:path:ordinal:edge:at`) and the two estimate modes, `estimates: view.reserved` so a thread arriving
+  for an unmeasured segment recomputes offsets. `kit/diff/virtualization.ts` hands TanStack
+  `getItemKey` through a getter for that reason, uses `overscan: 0` and a `rangeExtractor` with an
+  800px runway, and keeps the phase 0 measure counters. `activeVirt()` is the one for the view mode;
+  the loader's demand effect, the annotation request and the sticky header all read its virtual items.
+  Scroll restoration is still the pixel restorer in `scrollRestoration.ts`.
+
+Deviations from the plan:
+
+1. **Plugins import `@acorn/diff-document` directly**, the way they import protocol, and
+   `tools/arch/boundaries.test.ts` says so. The plan routed it through the facade. A facade
+   re-export on `/node` would have put the renderer's types into the node's type graph through a
+   plugin's `shared/api.ts`, which failed `tsc` in `apps/node`. `/ui/diff` still re-exports the types
+   the port is written in, and `documentTopology`, which the Changes source uses.
+2. **Descriptors carry counts, not pixels, and no ids.** A segment is `{ rows, bands, gaps, columns,
+   lines, oversize? }`; its identity is its patch digest and ordinal (`segmentContentKey`), and a
+   file's identity is its path. Heights are the renderer's, because they are CSS. Explicit ids and
+   content keys per descriptor would have added about 140 bytes to each of 27,000 segments.
+3. **The topology has no `completeness` and no `blocks`.** Completeness stays on the provider's
+   envelope (`PullDiffResponse`, `Compare`), because only the provider's own warning reads it. Inline
+   threads stay on the source's `threads`, from the PR detail, which is complete and already holds
+   every body; the conversation tab loads it anyway, so a block-body route would save nothing. The
+   viewer reserves each thread's space from the segment line spans, so thread positions are right
+   before their segments load. There is no `loadBlockContent`, and the files and detail mirrors are
+   not matched on a head revision: they refresh separately, as before, and a thread whose line is in
+   no segment is not drawn.
+4. **No `cachedSegment` and no `expandGap` on the port.** The loader owns what is resident, which is
+   where phase 4's cache belongs. Gap expansion keeps `fileText`; the revealed lines are an overlay
+   built in the renderer, keyed by the segment's content key, drawn as 64-row slices. `selectedPath`
+   and `signature` stayed. `contentSignature` and `contentKey` went: a segment keyed by content makes
+   them unnecessary.
+5. **Gaps always sit at a segment's edge.** A top or middle gap opens a segment and the bottom gap
+   closes one, so an overlay goes beside a segment rather than through it. That costs segments: the
+   canonical fixture is 27,653 segments and a 2.49 MB topology, cut on the node in about five seconds,
+   once, when the files are mirrored. The topology is not paged; the real-window run decides whether
+   it needs to be.
+6. **GitHub stores descriptors, not segments.** Each patch's descriptors are a small blob,
+   `diffdoc:v1:<digest>`, written beside the patch body before the swap, and a topology read parses
+   nothing. Segment rows are cut from the content-addressed patch body on request, with a 64 MB
+   parse cache in the plugin process. That avoids a second copy of every patch on disk and a SQLite
+   migration; a mirror written before this change catches up on its first diff read.
+7. **The segment and search routes are per repository**, `POST /repos/:owner/:repo/diff/segments`
+   and `…/diff/search`, shared by pull requests and compare previews, because both address a segment
+   by its digest. Access is the repository's, resolved as the blob route resolves it, and a digest has
+   to have the shape this plugin writes before it becomes part of a blob key. Neither route checks
+   that a digest belongs to a particular pull. The search body carries the document's files, because
+   a compare preview has no mirror to look them up in.
+8. **The compare route stores its patches** under their digests and answers a document; its query key
+   became `'v3'`.
+9. **Changes reads are POSTs** with bodies (`local/document`, `/segments`, `/search`). The node keeps
+   a status-key cache, so a poll that moved nothing diffs nothing, and a per-file record of the digest
+   the last document gave it; any other digest is a `409 revision_conflict`, even when its rows are
+   still cached. Batches are 200 paths per `git diff --no-renames`, byte-identical per file to a
+   single-file diff so the digests agree. Untracked files still take a `--no-index` call each. The
+   per-file `local/diff` route and bridge method were removed with the whole-file port.
+10. **Removed with the monolithic path**: `kit/diff/hydration.ts`, `features/diff/parsedPublisher.ts`,
+    GitHub's `POST …/files/patches`, and the client's `filesOptions`, `filePatchOptions`,
+    `fetchFilePatches`, `filesKey` and `filePatchKey`. A force refresh now reads the diff document.
+    The bounded row builders (`buildDiffRows`, `buildDiffRowsAsync`, `buildRenderableRows`,
+    `toBands`, `rowIdentityKeys`, `maxLineCols`) stay, on top of the package's parser; production
+    uses only `toBands` and `enrichDiffRows`, per segment.
+11. **Health.** `topology.segments` and `work.unvisitedSegments` are new fields. The diff is `ready`
+    when its topology is in and its source is not loading, which for a pull request includes the
+    detail's threads. `heldPublications` is always zero, because nothing is held back during a
+    scroll. Queue distance is in segments.
+12. **Every mounted item is measured**, not only threads, because the segment container is the unit.
+    A segment without dynamic content measures its estimate and commits nothing.
+13. **Collapse keeps the reading place only in the one case that loses it**: collapsing a file from
+    the sticky header scrolls back to that header. A general identity anchor is phase 3's.
+14. **The terminal host's `DiffPane` reads the same document**, and loads only the segments its
+    window reaches. It used to parse whole patches, and for the Changes pane it drew no rows at all,
+    because that source never put a patch on its files.
+15. **Telemetry**: `diff.segments.load`, `diff.segments.enrich`, `diff.segments.requested`,
+    `diff.files` and `diff.document.segments` replace `diff.parse`, `diff.rows` and
+    `diff.hydrator.*`.
+16. **Plugin API major 2** (docs/plugins/package-shape.md § The plugin API). The type change to
+    `DiffSource` was a break by itself, and `createDiffHydrator` came off `/ui/diff`.
+17. A small fix on the way: a split band for an unchanged line drew that line's notes twice.
+
+Not built or not verified:
+
+- The real-window run. Only jsdom saw the segment canvas, with a modelled layout
+  (`features/diff/layout.helper.ts`), and only at the `small` and `scale` profiles; `canonical` was
+  measured as a topology, not rendered. There is no heap profile. Smoke checklist item 82 in
+  [testing.md](../../testing.md) is owed.
+- GitHub's 300-file compare ceiling was not re-checked against GitHub's documentation in this phase;
+  phase 1's behaviour stands.
+- The Changes source's refetch on a `409` has no client test; the node's refusal does.
+

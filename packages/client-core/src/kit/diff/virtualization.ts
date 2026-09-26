@@ -1,10 +1,11 @@
 import { createVirtualizer, measureElement, observeElementRect, type Virtualizer } from '@tanstack/solid-virtual'
 
-const DIFF_OVERSCAN_ROWS = 80
+/** Mounted beyond each edge of the viewport: about two screens of runway altogether in a normal
+ *  pane, so a momentum scroll does not outrun what is mounted. */
+const DIFF_RUNWAY_PX = 800
 
-// Virtualizer plumbing shared by DiffView's unified/split lists. The two createVirtualizer setups
-// are identical apart from their item/key/estimate sources, and both feed the same batched-rAF
-// measure scheduling.
+// Virtualizer plumbing shared by the diff's unified and split lists. The two setups differ only in
+// how tall each item is estimated to be, and both feed the same batched-rAF measure scheduling.
 
 /**
  * What the two virtualizers and their schedulers did, for the diff's health reading
@@ -101,24 +102,50 @@ export function createDiffMeasureCounters() {
 export function createDiffVirtualizer<T>(opts: {
   items: () => readonly T[]
   keys: () => readonly string[]
-  /** Fallback getItemKey prefix for an index with no identity key (`row`/`band`). */
+  /** Fallback getItemKey prefix for an index with no identity key. */
   keyPrefix: string
   estimateSize: (item: T | undefined) => number
   scrollEl: () => HTMLDivElement | undefined
   counters?: DiffMeasureCounters
+  /** Read whenever offsets have to be recomputed without any key changing, such as an inline thread
+   *  arriving for a segment that has not been measured yet. */
+  estimates?: () => unknown
 }) {
-  return createVirtualizer<HTMLDivElement, Element>({
+  // Assigned below; the range extractor runs only once the virtualizer exists.
+  let instance: Virtualizer<HTMLDivElement, Element> | undefined
+  const virtualizer = createVirtualizer<HTMLDivElement, Element>({
     get count() {
       return opts.items().length
     },
     getScrollElement: () => opts.scrollEl() ?? null,
-    getItemKey: (index) => opts.keys()[index] ?? `${opts.keyPrefix}:${index}`,
+    // A getter, so a new key list or a moved estimate hands TanStack a new function. A new
+    // `getItemKey` is what makes it recompute every offset, and it does so keeping each measured size,
+    // where `measure()` would throw them all away.
+    get getItemKey() {
+      const keys = opts.keys()
+      opts.estimates?.()
+      return (index: number) => keys[index] ?? `${opts.keyPrefix}:${index}`
+    },
     estimateSize: (index) => opts.estimateSize(opts.items()[index]),
-    // About two screens of normal 20px lines in a typical pane. Diff rows are more expensive than plain
-    // list items, but this runway prevents a momentum scroll from outrunning the mounted window.
-    overscan: DIFF_OVERSCAN_ROWS,
+    overscan: 0,
+    // Runway in pixels rather than in items. An item is a segment of up to 64 rows or a 36px file
+    // header, so a count of items would be a screen of runway in one place and none in another.
+    rangeExtractor: (range) => {
+      const measured = instance?.measurementsCache ?? []
+      let first = range.startIndex
+      let before = 0
+      while (first > 0 && before < DIFF_RUNWAY_PX) before += measured[--first]?.size ?? 0
+      let last = range.endIndex
+      let after = 0
+      while (last < range.count - 1 && after < DIFF_RUNWAY_PX) after += measured[++last]?.size ?? 0
+      const out: number[] = []
+      for (let index = first; index <= last; index++) out.push(index)
+      return out
+    },
     ...(opts.counters ? { measureElement: opts.counters.measure, observeElementRect: opts.counters.observe } : {}),
   })
+  instance = virtualizer
+  return virtualizer
 }
 
 export type MeasureTarget = 'unified' | 'split'

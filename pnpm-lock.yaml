@@ -345,6 +345,9 @@ importers:
       '@acorn/custody':
         specifier: workspace:*
         version: link:../../packages/custody
+      '@acorn/diff-document':
+        specifier: workspace:*
+        version: link:../../packages/diff-document
       '@acorn/node-core':
         specifier: workspace:*
         version: link:../../packages/node-core
@@ -475,6 +478,9 @@ importers:
       '@acorn/dashboards-core':
         specifier: workspace:*
         version: link:../dashboards-core
+      '@acorn/diff-document':
+        specifier: workspace:*
+        version: link:../diff-document
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../protocol
@@ -562,9 +568,6 @@ importers:
       diff:
         specifier: ^9.0.0
         version: 9.0.0
-      gitdiff-parser:
-        specifier: ^0.3.1
-        version: 0.3.1
       idb-keyval:
         specifier: ^6.2.5
         version: 6.2.5
@@ -584,6 +587,9 @@ importers:
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0
+      gitdiff-parser:
+        specifier: ^0.3.1
+        version: 0.3.1
       jsdom:
         specifier: ^30.0.1
         version: 30.0.1
@@ -645,6 +651,19 @@ importers:
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../protocol
+    devDependencies:
+      typescript:
+        specifier: ^6.0.3
+        version: 6.0.3
+      vitest:
+        specifier: ^4.1.9
+        version: 4.1.9(@types/node@26.0.0)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
+
+  packages/diff-document:
+    dependencies:
+      gitdiff-parser:
+        specifier: ^0.3.1
+        version: 0.3.1
     devDependencies:
       typescript:
         specifier: ^6.0.3
@@ -719,6 +738,9 @@ importers:
       '@acorn/client-core':
         specifier: workspace:*
         version: link:../client-core
+      '@acorn/diff-document':
+        specifier: workspace:*
+        version: link:../diff-document
       '@acorn/node-core':
         specifier: workspace:*
         version: link:../node-core
@@ -926,6 +948,9 @@ importers:
 
   plugins/changes:
     dependencies:
+      '@acorn/diff-document':
+        specifier: workspace:*
+        version: link:../../packages/diff-document
       '@acorn/plugin-agents':
         specifier: workspace:*
         version: link:../agents
@@ -1229,6 +1254,9 @@ importers:
 
   plugins/github:
     dependencies:
+      '@acorn/diff-document':
+        specifier: workspace:*
+        version: link:../../packages/diff-document
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api

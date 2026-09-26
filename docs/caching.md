@@ -47,6 +47,12 @@ identify a patch: the same new file has a different patch against a different ba
 body stays keyed by its blob SHA, `filebody:<sha>`. Attachments and agent artifacts use the same
 immutable storage mechanism.
 
+Beside each patch body, the GitHub plugin stores the segment descriptors it cuts into,
+`diffdoc:v<version>:sha256:<hex>`, so a diff document's topology is read from small blobs rather than
+parsed ([diff-rendering.md](./diff-rendering.md) § The document). A new segmenter version reads new
+keys and cuts again; the old ones are only cache data. A compare preview writes its inline patch
+bodies under the same `patch:` keys, so its segments are served the same way.
+
 A GitHub file row says whether its patch is available. An available patch whose body is missing from
 the cache is an integrity failure, and the files route repairs it with a blocking refresh rather than
 serving the file as having no diff. A summary read touches no blob at all. A cache miss fetches the provider body, verifies the expected digest where available,
@@ -109,11 +115,19 @@ reconnect re-reads both the task's run list and the selected run's steps. The pa
 inside the active Node shell, and the task-run index subscribes through that same Node connection.
 Identical task or run IDs on two Nodes therefore cannot invalidate or navigate into each other.
 
+No diff segment, parsed row, token, or whole patch is in the query cache. The diff viewer's segment
+loader holds the open document's segments in memory, at most 96 and never across documents, and a
+pull request's document is under a `files` key that is not persisted (`['files', owner, repo, number,
+'diff']`). The providers keep their own parse caches on the node: 64 MB of parsed patches per plugin
+process, by digest, which are content-addressed and so can be gone but never wrong. The Changes
+plugin's also records which digest the last document gave each file, and a segment request for any
+other is refused rather than answered from the cache.
+
 The persisted cache has no version buster. An entry written before a response type gained a required
 field survives a relaunch as-is, so change the query key whenever the shape it caches gains a
-required field. Nothing else invalidates an old entry. GitHub's file summaries and compare keys end in
-`'v2'` for that reason: both responses gained `completeness`, and file rows gained `position` and
-patch state.
+required field. Nothing else invalidates an old entry. GitHub's file summaries key ends in `'v2'` for that
+reason: the response gained `completeness`, and file rows gained `position` and patch state. The
+compare key ends in `'v3'`: it gained `completeness`, then its `files` became a diff `document`.
 
 ## Fan-out cache safety
 

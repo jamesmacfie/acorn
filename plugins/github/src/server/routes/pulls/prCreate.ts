@@ -2,7 +2,10 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import { gh, ghError, ghGraphQL, ghGraphQLResult } from '../../githubApi'
 import type { Branch, Compare, PullTopologyCompleteness } from '../../../shared/api'
-import { type AppEnv, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
+import { type AppEnv, ownerId, patchBlobKey, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
+import { documentTopology, fileDocument, type DiffDocumentFile } from '@acorn/diff-document/document'
+import { mapLimited } from '../../mapLimited'
+import { patchDigest } from '../mirror/prMirror'
 import { githubToken } from '../../githubToken'
 import { createPullRequest } from '../../createPull'
 import { type GithubEmit, NO_EMIT } from '../../events'
@@ -26,6 +29,9 @@ const createBody = z.object({
 // GitHub's compare lists at most 300 changed files for the whole comparison, on the first page only,
 // and gives no total. So 300 files means there may be more.
 export const COMPARE_FILES_LIMIT = 300
+
+// Patch bodies written at once while a comparison is answered.
+const PATCH_WRITE_CONCURRENCY = 8
 
 export const compareCompleteness = (received: number): PullTopologyCompleteness =>
   received >= COMPARE_FILES_LIMIT
@@ -88,9 +94,13 @@ export const prCreate = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new 
     collected.sort((a, b) => b.date - a.date)
     return c.json(collected.slice(0, 100).map((b) => ({ name: b.name }) satisfies Branch))
   })
-  // Compare base..head → diff preview (CompareFile[]) + commits (for title prefill) + aheadBy.
+  // Compare base..head → diff preview (a document) + commits (for title prefill) + aheadBy.
   // Branch names with slashes go straight into the path (GitHub accepts them literally). Only the
   // first page is read: it carries the whole file list, and its 100 commits are enough to prefill.
+  //
+  // GitHub sends every patch inline. Each is stored under its digest, as a pull request's are, and
+  // the answer carries only the descriptors, so the preview loads its segments through the same
+  // routes a pull's diff does (./diffDocument.ts) rather than holding the whole comparison.
   .get('/:owner/:repo/compare', async (c) => {
     ownerId(c) // gate on auth; the credential itself comes from the stored integration
     const token = await githubToken(c)
@@ -104,18 +114,24 @@ export const prCreate = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new 
     if (err) return respondError(c, err.status, err.error)
     const data = (await res.json()) as GitHubCompare
     const files = data.files ?? []
-    return c.json({
-      aheadBy: data.ahead_by ?? 0,
-      completeness: compareCompleteness(files.length),
-      files: files.map((f) => ({
+    const documentFiles = await mapLimited(files, PATCH_WRITE_CONCURRENCY, async (f): Promise<DiffDocumentFile> => {
+      const patchKey = f.patch == null ? null : patchDigest(f.patch)
+      if (patchKey) await c.env.BLOBS.put(patchBlobKey(patchKey), f.patch!)
+      return {
         path: f.filename,
         status: f.status,
         additions: f.additions,
         deletions: f.deletions,
         sha: f.sha,
         viewed: false,
-        patch: f.patch ?? null,
-      })),
+        patchKey,
+        segments: patchKey ? fileDocument(f.filename, f.patch!).descriptors : [],
+      }
+    })
+    return c.json({
+      aheadBy: data.ahead_by ?? 0,
+      completeness: compareCompleteness(files.length),
+      document: documentTopology(documentFiles),
       commits: (data.commits ?? []).map((c) => ({ sha: c.sha, message: c.commit.message })),
     } satisfies Compare)
   })

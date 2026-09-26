@@ -99,7 +99,8 @@ export function NonCodeRow(props: {
 // Per-file header bar: opens each file's section in the stacked diff, and doubles as the sticky
 // current-file header DiffView pins to the top of the scroller (no anchor id there).
 export function FileHead(props: {
-  file: DiffFile
+  /** Only what the header draws, so a document's file and a whole-patch file both fit. */
+  file: Pick<DiffFile, 'path' | 'status' | 'additions' | 'deletions'>
   anchorId?: string
   collapsed?: boolean
   onToggleCollapse?: (path: string) => void

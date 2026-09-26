@@ -1,5 +1,6 @@
 import type { Task } from '@acorn/protocol/api.ts'
 import type { NoteSummary } from '@acorn/protocol/notes.ts'
+import { documentTopology, fileDocument, type DiffDocumentTopology, type DiffSegmentPayload } from '@acorn/diff-document/document'
 
 // One task and three notes, as the node would answer them. Shared by the smoke test and the capture
 // script (`pnpm --filter @acorn/tui capture`), which is how this package gets a screenshot on a machine
@@ -352,6 +353,29 @@ const PULL_FILES = [
   { path: 'src/session.ts', status: 'modified', additions: 4, deletions: 0, sha: 'b', viewed: false, position: 1, patchState: 'unavailable', patchKey: null, patch: null },
 ]
 
+type FixtureFile = { path: string; status: string | null; additions: number | null; deletions: number | null; sha: string | null; patch: string | null }
+
+/** Files as a diff document, cut the way a provider's node cuts one, and every segment of it. The stub
+ *  transport sees no request body, so a segments request is answered with all of them and the viewer
+ *  keeps the ones it asked for. Exported for the kit's own DiffPane case. */
+export function fixtureDocument(files: readonly FixtureFile[]): { topology: DiffDocumentTopology; segments: DiffSegmentPayload[] } {
+  const segments: DiffSegmentPayload[] = []
+  const topology = documentTopology(files.map((file, index) => {
+    const doc = fileDocument(file.path, file.patch)
+    const patchKey = file.patch ? `fixture:${index}:${file.patch.length}` : null
+    doc.segments.forEach((rows, ordinal) => segments.push({ path: file.path, patchKey: patchKey!, ordinal, rows }))
+    return { path: file.path, status: file.status, additions: file.additions, deletions: file.deletions, sha: file.sha, viewed: false, patchKey, segments: doc.descriptors }
+  }))
+  return { topology, segments }
+}
+
+/** The working tree's one patch, as the Changes node answers a document: per file, the digest and the
+ *  cut, and only for the files it has a patch for. */
+const localDocument = () => {
+  const { topology, segments } = fixtureDocument([{ path: 'src/login.ts', status: 'modified', additions: 2, deletions: 1, sha: 'unstaged', patch: PATCH.slice(PATCH.indexOf('@@')) }])
+  return { files: topology.files.map(({ path, patchKey, segments: cut }) => ({ path, patchKey, segments: cut })), segments }
+}
+
 const EDITOR_ENTRIES = [
   { name: 'src', dir: true },
   { name: 'package.json', dir: false },
@@ -454,7 +478,8 @@ const json = (value: unknown) => ({
       if (path.startsWith('/v1/p/agents/sessions/') && path.includes('/events')) return json({ events: [], nextCursor: null })
       if (path === `/v1/p/changes/tasks/${TASK.id}/local/status`) return json(LOCAL_STATUS)
       if (path === `/v1/p/changes/tasks/${TASK.id}/review-notes`) return json([])
-      if (path.startsWith(`/v1/p/changes/tasks/${TASK.id}/local/diff`)) return json({ patch: PATCH })
+      if (path === `/v1/p/changes/tasks/${TASK.id}/local/document`) return json({ files: localDocument().files })
+      if (path === `/v1/p/changes/tasks/${TASK.id}/local/document/segments`) return json(localDocument().segments)
       if (path.startsWith(`/v1/core/tasks/${TASK.id}/context`)) return json(TASK_CONTEXT)
       if (path === `/v1/p/workflows/tasks/${TASK.id}/workflows/runs`) return json([])
       if (path === `/v1/p/editor/tasks/${TASK.id}/editor/root`) return json({ root: TASK.worktreePath })
@@ -465,10 +490,11 @@ const json = (value: unknown) => ({
       // Any number, not only 42, so a test that walks a long list gets a loaded detail on every row
       // rather than "Not found" on all but the first.
       if (/^\/v1\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+$/.test(path)) return json(PULL_DETAIL)
-      // The patches lookup answers with the files alone; every GET on the files route answers with
-      // the list and whether it is all of them (plugins/github/src/shared/api.ts § PullFilesResponse).
-      if (/^\/v1\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+\/files\/patches/.test(path)) return json(pullFiles())
+      // Every GET on the files route answers with the list and whether it is all of them, and the diff
+      // route with the same files as a document (plugins/github/src/shared/api.ts § PullDiffResponse).
       if (/^\/v1\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+\/files/.test(path)) return json({ files: pullFiles(), completeness: { kind: 'complete' } })
+      if (/^\/v1\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+\/diff$/.test(path)) return json({ document: fixtureDocument(pullFiles()).topology, completeness: { kind: 'complete' } })
+      if (path === '/v1/p/github/repos/runn-fast/acorn/diff/segments') return json(fixtureDocument(pullFiles()).segments)
       if (path.startsWith('/v1/p/github/repos/runn-fast/acorn/pulls?')) return json(pulls())
       if (path === '/v1/p/github/repos/runn-fast/acorn/labels') return json([])
       if (path === '/v1/p/github/repos/runn-fast/acorn/mentions') return json([])

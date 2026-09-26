@@ -1,7 +1,8 @@
 # Docs migration: owners after each phase
 
-Status: phase 0's and phase 1's rows are done (2026-09-26). No owning document has changed for
-phases 2 to 5.
+Status: phase 0's, phase 1's and phase 2's rows are done (2026-09-26). No owning document has changed
+for phases 3 to 5. Phase 2's `docs/plugins.md` row landed in `docs/plugins/package-shape.md` § The
+plugin API, which `docs/plugins.md` links to, and the terminal's diff pane in `docs/tui/interaction.md`.
 
 Part of [docs/future/git-inspired/](./README.md). A phase is incomplete until the document that owns
 its shipped behavior states the new contract. Future files explain intent; owning docs describe the

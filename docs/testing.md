@@ -223,8 +223,25 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
   `prMirror.test.ts` runs against the real migrated `github.sqlite`: a failed page 12 leaves every old
   row, `fetched_at`, and completeness unchanged; two patches of one head blob read back apart; a
   missing body is an integrity failure; and a summary read touches no blob. `pullFiles.test.ts`,
-  `pullsBatch.test.ts`, and `prCreate.test.ts` cover the routes, and `DiffForPull.test.tsx` covers the
-  capped-list warning and the unavailable-patch path;
+  `pullsBatch.test.ts`, and `prCreate.test.ts` cover the routes, including the diff document, segment
+  and search reads by digest and the bounded refusals of a forged digest, an unknown body, a bad
+  ordinal and an oversized batch, and a compare answered as a document with its patches stored by
+  digest. `DiffForPull.test.tsx` covers the capped-list warning and that the pane reads segments and
+  never a whole patch;
+- the diff document has three tiers. `packages/diff-document/src/segment.test.ts` holds the segmenter
+  to its rules over a generated corpus: every row kept in order, the same cut every time, both
+  limits honoured except for one oversize row that is alone and marked, a gap only at a segment's
+  edge, a deletion run kept with its insertions, the raw fallback bounded, and keys that follow the
+  patch and not the file's position; `search.test.ts` pages across files and stops reading once a
+  page is full. `testkit/largeDiff.test.ts` holds every descriptor of the `scale` profile to the
+  bounded row builders the renderer draws with: rows, columns and split bands.
+  `plugins/changes/src/server/routes/localGit.test.ts` runs the Changes document over a real tree,
+  including a stale digest refused as a revision conflict and staged and unstaged kept apart.
+  `features/diff/DiffPane.test.tsx` renders the real pane over the fixture with a jsdom layout model
+  (`features/diff/layout.helper.ts`): plain rows before colour, a pane left open asking for a few
+  dozen of the `scale` profile's thousands of segments and then nothing more, a jump to the last
+  file that loads nothing in between, a new revision that reloads only the file that moved, find
+  across unloaded segments, gap expansion, and collapse;
 - four arch rules read source text rather than the import graph, because what they police is a
   global rather than an import: `window.acorn` outside the platform seam, and `console.*` outside
   each of the three loggers. Each carries a **baseline** of the files that survive, and each asserts
@@ -330,7 +347,9 @@ The counts are for seed 1. Two generators own the data:
   removed files, tabs, very long lines, many hunks with gaps, and text that repeats across files.
   Threads sit on both sides, resolved and not, with several comments, Markdown, images, `<details>`,
   and suggestions. `largeDiffSource` turns the files into a `DiffSource` for rendering the real
-  `DiffPane` in a test.
+  `DiffPane` in a test: it cuts the patches with `@acorn/diff-document` as a provider's node does and
+  answers segments and search from them, and it can record every segment request or hold each answer
+  back.
 - `plugins/agents/src/testkit/largeSession.ts` generates the session's turns and writes them through
   the plugin's own store, the way an imported transcript is written. The session ends stopped with
   every request resolved, so a booting node has nothing to recover.
@@ -338,8 +357,9 @@ The counts are for seed 1. Two generators own the data:
 The tests that hold the fixture and the health probes to their contract:
 
 - `largeDiff.test.ts` pins the small profile's digest, checks that every file's row count matches what
-  the diff model builds, that every thread and note sits on a drawn line, and streams the canonical
-  profile to check its size without holding it;
+  the diff model builds, that every thread and note sits on a drawn line, that the segmented document
+  describes each file with the counts its rows have, and streams the canonical profile to check its
+  size without holding it;
 - `largeSession.test.ts` seeds a session into a migrated database, reads it back page by page, and
   projects it into cards;
 - `plugins/changes/src/testkit/reviewNotes.test.ts` checks that seeded notes are the rows the route
@@ -357,9 +377,9 @@ invariants that do not depend on the machine: no blank or uncovered block in a s
 most one geometry commit per frame, no source topology after ready, mounted rows under a fixed
 ceiling at every profile, and teardown back to zero. It records, and does not gate, time to first
 content, time to ready, preparation and measurement time, correction pixels, and resident bytes,
-with the host, engine, build, and fixture beside them. Some invariants fail against today's diff,
-which is the baseline later work is measured from. Run it at `scale` and at `canonical` on the host
-used for release checks and keep both JSON reports.
+with the host, engine, build, and fixture beside them. The segmented document was built after the
+first partial run, which was the unsegmented baseline; a visible run at `scale` and at `canonical`
+is still owed for both. Run it on the host used for release checks and keep both JSON reports.
 
 ## Continuous integration
 
@@ -861,6 +881,14 @@ bindings rather than the prose.
     order. Open one with more than 3,000 files: the diff and the file list both say GitHub returned
     3,000 of its total. Compare two branches with more than 300 changed files in the create form: the
     count reads "first 300 files" and the preview says the comparison may have more.
+82. Open the diff of the largest pull request to hand, in unified and then split. The scrollbar is its
+    final length at once, file headers and the widest line are in place before their rows, rows appear
+    plain and then take colour, and a thread's space is there before its segment loads. Drag the
+    scrollbar to the end and back: every segment you land on draws within a moment and nothing between
+    loads. Find a word that appears only near the end and step to it. Expand a gap, collapse a file from
+    the sticky header, and leave the pane open for a minute: the health snapshot shows nothing queued.
+    Then do the same in the Changes pane while an agent edits a file: only that file's segments
+    reload, and the reader stays where they were.
 
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as

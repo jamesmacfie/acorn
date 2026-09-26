@@ -161,7 +161,7 @@ export default function CreatePullForm() {
           <Show when={!compare.isLoading} fallback={<Text emphasis="muted">Comparing…</Text>}>
             <Text emphasis="muted">
               {aheadBy() > 0
-                ? `${aheadBy()} commit${aheadBy() === 1 ? '' : 's'} · ${fileCountLabel(compare.data?.files.length ?? 0, compare.data?.completeness)}`
+                ? `${aheadBy()} commit${aheadBy() === 1 ? '' : 's'} · ${fileCountLabel(compare.data?.document.files.length ?? 0, compare.data?.completeness)}`
                 : 'Nothing to compare — branches are identical.'}
             </Text>
           </Show>

@@ -1,9 +1,9 @@
-import { createMemo, Show } from 'solid-js'
+import { Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useSearchParams } from '@solidjs/router'
 import { openPane } from '@acorn/plugin-api/client'
-import { filesKey, filePatchKey, pullKey, type PullFile, type PullFilesResponse } from '../shared/api'
-import { fetchFilePatches, fileBlobOptions, fileSummariesOptions, filesOptions, mentionsOptions, pullDetailOptions } from './queries'
+import { pullKey } from '../shared/api'
+import { fetchDiffSegments, fileBlobOptions, mentionsOptions, pullDetailOptions, pullDiffOptions, searchDiff } from './queries'
 import { addReviewComment, replyReview, resolveThread } from './mutations'
 import { Alert, DiffPane } from '@acorn/plugin-api/ui'
 import type { DiffSource } from '@acorn/plugin-api/ui/diff'
@@ -12,14 +12,12 @@ import { incompleteFilesMessage } from './completeness'
 
 // Right (Diff) pane: the shared diff shell (client-core's DiffPane, docs/diff-rendering.md) filled in
 // from a pull request. Everything here answers one of the shell's questions and nothing more: which
-// files, where their patch bodies come from, which threads to interleave, and what a comment does.
+// document, where its segments come from, which threads to place, and what a comment does.
 //
-// Browse requests full files. A task opened from the PR list already has file summaries in cache, so
-// its diff can draw file rows immediately and fetch patch bodies through the hydrator in small batches.
-// Binary and too-large files have no patch; the shell renders a "No diff" row for them.
-//
-// Until the shared source port carries completeness (phase 2 of docs/future/git-inspired/), this
-// component owns the warning that GitHub's 3,000-file API limit cut the list short.
+// The document is the node's (docs/github-integration.md § Diff documents): every file with the
+// segments its patch was cut into, and no patch text. The viewer asks for the segments it is near.
+// Binary and too-large files have no patch; the shell renders a "No diff" row for them. This component
+// owns the warning that GitHub's 3,000-file API limit cut the list short.
 export type PullRoute = {
   owner: string
   repo: string
@@ -35,46 +33,27 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
   const number = props.route.number
   const taskId = props.taskId
 
-  const files = createQuery<PullFilesResponse>(() => props.router
-    ? filesOptions(owner, repo, number, true)
-    : fileSummariesOptions(owner, repo, number, true))
+  const diff = createQuery(() => pullDiffOptions(owner, repo, number, true))
   const detail = createQuery(() => pullDetailOptions(owner, repo, number, true))
   const mentionsQuery = createQuery(() => mentionsOptions(owner, repo, true))
-
-  const fileList = () => files.data?.files
-  const byPath = createMemo(() => new Map((fileList() ?? []).map((file) => [file.path, file])))
-  // A force-push, a new commit, or a new base changes this, which is the shell's signal to drop parse
-  // state, the remembered scroll offset, and any collapsed files. patchKey is the patch's own digest,
-  // so a base change that leaves the head blob alone still moves it.
-  const signature = createMemo(() => (fileList() ?? []).map((file) => `${file.path}:${file.sha}:${file.patchKey}`).join('\0'))
+  const topology = () => diff.data?.document
 
   const source: DiffSource = {
     scope: { taskId: props.taskId, routeKey: props.route.key },
-    files: fileList,
-    loading: () => files.isLoading,
-    signature,
+    topology,
+    // The threads come with the detail, so the document is not ready until both are in.
+    loading: () => diff.isLoading || detail.isLoading,
+    // A force-push, a new commit, or a new base moves the revision, which is the shell's signal to
+    // drop expanded gaps, the remembered scroll offset, and any collapsed files. A patch's key is its
+    // own digest, so a base change that leaves the head blob alone still moves it.
+    signature: () => topology()?.revision ?? '',
     selectedPath: () => typeof searchParams.file === 'string' ? searchParams.file : '',
     threads: () => detail.data?.threads,
     mentions: () => mentionsQuery.data ?? [],
-    // Patch-body source. A file GitHub sent no patch for is resolved as it stands: the viewer draws
-    // its no-diff row. An available patch counts only with its body in hand and the same patchKey,
-    // checked in order: the per-path patch cache entry, then the warmed full files query. A summary
-    // with no body is content still to fetch, never a file without a diff.
-    cachedFile: (path) => {
-      const current = byPath().get(path)
-      if (!current) return null
-      if (current.patchState === 'unavailable' || current.patch != null) return current
-      const matches = (file: PullFile | undefined) => file?.patchKey === current.patchKey && file.patch != null ? file : null
-      return matches(queryClient.getQueryData<PullFile>(filePatchKey(owner, repo, number, path)))
-        ?? matches(queryClient.getQueryData<PullFilesResponse>(filesKey(owner, repo, number))?.files.find((entry) => entry.path === path))
-    },
-    // Anything still missing comes from the batch patch endpoint, seeding per-path cache entries.
-    fetchPatches: async (paths, signal) => {
-      const fetched = await fetchFilePatches(owner, repo, number, paths, signal)
-      for (const file of fetched) {
-        queryClient.setQueryData(filePatchKey(owner, repo, number, file.path), file)
-      }
-      return fetched
+    loadSegments: (requests, signal) => fetchDiffSegments(owner, repo, requests, signal),
+    search: async (request, signal) => {
+      const document = topology()
+      return document ? searchDiff(owner, repo, document, request, signal) : { matches: [], nextCursor: null }
     },
     // Immutable by sha, so one fetch per blob serves every gap in that file.
     fileText: async ({ sha }) => (await queryClient.fetchQuery(fileBlobOptions(owner, repo, sha))).text,
@@ -110,7 +89,7 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
   // the warning stays above it whichever file is on screen.
   return (
     <>
-      <Show when={incompleteFilesMessage(files.data?.completeness)}>{(message) => <Alert tone="warn">{message()}</Alert>}</Show>
+      <Show when={incompleteFilesMessage(diff.data?.completeness)}>{(message) => <Alert tone="warn">{message()}</Alert>}</Show>
       <DiffPane source={source} annotations={DIFF_LINE_POINT} />
     </>
   )

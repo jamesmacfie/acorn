@@ -97,7 +97,7 @@ Eleven entrypoints:
 | `@acorn/plugin-api/node` | `NodePlugin`, the route toolkit (`AppEnv`, `requireUser` and friends, `respondError`, the bridge, `portableCarrier`), the `PluginDatabase` handle type, `CoreServices` with its `ProjectRef`/`TaskRef` projections, `capabilityId`, provider and integration contracts |
 | `@acorn/plugin-api/client` | `ClientPlugin`, the API client and query options, client events, contribution types, task/workspace/fleet state, the design system's plain functions (`token`, the metrics, the status/display vocabulary), and `readLocal`/`writeLocal`/`clearLocal` for a per-device scrap such as an unsent draft |
 | `@acorn/plugin-api/ui` | Frame-safe presentation components: primitives (including the `ListDetail` two-column pane layout), `Icon`, `Picker` and its `PickerRow` for a list that opens from typing rather than from a button, `Menu` and its `RowActions` wrapper for the ellipsis menu on a list row, `Modal`, `Tabs`, `Markdown`, the diff rows, and `DiffPane` for the whole diff viewer. Also `attachPty`, which fills a `pty` rectangle from the channel the caller describes rather than from a box the host hands back ([terminal.md § Client](../terminal.md)) |
-| `@acorn/plugin-api/ui/diff` | The diff model, virtualizer, hydration and find pass, plus the `DiffSource` port `DiffPane` is driven through |
+| `@acorn/plugin-api/ui/diff` | The diff model, virtualizer and find marks, plus the `DiffSource` port `DiffPane` is driven through and the diff-document types it is written in: a topology, segments of plain rows, and search pages, which a provider builds on its node ([diff-rendering.md](../diff-rendering.md) § The document) |
 | `@acorn/plugin-api/ui/host` | Compiled-shell-only connected components and registration seams; never import this from an isolated frame |
 | `@acorn/plugin-api/ui/editor` | The host-owned CodeMirror surface: the theme, the view-state pair, and `languageForPath`, which is async because it downloads one grammar. Compiled panes only. The terminal client aliases it to a stub, because cells have no highlighter ([tui.md](../tui.md) § The host switch) |
 | `@acorn/plugin-api/ui/sdk` | The framework-free sandbox bridge, including API/state/UI calls and declared key claims, plus `mountFrame` and `mountTree`, the two render paths' entry points |
@@ -176,6 +176,16 @@ them. The manifest's `contributions.palette` alias did **not**: it names a comma
 it has always been read as one, and its removal is a separate announcement rather than something this
 batch could carry quietly. The alias was removed in the architecture reset; manifests now declare
 explicit `commands` with a `kind`.
+
+The architecture reset (`acorn-1`) started the count again at `1`. It went to `2` on 2026-09-26,
+when the diff viewer stopped taking whole patches. `DiffSource` lost `files`, `cachedFile`,
+`fetchPatches`, `contentSignature`, `contentKey`, `hasLineExtra` and `lineExtraSignature`, and gained
+`topology`, `loadSegments` and `search`; `lineExtra` became `{ anchors, render }`, so a source names
+the lines it draws under before any row is built. `createDiffHydrator` came off `/ui/diff` with the
+hydrator. What a provider now builds on its node is a diff document from `@acorn/diff-document`, and
+`/ui/diff` carries the document types the port is written in. A type change to a port is a break
+whether or not a name vanishes, so the major moved for the port as much as for the name
+([plugin-authoring.md](../plugin-authoring.md) § Drawing a diff says how to move a source).
 
 **Folding a removal into an open batch is a judgement, not a loophole.** The snapshot guard compares the
 committed major against the current one, so it cannot tell "this major already shipped" from "this major

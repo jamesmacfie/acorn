@@ -6,6 +6,7 @@ import { chunkRowsByColumnBudget, createLogger, patchBlobKey, type PluginDatabas
 import { filesResource, prResource } from '../../resourceKeys'
 import { mapLimited } from '../../mapLimited'
 import { COMPLETE, type FilesFetch, type PullComposite } from './prFetch'
+import { writePatchDocument } from './prDocument'
 import { checks as checksTable, comments as commentsTable, prCommits as prCommitsTable, prFiles as prFilesTable, prLabels as prLabelsTable, pullRequests as pullRequestsTable, reviewRequests as reviewRequestsTable, reviewThreads as reviewThreadsTable, reviews as reviewsTable, syncState as syncStateTable, viewedFiles as viewedFilesTable } from '../../../node/schema'
 
 // Shared PR mirror helpers: the GraphQL detail mirror and the REST files mirror (SQLite rows +
@@ -232,7 +233,7 @@ const BLOB_WRITE_CONCURRENCY = 8
 export const patchDigest = (patch: string) => `sha256:${createHash('sha256').update(patch).digest('hex')}`
 
 // Re-mirror one PR's files from a fetch that already holds every page. Patch bodies go to on-disk
-// BLOBS first, keyed by their digest. That is safe before the swap because an orphaned body is only
+// BLOBS first, keyed by their digest, each with its segment descriptors beside it. That is safe before the swap because an orphaned body is only
 // cache data. Only when every write has landed do the rows, their order, and the files sync row
 // (with its completeness) replace the old ones in one db.batch. A failed write throws and leaves the
 // previous mirror untouched.
@@ -253,7 +254,10 @@ export const mirrorFiles = async (blobs: PatchBlobStore, db: Db, key: PrKey, fet
   })
   await mapLimited(fetched.files, BLOB_WRITE_CONCURRENCY, async (f, i) => {
     const patchKey = rows[i]!.patchKey
-    if (patchKey) await blobs.put(patchBlobKey(patchKey), f.patch as string)
+    if (!patchKey) return
+    await blobs.put(patchBlobKey(patchKey), f.patch as string)
+    // Cut once here, so a topology read never parses (./prDocument.ts).
+    await writePatchDocument(blobs, patchKey, f.filename, f.patch as string)
   })
   const c = fetched.completeness
   const state = c.kind === 'complete'

@@ -1,21 +1,27 @@
 // Local-changes review over loopback HTTP: was `window.acorn.terminal.local`. Pure-Node
 // on the server, so it works in a plain browser (dev:node) too.
 import {
-  localActionRoute, localCommitMessageRoute, localDiffRoute, localHeadCommitRoute, localModelBackendsRoute, localNewSideRoute,
-  localStatusRoute, type CommitMessageRequest, type CommitOptions, type GeneratedCommitMessage, type HeadCommit, type PullOptions,
-  type PushOptions,
+  localActionRoute, localCommitMessageRoute, localDocumentRoute, localHeadCommitRoute, localModelBackendsRoute, localNewSideRoute,
+  localSearchRoute, localSegmentsRoute, localStatusRoute, type CommitMessageRequest, type CommitOptions, type GeneratedCommitMessage,
+  type HeadCommit, type LocalDocumentRequest, type LocalDocumentResponse, type LocalSearchRequest, type LocalSegmentsRequest,
+  type PullOptions, type PushOptions,
 } from '../shared/api'
+import type { DiffSearchPage, DiffSegmentPayload } from '@acorn/plugin-api/ui/diff'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import { readJson, writeJson } from '@acorn/plugin-api/client'
 import type { LocalStatus } from '@acorn/protocol/localGit.ts'
 
 type ActionResult = { ok: boolean; reason?: string }
-const post = <T>(url: string, body?: unknown) =>
-  writeJson<T>(url, { method: 'POST', headers: body === undefined ? undefined : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+const post = <T>(url: string, body?: unknown, signal?: AbortSignal) =>
+  writeJson<T>(url, { method: 'POST', headers: body === undefined ? undefined : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body), signal })
 
 export const localGitApi = {
   status: (taskId: string) => readJson<LocalStatus>(localStatusRoute(taskId)),
-  diff: (taskId: string, path: string, scope: 'unstaged' | 'staged') => readJson<{ patch: string } | { error: string }>(localDiffRoute(taskId, path, scope)),
+  // The stacked diff as a document, its segments, and its search pages (docs/diff-rendering.md § The
+  // document).
+  document: (taskId: string, request: LocalDocumentRequest, signal?: AbortSignal) => post<LocalDocumentResponse>(localDocumentRoute(taskId), request, signal),
+  segments: (taskId: string, request: LocalSegmentsRequest, signal?: AbortSignal) => post<DiffSegmentPayload[]>(localSegmentsRoute(taskId), request, signal),
+  search: (taskId: string, request: LocalSearchRequest, signal?: AbortSignal) => post<DiffSearchPage>(localSearchRoute(taskId), request, signal),
   newSide: (taskId: string, path: string, scope: 'unstaged' | 'staged') => readJson<{ text: string } | { error: string }>(localNewSideRoute(taskId, path, scope)),
   stage: (taskId: string, paths: string[]) => post<ActionResult>(localActionRoute(taskId, 'stage'), { paths }),
   unstage: (taskId: string, paths: string[]) => post<ActionResult>(localActionRoute(taskId, 'unstage'), { paths }),

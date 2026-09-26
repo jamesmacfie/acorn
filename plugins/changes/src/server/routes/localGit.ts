@@ -2,7 +2,11 @@ import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { LocalStatus } from '@acorn/protocol/localGit.ts'
-import type { CommitMessageRequest, CommitOptions, GeneratedCommitMessage, HeadCommit, PullOptions, PushOptions } from '../../shared/api'
+import type {
+  CommitMessageRequest, CommitOptions, GeneratedCommitMessage, HeadCommit, LocalDocumentRequest, LocalDocumentResponse, LocalSearchRequest,
+  LocalSegmentsRequest, PullOptions, PushOptions,
+} from '../../shared/api'
+import { MAX_DOCUMENT_FILES, MAX_SEGMENTS_PER_REQUEST, SEARCH_MAX_QUERY, type DiffSearchPage, type DiffSegmentPayload } from '@acorn/diff-document/document'
 import {
   type AppEnv,
   BridgeError,
@@ -16,19 +20,24 @@ import {
   viaBridge,
 } from '@acorn/plugin-api/node'
 
-// The ChangesPane's working-tree status, diff and blob reads, plus the staging, commit, discard and
-// remote actions. Task-scoped HTTP behind the LocalGitBridge (../localGit.ts). Pure Node, so it works
+// The ChangesPane's working-tree status, diff document and blob reads, plus the staging, commit,
+// discard and remote actions. Task-scoped HTTP behind the LocalGitBridge (../localGit.ts). Pure Node, so it works
 // in dev:node.
 
-export type LocalScope = 'unstaged' | 'staged'
+export type { LocalScope } from '../../shared/api'
 export type GitActionResult = { ok: boolean; reason?: string }
 export type LocalGitBridge = {
   /** One read answers the whole panel: the changes, the branch, its upstream, how far each way, and
    *  whether a merge or rebase is mid-flight. */
   status(taskId: string): Promise<LocalStatus>
-  diff(taskId: string, path: string, scope: LocalScope): Promise<{ patch: string } | { error: string }>
+  /** The stacked files' diff as document descriptors. Throws a `BridgeError` when there is no tree. */
+  document(taskId: string, request: LocalDocumentRequest): Promise<LocalDocumentResponse>
+  /** Segments by patch digest. A digest the tree no longer produces is a 409 `revision_conflict`. */
+  segments(taskId: string, request: LocalSegmentsRequest): Promise<DiffSegmentPayload[]>
+  /** One page of find matches over the named files, with the same conflict rule. */
+  search(taskId: string, request: LocalSearchRequest): Promise<DiffSearchPage>
   /** The new side of the file's diff, whole, so the pane can fill an expanded gap. */
-  newSide(taskId: string, path: string, scope: LocalScope): Promise<{ text: string } | { error: string }>
+  newSide(taskId: string, path: string, scope: 'unstaged' | 'staged'): Promise<{ text: string } | { error: string }>
   /** A row's checkbox sends one path, a group's sends many. */
   stage(taskId: string, paths: string[]): Promise<GitActionResult>
   unstage(taskId: string, paths: string[]): Promise<GitActionResult>
@@ -85,6 +94,26 @@ const pushBody = z.object({ force: z.boolean().optional() })
 // key nobody chose; `modelId` is optional because a backend that declares no model leaves the choice
 // to itself (@acorn/protocol/modelProviders.ts § defaultModelIdFor).
 const commitMessageBody = z.object({ backendId: z.string().min(1), modelId: z.string().min(1).optional() })
+// The document reads. Paths are validated again in ../localDocument.ts, where they reach git; here the
+// shape and the bounds, so a request cannot ask for an unbounded document or batch.
+const scope = z.enum(['staged', 'unstaged'])
+const patchKey = z.string().regex(/^sha256:[0-9a-f]{64}$/)
+const documentBody = z.object({
+  scope,
+  files: z.array(z.object({ path: z.string().min(1), key: z.string() })).max(MAX_DOCUMENT_FILES),
+}) satisfies z.ZodType<LocalDocumentRequest>
+const segmentsBody = z.object({
+  scope,
+  requests: z.array(z.object({ path: z.string().min(1), patchKey, ordinal: z.number().int().min(0) })).min(1).max(MAX_SEGMENTS_PER_REQUEST),
+}) satisfies z.ZodType<LocalSegmentsRequest>
+// The query is never logged or counted: it is a piece of somebody's source.
+const searchBody = z.object({
+  scope,
+  query: z.string().min(1).max(SEARCH_MAX_QUERY),
+  caseSensitive: z.boolean(),
+  cursor: z.string().max(64).nullable(),
+  files: z.array(z.object({ path: z.string().min(1), patchKey })).max(MAX_DOCUMENT_FILES),
+}) satisfies z.ZodType<LocalSearchRequest>
 
 const id = (c: { req: { param(k: string): string } }) => c.req.param('id')
 
@@ -119,10 +148,21 @@ async function viaModels<T>(c: Context<AppEnv>, fn: (bridge: LocalGitBridge, use
 
 export const localGit = new Hono<AppEnv>()
   .get('/:id/local/status', (c) => viaBridge(c, LOCAL_GIT, (b) => b.status(id(c))))
-  .get('/:id/local/diff', (c) => {
-    const path = c.req.query('path')
-    if (!path) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, LOCAL_GIT, (b) => b.diff(id(c), path, c.req.query('scope') === 'staged' ? 'staged' : 'unstaged'))
+  // Reads with a body, so POST: a stack of thousands of paths does not fit in a URL.
+  .post('/:id/local/document', async (c) => {
+    const p = documentBody.safeParse(await c.req.json().catch(() => null))
+    if (!p.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, LOCAL_GIT, (b) => b.document(id(c), p.data))
+  })
+  .post('/:id/local/document/segments', async (c) => {
+    const p = segmentsBody.safeParse(await c.req.json().catch(() => null))
+    if (!p.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, LOCAL_GIT, (b) => b.segments(id(c), p.data))
+  })
+  .post('/:id/local/document/search', async (c) => {
+    const p = searchBody.safeParse(await c.req.json().catch(() => null))
+    if (!p.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, LOCAL_GIT, (b) => b.search(id(c), p.data))
   })
   .get('/:id/local/new-side', (c) => {
     const path = c.req.query('path')

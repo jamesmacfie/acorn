@@ -7,6 +7,7 @@
 // Keep the route templates and query keys byte-identical when you move them. A retyped route
 // template compiles fine and 404s at runtime, and a changed query key orphans a user's persisted
 // IndexedDB cache, which has no buster.
+import type { DiffDocumentTopology, DiffSearchRequest, DiffSegmentRequest } from '@acorn/diff-document/document'
 import type { PullRef } from './pullRef'
 
 export type Repo = {
@@ -95,7 +96,13 @@ export type PullFile = {
 // The files route's response. The list is in `position` order, and whether it is everything GitHub
 // has is stated here rather than guessed from its length.
 export type PullFilesResponse = { files: PullFile[]; completeness: PullTopologyCompleteness }
-export type PullFilesPatchRequest = { paths: string[] }
+// The diff route's answer: the pull's files as a segmented document, with no patch text in it, and
+// whether that is every file GitHub has (docs/github-integration.md § Diff documents).
+export type PullDiffResponse = { document: DiffDocumentTopology; completeness: PullTopologyCompleteness }
+// A batch of segments by patch digest and ordinal, from a pull's document or a compare preview's.
+export type DiffSegmentsBody = { requests: DiffSegmentRequest[] }
+// A search over the files the request names, by path and patch digest, in document order.
+export type DiffSearchBody = DiffSearchRequest & { files: { path: string; patchKey: string }[] }
 // Conflicting files for a PR. `available` is false when the repo isn't mapped to a local checkout
 // (or the trial merge couldn't run), the UI then can't enumerate files, only say conflicts exist.
 export type PullConflicts = { available: boolean; files: string[] }
@@ -137,9 +144,9 @@ export type PullBatchRequest = { numbers: number[]; files?: PullBatchFilesMode }
 // Create-PR support: branch picker list + base..head compare (diff preview + commits for prefill).
 export type Branch = { name: string }
 export type CompareCommit = { sha: string; message: string }
-// Compare files carry their patch inline, so `patch: null` can only mean GitHub sent none.
-export type CompareFile = Pick<PullFile, 'path' | 'status' | 'additions' | 'deletions' | 'sha' | 'viewed' | 'patch'>
-export type Compare = { aheadBy: number; files: CompareFile[]; completeness: PullTopologyCompleteness; commits: CompareCommit[] }
+// The compare's files as a document, like a pull's. GitHub sends their patches inline; the route
+// stores each under its digest and answers descriptors, so the preview loads segments the same way.
+export type Compare = { aheadBy: number; document: DiffDocumentTopology; completeness: PullTopologyCompleteness; commits: CompareCommit[] }
 
 // Full head-blob body, fetched on demand to expand unchanged context around diff hunks.
 export type FileBlob = { text: string }
@@ -159,9 +166,9 @@ export const createPullRoute = (owner: string, repo: string) => `${repoRoute(own
 export const taskPullsRoute = (taskId: string) => `/v1/p/github/tasks/${encodeURIComponent(taskId)}/pulls`
 export const repoLabelsRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'labels')
 export const fileSummariesRoute = (owner: string, repo: string, number: string | number) => `${pullRoute(owner, repo, number, 'files')}?summary=1`
-export const filePatchRoute = (owner: string, repo: string, number: string | number, path: string) =>
-  `${pullRoute(owner, repo, number, 'files')}?path=${encodeURIComponent(path)}`
-export const filePatchesRoute = (owner: string, repo: string, number: string | number) => pullRoute(owner, repo, number, 'files/patches')
+export const pullDiffRoute = (owner: string, repo: string, number: string | number) => pullRoute(owner, repo, number, 'diff')
+export const diffSegmentsRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'diff/segments')
+export const diffSearchRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'diff/search')
 export const branchesRoute = (owner: string, repo: string) => repoRoute(owner, repo, 'branches')
 export const compareRoute = (owner: string, repo: string, base: string, head: string) =>
   `${repoRoute(owner, repo, 'compare')}?base=${encodeURIComponent(base)}&head=${encodeURIComponent(head)}`
@@ -189,16 +196,18 @@ export const taskPullsKey = (taskId: string) => ['task-pulls', taskId] as const
 export const pullKey = (owner: string, repo: string, number: string) => ['pull', owner, repo, number] as const
 export const pullPrefixKey = (owner: string, repo: string) => ['pull', owner, repo] as const
 export const repoLabelsKey = (owner: string, repo: string) => ['labels', owner, repo] as const
-export const filesKey = (owner: string, repo: string, number: string) => ['files', owner, repo, number] as const
 export const conflictsKey = (owner: string, repo: string, number: string, base: string) => ['conflicts', owner, repo, number, base] as const
 // 'v2': the response became PullFilesResponse, and a persisted summary array from before must not
 // hydrate into it.
 export const fileSummariesKey = (owner: string, repo: string, number: string) => ['files', owner, repo, number, 'summary', 'v2'] as const
-export const filePatchKey = (owner: string, repo: string, number: string, path: string) => ['files', owner, repo, number, 'patch', path] as const
+// Under 'files' and not 'summary', so it is not persisted: a document can be large, and it is
+// rebuilt from the node's own blobs in one read.
+export const pullDiffKey = (owner: string, repo: string, number: string) => ['files', owner, repo, number, 'diff'] as const
 export const fileBlobKey = (owner: string, repo: string, sha: string) => ['blob', owner, repo, sha] as const
 export const branchesKey = (owner: string, repo: string) => ['branches', owner, repo] as const
-// 'v2': Compare gained `completeness`.
-export const compareKey = (owner: string, repo: string, base: string, head: string) => ['compare', owner, repo, base, head, 'v2'] as const
+// 'v3': Compare's `files` became a `document` (v2 added `completeness`). A persisted answer from before
+// must not hydrate into the new shape.
+export const compareKey = (owner: string, repo: string, base: string, head: string) => ['compare', owner, repo, base, head, 'v3'] as const
 export const pinsKey = ['pins'] as const
 export const mentionsKey = (owner: string, repo: string) => ['mentions', owner, repo] as const
 export const runJobsKey = (owner: string, repo: string, runId: number) => ['run-jobs', owner, repo, runId] as const

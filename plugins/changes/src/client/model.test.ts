@@ -3,7 +3,7 @@ import type { LocalChange } from '@acorn/protocol/localGit.ts'
 import {
   buildTree, changeKey, commitMode, DEFAULT_CHANGE_VIEW, filesUnder, folderState,
   generateReason, groupChanges, groupSections, isFolderKey, patchKey, pickSelected, primaryRemote, remoteCounts,
-  remoteReason, sortRows, stackFor, stageableRows, stagedState, toPullFile, totals, unstagedPathsOf,
+  remoteReason, sortRows, stackFor, stageableRows, stagedState, documentFile, totals, unstagedPathsOf,
   viewNodes, visibleNodes, type ChangeView, type TreeNode,
 } from './model'
 import { DIFF_LINE_KEY, DIFF_LINE_POINT, PUSH_ACTIONS_MAX, PUSH_ACTIONS_POINT } from './extensionPoints'
@@ -157,26 +157,32 @@ describe('stackFor', () => {
   })
 })
 
-describe('toPullFile', () => {
+describe('documentFile', () => {
+  const cut = { patchKey: `sha256:${'c'.repeat(64)}`, segments: [{ rows: 2, bands: 2, gaps: 0, columns: 1, lines: [0, 0, 1, 1] as [number, number, number, number] }] }
+
   it('leaves a deleted file no new side, so its gaps stay inert', () => {
-    expect(toPullFile(c('src/gone.ts', false, 'deleted'), '@@ -1 +0,0 @@\n-x').sha).toBeNull()
-    expect(toPullFile(c('src/kept.ts', true), '').sha).toBe('staged')
+    expect(documentFile(c('src/gone.ts', false, 'deleted'), cut).sha).toBeNull()
+    expect(documentFile(c('src/kept.ts', true), undefined).sha).toBe('staged')
   })
 
   it('hands the viewer a conflict as a modification, since that is the working copy it gets', () => {
-    expect(toPullFile(c('src/clash.ts', false, 'conflicted'), '@@ -1 +1 @@\n-x\n+y').status).toBe('modified')
+    expect(documentFile(c('src/clash.ts', false, 'conflicted'), cut).status).toBe('modified')
   })
 
-  it('maps untracked → added and carries the patch', () => {
-    expect(toPullFile(c('n.md', false, 'untracked'), '@@ -0,0 +1 @@\n+x')).toEqual({
+  it('maps untracked → added and carries what the node cut its patch into', () => {
+    expect(documentFile(c('n.md', false, 'untracked'), cut)).toEqual({
       path: 'n.md',
       status: 'added',
       additions: null,
       deletions: null,
       sha: 'unstaged',
       viewed: false,
-      patch: '@@ -0,0 +1 @@\n+x',
+      ...cut,
     })
+  })
+
+  it('reads as no diff until the node has answered for the file', () => {
+    expect(documentFile(c('n.md', false, 'untracked'), undefined)).toMatchObject({ patchKey: null, segments: [] })
   })
 })
 
