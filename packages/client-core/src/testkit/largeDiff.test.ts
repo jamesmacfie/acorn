@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { buildDiffRows, buildRenderableRows, plainTokenize } from '../kit/diff/diffModel'
+import { fileDocument } from '@acorn/diff-document/document'
+import { buildDiffRows, buildRenderableRows, diffRowsFromPlain, maxLineCols, plainTokenize, toBands } from '../kit/diff/diffModel'
 import { LARGE_SURFACE_PROFILES, largeDiffFiles, largeDiffSummary } from './largeDiff'
 
 // The fixture every large-surface measurement is taken against. Later phases compare numbers across
@@ -76,4 +77,21 @@ describe('the large-diff fixture', () => {
     expect(canonical.fixedRows).toBeGreaterThanOrEqual(1_000_000)
     expect(canonical.threads).toBe(400)
   }, 60_000)
+})
+
+// The document the node routes build from these patches, held against the bounded row builders the
+// renderer draws a segment with: the counts a topology carries have to be the rows that get drawn.
+describe('the large-diff fixture as a segmented document', () => {
+  it('describes every file with the counts its rows actually have', () => {
+    for (const file of largeDiffFiles('scale', 1)) {
+      const doc = fileDocument(file.path, file.patch)
+      const whole = buildDiffRows(file, plainTokenize)
+      expect(doc.descriptors.reduce((sum, segment) => sum + segment.rows, 0), file.path).toBe(whole.length)
+      expect(Math.max(0, ...doc.descriptors.map((segment) => segment.columns))).toBe(maxLineCols(whole))
+      doc.segments.forEach((plain, ordinal) => {
+        const rows = diffRowsFromPlain(file.path, file.sha, plain)
+        expect(doc.descriptors[ordinal]!.bands).toBe(toBands(rows).length)
+      })
+    }
+  })
 })

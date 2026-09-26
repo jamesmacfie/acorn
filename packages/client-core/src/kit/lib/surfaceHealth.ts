@@ -25,11 +25,12 @@ export type SurfaceKind = 'diff' | 'timeline'
  *  concept of yet stays zero, which is what later phases report into. */
 export type SurfaceHealth = {
   /** The document as a whole. `ready` is the source-owned structure being complete. */
-  topology: { files: number; fixedRows: number; dynamicBlocks: number; ready: boolean; lateSourceBlocks: number }
+  topology: { files: number; segments: number; fixedRows: number; dynamicBlocks: number; ready: boolean; lateSourceBlocks: number }
   /** What is in the DOM now. Blank and uncovered are measured against the visible viewport only. */
   mounted: { segments: number; fixedRows: number; dynamicBlocks: number; blankBlocks: number; uncoveredRanges: number }
-  /** Work still owed. Distance is in the surface's own unit (files today), never a path. */
-  work: { queuedSegments: number; queuedEnrichment: number; furthestQueueDistance: number; scheduledFrames: number; heldPublications: number; prepareMs: number }
+  /** Work still owed. Distance is in the surface's own unit (segments for the diff), never a path.
+   *  `unvisitedSegments` is content prepared for a part of the surface the reader has not reached. */
+  work: { queuedSegments: number; queuedEnrichment: number; furthestQueueDistance: number; unvisitedSegments: number; scheduledFrames: number; heldPublications: number; prepareMs: number }
   /** Size reads and the geometry writes they caused, cumulative since mount, plus live observers. */
   measurement: { candidates: number; reads: number; commits: number; maxCommitsInFrame: number; readMs: number; activeObservers: number; observedElements: number }
   /** Scroll writes the surface made to keep a reading place, cumulative since mount. */
@@ -58,9 +59,9 @@ export type SurfaceHealthProbe = {
 }
 
 const TEMPLATE: SurfaceHealth = {
-  topology: { files: 0, fixedRows: 0, dynamicBlocks: 0, ready: false, lateSourceBlocks: 0 },
+  topology: { files: 0, segments: 0, fixedRows: 0, dynamicBlocks: 0, ready: false, lateSourceBlocks: 0 },
   mounted: { segments: 0, fixedRows: 0, dynamicBlocks: 0, blankBlocks: 0, uncoveredRanges: 0 },
-  work: { queuedSegments: 0, queuedEnrichment: 0, furthestQueueDistance: 0, scheduledFrames: 0, heldPublications: 0, prepareMs: 0 },
+  work: { queuedSegments: 0, queuedEnrichment: 0, furthestQueueDistance: 0, unvisitedSegments: 0, scheduledFrames: 0, heldPublications: 0, prepareMs: 0 },
   measurement: { candidates: 0, reads: 0, commits: 0, maxCommitsInFrame: 0, readMs: 0, activeObservers: 0, observedElements: 0 },
   correction: { count: 0, failed: 0, maxPixels: 0, maxAnchorDrift: 0 },
   resident: { documents: 0, segments: 0, rows: 0, estimatedBytes: 0 },

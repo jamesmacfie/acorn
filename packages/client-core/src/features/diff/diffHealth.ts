@@ -1,25 +1,28 @@
+import type { DiffDocumentTopology } from '@acorn/diff-document/document'
 import { registerSurfaceHealth, type SurfaceHealthReading } from '../../kit/lib/surfaceHealth'
-import { isCodeRow, type CodeRow, type DiffFile, type DiffThread, type ParsedFile, type Row, type SplitBand, type ViewMode } from '../../kit/diff/diffModel'
+import { isCodeRow, type CodeRow, type DiffThread, type Row, type ViewMode } from '../../kit/diff/diffModel'
 import type { DiffMeasureCounters } from '../../kit/diff/virtualization'
+import type { DiffItem } from './documentView'
+import type { SegmentLoader } from './segmentLoader'
 
 // The diff's health reading (docs/telemetry.md § Rendered-surface health). Everything here is read
 // when a snapshot is asked for, from state the pane already holds, so an open diff pays nothing for
 // it between requests.
 //
-// Two of the numbers are the current renderer's known costs rather than the goal the later phases
-// set: `topology` only knows a file's rows once the hydrator has parsed it, and the queue distance
-// shows the hydrator working through files the reader is nowhere near.
+// The document's size comes from its topology, the mounted counts from the items in the virtual
+// range, and the work owed from the segment loader, whose queue is only ever what the reader can see
+// and what is near it. The queue distance is in segments from the items on screen.
 
 type HealthVirtualizer = {
-  getVirtualItems: () => readonly { index: number }[]
+  getVirtualItems: () => readonly { index: number; start: number; end: number }[]
   elementsCache: ReadonlyMap<unknown, Element>
 }
 
 export type DiffHealthInputs = {
-  files: () => readonly DiffFile[]
-  rows: () => readonly Row[]
-  bands: () => readonly SplitBand[]
-  parsed: () => readonly ParsedFile[]
+  topology: () => DiffDocumentTopology | undefined
+  items: () => readonly DiffItem[]
+  /** Source threads that land in a segment of this document. */
+  placedThreads: () => number
   threads: () => readonly DiffThread[] | undefined
   viewMode: () => ViewMode
   virt: HealthVirtualizer
@@ -27,19 +30,16 @@ export type DiffHealthInputs = {
   scrollEl: () => HTMLElement | undefined
   counters: DiffMeasureCounters
   scheduledFrames: () => number
-  hydration: () => { queued: readonly string[]; loading: number }
-  heldPublications: () => number
-  visiblePaths: () => ReadonlySet<string>
+  loader: SegmentLoader
+  /** A mounted item's rows with its threads placed, or undefined while it is not loaded. */
+  itemRows: (item: Extract<DiffItem, { kind: 'segment' | 'overlay' }>) => readonly Row[] | undefined
   hasLineExtra: (row: CodeRow) => boolean
 }
 
-const isFixed = (row: Row) => row.kind !== 'thread' && row.kind !== 'load'
-const isPlaceholder = (parsed: ParsedFile) => parsed.diff.length === 1 && parsed.diff[0]?.kind === 'load'
-
 /**
- * How much of the visible viewport the mounted rows actually cover. Rects rather than virtual
- * offsets, because the failure worth catching is the DOM and the virtualizer disagreeing: a row whose
- * real height differs from its offset leaves a gap or an overlap the numbers alone would not show.
+ * How much of the visible viewport the mounted items actually cover. Rects rather than virtual
+ * offsets, because the failure worth catching is the DOM and the virtualizer disagreeing: an item
+ * whose real height differs from its offset leaves a gap or an overlap the numbers alone would not show.
  */
 function coverage(scroller: HTMLElement, selector: string): { blank: number; uncovered: number } {
   const view = scroller.getBoundingClientRect()
@@ -52,7 +52,7 @@ function coverage(scroller: HTMLElement, selector: string): { blank: number; unc
     const rect = element.getBoundingClientRect()
     if (rect.bottom <= view.top || rect.top >= bottom) continue
     if (rect.height > 0) spans.push([Math.max(rect.top, view.top), Math.min(rect.bottom, bottom)])
-    // Visible, and neither a skeleton nor content: a load row says "Loading", a code row has cells.
+    // Visible, and neither a placeholder nor content: a pending segment says "Loading", a row has cells.
     if (rect.height <= 0 || (!element.firstElementChild && !(element.textContent ?? '').trim())) blank++
   }
   spans.sort((a, b) => a[0] - b[0])
@@ -66,28 +66,6 @@ function coverage(scroller: HTMLElement, selector: string): { blank: number; unc
   return { blank, uncovered }
 }
 
-/** How far, in files, the furthest queued file is from the files the reader can see. */
-function queueDistance(files: readonly DiffFile[], queued: readonly string[], visible: ReadonlySet<string>): number {
-  if (!queued.length) return 0
-  const index = new Map(files.map((file, position) => [file.path, position]))
-  let low = Infinity
-  let high = -Infinity
-  for (const path of visible) {
-    const at = index.get(path)
-    if (at == null) continue
-    low = Math.min(low, at)
-    high = Math.max(high, at)
-  }
-  if (low === Infinity) low = high = 0
-  let furthest = 0
-  for (const path of queued) {
-    const at = index.get(path)
-    if (at == null) continue
-    furthest = Math.max(furthest, at < low ? low - at : at > high ? at - high : 0)
-  }
-  return furthest
-}
-
 const connected = (virtualizer: HealthVirtualizer) => {
   let count = 0
   for (const element of virtualizer.elementsCache.values()) if (element.isConnected) count++
@@ -97,7 +75,7 @@ const connected = (virtualizer: HealthVirtualizer) => {
 /**
  * Register the pane as a `diff` surface. Call it first in the pane, before anything that registers a
  * cleanup, and `attach` its inputs once they exist: disposal then runs after the virtualizers, the
- * hydrator and the measure schedulers have stopped, and the final reading shows that they did.
+ * loader and the measure schedulers have stopped, and the final reading shows that they did.
  */
 export function createDiffHealth() {
   let inputs: DiffHealthInputs | null = null
@@ -108,61 +86,73 @@ export function createDiffHealth() {
 
   const read = (): SurfaceHealthReading => {
     if (!inputs) return {}
-    const { files, rows, bands, counters } = inputs
-    const all = rows()
-    let fixedRows = 0
-    let dynamicBlocks = 0
-    for (const row of all) {
-      if (isFixed(row)) fixedRows++
-      else if (row.kind === 'thread') dynamicBlocks++
-    }
+    const { counters, loader } = inputs
+    const topology = inputs.topology()
+    const items = inputs.items()
+    const noDiff = topology?.files.filter((file) => !file.patchKey || !file.segments.length).length ?? 0
 
     const split = inputs.viewMode() === 'split'
+    const virtualizer = split ? inputs.splitVirt : inputs.virt
+    const scroller = inputs.scrollEl()
+    const viewTop = scroller?.scrollTop ?? 0
+    const viewBottom = viewTop + (scroller?.clientHeight ?? 0)
+    let mountedSegments = 0
     let mountedFixed = 0
     let mountedDynamic = 0
-    if (split) {
-      const list = bands()
-      for (const item of inputs.splitVirt.getVirtualItems()) {
-        const band = list[item.index]
-        if (!band) continue
-        const dynamic = band.kind === 'full'
-          ? band.row.kind === 'thread'
-          : (!!band.left && inputs.hasLineExtra(band.left)) || (!!band.right && inputs.hasLineExtra(band.right))
-        if (dynamic) mountedDynamic++
-        else mountedFixed++
+    let firstVisible = Infinity
+    let lastVisible = -Infinity
+    const segmentAt = new Map<string, number>()
+    let ordinal = 0
+    const positions = items.map((item) => (item.kind === 'segment' ? ordinal++ : ordinal))
+    items.forEach((item, index) => {
+      if (item.kind === 'segment') segmentAt.set(item.segment.contentKey, positions[index]!)
+    })
+    for (const vi of virtualizer.getVirtualItems()) {
+      const item = items[vi.index]
+      if (!item) continue
+      if (vi.end > viewTop && vi.start < viewBottom) {
+        firstVisible = Math.min(firstVisible, positions[vi.index]!)
+        lastVisible = Math.max(lastVisible, positions[vi.index]!)
       }
-    } else {
-      for (const item of inputs.virt.getVirtualItems()) {
-        const row = all[item.index]
-        if (!row) continue
+      if (item.kind === 'file' || item.kind === 'nodiff') {
+        mountedFixed++
+        continue
+      }
+      if (item.kind === 'segment') mountedSegments++
+      for (const row of inputs.itemRows(item) ?? []) {
         if (row.kind === 'thread' || (isCodeRow(row) && inputs.hasLineExtra(row))) mountedDynamic++
         else mountedFixed++
       }
     }
-    const scroller = inputs.scrollEl()
-    const shown = scroller
-      ? coverage(scroller, split ? '.diff-split-band[data-index]' : '.diff-row[data-index]')
-      : { blank: 0, uncovered: 0 }
+    const shown = scroller ? coverage(scroller, '.diff-item[data-index]') : { blank: 0, uncovered: 0 }
 
-    const hydration = inputs.hydration()
-    let residentRows = 0
-    let residentChars = 0
-    let documents = 0
-    for (const parsed of inputs.parsed()) {
-      if (isPlaceholder(parsed)) continue
-      documents = 1
-      residentRows += parsed.diff.length
-      residentChars += parsed.file.patch?.length ?? 0
+    const stats = loader.stats()
+    if (firstVisible === Infinity) firstVisible = lastVisible = 0
+    let furthest = 0
+    for (const key of stats.queued) {
+      const at = segmentAt.get(key)
+      if (at == null) continue
+      furthest = Math.max(furthest, at < firstVisible ? firstVisible - at : at > lastVisible ? at - lastVisible : 0)
     }
 
     return {
-      topology: { files: files().length, fixedRows, dynamicBlocks, ready, lateSourceBlocks },
-      mounted: { fixedRows: mountedFixed, dynamicBlocks: mountedDynamic, blankBlocks: shown.blank, uncoveredRanges: shown.uncovered },
+      topology: {
+        files: topology?.files.length ?? 0,
+        segments: topology?.totals.segments ?? 0,
+        // A header per file, a no-diff row for each file without one, and every segment's rows.
+        fixedRows: topology ? topology.totals.rows + topology.files.length + noDiff : 0,
+        dynamicBlocks: inputs.placedThreads(),
+        ready,
+        lateSourceBlocks,
+      },
+      mounted: { segments: mountedSegments, fixedRows: mountedFixed, dynamicBlocks: mountedDynamic, blankBlocks: shown.blank, uncoveredRanges: shown.uncovered },
       work: {
-        queuedSegments: hydration.queued.length + hydration.loading,
-        furthestQueueDistance: queueDistance(files(), hydration.queued, inputs.visiblePaths()),
+        queuedSegments: stats.queued.length + stats.loading,
+        queuedEnrichment: stats.enrichment,
+        furthestQueueDistance: furthest,
+        unvisitedSegments: stats.unvisited,
         scheduledFrames: inputs.scheduledFrames() + counters.pendingFrames(),
-        heldPublications: inputs.heldPublications(),
+        heldPublications: 0,
         prepareMs,
       },
       measurement: {
@@ -175,9 +165,9 @@ export function createDiffHealth() {
         observedElements: connected(inputs.virt) + connected(inputs.splitVirt),
       },
       correction: { count: counters.counts.corrections, maxPixels: counters.counts.maxCorrectionPixels },
-      // UTF-16 code units of the patch text held, a lower bound: the row objects and tokens built
-      // from it weigh several times that.
-      resident: { documents, rows: residentRows, estimatedBytes: residentChars * 2 },
+      // UTF-16 code units of the row text held, plus a flat allowance per row: a lower bound, since
+      // the tokens built from it weigh several times that.
+      resident: { documents: topology ? 1 : 0, segments: stats.segments, rows: stats.rows, estimatedBytes: stats.bytes },
     }
   }
 
@@ -185,10 +175,11 @@ export function createDiffHealth() {
 
   return {
     attach: (next: DiffHealthInputs) => { inputs = next },
-    /** Time spent parsing a file or rebuilding the row model, both proportional to the whole diff. */
+    /** Time spent building a segment's rows or applying its colour. */
     prepared: (ms: number) => { prepareMs += ms },
-    /** The hydrator has nothing left to do. The first time per file set, the topology is complete. */
-    settled: () => {
+    /** The topology and the source's threads have both arrived. The first time per file set, the
+     *  document's structure is complete. */
+    ready: () => {
       if (ready || !inputs) return
       ready = true
       readyThreads = new Set((inputs.threads() ?? []).map((thread) => thread.threadId))

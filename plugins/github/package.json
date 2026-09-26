@@ -16,6 +16,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@acorn/diff-document": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
     "@acorn/plugin-editor": "workspace:*",
     "@acorn/protocol": "workspace:*",

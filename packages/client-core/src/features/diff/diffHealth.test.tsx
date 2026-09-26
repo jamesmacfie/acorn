@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import type { DiffThread } from '../../kit/diff/diffModel'
 import { _resetSurfaceHealth, surfaceHealthSnapshot, type SurfaceHealthEntry } from '../../kit/lib/surfaceHealth'
 import { largeDiffFiles, largeDiffSource, largeDiffSummary, type LargeDiffFile } from '../../testkit/largeDiff'
+import { installDiffLayout } from './layout.helper'
 
 // The diff's health reading against the real pane and the generated fixture (./diffHealth.ts). jsdom
 // has no layout, so the scroller is given a height and every other element a row's, which is enough
@@ -16,19 +17,14 @@ vi.mock('../../infra/highlight/worker', () => ({
 
 const { DiffPane } = await import('./DiffPane')
 
-const offsetHeight = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')
 const cleanups: (() => void)[] = []
 
 beforeEach(() => {
-  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
-    configurable: true,
-    get(this: HTMLElement) { return this.classList.contains('diff') ? 600 : 20 },
-  })
+  cleanups.push(installDiffLayout())
 })
 
 afterEach(() => {
-  cleanups.splice(0).forEach((dispose) => dispose())
-  if (offsetHeight) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', offsetHeight)
+  cleanups.splice(0).reverse().forEach((dispose) => dispose())
   _resetSurfaceHealth()
 })
 
@@ -65,12 +61,19 @@ describe('the diff health probe', () => {
     expect(ready.topology.fixedRows).toBe(summary.fixedRows)
     expect(ready.topology.dynamicBlocks).toBe(summary.threads)
     expect(ready.topology.lateSourceBlocks).toBe(0)
-    expect(ready.work.queuedSegments).toBe(0)
-    expect(ready.resident.rows).toBeGreaterThan(0)
-    expect(ready.resident.estimatedBytes).toBeGreaterThan(0)
+    expect(ready.topology.segments).toBeGreaterThan(summary.files)
 
-    await vi.waitFor(() => expect(diff()?.measurement.activeObservers).toBeGreaterThan(0), { timeout: 5_000 })
+    // Only the segments near the viewport load, and once they have, nothing more is owed.
+    await vi.waitFor(() => {
+      const now = diff()!
+      expect(now.resident.rows).toBeGreaterThan(0)
+      expect(now.work.queuedSegments).toBe(0)
+      expect(now.measurement.activeObservers).toBeGreaterThan(0)
+    }, { timeout: 5_000 })
     const mounted = diff()!
+    expect(mounted.resident.estimatedBytes).toBeGreaterThan(0)
+    expect(mounted.mounted.segments).toBeGreaterThan(0)
+    expect(mounted.resident.segments).toBeLessThan(mounted.topology.segments)
     expect(mounted.mounted.fixedRows).toBeGreaterThan(0)
     // A window, not the document.
     expect(mounted.mounted.fixedRows + mounted.mounted.dynamicBlocks).toBeLessThan(summary.fixedRows / 10)

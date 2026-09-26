@@ -116,6 +116,37 @@ The client states what the files route reports. When the list is capped, the dif
 list both show a warning above the files, with GitHub's count when it gave one. File counts are the
 files received.
 
+### Diff documents
+
+The diff viewer reads a pull request as a document ([diff-rendering.md](./diff-rendering.md) § The
+document), not as patches. When the files mirror writes a patch body, it also cuts the patch into
+segments with `@acorn/diff-document` and writes the segment descriptors as a small blob beside it,
+`diffdoc:v<version>:<patch digest>` (`plugins/github/src/server/routes/mirror/prDocument.ts`). Both
+blobs are written before the swap, so the swap still publishes a complete revision or nothing.
+
+`GET /repos/:owner/:repo/pulls/:number/diff` is the document. It is served from the same files
+resource and the same refresh as the files route, reads the file rows in provider order and each
+available file's descriptor blob, and parses nothing. A descriptor blob that is missing, which is
+every file of a mirror written before documents existed, is cut from the patch body and stored on
+that read. A missing patch body is the same integrity failure the files route repairs, and it repairs
+the same way. The answer is `{ document, completeness }`, with no patch text in it. A 2,200-file,
+million-row pull request is about 27,000 segments and a 2.5 MB document.
+
+Segments and search are two repository routes, because a segment is addressed by its patch digest and
+a compare preview stores its patches the same way: `POST /repos/:owner/:repo/diff/segments` answers up
+to 32 segments by path, digest, and ordinal, cut from the patch body again, with parsed patches held
+in a 64 MB process-local cache for the next batch; `POST /repos/:owner/:repo/diff/search` answers a
+page of matches over the files the request names. Access is the repository's, resolved the way the
+blob route resolves it, and a digest must be one this plugin could have written before it becomes
+part of a blob key.
+
+Inline threads are not in the document. They come with the PR detail, which is complete when it is
+served, and the viewer places each one by its line number from the document's segment line spans, so
+its space is reserved before its segment loads. The diff source reports loading until both the
+document and the detail are in. The two mirrors refresh separately, so for one refresh interval the
+threads can describe an older head than the files; the thread whose line no longer exists in any
+segment is simply not drawn.
+
 ## Reads and writes
 
 The GitHub source provides repository browse, PR lists/detail, diff files, checks, Actions logs,
@@ -131,11 +162,14 @@ after a background refresh and after a successful PR mutation updates or invalid
 A provider refresh after a mutation can send a second event. This replaces signed HTML and keeps
 other clients and plugins in sync with the initiating client.
 
-The create-PR compare preview reads GitHub's compare endpoint directly and mirrors nothing. GitHub
+The create-PR compare preview reads GitHub's compare endpoint directly and mirrors no rows. GitHub
 lists at most 300 changed files for a whole comparison, on the first page only, and gives no total.
 So a comparison with 300 files reports `upstream-cap` for resource `compare-files`, and the preview
 and the create form's file count say that only the first 300 files are shown. The commits come from
-the first page too, which is enough for the title prefill.
+the first page too, which is enough for the title prefill. GitHub sends every patch inline; the route
+stores each under its digest in the blob cache, as the files mirror does, and answers a diff document
+rather than the patches, so the preview reads its segments through the same two repository routes as
+a pull's diff (§ Diff documents).
 
 Creating a pull request sends `plugin:github:pulls-changed` after the plugin invalidates the owning
 repository's open-pull list. The interactive route and `github_pull_create` agent tool share this

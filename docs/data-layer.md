@@ -142,6 +142,15 @@ stored under. `sync_state` has four nullable columns, `incomplete_cause`, `recei
 3,000-file ceiling cut the list short. The mirror's second migration empties the PR child tables and
 drops the `pr:` and `files:` sync rows, so every pull refetches once after the upgrade.
 
+The diff viewer's documents are generated data, and none of it is a table
+([diff-rendering.md](./diff-rendering.md) § The document). A pull request's segment descriptors are a
+blob per patch, keyed by the patch digest and the diff-document version, written beside the patch
+body before the swap; `pr_files.patch_key` is what makes them valid, and a new version of the
+segmenter reads a different key and cuts again. Segment rows are never stored: they are cut from the
+patch body when asked for. A compare preview stores its patch bodies the same way and nothing else.
+A working tree's documents are process memory in the Changes plugin, valid for the digest the last
+document gave each file and lost on restart.
+
 Docker, editor, Linear, Rollbar, model providers, preview, onboarding, and the built-in agents
 profiles use core services or provider registries without their own database file. Notes has no
 database either: task, workspace, and global notes are markdown files under `<data-root>/notes`, in
@@ -319,8 +328,8 @@ Machine-scoped entities include workspaces, tasks, notes, memories, terminal met
 project configuration. Identity-scoped records use the node's boot-bound opaque owner id. Provider
 account changes must not alter the owner's settings, integrations, or saved requests.
 
-The shared `blobs/` directory is content-addressed. It stores immutable patch bodies, file bodies,
-attachments, and artifacts by SHA. Plugin rows may retain a blob until the owning record is deleted.
+The shared `blobs/` directory is content-addressed. It stores immutable patch bodies and their diff
+document descriptors by patch digest, and file bodies, attachments, and artifacts by SHA. Plugin rows may retain a blob until the owning record is deleted.
 Worktrees are ordinary filesystem directories under the root and are not a database cache.
 
 ## Preferences and client persistence

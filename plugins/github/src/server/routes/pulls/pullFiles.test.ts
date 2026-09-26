@@ -2,7 +2,9 @@ import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AppEnv, Env } from '@acorn/plugin-api/testkit'
-import type { PullFile, PullFilesResponse } from '../../../shared/api'
+import type { DiffSearchPage, DiffSegmentPayload } from '@acorn/plugin-api/ui/diff'
+import type { PullDiffResponse, PullFilesResponse } from '../../../shared/api'
+import { diffDocument } from './diffDocument'
 import { fakeGithub, makeFakePull } from '../mirror/fakeGithub.helper'
 import { pullFiles } from './pullFiles'
 import { resolveRepoForUser } from '../mirror/repoMirror'
@@ -20,10 +22,11 @@ const env = () => ({
   BLOBS: { get: async (k: string) => blobs.get(k) ?? null, put: async (k: string, v: string) => void blobs.set(k, v) },
 }) as unknown as Env
 const get = async (query = '') => app.fetch(new Request(`http://acorn.test/api/repos/acme/web/pulls/7/files${query}`), env())
-const patches = async (paths: string[]) => app.fetch(new Request('http://acorn.test/api/repos/acme/web/pulls/7/files/patches', {
+const diff = async (query = '') => app.fetch(new Request(`http://acorn.test/api/repos/acme/web/pulls/7/diff${query}`), env())
+const post = async (path: string, body: unknown) => app.fetch(new Request(`http://acorn.test/api/repos/acme/web/${path}`, {
   method: 'POST',
   headers: { 'content-type': 'application/json' },
-  body: JSON.stringify({ paths }),
+  body: JSON.stringify(body),
 }), env())
 
 // File 1 is binary: GitHub sends no patch for it.
@@ -36,7 +39,7 @@ describe('pull files route', () => {
     app = new Hono<AppEnv>().use('/api/*', async (c, next) => {
       c.set('principal', { kind: 'device', userId: 'james' })
       await next()
-    }).route('/api/repos', pullFiles(plugin.db))
+    }).route('/api/repos', pullFiles(plugin.db)).route('/api/repos', diffDocument(plugin.db))
     vi.mocked(resolveRepoForUser).mockResolvedValue({ ok: true, value: { repoId: 19847 } })
   })
   afterEach(() => {
@@ -54,12 +57,51 @@ describe('pull files route', () => {
     expect(body.files[1]).toMatchObject({ patchState: 'unavailable', patchKey: null, patch: null })
   })
 
-  it('answers the patches lookup in request order, leaving out unknown paths and keeping unavailable ones', async () => {
+  it('answers the diff as a document in provider order, with descriptors and no patch text', async () => {
     vi.stubGlobal('fetch', fakeGithub(pull()).fetch)
-    const body = (await (await patches(['src/file-5.ts', 'nope.ts', 'src/file-1.ts', 'src/file-0.ts'])).json()) as PullFile[]
-    expect(body.map((f) => f.path)).toEqual(['src/file-5.ts', 'src/file-1.ts', 'src/file-0.ts'])
-    expect(body.map((f) => f.patch)).toEqual(['@@ -1 +1 @@\n+file 5', null, '@@ -1 +1 @@\n+file 0'])
-    expect(body[1]!.patchState).toBe('unavailable')
+    const body = (await (await diff()).json()) as PullDiffResponse
+    expect(body.completeness).toEqual({ kind: 'complete' })
+    expect(body.document.files.map((file) => file.path)).toEqual(Array.from({ length: 120 }, (_, i) => `src/file-${i}.ts`))
+    expect(body.document.files[0]).toMatchObject({ patchKey: expect.stringMatching(/^sha256:/), segments: [{ rows: 3, bands: 3 }] })
+    // GitHub sent no patch for file 1: no key and no segments, which the viewer draws as no diff.
+    expect(body.document.files[1]).toMatchObject({ patchKey: null, segments: [] })
+    expect(body.document.totals).toMatchObject({ files: 120, segments: 119 })
+    expect(JSON.stringify(body)).not.toContain('+file')
+  })
+
+  it('serves segments and search pages by patch digest from the same mirror', async () => {
+    vi.stubGlobal('fetch', fakeGithub(pull()).fetch)
+    const { document } = (await (await diff()).json()) as PullDiffResponse
+    const file = document.files[5]!
+    const segments = (await (await post('diff/segments', { requests: [{ path: file.path, patchKey: file.patchKey, ordinal: 0 }] })).json()) as DiffSegmentPayload[]
+    expect(segments[0]!.rows).toEqual([
+      { kind: 'hunk', text: '@@ -1 +1 @@' },
+      { kind: 'insert', oldNo: null, newNo: 1, raw: 'file 5' },
+      { kind: 'gap', side: 'bottom', oldStart: 2, newStart: 2, count: null },
+    ])
+    const files = document.files.flatMap((entry) => (entry.patchKey ? [{ path: entry.path, patchKey: entry.patchKey }] : []))
+    const page = (await (await post('diff/search', { query: 'FILE 11', caseSensitive: false, cursor: null, files })).json()) as DiffSearchPage
+    expect(page.matches.map((match) => [match.path, match.ordinal, match.row])).toEqual([
+      ['src/file-11.ts', 0, 1], ['src/file-110.ts', 0, 1], ['src/file-111.ts', 0, 1], ['src/file-112.ts', 0, 1],
+      ['src/file-113.ts', 0, 1], ['src/file-114.ts', 0, 1], ['src/file-115.ts', 0, 1], ['src/file-116.ts', 0, 1],
+      ['src/file-117.ts', 0, 1], ['src/file-118.ts', 0, 1], ['src/file-119.ts', 0, 1],
+    ])
+  })
+
+  it('refuses segment requests it cannot answer exactly, with bounded errors', async () => {
+    vi.stubGlobal('fetch', fakeGithub(pull()).fetch)
+    const { document } = (await (await diff()).json()) as PullDiffResponse
+    const file = document.files[0]!
+    // A digest this plugin could not have written never becomes a blob key.
+    expect((await post('diff/segments', { requests: [{ path: file.path, patchKey: 'patch:../../etc', ordinal: 0 }] })).status).toBe(400)
+    // A patch the node does not hold, and an ordinal the patch does not have.
+    expect((await post('diff/segments', { requests: [{ path: file.path, patchKey: `sha256:${'0'.repeat(64)}`, ordinal: 0 }] })).status).toBe(404)
+    expect((await post('diff/segments', { requests: [{ path: file.path, patchKey: file.patchKey, ordinal: 9 }] })).status).toBe(400)
+    // Too many at once, and none.
+    const many = Array.from({ length: 33 }, () => ({ path: file.path, patchKey: file.patchKey, ordinal: 0 }))
+    expect((await post('diff/segments', { requests: many })).status).toBe(400)
+    expect((await post('diff/segments', { requests: [] })).status).toBe(400)
+    expect((await post('diff/search', { query: 'x', caseSensitive: false, cursor: 'forged', files: [] })).status).toBe(400)
   })
 
   it('reads one path through the same envelope', async () => {
@@ -69,15 +111,16 @@ describe('pull files route', () => {
   })
 
   it('repairs a missing patch body with a refresh instead of serving it as no diff', async () => {
-    const fake = fakeGithub(pull())
+    // Patches no other test has parsed, so the node's parse cache cannot answer for the missing bodies.
+    const fake = fakeGithub(makeFakePull({ files: 3, patch: (i) => `@@ -1 +1 @@\n+repair ${i}` }))
     vi.stubGlobal('fetch', fake.fetch)
     await get('?summary=1')
     const before = fake.requests.length
     blobs.clear()
 
-    const body = (await (await patches(['src/file-0.ts'])).json()) as PullFile[]
+    const body = (await (await diff()).json()) as PullDiffResponse
 
-    expect(body[0]!.patch).toBe('@@ -1 +1 @@\n+file 0')
+    expect(body.document.files[0]!.segments).toHaveLength(1)
     expect(fake.requests.length).toBeGreaterThan(before)
   })
 

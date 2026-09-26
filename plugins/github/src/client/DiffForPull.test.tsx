@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { CodeRow, DiffSource } from '@acorn/plugin-api/ui/diff'
-import { filePatchKey, fileSummariesKey, filesKey, type PullFile, type PullFilesResponse } from '../shared/api'
+import type { CodeRow, DiffDocumentTopology, DiffSource } from '@acorn/plugin-api/ui/diff'
+import { pullDiffKey, pullKey, type PullDiffResponse } from '../shared/api'
 import { DiffForPull } from './DiffForPull'
 
 const { openPane } = vi.hoisted(() => ({ openPane: vi.fn() }))
@@ -28,12 +28,21 @@ vi.mock('@acorn/plugin-api/ui', () => ({
   },
 }))
 
-const file: PullFile = {
-  path: 'src/app.ts', status: 'modified', additions: 1, deletions: 0,
-  sha: 'new-sha', viewed: false, position: 0, patchState: 'available', patchKey: 'sha256:new', patch: null,
+const patchKey = `sha256:${'b'.repeat(64)}`
+const topology: DiffDocumentTopology = {
+  schemaVersion: 1,
+  revision: '2:abc',
+  totals: { files: 2, rows: 3, bands: 3, segments: 1, columns: 3 },
+  files: [
+    {
+      path: 'src/app.ts', status: 'modified', additions: 1, deletions: 0, sha: 'new-sha', viewed: false, patchKey,
+      segments: [{ rows: 3, bands: 3, gaps: 1, columns: 3, lines: [0, 0, 1, 1] }],
+    },
+    { path: 'logo.png', status: 'modified', additions: null, deletions: null, sha: null, viewed: false, patchKey: null, segments: [] },
+  ],
 }
-const summaries = (files: PullFile[], completeness: PullFilesResponse['completeness'] = { kind: 'complete' }): PullFilesResponse =>
-  ({ files, completeness })
+const diff = (completeness: PullDiffResponse['completeness'] = { kind: 'complete' }): PullDiffResponse => ({ document: topology, completeness })
+const file = topology.files[0]!
 
 describe('task pull diff', () => {
   afterEach(() => {
@@ -73,14 +82,12 @@ describe('task pull diff', () => {
     queryClient.clear()
   })
 
-  it('draws from warmed summaries and fetches only the missing patch', async () => {
+  it('hands the viewer the document and reads segments and search pages by patch digest', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
-    queryClient.setQueryData(fileSummariesKey('acorn', 'web', '42'), summaries([file]))
-    // A patch cached for different patch content must not be drawn under the new summary, even with
-    // the same head blob: the base moved.
-    queryClient.setQueryData(filePatchKey('acorn', 'web', '42', file.path), { ...file, patchKey: 'sha256:old', patch: '@@ old' })
+    queryClient.setQueryData(pullDiffKey('acorn', 'web', '42'), diff())
+    queryClient.setQueryData(pullKey('acorn', 'web', '42'), { pull: null, labels: [], reviews: [], requestedReviewers: [], comments: [], commits: [], checks: [], threads: [] })
     const fetchMock = vi.fn(async (url: string) => new Response(JSON.stringify(
-      url.endsWith('/files/patches') ? [{ ...file, patch: '@@ new' }] : [],
+      url.endsWith('/diff/segments') ? [{ path: file.path, patchKey, ordinal: 0, rows: [{ kind: 'insert', oldNo: null, newNo: 1, raw: 'new' }] }] : { matches: [], nextCursor: null },
     ), { headers: { 'content-type': 'application/json' } }))
     vi.stubGlobal('fetch', fetchMock)
 
@@ -92,43 +99,24 @@ describe('task pull diff', () => {
     ), host)
 
     try {
-      expect(source?.files()).toEqual([file])
-      expect(source?.cachedFile(file.path)).toBeNull()
-      expect(queryClient.getQueryData(filesKey('acorn', 'web', '42'))).toBeUndefined()
-
-      const patched = await source?.fetchPatches?.([file.path], new AbortController().signal)
-      expect(patched?.[0]?.patch).toBe('@@ new')
-      expect(source?.cachedFile(file.path)?.patch).toBe('@@ new')
-      expect(fetchMock).toHaveBeenCalledWith(
-        '/v1/p/github/repos/acorn/web/pulls/42/files/patches',
-        expect.objectContaining({ method: 'POST' }),
-      )
-      expect(fetchMock.mock.calls.some(([url]) => url === '/v2/p/github/repos/acorn/web/pulls/42/files')).toBe(false)
+      expect(source?.topology()).toEqual(topology)
+      expect(source?.signature()).toBe('2:abc')
+      expect(source?.loading()).toBe(false)
+      const segments = await source!.loadSegments([{ path: file.path, patchKey, ordinal: 0 }], new AbortController().signal)
+      expect(segments[0]?.rows).toHaveLength(1)
+      await source!.search({ query: 'new', caseSensitive: false, cursor: null }, new AbortController().signal)
+      expect(fetchMock).toHaveBeenCalledWith('/v1/p/github/repos/acorn/web/diff/segments', expect.objectContaining({ method: 'POST' }))
+      expect(fetchMock).toHaveBeenCalledWith('/v1/p/github/repos/acorn/web/diff/search', expect.objectContaining({ method: 'POST' }))
+      // No whole patch is read for the diff: not the files route, not a patches batch.
+      expect(fetchMock.mock.calls.some(([url]) => url.includes('/files'))).toBe(false)
     } finally {
       dispose()
       queryClient.clear()
     }
   })
 
-  it('resolves a file GitHub sent no patch for without fetching it', () => {
-    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
-    const binary: PullFile = { ...file, path: 'logo.png', patchState: 'unavailable', patchKey: null }
-    queryClient.setQueryData(fileSummariesKey('acorn', 'web', '42'), summaries([file, binary]))
-    const host = document.createElement('div')
-    const dispose = render(() => (
-      <QueryClientProvider client={queryClient}>
-        <DiffForPull route={{ owner: 'acorn', repo: 'web', number: '42', key: 'acorn/web#42' }} router={false} />
-      </QueryClientProvider>
-    ), host)
-    expect(source?.cachedFile(binary.path)).toEqual(binary)
-    // An available patch with no body in hand is content still to fetch, not a file without a diff.
-    expect(source?.cachedFile(file.path)).toBeNull()
-    dispose()
-    queryClient.clear()
-  })
-
   it('says when GitHub capped the file list, with and without its count', () => {
-    const cases: [PullFilesResponse['completeness'], string | null][] = [
+    const cases: [PullDiffResponse['completeness'], string | null][] = [
       [{ kind: 'complete' }, null],
       [
         { kind: 'incomplete', cause: 'upstream-cap', resource: 'files', received: 3000, reportedTotal: 3418, limit: 3000 },
@@ -141,7 +129,7 @@ describe('task pull diff', () => {
     ]
     for (const [completeness, message] of cases) {
       const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
-      queryClient.setQueryData(fileSummariesKey('acorn', 'web', '42'), summaries([file], completeness))
+      queryClient.setQueryData(pullDiffKey('acorn', 'web', '42'), diff(completeness))
       const host = document.createElement('div')
       const dispose = render(() => (
         <QueryClientProvider client={queryClient}>

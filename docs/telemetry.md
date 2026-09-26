@@ -540,16 +540,17 @@ zero, without waiting on garbage collection.
 
 | Group | Fields | Meaning |
 | --- | --- | --- |
-| `topology` | `files`, `fixedRows`, `dynamicBlocks`, `ready`, `lateSourceBlocks` | The document as a whole. Fixed rows are code and structural rows with exact heights. Dynamic blocks are the source's threads in a diff and the projected turns in a timeline. `ready` means the source-owned structure is complete. `lateSourceBlocks` counts source threads that arrived after that. |
-| `mounted` | `segments`, `fixedRows`, `dynamicBlocks`, `blankBlocks`, `uncoveredRanges` | What is in the DOM now. A blank block is a visible mounted row with neither a skeleton nor content. An uncovered range is visible space that no mounted row covers, measured from real rects. |
-| `work` | `queuedSegments`, `queuedEnrichment`, `furthestQueueDistance`, `scheduledFrames`, `heldPublications`, `prepareMs` | Work still owed. Distance is counted in files from the visible ones, never by path. `prepareMs` sums parse and row-model time, the work that grows with the whole diff. |
+| `topology` | `files`, `segments`, `fixedRows`, `dynamicBlocks`, `ready`, `lateSourceBlocks` | The document as a whole. Fixed rows are code and structural rows with exact heights. Segments are the diff document's bounded pieces. Dynamic blocks are the source's threads a diff places in some segment, and the projected turns in a timeline. `ready` means the source-owned structure is complete: for a diff, its topology and its threads have both arrived. `lateSourceBlocks` counts source threads that arrived after that. |
+| `mounted` | `segments`, `fixedRows`, `dynamicBlocks`, `blankBlocks`, `uncoveredRanges` | What is in the DOM now: segment items in the virtual range, and the rows drawn in them. A blank block is a visible mounted item with neither a placeholder nor content. An uncovered range is visible space that no mounted item covers, measured from real rects. |
+| `work` | `queuedSegments`, `queuedEnrichment`, `furthestQueueDistance`, `unvisitedSegments`, `scheduledFrames`, `heldPublications`, `prepareMs` | Work still owed. For a diff, queued and loading segments, segments loaded but not yet coloured, and how far, in segments, the furthest queued one is from the ones on screen, never by path. `unvisitedSegments` counts held segments the reader has never had on screen, which is the runway the loader keeps and should stay a few segments. `prepareMs` sums the time spent building segments' rows and applying their colour. |
 | `measurement` | `candidates`, `reads`, `commits`, `maxCommitsInFrame`, `readMs`, `activeObservers`, `observedElements` | Size reads and the geometry commits they caused, counted since mount. A commit is a read that changed a row's held size. Observers count up when created and down when disconnected. |
 | `correction` | `count`, `failed`, `maxPixels`, `maxAnchorDrift` | Scroll writes made to keep a reading place. `failed` counts corrections whose anchor had gone. |
-| `resident` | `documents`, `segments`, `rows`, `estimatedBytes` | Parsed content held for the surface. The byte count is a lower bound: the patch text, not the rows built from it. |
+| `resident` | `documents`, `segments`, `rows`, `estimatedBytes` | Parsed content held for the surface: for a diff, the segments the loader holds and their rows. The byte count is a lower bound: the row text and a flat allowance per row, not the tokens built from it. |
 
-A field a surface has no concept of yet stays zero. The diff has no segments and no separate
-enrichment queue, and the timeline measures no anchor drift. Those are the fields later work on
-large surfaces reports into (`docs/future/git-inspired/`).
+A field a surface has no concept of yet stays zero. The timeline has no segments, and neither surface
+measures anchor drift yet. Those are the fields later work on large surfaces reports into
+(`docs/future/git-inspired/`). `heldPublications` is always zero for the diff now: nothing is held
+back during a scroll, because a segment publishes when it arrives and it only arrives if it is near.
 
 The snapshot holds numbers, one boolean, and the two kind labels. The registry copies only the fields
 the template names and only when they are finite numbers, so a reader that returned a path, a line
@@ -577,9 +578,12 @@ mark, so a long automated loop leaves one entry. Nothing is put on `window`, and
 exposes it. The large-surface flow reads it this way ([local-development.md](./local-development.md)
 § Large-surface flow).
 
-What the numbers say about today's diff: its topology is known only after the hydrator has parsed
-every file, the queue distance shows the hydrator working through files the reader is nowhere near,
-and every row measured in a frame is its own geometry commit.
+What the numbers say about today's diff: its topology is complete before any row loads, its queue is
+only ever the segments on screen and the two either side, and a pane left open settles with nothing
+queued, so the queue distance stays at a few segments however large the document is. What they do
+not yet show is dynamic geometry: a segment with threads in it corrects its reservation when it
+mounts, and those corrections are still ordinary commits (phase 3 of
+[docs/future/git-inspired/](./future/git-inspired/README.md)).
 
 ## The terminal client, the helper, and the shell
 
@@ -642,7 +646,7 @@ Fixed operation/outcome labels keep the number of series bounded.
 | Was the response cheap to fetch but expensive to process? | `api.request` carries `responseBytes`; `api.response.bytes` and `api.decode` measure JSON reads after transport delivery. |
 | Is history size driving the cost? | `agents.snapshot.merge`, `agents.snapshot.index`, `agents.transcript.project`, `agents.transcript.visible`, with event/item counts. `agents.center.rows`, `agents.center.filter`, and `agents.sidebar.rows` cover roster work. |
 | Are cheap updates repeating too often? | `agents.snapshot.load` and `agents.roster.load` distinguish inflight/cache hits from misses, and a snapshot read that resumed from the events the store holds reports `resume`. Session updates, appended events, cache actions, `rows.reconcile`, `rows.item.mount`, and `pane.region.mount` count churn. `ui.interaction.work` reports up to five most frequently observed operations per interaction with trace IDs and call counts. |
-| Is rendering the content expensive? | `agents.transcript.cards` emits one initial `ui.render.batch` span with visible-card count, summed factory time, and wall time to the turn checkpoint. `markdown.parse`, `markdown.render`, `highlight.html.render`, and their character counts/cache outcomes cover shared markdown and code fences. `diff.parse`, `diff.rows`, file/row counts, `diff.hydrator.reset` (a whole diff read again), and `diff.hydrator.refresh` (how many files one content change read again) cover diff preparation. `editor.language.load`, `editor.state.create`, `editor.view.create`, and document character counts cover the shared editor; `editor.state.skipped` counts responses discarded after the pane unmounts. |
+| Is rendering the content expensive? | `agents.transcript.cards` emits one initial `ui.render.batch` span with visible-card count, summed factory time, and wall time to the turn checkpoint. `markdown.parse`, `markdown.render`, `highlight.html.render`, and their character counts/cache outcomes cover shared markdown and code fences. `diff.segments.load` (one batch of segments from the source), `diff.segments.enrich` (one segment's colour), the `diff.segments.requested` batch size, and the `diff.files` and `diff.document.segments` counts at each revision cover diff preparation; the parse itself is on the node. `editor.language.load`, `editor.state.create`, `editor.view.create`, and document character counts cover the shared editor; `editor.state.skipped` counts responses discarded after the pane unmounts. |
 | Does a large diff or timeline do work in proportion to its size? | `ui.surface.*` at a diff's `ready` and every surface's `teardown`, and the exact local snapshot in [Rendered-surface health](#rendered-surface-health): mounted versus total rows, queue distance, commits per frame, observers left at teardown. |
 | Is a worker falling behind or falling back? | `highlight.pending`, `highlight.queue.wait`, `highlight.worker.execute`, `highlight.timeout`, `highlight.result`, and `highlight.fallback`; `highlight.main_thread` measures the fallback. Worker execution includes grammar-loading waits; queue time is measured from posting to worker receipt. |
 | Is the client cache responsible? | `cache.read`, `cache.deserialize`, `cache.serialize`, `cache.write`, cache character/entry counts, and `cache.restore_to_hydrated` on the desktop. `cache.updates` labels only the fixed query-cache action, never query keys. |

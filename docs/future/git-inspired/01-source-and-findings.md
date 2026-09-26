@@ -91,10 +91,10 @@ gap expansion.
 
 ## Finding 3: the renderer eventually performs whole-document work
 
-`createDiffHydrator()` in `packages/client-core/src/kit/diff/hydration.ts` queues every file during
-`reset()` and keeps pumping until no queued path remains. It prioritizes the selected file and waits
-between background batches, which improves first paint, but an open pane still works through the
-entire document.
+`createDiffHydrator()` in `packages/client-core/src/kit/diff/hydration.ts` (deleted in phase 2)
+queues every file during `reset()` and keeps pumping until no queued path remains. It prioritizes
+the selected file and waits between background batches, which improves first paint, but an open
+pane still works through the entire document.
 
 For each file, `DiffPane` waits for `buildDiffRowsAsync()`. That call parses, syntax-highlights, and
 computes word diffs before the parsed file is published. Once files publish, the view repeatedly:

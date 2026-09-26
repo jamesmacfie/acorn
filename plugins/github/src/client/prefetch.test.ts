@@ -1,6 +1,6 @@
 import { QueryClient } from '@tanstack/solid-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { fileSummariesKey, filesKey, pullKey } from '../shared/api'
+import { fileSummariesKey, pullDiffKey, pullKey } from '../shared/api'
 import { INITIAL_PREFETCH_LIMIT, prefetchOpenPulls, prefetchPullSummary } from './prefetch'
 
 // Bodies cross the transport as bytes now, so assert the decoded payload rather than a JSON string.
@@ -81,7 +81,7 @@ describe('open PR warmup', () => {
     expect(batchBodyOf(fetchMock, 1)).toEqual({ numbers: [42], files: 'summary' })
     expect(queryClient.getQueryData(pullKey('acorn', 'web', '42'))).toEqual(detail)
     expect(queryClient.getQueryData(fileSummariesKey('acorn', 'web', '42'))).toEqual(files)
-    expect(queryClient.getQueryData(filesKey('acorn', 'web', '42'))).toBeUndefined()
+    expect(queryClient.getQueryData(pullDiffKey('acorn', 'web', '42'))).toBeUndefined()
   })
 
   it('prefetches one hovered PR through the same summary-only batch path', async () => {
@@ -103,7 +103,7 @@ describe('open PR warmup', () => {
     expect(batchBodyOf(fetchMock, 0)).toEqual({ numbers: [42], files: 'summary' })
     expect(queryClient.getQueryData(pullKey('acorn', 'web', '42'))).toEqual(detail)
     expect(queryClient.getQueryData(fileSummariesKey('acorn', 'web', '42'))).toEqual(files)
-    expect(queryClient.getQueryData(filesKey('acorn', 'web', '42'))).toBeUndefined()
+    expect(queryClient.getQueryData(pullDiffKey('acorn', 'web', '42'))).toBeUndefined()
   })
 
   it('bounds automatic warm-up and leaves the remaining PRs intent-driven', async () => {

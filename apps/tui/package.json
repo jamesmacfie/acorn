@@ -19,6 +19,7 @@
   "dependencies": {
     "@acorn/client-core": "workspace:*",
     "@acorn/custody": "workspace:*",
+    "@acorn/diff-document": "workspace:*",
     "@acorn/node-core": "workspace:*",
     "@acorn/plugin-agents": "workspace:*",
     "@acorn/plugin-api": "workspace:*",

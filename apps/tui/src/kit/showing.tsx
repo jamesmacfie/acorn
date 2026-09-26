@@ -7,7 +7,8 @@ import {
   COLLECTION_INTENTS, createCollectionIntents, type CollectionItem,
 } from '@acorn/client-core/kit/keys'
 import type { Intent } from '@acorn/client-core/kit/keys'
-import { buildDiffRows, plainTokenize, type CodeRow, type DiffFile, type Row as DiffRowT } from '@acorn/client-core/kit/diff/diffModel.ts'
+import { diffRowsFromPlain, type CodeRow, type DiffFile, type Row as DiffRowT } from '@acorn/client-core/kit/diff/diffModel.ts'
+import { segmentContentKey, type DiffDocumentFile, type DiffDocumentTopology, type DiffSegmentPayload, type DiffSegmentRequest } from '@acorn/diff-document/document'
 import type { PluginAnnotationKey } from '@acorn/protocol/extensionPoints.ts'
 import { annotationKey } from '@acorn/client-core/host/annotations/annotationKey.ts'
 import { annotationsFor, requestAnnotations } from '@acorn/client-core/host/annotations/annotations.ts'
@@ -898,7 +899,7 @@ export function DiffLine(props: { r: CodeRow; canAdd?: boolean; highlight?: unkn
 }
 
 /** reduced: the path in bold with `+n −m` at the far end, and no collapse control. */
-export function FileHead(props: { file: DiffFile; anchorId?: string; collapsed?: boolean; onToggleCollapse?: (path: string) => void }) {
+export function FileHead(props: { file: Pick<DiffFile, 'path' | 'additions' | 'deletions'>; anchorId?: string; collapsed?: boolean; onToggleCollapse?: (path: string) => void }) {
   return (
     <box flexDirection="row" gap={1} flexShrink={0}>
       <Line role="strong">{props.file.path}</Line>
@@ -952,22 +953,22 @@ export function AnnotationMarks(props: { point: string; itemKey: PluginAnnotatio
   )
 }
 
-/** reduced: unified only, and no syntax colour. `buildDiffRows` is the same parse the DOM viewer
- *  runs; what is dropped is the highlighter it feeds, which needs a grammar and a theme.
+/** reduced: unified only, and no syntax colour. The same document the DOM viewer draws: the source's
+ *  topology lays every file and segment out by count, and the rows of a segment are asked for only
+ *  once the window reaches it (docs/diff-rendering.md § The document). What is dropped is the
+ *  highlighter, which needs a grammar and a theme.
  *
  *  `annotations` is a point id, and it is a prop rather than something the source supplies for the
  *  reason the DOM viewer gives: the marks are drawn inside the row, so their placement is this
  *  component's business. A mark is text — it is not a stop and it changes nothing about how the diff
  *  is driven (docs/tui.md § What a plugin loses here).
  *
- *  **Windowed.** This node used to say in its own comment that there was no virtual window here and
- *  every row was built, which for a two-hundred-file pull request is tens of thousands of renderables
- *  in a pane that can show forty lines. It is windowed now, and the shape is a slice with two spacers
- *  rather than a virtualiser of its own: the rows are one flat list, the file headers are rows in it,
- *  and what is drawn is the slice around the viewport's offset with a box above and below standing in
- *  for the rest. The spacers are what keep this a `ScrollViewport` — the scrollbox owns the offset,
- *  the bar, the wheel and the page keys exactly as before, and it is still the focus stop a document
- *  with no controls needs (./scrolling.tsx, docs/tui.md § Scrolling viewports).
+ *  **Windowed.** What is drawn is the slice of lines around the viewport's offset, with a box above
+ *  and below standing in for the rest. A file is its header line and then its segments' rows, and a
+ *  segment's line count is in the topology, so the slice is found without any row existing. The
+ *  spacers are what keep this a `ScrollViewport` — the scrollbox owns the offset, the bar, the wheel
+ *  and the page keys exactly as before, and it is still the focus stop a document with no controls
+ *  needs (./scrolling.tsx, docs/tui.md § Scrolling viewports).
  *
  *  The known ceiling: a spacer is one line per row, and an annotated row draws two, so the content is
  *  as many lines taller than the model as there are marked rows inside the window. Nothing else here
@@ -975,8 +976,14 @@ export function AnnotationMarks(props: { point: string; itemKey: PluginAnnotatio
  *  a multiply, which is what the DOM viewer already keeps.
  */
 
-/** One line of the flat model: a file's header, or one of its rows. */
-type DiffEntry = { head: DiffFile; code?: undefined } | { head?: undefined; code: DiffRowT }
+/** One line of the window: a file's header, a row of a loaded segment, or a line of one still loading. */
+type DiffEntry =
+  | { head: DiffDocumentFile; code?: undefined; pending?: undefined }
+  | { head?: undefined; code: DiffRowT; pending?: undefined }
+  | { head?: undefined; code?: undefined; pending: true }
+
+/** A file header or a segment, at its first line. */
+type DiffBlock = { start: number; file: DiffDocumentFile; ordinal: number; lines: number }
 
 const isCode = (row: DiffRowT): row is CodeRow =>
   row.kind === 'normal' || row.kind === 'insert' || row.kind === 'delete'
@@ -990,28 +997,36 @@ const DIFF_OVERSCAN = 20
  *  build itself once before the first correction. */
 const DIFF_ASSUMED_ROWS = 60
 
-export function DiffPane(props: { source: { files: () => DiffFile[] | undefined; loading: () => boolean }; annotations?: string }) {
-  // One flat list, because a window is a slice and a file header is a row like any other. It is also
-  // the anchor the design asked for: a file starts at an index.
-  const lines = createMemo<DiffEntry[]>(() => (props.source.files() ?? []).flatMap((file) => [
-    { head: file } as DiffEntry,
-    ...buildDiffRows(file, plainTokenize).map((row): DiffEntry => ({ code: row })),
-  ]))
+/** Segments held at once: more than any window can reach, since a segment is at least one line, and
+ *  bounded, so a reader paging through a long diff does not keep all of it. */
+const DIFF_HELD_SEGMENTS = 512
 
-  // Every code row this pane holds, asked about in one request per contributor rather than one per
-  // line. The keys are built from the diff rather than from what is on screen, so a reader scrolling
-  // does not re-ask, and they are rebuilt when the diff is rather than on every render — which is
-  // what the effect used to do, joining a string over every row each time
-  // (client-core/host/annotations).
-  const keys = createMemo(() => lines().flatMap((entry) => (
-    entry.code && isCode(entry.code) ? [annotationKey(entry.code)] : []
-  )))
-  createEffect(() => {
-    const point = props.annotations
-    if (!point) return
-    requestAnnotations(point, keys())
+type TuiDiffSource = {
+  topology: () => DiffDocumentTopology | undefined
+  loading: () => boolean
+  loadSegments: (requests: DiffSegmentRequest[], signal: AbortSignal) => Promise<DiffSegmentPayload[]>
+}
+
+export function DiffPane(props: { source: TuiDiffSource; annotations?: string }) {
+  // Every file header and segment at its first line. Bounded by segments, not rows: the whole of what
+  // the window is found in. A header is block `-1`.
+  const blocks = createMemo(() => {
+    const out: DiffBlock[] = []
+    let at = 0
+    for (const file of props.source.topology()?.files ?? []) {
+      out.push({ start: at++, file, ordinal: -1, lines: 1 })
+      if (!file.patchKey) continue
+      file.segments.forEach((segment, ordinal) => {
+        out.push({ start: at, file, ordinal, lines: segment.rows })
+        at += segment.rows
+      })
+    }
+    return { out, total: at }
   })
 
+  // Loaded segments' rows by content key. A new revision keeps any segment whose content survived.
+  const [loaded, setLoaded] = createSignal<ReadonlyMap<string, DiffRowT[]>>(new Map())
+  const asked = new Set<string>()
   let viewport: (Renderable & Viewport) | undefined
   const [top, setTop] = createSignal(0)
   const [fit, setFit] = createSignal(0)
@@ -1025,12 +1040,68 @@ export function DiffPane(props: { source: { files: () => DiffFile[] | undefined;
   }
 
   const window = createMemo(() => {
-    const all = lines()
+    const { out, total } = blocks()
     const height = fit() || DIFF_ASSUMED_ROWS
-    const at = Math.min(top(), Math.max(0, all.length - height))
+    const at = Math.min(top(), Math.max(0, total - height))
     const from = Math.max(0, at - DIFF_OVERSCAN)
-    const until = Math.min(all.length, at + height + DIFF_OVERSCAN)
-    return { from, rows: all.slice(from, until), after: Math.max(0, all.length - until) }
+    const until = Math.min(total, at + height + DIFF_OVERSCAN)
+    const rows: DiffEntry[] = []
+    const wanted: DiffBlock[] = []
+    for (const block of out) {
+      if (block.start + block.lines <= from) continue
+      if (block.start >= until) break
+      if (block.ordinal < 0) {
+        rows.push({ head: block.file })
+        continue
+      }
+      const key = segmentContentKey(block.file.patchKey!, block.ordinal)
+      const segment = loaded().get(key)
+      if (!segment) wanted.push(block)
+      for (let line = Math.max(block.start, from); line < Math.min(block.start + block.lines, until); line++) {
+        const row = segment?.[line - block.start]
+        rows.push(row ? { code: row } : { pending: true })
+      }
+    }
+    return { from, rows, after: Math.max(0, total - until), wanted }
+  })
+
+  // The segments the window reaches and does not have, asked for once each.
+  createEffect(() => {
+    const wanted = window().wanted.filter((block) => !asked.has(segmentContentKey(block.file.patchKey!, block.ordinal)))
+    if (!wanted.length) return
+    for (const block of wanted) asked.add(segmentContentKey(block.file.patchKey!, block.ordinal))
+    const byKey = new Map(wanted.map((block) => [segmentContentKey(block.file.patchKey!, block.ordinal), block]))
+    void props.source.loadSegments(
+      wanted.map((block) => ({ path: block.file.path, patchKey: block.file.patchKey!, ordinal: block.ordinal })),
+      new AbortController().signal,
+    ).then((payloads) => {
+      const next = new Map(untrack(loaded))
+      for (const payload of payloads) {
+        const key = segmentContentKey(payload.patchKey, payload.ordinal)
+        const block = byKey.get(key)
+        if (block) next.set(key, diffRowsFromPlain(block.file.path, block.file.sha, payload.rows))
+      }
+      // Oldest first out.
+      for (const key of next.keys()) {
+        if (next.size <= DIFF_HELD_SEGMENTS) break
+        next.delete(key)
+        asked.delete(key)
+      }
+      setLoaded(next)
+    }, () => {
+      // Asked again the next time the window reaches it.
+      for (const key of byKey.keys()) asked.delete(key)
+    })
+  })
+
+  // The code rows in the window, asked about in one request per contributor rather than one per line.
+  // `requestAnnotations` compares the key set, so a render that moves nothing re-asks nothing
+  // (client-core/host/annotations).
+  const keys = createMemo(() => window().rows.flatMap((entry) => (entry.code && isCode(entry.code) ? [annotationKey(entry.code)] : [])))
+  createEffect(() => {
+    const point = props.annotations
+    if (!point) return
+    requestAnnotations(point, keys())
   })
 
   return (
@@ -1047,7 +1118,7 @@ export function DiffPane(props: { source: { files: () => DiffFile[] | undefined;
       onSizeChange={sync}
     >
       <ScrollViewport onScroll={sync} onBox={(box) => { viewport = box; sync() }}>
-        <Show when={props.source.files()} fallback={<Line role="muted">{props.source.loading() ? 'loading…' : 'no changes'}</Line>}>
+        <Show when={props.source.topology()} fallback={<Line role="muted">{props.source.loading() ? 'loading…' : 'no changes'}</Line>}>
           {/* The rows above the window, as height rather than as renderables, so the scrollbox's own
               offset and bar are about the whole diff and not about the slice. */}
           <box flexShrink={0} height={window().from} />
@@ -1055,14 +1126,14 @@ export function DiffPane(props: { source: { files: () => DiffFile[] | undefined;
             {(entry) => (
               <Show
                 when={entry.code}
-                fallback={(
+                fallback={entry.head ? (
                   /* `flexShrink={0}` for the reason each row carries it: a column taller than the
                      panel is squeezed rather than scrolled, and one file's rows are then drawn over
                      the next file's. The scroll is this pane's, at the box above. */
                   <box flexDirection="column" flexShrink={0}>
-                    <FileHead file={entry.head!} />
+                    <FileHead file={entry.head} />
                   </box>
-                )}
+                ) : <text flexShrink={0} wrapMode="none" {...runStyle('muted')}>loading…</text>}
               >
                 {(row) => (
                   <Show when={isCode(row())} fallback={<NonCodeRow row={row() as Exclude<DiffRowT, CodeRow>} />}>

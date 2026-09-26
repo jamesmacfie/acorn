@@ -12,8 +12,9 @@
 //
 // Test scaffolding: imported by tests and by the agent-automation seeder, never by production code
 // (tools/arch/boundaries.test.ts § the testkit is imported only by tests).
+import { documentTopology, fileDocument, searchDocument, type DiffDocumentFile, type DiffSegmentPayload, type DiffSegmentRequest } from '@acorn/diff-document/document'
 import type { DiffFile, DiffThread } from '../kit/diff/diffModel'
-import type { DiffSource } from '../features/diff/source'
+import type { DiffLineAnchor, DiffSource } from '../features/diff/source'
 
 export type LargeSurfaceProfile = 'small' | 'scale' | 'canonical'
 
@@ -285,10 +286,32 @@ export function largeDiffSummary(profile: LargeSurfaceProfile, seed = 1) {
 }
 
 /**
- * A `DiffSource` over generated files, for rendering the real `DiffPane` in a test. Threads are the
- * source's own; `lineExtra` draws each file's notes the way the Changes pane draws review notes.
+ * A `DiffSource` over generated files, for rendering the real `DiffPane` in a test. It plays the
+ * provider's part in-process: the topology and every segment are cut from the fixture's patches with
+ * the same package the node routes use, and `loadSegments` and `search` answer from them. Threads are
+ * the source's own; `lineExtra` draws each file's notes the way the Changes pane draws review notes.
+ *
+ * `onLoad` sees every segment request, which is how a test proves what the viewer asked for.
+ * `delay` holds each answer back, for a test about what the viewer shows while it waits.
  */
-export function largeDiffSource(files: readonly LargeDiffFile[], options: { scope?: string; threads?: () => DiffThread[] } = {}): DiffSource {
+export function largeDiffSource(files: readonly LargeDiffFile[], options: {
+  scope?: string
+  threads?: () => DiffThread[]
+  onLoad?: (requests: DiffSegmentRequest[]) => void
+  delay?: () => Promise<void>
+} = {}): DiffSource {
+  const documents = new Map(files.map((file) => [file.path, fileDocument(file.path, file.patch)]))
+  const patchKeys = new Map(files.map((file) => [file.path, file.patch ? `fixture:${fold(2166136261, file.patch).toString(16)}` : null]))
+  const topology = documentTopology(files.map((file): DiffDocumentFile => ({
+    path: file.path,
+    status: file.status,
+    additions: file.additions,
+    deletions: file.deletions,
+    sha: file.sha,
+    viewed: file.viewed,
+    patchKey: patchKeys.get(file.path) ?? null,
+    segments: documents.get(file.path)!.descriptors,
+  })))
   const byPath = new Map(files.map((file) => [file.path, file]))
   const allThreads = files.flatMap((file) => file.threads)
   const notesAt = new Map<string, LargeDiffNote[]>()
@@ -298,23 +321,40 @@ export function largeDiffSource(files: readonly LargeDiffFile[], options: { scop
       notesAt.set(key, [...(notesAt.get(key) ?? []), note])
     }
   }
+  const anchors: DiffLineAnchor[] = files.flatMap((file) => file.notes.map((note) => ({
+    path: note.path, side: note.side === 'deletions' ? 'old' as const : 'new' as const, line: note.line,
+  })))
   const notesFor = (row: { path: string; oldNo: number | null; newNo: number | null }) =>
     row.newNo != null ? notesAt.get(`${row.path}:additions:${row.newNo}`) : row.oldNo != null ? notesAt.get(`${row.path}:deletions:${row.oldNo}`) : undefined
   const scope = options.scope ?? 'large-diff'
   return {
     scope: { taskId: scope, routeKey: scope },
-    files: () => [...files],
+    topology: () => topology,
     loading: () => false,
-    signature: () => `${scope}:${files.length}`,
+    signature: () => topology.revision,
     selectedPath: () => '',
     threads: options.threads ?? (() => allThreads),
-    cachedFile: (path) => byPath.get(path) ?? null,
+    loadSegments: async (requests) => {
+      options.onLoad?.(requests)
+      await options.delay?.()
+      return requests.flatMap((request): DiffSegmentPayload[] => {
+        const rows = patchKeys.get(request.path) === request.patchKey ? documents.get(request.path)?.segments[request.ordinal] : undefined
+        return rows ? [{ ...request, rows }] : []
+      })
+    },
+    search: async (request) => (await searchDocument(
+      topology.files,
+      async (file) => documents.get(file.path)?.segments ?? [],
+      request,
+    )) ?? { matches: [], nextCursor: null },
     fileText: async ({ path }) => byPath.get(path)?.head ?? '',
     canComment: () => false,
     invalidate: () => {},
     draftPrefix: scope,
-    hasLineExtra: (row) => !!notesFor(row),
-    lineExtra: (row) => (notesFor(row) ?? []).map((note) => note.body).join('\n'),
+    lineExtra: {
+      anchors: () => anchors,
+      render: (row) => (notesFor(row) ?? []).map((note) => note.body).join('\n'),
+    },
     find: { commandId: `${scope}.find`, description: 'Find', category: 'navigation' },
   }
 }

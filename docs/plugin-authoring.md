@@ -54,6 +54,27 @@ For short integration examples, see [Events and capabilities](./plugin-authoring
 
 [The client half](plugin-authoring/the-node-half.md#the-client-half)
 
+## Drawing a diff
+
+`DiffPane` is on `@acorn/plugin-api/ui` for compiled plugins; a loaded plugin's frame or tree cannot
+hand it a source, because a `DiffSource` is functions. A compiled plugin fills the port with a
+document rather than with patches ([diff rendering](./diff-rendering.md) § The source port). Plugin
+API major `2` is where that changed, and a source written for `1` moves like this:
+
+- `files` becomes `topology`, a `DiffDocumentTopology`. Build it on your node with
+  `fileDocument(path, patch)` from `@acorn/diff-document/document` for each file's segment
+  descriptors and `documentTopology(files)` for the whole, and answer it from a route.
+- `cachedFile` and `fetchPatches` become `loadSegments(requests, signal)`: answer each
+  `{ path, patchKey, ordinal }` with that segment's plain rows, cut from the patch the key names.
+  Reject when you can no longer produce them, and refresh your topology.
+- `search(request, signal)` is new: `searchDocument` over the same files answers a page.
+- `contentSignature` and `contentKey` are gone. A segment is keyed by its patch digest, so a new
+  topology reloads only what moved.
+- `hasLineExtra` and `lineExtraSignature` become `lineExtra: { anchors, render }`: name every line you
+  draw under, up front.
+
+Declare `"apiVersion": "2"`, or a range that covers it, once the source is moved.
+
 ## Storage and migrations
 
 

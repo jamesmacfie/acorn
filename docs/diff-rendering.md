@@ -1,50 +1,97 @@
 # Diff rendering
 
-The shared diff viewer is in client-core and is used by the GitHub PR pane and Changes pane. It
-renders provider patches and local Git diffs through the same row model.
+The shared diff viewer is in client-core and is used by the GitHub PR pane, the GitHub compare
+preview, and the Changes pane. All three hand it the same thing: a document, laid out by a topology
+with no source text in it and filled in segment by segment as the reader comes near.
 
-It arrives in two layers, and the split is enforced (`tools/arch/boundaries.test.ts`, "client-core
-kit/ is pure presentation"):
+It arrives in three layers, and the split is enforced (`tools/arch/boundaries.test.ts`):
 
-- `kit/diff/` is the toolkit: the row model, the row components, the virtualizer, the find pass, the
-  hydrator. Props in, DOM out, no application state, so a plugin can reach for a piece of it to build
-  a simpler surface. The compare preview does exactly that.
+- `packages/diff-document/` (`@acorn/diff-document`) is the document itself: the patch parser, the
+  segmenter, the descriptors, search, and a parse cache. It has no DOM, node, Solid, database, or
+  transport dependency, because the node builds documents and the renderer reads them
+  ([architecture-overview.md](./architecture-overview.md) § Node API and client flow).
+- `kit/diff/` is the toolkit: the row model, the row components, the virtualizer, the find marks.
+  Props in, DOM out, no application state, so a plugin can reach for a piece of it to build a simpler
+  surface.
 - `features/diff/` is the viewer: `DiffPane` and the parts only it uses. This layer reads
   preferences, registers a command and a keybinding, and keeps session scroll state, none of which
   `kit/` may do.
 
 `DiffPane` is the whole viewer as one component, and a caller drives it through a `DiffSource`
-(`features/diff/source.ts`). Both are on the plugin API, `DiffPane` on `@acorn/plugin-api/ui` and the port
-type on `@acorn/plugin-api/ui/diff`.
+(`features/diff/source.ts`). Both are on the plugin API, `DiffPane` on `@acorn/plugin-api/ui` and the
+port type, with the document types it is written in, on `@acorn/plugin-api/ui/diff`.
+
+## The document
+
+A document is a topology and its segments (`packages/diff-document/src/model.ts`).
+
+The **topology** lists every file in order with its status, counts, new-side key (`sha`), and patch
+key, and for each file the segments its patch was cut into. A segment is described by counts alone:
+its unified rows, its split bands, how many of those rows are gaps, its widest line in columns, and
+the first and last old-side and new-side line numbers its code rows carry. The totals and a revision
+over every path and patch key close it off. That is enough to lay out the whole diff, size the
+scrollbar, place every file header, and put every inline thread in the right segment, before any row
+exists. It carries no line of code, no token, and no comment body.
+
+A **segment** is the plain rows of one bounded slice of one file's patch: gaps, hunk headers, and code
+lines with their numbers and raw text. Segments are bounded two ways, by `SEGMENT_MAX_ROWS` (64) and
+by `SEGMENT_MAX_BYTES` (32 KiB of row text), because a row count alone does not bound a generated
+file with one enormous line per row. A single row over the byte limit is kept whole, alone in a
+segment marked `oversize`. The segmenter (`segmentRows`) is deterministic:
+
+- A hunk joins the segment before it only when it fits whole, so boundaries fall between hunks where
+  they can.
+- A top or middle gap always opens a segment, and the bottom gap always closes one. An expanded gap
+  is therefore always at a segment's edge, and its revealed lines slot in beside the segment rather
+  than through the middle of it.
+- A hunk too big for one segment is split at the last point in the back half of the segment that
+  does not separate a deletion run from the insertions after it, so the split view's pairs stay
+  whole, or at the limit when there is no such point. The descriptor's band count is computed on the
+  segment's own rows with the same pairing `toBands` does, so it is exact either way.
+- A patch the parser cannot read falls back to its raw lines, unnumbered, still bounded.
+
+A segment's identity is its content. `segmentContentKey(patchKey, ordinal)` joins the diff-document
+version, the patch's own digest, and the segment's ordinal in its file, so a key is stable while other
+files come and go, different whenever the patch or the parser changes, and never tied to a position
+in the document. The patch key is a digest of the patch text, never the head blob SHA, which
+identifies the new side of a file rather than a diff against a particular base
+([caching.md](./caching.md) § Immutable blob cache). The file's `sha` stays what it was, the key a
+source reads the new side by.
+
+Find is a document operation too. `searchDocument` walks a document's code rows in order and answers
+a page of up to 500 matches by path, patch key, segment and row, with a cursor to the next page. It
+only reads as many files as the page needs.
+
+The limits a route enforces are in the same module: 32 segments per request, 5,000 files per
+document, a 256-character query.
 
 ## The source port
 
 `DiffSource` is how the viewer knows nothing about pull requests or working trees. The caller resolves
-its own queries and hands over accessors and callbacks: which files, where the patch bodies come from,
-which threads to interleave, what a comment does. Two rules keep the seam honest. The members are
+its own queries and hands over accessors and callbacks: the topology, where segments come from, how to
+search, which threads to place, what a comment does. Two rules keep the seam honest. The members are
 plain functions rather than a provider object the viewer could reach through, and an omitted optional
 member hides its affordance rather than needing a stub, so a source with no `fileText` renders gaps
 that cannot be expanded and a source with no `reply` gets thread rows whose reply box is disabled.
 
-`signature` and `contentSignature` are separate on purpose. The first says which files are on screen,
-and changing it drops the remembered scroll offset and the collapsed files. The second says what those
-files currently claim, and changing it re-reads the patches while leaving the reader where they were. A
-working tree needs the two apart, because an agent saving a file mid-review moves the content every
-poll and treating that as a new diff would throw the reader back to the top each time. A pull request
-does not: a new commit is both, so the GitHub pane sets only `signature`.
+The document members are `topology`, `loadSegments`, and `search`. `loadSegments` is asked for a few
+segments at a time, only near the viewport, and never for the whole document. A rejection shows that
+segment as failed with a Retry, and a source whose segments can go stale refreshes its topology as it
+rejects. There is no whole-patch member: a source never hands the viewer a patch.
 
-A changed `contentSignature` does not have to mean every patch. A source that also supplies
-`contentKey`, one file's part of the signature, gets only the files whose key moved read again, and
-the rest keep their rows and any load in flight. The changes pane keys a file by what its patch is
-made of, which the node puts on each `LocalChange` as `contentKey`: the modes and objects the status
-line names for the HEAD and index sides, and for the working-tree side, which git has not hashed, a
-fresh stat of the file (mode, size, mtime, ctime). A poll that finds nothing new reads no patch, and an
-agent saving one file reads that file. Before this, every poll read every patch again, two git
-processes per file. A node too old to send the key, a submodule, whose new commit is not on its status
-line, and a path the node could not stat all fall back to the poll count, which reads that file on
-every poll, because an edit can keep both line counts.
+`signature` and the topology's `revision` are separate on purpose. `signature` says which files are
+on screen, and changing it drops the remembered scroll offset, the collapsed files, and any gap the
+reader opened. `revision` says what those files currently claim, and changing it stops the requests
+for the old revision and leaves the reader where they were. A working tree needs the two apart,
+because an agent saving a file mid-review moves the content every poll, and treating that as a new
+diff would throw the reader back to the top each time. A pull request does not: a new commit is both,
+so the GitHub pane's signature is the revision.
 
-Behind the changes pane's two signatures is one resource, `LocalStatus`, which carries the branch, its
+A new revision reloads only what moved. Every segment is keyed by its content, so a segment whose file
+did not change keeps its rows, and an agent saving one file reloads that file's segments and nothing
+else.
+
+Behind the changes pane's document is one resource, `LocalStatus`, which carries the branch, its
 upstream, and how far the branch is each way alongside the file list, so no two regions of the panel
 can describe different trees. It is one `git status --porcelain=v2 --branch --untracked-files=all`
 call plus two numstats and a filesystem check for a half-finished merge or rebase, and the node shares
@@ -55,10 +102,12 @@ and the banner all derive from this one record. The last flag is what makes an u
 arrive as the files inside it: git's default collapses one to a single `dir/` entry, and a row named
 after a directory has no patch to show and no file to discard.
 
-Two members exist for what a caller draws that the viewer has no concept of: `lineExtra` puts content
-under a code row, inside the virtualized row so its height is measured, and `lineAction` adds a click
-affordance on a code line. The changes pane uses the first for review notes and the second for
-Alt-click to send a line reference to the agent.
+Three members exist for what a caller draws that the viewer has no concept of. `threads` are inline
+conversations, complete when the topology is, and placed by their line number. `lineExtra` puts
+content under a code row: `anchors` names every line that has some, up front, so the document reserves
+for it before the segment loads, and `render` draws one line's inside the segment so its height is
+measured with it. `lineAction` adds a click affordance on a code line. The changes pane uses the
+second for review notes and the third for Alt-click to send a line reference to the agent.
 The Changes source and a task's GitHub PR source supply `openLine`: an added line shows a hover button
 in its first gutter that opens the task's file at that new-side line in the editor. Repository PR browse
 has no task editor, so its source omits the callback. The viewer hides the button for deleted lines,
@@ -70,16 +119,32 @@ sent-state persistence changes the public result. The frame carries `{ taskId, t
 note ids, paths, snippets, or bodies, so badges and delivery gates can react without receiving review
 content. Consumers that need the notes themselves continue to use the task-authorized route.
 
-`plugins/github/src/client/DiffForPull.tsx` and `plugins/changes/src/client/ChangesPane.tsx` are the
-two implementations, and both are short enough to read in one sitting. That is the measure of whether
-the port is the right size.
+`plugins/github/src/client/DiffForPull.tsx`, `plugins/github/src/client/ComparePreview.tsx` and
+`plugins/changes/src/client/changesModel.tsx` are the three implementations, and each is short enough
+to read in one sitting. That is the measure of whether the port is the right size.
 
 ## Data flow
 
-The GitHub task pane uses the file summaries already warmed by the PR list, then loads patch bodies
-in small batches as the diff hydrates. Repository browse can start with full file payloads. Large or
-missing patch bodies are loaded lazily from the blob route. The Changes plugin obtains a local diff
-through the core Git service. Both paths normalize into file/hunk/line rows before rendering.
+Every document is built on the node. A provider parses and cuts each patch once, answers the
+descriptors, and answers segments by patch key when they are asked for:
+
+- A **pull request**'s patches are cut when they are mirrored, and each file's descriptors are stored
+  as a small blob beside its patch body ([github-integration.md](./github-integration.md) § Diff
+  documents). `GET …/pulls/:number/diff` reads the file rows and those blobs and parses nothing.
+  Segments and search are two repository routes, `POST …/diff/segments` and `POST …/diff/search`,
+  because a segment is addressed by the patch's digest and a compare preview stores its patches the
+  same way.
+- A **compare preview**'s patches arrive inline from GitHub. The compare route stores each under its
+  digest and answers a document, so the preview loads its segments through the same two routes.
+- A **working tree**'s document is read by path and status key (`POST …/local/document`), diffed in
+  batches of paths rather than a process per file, and held in a process-local cache
+  (`plugins/changes/src/server/localDocument.ts`). A segment request whose patch key is not the one the
+  last document gave its file is refused with `409 revision_conflict`, and the Changes source refreshes
+  its document when it sees one, so the viewer never draws one file from two states of the tree.
+  Staged and unstaged are separate documents.
+
+The GitHub task pane and repository browse read the same document; the file list beside them still
+reads the summaries already warmed by the PR list. The client never holds a whole patch.
 
 The changes pane's list is a navigator, not a selector: every file's hunks are stacked in one
 scroller and clicking a row scrolls to it, the way the pull-request pane's list works. Staging is a
@@ -124,23 +189,44 @@ Filling a gap needs the new side of the diff, and for a working tree that is not
 reads objects, and the new side of an unstaged diff has never been written to one. `localNewSideText`
 serves both cases, the index for a staged diff and the file on disk for an unstaged one, and refuses a
 symlink because a repo can hold one pointing anywhere and the path arrives over HTTP. The pane carries
-the staging area in `DiffFile.sha`, which the viewer never reads and hands straight back through
-`fileText`. A deleted file gets a null `sha`, which is how its gaps render inert: there is no new side
+the staging area in the document file's `sha`, which the viewer never reads and hands straight back
+through `fileText`. A deleted file gets a null `sha`, which is how its gaps render inert: there is no new side
 of a file that is gone.
 
-The row types (`DiffFile`, `DiffThread`, and their siblings, in `kit/diff/diffModel.ts`) are structural
-rather than named after either plugin's wire types. GitHub's `PullFile` and `Thread` and Changes'
-local rows all satisfy them without either plugin importing the other, so the renderer describes what
-it needs rather than one caller's type. `kit/diff/synth.ts` follows the same reasoning. A GitHub
-per-file patch is hunks-only, so it synthesizes a header for gitdiff-parser, and it lives here
-because both GitHub's PR file payloads and local `git diff` output reach that parser.
+The row types (`DiffThread`, `CodeRow`, and their siblings, in `kit/diff/diffModel.ts`) are
+structural rather than named after either plugin's wire types. GitHub's `Thread` and Changes' review
+notes satisfy them without either plugin importing the other, so the renderer describes what it needs
+rather than one caller's type. The parser follows the same reasoning. A GitHub per-file patch is
+hunks-only, so `synth` puts a header in front of it for gitdiff-parser, and it lives in
+`@acorn/diff-document` because both GitHub's patches and local `git diff` output reach that parser,
+on the node.
 
 ## Parsing and highlighting
 
-Patch parsing produces file headers, hunks, additions, deletions, context, and expandable gaps.
-Syntax highlighting is performed with Shiki on demand. Visible files and lines are prioritized; the
-viewer does not parse or highlight every file before first paint. Virtualizers keep long diffs within
-the renderer budget.
+The node parses; the renderer only builds rows for segments it has, and colours them afterwards.
+
+The viewer's list is of items, not rows (`features/diff/documentView.ts`): one per file header, one
+per segment, one per no-diff file, and one per 64-row slice of an expanded gap, all built from the
+topology. The segment loader (`features/diff/segmentLoader.ts`) is told, every time the virtual range
+moves, which segments are on screen and which are near: the virtual range plus two segments beyond
+each end. It asks the source for the missing ones in batches of eight, the ones on screen first, at
+most two requests in flight. Anything queued that has left the range is dropped, and a request whose
+every segment has left is aborted, so a pane left open does no more work than its range needs. There
+is no background drain. A new revision stops every request in flight and cannot publish into the new
+document, because a segment is published by its content key and a stale answer's key is not one the
+new topology asks for.
+
+A loaded segment publishes its plain rows at once: each code line is one token of its raw text. The
+segment is then queued for colour, in the same demand order, one segment at a time: syntax tokens per
+hunk-side through the highlight worker, and word spans for paired changes through the word-diff
+worker (`enrichDiffRows`). The coloured rows replace the plain ones under the same index, so no row is
+remounted and nothing moves, and only when the segment still holds the rows the colouring started
+from. An oversize segment stays plain. A dead or slow worker leaves plain text on screen, which is
+correct and readable.
+
+Held segments are bounded: 96 of them, least recently wanted first out, and never one that is wanted.
+Phase 4 of [docs/future/git-inspired/](./future/git-inspired/README.md) replaces that bound with a
+shared weighted cache.
 
 Highlighting runs in `highlighter.worker.ts` (`client-core/src/infra/highlight/`), off the thread that
 draws. Tokenizing a 45-file diff on the main thread cost about 2 seconds, in unbroken per-file blocks
@@ -182,61 +268,48 @@ either side. The worker must not pull in `kit/diff/diffModel.ts`, which would dr
 `gitdiff-parser` into the worker bundle, and the client must not pull in the worker's Shiki imports,
 which would put the WASM engine back on the main thread.
 
-Paired delete/insert lines use a second worker for word-level diffs. Patch parsing and row assembly
-remain on the main thread, but the `diffWordsWithSpace` work for one file is sent as one batch so it
-cannot block scrolling. The worker has the same cold/live/dead shape and a main-thread fallback as
-highlighting, without sharing Shiki's wider worker policy or lifecycle.
-
-**Hydration state is per file, and read per row.** The hydrator keeps each file's status —
-`idle`, `queued`, `loading`, `loaded`, `error` — in a Solid store keyed by path, and a load row reads
-its own key. It used to keep them in a `Map` behind one version counter, which made every publish look
-like a change to every file: `DiffPane` reads a status per file, so each of the two or three publishes
-per file rebuilt the row model for the whole diff. On a 200-file pull request that was 226 rebuilds of
-every file's rows during load, then 102 after status became per-file state
-(measured 2026-09-03).
-
-The hydrator keeps a plain `Map` beside the store for its own queue, and that is deliberate: its pump
-reads statuses synchronously from whatever reactive scope called `reset()`, and reading the store there
-would subscribe that scope to every path in the diff.
-
-Parsed files are keyed the same way, one store key per path, because the map used to be copied whole on
-every parse — one full copy per file in the diff. A publish replaces each key's value from the store's
-root rather than setting it by path, because a Solid store merges an object set by path into the one
-already there: a re-read file then changed no key, and its new rows waited for the next unrelated
-rebuild of the list to appear. The priority file publishes as soon as it is
-ready; later files publish in the hydrator's four-file fetch batches. `parsedPublisher.ts` holds
-off-screen batches while a scroll is active, flushes a file immediately if it enters the viewport,
-and applies the remaining files together in an idle turn after scrolling stops. This keeps progressive
-hydration from repeatedly rebuilding the combined row model on the scroll path. The one full copy left
-is the expanded-gap map, which is written once per gap a reader clicks open and is handed to
-`buildRenderableRows`, a published function that takes a `Map`.
+Paired delete/insert lines use a second worker for word-level diffs, with the same cold/live/dead
+shape and a main-thread fallback as highlighting, without sharing Shiki's wider worker policy or
+lifecycle. One segment's pairs are sent as one batch so the comparison cannot block scrolling.
 
 ## Row geometry
 
 Code lines do not soft-wrap. A long line scrolls sideways instead, and the line numbers and the +/-
 marker stay pinned to the left edge while it does.
 
-The virtualizer depends on that. Every code row is exactly one line tall, so `estimateRowSize` is
-always right and no code row is measured. Only threads are, because only they vary. When lines
-wrapped, a row's height was a layout question: each one painted at its 20px estimate and was
-corrected a frame later, and a first correction above the scroll offset makes the virtualizer write
-`scrollTop` to compensate. Scrolling flashed and stuttered.
+The virtualizer depends on that. It positions items, not rows: a segment's container is absolutely
+positioned and its rows are in normal flow inside it. Every code row and hunk header is exactly one
+line tall and a gap row is 28px, so a segment's height is exact from its descriptor before its rows
+arrive, plus a reservation for each inline thread its line span covers (50px resolved, 140px open). A
+segment on screen whose rows are still loading draws a placeholder of exactly that height that says
+so, so nothing below it moves when they arrive and the scrollbar never collapses. When lines wrapped,
+a row's height was a layout question: each one painted at its estimate and was corrected a frame
+later, and a first correction above the scroll offset makes the virtualizer write `scrollTop` to
+compensate. Scrolling flashed and stuttered.
 
-The list keeps 80 rows beyond the calculated range, about two viewport heights in a normal desktop
-pane. The Solid adapter uses a release that preserves measured item sizes when reactive
-options such as the row count change. Hydration therefore relies on the adapter's count update rather
-than calling `measure()` for the whole list. Full measurement is reserved for attaching a newly laid
-out scroller and restoring its position; a composer or annotation changing height remeasures only the
-mounted elements.
+Every mounted item is measured once and observed from then on. A segment with no thread, note, or mark
+in it measures what its descriptor said, so the measurement commits nothing; one with threads corrects
+its reservation when its rows arrive or a thread opens. Phase 3 moves those dynamic heights into their
+own index. The item keys are the file path and the segment ordinal, so an item that stays in range
+keeps its DOM while the range moves and a composer typing inside it keeps its focus.
+
+The list mounts 800px beyond each edge of the viewport, in pixels rather than items, because an item
+is a 36px header in one place and a 64-row segment in another. That is at most a few hundred rows
+mounted at any size of document. The Solid adapter uses a release that preserves measured item sizes
+when reactive options change; the item keys are handed to it through a getter, so a new key list, or a
+thread arriving for a segment not yet measured, makes it recompute offsets while keeping every
+measured size. Full measurement is reserved for attaching a newly laid out scroller and restoring its
+position.
 
 Because nothing wraps, something has to be wide enough to hold the widest line, and unified and split
 answer that differently.
 
 In unified the canvas itself is that wide, and the whole pane scrolls sideways. The width comes from
-the row model (`maxLineCols`, handed to CSS as `--diff-cols` in columns, since the font is monospace
-and one column is 1ch) rather than from `max-content`: rows are absolutely positioned, so only the
-ones inside the virtual window have boxes, and a layout-derived width would change as you scrolled
-vertically and drag the horizontal scroll position with it.
+the topology (`totals.columns`, the widest code line in the document, widened by any gap the reader
+opened, handed to CSS as `--diff-cols` in columns, since the font is monospace and one column is 1ch)
+rather than from `max-content`: only the items inside the virtual window have boxes, and a
+layout-derived width would change as you scrolled vertically and drag the horizontal scroll position
+with it. Because the number is in the topology, the canvas is its final width before any row loads.
 
 File headers stay visible while the wide canvas scrolls sideways, the same way the gutters do:
 each head is `position: sticky; left: 0` inside its canvas-wide row, sized to the visible
@@ -251,30 +324,43 @@ signals: the comment composer, including its busy and error state, mounts only f
 
 In split the pair always fits the pane, so half the pane stays half the pane however long a line
 gets, and each column scrolls horizontally inside itself. The scroller is each row's own code box, so
-there is one per row and `splitScrollSync.ts` keeps a column's rows in step. Their scrollbars are
+there is one per row and `splitScrollSync.ts` keeps a column's rows in step, across every mounted
+segment. Their scrollbars are
 hidden, since forty stacked would be noise rather than navigation, so a column scrolls by trackpad or
 shift+wheel.
 
 ## Modes
 
 - Unified mode renders old/new lines in one stream and is the default.
-- Split mode renders old and new columns with its own row virtualization.
+- Split mode renders the same items, each segment's rows paired into bands inside the segment. Its
+  height comes from the descriptor's band count, so the scrollbar is exact in both modes.
 - Word-level spans are attached only to paired delete/insert runs, preserving unchanged text, and
   their comparison runs in `wordDiff.worker.ts`.
-- Gap rows request additional context by file SHA/path and keep the current anchor stable.
+- Gap rows reveal context from the new side the source reads by `fileText`. The revealed lines are
+  keyed by the content key of the segment the gap sat at the edge of, so a new revision of that file
+  leaves them behind by construction, and they are drawn as 64-row slices beside that segment so
+  opening a five-thousand-line gap mounts no more than any other part of the document.
+- Find (Cmd+F) asks the source for a page of matches across the whole document
+  (`features/diff/findController.ts`) and takes the reader to one by its segment and row. Only that
+  segment loads; the marks draw on whichever matched rows are mounted. The next page is fetched when
+  the reader steps past the last match. The query goes to the source and nowhere else.
 
 ## Review threads and state
 
-Inline thread anchors use file path, side, and line coordinates. Thread state is fetched with the
-PR detail and updates through GitHub mutations. Viewed-file state is local app data and is merged into
-the file projection; it is not sent to GitHub.
+Inline thread anchors use file path, side, and line coordinates. A thread is placed in the segment
+whose line span covers its line, from the topology, so its space is reserved before its segment
+loads, and drawn under the code row with that line number when it does. Thread state is fetched with
+the PR detail and updates through GitHub mutations. Viewed-file state is local app data and is merged
+into the file projection; it is not sent to GitHub.
 
-The source's selected path is resolved after the file model is available, then scrolls to that file
-without forcing all other files to hydrate. The GitHub pane reads it from `?file=`.
+The source's selected path scrolls to that file's header as soon as the topology is in, because its
+offset is exact before any of its rows load. The GitHub pane reads it from `?file=`. Collapsing a file
+drops its segments from the list and keeps its header; collapsing one from the sticky header scrolls
+back to that header, so the reader stays on the file they collapsed.
 
 Scroll position and collapsed files are remembered per scope for the session (`diff/viewState.ts`): a
 task and the classic browser keep separate entries for the same content, and a task's entries are
-evicted when it is archived. Both are tied to the files signature, so new commits drop the stale
+evicted when it is archived. Both are tied to the source's signature, so new commits drop the stale
 position and collapse choices instead of restoring them against a different diff. An explicit file
 navigation wins over a saved scroll position.
 
@@ -287,17 +373,16 @@ own kind rather than the view mode: a mark on "line 42 as it will be" means the 
 reader is in split or unified.
 
 The marks compose with the source's own `lineExtra` rather than replacing it, in that order, because
-the source's annotation is the one the person using the pane wrote. They ride the same measurement path
-review threads do — drawn inside the virtualized row, counted by `hasLineExtra`, and invalidated
-through `lineExtraSignature` — so a mark arriving for a row already on screen grows it instead of
-overlapping the rows below.
+the source's annotation is the one the person using the pane wrote. They are drawn inside the segment,
+so a mark arriving for a row already on screen grows the segment instead of overlapping the rows below.
 
 Rows with no source annotation and no contributed mark do not mount an annotation component or an
 empty wrapper.
 
-Every code row in the diff is asked about at once, in one request per contributor: a coverage plugin on
-a two-thousand-line diff answers once. The host compares the key set before asking, so the effect
-re-running on every scroll and every thread toggle costs a string compare.
+Only the code rows of the items in the virtual range are asked about, in one request per contributor.
+The host compares the key set before asking, so a scroll within the same segments costs a string
+compare, and a coverage plugin on a million-line diff is asked about the few hundred rows the reader
+is near.
 
 Two owners open a line point: `changes:diff-line` over the working tree, and `github:diff-line` over a
 pull request. Both declare the same three fields in the same order, both hand the point's name to
