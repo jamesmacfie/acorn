@@ -13,11 +13,10 @@ import { seedLargeSession } from '@acorn/plugin-agents/testkit'
 import { seedReviewNotes } from '@acorn/plugin-changes/testkit'
 
 // Seeds an agent-automation data root before the window starts (docs/local-development.md § Agent-driven
-// desktop development). Without a fixture it adds one project. With `--fixture large-surfaces` it
-// writes a generated Git repository whose working tree holds the large diff, adds it as the project,
-// adds a task that runs in the project folder so its Changes pane shows that diff, and writes the
-// review notes and the long agent session through the two plugins' own testkits
-// (docs/testing.md § Large-surface fixture). Prints one JSON line the launcher records.
+// desktop development). Without a fixture it adds one project. Fixtures put a generated Git
+// repository, task, review notes and agent session into an isolated root. `tui-navigation` also
+// adds a second task and a second workspace/project so both UI hosts can exercise navigation over
+// the same scenario (docs/testing.md § Large-surface fixture). Prints one JSON line the launcher records.
 
 const args = Object.fromEntries(process.argv.slice(2).reduce<string[][]>((pairs, value, index, all) => {
   if (index % 2 === 0) pairs.push([value, all[index + 1] ?? ''])
@@ -30,9 +29,9 @@ const fixture = args['--fixture']
 const profile = (args['--profile'] || 'small') as LargeSurfaceProfile
 const seed = Number(args['--seed'] || 1)
 if (!dataDir || !projectPath || !isAbsolute(dataDir) || !isAbsolute(projectPath)) {
-  throw new Error('Usage: seed.ts --data-dir ABSOLUTE_PATH --project ABSOLUTE_PATH [--fixture large-surfaces --profile small|scale|canonical --seed N]')
+  throw new Error('Usage: seed.ts --data-dir ABSOLUTE_PATH --project ABSOLUTE_PATH [--fixture large-surfaces|tui-navigation --profile small|scale|canonical --seed N]')
 }
-if (fixture && fixture !== 'large-surfaces') throw new Error(`Unknown fixture: ${fixture}`)
+if (fixture && fixture !== 'large-surfaces' && fixture !== 'tui-navigation') throw new Error(`Unknown fixture: ${fixture}`)
 if (!['small', 'scale', 'canonical'].includes(profile) || !Number.isInteger(seed)) throw new Error('Profile must be small, scale or canonical, and seed an integer.')
 
 const git = (cwd: string, ...command: string[]) => execFileSync('git', command, {
@@ -55,7 +54,7 @@ function writeRepository(root: string): void {
   for (const file of largeDiffFiles(profile, seed)) {
     if (file.base != null) write(root, file.oldPath ?? file.path, file.base, file.binary)
   }
-  writeFileSync(join(root, 'README.md'), `Generated large-surface fixture: profile ${profile}, seed ${seed}.\n`)
+  writeFileSync(join(root, 'README.md'), `Generated UI fixture: profile ${profile}, seed ${seed}.\n`)
   git(root, 'add', '-A')
   git(root, '-c', 'user.name=Acorn fixture', '-c', 'user.email=fixture@acorn.invalid', 'commit', '-q', '-m', 'Fixture base')
   const apply = (file: LargeDiffFile) => {
@@ -83,10 +82,42 @@ try {
       const now = Date.now()
       const [{ value }] = await db.select({ value: max(schema.tasks.sort) }).from(schema.tasks)
       await db.insert(schema.tasks).values({
-        id: taskId, title: `Large surfaces (${profile})`, icon: null, origin: 'local', projectId: result.project.id,
+        id: taskId, title: fixture === 'tui-navigation' ? 'Review changed files' : `Large surfaces (${profile})`,
+        icon: null, origin: 'local', projectId: result.project.id,
         branch: null, skipSetup: true, pullNumber: null, worktreePath: null, status: 'active', parentId: null,
         sort: (value ?? -1) + 1, createdAt: now, updatedAt: now, archivedAt: null,
       })
+
+      let otherTaskId: string | undefined
+      let otherWorkspaceTaskId: string | undefined
+      if (fixture === 'tui-navigation') {
+        otherTaskId = randomUUID()
+        await db.insert(schema.tasks).values({
+          id: otherTaskId, title: 'Plan follow-up work', icon: null, origin: 'local', projectId: result.project.id,
+          branch: null, skipSetup: true, pullNumber: null, worktreePath: null, status: 'active', parentId: null,
+          sort: (value ?? -1) + 2, createdAt: now, updatedAt: now, archivedAt: null,
+        })
+
+        // This project belongs to a separate workspace. The folder stays beside the generated repo,
+        // inside the fixture directory, so a session never adds or changes a personal checkout.
+        const otherWorkspaceId = randomUUID()
+        await db.insert(schema.workspaces).values({
+          id: otherWorkspaceId, name: 'Side project', isDefault: false, sort: 1,
+          createdAt: now, updatedAt: now,
+        })
+        const otherPath = join(dirname(projectPath), 'side-project')
+        mkdirSync(otherPath, { recursive: true })
+        writeFileSync(join(otherPath, 'README.md'), '# Side project\n')
+        const otherProject = await createProject(db, { path: otherPath, workspaceId: otherWorkspaceId })
+        if (!otherProject.ok) throw new Error(otherProject.reason)
+        otherWorkspaceTaskId = randomUUID()
+        await db.insert(schema.tasks).values({
+          id: otherWorkspaceTaskId, title: 'Check workspace switch', icon: null, origin: 'local',
+          projectId: otherProject.project.id, branch: null, skipSetup: true, pullNumber: null,
+          worktreePath: null, status: 'active', parentId: null, sort: (value ?? -1) + 3,
+          createdAt: now, updatedAt: now, archivedAt: null,
+        })
+      }
 
       const notes = [...largeDiffFiles(profile, seed)].flatMap((file) => file.notes)
       const changes = makeTestNodeContext({ plugin: { name: 'changes' }, dataDir })
@@ -108,6 +139,7 @@ try {
       process.stdout.write(`${JSON.stringify({
         fixture, profile, seed,
         projectId: result.project.id, taskId, sessionId: session.session.id,
+        ...(otherTaskId ? { otherTaskId, otherWorkspaceTaskId } : {}),
         files: summary.files, fixedRows: summary.fixedRows, threads: summary.threads, notes: summary.notes,
         digest: summary.digest, turns: session.turns, events: session.events,
       })}\n`)

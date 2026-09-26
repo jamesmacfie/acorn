@@ -47,6 +47,13 @@ let leaving = false
 // `supervise.ts`, and read at print time because it grows for the life of the run (./boot.ts).
 const platform = installPlatform(opened, () => void quit())
 
+// This is a live client running under Node. Query Core may have been imported by a static boot
+// dependency before the platform installed `window`, so its module-time server detection can be
+// stale even though Solid's web entry is the client build. Set the runtime explicitly before any
+// query observer mounts.
+const { environmentManager } = await import('@tanstack/solid-query')
+environmentManager.setIsServer(() => false)
+
 // Nothing that reaches the node may be imported before the seam exists: an import is evaluated once,
 // and a module that reads `window.acorn` at its top level would read it before the line above ran.
 const { selectActiveNode, setActiveNode } = await import('@acorn/client-core/infra/node/activeNode.ts')
@@ -85,7 +92,10 @@ setCacheStorage(fileCacheStorage())
 // every request to the machine's own node. It also makes `activeCacheId()` and the client below the
 // same partition, which is what the watchers write into.
 setActiveNode(opened.nodeId)
-await selectActiveNode()
+// A data root can already hold node.json before its first Node handshake (an agent fixture does).
+// On that path the local fleet has no row yet. Selecting against it would clear the known node id
+// and leave every query with no target even after the handshake fills the fleet.
+if (!opened.starting) await selectActiveNode()
 
 // One client and one persister per node, and this host reads the same pair every other host does
 // (docs/caching.md § Renderer query cache). `App` used to mint a second `QueryClient` of its own, so
@@ -282,14 +292,15 @@ process.once('SIGTERM', () => void quit())
 // (./chrome/nodeState.ts).
 if (opened.starting) {
   setNodeStarting(true)
-  void opened.starting.then(
-    () => setNodeStarting(false),
-    (error: unknown) => {
-      setNodeStarting(false)
-      log.error(`acorn could not start a node: ${error instanceof Error ? error.message : String(error)}`)
-      void quit(1)
-    },
-  )
+  void opened.starting.then(async () => {
+    await selectActiveNode()
+    await client.invalidateQueries({ refetchType: 'active' })
+    setNodeStarting(false)
+  }).catch((error: unknown) => {
+    setNodeStarting(false)
+    log.error(`acorn could not start a node: ${error instanceof Error ? error.message : String(error)}`)
+    void quit(1)
+  })
 }
 
 // The tree mounts on the screen's root node rather than on the surface around it

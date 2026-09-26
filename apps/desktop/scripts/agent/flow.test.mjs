@@ -12,6 +12,11 @@ describe('parsing a flow', () => {
     expect(flow.stages.length).toBeGreaterThanOrEqual(6)
   })
 
+  it('accepts the desktop comparison flow', async () => {
+    const flow = parseFlow(await readFile(join(import.meta.dirname, 'flows', 'tui-navigation.json'), 'utf8'))
+    expect(flow.stages.map((stage) => stage.name)).toEqual(['task-roster', 'changes', 'agent', 'workspace-switch'])
+  })
+
   it('rejects an action it does not know', () => {
     expect(() => parseFlow(stage([{ hover: { target: { name: 'x' } } }, assertion]))).toThrow(/unknown action "hover"/)
   })
@@ -32,6 +37,11 @@ describe('parsing a flow', () => {
   it('rejects a flow that asserts nothing, or an invariant it does not know', () => {
     expect(() => parseFlow(stage([{ frames: 2 }]))).toThrow(/assert at least one/)
     expect(() => parseFlow(stage([{ assert: { surface: 'diff', invariant: 'fast' } }]))).toThrow(/invariant/)
+  })
+
+  it('rejects text checks with unknown fields or empty outcomes', () => {
+    expect(() => parseFlow(stage([{ assertText: { contains: [] } }]))).toThrow(/contains or absent/)
+    expect(() => parseFlow(stage([{ waitText: { text: 'ready', timeoutMs: 100, script: 'x' } }, assertion]))).toThrow(/script/)
   })
 
   it('rejects a step with two actions and a target with no name', () => {

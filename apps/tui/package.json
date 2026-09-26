@@ -12,6 +12,8 @@
     "build": "vite build && node scripts/check-startup-graph.mjs",
     "capture": "vite build && node dist/capture.js",
     "dev": "vite build && node dist/main.js",
+    "agent:session": "node scripts/agent/session.mjs",
+    "agent:ui": "node scripts/agent/ui.mjs",
     "lint": "tsc --noEmit",
     "test": "vitest run"
   },
@@ -59,6 +61,7 @@
   "devDependencies": {
     "@types/node": "^26.0.0",
     "@types/ws": "^8.5.13",
+    "node-pty": "^1.0.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
     "vite-plugin-solid": "^2.11.12",

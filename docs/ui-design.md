@@ -18,21 +18,21 @@ The shell owns navigation chrome and modal prompts. Plugins supply feature conte
 and slots. A child webview is positioned over a pane host by the shell; page content never
 owns the surrounding chrome.
 
-The terminal draws the same hierarchy at a quarter of the size, and where it differs it differs
-because there are no pixels to spend (`apps/tui/src/chrome/`):
+The terminal draws the same hierarchy with fewer cells, and its chrome arranges the shared content
+for keyboard navigation (`apps/tui/src/chrome/`):
 
 ```text
-Topbar:   one line. Workspace, task count, the open branch, the node's state as a dot
-Rail:     a column of tasks, browse sources under a rule; two cells of marks below 100 columns
-Main:     one pane, with a strip of pane labels above it
-Overlays: the palette, the cheat sheet and a quit confirmation, drawn where the pane is
+Topbar:   one line. Workspace, project, task count, branch, and node state
+Left:     Menu sources, Browse list, and workspace Tasks in one column
+Main:     one pane or source detail, with a strip of pane labels above it
+Overlays: palette, cheat sheet, pickers, inbox, trust, and quit confirmation
 Footer:   one line. What the keyboard will do, and the node's state when it needs a sentence
 ```
 
 Three differences are worth naming. There is one pane rather than a row of them, because two panes at
 80 columns are two 40-column panes and the kit's own floor is 80, so `nextPane` switches which pane is
 drawn instead of walking to the next one. The region cycle is the whole screen rather than the focused
-pane, for the same reason: rail, pane strip, the pane's own regions, and back. And an overlay hides the
+pane, for the same reason: Menu, Browse, Tasks, pane strip, the pane's own regions, and back. And an overlay hides the
 pane rather than replacing it, so opening the palette does not tear down the pane's queries and its
 model.
 

@@ -101,6 +101,57 @@ and host-owned child webviews still require native computer-use control or the r
 The WebDriver dependency and server exist only behind the `agent-automation` Cargo feature used by
 this launcher; normal development and packaged builds do not expose it.
 
+### Agent-driven terminal development
+
+Start an isolated terminal session from the checkout. It seeds the same Node data as the desktop
+agent launcher, checks the native Node ABI, builds the Node and TUI, and runs the compiled TUI
+inside a PTY with an 80 by 24 terminal by default:
+
+```sh
+pnpm dev:tui:agent -- --session tui-check --fixture tui-navigation
+```
+
+Keep that terminal open. In another terminal, inspect and drive the live screen:
+
+```sh
+pnpm dev:tui:agent:ui -- --session tui-check snapshot
+pnpm dev:tui:agent:ui -- --session tui-check press Tab
+pnpm dev:tui:agent:ui -- --session tui-check type "search text"
+pnpm dev:tui:agent:ui -- --session tui-check paste "pasted text"
+pnpm dev:tui:agent:ui -- --session tui-check resize 120 40
+pnpm dev:tui:agent:flow -- --session tui-check navigation
+pnpm dev:tui:agent:ui -- --session tui-check stop
+```
+
+`press` accepts a key or chord such as `Escape`, `Shift+Tab`, or `Ctrl+P`. `type` sends text as
+keystrokes; `paste` uses bracketed paste. The default `kitty` keyboard mode exercises the TUI's
+enhanced-key parser; `--keyboard legacy` exercises its fallback. Pass `--cols` and `--rows` to the
+launcher for a different initial size. `--onboarding` starts with an empty profile. With no fixture,
+the launcher adds `--project PATH` or the checkout as a local project. A fixture supplies its own
+project and cannot be combined with `--project` or `--onboarding`.
+
+The session manifest, Node data, TUI config, input trace, raw ANSI output, and flow reports live
+under `.acorn/agent-dev/tui/<session>/`. A stopped name needs `--reuse` to reopen its data. The
+driver listens only on loopback and keeps its control secret in the private session manifest. `stop`
+ends the PTY process; the launcher drains its child Node. A text snapshot is the terminal's visible
+cells at that size, so take another snapshot after each navigation step or resize.
+
+For a direct comparison, start a desktop window with the same fixture, profile, and seed, then run
+the desktop comparison flow:
+
+```sh
+pnpm dev:agent -- --session desktop-check --fixture tui-navigation
+pnpm dev:agent:ui -- --session desktop-check flow tui-navigation
+pnpm dev:agent:ui -- --session desktop-check stop
+```
+
+The two launchers keep separate data roots but generate the same scenario. Compare the task roster,
+workspace switcher, task panes, Changes, and agent content at 80 by 24 and 120 by 40. The flow
+reports and captured text provide repeatable checkpoints; inspect the live screens for focus,
+truncation, scrolling, and terminal-specific key behavior. Shared pane content comes from the same
+client-core code, while the terminal kit and chrome render it into cells. A different control layout
+can be expected; missing task information or unreachable navigation needs investigation.
+
 Working on a loaded plugin is `pnpm dev:plugin <id>` beside one of those. It rebuilds the plugin's
 package on every save. [plugins.md](./plugins.md) § The dev loop has the whole loop, including which
 target to build into and why the node restarts.

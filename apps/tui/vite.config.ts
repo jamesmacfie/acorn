@@ -84,6 +84,9 @@ export default defineConfig({
       // consumer that runs Solid on a real Node process points at the client build instead.
       { find: /^solid-js$/, replacement: 'solid-js/dist/solid.js' },
       { find: /^solid-js\/store$/, replacement: 'solid-js/store/dist/store.js' },
+      // TanStack Solid Query reads `isServer` from this entry. Node's default export condition
+      // resolves the server build, where queries never subscribe or fetch in a live TUI.
+      { find: /^solid-js\/web$/, replacement: 'solid-js/web/dist/web.js' },
       // CodeMirror's grammar and highlight-style half, browser xterm.js and its two addons, and
       // shiki. Three packages' worth of specifiers, three stubs, and one reason for all of them: each
       // is reached only from a DOM surface this host cannot draw — a CodeMirror `EditorView` in a

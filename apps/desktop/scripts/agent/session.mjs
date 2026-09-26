@@ -20,7 +20,7 @@ import {
 const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
 const cargo = process.platform === 'win32' ? 'cargo.exe' : 'cargo'
 
-const FIXTURES = ['large-surfaces']
+const FIXTURES = ['large-surfaces', 'tui-navigation']
 const PROFILES = ['small', 'scale', 'canonical']
 
 function parseArgs(argv) {

@@ -1,0 +1,51 @@
+{
+  "name": "tui-navigation",
+  "description": "Desktop comparison for the shared TUI navigation fixture. Start with --fixture tui-navigation.",
+  "stages": [
+    {
+      "name": "task-roster",
+      "steps": [
+        { "waitText": { "text": "Review changed files", "timeoutMs": 30000 } },
+        { "assertText": { "contains": ["Plan follow-up work"] } },
+        { "captureText": "initial" },
+        { "click": { "target": { "role": "button", "nameStartsWith": "Review changed files" } } },
+        { "waitText": { "text": "Changes", "timeoutMs": 30000 } },
+        { "captureText": "task-open" }
+      ]
+    },
+    {
+      "name": "changes",
+      "steps": [
+        { "click": { "target": { "role": "button", "name": "Changes" } } },
+        { "wait": { "surface": "diff", "until": "content", "timeoutMs": 120000 } },
+        { "assert": { "surface": "diff", "invariant": "noBlank" } },
+        { "captureText": "changes" }
+      ]
+    },
+    {
+      "name": "agent",
+      "steps": [
+        { "click": { "target": { "role": "button", "name": "Agent" } } },
+        { "wait": { "surface": "timeline", "until": "mounted", "timeoutMs": 120000 } },
+        { "assert": { "surface": "timeline", "invariant": "boundedMount" } },
+        { "captureText": "agent" }
+      ]
+    },
+    {
+      "name": "workspace-switch",
+      "steps": [
+        { "click": { "target": { "role": "button", "name": "Default▾" } } },
+        { "waitText": { "text": "Side project (1)", "timeoutMs": 30000 } },
+        { "captureText": "workspace-picker" },
+        { "click": { "target": { "role": "button", "name": "Side project (1)" } } },
+        { "waitText": { "text": "Check workspace switch", "timeoutMs": 30000 } },
+        { "assertText": { "contains": ["Check workspace switch"], "absent": ["Review changed files"] } },
+        { "captureText": "second-workspace" },
+        { "click": { "target": { "role": "button", "name": "Side project▾" } } },
+        { "click": { "target": { "role": "button", "name": "Default (1)" } } },
+        { "waitText": { "text": "Review changed files", "timeoutMs": 30000 } },
+        { "captureText": "default-return" }
+      ]
+    }
+  ]
+}
