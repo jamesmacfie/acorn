@@ -145,7 +145,12 @@ descriptors, and answers segments by patch key when they are asked for:
   (`plugins/changes/src/server/localDocument.ts`). A segment request whose patch key is not the one the
   last document gave its file is refused with `409 revision_conflict`, and the Changes source refreshes
   its document when it sees one, so the viewer never draws one file from two states of the tree.
-  Staged and unstaged are separate documents.
+  Staged and unstaged are separate documents, and segments and search go out under the staging area
+  of the document that described them. The batch pins git's `a/` and `b/` prefixes and reads each
+  path literally, so a user's diff settings or a path such as `app/[slug]` cannot change what a file
+  is given. A batch git cannot print, such as one past its output cap, is read one file at a time,
+  and a file git cannot read has no diff rather than failing the document. The pane asks for at most
+  the first 5,000 stacked files. A failed document read keeps the last document on screen.
 
 The GitHub task pane and repository browse read the same document; the file list beside them still
 reads the summaries already warmed by the PR list. The client never holds a whole patch.
