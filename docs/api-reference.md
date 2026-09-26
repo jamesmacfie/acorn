@@ -332,7 +332,7 @@ The pull request read routes, with types in `plugins/github/src/shared/api.ts`:
 | `POST …/pulls/batch` | `PullBatchItem[]`: `{ number, detail, files? }`; `files` is absent for mode `none` or a failed files refresh |
 | `GET …/compare?base=&head=` | `Compare`: `{ aheadBy, document, completeness, commits }` |
 | `POST …/:owner/:repo/diff/segments` | `DiffSegmentPayload[]` for 1 to 32 `requests` of `{ path, patchKey, ordinal }`, in request order |
-| `POST …/:owner/:repo/diff/search` | `DiffSearchPage`: up to 500 matches over the named `files`, with a `nextCursor` |
+| `POST …/:owner/:repo/diff/search` | `DiffSearchPage`: up to 500 matches over the named `files`, reading at most 1,000 segments, with a `nextCursor`. A page can be empty and still carry a cursor |
 
 `completeness` is `PullTopologyCompleteness`. `{ kind: 'complete' }` means the list is everything
 GitHub has. `{ kind: 'incomplete', cause: 'upstream-cap', resource, received, reportedTotal, limit }`
