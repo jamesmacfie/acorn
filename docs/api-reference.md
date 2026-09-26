@@ -564,7 +564,8 @@ only the files whose key moved. A null `patchKey` means the file has no diff in 
 or search request naming a digest that is not the one the last document gave that file, or not what
 git produces now when the node holds no document for it, answers `409 revision_conflict`, and the
 pane reads the document again. A path is validated where it reaches git, as the other routes do. A
-task with no worktree answers `404 not_found`.
+file git cannot read answers a null `patchKey` rather than failing the document. A task with no
+worktree answers `404 not_found`.
 
 ### Command palette routes
 

@@ -1,6 +1,6 @@
 import { createTaskService } from '@acorn/plugin-api/testkit'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
@@ -486,6 +486,23 @@ describe('the local diff document', () => {
     expect(fresh.status).toBe(200)
     // The same status key again reads nothing new and answers the same digest.
     expect((await documentOf('unstaged', 'k2')).body.files[0]!.patchKey).toBe(after.patchKey)
+  })
+
+  it('reads each file its own patch whatever the diff prefixes, and when a path contains " b/"', async () => {
+    mkdirSync(join(work, 'Plan b'), { recursive: true })
+    writeFileSync(join(work, 'c.md'), 'one\n', 'utf8')
+    writeFileSync(join(work, 'Plan b', 'c.md'), 'two\n', 'utf8')
+    git('add', '.')
+    git('commit', '-qm', 'twins')
+    git('config', 'diff.noprefix', 'true')
+    writeFileSync(join(work, 'c.md'), 'one edited\n', 'utf8')
+    writeFileSync(join(work, 'Plan b', 'c.md'), 'two edited\n', 'utf8')
+    const { body } = await post<LocalDocumentResponse>('document', { scope: 'unstaged', files: ['c.md', 'Plan b/c.md'].map((path) => ({ path, key: 'k1' })) })
+    for (const [file, text] of [[body.files[0]!, 'one edited'], [body.files[1]!, 'two edited']] as const) {
+      expect(file.patchKey).toMatch(/^sha256:/)
+      const rows = (await post<DiffSegmentPayload[]>('document/segments', { scope: 'unstaged', requests: [{ path: file.path, patchKey: file.patchKey, ordinal: 0 }] })).body[0]!.rows
+      expect(rows.filter((row) => row.kind === 'insert').map((row) => 'raw' in row && row.raw)).toEqual([text])
+    }
   })
 
   it('keeps the staged and unstaged stacks apart for a file in both', async () => {

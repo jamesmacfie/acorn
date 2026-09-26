@@ -7,9 +7,10 @@ import {
 } from '@acorn/plugin-api/client'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import { Badge, IconButton, Inline, Stack, Text } from '@acorn/plugin-api/ui'
+import { MAX_DOCUMENT_FILES } from '@acorn/diff-document/document'
 import { documentTopology, type CodeRow, type DiffLineAnchor, type DiffSource } from '@acorn/plugin-api/ui/diff'
 import { addReviewNote, deleteReviewNote, markReviewNotesSent } from './reviewNoteMutations'
-import { emptyLocalStatus, reviewNotesRoute, type LocalScope, type ModelPick, type ReviewNote } from '../shared/api'
+import { emptyLocalStatus, reviewNotesRoute, type LocalDocumentResponse, type LocalScope, type ModelPick, type ReviewNote } from '../shared/api'
 import { formatReviewPrompt } from '../shared/reviewPrompt'
 import { localGitApi } from './changesClient'
 import { readChangeView, saveChangeView } from './changesPrefs'
@@ -139,15 +140,30 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   // every file's patch; it is asked again whenever the stack or any file's status key moves, and diffs
   // only the files whose key did (../server/localDocument.ts). The answer carries the request it was
   // for, so the topology is always the node's view of one moment rather than a mix of two.
+  // At most the node's document limit. A stack past it, such as an unignored build folder, draws the
+  // rest as files with no diff rather than having the whole document refused.
   const documentRequest = createMemo(
-    () => ({ scope: scope(), files: stack().map((change) => ({ path: change.path, key: patchKey(change, statusRevision()) })) }),
+    () => ({ scope: scope(), files: stack().slice(0, MAX_DOCUMENT_FILES).map((change) => ({ path: change.path, key: patchKey(change, statusRevision()) })) }),
     undefined,
     { equals: (a, b) => a.scope === b.scope && a.files.length === b.files.length && a.files.every((file, at) => file.path === b.files[at]!.path && file.key === b.files[at]!.key) },
   )
-  const [document, { refetch: refetchDocument }] = createResource(
+  type HeldDocument = { scope: LocalScope; changes: ReturnType<typeof stack>; answer: LocalDocumentResponse }
+  // A read that fails keeps the last document, and the next status change asks again. Letting the
+  // resource error would make every read of it throw, in whichever pane region built this model.
+  const [document, { refetch: refetchDocument }] = createResource<HeldDocument | undefined, ReturnType<typeof documentRequest>>(
     () => (isArchiving(task.id) ? undefined : documentRequest()),
-    async (request) => ({ changes: stack(), answer: await localGitApi.document(task.id, request) }),
+    async (request, { value }) => {
+      try {
+        return { scope: request.scope, changes: stack(), answer: await localGitApi.document(task.id, request) }
+      } catch {
+        return value
+      }
+    },
   )
+  // Segments and search go out under the scope of the document they were described by. The reader can
+  // switch staging area before the next document arrives, and the old document's digests are not the
+  // other area's.
+  const documentScope = () => document.latest?.scope ?? scope()
   const topology = createMemo(() => {
     const held = document.latest
     if (!held) return undefined
@@ -181,10 +197,10 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     // Only after a click. pickSelected falls back to the first row so something renders on open, and
     // treating that as a scroll target would mean the remembered offset never won.
     selectedPath: () => (selectedKey() ? selected()?.path ?? '' : ''),
-    loadSegments: (requests, signal) => localGitApi.segments(task.id, { scope: scope(), requests }, signal).catch(conflicted),
+    loadSegments: (requests, signal) => localGitApi.segments(task.id, { scope: documentScope(), requests }, signal).catch(conflicted),
     search: (request, signal) => {
       const files = (topology()?.files ?? []).flatMap((file) => (file.patchKey ? [{ path: file.path, patchKey: file.patchKey }] : []))
-      return localGitApi.search(task.id, { ...request, scope: scope(), files }, signal).catch(conflicted)
+      return localGitApi.search(task.id, { ...request, scope: documentScope(), files }, signal).catch(conflicted)
     },
     // Fills an expanded gap. `sha` is the staging area documentFile put there, which is what says
     // whether the new side is the index or the file on disk.
