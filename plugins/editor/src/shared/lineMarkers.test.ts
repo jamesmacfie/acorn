@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { changedLineRanges, translateLineRanges, unifiedDiffHunks } from './lineMarkers'
+import { changedLineRanges, translateLineRanges, unifiedDiffHunks } from '../contract/lineMarkers'
 
 describe('editor line marker diff coordinates', () => {
   it('reads omitted counts, additions, replacements, and pure deletions', () => {
