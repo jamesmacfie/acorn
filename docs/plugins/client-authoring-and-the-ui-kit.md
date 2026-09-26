@@ -28,6 +28,12 @@ A tree needs none of this, and that is the point: the host draws the nodes, so t
 style pack and density are already applied and there is nothing to bridge. What follows is the frame
 path only.
 
+One worker may run several trees from the same accepted plugin bundle. The host gives each mount a
+separate bridge context and port: scope, selected item, document access, focus and gesture authority
+belong to that tree. The SDK routes selection and surface actions to the named mount; a tree cannot
+claim another mount's authority by naming its slot. Bundles built against the older single-bridge
+handshake remain usable with one mounted tree per worker.
+
 The shell owns the frame document and links `/ui.css`, a stylesheet assembled at build time from
 the same presentation-only primitive, tabs, picker, modal, copy, diff, and style-pack CSS the shell
 uses. The appearance bridge applies the complete theme, style and invariant token projection to the

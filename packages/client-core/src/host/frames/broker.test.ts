@@ -105,6 +105,34 @@ describe('the handshake', () => {
   })
 })
 
+describe('a tree bundle bootstrap bridge', () => {
+  it('denies effects until its one legacy slot has authority', async () => {
+    let authorized = false
+    const svc = services()
+    const channel = new MessageChannel()
+    const received: PluginBridgeMessage[] = []
+    channel.port2.onmessage = (event: MessageEvent) => received.push(event.data as PluginBridgeMessage)
+    const bridge = createFrameBridge({
+      port: channel.port1 as unknown as MessagePort, binding: BINDING, services: svc,
+      context: CONTEXT, authorize: () => authorized, onMisbehaving: () => {},
+    })
+    channel.port2.postMessage({ id: 1, kind: 'api', method: 'GET', path: tasksRoute })
+    await vi.waitFor(() => expect(received).toHaveLength(2))
+    expect(received[1]).toMatchObject({ id: 1, ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    expect(svc.fetch).not.toHaveBeenCalled()
+    authorized = true
+    channel.port2.postMessage({ id: 2, kind: 'api', method: 'GET', path: tasksRoute })
+    await vi.waitFor(() => expect(received).toHaveLength(3))
+    expect(svc.fetch).toHaveBeenCalledTimes(1)
+    authorized = false
+    channel.port2.postMessage({ id: 3, kind: 'ui', op: 'openPane', paneId: 'board' })
+    await vi.waitFor(() => expect(received).toHaveLength(4))
+    expect(svc.openPane).not.toHaveBeenCalled()
+    bridge.dispose()
+    channel.port2.close()
+  })
+})
+
 describe('forwarded keybindings', () => {
   it('sends a normalized chord to the host dispatcher without requiring a reply id', async () => {
     const h = withBridge()

@@ -64,6 +64,7 @@ export type PluginCustody = {
   state(): Promise<PluginHostState>
   cachePut(request: { nodeId: string; pluginId: string; hash: string; version: string }): Promise<PluginPutResult>
   trustRecord(request: PluginTrustDecision): Promise<void>
+  trustForget(request: { pluginId: string; hash: string }): Promise<void>
   // Enter or leave development mode for one plugin on one node. See docs/security.md § The dev
   // grant.
   devGrant(request: PluginDevGrantRequest): Promise<void>

@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@acorn/plugin-agents": "workspace:*",
+    "@acorn/diff-document": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
     "@acorn/plugin-editor": "workspace:*",
     "@acorn/protocol": "workspace:*",

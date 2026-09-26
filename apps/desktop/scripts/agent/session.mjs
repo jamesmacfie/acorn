@@ -20,8 +20,11 @@ import {
 const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
 const cargo = process.platform === 'win32' ? 'cargo.exe' : 'cargo'
 
+const FIXTURES = ['large-surfaces']
+const PROFILES = ['small', 'scale', 'canonical']
+
 function parseArgs(argv) {
-  const options = { session: null, project: repoRoot, onboarding: false, reuse: false, smoke: false, vite: false }
+  const options = { session: null, project: repoRoot, onboarding: false, reuse: false, smoke: false, vite: false, fixture: null, profile: 'small', seed: 1 }
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === '--') continue
@@ -31,9 +34,20 @@ function parseArgs(argv) {
     else if (arg === '--reuse') options.reuse = true
     else if (arg === '--smoke') options.smoke = true
     else if (arg === '--vite') options.vite = true
+    else if (arg === '--fixture') options.fixture = argv[++index] ?? ''
+    else if (arg === '--profile') options.profile = argv[++index] ?? ''
+    else if (arg === '--seed') options.seed = Number(argv[++index])
     else throw new Error(`Unknown option: ${arg}`)
   }
   if (options.onboarding && argv.includes('--project')) throw new Error('Use either --onboarding or --project, not both.')
+  if (options.fixture !== null) {
+    if (!FIXTURES.includes(options.fixture)) throw new Error(`Unknown fixture: ${options.fixture}. Known: ${FIXTURES.join(', ')}.`)
+    if (options.onboarding || argv.includes('--project') || argv.includes('--smoke')) throw new Error('A fixture brings its own project; drop --onboarding, --project and --smoke.')
+    if (!PROFILES.includes(options.profile)) throw new Error(`Unknown profile: ${options.profile}. Known: ${PROFILES.join(', ')}.`)
+    if (!Number.isInteger(options.seed)) throw new Error('The seed must be a whole number.')
+  } else if (argv.includes('--profile') || argv.includes('--seed')) {
+    throw new Error('--profile and --seed only mean something with --fixture.')
+  }
   if (options.smoke) options.onboarding = true
   return options
 }
@@ -44,6 +58,20 @@ function run(command, args, cwd) {
     child.once('error', reject)
     child.once('exit', (code, signal) => {
       if (code === 0) resolveRun()
+      else reject(new Error(`${command} ${args.join(' ')} exited with ${signal ?? code}.`))
+    })
+  })
+}
+
+/** Run a command and hand back its stdout, still showing its stderr. */
+function capture(command, args, cwd) {
+  return new Promise((resolveRun, reject) => {
+    const child = spawn(command, args, { cwd, stdio: ['ignore', 'pipe', 'inherit'], env: process.env })
+    let out = ''
+    child.stdout.on('data', (chunk) => { out += chunk })
+    child.once('error', reject)
+    child.once('exit', (code, signal) => {
+      if (code === 0) resolveRun(out)
       else reject(new Error(`${command} ${args.join(' ')} exited with ${signal ?? code}.`))
     })
   })
@@ -123,9 +151,10 @@ async function main() {
   let log = null
   let driver = null
   let status = 'failed'
+  let fixture = null
+  let previous = null
 
   if (await exists(directory)) {
-    let previous = null
     try { previous = await readJson(manifestFile) } catch {}
     if (previous && processIsAlive(previous.launcherPid)) throw new Error(`Agent session ${name} is already running.`)
     if (!options.reuse) throw new Error(`Agent session ${name} already exists. Choose another name or pass --reuse to keep its data.`)
@@ -146,7 +175,22 @@ async function main() {
     console.log(`[agent-dev:${name}] building the automation-only debug binary`)
     await run(cargo, ['build', '--manifest-path', join(desktopRoot, 'src-tauri', 'Cargo.toml'), '--features', 'agent-automation'], repoRoot)
 
-    if (!options.onboarding) {
+    if (options.fixture && options.reuse && previous?.fixture) {
+      // A reused session keeps the fixture it was generated with, data and repository both.
+      fixture = previous.fixture
+      options.project = fixture.project
+    } else if (options.fixture) {
+      // The fixture's repository lives in the session directory, beside the data it seeds, and is
+      // generated fresh from the profile and seed (docs/testing.md § Large-surface fixture).
+      const project = join(directory, 'fixture', 'repo')
+      console.log(`[agent-dev:${name}] generating the ${options.fixture} fixture (${options.profile}, seed ${options.seed})`)
+      const out = await capture(pnpm, ['exec', 'tsx', 'scripts/agent/seed.ts', '--data-dir', dataDir, '--project', project,
+        '--fixture', options.fixture, '--profile', options.profile, '--seed', String(options.seed)], desktopRoot)
+      const seeded = JSON.parse(out.trim().split('\n').at(-1))
+      fixture = { name: options.fixture, project, ...seeded }
+      delete fixture.fixture
+      options.project = project
+    } else if (!options.onboarding) {
       console.log(`[agent-dev:${name}] adding ${options.project}`)
       await run(pnpm, ['exec', 'tsx', 'scripts/agent/seed.ts', '--data-dir', dataDir, '--project', options.project], desktopRoot)
     }
@@ -190,6 +234,7 @@ async function main() {
       directory,
       dataDir,
       project: options.onboarding ? null : options.project,
+      fixture,
       viteUrl,
       webdriverEndpoint: endpoint,
       webdriverSessionId: driver.sessionId,
@@ -219,6 +264,7 @@ async function main() {
       launcherPid: process.pid,
       directory,
       dataDir,
+      fixture,
       stoppedAt: new Date().toISOString(),
     })
   }

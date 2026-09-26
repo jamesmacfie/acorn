@@ -57,7 +57,7 @@ const GROUPS = {
   pairing: { resolve: () => (canPairNodes() ? {} : null), members: [] },
   plugins: {
     resolve: pluginCustody,
-    members: members<PluginCustody>()(['state', 'cachePut', 'trustRecord', 'devGrant']),
+    members: members<PluginCustody>()(['state', 'cachePut', 'trustRecord', 'trustForget', 'devGrant']),
   },
   desktopExtras: {
     resolve: desktopExtras,

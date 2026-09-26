@@ -43,6 +43,9 @@ export type { TimelineControls } from '@acorn/client-core/kit/components/content
 // The reading place is the DOM timeline's contract and a plain value, so both hosts hand back the
 // same type even though this one never restores one (./grouping.tsx).
 export type { ReadingPlace } from '@acorn/client-core/kit/lib'
+// Which turns a long timeline draws. Counting, not measuring, so it holds in cells as it does on the DOM.
+export { createTimelineWindow } from '@acorn/client-core/kit/lib'
+export type { TimelineWindow } from '@acorn/client-core/kit/lib'
 export type {
   MentionSegment, MentionSource, MentionSuggestion, MentionTextareaProps,
 } from '@acorn/client-core/kit/components/inputs/MentionTextarea.tsx'

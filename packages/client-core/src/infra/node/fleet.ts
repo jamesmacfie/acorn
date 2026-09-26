@@ -7,6 +7,7 @@ import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { fleetBridge, nodeTransport } from '../platform'
 import { emitError, measure, recordDuration, recordSample, telemetryEnabled } from '../telemetry/emitter'
 import { createLogger, describeError } from '../telemetry/logger'
+import { dropSegmentCache } from '../../features/diff/segmentCache'
 
 // The fleet store: which nodes this client knows, what state each connection is in, and one query
 // cache per node (docs/architecture-overview.md § Client state and fleet behavior,
@@ -239,10 +240,12 @@ export const homeClient = (): QueryClient => clientFor(homeNodeId() ?? ORIGIN_NO
 // out to ten state owners.
 //
 // The in-memory client and the IndexedDB key are independent tiers, so dropping only the key leaves a
-// live cache that re-persists itself on the next write.
+// live cache that re-persists itself on the next write. The diff's resident segments sit beside the
+// client, keyed by it, and go with it (features/diff/segmentCache.ts).
 export function dropNode(nodeId: string): void {
   const cache = caches.get(nodeId)
   caches.delete(nodeId)
+  if (cache) dropSegmentCache(cache.client)
   cache?.client.clear()
   setNodes((current) => current.filter((node) => node.nodeId !== nodeId))
   setStatuses((current) => {

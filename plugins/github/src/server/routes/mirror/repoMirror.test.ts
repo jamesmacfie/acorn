@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestDb, testSecretEnv, type TestDb } from '@acorn/plugin-api/testkit'
 import { Hono } from 'hono'
+import { DIFF_DOCUMENT_VERSION } from '@acorn/diff-document/document'
 import { settleBackground } from '@acorn/plugin-api/testkit'
 import { gh } from '../../githubApi'
+import type { PullDiffResponse } from '../../../shared/api'
 import type { AppEnv } from '@acorn/plugin-api/testkit'
 import { PULLS_STALE_AFTER_MS as FILES_STALE_AFTER_MS } from '../../syncPolicy'
 import { pullFiles } from '../pulls/pullFiles'
@@ -49,7 +51,11 @@ const makePullFilesDb = (selectRows: unknown[][]) => {
   const queue = [...selectRows]
   const select = vi.fn(() => ({
     from: vi.fn(() => ({
-      where: vi.fn(async () => queue.shift() ?? []),
+      // Awaitable as it is, or after `.orderBy`, the way the mirror reads use it.
+      where: vi.fn(() => {
+        const rows = Promise.resolve(queue.shift() ?? [])
+        return Object.assign(rows, { orderBy: () => rows })
+      }),
     })),
   }))
   const db = {
@@ -140,6 +146,9 @@ describe('pull files stale-while-revalidate', () => {
       additions: 3,
       deletions: 1,
       sha: 'abc123',
+      position: 0,
+      patchState: 'available',
+      patchKey: 'sha256:abc',
     }
     const db = makePullFilesDb([
       [{ id: 19847 }],
@@ -174,19 +183,25 @@ describe('pull files stale-while-revalidate', () => {
     ])
 
     expect(response).toBeInstanceOf(Response)
-    expect(response && (await response.json())).toEqual([
-      {
-        path: 'src/app.ts',
-        status: 'modified',
-        additions: 3,
-        deletions: 1,
-        sha: 'abc123',
-        viewed: false,
-        patch: null,
-      },
-    ])
+    expect(response && (await response.json())).toEqual({
+      files: [
+        {
+          path: 'src/app.ts',
+          status: 'modified',
+          additions: 3,
+          deletions: 1,
+          sha: 'abc123',
+          viewed: false,
+          position: 0,
+          patchState: 'available',
+          patchKey: 'sha256:abc',
+          patch: null,
+        },
+      ],
+      completeness: { kind: 'complete' },
+    })
     expect(blobGet).not.toHaveBeenCalled()
-    expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100')
+    expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100&page=1')
 
     resolveGh(responseJson([{ filename: 'src/app.ts', status: 'modified', additions: 3, deletions: 1, sha: 'abc123', patch: '@@' }]))
     await settleBackground()
@@ -202,6 +217,9 @@ describe('pull files stale-while-revalidate', () => {
       additions: 3,
       deletions: 1,
       sha: 'abc123',
+      position: 0,
+      patchState: 'available',
+      patchKey: 'sha256:abc',
     }
     const freshSync = { userId: 'james', resource: 'files:19847:12', etag: null, fetchedAt: Date.now() }
     const db = makePullFilesDb([
@@ -229,10 +247,10 @@ describe('pull files stale-while-revalidate', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100')
+    expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100&page=1')
   })
 
-  it('returns stale requested patches in request order and refreshes in the background', async () => {
+  it('serves a stale diff document at once and refreshes in the background', async () => {
     const rowA = {
       userId: 'james',
       repoId: 19847,
@@ -242,6 +260,9 @@ describe('pull files stale-while-revalidate', () => {
       additions: 2,
       deletions: 0,
       sha: 'sha-a',
+      position: 0,
+      patchState: 'available',
+      patchKey: 'sha256:a',
     }
     const rowB = {
       userId: 'james',
@@ -252,6 +273,9 @@ describe('pull files stale-while-revalidate', () => {
       additions: 1,
       deletions: 1,
       sha: 'sha-b',
+      position: 1,
+      patchState: 'available',
+      patchKey: 'sha256:b',
     }
     const db = makePullFilesDb([
       [{ id: 19847 }],
@@ -275,43 +299,29 @@ describe('pull files stale-while-revalidate', () => {
     })
     app.route('/api/repos', pullFiles(db))
 
-    const blobGet = vi.fn(async (key: string) => (key === 'patch:sha-a' ? '@@ a' : '@@ b'))
+    // The document is cut from the patch bodies the first time, which also stores their descriptors.
+    const bodies: Record<string, string> = { 'patch:sha256:a': '@@ -1 +1 @@\n+a', 'patch:sha256:b': '@@ -1 +1 @@\n-b\n+c' }
+    const blobGet = vi.fn(async (key: string) => bodies[key] ?? null)
+    const blobPut = vi.fn(async () => undefined)
 
     const response = await Promise.race([
       app.fetch(
-        new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls/12/files/patches', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ paths: ['src/a.ts', 'src/b.ts'] }),
-        }),
-        { DB: core.db, BLOBS: { get: blobGet, put: vi.fn() }, ...testSecretEnv(ENC_KEY) } as unknown as Env,
+        new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls/12/diff'),
+        { DB: core.db, BLOBS: { get: blobGet, put: blobPut }, ...testSecretEnv(ENC_KEY) } as unknown as Env,
       ),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 20)),
     ])
 
     expect(response).toBeInstanceOf(Response)
-    expect(response && (await response.json())).toEqual([
-      {
-        path: 'src/a.ts',
-        status: 'modified',
-        additions: 2,
-        deletions: 0,
-        sha: 'sha-a',
-        viewed: false,
-        patch: '@@ a',
-      },
-      {
-        path: 'src/b.ts',
-        status: 'modified',
-        additions: 1,
-        deletions: 1,
-        sha: 'sha-b',
-        viewed: false,
-        patch: '@@ b',
-      },
+    const body = (await response!.json()) as PullDiffResponse
+    expect(body.completeness).toEqual({ kind: 'complete' })
+    expect(body.document.files.map((file) => [file.path, file.patchKey, file.segments.length]).sort()).toEqual([
+      ['src/a.ts', 'sha256:a', 1],
+      ['src/b.ts', 'sha256:b', 1],
     ])
-    expect(blobGet).toHaveBeenCalledTimes(2)
-    expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100')
+    expect(JSON.stringify(body)).not.toContain('+a')
+    expect(blobPut).toHaveBeenCalledWith(`diffdoc:v${DIFF_DOCUMENT_VERSION}:sha256:a`, expect.any(String))
+    expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100&page=1')
 
     resolveGh(
       responseJson([

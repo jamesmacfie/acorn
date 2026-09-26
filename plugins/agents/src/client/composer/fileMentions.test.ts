@@ -2,21 +2,30 @@ import { describe, expect, it } from 'vitest'
 import { fileMentionSuggestions, formatFileMention, parseFileMentions } from './fileMentions'
 
 describe('managed composer file mentions', () => {
+  const files = ['src/app.ts', 'README.md', 'docs/product brief.md', 'src/a.ts']
+
   it('extracts relative paths and line ranges', () => {
-    expect(parseFileMentions('Review @src/app.ts:4-9 and @README.md.')).toEqual([
+    expect(parseFileMentions('Review @src/app.ts:4-9 and @README.md.', files)).toEqual([
       { type: 'file', path: 'src/app.ts', lineStart: 4, lineEnd: 9 },
       { type: 'file', path: 'README.md' },
     ])
   })
 
   it('does not promote emails, absolute paths, traversal, or duplicates', () => {
-    expect(parseFileMentions('a@b.com @/etc/passwd @../secret @src/a.ts @src/a.ts')).toEqual([
+    expect(parseFileMentions('a@b.com @/etc/passwd @../secret @src/a.ts @src/a.ts', files)).toEqual([
       { type: 'file', path: 'src/a.ts' },
     ])
   })
 
+  it('keeps unmatched @ text in the message instead of sending a missing file part', () => {
+    expect(parseFileMentions('Ask @someone about @missing.ts and @src/app.ts', files)).toEqual([
+      { type: 'file', path: 'src/app.ts' },
+    ])
+    expect(parseFileMentions('Ask @someone about @missing.ts', [])).toEqual([])
+  })
+
   it('supports quoted paths selected by autocomplete', () => {
-    expect(parseFileMentions('Review @"docs/product brief.md":7-11 next.')).toEqual([
+    expect(parseFileMentions('Review @"docs/product brief.md":7-11 next.', files)).toEqual([
       { type: 'file', path: 'docs/product brief.md', lineStart: 7, lineEnd: 11 },
     ])
   })
@@ -24,7 +33,7 @@ describe('managed composer file mentions', () => {
   it('quotes a path with a space in it, so the mention it writes reads back as one token', () => {
     expect(formatFileMention('src/app.ts')).toBe('@src/app.ts')
     expect(formatFileMention('docs/product brief.md')).toBe('@"docs/product brief.md"')
-    expect(parseFileMentions(`Review ${formatFileMention('docs/product brief.md')} next.`))
+    expect(parseFileMentions(`Review ${formatFileMention('docs/product brief.md')} next.`, files))
       .toEqual([{ type: 'file', path: 'docs/product brief.md' }])
   })
 

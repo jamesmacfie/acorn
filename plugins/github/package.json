@@ -16,6 +16,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@acorn/diff-document": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
     "@acorn/plugin-editor": "workspace:*",
     "@acorn/protocol": "workspace:*",
@@ -23,7 +24,6 @@
     "@tanstack/solid-query": "^5.101.0",
     "@tanstack/solid-virtual": "^3.13.37",
     "drizzle-orm": "catalog:",
-    "gitdiff-parser": "^0.3.1",
     "hono": "catalog:",
     "solid-js": "catalog:",
     "zod": "catalog:"

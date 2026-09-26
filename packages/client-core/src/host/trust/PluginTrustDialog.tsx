@@ -2,7 +2,7 @@ import { createMemo, createSignal, For, Show } from 'solid-js'
 import { nodes } from '../../infra/node/fleet'
 import Icon from '../../kit/components/content/Icon'
 import { createDismissable } from '../../kit/lib/dismissable'
-import { pendingTrust, resolvePendingTrust, type PluginTrustRequest } from '../plugins/distribution'
+import { distribution, pendingTrust, resolvePendingTrust, type PluginTrustRequest } from '../plugins/distribution'
 import { recordTrustDecision, TIER_LABEL, trustTiers, type TierKey } from './trustModel'
 import './plugin-trust.css'
 import { Alert, Badge, Button, Kbd } from '../../kit/components/primitives'
@@ -42,6 +42,19 @@ export default function PluginTrustDialog() {
       .filter((tier) => tier.lines.length > 0),
   )
   const previousVersion = () => request()?.previous?.version
+  const previousStillActive = () => {
+    const current = request()
+    if (!current?.previous || current.relation !== 'installed') return false
+    return current.sourceNodeIds.every((nodeId) =>
+      distribution().selectionsByNode.get(nodeId)?.get(current.row.name)?.hash === current.previous?.hash)
+  }
+  const fallbackCopy = () => {
+    const current = request()
+    if (!current) return ''
+    if (previousStillActive()) return 'The current version keeps working until the node activates this update.'
+    if (current.relation === 'installed' && !current.previous) return 'Accepting now allows this interface to appear after the node starts this plugin.'
+    return "This plugin's interface stays unavailable on the affected node until you accept this version or the node runs an accepted version."
+  }
 
   const decide = async (decision: 'accepted' | 'rejected') => {
     const current = request()
@@ -106,7 +119,7 @@ export default function PluginTrustDialog() {
                       {previousVersion() ? `${previousVersion()} → ${current().row.installed?.version}` : current().row.installed?.version}
                     </Badge>
                     <Badge size="xs">
-                      <Icon name="monitor" /> from {nodeLabel(current().nodeId)}
+                      <Icon name="monitor" /> from {current().sourceNodeIds.map(nodeLabel).join(', ')}
                     </Badge>
                     <Show when={!previousVersion()}><Badge size="xs">first time</Badge></Show>
                   </p>
@@ -128,6 +141,7 @@ export default function PluginTrustDialog() {
                   )}
                 </Show>
               </p>
+              <p class="muted plugin-trust-intro">{fallbackCopy()}</p>
 
               <Show when={error()}><Alert>{error()}</Alert></Show>
 
@@ -181,14 +195,18 @@ export default function PluginTrustDialog() {
             </div>
             <div class="ui-modal-actions plugin-trust-actions plugin-trust-actions-with-hint">
               <p class="plugin-trust-escape">
-                Not sure? Press <Kbd size="xs">Esc</Kbd> — {previousVersion() ? `${previousVersion()} keeps running and ` : ''}acorn asks again next launch.
+                Press <Kbd size="xs">Esc</Kbd> to decide later. Acorn asks again next launch.
               </p>
               <div class="plugin-trust-buttons">
+                <Button variant="ghost" disabled={saving()} onPress={() => {
+                  const pending = request()
+                  if (pending) resolvePendingTrust(pending.row.name, pending.hash)
+                }}>Not now</Button>
                 <Button variant="ghost" disabled={saving()} onPress={() => void decide('rejected')}>
-                  {previousVersion() ? `Keep ${previousVersion()}` : 'Don’t run it'}
+                  {previousVersion() ? 'Reject update' : 'Reject plugin'}
                 </Button>
                 <Button disabled={saving()} onPress={() => void decide('accepted')}>
-                  {saving() ? 'Saving…' : previousVersion() ? 'Trust the update' : `Trust ${current().row.name} ${current().row.installed?.version}`}
+                  {saving() ? 'Saving…' : previousVersion() ? 'Accept update' : `Accept ${current().row.name} ${current().row.installed?.version}`}
                 </Button>
               </div>
             </div>

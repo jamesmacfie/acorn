@@ -110,10 +110,16 @@ Supporting documents, readable in any order:
 
 ## The order of work
 
-Phase 0 stands alone. It touches the helper, the platform seam's `plugins` group, `resolveBundles`,
+Phase 0 stands alone. It touches the helper, the platform seam's `plugins` group, the per-Node
+distribution snapshot (`packages/client-core/src/host/plugins/distributionModel.ts`),
 the trust store, and Settings, and none of that is layout work. It is worth landing early because it
 is the half of the ask that changes a stance rather than a surface, and because every later phase
 here installs its test plugins through it.
+
+The node-provided plugin lifecycle shipped on 2026-09-26. Phase 0 must add device-held bundles as an
+explicit higher-priority source beside per-Node runtime selections. The removed global
+`resolveBundles.ts` version winner is no longer an implementation seam. A device-held override does
+not change what any Node reports as its active service.
 
 Phases 1 and 2 are strictly ordered and both wait for layout phase 4. The pane switcher goes first
 because it is the smallest surface with a real contract, it is the example the owner gave, and
