@@ -486,10 +486,22 @@ export function Timeline(props: {
   // The list grows for two reasons and the response is the same rule either way: sit on the foot, or
   // put the anchor turn back under the reader. The scroller is observed too, because something
   // appearing above it shortens the viewport without touching the list.
+  //
+  // The trim waits for the next frame. Removing turns inside this callback resizes the element being
+  // observed, which the browser reports as a ResizeObserver loop error on the window, and the desktop
+  // records every window error as fatal.
+  let trimFrame = 0
   const growth = new ResizeObserver(() => {
     if (place.at === 'live') {
-      trim()
       pin()
+      if (!trimFrame && props.onTrim) {
+        trimFrame = requestAnimationFrame(() => {
+          trimFrame = 0
+          if (place.at !== 'live') return
+          trim()
+          pin()
+        })
+      }
     } else schedule()
   })
   counts.observers += 1
@@ -518,7 +530,7 @@ export function Timeline(props: {
     replaced.observe(scroller.parentElement, { childList: true })
     counts.observed += 1
   })
-  scheduledFrames = () => (frame ? 1 : 0) + author.pendingFrames()
+  scheduledFrames = () => (frame ? 1 : 0) + (trimFrame ? 1 : 0) + author.pendingFrames()
 
   onCleanup(() => {
     growth.disconnect()
@@ -526,8 +538,10 @@ export function Timeline(props: {
     counts.observers -= 2
     counts.observed = 0
     if (frame) cancelAnimationFrame(frame)
+    if (trimFrame) cancelAnimationFrame(trimFrame)
     author.dispose()
     frame = 0
+    trimFrame = 0
     scroller = undefined
   })
 

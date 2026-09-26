@@ -1,5 +1,5 @@
 import { agentTelemetry } from './agentTelemetry'
-import { createComputed, createMemo, createSignal, For, on, onCleanup, Show, untrack, type Setter } from 'solid-js'
+import { createComputed, createMemo, createSignal, For, onCleanup, Show, untrack, type Setter } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions } from '@acorn/plugin-api/client'
 import type { AgentNormalizedEvent, AgentSessionSnapshot } from '../../contract/wire.ts'
@@ -96,7 +96,6 @@ export default function AgentTranscript(props: {
   // (docs/managed-agents/client-surfaces.md § Client surfaces). The canonical 7,000-event session
   // projects to 3,387 cards, and building all of them on open was the cost the window removes. The
   // projection above still covers the whole session: only the drawing is windowed.
-  const drawn = createTimelineWindow(itemKeys)
   const sessionId = createMemo(() => props.snapshot.session.id)
   const sessionModel = createMemo(() => sessionModelSummary(props.snapshot.session))
   // The scroll memory is per view, not per session: the parent's stream and each subagent's run are
@@ -106,16 +105,25 @@ export default function AgentTranscript(props: {
     const view = focused() ? `${sessionId()}:${props.focusSubagentId}` : sessionId()
     return props.viewKeyPrefix ? `${props.viewKeyPrefix}:${view}` : view
   })
-  // A different list starts on its own newest page. How far back the reader went in one session says
+  // A different view starts on its own newest page. How far back the reader went in one session says
   // nothing about the next, and keeping it would draw a thousand cards of a transcript nobody asked for.
-  createComputed(on(viewId, () => drawn.reset(), { defer: true }))
-  // A request a notice or the sidebar named has to be drawn before its card can take focus.
+  const drawn = createTimelineWindow(itemKeys, viewId)
+  // A request a notice or the sidebar named has to be drawn before its card can take focus. Once per
+  // request and view: the request stays named after it is answered, and revealing it again on every
+  // event would undo each trim at the live end and rebuild the pages it dropped.
+  let revealedFor = ''
   createComputed(() => {
     const requestId = props.focusRequestId
     if (!requestId) return
+    const wanted = `${viewId()}\u0000${requestId}`
+    if (wanted === revealedFor) return
     const target = items().find((item) => item.event.type === 'request' && item.event.requestId === requestId)
-    if (target) drawn.reveal(target.key)
+    if (!target) return
+    revealedFor = wanted
+    drawn.reveal(target.key)
   })
+  // Read by every drawn turn's position attributes. A memo, so an event that adds no card wakes none.
+  const total = createMemo(() => items().length)
   // Initial rows are one batch: aggregate their factory time and the wall time to the next
   // microtask, then stay out of the 25 Hz streaming path. This is deliberately a turn-scoped probe,
   // not one record per card.
@@ -141,7 +149,7 @@ export default function AgentTranscript(props: {
   }
   const renderCard = (item: () => AgentConversationItem, index: () => number) => {
     const draw = () => (
-      <Timeline.Turn key={item().key} position={drawn.start() + index() + 1} setSize={items().length}>
+      <Timeline.Turn key={item().key} position={drawn.start() + index() + 1} setSize={total()}>
         <AgentEventCard
           item={item()}
           taskId={props.taskId}
@@ -204,7 +212,7 @@ export default function AgentTranscript(props: {
           // first. That is the explicit way to reach the start of a long session in one step.
           controls={(api) => props.onControls?.({ ...api, toTop: () => { drawn.showAll(); api.toTop() } })}
           // The projected count, for the timeline's health reading, against the drawn count.
-          total={items().length}
+          total={total()}
           hidden={drawn.start()}
           onShowEarlier={drawn.showEarlier}
           reveal={drawn.reveal}

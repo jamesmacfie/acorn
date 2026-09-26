@@ -1,4 +1,4 @@
-import { createRoot, createSignal } from 'solid-js'
+import { batch, createComputed, createRoot, createSignal } from 'solid-js'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createTimelineWindow, revealStart, TIMELINE_PAGE, windowStart, type TimelineWindow } from './timelineWindow'
 
@@ -94,5 +94,27 @@ describe('a timeline window', () => {
     window.reset()
     expect(window.keys()).toHaveLength(TIMELINE_PAGE)
     expect(window.keys()[0]).toBe(`k${5000 + 600 - TIMELINE_PAGE}`)
+  })
+
+  it('starts a new list on its newest page in the same pass that reads its keys', () => {
+    const [list, setList] = createSignal('one')
+    const [keys, setKeys] = createSignal(keysOf(1000))
+    let window!: TimelineWindow
+    const drawn: number[] = []
+    createRoot((done) => {
+      dispose = done
+      window = createTimelineWindow(keys, list)
+      createComputed(() => drawn.push(window.keys().length))
+    })
+    window.showAll()
+    drawn.length = 0
+    // The list and its keys change together, as a session switch does. Nothing is ever drawn at the
+    // old window's size over the new keys.
+    batch(() => {
+      setKeys(keysOf(900, 5000))
+      setList('two')
+    })
+    expect(drawn).toEqual([TIMELINE_PAGE])
+    expect(window.keys()[0]).toBe(`k${5000 + 900 - TIMELINE_PAGE}`)
   })
 })
