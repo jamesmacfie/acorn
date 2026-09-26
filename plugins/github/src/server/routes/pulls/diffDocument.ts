@@ -18,9 +18,11 @@ import { type GithubEmit, NO_EMIT } from '../../events'
 // key, so a request cannot address any other kind of blob.
 
 const patchKey = z.string().regex(/^sha256:[0-9a-f]{64}$/)
+// Longer than any path a file system accepts, so not a file GitHub listed.
+const path = z.string().min(1).max(4096)
 
 const segmentsBody = z.object({
-  requests: z.array(z.object({ path: z.string().min(1), patchKey, ordinal: z.number().int().min(0) })).min(1).max(MAX_SEGMENTS_PER_REQUEST),
+  requests: z.array(z.object({ path, patchKey, ordinal: z.number().int().min(0) })).min(1).max(MAX_SEGMENTS_PER_REQUEST),
 }) satisfies z.ZodType<DiffSegmentsBody>
 
 // The query is never logged or counted anywhere: it is a piece of somebody's source.
@@ -28,7 +30,7 @@ const searchBody = z.object({
   query: z.string().min(1).max(SEARCH_MAX_QUERY),
   caseSensitive: z.boolean(),
   cursor: z.string().max(64).nullable(),
-  files: z.array(z.object({ path: z.string().min(1), patchKey })).max(MAX_DOCUMENT_FILES),
+  files: z.array(z.object({ path, patchKey })).max(MAX_DOCUMENT_FILES),
 }) satisfies z.ZodType<DiffSearchBody>
 
 const resolveRepo = async (db: PluginDatabase, c: Context<AppEnv>, emit: GithubEmit) => {

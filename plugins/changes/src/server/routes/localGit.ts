@@ -98,13 +98,16 @@ const commitMessageBody = z.object({ backendId: z.string().min(1), modelId: z.st
 // shape and the bounds, so a request cannot ask for an unbounded document or batch.
 const scope = z.enum(['staged', 'unstaged'])
 const patchKey = z.string().regex(/^sha256:[0-9a-f]{64}$/)
+// A path no file system accepts, or a status key longer than any git status gives, is not a request.
+const path = z.string().min(1).max(4096)
+const statusKey = z.string().max(1024)
 const documentBody = z.object({
   scope,
-  files: z.array(z.object({ path: z.string().min(1), key: z.string() })).max(MAX_DOCUMENT_FILES),
+  files: z.array(z.object({ path, key: statusKey })).max(MAX_DOCUMENT_FILES),
 }) satisfies z.ZodType<LocalDocumentRequest>
 const segmentsBody = z.object({
   scope,
-  requests: z.array(z.object({ path: z.string().min(1), patchKey, ordinal: z.number().int().min(0) })).min(1).max(MAX_SEGMENTS_PER_REQUEST),
+  requests: z.array(z.object({ path, patchKey, ordinal: z.number().int().min(0) })).min(1).max(MAX_SEGMENTS_PER_REQUEST),
 }) satisfies z.ZodType<LocalSegmentsRequest>
 // The query is never logged or counted: it is a piece of somebody's source.
 const searchBody = z.object({
@@ -112,7 +115,7 @@ const searchBody = z.object({
   query: z.string().min(1).max(SEARCH_MAX_QUERY),
   caseSensitive: z.boolean(),
   cursor: z.string().max(64).nullable(),
-  files: z.array(z.object({ path: z.string().min(1), patchKey })).max(MAX_DOCUMENT_FILES),
+  files: z.array(z.object({ path, patchKey })).max(MAX_DOCUMENT_FILES),
 }) satisfies z.ZodType<LocalSearchRequest>
 
 const id = (c: { req: { param(k: string): string } }) => c.req.param('id')

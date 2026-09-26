@@ -354,7 +354,8 @@ routes read what a pull's diff or a compare preview named. A segment request's `
 an ordinal past the file's last segment `400 bad_ordinal`, and more than 32 requests, none, or a
 malformed body `400 bad_request`. A search body is `{ query, caseSensitive, cursor, files }` with a
 query of at most 256 characters and at most 5,000 files; a cursor this node did not write answers
-`400 bad_cursor`. The query is never logged.
+`400 bad_cursor`. The query is never logged. A path in either body is at most 4,096 characters, as
+it is on the Changes document routes.
 
 ### Agents
 
