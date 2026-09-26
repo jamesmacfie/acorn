@@ -19,7 +19,7 @@ export default mergeConfig(base, defineConfig({
   resolve: { alias: [{ find: /^ws$/, replacement: fileURLToPath(import.meta.resolve('ws')) }] },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.{ts,tsx}'],
+    include: ['src/**/*.test.{ts,tsx}', 'scripts/agent/**/*.test.mjs'],
     pool: 'forks',
   },
 }))

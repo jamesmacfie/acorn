@@ -70,6 +70,11 @@ port. The footer says `starting the node…` until the handshake lands, and the 
 invalidates whatever the shell asked for while nothing was listening
 ([caching.md](./caching.md) § Renderer query cache).
 
+A prepared data root can have `node.json` before this TUI has ever saved a fleet row. The test
+fixture does this. The shell keeps that known Node ID while the handshake is in flight, then selects
+it against the completed fleet and refreshes active queries. Selecting against the still-empty fleet
+would clear the ID and leave the first screen with no tasks even after the Node came online.
+
 Two cases still wait, and both for the same reason — there is nothing to draw. A first-ever start has
 no `node.json` and no cache under it. And pairing asks a question on stdin, so it stays in front of the
 renderer whatever else moves behind it.
@@ -570,6 +575,13 @@ the real fleet store and token files and the real broker over pinned TLS, and th
 questions only this host has: a second `acorn` attaches rather than starting a second node, a token
 the node refuses reads as `revoked` and stops retrying, and quitting drains the child and releases the
 root's lock.
+
+For terminal UX work, the agent driver runs the compiled TUI in a real PTY and captures its visible
+cells through a headless terminal. It sends raw keyboard input through the parser that the harness
+bypasses, records snapshots and resizes, and can run a bounded navigation flow against the shared
+desktop fixture. [local-development.md](./local-development.md#agent-driven-terminal-development)
+has the commands and comparison procedure. The driver complements the fast cell tests; a terminal
+emulator and human inspection still cover color, focus, and host-specific behavior.
 
 ## Shipping it
 

@@ -22,6 +22,12 @@ machine badly enough that they time out while passing in isolation.
 The desktop package's `test` stages the bundle inputs first, then runs its Vitest suites and the Rust
 unit tests, so the boot test always exercises fresh artifacts.
 
+The TUI agent driver has focused protocol, screen, and flow tests under
+`apps/tui/scripts/agent/`. A live PTY run is an opt-in acceptance check because it builds and starts
+a real Node and needs time for the terminal to draw. See
+[local-development.md](./local-development.md#agent-driven-terminal-development) for launch,
+snapshot, key, resize, flow, and stop commands.
+
 The workflow-v2 transition test creates a fixture, copies it, and runs only against the copy. It
 asserts both the targeted reset and survival of unrelated tasks, links, credentials/connections,
 devices, schedules, and files. A second copied fixture holds an active run and proves the quiescent
@@ -371,6 +377,16 @@ console line the page logged with the value it saw. Opt-in through
 tools reported why.
 
 ## Large-surface fixture
+
+The `tui-navigation` variant uses the same generated diff, review notes, and stopped agent session
+as `large-surfaces`, then adds another task in the first project and a task in a second workspace.
+Both agent launchers accept `--fixture tui-navigation --profile small|scale|canonical --seed N`.
+Run the terminal `navigation` flow and desktop `tui-navigation` flow against separate sessions with
+the same profile and seed. Their reports capture visible text at comparable navigation checkpoints;
+they do not assert pixel parity across renderers. The terminal's 80 by 24 and 120 by 40 checkpoints
+are also useful for spotting content hidden by layout, while the manual pass checks focus and
+scrolling that plain text cannot describe. The fixture test checks the seeded tasks and workspaces
+in a disposable database.
 
 Large diffs and long transcripts are tested against one generated fixture, built from a seed at run
 time so nothing a million lines long is checked in. It has three profiles:

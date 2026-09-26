@@ -39,6 +39,7 @@ const INVARIANTS = {
 }
 
 const isObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value)
+const snapshotWords = (snapshot) => [snapshot.text, ...(snapshot.elements ?? []).map((element) => element.name)].filter(Boolean).join('\n')
 
 function fail(path, message) {
   throw new Error(`Flow ${path}: ${message}`)
@@ -87,6 +88,22 @@ const ACTIONS = {
     if (!(value.until in WAITS)) fail(`${path}.until`, `must be one of ${Object.keys(WAITS).join(', ')}`)
     needNumber(value.timeoutMs, `${path}.timeoutMs`, 1, MAX_TIMEOUT_MS)
   },
+  waitText: (value, path) => {
+    onlyKeys(value, ['text', 'timeoutMs'], path)
+    needString(value.text, `${path}.text`)
+    needNumber(value.timeoutMs, `${path}.timeoutMs`, 1, MAX_TIMEOUT_MS)
+  },
+  assertText: (value, path) => {
+    onlyKeys(value, ['contains', 'absent'], path)
+    if (value.contains !== undefined && (!Array.isArray(value.contains) || !value.contains.every((item) => typeof item === 'string' && item.length))) {
+      fail(`${path}.contains`, 'must be a list of non-empty strings')
+    }
+    if (value.absent !== undefined && (!Array.isArray(value.absent) || !value.absent.every((item) => typeof item === 'string' && item.length))) {
+      fail(`${path}.absent`, 'must be a list of non-empty strings')
+    }
+    if (!(value.contains?.length || value.absent?.length)) fail(path, 'needs contains or absent')
+  },
+  captureText: (value, path) => needString(value, path),
   scroll: (value, path) => {
     onlyKeys(value, ['surface', 'fractions', 'settleMs'], path)
     needSurface(value.surface, `${path}.surface`)
@@ -129,7 +146,7 @@ function checkSteps(steps, path, depth) {
   })
 }
 
-const countAsserts = (steps) => steps.reduce((total, step) => total + ('assert' in step ? 1 : 0) + ('repeat' in step ? countAsserts(step.repeat.steps) : 0), 0)
+const countAsserts = (steps) => steps.reduce((total, step) => total + ('assert' in step || 'assertText' in step ? 1 : 0) + ('repeat' in step ? countAsserts(step.repeat.steps) : 0), 0)
 
 /** Parse and validate a flow file's contents. Throws on anything this runner would not do exactly. */
 export function parseFlow(text) {
@@ -260,6 +277,18 @@ export async function runFlow(client, flow, { fixture = null, log = () => {} } =
           if (Date.now() > deadline) throw new Error(`Stage "${stage.name}": ${value.surface} was not ${value.until} within ${value.timeoutMs}ms (${WAITS[value.until]}).`)
           previous = now
         }
+      } else if (action === 'waitText') {
+        const deadline = Date.now() + value.timeoutMs
+        let seen = ''
+        for (;;) {
+          seen = snapshotWords(await client.snapshot())
+          if (seen.includes(value.text)) {
+            stage.waits.push({ text: value.text, ms: Date.now() - lastAction })
+            break
+          }
+          if (Date.now() > deadline) throw new Error(`Stage "${stage.name}": the window did not show ${JSON.stringify(value.text)} within ${value.timeoutMs}ms.`)
+          await client.frames(2)
+        }
       } else if (action === 'scroll') {
         for (const fraction of value.fractions) {
           const place = await client.scrollToFraction(SCROLLERS[value.surface], fraction)
@@ -278,9 +307,16 @@ export async function runFlow(client, flow, { fixture = null, log = () => {} } =
         await client.frames(value)
       } else if (action === 'checkpoint') {
         stage.checkpoints.push({ name: value, atMs: Date.now() - started, health: await client.surfaceHealth() })
+      } else if (action === 'captureText') {
+        stage.checkpoints.push({ name: value, atMs: Date.now() - started, text: snapshotWords(await client.snapshot()).slice(0, 20_000) })
       } else if (action === 'assert') {
         const result = checkInvariant(await client.surfaceHealth(), value.surface, value.invariant)
         report.asserts.push({ stage: stage.name, surface: value.surface, invariant: value.invariant, ...result })
+      } else if (action === 'assertText') {
+        const text = snapshotWords(await client.snapshot())
+        const missing = (value.contains ?? []).filter((item) => !text.includes(item))
+        const present = (value.absent ?? []).filter((item) => text.includes(item))
+        report.asserts.push({ stage: stage.name, surface: 'window', invariant: 'text', pass: !missing.length && !present.length, detail: { missing, present } })
       } else if (action === 'repeat') {
         for (let time = 0; time < value.times; time++) await run(value.steps, stage)
       }
@@ -305,7 +341,7 @@ export function summarizeReport(report) {
   const lines = [`${report.flow}: ${report.stages.length} stages in ${Math.round(report.durationMs / 1000)}s, ${report.asserts.length - report.failed} of ${report.asserts.length} invariants held.`]
   if (report.fixture) lines.push(`Fixture ${report.fixture.name} ${report.fixture.profile} seed ${report.fixture.seed}: ${report.fixture.files} files, ${report.fixture.fixedRows} rows, ${report.fixture.events} events.`)
   for (const stage of report.stages) {
-    const waits = stage.waits.map((wait) => `${wait.surface} ${wait.until} ${wait.ms}ms`).join(', ')
+    const waits = stage.waits.map((wait) => wait.text ? `text ${JSON.stringify(wait.text)} ${wait.ms}ms` : `${wait.surface} ${wait.until} ${wait.ms}ms`).join(', ')
     lines.push(`  ${stage.name} (${Math.round(stage.durationMs)}ms)${waits ? `: ${waits}` : ''}${stage.skipped.length ? `; skipped ${stage.skipped.join(', ')}` : ''}`)
   }
   for (const entry of report.asserts.filter((item) => !item.pass)) {

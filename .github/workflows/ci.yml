@@ -42,3 +42,6 @@ jobs:
       # @acorn/desktop is excluded because its `test` stages the whole bundle and then runs cargo.
       # build-desktop.yml already has the Rust toolchain and the staged inputs, and runs it there.
       - run: pnpm test --filter='!@acorn/desktop'
+        env:
+          # Exercise both sides of the TUI's 80-cell layout breakpoint on pull requests.
+          ACORN_TUI_WIDE: '1'
