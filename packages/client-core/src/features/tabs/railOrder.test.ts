@@ -46,6 +46,23 @@ describe('moveTask (drag-reorder)', () => {
     expect(applyRailOrder(tasks, o).map((t) => t.id)).toEqual(['b', 'c', 'd', 'a'])
   })
 
+  it('preserves another workspace order when tasks are dragged in both workspaces', () => {
+    const first = [{ id: 'a1' }, { id: 'a2' }, { id: 'a3' }]
+    const second = [{ id: 'b1' }, { id: 'b2' }]
+    const firstOrder = moveTask(EMPTY_RAIL_ORDER, first.map((task) => task.id), 'a3', 'a1', 'before')
+    const secondOrder = moveTask(firstOrder, second.map((task) => task.id), 'b2', 'b1', 'before')
+
+    expect(applyRailOrder(first, secondOrder).map((task) => task.id)).toEqual(['a3', 'a1', 'a2'])
+    expect(applyRailOrder(second, secondOrder).map((task) => task.id)).toEqual(['b2', 'b1'])
+  })
+
+  it('preserves pinned and unpinned ids outside the current rail', () => {
+    const saved = { pinned: ['a1', 'b1'], order: ['a2', 'b2'] }
+    const next = moveTask(saved, ['b1', 'b2'], 'b2', 'b1', 'before')
+
+    expect(next).toEqual({ pinned: ['a1', 'b2', 'b1'], order: ['a2'] })
+  })
+
   it('dragging before a pinned row pins the task', () => {
     const start = pinTask(EMPTY_RAIL_ORDER, 'a')
     const visible = applyRailOrder(tasks, start).map((t) => t.id)

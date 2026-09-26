@@ -33,6 +33,12 @@ import {
 } from './stateMachine'
 import { ProviderEventMaterializer } from './providerEventMaterializer'
 import { agentTurnInputText, buildForkContext } from './runtimeContext'
+import {
+  mayBeUsageLimit,
+  USAGE_CONTINUATION_GRACE_MS,
+  usageContinuationInput,
+  usageContinuationMessage,
+} from './usageContinuation'
 
 /**
  * A session row as a client keeps it, for telling whether a recorded event changed it.
@@ -143,6 +149,10 @@ export type AgentRuntimeOptions = {
   /** How long a background child may go quiet before its roster row is settled to `idle`. Overridable
    *  only so a test does not have to wait out the real minute. */
   subagentQuietMs?: number
+  /** Confirms a suspected provider usage-limit error and returns the account's reset time. */
+  usageLimitResetAt?(providerId: string): Promise<number | null>
+  /** Test seam for the small delay after the provider's advertised reset boundary. */
+  usageContinuationGraceMs?: number
 }
 
 export type WaitCondition = 'ready' | 'attention' | 'turn_completed' | 'stopped'
@@ -180,6 +190,8 @@ export class ManagedAgentEngine {
   protected readonly terminalHandoffRunning?: (sessionId: string) => Promise<boolean>
   protected readonly hooks?: Pick<PluginHookRegistry, 'run'>
   protected readonly telemetry?: PluginTelemetry
+  protected readonly usageLimitResetAt?: (providerId: string) => Promise<number | null>
+  protected readonly usageContinuationGraceMs: number
   // The span of every turn this process dispatched and has not seen settle, by turn id. In memory
   // for the reason `live` is: a turn only runs inside the node that started it, and a turn the
   // process died in the middle of reports nothing, which is the honest answer.
@@ -199,6 +211,8 @@ export class ManagedAgentEngine {
   // so it fires only once that child has actually gone silent. Tracked for the same reason the
   // reconnect delays are: it must not outlive the engine that armed it.
   protected readonly quietTimers = new Map<string, ReturnType<typeof setTimeout>>()
+  protected queueWakeTimer: ReturnType<typeof setTimeout> | null = null
+  protected queueWakeAt: number | null = null
   protected readonly subagentQuietMs: number
   protected readonly listeners = new Set<RuntimeListener>()
   // The last row broadcast for each session, as `listedRow` reads it. See record().
@@ -227,6 +241,8 @@ export class ManagedAgentEngine {
     this.terminalHandoffRunning = options.terminalHandoffRunning
     this.hooks = options.hooks
     this.telemetry = options.telemetry
+    this.usageLimitResetAt = options.usageLimitResetAt
+    this.usageContinuationGraceMs = options.usageContinuationGraceMs ?? USAGE_CONTINUATION_GRACE_MS
     this.subagentQuietMs = options.subagentQuietMs ?? SUBAGENT_QUIET_MS
     this.store = new AgentStore(options.db, options.core, (frame) => this.publish?.(frame))
     this.attachments = new AgentAttachmentStore(options.db, options.dataDir, options.core)
@@ -309,6 +325,9 @@ export class ManagedAgentEngine {
     this.reconnectTimers.clear()
     for (const timer of this.quietTimers.values()) clearTimeout(timer)
     this.quietTimers.clear()
+    if (this.queueWakeTimer) clearTimeout(this.queueWakeTimer)
+    this.queueWakeTimer = null
+    this.queueWakeAt = null
     await Promise.all([...this.live.keys()].map((sessionId) => this.stopLive(sessionId)))
     if (this.pumping) {
       await new Promise<void>((resolve) => this.pumpIdleWaiters.add(resolve))
@@ -439,8 +458,41 @@ export class ManagedAgentEngine {
     }
     const turnId = live?.activeTurnId ?? null
     for (const normalized of await this.eventMaterializer.map(sessionId, turnId, event)) {
+      if (live && turnId && await this.deferForUsageLimit(sessionId, turnId, live, normalized)) continue
       await this.providerEvents.accept({ sessionId, turnId, event: normalized })
     }
+  }
+
+  protected async deferForUsageLimit(
+    sessionId: string,
+    turnId: string,
+    live: LiveSession,
+    event: AgentNormalizedEvent,
+  ): Promise<boolean> {
+    if (!this.usageLimitResetAt || !mayBeUsageLimit(event)) return false
+    const resetAt = await this.usageLimitResetAt(live.providerId).catch(() => null)
+    if (resetAt == null) return false
+    const resumeAt = Math.max(Date.now(), resetAt + this.usageContinuationGraceMs)
+    // Any streamed answer fragments must precede the scheduler's diagnostic in the durable ledger.
+    await this.providerEvents.flush(sessionId)
+    const turn = await this.store.deferTurnForUsageLimit(turnId, resumeAt, usageContinuationInput())
+    if (!turn) return false
+    live.activeTurnId = null
+    this.endTurnSpan(turnId, 'requeued')
+    this.emit({ channel: 'agent:turn', turn })
+    await this.record(sessionId, turnId, {
+      type: 'diagnostic',
+      level: 'warning',
+      message: usageContinuationMessage(resumeAt),
+    })
+    await this.record(sessionId, turnId, {
+      type: 'session_state',
+      state: 'ready',
+      detail: 'Waiting for the provider usage window to reset.',
+    })
+    this.armQueueWake(resumeAt)
+    void this.pump()
+    return true
   }
 
   protected async commitProviderEvent({ sessionId, event, turnId }: PendingAgentEvent): Promise<void> {
@@ -565,6 +617,10 @@ export class ManagedAgentEngine {
         })
         let started = false
         for (const item of sorted) {
+          if (item.turn.notBefore != null && item.turn.notBefore > Date.now()) {
+            this.armQueueWake(item.turn.notBefore)
+            continue
+          }
           const live = await this.ensureSession(item.session).catch(() => null)
           if (!live?.handle?.ready || live.activeTurnId || live.stopping || this.stopped) continue
           const currentSession = await this.store.requireSession(item.session.id)
@@ -584,9 +640,14 @@ export class ManagedAgentEngine {
           this.interactiveStreak = item.turn.source === 'workflow' ? 0 : this.interactiveStreak + 1
           await this.store.dispatchTurn(item.turn.id)
           try {
-            await this.record(item.session.id, item.turn.id, { type: 'user_message', text: agentTurnInputText(item.turn) })
+            const input = item.turn.continuationInput ?? item.turn.input
+            await this.record(item.session.id, item.turn.id, {
+              type: 'user_message',
+              text: agentTurnInputText({ ...item.turn, input }),
+              ...(item.turn.continuationInput ? { automatic: true } : {}),
+            })
             const attachments = Object.fromEntries((await Promise.all(
-              [...new Set(item.turn.input.flatMap((part) =>
+              [...new Set(input.flatMap((part) =>
                 part.type === 'attachment' || part.type === 'image' ? [part.attachmentId] : []))]
                 .map(async (attachmentId) => {
                   const attachment = await this.attachments.resolve(attachmentId)
@@ -602,7 +663,7 @@ export class ManagedAgentEngine {
             )))
             await this.store.startTurn(item.turn.id)
             this.beginTurnSpan(item.turn.id, item.session.id, live.providerId, item.turn.source)
-            void live.handle.sendTurn({ turn: item.turn, input: item.turn.input, attachments })
+            void live.handle.sendTurn({ turn: item.turn, input, attachments })
             .then(async (result) => {
               if (result.providerTurnRef) await this.store.setTurnProviderRef(item.turn.id, result.providerTurnRef)
             })
@@ -677,6 +738,19 @@ export class ManagedAgentEngine {
       for (const resolve of this.pumpIdleWaiters) resolve()
       this.pumpIdleWaiters.clear()
     }
+  }
+
+  protected armQueueWake(at: number): void {
+    if (this.stopped) return
+    if (this.queueWakeAt != null && this.queueWakeAt <= at) return
+    if (this.queueWakeTimer) clearTimeout(this.queueWakeTimer)
+    this.queueWakeAt = at
+    this.queueWakeTimer = setTimeout(() => {
+      this.queueWakeTimer = null
+      this.queueWakeAt = null
+      void this.pump()
+    }, Math.max(0, at - Date.now()))
+    this.queueWakeTimer.unref?.()
   }
 
   protected async record(

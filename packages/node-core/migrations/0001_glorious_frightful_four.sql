@@ -1,0 +1,1 @@
+ALTER TABLE `tasks` ADD `skip_setup` integer DEFAULT false NOT NULL;

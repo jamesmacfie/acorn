@@ -1,11 +1,25 @@
 import { existsSync, lstatSync, readdirSync, readFileSync, realpathSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { ACORN_BASELINE } from '../../packages/protocol/src/baseline.ts'
 
 const NODE_FILES = new Set(['core.sqlite', 'core.sqlite-wal', 'core.sqlite-shm', 'acorn.sqlite', 'acorn.sqlite-wal', 'acorn.sqlite-shm', 'node.json', 'node.lock', 'internal-token', 'active-identity', 'session.key', 'disabled-plugins.json'])
 const NODE_DIRS = new Set(['plugins', 'blobs', 'tls', 'logs', 'notes', 'memory-proposals', 'agent-objects', 'agent-artifacts', 'agent-usage-probe'])
-const DEVICE_FILES = new Set(['fleet.json', 'plugin-trust.json', 'data.key', 'shell-crash.json'])
-const DEVICE_DIRS = new Set(['plugin-cache'])
+// Keep the pre-baseline names in the reset inventory. The reset is the supported way to recover and
+// remove that state, while the baseline-qualified names are what the running custody stores write.
+const DEVICE_FILES = new Set([
+  'fleet.json',
+  `${ACORN_BASELINE}-fleet.json`,
+  'plugin-trust.json',
+  `${ACORN_BASELINE}-plugin-trust.json`,
+  'data.key',
+  'shell-crash.json',
+])
+const DEVICE_DIRS = new Set(['plugin-cache', `${ACORN_BASELINE}-plugin-cache`])
+const DEVICE_TOKEN_PREFIXES = ['device-token-', `${ACORN_BASELINE}-device-token-`]
+
+export const isDeviceTokenFile = name =>
+  DEVICE_TOKEN_PREFIXES.some(prefix => name.startsWith(prefix) && /^[A-Za-z0-9._-]{1,128}$/.test(name.slice(prefix.length)))
 
 export const inside = (parent, child) => child === parent || child.startsWith(`${parent}${sep}`)
 
@@ -94,9 +108,8 @@ export function inventoryRoots(input, cwd = process.cwd()) {
     checkNodeLock(roots.nodeRoot)
     select(roots.nodeRoot, files, directories, 'node', NODE_FILES, NODE_DIRS)
   }
-  const deviceFile = name => /^device-token-[A-Za-z0-9._-]{1,128}$/.test(name)
-  if (roots.desktopRoot) select(roots.desktopRoot, files, directories, 'desktop', DEVICE_FILES, DEVICE_DIRS, deviceFile)
-  if (roots.tuiRoot) select(roots.tuiRoot, files, directories, 'tui', DEVICE_FILES, new Set(['cache', 'plugins', 'plugin-cache']), deviceFile)
+  if (roots.desktopRoot) select(roots.desktopRoot, files, directories, 'desktop', DEVICE_FILES, DEVICE_DIRS, isDeviceTokenFile)
+  if (roots.tuiRoot) select(roots.tuiRoot, files, directories, 'tui', DEVICE_FILES, new Set(['cache', 'plugins', ...DEVICE_DIRS]), isDeviceTokenFile)
   if (roots.memoryRoot) select(roots.memoryRoot, files, directories, 'private-memory', new Set(['MEMORY.md']), new Set(['projects']), name => name.endsWith('.md'))
   const outstanding = []
   if (roots.desktopRoot) {

@@ -1,6 +1,7 @@
 import { createMemo } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useSearchParams } from '@solidjs/router'
+import { openPane } from '@acorn/plugin-api/client'
 import { filesKey, filePatchKey, pullKey, type PullFile } from '../shared/api'
 import { fetchFilePatches, fileBlobOptions, fileSummariesOptions, filesOptions, mentionsOptions, pullDetailOptions } from './queries'
 import { addReviewComment, replyReview, resolveThread } from './mutations'
@@ -28,6 +29,7 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
   const owner = props.route.owner
   const repo = props.route.repo
   const number = props.route.number
+  const taskId = props.taskId
 
   const files = createQuery<PullFile[]>(() => props.router
     ? filesOptions(owner, repo, number, true)
@@ -76,6 +78,12 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
     } : {}),
     invalidate: () => void queryClient.invalidateQueries({ queryKey: pullKey(owner, repo, number) }),
     draftPrefix: `${owner}/${repo}/${number}`,
+    ...(taskId ? {
+      openLine: (row: Parameters<NonNullable<DiffSource['openLine']>>[0]) => {
+        if (row.newNo == null) return
+        openPane(taskId, 'editor', { kind: 'editor:reveal', path: row.path, line: row.newNo }, 'add')
+      },
+    } : {}),
     // In router mode this pane owns the route, so the chord is claimed globally; in a task it is one
     // pane among several and has to be scoped to win only when the reader is looking at it.
     find: {

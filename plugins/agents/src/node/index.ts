@@ -114,6 +114,15 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // See docs/data-layer.md § Migrations.
       const store = ctx.storage.open()
       const core = ctx.core
+      // The runtime and the Usage page share one service. A suspected limit failure asks only its own
+      // harness collector for a fresh reset time; ordinary page reads keep using the cached snapshot.
+      const probeDir = join(dataDir, 'agent-usage-probe')
+      registerBuiltInUsageCollectors(probeDir)
+      const usageService = createAgentUsageService({
+        probeDir,
+        pricingForUser: (userId) => readAgentPricingPreferences(core.prefs, userId),
+        onRefreshed: () => ctx.events.send({ channel: pluginChannel('agents', 'usage-refreshed') }),
+      })
 
       // The one decision this plugin opens to other plugins (docs/plugins.md § Hooks). A prompt policy,
       // a redactor or a context injector registers a handler here; the point exists whether or not
@@ -139,6 +148,13 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         // Read per call, never captured. Agent records and credentials remain scoped to the active
         // account, and an account switch must not be served from a cached value.
         currentUserId: () => core.identity.active(),
+        usageLimitResetAt: async (providerId) => {
+          const userId = core.identity.active()
+          if (!userId) return null
+          const defaults = await readAgentSessionDefaults(core.prefs, userId)
+          if (!defaults.continueAfterUsageLimit) return null
+          return usageService.depletedUntil({ userId, providerId })
+        },
         publish: (frame) => {
           ctx.events.send(frame)
           // Every path that settles a turn announces it here, after its write commits, so this is the
@@ -206,14 +222,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // Local provider usage plus the pricing overrides it costs against. The probe directory sits
       // under the data root, and the pricing read goes through `CoreServices.prefs` because `prefs` is
       // core's table (../server/pricingStore.ts).
-      const probeDir = join(dataDir, 'agent-usage-probe')
-      registerBuiltInUsageCollectors(probeDir)
       usageRoute = ctx.capabilities.provide(AGENT_USAGE, {
-        ...createAgentUsageService({
-          probeDir,
-          pricingForUser: (userId) => readAgentPricingPreferences(core.prefs, userId),
-          onRefreshed: () => ctx.events.send({ channel: pluginChannel('agents', 'usage-refreshed') }),
-        }),
+        ...usageService,
         pricing: (userId) => readAgentPricingPreferences(core.prefs, userId),
         setPricing: (userId, preferences) => writeAgentPricingPreferences(core.prefs, userId, preferences),
         concurrency: (userId) => readAgentConcurrency(core.prefs, userId),

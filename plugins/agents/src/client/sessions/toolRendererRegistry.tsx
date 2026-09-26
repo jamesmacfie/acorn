@@ -1,17 +1,40 @@
-import { createEffect, createSignal, For, mergeProps, on, Show, type Component } from 'solid-js'
+import { createEffect, createSignal, For, mergeProps, on, onCleanup, Show, type Component } from 'solid-js'
 import { agentToolTone } from '../../contract/toolTone'
 import { CodeBlock, Fold, Inline, Stack, StatusDot, Text } from '@acorn/plugin-api/ui'
+import { formatRelativeTime } from '@acorn/plugin-api/client'
 import { AGENT_TOOL_CARD_POINT, type AgentToolCardProps } from '@acorn/protocol/extensionPoints.ts'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { useAgentToolFold } from './toolFoldPrefs'
 import { WebToolBody, webSummary } from './webToolCard'
+import { eventTime } from './eventTime'
 
-/** What the built-in card draws with: the point's own props plus the one thing a contributor cannot
- *  have, a callback. It is what lets "carry my last one forward" learn from this card too, and a
- *  function does not cross a port, so it stays on this side (@acorn/protocol/extensionPoints.ts). */
+/** What the built-in card draws with: the point's props plus host-only metadata and a callback.
+ *  The callback lets "carry my last one forward" learn from this card too. It cannot cross a port,
+ *  so it stays on this side (@acorn/protocol/extensionPoints.ts). */
 type AgentToolRendererProps = AgentToolCardProps & {
+  /** The first recorded update, used only by the built-in expanded body. */
+  createdAt: number
   /** Report a reader's toggle, so the fold setting learns from this card as well as a contributed one. */
   onOpenChange: (open: boolean) => void
+}
+
+// One clock for every open built-in tool body. A transcript can open hundreds of folds at once.
+const [now, setNow] = createSignal(Date.now())
+let clockReaders = 0
+let clockTimer: ReturnType<typeof setInterval> | undefined
+
+function useOpenToolClock(open: () => boolean): () => number {
+  createEffect(() => {
+    if (!open()) return
+    if (clockReaders++ === 0) {
+      setNow(Date.now())
+      clockTimer = setInterval(() => setNow(Date.now()), 60_000)
+    }
+    onCleanup(() => {
+      if (--clockReaders === 0) clearInterval(clockTimer)
+    })
+  })
+  return now
 }
 
 // A call with no status reported yet is in flight; see AgentToolCall.status.
@@ -63,6 +86,8 @@ const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
   // started call as `running`, the ACP path reports it as `pending` and never as `running` at all, so
   // one provider's cards opened themselves and the other's never did.
   const [open, setOpen] = createSignal(props.defaultOpen)
+  const clock = useOpenToolClock(open)
+  const started = () => `${eventTime(props.createdAt).full} · ${formatRelativeTime(props.createdAt, clock())}`
   // The reader hit "collapse all" above the composer. `defer`, so mounting is not itself a collapse:
   // the seed above already decided how this card opens, and a new card arriving after a collapse
   // starts collapsed anyway.
@@ -86,12 +111,18 @@ const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
         fallback={
           <Stack gap="row">
             <Show when={props.tool.input}>{(input) => <CodeBlock wrap maxHeight="block">{input()}</CodeBlock>}</Show>
+            <Text emphasis="muted">Started {started()}</Text>
             <Show when={props.tool.output}>{(output) => <CodeBlock wrap maxHeight="block">{output()}</CodeBlock>}</Show>
             <For each={props.tool.paths ?? []}>{(path) => <Text emphasis="mono">{path}</Text>}</For>
           </Stack>
         }
       >
-        {(web) => <WebToolBody web={web()} output={props.tool.output} />}
+        {(web) => (
+          <Stack gap="row">
+            <Text emphasis="muted">Started {started()}</Text>
+            <WebToolBody web={web()} output={props.tool.output} />
+          </Stack>
+        )}
       </Show>
     </Fold>
   )

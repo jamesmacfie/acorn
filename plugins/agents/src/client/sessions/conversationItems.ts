@@ -15,6 +15,8 @@ export type AgentConversationItem = {
   key: string
   firstSeq: number
   lastSeq: number
+  /** When the first event for this card reached the Node. Updates never move the card's time. */
+  createdAt: number
   turnId: string | null
   event: AgentNormalizedEvent
   /** Present on a subagent card: what that subagent did, in its own order. */
@@ -151,6 +153,7 @@ const openItem = (record: AgentEventRecord): AgentConversationItem => ({
   key: record.id,
   firstSeq: record.seq,
   lastSeq: reach(record),
+  createdAt: record.createdAt,
   turnId: record.turnId,
   event: record.event,
 })

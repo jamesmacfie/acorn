@@ -53,6 +53,8 @@ export const mapAgentTurn = (row: typeof schema.agentTurns.$inferSelect): AgentT
   source: row.source as AgentTurn['source'],
   status: row.status as AgentTurn['status'],
   input: parseJson<AgentInputPart[]>(row.inputJson, []),
+  continuationInput: parseJson<AgentInputPart[] | null>(row.continuationInputJson, null),
+  notBefore: row.notBefore,
   effectivePolicy: parseJson(row.effectivePolicyJson, {}),
   providerTurnRef: row.providerTurnRef,
   stopReason: row.stopReason,

@@ -50,6 +50,9 @@ export type HarnessLaunchSpec = {
   /** Config variables to carry through from the node's own environment, by name or `PREFIX_*` glob.
    *  Configuration only, never credentials: see the note on the generic driver's spawn. */
   envPassthrough?: readonly string[]
+  /** Adapter-specific metadata on ACP session creation and resume. Built-in only: a contributed
+   *  harness's behavior must remain expressible through the public manifest contract. */
+  acpSessionMeta?: Record<string, unknown>
   quirks?: HarnessQuirks
   /** Whether the harness's own account is logged in, for the Agent Center's provider-health row.
    *  Absent means the row shows installed-or-not only. */

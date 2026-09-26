@@ -90,6 +90,24 @@ const draw = (snapshot: AgentSessionSnapshot) => {
 }
 
 describe('a transcript row finding its turn', () => {
+  it('keeps tool time off the collapsed row after later updates', () => {
+    const firstAt = Date.parse('2026-09-25T03:24:18Z')
+    const snapshot = {
+      session: { id: 's1', title: 'A session', config: {} },
+      turns: [],
+      events: [
+        { ...record(1, 'a', { type: 'tool', tool: { id: 'bash', title: 'Run command', status: 'running' } }), createdAt: firstAt },
+        { ...record(2, 'a', { type: 'tool', tool: { id: 'bash', title: '', status: 'completed' } }), createdAt: firstAt + 5000 },
+      ],
+      requests: [],
+    } as unknown as AgentSessionSnapshot
+
+    const host = draw(snapshot)
+    const row = host.querySelector<HTMLElement>('.ui-timeline-turn')
+    expect(row?.hasAttribute('data-tip-at')).toBe(false)
+    expect(row?.hasAttribute('data-tip')).toBe(false)
+  })
+
   it('resolves through the map and never scans the turn list', () => {
     // An own `find` shadows the prototype's, so anything still scanning shows up here.
     const scan = vi.fn()

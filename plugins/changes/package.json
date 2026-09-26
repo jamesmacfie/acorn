@@ -17,6 +17,7 @@
   "dependencies": {
     "@acorn/plugin-agents": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
+    "@acorn/plugin-editor": "workspace:*",
     "@acorn/protocol": "workspace:*",
     "@tanstack/solid-query": "^5.101.0",
     "drizzle-orm": "catalog:",

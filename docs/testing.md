@@ -785,8 +785,8 @@ bindings rather than the prose.
     fields, publish, and activate the schedule. Focus stays visible and returns to its trigger when
     each dialog closes.
 79. Archive a task with a committed change and find it on the Archive page by a word from its agent
-    transcript. Open the matching session in the preview, and check that the Changes and editor panes
-    show the restore prompt. Restore it and check that the worktree comes back with the commit. Then
+    transcript. Open the matching session in the preview, and check that its right rail holds only Agent
+    and Notes. Restore it and check that the worktree comes back with the commit. Then
     delete the branch of another archived local task and check that restore asks before it cuts a new
     one.
 80. Open a Shell tab on one task and run a command that prints a line a second. Switch to a task

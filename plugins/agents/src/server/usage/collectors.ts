@@ -36,6 +36,10 @@ export class AgentUsageCollectorRegistry {
     return [...this.#entries.values()]
   }
 
+  get(provider: string): AgentUsageCollectorEntry | undefined {
+    return this.#entries.get(provider)
+  }
+
   clear(): void {
     this.#entries.clear()
   }

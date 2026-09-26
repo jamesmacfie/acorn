@@ -143,6 +143,20 @@ describe('TaskPaneHost', () => {
     expect(tabs.some((label) => label?.includes('agent'))).toBe(false)
   })
 
+  it('shows only panes that opt into archived tasks', () => {
+    pane({ id: 'pr', label: 'PR review', order: 0 })
+    pane({ id: 'agents', label: 'Agent', order: 1, readsArchived: true })
+    pane({ id: 'notes', label: 'Notes', order: 2, readsArchived: true })
+    pane({ id: 'changes', label: 'Changes', order: 3 })
+    layout.panes = ['pr', 'notes', 'changes']
+
+    mount(task({ status: 'archived', worktreePath: null }))
+
+    expect(drawn()).toEqual(['notes'])
+    const tabs = [...host.querySelectorAll('.pane-switcher [aria-pressed]')].map((node) => node.getAttribute('aria-label'))
+    expect(tabs).toEqual(['Agent', 'Notes'])
+  })
+
   it('keeps a command-only pane addressable without putting it in the switcher', () => {
     pane({ id: 'findings', order: 0, showInSwitcher: false })
     layout.panes = ['findings']

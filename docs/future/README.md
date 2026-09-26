@@ -204,7 +204,8 @@ promotion, native menus, dialogs and keychain prompts) stay manual.
 2026-09-24 and deleted 2026-09-26. [workspaces-and-tasks.md](../workspaces-and-tasks.md) § Restoring
 a task owns the behaviour, [plugins.md](../plugins.md) § Search providers owns `ctx.search`, and
 [testing.md](../testing.md) item 79 is the manual smoke it owed. Left out on purpose: more search
-providers than core tasks and the agents plugin, a loaded-tier search route, search across active
+providers than core tasks and the agents plugin, a loaded-tier search route (loaded task panes can
+still opt into the preview with `readsArchived: true` on their `frames` entry), search across active
 tasks, external-content FTS (it needs stable rowids and `agent_events` has a text key), opening an
 individually archived session in the preview, and bringing back containers, terminal sessions or
 scrollback.

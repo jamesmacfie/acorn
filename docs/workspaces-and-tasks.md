@@ -159,6 +159,9 @@ The project's setup script runs in the new worktree as an ordinary terminal sess
 so its output is readable while it works. The task's rail row says so too: a pulsing dot sits under
 the task glyph until that session exits, in the slot teardown's spinner uses at the other end of the
 task's life ([ui-design.md](./ui-design.md) § Rail controls).
+The New task dialog offers "Skip setup script" for a Git worktree task. The choice is stored on the
+task, so it also skips setup if another surface creates the worktree later or the task is restored.
+Unchecked tasks keep the project's configured setup behavior.
 
 A project's `.acorn/config.toml`, committed or personal, may list `copy` paths: repo-relative files,
 usually gitignored (`.env.local` and similar), copied into a freshly created worktree so it works
@@ -265,10 +268,12 @@ those tasks cannot be restored.
 The Archive entry at the bottom of the rail lists archived tasks, newest first, with a search box over
 every search provider ([plugins.md § Search providers](./plugins.md)). Selecting a task previews it
 read-only in the ordinary pane host, without adding it to the rail. A pane that reads stored history
-declares `readsArchived` and draws as it would for an active task. Agent, Notes and PR review do.
-Every other pane shows a restore prompt instead, because it would need the worktree or would start
-work on an archived task ([panes.md § Contributions](./panes.md)). The Agent pane keeps the
-transcripts and turns its composer off.
+declares `readsArchived`; only those panes appear in the archived preview's layout and right rail.
+Agent and Notes opt in. Every other pane is absent because it would need the worktree, would start work
+on an archived task, or does not belong in the compact history view
+([panes.md § Contributions](./panes.md)). The Agent pane keeps the transcripts and turns its composer
+off. The archived-task list uses the shared browse sidebar: it starts at the default list width,
+resizes, and collapses to task icons with its state remembered on the device.
 
 Restore is `POST /v1/core/tasks/:id/restore` (`restoreTask` in `server/storage/archive.ts`). It sets the
 task active and rebuilds the worktree before answering, through the same `resolveTaskCwd` a pane would
