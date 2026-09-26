@@ -10,9 +10,6 @@ export {
   buildDiffRows,
   buildDiffRowsAsync,
   buildRenderableRows,
-  DIFF_LOAD_ROW_HEIGHT,
-  estimateRowSize,
-  estimateSplitBandSize,
   expandGap,
   expandGapAsync,
   gapId,
@@ -21,7 +18,6 @@ export {
   maxLineCols,
   plainTokenize,
   rowIdentityKeys,
-  splitBandIdentityKeys,
   toBands,
 } from '@acorn/client-core/kit/diff'
 export type { CodeRow, DiffFile, GapRow, ParsedFile, Row, SplitBand, TokenizeLine, ViewMode } from '@acorn/client-core/kit/diff'
@@ -32,7 +28,6 @@ export type { CodeRow, DiffFile, GapRow, ParsedFile, Row, SplitBand, TokenizeLin
 export { tokenizeDocument } from '@acorn/client-core/infra/highlight'
 export type { TokenizeDocument } from '@acorn/client-core/infra/highlight'
 
-export { collectMatches } from '@acorn/client-core/kit/diff'
 export type { FindHighlight } from '@acorn/client-core/kit/diff'
 export { synth } from '@acorn/client-core/kit/diff'
 export { createSplitScrollSync } from '@acorn/client-core/kit/diff'

@@ -98,6 +98,13 @@ with `errors` is a failed refresh even when it carries partial data. There is no
 the batch route refreshes each stale pull through the same helper, three at a time, because a
 multi-alias query would stop at each connection's first page.
 
+One gap in that honesty is not closed. GitHub's REST endpoint lists at most 250 commits for a pull,
+and whether the GraphQL `commits` connection stops there too, with `hasNextPage` false, is not
+confirmed. If it does, the walker takes the first 250 as the whole list, because it compares the
+walked list against nothing. The fix is to ask for the connection's `totalCount` and carry a
+shortfall to the conversation, which needs a mirror column; the checks would also have to be read
+from `headRefOid` rather than `commits(last: 1)`, which would then name the 250th commit.
+
 The files come from the REST files endpoint, 100 a page, in order. The walk stops at a short page, at
 a full page with no `rel="next"` link, or after page 30, which is GitHub's 3,000-file ceiling. After a
 full page 30 the plugin reads the pull's `changed_files`. If that is more than 3,000, or GitHub gives

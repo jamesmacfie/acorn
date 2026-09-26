@@ -92,24 +92,12 @@ export type TokenizeLine = (path: string, content: string) => Tok[]
 export const isCodeRow = (r: Row): r is CodeRow => r.kind === 'normal' || r.kind === 'insert' || r.kind === 'delete'
 export const fileAnchor = (path: string) => `diff-file:${path}`
 
-// Virtualizer size estimates per row kind, and the single source for these numbers: DiffView's
-// fallback imports DIFF_LOAD_ROW_HEIGHT rather than redefining it.
+// Fixed row heights, and the single source for these numbers (docs/diff-rendering.md § Row geometry).
 export const DIFF_LINE_HEIGHT = 20
 export const DIFF_FILE_HEADER_HEIGHT = 36
 export const DIFF_THREAD_HEIGHT = 140
 export const DIFF_RESOLVED_THREAD_HEIGHT = 50
-export const DIFF_LOAD_ROW_HEIGHT = 36
 export const DIFF_GAP_ROW_HEIGHT = 28
-
-export const estimateRowSize = (row: Row | undefined) => {
-  if (!row) return DIFF_LINE_HEIGHT
-  if (row.kind === 'file') return DIFF_FILE_HEADER_HEIGHT
-  if (row.kind === 'thread') return row.thread.resolved ? DIFF_RESOLVED_THREAD_HEIGHT : DIFF_THREAD_HEIGHT
-  if (row.kind === 'nodiff') return DIFF_GAP_ROW_HEIGHT
-  if (row.kind === 'load') return DIFF_LOAD_ROW_HEIGHT
-  if (row.kind === 'gap') return DIFF_GAP_ROW_HEIGHT
-  return DIFF_LINE_HEIGHT
-}
 
 // Widest code line, in columns of 1ch (see docs/diff-rendering.md § Row geometry for why the row
 // canvas has to be this wide rather than sized by layout). Tabs advance to the next stop
@@ -118,12 +106,6 @@ export const maxLineCols = (rows: readonly Row[]) => {
   let widest = 0
   for (const row of rows) if (isCodeRow(row)) widest = Math.max(widest, lineColumns(row.raw))
   return widest
-}
-
-export const estimateSplitBandSize = (band: SplitBand | undefined) => {
-  if (!band) return DIFF_LINE_HEIGHT
-  if (band.kind === 'full') return estimateRowSize(band.row)
-  return Math.max(estimateRowSize(band.left ?? undefined), estimateRowSize(band.right ?? undefined))
 }
 
 const UNKNOWN_FILE_KEY = '<unknown>'
@@ -152,21 +134,6 @@ export function rowIdentityKeys(rows: readonly Row[]): string[] {
   return rows.map((row) => {
     if (row.kind === 'file') currentFilePath = row.file.path
     return countedKey(rowIdentityBase(row, currentFilePath), counts)
-  })
-}
-
-export function splitBandIdentityKeys(bands: readonly SplitBand[]): string[] {
-  const counts = new Map<string, number>()
-  let currentFilePath = UNKNOWN_FILE_KEY
-  return bands.map((band) => {
-    let base: string
-    if (band.kind === 'full') {
-      if (band.row.kind === 'file') currentFilePath = band.row.file.path
-      base = `full:${rowIdentityBase(band.row, currentFilePath)}`
-    } else {
-      base = `pair:${band.left ? codeRowIdentity(band.left) : 'empty'}:${band.right ? codeRowIdentity(band.right) : 'empty'}`
-    }
-    return countedKey(base, counts)
   })
 }
 
