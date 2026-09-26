@@ -26,8 +26,10 @@ export type SurfaceKind = 'diff' | 'timeline'
 export type SurfaceHealth = {
   /** The document as a whole. `ready` is the source-owned structure being complete. */
   topology: { files: number; segments: number; fixedRows: number; dynamicBlocks: number; ready: boolean; lateSourceBlocks: number }
-  /** What is in the DOM now. Blank and uncovered are measured against the visible viewport only. */
-  mounted: { segments: number; fixedRows: number; dynamicBlocks: number; blankBlocks: number; uncoveredRanges: number }
+  /** What is in the DOM now. Blank and uncovered are measured against the visible viewport only.
+   *  `bodies` is deferred content that has been built: an opened disclosure, or a turn's body drawn
+   *  once it came near the viewport. */
+  mounted: { segments: number; fixedRows: number; dynamicBlocks: number; blankBlocks: number; uncoveredRanges: number; bodies: number }
   /** Work still owed. Distance is in the surface's own unit (segments for the diff), never a path.
    *  `unvisitedSegments` is content prepared for a part of the surface the reader has not reached. */
   work: { queuedSegments: number; queuedEnrichment: number; furthestQueueDistance: number; unvisitedSegments: number; scheduledFrames: number; heldPublications: number; prepareMs: number }
@@ -45,6 +47,11 @@ export type SurfaceHealth = {
     documents: number; segments: number; rows: number; estimatedBytes: number; plainBytes: number; enrichmentBytes: number
     hits: number; misses: number; inserts: number; evictions: number; oversize: number; rowCeiling: number; byteCeiling: number
   }
+  /** A timeline drawing only its newest turns (./timelineWindow.ts). `hiddenEarlier` is the older
+   *  turns not drawn now. `expansions` and `trims` count the window growing and shrinking since mount.
+   *  `pinned` is how many turns the last trim kept past its page because the reader held a selection
+   *  or focus in them. */
+  window: { hiddenEarlier: number; expansions: number; trims: number; pinned: number }
 }
 
 export type SurfaceHealthEntry = { kind: SurfaceKind } & SurfaceHealth
@@ -68,7 +75,7 @@ export type SurfaceHealthProbe = {
 
 const TEMPLATE: SurfaceHealth = {
   topology: { files: 0, segments: 0, fixedRows: 0, dynamicBlocks: 0, ready: false, lateSourceBlocks: 0 },
-  mounted: { segments: 0, fixedRows: 0, dynamicBlocks: 0, blankBlocks: 0, uncoveredRanges: 0 },
+  mounted: { segments: 0, fixedRows: 0, dynamicBlocks: 0, blankBlocks: 0, uncoveredRanges: 0, bodies: 0 },
   work: { queuedSegments: 0, queuedEnrichment: 0, furthestQueueDistance: 0, unvisitedSegments: 0, scheduledFrames: 0, heldPublications: 0, prepareMs: 0 },
   measurement: { candidates: 0, reads: 0, commits: 0, maxCommitsInFrame: 0, readMs: 0, commitMs: 0, fixedRebuilds: 0, activeObservers: 0, observedElements: 0 },
   correction: { count: 0, failed: 0, substituted: 0, maxPixels: 0, maxAnchorDrift: 0 },
@@ -76,6 +83,7 @@ const TEMPLATE: SurfaceHealth = {
     documents: 0, segments: 0, rows: 0, estimatedBytes: 0, plainBytes: 0, enrichmentBytes: 0,
     hits: 0, misses: 0, inserts: 0, evictions: 0, oversize: 0, rowCeiling: 0, byteCeiling: 0,
   },
+  window: { hiddenEarlier: 0, expansions: 0, trims: 0, pinned: 0 },
 }
 
 const KINDS: readonly SurfaceKind[] = ['diff', 'timeline']

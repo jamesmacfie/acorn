@@ -84,7 +84,7 @@ describe('privacy', () => {
     expect(entry.topology.files).toBe(0)
     expect(entry.topology.ready).toBe(false)
     expect(JSON.stringify(entry)).not.toContain('CANARY')
-    expect(Object.keys(entry)).toEqual(['kind', 'topology', 'mounted', 'work', 'measurement', 'correction', 'resident'])
+    expect(Object.keys(entry)).toEqual(['kind', 'topology', 'mounted', 'work', 'measurement', 'correction', 'resident', 'window'])
   })
 
   it('serializes to numbers, booleans, and the fixed kind labels only', () => {

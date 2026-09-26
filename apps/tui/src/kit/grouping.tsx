@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createSignal, For, onCleanup, Show, type JSX } from 'solid-js'
+import { createEffect, createSignal, For, onCleanup, Show, untrack, type Accessor, type JSX } from 'solid-js'
 import type { Renderable } from '../tree/compat'
 import { COLLECTION_INTENTS, createCollectionIntents } from '@acorn/client-core/kit/keys'
 import type { Intent } from '@acorn/client-core/kit/keys'
@@ -18,6 +18,8 @@ import {
 import { stop } from '../keys/stops'
 import { LIST, OVERLAY_OWN, PARENT } from '../keys/tiers'
 import { ScrollViewport, type Viewport } from './scrolling'
+// A function declaration, so the cycle with ./asking.tsx (which draws `Menu` from here) resolves.
+import { Button } from './asking'
 import type { TimelineControls } from '@acorn/client-core/kit/components/content'
 import type { ReadingPlace } from '@acorn/client-core/kit/lib'
 import type { KitSection } from '@acorn/client-core/kit/components/layout'
@@ -213,9 +215,22 @@ export function Timeline(props: {
   /** The DOM timeline's health-reading count (client-core kit/lib/surfaceHealth.ts). Cells report no
    *  rendered-surface health, so it is accepted and ignored. */
   total?: number
+  /** Older turns the caller is not drawing. Drawn as "Show earlier" above the first turn, the same
+   *  control the DOM draws, so hidden history is stated on this host too. */
+  hidden?: number
+  onShowEarlier?: () => void
+  /** Ignored: this host restores no turn place, so it never has a hidden one to ask for. */
+  reveal?: (key: string) => boolean
+  /** Ignored: this host does not trim. A window here only grows until the list is drawn again. */
+  onTrim?: (key: string) => void
   children: JSX.Element
 }) {
-  if (!props.follow) return <box flexDirection="column" flexGrow={1}>{props.children}</box>
+  const earlier = () => (
+    <Show when={props.hidden}>
+      {(hidden) => <Button variant="ghost" size="sm" onPress={() => props.onShowEarlier?.()}>{`Show earlier (${hidden()})`}</Button>}
+    </Show>
+  )
+  if (!props.follow) return <box flexDirection="column" flexGrow={1}>{earlier()}{props.children}</box>
   let view: Viewport | undefined
   // The same jumps the DOM hands out, against this host's viewport. `scrollTo`, not `stickToBottom`,
   // for the bottom: the reader asked to go there, so it is not the conditional re-stick a turn arriving
@@ -234,6 +249,7 @@ export function Timeline(props: {
         flexShrink={0}
         onSizeChange={() => view?.stickToBottom()}
       >
+        {earlier()}
         {props.children}
       </box>
     </ScrollViewport>
@@ -243,10 +259,24 @@ export function Timeline(props: {
 /** One turn in a `Timeline`. The compound half, and it has to exist: `Timeline.Turn` on a `Timeline`
  *  with no `Turn` is `undefined` passed to `createComponent`, which is a pane that fails to draw
  *  rather than a pane that draws badly. Found by the pane sweep, on the PR conversation
- *  (docs/tui.md). */
-Timeline.Turn = (props: { key?: string; children: JSX.Element }) => (
-  <box flexDirection="column" marginTop={spaceLines('row')}>{props.children}</box>
-)
+ *  (docs/tui.md).
+ *
+ *  `position` and `setSize` are the DOM's list semantics and have nothing to draw here. A function
+ *  child is told it is near at once: a terminal cannot say what is near its viewport, so a deferred
+ *  body is built with the turn. */
+Timeline.Turn = (props: {
+  key?: string
+  position?: number
+  setSize?: number
+  children: JSX.Element | ((near: Accessor<boolean>) => JSX.Element)
+}) => {
+  const content = () => {
+    const child = props.children
+    if (typeof child !== 'function' || child.length === 0) return child as JSX.Element
+    return untrack(() => (child as (near: Accessor<boolean>) => JSX.Element)(() => true))
+  }
+  return <box flexDirection="column" marginTop={spaceLines('row')}>{content()}</box>
+}
 
 // ── Which panels a strip owns ─────────────────────────────────────────────────────────────────
 //
