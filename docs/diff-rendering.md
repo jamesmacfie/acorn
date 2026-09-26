@@ -225,9 +225,8 @@ remounted and nothing moves, and only when the segment still holds the rows the 
 from. An oversize segment stays plain. A dead or slow worker leaves plain text on screen, which is
 correct and readable.
 
-Held segments are bounded: 96 of them, least recently wanted first out, and never one that is wanted.
-Phase 4 of [docs/future/git-inspired/](./future/git-inspired/README.md) replaces that bound with a
-shared weighted cache.
+The loader keeps no rows of its own. They go into the node's resident segment cache, described in
+§ Resident segments below, which is how a pane opened a second time draws without asking the source.
 
 Highlighting runs in `highlighter.worker.ts` (`client-core/src/infra/highlight/`), off the thread that
 draws. Tokenizing a 45-file diff on the main thread cost about 2 seconds, in unbroken per-file blocks
@@ -272,6 +271,72 @@ which would put the WASM engine back on the main thread.
 Paired delete/insert lines use a second worker for word-level diffs, with the same cold/live/dead
 shape and a main-thread fallback as highlighting, without sharing Shiki's wider worker policy or
 lifecycle. One segment's pairs are sent as one batch so the comparison cannot block scrolling.
+
+## Resident segments
+
+A segment's rows outlive the pane that loaded them. `features/diff/segmentCache.ts` keeps the node's
+recently read segments in memory, so returning to a diff draws its last rows at once, already
+coloured, and asks the source only for what the cache no longer holds.
+
+**One cache per node.** The cache is found by the pane's query client (`segmentCacheFor`), which is
+one per node (§ Renderer query cache in [caching.md](./caching.md)). It has the same partition and
+lifetime as the rest of what the renderer holds for a node. A node switch mounts the other node's
+client and so the other node's cache. `dropNode` clears the removed node's cache at once. Unmounting a
+pane leaves the cache alone. The terminal client has its own diff loader and no resident cache.
+
+**Keys.** An entry is one segment of one file, keyed by `residentKey`: the segment's content key
+(the patch digest, the diff-document version, and the ordinal), the path, and the sha. Rows are a
+pure function of those four. The path picks the grammar, and the sha is what a gap reads the file
+through, so two files with the same patch never share rows. The key holds no source, route, pane,
+revision, or projection. The same patch on a task's pull request and on the repository's view of it
+is one entry. Review threads are not in the key, so resolving a thread or editing a comment leaves
+the code rows alone. Theme is not in the key either, because every token carries both themes'
+colours. The renderer's own parser and tokenizer cannot change within a process, and nothing is
+persisted, so there is no separate enrichment version.
+
+**Plain rows and colour.** An entry holds its plain rows and, once colouring lands, its coloured
+rows beside them. `plainWeight` and `enrichmentWeight` weigh the two apart. A reader returning to a
+segment whose colour was evicted sees plain rows at once, and the loader colours it again.
+
+**Budget.** Two ceilings, both counted over every entry: 40,000 rows (`SEGMENT_CACHE_ROWS`) and
+32 MiB of estimated bytes (`SEGMENT_CACHE_BYTES`). The byte estimate is a budget, not the engine's
+heap. It counts a fixed allowance per row, array, and token, and two bytes a character for text the
+entry owns. Strings rows share, such as the path and the raw text a plain token points at, count
+once. A row count keeps an underestimated allowance from letting the cache grow without bound. The
+numbers were chosen by hand, not from a heap sample. When an insert or a colouring leaves either
+ceiling exceeded, the cache walks from the least recently wanted segment. At each segment that no
+pane holds, it drops the colour first, and then the plain rows if that was not enough. It stops as
+soon as both ceilings hold.
+
+**Holds.** Each pane's loader holds the segments on screen, the two either side, and whatever it is
+loading or colouring, and replaces that claim on every range change. A held segment is never evicted.
+A batch is held from its request until the request ends, however it ends. A request that the reader
+scrolled away from is aborted and its claim dropped. A new revision keeps the old claim until the next
+range change replaces it, so rows that survive the revision are not evicted in between. Unmounting
+releases everything the pane held.
+
+**Oversize.** If what panes hold is over a ceiling after an insert, nothing unheld is left and the
+cache counts an oversize insert. It keeps the held segments, however large, and the next change to a
+claim evicts them once nothing holds them. With 64-row, 32 KB segments this needs a single row near
+16 million characters.
+
+**Revisions.** Nothing in the cache ever changes content, because a moved file has a new patch digest
+and so a new key. What differs is when old entries go:
+
+- When the file set stays the same and a file's patch moves, as a working tree's does on every save,
+  the pane drops the old patch's segments of that file at once (`supersede`). A second pane holding
+  them keeps them. A Changes poll that finds nothing new moves no revision and drops nothing.
+- When the file set changes, as a pull request's does with each commit, the old entries stay until
+  the budget takes them, because another view may still show that revision.
+
+**Not cached here.** Heights stay with the pane (§ Row geometry), and so do DOM nodes, Solid state,
+composers, drafts, observers, and requests. Nothing in this cache is written to disk or to the query
+cache's persisted snapshot. A colouring that fell back to plain text, after a highlight worker timed
+out, is kept as the segment's colour until the segment is evicted.
+
+The health reading's `resident` group reports the cache's weight against both ceilings and its
+inserts, evictions, and oversize inserts, plus the pane's own hits and misses. The telemetry samples
+are listed in [telemetry.md](./telemetry.md) § Renderer seams.
 
 ## Row geometry
 

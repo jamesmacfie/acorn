@@ -1,6 +1,6 @@
 # Phase 4: a bounded resident cache for recent diff segments
 
-Status: not started, 2026-09-26. Waits on phase 2. Phase 3 defines the measured-height boundary.
+Status: shipped 2026-09-26, tested in unit and jsdom suites. The real-window warm-revisit run is owed.
 
 ## Goal
 
@@ -250,3 +250,80 @@ Per [docs-migration.md](./docs-migration.md): `docs/caching.md`, `docs/state-own
   choosing byte and row ceilings.
 - Find every lifecycle path that can abandon an in-flight segment request and test pin release for
   each one.
+
+## What shipped differently
+
+The owning docs describe what runs: [diff-rendering.md](../../diff-rendering.md) § Resident segments,
+[caching.md](../../caching.md) § Resident diff segments, [state-ownership.md](../../state-ownership.md)
+§ Which mechanism holds a given fact, [telemetry.md](../../telemetry.md) § Renderer seams and
+§ Rendered-surface health, and [testing.md](../../testing.md) § Test layers and smoke item 84. Where
+this file and those disagree, they win.
+
+Where the pieces live, for phase 5:
+
+- The cache is `packages/client-core/src/features/diff/segmentCache.ts`: `createSegmentCache`,
+  `segmentCacheFor(queryClient)`, `dropSegmentCache`, `residentKey`, `plainWeight`, and
+  `enrichmentWeight`. `peek`, `has`, and `insert` are the read and write paths. `holder()` returns a
+  claim that `hold`s a key set, `release`s it, and `supersede`s a patch.
+- The loader is `features/diff/segmentLoader.ts`. It takes the cache as `cache`, and `rows`,
+  `status`, and `retry` take a segment address (content key, path, and sha) instead of a content key.
+
+Deviations from the plan:
+
+1. **Keyed by the query client, not added to `clientFor`.** `segmentCacheFor` keeps one cache per
+   `QueryClient` in a `WeakMap`, and `DiffPane` finds its cache from `useQueryClient()`. The pane
+   reads the partition it already draws from, with no second lookup through `activeCacheId()` that
+   could disagree with the provider during a switch. `dropNode` calls `dropSegmentCache`. A test's
+   own client gets its own cache, so the suites stay isolated without a reset hook.
+2. **No `cacheNamespace` and no document revision in the key.** A segment's content key is already
+   the patch digest, the diff-document version, and the ordinal. The rows built from it depend only
+   on that, the path, and the sha, so `residentKey` is those three strings. Any source on the node
+   that names the same key names the same rows, and a force push or a working-tree edit has new
+   digests. None of the three sources changed. The path and sha are in the key because the old
+   per-pane map keyed by content key alone would give two files with the same patch one set of rows.
+3. **No enrichment version and no parser version beyond the content key's.** The renderer's
+   tokenizer and row builder cannot change within a process, and nothing is persisted, so a new
+   build starts with an empty cache. Tokens carry both themes' colours, so theme is not in the key
+   either.
+4. **Superseding is the pane's, and keyed on the file set.** A source has no namespace to supersede
+   in. The pane drops a file's old patch when its revision moves and its signature does not, which is
+   exactly a working tree saving under the reader. A pull request's next commit changes the signature,
+   so its old revision stays for the budget, as the plan asked. Task and project removal add nothing:
+   the budget bounds a removed task's entries.
+5. **Pins are claims, one per pane.** A pane's claim is its visible and near segments plus whatever
+   it is loading or colouring, replaced on every range change. The near range is the demand's two
+   segments either side, so a near pin ends when the range moves. A new revision keeps the old claim
+   until the next demand, so rows that survive the revision are not evicted in between. The loader has
+   no path that leaves a claim behind: success, failure, and abort all end in the request's `finally`,
+   and `reset` and `dispose` rebuild or release it.
+6. **Eviction drops colour and then rows, per segment, oldest first.** The plan's rule 7 is met at
+   each segment: its colour goes before its plain rows. The cache does not strip colour from every
+   segment before evicting any plain rows, which would leave the most recent diff grey to keep the
+   oldest one's rows.
+7. **Oversize is counted per insert.** A batch that leaves the cache over a ceiling with nothing
+   unheld counts once. The held segments stay, and the next change to any claim evicts them if nothing
+   holds them.
+8. **Heights are not retained.** They stay per pane, as phase 3 left them. A revisit draws its rows
+   from memory and measures its blocks again on mount.
+9. **No query-key exclusion.** Segments never pass through the query cache, so there is no key family
+   to exclude. The persistence test dehydrates a client after a diff loaded and finds no segment text.
+10. **The byte estimate counts UTF-16.** Text is two bytes a character, which is closer to the
+    engine's own strings than UTF-8 bytes would be. The allowances are 64 bytes a row, 16 an array,
+    and 48 a token.
+11. **Ceilings chosen by hand.** 40,000 rows and 32 MiB. No heap sample or first-content timing
+    could be taken, because the worktree's window runs hidden behind the developer's own app.
+12. **Health.** The `resident` group gained `plainBytes`, `enrichmentBytes`, `hits`, `misses`,
+    `inserts`, `evictions`, `oversize`, `rowCeiling`, and `byteCeiling`, and it reports the node's
+    cache rather than the pane's rows. `documents` counts distinct patches held. `hits` and `misses`
+    are the pane's since mount; the rest are the cache's. `SegmentStatus` lost `loaded`, because the
+    cache is what says a segment is loaded.
+13. **The terminal client has no resident cache.** Its diff pane has its own loader, and it does not
+    share renderer memory with the desktop.
+
+Not built or not verified:
+
+- The real-window flow: a warm revisit painting before a request, and resident weight staying under
+  both ceilings while cycling documents. Smoke item 84 in [testing.md](../../testing.md) is owed.
+- The estimator's calibration against a heap sample, and the phase 0 before and after measurements.
+- A colouring that fell back to plain text after a worker timeout is cached as that segment's colour
+  until it is evicted. `enrichDiffRows` does not say when it fell back.

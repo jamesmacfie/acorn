@@ -267,6 +267,14 @@ fingerprint says whether its height still holds, and a mounted block is measured
 file signature clears every height, and so does leaving the pane. None of it is persisted: a height
 is a fact about one window's fonts and width.
 
+The diff's parsed rows are not the pane's. They are a node's, held in memory beside that node's query
+client by `client-core/features/diff/segmentCache.ts`, so a pane mounted again on the same node draws
+them without a request. The rule is the query cache's: one partition per node, cleared when the node is
+dropped, and a node switch reads the other node's. Unlike the query cache, none of it is persisted,
+and it holds no reader state. Heights, drafts, collapse, and the reading place stay where this section
+puts them, so a thread resolving changes a height and never a cached row
+([diff-rendering.md](./diff-rendering.md) § Resident segments).
+
 **A slice reads its own keys and nothing else.** Every slice used to carry a `legacy` reader as well,
 a second function that pulled the pre-scoped aggregate key the scoped keys replaced —
 `task_layouts` and `task_panes` for the layout slice, `editor_open_files`, `pr_filters`. Those went on

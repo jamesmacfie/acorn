@@ -4,7 +4,8 @@ Status: phase 0 partly shipped 2026-09-26 (its visible real-window run is owed).
 2026-09-26, tested against a mocked GitHub; a check against a real large pull request is owed. Phase 2
 shipped 2026-09-26, tested in jsdom and against real Git and a mocked GitHub; its real-window run at
 `scale` and `canonical` is owed. Phase 3 shipped 2026-09-26, tested in jsdom with a modelled layout;
-its real-window run is owed. Phases 4 and 5 have not started.
+its real-window run is owed. Phase 4 shipped 2026-09-26, tested in unit and jsdom suites; its
+real-window warm-revisit run is owed. Phase 5 has not started.
 
 This programme applies the useful parts of GitHub's 2026 account of rendering a pull request with
 2,200 files, more than one million changed lines, and more than 400 inline review comments. The
