@@ -56,15 +56,20 @@ export type TimelineWindow = {
   reveal: (key: string) => boolean
   /** Stop drawing every turn older than `key`. */
   trim: (key: string) => void
-  /** Back to the newest page, for a different list. */
+  /** Back to the newest page. A caller that passes `list` does not need it. */
   reset: () => void
 }
 
-export function createTimelineWindow(keys: Accessor<readonly string[]>): TimelineWindow {
+/**
+ * `list` names which list `keys` belongs to. When it changes, the window starts again on the newest
+ * page in the same pass that reads the new keys, so the old window's size never reaches the new list.
+ */
+export function createTimelineWindow(keys: Accessor<readonly string[]>, list?: Accessor<unknown>): TimelineWindow {
   // Bookkeeping, not state anything draws from: the oldest key drawn and how many turns that was, as
   // of the last time the window was worked out. `moved` is what makes a reader's action recompute.
   let first: string | null = null
   let count = TIMELINE_PAGE
+  let listed: unknown
   const [moved, setMoved] = createSignal(0)
   const move = (next: string | null, size = count) => {
     first = next
@@ -74,12 +79,18 @@ export function createTimelineWindow(keys: Accessor<readonly string[]>): Timelin
 
   const start = createMemo(() => {
     moved()
-    const list = keys()
+    const id = list?.()
+    if (id !== listed) {
+      listed = id
+      first = null
+      count = TIMELINE_PAGE
+    }
+    const current = keys()
     // An empty list has no oldest key to hold, and holding "none" would draw nothing once turns arrive.
-    if (!list.length) return 0
-    const at = windowStart(list, first, count)
-    first = list[at] ?? null
-    count = list.length - at
+    if (!current.length) return 0
+    const at = windowStart(current, first, count)
+    first = current[at] ?? null
+    count = current.length - at
     return at
   })
   const drawn = createMemo(() => keys().slice(start()))

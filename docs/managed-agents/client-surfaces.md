@@ -63,10 +63,11 @@ about 60 ms (2026-09-26, jsdom, no real-window timing). Its rules:
 - A remembered reading place in a hidden card, and a request a notice or the sidebar names, reveal
   the page that holds the card before anything is focused or scrolled. Only a card that has left the
   list for good hands the reader a neighbour, and the Timeline's health counts that as a
-  substitution.
+  substitution. A named request is revealed once per view, so a later trim can drop it again.
 - While the reader follows the live end, the Timeline trims back to 200 once it draws 400, which is
   once a page of new cards rather than once an event. It never trims a card holding the selection or
-  focus, and it never trims while the reader is away from the live end.
+  focus, and it never trims while the reader is away from the live end. The trim runs in the frame
+  after the list grows, not inside the resize callback, so the browser never reports a resize loop.
 - Switching session or subagent starts that list on its own newest page. The window is not kept per
   session.
 - Each card carries `aria-posinset` and `aria-setsize` for its place in the whole session, so a screen
