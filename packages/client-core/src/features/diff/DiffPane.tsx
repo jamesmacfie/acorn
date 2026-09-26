@@ -1,8 +1,8 @@
-import { measure, recordSample } from '../../infra/telemetry/emitter'
+import { measure, recordDuration, recordSample } from '../../infra/telemetry/emitter'
 import { batch, createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
 import { createStore, unwrap } from 'solid-js/store'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { segmentContentKey, type DiffSearchMatch } from '@acorn/diff-document/document'
+import { segmentContentKey, type DiffDocumentTopology, type DiffSearchMatch } from '@acorn/diff-document/document'
 import { tokenizeDocument } from '../../infra/highlight/worker'
 import { diffWordsDocument } from '../../infra/highlight/wordDiffWorker'
 import { readDraft, writeDraft } from '../../kit/lib/draftState'
@@ -41,7 +41,8 @@ import { diffCollapsed, rememberDiffCollapsed } from './viewState'
 import { createDiffHealth } from './diffHealth'
 import { bandBlock, createDiffLayout, lineBlock, rowBlocks, threadBlock, type DiffBlockInputs } from './diffLayout'
 import { createDocumentView, threadAnchor, type DiffItem, type GapOverlay, type SegmentRef } from './documentView'
-import { createSegmentLoader } from './segmentLoader'
+import { createSegmentLoader, type SegmentAddress } from './segmentLoader'
+import { segmentCacheFor } from './segmentCache'
 import { createLogger } from '../../infra/telemetry/logger'
 
 const log = createLogger('diff')
@@ -125,14 +126,18 @@ export function DiffPane(props: {
 
   // Spans per batch and per coloured segment, and the batch size as a sample: what reading near the
   // viewport costs, rather than what the whole document would (docs/telemetry.md § Rendered-surface
-  // health). Counts and times only.
+  // health). Counts and times only. The rows go into the node's segment cache, the one beside this
+  // pane's query client, so they outlive the pane (docs/diff-rendering.md § Resident segments).
+  const mountedAt = performance.now()
   const loader = createSegmentLoader({
+    cache: segmentCacheFor(queryClient),
     load: (requests, signal) => {
       recordSample('core', 'diff.segments.requested', requests.length)
       return measure('core', 'diff.segments.load', () => source().loadSegments(requests, signal))
     },
     enrich: (rows) => measure('core', 'diff.segments.enrich', () => enrichDiffRows(rows, tokenizeDocument, diffWordsDocument)),
     prepared: health.prepared,
+    firstPlain: (outcome) => recordDuration('core', 'diff.first_plain', performance.now() - mountedAt, { cache: outcome }),
   })
   onCleanup(loader.dispose)
 
@@ -170,7 +175,7 @@ export function DiffPane(props: {
   }
   const itemRows = (item: ContentItem): readonly Row[] | undefined => {
     if (item.kind === 'overlay') return withThreads(item.rows)
-    const loaded = loader.rows(item.segment.contentKey)
+    const loaded = loader.rows(item.segment)
     if (!loaded) return undefined
     return withThreads(loaded.slice(item.skipFirst ? 1 : 0, item.skipLast ? loaded.length - 1 : loaded.length))
   }
@@ -250,9 +255,21 @@ export function DiffPane(props: {
   }))
   // The same files, saying something new: a new revision. Requests for the old one stop; any segment
   // whose content key survived keeps its rows, so an agent saving one file reloads that file's
-  // segments and leaves the reader where they were.
+  // segments and leaves the reader where they were. When the file set is the same, a file whose patch
+  // moved is a working tree saved under the reader, and the old patch's segments are dropped from the
+  // cache: nothing will ask for them again. A new file set, such as a pull request's next commit,
+  // leaves them for the budget, because another view may still show that revision.
+  let shown: { signature: string; topology: DiffDocumentTopology } | null = null
   createEffect(on(revision, (_next, previous) => {
     if (previous !== undefined) loader.reset()
+    const next = topology()
+    if (shown && next && shown.signature === signature()) {
+      const now = new Map(next.files.map((file) => [file.path, file.patchKey]))
+      for (const file of shown.topology.files) {
+        if (file.patchKey && now.has(file.path) && now.get(file.path) !== file.patchKey) loader.supersede(file.path, file.patchKey)
+      }
+    }
+    shown = next ? { signature: signature(), topology: next } : null
   }))
   createEffect(() => {
     if (topology() && !source().loading()) health.ready()
@@ -330,10 +347,11 @@ export function DiffPane(props: {
     try {
       const lines = await expandGapAsync(gap, await fileText({ path: gap.path, sha: gap.sha }), tokenizeDocument)
       // A newer revision of the file arrived while the body was being read: this gap is gone.
-      if (!loader.rows(at.contentKey)) return
+      if (!loader.rows(at.segment)) return
       setOverlays((current) => {
         const next = new Map(current)
-        next.set(at.contentKey, [...(current.get(at.contentKey) ?? []), { edge: at.edge, rows: lines }])
+        const key = at.segment.contentKey
+        next.set(key, [...(current.get(key) ?? []), { edge: at.edge, rows: lines }])
         return next
       })
     } catch (error) {
@@ -343,14 +361,14 @@ export function DiffPane(props: {
       log.error('gap expansion failed', error)
     }
   }
-  const gapPosition = (gap: GapRow): { contentKey: string; edge: GapOverlay['edge'] } | null => {
+  const gapPosition = (gap: GapRow): { segment: SegmentAddress; edge: GapOverlay['edge'] } | null => {
     const file = view.fileByPath().get(gap.path)
     if (!file?.patchKey) return null
     for (let ordinal = 0; ordinal < file.segments.length; ordinal++) {
-      const contentKey = segmentContentKey(file.patchKey, ordinal)
-      const rows = loader.rows(contentKey)
+      const segment = { file, contentKey: segmentContentKey(file.patchKey, ordinal) }
+      const rows = loader.rows(segment)
       const index = rows?.findIndex((row) => row.kind === 'gap' && row.side === gap.side && row.oldStart === gap.oldStart && row.newStart === gap.newStart) ?? -1
-      if (index >= 0) return { contentKey, edge: index === 0 ? 'first' : 'last' }
+      if (index >= 0) return { segment, edge: index === 0 ? 'first' : 'last' }
     }
     return null
   }
