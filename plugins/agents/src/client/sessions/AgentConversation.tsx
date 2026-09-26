@@ -5,6 +5,7 @@ import { wsOnReconnect } from '@acorn/plugin-api/client'
 import AgentTranscript from './AgentTranscript'
 import AgentComposer from '../composer/AgentComposer'
 import QueuedAgentTurns from '../composer/QueuedAgentTurns'
+import ManagedChildRows from './ManagedChildRows'
 import { agentSessionIsStarting } from '../composer/agentComposerState'
 import { latestAutomaticTaskContext } from '../composer/automaticTaskContext'
 import { managedAgentStore } from './managedStore'
@@ -158,6 +159,7 @@ export default function AgentConversation(props: AgentConversationProps & {
         {(current) => (
           <>
             <Show when={props.note}>{(line) => <Text emphasis="muted" wrap>{line()}</Text>}</Show>
+            <ManagedChildRows parentSessionId={current().id} parentTaskId={current().taskId} />
             <AgentComposer
               session={current()}
               disabled={props.composerDisabled || current().controller !== 'acorn'

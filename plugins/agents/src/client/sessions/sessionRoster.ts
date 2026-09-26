@@ -113,3 +113,16 @@ export function delegationSummary(row: Extract<AgentSessionRosterRow, { kind: 'm
     : row.managedParent ? 'Delegated' : 'Delegated · parent unavailable'
   return `${owner} · depth ${delegation.depth} · ${delegation.isolation}`
 }
+
+/** Direct managed children in the node's projected lineage, including children on another task. */
+export function liveDelegatedChildren(
+  parentSessionId: string,
+  sessions: readonly AgentSession[],
+  delegationBySession: Readonly<Record<string, AgentSessionDelegation>>,
+): AgentSession[] {
+  return sessions.filter((session) => {
+    const owner = delegationBySession[session.id]?.owner
+    return !session.archivedAt && !['archived', 'stopped', 'failed'].includes(session.runtimeState)
+      && owner?.kind === 'managed' && owner.parentSessionId === parentSessionId
+  })
+}
