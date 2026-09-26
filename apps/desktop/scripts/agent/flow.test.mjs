@@ -99,6 +99,19 @@ describe('running a flow', () => {
     expect(summarizeReport(report)).toContain('FAILED sweep: diff singleCommitPerFrame {"maxCommitsInFrame":2}')
   })
 
+  it('counts a windowed timeline as mounted when every turn is drawn or counted as hidden', async () => {
+    const timeline = entry({
+      kind: 'timeline',
+      topology: { ...entry().topology, dynamicBlocks: 3_387 },
+      mounted: { ...entry().mounted, fixedRows: 0, dynamicBlocks: 200 },
+      window: { hiddenEarlier: 3_187, expansions: 0, trims: 0, pinned: 0 },
+    })
+    const client = { environment: async () => null, frames: async () => {}, surfaceHealth: async () => ({ surfaces: [timeline], retired: {} }), performanceEntries: async () => [] }
+    const flow = parseFlow(stage([{ wait: { surface: 'timeline', until: 'mounted', timeoutMs: 1_000 } }, { assert: { surface: 'timeline', invariant: 'boundedMount' } }]))
+    const report = await runFlow(client, flow)
+    expect(report.asserts.map((item) => [item.invariant, item.pass])).toEqual([['boundedMount', true]])
+  })
+
   it('fails a wait that never comes true, naming the condition', async () => {
     const client = { environment: async () => null, frames: async () => {}, surfaceHealth: async () => ({ surfaces: [], retired: {} }), performanceEntries: async () => [] }
     const flow = parseFlow(stage([{ wait: { surface: 'diff', until: 'ready', timeoutMs: 1 } }, assertion]))
