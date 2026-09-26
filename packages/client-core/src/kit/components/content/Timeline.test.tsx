@@ -5,6 +5,7 @@ import { Card } from '../primitives'
 import { Timeline } from './Timeline'
 import { LIVE, type ReadingPlace } from '../../lib/readingPlace'
 import { setScrollPlaceHandler, type ScrollPlaceReport } from '../../lib/scrollPlace'
+import { _resetSurfaceHealth, surfaceHealthSnapshot } from '../../lib/surfaceHealth'
 
 // The transcript's guardrails, at the node that owns them: appending a turn must not replace the ones
 // already drawn, following the newest turn must stop when the reader scrolls away from it, and a
@@ -410,5 +411,56 @@ describe('Timeline', () => {
     const [turns] = createSignal(['a', 'b'])
     mount(turns)
     expect(seen.map((report) => report.cause)).toEqual(['opened'])
+  })
+})
+
+// The numbers a timeline reports about itself (kit/lib/surfaceHealth.ts): the caller's projected turns
+// and the turns in the DOM are separate fields, and teardown leaves no observer or frame behind.
+describe('Timeline health', () => {
+  afterEach(() => _resetSurfaceHealth())
+
+  it('reports projected and mounted turns apart, and returns its observers and frames on teardown', () => {
+    const [turns, setTurns] = createSignal(['a', 'b', 'c'])
+    for (const key of ['a', 'b', 'c', 'd']) heights.set(key, 100)
+    dispose = render(() => (
+      <Timeline follow total={40}>
+        <For each={turns()}>
+          {(key) => <Timeline.Turn key={key}><Card>{key}</Card></Timeline.Turn>}
+        </For>
+      </Timeline>
+    ), host)
+    settle()
+
+    let [entry] = surfaceHealthSnapshot().surfaces
+    expect(entry?.kind).toBe('timeline')
+    expect(entry?.topology.dynamicBlocks).toBe(40)
+    expect(entry?.mounted.dynamicBlocks).toBe(3)
+    expect(entry?.measurement.activeObservers).toBe(2)
+    // The list and the scroller for size, the scroller's parent for being re-parented.
+    expect(entry?.measurement.observedElements).toBe(3)
+
+    // A new turn arrives and the timeline pins the reader to it: one write, one frame still owed.
+    setTurns(['a', 'b', 'c', 'd'])
+    layout()
+    observers.forEach((run) => run())
+    ;[entry] = surfaceHealthSnapshot().surfaces
+    expect(entry?.mounted.dynamicBlocks).toBe(4)
+    expect(entry?.work.scheduledFrames).toBeGreaterThan(0)
+
+    dispose?.()
+    dispose = undefined
+    const snapshot = surfaceHealthSnapshot()
+    expect(snapshot.surfaces).toEqual([])
+    expect(snapshot.retired.timeline?.measurement.activeObservers).toBe(0)
+    expect(snapshot.retired.timeline?.measurement.observedElements).toBe(0)
+    expect(snapshot.retired.timeline?.work.scheduledFrames).toBe(0)
+  })
+
+  it('counts a plain run of cards, which has no observers of its own', () => {
+    dispose = render(() => <Timeline><Timeline.Turn><Card>one</Card></Timeline.Turn></Timeline>, host)
+    const [entry] = surfaceHealthSnapshot().surfaces
+    expect(entry?.mounted.dynamicBlocks).toBe(1)
+    expect(entry?.topology.dynamicBlocks).toBe(1)
+    expect(entry?.measurement.activeObservers).toBe(0)
   })
 })

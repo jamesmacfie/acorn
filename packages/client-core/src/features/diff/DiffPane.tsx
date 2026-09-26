@@ -47,7 +47,8 @@ import { createParsedFilePublisher } from './parsedPublisher'
 import type { CommentSide, DiffSource } from './source'
 import { createDiffStickyFile } from './stickyFile'
 import { diffCollapsed, rememberDiffCollapsed } from './viewState'
-import { createDiffMeasureSchedulers, createDiffVirtualizer } from '../../kit/diff/virtualization'
+import { createDiffMeasureCounters, createDiffMeasureSchedulers, createDiffVirtualizer } from '../../kit/diff/virtualization'
+import { createDiffHealth } from './diffHealth'
 import { createLogger } from '../../infra/telemetry/logger'
 
 const log = createLogger('diff')
@@ -83,6 +84,12 @@ export function DiffPane(props: {
    */
   annotations?: string
 }) {
+  // First, so its cleanup runs after every other one here and its final reading sees them done
+  // (./diffHealth.ts).
+  const health = createDiffHealth()
+  onCleanup(health.dispose)
+  const measureCounters = createDiffMeasureCounters()
+  onCleanup(measureCounters.dispose)
   const queryClient = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
   // Marks compose with whatever the source already draws under a row: the changes pane's review notes
@@ -159,18 +166,26 @@ export function DiffPane(props: {
   }
 
   const hydrator = createDiffHydrator({
-    parseFile: (file) => measure('core', 'diff.parse', async () => ({
-      file,
-      diff: await buildDiffRowsAsync(
-        file,
-        shouldUsePlainTokenizer(file) ? plainTokenizeDocument : tokenizeDocument,
-        diffWordsDocument,
-      ),
-    })),
+    parseFile: async (file) => {
+      const started = performance.now()
+      try {
+        return await measure('core', 'diff.parse', async () => ({
+          file,
+          diff: await buildDiffRowsAsync(
+            file,
+            shouldUsePlainTokenizer(file) ? plainTokenizeDocument : tokenizeDocument,
+            diffWordsDocument,
+          ),
+        }))
+      } finally {
+        health.prepared(performance.now() - started)
+      }
+    },
     onParsed: (parsed) => parsedPublisher.enqueue([parsed]),
     onParsedBatch: parsedPublisher.enqueue,
     cachedFile: (path) => source().cachedFile(path),
     fetchPatches: (paths, signal) => source().fetchPatches?.(paths, signal) ?? Promise.resolve([]),
+    onSettled: () => health.settled(),
   })
   onCleanup(hydrator.dispose)
 
@@ -191,6 +206,7 @@ export function DiffPane(props: {
   // A different set of files: nothing about the old view survives.
   createEffect(on(filesSignature, (signature, previous) => {
     lastTarget = ''
+    health.reset()
     parsedPublisher.reset()
     setParsedByPath(reconcile({}))
     setExpanded(new Map())
@@ -243,7 +259,9 @@ export function DiffPane(props: {
   ))
 
   const rows = createMemo<Row[]>(() => {
+    const started = performance.now()
     const result = measure('core', 'diff.rows', () => buildRenderableRows(parsed(), source().threads?.(), expanded(), collapsedFiles()))
+    health.prepared(performance.now() - started)
     recordSample('core', 'diff.row_count', result.length)
     return result
   })
@@ -297,6 +315,7 @@ export function DiffPane(props: {
     keyPrefix: 'row',
     estimateSize: (row) => (row ? estimateRowSize(row) : DIFF_LOAD_ROW_HEIGHT),
     scrollEl,
+    counters: measureCounters,
   })
   const splitVirt = createDiffVirtualizer({
     items: bands,
@@ -304,11 +323,13 @@ export function DiffPane(props: {
     keyPrefix: 'band',
     estimateSize: estimateSplitBandSize,
     scrollEl,
+    counters: measureCounters,
   })
 
-  const { scheduleElementMeasure, cancel: cancelMeasures } = createDiffMeasureSchedulers(
+  const { scheduleElementMeasure, cancel: cancelMeasures, pendingFrames: pendingMeasureFrames } = createDiffMeasureSchedulers(
     { unified: virt, split: splitVirt },
     scrollEl,
+    measureCounters,
   )
 
   onMount(() => {
@@ -333,6 +354,25 @@ export function DiffPane(props: {
     band.kind === 'full'
       ? band.row.kind === 'thread'
       : (!!band.left && hasLineExtra(band.left)) || (!!band.right && hasLineExtra(band.right))
+
+  health.attach({
+    files,
+    rows,
+    bands,
+    parsed,
+    threads: () => source().threads?.(),
+    viewMode,
+    virt,
+    splitVirt,
+    scrollEl,
+    counters: measureCounters,
+    scheduledFrames: pendingMeasureFrames,
+    hydration: hydrator.pending,
+    heldPublications: parsedPublisher.held,
+    visiblePaths: () => visibleHydrationPaths,
+    hasLineExtra: (row) => source().hasLineExtra?.(row) ?? false,
+  })
+  createEffect(() => health.threads(source().threads?.()))
 
   const findController = createDiffFindController({ rows, bands, viewMode, unified: virt, split: splitVirt })
 

@@ -510,7 +510,10 @@ describe('architecture boundaries', () => {
     // Keeps a production file from importing test scaffolding, which is how a tmp-dir SQLite factory
     // ends up shipped. Any package's testkit/, not just node-core's: the rule immediately found the
     // same shape in plugins/github.
-    const offenders = EDGES.filter((e) => !isTestCode(e.fromFile))
+    // One exception: the agent-automation seeder, which writes fixtures into a throwaway data root
+    // before the window starts and is test scaffolding by purpose (docs/testing.md § Large-surface
+    // fixture). It never ships: apps/desktop/scripts/ is build and dev tooling.
+    const offenders = EDGES.filter((e) => !isTestCode(e.fromFile) && rel(e.fromFile) !== 'apps/desktop/scripts/agent/seed.ts')
       .filter((e) => e.target.file?.includes('/src/testkit/') || e.target.file?.endsWith('/src/testkit.ts'))
       .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
     expect([...new Set(offenders)].sort()).toEqual([])

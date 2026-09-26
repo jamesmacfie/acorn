@@ -26,6 +26,9 @@ type HydratorOptions = {
   cachedFile?: (path: string) => DiffFile | null
   /** Batch-fetch bodies still missing after cachedFile. Omitted → those files go to 'error'. */
   fetchPatches?: (paths: string[], signal: AbortSignal | undefined) => Promise<DiffFile[]>
+  /** Nothing is queued or loading any more: every file in the set has loaded or failed. Called again
+   *  after a later refresh settles, so a caller that wants the first time keeps its own flag. */
+  onSettled?: () => void
 }
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
@@ -176,9 +179,15 @@ export function createDiffHydrator(options: HydratorOptions) {
         }
         batchCount++
       }
+      if (!disposed && run === generation && !busy()) options.onSettled?.()
     } finally {
       if (run === generation) running = false
     }
+  }
+
+  const busy = () => {
+    for (const status of statuses.values()) if (status === 'queued' || status === 'loading') return true
+    return false
   }
 
   const schedule = () => {
@@ -240,11 +249,21 @@ export function createDiffHydrator(options: HydratorOptions) {
   /** One file's status, tracked per path: a row reading this re-renders for its own file only. */
   const status = (path: string): DiffHydrationStatus => published[path] ?? 'idle'
 
+  /** The work still owed, for the diff's health reading: the paths waiting, in queue order, and how
+   *  many are being read or parsed now. Built on demand; nothing calls it on the hot path. A disposed
+   *  hydrator owes nothing, whatever it had queued. */
+  const pending = () => {
+    if (disposed) return { queued: [], loading: 0 }
+    let loading = 0
+    for (const status of statuses.values()) if (status === 'loading') loading++
+    return { queued: queue.filter((path) => statuses.get(path) === 'queued'), loading }
+  }
+
   const dispose = () => {
     disposed = true
     generation++
     controller?.abort()
   }
 
-  return { dispose, prioritize, refresh, reset, retry, status }
+  return { dispose, pending, prioritize, refresh, reset, retry, status }
 }

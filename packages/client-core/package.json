@@ -148,6 +148,7 @@
     "./kit/lib/markdown": "./src/kit/lib/markdown.ts",
     "./kit/tokens": "./src/kit/tokens/public.ts",
     "./testkit/notifications": "./src/testkit/notifications.client.ts",
+    "./testkit/large-diff": "./src/testkit/largeDiff.ts",
     "./testkit/ws-client": "./src/testkit/wsClient.client.ts"
   },
   "scripts": {

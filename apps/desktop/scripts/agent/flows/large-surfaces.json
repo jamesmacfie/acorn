@@ -1,0 +1,111 @@
+{
+  "name": "large-surfaces",
+  "description": "The phase 0 sweep over the large-surface fixture: the Changes diff cold and warm, deep scrolling, dynamic content, layout changes, the long agent transcript, and teardown. Start the session with --fixture large-surfaces.",
+  "stages": [
+    {
+      "name": "cold-diff",
+      "steps": [
+        { "click": { "target": { "role": "button", "nameStartsWith": "Large surfaces (" } } },
+        { "click": { "target": { "role": "button", "name": "Changes" } } },
+        { "wait": { "surface": "diff", "until": "content", "timeoutMs": 600000 } },
+        { "checkpoint": "first-content" },
+        { "wait": { "surface": "diff", "until": "ready", "timeoutMs": 600000 } },
+        { "checkpoint": "ready" },
+        { "assert": { "surface": "diff", "invariant": "noLateTopology" } },
+        { "assert": { "surface": "diff", "invariant": "boundedMount" } }
+      ]
+    },
+    {
+      "name": "deep-sweep",
+      "steps": [
+        { "scroll": { "surface": "diff", "fractions": [0, 0.1, 0.25, 0.5, 0.75, 0.9, 1, 0.9, 0.75, 0.5, 0.25, 0.1, 0], "settleMs": 60000 } },
+        { "assert": { "surface": "diff", "invariant": "boundedMount" } },
+        { "assert": { "surface": "diff", "invariant": "singleCommitPerFrame" } }
+      ]
+    },
+    {
+      "name": "dynamic-content",
+      "steps": [
+        { "click": { "target": { "role": "button", "name": "Comment on this line" }, "optional": true } },
+        { "fill": { "target": { "role": "textbox", "name": "Comment on this line…" }, "text": "A comment typed by the large-surface flow.", "optional": true } },
+        { "wait": { "surface": "diff", "until": "settled", "timeoutMs": 60000 } },
+        { "checkpoint": "composer" },
+        { "click": { "target": { "role": "button", "name": "Delete note" }, "optional": true } },
+        { "wait": { "surface": "diff", "until": "settled", "timeoutMs": 60000 } },
+        { "checkpoint": "note-removed" },
+        { "assert": { "surface": "diff", "invariant": "noBlank" } },
+        { "assert": { "surface": "diff", "invariant": "singleCommitPerFrame" } }
+      ]
+    },
+    {
+      "name": "layout",
+      "steps": [
+        { "resize": { "width": 900, "height": 700 } },
+        { "wait": { "surface": "diff", "until": "settled", "timeoutMs": 60000 } },
+        { "checkpoint": "narrow" },
+        { "resize": { "width": 1600, "height": 1000 } },
+        { "wait": { "surface": "diff", "until": "settled", "timeoutMs": 60000 } },
+        { "checkpoint": "wide" },
+        { "click": { "target": { "role": "button", "name": "Collapse Changes list" }, "optional": true } },
+        { "wait": { "surface": "diff", "until": "settled", "timeoutMs": 60000 } },
+        { "click": { "target": { "role": "button", "name": "Expand Changes list" }, "optional": true } },
+        { "click": { "target": { "role": "button", "name": "Collapse file" }, "optional": true } },
+        { "wait": { "surface": "diff", "until": "settled", "timeoutMs": 60000 } },
+        { "click": { "target": { "role": "button", "name": "Expand file" }, "optional": true } },
+        { "click": { "target": { "role": "radio", "name": "Split" } } },
+        { "wait": { "surface": "diff", "until": "content", "timeoutMs": 120000 } },
+        { "checkpoint": "split" },
+        { "click": { "target": { "role": "radio", "name": "Unified" } } },
+        { "wait": { "surface": "diff", "until": "content", "timeoutMs": 120000 } },
+        { "click": { "target": { "role": "option", "nameStartsWith": "src/pkg-10/" }, "optional": true } },
+        { "wait": { "surface": "diff", "until": "settled", "timeoutMs": 60000 } },
+        { "checkpoint": "jumped" },
+        { "assert": { "surface": "diff", "invariant": "noBlank" } },
+        { "assert": { "surface": "diff", "invariant": "boundedMount" } }
+      ]
+    },
+    {
+      "name": "warm-revisit",
+      "steps": [
+        { "click": { "target": { "role": "button", "name": "Agent" } } },
+        { "wait": { "surface": "diff", "until": "gone", "timeoutMs": 60000 } },
+        { "assert": { "surface": "diff", "invariant": "teardown" } },
+        { "click": { "target": { "role": "button", "name": "Changes" } } },
+        { "wait": { "surface": "diff", "until": "content", "timeoutMs": 600000 } },
+        { "checkpoint": "warm-first-content" },
+        { "wait": { "surface": "diff", "until": "ready", "timeoutMs": 600000 } },
+        { "checkpoint": "warm-ready" }
+      ]
+    },
+    {
+      "name": "timeline",
+      "steps": [
+        { "click": { "target": { "role": "button", "name": "Agent" } } },
+        { "wait": { "surface": "timeline", "until": "mounted", "timeoutMs": 600000 } },
+        { "checkpoint": "transcript-mounted" },
+        { "click": { "target": { "role": "button", "name": "Scroll to the top of the transcript" }, "optional": true } },
+        { "wait": { "surface": "timeline", "until": "settled", "timeoutMs": 60000 } },
+        { "checkpoint": "oldest" },
+        { "click": { "target": { "role": "button", "name": "Scroll to the bottom of the transcript" }, "optional": true } },
+        { "wait": { "surface": "timeline", "until": "settled", "timeoutMs": 60000 } },
+        { "click": { "target": { "role": "button", "name": "Changes" } } },
+        { "wait": { "surface": "timeline", "until": "gone", "timeoutMs": 60000 } },
+        { "assert": { "surface": "timeline", "invariant": "teardown" } },
+        { "click": { "target": { "role": "button", "name": "Agent" } } },
+        { "wait": { "surface": "timeline", "until": "mounted", "timeoutMs": 600000 } },
+        { "checkpoint": "transcript-back" }
+      ]
+    },
+    {
+      "name": "teardown",
+      "steps": [
+        { "click": { "target": { "role": "button", "name": "Home" } } },
+        { "wait": { "surface": "timeline", "until": "gone", "timeoutMs": 60000 } },
+        { "wait": { "surface": "diff", "until": "gone", "timeoutMs": 60000 } },
+        { "checkpoint": "left" },
+        { "assert": { "surface": "timeline", "invariant": "teardown" } },
+        { "assert": { "surface": "diff", "invariant": "teardown" } }
+      ]
+    }
+  ]
+}
