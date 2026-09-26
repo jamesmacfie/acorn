@@ -15,7 +15,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | Folder | What it is | Status |
 | --- | --- | --- |
 | [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; nothing blocks it. |
-| [node/](./node/README.md) | Runtime identity, fleet reconciliation, trust transitions, worker and tree authority, and availability for UI supplied by node plugins. Seven phases. | Proposal, 2026-09-26. Not started; the worker identity correction is independent. |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
 | [dashboards/](./dashboards/README.md) | Remaining taskless database and write-back proposals. Shared data discovery and authoring now belong to workflow v2. | Redesign shipped; overlapping proposals superseded, 2026-09-13. |
@@ -51,12 +50,20 @@ rung-2 containment is recorded in `blockers.md` and sandbox's
 
 ## Retired folders
 
-`phased-review-steps/`, `user-extensions/`, `node-first/`, `acp/`, `tauri/`, `events/` and the later
+`phased-review-steps/`, `user-extensions/`, `node-first/`, `node/`, `acp/`, `tauri/`, `events/` and the later
 `events.md` follow-up (shipped on 2026-09-11), `layout/`, `structure/`,
 `structure-followup/`, `before-terminal-ui/`, `terminal/`, `terminal-updates/`, `terminal-rewrite/`,
 `notifications/`, and
 the single files `live-qa.md`, `dx.md` and `web_search_run.md` are in git history. Each ended by saying
 where its behaviour moved.
+
+`node/` shipped on 2026-09-26. [Architecture overview](../architecture-overview.md) owns the
+runtime-to-client data flow; [plugin activation](../plugins/activation.md) owns active versus installed
+identity, per-Node selection, trust transitions, and availability; [descriptors](../plugins/descriptors.md)
+and [shell](../shell.md) own per-tree bridge authority; [security](../security.md) and
+[caching](../caching.md) own exact-hash custody; [testing](../testing.md) retains the multi-node and
+multi-tree manual checks. The proposal's global winner terminology was replaced with selection from
+each Node's running identity. No persisted trust, cache, layout, or plugin state was cleared.
 
 `web_search_run.md` made a managed transcript show what an agent searched for, which pages it opened,
 and which sources came back, the same way whichever harness ran it. Shipped and deleted 2026-09-15.

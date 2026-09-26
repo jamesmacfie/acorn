@@ -49,6 +49,8 @@ export async function bootFixture(): Promise<{ task: typeof TASK }> {
   }
   const { selectActiveNode } = await import('@acorn/client-core/infra/node/activeNode.ts')
   await selectActiveNode()
+  const { refreshNodePlugins } = await import('@acorn/client-core/infra/node')
+  await refreshNodePlugins('node-1')
   return { task: TASK }
 }
 

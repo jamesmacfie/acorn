@@ -206,6 +206,45 @@ Settings → Plugins uses that to show neither update nor uninstall on a bundled
 ever error, and the checkbox already covers "stop running this" without the tombstone that uninstall
 leaves behind.
 
+### Running identity, distribution, and availability
+
+The roster distinguishes the `installed` disk candidate from `active`, the immutable declaration
+captured when this Node's loaded runtime started. `active` includes its version, permissions,
+contributions, API version, activation kind, and client hash. Installing, updating, or uninstalling a
+package changes disk state; it does not silently change the running node half. A successful live reload
+commits a new active identity only after the replacement initializes. A failed reload retains the old
+one. The Node keeps active bundle bytes separately from the package directory and serves
+`GET /v1/core/plugins/:id/bundles/:hash` for that identity, including after an on-disk update or
+uninstall. A client-only package can replace its active identity without a Node restart because it
+has no node half to swap.
+
+The client holds one distribution snapshot for the fleet. Each Node's last valid roster is an
+observation with freshness and reachability. Source-aware plugin events re-read only their Node;
+arrival, reconnect, switch, and unpair also reconcile. Reads and trust refreshes run in a serial
+queue, and a response from an unpaired Node cannot restore its authority. An unreadable Node keeps a
+stale observation for explanation, but contributes no live UI. There is no fleet-wide version winner:
+the active Node's registrations come from its own running identity. An installed update is an offer to
+cache and review, not a replacement for that selection.
+
+Device custody hashes the bytes it receives and stores decisions for exact `(pluginId, hash)` pairs.
+Caching alone grants nothing. A pending or rejected update leaves an accepted older runtime visible
+while that runtime still runs. When the Node commits unaccepted bytes, its loaded UI is withheld until
+acceptance. Trust writes complete before registration changes; revoking an exact acceptance or ending
+a development grant withdraws affected registrations and stops their workers immediately. Dismissing
+a prompt makes no durable decision; Settings → Plugins can show the pending offer. Reconsidering a
+rejection removes that exact recorded decision so the offer can be reviewed again.
+
+The same snapshot exposes structured reasons for withheld UI: unknown or unreachable Node, absent,
+disabled or failed runtime, waiting for restart, missing bundle, incompatible API, declaration
+conflict, pending trust, or rejection. Loaded panes, settings, importers (including one already open),
+footer slots, commands, and other declarations use those reasons and the current Node's selection.
+Compiled contributions with a `{ plugin: id }` requirement check that Node's running service; a
+saved disable that still awaits restart does not make a running compiled service disappear.
+
+Older Nodes omit `active`. The client accepts an old roster row only when `running` and its installed
+declaration coherently describe an active package; pending, failed, or disabled rows are withheld.
+The optional field preserves old query-cache responses without clearing per-Node caches.
+
 ## The dev loop
 
 Seeing a change to a loaded plugin run used to be four steps and a page of host knowledge: rebuild by
@@ -379,13 +418,12 @@ and the device stores a **dev trust grant**.
 The grant lives in the device's existing trust file (`packages/custody/src/plugins/pluginTrustStore.ts`),
 beside the acknowledgements, as `{ pluginId, nodeId, path?, grantedAt }`. It is keyed on the **pair**.
 The design note says "per (pluginId, device)" and the device half is the file itself; the node half is an
-addition, because fleet resolution picks the highest version across every paired node and a grant keyed on
-the name alone would auto-trust a bundle a *different* node started serving under it.
+addition because a grant keyed only on the name would auto-trust a bundle a *different* node offered.
 
 What it does: when the helper caches a bundle for a plugin under grant, it records an ordinary accepted
 acknowledgement for those bytes right there — beside the hash it computed itself, in the process that
 holds the grant. The renderer therefore never queues a prompt, and nothing about eligibility changes:
-`bundleAccepted` and `eligiblePlugins().trusted` see an acceptance and behave exactly as they would for
+`bundleAccepted` and the active Node's selection see an acceptance and behave exactly as they would for
 one the owner clicked. A dev-written row is marked `dev: true` (so revocation can find it) and
 `partial: true` (nobody read a disclosure, so it must never become the baseline of a later "what changed"
 diff).

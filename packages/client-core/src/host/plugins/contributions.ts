@@ -1,7 +1,10 @@
-import type { InstalledPluginRow, NodePluginRow, PluginContributions } from '@acorn/protocol/api.ts'
+import { PLUGIN_API_MAJOR, type NodePluginRow, type PluginContributions, type PluginRuntimeIdentity } from '@acorn/protocol/api.ts'
+import { speaksApiVersion } from '@acorn/protocol/plugin/apiVersion.ts'
 import { hasFrameRegion, hasRemoteRegion, isOverlaySurface, isProjectPaneSurface, isTaskPaneSurface } from '@acorn/protocol/plugin/contract.ts'
 import { namespaceContributions } from './contributionIds'
-import { activeBundles, bundleAccepted, installedByNode } from './distribution'
+import { activeNodeId } from '../../infra/node/activeNode'
+import { distribution } from './distribution'
+import { runtimeIdentityForRow } from './runtimeIdentity'
 
 // Who may contribute, and what they declared: the shared identity-and-trust check both registration
 // passes need before either can draw anything (docs/plugins.md § One shared eligibility and trust
@@ -11,49 +14,47 @@ import { activeBundles, bundleAccepted, installedByNode } from './distribution'
 export type EligiblePlugin = {
   pluginId: string
   row: NodePluginRow
-  installed: InstalledPluginRow
-  // The bundle this device would actually run, the winner of fleet resolution, or '' when nothing
-  // runnable resolved (docs/plugins.md § One shared eligibility and trust check).
+  installed: PluginRuntimeIdentity
+  inactive: boolean
+  // The bundle selected for the active node's running identity, or '' when none is usable.
   hash: string
   // May this device execute this plugin's code? See docs/plugins.md § One shared eligibility and trust
   // check for the frames-versus-chrome distinction this backs.
   trusted: boolean
 }
 
-/**
 /** Every plugin whose contributions this device may draw, one row per plugin id, already labelled with
  *  its trust state (docs/plugins.md § One shared eligibility and trust check). */
-export function eligiblePlugins(): EligiblePlugin[] {
-  const bundles = activeBundles()
-  const rowsById = new Map<string, { row: NodePluginRow; installed: InstalledPluginRow }[]>()
-  for (const roster of installedByNode().values()) {
-    for (const row of roster) {
-      if (!row.installed) continue
-      const entry = { row, installed: row.installed }
-      const rows = rowsById.get(row.name)
-      if (rows) rows.push(entry)
-      else rowsById.set(row.name, [entry])
-    }
-  }
-
+export function eligiblePlugins(options: { includeInactive?: boolean } = {}): EligiblePlugin[] {
+  const snapshot = distribution()
+  const nodeId = activeNodeId() ?? snapshot.byNode.keys().next().value
+  if (!nodeId) return []
+  const observation = snapshot.byNode.get(nodeId)
+  if (!observation?.reachable || observation.stale) return []
   const eligible: EligiblePlugin[] = []
-  for (const [pluginId, rows] of rowsById) {
-    const winner = bundles?.get(pluginId)
-    const chosen = (winner && rows.find((entry) => entry.installed.client?.hash === winner.hash)) ?? rows[0]!
-    // No fallback to the row's own claimed hash (docs/plugins.md § One shared eligibility and trust
-    // check explains why).
-    const hash = winner && chosen.installed.client?.hash === winner.hash ? winner.hash : ''
+  for (const row of observation.rows) {
+    const active = runtimeIdentityForRow(row)
+    // Chrome keeps command and shortcut metadata for a disabled plugin so saved bindings stay
+    // explainable. Every invocation still checks the active runtime on this node.
+    const runtime = active ??
+      (options.includeInactive && row.installed ? { ...row.installed, activation: 'node' as const } : null)
+    if (!runtime) continue
+    const selection = snapshot.selectionsByNode.get(nodeId)?.get(row.name)
+    const hash = speaksApiVersion(runtime.apiVersion, PLUGIN_API_MAJOR)
+      ? selection?.hash ?? runtime.client?.hash ?? ''
+      : ''
     // The one place a manifest's declared ids are bound to the plugin's own name (./contributionIds.ts).
     // Here rather than at each registration site, so every consumer below reads one spelling: the
     // registries, the `openPane` allowlist, the extension-point bindings and the content-link router all
     // work off this object.
-    const installed = { ...chosen.installed, contributions: namespaceContributions(pluginId, chosen.installed.contributions) }
+    const installed = { ...runtime, contributions: namespaceContributions(row.name, runtime.contributions) }
     eligible.push({
-      pluginId,
-      row: { ...chosen.row, installed },
+      pluginId: row.name,
+      row: { ...row, installed: runtime },
       installed,
+      inactive: !active,
       hash,
-      trusted: hash !== '' && bundleAccepted(pluginId, hash),
+      trusted: hash !== '' && selection?.hash === hash,
     })
   }
   return eligible

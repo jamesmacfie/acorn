@@ -794,6 +794,25 @@ bindings rather than the prose.
     every line printed while you were away. Open more than four terminals across tasks and switch
     between them: each draws, and none goes blank after its GPU context is given to another. Close the
     tab and check that switching back does not bring it back.
+81. On two paired Nodes with different accepted versions of one loaded plugin, switch between them.
+    Each Node shows contributions from its own running version. Update the inactive Node, reject then
+    reconsider its new client hash, and switch again: its old runtime remains visible until its Node
+    commits the update. After restart, the new version appears only when its exact bytes are accepted.
+    Disconnect, reconnect, and unpair one Node; stale or removed observations authorize no loaded UI.
+82. Open two remote trees from one loaded bundle with different task or project scopes. Select in one,
+    invoke a scoped action in each, then unmount the first. The second remains functional and never
+    receives the first tree's selection, document effects, or gesture authority. Revoke the accepted
+    hash while a tree is mounted; its worker and registrations disappear immediately.
+83. On a Node without a loaded plugin, check its settings page, project importer, task footer, command,
+    shortcut, and cooperative slot. They are absent or disabled, and a previously open importer closes.
+    Repeat with a failed load and with an unaccepted active runtime. In the terminal client, confirm
+    the same selection and trust behavior for a remote tree.
+
+The plugin lifecycle checks are supported by `distributionModel.test.ts`,
+`distribution.test.ts`, `availabilityModel.test.ts`, the Node state and bundle-route tests, and the
+worker/remote-tree suites. The real desktop driver reaches the main renderer but not native dialogs
+or host-owned child webviews; use the release pass for those surfaces. On 2026-09-26 an isolated Tauri
+session verified Settings → Plugins and a Findings remote settings tree, including its two controls.
 
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as
@@ -814,8 +833,9 @@ uses migrated temporary SQLite stores for revision and publication behavior; and
 cover local display semantics and device recovery. Real-window checks still exercise the composed
 editor and placement because those interactions are not proved by pure tests.
 
-A worktree cannot run the app without the main checkout's `.env`. An existing development instance
-also owns the desktop renderer's fixed port, 4319. Run the whole checklist from the main checkout.
+A normal worktree development run may need the main checkout's `.env`, and an existing development
+instance may own the renderer's fixed port, 4319. `pnpm dev:agent` uses isolated data and ports for
+real-window checks from a worktree.
 
 ## Composition-root tests
 

@@ -6,6 +6,7 @@
 // its own keys onto them.
 import { z } from 'zod'
 import { KIT_EVENTS } from './nodes.ts'
+import type { PluginFrameContext } from '../plugin/bridge.ts'
 
 export { TREE_PROTOCOL_VERSION } from './nodes.ts'
 import { propValue } from './props.ts'
@@ -94,7 +95,7 @@ export type TreeMutation =
 
 /** Sandbox to host. */
 export const sandboxMessage = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('tree:ready'), version: z.number().int(), entries: z.array(z.string().min(1).max(64)).max(64) }),
+  z.object({ kind: z.literal('tree:ready'), version: z.number().int(), entries: z.array(z.string().min(1).max(64)).max(64), scopedBridge: z.boolean().optional() }),
   // `bytes` is the sandbox's own measurement of this batch, taken before it posted (frames/sdk.ts).
   // The host reads it instead of stringifying the batch a second time on the main thread: the message
   // has already been cloned into the renderer's heap by the time the host sees it, so re-serialising it
@@ -123,7 +124,7 @@ export type TreeSandboxMessage = z.infer<typeof sandboxMessage>
 /** Host to sandbox. A second `tree:mount` for a slot already mounted is a props update, which is what
  *  keeps a tool card's redraw one message rather than a teardown. */
 export const hostMessage = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('tree:mount'), slot: slotId, entry: z.string().min(1).max(64), props: z.unknown() }),
+  z.object({ kind: z.literal('tree:mount'), slot: slotId, entry: z.string().min(1).max(64), props: z.unknown(), context: z.custom<PluginFrameContext>().optional(), bridgePort: z.custom<MessagePort>().optional() }),
   z.object({ kind: z.literal('tree:unmount'), slot: slotId }),
   z.object({ kind: z.literal('tree:event'), slot: slotId, handler: z.number().int().positive(), event: z.enum(KIT_EVENTS), payload: z.unknown() }),
   z.object({ kind: z.literal('tree:ping') }),

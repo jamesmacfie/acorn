@@ -414,6 +414,14 @@ const json = (value: unknown) => ({
       // sources that need no provider and the Browse panel has nothing to draw. The pull routes below
       // were always answered here; this is the row that lets a reader reach them.
       if (path === '/v1/core/prefs') return json({})
+      // Compiled client contributions now require the node's running roster. The fixture mirrors
+      // the built-in services its pane routes below represent; there are no loaded client bundles.
+      if (path === '/v1/core/plugins') return json({
+        restartRequired: false,
+        requests: [],
+        plugins: ['agents', 'browser', 'changes', 'docker', 'editor', 'github', 'memory', 'notes', 'preview', 'terminal', 'workflows']
+          .map((name) => ({ name, required: false, disabled: false, running: true, state: 'active', active: null })),
+      })
       if (path === '/v1/core/integrations') return json({ integrations: [GITHUB_INTEGRATION], providers: [] })
       if (path === '/v1/core/workspaces') return json([
         { id: 'ws-1', name: 'acorn', projects: [{ id: 'project-1', name: 'acorn' }, { id: 'project-2', name: 'sibling' }] },

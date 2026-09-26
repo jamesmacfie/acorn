@@ -236,11 +236,11 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
     if (plugins.skipped.length) bootLog.info(`plugins disabled for this node: ${plugins.skipped.join(', ')}`)
     pluginStateCapability = capabilities.provide(
       PLUGIN_STATE,
-      buildPluginStateBridge({
+      await buildPluginStateBridge({
         dataDir: config.dataDir,
         db,
         roster: () => plugins.roster,
-        booted: () => graph.installed.map((entry) => ({ id: entry.manifest.id, version: entry.manifest.version })),
+        booted: () => graph.installed,
         loadFailures: () => graph.failures,
         disabled,
         setDisabled: (names) => disabledPlugins.set(names),

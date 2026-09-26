@@ -27,6 +27,7 @@ const requestDecisionBody = z.strictObject({
   decision: z.enum(['approved', 'denied']),
   message: z.string().min(1).max(400).optional(),
 })
+const bundleHash = /^[0-9a-f]{64}$/
 
 // Every mutation here changes which code a node runs, and a client that retries a timed-out install
 // must not install twice. The global middleware (server/index.ts) replays a repeated key but does not
@@ -54,11 +55,18 @@ export const plugins = new Hono<AppEnv>()
   //
   // Gated by mount, not by handler (docs/security.md § Transport and auth). A task-scoped internal
   // token gets 403, because which code a device runs is an owner decision.
-  .get('/:id/client.js', async (c) => {
+  .get('/:id/bundles/:hash', async (c) => {
     const bridge = routeCapabilityFor(c, PLUGIN_STATE)
     if (!bridge) return respondError(c, 503, 'bridge-unavailable')
-    const bundle = await bridge.clientBundle(c.req.param('id'))
-    if (!bundle) return respondError(c, 404, 'not_found')
+    const id = c.req.param('id')
+    const hash = c.req.param('hash')
+    if (!bundleHash.test(hash)) return respondError(c, 404, 'not_found')
+    const advertised = pluginState(bridge).plugins.find((row) => row.name === id)
+    if (advertised?.active?.client?.hash !== hash && advertised?.installed?.client?.hash !== hash) {
+      return respondError(c, 404, 'not_found')
+    }
+    const bundle = await bridge.clientBundle(id, hash)
+    if (!bundle || bundle.hash !== hash) return respondError(c, 404, 'not_found')
     const etag = `"${bundle.hash}"`
     // Cheap because the hash is content: a device that already holds these bytes re-validates in one
     // round trip instead of re-transferring a megabyte of JavaScript over the broker.
@@ -70,6 +78,23 @@ export const plugins = new Hono<AppEnv>()
       // The device's cache is content-addressed and does the real caching. An HTTP cache in front of
       // a device-authenticated response only adds a second place for these bytes to live.
       'cache-control': 'private, no-store',
+    })
+  })
+  // Compatibility for clients that predate the advertised-hash route. Their roster names the current
+  // installed candidate, so this endpoint continues to serve that candidate while they roll forward.
+  .get('/:id/client.js', async (c) => {
+    const bridge = routeCapabilityFor(c, PLUGIN_STATE)
+    if (!bridge) return respondError(c, 503, 'bridge-unavailable')
+    const id = c.req.param('id')
+    const hash = bridge.installed().find((entry) => entry.id === id)?.client?.hash
+    if (!hash) return respondError(c, 404, 'not_found')
+    const bundle = await bridge.clientBundle(id, hash)
+    if (!bundle) return respondError(c, 404, 'not_found')
+    const etag = `"${bundle.hash}"`
+    if (c.req.header('if-none-match') === etag) return c.body(null, 304)
+    return c.body(bundle.bytes, 200, {
+      'content-type': 'text/javascript; charset=utf-8', etag,
+      'x-content-type-options': 'nosniff', 'cache-control': 'private, no-store',
     })
   })
   .put('/', async (c) => {

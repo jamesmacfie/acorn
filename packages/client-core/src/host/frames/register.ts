@@ -534,6 +534,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         label: surface.label,
         group: surface.group ?? 'general',
         order: surface.order,
+        requires: { loadedPlugin: pluginId },
         component: () => settingsTree
           ? createComponent(RemoteTree, { contribution: settingsTree, props: () => ({}) })
           : createComponent(PluginFrame, { binding: frameBindingFor(pluginId, surface, row), hash }),
@@ -544,6 +545,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         id: surface.id,
         label: surface.label,
         glyph: surface.glyph,
+        requires: { loadedPlugin: pluginId },
         component: (props) => createComponent(PluginFrame, {
           binding: frameBindingFor(pluginId, surface, row),
           hash,
@@ -561,12 +563,10 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
 /**
 /**
  * Register every accepted plugin's declared surfaces. Idempotent: called after the distribution pass and
- * again when a trust decision lands, and each call replaces what the previous one contributed. Not called
- * on a node switch, and doesn't need to be, since nothing registered here holds a node id.
+ * again when a trust decision or active node changes. Each call replaces the previous registrations.
  */
 export function syncFrameContributions(): void {
-  // Still gated on the distribution pass having run: a frame mounts bytes, and until one bundle has won
-  // per plugin id there's nothing to mount. The chrome pass has no such gate.
+  // A frame mounts bytes, so wait until the distribution pass has selected this node's runtime.
   if (!activeBundles()) return
 
   for (const disposables of registered.values()) for (const disposable of disposables.reverse()) disposable.dispose()
@@ -581,9 +581,8 @@ export function syncFrameContributions(): void {
   // Driven by the roster rather than the bundle map, because not every surface needs a bundle: a document
   // surface is host-drawn and executes nothing, so the loop has to reach a plugin with no client half.
   //
-  // Trust binds to bytes, and ../contributions.ts decided which bytes: the resolved winner's, never a
-  // hash a roster row merely claims. An untrusted row is kept here rather than dropped the way the chrome
-  // pass drops it, because acceptance withholds only the code-bearing surfaces.
+  // Trust binds to bytes, and ../contributions.ts selects the active node's runtime hash. An untrusted
+  // row stays here because acceptance withholds code-bearing surfaces, not host-drawn descriptors.
   //
   // A package with no client half is `trusted: false` for the same reason, and that's load-bearing: its
   // webview surfaces would otherwise mount external web content with no prompt ever firing, because the

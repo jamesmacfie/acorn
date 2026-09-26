@@ -4,7 +4,7 @@ import { writePrivateAtomic } from '@acorn/node-core/server/storage'
 import { join } from 'node:path'
 import { z } from 'zod'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
-import { corePluginBundleRoute } from '@acorn/protocol/api.ts'
+import { corePluginBundleByHashRoute, corePluginBundleRoute } from '@acorn/protocol/api.ts'
 import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 
@@ -118,10 +118,20 @@ export class PluginCache {
     try {
       response = await this.broker.fetch(nodeId, {
         requestId: `plugin-bundle-${pluginId}-${claim.hash.slice(0, 12)}`,
-        path: corePluginBundleRoute(pluginId),
+        path: corePluginBundleByHashRoute(pluginId, claim.hash),
         method: 'GET',
         headers: {},
       })
+      if (response.status === 404) {
+        // A node from before the hash-addressed route only has /client.js. The device still hashes
+        // what arrives and refuses anything other than this exact claim below.
+        response = await this.broker.fetch(nodeId, {
+          requestId: `plugin-bundle-legacy-${pluginId}-${claim.hash.slice(0, 12)}`,
+          path: corePluginBundleRoute(pluginId),
+          method: 'GET',
+          headers: {},
+        })
+      }
     } catch (error) {
       log.warn(`could not fetch ${pluginId} from ${nodeId}: ${describeError(error).message}`, { 'plugin.id': pluginId, 'node.id': nodeId })
       return { error: 'unreachable' }

@@ -1,6 +1,10 @@
 import { isDesktopHost } from '../platform'
 import { seamPresent, type SeamGroup } from '../platform/contract'
-import { disabledNodePlugins } from './nodePlugins'
+import { activeNodeId } from './activeNode'
+import { distribution, pluginEnabledOnNode, pluginServiceAvailableOnNode } from '../../host/plugins/distribution'
+import { runtimeIdentityForRow } from '../../host/plugins/runtimeIdentity'
+import { compiledServiceActive } from '../../host/plugins/availabilityModel'
+import { nodePlugins } from './nodePlugins'
 
 // What the surroundings offer a contribution: is a desktop shell hosting this renderer, and does the
 // node behind it run the plugin this surface is built on. "Host" rather than "client" because the word
@@ -36,6 +40,7 @@ import { disabledNodePlugins } from './nodePlugins'
 export type HostRequirement =
   | 'desktop'
   | { plugin: string }
+  | { loadedPlugin: string }
   | { seam: SeamGroup }
 
 // `requires` on a contribution, and the rule for where that field belongs: EVERY contribution the host
@@ -49,14 +54,23 @@ export type HostRequirement =
 // say so out loud where omitting the field would read as an oversight.
 export type HostCapabilityRequirement = 'none' | HostRequirement | readonly HostRequirement[]
 
-// Reactive: `disabledNodePlugins` is a signal, so a surface gated on a plugin follows the roster and
-// the owner's toggle without anyone re-reading it. Empty until the first roster read resolves, which is
-// the right default: a node that hasn't answered must not be assumed to have anything disabled, or the
-// first paint drops panes and then adds them back.
+// An unknown roster is unavailable. A saved disable or installed update cannot revoke the service
+// that remains active until restart, and a first install cannot imply the service is already running.
 const meets = (requirement: HostRequirement): boolean => {
   if (requirement === 'desktop') return isDesktopHost()
   if ('seam' in requirement) return seamPresent(requirement.seam)
-  return !disabledNodePlugins().includes(requirement.plugin)
+  const nodeId = activeNodeId()
+  if ('loadedPlugin' in requirement) return nodeId !== null && pluginEnabledOnNode(nodeId, requirement.loadedPlugin)
+  if (nodeId !== null && distribution().byNode.has(nodeId)) {
+    return pluginServiceAvailableOnNode(nodeId, requirement.plugin)
+  }
+  // Browser-origin clients have no device custody or fleet id. The active-node roster remains their
+  // compiled capability source, using the same conservative runtime adapter as fleet distribution.
+  return (nodePlugins()?.plugins ?? []).some((row) =>
+    row.name === requirement.plugin && (
+      runtimeIdentityForRow(row)?.activation === 'node' ||
+      compiledServiceActive(row)
+    ))
 }
 
 export const hasHostCapability = (requirement: HostCapabilityRequirement = 'none'): boolean => {

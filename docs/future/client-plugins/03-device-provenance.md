@@ -15,19 +15,19 @@ there.
   future web client fronts IndexedDB."
 - **The cache.** `packages/custody/src/plugins/pluginCache.ts` stores bundles content-addressed
   under `<userDataDir>/plugin-cache/<sha256>.js`, caps them at `MAX_BUNDLE_BYTES` (8 MiB), and
-  hashes what arrived rather than trusting a claim. Its one fill path is `putFromNode(nodeId,
-  pluginId, claim)`, which fetches `/v2/core/plugins/<id>/client.js` through the node broker.
+  hashes what arrived rather than trusting a claim. Its Node fill path is `putFromNode(nodeId,
+  pluginId, claim)`, which fetches `/v1/core/plugins/<id>/bundles/<hash>` through the broker and
+  falls back to the legacy client route for older Nodes.
 - **The trust store.** `packages/custody/src/plugins/pluginTrustStore.ts` keys acknowledgements
   on `(pluginId, hash)`. A row carries `nodeId`, and the comment beside it says "did this come from.
   Not part of the key, because the same bundle from a second node is the same bundle." Dev grants
   are keyed on `(pluginId, nodeId)`.
-- **Resolution.** `packages/client-core/src/host/trust/resolveBundles.ts` takes `BundleCandidate[]`
-  (each with `pluginId`, `version`, `hash`, `nodeId`) and picks one `ActiveBundle` per plugin id:
-  highest version whose `apiVersion` range covers `PLUGIN_API_MAJOR`, ties on hash. The winner
-  records `nodeIds[]`, the nodes offering that exact bundle.
+- **Selection.** `packages/client-core/src/host/plugins/distributionModel.ts` keeps one observation
+  per Node and selects the cached, accepted client hash matching each Node's active runtime. There is
+  no global version winner. Offered disk candidates remain separate from active selections.
 - **The roster.** `packages/client-core/src/host/plugins/distribution.ts` builds candidates from each
-  node's `GET /v2/core/plugins` answer (`installedByNode`), keeps `pendingTrust`, and
-  `syncPluginDistribution()` re-resolves after any change.
+  node's `GET /v1/core/plugins` answer, keeps `pendingTrust`, and
+  `syncPluginDistribution()` reconciles source-aware changes.
 - **The render paths.** `frames/register.ts` mounts a trusted bundle in an iframe at
   `app-plugin://<hash>`; layout phase 3 adds the worker. Neither asks where the bytes came from.
 
@@ -44,7 +44,7 @@ Every record that carries `nodeId` today gains a `source` instead:
 type BundleSource = { kind: 'node'; nodeId: string } | { kind: 'device' }
 ```
 
-`BundleCandidate`, `ActiveBundle`, `PluginAckRecord`, `PluginTrustDecision`, `PluginDevGrant`, and
+offered candidates, selections, `PluginAckRecord`, `PluginTrustDecision`, `PluginDevGrant`, and
 the cache's entry schema all take it. A `nodeId` string stays as a convenience accessor where the
 kind is `node`. The trust store's key stays `(pluginId, hash)`; provenance was never in the key and
 still is not, so a bundle the user installed on the device and the same bytes offered by a node are
@@ -82,19 +82,20 @@ compiled-only today and stay that way.
 
 ### Resolution against the fleet
 
-`resolveActiveBundles` takes one more candidate pool: the device's own bundles, each with `source: {
-kind: 'device' }`. The rule is:
+The distribution snapshot takes one more candidate pool: the device's own bundles, each with
+`source: { kind: 'device' }`. The rule is:
 
 1. A device candidate for a plugin id wins over every node candidate for that id, regardless of
    version. The user put it there on purpose; a node offering a newer build of the same id is
    offering it to a device that chose otherwise.
-2. Among device candidates the existing rule applies (highest version, then hash), though there is
+2. Among device candidates choose the highest compatible version, then hash, though there is
    normally one.
-3. The `ActiveBundle` records `source` and, for a device winner, the `nodeIds[]` that also offer the
-   same hash, if any, so Settings can say "also on node X".
+3. The device selection records `source` and the Node ids that also offer the same hash, if any, so
+   Settings can say "also on node X". Node runtime observations stay intact beneath that override.
 
-This is the one place a device plugin changes fleet behaviour, and it is a single sort key. A test
-pins it against the case that matters: node offers 2.0, device holds 1.9, device wins.
+This is the one place a device plugin changes presentation selection. A test pins it against the case
+that matters: a Node runs 2.0, the device holds 1.9, and the device-held UI is selected while the
+Node's active-service availability remains the Node's own fact.
 
 ### Trust
 
@@ -123,7 +124,7 @@ plugin has no node of its own to follow.
 
 ### The roster and Settings
 
-`GET /v2/core/plugins` is a node's roster and does not change. The client's roster view
+`GET /v1/core/plugins` is a node's roster and does not change. The client's roster view
 (`eligiblePlugins()` in `packages/client-core/src/host/plugins/contributions.ts`) merges the device's
 `PluginHostState.cached` entries whose `source.kind` is `device` as rows with no node. Settings →
 Plugins gains a section, "On this device", with install (the four sources), update, remove, enable
@@ -131,7 +132,7 @@ and disable, and the dev grant toggle. The existing per-node section is unchange
 appears in both shows in the device section with an "also offered by node X" line, because the
 device won resolution.
 
-Enable and disable for a device plugin is a device pref, not a node `PUT /v2/core/plugins`.
+Enable and disable for a device plugin is a device pref, not a node `PUT /v1/core/plugins`.
 
 ### Uninstall
 

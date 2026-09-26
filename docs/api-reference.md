@@ -171,6 +171,7 @@ itself is broken, and marking it retryable would invite a client to hammer it.
 | `GET` | `/v1/core/devices` | List paired devices |
 | `DELETE` | `/v1/core/devices/:id` | Revoke a device |
 | `GET` | `/v1/core/plugins` | List plugin status and capabilities |
+| `GET` | `/v1/core/plugins/:id/bundles/:hash` | Read the exact active or installed client bundle for device custody |
 | `PUT` | `/v1/core/plugins/:name` | Enable/disable an optional plugin |
 | `POST` | `/v1/core/plugins/:id/reload` | Swap a loaded plugin's node half in the running process |
 | `POST` | `/v1/core/plugins/requests/:requestId` | Answer an agent-raised install request (`approved`/`denied`) |
@@ -197,6 +198,12 @@ These routes are device-only. Backup uses Node filesystem paths, so an internal 
 reach it. Schedules are the same class for a different reason: a schedule is code the node runs
 unattended, so declaring one is a way to make code run later. For more information, see
 [the schedules doc](./schedules.md).
+
+Each plugin roster row may contain `active`, the declaration and client hash captured with its running
+loaded runtime, alongside `installed`, the current package on disk. `active: null` says no loaded
+runtime is active; an omitted field is an older response. `running` and `state` still describe the
+Node's activation and restart status. The bundle route resolves by the requested hash, including
+retained active bytes after an on-disk update, so custody can verify the hash before any trust decision.
 
 `GET /v1/core/plugins` also carries `requests`, the queue of installs an agent has asked for and the
 owner has not answered, and the decision route closes one. A task-scoped agent can raise a request
