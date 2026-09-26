@@ -12,7 +12,7 @@ import {
   addComment, addLabel, closePr, disableAutoMerge, enableAutoMerge, mergePr, removeLabel,
   removeReviewer, reopenPr, requestReviewer, rerunFailed, setDraft, setViewed, submitReview,
 } from '../mutations'
-import { buildConversationEntries, buildThreadSnippetIndex } from './model'
+import { buildConversationEntries } from './model'
 
 // Everything one pull request knows, held once per pull and read by every surface that draws it
 // (docs/github-integration.md, docs/panes.md § Layout model).
@@ -107,7 +107,6 @@ function build(scope: PrScope) {
   const fileList = () => files.data?.files ?? []
   const fileSummary = createMemo(() => summarizeFileStats(fileList()))
   const conversationEntries = createMemo(() => buildConversationEntries(detail.data))
-  const threadSnippetIndex = createMemo(() => buildThreadSnippetIndex(fileList()))
 
   // Linear tickets linked from the pull's body, comments, reviews and threads. The host reads every
   // registered recogniser, so this finds any provider's URLs; it is narrowed to Linear because what
@@ -229,7 +228,6 @@ function build(scope: PrScope) {
     filesLoading: () => files.isLoading,
     fileSummary,
     conversationEntries,
-    threadSnippetIndex,
     conflicting,
     conflicts: () => conflicts.data,
     conflictsLoading: () => conflicts.isLoading,
