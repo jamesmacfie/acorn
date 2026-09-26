@@ -78,12 +78,17 @@ describe('the diff health probe', () => {
     // A window, not the document.
     expect(mounted.mounted.fixedRows + mounted.mounted.dynamicBlocks).toBeLessThan(summary.fixedRows / 10)
     expect(mounted.measurement.candidates).toBeGreaterThan(0)
+    // One observer for the pane, watching the scroller and the mounted threads and notes only.
+    expect(mounted.measurement.activeObservers).toBe(1)
+    expect(mounted.measurement.observedElements).toBeGreaterThan(1)
+    expect(mounted.measurement.observedElements).toBeLessThanOrEqual(mounted.mounted.dynamicBlocks + 1)
 
     unmount()
     const snapshot = surfaceHealthSnapshot()
     expect(snapshot.surfaces.filter((entry) => entry.kind === 'diff')).toEqual([])
     const retired = snapshot.retired.diff!
     expect(retired.measurement.activeObservers).toBe(0)
+    expect(retired.measurement.observedElements).toBe(0)
     expect(retired.work.scheduledFrames).toBe(0)
     expect(retired.work.queuedSegments).toBe(0)
     expect(retired.work.heldPublications).toBe(0)
