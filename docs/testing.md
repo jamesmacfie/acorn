@@ -72,6 +72,11 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
   checks machinery, not pixels: a contribution under test renders a `<span>` carrying its own id. The
   smoke checklist below is still the eyes-on pass, and it is a good thing to run once after touching
   any of these;
+- exclusive chrome tests exercise core fallback for the task list, pane switcher, rail, and topbar;
+  remote-tree failure reports; host-minted nested slot placement; and the action boundary that refuses
+  source, node, and route choices the host did not offer. A real-window pass still checks the visual
+  arrangement, collapse control, nested task list and status items, and fallback after disabling or
+  removing a selected provider;
 - the palette session has one fixture suite and both hosts are held to it.
   `host/registries/commands/sessionStore.test.tsx` drives the session directly and asserts what the reader
   feels: what the empty root lists, what typing searches, what Enter does to a group, what Escape gives
@@ -471,6 +476,10 @@ build, and nothing ships to a person until it passes (docs/shell.md § Signing g
 4. Open a preview pane against a task dev server through the tunnel. Navigate, go back, and cover it
    with an overlay; the child webview hides rather than floating above it.
 5. Open a loaded plugin pane; it renders, and a network call from its frame fails.
+   Install a client-only plugin on this device from a remote package. Accept its trust prompt, confirm
+   its pane appears without restarting, then disable, re-enable, update, and remove it. A newer bundle
+   on a Node must not displace it. Removal must clear its state and restore core in any chosen
+   exclusive slot; a deliberately failing provider must also fall back to core.
 6. Open a loaded plugin's webview surface; a link to a host its manifest does not name is refused.
 7. Trigger the quit flow with an active agent; the concern prompt appears; quit drains cleanly.
 8. Kill the node process five times; the recovery screen appears on the sixth.

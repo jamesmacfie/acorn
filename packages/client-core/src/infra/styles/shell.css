@@ -29,6 +29,9 @@
   border-bottom: var(--chrome-divider);
   font-size: var(--fs-sm);
 }
+.topbar-host { flex: none; height: var(--topbar-h); min-width: 0; border-bottom: var(--chrome-divider); }
+.topbar-host > .topbar { height: 100%; border-bottom: 0; }
+.topbar-host > .remote-tree { height: 100%; display: flex; align-items: center; padding: 0 var(--pane-pad); }
 .brand { color: var(--text-muted); text-align: center; }
 
 .panes {

@@ -5,6 +5,7 @@
 // reads the stylesheets and asserts they agree, so the contract fails the suite rather than
 // degrading silently.
 import { THEME_PALETTE_TOKENS } from '@acorn/protocol/themeTokens.ts'
+export { DERIVED_STYLE_TOKENS, STYLE_TOKEN_FAMILIES } from '@acorn/protocol/styleValues.ts'
 
 /** Theme self-description: the only theme tokens that are not colours. See docs/ui-design.md
  * § Token axes for what each one replaced and why a plugin theme cannot set them. */

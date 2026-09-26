@@ -14,7 +14,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | Folder | What it is | Status |
 | --- | --- | --- |
-| [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; nothing blocks it. |
+| [client-plugins/](./client-plugins/README.md) | Delivered design record for device-held plugins, replacement chrome, style packs, and device configuration. Icon packs remain parked. | Five phases shipped 2026-09; web custody remains future-host work. |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
 | [dashboards/](./dashboards/README.md) | Remaining taskless database and write-back proposals. Shared data discovery and authoring now belong to workflow v2. | Redesign shipped; overlapping proposals superseded, 2026-09-13. |
@@ -43,8 +43,8 @@ read rather than asserted, and what is left of shipping it is step 7 of [bundle.
 The PWA is the layouts' narrow projections,
 compiled-tier's component couplings dissolved into slots, rail-tab's slice 3 became the `core:task`
 annotation point, and the marketing plugin docs should be written against the tree rather than the
-frame. Client-plugins consumes the remote root and `replace` arbitration and adds device provenance
-beside them; nothing in it waits any more. Sandbox is independent of all of that. Ecosystem's shipped
+frame. Client-plugins consumed the remote root and `replace` arbitration and added device provenance
+beside them. Sandbox is independent of all of that. Ecosystem's shipped
 rung-2 containment is recorded in `blockers.md` and sandbox's
 `phases.md`; `docs/security.md § The containment ladder` owns the behavior and the others point.
 

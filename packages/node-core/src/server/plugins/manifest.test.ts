@@ -485,6 +485,15 @@ describe('migration entrypoint confinement', () => {
 })
 
 describe('chrome descriptors', () => {
+  it('accepts a client-only remote-tree source and requires both regions', () => {
+    const source = { id: 'board', label: 'Board', order: 60, tree: { list: 'boardList', detail: 'boardDetail' } }
+    expect(webviewManifest({ sources: [source] }).success).toBe(true)
+    expect(messages(manifest({ sources: [source] }))).toContain('a remote-tree source requires a client bundle')
+    expect(messages(webviewManifest({ sources: [{ ...source, items: '/v1/p/board/items' }] })))
+      .toContain('a source needs either an items route or a remote tree')
+    expect(messages(webviewManifest({ sources: [{ ...source, tree: { list: 'boardList' } }] }))).not.toEqual([])
+  })
+
   it('accepts a chrome-only manifest with no frames at all', () => {
     const result = manifest({
       sources: [{ id: 'board', label: 'Board', glyph: 'kanban', order: 60, items: '/v1/p/board/rail-items' }],
@@ -1299,6 +1308,23 @@ describe('themes', () => {
   })
 })
 
+describe('styles', () => {
+  const style = (tokens: Record<string, string>) => ({ id: 'dense', label: 'Dense', tokens })
+
+  it('accepts a partial pack and rejects unsafe or out-of-family values', () => {
+    expect(manifest({ styles: [style({ '--row-h': '28px', '--font-mono': '"JetBrains Mono", monospace' })] }).success).toBe(true)
+    for (const [token, value] of [
+      ['--row-h', 'url(https://example.com/x)'],
+      ['--space-1', 'var(--shadow-1)'],
+      ['--shadow-2', '0 4px 8px #000'],
+      ['--gap-row', '5px'],
+      ['--unknown', '1px'],
+    ]) {
+      expect(manifest({ styles: [style({ [token]: value })] }).success, `${token}: ${value}`).toBe(false)
+    }
+  })
+})
+
 describe('slots', () => {
   const slot = (over: Record<string, unknown> = {}) =>
     ({ id: 'board-badge', slot: 'footer', data: '/v1/p/board/badge', ...over })
@@ -1604,9 +1630,17 @@ describe('the exclusive slot', () => {
   })
 
   it('refuses a core surface this acorn has not designated', () => {
-    expect(withBundle({ frames: [coreSlot({ coreSlot: 'topbar' })] }).success).toBe(false)
+    expect(withBundle({ frames: [coreSlot({ coreSlot: 'sidebar.future' })] }).success).toBe(false)
     expect(messages(withBundle({ frames: [coreSlot({ coreSlot: undefined })] })))
       .toContain('a coreSlot surface must name which core surface it replaces')
+  })
+
+  it('requires a remote tree for a pane switcher replacement', () => {
+    expect(messages(withBundle({ frames: [coreSlot({ coreSlot: 'pane.switcher' })] })))
+      .toContain('pane.switcher needs a single remote-tree body')
+    expect(messages(withBundle({ frames: [coreSlot({
+      coreSlot: 'pane.switcher', layout: 'single', regions: { body: { kind: 'remote', entry: 'switcher' } },
+    })] }))).toEqual([])
   })
 
   it('needs a client bundle, because the host mounts one here', () => {

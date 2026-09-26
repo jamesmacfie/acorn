@@ -64,7 +64,7 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
       key: 'enforced',
       now: [
         ...uiPermissionLines(installed.permissions, request.row.name),
-        ...nodePermissionLines(installed.permissions),
+        ...(request.source?.kind === 'device' ? [] : nodePermissionLines(installed.permissions)),
         ...keyClaimPermissionLines(keyClaimGrants(installed.contributions)),
         ...navigationDestinationPermissionLines(navigationDestinationGrants(installed.contributions)),
         // Both directions of the cooperative seam plus any core-surface offer. `request.row.name` is the
@@ -117,7 +117,7 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
       was: previous ? webviewPermissionLines(previous.webviews ?? []) : null,
     },
   ]
-  return groups.map(({ key, now, was }) => {
+  return groups.filter(({ key }) => request.source?.kind !== 'device' || key !== 'declared').map(({ key, now, was }) => {
     const before = was ? new Set(was.map((entry) => entry.key)) : null
     return {
       key,
@@ -141,6 +141,7 @@ export async function recordTrustDecision(request: PluginTrustRequest, decision:
     pluginId: request.row.name,
     hash: request.hash,
     nodeId: request.nodeId,
+    source: request.source ?? { kind: 'node', nodeId: request.nodeId },
     version: installed.version,
     permissions: installed.permissions,
     webviews: webviewGrants(installed.contributions),

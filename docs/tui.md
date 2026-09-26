@@ -126,6 +126,13 @@ beside it already does with its own TLS private key and session key. On NTFS the
 which [future/bundle.md](./future/bundle.md) § The snags carries with the other file-mode claims
 Windows does not honour.
 
+`acorn.json` in this config directory holds device appearance, shortcuts, rail order, and selected
+exclusive providers. The TUI reads it at startup and watches for changes; valid fields pass through
+the same device preference setters as Settings. A parse error keeps the last valid values. Plugin
+entries appear as installation offers in the Plugins palette and never grant trust. Local-folder
+requests are omitted because this host has no folder picker. Unknown keys survive Settings writes.
+The schema is `packages/plugin-types/acorn-device.schema.json`.
+
 ### Signals and exit
 
 `Ctrl+C` belongs to the TUI outside a PTY and to the PTY inside one, per the Rectangle contract below.
@@ -353,9 +360,11 @@ reads characters cannot see focus at all.
 Colour comes from `apps/tui/src/appearance.ts`, which collapses a theme's forty-odd tokens to the
 terminal's 16 slots plus `dim` and `bold`. `roleCell()` is `roleVar()`'s sibling and returns the
 cell style for a role value — a colour and an attribute bitmask — with `ignored` returning nothing.
-A theme picked in the app does not reach this host: a theme in acorn is an id whose tokens live in a
-`:root[data-theme=…]` block in a stylesheet, and publishing those as data is the appearance layer's
-change rather than the terminal's. The default was always the terminal's own palette.
+The terminal reads the device's `acorn.json` through the same schema and device preference setters
+as desktop. On a truecolour terminal, a built-in theme selection uses six colour primitives generated
+from the desktop theme stylesheet. Without a selected theme, or without truecolour support, the
+terminal uses its own palette. Follow-system mode uses the configured light theme because terminal
+emulators expose no reliable system light/dark signal.
 
 The seven layout components are `apps/tui/src/layouts/`, reaching the pane registry through
 `client-core/src/host/layouts/table.ts`, which is host-supplied for the same reason the component
@@ -536,6 +545,13 @@ For the full contract, see [Terminal chrome and plugins](./tui/chrome-and-plugin
 
 ## Loaded plugins
 
+The terminal's file-backed custody implements device install and remove through the same client-core
+platform contract as desktop. It uses the shared archive and manifest validation and keeps trust
+decisions and device preferences in its own configuration directory. The **Plugins on this device**
+palette group installs from a GitHub release, npm package, or HTTPS URL. It also updates, enables,
+disables, changes development trust, and removes installed bundles. Its source forms use the same
+resolver and trust prompt as the desktop. The terminal does not offer a local-folder picker.
+
 For the full contract, see [Terminal chrome and plugins](./tui/chrome-and-plugins.md#loaded-plugins).
 
 ## What a plugin loses here
@@ -590,14 +606,8 @@ module and the signing gate. What that step still owes is written there.
 - **The node half out of process.** The worker factory, the flags and the two ports are the design
   rung 2 inherits; what it still owes is `ctx` as authorised calls and the plugin-scoped token behind
   them ([security.md](./security.md) § Rung 2).
-- **A device-held install.** `{ path }` is a form the custody accepts and nothing offers, which is the
-  client-plugins programme's phase 0 on this host.
 - **A read-only text view inside an `editor` rectangle**, with a find bar. The box and `$EDITOR` cover
   the case today.
-- **A device preference store.** There is no `localStorage` here and `writeDevicePref` is a no-op, so
-  every device-scoped setting the desktop holds is either a default or an environment variable on this
-  host — the notification switches among them (`ACORN_TUI_NOTIFY`). A file-backed store under the
-  TUI's config directory would let the Notifications settings page work here as it does there.
 - **A test for the no-shrink rule.** One `flexShrink` left at its default on a pane's path brings the
   interleaving back, and what catches it is a pane suite noticing a string is missing rather than a
   rule saying why.

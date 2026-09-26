@@ -122,9 +122,8 @@ describe('Slot', () => {
     expect(draw(() => () => <Slot point="agents:attachment" key="image/png">default</Slot>)).toBe('tree:images')
   })
 
-  it('has no way to nest, because a contributor’s tree cannot name a Slot', () => {
-    // The one-level rule is enforced by the wire vocabulary rather than by a runtime guard: a grafted
-    // subtree is a stream of kit node names and `Slot` is not one of them. What this holds is the
+  it('resolves a slot in the owner’s default without nesting a contributor', () => {
+    // A grafted contributor receives no host-minted chrome slot reference. What this holds is the
     // consequence — a slot in the *owner's* own default children is ordinary tree and still resolves,
     // because the owner is not a contributor to itself.
     point()

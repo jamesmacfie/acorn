@@ -400,6 +400,18 @@ design all three constraints exist to prevent.
 
 ## Third-party plugin bundles
 
+A device-held plugin has no Node half. The desktop helper fetches a package from the source the owner
+entered, applies the Node installer's archive and manifest checks, refuses Node entries and
+Node-dependent contributions, and hashes the client bundle before adding it to the cache. The client
+checks the manifest again before registering any surface. Device-held and Node-delivered bundles use
+the same sandboxed iframe and remote-tree worker paths; neither executes in the shell process.
+
+Bundle cache entries and acknowledgement records carry `{ kind: 'node', nodeId }` or
+`{ kind: 'device' }` provenance. Old acknowledgement rows with `nodeId` and no source read as
+Node-sourced. The acknowledgement key remains `(pluginId, hash)`: identical bytes from both sources
+share one decision. The prompt names the source as the owner entered it, warns that a folder is not
+pinned, and omits the Node execution disclosure for device bundles. An updated hash asks again.
+
 A plugin installed on a Node is distributed by that Node: its client bundle travels the existing
 broker pipe to every paired device. That makes a Node a source of executable code, so the bundle is
 gated twice — once on content, once on consent.
@@ -568,6 +580,10 @@ whatever the node's working directory happens to be. And the picker in Settings 
 own; for a remote node the owner types a path they know. That is a correctness gate, not a trust one.
 
 ### The dev grant
+
+A device-held plugin uses a grant for `(pluginId, { kind: 'device' })`. It cannot auto-accept a
+Node-delivered bundle with the same ID. Removing the device plugin revokes this grant and its automatic
+acknowledgements; decisions the owner made in the prompt remain.
 
 Per-hash consent is right for distribution and wrong for iteration, so a plugin the owner is actively
 developing can be put into **development mode**: a grant stored per `(pluginId, nodeId)` on the device,

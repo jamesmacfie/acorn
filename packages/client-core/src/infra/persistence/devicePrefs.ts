@@ -7,8 +7,10 @@ const DEVICE_KEYS: ReadonlySet<string> = new Set<string>([
   PrefKeys.themeLight,
   PrefKeys.themeDark,
   PrefKeys.style,
+  PrefKeys.devicePluginsDisabled,
   PrefKeys.keybindings,
   PrefKeys.railOrder,
+  PrefKeys.leftCollapsed,
   PrefKeys.diffView,
   PrefKeys.terminalRailDefault,
   PrefKeys.terminalHeight,
@@ -36,7 +38,28 @@ const PREFIX = `acorn-pref:${ACORN_BASELINE}:`
 // (persistence/persistedState.ts), and the scoped slices are exactly the four composition kinds
 // that now belong to the node they describe (docs/state.md § Scope rules). Unknown means node,
 // which is what a per-task layout key needs.
-export const isDevicePref = (key: string): boolean => DEVICE_KEYS.has(key)
+const devicePluginIds = new Set<string>()
+export const setDevicePluginIds = (ids: Iterable<string>): void => {
+  devicePluginIds.clear()
+  for (const id of ids) devicePluginIds.add(id)
+}
+export const isDevicePref = (key: string): boolean => {
+  if (DEVICE_KEYS.has(key)) return true
+  const match = /^plugin:([^:]+):/.exec(key)
+  return !!match && devicePluginIds.has(match[1])
+}
+
+export function removeDevicePluginPrefs(pluginId: string): void {
+  const store = storage()
+  if (!store) return
+  const prefix = `${PREFIX}plugin:${pluginId}:`
+  const keys: string[] = []
+  for (let i = 0; i < store.length; i++) {
+    const key = store.key(i)
+    if (key?.startsWith(prefix)) keys.push(key)
+  }
+  for (const key of keys) store.removeItem(key)
+}
 
 // `null` rather than a throw when there is no storage: this runs in a bare-Node vitest too, and a pref that
 // cannot be read is the same as one that was never set.

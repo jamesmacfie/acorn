@@ -1,8 +1,7 @@
 # Replaceable surfaces: core chrome as providers of named slots
 
-Part of [docs/future/client-plugins/](./README.md). This is the design for the second stance change:
-the pane switcher, the rail, and the topbar become exclusive slots that core fills by default and a
-plugin may offer to fill instead. Phases 1 and 2 build it.
+Historical design record from [client plugins](./README.md). The pane switcher, rail, and topbar
+slots shipped in phases 1 and 2; [plugins.md](../../plugins.md) owns current behavior.
 
 ## What exists
 

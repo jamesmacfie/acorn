@@ -62,6 +62,9 @@ client: PaneIntent
 client: PaneLayoutContribution
 client: PaneModelContext
 client: PaneRegistration
+client: PaneSwitcherData
+client: PaneSwitcherPane
+client: PaneSwitcherProps
 client: PersistedSliceKeys
 client: PersistedStateSlice
 client: PickedFile
@@ -86,11 +89,13 @@ client: QueryRevision
 client: QuerySaveState
 client: QueryScope
 client: REF_LINK_CLASS
+client: RailData
 client: RailMarker
 client: RailMarkerContribution
 client: RailMarkerDot
 client: RailMarkerPosition
 client: RailMarkerTarget
+client: RailProps
 client: RailTone
 client: RefPanelProps
 client: RefPanelTarget
@@ -103,6 +108,7 @@ client: SessionSubmit
 client: SessionSummary
 client: SettingCommand
 client: ShellSlotContribution
+client: SlotRef
 client: SourceContribution
 client: SourceRouteContribution
 client: SpanHandle
@@ -110,6 +116,8 @@ client: Task
 client: TaskLayout
 client: TaskRowTarget
 client: TaskSlotContribution
+client: TopbarData
+client: TopbarProps
 client: UiSlotContribution
 client: VersionedDataValue
 client: VisibleElementRect
@@ -806,6 +814,7 @@ ui/tree: Section
 ui/tree: SectionHeader
 ui/tree: SegmentedControl
 ui/tree: Select
+ui/tree: Slot
 ui/tree: Spinner
 ui/tree: SplitCell
 ui/tree: SplitHandle
