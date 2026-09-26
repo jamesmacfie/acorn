@@ -66,7 +66,9 @@ export function enrichmentWeight(rows: readonly DiffRow[]): number {
  */
 export const residentKey = (contentKey: string, path: string, sha: string | null): string => `${contentKey}\u0000${path}\u0000${sha ?? ''}`
 
-export type ResidentSegment = { plain: readonly DiffRow[]; enriched: readonly DiffRow[] | null }
+/** `provisional` colour is a fallback after the highlight worker timed out: drawn, but a later pane
+ *  colours the segment again rather than take it as final. */
+export type ResidentSegment = { plain: readonly DiffRow[]; enriched: readonly DiffRow[] | null; provisional: boolean }
 
 export type EvictReason = 'budget' | 'superseded' | 'node-drop'
 
@@ -75,6 +77,7 @@ type Entry = {
   patchKey: string
   plain: DiffRow[]
   enriched: DiffRow[] | null
+  provisional: boolean
   rows: number
   plainBytes: number
   enrichmentBytes: number
@@ -147,6 +150,7 @@ export function createSegmentCache(limits: { rows: number; bytes: number } = { r
       if (entry.enriched) {
         enrichmentBytes -= entry.enrichmentBytes
         entry.enriched = null
+        entry.provisional = false
         entry.enrichmentBytes = 0
         changed(key)
         if (!over()) break
@@ -217,6 +221,7 @@ export function createSegmentCache(limits: { rows: number; bytes: number } = { r
           patchKey: item.patchKey,
           plain: item.plain,
           enriched: null,
+          provisional: false,
           rows: item.plain.length,
           plainBytes: plainWeight(item.plain),
           enrichmentBytes: 0,
@@ -235,11 +240,12 @@ export function createSegmentCache(limits: { rows: number; bytes: number } = { r
       reportResident()
     },
     /** Coloured rows for a segment, kept only if it still holds the plain rows they were built from. */
-    enrich: (key: string, from: readonly DiffRow[], enriched: DiffRow[]): boolean => {
+    enrich: (key: string, from: readonly DiffRow[], enriched: DiffRow[], provisional = false): boolean => {
       const entry = entries.get(key)
       if (!entry || entry.plain !== from) return false
       enrichmentBytes -= entry.enrichmentBytes
       entry.enriched = enriched
+      entry.provisional = provisional
       entry.enrichmentBytes = enrichmentWeight(enriched)
       enrichmentBytes += entry.enrichmentBytes
       trim()

@@ -11,9 +11,10 @@ import type { DiffSource } from './source'
 // clamps, blocks as tall as the test says, and a ResizeObserver that reports when the test says the
 // browser would. Momentum, fractional pixels and paint are the real window's to check.
 
-vi.mock('../../infra/highlight/worker', () => ({
-  tokenizeDocument: async (_path: string, code: string) => code.split('\n').map((line) => [{ content: line, light: '', dark: '' }]),
-}))
+vi.mock('../../infra/highlight/worker', () => {
+  const tokenizeDocument = async (_path: string, code: string) => code.split('\n').map((line) => [{ content: line, light: '', dark: '' }])
+  return { tokenizeDocument, highlightDocument: async (path: string, code: string) => ({ lines: await tokenizeDocument(path, code), timedOut: false }) }
+})
 
 const { DiffPane } = await import('./DiffPane')
 

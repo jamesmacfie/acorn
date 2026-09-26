@@ -32,7 +32,7 @@ function setup() {
       load: (requests, signal) => new Promise<DiffSegmentPayload[]>((resolve, reject) => {
         pending.push({ requests, signal, resolve: () => resolve(answer(requests)), reject: () => reject(new Error('gone')) })
       }),
-      enrich: async (rows) => [...rows],
+      enrich: async (rows) => ({ rows: [...rows], provisional: false }),
       firstPlain: (outcome) => outcomes.push(outcome),
     }),
   }))
@@ -99,7 +99,7 @@ describe('the segment loader', () => {
     const roomy = createSegmentCache()
     const load = (requests: DiffSegmentRequest[]) => Promise.resolve(answer(requests))
     const outcomes: string[] = []
-    const make = () => createRoot((dispose) => ({ dispose, loader: createSegmentLoader({ cache: roomy, load, enrich: async (rows) => [...rows], firstPlain: (outcome) => outcomes.push(outcome) }) }))
+    const make = () => createRoot((dispose) => ({ dispose, loader: createSegmentLoader({ cache: roomy, load, enrich: async (rows) => ({ rows: [...rows], provisional: false }), firstPlain: (outcome) => outcomes.push(outcome) }) }))
     const first = make()
     first.loader.demand([ref(0)], [])
     await flush()
@@ -121,5 +121,35 @@ describe('the segment loader', () => {
     expect(tiny.cache.stats().segments).toBe(1)
     tiny.loader.dispose()
     expect(tiny.cache.stats().segments).toBe(0)
+  })
+
+  it('does not keep a fallback colour as final: its pane stops, and the next pane colours again', async () => {
+    const roomy = createSegmentCache()
+    const load = (requests: DiffSegmentRequest[]) => Promise.resolve(answer(requests))
+    let attempts = 0
+    const make = (provisional: boolean) => createRoot((dispose) => ({
+      dispose,
+      loader: createSegmentLoader({ cache: roomy, load, enrich: async (rows) => (attempts++, { rows: [...rows], provisional }) }),
+    }))
+    const first = make(true)
+    first.loader.demand([ref(0)], [])
+    await flush()
+    await flush()
+    expect(attempts).toBe(1)
+    expect(roomy.peek(keyOf(0))).toMatchObject({ provisional: true })
+    first.loader.demand([ref(0)], [ref(1)])
+    await flush()
+    await flush()
+    expect(attempts).toBe(2)
+    expect(first.loader.stats().enrichment).toBe(0)
+    first.loader.dispose()
+    first.dispose()
+
+    const second = make(false)
+    second.loader.demand([ref(0)], [])
+    await flush()
+    expect(attempts).toBe(3)
+    expect(roomy.peek(keyOf(0))).toMatchObject({ provisional: false })
+    expect(roomy.peek(keyOf(0))?.enriched).not.toBeNull()
   })
 })
