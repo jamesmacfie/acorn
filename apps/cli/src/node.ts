@@ -31,6 +31,10 @@ export function matchingNode(fleet: FleetStore, target: string): FleetNode | und
   }
 }
 
+const localPairingInstructions = (pid: number): string =>
+  `If desktop started the local Node, open Settings > Nodes > Pair another client. ` +
+  `If it is standalone, run kill -USR1 ${pid} and read its terminal output.`
+
 export async function openCliNode(target?: string): Promise<CliNode> {
   const { tokens, fleet } = custody()
   let selected: FleetNode
@@ -48,7 +52,10 @@ export async function openCliNode(target?: string): Promise<CliNode> {
     if (prior?.fingerprint && prior.fingerprint !== running.fingerprint) throw new CliError('identity_mismatch', 'The local Node certificate changed; pairing is required.', 3)
     const token = tokens.read(LOCAL_TOKEN_SCOPE)
     if (!token) {
-      if (!process.stdin.isTTY || !process.stdout.isTTY) throw new CliError('pairing_required', `The local Node is unpaired. Run kill -USR1 ${running.pid}, then run acorn workspace list in a terminal.`, 3)
+      if (!process.stdin.isTTY || !process.stdout.isTTY) {
+        throw new CliError('pairing_required', `${localPairingInstructions(running.pid)} Then run acorn workspace list in a terminal.`, 3)
+      }
+      process.stderr.write(`${localPairingInstructions(running.pid)}\n`)
       selected = await pairInteractively(running.endpoint, fleet, { label: prior?.label ?? 'This computer', local: true })
     } else {
       const { pid: _pid, ...record } = running
