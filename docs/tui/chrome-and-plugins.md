@@ -110,6 +110,17 @@ functions. `Dynamic` therefore updates labels and descriptor props in place inst
 roster/trust refresh as a new component and remounting the list, which would discard its caret,
 virtual window and query subscriptions.
 
+### A loaded document region
+
+Loaded pane registration is shared by desktop and terminal. For a manifest `document` region it uses
+`client-core/host/frames/documentSurface.ts` to select the host's editor, just as a `remote` region
+selects the host's tree renderer. The desktop uses CodeMirror. The terminal supplies
+`apps/tui/src/plugins/DocumentSurface.tsx`, an editable text field for a writable route and a text
+view for a read-only route. It resolves and bounds the declared document route, reads and saves through
+the Node API, and hands the sibling plugin tree a live `read`/`write`/`flush` handle. A pane-scoped
+shortcut pressed in the field flushes before it dispatches the command. Syntax highlighting and
+completion popups are desktop editor features; the terminal field is plain text.
+
 ### What is drawn bespoke
 
 The rail's task list goes through the same `rail.taskList` exclusive slot the desktop's does, so a
