@@ -464,6 +464,10 @@ const json = (value: unknown) => ({
         { id: 'rotate', title: 'Rotate the signing key' },
         { id: 'copy', title: 'Password reset copy' },
       ] })
+      if (path === '/v1/p/probe/task-items') return json({ items: [
+        { id: 'first', title: 'First incident', task: { title: 'First incident' } },
+        { id: 'second', title: 'Second incident', task: { title: 'Second incident' } },
+      ] })
       if (path === '/v1/core/projects') return json({
         projects: [PROJECT, OTHER_PROJECT, ...(process.env.ACORN_FIXTURE_SECOND_WORKSPACE ? [SECOND_PROJECT] : [])],
       })

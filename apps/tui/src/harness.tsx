@@ -202,6 +202,8 @@ export async function renderFixture(size: {
   const { _resetRegions } = await import('./keys/regions')
   const { _resetLayoutState } = await import('@acorn/client-core/host/layouts/state.ts')
   const { _resetChrome } = await import('./chrome/state')
+  const { resetPromotion } = await import('./chrome/promotionStore')
+  const { resetFilePrompts } = await import('./chrome/filePrompt')
   const { _resetHints } = await import('./chrome/bindings')
   const { _resetRouter } = await import('./kit/router')
   const { clearAnnotations } = await import('@acorn/client-core/host/annotations/annotations.ts')
@@ -220,6 +222,8 @@ export async function renderFixture(size: {
   _resetRegions()
   _resetLayoutState()
   _resetChrome()
+  resetPromotion()
+  resetFilePrompts()
   // …and the footer's cached answer, which is keyed on the engine among other things and would
   // otherwise be the previous render's hints until something moved (./chrome/bindings.ts).
   _resetHints()

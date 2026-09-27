@@ -62,6 +62,7 @@ const { fileCacheStorage } = await import('./node/cache')
 const { persistQueryClient } = await import('@tanstack/query-persist-client-core')
 const { PERSISTED_SNAPSHOT_MAX_AGE_MS, shouldPersistQuery } = await import('@acorn/client-core/infra/persistence/queryPersistence.ts')
 const { markNodeRecovered, setNodeStarting } = await import('./chrome/nodeState')
+const { refreshNodeQueries } = await import('./chrome/recovery')
 const { watchPluginChanges } = await import('@acorn/client-core/host/plugins/reload.ts')
 const { startDeviceConfigSync } = await import('@acorn/client-core/infra/persistence/deviceConfigSync.ts')
 const { themeColorTokens } = await import('@acorn/client-core/infra/styles/themeColorTokens.ts')
@@ -231,7 +232,7 @@ async function fillIn(): Promise<void> {
     createEffect(() => {
       const current = ++refresh
       if (nodeState(opened.nodeId) === 'offline') return
-      void client.invalidateQueries({ refetchType: 'active' }).then(() => {
+      void refreshNodeQueries(client).then(() => {
         if (current === refresh && nodeState(opened.nodeId) === 'online') markNodeRecovered(opened.nodeId)
       })
     })
@@ -315,7 +316,7 @@ if (opened.starting) {
   setNodeStarting(true)
   void opened.starting.then(async () => {
     await selectActiveNode()
-    await client.invalidateQueries({ refetchType: 'active' })
+    await refreshNodeQueries(client)
     setNodeStarting(false)
   }).catch((error: unknown) => {
     setNodeStarting(false)
