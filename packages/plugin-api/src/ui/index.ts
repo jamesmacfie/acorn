@@ -52,6 +52,7 @@ export { tip } from '@acorn/client-core/kit/components/overlays/tips.tsx'
 // Behavior that isn't a component ships as a hook, following the dismissable.ts precedent.
 // Arm-to-confirm exists because a sandboxed frame's `window.confirm` silently returns false.
 export { createArmedConfirm } from '@acorn/client-core/kit/lib'
+export { modelProviderFailure } from '@acorn/client-core/kit/lib'
 export { default as CopyButton } from '@acorn/client-core/kit/components/inputs/CopyButton.tsx'
 // The field that completes what is typed after a sigil and colours what it has completed. `mentions`
 // is the short form (one list of logins after `@`); `sources` and `segments` are the general one, and

@@ -81,7 +81,7 @@ export function sanitizeProps(type: string, raw: unknown): SanitizedProps {
       dropped.push(key)
       continue
     }
-    // Every `on*` is either one of the kit's eleven events carrying a handler id, or it is nothing.
+    // Every `on*` is either one of the kit's twelve events carrying a handler id, or it is nothing.
     // This is what stops a raw key or pointer handler from ever existing in a remote tree.
     if (key.startsWith('on')) {
       if (isKitEvent(key) && isHandlerRef(value) && handlerRef.safeParse(value).success) props[key] = value

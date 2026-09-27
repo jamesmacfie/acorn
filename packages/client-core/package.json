@@ -151,6 +151,7 @@
     "./kit/lib/confirm": "./src/kit/lib/confirm.ts",
     "./kit/lib/graphLayout": "./src/kit/lib/graphLayout.ts",
     "./kit/lib/markdown": "./src/kit/lib/markdown.ts",
+    "./kit/lib/modelProviderFailure": "./src/kit/lib/modelProviderFailure.ts",
     "./kit/tokens": "./src/kit/tokens/public.ts",
     "./testkit/notifications": "./src/testkit/notifications.client.ts",
     "./testkit/large-diff": "./src/testkit/largeDiff.ts",

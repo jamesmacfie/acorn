@@ -56,6 +56,10 @@ keeps manual SQL available and hides **Generate**. The frame learns which connec
 route on this plugin's node half over `CoreServices.models.available`, ids and labels only. A frame
 has no way to read core's connection roster, and it should not get one.
 
+Once the reader starts SQL generation, the modal stays open until the request settles. Dismissing it
+while the model is working would let the response replace the host-owned editor after the reader had
+returned to it. A failed request leaves the prompt and error visible for another attempt.
+
 ## From the command palette
 
 Four commands in the manifest, three of them visible and hanging under a **Database** group. The two

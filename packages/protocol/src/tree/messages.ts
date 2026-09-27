@@ -2,7 +2,7 @@
 // the mount lifecycle. See docs/plugins.md § The tree contract.
 //
 // Nothing here names the DOM. A terminal host applies the same mutations to a cell buffer, and the
-// events are the kit's eleven semantic names rather than keys or pointers, so a terminal host maps
+// events are the kit's twelve semantic names rather than keys or pointers, so a terminal host maps
 // its own keys onto them.
 import { z } from 'zod'
 import { KIT_EVENTS } from './nodes.ts'

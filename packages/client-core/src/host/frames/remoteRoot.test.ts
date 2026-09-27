@@ -73,6 +73,21 @@ describe('the remote root', () => {
     expect(press).toHaveBeenCalledWith({ at: 'the card' })
   })
 
+  it('carries a confirmation handler from a remote ConfirmButton', async () => {
+    const { root, ops } = collect()
+    const confirm = vi.fn()
+    const button = createNode('ConfirmButton')
+    setProperty(button, 'onConfirm', confirm)
+    insertNode(root.node, button, null)
+    await flush()
+
+    const insert = ops().find((op) => op.op === 'insert')
+    if (insert?.op !== 'insert') throw new Error('unreachable')
+    expect(insert.node.props.onConfirm).toEqual({ $handler: 1 })
+    root.dispatch(1, undefined)
+    expect(confirm).toHaveBeenCalledOnce()
+  })
+
   it('copies JSON props out of proxies before they cross the worker port', async () => {
     const { root, ops } = collect()
     const tabs = createNode('Tabs')

@@ -715,6 +715,7 @@ ui/host: registerWillHandler
 ui/host: requestAnnotations
 ui/host: selectPaneTab
 ui/host: slotFills
+ui/model-provider-failure: modelProviderFailure
 ui/sdk: AcornBridge
 ui/sdk: AcornBridgeError
 ui/sdk: PluginByteResponse
@@ -844,6 +845,7 @@ ui/tree: insert
 ui/tree: insertNode
 ui/tree: memo
 ui/tree: mergeProps
+ui/tree: modelProviderFailure
 ui/tree: render
 ui/tree: setProp
 ui/tree: solidTree
@@ -947,6 +949,7 @@ ui: createArmedConfirm
 ui: createSplitDrag
 ui: createTimelineWindow
 ui: defaultModelIdFor
+ui: modelProviderFailure
 ui: paneCollapseKey
 ui: renderMarkdown
 ui: rowHeightSm
