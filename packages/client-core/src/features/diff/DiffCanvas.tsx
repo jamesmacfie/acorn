@@ -36,9 +36,10 @@ export type DiffRowContext = {
   lineExtra?: (row: CodeRow) => JSX.Element
   lineAction?: { title: string; run: (row: CodeRow, event: MouseEvent) => void }
   openLine?: (row: CodeRow) => void
+  askAgent?: (row: CodeRow) => void
   /** The dynamic block a code row or a split band carries now, or null for none (./diffLayout.ts). */
-  lineBlock: (row: CodeRow) => string | null
-  bandBlock: (left: CodeRow | null, right: CodeRow | null) => string | null
+  lineBlock: (row: CodeRow, itemKey: string) => string | null
+  bandBlock: (left: CodeRow | null, right: CodeRow | null, itemKey: string) => string | null
   observeBlock: CanvasLayout['observeBlock']
 }
 
@@ -111,8 +112,8 @@ export function DiffCanvas(props: {
               />
             )}>
               {(loaded) => (
-                <Show when={split()} fallback={<Index each={loaded()}>{(row) => <UnifiedRow row={row()} ctx={props.rows} />}</Index>}>
-                  <Bands rows={loaded()} ctx={props.rows} adopt={splitScroll.adopt} />
+                <Show when={split()} fallback={<Index each={loaded()}>{(row) => <UnifiedRow row={row()} ctx={props.rows} itemKey={item().key} />}</Index>}>
+                  <Bands rows={loaded()} ctx={props.rows} adopt={splitScroll.adopt} itemKey={item().key} />
                 </Show>
               )}
             </Show>
@@ -219,14 +220,14 @@ function SegmentPlaceholder(props: { height: number; failed: boolean; onRetry: (
   )
 }
 
-function UnifiedRow(props: { row: Row; ctx: DiffRowContext }) {
+function UnifiedRow(props: { row: Row; ctx: DiffRowContext; itemKey: string }) {
   const code = () => (isCodeRow(props.row) ? props.row : null)
   // A thread row is all dynamic block; a code row is one when something is drawn under its line, and
   // that line is the fixed part of it.
   const block = () => {
     if (props.row.kind === 'thread') return { id: threadBlockId(props.row.thread), base: 0 }
     const row = code()
-    const id = row && props.ctx.lineBlock(row)
+    const id = row && props.ctx.lineBlock(row, props.itemKey)
     return id ? { id, base: DIFF_LINE_HEIGHT } : null
   }
   return (
@@ -272,6 +273,7 @@ function UnifiedRow(props: { row: Row; ctx: DiffRowContext }) {
                 mentions={props.ctx.mentions()}
                 highlight={props.ctx.findHighlight(row())}
                 openLine={props.ctx.openLine}
+                askAgent={props.ctx.askAgent}
               />
               {/* Its own line under the code. `.diff-row` wraps, so anything drawn beside `DiffLine`
                   needs a full basis or it shares the line with the code and squeezes it. The wrapper
@@ -290,12 +292,12 @@ function UnifiedRow(props: { row: Row; ctx: DiffRowContext }) {
 
 /** One segment's rows as split bands. Paired inside the segment, which is exact: the segmenter never
  *  separates a deletion run from its insertions when it can avoid it, and counted the same way. */
-function Bands(props: { rows: readonly Row[]; ctx: DiffRowContext; adopt: (band: HTMLElement) => void }) {
+function Bands(props: { rows: readonly Row[]; ctx: DiffRowContext; adopt: (band: HTMLElement) => void; itemKey: string }) {
   const bands = createMemo(() => toBands([...props.rows]))
-  return <Index each={bands()}>{(band) => <SplitBandView band={band()} ctx={props.ctx} adopt={props.adopt} />}</Index>
+  return <Index each={bands()}>{(band) => <SplitBandView band={band()} ctx={props.ctx} adopt={props.adopt} itemKey={props.itemKey} />}</Index>
 }
 
-function SplitBandView(props: { band: SplitBand; ctx: DiffRowContext; adopt: (band: HTMLElement) => void }) {
+function SplitBandView(props: { band: SplitBand; ctx: DiffRowContext; adopt: (band: HTMLElement) => void; itemKey: string }) {
   let bandEl: HTMLDivElement | undefined
   // onMount, not the ref: the cells are not in the DOM yet when the ref for their band fires. A band
   // scrolling in while its column is scrolled right must not start at 0.
@@ -308,7 +310,7 @@ function SplitBandView(props: { band: SplitBand; ctx: DiffRowContext; adopt: (ba
   const block = () => {
     const band = props.band
     if (band.kind === 'full') return band.row.kind === 'thread' ? { id: threadBlockId(band.row.thread), base: 0 } : null
-    const id = props.ctx.bandBlock(band.left, band.right)
+    const id = props.ctx.bandBlock(band.left, band.right, props.itemKey)
     return id ? { id, base: DIFF_LINE_HEIGHT } : null
   }
   return (
@@ -348,6 +350,7 @@ function SplitBandView(props: { band: SplitBand; ctx: DiffRowContext; adopt: (ba
                 mentions={props.ctx.mentions()}
                 highlight={band().left ? props.ctx.findHighlight(band().left!) : undefined}
                 openLine={props.ctx.openLine}
+                askAgent={props.ctx.askAgent}
               />
               <SplitCell
                 r={band().right}
@@ -359,6 +362,7 @@ function SplitBandView(props: { band: SplitBand; ctx: DiffRowContext; adopt: (ba
                 mentions={props.ctx.mentions()}
                 highlight={band().right ? props.ctx.findHighlight(band().right!) : undefined}
                 openLine={props.ctx.openLine}
+                askAgent={props.ctx.askAgent}
               />
             </div>
             {/* Below the pair rather than inside a cell: an annotation is about the line, and both

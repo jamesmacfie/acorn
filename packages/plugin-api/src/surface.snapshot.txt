@@ -682,6 +682,7 @@ ui/diff: expandGapAsync
 ui/diff: gapId
 ui/diff: highlighterTokenize
 ui/diff: isCodeRow
+ui/diff: loadDiffLineContext
 ui/diff: maxLineCols
 ui/diff: plainTokenize
 ui/diff: rowIdentityKeys

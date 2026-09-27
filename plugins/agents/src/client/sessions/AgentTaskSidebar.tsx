@@ -2,7 +2,7 @@ import { agentTelemetry, startAgentView } from './agentTelemetry'
 import { createMemo, createEffect, onCleanup, Show } from 'solid-js'
 import type { Task } from '@acorn/plugin-api/client'
 import {
-  EmptyState, Icon, Inline, Menu, paneCollapseKey, Row, RowActions, Rows, Section, SectionHeader,
+  EmptyState, Fold, Icon, Inline, Menu, paneCollapseKey, Row, RowActions, Rows, Section, SectionHeader,
   sidebarCollapsed, Stack, Text,
 } from '@acorn/plugin-api/ui'
 import { managedAgentStore } from './managedStore'
@@ -15,6 +15,7 @@ import { attentionMark } from './stateTone'
 import { subagentSummary } from './subagentDisplay'
 import { canStopAgent } from './agentActivity'
 import { delegationSummary } from './sessionRoster'
+import { isStale } from '../inlineDiff/patchStatus.ts'
 import {
   clearManagedSubagent, openManagedSession, selectManagedSession, selectManagedSubagent,
   selectedManagedSubagent,
@@ -87,7 +88,9 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
   // Sessions and their subagents in one list, because they are one thing to walk with the arrows.
   // The key says which: `<session id>` or `<session id>/<subagent id>`.
   const sessionRows = createMemo(() => agentTelemetry.measure('agents.sidebar.rows', () =>
-    model.sessionRoster().map(({ key, label }) => ({ key, label }))))
+    model.sessionRoster().filter((row) => !row.session.origin).map(({ key, label }) => ({ key, label }))))
+  const inlineSessions = createMemo(() => model.taskSessions().filter((session) => session.origin?.kind === 'inline-diff'))
+  const inlineNeedsYou = createMemo(() => inlineSessions().filter((session) => !['none', 'unread'].includes(session.attention)).length)
   createEffect(() => agentTelemetry.observe('agents.sidebar.row_count', sessionRows().length))
   const sessionOf = (key: string) => model.sessionRoster().find((candidate) => candidate.key === key) ?? null
   const selectedRowKey = createMemo(() => {
@@ -291,6 +294,35 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
           </Rows>
         </Show>
       </Section>
+      <Show when={inlineSessions().length}>
+        <Fold label={`Inline chats (${inlineSessions().length})`} meta={inlineNeedsYou() ? <Text emphasis="muted">{inlineNeedsYou()} need you</Text> : undefined}>
+          <Rows
+            id={`agents:inline:${props.task.id}`}
+            ariaLabel="Inline chats"
+            items={inlineSessions().map((session) => ({ key: session.id, label: session.title }))}
+            selected={selectedRowKey()}
+            onSelect={(key) => openManagedSession(props.task.id, key)}
+            onActivate={(key) => openManagedSession(props.task.id, key)}
+          >
+            {(item, itemProps, selected) => {
+              const current = () => inlineSessions().find((session) => session.id === item.key)
+              return <Show when={current()}>{(session) => <Row
+                item={itemProps}
+                variant="stacked"
+                density="compact"
+                selected={selected()}
+                title={session().title}
+                leading={<RuntimeStateIcon state={session().runtimeState} queued={session().queuedTurns} />}
+                trailing={<Show when={!['none', 'unread'].includes(session().attention)}><Icon {...attentionMark(session().attention)} /></Show>}
+                onPress={() => openManagedSession(props.task.id, session().id)}
+              >
+                <Text emphasis="strong">{session().title}</Text>
+                <Text emphasis="muted">{session().origin?.path}:{session().origin?.line} · {session().origin && isStale(session().origin!) ? 'stale patch' : 'diff chat'}</Text>
+              </Row>}</Show>
+            }}
+          </Rows>
+        </Fold>
+      </Show>
     </Stack>
   )
 }

@@ -1816,6 +1816,7 @@ describe('managed agent runtime conformance', () => {
       followLastSession: false,
       pinned: { fake: { model: 'opus', reasoning: 'nonsense' } },
       last: {},
+      inline: { providerId: null, pinned: {} },
     })
     runtime = defaultsRuntime(owner)
 
