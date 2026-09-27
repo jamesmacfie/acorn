@@ -16,6 +16,7 @@ import { ExclusiveSlot } from './slot'
 import { registerCoreExclusiveSlot } from '@acorn/client-core/host/registries/extensionPoints'
 import { BROWSE, MENU, TASKS } from './topology'
 import type { ShellModel } from './model'
+import { setHighlightedTaskId } from './state'
 import { workflowTaskHierarchy } from '@acorn/client-core/features/tasks'
 import { expandedWorkflowRoots, toggleWorkflowRoot } from '@acorn/client-core/features/tasks'
 
@@ -118,6 +119,7 @@ function TaskList(props: { model: ShellModel; markerCells: number }) {
       id="chrome.rail.tasks"
       ariaLabel="Tasks"
       items={rows()}
+      onSelect={setHighlightedTaskId}
       onMenu={(id) => {
         if (resolveRailMarkers(markersFor({ kind: 'task', id })).legend.length) setInspecting(id)
       }}
@@ -173,7 +175,7 @@ registerCoreExclusiveSlot('rail.taskList', (props) => {
   return <TaskList model={value.model} markerCells={value.markerCells} />
 })
 
-export function Rail(props: { model: ShellModel; cells: number }) {
+export function Rail(props: { model: ShellModel; cells: number; nodeId: string }) {
   // Three panels and nothing else: which sources this workspace has, and which of them the session
   // starts on, are both the model's (./model.ts § defaultSource). A component that draws is a
   // component that cannot race the thing it draws.
@@ -225,7 +227,7 @@ export function Rail(props: { model: ShellModel; cells: number }) {
         <Show
           when={source()?.regions?.list}
           fallback={
-            <PanelBody name="browse">
+            <PanelBody name="browse" nodeId={props.nodeId}>
               <Line role="muted">{source() ? 'Nothing to list here.' : 'Choose a source.'}</Line>
             </PanelBody>
           }
@@ -245,7 +247,7 @@ export function Rail(props: { model: ShellModel; cells: number }) {
               {/* A source's list region is a `lazy()` and it can throw, and `PanelBody` is what this
                   panel draws for each of those rather than the blank frame both used to leave
                   (../panel.tsx). */}
-              <PanelBody name="browse"><Dynamic component={list()} /></PanelBody>
+              <PanelBody name="browse" nodeId={props.nodeId}><Dynamic component={list()} /></PanelBody>
             </box>
           )}
         </Show>

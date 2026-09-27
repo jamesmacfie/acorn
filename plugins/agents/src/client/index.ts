@@ -6,10 +6,11 @@
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { AGENTS_CONVERSATION } from '../contract/conversation'
+import { installManagedHandoff } from '../contract/handoffClient'
 import { ATTENTION_COPY, isActiveAgent, needsAttention } from './sessions/agentActivity'
 import { managedAgentApi } from './sessions/managedClient'
 import { activateManagedAgentNoticeTargets, activateManagedAgentPaneIntents, agentAttentionItemId } from './sessions/managedSelection'
-import { activateManagedAgentNotifications } from './sessions/managedStore'
+import { activateManagedAgentNotifications, managedAgentStore } from './sessions/managedStore'
 import { agentPaneContribution } from './paneContribution'
 import { agentRailMarkerContribution } from './railMarkerContribution'
 import { activateManagedAgentReferences } from './referenceContribution'
@@ -138,6 +139,9 @@ export const agentsClientPlugin: ClientPlugin = {
   // this plugin back, so a second activation replaces the first rather than stacking on it.
   activate: () => {
     const stops = [
+      installManagedHandoff(async (sessionId) => {
+        managedAgentStore.upsertSession(await managedAgentApi.resumeManaged(sessionId))
+      }),
       activateManagedAgentReferences(),
       activateManagedAgentNotifications(),
       activateManagedAgentNoticeTargets(),

@@ -16,7 +16,7 @@ import { createSignal } from 'solid-js'
  *  distribution pass queues a bundle and the shell raises it (../plugins/TrustPrompt.tsx).
  *  `notifications` is the bell's two sections, which on this host have no popover to live in
  *  (./Inbox.tsx). */
-export type OverlayName = 'palette' | 'help' | 'quit' | 'trust' | 'workspace' | 'project' | 'notifications'
+export type OverlayName = 'palette' | 'help' | 'quit' | 'trust' | 'workspace' | 'project' | 'notifications' | 'setup' | 'promotion' | 'sessions' | 'file'
 
 // A stack rather than one slot, because the topmost is the one that owns the keys and closing it has
 // to reveal the one under it. In practice two are rarely open at once — `?` inside the palette types
@@ -58,9 +58,15 @@ export { placeRestored, setPlaceRestored }
 const [chosenWorkspace, setChosenWorkspace] = createSignal<string | null>(null)
 export { chosenWorkspace, setChosenWorkspace }
 
+// The rail has only a narrow column for task rows. Repeat the focused row's full title across the
+// screen so its identity survives narrow cells and a marker count at the right.
+const [highlightedTaskId, setHighlightedTaskId] = createSignal<string | null>(null)
+export { highlightedTaskId, setHighlightedTaskId }
+
 /** Test seam. Module state outlives a render, so a suite must not inherit the previous one's shell. */
 export function _resetChrome(): void {
   setStack([])
   setChosenWorkspace(null)
+  setHighlightedTaskId(null)
   setPlaceRestored(false)
 }

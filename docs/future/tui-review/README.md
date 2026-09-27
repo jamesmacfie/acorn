@@ -1,6 +1,6 @@
 # Terminal UI review
 
-Date: 2026-09-27. Status: review and partial repair. Standalone terminal acceptance remains open.
+Date: 2026-09-27. Status: implementation in progress. Standalone terminal acceptance remains open.
 
 The target is an `acorn` terminal client that can be the user's primary app. It must start from a
 clean installation, expose every applicable task and node operation without dead controls, teach its
@@ -27,12 +27,12 @@ task opening, agent and Changes panes, workspace switching, help, and resizing. 
 tests cover agent turns, PR controls, plugin trees, scrolling, and PTY escape. That is a useful base,
 but it does not establish that a user can complete the desktop's whole workflow from a terminal.
 
-The most serious gaps are controls that appear actionable but have no terminal effect, especially
-agent attachments and exports and source-item promotion. Settings has no TUI surface, so setup and
-recovery depend on editing configuration or using another host. The terminal drawer and several
-desktop slots have no reachable alternative. A rebuilt live run also left an Agent pane showing a
-transient connection error after the Node returned online. Live review found text clipping in narrow
-rows and a commit action rendering `[object Object]`; the latter was repaired in this review.
+The initial review found controls that appeared actionable but had no terminal effect, including
+agent attachments, exports, and source-item promotion. It also found no Settings route, no terminal
+drawer, and a transient Agent pane error that survived reconnect. The implementation pass below
+addresses those paths. Several desktop settings and feature journeys still need terminal acceptance.
+The review also found text clipping in narrow rows and a commit action rendering `[object Object]`;
+the latter was repaired in this review.
 
 ## Implemented during this review
 
@@ -51,6 +51,21 @@ The clean isolated PTY navigation flow, the TUI suite, lint, and documentation p
 after these changes. The broader terminal-only journeys and reused-session recovery gate in
 [Delivery and acceptance](./delivery.md) remain open. The remaining proposals are not described as
 shipped behavior in the owning docs.
+
+## Implementation pass on 2026-09-27
+
+The host now retries reads and pane boundaries after reconnect, with a visible Retry control for a
+persistent error. A first-run route creates workspaces, projects, and tasks and exposes provider
+connections; Settings and New task remain in the palette. Password fields mask their terminal cells.
+The file seam opens an absolute local path prompt for attachments and downloads, with errors and
+overwrite confirmation. Source rows can invoke their promotion contract through a terminal task
+picker. A task and the palette can open a native terminal session list and PTY, including an existing
+managed-agent handoff. The selected task's full title is repeated across the screen.
+
+Focused tests and a live disposable shell PTY passed at 80 by 24 and 120 by 40. A clean-profile
+journey created a workspace, project, and task, and a fresh fixture passed the navigation flow. The
+provider connection journey, full feature inventory, desktop comparison, and packaged release
+checks remain open. These are release gates, not claims of completion.
 
 ## Outcome required to close this review
 

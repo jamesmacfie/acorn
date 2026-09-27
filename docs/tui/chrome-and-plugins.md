@@ -225,6 +225,12 @@ that takes the keys off whatever had them. Neither restores what you were lookin
 settle, so the caret lands on the first row of the roster that replaced the old one rather than on
 whatever survived the switch. The command chord opens the palette from anywhere except an entered PTY.
 
+With a task open, `t` opens its terminal sessions. The palette offers the same route when the active
+Node has the Terminal plugin. The task rail may shorten a title to preserve its marker count; a line
+across the screen repeats the selected task's complete title, wrapping when needed. A source row with
+a promotion contract offers `Shift+F10` to create a task or attach to an active one. The source owns
+the seed and link operation; the terminal supplies the task choices and reports write errors.
+
 A pane opens with the keys already somewhere, because there is no click to put them there. And a
 region opens on its list where it has one rather than on the first field above it, because the first
 thing focused is the thing the bare keys drive and landing in a filter box means `j` types a `j`.
