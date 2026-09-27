@@ -39,6 +39,9 @@ The editor's text is a per-task scratch document (`db_scratch`), because a host-
 surface is a route that reads it plus a route that writes it. The host owns the dirty state, the
 autosave debounce, ⌘S, and the scroll position, so a half-written query survives closing the pane.
 What you meant to keep still goes through **Save**, into the project-scoped saved queries.
+In the terminal client the document region is an editable cell field above the plugin's frame.
+It autosaves and accepts Ctrl+S, uses the same scratch route, and gives the frame the same document handle; SQL syntax colours
+and completion popups are absent there.
 
 `⌘Enter` runs the query. The chord is pressed with focus in the host's editor, so the host resolves it
 against the manifest's surface-scoped keybinding, flushes the document, and then delivers the command

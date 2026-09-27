@@ -37,6 +37,7 @@ import { clearSurfaceFailures, recordSurfaceFailure } from '../plugins/surfaceFa
 import type { FrameBinding } from './broker'
 import { isHostOwnedSurface, paneLayoutFor, remoteRegionEntry } from './layouts'
 import { closePluginOverlay, pluginOverlayOpen } from './overlays'
+import { suppliedDocumentSurface } from './documentSurface'
 import { createLogger } from '../../infra/telemetry/logger'
 
 const log = createLogger('plugins')
@@ -89,7 +90,9 @@ const DomExtendedPane = lazy(() => import('../chrome/ChromeExtendedPane'))
 const RemoteTree = lazy(async () => ({ default: suppliedRemoteTree() ?? (await import('../tree/RemoteTree')).RemoteTree }))
 // Lazy for the reason above, plus one more: this file is evaluated on every shell boot, and a static
 // import would put the editor and its grammars in the boot graph for a pane most sessions never open.
-const DocumentSurface = lazy(() => import('../../features/editor/DocumentSurface'))
+const DocumentSurface = lazy(async () => ({
+  default: suppliedDocumentSurface() ?? (await import('../../features/editor/DocumentSurface')).default,
+}))
 // The host's layouts. Its own lazy boundary rather than a branch inside the one above, so a shell that
 // only opens whole-pane documents never pulls the splitters and the tab strip in.
 const paneLayouts = () => import('../layouts')

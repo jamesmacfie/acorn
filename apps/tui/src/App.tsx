@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, type JSX } from 'solid-js'
+import { createEffect, lazy, type JSX } from 'solid-js'
 import { QueryClientProvider, createQuery, type QueryClient } from '@tanstack/solid-query'
 import { prefsOptions, tasksOptions } from '@acorn/client-core/infra/queries.ts'
 import { setTelemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
@@ -13,11 +13,12 @@ import { sourcePanel } from './plugins/SourcePanel'
 import { setExtendedPane } from '@acorn/client-core/host/chrome'
 import { ExtendedPane } from './plugins/ExtendedPane'
 import { setRemoteTree } from '@acorn/client-core/host/tree'
+import { setDocumentSurface } from '@acorn/client-core/host/frames/documentSurface.ts'
 import { LAYOUTS } from './layouts'
 import { RemoteTree } from './plugins/RemoteTree'
 import { Shell } from './chrome/Shell'
 
-// The composition root's client half: the four host seams and the shell under the one query client
+// The composition root's client half: the host seams and the shell under the one query client
 // this node has. What is on screen is `chrome/Shell.tsx`; this is what has to be true before it draws.
 //
 // The roster is not here. It is `./roster.ts`, imported after the first frame, and that file says why.
@@ -38,6 +39,9 @@ setLayouts(LAYOUTS)
 // The loaded-plugin tree seam. Its worker factory is installed beside the loaded-plugin watcher
 // after the first frame: no bundle can reach this renderer until that watcher starts.
 setRemoteTree(RemoteTree)
+// The document region is host-owned too. Keep its editor and route reader behind a loader so opening
+// an ordinary task does not add them to the first frame's startup graph.
+setDocumentSurface(lazy(() => import('./plugins/DocumentSurface').then((module) => ({ default: module.DocumentSurface }))))
 
 // …and the third seam of the same shape. A plugin that contributes a rail source by descriptor rather
 // than by code gets `ChromeSourcePanel` on the desktop, which is `<main class="panes">` and DOM kit
