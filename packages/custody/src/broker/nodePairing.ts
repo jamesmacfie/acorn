@@ -3,7 +3,7 @@ import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { NODE_PROTOCOL_VERSION, nodeInfoSchema, pairResultSchema, type PairResult } from '@acorn/protocol/node.ts'
 import type { NodeProbeResult } from '@acorn/protocol/broker.ts'
 import { normalizeFingerprint, pinnedTlsOptions } from './nodeBroker'
-import { nodeRequest } from './nodeRequest'
+import { nodeRequest, readBoundedResponse } from './nodeRequest'
 
 // The two requests that turn a URL into a fleet member. See docs/api-reference.md, "Pairing".
 //
@@ -14,6 +14,8 @@ import { nodeRequest } from './nodeRequest'
 // Shell-free, like nodeBroker.ts, so it can be exercised against a real TLS server.
 
 const PROBE_TIMEOUT_MS = 8_000
+export const MAX_NODE_PROBE_BYTES = 16 * 1024
+const MAX_PAIR_RESPONSE_BYTES = 64 * 1024
 
 // Steps 1 and 2: reach the node and learn the certificate it presents.
 //
@@ -84,6 +86,7 @@ export async function pairWithNode(
       body: { kind: 'bytes', bytes: new TextEncoder().encode(JSON.stringify(request)) },
       agent,
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
+      maxResponseBytes: MAX_PAIR_RESPONSE_BYTES,
     })
     const text = new TextDecoder().decode(response.body)
     if (response.status !== 200) {
@@ -106,18 +109,18 @@ function unverifiedGet(url: URL): Promise<{ body: string; certPem: string; finge
     const req = httpsRequest(url, { method: 'GET', rejectUnauthorized: false, timeout: PROBE_TIMEOUT_MS }, (res) => {
       const socket = res.socket as import('node:tls').TLSSocket
       const cert = socket.getPeerCertificate()
-      if (!cert?.raw) return reject(new Error('The node presented no certificate.'))
-      const chunks: Buffer[] = []
-      res.on('data', (chunk: Buffer) => chunks.push(chunk))
-      res.on('end', () => {
+      if (!cert?.raw) {
+        res.destroy()
+        return reject(new Error('The node presented no certificate.'))
+      }
+      void readBoundedResponse(res, MAX_NODE_PROBE_BYTES).then((body) => {
         if (res.statusCode !== 200) return reject(new Error(`${url.origin} answered ${res.statusCode} at /v1/node.`))
         resolve({
-          body: Buffer.concat(chunks).toString('utf8'),
+          body: body.toString('utf8'),
           certPem: toPem(cert.raw),
           fingerprint: normalizeFingerprint(cert.fingerprint256),
         })
-      })
-      res.on('error', reject)
+      }, reject)
     })
     req.on('timeout', () => req.destroy(new Error(`${url.origin} did not respond.`)))
     req.on('error', reject)

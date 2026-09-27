@@ -181,6 +181,7 @@ const RULES: readonly RouteRule[] = [
   // exactly why a frame must not be able to reach it: a prompt-injected agent driving a frame could
   // otherwise re-run a plugin's node half on its own timing.
   { path: shape(`/v1/core/plugins/${SEG}/reload`), scopes: {} },
+  { path: shape(`/v1/core/plugins/${SEG}/review`), scopes: {}, note: 'Clears a durable gate before Node code can run.' },
   // The owner's answer to an agent's install request. Unmappable for the same reason as the three above,
   // and it is the line that keeps the approval split honest: a frame that could POST an approval would be
   // able to answer the very question that exists because an agent must not install code.
@@ -223,13 +224,49 @@ const RULES: readonly RouteRule[] = [
   { path: shape('/v1/core/models/backends'), scopes: {}, note: 'The whole model roster. A plugin proxies its own through ctx.core.models.' },
 ]
 
-export type ApiDecision = { allowed: true } | { allowed: false; reason: string }
+export type ApiDecision = { allowed: true; path: string } | { allowed: false; reason: string }
 
 const DENY = (reason: string): ApiDecision => ({ allowed: false, reason })
 
 // The path a rule is matched against: query string dropped, since no rule keys off one and a `?` is
 // never part of a route's identity.
 const pathOnly = (path: string): string => path.split(/[?#]/, 1)[0]
+
+// URL parsing in custody is the final authority on the request target. Parse here with the same URL
+// semantics, then forward the parsed path so the route we authorize is the route the Node receives.
+// In particular, WHATWG URL parsing removes percent-encoded dot segments and treats backslashes as
+// separators. Encoded separators are refused too: a router or proxy must not be able to interpret a
+// segment as a different path shape after this check.
+function bridgePath(path: string): { target: string; forwarded: string } | null {
+  if (!path.startsWith('/') || path.startsWith('//') || path.includes('#')) return null
+  const target = pathOnly(path)
+  let url: URL
+  try {
+    url = new URL(path, 'https://acorn.invalid')
+  } catch {
+    return null
+  }
+  if (url.origin !== 'https://acorn.invalid' || url.pathname !== target) return null
+  for (const segment of target.split('/')) {
+    let decoded = segment
+    // Reject nested encodings as well as a single encoded separator. The Node router must never get
+    // a later chance to turn an opaque id into a path delimiter or traversal segment.
+    for (let depth = 0; depth < 8; depth += 1) {
+      let next: string
+      try {
+        next = decodeURIComponent(decoded)
+      } catch {
+        if (depth === 0) return null
+        break // A literal percent sign decoded from %25 is an opaque id, not another escape.
+      }
+      if (next === '.' || next === '..' || next.includes('/') || next.includes('\\')) return null
+      if (next === decoded) break
+      decoded = next
+      if (depth === 7) return null
+    }
+  }
+  return { target: url.pathname, forwarded: `${url.pathname}${url.search}` }
+}
 
 /**
  * Is this frame allowed to make this call? `api` is the plugin's manifest-declared scope list, read by
@@ -242,15 +279,14 @@ export function allowApi(
 ): ApiDecision {
   if (!isApiMethod(method)) return DENY(`unsupported method ${method}`)
 
-  // Shape first. A path that is not an absolute node path is not a path we can classify at all, and a
-  // protocol-relative `//host/x` would be a URL wearing a path's clothes.
-  if (!path.startsWith('/') || path.startsWith('//')) return DENY('path must be absolute')
-  const target = pathOnly(path)
-  if (target.split('/').includes('..')) return DENY('path must not traverse')
+  // Shape first. The path checked here is the path custody will send, including its query string.
+  const parsed = bridgePath(path)
+  if (!parsed) return DENY('path must be absolute and canonical')
+  const { target, forwarded } = parsed
 
   // The plugin's own namespace, always allowed: it is the plugin's own node half answering.
   const own = `${PLUGIN_NAMESPACE}${binding.pluginId}`
-  if (target === own || target.startsWith(`${own}/`)) return { allowed: true }
+  if (target === own || target.startsWith(`${own}/`)) return { allowed: true, path: forwarded }
   // Another plugin's namespace. Cross-plugin collaboration is a server-side capability, not an HTTP
   // call one plugin's UI makes into another's routes.
   if (target.startsWith(PLUGIN_NAMESPACE)) return DENY('another plugin’s namespace')
@@ -260,7 +296,7 @@ export function allowApi(
   const scope = rule.scopes[method]
   if (!scope) return DENY(`${method} ${target} cannot be granted to a plugin`)
   if (!binding.api.includes(scope)) return DENY(`missing scope ${scope}`)
-  return { allowed: true }
+  return { allowed: true, path: forwarded }
 }
 
 /**

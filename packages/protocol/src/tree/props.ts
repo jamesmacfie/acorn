@@ -12,6 +12,7 @@
 // entries — every caller already goes through it.
 import { z } from 'zod'
 import { FORBIDDEN_PROPS, isKitEvent, KIT_NODES, ROLE_PROPS, ROLE_VALUES, TEXT_NODE, type KitNodeName } from './nodes.ts'
+import { safeContentHref } from '../externalUrl.ts'
 
 /** A handler on the wire. Never a function: the sandbox mints an id, the host maps it back to a
  *  closure that posts the event. */
@@ -23,11 +24,49 @@ export const isHandlerRef = (value: unknown): value is HandlerRef =>
 
 type Json = string | number | boolean | null | Json[] | { [key: string]: Json }
 
-// Depth-bounded rather than unbounded: `z.lazy` would happily walk a 10k-deep object a sandbox sent
-// to burn a frame's budget, and no kit prop is a deep tree.
-const json: z.ZodType<Json> = z.lazy(() =>
-  z.union([z.string(), z.number(), z.boolean(), z.null(), z.array(json).max(1_000), z.record(z.string().max(64), json)]),
-)
+// A prop is untrusted structured-clone data. Validate it iteratively so even a very deep value
+// cannot overflow Zod's parser stack before the host decides to drop that prop.
+const MAX_JSON_DEPTH = 16
+const MAX_JSON_VALUES = 10_000
+const MAX_JSON_CHARS = 1_048_576
+
+function boundedJson(value: unknown): value is Json {
+  const pending: { value: unknown; depth: number }[] = [{ value, depth: 0 }]
+  const seen = new WeakSet<object>()
+  let values = 0
+  let chars = 0
+  while (pending.length) {
+    const item = pending.pop()!
+    if (++values > MAX_JSON_VALUES || item.depth > MAX_JSON_DEPTH) return false
+    const current = item.value
+    if (typeof current === 'string') {
+      chars += current.length
+      if (chars > MAX_JSON_CHARS) return false
+      continue
+    }
+    if (current === null || typeof current === 'boolean') continue
+    if (typeof current === 'number' && Number.isFinite(current)) continue
+    if (typeof current !== 'object' || seen.has(current)) return false
+    seen.add(current)
+    if (Array.isArray(current)) {
+      if (current.length > 1_000 || values + pending.length + current.length > MAX_JSON_VALUES) return false
+      for (const child of current) pending.push({ value: child, depth: item.depth + 1 })
+      continue
+    }
+    if (Object.getPrototypeOf(current) !== Object.prototype && Object.getPrototypeOf(current) !== null) return false
+    let keys = 0
+    for (const key in current) {
+      if (!Object.hasOwn(current, key)) continue
+      if (++keys > 1_000 || key.length > 64) return false
+      chars += key.length
+      if (chars > MAX_JSON_CHARS || values + pending.length + keys > MAX_JSON_VALUES) return false
+      pending.push({ value: (current as Record<string, unknown>)[key], depth: item.depth + 1 })
+    }
+  }
+  return true
+}
+
+const json: z.ZodType<Json> = z.custom<Json>(boundedJson)
 
 /** One prop's value: a handler id, or plain JSON. */
 export const propValue = z.union([handlerRef, json])
@@ -78,6 +117,12 @@ export function sanitizeProps(type: string, raw: unknown): SanitizedProps {
       continue
     }
     if (forbidden.has(key)) {
+      dropped.push(key)
+      continue
+    }
+    // A remote tree has no authority to navigate the privileged renderer. It may offer an HTTPS
+    // destination for an owner click; local routes use host actions, not an arbitrary href.
+    if (key === 'href' && (typeof value !== 'string' || !safeContentHref(value)?.startsWith('https://'))) {
       dropped.push(key)
       continue
     }

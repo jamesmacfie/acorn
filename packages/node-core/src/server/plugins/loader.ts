@@ -11,7 +11,7 @@
 import { createHash } from 'node:crypto'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { confineExistingFile, resolveInRoot } from '../core/fs'
 import { describeSource, pluginInstallRoot, readLockfile, sweepDebris } from './installer'
 import { PLUGIN_API_MAJOR, readPluginManifestResult, speaksApiVersion, type ManifestUnknown, type PluginManifest } from './manifest'
@@ -19,6 +19,7 @@ import { PluginMigrationsError, pluginMigrationsChain } from './migrations'
 import { openPluginDb } from './storage'
 import { readBundledPluginState } from './bundledState'
 import { disposeUnstartedPlugin, isolateNodePlugin } from './isolation'
+import { hasPendingPluginReview } from './pendingReview'
 import type { NodePlugin, PluginStorage } from '../pluginHost/types'
 import { createLogger } from '../telemetry/logger'
 import type { PluginRuntimeIdentity } from '@acorn/protocol/api.ts'
@@ -487,7 +488,12 @@ export async function loadExternalPlugins(
   // Every package starts at once, and the results fold back in directory order. A worker's start
   // happens almost entirely off this thread: its bootstrap and the bundle's evaluation take about
   // 45 ms a package. Awaiting them one at a time would make boot wait for the sum.
-  const outcomes = await Promise.all(scan.installed.map((entry) => loadEntry(entry, dataRoot, builtins)))
+  const outcomes = await Promise.all(scan.installed.map((entry) =>
+    // This is shared by boot and live reload. Checking before loadEntry also blocks manifest-only
+    // harness registration; merely setting `disabled` would still import the Node bundle above it.
+    hasPendingPluginReview(dataRoot, basename(entry.dir)) || hasPendingPluginReview(dataRoot, entry.manifest.id)
+      ? Promise.resolve({ installed: entry } as EntryOutcome)
+      : loadEntry(entry, dataRoot, builtins)))
   for (const outcome of outcomes) {
     if (outcome.failure) failures.push(outcome.failure)
     if (outcome.loaded) {

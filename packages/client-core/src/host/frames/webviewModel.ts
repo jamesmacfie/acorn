@@ -4,8 +4,8 @@ import { readJson } from '../../infra/node/apiClient'
 import { ownsRoute } from '../chrome/chromeData'
 import type { FrameBinding } from './broker'
 
-export const pluginWebviewKey = (binding: Pick<FrameBinding, 'pluginId' | 'surface' | 'taskId'>): string =>
-  ['plugin', binding.pluginId, binding.surface, binding.taskId].filter((part) => part !== undefined).map((part) => encodeURIComponent(part!)).join(':')
+export const pluginWebviewKey = (binding: Pick<FrameBinding, 'pluginId' | 'nodeId' | 'surface' | 'taskId'>): string =>
+  ['plugin', binding.pluginId, binding.nodeId, binding.surface, binding.taskId].filter((part) => part !== undefined).map((part) => encodeURIComponent(part!)).join(':')
 
 const sourcePath = (path: string, binding: Pick<FrameBinding, 'taskId' | 'projectId'>): string => {
   const url = new URL(path, 'https://acorn.invalid')

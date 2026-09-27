@@ -80,6 +80,7 @@ test('a decision is recorded per (plugin, bundle), and only for bundles this dev
     hash,
     nodeId: 'node-1',
     version: '1.0.0',
+    declaration: 'test-declaration',
     permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
     webviews: [],
     keyClaims: [],

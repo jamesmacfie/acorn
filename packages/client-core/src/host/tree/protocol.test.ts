@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { mutation, sandboxMessage, TREE_LIMITS } from '@acorn/protocol/tree/messages.ts'
+import { boundedSandboxMessage, mutation, sandboxMessage, TREE_LIMITS } from '@acorn/protocol/tree/messages.ts'
 import { KIT_NODES, ROLE_VALUES, TEXT_NODE } from '@acorn/protocol/tree/nodes.ts'
 import { KIT_NODE_SCHEMAS, sanitizeProps } from '@acorn/protocol/tree/props.ts'
 import { NODE_SUPPORT } from '../../kit/tokens/support'
@@ -38,6 +38,20 @@ describe('props are sanitized before anything sees them', () => {
     })
     expect(props).toEqual({ tone: 'ok' })
     expect(dropped.sort()).toEqual(['children', 'class', 'innerHTML', 'ref', 'style'])
+  })
+
+  it('drops nested host handles before kit components can spread them onto DOM', () => {
+    const row = sanitizeProps('Row', { label: 'safe', item: { innerHTML: '<img src=x onerror=run()>', onClick: 'run()' } })
+    expect(row).toEqual({ props: { label: 'safe' }, dropped: ['item'] })
+    const split = sanitizeProps('SplitHandle', { axis: 'x', drag: { handleProps: { innerHTML: '<script>run()</script>', style: 'position:fixed' } } })
+    expect(split).toEqual({ props: { axis: 'x' }, dropped: ['drag'] })
+  })
+
+  it('allows only explicit HTTPS destinations in sandboxed tree href props', () => {
+    expect(sanitizeProps('Button', { href: 'https://example.test/', label: 'Open' }).props).toEqual({ href: 'https://example.test/', label: 'Open' })
+    for (const href of ['javascript:alert(1)', 'data:text/html,evil', 'file:///tmp/x', '/settings', 'http://example.test/']) {
+      expect(sanitizeProps('Button', { href }).props).toEqual({})
+    }
   })
 
   it('keeps a handler id only under one of the kit events', () => {
@@ -84,6 +98,17 @@ describe('the mutation schema', () => {
   it('refuses a batch over the op cap at the door', () => {
     const ops = Array.from({ length: TREE_LIMITS.batchOps + 1 }, () => ({ op: 'remove', id: 'n1' }))
     expect(sandboxMessage.safeParse({ kind: 'tree:batch', slot: 's1', ops }).success).toBe(false)
+  })
+
+  it('bounds nested props and tree messages before recursive parsing', () => {
+    let deep: unknown = 'end'
+    for (let i = 0; i < 10_000; i++) deep = { next: deep }
+    const prop = { kind: 'tree:batch', slot: 's1', ops: [{ op: 'patch', id: 'n1', props: { data: deep } }] }
+    expect(boundedSandboxMessage(prop)).toBe(false)
+    expect(sandboxMessage.safeParse(prop).success).toBe(false)
+
+    const huge = { kind: 'tree:batch', slot: 's1', ops: [{ op: 'text', id: 'n1', value: 'x'.repeat(TREE_LIMITS.batchBytes + 1) }], bytes: 0 }
+    expect(boundedSandboxMessage(huge)).toBe(false)
   })
 
   it('survives a fuzz of malformed messages without throwing', () => {

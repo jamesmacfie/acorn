@@ -8,6 +8,7 @@ import { restartLocalNode } from '../../infra/node/fleetActions'
 import {
   installNodePlugin,
   refreshNodePlugins,
+  reviewNodePlugin,
   saveDisabledNodePlugins,
   uninstallNodePlugin,
   updateNodePlugin,
@@ -28,6 +29,7 @@ import { prefsOptions } from '../../infra/queries'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { savePref } from './savePref'
 import ExtensionPointsDev from './ExtensionPointsDev'
+import { navigationDestinationGrants, navigationDestinationPermissionLines, nodePermissionLines, scheduleGrants, schedulePermissionLines, uiPermissionLines, webviewGrants, webviewPermissionLines } from '../../host/trust/permissions'
 import ConfigPluginOffers from './ConfigPluginOffers'
 import {
   CORE_SLOT_PROVIDER,
@@ -105,6 +107,7 @@ export default function PluginsSettings() {
   const rows = createMemo<NodePluginRow[]>(() => state()?.plugins ?? [])
   const restartRequired = () => state()?.restartRequired === true
   const availabilityMessage = (row: NodePluginRow): string => {
+    if (row.pendingReview) return 'Held for owner review. Restarting will not load this package.'
     const id = nodeId()
     if (!id) return 'Node unavailable'
     const result = contributionAvailability(distribution(), id, row.name, PLUGIN_API_MAJOR)
@@ -295,6 +298,25 @@ export default function PluginsSettings() {
       await refetch()
     })
 
+  const stagedPermissionLines = (row: NodePluginRow) => {
+    const installed = row.installed
+    if (!installed) return []
+    return [
+      ...nodePermissionLines(installed.permissions),
+      ...schedulePermissionLines(scheduleGrants(installed.contributions)),
+      ...uiPermissionLines(installed.permissions, row.name),
+      ...navigationDestinationPermissionLines(navigationDestinationGrants(installed.contributions)),
+      ...webviewPermissionLines(webviewGrants(installed.contributions)),
+    ]
+  }
+  const decideStaged = (row: NodePluginRow, decision: 'approved' | 'denied') => run(async () => {
+    const pending = row.pendingReview
+    if (!pending || !('reviewId' in pending)) throw new Error('This review record is unreadable. Remove the package to clear it.')
+    if (decision === 'approved' && !row.installed) throw new Error('The staged package is missing. Remove this interrupted review.')
+    await reviewNodePlugin(row.name, pending, decision, nodeId() ?? undefined)
+    await settle()
+  })
+
   return (
     <div class="settings-section">
       <h3 class="settings-heading">On this device</h3>
@@ -431,6 +453,21 @@ export default function PluginsSettings() {
                   app's, and the empty cell is how the owner tells the two apart. */}
               <span class="plugin-version muted">{row.installed?.version ?? ''}</span>
               <span class="plugin-meta">
+                <Show when={row.pendingReview}>
+                  {(pending) => <Show when={'corrupt' in pending()} fallback={
+                    <details class="plugin-emits">
+                      <summary>Review staged package and permissions</summary>
+                      <p class="muted">Agent-requested {row.name} {row.installed?.version} is held from execution. Its Node code cannot start until you approve this review. If installation was interrupted, remove it and ask the agent to try again.</p>
+                      <ul><For each={stagedPermissionLines(row)} fallback={<li>It declares no permissions.</li>}>
+                        {(line) => <li>{line.text}</li>}
+                      </For></ul>
+                      <Button size="sm" disabled={busy() || !row.installed} onPress={() => void decideStaged(row, 'approved')}>Approve this package</Button>
+                      <Button size="sm" tone="danger" disabled={busy()} onPress={() => void decideStaged(row, 'denied')}>Remove staged package</Button>
+                    </details>
+                  }>
+                    <span class="plugin-pending" role="status">Review record is unreadable. Remove this package to recover.</span>
+                  </Show>}
+                </Show>
                 <Show when={row.installed?.source}>
                   {(source) => <span class="plugin-source muted" title={source()}>{source()}</span>}
                 </Show>
@@ -479,12 +516,12 @@ export default function PluginsSettings() {
                   no lockfile, so the node cannot re-resolve a source for it, and the next build brings
                   it back at the app's version anyway. */}
               <span class="plugin-actions">
-                <Show when={row.installed && !row.installed.bundled}>
+                <Show when={(row.installed && !row.installed.bundled) || row.pendingReview}>
                   <Show
                     when={removing() === row.name}
                     fallback={
                       <>
-                        <IconButton variant="ghost" icon="refresh-cw" label={`Update ${row.name}`} title="Update" disabled={busy()} onPress={() => void update(row.name)} />
+                        <IconButton variant="ghost" icon="refresh-cw" label={`Update ${row.name}`} title="Update" disabled={busy() || !!row.pendingReview} onPress={() => void update(row.name)} />
                         <IconButton variant="ghost" tone="danger" icon="trash-2" label={`Uninstall ${row.name}`} title="Uninstall" disabled={busy()} onPress={() => setRemoving(row.name)} />
                       </>
                     }

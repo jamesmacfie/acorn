@@ -42,6 +42,8 @@ export default function PluginTrustDialog() {
       .filter((tier) => tier.lines.length > 0),
   )
   const previousVersion = () => request()?.previous?.version
+  const sameBundleReview = () => request()?.previous?.hash === request()?.hash
+  const changedDeclaration = () => sameBundleReview() && !!request()?.previous?.declaration
   const previousStillActive = () => {
     const current = request()
     if (!current?.previous || current.relation !== 'installed') return false
@@ -107,19 +109,17 @@ export default function PluginTrustDialog() {
             onClick={dismiss.onContainerClick}
             onKeyDown={dismiss.onKeyDown}
           >
-            <div class="overlay-title">{previousVersion() ? 'Plugin update' : 'Plugin trust'}</div>
+            <div class="overlay-title">{sameBundleReview() ? changedDeclaration() ? 'Plugin declaration changed' : 'Review plugin declaration' : previousVersion() ? 'Plugin update' : 'Plugin trust'}</div>
             <div class="overlay-body plugin-trust-body">
               <header class="plugin-trust-identity">
                 <span class="plugin-trust-glyph" aria-hidden="true">{current().row.name.slice(0, 1).toUpperCase()}</span>
                 <div>
                   <h2 id="plugin-trust-title">
                     <code>{current().row.name}</code>
-                    {previousVersion() ? (addedLines().length ? ' was updated — it asks for more' : ' was updated') : ' wants to run in acorn'}
+                    {sameBundleReview() ? changedDeclaration() ? ' changed what it asks for' : ' needs another review' : previousVersion() ? (addedLines().length ? ' was updated — it asks for more' : ' was updated') : ' wants to run in acorn'}
                   </h2>
                   <p class="plugin-trust-meta">
-                    <Badge size="xs">
-                      {previousVersion() ? `${previousVersion()} → ${current().row.installed?.version}` : current().row.installed?.version}
-                    </Badge>
+                    <Badge size="xs">{sameBundleReview() ? current().row.installed?.version : previousVersion() ? `${previousVersion()} → ${current().row.installed?.version}` : current().row.installed?.version}</Badge>
                     <Badge size="xs">
                       <Icon name="monitor" /> {current().source?.kind === 'device'
                         ? current().sourceLabel?.startsWith('path:')
@@ -134,8 +134,12 @@ export default function PluginTrustDialog() {
 
               <p class="muted plugin-trust-intro">
                 <Show
-                  when={previousVersion()}
-                  fallback="None of its code has run yet. Review what it asks for below — acorn asks again if the bundle changes."
+                  when={previousVersion() && !sameBundleReview()}
+                  fallback={sameBundleReview()
+                    ? changedDeclaration()
+                      ? 'The client code is the same, but this node changed its declaration. Acorn has withheld its interface until you review these permissions and contributions again.'
+                      : 'Acorn needs an approval that binds this client code to its current permissions and contributions. Its interface is withheld until you review them.'
+                    : 'None of its code has run yet. Review what it asks for below — acorn asks again if the bundle changes.'}
                 >
                   {(version) => (
                     <Show

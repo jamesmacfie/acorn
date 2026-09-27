@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { PLUGIN_API_MAJOR, type InstalledPluginRow, type NodePluginRow, type PluginRuntimeIdentity } from '@acorn/protocol/api.ts'
+import { PLUGIN_API_MAJOR, type InstalledPluginRow, type NodePluginRow, type PluginFrameSurface, type PluginRuntimeIdentity } from '@acorn/protocol/api.ts'
+import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
 import type { PluginHostState } from '../../infra/platform'
 import { decisionKey, derivePluginDistribution, type DevicePluginEntry, type NodePluginObservation } from './distributionModel'
 
@@ -30,6 +31,7 @@ const host = (hashes: string[], decisions: { pluginId: string; hash: string; dec
   acks: decisions.map((decision, index) => ({
     ...decision, nodeId: 'a', version: '1', decidedAt: index + 1,
     permissions: identity('1', decision.hash).permissions,
+    declaration: clientDeclaration(identity('1', decision.hash)),
     webviews: [], keyClaims: [], navigationDestinations: [], extensions: [], schedules: [], taskChecks: [], harnesses: [], agentTools: [], contextSections: [],
   })),
   devGrants: [],
@@ -38,6 +40,22 @@ const selected = (result: ReturnType<typeof derivePluginDistribution>, nodeId: s
   result.selectionsByNode.get(nodeId)?.get(pluginId)?.hash
 
 describe('fleet selection policy', () => {
+  it('does not offer staged client bytes while keeping the previously running version', () => {
+    const old = identity('1.0.0', 'old-hash')
+    const next = identity('2.0.0', 'staged-hash')
+    const held = { ...row('reports', old, installed(next)), state: 'pending-review' as const,
+      pendingReview: { reviewId: 'r', fingerprint: 'f', stagedAt: 1 } }
+    const state = host(['old-hash', 'staged-hash'], [
+      { pluginId: 'reports', hash: 'old-hash', decision: 'accepted' },
+    ])
+    const result = derivePluginDistribution(new Map([['a', observation('a', [held])]]), state, 1, PLUGIN_API_MAJOR)
+    expect(selected(result, 'a', 'reports')).toBe('old-hash')
+    expect(result.pendingTrust).toEqual([])
+    const clientOnly = { ...row('client-only', null, installed(next)), state: 'pending-review' as const, pendingReview: held.pendingReview }
+    const blocked = derivePluginDistribution(new Map([['a', observation('a', [clientOnly])]]), state, 2, PLUGIN_API_MAJOR)
+    expect(selected(blocked, 'a', 'client-only')).toBeUndefined()
+    expect(blocked.pendingTrust).toEqual([])
+  })
   it('prefers an older device bundle while retaining the newer node runtime observation', () => {
     const newer = identity('2.0.0', 'node-hash')
     const byNode = new Map([['a', observation('a', [row('reports', newer, installed(newer))])]])
@@ -136,6 +154,89 @@ describe('fleet selection policy', () => {
     expect(result.conflictingKeys.has(decisionKey('reports', 'shared-hash'))).toBe(true)
     expect(selected(result, 'a', 'reports')).toBeUndefined()
     expect(selected(result, 'b', 'reports')).toBeUndefined()
+  })
+
+  it('withholds a single changed API declaration under previously accepted bytes and queues reapproval', () => {
+    const original = identity('1.0.0', 'shared-hash')
+    const widened = { ...original, permissions: { ...original.permissions, api: ['/v1/core/tasks'] } }
+    const byNode = new Map([['a', observation('a', [row('reports', widened, installed(widened))])]])
+    const state = host(['shared-hash'], [{ pluginId: 'reports', hash: 'shared-hash', decision: 'accepted' }])
+    const result = derivePluginDistribution(byNode, state, 1, PLUGIN_API_MAJOR)
+    expect(selected(result, 'a', 'reports')).toBeUndefined()
+    expect(result.acceptedKeys.has(decisionKey('reports', 'shared-hash'))).toBe(false)
+    expect(result.pendingTrust).toMatchObject([{ hash: 'shared-hash', previous: { hash: 'shared-hash' } }])
+
+    state.acks[0]!.declaration = clientDeclaration(widened)
+    const reapproved = derivePluginDistribution(byNode, state, 2, PLUGIN_API_MAJOR)
+    expect(selected(reapproved, 'a', 'reports')).toBe('shared-hash')
+    expect(reapproved.pendingTrust).toEqual([])
+  })
+
+  it('withholds a changed webview host under the same bundle hash', () => {
+    const original = identity('1.0.0', 'shared-hash')
+    const webview = (host: string): PluginFrameSurface => ({
+      target: 'webview', id: 'report', label: 'Report', glyph: 'puzzle', order: 500,
+      formFactor: ['desktop'], hosts: [host], url: `https://${host}`,
+    })
+    const old = { ...original, contributions: { frames: [webview('reports.example.com')] } as PluginRuntimeIdentity['contributions'] }
+    const changed = { ...original, contributions: { frames: [webview('private.example.com')] } as PluginRuntimeIdentity['contributions'] }
+    const state = host(['shared-hash'], [{ pluginId: 'reports', hash: 'shared-hash', decision: 'accepted' }])
+    state.acks[0]!.declaration = clientDeclaration(old)
+    const result = derivePluginDistribution(new Map([['a', observation('a', [row('reports', changed, installed(changed))])]]), state, 1, PLUGIN_API_MAJOR)
+    expect(selected(result, 'a', 'reports')).toBeUndefined()
+    expect(result.pendingTrust).toHaveLength(1)
+  })
+
+  it('withholds a changed device-held declaration under accepted bytes while retaining device precedence', () => {
+    const original = identity('1.0.0', 'device-hash')
+    const changed = { ...original, permissions: { ...original.permissions, api: ['/v1/p/reports/data'] } }
+    const device: DevicePluginEntry = {
+      hash: 'device-hash', sourceLabel: 'npm:reports', nodeIds: ['a'], sameHashNodeIds: [],
+      row: row('reports', null, installed(changed)),
+    }
+    const state = host(['device-hash'], [{ pluginId: 'reports', hash: 'device-hash', decision: 'accepted' }])
+    const result = derivePluginDistribution(new Map(), state, 1, PLUGIN_API_MAJOR, [device])
+    expect(result.selectedDevice.get('reports')).toBe(device)
+    expect(result.acceptedKeys.has(decisionKey('reports', 'device-hash'))).toBe(false)
+    expect(result.pendingTrust).toMatchObject([{ hash: 'device-hash', source: { kind: 'device' } }])
+  })
+
+  it('re-prompts for legacy approvals without a declaration binding and accepts equivalent node offers', () => {
+    const offered = identity('1.0.0', 'shared-hash')
+    const byNode = new Map([
+      ['a', observation('a', [row('reports', offered, installed(offered))])],
+      ['b', observation('b', [row('reports', { ...offered, version: '2.0.0' }, installed(offered))])],
+    ])
+    const state = host(['shared-hash'], [{ pluginId: 'reports', hash: 'shared-hash', decision: 'accepted' }])
+    delete state.acks[0]!.declaration
+    const legacy = derivePluginDistribution(byNode, state, 1, PLUGIN_API_MAJOR)
+    expect(selected(legacy, 'a', 'reports')).toBeUndefined()
+    expect(legacy.pendingTrust).toHaveLength(1)
+    expect(legacy.pendingTrust[0]?.sourceNodeIds).toEqual(['a', 'b'])
+
+    state.acks[0]!.declaration = clientDeclaration(offered)
+    const accepted = derivePluginDistribution(byNode, state, 2, PLUGIN_API_MAJOR)
+    expect(selected(accepted, 'a', 'reports')).toBe('shared-hash')
+    expect(selected(accepted, 'b', 'reports')).toBe('shared-hash')
+  })
+
+  it('keeps a development grant on its node and queues another node with the same bytes for manual review', () => {
+    const offered = identity('1.0.0', 'shared-hash')
+    const byNode = new Map([
+      ['a', observation('a', [row('reports', offered, installed(offered))])],
+      ['b', observation('b', [row('reports', offered, installed(offered))])],
+    ])
+    const state = host(['shared-hash'])
+    state.acks.push({ pluginId: 'reports', hash: 'shared-hash', nodeId: 'a',
+      source: { kind: 'node', nodeId: 'a' }, version: '1.0.0', permissions: offered.permissions,
+      webviews: [], keyClaims: [], navigationDestinations: [], extensions: [], schedules: [], taskChecks: [], harnesses: [], agentTools: [], contextSections: [],
+      decision: 'accepted', decidedAt: 1, partial: true, dev: true })
+    state.devGrants.push({ pluginId: 'reports', nodeId: 'a', source: { kind: 'node', nodeId: 'a' }, grantedAt: 1 })
+    const result = derivePluginDistribution(byNode, state, 1, PLUGIN_API_MAJOR)
+    expect(selected(result, 'a', 'reports')).toBe('shared-hash')
+    expect(selected(result, 'b', 'reports')).toBeUndefined()
+    expect(result.acceptedKeys.has(decisionKey('reports', 'shared-hash'))).toBe(false)
+    expect(result.pendingTrust).toMatchObject([{ nodeId: 'b', sourceNodeIds: ['b'] }])
   })
 
   it('detects a changed declaration even when an installed update reuses the active client bytes', () => {

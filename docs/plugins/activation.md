@@ -231,10 +231,12 @@ when the active Node reports a newer version. Disabling or withholding trust fro
 withdraws its contributions; it does not expose the Node bundle under the same ID. Node runtime
 observations remain intact for service availability and Settings.
 
-Device custody hashes the bytes it receives and stores decisions for exact `(pluginId, hash)` pairs.
+Device custody hashes the bytes it receives and stores decisions for exact `(pluginId, hash)` pairs,
+bound to the permissions, contributions, API version, and emitted events approved with those bytes.
 Caching alone grants nothing. A pending or rejected update leaves an accepted older runtime visible
 while that runtime still runs. When the Node commits unaccepted bytes, its loaded UI is withheld until
-acceptance. Trust writes complete before registration changes; revoking an exact acceptance or ending
+acceptance. A changed declaration under the same hash also withholds the UI and asks for review;
+older approvals without a declaration binding re-prompt. Trust writes complete before registration changes; revoking an exact acceptance or ending
 a development grant withdraws affected registrations and stops their workers immediately. Dismissing
 a prompt makes no durable decision; Settings → Plugins can show the pending offer. Reconsidering a
 rejection removes that exact recorded decision so the offer can be reviewed again.
@@ -386,8 +388,10 @@ Four properties worth stating because they are easy to lose:
   outstanding requests is the cap.
 - **An approval is spent once.** Collecting the decision deletes the row. A second identical call is a new
   question, not a second use of an old yes.
-- **The store is in memory.** A pending request is a question waiting on someone looking at the app right
-  now; a node restart is a perfectly good "no", and an hour is the expiry.
+- **The request store is in memory; the code gate is durable.** An unanswered question expires after an
+  hour or a Node restart. Once the owner has fetched a package for review, a sidecar marker beside the
+  installed directory keeps that candidate inert across restarts until the owner approves or removes it.
+  The marker is written before the package is placed and checked before every boot or reload import.
 
 ### What the owner can know before the download
 
@@ -398,10 +402,18 @@ cannot show one. The approval is therefore two screens, and the split is deliber
    knowable before anything is fetched, and it is the gate on the fetch itself — a node reaching out to a
    URL an agent chose is a network action taken on an agent's say-so, so a No here means nothing is
    downloaded at all.
-2. **The review.** The device installs, then reads the real manifest back off the roster and shows what
-   the package declares. Install runs no plugin code — every result is `installed-restart-required` — so
-   this still happens before anything executes, and its No uninstalls the package again (keeping its
-   data, as every other uninstall path does by default).
+2. **The review.** The device installs behind a durable pending-review marker, then reads the real
+   manifest back off the roster and shows what the package declares. The Node loader refuses to import
+   marked packages at boot or reload, including manifest-only registrations, and the client does not
+   offer their candidate bundle. Approval checks the marker generation and a fingerprint of the whole
+   package tree before clearing the gate. No removes the package and marker, keeping plugin data.
+
+If the owner dismisses review, the marker remains. Settings → Plugins shows the held package and its
+permissions after reconnect or restart, with approval and removal actions. A corrupt marker or an
+interrupted install without a package can be removed there. The old process can keep serving the prior
+version during a staged update; a restart before approval never imports the replacement. Direct owner
+installs in Settings continue to use the ordinary install path, but cannot replace a candidate that is
+still held for review.
 
 The alternative — download and validate first, then approve against the real manifest — was rejected for
 two reasons. It fetches on the agent's word with no human in between, and pinning the reviewed bytes
@@ -517,6 +529,8 @@ plugin-owned Node routes, including the `items` form of a rail source. A client-
 helper rejects invalid packages before caching, and
 the client repeats the rule before registering contributions. Its code runs through the same sandboxed
 iframe or remote-tree worker as a Node-delivered bundle, never in the shell process.
+On desktop, a remote-tree worker is created by a host-owned relay document at the bundle's
+`app-plugin://<hash>` origin. The bundle never executes under the renderer's `app://acorn` origin.
 
 One active bundle exists per plugin ID. A compatible device bundle wins over any Node offer of that
 ID, even if the Node version is newer; version and hash order still choose among device candidates.

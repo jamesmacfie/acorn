@@ -258,7 +258,11 @@ serve while it is still rebuilding the optimized dependency graph; opening on th
 the entry request receive Vite's transient 504, and the window worked only after a manual reload. The
 shell retries that 504 and a temporarily unavailable socket for up to 30 seconds. Any other HTTP
 status ends the wait so the real Vite transform error reaches the startup guard instead of becoming a
-readiness timeout. The same check covers `tauri dev` and isolated automation sessions.
+readiness timeout. The same check covers `tauri dev` and isolated automation sessions. Vite can
+invalidate the graph again while the window is loading. If the development entry script then fails,
+the page's startup guard probes it, shows a brief loading message, and reloads up to four times for
+a transient 502–504 or a newly settled JavaScript response. It leaves a transform error on the
+failure screen, and a successful mount clears the retry count.
 
 **The proxy forwards what Vite said, including a refusal.** A non-2xx is an answer, not a transport
 failure, and `ureq` reports both as `Err`. Two of them turn up on a cold launch: 504 is how Vite asks
@@ -302,7 +306,7 @@ test reads the JSON back and fails if `windows` reappears.
 preview pane is a child webview rather than a frame, so widening this for `http(s)` would buy
 nothing. Two more directives carry their own reason: `style-src 'unsafe-inline'` is required because
 Shiki emits `style="color:#…"` attributes into HTML that reaches `innerHTML`, and style attributes
-are gated independently of `el.style.x = v` assignments; `img-src https:` exists for GitHub avatars
+are gated independently of `el.style.x = v` assignments; remote images are limited to GitHub avatar hosts
 rendered in PR authorship (`kit/components/content/UserAvatar.tsx`), and narrowing it to the two GitHub avatar hosts is a
 one-line change once nothing else renders a remote image.
 
@@ -353,25 +357,28 @@ reader gets has the shell's focus handling, keyboard model, ARIA and style pack,
 iframe can borrow. `docs/plugins.md` § The client half of a loaded plugin has the plugin-facing half;
 this section is the shell's.
 
-The worker script is the plugin's own bundle, served by `app_scheme.rs` at
-`app://acorn/plugin-worker/<sha256>.js` from the same content-addressed cache the plugin scheme reads.
-It is served from *this* origin rather than from `app-plugin://<hash>` because a worker script has to
-be same-origin with the document that starts it; there is no way to point `new Worker()` at another
-scheme. The hash in the path is validated as 64 lowercase hex digits before the read, so the path can
-name a bundle this device holds and nothing else, and a hash the cache does not hold is a 404 rather
-than a fall-through to the client root — a Worker handed the shell's `index.html` would be a strange
-failure to debug.
+The renderer embeds a hidden, host-owned document at `app-plugin://<sha256>/worker.html`. That
+document loads only `/worker-host.js`, also written by the shell. It creates a module Worker from
+`/client.js`, so the plugin bundle executes under its own content-addressed origin and cannot read
+the renderer's IndexedDB, cache, or other same-origin storage. The renderer checks the relay frame's
+window, exact origin, and per-instance nonce before it transfers the bridge and tree ports. The relay
+checks its parent origin, nonce, protocol version, and port count before passing them to the Worker.
+There is no fallback that executes the bundle at `app://acorn` if the relay or Worker fails; the tree
+shows a failure. The old `/plugin-worker/*` renderer route now returns 404.
 
 The bytes are identical to what the frame origin serves as `/client.js`, and so is the trust decision:
 the owner accepted the exact `(pluginId, hash)` pair. The worker path asks no second question.
 
-Its policy is its own, for the reason the highlighter's is (above): a same-origin worker takes its CSP
-from its own script's response headers. `PLUGIN_WORKER_CSP` is
-`default-src 'none'; script-src 'self'; connect-src 'none'` — tighter than the highlighter's, with no
-`wasm-unsafe-eval`, because a plugin bundle is a stranger's code and nothing a tree draws needs one.
-`connect-src 'none'` is the load-bearing directive it shares with the frame origin: fetch, XHR,
-WebSocket and `sendBeacon` all fail inside the worker, so the transferred `MessagePort` is the only way
-out of it. The document's `worker-src` names `'self' blob:` and never the plugin scheme.
+The relay document's CSP allows only its host script and one same-origin Worker. The bundle's own
+response has `default-src 'none'; script-src 'self'; worker-src 'none'; connect-src 'none'`, with no
+`wasm-unsafe-eval`. `connect-src 'none'` blocks direct network I/O; the transferred ports are its
+only host channel. The normal plugin frame document still has `worker-src 'none'`. The renderer's
+`worker-src` remains for its own highlighter only, and its `frame-src` admits the plugin scheme.
+
+On Windows, Wry maps custom schemes to HTTP origins (`app://acorn` to `http://app.localhost` and
+`app-plugin://<hash>` to `http://app-plugin.<hash>`). The handshake accepts these exact mapped
+origins. A 64-character hash host has not been verified in WebView2; if that engine rejects the
+mapped hostname, the tree fails closed and cannot fall back to renderer-origin execution.
 
 The renderer's half is `packages/client-core/src/host/tree/`: `workerHost.ts` owns one worker per
 accepted `(pluginId, hash)`, shared by that identity's trees and stopped a grace period after the last
@@ -474,7 +481,9 @@ than a fetch. Phase 0 measured the arrangement in WKWebView: each hash is a real
 storage, `'self'` resolves against it, and the per-response CSP is honoured.
 
 Only `/index.html`, generated by the shell so the plugin never controls its own head, `/client.js`,
-and the host-owned `/ui.css` presentation kit exist there. The stylesheet is a staged file the
+the host-owned `/ui.css` presentation kit, and the host-owned tree relay document/script exist there.
+The relay document does not load the plugin bundle in its window; it creates a Worker for it.
+The stylesheet is a staged file the
 handler reads once at boot; `apps/desktop/scripts/stage.mjs` holds the ordered list of client-core
 modules that make it up, and `packages/client-core/src/infra/styles/cssHygiene.test.ts` reads that list and
 checks a frame is served a base rule for every class `primitives.css` styles. The handler resolves a
@@ -494,7 +503,7 @@ frame's only I/O is the `MessagePort` the shell transfers in, where each call is
 plugin's declared scopes (`docs/plugins.md`). The renderer's own CSP names this scheme in `frame-src`
 and nothing else.
 
-There is no `x-frame-options` or `frame-ancestors` on these responses: the shell frames a plugin from
+There is no `x-frame-options` or `frame-ancestors` on plugin responses: the shell frames a plugin from
 `app://acorn`, a different origin, so `SAMEORIGIN` would block the only embed that is meant to work.
 What bounds who can frame a plugin is that nothing else in this process can. The shell's own CSP is
 the only one naming this scheme in `frame-src`, and top-level navigation to it is denied below.
@@ -504,13 +513,20 @@ is nothing to gain and one more place for stale bytes to live.
 
 ### Navigation policy
 
-The window's `on_navigation` guard admits `app://acorn` and `app-plugin://` and refuses everything
-else. It fires for subframes as well as the main frame, which is the one guard covering both halves
+The window's `on_navigation` guard admits the exact `app://acorn` origin and hash-shaped
+`app-plugin://<hash>` origins (including Wry's mapped forms on Windows) and refuses everything else.
+It fires for subframes as well as the main frame, which is the one guard covering both halves
 Electron needed two events for: a plugin origin can never become the whole window, and a plugin frame
 cannot navigate itself off its own document. Returning false leaves the frame where it was, verified
 in phase 0. There is no OAuth exception: GitHub connects by device flow against the node
 (`POST /v1/p/github/auth/device/start`), so no window ever has to navigate to github.com.
 `on_new_window` denies `window.open` from anywhere, plugin frames included.
+
+The renderer response itself carries `frame-ancestors 'none'`. This is required even with the
+navigation callback: an isolated plugin iframe uses `allow-scripts allow-same-origin`, and must never
+load an `app://acorn` document as its child document, where it could become same-origin with the
+parent. The app scheme handler also refuses every authority other than `app://acorn`; a string-prefix
+lookalike such as `app://acorn.evil` never receives renderer assets.
 
 A frame's rendered content therefore reaches the outside world only by asking, over the bridge.
 `ui.openUrl` hands an `https` URL to the shell, which resolves it in-app if a content-link recogniser
@@ -538,6 +554,13 @@ scheme with no CORS.
 The renderer calls `nodeFetch(nodeId, request)` and the stream methods over the helper socket. The
 broker adds the bearer, validates the pinned certificate, and returns serializable response bytes.
 Node states are `online`, `degraded`, `offline`, `incompatible`, and `revoked`.
+
+The broker buffers each HTTP response before it crosses to the renderer, so custody caps ordinary
+responses at 64 MiB. A plugin bundle download has the tighter 8 MiB limit of the bundle format;
+the unverified pairing probe allows 16 KiB and the pinned pairing result 64 KiB. Each limit rejects
+an oversized declared `Content-Length` before reading, and counts actual chunks when the length is
+absent or false. The socket is closed as soon as the limit is crossed. A response limit error is a
+failure of that read, not evidence that the Node is offline.
 
 Both ends run a ping and pong watchdog. A sequence gap or watchdog failure makes the node stale and
 causes the client to reconnect and refetch, with one exception: a `ws:shed` marker says the node
@@ -614,15 +637,19 @@ revoked.
 `apps/desktop/src-tauri/src/webviews.rs` owns every child webview: the browser preview pane and
 loaded-plugin webview surfaces. It is one module rather than three because the difference between the
 two products is a policy function and a key prefix. Keys are `preview:<taskId>` and
-`plugin:<pluginId>:<nodeId>[:<surface>]`, and the prefix is validated rather than assumed, because it
-is what selects the policy.
+`plugin:<pluginId>:<nodeId>:<surface>[:<taskId>]`; the node ID keeps each node's page storage and
+navigation state separate. The prefix and key shape are validated because they select the policy.
 
 A child webview under `Window::add_child` composites over the main one and takes logical bounds from
 the renderer's pane geometry. It does not inherit DOM overflow clipping, so the renderer intersects
 the host element with the viewport and every clipping ancestor before it sends those bounds. The
 child hides when no visible area remains or an overlay covers the pane. `incognito(true)` gives it
-its own ephemeral data store. Preview is one kept-alive webview per task, restricted to HTTP and
-HTTPS URLs with no credentials, with an external chrome layer the renderer draws. In development,
+its own ephemeral data store. Local-node preview is one kept-alive webview per task, restricted to
+HTTP and HTTPS URLs with no credentials, with an external chrome layer the renderer draws. Remote-node
+preview is unavailable: the native webview has no network-level policy for page subrequests, so a
+remote page could reach services on the client's private network even when its first request goes
+through a preview tunnel. The pane explains this and evicts an existing view when its node becomes
+remote. In development,
 the preview's DevTools button addresses that child handle rather than the main renderer and reapplies
 the child's bounds after WebKit opens its inspector. A loaded plugin's webview surface is checked
 against its manifest hosts by the renderer broker and again here, and two independent checks is the
@@ -631,8 +658,13 @@ caps what a renderer bug that ensures in a loop can cost.
 
 wry exposes no navigation history, so the shell keeps its own. `on_navigation` reports every
 navigation, including the ones page script drives, and the module marks the traversals it asked for
-so they move the cursor instead of truncating the future. That is what lets the pane offer back and
-forward honestly rather than always-enabled.
+so they move the cursor instead of truncating the future. The callback reads the record's live host
+policy on every navigation. When `ensure` receives a changed policy, the shell swaps that policy and
+closes the old native view before opening a fresh one; this also cancels an in-flight navigation and
+discards a page or history entry on a now-revoked host. An empty or invalid replacement retires the
+old view. A failed replacement is reported to the pane.
+If native close fails, the shell hides and tries to blank the invalidated view, refuses further
+show/load/command calls for it, and retries close on the next `ensure`.
 
 Normal development and packaged webviews expose no automation server. The explicit
 `agent-automation` build is the exception: its main Acorn webview has a loopback-only WebDriver server
@@ -649,10 +681,11 @@ and re-reads on `plugin:preview:url-changed { taskId, url, source }`, where `url
 connected client agree on the answer. The terminal recipe picker reaches preview through the
 `preview.recipeSelection` client capability, avoiding a reverse package import.
 
-For a task whose dev server is served by another node process,
-`@acorn/custody/supervision/previewTunnel.ts` opens an authenticated loopback listener that forwards
-raw bytes to the node's own tunnel endpoint over its pinned agent, so the preview pane can reach a
-dev server without the renderer ever touching the network directly. It binds `127.0.0.1` explicitly;
+The preview tunnel implementation remains in custody but the pane does not open it while remote
+preview is disabled. The following describes that dormant transport, not an enabled remote preview
+path. A tunnel alone is not a browser network boundary: after loading a page, the
+native webview can make additional requests directly from the client computer. The existing
+`@acorn/custody/supervision/previewTunnel.ts` listener binds `127.0.0.1` explicitly;
 binding `0.0.0.0` would publish another machine's dev server to the local network, the opposite of
 the tunnel's purpose. Because a task's preview URL can be resolved more than once while its resource
 is settling, opening for a key already in flight returns the same promise instead of racing a second

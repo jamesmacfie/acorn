@@ -1,7 +1,7 @@
 import { render } from 'solid-js/web'
 import type { JSX } from 'solid-js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { DiffLine, SplitCell } from './DiffRows'
+import { DiffLine, NonCodeRow, SplitCell } from './DiffRows'
 import type { CodeRow } from './diffModel'
 
 const insert: CodeRow = {
@@ -61,5 +61,27 @@ describe('diff line editor navigation', () => {
       </div>
     ))
     expect(host.querySelector('.diff-open-btn')).toBeNull()
+  })
+})
+
+describe('review comment HTML', () => {
+  it('sanitizes a provider comment before it enters the diff view', () => {
+    const host = mount(() => (
+      <NonCodeRow
+        row={{ kind: 'thread', thread: {
+          threadId: 'thread-1', path: 'src/example.ts', line: 48, side: 'RIGHT', resolved: false,
+          comments: [{
+            id: 'comment-1', databaseId: 1, author: 'reviewer', createdAt: null,
+            body: '<p><strong>Review</strong> <img src="https://attacker.test/pixel" onerror="run()"><a href="javascript:run()">unsafe</a> <a href="https://example.test/">safe</a></p>',
+          }],
+        } }}
+        onMutated={() => {}}
+        resolveThread={async () => {}}
+        reply={async () => {}}
+      />
+    ))
+    const body = host.querySelector('.diff-thread-comment .ui-markdown')
+    expect(body?.innerHTML).toBe('<p><strong>Review</strong> unsafe <a href="https://example.test/" target="_blank" rel="noopener noreferrer">safe</a></p>')
+    expect(body?.querySelector('img, script, [onerror]')).toBeNull()
   })
 })

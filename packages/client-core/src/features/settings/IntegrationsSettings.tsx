@@ -2,6 +2,7 @@ import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
 import { connectionName, MAX_CONNECTION_NAME } from '@acorn/protocol/integrations.ts'
+import { safeVerificationUrl } from '@acorn/protocol/externalUrl.ts'
 import CopyButton from '../../kit/components/inputs/CopyButton'
 import Icon from '../../kit/components/content/Icon'
 import { brandStyle } from '../../kit/tokens/brandMarks'
@@ -266,9 +267,9 @@ export default function IntegrationsSettings() {
                   {/* A real link, not a fetch: main's setWindowOpenHandler routes it through
                       isAllowedExternalUrl → shell.openExternal, so it opens in the owner's browser.
                       CSP-safe because it is a navigation, not a frame or a connect-src. */}
-                  <a class="ui-btn" href={started().verificationUri} target="_blank" rel="noopener noreferrer">
-                    Open {new URL(started().verificationUri).host}
-                  </a>
+                  <Show when={safeVerificationUrl(started().verificationUri)} fallback={<Alert>The provider returned an unsafe sign-in address. Cancel and retry.</Alert>}>
+                    {(url) => <a class="ui-btn" href={url().href} target="_blank" rel="noopener noreferrer">Open {url().host}</a>}
+                  </Show>
                   <p class="integration-add-hint muted">Waiting for approval…</p>
                   <Button variant="ghost" tone="danger" onPress={deviceFlow.cancel}>Cancel</Button>
                 </div>

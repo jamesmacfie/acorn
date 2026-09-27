@@ -1,4 +1,4 @@
-import { installPlugin, uninstallPlugin, updatePlugin } from '@acorn/node-core/server/plugins'
+import { installPlugin, pluginDir, uninstallPlugin, updatePlugin } from '@acorn/node-core/server/plugins'
 import { installedPluginInfo, readClientBundle, scanInstalled, snapshotActivePlugin, type ActivePluginSnapshot, type InstalledPlugin } from '@acorn/node-core/server/plugins'
 import { createPluginReloader } from '@acorn/node-core/server/plugins'
 import { cascadeDeletePluginData } from '@acorn/node-core/server/db/cascade.ts'
@@ -7,6 +7,7 @@ import type { PluginsBridge } from '@acorn/node-core/server/pluginHost'
 import type { PluginHostResult, PluginRosterEntry } from '@acorn/node-core/server/pluginHost/host.ts'
 import type { PluginLoadFailure } from '@acorn/node-core/server/plugins'
 import { nodePluginNames } from './composition'
+import { approvePluginReview, hasPendingPluginReview, pendingPluginReviewIds, pluginReviewFingerprint, readPendingPluginReview } from '@acorn/node-core/server/plugins'
 
 // The PLUGIN_STATE bridge, built once for both composition roots (docs/node-distribution.md §
 // Plugins). Building it once here is what stops the two roots drifting on which build allows
@@ -70,11 +71,20 @@ export async function buildPluginStateBridge(input: PluginStateInput): Promise<P
     // stops claiming a restart is pending for code that is already live.
     booted: () => [...active().values()],
     loadFailures: input.loadFailures,
+    pendingReview: (id) => readPendingPluginReview(dataDir, id) ?? (hasPendingPluginReview(dataDir, id) ? { corrupt: true } : null),
+    pendingReviewIds: () => pendingPluginReviewIds(dataDir),
+    approveReview: (id, reviewId, fingerprint) => {
+      const candidate = installed().find((entry) => entry.manifest.id === id && entry.dir === pluginDir(dataDir, id))
+      if (!candidate) throw new Error(`No installed package '${id}' is available for review.`)
+      const currentFingerprint = pluginReviewFingerprint(candidate.dir)
+      if (currentFingerprint !== fingerprint) throw new Error(`'${id}' changed since the review was opened. Reopen its review.`)
+      return approvePluginReview(dataDir, id, reviewId, currentFingerprint)
+    },
     clientBundle: async (id, hash) => {
       const retained = active().get(id)?.bundle
       if (retained?.hash === hash) return retained
       const candidates = installed()
-      const candidate = candidates.find((entry) => entry.manifest.id === id && entry.client?.hash === hash)
+      const candidate = candidates.find((entry) => entry.manifest.id === id && !hasPendingPluginReview(dataDir, id) && entry.client?.hash === hash)
       if (!candidate) return null
       const bundle = await readClientBundle([candidate], id)
       // A package can change between the advertised scan and this read. The named hash is the

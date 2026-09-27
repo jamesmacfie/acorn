@@ -8,21 +8,25 @@ const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ESC[c])
 
 // Allow only http(s) and mailto; the input is already HTML-escaped when this runs.
 const safeHref = (u: string): string | null => (/^(https?:\/\/|mailto:)/i.test(u) ? u : null)
-// Images are fetched by the renderer, so mailto is not meaningful here.
-//
-// `data:image/` is allowed alongside http(s) because of the sandboxed plugin frames, whose CSP is
-// `img-src 'self' data:` with `connect-src 'none'` (docs/shell.md § The plugin frame origin). A frame
-// cannot load a remote image at all, and a provider's uploads are usually behind the same credential
-// its API is, so the only way one draws a picture is for its node half to fetch the bytes and hand
-// them back inline. Inert either way: an `<img>` never executes what it points at, SVG included.
-const safeImageSrc = (u: string): boolean => /^(https?:\/\/|data:image\/)/i.test(u)
+// A Node-provided markdown body can name an arbitrary URL. Loading it as an image would issue a
+// request from the client's machine without a click, including to private-network services. Images
+// therefore arrive as raster bytes over the broker and are displayed as bounded data URLs.
+const MAX_INLINE_IMAGE_BYTES = 8 * 1024 * 1024
+const safeImageSrc = (u: string): boolean => {
+  const prefix = /^data:image\/(?:png|jpeg|gif|webp|avif);base64,/i.exec(u)
+  if (!prefix) return false
+  const encoded = u.slice(prefix[0].length)
+  return encoded.length > 0
+    && Math.floor(encoded.length * 3 / 4) <= MAX_INLINE_IMAGE_BYTES
+    && /^[A-Za-z0-9+/]+={0,2}$/.test(encoded)
+}
 
 export type MarkdownOptions = {
   /**
-   * What an image in the source becomes. `inline` renders an `<img>`, for content a person wrote in a
-   * tracker or a note. `placeholder` renders the alt text and never issues the request, for output a
-   * model produced: a remote image there is a tracking pixel that carries the reader's IP, and the
-   * managed-agent transcript is provider text rather than authored text. Defaults to `inline`.
+   * What an image in the source becomes. `inline` renders an `<img>` only for a bounded raster data
+   * URL already delivered as bytes. A remote URL becomes alt text, because rendering it would make
+   * the client's machine fetch it. `placeholder` renders alt text for every image, including data
+   * URLs. Defaults to `inline`.
    *
    * `thumb` is `inline` drawn as a short band across whatever holds it, cropped to fill, for a picture
    * that stands for a file rather than being the content: an attachment above its filename, where full

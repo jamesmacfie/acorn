@@ -4,7 +4,7 @@ import { EmptyState, IconButton, Input, Rectangle, Spinner, Text, Toolbar } from
 
 const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
 
-export default function PreviewPane(props: { taskId: string; url: string | null }) {
+export default function PreviewPane(props: { taskId: string; url: string | null; remoteBlocked: boolean }) {
   let host!: HTMLElement
   const preview = previewViews()
   const [loading, setLoading] = createSignal(false)
@@ -82,6 +82,11 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
     const covered = suppressed()
     const version = ++ensureVersion
     if (!preview || !host) return
+    if (props.remoteBlocked) {
+      // A hidden kept-alive view would keep running page scripts after a node switch. Destroy it.
+      preview.evict(taskId)
+      return
+    }
     if (!url) {
       preview.hide()
       return
@@ -92,7 +97,13 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
       syncRect()
     }
     void preview.ensure(taskId, url).then((ready) => {
-      if (!ready || version !== ensureVersion) return
+      if (!ready) return
+      // An ensure started for the local node may finish after the pane switches to a remote one.
+      if (props.remoteBlocked) {
+        preview.evict(taskId)
+        return
+      }
+      if (version !== ensureVersion) return
       // A view the shell has just created is a 1x1 square in the corner, and the bounds call that
       // ran before `ensure` found no view to move, so this one placement cannot be the one the
       // memo above skips.
@@ -111,7 +122,13 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
     <>
       {/* No "needs the desktop app" fallback: the pane's `requires: { seam: 'preview' }` means a host
           without the seam never offers it (./PreviewTaskPane.tsx). */}
-      <Show when={props.url} fallback={
+      <Show when={props.remoteBlocked}>
+        <EmptyState title="Preview unavailable on remote Nodes">
+          A page loaded here could reach services on this computer's network. Run Acorn on the Node
+          machine to inspect its preview.
+        </EmptyState>
+      </Show>
+      <Show when={!props.remoteBlocked && props.url} fallback={props.remoteBlocked ? null :
         <EmptyState title="No preview URL yet">
           Declare a run target with a <Text emphasis="mono">url</Text> — in{' '}
           <Text emphasis="mono">.acorn/config.toml</Text> or the workspace's run targets — and start it
@@ -144,7 +161,7 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
       </Show>
       {/* A WebContentsView is somebody else's pixels, so it is a rectangle: the kit owns the box and
           the way in and out of it with the keyboard, and the shell positions the view over `mount`. */}
-      <Rectangle kind="webview" label="Preview" mount={(element) => { host = element }} />
+      <Rectangle kind="webview" label="Preview" hidden={props.remoteBlocked} mount={(element) => { host = element }} />
     </>
   )
 }

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PLUGIN_API_MAJOR, type NodePluginPermissions, type NodePluginRow, type PluginContributions } from '@acorn/protocol/api.ts'
+import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
 import type { PluginAckRecord } from '../../infra/platform'
 
 let hostAcks: PluginAckRecord[] = []
@@ -251,6 +252,7 @@ describe('recordTrustDecision', () => {
     off()
     expect(recordPluginTrust).toHaveBeenCalledWith(expect.objectContaining({
       pluginId: 'board', hash: HASH, nodeId: 'node-a', version: '2.0.0', decision: 'accepted',
+      declaration: clientDeclaration(current.row.installed!),
       navigationDestinations: [], agentTools: [], contextSections: [],
     }))
     // The projection catches up so a just-accepted plugin's surfaces do not wait for the next boot.

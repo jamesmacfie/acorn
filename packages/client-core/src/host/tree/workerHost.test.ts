@@ -3,7 +3,8 @@ import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import type { FrameBridge } from '../frames/broker'
 import type { TreeSlotBridge } from './workerHost'
 import { allowApi } from '../frames/scopes'
-import { _setWorkerFactory, _stopAllTreeWorkers, acquireTreeWorker, pluginWorkerUrl, stopTreeWorker } from './workerHost'
+import { pluginTreeRelayOrigin, pluginTreeRelayUrl } from './isolatedWorker'
+import { _setWorkerFactory, _stopAllTreeWorkers, acquireTreeWorker, stopTreeWorker } from './workerHost'
 
 // The lifecycle around a plugin's worker: one per bundle, shared by every tree it serves, stopped when
 // the last one goes and when it stops answering.
@@ -79,6 +80,18 @@ afterEach(() => {
 })
 
 describe('one worker per bundle', () => {
+  it('reports an unavailable isolated origin through the normal tree failure path', async () => {
+    _setWorkerFactory(() => { throw new Error('unknown renderer origin for a plugin worker') })
+    const refused: string[] = []
+    const handle = acquire(refused)
+    const failures: string[] = []
+    handle.transport('s1').onFailed((reason) => failures.push(reason))
+    await settle()
+    expect(refused).toContain('unknown renderer origin for a plugin worker')
+    expect(failures).toContain('unknown renderer origin for a plugin worker')
+    expect(handle.bridgePort()).toBeNull()
+  })
+
   it('isolates identical bytes by plugin id, including each bridge’s API namespace', () => {
     start()
     const connected: string[] = []
@@ -146,9 +159,13 @@ describe('one worker per bundle', () => {
     expect(sandbox!.terminated).toBe(true)
   })
 
-  it('names the bundle by its hash, on the shell’s own origin', () => {
-    // Not `app-plugin://`: a worker script has to be same-origin with the document that started it.
-    expect(pluginWorkerUrl(HASH)).toBe(`/plugin-worker/${HASH}.js`)
+  it('starts the bundle through its isolated plugin origin', () => {
+    expect(pluginTreeRelayUrl(HASH, 'nonce')).toBe(`app-plugin://${HASH}/worker.html#nonce`)
+    expect(() => pluginTreeRelayUrl('../acorn', 'nonce')).toThrow('invalid plugin bundle hash')
+    expect(pluginTreeRelayOrigin(HASH, 'app://acorn')).toBe(`app-plugin://${HASH}`)
+    expect(pluginTreeRelayOrigin(HASH, 'http://app.localhost')).toBe(`http://app-plugin.${HASH}`)
+    expect(pluginTreeRelayOrigin(HASH, 'https://app.localhost')).toBe(`https://app-plugin.${HASH}`)
+    expect(() => pluginTreeRelayOrigin(HASH, 'https://evil.example')).toThrow('unknown renderer origin')
   })
 
   it('leaves another plugin alive when the first plugin’s grace expires', async () => {
@@ -206,6 +223,21 @@ describe('one worker per bundle', () => {
 })
 
 describe('what reaches a tree', () => {
+  it('rejects a forged small byte count on an oversized batch', async () => {
+    start()
+    const refused: string[] = []
+    const handle = acquire(refused)
+    handle.mount('s1', 'toolCard', {})
+    const received: TreeMutation[][] = []
+    handle.transport('s1').onBatch((batch) => received.push([...batch]))
+    const ops = Array.from({ length: 20 }, (_, index) => ({ op: 'text', id: `n${index}`, value: 'x'.repeat(60_000) }))
+    sandbox!.port.postMessage({ kind: 'tree:batch', slot: 's1', ops, bytes: 0 })
+    await settle()
+    expect(refused).toContain('sent a tree message past the host size or depth limit')
+    expect(received).toEqual([])
+    handle.release()
+  })
+
   it('replays the first batch when the worker answers before the host subscribes', async () => {
     start()
     const handle = acquire()

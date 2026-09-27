@@ -104,4 +104,7 @@ export const ROLE_PROPS = {
 export const FORBIDDEN_PROPS = [
   'class', 'className', 'classList', 'style', 'ref', 'innerHTML', 'innerText', 'textContent',
   'dangerouslySetInnerHTML', 'children',
+  // `Row.item` and `SplitHandle.drag.handleProps` are host-minted collection/drag handles that kit
+  // components spread onto DOM elements. Nested JSON here would bypass every top-level prop check.
+  'item', 'drag',
 ] as const

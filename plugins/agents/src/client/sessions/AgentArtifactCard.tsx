@@ -4,7 +4,7 @@ import { saveFile } from '@acorn/plugin-api/client'
 import { Card, Icon, Markdown, Row, Stack, Text } from '@acorn/plugin-api/ui'
 import { managedAgentApi } from './managedClient'
 import { downloadName } from './downloadName'
-import { dataUrl, imageAlt, isInlineImageType } from './inlineImage'
+import { dataUrl, imageAlt, isInlineImageType, MAX_INLINE_IMAGE_BYTES } from './inlineImage'
 
 type ArtifactEvent = Extract<AgentNormalizedEvent, { type: 'artifact' }>
 
@@ -34,9 +34,10 @@ function DownloadRow(props: { artifact: ArtifactEvent }) {
 
 export default function AgentArtifactCard(props: { artifact: ArtifactEvent }) {
   const [image] = createResource(
-    () => isInlineImageType(props.artifact.mediaType) ? props.artifact.artifactId : null,
+    () => isInlineImageType(props.artifact.mediaType) && (props.artifact.byteSize === undefined || props.artifact.byteSize <= MAX_INLINE_IMAGE_BYTES)
+      ? props.artifact.artifactId : null,
     async (artifactId) => {
-      const content = await managedAgentApi.artifactContent(artifactId).catch(() => null)
+      const content = await managedAgentApi.artifactPreview(artifactId).catch(() => null)
       if (!content || !isInlineImageType(content.type)) return null
       return dataUrl(content.bytes, content.type)
     },

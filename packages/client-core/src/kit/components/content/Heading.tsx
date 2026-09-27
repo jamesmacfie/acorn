@@ -12,7 +12,7 @@ export function Heading(props: { level?: 1 | 2 | 3; eyebrow?: string; children: 
   return (
     <div class="ui-heading" data-level={String(props.level ?? 2)}>
       <Show when={props.eyebrow}><span class="ui-heading-eyebrow">{props.eyebrow}</span></Show>
-      <Dynamic component={`h${props.level ?? 2}`} class="ui-heading-title">{props.children}</Dynamic>
+      <Dynamic component={`h${[1, 2, 3, 4, 5, 6].includes(props.level ?? 2) ? props.level ?? 2 : 2}`} class="ui-heading-title">{props.children}</Dynamic>
     </div>
   )
 }
