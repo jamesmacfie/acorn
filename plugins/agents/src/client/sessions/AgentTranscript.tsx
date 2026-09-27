@@ -16,6 +16,7 @@ import { subagentSummary } from './subagentDisplay'
 import { agentSessionIsStarting } from '../composer/agentComposerState'
 import { AgentToolFoldContext, createAgentToolFoldSetting } from './toolFoldPrefs'
 import { readingPlace, rememberReadingPlace } from './readingPlaceStore'
+import { codexPlanHandoffState, type CodexPlanHandoffState } from '../../shared/codexPlanHandoff'
 
 // The session's stream, as a `Timeline` of cards.
 //
@@ -41,6 +42,7 @@ export default function AgentTranscript(props: {
   onControls?: (api: TimelineControls) => void
   onExitSubagent: () => void
   onRequestResolved: () => void
+  onPlanImplemented?: () => void
 }) {
   const queryClient = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
@@ -67,6 +69,10 @@ export default function AgentTranscript(props: {
   // said, both live on the row and keep changing long after the event is written.
   const requestsById = createMemo(() =>
     new Map(requests().map((request) => [request.providerRequestId, request])))
+  const proposalStates = createMemo(() => new Map(props.snapshot.events.flatMap((record) =>
+    record.event.type === 'plan_proposal'
+      ? [[record.id, codexPlanHandoffState(props.snapshot.session, turns(), props.snapshot.events, record)] as const]
+      : [])))
   // The selected subagent's card, when there is one. A complex child run does not fit in a box inside
   // its parent's stream, so selecting it moves the whole window onto that run: the transcript renders
   // the card's own children as its top level, which the projection already built as a tree.
@@ -162,6 +168,10 @@ export default function AgentTranscript(props: {
           focusRequest={item().event.type === 'request'
             && (item().event as Extract<AgentNormalizedEvent, { type: 'request' }>).requestId === props.focusRequestId}
           onRequestResolved={props.onRequestResolved}
+          planHandoffState={item().event.type === 'plan_proposal'
+            ? proposalStates().get(item().key) as CodexPlanHandoffState | undefined
+            : undefined}
+          onPlanImplemented={props.onPlanImplemented}
         />
       </Timeline.Turn>
     )

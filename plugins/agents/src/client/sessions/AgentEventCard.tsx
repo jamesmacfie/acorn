@@ -18,6 +18,8 @@ import AgentArtifactCard from './AgentArtifactCard'
 import AgentAttachmentCard from './AgentAttachmentCard'
 import { senderLabel } from './turnSender'
 import { eventTime } from './eventTime'
+import { managedAgentApi } from './managedClient'
+import type { CodexPlanHandoffState } from '../../shared/codexPlanHandoff'
 
 // One event of a session, as a card in the transcript's `Timeline`. Thirteen kinds, and the tool call
 // is the fourteenth: it is a `Slot`, so another plugin may draw it (./toolRendererRegistry.tsx).
@@ -84,9 +86,26 @@ export default function AgentEventCard(props: {
   /** Bring this request's card to the reader, for the notice or sidebar row that named it. */
   focusRequest?: boolean
   onRequestResolved?: () => void
+  planHandoffState?: CodexPlanHandoffState
+  onPlanImplemented?: () => void
 }) {
   const event = () => props.item.event
   const openChanges = () => dispatchLayout(props.taskId, { type: 'show', pane: 'changes' })
+  const [implementing, setImplementing] = createSignal(false)
+  const [planError, setPlanError] = createSignal('')
+  const implementPlan = async (itemId: string) => {
+    if (implementing()) return
+    setImplementing(true)
+    setPlanError('')
+    try {
+      await managedAgentApi.implementPlan(props.sessionId, itemId)
+      props.onPlanImplemented?.()
+    } catch (caught) {
+      setPlanError(caught instanceof Error ? caught.message : 'Unable to implement this plan.')
+    } finally {
+      setImplementing(false)
+    }
+  }
 
   return (
     <>
@@ -280,6 +299,29 @@ export default function AgentEventCard(props: {
             </For>
           </Stack>
         </Card>
+      </Show>
+      <Show when={event().type === 'plan_proposal'}>
+        {(_shown) => {
+          const proposal = () => event() as Extract<ReturnType<typeof event>, { type: 'plan_proposal' }>
+          return (
+            <Card pad="sm">
+              <Stack gap="row">
+                <Text emphasis="eyebrow">Proposed plan</Text>
+                <AgentMarkdown text={proposal().text} taskId={props.taskId} />
+                <Show when={props.planHandoffState === 'actionable'}>
+                  <Button variant="solid" size="sm" disabled={implementing()}
+                    onPress={() => void implementPlan(proposal().itemId)}>
+                    {implementing() ? 'Starting implementation…' : 'Implement plan'}
+                  </Button>
+                </Show>
+                <Show when={props.planHandoffState === 'handled'}>
+                  <Text emphasis="muted">Implementation started</Text>
+                </Show>
+                <Show when={planError()}>{(message) => <Alert>{message()}</Alert>}</Show>
+              </Stack>
+            </Card>
+          )
+        }}
       </Show>
       <Show when={event().type === 'file_change'}>
         {(_shown) => {

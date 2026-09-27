@@ -124,6 +124,7 @@ export function managedAgentsBridge(
       return { ...page, events: events.map(clientEventRecord) }
     }),
     enqueueTurn: (sessionId, input) => guarded(() => runtime.enqueueTurn(sessionId, input)),
+    implementCodexPlan: (sessionId, itemId) => guarded(() => runtime.implementCodexPlan(sessionId, itemId)),
     patchQueuedTurn: (sessionId, turnId, patch) =>
       guarded(() => runtime.patchQueuedTurn(sessionId, turnId, patch)),
     cancelTurn: (sessionId, turnId) => guarded(() => runtime.cancelTurn(sessionId, turnId)),

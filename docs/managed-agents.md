@@ -155,6 +155,14 @@ discovers Default and Plan through
 `thread/settings/updated` so a preset's effective model and effort stay synchronized with the generic
 configuration shown by acorn. App-servers that do not expose the experimental list endpoint continue
 without a Mode picker.
+Codex's `turn/plan/updated` steps remain a progress card. A completed `plan` item is stored as a
+separate proposal with its item and provider turn IDs and shown in the transcript. For the latest
+successfully completed interactive Plan turn under Acorn control, the shared desktop and terminal card
+offers **Implement plan**. The Node checks the proposal and turn again in one SQLite transaction,
+switches only the session's Mode option to Default, and queues one continuation in the same Codex
+thread. The accepted turn records the proposal identity, so a second click or client reuses that turn
+and a reload shows the proposal as handled. Planning question responses remain request resolutions;
+they never accept a plan. A revision turn or a rejected handoff leaves Plan selected.
 A native driver is written when a vendor protocol carries product value the generic driver cannot,
 and it lives in plugins/agents with the rest of the first-party code. The registry has two doors and
 the names are the point: `register(spec)` takes data, `registerNative(id, factory)` takes code.

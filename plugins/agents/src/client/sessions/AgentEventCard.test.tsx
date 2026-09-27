@@ -3,6 +3,8 @@ import { expect, it, vi } from 'vitest'
 import type { AgentConversationItem } from './conversationItems'
 import type { AgentTurn } from '../../contract/wire.ts'
 
+const implementPlan = vi.fn(async () => ({}))
+
 let markdownMounts = 0
 vi.mock('./ManagedAgentMarkdown', () => ({
   default: (props: { text: string }) => { markdownMounts++; return <span>{props.text}</span> },
@@ -16,10 +18,41 @@ vi.mock('./managedClient', () => ({
       id, taskId: 'task', filename: 'notes.pdf', mediaType: 'application/pdf', byteSize: 2048, createdAt: 0,
     }),
     attachmentContent: async () => { throw new Error('bytes are only fetched for a picture') },
+    implementPlan,
   },
 }))
 
 const { default: AgentEventCard, withoutAttachmentPlaceholders } = await import('./AgentEventCard')
+
+it('offers the completed Codex proposal in the shared desktop and terminal card', async () => {
+  implementPlan.mockClear()
+  const item: AgentConversationItem = {
+    key: 'proposal', firstSeq: 2, lastSeq: 2, createdAt: 2, turnId: 'turn-1',
+    event: { type: 'plan_proposal', itemId: 'plan-1', providerTurnId: 'codex-turn-1', text: '1. Update the API' },
+  }
+  const host = document.createElement('div')
+  document.body.append(host)
+  const changed = vi.fn()
+  const dispose = render(() => <AgentEventCard item={item} taskId="task" sessionId="session"
+    planHandoffState="actionable" onPlanImplemented={changed} />, host)
+  try {
+    const button = [...host.querySelectorAll('button')].find((element) => element.textContent?.includes('Implement plan'))
+    expect(button).toBeDefined()
+    button!.click()
+    button!.click()
+    await vi.waitFor(() => expect(changed).toHaveBeenCalledOnce())
+    expect(implementPlan).toHaveBeenCalledOnce()
+    expect(implementPlan).toHaveBeenCalledWith('session', 'plan-1')
+  } finally { dispose(); host.remove() }
+
+  const handled = document.createElement('div')
+  const disposeHandled = render(() => <AgentEventCard item={item} taskId="task" sessionId="session"
+    planHandoffState="handled" />, handled)
+  try {
+    expect(handled.textContent).toContain('Implementation started')
+    expect(handled.textContent).not.toContain('Implement plan')
+  } finally { disposeHandled() }
+})
 
 it('puts a focusable local time with the full timestamp on both sides of a conversation', () => {
   const at = Date.parse('2026-09-25T03:24:18Z')
