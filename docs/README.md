@@ -111,6 +111,23 @@ Start with the plugin map, then follow the authoring guide or API reference.
 - `schemas/` — generated, versioned JSON Schemas that are pinned by a test and immutable by rule.
   Today that is `docs/schemas/enrollment-v1.json`.
 
+### Command-line interface proposal
+
+| Document | What it holds |
+| --- | --- |
+| [CLI programme](./future/cli/README.md) | Goal, facts, phase order, and handoff map. |
+| [Architecture](./future/cli/architecture.md) | Node boundary, custody, process lifetime, and distribution. |
+| [Interface](./future/cli/interface.md) | Command grammar, machine output, typed stdin, waits, and errors. |
+| [Phase 1: host](./future/cli/phase-1-host.md) | Headless entry, packaged CLI, workspace/project discovery, and reads. |
+| [Phase 2: service](./future/cli/phase-2-service.md) | Persistent local Node start, status, stop, and ownership. |
+| [Workspace and project commands](./future/cli/workspace-and-project-commands.md) | Phase 3 resource administration, configuration, and provider mappings. |
+| [Phase 3: tasks and agents](./future/cli/phase-3-tasks-and-agents.md) | Workspace/project writes, task creation, sessions, prompts, events, and waits. |
+| [Phase 4: workflows](./future/cli/phase-4-workflows.md) | Definition discovery, start, run and step reads, waits, and merged runs. |
+| [Phase 5: plugins](./future/cli/phase-5-plugin-commands.md) | Typed loaded-plugin commands and dispatch. |
+| [Verification](./future/cli/verification.md) | Cross-phase tests, failure matrix, and release acceptance. |
+| [References](./future/cli/references.md) | Repository contracts and external CLI precedents. |
+| [Decisions refused](./future/cli/refused.md) | Alternatives considered and conditions to reopen them. |
+
 ## Documentation ownership
 
 Keep one owning page for each contract. Link to it from other pages instead of copying its details.
