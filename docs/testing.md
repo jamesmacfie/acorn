@@ -20,8 +20,9 @@ rather than `turbo run test` directly: the bound is what keeps the suite honest.
 spawn a real subprocess, mint a certificate, or run git, and turning the bound off oversubscribes the
 machine badly enough that they time out while passing in isolation.
 
-The desktop package's `test` stages the bundle inputs first, then runs its Vitest suites and the Rust
-unit tests, so the boot test always exercises fresh artifacts.
+The desktop package's `test` stages the bundle inputs first, including a build of the plugin SDK for
+bundled plugin imports. It then runs its Vitest suites and the Rust unit tests, so the boot test
+exercises fresh artifacts.
 
 The TUI agent driver has focused protocol, screen, and flow tests under
 `apps/tui/scripts/agent/`. A live PTY run is an opt-in acceptance check because it builds and starts
@@ -376,8 +377,9 @@ guard, the highlighter worker's separate policy, the refusal to answer a node ro
 own HTML, the handshake and ready-line parsing, the data key's shape and file fallback, the plugin
 scheme's hash grammar and frame CSP, the webview URL policies and the key grammar that picks between
 them, the navigation-history bookkeeping, the capability file's webview scoping, and the three
-packaging properties in `tauri.conf.json`. `.github/workflows/build-desktop.yml` runs both halves
-before the bundler pass, so a broken boot path fails in seconds rather than minutes.
+packaging properties in `tauri.conf.json`. The macOS pull request job in `.github/workflows/ci.yml`
+runs both halves. `.github/workflows/build-desktop.yml` runs them again before the bundler pass on
+`main` and tags, so a broken boot path fails before packaging.
 
 What no headless run reaches is compositing: a child webview positioned over a window needs a window.
 That is what items 4 and 5 of the smoke checklist are for.
@@ -463,23 +465,22 @@ is still owed for both. Run it on the host used for release checks and keep both
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs `pnpm lint` and `pnpm test` on every pull request and on push to
-`main`. Before it existed, the architecture rules and the path checker ran only on whoever remembered
-to run them: `.github/workflows/build-desktop.yml` has no `pull_request` trigger and tests the desktop
-package alone. That is how twelve doc paths rotted without anything going red.
+`.github/workflows/ci.yml` runs `pnpm lint` and the non-desktop `pnpm test` suites on every pull
+request and on push to `main`. A separate macOS job runs `pnpm --filter @acorn/desktop test` on pull
+requests without signing secrets. `.github/workflows/build-desktop.yml` runs the same desktop tests
+before building the signed artifact on `main` and tags.
 
-It runs on Linux, for two reasons that are both about the runner rather than the code. A macOS runner
-has no Docker for the container probes to find, and its `/var` is a symlink to `/private/var`, which is
-the artefact behind one of the pre-existing failures below.
+The non-desktop job runs on Linux. A macOS runner has no Docker for the container probes to find,
+and its `/var` is a symlink to `/private/var`, which causes one of the pre-existing failures below.
 
-`@acorn/desktop` is filtered out of the test run. Its `test` script stages the whole bundle and then
-runs `cargo test`, and `build-desktop.yml` already has the Rust toolchain, the staged inputs, and the
-pinned-runtime cache to do it in. That does mean the boot test and the Rust suite gate `main` rather
-than the pull request.
+`@acorn/desktop` is filtered out of the Linux test run. Its macOS pull request job installs Rust and
+caches the pinned Node runtime; the package's `test` script stages the bundle inputs, builds the
+renderer, runs Vitest including the helper boot test, and runs `cargo test`. It does not require
+updater signing secrets or build a distributable.
 
-Nothing is cached between runs, so CI runs the suites a local `pnpm test` usually serves from
-Turborepo's cache. A green local run with 30 of 31 tasks cached is not evidence about the one task you
-changed.
+The workflows cache dependencies and the pinned Node runtime, but not Turborepo task outputs. CI
+runs suites that a local `pnpm test` might serve from Turborepo's cache. A green local run with 30 of
+31 tasks cached is not evidence about the one task you changed.
 
 The startup budget checks live in `build` scripts because they assert properties of built output.
 `@acorn/desktop`'s `build` runs
@@ -489,13 +490,12 @@ the build over a byte ceiling or a denylisted chunk name; [frontend.md](./fronte
 enforce. The TUI build also checks that Node can resolve every external import in its emitted modules,
 including lazy chunks, through `apps/tui/scripts/check-runtime-imports.mjs`.
 
-The build checks do not run in this workflow, which only runs `lint` and `test`: the renderer's runs in
-`build-desktop.yml`, which builds the bundle, and the terminal client's runs whenever somebody builds
-that package. So each has a fixture suite beside it that drives the same script against a directory it
-writes itself — `apps/desktop/test/scripts/` and `apps/tui/src/startupGraph.test.ts`. The TUI's
-`apps/tui/src/runtimeImports.test.ts` exercises its external-import check. Those are what
-gate a pull request: they prove the rule, and the `build` invocation is what applies it to the real
-bytes.
+The desktop pull request job builds the renderer through its `test` script, but does not run the
+renderer budget check; `build-desktop.yml` applies that check to the real build output. The terminal
+client's build check runs when somebody builds that package. Each has a fixture suite that drives the
+same script against a directory it writes itself — `apps/desktop/test/scripts/` and
+`apps/tui/src/startupGraph.test.ts`. The TUI's `apps/tui/src/runtimeImports.test.ts` exercises its
+external-import check. Those fixture suites gate pull requests.
 
 ## The smoke checklist
 
