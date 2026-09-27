@@ -9,7 +9,7 @@ import type { Env } from '@acorn/plugin-api/testkit'
 
 // Workflow start/gate execute an agent step, so the route test proves body validation, auth, and
 // the bridge-unavailable 503 (the privileged-boundary contract). The runner logic is tested in
-// ../workflowRunner.test.ts.
+// the run and dispatch tests.
 
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {

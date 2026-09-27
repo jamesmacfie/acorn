@@ -2,6 +2,11 @@
 
 Part of [workflows.md](../workflows.md).
 
+The Node's `plugins/workflows/src/server/authoring/` generates and grounds proposed definitions.
+`definitions/` loads saved definitions, `files/` handles repository and user file writes, and
+`publication/` records published revisions and drafts. The client editor stays under
+`plugins/workflows/src/client/editor/`.
+
 ## Authoring
 
 Workflows is a source in the left rail, present in every workspace because nothing has to be

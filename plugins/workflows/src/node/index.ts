@@ -7,37 +7,37 @@ import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets.ts'
 import { buildHeadlessArgv, buildSessionEnv, describeError, type InternalEnvFactory, type NodePlugin, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
 import { eq } from 'drizzle-orm'
-import { loadWorkflowFiles } from '../server/workflowFiles'
-import { defsForProject, getDef, listDefs, mergedList } from '../server/workflowDefs'
-import { workflowFileAuthoring } from '../server/workflowFileAuthoring'
-import { destinationQuery, validateWorkflowDestination } from '../server/workflowDestination'
-import { workflowDraftQueries } from '../server/workflowDraftQueries'
-import { workflowPublication } from '../server/workflowPublication'
-import { publishedWorkflow } from '../server/workflowPublicationStore'
-import { generateWorkflowRequest } from '../server/generateWorkflowRequest'
-import { authorWorkflowConversation } from '../server/workflowAuthoringConversation'
-import { WorkflowDispatcher } from '../server/workflowDispatch'
-import { WorkflowProcessingStore } from '../server/workflowProcessingStore'
-import { workflowSelectionPage, workflowRecordAttemptPage, workflowRecordSnapshot } from '../server/workflowProcessingReadModel'
-import { prepareWorkflowReprocess } from '../server/workflowReprocess'
-import { WorkflowRunner, type RunnerDeps, type WorkflowDef } from '../server/workflowRunner'
+import { loadWorkflowFiles } from '../server/definitions/files'
+import { defsForProject, getDef, listDefs, mergedList } from '../server/definitions/store'
+import { workflowFileAuthoring } from '../server/files/authoring'
+import { destinationQuery, validateWorkflowDestination } from '../server/validation/destination'
+import { workflowDraftQueries } from '../server/publication/draftQueries'
+import { workflowPublication } from '../server/publication/service'
+import { publishedWorkflow } from '../server/publication/store'
+import { generateWorkflowRequest } from '../server/authoring/generationRequest'
+import { authorWorkflowConversation } from '../server/authoring/conversation'
+import { WorkflowDispatcher } from '../server/dispatch/dispatcher'
+import { WorkflowProcessingStore } from '../server/processing/store'
+import { workflowSelectionPage, workflowRecordAttemptPage, workflowRecordSnapshot } from '../server/processing/readModel'
+import { prepareWorkflowReprocess } from '../server/processing/reprocess'
+import { WorkflowRunner, type RunnerDeps, type WorkflowDef } from '../server/runs/runner'
 import { WORKFLOWS_NOTICES, type WorkflowNotices } from '../contract/notices'
 import { WORKFLOWS_RUNNER } from '../contract/runner'
 import { WORKFLOW_GATES } from '../contract/events'
 import { WORKFLOW_REVIEW_INPUT } from '../contract/reviewInput'
-import { workflowReviewInput } from '../server/workflowReviewInput'
+import { workflowReviewInput } from '../server/runs/read/reviewInput'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
-import { encodeToolCeiling } from '../server/workflowTools'
-import { validateWorkflow } from '../server/workflowValidation'
-import { workflowRunById, workflowRunsForTask, workflowStepStatuses } from '../server/workflowRunReadModel'
-import { workflowTaskResolutionScope } from '../server/workflowResolution'
+import { encodeToolCeiling } from '../server/steps/tools'
+import { validateWorkflow } from '../server/validation/definition'
+import { workflowRunById, workflowRunsForTask, workflowStepStatuses } from '../server/runs/read/readModel'
+import { workflowTaskResolutionScope } from '../server/definitions/resolution'
 import { WORKFLOW_ROUTE, workflow } from '../server/routes/workflow'
 import { WORKFLOW_DEFS_ROUTE, workflowDefsRoutes } from '../server/routes/defs'
 import { workflowRuns, workflowSteps } from './schema'
-import { workflowRunList, workflowStepProjections, workflowTaskNavigation } from '../server/workflowRunProjection'
-import { WorkflowStartService } from '../server/workflowStartService'
-import { assertWorkflowDataScope } from '../server/workflowDataSteps'
-import { parseWorkflowScheduleTarget, WorkflowScheduleService, type WorkflowScheduleScheduler } from '../server/workflowSchedules'
+import { workflowRunList, workflowStepProjections, workflowTaskNavigation } from '../server/runs/read/projection'
+import { WorkflowStartService } from '../server/runs/admission'
+import { assertWorkflowDataScope } from '../server/steps/data'
+import { parseWorkflowScheduleTarget, WorkflowScheduleService, type WorkflowScheduleScheduler } from '../server/schedules/service'
 import { WORKFLOW_SCHEDULES_ROUTE, workflowScheduleRoutes } from '../server/routes/schedules'
 
 export type WorkflowsPluginDeps = {
@@ -539,7 +539,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
             }),
           }
         },
-        // Wiring only; the two calls and the repair pass are in ../server/generateWorkflowRequest.ts.
+        // Wiring only; the two calls and the repair pass are in ../server/authoring/generationRequest.ts.
         // The runner's validation catalog rather than the pure one built from the kinds alone: it
         // carries each contributed kind's own `validate`, without which a workspace definition with a
         // broken step passes the example filter and teaches the model the mistake.
@@ -610,7 +610,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
 
       // reconcile() is not called here. It has to run after the listener binds and before the
       // composition root resolves `deps.reconciled`, so the root drives it through this capability
-      // (server/workflowRunner.ts explains the ordering).
+      // (server/runs/runner.ts explains the ordering).
       ctx.capabilities.provide(WORKFLOWS_RUNNER, {
         reconcile: async () => {
           const recovered = await dispatcher.reconcile()

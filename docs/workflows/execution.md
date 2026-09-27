@@ -13,11 +13,13 @@ Runs and steps persist state transitions. A restart reconciles persisted operati
 blindly repeats an external side effect with unknown outcome. Ambiguous work parks in an explicit
 recovery/gated state. Cancellation propagates to child sessions and process groups.
 
-The implementation follows those ownership boundaries. `workflowRunner.ts` coordinates graph ticks,
-start, retry, and recovery. `workflowGraph.ts` calculates reachability after branches and retries.
-`workflowStepExecution.ts` renders handler inputs, admits agent turns, and records outcomes.
-`workflowRunState.ts` owns row writes, status events, and spans. `workflowChildLifecycle.ts` and
-`workflowRunTermination.ts` own child waits and run cleanup.
+The Node implementation follows those boundaries under `plugins/workflows/src/server/`.
+`definitions/` loads and resolves frozen definitions. `validation/` checks their graph, bindings,
+and destination. `runs/` coordinates graph ticks, start, retry, recovery, row writes, and termination.
+Its `read/` folder projects persisted runs for the client. `steps/` renders handler inputs and records
+step outcomes. `dispatch/` reserves and waits for child workflows. `processing/` owns tracked record
+attempts and incremental checkpoints. `schedules/` owns scheduled admission. `routes/` exposes
+the Node capabilities without owning execution state.
 
 ### The graph
 
