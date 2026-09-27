@@ -8,7 +8,6 @@ import { isTyping } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm'
 import { isCompact, slotColor } from '../appearance'
 import { flatten, Line, slot } from './cells'
-import { GLYPHS } from './glyphs'
 import { borderCell, boxBorder, litControl, spaceCells, spaceLines } from './roles'
 import { trapKeys } from '../keys/trap'
 import { bindKeys } from '../keys/install'
@@ -324,13 +323,8 @@ export function registerPanel(idPrefix: string, box: Renderable): void {
   })
 }
 
-/** The mark a tab carries goes in front of its label rather than beside it, because a cell row has
- *  no baseline to align an icon against. A Lucide name with no glyph of its own drops out
- *  (../kit/glyphs.ts), and `title` has nowhere to hover. */
-const labelOf = (tab: { label: string; icon?: string }): string => {
-  const glyph = tab.icon ? GLYPHS[tab.icon] : undefined
-  return glyph ? `${glyph} ${tab.label}` : tab.label
-}
+/** The text label identifies a tab without requiring an icon font or SVG. */
+const labelOf = (tab: { label: string; icon?: string }): string => tab.label
 
 /** `Tab  [Tab]  Tab` on one line, the selected one in brackets.
  *
@@ -863,7 +857,7 @@ export function DocumentTabs(props: {
   )
 }
 
-/** A bold line with its actions at the far end. */
+/** Keep the section name visible when action labels need the full width of a terminal panel. */
 export function SectionHeader(props: {
   level?: 'pane' | 'group' | 'sub'
   sticky?: boolean
@@ -872,11 +866,12 @@ export function SectionHeader(props: {
   children: JSX.Element
 }) {
   return (
-    <box flexDirection="row" gap={1}>
-      <Line role="strong">{flatten(props.children)}</Line>
-      <Show when={props.count !== undefined}><Line role="muted">{String(props.count)}</Line></Show>
-      <box flexGrow={1} />
-      {slot(props.actions)}
+    <box flexDirection="column" flexShrink={0}>
+      <box flexDirection="row" gap={1} flexShrink={0}>
+        <Line role="strong">{flatten(props.children)}</Line>
+        <Show when={props.count !== undefined}><Line role="muted">{String(props.count)}</Line></Show>
+      </box>
+      <Show when={props.actions}>{slot(props.actions)}</Show>
     </box>
   )
 }

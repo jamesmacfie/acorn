@@ -126,10 +126,8 @@ describe('running an agent from a terminal', () => {
     try {
       await openFirstSession(screen)
       await enterDetail(screen)
-      // `[…]`, not the words: an `IconButton` paints its mark on this host (../kit/asking.tsx), and
-      // the brackets are the `outline` variant's, which is what tells the pane's own overflow menu
-      // from the bare `…` on a response card further up the column.
-      await stopSaying(screen, '[…]')
+      // The visible label identifies the action without relying on a Lucide substitute.
+      await stopSaying(screen, '[Session actions]')
       await screen.press('RETURN')
       // `until`, not `frame`: the rows are built from the provider list, which is a resource the pane
       // is still fetching when the menu opens.

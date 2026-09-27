@@ -123,10 +123,9 @@ that declare support for the host's form factor.
 #### Task markers
 
 The task list consumes the allocator's complete ordered marker legend rather than its four-corner
-desktop placement. A terminal row has one trailing dimension, so it draws every marker glyph in that
-order while space remains. The task title yields width first. If the row cannot fit all accepted
-glyphs, the host reserves room for `+N`, where N is the number omitted. No accepted marker disappears
-without that disclosure.
+desktop placement. A terminal row shows its count instead of replacing Lucide icon names with
+ambiguous symbols. It says `N marks` where seven cells fit and `+N` in a narrow rail. The full
+ordered legend remains available from the row.
 
 Focus the task row and press `Shift+F10` or the menu key to open the host-owned **Task markers**
 modal. Its virtual list contains every marker label, including labels represented by `+N`. The plugin
@@ -324,7 +323,7 @@ lives.
 | Kind or slot | Desktop | Terminal | Where the answer lives |
 | --- | --- | --- | --- |
 | `rows` (`pane.footer`) | A strip of rows under the pane's frame | A `Rows` collection at the end of the pane, one per contributor, headed by its label and the contributing plugin's id | `apps/tui/src/kit/host.tsx` § `ExtensionRows`, drawn by `apps/tui/src/plugins/ExtendedPane.tsx` |
-| `annotation` | Marks inside the diff row, under the code; `core:task` marks become rail markers | Diff marks appear below the code; task marks use the complete ordered rail legend with a `+N` disclosure and `Shift+F10` inspection | `apps/tui/src/kit/showing.tsx` § `AnnotatedDiffLine`; § Task markers above |
+| `annotation` | Marks inside the diff row, under the code; `core:task` marks become rail markers | Diff marks appear below the code; task rows show a count and offer `Shift+F10` inspection of the full legend | `apps/tui/src/kit/showing.tsx` § `AnnotatedDiffLine`; § Task markers above |
 | `remote` (a `Slot`) | The contributor's tree, in the owner's surface | The same tree, in the same place, drawn from the same batch | `apps/tui/src/kit/host.tsx` § `Slot` |
 | `rectangle` (`pane.inline-*`) | Another plugin's iframe | One muted line naming the point | § Rectangles |
 | `hook` | Runs on the node | Runs on the node | Nothing to draw on either host |
