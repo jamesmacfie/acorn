@@ -13,6 +13,9 @@ development root. `--node ID` selects a remembered Node ID, and an unambiguous l
 `--node https://HOST:PORT` pairs interactively when it is not remembered. Scripts cannot pair for
 the first time. An unavailable Node, missing token, changed certificate, rejected credential, or
 incompatible protocol exits with a connection error. A command never falls back to a different Node.
+If a local Node needs pairing, open **Settings → Nodes → Pair another client** in the desktop that
+started it. For a standalone Node, run `kill -USR1 PID` and read the code from its launching
+terminal. Then run the CLI command in an interactive terminal to enter the code.
 
 ## Commands
 
@@ -238,10 +241,11 @@ candidate; an installed candidate may be waiting for a restart.
 ## Output and errors
 
 Text is a tab-separated table. It retains IDs and supports `--no-header`. `--output json` writes
-one JSON object for `show` or one array for `list`, followed by one newline. Each resource has
-`apiVersion: "acorn.cli/v1"`, `kind`, `nodeId`, and `id`; documented CLI fields are projected from
-the Node response. JSON Lines is available for `agent events`, plugin command discovery, and
-plugin command results.
+one JSON object for `show` or one array for `list`, followed by one newline. Resources have
+`apiVersion: "acorn.cli/v1"`, `kind`, and `nodeId` when connected to a Node. Individual resources
+also have an `id`; service status and aggregate list envelopes do not. Documented CLI fields are
+projected from the Node response. JSON Lines is available for `agent events`, plugin command
+discovery, and plugin command results.
 Service commands return a `NodeService` state object; a stopped service has null identity
 fields. A failed command writes an error to stderr; partial writes and checked waits also write
 their inspectable resource to stdout. JSON mode writes one error object containing its
