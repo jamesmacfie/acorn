@@ -37,6 +37,8 @@ export function RollbarItemView(props: {
   state: RollbarViewState
   activeTab: string
   occurrence: OccurrenceState
+  refreshing: boolean
+  refreshError: string
   onSelect(id: string): void
   onRefresh(): void
   onOccurrence(id: string): void
@@ -51,8 +53,12 @@ export function RollbarItemView(props: {
       <Toolbar variant="bar">
         <Heading level={1} eyebrow={`${item().integrationLabel} · #${item().identifier}`}>{item().title}</Heading>
         <ToolbarSpacer />
-        <Button size="sm" onPress={props.onRefresh}>Refresh</Button>
+        <Button size="sm" busy={props.refreshing} disabled={props.refreshing} onPress={props.onRefresh}>Refresh</Button>
       </Toolbar>
+
+      <Show when={props.refreshError}>{(detail) => (
+        <Alert variant="banner" title="Could not refresh this Rollbar item.">{detail()}</Alert>
+      )}</Show>
 
       <ChipRow ariaLabel="Item status">
         <For each={[item().level, item().environment, item().status].filter(Boolean)}>{(value) => (

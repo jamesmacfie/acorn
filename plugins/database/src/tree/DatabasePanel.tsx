@@ -1,6 +1,6 @@
 import { batch, createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import {
-  Alert, Button, Checkbox, createArmedConfirm, DetailColumn, EmptyState, Grid, Input, Inline,
+  Alert, Button, Checkbox, ConfirmButton, DetailColumn, EmptyState, Grid, Input, Inline,
   ListColumn, ListDetail, Picker, Row, SectionHeader, Stack, Text, Textarea, Toolbar, ToolbarSpacer,
 } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
@@ -57,7 +57,6 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
   const [activeRow, setActiveRow] = createSignal<number | null>(null)
   const [inserting, setInserting] = createSignal(false)
   const [busy, setBusy] = createSignal(false)
-  const deleteArmed = createArmedConfirm()
   const [generating, setGenerating] = createSignal(false)
   const [saving, setSaving] = createSignal<string | null>(null) // the SQL being saved (null = modal closed)
 
@@ -359,7 +358,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
               table={resultTable()}
               meta={columns()}
               busy={busy()}
-              onClose={() => { setActiveRow(null); deleteArmed.disarm() }}
+              onClose={() => setActiveRow(null)}
               onSave={async (edits) => {
                 const t = resultTable()
                 if (!t) return
@@ -378,11 +377,9 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
                   setBusy(false)
                 }
               }}
-              deleteArmed={!!deleteArmed.armed()}
               onDelete={async () => {
                 const t = resultTable()
                 if (!t) return
-                if (!deleteArmed.request('row')) return
                 const pk = primaryKey()
                 setBusy(true)
                 try {
@@ -439,7 +436,6 @@ function RowDetail(props: {
   onClose: () => void
   onSave?: (edits: [string, DbCell][]) => void | Promise<void>
   onDelete?: () => void | Promise<void>
-  deleteArmed?: boolean
   onInsert?: (values: Record<string, DbCell>) => void | Promise<void>
 }) {
   const metaByName = new Map(props.meta.map((c) => [c.name, c]))
@@ -517,7 +513,13 @@ function RowDetail(props: {
         <Show when={editable()} fallback={<Text tone="muted">Read-only (no single-table PK).</Text>}>
           <Button variant="solid" disabled={props.busy} onPress={save}>Save</Button>
           <Show when={!props.insert}>
-            <Button tone="danger" disabled={props.busy} onPress={() => void props.onDelete?.()}>{props.deleteArmed ? 'Delete?' : 'Delete'}</Button>
+            {/* RowDetail stays mounted when selection changes. Remount the armed control with its
+                row so a second press cannot delete a different row. */}
+            <Show when={props.row} keyed>
+              <ConfirmButton tone="danger" disabled={props.busy} confirmLabel="Confirm delete" onConfirm={() => void props.onDelete?.()}>
+                Delete
+              </ConfirmButton>
+            </Show>
           </Show>
         </Show>
       </Toolbar>

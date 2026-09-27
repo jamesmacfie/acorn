@@ -40,16 +40,25 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
   const [page, setPage] = createSignal<PageState>({ kind: 'loading', message: 'Loading Rollbar…' })
   const [activeTab, setActiveTab] = createSignal('overview')
   const [occurrence, setOccurrence] = createSignal<OccurrenceState>({ kind: 'empty' })
+  const [refreshing, setRefreshing] = createSignal(false)
+  const [refreshError, setRefreshError] = createSignal('')
   let itemLoad = 0
   let occurrenceLoad = 0
 
   const load = async (target: RollbarRailTarget, refresh = false): Promise<void> => {
+    if (refresh && refreshing()) return
     const request = ++itemLoad
-    occurrenceLoad += 1
-    setView(null)
-    setOccurrence({ kind: 'empty' })
-    setActiveTab('overview')
-    setPage({ kind: 'loading', message: 'Loading Rollbar item…' })
+    const keepView = refresh && view() !== null && targetKey(view()!.target) === targetKey(target)
+    setRefreshError('')
+    if (keepView) setRefreshing(true)
+    else {
+      occurrenceLoad += 1
+      setRefreshing(false)
+      setView(null)
+      setOccurrence({ kind: 'empty' })
+      setActiveTab('overview')
+      setPage({ kind: 'loading', message: 'Loading Rollbar item…' })
+    }
     try {
       const [item, occurrences] = await Promise.all([
         props.bridge.api.get<RollbarItemMetadata>(
@@ -60,10 +69,17 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
         ),
       ])
       if (request !== itemLoad) return
+      const currentOccurrence = occurrence()
+      if (!keepView || currentOccurrence.kind !== 'ready' || !occurrences.occurrences.some((entry) => entry.id === currentOccurrence.detail.id)) {
+        setOccurrence({ kind: 'empty' })
+      }
       setView({ target, item, occurrences: occurrences.occurrences })
     } catch (error) {
       if (request !== itemLoad) return
-      setPage({ kind: 'error', title: 'Could not load this Rollbar item.', detail: detailOf(error) })
+      if (keepView) setRefreshError(detailOf(error))
+      else setPage({ kind: 'error', title: 'Could not load this Rollbar item.', detail: detailOf(error) })
+    } finally {
+      if (request === itemLoad) setRefreshing(false)
     }
   }
 
@@ -136,6 +152,8 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
           state={state()}
           activeTab={activeTab()}
           occurrence={occurrence()}
+          refreshing={refreshing()}
+          refreshError={refreshError()}
           onSelect={setActiveTab}
           onRefresh={() => void load(state().target, true)}
           onOccurrence={(id) => void loadOccurrence(id)}

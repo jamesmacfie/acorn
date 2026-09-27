@@ -88,16 +88,16 @@ named hosts and nowhere else. `Fallback forNode="Grid"` draws its children where
 this host cannot draw that node. Both are here before there is a second host, so a plugin can be
 written against one before it arrives.
 
-**A node has one name, and a handler has one of eleven.** Both fell out of the remote path, where a
+**A node has one name, and a handler has one of twelve.** Both fell out of the remote path, where a
 node is a type string on a message port and a prop is JSON. A compound spelling has nowhere to put its
 dot, so `Modal.Body`, `Modal.Actions`, `Tabs.Panel` and `Toolbar.Spacer` are also exported as
 `ModalBody`, `ModalActions`, `TabPanel` and `ToolbarSpacer`; the dotted names stay as aliases because
 they read better beside the node they belong to. And a callback prop is only sendable under one of the
-kit's eleven semantic events, which is why `Modal` takes `onDismiss` rather than `onClose`, `Input` and
+kit's twelve semantic events, which is why `Modal` takes `onDismiss` rather than `onClose`, `Input` and
 `Textarea` take `onChange` for the committed value rather than `onCommit`, and `Grid` takes `onSelect`
-rather than `onSelectRow`. A name outside the eleven — `onInput`, `onKeyDown`, `onPaste` — still works
-in the shell and is dropped on the way to a sandbox, which is the honest answer: a terminal host has
-no paste event to deliver.
+rather than `onSelectRow`. `ConfirmButton` sends `onConfirm` only after its own confirmation step. A
+name outside the twelve — `onInput`, `onKeyDown`, `onPaste` — still works in the shell and is dropped
+on the way to a sandbox, which is the honest answer: a terminal host has no paste event to deliver.
 
 **Behaviour a pane keeps redoing becomes a node's prop.** Three arrived with the agents pane, and each
 replaced a copy of the same machinery in a plugin. `Timeline follow` makes the timeline the scroller

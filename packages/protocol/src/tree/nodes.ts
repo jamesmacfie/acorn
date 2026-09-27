@@ -58,12 +58,12 @@ export const isKitNode = (value: string): value is KitNodeName => kitNodeSet.has
  * The closed set of events a node may send back.
  *
  * Never a key and never a pointer event: a terminal host has neither, and it must be able to map its
- * own keys onto the same eleven names. A prop whose name is in here carries a handler id; a prop
+ * own keys onto the same twelve names. A prop whose name is in here carries a handler id; a prop
  * whose name starts with `on` and is not in here is dropped.
  */
 export const KIT_EVENTS = [
   'onPress', 'onChange', 'onSubmit', 'onSelect', 'onActivate', 'onToggle', 'onOpenChange',
-  'onExpand', 'onDismiss', 'onPick', 'onRemove',
+  'onExpand', 'onDismiss', 'onPick', 'onRemove', 'onConfirm',
 ] as const
 export type KitEvent = (typeof KIT_EVENTS)[number]
 

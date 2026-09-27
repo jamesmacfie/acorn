@@ -806,6 +806,11 @@ edge, and no real-WebKit run has accepted it.
 | `CopyButton` | stop | a labeled Copy control sends OSC 52 where the terminal takes it, and prints the value on its own line to copy by hand where it does not |
 | `ModelBackendPicker` | stop | two `Select`s over the backends a Generate control can spend: a stored key, or an installed agent CLI |
 
+`modelProviderFailure` is a pure presentation helper at `@acorn/plugin-api/ui/model-provider-failure`,
+also exported by `@acorn/plugin-api/ui` and `@acorn/plugin-api/ui/tree`. Generate controls use it for
+shared provider error codes, then supply their own fallback for failures specific to the action. It
+adds no kit node or host behavior.
+
 ### Pixels, and the host wrappers
 
 | Node | Focus | At 80×24 |
