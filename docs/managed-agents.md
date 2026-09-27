@@ -321,6 +321,10 @@ catalogues plus exact-model overrides. Plan usage is per harness: the built-in C
 contributed harness's `probes.usage` route feed one registry, and a harness with no collector shows no
 usage section.
 
+The Agent pane shows a refresh icon beside each harness's usage. It probes only that harness and
+keeps the other readings in place. The full refresh action and five-minute polling still check every
+harness; a single-harness refresh does not delay the next full check.
+
 Each quota row draws a bar under its sentence, coloured by the same reading as the dot beside the
 harness name, with a small triangle marking where a steady spend would have left the fill by now. A
 percentage on its own does not say whether it is a problem: 20% left is comfortable an hour into a

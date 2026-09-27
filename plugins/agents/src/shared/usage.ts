@@ -1,5 +1,7 @@
 export const agentUsageRoute = '/v1/p/agents/usage'
 export const agentUsageRefreshRoute = '/v1/p/agents/usage/refresh'
+export const agentUsageProviderRefreshRoute = (providerId: string): string =>
+  `${agentUsageRefreshRoute}/${encodeURIComponent(providerId)}`
 
 // A harness id, not a member of a closed set, because harnesses are a contribution point
 // (docs/managed-agents.md § Harnesses). The durable model in @acorn/plugin-agents/contract/wire already
