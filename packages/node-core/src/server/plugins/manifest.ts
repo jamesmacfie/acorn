@@ -58,6 +58,7 @@ export type {
   PluginScheduleDescriptor,
   PluginTaskCheckDescriptor,
 } from '@acorn/protocol/plugin/contract.ts'
+export type { PluginCliCommandDescriptor } from '@acorn/protocol/plugin/cliCommands.ts'
 
 // Cross-field checks, which is why they are here and not on the fields: every one of them needs either
 // `id` or the frame list, and neither is visible from inside a nested schema.
@@ -80,7 +81,7 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
     }
     required.add(dependency.id)
   }
-  const { frames, sources, slots, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes, themes, contextMenus, extensionPoints, extensions, schedules, taskChecks, harnesses, agentTools, contextSections } = manifest.contributions
+  const { frames, sources, slots, commands, keybindings, attention, nodeStats, contentLinks, agentContexts, refResolvers, routes, themes, contextMenus, extensionPoints, extensions, schedules, taskChecks, harnesses, agentTools, contextSections, cliCommands } = manifest.contributions
   const own = `/v1/p/${manifest.id}/`
   // The renderer twin of `own`. Re-spelled here rather than imported, exactly as client-core re-spells
   // `/v1/p/` (plugins/chrome/data.ts states the argument): the authority for core's URL shapes is
@@ -135,6 +136,17 @@ export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, c
 
   agentTools.forEach((entry, i) => route(entry.handler, ['contributions', 'agentTools', i, 'handler']))
   contextSections.forEach((entry, i) => route(entry.read, ['contributions', 'contextSections', i, 'read']))
+  const cliNames = new Set<string>()
+  cliCommands.forEach((entry, i) => {
+    const at = ['contributions', 'cliCommands', i] as (string | number)[]
+    if (manifest.id === 'list') ctx.addIssue({ code: 'custom', path: at, message: "a plugin named 'list' cannot expose CLI commands because plugin list is built in" })
+    if (entry.name === 'commands') ctx.addIssue({ code: 'custom', path: [...at, 'name'], message: "'commands' is the built-in discovery verb" })
+    if (cliNames.has(entry.name)) ctx.addIssue({ code: 'custom', path: [...at, 'name'], message: `duplicate CLI command '${entry.name}'` })
+    cliNames.add(entry.name)
+    if (!manifest.node) ctx.addIssue({ code: 'custom', path: at, message: 'a CLI command requires a node entry' })
+    if (!(NODE_CORE_FACETS as readonly string[]).includes(entry.capability)) ctx.addIssue({ code: 'custom', path: [...at, 'capability'], message: `unknown core capability '${entry.capability}'` })
+    if (!manifest.permissions.node.core.includes(entry.capability)) ctx.addIssue({ code: 'custom', path: [...at, 'capability'], message: `CLI command requires declared core capability '${entry.capability}'` })
+  })
   if (!manifest.node) {
     for (const kind of ['dataSources', 'dataSourceDiscoveries'] as const) {
       manifest.contributions[kind]?.forEach((_entry, i) => ctx.addIssue({

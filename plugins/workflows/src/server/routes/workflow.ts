@@ -36,7 +36,9 @@ export type WorkflowBridge = {
   // the definition in the body is what lets the repo trust snapshot be checked for real.
   startById(taskId: string, defId: string, inputs: Record<string, DataValue> | undefined, allowDatabaseDefinitions: boolean): Promise<{ runId?: string; error?: string }>
   runs(taskId: string): Promise<WorkflowRunProjection[]>
+  run(runId: string): Promise<WorkflowRunProjection | null>
   steps(runId: string): Promise<WorkflowStepProjection[]>
+  stepStatuses(runId: string): Promise<{ steps: { id: string; status: string }[]; truncated: boolean }>
   gate(runId: string, stepId: string, approved: boolean): Promise<{ ok: boolean }>
   cancel(runId: string): Promise<{ ok: boolean }>
   kill(runId: string, stepId: string): Promise<{ ok: boolean }>
@@ -119,6 +121,7 @@ const ownsRun = createMiddleware<AppEnv>(async (c, next) => {
 // Mounted at the plugin namespace root so it can carry both task-scoped (/tasks/:id/...) and run-scoped
 // (/workflows/runs/:runId/...) paths in one router.
 export const workflow = new Hono<AppEnv>()
+  .use('/workflows/runs/:runId', ownsRun)
   .use('/workflows/runs/:runId/*', ownsRun)
   // The editor's list of what a step may be, including project-scoped saved workflow references.
   // Device-only because database definitions are owner-authored executable configuration.
@@ -140,7 +143,14 @@ export const workflow = new Hono<AppEnv>()
     return respondError(c, 400, 'published_definition_required', ['Publish this workflow and start it by its definition ID.'])
   })
   .get('/tasks/:id/workflows/runs', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.runs(c.req.param('id'))))
+  .get('/workflows/runs/:runId', async (c) => {
+    const bridge = routeCapabilityFor(c, WORKFLOW_ROUTE)
+    if (!bridge) return viaBridge(c, WORKFLOW_ROUTE, (b) => b.run(c.req.param('runId')))
+    const run = await bridge.run(c.req.param('runId'))
+    return run ? c.json(run) : respondError(c, 404, 'not_found')
+  })
   .get('/workflows/runs/:runId/steps', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.steps(c.req.param('runId'))))
+  .get('/workflows/runs/:runId/step-statuses', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.stepStatuses(c.req.param('runId'))))
   .get('/workflows/runs/:runId/records', requireDevice, async (c) => {
     const parsed = recordsQuery.safeParse(c.req.query())
     if (!parsed.success) return respondError(c, 400, 'bad_request')

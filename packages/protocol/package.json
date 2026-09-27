@@ -56,6 +56,7 @@
     "./plugin/source.ts": "./src/plugin/source.ts",
     "./plugin/bridge.ts": "./src/plugin/bridge.ts",
     "./plugin/contract.ts": "./src/plugin/contract.ts",
+    "./plugin/cliCommands.ts": "./src/plugin/cliCommands.ts",
     "./plugin/grants.ts": "./src/plugin/grants.ts",
     "./plugin/ids.ts": "./src/plugin/ids.ts",
     "./plugin/runtimeContributions.ts": "./src/plugin/runtimeContributions.ts",

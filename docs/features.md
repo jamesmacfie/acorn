@@ -108,3 +108,12 @@ switches sound, system notifications, the app-icon count, and each of the three 
 do that is worth interrupting for ([notifications.md](./notifications.md) § Settings). Nodes and plugins are
 managed per Node. With more than one Node, the shell adds Fleet home, Node labels, aggregate Agent
 Center/attention/search, Node-aware palette rows, and partial/offline states.
+
+## Command-line client
+
+`acorn` with no arguments opens the terminal client. Headless commands use the same paired Node
+custody to administer workspaces and projects, create tasks, queue managed agent turns, start
+published workflows, and inspect durable runs from a later process. `acorn node start --background`
+explicitly starts a persistent local service. Loaded Node plugins can declare typed commands under
+`acorn plugin ID COMMAND`; the Node validates scope and dispatches them through the plugin's owned
+route. See [CLI](./cli.md) for commands, JSON schemas, examples, and exit codes.

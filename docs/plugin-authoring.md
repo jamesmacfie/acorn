@@ -58,6 +58,10 @@ checks it again before adding any style to the shell.
 
 [The manifest](plugin-authoring/the-manifest.md)
 
+## CLI commands
+
+[CLI command authoring](plugin-authoring/cli-commands.md)
+
 ## The node half
 
 <a id="telemetry-and-logging"></a>

@@ -3,6 +3,8 @@
 acorn is a local macOS workspace for reviewing GitHub pull requests and running coding agents in
 isolated git worktrees. The desktop app is a SolidJS renderer inside a Tauri shell. Its Node service
 owns the data, integrations, worktrees, terminals, agents, workflows, and processes.
+The `acorn` launcher opens the terminal client with no arguments and runs headless commands with a
+subcommand. See [CLI](./docs/cli.md).
 
 The desktop can manage the bundled local Node and any other Nodes paired to the same installation.
 Every Node has its own data root and is addressed through the same HTTPS protocol.
@@ -22,6 +24,8 @@ Every Node has its own data root and is addressed through the same HTTPS protoco
   joins.
 - Settings covers integrations, model providers, terminals, Docker, HTTP requests, workflows,
   MCP, agent tools, nodes, plugins, security, and appearance.
+- The headless CLI manages workspaces, projects, tasks, managed agents, workflows, and plugin commands
+  through the same paired Node API. It can explicitly start a persistent local Node service.
 
 ## Runtime shape
 
@@ -35,14 +39,16 @@ The renderer loads from the shell's `app://acorn` scheme. It does not hold devic
 certificates and cannot connect to a Node directly. One loopback WebSocket reaches the helper's
 connection broker, which performs pinned HTTPS/WebSocket connections and attaches the device bearer.
 
-The Node serves only `/v2`: core routes under `/v2/core/*`, plugin routes under
-`/v2/p/<plugin>/*`, and the authenticated event/stream socket at `/v2/events`. It serves no web
+The Node serves only `/v1`: core routes under `/v1/core/*`, plugin routes under
+`/v1/p/<plugin>/*`, and the authenticated event/stream socket at `/v1/events`. It serves no web
 assets and has no SPA fallback.
 
 ## Repository layout
 
 ```text
 apps/desktop/     Rust shell, desktop helper, renderer bridge, renderer, and packaging
+apps/cli/         Headless command client and shared acorn launcher
+apps/tui/         Interactive terminal client
 apps/node/        Node composition roots, standalone entry, plugin activation, and integration tests
 packages/protocol Wire contracts and route/query builders
 packages/node-core Node server, auth, storage, core services, MCP, and shared registries
@@ -73,8 +79,9 @@ Useful commands:
 
 ```sh
 pnpm dev:node                              # standalone Node, no desktop window
+pnpm --filter @acorn/cli build             # headless CLI bundle for node apps/cli/bin/acorn.mjs
 pnpm dev:plugin <id>                       # rebuild one loaded plugin's package on every save
-pnpm lint                                  # strict TypeScript and architecture checks
+pnpm lint                                  # oxlint and TypeScript checks
 pnpm test                                  # native rebuild plus Vitest suites
 pnpm db:check                              # replay every SQLite migration chain
 pnpm --filter @acorn/desktop dist          # build, package, and verify the macOS DMG

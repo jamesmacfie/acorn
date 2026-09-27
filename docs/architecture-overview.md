@@ -89,6 +89,12 @@ arch rule refuses an import of custody from anything in `apps/tui` that draws a 
 window, no webview and no keychain, so the affordances those gate are absent through the platform seam
 rather than stubbed. See [the terminal client doc](./tui.md).
 
+The headless CLI enters through the same `acorn` launcher when a subcommand is present. It reuses
+`@acorn/custody` for fleet membership, device tokens, certificate pins, and the broker, then reads
+one selected Node over `/v1`. Only explicit `node start --background` and `node stop` own a
+persistent local Node lifetime; ordinary resource commands attach without starting it. See
+[command-line client](./cli.md).
+
 Only serializable values cross a boundary. Product requests and streams use the broker and `/v1`.
 The service protocol is reserved for lifecycle messages.
 

@@ -65,6 +65,9 @@ export const nodeInfoSchema = z.object({
   protocolVersion: z.number().int().positive(),
   fingerprint: z.string().min(1),
   nodeId: z.string().optional(),
+  // Present only on a CLI-owned background process and only to an authenticated caller. This
+  // instance nonce lets lifecycle commands reject a stale PID/record after the root is reopened.
+  serviceInstanceId: z.string().uuid().optional(),
 })
 
 export type NodeInfo = z.infer<typeof nodeInfoSchema>

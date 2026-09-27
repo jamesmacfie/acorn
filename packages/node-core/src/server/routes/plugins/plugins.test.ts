@@ -10,6 +10,13 @@ import { setRouteTestCapability } from '../../bridge'
 import { _resetPluginRequests, raisePluginRequest } from '../../agentTools/pluginRequests'
 import { PLUGIN_STATE } from '../../pluginHost/state'
 import { plugins } from './plugins'
+import { testCliCommandDescriptor } from '../../../testkit/runtimeContributions'
+import { memoryIdentityStore } from '../../activeIdentity'
+import { idempotencyStore } from '../../auth/idempotency'
+import { idempotency } from '../../middleware/idempotency'
+import { makeTestDb, testEnv } from '../../../testkit/db'
+import { schema } from '../../db'
+import { registerRoute, removePluginRoutes } from '../registry'
 
 const ROSTER: PluginRosterEntry[] = [
   { name: 'github', required: false, disabled: false, state: 'active' },
@@ -25,7 +32,7 @@ const installedEntry = (id: string, over: Partial<InstalledPluginInfo> = {}): In
   apiVersion: '1',
   permissions: NO_PERMISSIONS,
   emits: [],
-  contributions: { frames: [], remote: [], sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [] },
+  contributions: { frames: [], remote: [], sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [], cliCommands: [] },
   client: { hash: 'a'.repeat(64), bytes: 12 },
   hasNode: true,
   ...over,
@@ -130,6 +137,82 @@ const asTaskAgent = () => app({ kind: 'internal', userId: 'james', scope: 'task'
 
 afterEach(() => setRouteTestCapability(PLUGIN_STATE, null))
 
+describe('loaded CLI command dispatch', () => {
+  const read = testCliCommandDescriptor()
+  const write = testCliCommandDescriptor({
+    name: 'set', title: 'Set probe', summary: 'Replace one fixture value.',
+    effects: 'Replaces the fixture value.', risk: 'write', route: { method: 'POST', path: '/cli/set' },
+  })
+  const snapshot = (version: string, commands = [read, write]) => {
+    const entry = installedEntry('fixture', {
+      version,
+      permissions: { ...NO_PERMISSIONS, node: { ...NO_PERMISSIONS.node, core: ['tasks'] } },
+      contributions: { ...installedEntry('fixture').contributions, cliCommands: commands },
+    })
+    const { id: _id, hasNode: _hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...identity } = entry
+    return { id: 'fixture', identity: { ...identity, activation: 'node' as const }, bundle: null }
+  }
+
+  it('rechecks the active descriptor, rejects invalid input/output, and replays a keyed write', async () => {
+    const database = makeTestDb()
+    const active = [snapshot('1.0.0')]
+    wire([], { roster: [{ name: 'fixture', required: false, disabled: false, state: 'active' }],
+      installed: [installedEntry('fixture', { version: '2.0.0' })], activeSnapshots: active })
+    let value = 'first'
+    let writes = 0
+    let malformed = false
+    let sawBearer = false
+    registerRoute({ plugin: 'fixture', prefix: '', fetch: async (request) => {
+      sawBearer ||= request.headers.has('authorization')
+      const input = await request.json() as { value?: string }
+      if (new URL(request.url).pathname === '/cli/set') { writes++; value = input.value ?? 'set'; return Response.json({ value }) }
+      return Response.json({ value: malformed ? 12 : value })
+    } })
+    const hono = new Hono<AppEnv>()
+    let principal: AppEnv['Variables']['principal'] = { kind: 'device', userId: 'james', deviceId: 'd1' }
+    hono.use('/v1/*', async (c, next) => { c.set('principal', principal); await next() })
+    hono.use('/v1/*', idempotency)
+    hono.use('/v1/core/plugins/*', requireDevice)
+    hono.route('/v1/core/plugins', plugins)
+    const env = testEnv({ NODE_ID: 'node-a', ACTIVE_IDENTITY: memoryIdentityStore('james'), DB: database.db, IDEMPOTENCY: idempotencyStore(database.db) })
+    const call = (command: string, input: unknown, headers: Record<string, string> = {}) => hono.fetch(at(`/fixture/cli/${command}`, 'POST', { input }, headers), env)
+    try {
+      expect((await call('probe', { nodeId: 'wrong' })).status).toBe(400)
+      expect((await call('probe', { nodeId: 'node-a', extra: true })).status).toBe(400)
+      principal = { kind: 'internal', userId: 'james', scope: 'task', taskId: 't1' }
+      expect((await call('probe', { nodeId: 'node-a' })).status).toBe(403)
+      principal = { kind: 'device', userId: 'james', deviceId: 'd1' }
+      expect((await call('set', { nodeId: 'node-a' })).status).toBe(400)
+      expect((await call('set', { nodeId: 'node-a' }, KEY)).status).toBe(200)
+      expect((await call('set', { nodeId: 'node-a' }, KEY)).status).toBe(200)
+      expect(writes).toBe(1)
+      expect(sawBearer).toBe(false)
+      malformed = true
+      expect((await call('probe', { nodeId: 'node-a' })).status).toBe(502)
+      malformed = false
+      active[0] = snapshot('2.0.0', [read])
+      expect((await call('set', { nodeId: 'node-a' }, { 'idempotency-key': '22222222-2222-4222-8222-222222222222' })).status).toBe(404)
+      value = 'second'
+      expect(((await (await call('probe', { nodeId: 'node-a' })).json()) as { result: { value: string } }).result.value).toBe('second')
+      database.db.insert(schema.workspaces).values({ id: 'w1', name: 'One', createdAt: 1, updatedAt: 1 }).run()
+      database.db.insert(schema.projects).values({ id: 'p1', name: 'One', workspaceId: 'w1', createdAt: 1, updatedAt: 1 }).run()
+      database.db.insert(schema.tasks).values({ id: 't1', title: 'One', origin: 'local', projectId: 'p1', status: 'active', createdAt: 1, updatedAt: 1 }).run()
+      const scoped = testCliCommandDescriptor({ scope: 'task', inputSchema: { type: 'object', properties: {
+        nodeId: { type: 'string' }, taskId: { type: 'string' }, projectId: { type: 'string' }, workspaceId: { type: 'string' },
+      }, required: ['nodeId', 'taskId'], additionalProperties: false } })
+      active[0] = snapshot('3.0.0', [scoped])
+      expect((await call('probe', { nodeId: 'node-a' })).status).toBe(400)
+      expect((await call('probe', { nodeId: 'node-a', taskId: 'missing' })).status).toBe(404)
+      expect((await call('probe', { nodeId: 'node-a', taskId: 't1', projectId: 'other' })).status).toBe(404)
+      expect((await call('probe', { nodeId: 'node-a', taskId: 't1', workspaceId: 'other' })).status).toBe(404)
+      expect((await call('probe', { nodeId: 'node-a', taskId: 't1', projectId: 'p1', workspaceId: 'w1' })).status).toBe(200)
+      wire(['fixture'], { roster: [{ name: 'fixture', required: false, disabled: false, state: 'active' }], activeSnapshots: active,
+        installed: [installedEntry('fixture')] })
+      expect((await call('probe', { nodeId: 'node-a', taskId: 't1' })).status).toBe(404)
+    } finally { removePluginRoutes('fixture'); database.cleanup() }
+  })
+})
+
 describe('GET /v1/core/plugins', () => {
   it('503s with no bridge, so an unwired node says so instead of answering an empty roster', async () => {
     setRouteTestCapability(PLUGIN_STATE, null)
@@ -231,7 +314,7 @@ describe('installed packages in the roster (docs/plugins.md)', () => {
       emits: [],
       // Passed through untouched for the device to register surfaces from (docs/plugins.md). The node
       // neither reads nor renders it.
-      contributions: { frames: [], remote: [], sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [] },
+      contributions: { frames: [], remote: [], sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [], cliCommands: [] },
       client: { hash: 'a'.repeat(64), bytes: 12 },
     })
     // The client's "is this third-party?" answer, so a built-in must not carry the block at all.

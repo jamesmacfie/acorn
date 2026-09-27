@@ -3465,6 +3465,100 @@
               "maxTokens"
             ]
           }
+        },
+        "cliCommands": {
+          "default": [],
+          "maxItems": 16,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z][a-z0-9-]{0,63}$"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              },
+              "effects": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "risk": {
+                "type": "string",
+                "enum": [
+                  "read",
+                  "write"
+                ]
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "node",
+                  "workspace",
+                  "project",
+                  "task"
+                ]
+              },
+              "capability": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "inputSchema": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "outputSchema": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "route": {
+                "type": "object",
+                "properties": {
+                  "method": {
+                    "type": "string",
+                    "const": "POST"
+                  },
+                  "path": {
+                    "type": "string",
+                    "pattern": "^\\/cli\\/[a-z][a-z0-9-]{0,63}$"
+                  }
+                },
+                "required": [
+                  "method",
+                  "path"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "name",
+              "title",
+              "summary",
+              "risk",
+              "scope",
+              "capability",
+              "inputSchema",
+              "outputSchema",
+              "route"
+            ],
+            "additionalProperties": false
+          }
         }
       },
       "additionalProperties": {}

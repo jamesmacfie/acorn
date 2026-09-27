@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import * as schema from '../node/schema'
-import { workflowRunsForTask } from './workflowRunReadModel'
+import { workflowRunById, workflowRunsForTask, workflowStepStatuses } from './workflowRunReadModel'
 
 const at = 100
 
@@ -39,5 +39,20 @@ describe('workflow run read model', () => {
     const [root] = await workflowRunsForTask(store.db, 'root-task')
     expect(root.usage).toMatchObject({ inputTokens: 30, outputTokens: 6, turns: 2 })
     expect(root.usage?.costUsd).toBeCloseTo(0.3)
+    expect(await workflowRunById(store.db, 'child-run')).toMatchObject({ id: 'child-run', taskId: 'child-task', rootTaskId: 'root-task' })
+    expect(await workflowRunById(store.db, 'missing')).toBeNull()
+  })
+
+  it('caps polling at 200 status-only rows and marks the omitted tail', async () => {
+    await store.db.insert(schema.workflowSteps).values(Array.from({ length: 201 }, (_, idx) => ({
+      id: `s${idx}`, runId: 'run', idx, name: `Step ${idx}`, status: idx === 200 ? 'waiting-gate' : 'done',
+      resultJson: 'private result', createdAt: at, updatedAt: at,
+    })))
+    const result = await workflowStepStatuses(store.db, 'run')
+    expect(result.truncated).toBe(true)
+    expect(result.steps[0]).toEqual({ id: 's0', status: 'done' })
+    expect(result.steps).toHaveLength(200)
+    expect(result.steps.at(-1)).toEqual({ id: 's199', status: 'done' })
+    expect(JSON.stringify(result)).not.toContain('private result')
   })
 })

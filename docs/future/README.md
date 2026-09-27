@@ -14,7 +14,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | Folder | What it is | Status |
 | --- | --- | --- |
-| [cli/](./cli/README.md) | Scriptable commands for workspaces, projects, tasks, agents, workflows, runs, persistent local Node service, and loaded plugins. | Proposal, 2026-09-27. Five implementation phases; no CLI subcommands shipped. |
 | [client-plugins/](./client-plugins/README.md) | Delivered design record for device-held plugins, replacement chrome, style packs, and device configuration. Icon packs remain parked. | Five phases shipped 2026-09; web custody remains future-host work. |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
@@ -26,7 +25,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | File | What it is | Status |
 | --- | --- | --- |
-| [bundle.md](./bundle.md) | Packaging a downloadable node: native deps, the CI matrix, the snags. | DX half shipped; distribution half remains. |
+| [bundle.md](./bundle.md) | Packaging a downloadable node: native deps, the CI matrix, the snags. | DX and CLI/TUI tarball staging shipped; platform binaries, installer, container image, and desktop embedding remain. |
 | [compiled-tier.md](./compiled-tier.md) | Which compiled plugin moves to the loaded tier next and what blocks it. | Standing map. Three of its four couplings dissolved when the remote component tree shipped. |
 | [integration-ideas.md](./integration-ideas.md) | The catalogue of integrations a workspace could hold, and the four shapes they collapse into. | Research notes. |
 | [kimi.md](./kimi.md) | Kimi Code CLI as a contributed tier 1 harness: the manifest, the four declarations to get right, and the Kimi usage API research behind the optional probes. | Proposal, 2026-09-18. Not started. |
@@ -40,7 +39,8 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 Host-owned plugin UI is the seam most of the others lean on, and it shipped in 2026-08. The terminal
 client ([tui.md](../tui.md)) was the second host built on it, which is why the kit's `tui` column is
-read rather than asserted, and what is left of shipping it is step 7 of [bundle.md](./bundle.md).
+read rather than asserted. The terminal and headless clients now ship in the standalone Node tarball;
+desktop embedding and platform release artifacts remain in [bundle.md](./bundle.md).
 The PWA is the layouts' narrow projections,
 compiled-tier's component couplings dissolved into slots, the `core:task` annotation point carries
 loaded task status, and the marketing plugin docs should be written against the tree rather than the
@@ -50,6 +50,12 @@ rung-2 containment is recorded in `blockers.md` and sandbox's
 `phases.md`; `docs/security.md § The containment ladder` owns the behavior and the others point.
 
 ## Retired folders
+
+`cli/` shipped on 2026-09-27 and was deleted after final review. [CLI](../cli.md) owns command
+grammar, output schemas, service lifecycle, and examples; [Node distribution](../node-distribution.md)
+owns packaging; [API reference](../api-reference.md) owns the invocation route; and
+[CLI command authoring](../plugin-authoring/cli-commands.md) owns the loaded-plugin descriptor.
+The five-phase proposal and its refused alternatives remain in git history.
 
 `phased-review-steps/`, `user-extensions/`, `node-first/`, `node/`, `acp/`, `tauri/`, `events/` and the later
 `events.md` follow-up (shipped on 2026-09-11), `layout/`, `structure/`,
@@ -354,10 +360,10 @@ and auth, Third-party plugin bundles and The containment ladder for the worker-t
 [first-party-plugins.md](../first-party-plugins.md) § What each of these loses in a terminal for the
 plugin-by-plugin table, [terminal.md](../terminal.md) § Client and [editor.md](../editor.md) for
 `attachPty` and the `$EDITOR` handoff, [node-distribution.md](../node-distribution.md) § Reaching a
-node with `acorn`, and [testing.md](../testing.md) § Test layers for the six suites. Phase 7, putting
-`acorn` in the two artifacts, is the one phase that never ran; its design is
-[bundle.md](./bundle.md) § Shipping `acorn`, which is where it belonged all along, because the tarball
-is that file's pipeline and not this programme's.
+node with `acorn`, and [testing.md](../testing.md) § Test layers for the six suites. Phase 7's tarball
+half shipped with the headless CLI on 2026-09-27: `scripts/pack-node.mjs` stages the shared launcher
+and both client bundles. Embedding that launcher in the desktop app and the platform release pipeline
+remain in [bundle.md](./bundle.md) § Shipping `acorn`.
 
 `before-terminal-ui/` was eight phases that emptied the plugin client tier of the raw DOM a second
 host cannot draw, shipped and deleted 2026-08-31. The kit grew four nodes and

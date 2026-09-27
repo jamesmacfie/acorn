@@ -193,6 +193,7 @@ export {
   PLUGIN_TOOL_TIMEOUT_MAX_MS,
 } from '@acorn/protocol/plugin/runtimeContributions.ts'
 export type { PluginAgentToolDescriptor, PluginContextSectionDescriptor } from '@acorn/protocol/plugin/runtimeContributions.ts'
+export type { PluginCliCommandDescriptor } from '@acorn/protocol/plugin/cliCommands.ts'
 // The context-section helpers, not the sections: `pr`, `notes` and `memory` are shaped by the plugins
 // that own their rows (docs/agent-tools.md § Context sections).
 export { formatOmitted, truncateBytes } from '@acorn/node-core/server/agentTools'

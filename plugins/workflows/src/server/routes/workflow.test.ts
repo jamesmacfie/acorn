@@ -38,7 +38,9 @@ const fake = (over: Partial<WorkflowBridge> = {}): WorkflowBridge => ({
   start: async () => ({ runId: 'run1' }),
   startById: async () => ({ runId: 'run1' }),
   runs: async () => [],
+  run: async () => null,
   steps: async () => [],
+  stepStatuses: async () => ({ steps: [], truncated: false }),
   gate: async () => ({ ok: true }),
   cancel: async () => ({ ok: true }),
   kill: async () => ({ ok: true }),
@@ -230,10 +232,14 @@ describe('a task-scoped credential is confined to its own runs', () => {
       cancel: async (runId) => (calls.push(`cancel:${runId}`), { ok: true }),
       kill: async (runId) => (calls.push(`kill:${runId}`), { ok: true }),
       steps: async () => (calls.push('steps'), []),
+      stepStatuses: async () => (calls.push('stepStatuses'), { steps: [], truncated: false }),
+      run: async () => (calls.push('run'), { id: 'run1' } as never),
     }))
     const app = asTask1()
     for (const runId of ['run2', 'nope']) {
+      expect((await app.fetch(req(`/api/workflows/runs/${runId}`), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/workflows/runs/${runId}/steps`), {} as Env)).status).toBe(404)
+      expect((await app.fetch(req(`/api/workflows/runs/${runId}/step-statuses`), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/workflows/runs/${runId}/gate`, 'POST', { stepId: 's', approved: true }), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/workflows/runs/${runId}/cancel`, 'POST'), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/workflows/runs/${runId}/kill`, 'POST', { stepId: 's' }), {} as Env)).status).toBe(404)
@@ -242,6 +248,24 @@ describe('a task-scoped credential is confined to its own runs', () => {
     // Its own run still works.
     expect((await app.fetch(req('/api/workflows/runs/run1/cancel', 'POST'), {} as Env)).status).toBe(200)
     expect(calls).toEqual(['cancel:run1'])
+  })
+
+  it('reads its own run and treats unknown and foreign IDs the same', async () => {
+    const run = vi.fn(async () => ({ id: 'run1', taskId: 'task1', name: 'Review', status: 'done' } as never))
+    setWorkflowBridge(fake({ run }))
+    const app = asTask1()
+    expect(await (await app.fetch(req('/api/workflows/runs/run1'), {} as Env)).json()).toMatchObject({ id: 'run1', taskId: 'task1' })
+    const unknown = await app.fetch(req('/api/workflows/runs/nope'), {} as Env)
+    const foreign = await app.fetch(req('/api/workflows/runs/run2'), {} as Env)
+    expect(unknown.status).toBe(404)
+    expect(foreign.status).toBe(404)
+    expect(await unknown.json()).toEqual(await foreign.json())
+    expect(run).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns compact statuses under the same run guard', async () => {
+    setWorkflowBridge(fake({ stepStatuses: async () => ({ steps: [{ id: 's1', status: 'waiting-gate' }], truncated: false }) }))
+    expect(await (await asTask1().fetch(req('/api/workflows/runs/run1/step-statuses'), {} as Env)).json()).toEqual({ steps: [{ id: 's1', status: 'waiting-gate' }], truncated: false })
   })
 
   // Retry is the one run action a confined caller may not take, even on its own run: an agent could

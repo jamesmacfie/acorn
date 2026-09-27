@@ -7,6 +7,11 @@ import { routeCapabilityFor, BridgeError, viaBridge } from '../../bridge'
 import type { AppEnv } from '../../middleware/auth'
 import { respondError } from '../../respond'
 import { PLUGIN_STATE, pluginState } from '../../pluginHost/state'
+import { dispatchPluginRoute } from '../../pluginHost/dispatch'
+import { validatePluginCliValue, PLUGIN_CLI_INPUT_MAX_BYTES, PLUGIN_CLI_OUTPUT_MAX_BYTES } from '@acorn/protocol/plugin/cliCommands.ts'
+import { getDb } from '../../db'
+import { projects, tasks, workspaces } from '../../db/schema'
+import { eq } from 'drizzle-orm'
 
 const body = z.strictObject({ disabled: z.array(z.string().min(1)).max(200) })
 
@@ -37,6 +42,22 @@ const requireIdempotencyKey = (c: Context<AppEnv>): Response | null =>
     ? null
     : respondError(c, 400, 'bad_request', ['This request must carry an Idempotency-Key header.'])
 
+const boundedCommandOutput = async (response: Response): Promise<string | null> => {
+  if (!response.body) return ''
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  let bytes = 0
+  let text = ''
+  for (;;) {
+    const part = await reader.read()
+    if (part.done) break
+    bytes += part.value.byteLength
+    if (bytes > PLUGIN_CLI_OUTPUT_MAX_BYTES) { await reader.cancel().catch(() => {}); return null }
+    text += decoder.decode(part.value, { stream: true })
+  }
+  return text + decoder.decode()
+}
+
 // The installer's refusals are all operator-fixable: a bad manifest, an unreachable release, a
 // downgrade. They surface as one 400 carrying the sentence rather than a 500, the stance
 // routes/backup.ts takes for tar failures.
@@ -50,6 +71,65 @@ const asBadRequest = async <T>(work: () => Promise<T> | T): Promise<T> => {
 
 export const plugins = new Hono<AppEnv>()
   .get('/', (c) => viaBridge(c, PLUGIN_STATE, async (bridge) => pluginState(bridge)))
+  // Resolve against the running declaration on every call. A pending install, disable, or
+  // failed reload cannot leave a stale executable command behind in a long-lived CLI.
+  .post('/:id/cli/:name', async (c) => {
+    const bridge = routeCapabilityFor(c, PLUGIN_STATE)
+    if (!bridge) return respondError(c, 503, 'bridge-unavailable')
+    const id = c.req.param('id')
+    const row = pluginState(bridge).plugins.find((entry) => entry.name === id)
+    const descriptor = row?.running && !row.disabled && row.active?.activation === 'node'
+      ? row.active.contributions.cliCommands?.find((command) => command.name === c.req.param('name')) : undefined
+    if (!descriptor) return respondError(c, 404, 'not_found')
+    if (!row?.active?.permissions.node.core.includes(descriptor.capability)) return respondError(c, 403, 'forbidden')
+    if (descriptor.risk === 'write' && !c.req.header('idempotency-key')) {
+      return respondError(c, 400, 'bad_request', ['Write commands require an Idempotency-Key.'])
+    }
+    const raw = await c.req.text()
+    if (Buffer.byteLength(raw, 'utf8') > PLUGIN_CLI_INPUT_MAX_BYTES + 32) return respondError(c, 413, 'bad_request', ['Command input is too large.'])
+    let parsed: unknown
+    try { parsed = JSON.parse(raw) } catch { return respondError(c, 400, 'bad_request', ['Command body must be JSON.']) }
+    const body = parsed as { input?: unknown } | null
+    if (!body || typeof body !== 'object' || Array.isArray(body) || !('input' in body) || Object.keys(body).some((key) => key !== 'input')) {
+      return respondError(c, 400, 'bad_request', ['Command body must contain only input.'])
+    }
+    if (Buffer.byteLength(JSON.stringify(body.input), 'utf8') > PLUGIN_CLI_INPUT_MAX_BYTES) return respondError(c, 413, 'bad_request', ['Command input is too large.'])
+    const errors = validatePluginCliValue(descriptor.inputSchema, body.input)
+    if (errors.length) return respondError(c, 400, 'bad_request', errors.map((issue) => `${issue.path}: ${issue.message}`))
+    const input = body.input as Record<string, unknown>
+    if (input.nodeId !== c.env.NODE_ID) return respondError(c, 400, 'bad_request', ['$.nodeId: selected Node does not match.'])
+    const db = getDb(c.env)
+    const workspaceId = input.workspaceId
+    const projectId = input.projectId
+    const taskId = input.taskId
+    if (descriptor.scope !== 'node') {
+      if (descriptor.scope === 'workspace') {
+        if (typeof workspaceId !== 'string' || !(await db.select({ id: workspaces.id }).from(workspaces).where(eq(workspaces.id, workspaceId)).get())) return respondError(c, 404, 'not_found')
+      } else if (descriptor.scope === 'project') {
+        const project = typeof projectId === 'string' ? await db.select({ workspaceId: projects.workspaceId }).from(projects).where(eq(projects.id, projectId)).get() : null
+        if (!project || (workspaceId !== undefined && workspaceId !== project.workspaceId)) return respondError(c, 404, 'not_found')
+      } else {
+        const task = typeof taskId === 'string' ? await db.select({ projectId: tasks.projectId }).from(tasks).where(eq(tasks.id, taskId)).get() : null
+        if (!task) return respondError(c, 404, 'not_found')
+        const project = await db.select({ workspaceId: projects.workspaceId }).from(projects).where(eq(projects.id, task.projectId)).get()
+        if (!project || (projectId !== undefined && projectId !== task.projectId) || (workspaceId !== undefined && workspaceId !== project.workspaceId)) return respondError(c, 404, 'not_found')
+      }
+    }
+    let response: Response
+    try {
+      response = await dispatchPluginRoute(c.env, id, `/v1/p/${id}${descriptor.route.path}`, {
+        method: descriptor.route.method, body: JSON.stringify(input),
+      }, AbortSignal.timeout(30_000), c.get('principal')!)
+    } catch { return respondError(c, 502, 'plugin_command_failed') }
+    if (!response.ok) return respondError(c, 502, 'plugin_command_failed', [`Plugin handler returned HTTP ${response.status}.`])
+    const output = await boundedCommandOutput(response)
+    if (output === null) return respondError(c, 502, 'invalid_response', ['Plugin command output is too large.'])
+    let result: unknown
+    try { result = JSON.parse(output) } catch { return respondError(c, 502, 'invalid_response', ['Plugin command output is not JSON.']) }
+    const outputErrors = validatePluginCliValue(descriptor.outputSchema, result)
+    if (outputErrors.length) return respondError(c, 502, 'invalid_response', outputErrors.map((issue) => `${issue.path}: ${issue.message}`))
+    return c.json({ result })
+  })
   // The client bundle itself (docs/plugins.md). Not viaBridge, because that helper always JSONs and
   // this is the one response in the family that is bytes.
   //

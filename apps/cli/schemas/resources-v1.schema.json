@@ -1,0 +1,265 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://acorn.local/schemas/cli/resources-v1",
+  "oneOf": [
+    { "$ref": "#/$defs/Node" },
+    { "$ref": "#/$defs/Workspace" },
+    { "$ref": "#/$defs/Project" },
+    { "$ref": "#/$defs/Task" },
+    { "$ref": "#/$defs/Plugin" },
+    { "$ref": "#/$defs/PluginCommand" },
+    { "$ref": "#/$defs/PluginCommandResult" },
+    { "$ref": "#/$defs/NodeService" },
+    { "$ref": "#/$defs/WorkspaceExternalProjects" },
+    { "$ref": "#/$defs/ProjectConfig" },
+    { "$ref": "#/$defs/Deletion" },
+    { "$ref": "#/$defs/AgentProvider" },
+    { "$ref": "#/$defs/AgentSession" },
+    { "$ref": "#/$defs/AgentTurnAck" },
+    { "$ref": "#/$defs/AgentEvent" },
+    { "$ref": "#/$defs/WorkflowDefinition" },
+    { "$ref": "#/$defs/WorkflowDefinitionList" },
+    { "$ref": "#/$defs/WorkflowRun" },
+    { "$ref": "#/$defs/WorkflowRunAck" },
+    { "$ref": "#/$defs/WorkflowStep" },
+    { "$ref": "#/$defs/RunSummary" },
+    { "$ref": "#/$defs/RunList" }
+  ],
+  "$defs": {
+    "Node": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "id", "protocolVersion", "baseline", "endpoint"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "Node" },
+        "nodeId": { "type": "string" }, "id": { "type": "string" }, "protocolVersion": { "type": "integer" },
+        "baseline": { "type": "string" }, "endpoint": { "type": ["string", "null"] }
+      }
+    },
+    "Workspace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "id", "name", "isDefault", "sort", "projects"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "Workspace" },
+        "nodeId": { "type": "string" }, "id": { "type": "string" }, "name": { "type": "string" },
+        "isDefault": { "type": "boolean" }, "sort": { "type": "integer" },
+        "projects": { "type": "array", "items": { "type": "object", "additionalProperties": false,
+          "required": ["id", "name", "sort"], "properties": {
+            "id": { "type": "string" }, "name": { "type": "string" }, "sort": { "type": "integer" }
+          } } }
+      }
+    },
+    "Project": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "id", "name", "workspaceId", "path", "hidden", "vcs", "defaultBranch", "remoteUrl"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "Project" },
+        "nodeId": { "type": "string" }, "id": { "type": "string" }, "name": { "type": "string" },
+        "workspaceId": { "type": "string" }, "path": { "type": ["string", "null"] },
+        "hidden": { "type": "boolean" }, "vcs": { "enum": ["git", null] },
+        "defaultBranch": { "type": ["string", "null"] }, "remoteUrl": { "type": ["string", "null"] }
+      }
+    },
+    "Task": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "id", "projectId", "title", "origin", "status", "branch", "worktreePath", "parentId"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "Task" },
+        "nodeId": { "type": "string" }, "id": { "type": "string" }, "projectId": { "type": "string" },
+        "title": { "type": "string" }, "origin": { "type": "string" }, "status": { "enum": ["active", "archived", "cancelled"] },
+        "branch": { "type": ["string", "null"] }, "worktreePath": { "type": ["string", "null"] },
+        "parentId": { "type": ["string", "null"] }, "archivedAt": { "type": "integer" }
+      }
+    },
+    "NodeService": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "state", "nodeId", "pid", "endpoint", "protocolVersion", "healthy", "logPath"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "NodeService" },
+        "state": { "enum": ["running", "starting", "stopped", "running-unowned"] },
+        "nodeId": { "type": ["string", "null"] }, "pid": { "type": ["integer", "null"] },
+        "endpoint": { "type": ["string", "null"] }, "protocolVersion": { "type": ["integer", "null"] },
+        "healthy": { "type": "boolean" }, "logPath": { "type": ["string", "null"] }
+      }
+    },
+    "WorkspaceExternalProjects": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "id", "projects"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "WorkspaceExternalProjects" },
+        "nodeId": { "type": "string" }, "id": { "type": "string" }, "replacedCount": { "type": "integer" },
+        "projects": { "type": "array", "items": { "type": "object", "additionalProperties": false,
+          "required": ["integrationId", "externalId"], "properties": {
+            "integrationId": { "type": "string" }, "externalId": { "type": "string" }, "projectId": { "type": "string" }
+          } } }
+      }
+    },
+    "ProjectConfig": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "id", "config"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "ProjectConfig" },
+        "nodeId": { "type": "string" }, "id": { "type": "string" }, "config": { "type": "object" }
+      }
+    },
+    "Deletion": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "id", "resourceKind"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "Deletion" },
+        "nodeId": { "type": "string" }, "id": { "type": "string" }, "resourceKind": { "enum": ["Workspace", "Project"] }
+      }
+    },
+    "AgentProvider": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "id", "profileId", "label", "installed", "authenticated", "driverKind", "diagnostics"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "AgentProvider" },
+        "nodeId": { "type": "string" }, "id": { "type": "string" }, "profileId": { "type": "string" },
+        "label": { "type": "string" }, "installed": { "type": "boolean" }, "authenticated": { "type": ["boolean", "null"] },
+        "driverKind": { "type": "string" }, "diagnostics": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "AgentSession": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "id", "taskId", "providerId", "profileId", "sessionKind", "title", "runtimeState", "attention", "lastEventSeq", "queuedTurns", "createdAt", "updatedAt"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "AgentSession" },
+        "nodeId": { "type": "string" }, "id": { "type": "string" }, "taskId": { "type": "string" },
+        "providerId": { "type": "string" }, "profileId": { "type": "string" }, "sessionKind": { "type": "string" },
+        "title": { "type": "string" }, "runtimeState": { "type": "string" }, "attention": { "type": "string" },
+        "lastEventSeq": { "type": "integer" }, "queuedTurns": { "type": "integer" }, "createdAt": { "type": "integer" }, "updatedAt": { "type": "integer" },
+        "firstTurnId": { "type": ["string", "null"] }, "firstTurnStatus": { "type": "string" },
+        "lastTurnId": { "type": ["string", "null"] }, "lastTurnStatus": { "type": ["string", "null"] },
+        "pendingRequests": { "type": "integer" }
+      }
+    },
+    "AgentTurnAck": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "id", "sessionId", "status", "ordinal"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "AgentTurnAck" },
+        "nodeId": { "type": "string" }, "id": { "type": "string" }, "sessionId": { "type": "string" },
+        "status": { "type": "string" }, "ordinal": { "type": "integer" }
+      }
+    },
+    "AgentEvent": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "id", "sessionId", "turnId", "seq", "event", "createdAt"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "AgentEvent" },
+        "nodeId": { "type": "string" }, "id": { "type": "string" }, "sessionId": { "type": "string" },
+        "turnId": { "type": ["string", "null"] }, "seq": { "type": "integer" }, "event": { "type": "object" },
+        "createdAt": { "type": "integer" }, "foldedThroughSeq": { "type": "integer" }
+      }
+    },
+    "WorkflowDefinition": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "id", "taskId", "name", "source", "publishedRevision", "inputs", "valid", "problems", "runnable"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "WorkflowDefinition" }, "nodeId": { "type": "string" },
+        "id": { "type": "string" }, "taskId": { "type": "string" }, "name": { "type": "string" },
+        "source": { "enum": ["repo", "user", "database"] }, "publishedRevision": { "type": ["integer", "null"] },
+        "inputs": { "type": "array", "items": { "type": "object" } },
+        "valid": { "type": "boolean" }, "problems": { "type": "array", "items": { "type": "string" } }, "runnable": { "type": "boolean" }
+      }
+    },
+    "WorkflowDefinitionList": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "taskId", "definitions", "errors"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "WorkflowDefinitionList" }, "nodeId": { "type": "string" }, "taskId": { "type": "string" },
+        "definitions": { "type": "array", "items": { "$ref": "#/$defs/WorkflowDefinition" } },
+        "errors": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["source", "message"], "properties": { "source": { "type": "string" }, "message": { "type": "string" } } } }
+      }
+    },
+    "WorkflowRun": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "id", "taskId", "name", "status", "posture", "error", "createdAt", "updatedAt", "rootRunId", "parentRunId", "parentStepId", "rootTaskId", "parentTaskId", "depth", "usage"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "WorkflowRun" }, "nodeId": { "type": "string" },
+        "id": { "type": "string" }, "taskId": { "type": "string" }, "name": { "type": "string" }, "status": { "type": "string" },
+        "posture": { "type": ["string", "null"] }, "error": { "type": ["string", "null"] },
+        "createdAt": { "type": "integer" }, "updatedAt": { "type": "integer" },
+        "rootRunId": { "type": ["string", "null"] }, "parentRunId": { "type": ["string", "null"] }, "parentStepId": { "type": ["string", "null"] },
+        "rootTaskId": { "type": "string" }, "parentTaskId": { "type": ["string", "null"] }, "depth": { "type": "integer" },
+        "usage": { "type": ["object", "null"] },
+        "stepStatuses": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["id", "status"], "properties": { "id": { "type": "string" }, "status": { "type": "string" } } } },
+        "stepsTruncated": { "type": "boolean" }
+      }
+    },
+    "WorkflowRunAck": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "id", "taskId", "status"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "WorkflowRunAck" }, "nodeId": { "type": "string" },
+        "id": { "type": "string" }, "taskId": { "type": "string" }, "status": { "const": "unconfirmed" }
+      }
+    },
+    "WorkflowStep": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "id", "runId", "idx", "name", "stepKind", "status", "error", "parentStepId", "sessionId", "agentSessionId", "costUsd", "iteration", "childRuns", "createdAt", "updatedAt"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "WorkflowStep" }, "nodeId": { "type": "string" },
+        "id": { "type": "string" }, "runId": { "type": "string" }, "idx": { "type": "integer" }, "name": { "type": "string" },
+        "stepKind": { "type": "string" }, "status": { "type": "string" }, "error": { "type": ["string", "null"] }, "parentStepId": { "type": ["string", "null"] },
+        "sessionId": { "type": ["string", "null"] }, "agentSessionId": { "type": ["string", "null"] },
+        "costUsd": { "type": ["number", "null"] }, "iteration": { "type": "integer" },
+        "childRuns": { "type": "array", "items": { "type": "object", "additionalProperties": false, "required": ["taskId", "runId", "runStatus", "dispatchState"], "properties": { "taskId": { "type": "string" }, "runId": { "type": "string" }, "runStatus": { "type": ["string", "null"] }, "dispatchState": { "type": "string" } } } },
+        "createdAt": { "type": "integer" }, "updatedAt": { "type": "integer" }
+      }
+    },
+    "RunSummary": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "id", "pluginId", "title", "status", "startedAt", "endedAt", "taskId", "costUsd", "detail"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "RunSummary" }, "nodeId": { "type": "string" },
+        "id": { "type": "string" }, "pluginId": { "type": "string" }, "title": { "type": "string" }, "status": { "type": "string" },
+        "startedAt": { "type": "integer" }, "endedAt": { "type": ["integer", "null"] }, "taskId": { "type": ["string", "null"] },
+        "costUsd": { "type": ["number", "null"] }, "detail": { "type": ["string", "null"] }
+      }
+    },
+    "RunList": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "workspaceId", "runs", "failedSources", "complete", "sourceLimit", "truncated", "note"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "RunList" }, "nodeId": { "type": "string" },
+        "workspaceId": { "type": ["string", "null"] }, "runs": { "type": "array", "items": { "$ref": "#/$defs/RunSummary" } },
+        "failedSources": { "type": "array", "items": { "type": "string" } }, "complete": { "const": false },
+        "sourceLimit": { "type": "integer" }, "truncated": { "const": "unknown" }, "note": { "type": "string" }
+      }
+    },
+    "PluginCommand": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "id", "pluginId", "name", "title", "summary", "effects", "risk", "scope", "capability", "inputSchema", "outputSchema"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "PluginCommand" },
+        "nodeId": { "type": "string" }, "id": { "type": "string" }, "pluginId": { "type": "string" }, "name": { "type": "string" },
+        "title": { "type": "string" }, "summary": { "type": "string" }, "effects": { "type": ["string", "null"] },
+        "risk": { "enum": ["read", "write"] }, "scope": { "enum": ["node", "workspace", "project", "task"] },
+        "capability": { "type": "string" },
+        "inputSchema": { "type": "object" }, "outputSchema": { "type": "object" }
+      }
+    },
+    "PluginCommandResult": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "id", "pluginId", "command", "result"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "PluginCommandResult" },
+        "nodeId": { "type": "string" }, "id": { "type": "string" }, "pluginId": { "type": "string" },
+        "command": { "type": "string" }, "result": { "type": "object" }
+      }
+    },
+    "Plugin": {
+      "type": "object", "additionalProperties": false,
+      "required": ["apiVersion", "kind", "nodeId", "id", "state", "running", "disabled", "required", "activeVersion", "installedVersion"],
+      "properties": {
+        "apiVersion": { "const": "acorn.cli/v1" }, "kind": { "const": "Plugin" },
+        "nodeId": { "type": "string" }, "id": { "type": "string" },
+        "state": { "enum": ["active", "failed", "disabled", "pending-restart"] },
+        "running": { "type": "boolean" }, "disabled": { "type": "boolean" }, "required": { "type": "boolean" },
+        "activeVersion": { "type": ["string", "null"] }, "installedVersion": { "type": ["string", "null"] }
+      }
+    }
+  }
+}

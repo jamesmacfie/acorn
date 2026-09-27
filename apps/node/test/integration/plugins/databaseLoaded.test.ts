@@ -10,6 +10,7 @@ import { createCoreServices } from '@acorn/node-core/server/core/index.ts'
 import { loadExternalPlugins } from '@acorn/node-core/server/plugins'
 import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
+import { pluginRouteContributions } from '@acorn/node-core/server/routes/registry.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
 
 const NODE_APP = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
@@ -49,6 +50,10 @@ describe('database as a host-mediated loaded plugin', () => {
       net: [],
     })
     expect(loaded[0].manifest.permissions.node.env).toBeUndefined()
+    expect(loaded[0].manifest.permissions.node).toMatchObject({ secrets: false, exec: false, net: [] })
+    expect(loaded[0].manifest.contributions.cliCommands).toMatchObject([
+      { name: 'query', risk: 'read', capability: 'data:query', route: { method: 'POST', path: '/cli/query' } },
+    ])
 
     const capabilities = new CapabilityRegistry()
     plugins = await initPlugins([loaded[0].plugin], {
@@ -68,5 +73,16 @@ describe('database as a host-mediated loaded plugin', () => {
     expect(plugins.failed).toEqual([])
     expect(plugins.enabled).toEqual(['database'])
     expect(capabilities.get(DATABASE_QUERY)).toBeDefined()
+    const route = pluginRouteContributions().find((entry) => entry.plugin === 'database' && entry.fetch)
+    expect(route?.fetch).toBeDefined()
+    const response = await route!.fetch!(new Request('http://database.test/cli/query', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ nodeId: 'node-a', taskId: 'task-one', sql: 'delete from users' }),
+    }), {
+      userId: 'owner-1', principal: { kind: 'device', userId: 'owner-1', deviceId: 'device-one' },
+      providers: { connections: async () => [], withConnections: async () => [],
+        resource: async () => { throw new Error('no provider') }, items: () => { throw new Error('no provider') } },
+    })
+    expect(response.status).toBe(400)
   })
 })

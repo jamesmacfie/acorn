@@ -134,7 +134,13 @@ const _loadedContext = {
   id: 'references', label: 'References', order: 60,
   read: '/v1/p/example/context/references', maxBytes: 32_768, maxTokens: 4_096,
 } satisfies Published.PluginContextSectionDescriptor
-void [_loadedTool, _loadedContext]
+const _loadedCliCommand = {
+  name: 'inspect', title: 'Inspect', summary: 'Read one project.', risk: 'read',
+  scope: 'project', capability: 'projects:read', route: { method: 'POST', path: '/cli/inspect' },
+  inputSchema: { type: 'object', properties: { nodeId: { type: 'string' }, projectId: { type: 'string' } }, required: ['nodeId', 'projectId'] },
+  outputSchema: { type: 'object', properties: { status: { type: 'string' } }, required: ['status'] },
+} satisfies Published.PluginCliCommandDescriptor
+void [_loadedTool, _loadedContext, _loadedCliCommand]
 
 it('leaves most of the surface compared, not substituted', () => {
   // What the assertions above cannot catch: the hole lists growing until the comparison is vacuous.

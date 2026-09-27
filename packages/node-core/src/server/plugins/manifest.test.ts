@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { THEME_PALETTE_TOKENS } from '@acorn/protocol/themeTokens.ts'
 import { parsePluginManifest, pluginManifestSchema } from './manifest'
+import { testCliCommandDescriptor } from '../../testkit/runtimeContributions'
 
 // The declarative-chrome half of the manifest (docs/plugins.md).
 //
@@ -33,6 +34,38 @@ const nodeManifest = (contributions: Record<string, unknown>) =>
   pluginManifestSchema.safeParse({
     id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', node: './dist/node.js', contributions,
   })
+
+describe('CLI command declarations', () => {
+  const command = testCliCommandDescriptor()
+  const parse = (cliCommands: unknown[], core = ['tasks']) => pluginManifestSchema.safeParse({
+    id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1',
+    node: './dist/node.js', permissions: { node: { core } }, contributions: { cliCommands },
+  })
+
+  it('accepts a bounded read and a described write in its own command namespace', () => {
+    expect(parse([command, testCliCommandDescriptor({
+      name: 'set', title: 'Set probe', summary: 'Set a fixture value.', effects: 'Replaces only the fixture probe value.',
+      risk: 'write', route: { method: 'POST', path: '/cli/set' },
+    })]).success).toBe(true)
+  })
+
+  it('rejects duplicates, cross-route references and undeclared capabilities', () => {
+    expect(parse([command, command]).success).toBe(false)
+    expect(parse([testCliCommandDescriptor({ route: { method: 'POST', path: '/v1/core/tasks' } })]).success).toBe(false)
+    expect(parse([testCliCommandDescriptor({ route: { method: 'POST', path: '/cli/other' } })]).success).toBe(false)
+    expect(parse([testCliCommandDescriptor({ name: 'commands', route: { method: 'POST', path: '/cli/commands' } })]).success).toBe(false)
+    expect(parse([command], []).success).toBe(false)
+    expect(parse([testCliCommandDescriptor({ capability: 'future:root' })], ['future:root']).success).toBe(false)
+    for (const name of ['trailing-', 'double--hyphen']) {
+      expect(parse([testCliCommandDescriptor({ name, route: { method: 'POST', path: `/cli/${name}` } })]).success).toBe(false)
+    }
+  })
+
+  it('requires a write effect and rejects unbounded schema language', () => {
+    expect(parse([testCliCommandDescriptor({ risk: 'write' })]).success).toBe(false)
+    expect(parse([testCliCommandDescriptor({ inputSchema: { type: 'object', $ref: 'https://hostile.test/schema' } })]).success).toBe(false)
+  })
+})
 
 const webviewManifest = (contributions: Record<string, unknown>) =>
   pluginManifestSchema.safeParse({

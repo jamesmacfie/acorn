@@ -1,5 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
+import { makeTestDb, makeTestPluginDb, schema, validatePluginConfig, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { createTaskService } from '@acorn/plugin-api/testkit'
 import { createProjectService } from '@acorn/plugin-api/testkit'
 import type { GenerateTextRequest, ModelService } from '@acorn/plugin-api/testkit'
@@ -109,6 +111,27 @@ const seed = async (f: Fixture) => {
 }
 
 describe('database routes', () => {
+  it('keeps the loaded CLI descriptor valid in the built manifest', async () => {
+    const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
+    const result = await validatePluginConfig(root)
+    expect(result.ok).toBe(true)
+  })
+  it('serves the CLI query through the shared read-only service with the row cap', async () => {
+    const f = fixture()
+    try {
+      const query = vi.fn(async () => ({ columns: ['answer'], rows: Array.from({ length: 230 }, (_, i) => [i === 0 ? null : String(i)]), rowCount: 230, command: 'SELECT', ms: 1 }))
+      const bridge = fake({ query })
+      const response = await f.call('/cli/query', json({ nodeId: 'node-a', taskId: 'task1', sql: 'select answer', maxRows: 200 }), bridge)
+      expect(response.status).toBe(200)
+      const result = await response.json() as { rows: { value: string; isNull: boolean }[][]; truncated: boolean }
+      expect(result.rows).toHaveLength(200)
+      expect(result.rows[0]?.[0]).toEqual({ value: '', isNull: true })
+      expect(result.truncated).toBe(true)
+      expect(query).toHaveBeenCalledWith('task1', 'select answer', { readOnly: true })
+      expect((await f.call('/cli/query', json({ nodeId: 'node-a', taskId: 'task1', sql: 'delete from users' }), bridge)).status).toBe(400)
+      expect(query).toHaveBeenCalledTimes(1)
+    } finally { f.cleanup() }
+  })
   let f: Fixture
   beforeEach(async () => {
     f = fixture()

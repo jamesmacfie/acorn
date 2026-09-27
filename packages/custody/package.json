@@ -10,7 +10,8 @@
     "./custody/deviceTokenStore.ts": "./src/custody/deviceTokenStore.ts",
     "./plugins": "./src/plugins/public.ts",
     "./config": "./src/config/deviceConfig.ts",
-    "./runtime": "./src/runtime/public.ts"
+    "./runtime": "./src/runtime/public.ts",
+    "./local": "./src/local/public.ts"
   },
   "scripts": {
     "lint": "tsc --noEmit",

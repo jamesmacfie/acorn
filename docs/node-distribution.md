@@ -1,9 +1,15 @@
 # Standalone Node distribution
 
 `pnpm pack:node` builds a self-contained tarball for running an acorn Node without the desktop app.
-The artifact contains the Node service and standalone entrypoints, shared chunks with the
-pure-JavaScript dependencies bundled in, migrations, and a `package.json` naming the few packages
-installed beside them: native modules and packages loaded at run time (`apps/node/externals.ts`).
+The artifact contains the Node service, a headless CLI and terminal client under one `acorn`
+launcher, shared chunks with the pure-JavaScript dependencies bundled in, migrations, and a
+`package.json` naming packages installed beside them: native modules and packages loaded at run
+time (`apps/node/externals.ts`). Run `node bin/acorn.mjs --help` from the extracted folder after
+`npm install --omit=dev`; `node bin/acorn.mjs` opens the terminal client and needs a terminal.
+The CLI read commands attach to a running Node and use the same device custody as the terminal
+client. `node start --background` runs the standalone entry as a persistent local service from the
+extracted archive, with a private token handoff and rotated restricted log; `node status` and
+`node stop` inspect or drain only that CLI-owned process. See [command-line client](./cli.md).
 
 ## Runtime
 
@@ -61,7 +67,7 @@ finished, not how long it worked.
 
 ## Reaching a node with `acorn`
 
-`acorn` is the terminal client (`apps/tui/`, [docs/tui.md](./tui.md)). Run it and it opens the
+`acorn` with no command is the terminal client (`apps/tui/`, [docs/tui.md](./tui.md)). Run it and it opens the
 workspace for the node this machine's data root holds: `ACORN_DATA_DIR`, else the desktop app's root
 if the app is installed here, else the dev checkout's. It reads the root's lock to decide what to do.
 A node already holds it, so `acorn` attaches, reading the endpoint from `node.json` and the
@@ -149,9 +155,10 @@ data root. A standalone node's list is the file alone.
 ```sh
 tar -xzf acorn-node-*.tgz
 cd acorn-node-*
-pnpm install --prod
-pnpm rebuild
-ACORN_DATA_DIR=/var/lib/acorn-node pnpm start
+npm install --omit=dev
+npm rebuild
+ACORN_DATA_DIR=/var/lib/acorn-node npm start
+node bin/acorn.mjs --help
 ```
 
 The target machine needs Node 24.4+, or 22.18+ on the 22 LTS line, because the `node:sqlite` surface

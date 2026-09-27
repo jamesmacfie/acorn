@@ -51,6 +51,21 @@ describe('requireUser gate over the protected router table', () => {
     expect(res.status).toBe(200)
   })
 
+  it('shows the background instance ID only to an authenticated device', async () => {
+    const env = {
+      NODE_ID: 'node-one', NODE_FINGERPRINT: 'fingerprint', SERVICE_INSTANCE_ID: '00000000-0000-4000-8000-000000000001',
+      DEVICES: { authenticate: async () => ({ deviceId: 'device-one' }) },
+      ACTIVE_IDENTITY: { get: () => 'owner-one' },
+    } as unknown as Env
+    const app = createApp()
+    const url = 'http://127.0.0.1:4317/v1/node'
+    const publicInfo = await (await app.fetch(new Request(url), env)).json() as Record<string, unknown>
+    expect(publicInfo.nodeId).toBeUndefined()
+    expect(publicInfo.serviceInstanceId).toBeUndefined()
+    const privateInfo = await (await app.fetch(new Request(url, { headers: { authorization: 'Bearer device-token' } }), env)).json() as Record<string, unknown>
+    expect(privateInfo).toMatchObject({ nodeId: 'node-one', serviceInstanceId: env.SERVICE_INSTANCE_ID })
+  })
+
   // The /auth namespace is not part of the current API. Keep these probes so a public login surface
   // cannot be introduced without the route conformance suite noticing.
   it.each([

@@ -122,6 +122,15 @@ introspected schema (`assertTable`, `assertColumns` in `server/database.ts`) and
 use. Arbitrary SQL typed into the editor runs verbatim: it is the reader's own database, and writes
 are the point of the pane.
 
+## CLI query
+
+The loaded plugin also declares `acorn plugin database query`. Its `/cli/query` route calls the
+same `database.query` capability described below, so the CLI receives a bounded read-only result
+instead of reaching the pane's arbitrary SQL editor route. Input is a JSON object with `nodeId`,
+`taskId`, `sql`, and optional `maxRows` up to 200. The Node checks task scope before dispatch.
+See [CLI commands](./cli.md) for an invocation and [command authoring](./plugin-authoring/cli-commands.md)
+for the descriptor contract.
+
 ## Workflow steps
 
 This plugin contributes two step kinds to `workflows:step-kind`

@@ -61,6 +61,11 @@ Loaded packages declare task-scoped tools and bounded context through `contribut
 `contributions.contextSections` instead. The host adapts those descriptors into the same registries;
 they are not a second MCP server or context assembler.
 
+A loaded Node plugin can also declare `contributions.cliCommands` for structured headless calls.
+The CLI reads descriptors from the selected Node's running roster and the Node dispatches through
+the plugin's own route with the paired device principal. [CLI command authoring](./plugin-authoring/cli-commands.md)
+defines the schema, scope, and retry contract.
+
 Core returns projections such as `TaskRef`, not database rows. A manifest grants each core facet
 explicitly. The host sends that owner-bound projection over RPC to a permission-scoped worker; direct
 database and unrestricted Node builtin access are unavailable. For the trust boundary, see

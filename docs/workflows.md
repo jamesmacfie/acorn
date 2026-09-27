@@ -1,5 +1,9 @@
 # Workflows
 
+The headless commands in [the CLI reference](./cli.md) list published definitions, start a run by
+its returned ID with typed JSON inputs, and inspect or wait on durable runs and steps. The Node
+continues to own definition resolution, trust, gates, recovery, and execution.
+
 Workflows are durable Node orchestration. A definition is either a committed
 `.acorn/workflows/*.toml` file or a `workflow_defs` row the owner typed in the app, and the two are
 read as one list. SQLite stores expanded runs, steps, gates, trigger cursors, and recovery state.

@@ -1,6 +1,7 @@
 # Release notes
 
-The acorn-1 baseline includes the Tauri desktop app, the terminal client, and a standalone Node.
+The acorn-1 baseline includes the Tauri desktop app, the terminal client, a headless CLI, and a
+standalone Node.
 
 ## Runtime
 
@@ -10,6 +11,8 @@ The acorn-1 baseline includes the Tauri desktop app, the terminal client, and a 
 - Renderer traffic and streams use the helper's connection broker, over one loopback WebSocket.
 - Product routes are under `/v1/core/*` and `/v1/p/<plugin>/*`; live events and streams use
   `/v1/events`. The Node probe and pairing response carry `baseline: "acorn-1"`.
+- `acorn node start --background` owns a persistent local service with an authenticated startup
+  handshake; `status` and `stop` target only that service.
 
 ## Product
 
@@ -19,6 +22,9 @@ notes/memory/context, workflows, Docker, PostgreSQL tools, encrypted HTTP reques
 model providers, Nodes, per-Node plugin toggles, Fleet surfaces, backup, configuration import, audit,
 security settings, and the standalone Node tarball. Managed agents can delegate into a child session
 and report back to their owner. Workflows can be authored in the app or loaded from repository TOML.
+Headless `acorn` commands use the same paired Node to manage workspaces, projects, tasks, agents,
+workflows, and runs. Loaded plugins can expose typed commands; the Database plugin offers bounded
+read-only `query`. See [CLI](./cli.md) for the command contract.
 
 ## Plugin UI
 

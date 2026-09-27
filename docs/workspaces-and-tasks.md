@@ -24,6 +24,11 @@ The `Default` workspace is created lazily by the first project, not at boot: bot
 Projects or imports repositories explicitly through the GitHub plugin. Moving or hiding a project
 changes only its core row; deleting a project never deletes its folder.
 
+Registering a local folder through the CLI requires an explicit workspace and an absolute Node-host
+path. Core compares the folder's resolved path with registered project paths, so symlink and `..`
+aliases reuse an existing project ID. The stored path remains the spelling originally registered.
+See [Command-line client](./cli.md) for the administration commands and typed pipe contract.
+
 Settings → Projects lists projects grouped under their workspace rather than giving every row a
 workspace dropdown in isolation. The grouping is what is being edited, so it is the layout. The card
 owns the column tracks, and its header and rows subgrid into them, so names, selects, and buttons

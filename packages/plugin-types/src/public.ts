@@ -79,6 +79,20 @@ export type PluginContextSectionDescriptor = {
   maxTokens: number
 }
 
+/** A manifest-declared headless command served by this plugin's Node worker. */
+export type PluginCliCommandDescriptor = {
+  name: string
+  title: string
+  summary: string
+  effects?: string
+  risk: 'read' | 'write'
+  scope: 'node' | 'workspace' | 'project' | 'task'
+  capability: string
+  inputSchema: PluginToolJsonSchema
+  outputSchema: PluginToolJsonSchema
+  route: { method: 'POST'; path: string }
+}
+
 // ── The two entry points ──────────────────────────────────────────────────────────────────────────
 
 /** The default export of a loaded plugin's node entrypoint. `name` must equal the manifest's `id`. */

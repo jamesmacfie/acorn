@@ -50,6 +50,28 @@ using it, so start this way when somebody is working in the app while the shell 
 Pick the new binary up by stopping it and starting `pnpm dev` again. Renderer hot reload is Vite's
 and works the same either way.
 
+### Headless CLI development
+
+Build the CLI and terminal bundles, then run the shared launcher. Help needs no Node; read and write
+commands attach to a running local Node. Use a temporary data root when testing service ownership:
+
+```sh
+pnpm --filter @acorn/cli build
+pnpm --filter @acorn/tui build
+pnpm --filter @acorn/node build
+node apps/cli/bin/acorn.mjs --help
+export ACORN_DATA_DIR="$(mktemp -d)"
+node apps/cli/bin/acorn.mjs node start --background --output json
+node apps/cli/bin/acorn.mjs node status --output json
+node apps/cli/bin/acorn.mjs node stop --output json
+```
+
+Keep the same `ACORN_DATA_DIR` for later commands, including `node stop`. The service uses the
+standalone Node bundle. The CLI test
+suite is `pnpm --filter @acorn/cli test`; the extracted artifact check is `pnpm pack:node` followed
+by `npm install --omit=dev` inside the extracted archive. See [CLI](./cli.md) for resource schemas,
+pairing, and end-to-end examples.
+
 ### Agent-driven desktop development
 
 An agent on a graphical development host can launch and drive a real Acorn window without using the
@@ -393,6 +415,9 @@ request counts still measure correctly in a hidden window, but a paint does not 
 puts them, all core and plugin migration chains, the plugin frame stylesheet, and the pinned Node
 runtime where the bundler will find them. The staging check detects missing artifacts but cannot
 identify stale output by itself, so build order is `package.json`'s job.
+`apps/cli` emits the headless bundle and launcher, while `apps/tui` emits the interactive bundle.
+`pnpm pack:node` stages all three in one archive with the runtime dependencies named by its generated
+manifest.
 
 ## Data and credentials
 
