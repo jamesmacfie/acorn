@@ -20,6 +20,12 @@ newest turn until the reader scrolls away from it, picks the bottom up again whe
 and gives a reader the place they left when they come back to a session. The bar above it and the
 composer below it are pinned by being that scroller's siblings.
 
+The conversation is keyed by the resolved session id. The Agent pane keeps its detail region mounted
+while the reader chooses another row in the same task, and the Workflows pane can resolve a step's
+session after it has mounted. A different id disposes the prior transcript, snapshot subscription,
+pending reveal, and local view controls before mounting the new one. Drafts and reading places remain
+in their session-keyed stores, so returning to a session restores those separately.
+
 Immediately after the title, the header hosts the `agents:session-header` remote `stack` point. Its
 props are a public projection rather than the ledger itself: task and session ids, provider id,
 per-turn usage and resolved prices, and explicit token/cost accounting modes. The owner stops there.

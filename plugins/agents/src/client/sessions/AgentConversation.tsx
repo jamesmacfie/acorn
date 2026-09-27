@@ -31,6 +31,27 @@ export default function AgentConversation(props: AgentConversationProps & {
    *  whichever effect happened to run first. */
   autoFocus?: boolean
 }) {
+  // The transcript, its effects and its local controls belong to one session. Keep that owner keyed
+  // when a pane stays mounted and changes selection; otherwise Solid reuses the old conversation's
+  // reactive subtree while its snapshot and cleanup effects are changing underneath it.
+  const sessionId = createMemo(() => props.sessionId
+    ?? (props.workflowStepId
+      ? managedAgentStore.sessions().find((item) => item.config.workflowStepId === props.workflowStepId)?.id
+      : undefined)
+    ?? '')
+  return (
+    <Show when={sessionId()} keyed fallback={<EmptyState size="sm">{props.noSession ?? 'No session to show.'}</EmptyState>}>
+      {(id) => <SessionConversation sessionId={id} conversation={props} />}
+    </Show>
+  )
+}
+
+function SessionConversation(input: {
+  sessionId: string
+  conversation: AgentConversationProps & { autoFocus?: boolean }
+}) {
+  const props = input.conversation
+  const sessionId = () => input.sessionId
   const [error, setError] = createSignal('')
   // The transcript view controls, sitting above the composer because that is where the reader's hands
   // are. They reach into the transcript, which is a sibling: the scroll jumps come back up from the kit
@@ -38,20 +59,6 @@ export default function AgentConversation(props: AgentConversationProps & {
   const [scrollControls, setScrollControls] = createSignal<TimelineControls>()
   const [chatsOnly, setChatsOnly] = createSignal(false)
   const [collapseTick, setCollapseTick] = createSignal(0)
-  // A memo, not an inline getter. `on()` re-runs its callback on every notification without comparing
-  // the input, and `loadSnapshot` ends in `upsertSession`, which replaces the row a caller may have
-  // derived this id from. That was an infinite reload loop in the pane model this came out of.
-  //
-  // Falling back to the step's own session is what lets a caller draw a step that is still running.
-  // The node writes `config.workflowStepId` when it starts the session
-  // (../../server/sessions/sessionExecute.ts) and broadcasts the row whenever it changes,
-  // and this client holds an app-lifetime subscription to that, so the lookup is a scan of a roster
-  // that is already in memory.
-  const sessionId = createMemo(() => props.sessionId
-    ?? (props.workflowStepId
-      ? managedAgentStore.sessions().find((item) => item.config.workflowStepId === props.workflowStepId)?.id
-      : undefined)
-    ?? '')
   const snapshot = createMemo(() => managedAgentStore.snapshots()[sessionId()])
   const stored = createMemo(() => managedAgentStore.sessions().find((item) => item.id === sessionId()))
   // The store's row where there is one, the snapshot's where the roster has not caught up. Both are the

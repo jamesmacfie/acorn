@@ -1,3 +1,4 @@
+import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentSession, AgentSessionSnapshot } from '../../contract/wire.ts'
@@ -21,7 +22,7 @@ vi.mock('@solidjs/router', () => ({ useNavigate: () => () => {} }))
 // about, and both would need a node.
 vi.mock('../composer/AgentComposer', () => ({ default: () => <textarea aria-label="Prompt" /> }))
 vi.mock('../composer/QueuedAgentTurns', () => ({ default: () => null }))
-vi.mock('./AgentEventCard', () => ({ default: () => null }))
+vi.mock('./AgentEventCard', () => ({ default: (props: { item: { event: { text?: string } } }) => <div>{props.item.event.text}</div> }))
 
 const SESSION = 's1'
 const session = {
@@ -60,9 +61,10 @@ const snapshot = {
 
 let listedSessions: AgentSession[] = [session]
 let listedDelegations: unknown[] = []
+const snapshotsById: Record<string, AgentSessionSnapshot> = { [SESSION]: snapshot }
 vi.mock('./managedClient', () => ({
   managedAgentApi: {
-    snapshot: async () => snapshot,
+    snapshot: async (id: string) => snapshotsById[id],
     sessions: async () => ({ sessions: listedSessions, delegations: listedDelegations, nextCursor: null }),
   },
 }))
@@ -82,6 +84,8 @@ afterEach(() => {
   managedAgentStore.clear()
   listedSessions = [session]
   listedDelegations = []
+  snapshotsById[SESSION] = snapshot
+  for (const id of Object.keys(snapshotsById)) if (id !== SESSION) delete snapshotsById[id]
 })
 
 const draw = () => {
@@ -127,5 +131,58 @@ describe('the conversation in a pane region', () => {
     expect(document.activeElement).toBe(composer)
     expect(composer.value).toBe('Keep this draft')
     expect([composer.selectionStart, composer.selectionEnd]).toEqual([5, 9])
+  })
+
+  it('shows the selected session without remounting the task pane', async () => {
+    const other = { ...session, id: 's2', title: 'Another session' }
+    snapshotsById[other.id] = {
+      ...snapshot,
+      session: other,
+      events: [{ ...snapshot.events[0], id: 'e2', sessionId: other.id,
+        event: { type: 'assistant_message', text: 'second conversation', messageId: 'm2' } }],
+    }
+    listedSessions = [session, other]
+    managedAgentStore.upsertSession(session)
+    managedAgentStore.upsertSession(other)
+    const [selected, setSelected] = createSignal(SESSION)
+    ;(globalThis as { ResizeObserver?: unknown }).ResizeObserver = TestResizeObserver
+    const host = document.createElement('div')
+    document.body.append(host)
+    const dispose = render(() => <AgentConversation sessionId={selected()} viewKeyPrefix="test" />, host)
+    hosts.push(() => { dispose(); host.remove() })
+
+    await managedAgentStore.loadSnapshot(SESSION)
+    expect(host.textContent).toContain('hello')
+    setSelected(other.id)
+    await vi.waitFor(() => expect(host.textContent).toContain('second conversation'))
+    expect(host.textContent).not.toContain('hello')
+    setSelected(SESSION)
+    await vi.waitFor(() => expect(host.textContent).toContain('hello'))
+    expect(host.textContent).not.toContain('second conversation')
+  })
+
+  it('changes conversations when a workflow pane selects another step', async () => {
+    const first = { ...session, config: { workflowStepId: 'step-1' } }
+    const second = { ...session, id: 's2', config: { workflowStepId: 'step-2' } }
+    snapshotsById[SESSION] = { ...snapshot, session: first }
+    snapshotsById[second.id] = {
+      ...snapshot,
+      session: second,
+      events: [{ ...snapshot.events[0], id: 'e2', sessionId: second.id,
+        event: { type: 'assistant_message', text: 'step two', messageId: 'm2' } }],
+    }
+    managedAgentStore.upsertSession(first)
+    managedAgentStore.upsertSession(second)
+    const [step, setStep] = createSignal('step-1')
+    ;(globalThis as { ResizeObserver?: unknown }).ResizeObserver = TestResizeObserver
+    const host = document.createElement('div')
+    document.body.append(host)
+    const dispose = render(() => <AgentConversation workflowStepId={step()} viewKeyPrefix="workflow" />, host)
+    hosts.push(() => { dispose(); host.remove() })
+
+    await vi.waitFor(() => expect(host.textContent).toContain('hello'))
+    setStep('step-2')
+    await vi.waitFor(() => expect(host.textContent).toContain('step two'))
+    expect(host.textContent).not.toContain('hello')
   })
 })
