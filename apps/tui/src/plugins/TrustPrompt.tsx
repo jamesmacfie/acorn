@@ -65,7 +65,11 @@ export function TrustPrompt() {
             <Line role="muted">
               {`${current().row.installed?.version ?? '?'} ${current().source?.kind === 'device'
                 ? `installed on this device from ${current().sourceLabel ?? 'a package'}${current().sourceLabel?.startsWith('path:') ? ' (folder bytes are not pinned)' : ''}`
-                : `from ${nodeLabel(current().nodeId)}`}${current().previous ? `, an update from ${current().previous!.version}` : ''}`}
+                : `from ${nodeLabel(current().nodeId)}`}${current().previous?.hash === current().hash
+                ? current().previous?.declaration
+                  ? ', same client code with a changed declaration; review its grants again'
+                  : ', review the declaration for this previously approved client code again'
+                : current().previous ? `, an update from ${current().previous!.version}` : ''}`}
             </Line>
             <Show when={added().length}>
               <SectionHeader level="group">What this version asks for that the last one did not</SectionHeader>

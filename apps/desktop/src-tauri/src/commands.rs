@@ -123,11 +123,29 @@ fn mime_for(path: &std::path::Path) -> &'static str {
 /// The native save dialog plus the write. False when the owner dismissed the dialog and when the
 /// write failed; either way the renderer learns nothing about where the file went, which keeps the
 /// filesystem the shell's the same way `pick_folder` does.
+const MAX_SAVE_BYTES: usize = 64 * 1024 * 1024;
+const MAX_SAVE_ENCODED_CHARS: usize = MAX_SAVE_BYTES.div_ceil(3) * 4;
+
+fn safe_suggested_name(value: &str) -> String {
+    let clean = value.chars().take(180).fold(String::new(), |mut out, ch| {
+        if ch.is_alphanumeric() || matches!(ch, '.' | '_' | '-') {
+            out.push(ch);
+        } else if !out.ends_with('-') {
+            out.push('-');
+        }
+        out
+    });
+    let clean = clean.trim_matches(|ch| matches!(ch, '.' | '-' | '_'));
+    if clean.is_empty() { "download".to_string() } else { clean.to_string() }
+}
+
 #[tauri::command]
 pub async fn save_file(app: AppHandle, bytes: String, suggested_name: String) -> bool {
+    if bytes.len() > MAX_SAVE_ENCODED_CHARS { return false; }
     let Ok(decoded) = BASE64.decode(bytes) else { return false };
+    if decoded.len() > MAX_SAVE_BYTES { return false; }
     let (tx, rx) = std::sync::mpsc::channel();
-    app.dialog().file().set_file_name(&suggested_name).save_file(move |path| {
+    app.dialog().file().set_file_name(safe_suggested_name(&suggested_name)).save_file(move |path| {
         let _ = tx.send(path.and_then(|p| p.into_path().ok()));
     });
     let Some(path) = tauri::async_runtime::spawn_blocking(move || rx.recv().unwrap_or(None)).await.unwrap_or(None) else {
@@ -293,7 +311,7 @@ pub fn shutdown(app: &AppHandle) {
 
 #[cfg(test)]
 mod tests {
-    use super::{activation_tag, mime_for, ACTIVATION_WINDOW};
+    use super::{activation_tag, mime_for, safe_suggested_name, ACTIVATION_WINDOW, MAX_SAVE_BYTES, MAX_SAVE_ENCODED_CHARS};
     use std::path::Path;
     use std::time::{Duration, Instant};
 
@@ -306,6 +324,15 @@ mod tests {
         // and a file with no extension at all.
         assert_eq!(mime_for(Path::new("/tmp/main.rs")), "text/plain");
         assert_eq!(mime_for(Path::new("/tmp/Makefile")), "text/plain");
+    }
+
+    #[test]
+    fn a_node_supplied_download_name_cannot_preselect_a_path_or_hide_a_file() {
+        assert_eq!(safe_suggested_name("../../.ssh/authorized_keys"), "ssh-authorized_keys");
+        assert_eq!(safe_suggested_name("C:\\Users\\owner\\run\u{202e}cod.exe"), "C-Users-owner-run-cod.exe");
+        assert_eq!(safe_suggested_name("\u{0000}../.."), "download");
+        assert_eq!(safe_suggested_name("résumé.pdf"), "résumé.pdf");
+        assert_eq!(MAX_SAVE_ENCODED_CHARS, MAX_SAVE_BYTES.div_ceil(3) * 4);
     }
 
     #[test]

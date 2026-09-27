@@ -1,5 +1,5 @@
 import { createMemo, createRenderEffect, createResource, onCleanup } from 'solid-js'
-import { closeTunnelsForTask, onPluginFrame, readJson, type Task, tunnelUrl } from '@acorn/plugin-api/client'
+import { closeTunnelsForTask, onPluginFrame, previewUrlForClient, readJson, remotePreviewBlocked, type Task } from '@acorn/plugin-api/client'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import type { PreviewUrlState } from '../contract/urls'
 import { previewUrlRoute } from '../shared/api'
@@ -14,14 +14,9 @@ export function PreviewTaskPane(props: { task: Task }) {
     if ((payload as { taskId?: unknown }).taskId === props.task.id) void refetch()
   }))
 
-  // The URL this machine can actually load. For the bundled local node the two are identical. For a
-  // remote one, a loopback URL is rewritten to a tunnel port that main opens over the authenticated
-  // connection (client-core's node/tunnelUrl.ts). This is a resource because opening the tunnel is a
-  // round trip.
-  const [loadable] = createResource(
-    () => ({ taskId: props.task.id, url: resolved()?.url ?? null }),
-    ({ taskId, url }) => tunnelUrl(taskId, url),
-  )
+  // Only a local node's URL may enter the native webview. A remote page could contact the client's
+  // private network from a redirect or subrequest even if its first request used a tunnel.
+  const loadable = createMemo(() => previewUrlForClient(resolved()?.url ?? null))
 
   // The listener is per (node, task, port) and outlives a pane re-render, since the pane reconciles
   // its URL often. It closes when the task does.
@@ -38,5 +33,5 @@ export function PreviewTaskPane(props: { task: Task }) {
     onCleanup(() => closeTunnelsForTask(id))
   })
 
-  return <PreviewPane taskId={props.task.id} url={loadable() ?? null} />
+  return <PreviewPane taskId={props.task.id} url={loadable()} remoteBlocked={remotePreviewBlocked()} />
 }

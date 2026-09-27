@@ -27,9 +27,11 @@ export default function PluginWebview(props: PluginWebviewProps) {
   const [canBack, setCanBack] = createSignal(false)
   const [canForward, setCanForward] = createSignal(false)
   const [blocked, setBlocked] = createSignal('')
+  const [failed, setFailed] = createSignal(false)
   const [suppressed, setSuppressed] = createSignal(false)
   let ensureVersion = 0
   let placed = ''
+  let ensuredKey = ''
 
   const syncRect = () => {
     if (!native || !host) return
@@ -78,8 +80,10 @@ export default function PluginWebview(props: PluginWebviewProps) {
       clearInterval(poll)
       offEvent()
       offBlocked()
-      native.hide(key())
-      native.evict(key())
+      if (ensuredKey) {
+        native.hide(ensuredKey)
+        native.evict(ensuredKey)
+      }
     })
   })
 
@@ -87,17 +91,35 @@ export default function PluginWebview(props: PluginWebviewProps) {
     const homeUrl = home()
     const covered = suppressed()
     const version = ++ensureVersion
+    const nextKey = key()
+    if (native && ensuredKey && ensuredKey !== nextKey) {
+      native.hide(ensuredKey)
+      native.evict(ensuredKey)
+      ensuredKey = ''
+    }
     if (!native || !host || !homeUrl) {
-      if (native) native.hide(key())
+      if (native && ensuredKey) {
+        native.hide(ensuredKey)
+        native.evict(ensuredKey)
+        ensuredKey = ''
+      }
       return
     }
-    if (covered) native.hide(key())
+    ensuredKey = nextKey
+    setFailed(false)
+    if (covered) native.hide(nextKey)
     else syncRect()
-    void native.ensure(key(), homeUrl, props.surface.hosts ?? []).then((ready) => {
-      if (!ready || version !== ensureVersion) return
+    void native.ensure(nextKey, homeUrl, props.surface.hosts ?? []).then((ready) => {
+      if (version !== ensureVersion) return
+      if (!ready) {
+        setFailed(true)
+        return
+      }
       placed = ''
       syncRect()
-      if (!suppressed()) native.show(key())
+      if (!suppressed()) native.show(nextKey)
+    }).catch(() => {
+      if (version === ensureVersion) setFailed(true)
     })
   })
 
@@ -132,6 +154,7 @@ export default function PluginWebview(props: PluginWebviewProps) {
         <Button variant="bare" title="Reload" onPress={() => void native?.command(key(), 'reload')}>↻</Button>
         <span class="plugin-webview-hostname" title={url() || home() || ''}>{displayHost(url() || home() || '') || 'No page loaded'}</span>
         <Show when={blocked()}><Alert tone="warn">Blocked navigation to {blocked()}</Alert></Show>
+        <Show when={failed()}><Alert tone="warn">Could not open the plugin page.</Alert></Show>
         {/* Was a literal ◐ glyph with no accessible name. */}
         <Show when={loading()}><Spinner label="Loading page" /></Show>
       </div>

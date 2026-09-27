@@ -156,7 +156,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
       addressed = nodeId
       const parsed = nodeFetchRequestSchema.parse(toFetchRequest(request as WireFetchRequest))
       try {
-        const response = await helper.broker.fetch(nodeId, parsed)
+        const response = await helper.broker.fetch(nodeId, parsed, { maxResponseBytes: parsed.maxResponseBytes })
         return { status: response.status, headers: response.headers, body: encodeBytes(response.body) }
       } catch (error) {
         // A request the renderer itself cancelled is not a handler failure; 499 says the caller has

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { PLUGIN_API_MAJOR, type NodePluginRow, type PluginRuntimeIdentity } from '@acorn/protocol/api.ts'
+import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
 import type { PluginHostState } from '../../infra/platform'
 import { contributionAvailability, nodePluginServiceAvailable } from './availabilityModel'
 import { derivePluginDistribution, type NodePluginObservation } from './distributionModel'
@@ -18,6 +19,7 @@ const host = (decision?: 'accepted' | 'rejected'): PluginHostState => ({
   cached: { 'accepted-hash': { pluginId: 'reports', version: '1.0.0', bytes: 10 } },
   acks: decision ? [{
     pluginId: 'reports', hash: 'accepted-hash', nodeId: 'a', version: '1.0.0', decision, decidedAt: 1,
+    declaration: clientDeclaration(runtime),
     permissions: runtime.permissions, webviews: [], keyClaims: [], navigationDestinations: [],
     extensions: [], schedules: [], taskChecks: [], harnesses: [], agentTools: [], contextSections: [],
   }] : [],

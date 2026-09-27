@@ -3,9 +3,10 @@ import { afterEach, expect, it, vi } from 'vitest'
 import type { AgentNormalizedEvent } from '../../contract/wire.ts'
 
 const artifactContent = vi.fn()
+const artifactPreview = vi.fn()
 const saveFile = vi.fn()
 
-vi.mock('./managedClient', () => ({ managedAgentApi: { artifactContent } }))
+vi.mock('./managedClient', () => ({ managedAgentApi: { artifactContent, artifactPreview } }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...await importOriginal<typeof import('@acorn/plugin-api/client')>(),
   saveFile,
@@ -32,11 +33,13 @@ const draw = (artifact: ArtifactEvent) => {
 }
 
 it('fetches an authenticated raster artifact and displays it inline', async () => {
-  artifactContent.mockResolvedValue({
+  const content = {
     bytes: Uint8Array.from([0x89, 0x50, 0x4e, 0x47]),
     type: 'image/png',
     filename: 'Generated image.png',
-  })
+  }
+  artifactPreview.mockResolvedValue(content)
+  artifactContent.mockResolvedValue(content)
   const host = draw({
     type: 'artifact',
     artifactId: 'image-1',
@@ -73,4 +76,12 @@ it('keeps non-image artifacts on the download-only path', () => {
   expect(host.querySelector('img')).toBeNull()
   expect(host.textContent).toContain('Command output')
   expect(artifactContent).not.toHaveBeenCalled()
+  expect(artifactPreview).not.toHaveBeenCalled()
+})
+
+it('does not automatically fetch an oversized advertised image', () => {
+  const host = draw({ type: 'artifact', artifactId: 'large', kind: 'file', title: 'large.png', mediaType: 'image/png', byteSize: 8 * 1024 * 1024 + 1 })
+  expect(host.querySelector('img')).toBeNull()
+  expect(artifactPreview).not.toHaveBeenCalled()
+  expect(host.textContent).toContain('Download')
 })

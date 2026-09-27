@@ -3,6 +3,7 @@ import { Dynamic } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import { createDeviceFlow, integrationsOptions, type Project, projectImporterRegistry } from '@acorn/plugin-api/client'
 import { Alert, Badge, Button, Card, ChipRow, Chip, CopyButton, Heading, Inline, Stack, Text, Toolbar } from '@acorn/plugin-api/ui'
+import { safeVerificationUrl } from '@acorn/protocol/externalUrl.ts'
 
 // The GitHub branch of the wizard: the device grant, then whatever GitHub registered as a project
 // importer. Neither half is written here. The grant is core's shared createDeviceFlow, the same one
@@ -22,6 +23,10 @@ export default function GithubConnect(props: {
     !!integrations.data?.integrations.some((entry) => entry.providerId === 'github' && entry.status === 'connected')
   const flow = createDeviceFlow(() => 'github', async () => { await integrations.refetch() })
   const importer = createMemo(() => projectImporterRegistry.get('github'))
+  const githubVerification = (value: string): URL | null => {
+    const url = safeVerificationUrl(value)
+    return url?.hostname === 'github.com' && url.pathname === '/login/device' ? url : null
+  }
 
   return (
     <Stack gap="row">
@@ -44,7 +49,9 @@ export default function GithubConnect(props: {
               {(started) => (
                 <Card>
                   <Stack gap="row">
-                    <Text emphasis="muted">{new URL(started().verificationUri).host}{new URL(started().verificationUri).pathname}</Text>
+                    <Show when={githubVerification(started().verificationUri)} fallback={<Alert>GitHub returned an unsafe sign-in address. Cancel and retry.</Alert>}>
+                      {(url) => <Text emphasis="muted">{url().host}{url().pathname}</Text>}
+                    </Show>
                     {/* The code is the thing to read, so it gets the emphasis. */}
                     <Inline gap="inline">
                       <Text emphasis="mono">{started().userCode}</Text>
@@ -53,7 +60,9 @@ export default function GithubConnect(props: {
                     <Toolbar variant="actions" size="sm">
                       {/* A real link, not a fetch: the shell's external-URL gate routes it to the
                           owner's browser. */}
-                      <Button href={started().verificationUri}>Open GitHub</Button>
+                      <Show when={githubVerification(started().verificationUri)}>
+                        {(url) => <Button href={url().href}>Open GitHub</Button>}
+                      </Show>
                       <Button variant="bare" onPress={flow.cancel}>Cancel</Button>
                     </Toolbar>
                     <Text emphasis="muted">Waiting for approval…</Text>

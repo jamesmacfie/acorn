@@ -7,6 +7,7 @@ import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker
 import { MAX_BUNDLE_BYTES, PluginCache } from './pluginCache'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
+import { NodeResponseTooLargeError } from '../broker/nodeRequest'
 
 // Nothing to mock: the cache takes userDataDir as a parameter, the way fleetStore does, and touches
 // no shell API. That is what makes the hashing rules, the part that carries the security property,
@@ -18,11 +19,11 @@ const sha256 = (text: string) => createHash('sha256').update(Buffer.from(text)).
 let dir = ''
 let served: { status: number; body: string | Uint8Array<ArrayBuffer> } | Error = { status: 200, body: BUNDLE }
 let legacyServed: typeof served | null = null
-let requests: Array<{ nodeId: string; request: NodeFetchRequest }> = []
+let requests: Array<{ nodeId: string; request: NodeFetchRequest; limits: { maxResponseBytes?: number } | undefined }> = []
 
 const broker = {
-  fetch: async (nodeId: string, request: NodeFetchRequest): Promise<NodeFetchResponse> => {
-    requests.push({ nodeId, request })
+  fetch: async (nodeId: string, request: NodeFetchRequest, limits?: { maxResponseBytes?: number }): Promise<NodeFetchResponse> => {
+    requests.push({ nodeId, request, limits })
     const answer = request.path.endsWith('/client.js') && legacyServed ? legacyServed : served
     if (answer instanceof Error) throw answer
     const body = typeof answer.body === 'string' ? new TextEncoder().encode(answer.body) : answer.body
@@ -53,6 +54,7 @@ describe('fetching a bundle from a node', () => {
     const store = cache()
     expect(await store.putFromNode('node-a', 'sparkline', claim())).toEqual({ hash: sha256(BUNDLE) })
     expect(requests[0].request.path).toBe(`/v1/core/plugins/sparkline/bundles/${sha256(BUNDLE)}`)
+    expect(requests[0].limits).toEqual({ maxResponseBytes: MAX_BUNDLE_BYTES })
     expect(store.has(sha256(BUNDLE))).toBe(true)
     expect(readFileSync(join(cacheDir(), `${sha256(BUNDLE)}.js`), 'utf8')).toBe(BUNDLE)
     expect(store.list()[sha256(BUNDLE)]).toMatchObject({ pluginId: 'sparkline', version: '1.2.0', bytes: BUNDLE.length, nodeIds: ['node-a'] })
@@ -72,6 +74,10 @@ describe('fetching a bundle from a node', () => {
     expect(requests.map(({ request }) => request.path)).toEqual([
       `/v1/core/plugins/sparkline/bundles/${sha256(BUNDLE)}`,
       '/v1/core/plugins/sparkline/client.js',
+    ])
+    expect(requests.map(({ limits }) => limits)).toEqual([
+      { maxResponseBytes: MAX_BUNDLE_BYTES },
+      { maxResponseBytes: MAX_BUNDLE_BYTES },
     ])
     legacyServed = { status: 200, body: 'other bytes' }
     expect(await cache().putFromNode('old-node', 'changed', claim(sha256('different')))).toEqual({ error: 'hash-mismatch' })
@@ -196,6 +202,11 @@ describe('trust binds to bytes, not to the listing', () => {
     const huge = new Uint8Array(MAX_BUNDLE_BYTES + 1)
     served = { status: 200, body: huge }
     expect(await cache().putFromNode('node-a', 'sparkline', claim(createHash('sha256').update(huge).digest('hex')))).toEqual({ error: 'too-large' })
+  })
+
+  it('reports a transport refusal as too large rather than unreachable', async () => {
+    served = new NodeResponseTooLargeError(MAX_BUNDLE_BYTES)
+    expect(await cache().putFromNode('node-a', 'sparkline', claim())).toEqual({ error: 'too-large' })
   })
 })
 

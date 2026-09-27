@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use serde::{Deserialize, Serialize};
 use tauri::webview::{Cookie, NewWindowResponse, PageLoadEvent, WebviewBuilder};
@@ -12,7 +12,8 @@ use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, 
 // request. The pane's cookie store is seeded before its first real navigation instead, from secrets
 // the helper pushes to the shell per port. The secret never reaches the renderer.
 
-/// Preview keys are `preview:<taskId>`; plugin surfaces are `plugin:<pluginId>:<nodeId>[:<surface>]`.
+/// Preview keys are `preview:<taskId>`; plugin surfaces are
+/// `plugin:<pluginId>:<nodeId>:<surface>[:<taskId>]`.
 /// The prefix selects the policy below, so it is validated rather than assumed.
 const PREVIEW_PREFIX: &str = "preview:";
 const PLUGIN_PREFIX: &str = "plugin:";
@@ -27,6 +28,7 @@ const MAX_WEBVIEWS: usize = 32;
 
 #[derive(Clone, Debug, PartialEq)]
 enum Policy {
+    Denied,
     Preview,
     /// The manifest host allowlist, checked here and in the renderer broker. Widening the grant in
     /// one layer must not silently widen the other.
@@ -36,9 +38,35 @@ enum Policy {
 impl Policy {
     fn allows(&self, url: &str) -> bool {
         match self {
+            Policy::Denied => false,
             Policy::Preview => is_allowed_preview_url(url),
             Policy::Plugin(hosts) => is_allowed_webview_url(url, hosts),
         }
+    }
+}
+
+/// The navigation callback outlives an `ensure` call. Keep its grant on the same handle as the
+/// record, so a refresh is observed by an already-created native view before it can navigate again.
+#[derive(Clone)]
+struct LivePolicy(Arc<Mutex<Policy>>);
+
+impl LivePolicy {
+    fn new(policy: Policy) -> Self {
+        Self(Arc::new(Mutex::new(policy)))
+    }
+
+    fn allows(&self, url: &str) -> bool {
+        self.0.lock().unwrap().allows(url)
+    }
+
+    /// Swap the whole grant under one lock. The callback never sees a partially updated host list.
+    fn replace(&self, next: Policy) -> bool {
+        let mut current = self.0.lock().unwrap();
+        if *current == next {
+            return false;
+        }
+        *current = next;
+        true
     }
 }
 
@@ -85,13 +113,16 @@ impl Nav {
 
 struct Record<R: Runtime> {
     webview: Webview<R>,
-    nav: std::sync::Arc<Mutex<Nav>>,
-    policy: Policy,
+    nav: Arc<Mutex<Nav>>,
+    policy: LivePolicy,
+    invalidated: bool,
 }
 
 /// The shell's webview state. `tunnels` is written from the helper's stdout signals, never from the
 /// renderer.
 pub struct Webviews<R: Runtime> {
+    /// Serializes ensure/evict without holding `records` across native webview operations.
+    operations: Mutex<()>,
     records: Mutex<HashMap<String, Record<R>>>,
     tunnels: Mutex<HashMap<u16, String>>,
 }
@@ -99,7 +130,7 @@ pub struct Webviews<R: Runtime> {
 // Hand-written because `derive(Default)` would ask the runtime parameter to be Default too.
 impl<R: Runtime> Default for Webviews<R> {
     fn default() -> Self {
-        Self { records: Mutex::new(HashMap::new()), tunnels: Mutex::new(HashMap::new()) }
+        Self { operations: Mutex::new(()), records: Mutex::new(HashMap::new()), tunnels: Mutex::new(HashMap::new()) }
     }
 }
 
@@ -115,7 +146,9 @@ impl<R: Runtime> Webviews<R> {
 
     /// Close every webview, so none outlives the window it is composited over.
     pub fn dispose(&self) {
-        for (_, record) in self.records.lock().unwrap().drain() {
+        let _operation = self.operations.lock().unwrap();
+        let records: Vec<_> = self.records.lock().unwrap().drain().map(|(_, record)| record).collect();
+        for record in records {
             let _ = record.webview.close();
         }
     }
@@ -214,7 +247,7 @@ fn policy_for(key: &str, hosts: Option<Vec<String>>) -> Option<Policy> {
     }
     let rest = key.strip_prefix(PLUGIN_PREFIX)?;
     let segments = rest.split(':').count();
-    if !(2..=3).contains(&segments) || rest.split(':').any(str::is_empty) {
+    if !(3..=4).contains(&segments) || rest.split(':').any(str::is_empty) {
         return None;
     }
     // A plugin surface with no allowlist can reach nothing, which is a refusal spelled the long way.
@@ -228,40 +261,81 @@ fn policy_for(key: &str, hosts: Option<Vec<String>>) -> Option<Policy> {
 #[tauri::command]
 pub fn webview_ensure<R: Runtime>(app: AppHandle<R>, key: String, url: String, hosts: Option<Vec<String>>) -> bool {
     let state = app.state::<Webviews<R>>();
-    let Some(policy) = policy_for(&key, hosts) else { return false };
+    let _operation = state.operations.lock().unwrap();
+    let Some(policy) = policy_for(&key, hosts) else {
+        // An empty or invalid replacement grant must retire an older view with this key.
+        retire_record(&state, &key, Policy::Denied);
+        return false;
+    };
     if !policy.allows(&url) {
+        retire_record(&state, &key, Policy::Denied);
         return false;
     }
 
     {
         let mut records = state.records.lock().unwrap();
         if let Some(record) = records.get_mut(&key) {
-            // Refresh the policy across renderer remounts. It carries no authority of its own,
-            // because every operation resolves the record by key and re-checks the URL.
-            record.policy = policy;
-            let current = record.nav.lock().unwrap().url();
-            if current != url {
-                let _ = Url::parse(&url).map(|parsed| record.webview.navigate(parsed));
+            // The callback observes this swap before the native page is closed. Closing the entire
+            // view cancels a navigation approved just before the swap and clears old page state.
+            let changed = record.policy.replace(policy.clone());
+            if !changed && !record.invalidated {
+                let current = record.nav.lock().unwrap().url();
+                return current == url || Url::parse(&url).is_ok_and(|parsed| record.webview.navigate(parsed).is_ok());
             }
-            return true;
-        }
-        if records.len() >= MAX_WEBVIEWS {
-            eprintln!("[webview] refusing {key}: {MAX_WEBVIEWS} surfaces are already open");
-            return false;
+            record.invalidated = true;
         }
     }
+    if !retire_record(&state, &key, policy.clone()) {
+        return false;
+    }
+    if state.records.lock().unwrap().len() >= MAX_WEBVIEWS {
+        eprintln!("[webview] refusing {key}: {MAX_WEBVIEWS} surfaces are already open");
+        return false;
+    }
 
-    create(&app, &key, &url, policy).is_some()
+    let Some(record) = create(&app, &key, &url, policy) else { return false };
+    state.records.lock().unwrap().insert(key, record);
+    true
 }
 
-fn create<R: Runtime>(app: &AppHandle<R>, key: &str, home: &str, policy: Policy) -> Option<()> {
+/// The caller holds `operations`, so no second ensure can create the same native label before the
+/// old view closes. The map lock is released before `hide`, `close`, or the fallback navigation.
+fn retire_record<R: Runtime>(state: &Webviews<R>, key: &str, policy: Policy) -> bool {
+    let old = {
+        let mut records = state.records.lock().unwrap();
+        if let Some(record) = records.get_mut(key) {
+            record.policy.replace(policy);
+            record.invalidated = true;
+        }
+        records.remove(key)
+    };
+    let Some(record) = old else { return true };
+    if let Err(error) = record.webview.hide() {
+        eprintln!("[webview] could not hide invalidated {key}: {error}");
+    }
+    if let Err(error) = record.webview.close() {
+        eprintln!("[webview] could not close invalidated {key}: {error}");
+        // `on_navigation` admits about:blank before it checks even the denied policy. If native
+        // close fails, try to unload the page; retain an unusable record so a later ensure retries.
+        if let Err(blank_error) = record.webview.navigate(Url::parse("about:blank").unwrap()) {
+            eprintln!("[webview] could not blank invalidated {key}: {blank_error}");
+        }
+        state.records.lock().unwrap().insert(key.to_string(), record);
+        return false;
+    }
+    true
+}
+
+fn create<R: Runtime>(app: &AppHandle<R>, key: &str, home: &str, policy: Policy) -> Option<Record<R>> {
     let window = app.get_window("main")?;
-    let nav = std::sync::Arc::new(Mutex::new(Nav::default()));
+    let home_url = Url::parse(home).ok()?;
+    let nav = Arc::new(Mutex::new(Nav::default()));
+    let live_policy = LivePolicy::new(policy);
 
     let guard_nav = nav.clone();
     let guard_app = app.clone();
     let guard_key = key.to_string();
-    let guard_policy = policy.clone();
+    let guard_policy = live_policy.clone();
     let load_nav = nav.clone();
     let load_app = app.clone();
     let load_key = key.to_string();
@@ -323,11 +397,12 @@ fn create<R: Runtime>(app: &AppHandle<R>, key: &str, home: &str, policy: Policy)
     // the store is write-only from here. The helper checks that the cookie arrived.
     seed_tunnel_cookie(app, &webview, home);
 
-    if let Ok(parsed) = Url::parse(home) {
-        let _ = webview.navigate(parsed);
+    if let Err(error) = webview.navigate(home_url) {
+        eprintln!("[webview] could not navigate {key}: {error}");
+        let _ = webview.close();
+        return None;
     }
-    app.state::<Webviews<R>>().records.lock().unwrap().insert(key.to_string(), Record { webview, nav, policy });
-    Some(())
+    Some(Record { webview, nav, policy: live_policy, invalidated: false })
 }
 
 /// Tauri labels have their own grammar and must be unique per app, and the seam's keys carry colons.
@@ -380,7 +455,9 @@ pub fn webview_show<R: Runtime>(app: AppHandle<R>, key: String, exclusive: bool)
         }
     }
     if let Some(record) = records.get(&key) {
-        let _ = record.webview.show();
+        if !record.invalidated {
+            let _ = record.webview.show();
+        }
     }
 }
 
@@ -409,6 +486,9 @@ pub fn webview_load<R: Runtime>(app: AppHandle<R>, key: String, url: String) -> 
     let state = app.state::<Webviews<R>>();
     let records = state.records.lock().unwrap();
     let Some(record) = records.get(&key) else { return false };
+    if record.invalidated {
+        return false;
+    }
     if !record.policy.allows(&url) {
         return false;
     }
@@ -420,6 +500,9 @@ pub fn webview_command<R: Runtime>(app: AppHandle<R>, key: String, action: Strin
     let state = app.state::<Webviews<R>>();
     let records = state.records.lock().unwrap();
     let Some(record) = records.get(&key) else { return false };
+    if record.invalidated {
+        return false;
+    }
     let webview = &record.webview;
     match action.as_str() {
         // wry has no history API, so traversal is asked of the page and the shell moves its own
@@ -464,10 +547,8 @@ pub fn webview_command<R: Runtime>(app: AppHandle<R>, key: String, action: Strin
 #[tauri::command]
 pub fn webview_evict<R: Runtime>(app: AppHandle<R>, key: String) {
     let state = app.state::<Webviews<R>>();
-    let removed = state.records.lock().unwrap().remove(&key);
-    if let Some(record) = removed {
-        let _ = record.webview.close();
-    }
+    let _operation = state.operations.lock().unwrap();
+    retire_record(&state, &key, Policy::Denied);
 }
 
 fn family(key: &str) -> Option<&'static str> {
@@ -522,14 +603,35 @@ mod tests {
         assert_eq!(policy_for("preview:task-1", None), Some(Policy::Preview));
         assert_eq!(policy_for("preview:", None), None);
         assert_eq!(policy_for("preview:a:b", None), None);
-        assert_eq!(policy_for("plugin:db:node-1", Some(vec!["example.com".into()])), Some(Policy::Plugin(vec!["example.com".into()])));
         assert_eq!(policy_for("plugin:db:node-1:pane", Some(vec!["example.com".into()])), Some(Policy::Plugin(vec!["example.com".into()])));
+        assert_eq!(policy_for("plugin:db:node-1:pane:task-1", Some(vec!["example.com".into()])), Some(Policy::Plugin(vec!["example.com".into()])));
         // A plugin surface with no allowlist reaches nothing, so it is never created.
-        assert_eq!(policy_for("plugin:db:node-1", None), None);
-        assert_eq!(policy_for("plugin:db:node-1", Some(vec![])), None);
+        assert_eq!(policy_for("plugin:db:node-1:pane", None), None);
+        assert_eq!(policy_for("plugin:db:node-1:pane", Some(vec![])), None);
+        assert_eq!(policy_for("plugin:db:node-1", Some(vec!["example.com".into()])), None);
         assert_eq!(policy_for("plugin:db", Some(vec!["example.com".into()])), None);
         assert_eq!(policy_for("plugin::node-1", Some(vec!["example.com".into()])), None);
         assert_eq!(policy_for("../etc/passwd", None), None);
+    }
+
+    #[test]
+    fn a_live_navigation_guard_observes_narrowing_and_widening() {
+        let policy = LivePolicy::new(Policy::Plugin(vec!["old.example".into(), "keep.example".into()]));
+        let guard = policy.clone(); // The copy retained by `on_navigation` when the view is created.
+        assert!(guard.allows("https://old.example/page"));
+        assert!(!guard.allows("https://new.example/page"));
+
+        assert!(policy.replace(Policy::Plugin(vec!["keep.example".into()])));
+        assert!(!guard.allows("https://old.example/page"));
+        assert!(guard.allows("https://keep.example/page"));
+
+        assert!(policy.replace(Policy::Plugin(vec!["keep.example".into(), "new.example".into()])));
+        assert!(guard.allows("https://new.example/page"));
+        assert!(!policy.replace(Policy::Plugin(vec!["keep.example".into(), "new.example".into()])));
+
+        policy.replace(Policy::Denied);
+        assert!(!guard.allows("https://keep.example/page"));
+        assert!(!guard.allows("https://new.example/page"));
     }
 
     #[test]

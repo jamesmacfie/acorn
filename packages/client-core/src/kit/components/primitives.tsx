@@ -3,6 +3,7 @@ import {
   type JSX,
 } from 'solid-js'
 import { Dynamic, Portal } from 'solid-js/web'
+import { safeContentHref } from '@acorn/protocol/externalUrl.ts'
 import { createAnchoredPopover, type AnchoredPopover } from '../lib/anchor'
 import { createArmedConfirm } from '../lib/confirm'
 import { sidebarCollapse } from '../lib/collapseState'
@@ -96,6 +97,7 @@ const buttonAttrs = (own: ButtonProps) => ({
 })
 
 export function Button(props: ButtonProps) {
+  const safeHref = () => safeContentHref(props.href)
   // Read once, for the reason on RowParts: testing `props.children` and then inserting it built an
   // icon button's mark twice.
   const content = children(() => props.children)
@@ -109,7 +111,7 @@ export function Button(props: ButtonProps) {
   )
   return (
     <Show
-      when={props.href}
+      when={safeHref()}
       fallback={
         <button
           {...buttonAttrs(props)}
@@ -733,6 +735,7 @@ export function Row(props: {
   title?: string
   children: JSX.Element
 }) {
+  const safeHref = safeContentHref(props.href)
   const activate = () => props.onPress?.()
   // Given a rail form, draw it. The caller owns both the column's collapse and its rows, so it
   // passes the slot or leaves it off; there is no second boolean that could disagree with the width
@@ -750,11 +753,13 @@ export function Row(props: {
       <span class="ui-row-collapsed">{props.collapsed}</span>
     </Show>
   )
-  if (props.href !== undefined) {
+  if (safeHref) {
     return (
       <a
         {...(props.item ?? {})}
-        href={props.href}
+        href={safeHref}
+        target={isExternal(safeHref) ? '_blank' : undefined}
+        rel={isExternal(safeHref) ? 'noopener noreferrer' : undefined}
         class="ui-row"
         data-selected={props.selected ? '' : undefined}
         data-collapsed={collapsed() ? '' : undefined}
@@ -1544,6 +1549,9 @@ export function TreeRow(props: {
 /* SplitHandle: the drag-resize grip. Behaviour lives in createSplitDrag (ui/split.ts); this is the
    markup, a wide hit area around a hairline. */
 export function SplitHandle(props: { axis: 'x' | 'y'; drag: SplitDrag }) {
+  // A remote tree may name a kit node without being able to supply this host-minted drag handle.
+  // The wire drops `drag`; keep such a node inert rather than throwing during host render.
+  if (!props.drag) return null
   return <div {...props.drag.handleProps} class="ui-split-handle" data-axis={props.axis} />
 }
 
@@ -1682,7 +1690,7 @@ export function ListDetail(props: {
           </aside>
           {edge()}
           <Dynamic
-            component={props.detailAs ?? 'div'}
+            component={props.detailAs === 'main' ? 'main' : 'div'}
             class="ui-listdetail-detail"
             data-scroll={props.scrollDetail ? '' : undefined}
           >

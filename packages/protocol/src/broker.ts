@@ -26,11 +26,17 @@ export const nodeFetchRequestSchema = z.strictObject({
   requestId: z.string().min(1),
   // Always node-relative and always absolute-rooted. Main joins it onto the node's endpoint, so a
   // renderer cannot redirect traffic at another host by smuggling in a full URL.
-  path: z.string().startsWith('/'),
+  path: z.string().startsWith('/').refine((path) =>
+    !path.startsWith('//') && !path.includes('\\') && !path.includes('#') &&
+    new URL(path, 'https://acorn.invalid').origin === 'https://acorn.invalid',
+  'Node paths must be absolute paths on the paired node'),
   method: z.string().min(1).default('GET'),
   headers: z.record(z.string(), z.string()).default({}),
   body: nodeFetchBodySchema.optional(),
   timeoutMs: z.number().int().positive().optional(),
+  // The renderer may ask for a stricter ceiling for previews. The broker always applies its own
+  // 64 MiB maximum, so this field can only reduce its allocation.
+  maxResponseBytes: z.number().int().positive().max(64 * 1024 * 1024).optional(),
 })
 export type NodeFetchRequest = z.input<typeof nodeFetchRequestSchema>
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { isPluginOpenableUrl } from './externalUrl'
+import { isPluginOpenableUrl, safeContentHref, safeVerificationUrl } from './externalUrl'
 
 // One policy, two callers: the manifest parser for the `openUrl` descriptor verb, and the frame bridge
 // for `ui.openUrl`. The suite lives here because the rule is shared, and because both callers would
@@ -50,5 +50,26 @@ describe('isPluginOpenableUrl', () => {
     // which is exactly the class of disagreement this shared module exists to prevent.
     expect(isPluginOpenableUrl('  https://example.com  ')).toBe(true)
     expect(isPluginOpenableUrl('HTTPS://example.com')).toBe(true)
+  })
+})
+
+describe('safeVerificationUrl', () => {
+  it('only turns an absolute, credential-free HTTPS provider reply into a renderer link', () => {
+    expect(safeVerificationUrl('https://github.com/login/device')?.href).toBe('https://github.com/login/device')
+    for (const url of ['javascript:alert(1)', 'data:text/html,evil', 'http://example.test/', '//example.test/', 'https://user:secret@example.test/', 'https:\n//example.test/']) {
+      expect(safeVerificationUrl(url)).toBeNull()
+    }
+  })
+})
+
+describe('safeContentHref', () => {
+  it('keeps explicit app routes and ordinary web/mail links but refuses executable schemes', () => {
+    expect(safeContentHref('/settings/plugins')).toBe('/settings/plugins')
+    expect(safeContentHref('#details')).toBe('#details')
+    expect(safeContentHref('https://example.test/')).toBe('https://example.test/')
+    expect(safeContentHref('mailto:owner@example.test')).toBe('mailto:owner@example.test')
+    for (const value of ['javascript:alert(1)', 'data:text/html,evil', 'file:///tmp/x', '//attacker.test/', '/\\attacker.test/', 'https://user:secret@example.test/', 'https:\n//example.test/']) {
+      expect(safeContentHref(value)).toBeNull()
+    }
   })
 })

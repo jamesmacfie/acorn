@@ -13,6 +13,7 @@ import { fileAnchor, type CodeRow, type FileRow, type GapRow, type HunkRow, type
 import { markTokens, type FindHighlight } from './find'
 import { persistDraft } from '../lib/draftState'
 import { Button } from '../components/primitives'
+import SanitizedHtml from '../components/content/SanitizedHtml'
 
 export type LineComposerController = {
   isOpen: () => boolean
@@ -454,7 +455,7 @@ function ThreadRow(props: {
                 <UserAvatar login={c.author} />
                 <strong>{c.author ?? 'unknown'}</strong>
               </div>
-              <div class="ui-markdown" innerHTML={c.body ?? ''} />
+              <SanitizedHtml html={c.body ?? ''} />
             </div>
           )}
         </For>
