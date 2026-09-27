@@ -549,8 +549,8 @@ see, not the code to read:
 15. Select a plugin-contributed theme; the terminal and CodeMirror pick up the right light or dark
     self-description. Disable the plugin; the fallback to Light or Dark happens without the stored
     preference being rewritten.
-16. Edit a dev-mode plugin's entry file; the swap lands without a restart or a trust prompt. Edit a
-    non-entry module; the one-module-deep limit surfaces as the restart hint, not silence.
+16. Edit a dev-mode plugin's entry file and an imported route module. Reload the plugin after each
+    edit; both changes take effect in the fresh worker without a node restart or a trust prompt.
 
 The next two are the remote tree's, from layout phase 3 (2026-08-29). The suites cover the wire, the
 renderer, the worker lifecycle and the two render paths producing identical DOM; what nothing
@@ -591,11 +591,11 @@ stylesheet; only a person can tell whether the result is usable.
     keyboard can get stuck. Do the editor pane's file tree, the find-in-files results, the terminal
     drawer, the agents transcript and the PR pane's diff at minimum. Turn on a screen reader for one
     pass over the editor's sidebar: the file tree announces as a tree with levels and expanded state.
-24. Scaffold a fresh plugin with `npm create acorn-plugin`, install it from disk, accept its bundle,
-    and check both halves of what it declares. Its tool card draws in an agent transcript from its own
-    worker, and its diff-line annotation appears on every tenth line of the Changes pane. Then check
-    the developer view on the plugin's page, disable the plugin, and uninstall it: the card and the
-    annotation go at each step and nothing else moves.
+24. Scaffold a fresh plugin with `npm create acorn-plugin`, install it from disk, and accept its bundle.
+    Open a task and run its **Open** command. Its own pane draws from a worker; press **Say hello** and
+    check that the Node route's greeting appears. Then check the developer view on the plugin's page,
+    disable the plugin, and uninstall it. The pane and command disappear at each step while the other
+    panes stay available.
 25. Scaffold the other shape with `--rectangle` and repeat the install. Its pane draws inside an
     iframe, and a network call from that iframe fails.
 

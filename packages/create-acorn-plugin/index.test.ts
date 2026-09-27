@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { expect, it } from 'vitest'
-import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
+import { PLUGIN_API_MAJOR, speaksApiVersion } from '@acorn/protocol/plugin/apiVersion.ts'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { parsePluginManifest } from '@acorn/node-core/server/plugins'
 import { loadExternalPlugins, pluginInstallDir } from '@acorn/node-core/server/plugins'
@@ -31,6 +31,16 @@ const documentedExample = (heading: string, language: string): string => {
   return `${source.slice(start, end)}\n`
 }
 
+function fencedExample(path: string, sectionTitle: string, language: string): string {
+  const source = readFileSync(join(REPO, path), 'utf8')
+  const section = source.indexOf(sectionTitle)
+  const open = source.indexOf(`\`\`\`${language}\n`, section)
+  const start = open + language.length + 4
+  const end = source.indexOf('\n```', start)
+  if (section < 0 || open < 0 || end < 0) throw new Error(`Could not find ${sectionTitle} in ${path}`)
+  return source.slice(start, end)
+}
+
 /** Run the scaffolder the way a person does, in a fresh directory, and read back what it wrote. */
 function runCli(...args: string[]): { dir: string; manifest: Record<string, unknown> } {
   const cwd = mkdtempSync(join(tmpdir(), 'acorn scaffold-'))
@@ -41,6 +51,16 @@ function runCli(...args: string[]): { dir: string; manifest: Record<string, unkn
 }
 
 const TSC = join(PACKAGES, 'protocol', 'node_modules', '.bin', 'tsc')
+
+function unpackPublishedPackage(name: string, destination: string): void {
+  const output = execFileSync('pnpm', ['pack', '--pack-destination', dirname(destination)], {
+    cwd: join(PACKAGES, name), encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+  })
+  const tarball = output.trim().split('\n').at(-1)
+  if (!tarball?.endsWith('.tgz')) throw new Error(`pnpm pack did not return a tarball: ${output}`)
+  mkdirSync(destination, { recursive: true })
+  execFileSync('tar', ['-xzf', tarball, '--strip-components', '1', '-C', destination])
+}
 const NODE_TYPES = (() => {
   const store = join(REPO, 'node_modules', '.pnpm')
   const entry = readdirSync(store).find((name) => name.startsWith('@types+node@'))
@@ -50,13 +70,11 @@ const NODE_TYPES = (() => {
 
 // The scaffold is a copy of the authoring contract living outside the repository's reach: nothing
 // a reader of packages/protocol would think to grep finds it, and a stranger's first plugin is
-// what breaks when it drifts. See docs/plugin-authoring.md § Start from the scaffold. These are
-// the three ways it can drift silently.
+// what breaks when it drifts. See docs/plugin-authoring/start-from-the-scaffold.md.
 
-it('writes the api major this node actually demands', () => {
-  // The one number a manifest must match by exact string comparison. A `failed` roster row on every
-  // scaffolded plugin is the failure mode this prevents.
+it('writes an api range this node accepts', () => {
   expect(API_VERSION).toBe(PLUGIN_API_MAJOR)
+  expect(speaksApiVersion(API_VERSION)).toBe(true)
 })
 
 it('writes the baseline this node admits', () => {
@@ -70,6 +88,20 @@ it('points $schema at the schema this repository actually publishes', () => {
   expect(SCHEMA_URL).toBe(generated.$id)
 })
 
+it('keeps copyable manifest examples compatible with the host major', () => {
+  for (const [path, section] of [
+    ['docs/plugin-authoring/the-manifest.md', '#### Add task annotations'],
+    ['docs/plugin-authoring/installing-a-hand-written-package.md', '### `acorn-plugin.json`'],
+  ]) {
+    const example = JSON.parse(fencedExample(path!, section!, 'json'))
+    expect(speaksApiVersion(example.apiVersion), path).toBe(true)
+    const result = parsePluginManifest(example)
+    expect(result.ok ? null : result.reason, path).toBe(null)
+  }
+  const typesExample = JSON.parse(fencedExample('packages/plugin-types/README.md', '## The manifest schema', 'json'))
+  expect(speaksApiVersion(typesExample.apiVersion)).toBe(true)
+})
+
 it('emits a manifest the host parses, cross-field rules and all', () => {
   const files = scaffoldFiles('my-widget') as Record<string, string>
   // The host's own parser, not the shape schema: the cross-field rules are what a scaffold trips,
@@ -78,35 +110,20 @@ it('emits a manifest the host parses, cross-field rules and all', () => {
   expect(result.ok ? null : result.reason).toBe(null)
 })
 
-it('emits a tree plugin by default, filling a slot and an annotation point', () => {
-  // The default render path since phase 9 of the layout programme, and both halves of the cooperative
-  // seam: one contribution draws, the other only says something true (docs/plugins.md § The tree contract).
+it('emits an owned tree pane that the command can open', () => {
   const files = scaffoldFiles('my-widget', 'My widget') as Record<string, string>
   const manifest = JSON.parse(files['acorn-plugin.json']) as { contributions: Record<string, unknown> }
-  expect(manifest.contributions.frames).toBeUndefined()
-  expect(manifest.contributions.commands).toEqual([{
-    id: 'greeting', kind: 'action', title: 'My widget: send greeting',
-    action: { verb: 'runNodeAction', path: '/v1/p/my-widget/greeting' },
+  expect(manifest.contributions.frames).toEqual([{
+    target: 'pane', id: 'my-widget', label: 'My widget', glyph: 'puzzle', order: 800,
+    layout: 'single', regions: { body: { kind: 'remote', entry: 'pane' } },
   }])
-  expect(manifest.contributions.extensions).toEqual([
-    {
-      id: 'my-widget.tool-card',
-      point: 'agents:tool-card',
-      label: 'My widget tool calls',
-      remote: 'toolCard',
-      matches: ['execute'],
-    },
-    {
-      id: 'my-widget.diff-note',
-      point: 'changes:diff-line',
-      label: 'My widget notes',
-      items: '/v1/p/my-widget/marks',
-    },
-  ])
-  // The entry the manifest names has to be one the bundle announces, or the host draws a placeholder
-  // and the author's first run is a mystery. The annotation route has to exist for the same reason.
-  expect(files['client.js']).toContain("entries: ['toolCard']")
-  expect(files['server/routes.js']).toContain("pathname === '/marks'")
+  expect(manifest.contributions.commands).toEqual([{
+    id: 'open', kind: 'action', title: 'Open My widget', category: 'pane',
+    action: { verb: 'openPane', pane: 'my-widget' },
+  }])
+  expect(manifest.contributions.extensions).toBeUndefined()
+  expect(files['client.js']).toContain("entries: ['pane']")
+  expect(files['server/routes.js']).toContain("pathname !== '/greeting'")
 })
 
 it('emits a rectangle plugin under --rectangle, as a layout with a frame region', () => {
@@ -138,8 +155,7 @@ it('emits a node half that loads and satisfies the structural plugin check', asy
       writeFileSync(join(dir, path), contents)
     }
 
-    // What the loader does: import the entrypoint and check the default export structurally. This also
-    // proves the relative specifier between the two node files resolves with no node_modules in sight.
+    // What the loader does: import the entrypoint and check the default export structurally.
     const plugin = (await import(pathToFileURL(join(dir, 'node/index.js')).href)) as {
       default: { name: string; init: unknown }
     }
@@ -149,20 +165,55 @@ it('emits a node half that loads and satisfies the structural plugin check', asy
     const { loaded, failures } = await loadExternalPlugins(dataRoot, { builtins: [] })
     expect(failures).toEqual([])
     expect(loaded.map((entry) => entry.manifest.contributions.commands[0])).toMatchObject([{
-      id: 'greeting', kind: 'action', title: 'My widget: send greeting',
-      action: { verb: 'runNodeAction', path: '/v1/p/my-widget/greeting' },
+      id: 'open', kind: 'action', title: 'Open My widget', category: 'pane',
+      action: { verb: 'openPane', pane: 'my-widget' },
     }])
     await loaded[0]?.plugin.dispose?.()
 
-    // The client half can't be imported here: it reaches for `document` at module scope. Parse it
-    // instead, since a syntax error in the generated bridge is otherwise a blank rectangle in
-    // someone else's app.
+    // The client behavior runs in scaffoldClient.test.ts. Keep syntax checks here for both variants.
     writeFileSync(join(dir, 'client.mjs'), files['client.js'])
     execFileSync(process.execPath, ['--check', join(dir, 'client.mjs')])
   } finally {
     rmSync(dataRoot, { recursive: true, force: true })
   }
 })
+
+it('reloads an edited route module in a fresh isolated worker', async () => {
+  const dataRoot = mkdtempSync(join(tmpdir(), 'scaffold-reload-'))
+  const dir = join(pluginInstallDir(dataRoot), 'my-widget')
+  const files = scaffoldFiles('my-widget') as Record<string, string>
+  for (const [path, contents] of Object.entries(files)) {
+    mkdirSync(dirname(join(dir, path)), { recursive: true })
+    writeFileSync(join(dir, path), contents)
+  }
+  const greeting = async () => {
+    const { loaded, failures } = await loadExternalPlugins(dataRoot, { builtins: [] })
+    expect(failures).toEqual([])
+    const plugin = loaded[0]!.plugin
+    let handle: ((request: Request, context: { userId: string }) => Promise<Response>) | undefined
+    try {
+      await plugin.init({
+        log: { info: () => {} },
+        routes: { fetch: (handler: typeof handle) => { handle = handler } },
+        schedules: { register: () => {} },
+        providers: {},
+        events: {},
+        core: { tasks: { load: async () => null } },
+      } as never)
+      const response = await handle!(new Request('https://node.invalid/greeting'), { userId: 'owner' })
+      return await response.json() as { text: string }
+    } finally {
+      await plugin.dispose?.()
+    }
+  }
+  try {
+    expect((await greeting()).text).toBe('Hello from the node')
+    writeFileSync(join(dir, 'server/routes.js'), files['server/routes.js']!.replace('Hello from the node', 'Hello after reload'))
+    expect((await greeting()).text).toBe('Hello after reload')
+  } finally {
+    rmSync(dataRoot, { recursive: true, force: true })
+  }
+}, 20_000)
 
 it('refuses a name with no usable id in it', () => {
   expect(toPluginId('My Widget')).toBe('my-widget')
@@ -173,7 +224,7 @@ it('refuses a name with no usable id in it', () => {
   expect(toPluginId('!!!')).toBe(null)
 })
 
-it("type-checks its node half against the published declarations, from outside this repository", () => {
+it('runs the packed scaffold and type-checks it against the packed declarations outside the repository', () => {
   // The acceptance test for `acorn-plugin-types`, and the only one that runs the way a stranger does:
   // a scaffolded directory somewhere else on disk, resolving the package by name out of its own
   // node_modules, with `checkJs` and `strict` on and library checking NOT skipped.
@@ -183,20 +234,16 @@ it("type-checks its node half against the published declarations, from outside t
   // for the person this package exists for. What this catches: a JSDoc annotation the scaffold writes
   // that names a type the package does not export, and a declaration file that needs something the
   // package never told anyone to install.
-  const dir = mkdtempSync(join(tmpdir(), 'scaffold-types-'))
+  const root = mkdtempSync(join(tmpdir(), 'scaffold-types-'))
   try {
-    const files = scaffoldFiles('my-widget') as Record<string, string>
-    for (const [path, contents] of Object.entries(files)) {
-      mkdirSync(dirname(join(dir, path)), { recursive: true })
-      writeFileSync(join(dir, path), contents)
-    }
-
-    // The published artifact, not the source: `dist/index.d.ts` is what npm would deliver, and the
-    // build that produces it is one `cp`.
+    const cli = join(root, 'create-acorn-plugin')
+    unpackPublishedPackage('create-acorn-plugin', cli)
+    execFileSync(process.execPath, [join(cli, 'index.mjs'), 'my-widget'], { cwd: root })
+    const dir = join(root, 'my-widget')
     const types = join(dir, 'node_modules', 'acorn-plugin-types')
-    mkdirSync(join(types, 'dist'), { recursive: true })
-    copyFileSync(join(PACKAGES, 'plugin-types', 'src', 'public.ts'), join(types, 'dist', 'index.d.ts'))
-    copyFileSync(join(PACKAGES, 'plugin-types', 'package.json'), join(types, 'package.json'))
+    unpackPublishedPackage('plugin-types', types)
+    expect(readFileSync(join(types, 'dist', 'index.d.ts'), 'utf8')).toContain('NodePluginContext')
+    expect(readFileSync(join(dir, 'acorn-plugin.json'), 'utf8')).toContain('"apiVersion": "2"')
 
     writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify({
       compilerOptions: {
@@ -215,21 +262,35 @@ it("type-checks its node half against the published declarations, from outside t
       },
       include: ['node'],
     }))
-    // Resolved out of the workspace store rather than installed, so this test needs no network. The
-    // whole directory, dereferenced, because @types/node has a dependency of its own and a copy of the
-    // symlink pnpm leaves behind would point outside the temp tree.
+    // Only @types/node comes from the workspace store. The two packages under test are tarball bytes.
     cpSync(NODE_TYPES, join(dir, 'node_modules'), { recursive: true, dereference: true })
 
     try {
       execFileSync(TSC, ['--noEmit'], { cwd: dir, stdio: 'pipe' })
+      execFileSync(process.execPath, ['--check', join(dir, 'client.js')], { stdio: 'pipe' })
     } catch (error) {
       // tsc reports on stdout, so the default message ("Command failed") says nothing at all.
       throw new Error(String((error as { stdout?: Buffer }).stdout ?? error))
     }
   } finally {
-    rmSync(dir, { recursive: true, force: true })
+    rmSync(root, { recursive: true, force: true })
   }
-})
+}, 30_000)
+
+it('imports the packed client SDK through its package export outside the repository', () => {
+  const root = mkdtempSync(join(tmpdir(), 'scaffold-sdk-'))
+  try {
+    const sdk = join(root, 'node_modules', 'acorn-plugin-sdk')
+    unpackPublishedPackage('plugin-sdk', sdk)
+    const output = execFileSync(process.execPath, [
+      '--input-type=module', '-e',
+      "import('acorn-plugin-sdk').then((sdk) => console.log(typeof sdk.connect, typeof sdk.mountTree))",
+    ], { cwd: root, encoding: 'utf8' })
+    expect(output.trim()).toBe('function function')
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+}, 30_000)
 
 it('type-checks the complete documented plugin example outside the workspace', () => {
   const dir = mkdtempSync(join(tmpdir(), 'documented-plugin-'))
@@ -299,11 +360,9 @@ it('--rectangle picks the render path, wherever it sits in the argv', () => {
   expect(after.dir.endsWith('sink-two')).toBe(true)
 })
 
-it('scaffolds a tree by default, with both halves of the cooperative seam', () => {
+it('scaffolds an owned tree pane by default', () => {
   const { manifest } = runCli('sink three')
-  const contributions = manifest.contributions as { frames?: unknown[]; extensions?: { point: string }[] }
-  // No rectangle at all: a tree plugin draws through somebody else's slot and its own pane comes later.
-  expect(contributions.frames).toBeUndefined()
-  expect((contributions.extensions ?? []).map((entry) => entry.point))
-    .toEqual(['agents:tool-card', 'changes:diff-line'])
+  const contributions = manifest.contributions as { frames?: { regions?: Record<string, unknown> }[]; extensions?: unknown[] }
+  expect(contributions.frames?.[0]?.regions).toEqual({ body: { kind: 'remote', entry: 'pane' } })
+  expect(contributions.extensions).toBeUndefined()
 })
