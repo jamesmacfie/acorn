@@ -574,7 +574,9 @@ describe('architecture boundaries', () => {
   it('libraries publish only enumerated, existing source entrypoints', () => {
     const limits: Record<string, number> = {
       '@acorn/protocol': 80,
-      '@acorn/client-core': 150,
+      // Model-provider error guidance needs a pure path for logic tests and remote trees. Importing
+      // the kit/lib barrel here would pull renderer-only modules into those consumers.
+      '@acorn/client-core': 151,
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 10,

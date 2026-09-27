@@ -15,7 +15,6 @@
 // time: the reader is looking at one panel, and a worker has no scope-eviction channel to hear about
 // anything else, so the previous one is disposed when the next asks.
 import { createEffect, createMemo, createResource, createRoot, createSignal, onCleanup } from 'solid-js'
-import { createArmedConfirm } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import { fromCurl, toCurl, type HttpRequest, type SendResult } from '../shared/model'
 import { createRequest, deleteRequest, listRequests, sendRequest, updateRequest } from './httpClient'
@@ -90,8 +89,6 @@ function build(subject: PanelSubject) {
     void adhocActions.refetch()
   }
 
-  const armedDelete = createArmedConfirm()
-
   const current = createMemo<HttpRequest | null>(() => {
     const sel = selection()
     if (sel.kind !== 'saved') return null
@@ -106,7 +103,6 @@ function build(subject: PanelSubject) {
   const patch = (p: Partial<Draft>) => setDraft((d) => ({ ...d, ...p }))
 
   function open(row: HttpRequest) {
-    armedDelete.disarm()
     setSelection({ kind: 'saved', id: row.id })
     setDraft(toDraft(row))
     setResult(null)
@@ -186,7 +182,6 @@ function build(subject: PanelSubject) {
   }
 
   async function remove(row: HttpRequest) {
-    if (!armedDelete.request(row.id)) return
     try {
       await deleteRequest(projectId, row.id)
       if (current()?.id === row.id) startNew()
@@ -245,7 +240,6 @@ function build(subject: PanelSubject) {
     sending, saving,
     saveOpen, setSaveOpen, openSave, onSaveClick, saveTarget, persist,
     saved, adhoc, groups, folders,
-    armedDelete,
     current, dirty,
     open, startNew, remove, fire,
     commitUrl, copy, copyAsCurl,

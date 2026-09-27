@@ -1,6 +1,7 @@
 // ChangesPane model: pure grouping, ordering and selection over LocalChange[], plus the adapter
 // that feeds a local patch into the shared diff pipeline (the document's file shape).
 import type { DiffDocumentFile } from '@acorn/plugin-api/ui/diff'
+import { modelProviderFailure } from '@acorn/plugin-api/ui/model-provider-failure'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { LocalChange, LocalStatus } from '@acorn/protocol/localGit.ts'
 
@@ -192,21 +193,11 @@ export type PickedBackend = Pick<ModelBackend, 'kind' | 'label'>
  *
  *  Matched on the error envelope's `code` rather than on an `ApiError` instance: the class is not on
  *  the plugin surface, and the code is the part of the envelope that is a contract
- *  (docs/api-reference.md § Errors). Two provider codes get a next step; everything else keeps
+ *  (docs/api-reference.md § Errors). Shared provider codes get a next step; everything else keeps
  *  the node's own prose, which for a refusal is the sentence the bridge wrote. */
 export function generateReason(error: unknown, backend?: PickedBackend): string {
-  const code = error && typeof error === 'object' && 'code' in error ? String((error as { code: unknown }).code) : ''
-  if (code === 'provider_needs_auth') return 'The provider key was rejected. Reconnect it in Settings, under Integrations.'
-  if (code === 'provider_rate_limited') return 'The provider is rate-limiting requests. Try again shortly.'
-  // A CLI generate fails as `provider_unavailable` too, and "try again shortly" is the wrong advice
-  // for it: the usual cause is a CLI that is installed but signed out, which retrying will not fix.
-  // The next step is to run it once in a terminal and see what it says.
-  if (code === 'provider_unavailable') {
-    return backend?.kind === 'harness'
-      ? `${backend.label} did not answer. Run it once in a terminal to check it is signed in.`
-      : 'The provider did not answer. Try again shortly.'
-  }
-  return error instanceof Error && error.message ? error.message : 'Writing the message failed.'
+  return modelProviderFailure(error, backend)
+    ?? (error instanceof Error && error.message ? error.message : 'Writing the message failed.')
 }
 
 /** How the list is drawn, remembered per device (./changesPrefs.ts). Three choices that do not

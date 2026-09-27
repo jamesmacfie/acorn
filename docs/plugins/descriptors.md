@@ -290,10 +290,11 @@ which means a batch costs its own ops rather than the tree it is applied to — 
 5,000-node cap is 71 ms rather than the 1.1 seconds the earlier scan-every-node walk took
 (measured 2026-09-03).
 
-**Eleven events, host to sandbox**: `onPress`, `onChange` (the committed value), `onSubmit`,
-`onSelect`, `onActivate`, `onToggle`, `onOpenChange`, `onExpand`, `onDismiss`, `onPick`, `onRemove`.
+**Twelve events, host to sandbox**: `onPress`, `onChange` (the committed value), `onSubmit`,
+`onSelect`, `onActivate`, `onToggle`, `onOpenChange`, `onExpand`, `onDismiss`, `onPick`, `onRemove`,
+`onConfirm`.
 Never a key and never a pointer event, because a terminal host has neither and has to be able to map
-its own keys onto these eleven names. A prop whose name is in the list carries a handler id; a prop
+its own keys onto these twelve names. A prop whose name is in the list carries a handler id; a prop
 whose name starts with `on` and is not in the list is dropped.
 
 **Lifecycle** is `tree:mount(slot, entry, props)` and `tree:unmount(slot)` from host to sandbox, with
@@ -338,7 +339,7 @@ shell's DOM:
 
 The version travels in the handshake (`TREE_PROTOCOL_VERSION`), and a mismatch leaves the contribution
 empty rather than crashing the host. `packages/protocol/src/tree/nodes.ts` carries the node names, the
-eleven events and the role enums as plain constants with no Zod on them, because that file is bundled
+twelve events and the role enums as plain constants with no Zod on them, because that file is bundled
 into a stranger's
 plugin; `messages.ts` holds the schemas the host parses with. The lists are duplicated from
 client-core's kit, which owns them, and a test over there fails the moment the two disagree.

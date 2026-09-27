@@ -30,6 +30,7 @@ export type { KitNodeProps } from '@acorn/client-core/host/frames/remoteSolid.ts
 // components compiled for a document, and a tree bundle must not pull one in: its own build compiles
 // JSX into acorn's nodes, so a shell component reaching it would come out the far side as a tree.
 export { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm'
+export { modelProviderFailure } from '@acorn/client-core/kit/lib/modelProviderFailure'
 // Which model a backend starts on, for a tree that draws a `ModelBackendPicker` node and has to
 // seed it. A pure function, and its own module for exactly this reason.
 export { defaultModelIdFor } from '@acorn/client-core/features/settings/default-model'
