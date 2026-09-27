@@ -729,6 +729,9 @@ export function ListDetail(props: {
   scrollDetail?: boolean
   detailAs?: 'div' | 'main'
   collapseKey?: string
+  /** The terminal keeps the full list readable at its own width, so this DOM collapse choice is
+   *  accepted for the shared kit contract and ignored here. */
+  collapseContent?: 'rows' | 'empty'
   children: JSX.Element
 }) {
   let box: Renderable | undefined
