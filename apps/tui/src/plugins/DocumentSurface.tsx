@@ -60,10 +60,9 @@ export function DocumentSurface(props: DocumentSurfaceProps) {
     return save()
   }
   const change = (next: string): void => {
-    if (new TextEncoder().encode(next).byteLength > MAX_DOCUMENT_BYTES) {
-      setError(`Document is larger than ${MAX_DOCUMENT_BYTES / 1024 / 1024} MiB.`)
-      return
-    }
+    // Keep the displayed field and the sibling frame's live handle in step even if a later save
+    // rejects an oversized edit. Refusing only the signal here would leave the field showing SQL
+    // that `bridge.document.read()` did not return.
     setValue(next)
     scheduleSave()
   }
