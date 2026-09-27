@@ -13,7 +13,7 @@ import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import { ensureCert } from '@acorn/node-core/server/transport'
 import { flushTelemetry, onTelemetryBatch, setTelemetryPref, startTelemetry } from '@acorn/node-core/server/telemetry'
 import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
-import { NodeBroker } from './nodeBroker'
+import { MAX_NODE_WS_MESSAGE_BYTES, NodeBroker } from './nodeBroker'
 
 // Drives the real broker against a real http/https server. The pin in particular cannot be
 // meaningfully faked: the whole failure mode worth testing is that it fails closed.
@@ -110,6 +110,17 @@ const bytes = (text: string) => new TextEncoder().encode(text)
 const text = (body: Uint8Array) => new TextDecoder().decode(body)
 
 describe('broker HTTP', () => {
+  it('rejects authority-changing renderer paths before attaching the paired-node bearer', async () => {
+    const { origin } = await listen(false)
+    const { origin: attackerOrigin } = await listen(false)
+    const broker = makeBroker()
+    broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 'secret' })
+    for (const path of [`//${new URL(attackerOrigin).host}/steal`, '/\\attacker.test/steal', '/path#fragment']) {
+      await expect(broker.fetch('n1', { requestId: `bad-${path}`, path })).rejects.toThrow(/paired node/)
+    }
+    expect(received.every((request) => request.path === '/v1/node')).toBe(true)
+  })
+
   it('round-trips JSON and attaches the bearer itself', async () => {
     const { origin } = await listen(false)
     const broker = makeBroker()
@@ -237,6 +248,21 @@ describe('broker HTTP', () => {
     await expect(broker.fetch('n1', { requestId: 'r-after', path: '/x' })).resolves.toMatchObject({ status: 200 })
   })
 
+  it('keeps a node online when one response exceeds its caller limit', async () => {
+    const { origin } = await listen(false)
+    const broker = makeBroker()
+    broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
+    await broker.fetch('n1', { requestId: 'r-warm', path: '/x' })
+
+    respond = () => ({ status: 200, body: '123456' })
+    await expect(broker.fetch('n1', { requestId: 'r-large', path: '/large' }, { maxResponseBytes: 5 }))
+      .rejects.toMatchObject({ name: 'NodeResponseTooLargeError' })
+    expect(statuses.filter((s) => s.state === 'offline' && s.error?.code === 'unreachable')).toEqual([])
+
+    respond = () => ({ status: 200, body: 'ok' })
+    await expect(broker.fetch('n1', { requestId: 'r-after', path: '/x' })).resolves.toMatchObject({ status: 200 })
+  })
+
   // The other half: a node that is genuinely not there still has to reach `offline`, or nothing in
   // the fleet UI ever says so.
   it('marks a node offline when the transport itself fails', async () => {
@@ -351,6 +377,25 @@ describe('broker TLS pinning', () => {
 })
 
 describe('broker WebSocket', () => {
+  it('closes an oversized node frame before forwarding or parsing it', async () => {
+    const { origin, server } = await listen(false)
+    const wss = new WebSocketServer({ server, path: WS_PATH })
+    let closes = 0
+    wss.on('connection', (socket) => {
+      socket.on('close', () => { closes++ })
+      socket.send(Buffer.alloc(MAX_NODE_WS_MESSAGE_BYTES + 1), { binary: true })
+    })
+    const frames: unknown[] = []
+    const bytes: Uint8Array[] = []
+    const broker = new NodeBroker({ frame: (_n, frame) => frames.push(frame), bytes: (_n, frame) => bytes.push(frame), status: (state) => statuses.push(state) })
+    brokers.push(broker)
+    broker.upsert({ nodeId: 'n1', label: 'local', endpoint: origin, local: true, token: 't' })
+    await waitFor(() => closes > 0, 'oversized socket closure')
+    expect(frames).toEqual([])
+    expect(bytes).toEqual([])
+    expect(statuses.at(-1)).toMatchObject({ state: 'offline', error: { code: 'unreachable' } })
+  })
+
   it('authenticates the upgrade with the bearer and forwards frames verbatim', async () => {
     const { origin, server } = await listen(false)
     const upgrades: string[] = []

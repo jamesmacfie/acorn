@@ -174,6 +174,9 @@ export type PluginTrustDecision = {
   nodeId: string
   source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource
   version: string
+  // Canonical client authority from the declaration shown at consent time. A hash alone binds
+  // code bytes but cannot bind the API grants and contributions a Node attaches to those bytes.
+  declaration: string
   permissions: NodePluginPermissions
   webviews: PluginWebviewGrant[]
   keyClaims: PluginKeyClaimGrant[]
@@ -195,11 +198,14 @@ export type PluginTrustDecision = {
   contextSections: PluginContextSectionGrant[]
   decision: 'accepted' | 'rejected'
 }
-export type PluginAckRecord = PluginTrustDecision & {
+export type PluginAckRecord = Omit<PluginTrustDecision, 'declaration'> & {
+  // Old on-disk approvals have no declaration. They cannot authorize a loaded UI until reviewed.
+  declaration?: string
   decidedAt: number
   // The decision was recorded but its disclosure snapshot could not be. See docs/security.md §
   // The dev grant for why such a row never becomes the baseline of a later "what changed" diff.
   partial?: true
+  dev?: true
 }
 // Which plugins this device is developing, and against which node. See docs/security.md § The dev
 // grant for why the key is the pair rather than the plugin id alone.

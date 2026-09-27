@@ -49,6 +49,7 @@ export type CoreAuditAction =
   // rows above say what happened to the node; this one says who asked for it and whether a human agreed
   // (docs/plugins.md § Approval-mediated install).
   | 'plugins.request.decided'
+  | 'plugins.review.decided'
   // Data leaving or entering the node.
   | 'backup.created'
 

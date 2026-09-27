@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PLUGIN_API_MAJOR, type NodePluginRow, type PluginRuntimeIdentity } from '@acorn/protocol/api.ts'
+import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
 import type { PluginHostState } from '../../infra/platform'
 
 let paired = ['a', 'b']
@@ -22,6 +23,7 @@ const hostState = (): PluginHostState => ({
   cached: Object.fromEntries(['one', 'two'].map((hash) => [hash, { pluginId: 'reports', version: hash, bytes: 10 }])),
   acks: ['one', 'two'].map((hash) => ({ pluginId: 'reports', hash, decision: 'accepted' as const, nodeId: 'a', version: hash,
     decidedAt: 1, permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
+    declaration: clientDeclaration(runtime(hash)),
     webviews: [], keyClaims: [], navigationDestinations: [], extensions: [], schedules: [], taskChecks: [], harnesses: [], agentTools: [], contextSections: [],
   })),
   devGrants: [],

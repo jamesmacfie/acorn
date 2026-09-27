@@ -55,6 +55,7 @@ type WireOptions = {
   // except the one about a package that would not load.
   // Unstamped. The helper adds the clock, as in pluginState.test.ts.
   loadFailures?: Omit<PluginLoadFailure, 'at'>[]
+  pendingReview?: { reviewId: string; requestId: string; fingerprint: string; stagedAt: number }
 }
 
 // The bridge the composition roots fill (apps/node's service/runtime.ts and server/standalone.ts). The
@@ -63,7 +64,7 @@ type WireOptions = {
 const wire = (initial: readonly string[], options: WireOptions = {}) => {
   let saved = [...initial]
   const installed = options.installed ?? []
-  const calls: { install: unknown[]; update: unknown[]; uninstall: unknown[]; reload: unknown[] } = { install: [], update: [], uninstall: [], reload: [] }
+  const calls: { install: unknown[]; update: unknown[]; uninstall: unknown[]; reload: unknown[]; approve: unknown[] } = { install: [], update: [], uninstall: [], reload: [], approve: [] }
   setRouteTestCapability(PLUGIN_STATE, {
     roster: () => options.roster ?? ROSTER,
     installed: () => installed,
@@ -77,6 +78,13 @@ const wire = (initial: readonly string[], options: WireOptions = {}) => {
     },
     disabled: () => saved,
     loadFailures: () => (options.loadFailures ?? []).map((failure) => ({ ...failure, at: 1_700_000_000_000 })),
+    pendingReview: () => options.pendingReview ?? null,
+    pendingReviewIds: () => options.pendingReview ? ['ntfy'] : [],
+    approveReview: (id, reviewId, fingerprint) => {
+      calls.approve.push({ id, reviewId, fingerprint })
+      if (!options.pendingReview) throw new Error('not under test')
+      return options.pendingReview
+    },
     setDisabled: (names) => void (saved = [...names]),
     install: async (source, opts) => {
       calls.install.push({ source, opts })
@@ -136,6 +144,57 @@ const asDevice = () => app({ kind: 'device', userId: 'james', deviceId: 'd1' })
 const asTaskAgent = () => app({ kind: 'internal', userId: 'james', scope: 'task', taskId: 't1' })
 
 afterEach(() => setRouteTestCapability(PLUGIN_STATE, null))
+
+describe('agent-requested staged review', () => {
+  afterEach(() => _resetPluginRequests())
+
+  it('binds the first install to the pending request and only clears its gate on the matching second approval', async () => {
+    _resetPluginRequests()
+    const source = { path: '/tmp/review-fixture' }
+    const raised = raisePluginRequest({ taskId: 'task-1', action: 'install', source, dev: false })
+    if (raised.state !== 'pending') throw new Error('expected pending request')
+    const marker = { reviewId: '00000000-0000-4000-8000-000000000002', requestId: raised.request.requestId,
+      fingerprint: 'a'.repeat(64), stagedAt: 1 }
+    const state = wire([], { pendingReview: marker })
+    const node = asDevice()
+
+    const wrongSource = await node.request(at('/install', 'POST', {
+      source: { path: '/tmp/other' }, reviewRequestId: marker.requestId,
+    }, KEY))
+    expect(wrongSource.status).toBe(400)
+    const staged = await node.request(at('/install', 'POST', { source, reviewRequestId: marker.requestId }, KEY))
+    expect(staged.status).toBe(200)
+    expect(state.calls.install).toEqual([{ source, opts: { allowDowngrade: undefined, reviewRequestId: marker.requestId } }])
+
+    const stale = await node.request(at('/ntfy/review', 'POST', { reviewId: marker.reviewId, fingerprint: 'b'.repeat(64), decision: 'approved' }, KEY))
+    expect(stale.status).toBe(409)
+    expect(state.calls.approve).toEqual([])
+    const approved = await node.request(at('/ntfy/review', 'POST', { reviewId: marker.reviewId, fingerprint: marker.fingerprint, decision: 'approved' }, KEY))
+    expect(approved.status).toBe(200)
+    expect(state.calls.approve).toEqual([{ id: 'ntfy', reviewId: marker.reviewId, fingerprint: marker.fingerprint }])
+    const collected = raisePluginRequest({ taskId: 'task-1', action: 'install', source, dev: false })
+    expect(collected).toMatchObject({ state: 'decided', outcome: { decision: 'approved' } })
+  })
+
+  it('removes a rejected staged package and settles the agent request', async () => {
+    _resetPluginRequests()
+    const raised = raisePluginRequest({ taskId: 'task-1', action: 'update', pluginId: 'ntfy', dev: false })
+    if (raised.state !== 'pending') throw new Error('expected pending request')
+    const marker = { reviewId: '00000000-0000-4000-8000-000000000003', requestId: raised.request.requestId,
+      fingerprint: 'c'.repeat(64), stagedAt: 1 }
+    const state = wire([], { pendingReview: marker })
+    const node = asDevice()
+    const stage = await node.request(at('/ntfy/update', 'POST', { reviewRequestId: marker.requestId }, KEY))
+    expect(stage.status).toBe(200)
+    expect(state.calls.update).toEqual([{ id: 'ntfy', opts: { allowDowngrade: undefined, reviewRequestId: marker.requestId } }])
+    const denied = await node.request(at('/ntfy/review', 'POST', { reviewId: marker.reviewId, fingerprint: marker.fingerprint, decision: 'denied' }, KEY))
+    expect(denied.status).toBe(200)
+    expect(state.calls.uninstall).toEqual([{ id: 'ntfy', opts: {} }])
+    expect(raisePluginRequest({ taskId: 'task-1', action: 'update', pluginId: 'ntfy', dev: false })).toMatchObject({
+      state: 'decided', outcome: { decision: 'denied' },
+    })
+  })
+})
 
 describe('loaded CLI command dispatch', () => {
   const read = testCliCommandDescriptor()

@@ -1,7 +1,7 @@
 import { Agent as HttpAgent } from 'node:http'
 import { Agent as HttpsAgent } from 'node:https'
 import { WebSocket } from 'ws'
-import { nodeRequest } from './nodeRequest'
+import { nodeRequest, NodeResponseTooLargeError } from './nodeRequest'
 import { WS_PATH, type WsClientFrame } from '@acorn/protocol/ws.ts'
 import { NODE_PROTOCOL_VERSION, nodeInfoSchema } from '@acorn/protocol/node.ts'
 import {
@@ -42,6 +42,11 @@ const MISSED_PONGS_BEFORE_DEAD = 2
 // Short, because this sits in front of the socket on every connect and a slow node must not delay
 // the reconnect. Timing out here reads as "no clear answer" and the socket opens.
 const PROTOCOL_PROBE_TIMEOUT_MS = 5_000
+const PROTOCOL_PROBE_MAX_BYTES = 16 * 1024
+// ws enforces this while assembling (including inflated messages), before toString/JSON.parse or
+// the helper IPC boundary can make another copy. A malicious node must not pick the allocation size.
+export const MAX_NODE_WS_MESSAGE_BYTES = 8 * 1024 * 1024
+const MAX_NODE_HTTP_SOCKETS = 4
 
 // A node plus the material only main may hold: the bearer, and the certificate to pin against.
 export type BrokerNode = NodeRecord & { token: string; certPem?: string }
@@ -99,8 +104,8 @@ export class NodeBroker {
   upsert(node: BrokerNode): void {
     this.remove(node.nodeId)
     const agent = node.endpoint.startsWith('https:')
-      ? new HttpsAgent({ keepAlive: true, ...this.pinning(node) })
-      : new HttpAgent({ keepAlive: true })
+      ? new HttpsAgent({ keepAlive: true, maxSockets: MAX_NODE_HTTP_SOCKETS, ...this.pinning(node) })
+      : new HttpAgent({ keepAlive: true, maxSockets: MAX_NODE_HTTP_SOCKETS })
     const connection: Connection = {
       node,
       agent,
@@ -164,6 +169,7 @@ export class NodeBroker {
         headers: {},
         agent: connection.agent,
         signal: AbortSignal.timeout(PROTOCOL_PROBE_TIMEOUT_MS),
+        maxResponseBytes: PROTOCOL_PROBE_MAX_BYTES,
       })
       if (response.status !== 200) return null
       const payload: unknown = JSON.parse(new TextDecoder().decode(response.body))
@@ -205,9 +211,19 @@ export class NodeBroker {
 
   // --- HTTP ---
 
-  async fetch(nodeId: string, request: NodeFetchRequest): Promise<NodeFetchResponse> {
+  async fetch(nodeId: string, request: NodeFetchRequest, limits: { maxResponseBytes?: number } = {}): Promise<NodeFetchResponse> {
     const connection = this.connections.get(nodeId)
     if (!connection) throw new Error(`Unknown node ${nodeId}`)
+    // Types do not validate a helper message at runtime. In particular `//host/path` is accepted by
+    // startsWith('/') but changes the origin when joined with the node endpoint. Never send the
+    // paired-node bearer to an authority chosen by a path from the renderer.
+    if (!request.path.startsWith('/') || request.path.startsWith('//') || request.path.includes('\\') || request.path.includes('#')) {
+      throw new Error('Node request path must stay on the paired node.')
+    }
+    const target = new URL(request.path, connection.node.endpoint)
+    if (target.origin !== new URL(connection.node.endpoint).origin) {
+      throw new Error('Node request path must stay on the paired node.')
+    }
 
     const controller = new AbortController()
     this.inFlight.set(request.requestId, controller)
@@ -220,9 +236,9 @@ export class NodeBroker {
     }, request.timeoutMs ?? DEFAULT_TIMEOUT_MS)
     try {
       const response = await measure('core', 'broker.request', () => nodeRequest({
-        // `new URL(path, endpoint)` with a path validated to start with '/' cannot escape the
-        // endpoint's origin, so a renderer cannot aim a request at another host.
-        url: new URL(request.path, connection.node.endpoint),
+        // The origin was checked before this request, including protocol-relative paths and
+        // backslashes. The endpoint and its bearer stay paired.
+        url: target,
         method: request.method ?? 'GET',
         headers: {
           ...request.headers,
@@ -232,6 +248,7 @@ export class NodeBroker {
         body: request.body,
         agent: connection.agent,
         signal: controller.signal,
+        maxResponseBytes: limits.maxResponseBytes,
       }), { 'node.id': nodeId, method: request.method ?? 'GET' })
       this.noteHttpResult(connection, response)
       return response
@@ -255,6 +272,8 @@ export class NodeBroker {
         // aborted" also tells someone whose node stopped answering nothing.
         throw Object.assign(new Error(`The node did not answer within ${request.timeoutMs ?? DEFAULT_TIMEOUT_MS}ms`), { name: 'TimeoutError' })
       }
+      // A route returning too much data is a response failure, not evidence that its node is down.
+      if (error instanceof NodeResponseTooLargeError) throw error
       // Everything left is the transport itself: connection refused, socket hang-up, pin mismatch.
       this.noteHttpFailure(connection, error)
       throw error
@@ -287,6 +306,8 @@ export class NodeBroker {
     const ws = new WebSocket(url, {
       headers: { authorization: `Bearer ${connection.node.token}` },
       agent: connection.agent,
+      maxPayload: MAX_NODE_WS_MESSAGE_BYTES,
+      perMessageDeflate: false,
     })
     connection.ws = ws
 
@@ -461,6 +482,15 @@ export class NodeBroker {
   }
 
   private noteSocketError(connection: Connection, error: unknown): void {
+    if ((error as { code?: unknown } | null)?.code === 'WS_ERR_UNSUPPORTED_MESSAGE_LENGTH') {
+      // A peer violating the message ceiling can otherwise make us receive and reject another
+      // allocation on every reconnect. Keep it offline until the owner reconnects this node.
+      connection.closed = true
+      connection.ws?.terminate()
+      this.setState(connection, 'offline', { code: 'unreachable' })
+      log.warn(`${connection.node.nodeId} sent a WebSocket message over the client limit`, { 'node.id': connection.node.nodeId })
+      return
+    }
     if (isPinMismatch(error)) {
       // A changed fingerprint is a hard security stop, never an auto-retrust. See docs/security.md.
       // Stop reconnecting so the UI has to involve the owner.

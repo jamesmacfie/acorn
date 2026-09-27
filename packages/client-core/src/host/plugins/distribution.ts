@@ -2,6 +2,7 @@ import { createSignal } from 'solid-js'
 import { corePluginsRoute, PLUGIN_API_MAJOR, type NodePluginRow, type NodePluginState } from '@acorn/protocol/api.ts'
 import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
 import { hasNodeHalf } from '@acorn/protocol/plugin/bundles.ts'
+import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
 import type { PluginAckRecord, PluginHostState } from '../../infra/platform'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { readDevicePrefs, setDevicePluginIds } from '../../infra/persistence/devicePrefs'
@@ -271,7 +272,13 @@ export function _seedPluginDistribution(
   }
   const acks = accepted.map((value) => {
     const split = value.lastIndexOf(' ')
-    return { pluginId: value.slice(0, split), hash: value.slice(split + 1), decision: 'accepted' } as PluginAckRecord
+    const pluginId = value.slice(0, split)
+    const hash = value.slice(split + 1)
+    const declaration = [...byNode.values()].flatMap((observation) => observation.rows)
+      .filter((row) => row.name === pluginId)
+      .flatMap((row) => [runtimeIdentityForRow(row), row.installed])
+      .find((offer) => offer?.client?.hash === hash)
+    return { pluginId, hash, decision: 'accepted', ...(declaration ? { declaration: clientDeclaration(declaration) } : {}) } as PluginAckRecord
   })
   initialized = true
   dismissed.clear()
@@ -287,7 +294,12 @@ export function _seedDevicePluginDistribution(entries: readonly DevicePluginEntr
   for (const entry of entries) cached[entry.hash] = {
     pluginId: entry.row.name, version: entry.row.installed!.version, bytes: entry.row.installed!.client?.bytes ?? 0,
   }
-  lastHostState = { ...lastHostState, cached }
+  const acks = lastHostState.acks.map((ack) => {
+    const entry = entries.find((candidate) => candidate.row.name === ack.pluginId && candidate.hash === ack.hash)
+    return entry?.row.installed && ack.decision === 'accepted'
+      ? { ...ack, declaration: clientDeclaration(entry.row.installed) } : ack
+  })
+  lastHostState = { ...lastHostState, cached, acks }
   publish(derivePluginDistribution(current.byNode, lastHostState, current.revision + 1, PLUGIN_API_MAJOR, entries))
 }
 

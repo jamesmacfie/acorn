@@ -323,17 +323,20 @@ shell's DOM:
 
 - `type` has to be a node this build knows and can draw on this host. Anything else is omitted, so an
   optional contribution cannot replace its owner's UI with an error.
-- A prop value is a handler id or plain JSON, depth-bounded. `class`, `className`, `style` and
-  `classList` are refused outright, a role prop carrying a raw colour is refused, and a function can
-  never cross because a function is not JSON. A failing prop is dropped, the node still renders, and
-  the row says which prop.
-- Text is set as text. `Markdown` goes through the shell's own markdown policy. A `Button` carries a
-  handler id, never a URL or a command id; navigation is `bridge.ui.openUrl`, held to the same rules
-  as a frame's.
+- A prop value is a handler id or plain JSON, bounded to 16 levels, 10,000 values and 1 MiB of
+  characters. `class`, `className`, `style`, `classList` and nested host handles such as `item` and
+  `drag` are refused outright. A role prop carrying a raw colour is refused, and a function cannot
+  cross because it is not JSON. A failing prop is dropped, the node still renders, and the row says
+  which prop.
+- Text is set as text. `Markdown` goes through the shell's own markdown policy. A tree may put only an
+  explicit HTTPS URL in an `href` prop; the kit validates every rendered anchor again. Programmatic
+  navigation uses `bridge.ui.openUrl` under the same focus and URL policy as a frame.
 - **Caps**, in `TREE_LIMITS`: 1 MiB and 4,000 mutations per batch, 5,000 live nodes and 64 levels of
   depth per tree, 65,536 characters in one text node, 512 trees per worker. The byte cap is sized like
   the state channel's 1 MiB per value: generous for anything honest, small enough that a bundle cannot
-  use the renderer as a memory bomb. Past a cap the batch is dropped and recorded.
+  use the renderer as a memory bomb. The host checks message depth and size before recursive parsing
+  and measures batch bytes itself instead of trusting the sandbox's `bytes` field. Past a cap the batch
+  is dropped and recorded.
 - **Rate**: batches are coalesced per frame on the host side. A sandbox that floods is throttled, not
   trusted.
 

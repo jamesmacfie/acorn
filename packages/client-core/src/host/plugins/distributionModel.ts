@@ -1,4 +1,5 @@
 import { speaksApiVersion } from '@acorn/protocol/plugin/apiVersion.ts'
+import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
 import type { InstalledPluginRow, NodePluginRow, PluginInstallSource, PluginRuntimeIdentity } from '@acorn/protocol/api.ts'
 import type { BundleSource } from '@acorn/protocol/plugin/bundles.ts'
 import type { PluginAckRecord, PluginHostState } from '../../infra/platform'
@@ -82,28 +83,31 @@ export type PluginDistributionSnapshot = {
 
 export const decisionKey = (pluginId: string, hash: string): string => JSON.stringify([pluginId, hash])
 
-const canonical = (value: unknown): string => {
-  if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
-  if (value && typeof value === 'object') {
-    return `{${Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`).join(',')}}`
-  }
-  return JSON.stringify(value)
-}
-
 // One acknowledgement covers one exact pair. If nodes attach different grants to the same bytes,
 // no selection or prompt may turn that single decision into authority for both declarations.
-const enforcedDeclaration = (candidate: OfferedPluginCandidate): string => canonical({
-  apiVersion: candidate.declaration.apiVersion,
-  permissions: candidate.declaration.permissions,
-  contributions: candidate.declaration.contributions,
-  emits: candidate.declaration.emits ?? [],
-})
+const enforcedDeclaration = (candidate: OfferedPluginCandidate): string => clientDeclaration(candidate.declaration)
+
+const sameGrantSource = (grant: PluginHostState['devGrants'][number], source: NonNullable<PluginAckRecord['source']>): boolean => {
+  const granted = grant.source ?? { kind: 'node', nodeId: grant.nodeId }
+  return granted.kind === source.kind && (granted.kind === 'device' || (source.kind === 'node' && granted.nodeId === source.nodeId))
+}
+
+const devAccepted = (host: PluginHostState, ack: PluginAckRecord | undefined, nodeId: string): boolean => {
+  if (!ack?.dev || !ack.partial) return false
+  const source = ack.source ?? { kind: 'node', nodeId: ack.nodeId }
+  if (source.kind === 'node' ? source.nodeId !== nodeId : nodeId !== '') return false
+  return host.devGrants.some((grant) => grant.pluginId === ack.pluginId && sameGrantSource(grant, source))
+}
+
+const acceptedDeclaration = (host: PluginHostState, ack: PluginAckRecord | undefined,
+  declaration: InstalledPluginRow | PluginRuntimeIdentity, nodeId: string): boolean =>
+  ack?.decision === 'accepted' && (ack.declaration === clientDeclaration(declaration) || devAccepted(host, ack, nodeId))
 
 const offersFor = (nodeId: string, row: NodePluginRow): OfferedPluginCandidate[] => {
   const active = runtimeIdentityForRow(row)
   const offers: OfferedPluginCandidate[] = []
   if (active?.client) offers.push({ nodeId, pluginId: row.name, row, declaration: active, hash: active.client.hash, relation: 'active' })
-  if (row.installed?.client) {
+  if (!row.pendingReview && row.installed?.client) {
     offers.push({ nodeId, pluginId: row.name, row, declaration: row.installed, hash: row.installed.client.hash, relation: 'installed' })
   }
   return offers
@@ -134,7 +138,6 @@ export function derivePluginDistribution(
   }
 
   const acksByKey = new Map(host.acks.map((ack) => [decisionKey(ack.pluginId, ack.hash), ack]))
-  const acceptedKeys = new Set(host.acks.filter((ack) => ack.decision === 'accepted').map((ack) => decisionKey(ack.pluginId, ack.hash)))
   const cached = new Set(Object.keys(host.cached))
   const selectedDevice = new Map<string, DevicePluginEntry>()
   for (const entry of devicePlugins) {
@@ -146,6 +149,19 @@ export function derivePluginDistribution(
       selectedDevice.set(entry.row.name, entry)
     }
   }
+  const acceptedKeys = new Set<string>()
+  for (const [key, candidates] of byKey) {
+    const ack = acksByKey.get(key)
+    if (!selectedDevice.has(candidates[0]!.pluginId) && !conflictingKeys.has(key) && ack?.decision === 'accepted' &&
+      candidates.some((candidate) => ack.declaration === clientDeclaration(candidate.declaration))) {
+      acceptedKeys.add(key)
+    }
+  }
+  for (const [id, entry] of selectedDevice) {
+    if (entry.row.installed && acceptedDeclaration(host, acksByKey.get(decisionKey(id, entry.hash)), entry.row.installed, '')) {
+      acceptedKeys.add(decisionKey(id, entry.hash))
+    }
+  }
   const selectionsByNode = new Map<string, ReadonlyMap<string, PluginSelection>>()
   for (const observation of byNode.values()) {
     const selections = new Map<string, PluginSelection>()
@@ -155,7 +171,7 @@ export function derivePluginDistribution(
         if (!runtime || !speaksApiVersion(runtime.apiVersion, apiVersion)) continue
         const hash = runtime.client?.hash ?? ''
         const key = decisionKey(row.name, hash)
-        if (hash && (!cached.has(hash) || !acceptedKeys.has(key) || conflictingKeys.has(key))) continue
+        if (hash && (!cached.has(hash) || !acceptedDeclaration(host, acksByKey.get(key), runtime, observation.nodeId) || conflictingKeys.has(key))) continue
         selections.set(row.name, { nodeId: observation.nodeId, pluginId: row.name, row, runtime, hash })
       }
     }
@@ -165,8 +181,10 @@ export function derivePluginDistribution(
   const pendingTrust: PluginTrustRequest[] = []
   for (const entry of selectedDevice.values()) {
     const key = decisionKey(entry.row.name, entry.hash)
-    if (!cached.has(entry.hash) || acksByKey.has(key)) continue
-    const previous = latestPrevious(host.acks, entry.row.name, entry.hash)
+    const installed = entry.row.installed
+    if (!installed || !cached.has(entry.hash) ||
+      (acksByKey.has(key) && (acksByKey.get(key)?.decision === 'rejected' || acceptedDeclaration(host, acksByKey.get(key), installed, '')))) continue
+    const previous = acksByKey.get(key) ?? latestPrevious(host.acks, entry.row.name, entry.hash)
     pendingTrust.push({
       row: entry.row, hash: entry.hash, nodeId: '', sourceNodeIds: entry.sameHashNodeIds,
       relation: 'installed', source: { kind: 'device' }, sourceLabel: entry.sourceLabel,
@@ -174,18 +192,22 @@ export function derivePluginDistribution(
     })
   }
   for (const [key, candidates] of byKey) {
-    if (conflictingKeys.has(key) || acksByKey.has(key) ||
+    if (conflictingKeys.has(key) ||
       selectedDevice.has(candidates[0]!.pluginId)) continue
     const compatible = candidates.filter((candidate) => speaksApiVersion(candidate.declaration.apiVersion, apiVersion))
     if (!compatible.length || !cached.has(compatible[0]!.hash)) continue
     compatible.sort((a, b) => Number(b.relation === 'active') - Number(a.relation === 'active') || a.nodeId.localeCompare(b.nodeId))
-    const first = compatible[0]!
-    const previous = latestPrevious(host.acks, first.pluginId, first.hash)
+    const ack = acksByKey.get(key)
+    if (ack?.decision === 'rejected') continue
+    const unapproved = compatible.filter((candidate) => !acceptedDeclaration(host, ack, candidate.declaration, candidate.nodeId))
+    if (!unapproved.length) continue
+    const first = unapproved[0]!
+    const previous = ack ?? latestPrevious(host.acks, first.pluginId, first.hash)
     pendingTrust.push({
       row: first.relation === 'active' ? { ...first.row, installed: first.declaration } : first.row,
       hash: first.hash,
       nodeId: first.nodeId,
-      sourceNodeIds: [...new Set(compatible.map((candidate) => candidate.nodeId))].sort(),
+      sourceNodeIds: [...new Set(unapproved.map((candidate) => candidate.nodeId))].sort(),
       relation: first.relation,
       source: { kind: 'node', nodeId: first.nodeId },
       ...(previous ? { previous } : {}),

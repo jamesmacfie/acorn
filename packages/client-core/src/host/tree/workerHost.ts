@@ -3,8 +3,8 @@
 //
 // What the worker has: the plugin's bundle, whatever framework it brought, and a bridge per tree. What it
 // does not have: a DOM, `fetch`, `importScripts` after boot, or any handle to another plugin's worker.
-// The first two are the shell's CSP on the worker script's own response (app_scheme.rs); the last is
-// arithmetic, since a worker is reached only through the port that created it.
+// The first two are the shell's CSP on the plugin-origin script response (plugin_scheme.rs); the last
+// follows from the isolated origin and the host's per-worker ports.
 //
 // Trust is unchanged from the frame path. The bundle hash is what the device accepted, the prompt is
 // the same prompt, and a withheld bundle mounts nothing. A worker is the same bytes with a different
@@ -12,22 +12,12 @@
 import { PLUGIN_BRIDGE_VERSION } from '@acorn/protocol/plugin/bridge.ts'
 import type { PluginBridgeAppearance, PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
 import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
-import { TREE_LIMITS, batchBytes, sandboxMessage, type TreeHostOp } from '@acorn/protocol/tree/messages.ts'
+import { TREE_LIMITS, batchBytes, boundedSandboxMessage, sandboxMessage, type TreeHostOp } from '@acorn/protocol/tree/messages.ts'
 import type { KitEvent } from '@acorn/protocol/tree/nodes.ts'
 import { postAppearance, postSelect, postSurfaceAction, type FrameBridge } from '../frames/broker'
 import { createLogger } from '../../infra/telemetry/logger'
 import type { TreeTransport } from './TreeHost'
-
-/**
- * Where the worker script comes from: the shell's own origin, serving the same content-addressed
- * bundle the plugin scheme serves as `/client.js`.
- *
- * It cannot be `app-plugin://<hash>/client.js`, however much that would suit: a worker script must be
- * same-origin with the document that starts it, and the plugin scheme is a different origin by design.
- * So the shell serves the identical bytes at its own origin under a policy that gives them nothing —
- * see `app_scheme.rs`, `is_plugin_worker`.
- */
-export const pluginWorkerUrl = (hash: string): string => `/plugin-worker/${hash}.js`
+import { createIsolatedTreeWorker, type TreeSandbox } from './isolatedWorker'
 
 /** How long a worker with no live tree is kept before it is stopped. Long enough that scrolling a
  *  transcript past the last of a plugin's tool cards and back does not restart it. */
@@ -93,7 +83,7 @@ type Slot = {
 
 type Live = {
   key: TreeWorkerKey
-  worker: Worker
+  worker: TreeSandbox
   port: MessagePort
   /** The other half of the handshake: the bridge's port, kept so `bridgePort()` can hand it out. */
   bridgeSide: MessagePort
@@ -119,12 +109,12 @@ export type TreeWorkerKey = { pluginId: string; hash: string }
 const workerKey = ({ pluginId, hash }: TreeWorkerKey): string => JSON.stringify([pluginId, hash])
 const workers = new Map<string, Live>()
 
-// The seam the jsdom suite spawns through: jsdom has no `Worker`, and a real one would need a real
-// bundle on disk. Everything else in this file is exercised for real.
-let spawn: (url: string) => Worker = (url) => new Worker(url, { type: 'module' })
+// The seam the unit suite spawns through: a real relay needs Tauri's plugin scheme and a cached
+// bundle. The relay's port and origin checks have a separate jsdom suite.
+let spawn: (hash: string) => TreeSandbox = createIsolatedTreeWorker
 
-export function _setWorkerFactory(factory: ((url: string) => Worker) | null): void {
-  spawn = factory ?? ((url) => new Worker(url, { type: 'module' }))
+export function _setWorkerFactory(factory: ((hash: string) => TreeSandbox) | null): void {
+  spawn = factory ?? createIsolatedTreeWorker
 }
 
 export type AcquireInput = {
@@ -280,7 +270,16 @@ function sendMount(live: Live, id: string, slot: Slot, onRefused: (reason: strin
 
 function start(input: AcquireInput, key: TreeWorkerKey): Live {
   const log = createLogger('plugins', input.pluginId)
-  const worker = spawn(pluginWorkerUrl(input.hash))
+  let spawnError: string | null = null
+  let worker: TreeSandbox
+  try {
+    worker = spawn(input.hash)
+  } catch (error) {
+    // Unknown renderer origins, unavailable WebCrypto, and invalid hashes all fail the tree without
+    // ever falling back to a Worker at app://acorn. Keep the normal failure/placeholder lifecycle.
+    spawnError = error instanceof Error ? error.message : 'the isolated plugin worker could not start'
+    worker = { postMessage: () => {}, terminate: () => {}, onerror: null }
+  }
   const bridgeChannel = new MessageChannel()
   const treeChannel = new MessageChannel()
   const live: Live = {
@@ -306,6 +305,7 @@ function start(input: AcquireInput, key: TreeWorkerKey): Live {
   workers.set(workerKey(key), live)
 
   live.port.onmessage = (event: MessageEvent) => {
+    if (!boundedSandboxMessage(event.data)) return input.onRefused('sent a tree message past the host size or depth limit')
     const parsed = sandboxMessage.safeParse(event.data)
     if (!parsed.success) return input.onRefused(`sent a tree message the host could not read: ${parsed.error.issues[0]?.message ?? 'unknown'}`)
     const message = parsed.data
@@ -376,10 +376,8 @@ function start(input: AcquireInput, key: TreeWorkerKey): Live {
         return
       }
       case 'tree:batch': {
-        // The sandbox's own measurement, taken before it posted. Falls back to measuring here only for
-        // a bundle built before `bytes` existed (@acorn/protocol/tree/messages.ts says why trusting it
-        // gives a hostile bundle nothing).
-        const bytes = message.bytes ?? batchBytes(message)
+        // The sandbox can forge `bytes`; account for the actual received message.
+        const bytes = batchBytes(message)
         if (bytes > TREE_LIMITS.batchBytes) return input.onRefused(`dropped a ${bytes}-byte batch, over the ${TREE_LIMITS.batchBytes}-byte cap`)
         const slot = live.slots.get(message.slot)
         // A batch for a tree nobody is showing any more. Dropped silently: unmount and a batch in
@@ -413,6 +411,11 @@ function start(input: AcquireInput, key: TreeWorkerKey): Live {
     const message = 'message' in event && typeof event.message === 'string' ? event.message : 'the plugin worker threw'
     input.onRefused(message)
     stop(key, message, live)
+  }
+
+  if (spawnError) {
+    const reason = spawnError
+    queueMicrotask(() => worker.onerror?.({ message: reason } as ErrorEvent))
   }
 
   live.beat = setInterval(() => {

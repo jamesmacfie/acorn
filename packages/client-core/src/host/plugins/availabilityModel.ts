@@ -49,7 +49,7 @@ export function nodePluginRuntime(
   if (!row) return { kind: 'absent' }
   const runtime = runtimeIdentityForRow(row)
   if (runtime) {
-    const pendingCandidate = row.installed &&
+    const pendingCandidate = !row.pendingReview && row.installed &&
       (row.installed.version !== runtime.version || row.installed.client?.hash !== runtime.client?.hash)
       ? row.installed : undefined
     return {

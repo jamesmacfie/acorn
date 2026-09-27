@@ -37,6 +37,7 @@ type Situation = {
   // Unstamped, and the helper adds the clock: what these cases are about is the reason text and the
   // resulting state, and every literal carrying an identical `at:` would only bury that.
   loadFailures?: Omit<PluginLoadFailure, 'at'>[]
+  review?: Record<string, { reviewId: string; requestId: string; fingerprint: string; stagedAt: number } | { corrupt: true }>
 }
 
 // A fixed instant so a test can assert the row carries the loader's stamp rather than a fresh clock.
@@ -53,6 +54,9 @@ const bridge = (situation: Situation): PluginsBridge => {
       .map((entry) => activeSnapshot(entry.id, entry.version)),
     disabled: () => situation.disabled ?? [],
     loadFailures: () => (situation.loadFailures ?? []).map((failure) => ({ ...failure, at: FAILED_AT })),
+    pendingReview: (id) => situation.review?.[id] ?? null,
+    pendingReviewIds: () => Object.keys(situation.review ?? {}),
+    approveReview: () => { throw new Error('not under test') },
     clientBundle: async () => null,
     setDisabled: () => {},
     install: async () => ({ id: '', version: '', state: 'installed-restart-required' }),
@@ -65,6 +69,26 @@ const bridge = (situation: Situation): PluginsBridge => {
 const row = (result: ReturnType<typeof pluginState>, name: string) => result.plugins.find((entry) => entry.name === name)
 
 describe('pluginState', () => {
+  it('holds a staged client-only package and an orphan marker for recovery without a restart banner', () => {
+    const review = { reviewId: 'r', requestId: 'q', fingerprint: 'f', stagedAt: 1 }
+    const candidate = installed('client-only', { hasNode: false })
+    const state = pluginState(bridge({ installed: [candidate], booted: [], review: { 'client-only': review, orphan: { corrupt: true } } }))
+    expect(row(state, 'client-only')).toMatchObject({ state: 'pending-review', running: false, active: null, pendingReview: { reviewId: 'r', fingerprint: 'f', stagedAt: 1 } })
+    expect(row(state, 'orphan')).toMatchObject({ state: 'pending-review', running: false, pendingReview: { corrupt: true } })
+    expect(state.restartRequired).toBe(false)
+  })
+
+  it('keeps an invalid staged manifest removable when the loader has no installed row', () => {
+    const state = pluginState(bridge({
+      loadFailures: [{ id: 'broken', dir: '/data/plugins/broken', reason: 'manifest does not parse' }],
+      review: { broken: { corrupt: true } },
+    }))
+    expect(row(state, 'broken')).toMatchObject({
+      state: 'pending-review', running: false, active: null,
+      pendingReview: { corrupt: true }, stage: 'load', reason: 'manifest does not parse',
+    })
+    expect(state.restartRequired).toBe(false)
+  })
   it('reports a running node with nothing pending', () => {
     const result = pluginState(bridge({ roster: [{
       name: 'github', required: false, disabled: false, state: 'active',

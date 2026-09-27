@@ -54,6 +54,7 @@ export const decisionSchema = z.object({
   nodeId: z.string().default(''),
   source: bundleSourceSchema.optional(),
   version: z.string().min(1),
+  declaration: z.string().min(1).max(1_000_000).optional(),
   decision: z.enum(['accepted', 'rejected']),
 })
 
@@ -65,6 +66,7 @@ export const decisionSchema = z.object({
 // grant this schema refuses. With one combined schema the whole handler threw, so neither accept nor
 // reject could be recorded and the prompt re-queued on every boot.
 export const disclosureSchema = z.object({
+  declaration: z.string().min(1).max(1_000_000),
   permissions: pluginPermissionsSchema,
   webviews: z.array(z.strictObject({
     surface: z.string().min(1).max(64),
@@ -134,7 +136,7 @@ export const NO_DISCLOSURE = {
   harnesses: [],
   agentTools: [],
   contextSections: [],
-} satisfies z.infer<typeof disclosureSchema>
+} satisfies Omit<z.infer<typeof disclosureSchema>, 'declaration'>
 
 export type PluginsState = {
   // Hash to what this device holds. The renderer diffs a node's listing against it to decide what to

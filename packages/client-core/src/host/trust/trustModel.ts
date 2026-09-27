@@ -23,6 +23,7 @@ import {
   webviewPermissionLines,
 } from './permissions'
 import { recordPluginTrust } from '../plugins/host'
+import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
 
 // What the trust prompt says, and what answering it does (PluginTrustDialog.tsx draws it).
 //
@@ -58,7 +59,7 @@ export type TrustTier = { key: TierKey; lines: TrustLine[] }
 export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[] {
   const installed = request?.row.installed
   if (!request || !installed) return []
-  const previous = request.previous
+  const previous = request.previous?.partial ? undefined : request.previous
   const groups: { key: TierKey; now: readonly PermissionLine[]; was: readonly PermissionLine[] | null }[] = [
     {
       key: 'enforced',
@@ -143,6 +144,7 @@ export async function recordTrustDecision(request: PluginTrustRequest, decision:
     nodeId: request.nodeId,
     source: request.source ?? { kind: 'node', nodeId: request.nodeId },
     version: installed.version,
+    declaration: clientDeclaration(installed),
     permissions: installed.permissions,
     webviews: webviewGrants(installed.contributions),
     keyClaims: keyClaimGrants(installed.contributions),

@@ -72,10 +72,6 @@ pub fn run() {
     // Read before the app runs, because the scheme handler cannot ask for state it does not have.
     let frames: Arc<RwLock<Option<Frames>>> = Arc::new(RwLock::new(None));
     let scheme_frames = frames.clone();
-    // The app scheme needs the same handle: a loaded plugin's tree worker is that plugin's bundle,
-    // served from this origin because a worker script must be same-origin with the document that
-    // starts it. See src/app_scheme.rs, `plugin_worker_hash`.
-    let worker_frames = frames.clone();
     let scheme_reset_mode = reset_mode;
 
     let mut builder = tauri::Builder::default();
@@ -119,13 +115,12 @@ pub fn run() {
                 Some(origin) => Source::DevServer(origin.clone()),
                 None => Source::Files(client_root(ctx.app_handle())),
             };
-            let frames = worker_frames.clone();
             let port = scheme_port.clone();
             std::thread::spawn(move || {
-                let response = if scheme_reset_mode && request.uri().path() == "/reset" {
+                let response = if scheme_reset_mode && app_scheme::is_app_authority(request.uri()) && request.uri().path() == "/reset" {
                     reset_stage::page()
                 } else {
-                    app_scheme::serve(&source, frames.read().unwrap().as_ref(), *port.read().unwrap(), &request)
+                    app_scheme::serve(&source, *port.read().unwrap(), &request)
                 };
                 responder.respond(response)
             });
@@ -422,7 +417,7 @@ fn open_window(app: &tauri::AppHandle) -> tauri::Result<()> {
         // node, so nothing legitimate navigates this frame off its own origin. See docs/shell.md,
         // "The plugin frame origin".
         .on_navigation(|url| {
-            if url.as_str().starts_with(APP_ORIGIN) || url.scheme() == PLUGIN_SCHEME {
+            if is_renderer_url(url) || is_plugin_url(url) {
                 return true;
             }
             eprintln!("[shell] blocked navigation: {url}");
@@ -439,9 +434,33 @@ fn open_reset_window(app: &tauri::AppHandle, fixture: bool) -> tauri::Result<()>
         .inner_size(640.0, 260.0)
         // Fixture checks use an ephemeral profile, so they cannot clear an installed app's origin.
         .incognito(fixture)
-        .on_navigation(|url| url.path() == "/reset" && url.as_str().starts_with(APP_ORIGIN))
+        .on_navigation(|url| url.path() == "/reset" && is_renderer_url(url))
         .build()?;
     Ok(())
+}
+
+fn is_renderer_url(url: &tauri::Url) -> bool {
+    is_renderer_url_for(url, cfg!(windows) || cfg!(target_os = "android"))
+}
+
+fn is_renderer_url_for(url: &tauri::Url, mapped_schemes: bool) -> bool {
+    let original = url.scheme() == APP_SCHEME && url.host_str() == Some("acorn");
+    let mapped = mapped_schemes && matches!(url.scheme(), "http" | "https") && url.host_str() == Some("app.localhost");
+    (original || mapped) && url.port().is_none() && url.username().is_empty() && url.password().is_none()
+}
+
+fn is_plugin_url(url: &tauri::Url) -> bool {
+    is_plugin_url_for(url, cfg!(windows) || cfg!(target_os = "android"))
+}
+
+fn is_plugin_url_for(url: &tauri::Url, mapped_schemes: bool) -> bool {
+    let host = match url.scheme() {
+        PLUGIN_SCHEME => url.host_str(),
+        "http" | "https" if mapped_schemes => url.host_str().and_then(|host| host.strip_prefix("app-plugin.")),
+        _ => None,
+    };
+    host.is_some_and(|hash| hash.len() == 64 && hash.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()))
+        && url.port().is_none() && url.username().is_empty() && url.password().is_none()
 }
 
 /// The renderer bridge, plus the one value it cannot ask for asynchronously. A missing bundle is not
@@ -510,6 +529,34 @@ mod tests {
     fn the_window_url_is_the_origin_the_helper_checks() {
         assert!(format!("{APP_ORIGIN}/").starts_with(APP_ORIGIN));
         assert_eq!(APP_ORIGIN, "app://acorn");
+    }
+
+    #[test]
+    fn navigation_accepts_only_exact_renderer_and_hash_plugin_origins() {
+        const HASH: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        for (url, native, mapped) in [
+            ("app://acorn/index.html", true, true),
+            ("http://app.localhost/index.html", false, true),
+            ("https://app.localhost/index.html", false, true),
+            ("app://acorn.evil/index.html", false, false),
+            ("app://acorn:123/index.html", false, false),
+            ("http://app.localhost.evil/index.html", false, false),
+        ] {
+            let url: tauri::Url = url.parse().unwrap();
+            assert_eq!(is_renderer_url_for(&url, false), native, "{url}");
+            assert_eq!(is_renderer_url_for(&url, true), mapped, "{url}");
+        }
+        for (url, native, mapped) in [
+            (format!("app-plugin://{HASH}/worker.html"), true, true),
+            (format!("http://app-plugin.{HASH}/worker.html"), false, true),
+            (format!("https://app-plugin.{HASH}/worker.html"), false, true),
+            ("app-plugin://acorn/worker.html".to_string(), false, false),
+            (format!("http://app-plugin.{HASH}.evil/worker.html"), false, false),
+        ] {
+            let url: tauri::Url = url.parse().unwrap();
+            assert_eq!(is_plugin_url_for(&url, false), native, "{url}");
+            assert_eq!(is_plugin_url_for(&url, true), mapped, "{url}");
+        }
     }
 
     #[test]

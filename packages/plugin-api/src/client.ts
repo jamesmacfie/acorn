@@ -185,7 +185,7 @@ export type { Project, ProjectPatch, ProjectSeed } from '@acorn/protocol/api.ts'
 export { activeNodeId, nodeReady, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 export { createFleetQuery } from '@acorn/client-core/infra/node'
 export { nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
-export { closeTunnelsForTask, tunnelUrl } from '@acorn/client-core/infra/node'
+export { closeTunnelsForTask, previewUrlForClient, remotePreviewBlocked, tunnelUrl } from '@acorn/client-core/infra/node'
 
 // ── Agent context and references ──────────────────────────────────────────────────────────────
 export { contextSnapshot } from '@acorn/client-core/features/agent'
