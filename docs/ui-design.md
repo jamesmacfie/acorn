@@ -301,6 +301,11 @@ to. The control rides the divider rather than sitting in the list's header, beca
 form the header belongs to a `ListColumn` the caller built and this node has nothing to put a button
 into, and because a collapsed column has no header left to sit in.
 
+When its contents have no readable rail form, the kit's `ListDetail` can take
+`collapseContent="empty"`. It hides the list's contents while collapsed but keeps them mounted, so
+inputs, search results and scroll state are still there when the reader expands it. The expand
+control stays on the divider. The editor uses this for its file tree and search panel.
+
 The divider and the control on it are one node, `CollapseEdge`, and both tiers draw it: the kit's
 `ListDetail` and the host's `list-detail` layout. They each wrote their own at first, and the two
 buttons drifted apart, one with a border and one without. A split that does not collapse still gets

@@ -4,7 +4,7 @@ import { basicSetup } from 'codemirror'
 import { EditorState, Prec, StateEffect, type Extension, type Text } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, type Task } from '@acorn/plugin-api/client'
-import { Alert, Button, DocumentTabs, EmptyState, ListDetail, Rectangle, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
+import { Alert, Button, DocumentTabs, EmptyState, ListDetail, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
 import { applyViewState, captureViewState, editorTheme, languageForPath, refreshEditorTheme, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
 import { editorApi, editorRootKey, EDITOR_ROOT_STALE_MS } from './editorClient'
 import { readEditorMode, saveEditorMode } from './editorPrefs'
@@ -68,6 +68,8 @@ export default function EditorPane(props: { task: Task }) {
   const [pendingReveal, setPendingReveal] = createSignal<{ path: string; line: number; column?: number } | null>(null)
   const [treeReveal, setTreeReveal] = createSignal<FileTreeRevealRequest | null>(null)
   const [side, setSide] = createSignal<'files' | 'search'>('files')
+  const sidebarKey = paneCollapseKey('editor')
+  const [, setSidebarCollapsed] = sidebarCollapse(sidebarKey)
   let treeRevealRevision = 0
 
   let view: EditorView | undefined
@@ -128,6 +130,7 @@ export default function EditorPane(props: { task: Task }) {
   const revealActiveFile = () => {
     const path = active()
     if (!path) return
+    setSidebarCollapsed(false)
     setSide('files') // the tree is one of two things the sidebar shows; revealing into a hidden one is a no-op
     setTreeReveal({ path, revision: ++treeRevealRevision })
   }
@@ -409,6 +412,7 @@ export default function EditorPane(props: { task: Task }) {
     if (!intent) return
     // ⌘⇧F and the "Find in files…" palette row.
     if (intent.kind === 'editor:search') {
+      setSidebarCollapsed(false)
       setSide('search')
       return
     }
@@ -501,6 +505,8 @@ export default function EditorPane(props: { task: Task }) {
       <Show when={root()} fallback={<EmptyState>Open a terminal first to map this repo's checkout.</EmptyState>}>
         <ListDetail
           listLabel="Editor sidebar"
+          collapseKey={sidebarKey}
+          collapseContent="empty"
           list={
             <>
               <Tabs
