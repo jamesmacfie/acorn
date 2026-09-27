@@ -22,6 +22,7 @@ import {
 import { AuthoringConversation } from '@acorn/plugin-api/ui/data-sources'
 import { workflowsSurfacePath } from '../surfacePath'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
+import { unavailableCatalogKind, unavailableStepKindMessage } from '../../shared/stepKindAvailability'
 import { workflowApi } from '../workflowsClient'
 import {
   addNode,
@@ -147,6 +148,9 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
     store.catalog()?.kinds.find((entry) => entry.id === kind)?.describe ?? BUILTIN_STEP_DESCRIPTIONS[kind]
   const missing = createMemo(() => missingRequiredFields(draft().def, describeFor))
   const problems = () => [...missing(), ...store.problems()]
+  const runnableDefinition = () => store.ref()?.source === 'database' ? store.publishedDef() : draft().def
+  const missingRunKind = () => runnableDefinition()?.steps.find((step) => unavailableCatalogKind(step.kind ?? 'agent', store.catalog()))
+  const missingDraftKind = () => draft().def.steps.find((step) => unavailableCatalogKind(step.kind ?? 'agent', store.catalog()))
   const counts = createMemo(() => {
     const def = draft().def
     const roots = def.steps.filter((step, index) => (step.after ? step.after.length === 0 : index === 0)).length
@@ -289,7 +293,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
           <Show when={store.ref()?.source === 'database'}>
             <Button size="sm" disabled={!store.publishedRevision()} onPress={schedule}>Schedule…</Button>
           </Show>
-          <Button size="sm" disabled={store.ref()?.source === 'database' && !store.publishedRevision()} onPress={run}>Run published…</Button>
+          <Button size="sm" disabled={(store.ref()?.source === 'database' && !store.publishedRevision()) || !!missingRunKind()} onPress={run}>Run published…</Button>
         </>
       )}
     />
@@ -335,8 +339,10 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       <Show when={store.ref()?.source === 'database' && !store.publishedRevision()}>
         <Alert tone="warn" title="Run unavailable">
           <Inline gap="inline" wrap>
-            <Text>Publish this workflow before running it.</Text>
-            <Button size="sm" disabled={store.busy()} onPress={() => void store.preparePublication()}>Review publication</Button>
+            <Text>{missingDraftKind() ? unavailableStepKindMessage(missingDraftKind()!.kind ?? 'agent') : 'Publish this workflow before running it.'}</Text>
+            <Show when={!missingDraftKind()}>
+              <Button size="sm" disabled={store.busy()} onPress={() => void store.preparePublication()}>Review publication</Button>
+            </Show>
           </Inline>
         </Alert>
       </Show>

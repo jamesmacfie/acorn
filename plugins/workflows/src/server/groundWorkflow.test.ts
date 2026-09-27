@@ -13,6 +13,7 @@ import { extractJsonObject, groundWorkflow, parseGeneratedWorkflow, stripJsonFen
 // below is pinned against the shape it actually has (../../../http/src/server/workflowStep.ts).
 const httpKind: StepKindDescription = {
   label: 'Call an HTTP endpoint',
+  description: 'Call an HTTP endpoint.', icon: 'globe', output: { description: 'HTTP response.' },
   fields: [
     { id: 'method', label: 'Method', type: 'select', required: true, options: [{ value: 'GET', label: 'GET' }] },
     { id: 'url', label: 'URL', type: 'text', required: true },

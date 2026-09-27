@@ -220,10 +220,17 @@ template.
 
 ### A kind describes its own form
 
-A kind can carry a `describe`: a label, an icon, and its inputs as a list of fields. The host draws
-that form, on the desktop and in the terminal, so a plugin adds an editable step kind without
-shipping a component. `describe` is optional. A kind without one is listed by name with a raw JSON
-`with`.
+A kind provides a `describe` with a label, icon, description, fields, and output description. The
+host draws that form on desktop and in the terminal, so a plugin adds an editable step kind without
+shipping a component. An output schema and semantic validator are optional. Workflows excludes a
+contributed kind with incomplete metadata from the catalog, validation, and dispatch, and logs the
+rejected kind and missing fields. The plugin's other contributions remain active.
+
+A saved workflow keeps a missing kind's qualified ID and `with` settings. The editor identifies the
+contributing plugin, allows raw JSON editing, and reports why the workflow cannot run. Admission
+refuses a new run. An active run fails if its next step requires a kind that has disappeared. When the
+same kind returns, validation runs again against its current contract; a valid definition becomes
+runnable without rewriting the saved step.
 
 A field is `text`, `textarea`, `number`, `boolean`, `select`, or `prompt`. A `prompt` field is a
 textarea that accepts template references. A `select` either lists its `options` or names an

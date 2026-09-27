@@ -2,6 +2,7 @@ import type { DataBinding, DataPredicate } from '@acorn/protocol/dataBindings.ts
 import type { WorkflowCatalog, WorkflowDef, WorkflowStepDef } from '../../shared/workflowContracts'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 import { stepIdentity } from '../../shared/workflowIdentity'
+import { stepKindPluginId, unavailableCatalogKind } from '../../shared/stepKindAvailability'
 import { effectiveAfter } from './draft'
 
 const kindOf = (step: WorkflowStepDef) => step.kind ?? 'agent'
@@ -38,6 +39,10 @@ function conditionLabel(condition: DataPredicate | undefined, def: WorkflowDef):
 
 export function stepSummary(step: WorkflowStepDef, def: WorkflowDef, catalog: WorkflowCatalog | undefined): string {
   const kind = kindOf(step)
+  if (unavailableCatalogKind(kind, catalog)) {
+    const pluginId = stepKindPluginId(kind)
+    return pluginId ? `Plugin '${pluginId}' does not provide this step on this node.` : `Step kind '${kind}' is unavailable on this node.`
+  }
   if (kind === 'find-records') {
     const query = step.query
     if (!query) return 'Choose records to find.'
