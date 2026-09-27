@@ -52,8 +52,9 @@ your own `var(--bg)` rules resolve.
 ## Compatibility
 
 A plugin that loads under a given `PLUGIN_API_MAJOR` keeps loading under it. Removing a name from this
-surface requires that major to move — enforced in acorn's own tree, not by convention. A major bump is
-a hard break with no deprecation window, and a manifest names its major by exact string match.
+surface requires that major to move, enforced in acorn's own tree. A manifest declares one major, such
+as `"2"`, or a range covering the host, such as `"1 || 2"`. Declare a range only after testing the
+plugin against each included major.
 
 ## Docs
 
