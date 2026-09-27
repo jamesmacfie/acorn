@@ -18,7 +18,6 @@ import { flatten, hasNode, Line, pad, Run, runStyle, slot } from './cells'
 import { markdownLines, type Line as MarkdownLine } from './markdown'
 import { borderCell, litControl, rule, spaceCells } from './roles'
 import { ScrollViewport, type Viewport } from './scrolling'
-import { GLYPHS } from './glyphs'
 import { spinnerFrame } from './tick'
 import { focusRenderable, focusedRenderable, scheduleSettle } from '../keys/regions'
 
@@ -233,9 +232,8 @@ export function TreeRow(props: {
  *  nothing and left every item with `context: undefined`. Found by the pane sweep, on the agents
  *  session list (docs/tui.md).
  *
- *  The DOM's is an ellipsis button opening a menu. Here the items are the row's trailing glyphs, which
- *  is what the node's own sentence says (docs/ui-design.md § Every node at 80 by 24): there is no
- *  pointer to open a menu with, and a row of glyphs is one fewer press. So the context they are handed
+ *  The DOM's is an ellipsis button opening a menu. Here the items are labeled controls. There is no
+ *  pointer to open a hover menu with, so the context they are handed
  *  closes nothing, because there is no list to close.
  */
 export function RowActions(props: { ariaLabel: string; children: (menu: { close: () => void }) => JSX.Element }) {
@@ -532,13 +530,8 @@ export function UserAvatar(props: { login: string | null | undefined; size?: 'sm
   return <Line role="muted">{`[${initials()}]`}</Line>
 }
 
-/** A glyph from the name table, an emoji as itself, and nothing for a Lucide name with no glyph.
- *  Drawing the name as words instead would push every row it sits in sideways by six cells. */
-export function Icon(props: { name: string; size?: number | string; title?: string; tone?: Tone | 'brand'; spin?: boolean }) {
-  const glyph = () => GLYPHS[props.name] ?? ([...props.name].length === 1 ? props.name : '')
-  const tone = () => (props.tone === 'brand' ? 'accent' : props.tone)
-  return <Show when={glyph()}>{(mark) => <Line tone={tone()}>{mark()}</Line>}</Show>
-}
+/** SVG and Lucide names have no terminal rendering. State belongs in the surrounding text. */
+export const Icon = (_props: { name: string; size?: number | string; title?: string; tone?: Tone | 'brand'; spin?: boolean }) => null
 
 /** `⌘K` or `ctrl+k`, per host. The chord arrives already spelled for this platform; the node is the
  *  box around it, and a terminal has no box. */

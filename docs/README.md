@@ -104,6 +104,8 @@ Start with the plugin map, then follow the authoring guide or API reference.
 - [future/](./future/README.md) — designs, analyses, sequenced plans, and delivery records retained
   while acceptance remains open. Its README indexes every programme and single file. Shipped
   behaviour belongs in an owning doc above.
+- [Terminal UI review](./future/tui-review/README.md) — live UX evidence, feature coverage, host
+  projections, and acceptance gates for a standalone terminal client.
 - [Plugin list search proposal](./future/pluginsearch.md) — search beyond the loaded Linear,
   Rollbar, and GitHub list rows while keeping project and state scope.
 - `schemas/` — generated, versioned JSON Schemas that are pinned by a test and immutable by rule.
