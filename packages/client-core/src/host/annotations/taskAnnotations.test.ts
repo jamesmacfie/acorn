@@ -11,7 +11,8 @@ vi.mock('../plugins/surfaceFailures', () => ({ recordSurfaceFailure: vi.fn() }))
 
 // `core:task` is core's own annotation point, and the thing worth pinning is the translation: a mark
 // is a line of text on a diff and a corner icon on a 52-pixel rail row, and the words survive either
-// way — in the legend here, beside the icon there. See docs/future/rail-tab.md § Slice 3.
+// way — in the legend here, beside the icon there. See docs/plugins/cooperative-extension-points.md
+// § Task annotations and docs/ui-design.md § Rail controls and status markers.
 
 const registered: Disposable[] = []
 
@@ -66,5 +67,17 @@ describe('core:task', () => {
     await vi.waitFor(() => expect(markersFor({ kind: 'task', id: 't1' })).toHaveLength(1))
     expect(markersFor({ kind: 'task', id: 't2' })).toEqual([])
     expect(markersFor({ kind: 'source', id: 'github' })).toEqual([])
+  })
+
+  it('retains at most 256 accepted marks from one contributor and request', async () => {
+    contributor('deploys', Array.from({ length: 300 }, (_, index) => ({
+      key: { task: 't1' },
+      severity: 'info',
+      text: `Deployment ${index}`,
+    })))
+
+    requestTaskAnnotations(['t1'])
+    await vi.waitFor(() => expect(markersFor({ kind: 'task', id: 't1' })).toHaveLength(256))
+    expect(resolveRailMarkers(markersFor({ kind: 'task', id: 't1' })).legend).toHaveLength(256)
   })
 })

@@ -3,7 +3,7 @@ import type { CommandSettingOption } from '@acorn/protocol/commands.ts'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { resolveTheme, THEMES } from './builtInThemes'
 import { savePref } from './savePref'
-import { DEFAULT_STYLE, STYLES } from './uiStyles'
+import { resolveStyle, STYLES } from './uiStyles'
 
 // The five appearance choices, as one reader and one writer each.
 //
@@ -25,7 +25,7 @@ import { DEFAULT_STYLE, STYLES } from './uiStyles'
 /** The prefs map as `prefsOptions` hands it over: absent while the first read is in flight. */
 export type AppearancePrefs = Record<string, string> | undefined
 
-export const appearanceStyle = (prefs: AppearancePrefs): string => prefs?.[PrefKeys.style] ?? DEFAULT_STYLE
+export const appearanceStyle = (prefs: AppearancePrefs): string => resolveStyle(prefs?.[PrefKeys.style])
 export const saveAppearanceStyle = (qc: QueryClient, value: string): Promise<boolean> =>
   savePref(qc, PrefKeys.style, value)
 

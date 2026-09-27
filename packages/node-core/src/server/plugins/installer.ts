@@ -24,6 +24,7 @@ import type {
   PluginUninstallResult,
   PluginUpdateResult,
 } from '@acorn/protocol/api.ts'
+import { describePluginSource, guardPluginUrl, resolvePluginSource, RELEASE_ASSET } from '@acorn/protocol/plugin/source.ts'
 import { writePrivateAtomic } from '../storage/dataRoot'
 import { runProcess } from '../core/proc'
 import { resolveInRoot } from '../core/fs'
@@ -40,7 +41,7 @@ const UNPACK_TIMEOUT_MS = 120_000
 
 // The convention this phase establishes: a GitHub release carries the package as one asset with this
 // exact name.
-export const RELEASE_ASSET = 'acorn-plugin.tgz'
+export { RELEASE_ASSET }
 
 // Everything a caller can be told about why an install did not happen. One class rather than a code
 // union because every one of these is the same outcome for the owner, "that package was refused, and
@@ -88,68 +89,14 @@ export function readLockfile(dataRoot: string, id: string): PluginLockfile | nul
 }
 
 /** One line naming where a package came from, for the settings row. */
-export const describeSource = (source: PluginInstallSource): string =>
-  'github' in source
-    ? `github:${source.github}${source.tag ? `@${source.tag}` : ''}`
-    : 'npm' in source
-      ? `npm:${source.npm}${source.version ? `@${source.version}` : ''}`
-      : 'url' in source
-        ? source.url
-        : `path:${source.path}`
+export const describeSource = describePluginSource
 
 // ── Source resolution ─────────────────────────────────────────────────────────────────────────────
-
-type Resolved = { url: string; provenance: PluginProvenance }
-
-const json = async (url: string, accept: string): Promise<unknown> => {
-  guardUrl(url)
-  const res = await fetch(url, { headers: { accept }, signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) })
-  if (!res.ok) fail(`${url} answered ${res.status}.`)
-  return await res.json()
-}
-
-async function resolveGithub(source: { github: string; tag?: string }): Promise<Resolved> {
-  if (!/^[\w.-]+\/[\w.-]+$/.test(source.github)) fail(`'${source.github}' is not an owner/repo pair.`)
-  const base = `https://api.github.com/repos/${source.github}/releases`
-  const release = (await json(source.tag ? `${base}/tags/${encodeURIComponent(source.tag)}` : `${base}/latest`, 'application/vnd.github+json')) as {
-    tag_name?: string
-    assets?: { name?: string; browser_download_url?: string }[]
-  }
-  const asset = (release.assets ?? []).find((candidate) => candidate.name === RELEASE_ASSET)
-  if (!asset?.browser_download_url) {
-    fail(`That release has no ${RELEASE_ASSET} asset. An acorn plugin release publishes the package under exactly that name.`)
-  }
-  return { url: asset!.browser_download_url!, provenance: { tag: release.tag_name ?? source.tag ?? 'latest' } }
-}
-
-async function resolveNpm(source: { npm: string; version?: string }): Promise<Resolved> {
-  if (!/^(@[\w.-]+\/)?[\w.-]+$/.test(source.npm)) fail(`'${source.npm}' is not an npm package name.`)
-  const packument = (await json(`https://registry.npmjs.org/${source.npm.replace('/', '%2f')}`, 'application/json')) as {
-    'dist-tags'?: Record<string, string>
-    versions?: Record<string, { dist?: { tarball?: string; integrity?: string } }>
-  }
-  const version = source.version ?? packument['dist-tags']?.latest
-  if (!version) fail(`${source.npm} has no published version to install.`)
-  const dist = packument.versions?.[version!]?.dist
-  if (!dist?.tarball) fail(`${source.npm}@${version} has no tarball on the registry.`)
-  return { url: dist!.tarball!, provenance: { version: version!, ...(dist!.integrity ? { integrity: dist!.integrity } : {}) } }
-}
 
 // https everywhere, plus http on loopback so a test or a local build server can hand this a real
 // archive over a real socket. Anything else is a downgrade: a plugin package is code, and fetching it
 // in the clear means whoever is between the node and the host chooses what runs.
-export function guardUrl(raw: string): void {
-  let url: URL
-  try {
-    url = new URL(raw)
-  } catch {
-    return fail(`'${raw}' is not a URL.`)
-  }
-  if (url.protocol === 'https:') return
-  const loopback = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]' || url.hostname === '::1'
-  if (url.protocol === 'http:' && loopback) return
-  fail('A plugin package must be fetched over https (http is accepted only from localhost).')
-}
+export const guardUrl = guardPluginUrl
 
 // ── Download and unpack ───────────────────────────────────────────────────────────────────────────
 
@@ -283,6 +230,34 @@ function validate(root: string, expectId: string | null): PluginManifest {
   return manifest
 }
 
+/** Inspect downloaded package bytes without installing them on a node. The callback must copy what it
+ * needs before this returns; the staged directory is always removed. Desktop custody uses the same
+ * archive limit, integrity check, unpacking, and manifest parser as the node installer. */
+export async function withPluginPackage<T>(
+  stagingRoot: string,
+  source: PluginInstallSource,
+  inspect: (root: string, manifest: PluginManifest) => Promise<T> | T,
+): Promise<T> {
+  if ('path' in source) {
+    if (!isAbsolute(source.path)) fail('A local plugin path must be absolute.')
+    return inspect(source.path, validate(source.path, null))
+  }
+  mkdirSync(stagingRoot, { recursive: true, mode: 0o700 })
+  const staging = join(stagingRoot, `.staging-${randomUUID().slice(0, 8)}`)
+  mkdirSync(staging, { recursive: true, mode: 0o700 })
+  try {
+    const resolved = await resolvePluginSource(source)
+    const archive = join(staging, 'package.tgz')
+    await download(resolved.url, archive, resolved.provenance.integrity)
+    const unpacked = join(staging, 'unpacked')
+    await unpack(archive, unpacked)
+    const root = packageRoot(unpacked)
+    return await inspect(root, validate(root, null))
+  } finally {
+    rmSync(staging, { recursive: true, force: true })
+  }
+}
+
 // ── Versions ──────────────────────────────────────────────────────────────────────────────────────
 
 // Dotted numeric prefixes only. `null` means "these two cannot be ordered", which is the honest answer
@@ -383,7 +358,7 @@ async function place(dataRoot: string, source: PluginInstallSource, expectId: st
   const staging = join(root, `.staging-${randomUUID().slice(0, 8)}`)
   mkdirSync(staging, { recursive: true, mode: 0o700 })
   try {
-    const resolved = 'github' in source ? await resolveGithub(source) : 'npm' in source ? await resolveNpm(source) : { url: source.url, provenance: {} }
+    const resolved = await resolvePluginSource(source)
     const archive = join(staging, 'package.tgz')
     const archiveSha256 = await download(resolved.url, archive, resolved.provenance.integrity)
     const unpacked = join(staging, 'unpacked')

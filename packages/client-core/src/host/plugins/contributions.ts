@@ -5,6 +5,7 @@ import { namespaceContributions } from './contributionIds'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { distribution } from './distribution'
 import { runtimeIdentityForRow } from './runtimeIdentity'
+import { decisionKey } from './distributionModel'
 
 // Who may contribute, and what they declared: the shared identity-and-trust check both registration
 // passes need before either can draw anything (docs/plugins.md § One shared eligibility and trust
@@ -28,11 +29,23 @@ export type EligiblePlugin = {
 export function eligiblePlugins(options: { includeInactive?: boolean } = {}): EligiblePlugin[] {
   const snapshot = distribution()
   const nodeId = activeNodeId() ?? snapshot.byNode.keys().next().value
-  if (!nodeId) return []
-  const observation = snapshot.byNode.get(nodeId)
-  if (!observation?.reachable || observation.stale) return []
   const eligible: EligiblePlugin[] = []
+  for (const [pluginId, entry] of snapshot.selectedDevice) {
+    const runtime = entry.row.installed && { ...entry.row.installed, activation: 'client-only' as const }
+    if (!runtime || entry.row.disabled) continue
+    const hash = entry.hash
+    const trusted = snapshot.cachedHashes.has(hash) && snapshot.acceptedKeys.has(decisionKey(pluginId, hash))
+    eligible.push({
+      pluginId, row: { ...entry.row, installed: runtime },
+      installed: { ...runtime, contributions: namespaceContributions(pluginId, runtime.contributions) },
+      inactive: false, hash, trusted,
+    })
+  }
+  if (!nodeId) return eligible
+  const observation = snapshot.byNode.get(nodeId)
+  if (!observation?.reachable || observation.stale) return eligible
   for (const row of observation.rows) {
+    if (snapshot.selectedDevice.has(row.name)) continue
     const active = runtimeIdentityForRow(row)
     // Chrome keeps command and shortcut metadata for a disabled plugin so saved bindings stay
     // explainable. Every invocation still checks the active runtime on this node.
@@ -60,12 +73,10 @@ export function eligiblePlugins(options: { includeInactive?: boolean } = {}): El
   return eligible
 }
 
-/**
 /** Does this package carry code this device has not been cleared to run? See docs/plugins.md § One
  *  shared eligibility and trust check for how this differs from `trusted`. */
 export const hasWithheldCode = (entry: EligiblePlugin): boolean => entry.installed.client !== null && !entry.trusted
 
-/**
 /**
  * A task-scoped pane, which is the only kind of surface a task's layout can hold.
  *

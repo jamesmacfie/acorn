@@ -28,6 +28,14 @@ graph and loses its preloads.
 appearance. It selects a Node-aware cache scope and keys task content by Node/task identity so a
 switch disposes the previous task scope.
 
+The top bar, left rail, pane switcher, and task list are exclusive slots. Each has a registered core
+provider and may have plugin offers; the device preference selects one. `App.tsx` builds the topbar's
+serializable workspace, project, breadcrumb, and fleet data, while `TabRail.tsx` builds the rail's
+available source list and markers. Host verbs keep navigation, source ordering, rail collapse, and
+preference writes outside plugin code. The rail and topbar each lend one opaque nested slot reference:
+`rail.taskList` and `topbar.right`. A remote tree can place only the reference it was given; the child
+surface cannot open another nested slot.
+
 **Four folders under `packages/client-core/src`, and the order is the dependency order.** `kit/` is
 the design system: components, role tokens, the diff toolkit, the key primitives. Props in, DOM out,
 and an arch test holds it there, because `kit/` is what `@acorn/plugin-api/ui` re-exports. `infra/`
@@ -160,6 +168,16 @@ the colour, the spin, and the tooltip legend
 consuming render, so a plugin reads signals it already owns and the rail re-renders when they change,
 rather than the host inventing a query observer per rail button. One throwing contribution is isolated;
 the rest of the control still draws.
+
+Loaded task markers enter through `core:task`, the generic annotation point. The rail sends the whole
+visible task-id set once per contributor. Each contributor's request identity includes its descriptor
+registration, the active node, `chromeDeps(pluginId)`, and the visible keys. The shared chrome watcher
+already advances that freshness revision for plugin pushes, global status, and declared polling, so
+annotations add no per-row query, timer, observer, or subscription. A changed identity synchronously
+clears and aborts only that contributor, while an exact-generation guard rejects late answers. Chrome
+resync clears retained annotation state before registrations are replaced. Results merge in registered
+contributor order, independent of network completion order. For the budgets and response shape, see
+[Task annotations](./plugins/cooperative-extension-points.md#task-annotations).
 
 Workflow descendant grouping is a client-core task projection, not plugin-owned rail markup. Tasks
 created through the workflow child seam carry `workflows:child`; desktop and terminal rails use the

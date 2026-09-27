@@ -84,6 +84,7 @@ The desktop persists:
 - which Node this window talked to last, so the next launch can pick its cache partition before
   the fleet answers ([frontend.md](./frontend.md) § Startup readiness);
 - device-scoped appearance, shortcuts, rail order, and window geometry;
+- device-held plugin enablement and `plugin:<device-plugin-id>:*` state;
 - the per-Node IndexedDB query cache;
 - selection/restore state and local drafts.
 
@@ -107,6 +108,20 @@ store leaves device preferences at their defaults. Settings saved while storage 
 on the next launch; a save while it is unavailable stays only in the current query cache. Task layouts
 remain in the owning Node's preferences, so switching Nodes
 does not transfer a layout.
+
+The device plugin state rule is prefix-aware because installed plugin IDs are unknown at build time.
+Only IDs present in the device bundle roster acquire that prefix; Node-delivered plugin state keeps
+using Node preferences. Uninstall removes that device prefix and the device enablement entry while
+preserving manual trust acknowledgements.
+
+`acorn.json` is a second interface to selected device preferences: appearance, keybinding overrides,
+rail order and collapse, and exclusive-slot picks. The desktop helper reads and watches it in its
+user data directory; the terminal uses its own config directory. Incoming values pass through the
+normal device preference setter, which writes local storage before updating the query cache. A
+Settings change to a covered value writes the file. Unknown top-level keys survive a write, and a
+parse error leaves the last valid state on screen with a line and column notice. A `plugins` entry
+is an installation request shown to the user, never a trust grant. The file contains no Node
+preferences, plugin-owned state, credentials, commands, or executable paths.
 
 Use the persistence scope that owns the state:
 

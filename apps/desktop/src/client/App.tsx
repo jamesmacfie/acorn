@@ -8,14 +8,10 @@ import { clear } from 'idb-keyval'
 import { integrationsOptions, prefsOptions, type Project, projectsKey, projectsOptions, type Task, tasksKey, tasksOptions, type Workspace, workspacesOptions } from '@acorn/client-core/infra/queries.ts'
 import { setProjectsLookup } from '@acorn/client-core/features/projects/projectLookup.ts'
 import { setTaskLookup } from '@acorn/client-core/features/tasks'
-import Picker from '@acorn/client-core/kit/components/inputs/Picker.tsx'
-import { Button, Select } from '@acorn/client-core/kit/components/primitives.tsx'
-import WorkspacePicker from '@acorn/client-core/kit/components/inputs/WorkspacePicker.tsx'
 import {
   createFleetWorkspaces, noteWorkspaceVisit, planWorkspaceViewTransition, selectFleetWorkspace,
   viewToRemember, workspaceForProject, workspaceOwnsPath,
 } from '@acorn/client-core/features/workspaces'
-import OverflowMenu from '@acorn/client-core/features/settings/OverflowMenu.tsx'
 import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
 import { initSoundNotices } from '@acorn/client-core/features/notifications'
 import { sessionSummaries } from '@acorn/client-core/features/tasks'
@@ -27,7 +23,6 @@ import { isTerminalTarget } from '@acorn/client-core/host/keys'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/features/tasks/activate.ts'
 import { desktopExtras } from '@acorn/client-core/infra/platform'
 import NodeGate from '@acorn/client-core/features/fleet/NodeGate.tsx'
-import NodeChip from '@acorn/client-core/features/fleet/NodeChip.tsx'
 import { activeNodeId, nodeGateHolds, nodeReady, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 import { nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
 import { warnOnceAboutDisk } from '@acorn/client-core/infra/node'
@@ -54,6 +49,13 @@ import { createSourceScope } from '@acorn/client-core/features/tabs'
 import { setTelemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
 import { emitBootSpans } from './boot'
 import { telemetryOn } from '@acorn/client-core/features/settings'
+import type { TopbarProps } from '@acorn/protocol/chrome.ts'
+import Topbar from '@acorn/client-core/host/chrome/Topbar.tsx'
+import ExclusiveSlotHost from '@acorn/client-core/host/plugins/ExclusiveSlotHost.tsx'
+import { mintSlotRef } from '@acorn/client-core/host/plugins/NestedChromeSlot.tsx'
+import { registerCoreExclusiveSlot } from '@acorn/client-core/host/registries/extensionPoints'
+import { PrefKeys } from '@acorn/client-core/infra/persistence'
+import { savePref } from '@acorn/client-core/features/settings/savePref.ts'
 
 // The shell and PR list are the startup path. Heavy/conditional surfaces stay behind their actual
 // navigation intent so the editor, xterm, Shiki/diff rendering, settings plugins, and onboarding do not
@@ -111,6 +113,7 @@ export default function App() {
   onMount(() => {
     const commands = registerCommands([
       { id: 'core.settings.open', title: 'Open settings', category: 'navigation', run: () => openSettings() },
+      { id: 'core.rail.toggle', title: 'Toggle rail', category: 'navigation', run: () => toggleRail() },
       {
         id: 'core.surface.toggle-maximize', title: 'Toggle focused surface maximize', category: 'pane',
         when: inTaskView,
@@ -134,6 +137,7 @@ export default function App() {
     ])
     const bindings = registerKeybindings([
       { id: 'core.settings.open', command: 'core.settings.open', description: 'Open settings', category: 'Global', defaultChord: 'meta+,', when: 'global' },
+      { id: 'core.rail.toggle', command: 'core.rail.toggle', description: 'Toggle rail', category: 'Global', defaultChord: 'meta+b', when: 'global' },
       { id: 'core.surface.toggle-maximize', command: 'core.surface.toggle-maximize', description: 'Toggle focused pane or terminal maximize', category: 'Panes', defaultChord: 'meta+shift+enter', when: 'task' },
       // The command is the palette's own Last workspace row, registered with the rest of the Go to
       // group (client-core/host/palette/navigationCommands.ts); this is the chord that reaches it.
@@ -271,6 +275,8 @@ export default function App() {
   const projects = createQuery(() => projectsOptions(nodeReady()))
   const tasks = createQuery(() => tasksOptions(nodeReady()))
   const workspaces = createQuery(() => workspacesOptions(nodeReady()))
+  const railCollapsed = () => prefs.data?.[PrefKeys.leftCollapsed] === 'true'
+  const toggleRail = () => void savePref(queryClient, PrefKeys.leftCollapsed, String(!railCollapsed()))
 
   const startup = createAppStartupRestore({
     queryClient,
@@ -357,11 +363,6 @@ export default function App() {
   // Every node's workspaces, for the topbar picker. Grouped rather than merged: a workspace belongs to
   // exactly one node, and two nodes both having a "Default" is the normal case.
   const fleetWorkspaces = createFleetWorkspaces()
-  const activeFleetWorkspace = () => {
-    const workspace = activeWorkspace()
-    if (!workspace) return null
-    return fleetWorkspaces().entries.find((entry) => entry.nodeId === activeNodeId() && entry.workspace.id === workspace.id) ?? null
-  }
   // Projects scoped to the active workspace for the topbar selector. Falls back to all projects before
   // the workspace mapping has loaded so the picker is never empty.
   const scopedProjects = () => {
@@ -455,6 +456,55 @@ export default function App() {
   const showProjectPicker = () => scopedProjects().length > 0
     && (inTaskView() || sourceIsProjectScoped(selectedSource()))
 
+  const rightSlotRef = mintSlotRef()
+  const topbarProps = (): TopbarProps => {
+    const active = activeNodeId()
+    const project = scopedProjects().find((candidate) => candidate.id === contextProjectId())
+    const breadcrumb: { label: string; route?: string }[] = []
+    if (params.projectId) {
+      breadcrumb.push({ label: projects.data?.find((candidate) => candidate.id === params.projectId)?.name ?? params.projectId,
+        route: projectPath(params.projectId) })
+      if (params.number) breadcrumb.push({ label: `#${params.number}` })
+      if (isNew()) breadcrumb.push({ label: 'new' })
+    }
+    return {
+      workspace: activeWorkspace() ? { id: activeWorkspace()!.id, label: activeWorkspace()!.name } : null,
+      workspaces: fleetWorkspaces().entries.map((entry) => ({
+        id: entry.workspace.id, label: entry.workspace.name, nodeId: entry.nodeId,
+        nodeLabel: entry.node.label, projectCount: entry.workspace.projects.length,
+      })),
+      project: project ? { id: project.id, label: project.name } : null,
+      projects: scopedProjects().map((entry) => ({ id: entry.id, label: entry.name })),
+      projectPickerVisible: showProjectPicker(),
+      projectPickerDisabled: !selectedSource() && !!activeTask(),
+      breadcrumb,
+      node: active ? { id: active, label: nodes().find((entry) => entry.nodeId === active)?.label ?? active, state: nodeState(active) } : null,
+      nodes: nodes().map((entry) => ({ id: entry.nodeId, label: entry.label, state: nodeState(entry.nodeId) })),
+      account: null,
+      railCollapsed: railCollapsed(),
+      slots: { right: rightSlotRef },
+      pickWorkspace: (id, nodeId) => {
+        const entry = fleetWorkspaces().entries.find((candidate) => candidate.workspace.id === id && candidate.nodeId === nodeId)
+        if (entry) selectFleetWorkspace(entry, navigate)
+      },
+      pickProject: (id) => {
+        if (!scopedProjects().some((candidate) => candidate.id === id)) return
+        if (!selectedSource()) {
+          const source = defaultSourceId()
+          if (source) setSelectedSource(source)
+        }
+        navigate(projectPath(id))
+      },
+      pickNode: (id) => { if (nodes().some((candidate) => candidate.nodeId === id)) setActiveNode(id) },
+      openSettings: () => openSettings(),
+      collapseRail: toggleRail,
+      navigate: (route) => { if (breadcrumb.some((item) => item.route === route)) navigate(route) },
+      clearCache,
+    }
+  }
+  const coreTopbar = registerCoreExclusiveSlot('topbar', Topbar)
+  onCleanup(() => coreTopbar.dispose())
+
   // The source on screen, when it has something to draw. A source that contributed neither a component
   // nor regions is a rail row and nothing else, and the Switch's empty state below is the honest
   // answer for it — which is what asking for `?.component` used to get us before `regions` existed.
@@ -480,76 +530,9 @@ export default function App() {
   return (
     <Show when={!nodeGateHolds() && !isRestoring()} fallback={<NodeGate />}>
     <div class="shell">
-    {/* The bar spans the window rather than sitting beside the rail, so its bottom border is the one
-        line the rail, the panes and the pane switcher all start under. */}
-    <header class="topbar">
-        <div class="topbar-side">
-          <Show when={fleetWorkspaces().entries.length}>
-            <WorkspacePicker
-              workspaces={fleetWorkspaces().entries}
-              active={activeFleetWorkspace()}
-              grouped={fleetWorkspaces().grouped}
-              /* Switches node context before navigating, so the route resolves against the node that
-                 owns the workspace (client-core's workspaces/fleetWorkspaces.ts explains the order).
-                 The last view is then restored per-workspace by the activeWorkspace effect above. */
-              onSelect={(entry) => selectFleetWorkspace(entry, navigate)}
-            />
-          </Show>
-          <Show when={showProjectPicker()}>
-            <Picker<Project>
-              label={scopedProjects().find((project) => project.id === contextProjectId())?.name ?? 'Select a project'}
-              ariaLabel="Project"
-              placeholder="Filter projects…"
-              emptyText="No projects."
-              results={(query) => {
-                const q = query.trim().toLowerCase()
-                return q ? scopedProjects().filter((project) => project.name.toLowerCase().includes(q)) : scopedProjects()
-              }}
-              rowLabel={(project) => project.name}
-              isActive={(project) => project.id === contextProjectId()}
-              disabled={!selectedSource() && !!activeTask()}
-              onSelect={(project) => {
-                if (!selectedSource()) {
-                  const source = defaultSourceId()
-                  if (source) setSelectedSource(source)
-                }
-                navigate(projectPath(project.id))
-              }}
-            />
-          </Show>
-        </div>
-        <div class="breadcrumb">
-          <Show when={params.projectId} fallback={<span class="brand">acorn</span>}>
-            <Button variant="bare" onPress={() => navigate(projectPath(params.projectId ?? ''))}>
-              {projects.data?.find((project) => project.id === params.projectId)?.name ?? params.projectId}
-            </Button>
-            <Show when={params.number}>
-              <span class="crumb-sep">/</span>
-              <span class="crumb crumb-num">#{params.number}</span>
-            </Show>
-            <Show when={isNew()}>
-              <span class="crumb-sep">/</span>
-              <span class="crumb crumb-num">new</span>
-            </Show>
-          </Show>
-        </div>
-        <div class="topbar-side topbar-end">
-          {/* Keep the node switcher out of production first-run until a second node exists. */}
-          <Show when={nodes().length > 1 || import.meta.env.DEV}>
-            <Select
-              width="auto"
-              label="Active node"
-              value={activeNodeId() ?? ''}
-              onChange={(value) => setActiveNode(value || null)} options={[...nodes().map((node) => ({ value: node.nodeId, label: node.label }))]} />
-          </Show>
-          {/* The compact chip reports the active node's connection state; surfaces render their own
-              freshness where they have useful scope. */}
-          <Show when={activeNodeId()}>
-            {(nodeId) => <NodeChip nodeId={nodeId()} compact={nodes().length <= 1} query={{}} />}
-          </Show>
-          <SlotHost slot="topbar.right" context={slotContext()} />
-          <OverflowMenu onSettings={() => openSettings()} onClearCache={clearCache} />
-        </div>
+    <header class="topbar-host">
+      <ExclusiveSlotHost slot="topbar" value={topbarProps()}
+        nestedSlots={[{ ref: rightSlotRef, render: () => <SlotHost slot="topbar.right" context={slotContext()} /> }]} />
     </header>
     <div class="shell-body">
     <TabRail />

@@ -7,6 +7,11 @@ It shares this file's reasoning about auth and custody and none of its browser c
 The three cheap preparation items at the bottom ARE worth doing early — they are annotated in
 the plugin docs (`docs/plugins.md`, `docs/security.md`).
 
+Browser-side plugin custody must implement the complete `PluginCustody` group, including device
+install and remove. It can use the fetch-injected source resolver, IndexedDB for bundles, and
+WebCrypto for hashing; a browser host offers no local-folder installation. See
+[host requirements](./client-plugins/07-hosts.md).
+
 ## The shape of the demand
 
 The signal from surveying herdr's plugin ecosystem: the most-wanted remote surface is not the

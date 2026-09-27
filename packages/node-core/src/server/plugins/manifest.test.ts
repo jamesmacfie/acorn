@@ -485,6 +485,15 @@ describe('migration entrypoint confinement', () => {
 })
 
 describe('chrome descriptors', () => {
+  it('accepts a client-only remote-tree source and requires both regions', () => {
+    const source = { id: 'board', label: 'Board', order: 60, tree: { list: 'boardList', detail: 'boardDetail' } }
+    expect(webviewManifest({ sources: [source] }).success).toBe(true)
+    expect(messages(manifest({ sources: [source] }))).toContain('a remote-tree source requires a client bundle')
+    expect(messages(webviewManifest({ sources: [{ ...source, items: '/v1/p/board/items' }] })))
+      .toContain('a source needs either an items route or a remote tree')
+    expect(messages(webviewManifest({ sources: [{ ...source, tree: { list: 'boardList' } }] }))).not.toEqual([])
+  })
+
   it('accepts a chrome-only manifest with no frames at all', () => {
     const result = manifest({
       sources: [{ id: 'board', label: 'Board', glyph: 'kanban', order: 60, items: '/v1/p/board/rail-items' }],
@@ -1299,6 +1308,23 @@ describe('themes', () => {
   })
 })
 
+describe('styles', () => {
+  const style = (tokens: Record<string, string>) => ({ id: 'dense', label: 'Dense', tokens })
+
+  it('accepts a partial pack and rejects unsafe or out-of-family values', () => {
+    expect(manifest({ styles: [style({ '--row-h': '28px', '--font-mono': '"JetBrains Mono", monospace' })] }).success).toBe(true)
+    for (const [token, value] of [
+      ['--row-h', 'url(https://example.com/x)'],
+      ['--space-1', 'var(--shadow-1)'],
+      ['--shadow-2', '0 4px 8px #000'],
+      ['--gap-row', '5px'],
+      ['--unknown', '1px'],
+    ]) {
+      expect(manifest({ styles: [style({ [token]: value })] }).success, `${token}: ${value}`).toBe(false)
+    }
+  })
+})
+
 describe('slots', () => {
   const slot = (over: Record<string, unknown> = {}) =>
     ({ id: 'board-badge', slot: 'footer', data: '/v1/p/board/badge', ...over })
@@ -1458,8 +1484,28 @@ describe('extensions', () => {
     ({ id: 'board-issues', point: 'tracker:card-links', label: 'Issues', items: '/v1/p/board/issues', ...over })
 
   it('accepts a contribution naming another plugin’s point, and defaults its order', () => {
-    const parsed = manifest({ extensions: [extension()] })
+    const parsed = nodeManifest({ extensions: [extension()] })
     expect(parsed.success && parsed.data.contributions.extensions[0]!.order).toBe(500)
+  })
+
+  it('requires a node bundle for items and route carriers', () => {
+    expect(messages(manifest({ extensions: [extension()] })))
+      .toContain('an items extension calls a node route; declare `node` in the manifest')
+    expect(messages(manifest({ extensions: [extension({ items: undefined, route: '/v1/p/board/check', mode: 'observe' })] })))
+      .toContain('a route extension calls a node route; declare `node` in the manifest')
+
+    expect(nodeManifest({ extensions: [extension()] }).success).toBe(true)
+    expect(nodeManifest({ extensions: [extension({ items: undefined, route: '/v1/p/board/check', mode: 'observe' })] }).success).toBe(true)
+  })
+
+  it('keeps remote and frame carriers independent of the node bundle', () => {
+    expect(webviewManifest({
+      extensions: [extension({ items: undefined, remote: 'card' })],
+    }).success).toBe(true)
+    expect(webviewManifest({
+      frames: [{ target: 'inline', id: 'preview', label: 'Preview' }],
+      extensions: [extension({ items: undefined, frame: 'preview' })],
+    }).success).toBe(true)
   })
 
   it('refuses a point reference that is not one', () => {
@@ -1485,7 +1531,7 @@ describe('extensions', () => {
     expect(manifest({ extensions: [extension({ onSelect: { verb: 'createTask' } })] }).success).toBe(false)
     expect(messages(manifest({ extensions: [extension({ onSelect: { verb: 'openPane', pane: 'ghost' } })] })))
       .toContain("openPane names 'ghost', which this manifest does not declare as a task-scoped pane")
-    expect(manifest({
+    expect(nodeManifest({
       frames: [PANE],
       extensions: [extension({ onSelect: { verb: 'openPane', pane: 'board' } })],
     }).success).toBe(true)
@@ -1494,9 +1540,9 @@ describe('extensions', () => {
   it('caps the list and counts its ids in the one-id-per-contribution rule', () => {
     // Sixteen since the one key grew from rows to five kinds: a plugin that opens a pane, a slot in it,
     // a hook before it acts and an annotation on its rows is describing one integration, not four.
-    expect(manifest({ extensions: Array.from({ length: 16 }, (_, i) => extension({ id: `e-${i}` })) }).success).toBe(true)
-    expect(manifest({ extensions: Array.from({ length: 17 }, (_, i) => extension({ id: `e-${i}` })) }).success).toBe(false)
-    expect(messages(manifest({ extensions: [extension(), extension()] }))).toContain("duplicate contribution id 'board-issues'")
+    expect(nodeManifest({ extensions: Array.from({ length: 16 }, (_, i) => extension({ id: `e-${i}` })) }).success).toBe(true)
+    expect(nodeManifest({ extensions: Array.from({ length: 17 }, (_, i) => extension({ id: `e-${i}` })) }).success).toBe(false)
+    expect(messages(nodeManifest({ extensions: [extension(), extension()] }))).toContain("duplicate contribution id 'board-issues'")
   })
 })
 
@@ -1544,7 +1590,7 @@ describe('the five kinds', () => {
 
   it('makes a contribution name exactly one way in', () => {
     const extension = (over: Record<string, unknown>) =>
-      manifest({ frames: [PANE], extensions: [{ id: 'e', point: 'other:p', label: 'E', ...over }] })
+      nodeManifest({ frames: [PANE], extensions: [{ id: 'e', point: 'other:p', label: 'E', ...over }] })
     expect(extension({ items: '/v1/p/board/rows' }).success).toBe(true)
     expect(messages(extension({}))).toContain('an extension names exactly one of items, remote, frame or route')
     expect(messages(extension({ items: '/v1/p/board/rows', route: '/v1/p/board/hook', mode: 'veto' })))
@@ -1553,7 +1599,7 @@ describe('the five kinds', () => {
 
   it('makes a hook handler say what it asks to do, and refuses a mode on anything else', () => {
     const extension = (over: Record<string, unknown>) =>
-      manifest({ frames: [PANE], extensions: [{ id: 'e', point: 'other:p', label: 'E', ...over }] })
+      nodeManifest({ frames: [PANE], extensions: [{ id: 'e', point: 'other:p', label: 'E', ...over }] })
     expect(extension({ route: '/v1/p/board/scan', mode: 'veto' }).success).toBe(true)
     expect(messages(extension({ route: '/v1/p/board/scan' })))
       .toContain('a hook handler says what it asks to do: observe, transform or veto')
@@ -1604,9 +1650,17 @@ describe('the exclusive slot', () => {
   })
 
   it('refuses a core surface this acorn has not designated', () => {
-    expect(withBundle({ frames: [coreSlot({ coreSlot: 'topbar' })] }).success).toBe(false)
+    expect(withBundle({ frames: [coreSlot({ coreSlot: 'sidebar.future' })] }).success).toBe(false)
     expect(messages(withBundle({ frames: [coreSlot({ coreSlot: undefined })] })))
       .toContain('a coreSlot surface must name which core surface it replaces')
+  })
+
+  it('requires a remote tree for a pane switcher replacement', () => {
+    expect(messages(withBundle({ frames: [coreSlot({ coreSlot: 'pane.switcher' })] })))
+      .toContain('pane.switcher needs a single remote-tree body')
+    expect(messages(withBundle({ frames: [coreSlot({
+      coreSlot: 'pane.switcher', layout: 'single', regions: { body: { kind: 'remote', entry: 'switcher' } },
+    })] }))).toEqual([])
   })
 
   it('needs a client bundle, because the host mounts one here', () => {

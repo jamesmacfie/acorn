@@ -8,6 +8,7 @@ import { FleetStore, toNodeRecord } from './broker/fleetStore'
 import { NodeBroker } from './broker/nodeBroker'
 import { PluginCache } from './plugins/pluginCache'
 import { PluginTrustStore } from './plugins/pluginTrustStore'
+import { DeviceConfigStore } from './config/deviceConfig'
 import { PreviewTunnels, type TunnelEvents } from './supervision/previewTunnel'
 import { ServiceHost } from './supervision/serviceHost'
 import { startHelperTelemetry } from './telemetry'
@@ -64,6 +65,7 @@ export type Helper = {
   tunnels: PreviewTunnels
   pluginCache: PluginCache
   pluginTrust: PluginTrustStore
+  config: DeviceConfigStore
   // Start the node and adopt it into the fleet. Resolves when its migrations, bridge installation,
   // and loopback listener are done. Durable reconciliation continues in the background over there.
   start(): Promise<ServiceStartResult>
@@ -147,6 +149,7 @@ export function createHelper(options: HelperOptions): Helper {
   pluginCache.sweep()
   helperMark('plugin-cache sweep')
   const pluginTrust = new PluginTrustStore(userDataDir)
+  const config = new DeviceConfigStore(userDataDir)
 
   // What this process reports, and where the Rust shell's last words go (./telemetry.ts). Built here
   // because the broker is what a batch leaves over and the local node is what it leaves for; started
@@ -271,6 +274,7 @@ export function createHelper(options: HelperOptions): Helper {
     tunnels,
     pluginCache,
     pluginTrust,
+    config,
     start,
     // The desktop's boot path (docs/shell.md § The shell process). The window is already open, so the
     // only place a failure can be reported is the recovery dialog, and the only thing that can put it

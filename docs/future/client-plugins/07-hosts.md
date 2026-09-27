@@ -1,8 +1,8 @@
 # Hosts: what the desktop, the PWA, and the terminal owe the custody contract
 
-Part of [docs/future/client-plugins/](./README.md). The owner's instruction is that desktop, mobile,
-and terminal stay in view. This file is the checklist every phase's "doors left open" section is
-measured against, and it says which host owns what.
+Historical host checklist from [client plugins](./README.md). Desktop and terminal custody shipped;
+the PWA remains future work in [remote.md](../remote.md). Current platform contracts live in
+[frontend.md](../../frontend.md) and [plugins.md](../../plugins.md).
 
 ## The contract is `PluginCustody`
 

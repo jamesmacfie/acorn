@@ -20,6 +20,7 @@ import { watchConnectionChanges } from '@acorn/client-core/features/integrations
 import { watchProjectChanges } from '@acorn/client-core/features/projects/watchProjectChanges.ts'
 import { watchWorkspaceChanges } from '@acorn/client-core/features/workspaces/watchWorkspaceChanges.ts'
 import { watchNodeEvents } from '@acorn/client-core/infra/node/watchNodeEvents.ts'
+import { startDeviceConfigSync } from '@acorn/client-core/infra/persistence/deviceConfigSync.ts'
 import { emitError, flushTelemetry, startClientTelemetry } from '@acorn/client-core/infra/telemetry/emitter.ts'
 import { postTelemetryBatch } from '@acorn/client-core/infra/telemetry/post.ts'
 import { bootMark, emitBootSpans } from './boot'
@@ -127,6 +128,7 @@ createRoot(() => {
 // appeared for the rest of the session. The watcher also keeps them reconciled afterwards: a node that
 // reloads a plugin in place broadcasts `plugins:changed` (docs/plugins.md § The dev loop).
 watchPluginChanges()
+void startDeviceConfigSync(() => clientFor(activeCacheId()).client)
 
 // The same shape for the task list: every task write on the node broadcasts `tasks:changed`, and this
 // window invalidates its cached list whether or not it was the one that wrote

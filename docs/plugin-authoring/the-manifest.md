@@ -121,7 +121,7 @@ host cannot draw.
 | `extensionPoints` | 4 | A place inside one of **your** surfaces that other plugins may fill: `{ id, label, kind, … }`. `kind` picks which of the five a point takes and which other fields it reads: `rows` and `annotation` take a `location` or a `key`, `remote` and `rectangle` take a `mode`, and `hook` takes a `payload` and an `allows` list. The host mints the id as `<yourId>:<pointId>`. You write no code for a `rows` or `annotation` point — the host draws it. |
 | `schedules` | 4 | Work the node runs on a timer: `{ id, name, run, cadence, timeout? }`. `run` is a POST on your own namespace, called with `{ scheduleId }`, and its response is ignored beyond ok or error. `timeout` is seconds, defaulting to 60. The host mints the key from your plugin id, which is what opts the schedule into the 300-second plugin cadence floor. See `docs/schedules.md`. |
 | `taskChecks` | 4 | What you have to say when the owner archives a task, and the cleanup you offer to do: `{ id, check, apply?, timeout? }`. `check` is a GET answering `{ concern }`; `apply` is a POST the archive runs if the owner leaves your checkbox ticked. See below. |
-| `extensions` | 8 | What **you** bring to another plugin's point: `{ id, point, label, order?, … }`. `point` is `<ownerPluginId>:<pointId>`, and naming the owner out loud is the disclosure. Exactly one carrier says what you bring: `items` is a GET on your own namespace, for rows and annotations; `remote` is a key of the object your bundle passed to `mountTree`, for a tree; `frame` is an `inline` surface of yours, for a rectangle; `route` is a POST on your own namespace, for a hook handler. `matches` narrows a tree or a rectangle to the key values it draws, and `onSelect` takes the narrow verb set. |
+| `extensions` | 8 | What **you** bring to another plugin's point: `{ id, point, label, order?, … }`. `point` is `<ownerPluginId>:<pointId>`, and naming the owner out loud is the disclosure. Exactly one carrier says what you bring: `items` is a route on your own namespace, read with GET for rows and POST for annotations; `remote` is a key of the object your bundle passed to `mountTree`, for a tree; `frame` is an `inline` surface of yours, for a rectangle; `route` is a POST on your own namespace, for a hook handler. `items` and `route` require a `node` entry because only the node bundle can serve them. `matches` narrows a tree or a rectangle to the key values it draws, and `onSelect` takes the narrow verb set. |
 | `auditActions` | 8 | A verb you write onto the node's audit trail: `{ id, label }`. The host qualifies it as `<yourId>:<id>` and refuses a `ctx.audit.record` naming one you did not declare, so the trail stays enumerable. Record what a person reviewing this machine would want to see, not every call you make. |
 | `harnesses` | 4 | A managed agent acorn starts, drives and draws a transcript for: `{ id, label, glyph?, spawn, envPassthrough?, quirks?, probes?, terminal? }`. The only contribution that names a program acorn will run, and the only node-side one that needs no bundle at all. See [§ Harnesses](the-manifest.md#harnesses). |
 | `agentTools` | 16 | A task-scoped agent tool projected through the ordinary registry: `{ id, description, inputSchema, risk, handler, scope?, requiresSession?, timeoutMs?, maxOutputBytes? }`. `handler` must be in your own `/v1/p/<id>/` namespace. The host qualifies the runtime name as `<pluginId>_<id>`, validates the bounded JSON Schema at install and validates every call again. See [Agent tools](../agent-tools.md#loaded-manifest-carriers). |
@@ -159,11 +159,92 @@ row's id. A contribution to a point that is not there — owner not installed, d
 the point in an update — delivers nothing, silently; that is the designed outcome, not a failure to
 chase. **Call `plugin_authoring` for the current location list.**
 
-A `coreSlot` frame is the related pattern for acorn's *own* surfaces:
-`{ target: "coreSlot", id, label, coreSlot }` plus a client bundle, where `coreSlot` names one of the
-designated surfaces (`rail.taskList` today). Declaring one **seizes nothing** — the user picks the
-provider in Settings → Plugins, and acorn draws its own again the moment your plugin is disabled or your
-surface throws. It is not a pane, so no verb can name it and it never appears in the pane switcher.
+#### Add task annotations
+
+Use the core-owned `core:task` annotation point to publish loaded-plugin status on task rows. This
+complete manifest has a node bundle and one route-backed extension:
+
+```json
+{
+  "id": "deploy-status",
+  "name": "Deploy status",
+  "version": "1.0.0",
+  "baseline": "acorn-1",
+  "apiVersion": "1",
+  "node": "./node.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "task-deployments",
+        "point": "core:task",
+        "label": "Deployments",
+        "items": "/v1/p/deploy-status/task-annotations"
+      }
+    ]
+  }
+}
+```
+
+The node route receives the visible task ids in one POST. Return only marks for keys that you know:
+
+```js
+const deployments = new Map([
+  ['task-123', { failed: false }],
+  ['task-456', { failed: true }],
+])
+
+export default {
+  name: 'deploy-status',
+  init(ctx) {
+    ctx.routes.fetch(async (request) => {
+      const url = new URL(request.url)
+      if (request.method !== 'POST' || url.pathname !== '/task-annotations') {
+        return new Response('Not found', { status: 404 })
+      }
+
+      const body = await request.json()
+      const keys = Array.isArray(body.keys) ? body.keys : []
+      const items = keys.flatMap((key) => {
+        if (!key || typeof key.task !== 'string') return []
+        const deployment = deployments.get(key.task)
+        if (!deployment) return []
+        return [{
+          key: { task: key.task },
+          severity: deployment.failed ? 'danger' : 'info',
+          text: deployment.failed ? 'Deployment failed' : 'Deployment is live',
+          icon: deployment.failed ? 'circle-alert' : 'rocket',
+        }]
+      })
+      return Response.json({ items })
+    })
+  },
+}
+```
+
+`core:task` keys contain one scalar string field, `task`. A mark contains that key, an `info`, `warn`,
+or `danger` severity, text that the host caps at 200 characters, and an optional Lucide or `brand:`
+icon name that the host resolves. It contains no JSX, CSS, geometry, color, or action. The host stamps
+your plugin id as provenance, accepts at most 256 valid marks from this contributor and request, and
+draws them through its own desktop and terminal rail projections. The generic annotation transport
+inspects at most 4,096 raw rows before the point-specific limit. Malformed rows are dropped
+independently.
+
+For request identity, freshness, cancellation, and failure isolation, see
+[Task annotations](../plugins/cooperative-extension-points.md#task-annotations).
+
+The node requirement applies only to the route-backed `items` and `route` carriers. `remote` and
+`frame` keep their client-bundle checks, and a descriptor-only harness can still omit `node` unless it
+declares a probe route.
+
+A `coreSlot` surface is the related pattern for acorn's *own* surfaces:
+`{ target: "coreSlot", id, label, coreSlot }` plus a client bundle. The designated surfaces are
+`rail.taskList`, `pane.switcher`, `rail`, and `topbar`. The last three require a `single` layout with
+one remote-tree `body`; the host gives that tree data and named actions. A rail or topbar tree can
+place its one nested host slot with the `Slot` node and the `slotRef` in its props. Declare
+`placesSlots: ["rail.taskList"]` or `["topbar.right"]` when you place it; Settings warns when the
+declaration is absent. Declaring a replacement **seizes nothing** — the user picks the provider in
+Settings → Plugins, and acorn draws its own again when your plugin is disabled or its surface fails.
+It is not a pane, so no pane verb can name it.
 
 A `taskChecks` entry is the one contribution that runs when a person is about to lose something.
 Archiving a task removes its worktree, so the host asks every plugin first and draws the answers in one
@@ -205,8 +286,9 @@ whose `onSelect` navigates to it (its only mount site); an `overlay` needs an ac
 `surfaceAction` may name only a pane that draws a region of its own, as an iframe or as a worker
 tree; a webview needs a client bundle; an
 extension point must hang off a `pane` this manifest declares and only one may sit at each location on
-it; an `extensions` entry's `point` must be a `<pluginId>:<pointId>` reference and its `items` route
-must be your own; a `taskChecks` entry needs a `node` half, since only that serves the namespace its two
+it; an `extensions` entry's `point` must be a `<pluginId>:<pointId>` reference, its `items` or `route`
+path must be your own, and either route-backed carrier requires a `node` half; a `taskChecks` entry
+needs a `node` half, since only that serves the namespace its two
 routes live in; a `harnesses` entry's `spawn` must name exactly one of `command` and `entry`, may only
 carry `requires` beside an `entry`, and needs a `node` half if it declares any `probes`; a `coreSlot`
 surface needs both a designated slot name and a client bundle; and no id may repeat across

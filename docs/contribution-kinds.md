@@ -33,6 +33,12 @@ Drawn by the shell. A loaded plugin's UI is an iframe (`frames`), a tree of the 
 emitted from a worker (`remote`), or a descriptor the host renders. It never hands the shell a
 component: a tree names one, and the host mounts its own.
 
+A device-held client-only package may declare client contributions that need no Node handler. A rail
+source uses `tree: { list, detail }`, with both names pointing at entries in its remote-tree worker;
+the route-backed `items` form needs a Node half. Route-backed slots, attention, node stats, agent
+contexts, reference resolvers, commands, document regions, and extension carriers are also refused.
+See [Device-held plugins](./plugins/activation.md#device-held-plugins).
+
 Every loaded client kind is registered from the current Node's active declaration and selected exact
 bundle. Its availability gate follows that Node's runtime and trust state, so a failed, stale, absent,
 or unaccepted runtime cannot leave a visible settings page, importer, footer row, command, or tree
@@ -60,13 +66,14 @@ model; the table below owns the kinds themselves.
 | Agent contexts | Both | `ctx.agentContexts` / `contributions.agentContexts` | The context tray on an agent launch |
 | Ref resolvers | Both | `ctx.contribute(refResolverRegistry)` / `contributions.refResolvers` | External-item label resolution |
 | Themes | Both | `ctx.contribute(themeRegistry)` / `contributions.themes` | The appearance picker |
+| Style packs | Loaded | `contributions.styles` | Settings → Appearance; the host validates token data and generates the CSS block. No plugin selector enters the shell. **Direction: shipped as validated data.** |
 | Context menus | Both | `ctx.contribute(contextMenuRegistry)` / `contributions.contextMenus` | Host-drawn context menus, at one of two locations: `task.row` is a row in the tab rail and matches on `origin`, `projectId` and `pinned`; `item.row` is a row in an integration's list — Rollbar, Linear, GitHub — and matches on `providerId` and `projectId` (docs/plugins.md § Context menus) |
 | Extension points | Both | `ctx.extensionPoints` / `contributions.extensionPoints` | A surface a plugin opens to others, in one of five kinds: rows, annotations, remote trees, rectangles, hooks (docs/plugins.md § Cooperative extension points). The host mints `<pluginId>:<id>` from the plugin doing the registering, either way in. A `remote` point may also declare `actions`, the closed list of things a contributor's tree may ask it to do (docs/plugins.md § Asking the owner); the owner binds a handler of the same name per `Slot`, and a name missing from either list is refused. |
-| Extensions | Both | `ctx.extensions` / `contributions.extensions` | A contribution into someone else's point. A compiled plugin's carrier is a `component` the host mounts where it would mount a worker's tree; a loaded plugin's is `items`, `remote`, `frame` or `route`. A `remote` one may name `overlay`, one of its own manifest's overlay frames that this tree may ask the host to present (docs/plugins.md § Companion overlays). That is a qualifier on the carrier, not a sixth carrier: a descriptor still names exactly one. |
+| Extensions | Both | `ctx.extensions` / `contributions.extensions` | A contribution into someone else's point. A compiled plugin's carrier is a `component` the host mounts where it would mount a worker's tree; a loaded plugin's is `items`, `remote`, `frame` or `route`. An `items` extension aimed at `core:task` is how a loaded plugin publishes task status for the rail. A `remote` one may name `overlay`, one of its own manifest's overlay frames that this tree may ask the host to present (docs/plugins.md § Companion overlays). That is a qualifier on the carrier, not a sixth carrier: a descriptor still names exactly one. |
 | Brand marks | Both | `ctx.brandMarks` / manifest `icon` and `icons` | The `brand:` glyph namespace |
 | Client schedules | Compiled | `ctx.schedules` | The device-local scheduler. **Direction: stays compiled.** A loaded plugin's periodic work belongs on the node, which runs whether or not a client is open (docs/schedules.md § Why the node, and only the node). The client registry exists for work that has no meaning without a window. |
 | Integration flows | Compiled | `ctx.integrationFlows` | The connect-a-provider wizard. **Direction: gains a manifest twin.** Named as a blocker on moving `github` out of tree ([compiled-tier.md](./future/compiled-tier.md)); the flow is already a sequence of steps rather than a component, so the descriptor is a shape question, not a seam question. |
-| Rail markers | Compiled | `ctx.railMarkers` | A status dot on a rail control. **Direction: gains a manifest twin,** in rail-tab slice 3 ([rail-tab.md](./future/rail-tab.md)). Data only, no click verb, so the descriptor is a route plus a colour. Not landed as of 2026-08-28. |
+| Rail markers | Compiled | `ctx.railMarkers` | A status marker on a task, source, or pane control. **Direction: stays compiled.** Loaded task status uses the generic `core:task` annotation point through `contributions.extensions`; source and pane status need an owner-declared annotation point before a loaded plugin has a real consumer. There is no rail-marker manifest twin. |
 | Persisted state slices | Compiled | `ctx.persistedStateSlices` | Device-local persisted state. **Direction: stays compiled.** A loaded plugin has `plugin:<id>:*` prefs through `ctx.core.prefs` and its frame's own `state` verb, which is the same capability with the namespace bound by the host. A second mechanism would be a second namespace to police. |
 | Client capabilities | Compiled | `ctx.capabilities` | Plugin-to-plugin function calls in the renderer. **Direction: stays compiled, permanently.** A live function cannot cross the iframe boundary. The loaded tier's equivalent is a route, and that is the right shape for it. |
 

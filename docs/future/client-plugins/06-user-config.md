@@ -1,7 +1,8 @@
-# User config: a device config file, as data, later
+# User config: a device config file, as data
 
-Part of [docs/future/client-plugins/](./README.md). Phase 4 builds it, and phase 4 waits for a
-terminal host to exist.
+Historical design record from [client plugins](./README.md). Phase 4 shipped; current behavior lives
+in [state ownership](../../state-ownership.md), [desktop shell](../../shell.md), and
+[terminal client](../../tui.md).
 
 ## Why a file at all
 

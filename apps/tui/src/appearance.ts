@@ -12,13 +12,8 @@ import type { Color } from './colour'
 // wrong. `paletteFor` is what a theme is for: a caller that knows the theme's colours and knows the
 // terminal will take them can hand both over.
 //
-// No theme is read, and phase 4 found out why it cannot be yet: a theme in acorn is an id, and its
-// forty tokens live in a `:root[data-theme=…]` block in a stylesheet. There is no JS-readable table of
-// them — the only reader is `infra/styles/readStyleSheets.ts`, which walks the repo from
-// `pnpm-workspace.yaml` and is test-only by construction. So the terminal cannot resolve a theme's
-// colours without the appearance layer publishing them as data, and that is the appearance layer's
-// change to make, not this file's. `paletteFor` is written and tested against the tokens, so the day
-// they are published this is a call site rather than a design.
+// The appearance layer exposes the six relevant built-in colour tokens as data from its own CSS
+// source. A configured theme uses those tokens when the terminal supports truecolour.
 
 /** The six colours a role can ask for. `default` is the terminal's own foreground. */
 export type Palette = Record<Slot, Color>
@@ -91,7 +86,7 @@ let palette: Palette = TERMINAL_PALETTE
  *  default slot instead. */
 export const slotColor = (slot: Slot | undefined): Color => palette[slot ?? 'default']
 
-/** Swap the palette. Phase 4's job, when the TUI can read the chosen theme off the node. */
+/** Swap the palette when the device configuration changes. */
 export const setPalette = (next: Palette): void => { palette = next }
 
 // Density is the one style axis a terminal keeps (docs/ui-design.md § Roles, and what each host makes

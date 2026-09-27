@@ -125,6 +125,8 @@ export function Row(props: {
   variant?: 'default' | 'stacked' | 'tree'
   leading?: JSX.Element
   trailing?: JSX.Element
+  /** Keep a host-owned disclosure visible, allowing the title to give up its normal cell floor. */
+  keepTrailing?: boolean
   meta?: JSX.Element
   collapsed?: JSX.Element
   title?: string
@@ -167,7 +169,7 @@ export function Row(props: {
           (docs/tui.md). */}
       <box
         flexShrink={SHRINK.title}
-        minWidth={TITLE_CELLS}
+        minWidth={props.keepTrailing ? 1 : TITLE_CELLS}
         overflow="hidden"
         flexDirection={props.variant === 'stacked' ? 'column' : 'row'}
         gap={props.variant === 'stacked' ? 0 : 1}
@@ -181,7 +183,7 @@ export function Row(props: {
       </box>
       <box flexGrow={1} />
       <Part shrink={SHRINK.meta}>{props.meta}</Part>
-      <Part shrink={SHRINK.trailing}>{props.trailing}</Part>
+      <Part shrink={props.keepTrailing ? 0 : SHRINK.trailing}>{props.trailing}</Part>
     </box>
   )
 }
@@ -199,6 +201,7 @@ export function TreeRow(props: {
   onDoublePress?: () => void
   leading?: JSX.Element
   trailing?: JSX.Element
+  keepTrailing?: boolean
   meta?: JSX.Element
   reveal?: boolean
   collapsed?: JSX.Element
@@ -214,6 +217,7 @@ export function TreeRow(props: {
       variant="tree"
       meta={props.meta}
       trailing={props.trailing}
+      keepTrailing={props.keepTrailing}
       onPress={props.onPress}
       leading={<box flexDirection="row" gap={1}><Line>{props.expandable ? (props.expanded ? '▾' : '▸') : ' '}</Line>{slot(props.leading)}</box>}
     >

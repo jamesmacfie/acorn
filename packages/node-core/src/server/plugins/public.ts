@@ -3,7 +3,7 @@ export {
   bundledPluginStatePath, markPluginUserManaged, readBundledPluginState, userManagedPluginIds,
 } from './bundledState.ts'
 export { disabledPluginsStore } from './disabled.ts'
-export { installPlugin, pluginDir, pluginInstallRoot, uninstallPlugin, updatePlugin } from './installer.ts'
+export { installPlugin, pluginDir, pluginInstallRoot, uninstallPlugin, updatePlugin, withPluginPackage } from './installer.ts'
 export {
   installedPluginInfo, loadExternalPlugins, pluginInstallDir, readClientBundle, snapshotActivePlugin,
   scanInstalled,

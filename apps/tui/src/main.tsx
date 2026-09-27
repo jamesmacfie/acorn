@@ -63,6 +63,9 @@ const { persistQueryClient } = await import('@tanstack/query-persist-client-core
 const { PERSISTED_SNAPSHOT_MAX_AGE_MS, shouldPersistQuery } = await import('@acorn/client-core/infra/persistence/queryPersistence.ts')
 const { markNodeRecovered, setNodeStarting } = await import('./chrome/nodeState')
 const { watchPluginChanges } = await import('@acorn/client-core/host/plugins/reload.ts')
+const { startDeviceConfigSync } = await import('@acorn/client-core/infra/persistence/deviceConfigSync.ts')
+const { themeColorTokens } = await import('@acorn/client-core/infra/styles/themeColorTokens.ts')
+const { paletteFor, reportsTruecolor, setPalette } = await import('./appearance')
 const { watchTaskChanges } = await import('@acorn/client-core/features/tasks/watchTaskChanges.ts')
 const { watchConnectionChanges } = await import('@acorn/client-core/features/integrations/watchConnectionChanges.ts')
 const { watchProjectChanges } = await import('@acorn/client-core/features/projects/watchProjectChanges.ts')
@@ -115,6 +118,12 @@ const [, restored] = persistQueryClient({
 // drawn a tick before it lands would draw an empty rail and then fill it.
 await restored
 bootMark('cache restored')
+const stopDeviceConfig = await startDeviceConfigSync(() => client, (config) => {
+  // A terminal has no OS light/dark signal. In follow-system mode, use the configured light pick.
+  // Without a selected theme, retain the terminal's own palette.
+  const id = config.themeFollowSystem ? config.themeLight : config.theme
+  setPalette(paletteFor(id ? themeColorTokens(id) ?? {} : {}, reportsTruecolor()))
+})
 
 // The shell, and not one line earlier: a module that reaches the node must not be evaluated before
 // `installPlatform` has run, or `send` finds no transport and falls back to global `fetch` with a
@@ -193,6 +202,15 @@ async function fillIn(): Promise<void> {
   installPluginWorkers()
   installRoster()
   bootMark('roster registered')
+  const [{ TrustPrompt }, { setTrustPromptComponent }] = await Promise.all([
+    import('./plugins/TrustPrompt'),
+    import('./plugins/trustPromptLoader'),
+  ])
+  setTrustPromptComponent(() => TrustPrompt)
+  // Device installation pulls custody and source resolution into its command handlers. Register it
+  // after the first frame with the rest of the plugin work, not in Shell's eager chrome graph.
+  const { registerDevicePluginCommands } = await import('./plugins/commands')
+  stopDeviceCommands = registerDevicePluginCommands().dispose
 
   // Every task write on the node broadcasts `tasks:changed`, and this turns that into one invalidation
   // of the client the shell reads — which it now is (docs/plugins.md § Hearing a core event). The
@@ -256,7 +274,10 @@ const engine = installKeymap(renderer)
 
 // The terminal comes back first, then the node drains. A node that started here gets its bounded
 // SIGTERM drain; one this TUI only attached to is left running, because whoever started it owns it.
+let stopDeviceCommands: (() => void) | undefined
 async function quit(code = 0): Promise<never> {
+  stopDeviceCommands?.()
+  stopDeviceConfig()
   if (leaving) return await new Promise<never>(() => {}) // a second Ctrl+C during the drain waits
   leaving = true
   renderer.destroy()

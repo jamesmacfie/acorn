@@ -45,12 +45,14 @@ export default function PluginTrustDialog() {
   const previousStillActive = () => {
     const current = request()
     if (!current?.previous || current.relation !== 'installed') return false
+    if (current.source?.kind === 'device') return false
     return current.sourceNodeIds.every((nodeId) =>
       distribution().selectionsByNode.get(nodeId)?.get(current.row.name)?.hash === current.previous?.hash)
   }
   const fallbackCopy = () => {
     const current = request()
     if (!current) return ''
+    if (current.source?.kind === 'device') return 'This device plugin stays unavailable until you accept this version.'
     if (previousStillActive()) return 'The current version keeps working until the node activates this update.'
     if (current.relation === 'installed' && !current.previous) return 'Accepting now allows this interface to appear after the node starts this plugin.'
     return "This plugin's interface stays unavailable on the affected node until you accept this version or the node runs an accepted version."
@@ -119,7 +121,11 @@ export default function PluginTrustDialog() {
                       {previousVersion() ? `${previousVersion()} → ${current().row.installed?.version}` : current().row.installed?.version}
                     </Badge>
                     <Badge size="xs">
-                      <Icon name="monitor" /> from {current().sourceNodeIds.map(nodeLabel).join(', ')}
+                      <Icon name="monitor" /> {current().source?.kind === 'device'
+                        ? current().sourceLabel?.startsWith('path:')
+                          ? `installed on this device from ${current().sourceLabel}; a folder pins nothing`
+                          : `installed on this device from ${current().sourceLabel ?? 'a package'}`
+                        : `from ${current().sourceNodeIds.map(nodeLabel).join(', ')}`}
                     </Badge>
                     <Show when={!previousVersion()}><Badge size="xs">first time</Badge></Show>
                   </p>
@@ -129,7 +135,7 @@ export default function PluginTrustDialog() {
               <p class="muted plugin-trust-intro">
                 <Show
                   when={previousVersion()}
-                  fallback="None of its code has run yet. Review what it asks for below — you’ll only be asked once for this version."
+                  fallback="None of its code has run yet. Review what it asks for below — acorn asks again if the bundle changes."
                 >
                   {(version) => (
                     <Show
@@ -181,7 +187,9 @@ export default function PluginTrustDialog() {
               {/* The vocabulary, once, matching docs/security.md § Node-half plugin security. */}
               <p class="muted plugin-trust-legend">
                 <Show when={has('enforced')}>
-                  <span><strong>Enforced</strong> — acorn checks these in the sandboxed interface and isolated server realm; anything not listed is refused.</span>
+                  <span><strong>Enforced</strong> — {current().source?.kind === 'device'
+                    ? 'acorn checks these in the sandboxed interface; anything not listed is refused.'
+                    : 'acorn checks these in the sandboxed interface and isolated server realm; anything not listed is refused.'}</span>
                 </Show>
                 <Show when={has('declared')}>
                   <span>

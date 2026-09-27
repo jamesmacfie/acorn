@@ -116,8 +116,23 @@ The rail's task list goes through the same `rail.taskList` exclusive slot the de
 plugin that offers to replace it replaces it on both hosts. `ExclusiveSlotHost` is host-supplied like
 the component table, because the DOM's copy reaches for `Dynamic` from `solid-js/web` and pulling that
 in would put a second Solid renderer in the graph to render one child. The arbitration rule in
-`exclusiveSlots.ts` is shared unchanged. The topbar and the pane strip are bespoke until the
-client-plugins programme gives each a contract.
+`exclusiveSlots.ts` is shared unchanged. The topbar and pane strip remain terminal-owned drawings;
+the desktop's `rail`, `topbar`, and `pane.switcher` replacement contracts apply only to providers
+that declare support for the host's form factor.
+
+#### Task markers
+
+The task list consumes the allocator's complete ordered marker legend rather than its four-corner
+desktop placement. A terminal row has one trailing dimension, so it draws every marker glyph in that
+order while space remains. The task title yields width first. If the row cannot fit all accepted
+glyphs, the host reserves room for `+N`, where N is the number omitted. No accepted marker disappears
+without that disclosure.
+
+Focus the task row and press `Shift+F10` or the menu key to open the host-owned **Task markers**
+modal. Its virtual list contains every marker label, including labels represented by `+N`. The plugin
+supplies no action or terminal UI. This projection does not change the desktop allocator or its
+corner assignments. Loaded task marks arrive through the same `core:task` annotation point as the
+desktop; see [Task annotations](../plugins/cooperative-extension-points.md#task-annotations).
 
 The palette is a `Modal` over the same session the desktop's runs on
 (`client-core/host/registries/commands/sessionStore.ts`). The query, the order, the cursor, the frame stack
@@ -309,13 +324,13 @@ lives.
 | Kind or slot | Desktop | Terminal | Where the answer lives |
 | --- | --- | --- | --- |
 | `rows` (`pane.footer`) | A strip of rows under the pane's frame | A `Rows` collection at the end of the pane, one per contributor, headed by its label and the contributing plugin's id | `apps/tui/src/kit/host.tsx` § `ExtensionRows`, drawn by `apps/tui/src/plugins/ExtendedPane.tsx` |
-| `annotation` | Marks inside the diff row, under the code | The same marks on the line below the code, indented past the gutter | `apps/tui/src/kit/showing.tsx` § `AnnotatedDiffLine` |
+| `annotation` | Marks inside the diff row, under the code; `core:task` marks become rail markers | Diff marks appear below the code; task marks use the complete ordered rail legend with a `+N` disclosure and `Shift+F10` inspection | `apps/tui/src/kit/showing.tsx` § `AnnotatedDiffLine`; § Task markers above |
 | `remote` (a `Slot`) | The contributor's tree, in the owner's surface | The same tree, in the same place, drawn from the same batch | `apps/tui/src/kit/host.tsx` § `Slot` |
 | `rectangle` (`pane.inline-*`) | Another plugin's iframe | One muted line naming the point | § Rectangles |
 | `hook` | Runs on the node | Runs on the node | Nothing to draw on either host |
 | `pane.aside` | A dashboard grid the user composed, beside the pane | One muted line naming the point | [future/dashboards/README.md](../future/dashboards/README.md) |
 | `rail.taskList` (exclusive slot) | The replacement draws in place of core's list | The same, through the same arbitration | `apps/tui/src/chrome/slot.tsx` |
-| `overlay`, `drawer`, `task.footer`, `task.switcher.extra`, `topbar.*` | Host UI slots a plugin fills | Not drawn | [future/client-plugins/04-replaceable-surfaces.md](../future/client-plugins/04-replaceable-surfaces.md) |
+| `overlay`, `drawer`, `task.footer`, `task.switcher.extra`, `topbar.*` | Host UI slots a plugin fills | Not drawn | [Plugin extension points](../plugins.md) |
 
 The last row costs five first-party registrations, and two of them draw nothing: github's and agents'
 `overlay` entries are where a command that needs the router or a query client gets mounted, and

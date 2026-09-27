@@ -18,3 +18,7 @@ export const STYLES = (): [string, string][] => styleContributions().map((style)
  *  three that need it — the startup effect, the Appearance page and its palette command — must agree,
  *  and the plain-:root default is this file's fact. */
 export const DEFAULT_STYLE = 'terminal'
+
+/** Keep the stored choice while its plugin is unavailable; registration restores it reactively. */
+export const resolveStyle = (id: string | undefined): string =>
+  id && styleRegistry.get(id) ? id : DEFAULT_STYLE

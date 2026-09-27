@@ -120,7 +120,7 @@ export class AgentDelegationService {
     private readonly reconciled: Promise<void> = Promise.resolve(),
   ) {
     this.worktrees = new WorktreeProvisioning(runtime, store, tasks)
-    this.reports = new DelegationReports(runtime)
+    this.reports = new DelegationReports(runtime, store)
   }
 
   async canSpawn(context: ToolContext): Promise<boolean> {
