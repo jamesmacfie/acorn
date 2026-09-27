@@ -1,7 +1,10 @@
 import { children, createEffect, createSignal, on, Show, type JSX } from 'solid-js'
 import { bindIntents } from '../../keys/keymapHost'
 import MentionTextarea from './MentionTextarea'
-import { Alert, Button, Textarea, Toolbar } from '../primitives'
+import { Alert } from '../content/Alert'
+import { Toolbar } from '../layout/Toolbar'
+import { Button } from './Button'
+import { Textarea } from './Textarea'
 
 // The comment box: textarea, submit, error line, and the Cmd+Enter chord, which github documented only
 // inside a placeholder string.
@@ -41,7 +44,7 @@ export function Composer(props: {
     props.onInput?.(value)
   }
 
-  // Read once, for the reason on RowParts (../primitives.tsx).
+  // Read once, for the reason on RowParts (../layout/Row.tsx).
   const hint = children(() => props.hint)
   const secondary = children(() => props.secondary)
 

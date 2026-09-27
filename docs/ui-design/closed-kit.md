@@ -180,8 +180,10 @@ declared axes:
 
 ### How the kit is built
 
-`primitives.css` holds the shared CSS for the components in `kit/components/primitives.tsx` and the component
-files beside it. Specificity is layered by convention: a node's base rule is a bare class, `(0,1,0)`;
+`primitives.css` holds the shared CSS for the components in `kit/components/inputs/`,
+`kit/components/content/`, and `kit/components/layout/`. The `kit/components/primitives.tsx` package
+subpath resolves to `primitives.ts` and keeps the established import contract.
+Specificity is layered by convention: a node's base rule is a bare class, `(0,1,0)`;
 a variant selector adds an attribute, `(0,2,0)`; a style pack's override adds a
 `:root[data-style="x"]` prefix, `(0,3,0)`. A pack wins because it is more specific, never because its
 stylesheet loads last.

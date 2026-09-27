@@ -18,7 +18,7 @@ import { MAX_TABS, removeHomeTab, setHomeTabs, type DashboardTab } from './persi
 // `createListNavigation`, the same three lines either way.
 //
 // The root is a `<span>` because the bar takes the section header's label seat: tabs are the heading
-// when there are several (`SectionHeader`, primitives.tsx).
+// when there are several (`SectionHeader`, kit/components/layout/SectionHeader.tsx).
 
 const NEXT_KEYS = new Set(['ArrowRight', 'ArrowDown', 'j'])
 const PREV_KEYS = new Set(['ArrowLeft', 'ArrowUp', 'k'])

@@ -5,7 +5,7 @@ import { createScrollAuthor } from '../../lib/scrollAuthor'
 import { reportScrollPlace } from '../../lib/scrollPlace'
 import { registerSurfaceHealth } from '../../lib/surfaceHealth'
 import { TIMELINE_PAGE } from '../../lib/timelineWindow'
-import { Button } from '../primitives'
+import { Button } from '../inputs/Button'
 
 /* Timeline: a sequence of turns. The agents transcript and github's PR conversation are the same
    shape, and both drew it themselves.
