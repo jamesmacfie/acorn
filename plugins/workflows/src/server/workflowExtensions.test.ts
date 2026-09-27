@@ -26,6 +26,7 @@ const described = (over: Partial<StepKindContribution> = {}): StepKindContributi
   handler: async () => ({ status: 'done' as const }),
   describe: {
     label: 'Ring a bell',
+    description: 'Ring a bell.', icon: 'bell', output: { description: 'The bell result.' },
     fields: [
       { id: 'bell', label: 'Bell', type: 'text', required: true },
       { id: 'volume', label: 'Volume', type: 'number', min: 1, max: 10 },
@@ -46,6 +47,7 @@ describe('workflow extension points', () => {
         value: {
           handler: async () => ({ status: 'done' as const }),
           validate: (step, { label }) => (step.prompt ? [] : [`${label} requires prompt`]),
+          describe: described().describe,
         } satisfies StepKindContribution,
       }]))
       const catalog = runner.validationCatalog()
@@ -72,7 +74,7 @@ describe('the kind catalog', () => {
     }
   }
 
-  it('carries a contributed kind\'s description, and null for one that has none', () => {
+  it('includes complete kinds and rejects incomplete contributions without affecting others', () => {
     withKinds([
       { id: 'other:bell', pluginId: 'other', order: 0, value: described() },
       { id: 'other:quiet', pluginId: 'other', order: 0, value: { handler: async () => ({ status: 'done' as const }) } },
@@ -83,7 +85,8 @@ describe('the kind catalog', () => {
       expect(catalog.kinds.find((kind) => kind.id === 'agent')).toMatchObject({ pluginId: null })
       expect(catalog.kinds.find((kind) => kind.id === 'agent')?.describe?.fields.map((field) => field.id)).toContain('prompt')
       expect(catalog.kinds.find((kind) => kind.id === 'other:bell')?.describe?.fields.map((field) => field.id)).toEqual(['bell', 'volume'])
-      expect(catalog.kinds.find((kind) => kind.id === 'other:quiet')?.describe).toBeNull()
+      expect(catalog.kinds.find((kind) => kind.id === 'other:quiet')).toBeUndefined()
+      expect(runner.validationCatalog().stepKinds.has('other:quiet')).toBe(false)
       expect(catalog.policies).toContainEqual({ id: 'checks-green', pluginId: null })
     })
   })
@@ -103,8 +106,8 @@ describe('the kind catalog', () => {
 
   it('lets a contributed kind take isolation only when its description says it runs an agent', () => {
     withKinds([
-      { id: 'other:think', pluginId: 'other', order: 0, value: described({ describe: { label: 'Think', runsAgent: true, fields: [] } }) },
-      { id: 'other:bell', pluginId: 'other', order: 0, value: described({ describe: { label: 'Ring', fields: [] } }) },
+      { id: 'other:think', pluginId: 'other', order: 0, value: described({ describe: { ...described().describe, label: 'Think', runsAgent: true, fields: [] } }) },
+      { id: 'other:bell', pluginId: 'other', order: 0, value: described({ describe: { ...described().describe, label: 'Ring', fields: [] } }) },
     ], (runner) => {
       const catalog = runner.validationCatalog()
       // Only the isolation rule is under test: no agent profile is registered in this process, so the

@@ -562,7 +562,10 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     // What `ctx.extensionPoints` hands the runner: entry ids already qualified by the host, which is
     // also the name a workflow file writes for a contributed kind (plugins/workflows/contract/extensions.ts).
     const contributed: Record<string, Extension<unknown>[]> = {
-      [WORKFLOW_STEP_KIND]: [{ id: 'src:custom', pluginId: 'src', order: 0, value: { handler: async () => ({ status: 'done', result: { custom: true } }) } }],
+      [WORKFLOW_STEP_KIND]: [{ id: 'src:custom', pluginId: 'src', order: 0, value: {
+        handler: async () => ({ status: 'done', result: { custom: true } }),
+        describe: { label: 'Custom', description: 'Run the custom step.', icon: 'sparkles', fields: [], output: { description: 'Custom result.' } },
+      } }],
       [WORKFLOW_POLICY]: [{ id: 'src:always', pluginId: 'src', order: 0, value: async () => ({ pass: true }) }],
       [WORKFLOW_TRIGGER]: [{
         id: 'src:pr-opened',
@@ -581,6 +584,35 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const [run] = await wf.db.select().from(workflowRuns)
     expect(run.trigger).toBe('src:pr-opened')
     expect((await waitDone(runner, run.id)).status).toBe('done')
+  })
+
+  it('fails an affected run when its plugin disappears, then accepts the saved kind when it returns', async () => {
+    const kinds: Extension<unknown>[] = []
+    let removeAfterFirst = true
+    const contribution = { id: 'src:custom', pluginId: 'src', order: 0, value: {
+      describe: { label: 'Custom', description: 'Run a custom step.', icon: 'sparkles', fields: [], output: { description: 'Custom result.' } },
+      handler: async () => {
+        if (removeAfterFirst) {
+          kinds.length = 0
+          removeAfterFirst = false
+        }
+        return { status: 'done' as const }
+      },
+    } }
+    kinds.push(contribution)
+    const runner = new WorkflowRunner(wf.db, deps(), { entries: (point) => (point === WORKFLOW_STEP_KIND ? kinds : []) as never })
+    const definition: WorkflowDef = { baseline: 'acorn-1', formatVersion: 1, name: 'custom', steps: [
+      { id: 'first', name: 'First', kind: 'src:custom' },
+      { id: 'second', name: 'Second', kind: 'src:custom' },
+    ] }
+    const first = await runner.start('task1', definition)
+    const failed = await waitDone(runner, first)
+    expect(failed.status).toBe('failed')
+    expect(failed.error).toContain("Plugin 'src' does not provide workflow step 'src:custom'")
+
+    kinds.push(contribution)
+    const second = await runner.start('task1', definition)
+    expect((await waitDone(runner, second)).status).toBe('done')
   })
 
   // ── The graph (docs/workflows.md § Execution model) ─────────────────────────────────────────────

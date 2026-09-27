@@ -82,6 +82,22 @@ Three of them are newer than the rest and worth naming:
 checkout readers. Use it when a plugin must validate that a task-scoped record names a project in the
 same workspace. It does not grant project writes or raw filesystem access.
 
+### Contributing a workflow step
+
+Handle `workflows:step-kind` from your node entrypoint. The host qualifies your entry ID as
+`<yourPluginId>:<entryId>`, which is the `kind` a saved workflow uses. Provide a handler and a
+`describe` with a label, icon, description, field list, and output description. Add a `validate`
+callback only for checks the field rules cannot express. Fields read and write the step's `with`
+object; the handler receives its template strings already rendered. Return `status: 'done'` with
+`structured` for a typed result, or `status: 'failed'` with a clear error. Provide an output schema
+when the result has a stable shape. See [Contributed step kinds](../workflows.md#contributed-step-kinds)
+for the full contract and the HTTP plugin for a working example.
+
+If the handler needs another plugin, declare that plugin in `requires.plugins` and its capability in
+`permissions.node.capabilities`. Resolve the capability inside the handler through
+`ctx.capabilities.get(id)` or `require(id)` so a disabled or reloaded provider cannot leave a cached
+implementation. Keep the step's saved kind ID stable; a rename makes saved workflows unavailable.
+
 ### Contributing findings from an installed plugin
 
 An external producer does not import Findings' runtime or receive its storage. It requires a

@@ -4,6 +4,7 @@ import { debounce } from '@acorn/plugin-api/client'
 import { Graph, type GraphCard } from '@acorn/plugin-api/ui'
 import type { WorkflowCatalog } from '../../shared/workflowContracts'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
+import { stepKindPluginId, unavailableCatalogKind } from '../../shared/stepKindAvailability'
 import { LAYOUT_WRITE_DELAY_MS, readLayout, writeLayout, type WorkflowLayout } from '../layoutPrefs'
 import { graphOrder, type DraftSelection, type WorkflowDraft } from './draft'
 
@@ -39,8 +40,10 @@ export default function GraphView(props: {
     return {
       id: row.name,
       label: def().steps.find(step => stepIdentity(step) === row.name)?.name ?? row.name,
-      detail: described?.label ?? kind,
-      glyph: described?.icon,
+      detail: unavailableCatalogKind(kind, props.catalog)
+        ? `${stepKindPluginId(kind) ? `Plugin ${stepKindPluginId(kind)}` : kind} unavailable`
+        : described?.label ?? kind,
+      glyph: unavailableCatalogKind(kind, props.catalog) ? 'triangle-alert' : described?.icon,
       selected: row.name === selected(),
     }
   }))

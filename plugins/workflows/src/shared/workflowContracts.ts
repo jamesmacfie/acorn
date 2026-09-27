@@ -237,20 +237,18 @@ export type StepField = {
 
 export type StepKindDescription = {
   label: string
-  description?: string
+  description: string
   /** A Lucide name or a `brand:` mark. */
-  icon?: string
+  icon: string
   /** True for a kind that runs an agent, and so may take `isolation`, `inputs` and `configOptions`.
    *  The editor draws the profile, model and ceiling fields for these from the provider descriptors,
    *  which is why they are not in `fields`. */
   runsAgent?: boolean
   fields: StepField[]
-  output?: { description: string; schema?: object }
+  output: { description: string; schema?: object }
 }
 
-// `describe` is optional so every contribution written before it keeps loading. A kind without one
-// draws as a name and a raw JSON `with`.
-export type StepKindContribution = { handler: StepHandler; validate?: StepValidator; describe?: StepKindDescription }
+export type StepKindContribution = { handler: StepHandler; validate?: StepValidator; describe: StepKindDescription }
 
 /** What the editor and the palette need to offer every kind this node can run
  *  (docs/api-reference.md § Workflows). `pluginId` is null for a built-in. */

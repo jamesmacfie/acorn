@@ -15,6 +15,7 @@ import type {
   WorkflowStepRow,
 } from '../shared/workflowContracts'
 import type { PolicyEvaluator, StepKindContribution, WorkflowCatalog } from '../shared/workflowContracts'
+import { stepKindContributionProblems, stepKindPluginId, unavailableStepKindMessage } from '../shared/stepKindAvailability'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../shared/stepFields'
 import { managedProviderForProfile } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
@@ -75,6 +76,7 @@ export type RunStepOptions = HeadlessOpts & {
 export type StepRunRequest = Omit<RunStepOptions, 'profileId'>
 
 export type RunnerDeps = {
+  invalidStepKind?: (id: string, problems: readonly string[]) => void
   dataAccess?: import('./workflowDataSteps').WorkflowDataServices['access']
   runStep(taskId: string, def: WorkflowStepDef, opts: RunStepOptions): Promise<HeadlessResult>
   writeHandoff(taskId: string, runId: string, stepName: string, body: string): Promise<void>
@@ -185,6 +187,7 @@ export class WorkflowRunner {
   // qualified and comes from the extension points (../contract/extensions.ts).
   readonly #builtins: { stepKinds: Map<string, StepKindContribution>; policies: Map<string, PolicyEvaluator> }
   readonly #extensions: WorkflowExtensions
+  readonly #reportedInvalidKinds = new Map<string, string>()
   readonly #activeRuns = new Set<string>()
   // Runs whose tick was asked for while one was already computing. Without this a step that settles
   // mid-tick loses its wake-up: the tick that swallowed the call had already read the rows, so it
@@ -284,10 +287,29 @@ export class WorkflowRunner {
    *  host-minted `<pluginId>:<entryId>` for anything contributed. Resolved per call, never cached,
    *  because the plugin that fills the point may init after this one does. */
   #stepKind(kind: string): StepKindContribution | undefined {
-    if (kind === 'workflow') return { handler: this.#childLifecycle.handler() }
-    if (kind === 'workflow-map') return { handler: this.#childLifecycle.mapHandler() }
+    if (kind === 'workflow') return { handler: this.#childLifecycle.handler(), describe: BUILTIN_STEP_DESCRIPTIONS.workflow }
+    if (kind === 'workflow-map') return { handler: this.#childLifecycle.mapHandler(), describe: BUILTIN_STEP_DESCRIPTIONS['workflow-map'] }
     return this.#builtins.stepKinds.get(kind)
-      ?? this.#extensions.entries(WORKFLOW_STEP_KIND).find((entry) => entry.id === kind)?.value
+      ?? this.#validContributedKinds().find((entry) => entry.id === kind)?.value
+  }
+
+  #validContributedKinds() {
+    const entries = this.#extensions.entries(WORKFLOW_STEP_KIND)
+    const live = new Set(entries.map((entry) => entry.id))
+    for (const id of this.#reportedInvalidKinds.keys()) if (!live.has(id)) this.#reportedInvalidKinds.delete(id)
+    return entries.filter((entry) => {
+      const problems = stepKindContributionProblems(entry.value)
+      if (!problems.length) {
+        this.#reportedInvalidKinds.delete(entry.id)
+        return true
+      }
+      const message = problems.join('; ')
+      if (this.#reportedInvalidKinds.get(entry.id) !== message) {
+        this.#reportedInvalidKinds.set(entry.id, message)
+        this.deps.invalidStepKind?.(entry.id, problems)
+      }
+      return false
+    })
   }
 
   #policy(policy: string): PolicyEvaluator | undefined {
@@ -308,7 +330,7 @@ export class WorkflowRunner {
           describe: BUILTIN_STEP_DESCRIPTIONS[id],
         },
       })),
-      ...this.#extensions.entries(WORKFLOW_STEP_KIND).map((entry) => ({ id: entry.id, pluginId: entry.pluginId, contribution: entry.value })),
+      ...this.#validContributedKinds().map((entry) => ({ id: entry.id, pluginId: entry.pluginId, contribution: entry.value })),
     ]
   }
 
@@ -579,7 +601,9 @@ export class WorkflowRunner {
     const kind = def.kind ?? 'agent'
     const handler = this.#stepKind(kind)?.handler
     if (!handler) {
-      await this.finishRun(run, 'failed', `Step '${def.name}' has unknown kind '${kind}'.`, step.id)
+      await this.finishRun(run, 'failed', stepKindPluginId(kind)
+        ? `Step '${def.name}' cannot run. ${unavailableStepKindMessage(kind)}`
+        : `Step '${def.name}' has unknown kind '${kind}'.`, step.id)
       return
     }
     const inputs = frozenWorkflowInputs(workflow)

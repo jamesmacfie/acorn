@@ -77,6 +77,7 @@ export const BUILTIN_STEP_DESCRIPTIONS: Readonly<Record<string, StepKindDescript
     description: 'Park the run until somebody approves it. An autonomous run passes straight through.',
     icon: 'hand',
     fields: [],
+    output: { description: 'The approval outcome.' },
   },
   'gate-policy': {
     label: 'Check a policy',

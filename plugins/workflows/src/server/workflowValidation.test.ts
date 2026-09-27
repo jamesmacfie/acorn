@@ -27,6 +27,10 @@ const check = (def: WorkflowDef) => validateWorkflow({
 }, catalog)
 
 describe('a draft in progress', () => {
+  it('names the plugin that must return before a saved kind can run', () => {
+    expect(check({ baseline: 'acorn-1', formatVersion: 1, name: 'w', steps: [{ name: 'send', kind: 'mail:send' }] }))
+      .toContain("step 'send' cannot run. Plugin 'mail' does not provide workflow step 'mail:send' on this node. Install, enable, or update the plugin to use this step.")
+  })
   // The editor creates a definition with no steps and draws what this reports in its footer. Storing
   // it is fine; `WorkflowRunner.start` is what refuses to run it (plugins/workflows/src/node/index.ts).
   it('reports a definition with no steps rather than being a shape the store refuses', () => {
