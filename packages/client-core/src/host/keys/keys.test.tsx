@@ -210,7 +210,7 @@ describe('a tab strip is a collection', () => {
         ariaLabel="Sections"
       />
     ), host)
-    const strip = host.querySelector<HTMLElement>('.ui-tabs')!
+    const strip = host.querySelector<HTMLElement>('.ui-tabs .ui-tab-scroll')!
     expect(strip.getAttribute('role')).toBe('tablist')
     // The tab keeps the id the panel points back at.
     expect(strip.querySelector('.ui-tab')!.id).toBe('panel-tab-one')

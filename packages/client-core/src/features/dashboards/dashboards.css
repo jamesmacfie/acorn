@@ -58,11 +58,14 @@
   align-items: center;
   gap: var(--space-1);
   min-width: 0;
-  flex-wrap: wrap;
+}
+.dash-tabs-strip {
+  gap: var(--space-1);
 }
 .dash-tab-slot {
   display: flex;
   align-items: center;
+  flex: none;
 }
 .dash-tab {
   font: inherit;

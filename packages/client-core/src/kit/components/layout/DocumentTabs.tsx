@@ -1,6 +1,7 @@
 import { createEffect, For, Show, type JSX } from 'solid-js'
 import { IconButton } from '../inputs/IconButton'
 import { StatusDot } from '../primitives'
+import { revealActiveTab } from './tabScroll'
 
 export type DocTabDef = {
   id: string
@@ -40,14 +41,7 @@ export function DocumentTabs(props: {
 
   // A tab activated by keyboard, or opened off-screen in a long strip, has to be brought into view
   // or the selection is invisible.
-  createEffect(() => {
-    const id = props.active
-    if (!id || !stripRef) return
-    queueMicrotask(() => {
-      stripRef?.querySelector(`#${CSS.escape(`${props.idPrefix}-tab-${id}`)}`)
-        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-    })
-  })
+  createEffect(() => revealActiveTab(stripRef, `${props.idPrefix}-tab-${props.active}`))
 
   const move = (offset: number) => {
     if (!props.tabs.length) return
@@ -61,7 +55,7 @@ export function DocumentTabs(props: {
     <div class="ui-doctabs">
       <div
         ref={stripRef}
-        class="ui-doctabs-strip"
+        class="ui-tab-scroll ui-doctabs-strip"
         role="tablist"
         aria-label={props.ariaLabel}
         onKeyDown={(event) => {
