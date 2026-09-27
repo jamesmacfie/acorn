@@ -21,7 +21,7 @@ import { compileContentLinkPattern } from '@acorn/protocol/contentLinkPattern.ts
 import { isInlineLocation, type ExtensionPointKind } from '@acorn/protocol/extensionPoints.ts'
 import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
 import { isAllowedWebviewUrl } from '@acorn/protocol/webview.ts'
-import { NODE_CORE_FACETS } from './permissions'
+import { NODE_CORE_FACETS } from './coreFacets'
 import {
   hasFrameRegion,
   hasRemoteRegion,
