@@ -1,7 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createEffect, createSignal, For, Index, on, onCleanup, Show, splitProps, untrack, type JSX } from 'solid-js'
 import type { Renderable } from '../tree/compat'
-import { GLYPHS } from './glyphs'
 import { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm'
 import {
   COLLECTION_INTENTS, createCollectionIntents,
@@ -92,7 +91,7 @@ export function ConfirmButton(props: ButtonProps & {
   onConfirm: () => void
 }) {
   const armed = createArmedConfirm(() => props.timeoutMs ?? 3000)
-  const body = () => flatten(props.children) || props.label || ''
+  const body = () => (hasNode(props.children) ? props.label ?? '' : flatten(props.children) || props.label || '')
   // One button, so one key: `request` is keyed because the armed state usually lives outside a single
   // control, and this is the degenerate case the DOM's ConfirmButton is too.
   const press = () => {
@@ -520,20 +519,15 @@ export function Checkbox(props: {
   )
 }
 
-/** reduced: one cell, the same glyph `Icon` would draw, rather than the words. `./glyphs.ts` states
- *  the rule this follows — a name is one character here or it is nothing, because words in a bar push
- *  every row sideways. `Button` alone cannot do this: it prints `label` for any child it cannot read
- *  text off, so a row of four transcript controls came to fifty cells of an eighty-cell pane.
- *
- *  The label is the fallback, for a name with no glyph yet. Wide, but a button drawing nothing is a
- *  button nobody can find, and the width is the thing that says which name to add to the map. */
+/** A terminal action uses its label. The icon name belongs to the shared DOM contract, but no SVG
+ *  reaches this host and a substituted symbol would hide the action's meaning. */
 export function IconButton(props: Omit<ButtonProps, 'children' | 'iconOnly' | 'label'> & {
   icon: string
   label: string
   spin?: boolean
 }) {
-  const [own, rest] = splitProps(props, ['icon', 'spin'])
-  return <Button {...rest} variant={rest.variant ?? 'bare'} label={GLYPHS[own.icon] ?? props.label} />
+  const [, rest] = splitProps(props, ['icon', 'spin'])
+  return <Button {...rest} variant={rest.variant ?? 'bare'} label={props.label} />
 }
 
 /** `[x] label`, the same two cells as a Checkbox, because in a terminal a switch is a checkbox that
@@ -657,7 +651,7 @@ export function Picker<T>(props: PickerProps<T>) {
   )
 }
 
-/** One line in that menu: glyph, label, dim hint. */
+/** One line in that menu: label and dim hint. */
 export function PickerRow(props: {
   label: string
   description?: string
@@ -944,7 +938,7 @@ export function CopyButton(props: { text: () => string; onCopy?: (text: string) 
   }
   return (
     <box flexDirection="column">
-      <Button variant="bare" onPress={copy}>⧉</Button>
+      <Button variant="bare" label="Copy" onPress={copy} />
       <Show when={shown()}><Line role="mono">{props.text()}</Line></Show>
     </box>
   )

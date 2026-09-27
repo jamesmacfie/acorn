@@ -37,9 +37,9 @@ const MARKLESS = /^[\p{Mn}\p{Me}\p{Cf}\u200b\u2060\ufeff]/u
  *  a line here and the cells it lands in, not an upgrade of somebody else's regex.
  *
  *  Two entries worth naming, because both were measured. U+2630 to U+2637 moved to `W` in Unicode 16,
- *  so `☰` — which `apps/tui/src/kit/glyphs.ts` spends on `list` — is two cells by the standard and one
+ *  so `☰` is two cells by the standard and one
  *  cell in any terminal with an older table. That is a glyph whose width the layout cannot predict,
- *  and a later slice replaces it. And the astral pictographs OpenTUI widens (U+1F5C0, U+1F5CE,
+ *  so the kit avoids using it. And the astral pictographs OpenTUI widens (U+1F5C0, U+1F5CE,
  *  U+1F5D2, U+1F5C3, U+1F5B5 among 279 code points) are deliberately absent: the standard, xterm and
  *  `string-width` all call them one cell, and phase 3 puts an xterm-measured rectangle on the same
  *  screen, so the two halves of one frame have to count alike. */

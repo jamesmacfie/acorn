@@ -133,7 +133,7 @@ const CASES: Case[] = [
   },
   {
     node: 'Tabs',
-    draws: 'Tab  [Tab]  Tab on one line, the selected one in brackets, a marked tab behind its glyph',
+    draws: 'Tab  [Tab]  Tab on one line, using text labels without icons',
     render: () => (
       <Tabs
         idPrefix="t"
@@ -145,7 +145,7 @@ const CASES: Case[] = [
     ),
     check: (frame) => {
       expect(lineWith(frame, 'one')).toContain('[two]')
-      expect(lineWith(frame, 'one')).toContain('⑂ one')
+      expect(lineWith(frame, 'one')).not.toContain('⑂')
     },
   },
   {
@@ -285,11 +285,10 @@ const CASES: Case[] = [
   },
   {
     node: 'SectionHeader',
-    draws: 'a bold line with its actions at the far end',
+    draws: 'a bold heading with its actions on the next line',
     render: () => <SectionHeader actions={<Button label="New" />}>Files</SectionHeader>,
     check: (frame) => {
-      const line = lineWith(frame, 'Files')
-      expect(line.trimEnd().endsWith('[New]')).toBe(true)
+      expect(rowOf(frame, '[New]')).toBe(rowOf(frame, 'Files') + 1)
     },
   },
   {
@@ -361,9 +360,9 @@ const CASES: Case[] = [
   },
   {
     node: 'RowActions',
-    draws: "the row's actions as glyphs, always drawn, never on hover",
-    render: () => <Row reveal trailing={<RowActions ariaLabel="Actions">{() => <Icon name="x" />}</RowActions>}>a row</Row>,
-    check: (frame) => expect(lineWith(frame, 'a row')).toContain('✕'),
+    draws: "the row's labeled actions, always drawn, never on hover",
+    render: () => <Row reveal trailing={<RowActions ariaLabel="Actions">{() => <IconButton icon="x" label="Close" />}</RowActions>}>a row</Row>,
+    check: (frame) => expect(lineWith(frame, 'a row')).toContain('Close'),
   },
   {
     node: 'Badge',
@@ -631,10 +630,11 @@ const CASES: Case[] = [
   },
   {
     node: 'Icon',
-    draws: 'reduced: a glyph from the name table, and nothing for a name with none',
-    render: () => <Inline><Icon name="check" /><Icon name="not-a-real-icon" /></Inline>,
+    draws: 'no Lucide glyph, even when a title is supplied for desktop hover',
+    render: () => <Inline><Icon name="check" title="Ready" /><Icon name="not-a-real-icon" /></Inline>,
     check: (frame) => {
-      has(frame, '✓')
+      lacks(frame, 'Ready')
+      lacks(frame, '✓')
       lacks(frame, 'not-a-real-icon')
     },
   },
@@ -648,19 +648,20 @@ const CASES: Case[] = [
   },
   {
     node: 'IconButton',
-    draws: 'one cell: the mark, not the words a bar has no room for',
+    draws: 'the action label instead of an icon',
     render: () => <IconButton icon="arrow-up-to-line" label="Go to top" />,
     check: (frame) => {
-      has(frame, '⇑')
-      expect(frame).not.toContain('Go to top')
+      has(frame, 'Go to top')
+      lacks(frame, '⇑')
     },
   },
   {
     node: 'ConfirmButton',
-    draws: 'the label at rest; the armed button is the prompt',
-    render: () => <ConfirmButton label="Delete" onConfirm={() => {}} />,
+    draws: 'the label at rest even with an icon child; the armed button is the prompt',
+    render: () => <ConfirmButton label="Delete" onConfirm={() => {}}><Icon name="trash-2" /></ConfirmButton>,
     check: (frame) => {
       has(frame, '[Delete]')
+      lacks(frame, '[object Object]')
       // Arming is a press, and a button becomes a focus stop in phase 2. The armed label is
       // `createArmedConfirm`'s, which client-core tests directly.
       lacks(frame, 'Delete?')
@@ -785,7 +786,7 @@ const CASES: Case[] = [
     node: 'CopyButton',
     draws: 'fallback: a control that copies where the terminal takes OSC 52, and prints otherwise',
     render: () => <CopyButton text={() => 'copied text'} />,
-    check: (frame) => has(frame, '⧉'),
+    check: (frame) => has(frame, 'Copy'),
   },
   {
     node: 'ModelBackendPicker',
@@ -1042,10 +1043,10 @@ const BEHAVIOURS: Behaviour[] = [
   },
   {
     node: 'IconButton',
-    does: 'presses on Enter like any other button, with the mark in place of a label',
+    does: 'presses on Enter like any other button, with a text label',
     render: (record) => <IconButton icon="arrow-up-to-line" label="Go to top" onPress={() => record('press')} />,
     drive: async (screen, pressed) => {
-      lit(screen, '⇑')
+      lit(screen, 'Go to top')
       await screen.press('RETURN')
       expect(pressed).toEqual(['press'])
     },
