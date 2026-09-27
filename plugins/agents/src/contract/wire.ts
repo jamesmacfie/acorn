@@ -276,6 +276,8 @@ export type AgentNormalizedEvent =
   | { type: 'tool'; tool: AgentToolCall }
   | { type: 'subagent'; subagent: AgentSubagentUpdate }
   | { type: 'plan'; entries: AgentPlanEntry[] }
+  /** Codex's completed plan item, separate from turn/plan/updated progress steps. */
+  | { type: 'plan_proposal'; itemId: string; providerTurnId: string; text: string }
   | { type: 'usage'; usage: AgentUsage }
   | { type: 'request'; requestId: string; kind: AgentRequestKind; title: string; detail?: string; options?: AgentPermissionOption[]; questions?: AgentQuestion[] }
   | { type: 'request_resolved'; requestId: string; resolution: unknown }
@@ -445,6 +447,7 @@ export const agentEventSearchText = (event: AgentNormalizedEvent): string | null
     case 'user_message':
     case 'assistant_message':
     case 'reasoning':
+    case 'plan_proposal':
       return event.text
     case 'tool':
       return [

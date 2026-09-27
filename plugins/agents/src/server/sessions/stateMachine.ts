@@ -76,6 +76,7 @@ export function projectAgentEvent(
     case 'reasoning':
     case 'tool':
     case 'plan':
+    case 'plan_proposal':
     case 'artifact':
     case 'file_change':
     case 'terminal':
@@ -294,6 +295,7 @@ export function evolveAgentState(
     case 'reasoning':
     case 'tool':
     case 'plan':
+    case 'plan_proposal':
     case 'file_change':
     case 'terminal':
     case 'artifact': {

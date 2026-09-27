@@ -155,6 +155,7 @@ function SessionConversation(input: {
               onControls={setScrollControls}
               onExitSubagent={() => clearManagedSubagent(sessionId())}
               onRequestResolved={reload}
+              onPlanImplemented={reload}
             />
             <QueuedAgentTurns
               sessionId={sessionId()}

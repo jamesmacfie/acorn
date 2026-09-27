@@ -100,6 +100,8 @@ export const managedAgentApi = {
     readJson<AgentEventPage>(sessionRoute(sessionId, `/events?afterSeq=${afterSeq}&limit=${limit}&fold=1`)),
   enqueue: (sessionId: string, input: Omit<EnqueueAgentTurnInput, 'idempotencyKey'>) =>
     jsonWrite<AgentTurn>(sessionRoute(sessionId, '/turns'), 'POST', input, true),
+  implementPlan: (sessionId: string, itemId: string) =>
+    jsonWrite<AgentTurn>(sessionRoute(sessionId, '/implement-plan'), 'POST', { itemId }),
   patchQueuedTurn: (sessionId: string, turnId: string, patch: { input?: AgentTurn['input']; ordinal?: number }) =>
     jsonWrite<AgentTurn>(
       sessionRoute(sessionId, `/turns/${encodeURIComponent(turnId)}`),

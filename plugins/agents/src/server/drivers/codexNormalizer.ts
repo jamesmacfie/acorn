@@ -269,6 +269,14 @@ export function normalizeCodexNotification(notification: JsonRpcNotification): A
     case 'item/completed': {
       const item = asObject(params.item)
       if (!item) return []
+      if (method === 'item/completed' && item.type === 'plan') {
+        const itemId = stringValue(item.id)
+        const providerTurnId = stringValue(params.turnId)
+        const text = stringValue(item.text)
+        return itemId && providerTurnId && text?.trim()
+          ? [{ type: 'plan_proposal', itemId, providerTurnId, text }]
+          : []
+      }
       const tool = toolFromItem(item, method === 'item/completed')
       if (tool) {
         return [

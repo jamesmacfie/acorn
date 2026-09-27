@@ -193,6 +193,13 @@ export function boundProviderEvent(
           text: entry.text.slice(0, 16_384),
         })),
       }
+    case 'plan_proposal':
+      return {
+        ...event,
+        itemId: event.itemId.slice(0, 2_000),
+        providerTurnId: event.providerTurnId.slice(0, 2_000),
+        text: event.text.slice(0, 128 * 1024),
+      }
     case 'request':
       return {
         ...event,

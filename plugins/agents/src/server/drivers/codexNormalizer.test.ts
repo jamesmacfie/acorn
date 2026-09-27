@@ -160,6 +160,20 @@ describe('Codex app-server normalization', () => {
     }])
   })
 
+  it('persists only the authoritative completed proposal, separate from progress and questions', () => {
+    expect(normalizeCodexNotification({ method: 'item/plan/delta', params: {
+      itemId: 'plan-1', turnId: 'codex-turn-1', delta: 'Draft text',
+    } })).toEqual([])
+    expect(normalizeCodexNotification({ method: 'item/completed', params: {
+      turnId: 'codex-turn-1', item: { id: 'plan-1', type: 'plan', text: 'Final **plan**' },
+    } })).toEqual([{
+      type: 'plan_proposal', itemId: 'plan-1', providerTurnId: 'codex-turn-1', text: 'Final **plan**',
+    }])
+    expect(normalizeCodexServerRequest({ id: 2, method: 'item/tool/requestUserInput', params: {
+      questions: [{ id: 'go', question: 'Shall I plan it?' }],
+    } })).toMatchObject({ type: 'request', kind: 'question' })
+  })
+
   it('extracts completed generated images as transient provider artifacts', async () => {
     const result = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
     const notification = {

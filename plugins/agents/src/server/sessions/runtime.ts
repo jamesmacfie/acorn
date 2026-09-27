@@ -32,6 +32,7 @@ import {
   type WaitCondition,
 } from './runtimeEngine'
 import { mergeSessionConfigChange } from './sessionConfigMerge'
+import { CODEX_PLAN_IMPLEMENTATION_PROMPT } from '../../shared/codexPlanHandoff'
 import {
   buildSessionTitlePrompt,
   generationText,
@@ -426,6 +427,31 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       && outcome.firstTurnFallback
     ) {
       this.startSessionTitleGeneration(session, enqueued.input, outcome.firstTurnFallback)
+    }
+    return turn
+  }
+
+  async implementCodexPlan(sessionId: string, itemId: string): Promise<AgentTurn> {
+    const session = await this.store.requireSession(sessionId)
+    if (session.controller !== 'acorn' || session.kind !== 'interactive'
+      || session.driverKind !== 'codex-app-server' || session.archivedAt) {
+      throw new Error('This session cannot implement a Codex plan.')
+    }
+    await this.core.tasks.requireRoot(session.taskId)
+    const changed = await this.hooks?.run('before-send', {
+      sessionId,
+      taskId: session.taskId,
+      text: CODEX_PLAN_IMPLEMENTATION_PROMPT,
+    })
+    if (changed && !changed.ok) throw new Error(`${changed.by}: ${changed.reason}`)
+    const prompt = changed?.payload.text ?? CODEX_PLAN_IMPLEMENTATION_PROMPT
+    if (!prompt.trim() || prompt.length > 1_000_000) throw new Error('The implementation prompt is invalid.')
+    const { turn, inserted } = await this.store.acceptCodexPlan(sessionId, itemId, prompt)
+    if (inserted) {
+      const updated = await this.store.requireSession(sessionId)
+      this.emit({ channel: 'agent:session', session: updated })
+      this.emit({ channel: 'agent:turn', turn })
+      void this.ensureSession(updated).then(() => this.pump()).catch(() => undefined)
     }
     return turn
   }

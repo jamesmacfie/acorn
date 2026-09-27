@@ -36,6 +36,7 @@ const VISIBLE_EVENT_TYPES = new Set<AgentNormalizedEvent['type']>([
   'tool',
   'subagent',
   'plan',
+  'plan_proposal',
   'request',
   'file_change',
   'terminal',
@@ -88,6 +89,7 @@ export const isChatItem = (item: AgentConversationItem): boolean =>
   item.event.type === 'user_message'
   || item.event.type === 'assistant_message'
   || item.event.type === 'request'
+  || item.event.type === 'plan_proposal'
 
 /** The card for one subagent, so a caller can render that subagent's run on its own. */
 export const findSubagentItem = (
