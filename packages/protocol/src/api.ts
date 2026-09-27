@@ -327,7 +327,7 @@ export type NodePluginRow = {
   // 'pending-restart' means a package sits on the node's disk that this process never loaded: freshly
   // installed, updated, or uninstalled while still running. Like 'failed' it's about the package
   // rather than the toggle, but unlike 'failed' a restart fixes it, so it does raise the banner.
-  state: 'active' | 'failed' | 'disabled' | 'pending-restart'
+  state: 'active' | 'failed' | 'disabled' | 'pending-restart' | 'pending-review'
   // Epoch millis, present only on a failed row.
   failedAt?: number
   // Why it failed, in the words of whatever broke: the thrown message from a contained init or ready,
@@ -346,6 +346,8 @@ export type NodePluginRow = {
   /** The declaration committed with the service this process runs. `null` means this node has no
    * active loaded runtime; omission identifies a response cached from a node predating this field. */
   active?: PluginRuntimeIdentity | null
+  /** An agent-requested disk candidate held inert until the owner reviews these exact bytes. */
+  pendingReview?: { reviewId: string; fingerprint: string; stagedAt: number } | { corrupt: true }
 }
 
 // The major of @acorn/plugin-api a bundle was built against. A manifest that doesn't name exactly this
@@ -666,6 +668,7 @@ export const corePluginInstallRoute = '/v1/core/plugins/install'
 export const corePluginRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}`
 export const corePluginUpdateRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/update`
 export const corePluginReloadRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/reload`
+export const corePluginReviewRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/review`
 // The owner's answer to one agent-raised approval request. Device-only, and permanently unmappable
 // from a plugin frame: an approval a frame could post would turn the request/decision split back into
 // an install route the agent can reach (client-core/host/frames/scopes.ts).

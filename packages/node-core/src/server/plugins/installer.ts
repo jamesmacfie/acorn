@@ -31,6 +31,7 @@ import { resolveInRoot } from '../core/fs'
 import { MANIFEST_FILE, PLUGIN_API_MAJOR, readPluginManifestResult, speaksApiVersion, type PluginManifest } from './manifest'
 import { pluginDbPath, PLUGIN_DB_DIR } from './storage'
 import { markPluginRemoved, markPluginUserManaged } from './bundledState'
+import { hasPendingPluginReview, pluginReviewFingerprint, removePluginReview, stagePluginReview } from './pendingReview'
 
 // A plugin package is source plus a bundle or two. 32 MiB is roughly four times the client-bundle
 // ceiling and leaves room for assets; anything past it is not a plugin, and a node should not spool a
@@ -70,10 +71,14 @@ export type PluginLockfile = {
 }
 
 export const pluginInstallRoot = (dataRoot: string): string => join(resolve(dataRoot), PLUGIN_DB_DIR)
-export const pluginDir = (dataRoot: string, id: string): string => join(pluginInstallRoot(dataRoot), id)
+const checkedPluginId = (id: string): string => {
+  if (!/^[a-z][a-z0-9-]{1,31}$/.test(id)) fail('Invalid plugin id.')
+  return id
+}
+export const pluginDir = (dataRoot: string, id: string): string => join(pluginInstallRoot(dataRoot), checkedPluginId(id))
 // Beside `<id>/` and `<id>.sqlite`, and unable to collide with either: the manifest id regex forbids a
 // dot, so no plugin directory can be named `<id>.lock.json`.
-export const lockfilePath = (dataRoot: string, id: string): string => join(pluginInstallRoot(dataRoot), `${id}.lock.json`)
+export const lockfilePath = (dataRoot: string, id: string): string => join(pluginInstallRoot(dataRoot), `${checkedPluginId(id)}.lock.json`)
 
 /** Never throws. A missing or corrupt lockfile means "installed before lockfiles, or hand-copied", which
  * is a plugin with no known source rather than an error. */
@@ -336,6 +341,8 @@ export function sweepDebris(dataRoot: string): void {
 
 export type InstallOptions = {
   allowDowngrade?: boolean
+  /** An owner-approved first step of an agent request. The package is quarantined before placement. */
+  reviewRequestId?: string
 }
 
 export async function installPlugin(dataRoot: string, source: PluginInstallSource, options: InstallOptions = {}): Promise<PluginInstallResult> {
@@ -343,6 +350,7 @@ export async function installPlugin(dataRoot: string, source: PluginInstallSourc
 }
 
 export async function updatePlugin(dataRoot: string, id: string, options: InstallOptions = {}): Promise<PluginUpdateResult> {
+  if (hasPendingPluginReview(dataRoot, id)) fail(`'${id}' has an unreviewed package. Review or remove it first.`)
   const lock = readLockfile(dataRoot, id)
   if (!lock) fail(`acorn does not know where '${id}' came from, so it cannot update it. Reinstall it from its source.`)
   const result = await place(dataRoot, lock!.source, id, options)
@@ -365,6 +373,7 @@ async function place(dataRoot: string, source: PluginInstallSource, expectId: st
     await unpack(archive, unpacked)
     const pkg = packageRoot(unpacked)
     const manifest = validate(pkg, expectId)
+    if (hasPendingPluginReview(dataRoot, manifest.id)) fail(`'${manifest.id}' has an unreviewed package. Review or remove it first.`)
 
     const existing = readLockfile(dataRoot, manifest.id)
     guardDowngrade(existing, manifest.version, options)
@@ -373,6 +382,7 @@ async function place(dataRoot: string, source: PluginInstallSource, expectId: st
       ...(manifest.client ? { client: digestOf(pkg, manifest.client)! } : {}),
     }
 
+    if (options.reviewRequestId) stagePluginReview(dataRoot, manifest.id, options.reviewRequestId, pluginReviewFingerprint(pkg))
     placeAtomically(dataRoot, manifest.id, pkg)
     writeLockfile(dataRoot, manifest.id, {
       source,
@@ -395,11 +405,13 @@ async function place(dataRoot: string, source: PluginInstallSource, expectId: st
 function linkLocal(dataRoot: string, source: { path: string }, expectId: string | null, options: InstallOptions): PluginInstallResult {
   if (!isAbsolute(source.path)) fail('A local plugin path must be absolute.')
   const manifest = validate(source.path, expectId)
+  if (hasPendingPluginReview(dataRoot, manifest.id)) fail(`'${manifest.id}' has an unreviewed package. Review or remove it first.`)
   guardDowngrade(readLockfile(dataRoot, manifest.id), manifest.version, options)
 
   mkdirSync(pluginInstallRoot(dataRoot), { recursive: true, mode: 0o700 })
   sweepDebris(dataRoot)
   const target = pluginDir(dataRoot, manifest.id)
+  if (options.reviewRequestId) stagePluginReview(dataRoot, manifest.id, options.reviewRequestId, pluginReviewFingerprint(source.path))
   rmSync(target, { recursive: true, force: true })
   symlinkSync(source.path, target)
   writeLockfile(dataRoot, manifest.id, {
@@ -425,11 +437,12 @@ function guardDowngrade(existing: PluginLockfile | null, next: string, options: 
 
 export function uninstallPlugin(dataRoot: string, id: string, options: { purgeData?: boolean } = {}): PluginUninstallResult {
   const target = pluginDir(dataRoot, id)
-  if (!existsSync(target) && !existsSync(lockfilePath(dataRoot, id))) fail(`'${id}' is not installed on this node.`)
+  if (!existsSync(target) && !existsSync(lockfilePath(dataRoot, id)) && !hasPendingPluginReview(dataRoot, id)) fail(`'${id}' is not installed on this node.`)
   markPluginRemoved(dataRoot, id)
   // lstat, so a `{ path }` folder symlink is unlinked rather than followed into the owner's directory.
   rmSync(target, { recursive: true, force: true })
   rmSync(lockfilePath(dataRoot, id), { force: true })
+  removePluginReview(dataRoot, id)
 
   // Retained by default, which mirrors what disabling has always done (docs/plugins.md: "SQLite files
   // remain on disk and can be re-enabled later"). Reinstalling then finds its data where it left it.

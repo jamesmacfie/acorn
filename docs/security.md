@@ -11,7 +11,8 @@ and untrusted provider/preview content rather than implementing multi-user roles
 - Desktop shell and its helper: native host, broker, certificate pins, device-token custody, window policy, and
   preview `WebContentsView` host.
 - Node: authoritative data and execution environment. It is intentionally able to run developer
-  tools, so a compromised Node account is outside the application threat model.
+  tools. A compromised Node can compromise its own host, but its replies and plugin offers remain
+  untrusted input on a connecting client.
 - Node child: task-scoped internal caller. It receives only an allowlisted environment and scoped
   token; its routes and task identity are checked by the Node.
 - Terminal client (`acorn`, `docs/tui.md`): the first two collapsed into one process. UI code
@@ -21,14 +22,23 @@ and untrusted provider/preview content rather than implementing multi-user roles
   `apps/tui` that draws a cell. A loaded plugin still gets a realm of its own — a worker thread under
   `--permission` — so the boundary that matters most is the one that did not move.
 
-The application does not defend against root/other-user access to the host, a compromised Node
-account, or malicious first-party plugin code. Those are OS/deployment concerns.
+The application does not defend a Node host against root/other-user access or a compromised Node
+account, nor does it sandbox first-party plugin code. A client still treats a paired Node as an
+untrusted source of replies, events, content, and plugin offers until an owner authorizes code.
 
 ## Transport and auth
 
 - Nodes bind to `127.0.0.1` over TLS 1.3 and reject unexpected `Host` values.
 - The certificate is self-signed, persisted in the Node data root, and pinned by fingerprint in the
   helper's broker. A changed fingerprint is a hard stop.
+- A renderer request path is checked as a same-origin absolute path both at the helper schema and in
+  the broker immediately before joining it with the paired endpoint. Protocol-relative paths,
+  backslashes, and fragments cannot redirect a request carrying that node's bearer. The broker
+  bounds each HTTP reply to 64 MiB, the `/v1/node` compatibility probe to 16 KiB, and each
+  WebSocket message to 8 MiB before parsing or forwarding it.
+  The broker opens at most four HTTP sockets per Node. Automatic agent image previews ask for an
+  8 MiB transport ceiling and refuse oversized metadata or bytes before raster encoding; explicit
+  downloads still use the normal bounded reply path and require a save action.
 - The bearer rides the `/v1/events` upgrade request's headers, which a browser cannot set. On the
   desktop that is why the socket belongs to the helper rather than the renderer. The terminal client
   (`docs/tui.md`) is one process running under Node, so it sets the header itself: equal to
@@ -412,18 +422,23 @@ the same sandboxed iframe and remote-tree worker paths; neither executes in the 
 Bundle cache entries and acknowledgement records carry `{ kind: 'node', nodeId }` or
 `{ kind: 'device' }` provenance. Old acknowledgement rows with `nodeId` and no source read as
 Node-sourced. The acknowledgement key remains `(pluginId, hash)`: identical bytes from both sources
-share one decision. The prompt names the source as the owner entered it, warns that a folder is not
-pinned, and omits the Node execution disclosure for device bundles. An updated hash asks again.
+can share one decision only while their enforced declarations agree with the declaration approved.
+The prompt names the source as the owner entered it, warns that a folder is not pinned, and omits the
+Node execution disclosure for device bundles. An updated hash asks again.
 
 A plugin installed on a Node is distributed by that Node: its client bundle travels the existing
 broker pipe to every paired device. That makes a Node a source of executable code, so the bundle is
 gated twice — once on content, once on consent.
 
-**Trust binds to bytes, not to claims.** The hash a Node advertises in `/v1/core/plugins` is
+**Trust binds to bytes and the approved client declaration, not to Node claims.** The hash a Node advertises in `/v1/core/plugins` is
 untrusted input. The helper fetches the bundle itself (the bytes never pass through the renderer),
 hashes what arrived, and stores it content-addressed under that hash. A mismatch against the
 advertised value is refused and reported, never re-keyed. Every acknowledgement therefore binds a
-plugin id to a hash no one but this device computed.
+plugin id to a hash no one but this device computed. It also stores a canonical projection of the API
+version, permissions, contributions, and emitted events that the owner reviewed. A Node that changes
+that projection under unchanged bytes loses the client selection and asks for another review. Existing
+manual acknowledgements from before this binding have no projection; they fail closed and re-prompt.
+Development-mode acknowledgements remain an explicit exception, scoped to the granted source.
 
 The terminal client has no helper to do that, so it does it itself, with the same two stores
 (`@acorn/custody`'s `PluginCache` and `PluginTrustStore`, pointed at `$XDG_CONFIG_HOME/acorn/plugins/`
@@ -463,7 +478,9 @@ half still runs. Acceptance is recorded before the distribution snapshot enables
 revoking an exact hash or ending a development grant removes its registrations and stops its worker.
 The same `(pluginId, hash)` decision can cover equivalent offers from two Nodes. If those Nodes attach
 conflicting enforced declarations to that key, the client withholds it instead of treating one
-acknowledgement as consent to both.
+acknowledgement as consent to both. A single changed offer is also withheld until its current
+declaration is approved. First-party auto-acceptance records the declaration read from app-owned
+resources, so a Node cannot widen it by claiming the same first-party bundle hash.
 
 **What "gained" means.** Each rendered permission line carries a stable grant key, separate from its
 sentence (`packages/client-core/src/host/trust/permissions.ts`). The update diff compares keys, not
@@ -477,7 +494,8 @@ The threats this closes, and the ones it does not:
   per-device acknowledgement that names the Node, and (phase 3) the sandbox the bundle runs in.
   Nothing a Node pushes runs unprompted. The sandbox is one of three, and the trust decision covers all
   of them because they are the same bytes: the iframe at `app-plugin://<hash>` for a bundle that draws
-  its own pixels, a Web Worker for one that draws a tree (`docs/shell.md § The plugin worker`), and — in
+  its own pixels, a Web Worker created by a host-owned relay at the same isolated plugin origin for
+  one that draws a tree (`docs/shell.md § The plugin worker`), and — in
   the terminal, where there is no iframe and no CSP — a `node:worker_threads` thread under
   `--permission`. No path asks a second question, and none can start without an accepted hash.
 - **A Node lying in its listing** about hash, version or permissions — the hash is recomputed from the
@@ -528,7 +546,10 @@ could post an approval would answer the question that exists because an agent mu
 
 Because the installer only validates a manifest after fetching, the approval is two screens: the agent's
 ask (action, source, its stated reason) gates the *fetch*, and a second screen shows the real manifest read
-back off disk before anything runs — install never starts a plugin — with a No that uninstalls it again.
+back off disk before anything runs. A durable marker is published before the package reaches its installed
+path. Boot and reload refuse marked packages; their client bundles are withheld. Approval checks the
+marker generation and complete package fingerprint, then clears the marker. Dismissing review leaves it
+held across restarts, and Settings → Plugins can approve or remove it. A No uninstalls it again.
 `docs/plugins.md § What the owner can know before the download` records why that ordering was chosen over
 downloading first.
 
@@ -653,20 +674,25 @@ privileged webview had no policy. It has one; the config is simply not where it 
 plainly, because the next reader will look in the same place.
 
 What the policy is a second layer behind. The renderer displays text this app did not author — agent
-transcripts, GitHub `bodyHTML`, Linear descriptions, Rollbar payloads, notes an agent wrote — and two
-bindings pass GitHub's `bodyHTML` to `innerHTML` verbatim, trusting GitHub's sanitizer:
+transcripts, GitHub `bodyHTML`, Linear descriptions, Rollbar payloads, notes an agent wrote. Two
+bindings display provider-rendered HTML:
 
 - `packages/client-core/src/host/components/ProviderHtml.tsx`, the host component every provider-rendered
   body now goes through: github's description, its comments and its review threads
 - `packages/client-core/src/kit/diff/DiffRows.tsx`
 
-The first was three hand-written bindings inside the github plugin until phase 7 of the layout
-programme. Neither is a known bug. They are listed because each one is a place where a sanitizer being wrong once
-would put script in a webview that can call into Rust, and the policy is what stands behind them if
-that ever happens.
+Both bindings call `packages/client-core/src/kit/lib/sanitizedHtml.ts` before inserting anything into
+the live DOM. It parses the provider string in an inert template, then creates fresh text and a small
+allowlist of formatting elements. The only copied attribute is a validated absolute HTTPS `href`;
+links get host-owned `target` and `rel` values. Scripts, forms, foreign namespaces, images, embeds,
+styles and other automatic resource loads are dropped, along with every provider attribute. The host
+adds bare-reference links only after this pass. Input length, node count and depth are bounded. The
+renderer CSP remains a second layer if this sanitizer is ever wrong.
 
 The Markdown renderer (`packages/client-core/src/kit/lib/markdown.ts`) is the other sink, and it is the app's
-own. It escapes first and builds tags afterwards, which holds. What did not hold was its sentinel: it
+own. It escapes first and builds tags afterwards, which holds. It only emits images from bounded raster
+data URLs; remote image URLs in Node-provided markdown become alt text so they cannot trigger requests
+from the client's network. What did not hold was its sentinel: it
 reserved U+E000 to protect code spans and images across the escaping pass, on the stated grounds that
 real text never contains it. The input decides what is in it, so a source that spelled the sentinel
 forged an index into the token tables and crashed the render. `renderMarkdown` strips U+E000 on the way
@@ -680,6 +706,12 @@ navigation checks, denied permission requests, and browser chrome outside the gu
 plugin surfaces add a manifest host allowlist enforced on redirects. The remote preview tunnel accepts
 only declared task ports and authenticates its local loopback request with a per-tunnel secret before
 forwarding it to the Node.
+
+The preview pane refuses every remote Node URL, including public URLs and tunnelled loopback URLs.
+The child webview can check a navigation but cannot confine the page's redirects and subrequests to
+the remote Node's network. A tunnelled first request would still let page script contact services on
+the client's private network. Only a Node positively marked local by custody can supply a loadable
+preview URL; switching a pane to a remote Node evicts its kept-alive native view.
 
 Agent browser tools drive a separate browser of the node's own, through `plugins/browser`, rather than
 the person's preview pane. That separation is deliberate: the pane a person is looking at is not a

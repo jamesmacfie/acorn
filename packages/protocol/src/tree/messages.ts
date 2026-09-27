@@ -96,13 +96,8 @@ export type TreeMutation =
 /** Sandbox to host. */
 export const sandboxMessage = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('tree:ready'), version: z.number().int(), entries: z.array(z.string().min(1).max(64)).max(64), scopedBridge: z.boolean().optional() }),
-  // `bytes` is the sandbox's own measurement of this batch, taken before it posted (frames/sdk.ts).
-  // The host reads it instead of stringifying the batch a second time on the main thread: the message
-  // has already been cloned into the renderer's heap by the time the host sees it, so re-serialising it
-  // there costs another copy of the same bytes and prevents nothing. What actually bounds a hostile
-  // bundle is `batchOps` here, `treeNodes`, `depth` and `textLength` in `mutation`, and the whole-batch
-  // pre-flight in client-core/host/tree/treeState.ts, none of which the sandbox can talk its way past.
-  // Absent from an older bundle, and then the host measures for itself.
+  // `bytes` is the sandbox's measurement for its own bookkeeping. The host measures the actual
+  // received message after its nonrecursive preflight; a plugin can forge this field.
   z.object({ kind: z.literal('tree:batch'), slot: slotId, ops: z.array(mutation).max(TREE_LIMITS.batchOps), bytes: z.number().int().min(0).optional() }),
   z.object({ kind: z.literal('tree:failed'), slot: slotId, message: z.string().max(1_000) }),
   z.object({ kind: z.literal('tree:pong') }),
@@ -144,10 +139,45 @@ export const hostMessage = z.discriminatedUnion('kind', [
 ])
 export type TreeHostMessage = z.infer<typeof hostMessage>
 
-/** Cheap byte count for the cap. `JSON.stringify` is what crossed the port anyway.
- *
- *  Called on the sandbox's side of the port now, before it posts, and on the host's side only for a
- *  batch that arrived without a `bytes` field. */
+/** Reject oversized or over-deep structured-clone input before a recursive wire schema sees it.
+ *  The sandbox is accepted plugin code, but its size claims are not an authority. */
+export function boundedSandboxMessage(value: unknown): boolean {
+  const pending: { value: unknown; depth: number }[] = [{ value, depth: 0 }]
+  const seen = new WeakSet<object>()
+  let values = 0
+  let chars = 0
+  while (pending.length) {
+    const item = pending.pop()!
+    // Each tree level has a node object and a children array, then up to 16 prop levels.
+    if (++values > 100_000 || item.depth > TREE_LIMITS.depth * 2 + 32) return false
+    const current = item.value
+    if (typeof current === 'string') {
+      chars += current.length
+      if (chars > TREE_LIMITS.batchBytes) return false
+      continue
+    }
+    if (current === null || current === undefined || typeof current === 'boolean') continue
+    if (typeof current === 'number' && Number.isFinite(current)) continue
+    if (typeof current !== 'object' || seen.has(current)) return false
+    seen.add(current)
+    if (Array.isArray(current)) {
+      if (values + pending.length + current.length > 100_000) return false
+      for (const child of current) pending.push({ value: child, depth: item.depth + 1 })
+      continue
+    }
+    if (Object.getPrototypeOf(current) !== Object.prototype && Object.getPrototypeOf(current) !== null) return false
+    for (const key in current) {
+      if (!Object.hasOwn(current, key)) continue
+      chars += key.length
+      if (chars > TREE_LIMITS.batchBytes || values + pending.length > 100_000) return false
+      pending.push({ value: (current as Record<string, unknown>)[key], depth: item.depth + 1 })
+    }
+  }
+  return true
+}
+
+/** Cheap byte count for the cap. `JSON.stringify` is what crossed the port anyway. The host calls
+ *  this only after boundedSandboxMessage has limited depth and size. */
 export const batchBytes = (message: unknown): number => {
   try {
     return new TextEncoder().encode(JSON.stringify(message)).byteLength

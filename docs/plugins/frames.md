@@ -15,7 +15,13 @@ from its content-addressed cache with `connect-src 'none'`: the frame has no net
 `window.acorn`, and no reach into the shell. Its only I/O is one `MessagePort`, where every call
 is checked against the manifest's declared scopes by an allowlist naming each path and method
 (`packages/client-core/src/host/frames/`, `scopes.ts` is the choke point). The host pins which
-Node the frame talks to; the frame cannot name one. A `refPanel` frame is one of the two surfaces whose
+Node the frame talks to; the frame cannot name one.
+
+The bridge parses a request path before authorization and forwards that same canonical path with its
+query string. Paths whose route changes during URL parsing, encoded path separators, and fragments are
+refused, so a plugin-owned route cannot normalize into a core or another plugin's route.
+
+A `refPanel` frame is one of the two surfaces whose
 surrounding chrome the host draws rather than the plugin (`overlay` is the other): an iframe cannot
 `Portal` out of the box its consumer placed it in, and the bridge's close verb does not reach a
 reference panel — it is granted to importers and overlays only — so the manifest adapter

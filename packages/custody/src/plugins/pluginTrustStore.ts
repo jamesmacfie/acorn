@@ -97,6 +97,9 @@ const ackSchema = z.strictObject({
   nodeId: z.string().default(''),
   source: bundleSourceSchema.optional(),
   version: z.string().min(1),
+  // Older records lack this binding and must be reviewed again before selection. The string is
+  // produced by the shared protocol projection, not accepted from the Node as an authority claim.
+  declaration: z.string().min(1).max(1_000_000).optional(),
   // Parsed, not cast. This is the disclosure the owner consents to, so it has to be provably the
   // same shape the node parsed off disk. See @acorn/protocol/plugin/contract.ts.
   permissions: pluginPermissionsSchema,
@@ -257,6 +260,10 @@ export class PluginTrustStore {
   recordDevAccept(input: { pluginId: string; hash: string; nodeId: string; source?: BundleSource; version: string }): boolean {
     const source = input.source ?? { kind: 'node', nodeId: input.nodeId }
     if (!this.devGrantFor(input.pluginId, source)) return false
+    // A per-source development grant cannot overwrite a later manual decision on the globally
+    // keyed bundle. This matters when another node offers the same bytes and the owner reviews it.
+    const existing = this.decisionFor(input.pluginId, input.hash)
+    if (existing && !existing.dev) return false
     this.record({
       ...input,
       source,

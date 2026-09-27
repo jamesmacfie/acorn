@@ -3,7 +3,7 @@ import { runCommand, validateCommand } from './commands'
 import { reportError } from './error'
 import { openCliNode } from './node'
 import { writeOutput } from './output'
-import { nodeServiceStatus, startNodeService, stopNodeService } from './service/lifecycle'
+import { nodeServiceStatus, startNodeService, stopNodeService } from './supervision/lifecycle'
 import { pluginCommandHelp } from './pluginCommands'
 
 export async function main(argv: string[] = process.argv.slice(2)): Promise<number> {

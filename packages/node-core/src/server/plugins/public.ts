@@ -12,4 +12,5 @@ export type { ActivePluginSnapshot, InstalledPlugin, LoadedPlugin, PluginLoadFai
 export { PLUGIN_API_MAJOR, parsePluginManifest, readPluginManifest } from './manifest.ts'
 export { createPluginReloader } from './reload.ts'
 export { pluginDbPath } from './storage.ts'
+export { approvePluginReview, hasPendingPluginReview, pendingPluginReviewIds, pluginReviewFingerprint, readPendingPluginReview } from './pendingReview.ts'
 export type { PluginDatabase } from './storage.ts'

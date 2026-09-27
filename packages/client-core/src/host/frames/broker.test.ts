@@ -168,6 +168,27 @@ describe('api calls', () => {
     expect(h.svc.fetch).not.toHaveBeenCalled()
   })
 
+  it('denies encoded traversal into the core preview script route before transport', async () => {
+    const h = withBridge({ api: [] })
+    h.send({
+      id: 101,
+      kind: 'api',
+      method: 'POST',
+      path: '/v1/p/board/%2e%2e/%2e%2e/core/tasks/task-1/preview-url',
+      body: { script: 'echo should-not-run' },
+    })
+    await h.settled(2)
+    expect(replyTo(h, 101)).toMatchObject({ id: 101, ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    expect(h.svc.fetch).not.toHaveBeenCalled()
+  })
+
+  it('forwards the same canonical route and query it authorized', async () => {
+    const h = withBridge({ api: [] })
+    h.send({ id: 102, kind: 'api', method: 'GET', path: '/v1/p/board/cards/a%20b?q=%2e%2e' })
+    await h.settled(2)
+    expect(h.svc.fetch).toHaveBeenCalledWith('GET', '/v1/p/board/cards/a%20b?q=%2e%2e', undefined, expect.anything())
+  })
+
   it('denies the project config write even to a frame holding core.projects:write', async () => {
     // The code-execution path. Config writes are shell commands the Node runs on the next task, so this
     // is asserted here as well as in the scope table's own suite.
@@ -595,6 +616,13 @@ describe('byte requests', () => {
     )
   })
 
+  it('forwards an authorized byte route with its query string intact', async () => {
+    const h = withBridge({ api: [] })
+    h.send({ id: 104, kind: 'api.bytes', method: 'GET', path: '/v1/p/board/files/a%20b?size=small' })
+    await h.settled(2)
+    expect(h.svc.fetchBytes).toHaveBeenCalledWith('GET', '/v1/p/board/files/a%20b?size=small', undefined, expect.anything())
+  })
+
   // The one that matters. `image-markup` needs attachment content, and the temptation is to let it call
   // the agents routes directly. It cannot, and the check happens before the body is looked at, so a
   // 12 MiB POST at somebody else's namespace is refused without being read.
@@ -603,6 +631,14 @@ describe('byte requests', () => {
     h.send({ id: 32, kind: 'api.bytes', method: 'GET', path: '/v1/p/agents/attachments/a1/content' })
     await h.settled(2)
     expect(replyTo(h, 32)).toMatchObject({ id: 32, ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    expect(h.svc.fetchBytes).not.toHaveBeenCalled()
+  })
+
+  it('refuses encoded traversal on the byte path before transport', async () => {
+    const h = withBridge({ api: [] })
+    h.send({ id: 103, kind: 'api.bytes', method: 'GET', path: '/v1/p/board/%2e%2e/%2e%2e/core/tasks/task-1/preview-url' })
+    await h.settled(2)
+    expect(replyTo(h, 103)).toMatchObject({ id: 103, ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
     expect(h.svc.fetchBytes).not.toHaveBeenCalled()
   })
 

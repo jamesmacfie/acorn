@@ -222,6 +222,7 @@ client: pickFiles
 client: pickFolder
 client: postJson
 client: prefsOptions
+client: previewUrlForClient
 client: previewViews
 client: projectImporterRegistry
 client: projectPath
@@ -247,6 +248,7 @@ client: registerContextMenuItems
 client: registerNoticeTargetHandler
 client: registerWsBinaryHandler
 client: registerWsChannel
+client: remotePreviewBlocked
 client: renderMarkdown
 client: replaceAttentionSource
 client: requestTerminalFocusIntent
@@ -397,6 +399,7 @@ node: PLUGIN_TOOL_SCHEMA_MAX_DEPTH
 node: PLUGIN_TOOL_TIMEOUT_MAX_MS
 node: PluginAgentToolDescriptor
 node: PluginBroadcast
+node: PluginCliCommandDescriptor
 node: PluginContextSection
 node: PluginContextSectionDescriptor
 node: PluginDatabase
@@ -626,6 +629,7 @@ testkit: setRouteTestCapability
 testkit: setRunBridge
 testkit: settleBackground
 testkit: testAgentToolDescriptor
+testkit: testCliCommandDescriptor
 testkit: testConnection
 testkit: testContextSectionDescriptor
 testkit: testEnv

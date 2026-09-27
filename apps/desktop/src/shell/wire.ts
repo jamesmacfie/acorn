@@ -114,5 +114,6 @@ export type WireFetchRequest = {
   headers?: Record<string, string>
   body?: WireFetchBody
   timeoutMs?: number
+  maxResponseBytes?: number
 }
 export type WireFetchResponse = { status: number; headers: Record<string, string>; body: string }

@@ -31,7 +31,7 @@ export const pullRequests = sqliteTable(
     state: text('state').notNull(), // open | closed | merged
     draft: integer('draft', { mode: 'boolean' }).notNull().default(false),
     title: text('title').notNull(),
-    body: text('body'), // sanitized bodyHTML from GraphQL (rendered via innerHTML)
+    body: text('body'), // provider-rendered bodyHTML; the client sanitizes it before display
     headSha: text('head_sha'), // head commit oid — commit_id for creating line comments
     headRef: text('head_ref'),
     baseRef: text('base_ref'),

@@ -13,6 +13,9 @@ vi.mock('../sessions/managedClient', () => ({
     attachmentContent: async () => ({
       bytes: new Uint8Array([137, 80, 78, 71]), type: 'image/png', filename: 'screenshot.png',
     }),
+    attachmentPreview: async () => ({
+      bytes: new Uint8Array([137, 80, 78, 71]), type: 'image/png', filename: 'screenshot.png',
+    }),
   },
 }))
 

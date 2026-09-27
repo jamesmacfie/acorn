@@ -16,6 +16,7 @@ import type {
   EnqueueAgentTurnInput,
   ImportAgentTranscriptInput,
 } from '../../shared/schemas'
+import { MAX_INLINE_IMAGE_BYTES } from './inlineImage'
 
 const ROOT = '/v1/p/agents'
 const sessionRoute = (sessionId: string, suffix = '') =>
@@ -50,6 +51,8 @@ export const managedAgentApi = {
   // Bytes, not a URL, for the reason artifactContent gives below.
   attachmentContent: (attachmentId: string) =>
     readBytes(`${ROOT}/attachments/${encodeURIComponent(attachmentId)}/content`, 'Unable to read attachment.'),
+  attachmentPreview: (attachmentId: string) =>
+    readBytes(`${ROOT}/attachments/${encodeURIComponent(attachmentId)}/content`, 'Unable to read attachment preview.', { maxResponseBytes: MAX_INLINE_IMAGE_BYTES }),
   artifacts: (sessionId: string) =>
     readJson<AgentArtifact[]>(sessionRoute(sessionId, '/artifacts')),
   artifact: (artifactId: string) =>
@@ -59,6 +62,8 @@ export const managedAgentApi = {
   // the device bearer. The caller turns this into a blob URL for the download.
   artifactContent: (artifactId: string) =>
     readBytes(`${ROOT}/artifacts/${encodeURIComponent(artifactId)}/content`, 'Unable to download artifact.'),
+  artifactPreview: (artifactId: string) =>
+    readBytes(`${ROOT}/artifacts/${encodeURIComponent(artifactId)}/content`, 'Unable to read artifact preview.', { maxResponseBytes: MAX_INLINE_IMAGE_BYTES }),
   // `nodeId` and `signal` are the fleet escape hatch (client-core's node/fanout.ts). Every other method
   // here addresses the ambient active node, which is right for a surface bound to one task; these two
   // feed Fleet home and the aggregated Agent Center, whose job is to ask several nodes at once.

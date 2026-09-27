@@ -28,7 +28,9 @@ fn plugin_cache_dir(user_data_dir: &Path) -> PathBuf {
 /// The plugin frame's CSP, one header on every response. See docs/shell.md, "The plugin frame
 /// origin", for each directive. `connect-src 'none'` is the load-bearing one: fetch, XHR, WebSocket,
 /// and sendBeacon all fail in a frame served this policy.
-const CSP: &str = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
+const CSP: &str = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'none'; frame-src 'none'; worker-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
+const RELAY_CSP: &str = "default-src 'none'; script-src 'self'; worker-src 'self'; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'";
+const WORKER_CSP: &str = "default-src 'none'; script-src 'self'; worker-src 'none'; connect-src 'none'";
 
 /// The generated document: the host's shared stylesheet and the plugin's module script. No inline
 /// script, no favicon, and no title a plugin could use to impersonate the shell in a devtools list.
@@ -49,6 +51,8 @@ const DOCUMENT: &str = r#"<!doctype html>
 <body><script type="module" src="/client.js"></script></body>
 </html>
 "#;
+const WORKER_DOCUMENT: &str = "<!doctype html><html><head><meta charset=\"utf-8\"></head><body><script src=\"/worker-host.js\"></script></body></html>";
+const WORKER_RELAY: &str = include_str!("plugin_worker_relay.js");
 
 /// What the handler needs to answer: where bundles live, and the stylesheet every frame shares.
 pub struct Frames {
@@ -57,17 +61,6 @@ pub struct Frames {
 }
 
 impl Frames {
-    /// Where one bundle's bytes are, for a reader outside this module.
-    ///
-    /// The plugin worker is the reader: a worker script has to be same-origin with the document that
-    /// starts it, so the shell serves the identical bytes at `app://acorn/plugin-worker/<hash>.js`
-    /// under its own policy (`app_scheme.rs`). The cache is content-addressed either way, so both
-    /// paths name the same file and neither can name anything else.
-    pub fn bundle_path(&self, hash: &str) -> Option<PathBuf> {
-        if !is_hash(hash) { return None; }
-        Some(self.cache_dir.join(format!("{hash}.js")))
-    }
-
     /// Read the staged stylesheet once. A missing one is not fatal. Frames still run, undressed,
     /// which reads better than a scheme that refuses to serve.
     pub fn new(user_data_dir: &Path, styles_path: &Path) -> Self {
@@ -88,13 +81,15 @@ pub fn serve(frames: &Frames, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
     // reaches the cache lookup.
     let hash = request.uri().host().unwrap_or_default().to_string();
     if !is_hash(&hash) {
-        return respond(404, "text/plain", Vec::new());
+        return respond(404, "text/plain", Vec::new(), CSP);
     }
 
     match request.uri().path() {
-        "/" | "/index.html" => respond(200, "text/html; charset=utf-8", DOCUMENT.as_bytes().to_vec()),
+        "/" | "/index.html" => respond(200, "text/html; charset=utf-8", DOCUMENT.as_bytes().to_vec(), CSP),
+        "/worker.html" => respond(200, "text/html; charset=utf-8", WORKER_DOCUMENT.as_bytes().to_vec(), RELAY_CSP),
+        "/worker-host.js" => respond(200, "text/javascript; charset=utf-8", WORKER_RELAY.as_bytes().to_vec(), RELAY_CSP),
         // One host-owned stylesheet, identical at every plugin origin. The plugin cannot replace it.
-        "/ui.css" => respond(200, "text/css; charset=utf-8", frames.styles.clone()),
+        "/ui.css" => respond(200, "text/css; charset=utf-8", frames.styles.clone(), CSP),
         // One bundle per plugin, one file per bundle. There is no plugin-controlled asset tree: a
         // plugin that wants an image or font inlines it, which keeps the hash claim auditable.
         //
@@ -103,18 +98,18 @@ pub fn serve(frames: &Frames, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
         "/client.js" => match std::fs::read(frames.cache_dir.join(format!("{hash}.js"))) {
             // A hash the cache does not hold, usually a bundle the owner rejected or one that was
             // swept. The answer is nothing, not a fetch from the node that offered it.
-            Err(_) => respond(404, "text/plain", Vec::new()),
-            Ok(bytes) => respond(200, "text/javascript; charset=utf-8", bytes),
+            Err(_) => respond(404, "text/plain", Vec::new(), WORKER_CSP),
+            Ok(bytes) => respond(200, "text/javascript; charset=utf-8", bytes, WORKER_CSP),
         },
-        _ => respond(404, "text/plain", Vec::new()),
+        _ => respond(404, "text/plain", Vec::new(), CSP),
     }
 }
 
-fn respond(status: u16, mime: &str, body: Vec<u8>) -> Response<Vec<u8>> {
+fn respond(status: u16, mime: &str, body: Vec<u8>, csp: &str) -> Response<Vec<u8>> {
     Response::builder()
         .status(status)
         .header("content-type", mime)
-        .header("content-security-policy", CSP)
+        .header("content-security-policy", csp)
         // The bundle is served as a module script. A sniffed type is a type an attacker chose.
         .header("x-content-type-options", "nosniff")
         // Frames are hash-addressed, so caching forever would be correct, but this is a local scheme
@@ -146,15 +141,40 @@ mod tests {
     #[test]
     fn the_frame_policy_is_network_dead_and_travels_on_every_response() {
         let frames = Frames { cache_dir: PathBuf::from("/nowhere"), styles: b"body{}".to_vec() };
-        for (path, status) in [("/", 200), ("/ui.css", 200), ("/client.js", 404), ("/anything-else", 404)] {
+        for (path, status) in [("/", 200), ("/ui.css", 200), ("/client.js", 404), ("/worker.html", 200), ("/worker-host.js", 200), ("/anything-else", 404)] {
             let response = serve(&frames, &get(path, HASH));
             assert_eq!(response.status(), status, "{path}");
             let csp = response.headers().get("content-security-policy").unwrap().to_str().unwrap();
             assert!(csp.contains("connect-src 'none'"), "{path}: {csp}");
             assert!(csp.contains("script-src 'self'"), "{path}: {csp}");
-            assert!(csp.contains("frame-src 'none'"), "{path}: {csp}");
+            if path == "/client.js" {
+                assert!(csp.contains("worker-src 'none'"), "{path}: {csp}");
+            } else {
+                assert!(csp.contains("frame-src 'none'"), "{path}: {csp}");
+            }
             assert_eq!(response.headers().get("cache-control").unwrap(), "no-store");
         }
+    }
+
+    #[test]
+    fn relay_document_only_loads_host_code_and_can_start_only_same_origin_worker() {
+        let frames = Frames { cache_dir: PathBuf::from("/nowhere"), styles: Vec::new() };
+        let document = serve(&frames, &get("/worker.html", HASH));
+        let html = String::from_utf8(document.body().clone()).unwrap();
+        assert!(html.contains("src=\"/worker-host.js\""));
+        assert!(!html.contains("/client.js"));
+        let csp = document.headers().get("content-security-policy").unwrap().to_str().unwrap();
+        assert!(csp.contains("worker-src 'self'"));
+        assert!(csp.contains("connect-src 'none'"));
+        let script = serve(&frames, &get("/worker-host.js", HASH));
+        let js = String::from_utf8(script.body().clone()).unwrap();
+        assert!(js.contains("new Worker('/client.js'"));
+        assert!(js.contains("event.source !== window.parent"));
+        assert!(js.contains("event.origin !== hostOrigin"));
+        assert!(js.contains("'app://acorn'"));
+        assert!(js.contains("'http://app.localhost'"));
+        assert!(js.contains("message.nonce !== nonce"));
+        assert!(js.contains("event.ports.length !== 2"));
     }
 
     #[test]

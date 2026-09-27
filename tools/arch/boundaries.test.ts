@@ -289,6 +289,7 @@ describe('architecture boundaries', () => {
       // The supervised node's own child.
       'packages/custody/src/supervision/serviceHost.ts',
       'apps/tui/src/node/supervise.ts', // `acorn` supervising the node it started, when it started one
+      'apps/cli/src/supervision/lifecycle.ts', // explicit background Node lifecycle commands
       // Long-lived engines. Each owns its children's lifetime, and the broker has no model for that.
       'plugins/terminal/src/server/terminal.ts', // PTYs
       'plugins/agents/src/server/drivers/jsonRpcProcess.ts', // ACP driver, one process per session
@@ -723,7 +724,7 @@ describe('architecture boundaries', () => {
       ['packages/protocol/src/agentContext.ts', "'context' the agent input part"],
       ['packages/client-core/src/features/agent/contextSnapshot.ts', "'context' the agent input part"],
       ['packages/client-core/src/host/chrome/chromeData.ts', "'context' the agent input part"],
-      ['packages/node-core/src/server/plugins/permissions.ts', "'context' the permission name"],
+      ['packages/node-core/src/server/plugins/coreFacets.ts', "'context' the core facet name"],
       ['packages/node-core/src/server/plugins/nodePluginWorker.ts', "'context' the RPC path and 'http' the Node builtin"],
       // `database` the layer a workflow definition was found in: a row in acorn's own store rather
       // than a file somebody committed. Nothing to do with the database plugin.

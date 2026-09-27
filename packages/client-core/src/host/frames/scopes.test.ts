@@ -203,6 +203,11 @@ describe('plugin namespaces', () => {
     expect(allowApi(board, 'POST', '/v1/p/board').allowed).toBe(true)
   })
 
+  it('preserves query strings and encoded opaque ids on an allowed route', () => {
+    const path = '/v1/p/board/cards/a%20b%25?q=%2e%2e'
+    expect(allowApi(board, 'GET', path)).toEqual({ allowed: true, path })
+  })
+
   it('denies another plugin’s namespace', () => {
     expect(allowApi(board, 'GET', '/v1/p/github/pulls')).toEqual({ allowed: false, reason: 'another plugin’s namespace' })
   })
@@ -224,6 +229,30 @@ describe('malformed paths', () => {
 
   it('rejects traversal', () => {
     expect(allowApi(board, 'GET', '/v1/core/tasks/../security').allowed).toBe(false)
+  })
+
+  it('rejects paths whose route changes when custody constructs its URL', () => {
+    const preview = '/v1/core/tasks/task-1/preview-url'
+    for (const path of [
+      `/v1/p/board/%2e%2e/%2e%2e/core/tasks/task-1/preview-url`,
+      `/v1/p/board/.%2e/.%2e/core/tasks/task-1/preview-url`,
+      `/v1/p/board/../../core/tasks/task-1/preview-url`,
+      `/v1/p/board\\..\\..\\core\\tasks\\task-1\\preview-url`,
+    ]) {
+      expect(new URL(path, 'https://node.invalid').pathname).toBe(preview)
+      expect(allowApi(board, 'POST', path).allowed).toBe(false)
+    }
+  })
+
+  it('rejects encoded separators, nested traversal and URL fragments', () => {
+    for (const path of [
+      '/v1/p/board/cards/a%2fb',
+      '/v1/p/board/cards/a%5cb',
+      '/v1/p/board/%252e%252e/%252e%252e/core/tasks/task-1/preview-url',
+      '/v1/p/board/cards#fragment',
+    ]) {
+      expect(allowApi(board, 'GET', path).allowed).toBe(false)
+    }
   })
 
   it('rejects a method it does not know', () => {

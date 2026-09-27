@@ -13,6 +13,7 @@ import type { PluginInstallSource } from '@acorn/protocol/api.ts'
 import { describePluginSource } from '@acorn/protocol/plugin/source.ts'
 import { resolveInRoot } from '@acorn/node-core/server/core/fs.ts'
 import { installSchema } from './pluginRequests'
+import { NodeResponseTooLargeError } from '../broker/nodeRequest'
 
 const log = createLogger('plugins')
 
@@ -31,8 +32,8 @@ const INDEX_FILE = 'index.json'
 const HASH_RE = /^[0-9a-f]{64}$/
 
 // Matches the node's own ceiling, node-core MAX_CLIENT_BUNDLE_BYTES. Enforced again here because the
-// node that answers is not necessarily one this device trusts yet, and a response arrives fully
-// buffered in main's heap.
+// node that answers is not necessarily one this device trusts yet. The same limit is passed to the
+// broker transport, which rejects before retaining excess response bytes.
 export const MAX_BUNDLE_BYTES = 8 * 1024 * 1024
 
 // How long an unreferenced bundle survives. Generous on purpose. The cache is a few hundred kilobytes
@@ -62,7 +63,7 @@ export type PutResult = { hash: string } | { error: PutFailure }
 
 // Just enough of NodeBroker to fetch. Narrow so the tests can exercise the hashing rules without a
 // TLS server.
-export type BundleFetcher = { fetch(nodeId: string, request: NodeFetchRequest): Promise<NodeFetchResponse> }
+export type BundleFetcher = { fetch(nodeId: string, request: NodeFetchRequest, limits?: { maxResponseBytes?: number }): Promise<NodeFetchResponse> }
 
 export class PluginCache {
   #entries: Record<string, PluginCacheEntry> | null = null
@@ -131,7 +132,7 @@ export class PluginCache {
         path: corePluginBundleByHashRoute(pluginId, claim.hash),
         method: 'GET',
         headers: {},
-      })
+      }, { maxResponseBytes: MAX_BUNDLE_BYTES })
       if (response.status === 404) {
         // A node from before the hash-addressed route only has /client.js. The device still hashes
         // what arrives and refuses anything other than this exact claim below.
@@ -140,9 +141,10 @@ export class PluginCache {
           path: corePluginBundleRoute(pluginId),
           method: 'GET',
           headers: {},
-        })
+        }, { maxResponseBytes: MAX_BUNDLE_BYTES })
       }
     } catch (error) {
+      if (error instanceof NodeResponseTooLargeError) return { error: 'too-large' }
       log.warn(`could not fetch ${pluginId} from ${nodeId}: ${describeError(error).message}`, { 'plugin.id': pluginId, 'node.id': nodeId })
       return { error: 'unreachable' }
     }

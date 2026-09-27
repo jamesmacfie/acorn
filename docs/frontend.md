@@ -430,8 +430,10 @@ over a byte ceiling, and on a **chunk name**.
 - **The terminal client.** `apps/tui/scripts/check-startup-graph.mjs`, run from `@acorn/tui`'s `build`.
   That bundle sets `modulePreload: false` and has one entry, so there is no preload list to read; the
   analogue is the static import closure of the `App` chunk `main.js` reaches for first, and everything
-  in it is evaluated before the first cell is drawn. The ceiling is 1,130,000 B. The 2026-09-23
-  acceptance build measured 1,118,096 B across 123 eager chunks. The closure grew when the client
+  in it is evaluated before the first cell is drawn. The ceiling is 1,175,000 B. The 2026-09-28
+  security build measured 1,137,492 B across 131 eager chunks; validation at the Node and content
+  boundaries must load before untrusted content is drawn. The earlier 2026-09-23 acceptance build
+  measured 1,118,096 B across 123 eager chunks. The closure grew when the client
   took over its own painting: what
   used to be a 6 MB native library outside the bundle is about 98 KB inside it
   ([tui.md](./tui.md) § How a frame is drawn). Dropping a dependency moves this number by nothing —

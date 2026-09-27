@@ -264,7 +264,7 @@ export function createFrameBridge(input: {
     const controller = new AbortController()
     inFlight.set(id, controller)
     try {
-      const result = await services.fetch(method, path, body, controller.signal)
+      const result = await services.fetch(method, decision.path, body, controller.signal)
       if (!inFlight.has(id)) return // cancelled while in flight; the frame stopped caring
       if (result.ok) post({ id, ok: true, status: result.status, body: result.body })
       else {
@@ -329,7 +329,7 @@ export function createFrameBridge(input: {
     const controller = new AbortController()
     inFlight.set(id, controller)
     try {
-      const result = await services.fetchBytes(method, path, body, controller.signal)
+      const result = await services.fetchBytes(method, decision.path, body, controller.signal)
       if (!inFlight.has(id)) return // cancelled while in flight; the frame stopped caring
       if (!result.ok) {
         post({

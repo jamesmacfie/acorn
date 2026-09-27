@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono'
 import { z } from 'zod'
-import { decidePluginRequest } from '../../agentTools/pluginRequests'
+import { decidePluginRequest, pendingPluginRequest } from '../../agentTools/pluginRequests'
 import { auditRequest } from '../../auditRequest'
 import { broadcastPluginsChanged } from '../../notify'
 import { routeCapabilityFor, BridgeError, viaBridge } from '../../bridge'
@@ -23,9 +23,12 @@ const installSource = z.union([
   z.strictObject({ url: z.string().min(1).max(2048) }),
   z.strictObject({ path: z.string().min(1).max(1024) }),
 ])
-const installBody = z.strictObject({ source: installSource, allowDowngrade: z.boolean().optional() })
-const updateBody = z.strictObject({ allowDowngrade: z.boolean().optional() })
+const installBody = z.strictObject({ source: installSource, allowDowngrade: z.boolean().optional(), reviewRequestId: z.uuid().optional() })
+const updateBody = z.strictObject({ allowDowngrade: z.boolean().optional(), reviewRequestId: z.uuid().optional() })
 const uninstallBody = z.strictObject({ purgeData: z.boolean().optional() })
+const reviewBody = z.strictObject({ reviewId: z.uuid(), fingerprint: z.string().regex(/^[a-f0-9]{64}$/), decision: z.enum(['approved', 'denied']) })
+const sameSource = (left: unknown, right: unknown): boolean =>
+  !!left && !!right && JSON.stringify(Object.entries(left as Record<string, unknown>).sort()) === JSON.stringify(Object.entries(right as Record<string, unknown>).sort())
 // The owner's answer to one agent-raised request. The device writes `message`, never the agent: the
 // sentence the agent is told is the one piece of this exchange the human's side owns.
 const requestDecisionBody = z.strictObject({
@@ -229,8 +232,12 @@ export const plugins = new Hono<AppEnv>()
     if (missing) return missing
     const parsed = installBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
+    if (parsed.data.reviewRequestId) {
+      const request = pendingPluginRequest(parsed.data.reviewRequestId)
+      if (!request || request.action !== 'install' || !sameSource(request.source, parsed.data.source)) return respondError(c, 400, 'bad_request', ['The staged install does not match a pending agent request.'])
+    }
     return viaBridge(c, PLUGIN_STATE, async (bridge) => {
-      const result = await asBadRequest(() => bridge.install(parsed.data.source, { allowDowngrade: parsed.data.allowDowngrade }))
+      const result = await asBadRequest(() => bridge.install(parsed.data.source, { allowDowngrade: parsed.data.allowDowngrade, reviewRequestId: parsed.data.reviewRequestId }))
       auditRequest(c, {
         action: 'plugins.installed',
         subject: result.id,
@@ -248,8 +255,12 @@ export const plugins = new Hono<AppEnv>()
     const parsed = updateBody.safeParse(await c.req.json().catch(() => ({})))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     const id = c.req.param('id')
+    if (parsed.data.reviewRequestId) {
+      const request = pendingPluginRequest(parsed.data.reviewRequestId)
+      if (!request || request.action !== 'update' || request.pluginId !== id) return respondError(c, 400, 'bad_request', ['The staged update does not match a pending agent request.'])
+    }
     return viaBridge(c, PLUGIN_STATE, async (bridge) => {
-      const result = await asBadRequest(() => bridge.update(id, { allowDowngrade: parsed.data.allowDowngrade }))
+      const result = await asBadRequest(() => bridge.update(id, { allowDowngrade: parsed.data.allowDowngrade, reviewRequestId: parsed.data.reviewRequestId }))
       auditRequest(c, {
         action: 'plugins.updated',
         subject: result.id,
@@ -257,6 +268,32 @@ export const plugins = new Hono<AppEnv>()
       })
       broadcastPluginsChanged()
       return result
+    })
+  })
+  .post('/:id/review', async (c) => {
+    const missing = requireIdempotencyKey(c)
+    if (missing) return missing
+    const parsed = reviewBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    const id = c.req.param('id')
+    if (!/^[a-z][a-z0-9-]{1,31}$/.test(id)) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, PLUGIN_STATE, async (bridge) => {
+      const pending = bridge.pendingReview(id)
+      if (!pending || !('reviewId' in pending) || pending.reviewId !== parsed.data.reviewId || pending.fingerprint !== parsed.data.fingerprint) {
+        throw new BridgeError(409, 'bad_request', 'This package review changed. Refresh the plugin list.')
+      }
+      if (parsed.data.decision === 'approved') {
+        await asBadRequest(() => bridge.approveReview(id, pending.reviewId, pending.fingerprint))
+      } else {
+        await asBadRequest(() => bridge.uninstall(id, {}))
+      }
+      decidePluginRequest(pending.requestId, {
+        decision: parsed.data.decision,
+        message: parsed.data.decision === 'approved' ? `The owner reviewed and approved ${id}.` : `The owner reviewed and removed ${id}.`,
+      })
+      auditRequest(c, { action: 'plugins.review.decided', subject: id, details: { decision: parsed.data.decision } })
+      broadcastPluginsChanged()
+      return { ok: true }
     })
   })
   // The one exception to "nothing here starts a plugin" (docs/plugins.md § The dev loop § Reloading

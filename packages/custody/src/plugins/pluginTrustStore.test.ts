@@ -62,6 +62,15 @@ describe('acknowledging a bundle', () => {
     expect(first.decisionFor('sparkline', HASH_A)).toMatchObject({ dev: true, partial: true, source: { kind: 'device' } })
   })
 
+  it('does not overwrite a later manual decision when a development source is cached again', () => {
+    const first = store()
+    first.grantDev({ pluginId: 'sparkline', nodeId: 'node-a', source: { kind: 'node', nodeId: 'node-a' }, grantedAt: Date.now() })
+    expect(first.recordDevAccept({ pluginId: 'sparkline', nodeId: 'node-a', hash: HASH_A, version: '1.0.0' })).toBe(true)
+    first.record(ack({ decision: 'rejected', declaration: 'reviewed-declaration' }))
+    expect(first.recordDevAccept({ pluginId: 'sparkline', nodeId: 'node-a', hash: HASH_A, version: '1.0.0' })).toBe(false)
+    expect(first.decisionFor('sparkline', HASH_A)).toMatchObject({ decision: 'rejected', declaration: 'reviewed-declaration' })
+  })
+
   it('keeps device acknowledgements after uninstall while ending future development trust', () => {
     const first = store()
     first.grantDev({ pluginId: 'sparkline', nodeId: '', source: { kind: 'device' }, grantedAt: Date.now() })
