@@ -3,7 +3,7 @@ import { workflowIncrementalQuery } from './workflowIncremental'
 import { type HeadlessResult, type PluginDatabase } from '@acorn/plugin-api/node'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../shared/stepFields'
 import type { PolicyEvaluator, StepHandler, StepHandlerContext, StepHandlerOutcome, StepKindContribution, StepValidator, WorkflowStepDef, WorkflowStepRow } from '../shared/workflowContracts'
-import type { RunnerDeps, StepRunRequest } from './workflowRunner'
+import type { RunnerDeps, StepRunRequest } from './workflowRunnerDeps'
 
 export const MAX_STEP_TURNS = 8
 
