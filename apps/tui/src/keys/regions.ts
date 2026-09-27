@@ -1,63 +1,30 @@
-// Focus regions without a DOM. This store alone owns the focused renderable, scope stack, region
-// claims, and focus memory. regionTraversal.ts walks explicit tree inputs and counts each visited
-// node through the callback supplied here.
-//
-// `client-core/host/keys/focusRegions.ts` keeps the same contract and is DOM all the way down: it
-// orders regions by `compareDocumentPosition`, finds a region's first stop with `querySelector`,
-// focuses the element itself, and listens for `focusin` and `pointerdown`. None of that exists here
-// (docs/tui.md § Focus regions).
-//
-// What replaces each:
-//
-//   order       the layout registers its regions in the order it draws them, from its own knowledge
-//               (LAYOUT_REGIONS in @acorn/protocol/paneLayouts.ts). Nothing is derived from position.
-//   first stop  the first renderable in the region's subtree this store will focus. The kit marks
-//               those as it draws them — `focusRoles.ts` says which nodes are a stop, an item, a
-//               collection or a trap — and the `focusable` flag is what that mark becomes.
-//   focus       this module's. One signal holds the renderable that has the keys, this file is the
-//               only thing that writes it, and the renderer is told rather than asked
-//               (§ The one owner).
-//   pointer     a hit test rather than a focus event. The renderer resolves what a click landed on
-//               and the store decides what that means, which is why the renderer's own `autoFocus`
-//               is off (§ Clicks are hit tests, ../main.tsx).
-//
-// Five levels and nothing else: screen, column, region, parent stop, stop. A parent stop is a
-// renderable that owns panels — a `Sections` strip owns the panel under it — so Down enters and
-// Escape climbs. Everything the shell knows and this module must not, arrives through `setTopology`
-// and `setPaneCycler`: no chrome id is spelled here.
-//
-// There is one question about where the keys are and one rule for putting them somewhere better,
-// `ensureFocus`, scheduled by `scheduleSettle`. That is the only `queueMicrotask` in this folder, and
-// the reason is that six of them raced each other (§ The landing rule).
-//
-// The pane and region chords live on the same layer 5 the desktop uses, so priority decides here too.
+// This store owns the focused renderable, scope stack, region claims, and focus memory.
+// The kit marks focusable nodes; regionTraversal.ts walks the retained tree.
+// Chrome supplies topology and pane cycling without leaking its IDs into this module.
 
 import { createSignal, onCleanup } from 'solid-js'
 import { isRemoved, type Renderable } from '../tree/compat'
 import type { Press } from '../tree/hit'
 import type { Renderer } from '../renderer'
+import {
+  collectionAt, collectionExpands, collections, isItem, itemByIdentity, itemIdentity,
+  itemPick, registerItem, resetCollections,
+} from './collectionRegistry'
+import {
+  findParent, isPanel, ownerOf, panelSet, parentEntries, parentEntry, resetParentStops,
+} from './parentStops'
+import type { ParentStop } from './parentStops'
 import { adjacentStop, firstInTree, stopsInTree } from './regionTraversal'
+
+export { markCollection } from './collectionRegistry'
+export { markParent, panelsChanged } from './parentStops'
 
 export type RegionRef = { paneId: string; regionId: string }
 
-/** Is this a scroll viewport?
- *
- *  By `kind`, because a node here is a plain object and there is no class to be an instance of
- *  (../tree/compat.ts).
- *
- *  Exported for the footer, which has to say `scroll` rather than `move` for the one stop that
- *  scrolls (../chrome/bindings.ts § focusedKind). */
+/** A native scrollbox can own arrow keys when it has no control. */
 export const isViewport = (node: Renderable): boolean => node.kind === 'scrollbox'
 
-/** Is this a field somebody types into?
- *
- *  By `kind` for the same reason `isViewport` is, and this one is the reason nothing typed under our
- *  painter at first: `../keys/install.ts § isTypingTarget` asked two `instanceof`s of a plain object,
- *  so the typing shadow never went up, the bare keys stayed bound to the collection around the field,
- *  and the hand-off had nothing it recognised to hand a key to.
- *
- *  Exported for its two askers, which are the dispatcher's hand-off and the footer's row of words —
- *  both of which had their own copy of the pair (`../chrome/bindings.ts § focusedKind`). */
+/** Input and textarea nodes receive typed keys through the terminal handoff. */
 export const isField = (node: Renderable): boolean => node.kind === 'input' || node.kind === 'textarea'
 
 /** The leftmost column. Two facts about the screen are two too many for this module to know, so this
@@ -117,26 +84,14 @@ type Group = RegionRef & Memory & {
 }
 
 const groups: Group[] = []
-// And the same regions by their box and by their ref, because every question this module asks about a
-// region is one of those two lookups inside a walk of the retained tree: `stopsIn` asks "is this child
-// a region" of every node it visits, `regionOf` asks it of every ancestor, and `groupAt` resolves the
-// claim on every move. A linear scan inside a walk is O(nodes × regions) where O(depth) would do.
-//
-// The array stays, because ordering is the one thing it is good at and `ordered()` is the only reader
-// that needs it (§ ordered). The maps are written where a region registers and deleted where it goes,
-// so there is one place either can drift and it is the same place.
+// Keep order in the array and use maps for repeated ancestor and reference lookups.
 const groupByBox = new Map<Renderable, Group>()
 const groupByRef = new Map<string, Group>()
 
 const refKey = (ref: RegionRef): string => `${ref.paneId}\u0000${ref.regionId}`
 
-// ── The step counter ──────────────────────────────────────────────────────────────────────────
-//
-// How many renderables the walks in this module visited, so "a key press costs the depth of the focus
-// tree and not the size of the region" is a number rather than a claim. Behind the same flag the key
-// trace is, because a counter nobody reads is a branch on every node of every walk
-// (./install.ts § The trace, docs/tui.md § Seeing what the keys did).
-
+// ── The step counter ──
+// Count tree visits only while the key trace is enabled.
 let counting = !!process.env.ACORN_TUI_KEYS_TRACE
 let visited = 0
 
@@ -174,26 +129,7 @@ const [focusedNode, setFocusedNode] = createSignal<Renderable | null>(null)
 /** The renderable that has the keys. */
 export const focusedRenderable = focusedNode
 
-/**
- * Whether a renderable is still on screen: alive, visible, visible all the way up, and still in the
- * tree.
- *
- * The parent walk is the whole point. OpenTUI's `visible` is per node, so a focused descendant of a
- * hidden box goes on reporting `visible: true` about itself, and two things here hide a whole subtree
- * rather than unmounting it: the shell's main row behind an overlay, and the `TabPanel` that is not
- * showing. Asking the node alone said the keys were fine while they sat behind a dialog
- * (../chrome/Shell.tsx, ../kit/grouping.tsx, ../tree/compat.ts § visible).
- *
- * The end of the walk is the fourth question and it is our painter's. Nothing is destroyed there —
- * that is the fault class it exists to end — so `isDestroyed` cannot answer "Solid took this away",
- * and a re-rendered pane left whole subtrees answering yes to the other three from nowhere at all.
- * Only the top of a removed subtree is unlinked, so the question belongs at the end of the chain and
- * nowhere else, and it costs the walk nothing (../tree/compat.ts § removed). Under the old painter it
- * is always false, because nothing there ever marks a node.
- *
- * Exported because the reachability property asks it after every press, and two answers to one
- * question is the drift this module exists to remove (../reachability.test.tsx).
- */
+/** Check the node, every visible ancestor, and the retained tree root. Hidden panels and unlinked subtrees cannot hold focus. */
 export const onScreen = (node: Renderable | null | undefined): boolean => {
   if (!node || node.isDestroyed) return false
   // The walk starts at the node rather than at its parent, because a node's own `visible` is not a
@@ -204,15 +140,7 @@ export const onScreen = (node: Renderable | null | undefined): boolean => {
   return !isRemoved(top)
 }
 
-/**
- * Whether the keys are inside this box.
- *
- * The question a frame asks to draw itself as the active one. OpenTUI answers a version of it for
- * free, since `focusedBorderColor` fires when a box is focused or holds the focus, but only for a box
- * that is itself `focusable`, and it answers about the box alone: a `Panel` that is not a region has
- * no flag of its own and never lights. Reading the signal and walking up costs a few parent hops and
- * answers for every frame the same way.
- */
+/** A frame draws its active border when it contains the focused node. */
 export const focusWithin = (box: Renderable | undefined): boolean => {
   const node = focusedNode()
   return !!box && !!node && within(box, node)
@@ -231,21 +159,8 @@ const groupAt = (ref: RegionRef | null | undefined): Group | undefined => {
   return group && inScope(group.box) ? group : undefined
 }
 
-// ── Scopes ────────────────────────────────────────────────────────────────────────────────────
-//
-// A trap is a scope, not a swallow. The bottom of the stack is the screen, which contains
-// everything; a `Modal` or an open `MenuList` pushes its own box while it is drawn. Every question
-// this module answers is answered inside the top scope and nowhere else: which regions are on
-// screen, which stops a walk can see, where Tab goes, where Left goes. Nothing behind the top scope
-// exists as far as the keys are concerned (docs/tui.md § Traps).
-//
-// That is what makes a dialog a dialog on a host with no scrim, and it names no keys. What it
-// replaced was a layer that named them all and leaked the one it got wrong; ./trap.ts holds that
-// history, because that is the file the swallow was in.
-//
-// A stack rather than one box, because a `Menu` inside a `Modal` is a second scope over the first
-// and closing it must leave the modal still holding the keys.
-
+// ── Scopes ──
+// The top scope limits every focus query. A nested menu can sit above a modal.
 type Scope = Memory & {
   /** The box that contains the keys. Null for the screen, which contains everything. */
   box: Renderable | null
@@ -288,16 +203,7 @@ const inScope = (node: Renderable): boolean => {
  *  screen (./install.ts, ./commandLayer.ts, docs/tui.md § Keys and focus). */
 export const scopeDepth = (): number => scopes().length
 
-/** How many regions the keys can reach.
- *
- *  The footer asks. Inside a dialog the region layer's Tab is still registered and the engine still
- *  reports it live, because a layer knows nothing about scopes, so only the store can say that Tab
- *  has nowhere to go (../chrome/bindings.ts).
- *
- *  Reads `mounted()` so the answer is reactive. `groups` is a plain array, so a region registering or
- *  unregistering without moving focus left the footer offering `tab region` on a screen with one
- *  region, or hiding it on a screen with three. Hiding the rail happens to move focus as well, which
- *  is why nobody saw it; that was luck rather than a rule. */
+/** Read the mount signal so footer hints update when regions appear or disappear without a focus move. */
 export const regionsInScope = (): number => {
   mounted()
   return ordered().length
@@ -310,22 +216,7 @@ export const focusedInScope = (): boolean => {
   return !node || inScope(node)
 }
 
-/**
- * Contain the keys in this box until it is gone, and hand them back where they came from.
- *
- * A `Modal` pushes a scope by being drawn and pops it by being disposed, so a dialog contains the
- * keys and lands them without its caller reaching for anything: that used to be two jobs and every
- * modal a plugin drew did only the first, leaving a reader a dialog they could not answer.
- *
- * Handing them back needs nothing recorded here. The scope holds the keys and so holds the memory of
- * where they were inside it, and the region behind it still claims them and still remembers its own
- * last stop, so closing a `Menu` is the region re-entered on the trigger that opened it and closing
- * one drawn inside a `Modal` is the modal re-entered on its own last stop (§ The one owner). The DOM
- * palette keeps a `prevFocus` element instead (client-core/host/palette/overlay.ts).
- *
- * The caller owns the pop, which is `onCleanup(pushScope(box))` in the box's own `ref`
- * (../kit/grouping.tsx).
- */
+/** Contain focus in a box until cleanup. Remove by identity because nested scopes can dispose out of order. */
 export function pushScope(box: Renderable): () => void {
   // Focusable from the push, for the reason a region's frame is: a scope with nothing focusable in
   // it, such as the cheat sheet, which is lines of text, still has to hold the keys, or the dialog is
@@ -361,121 +252,16 @@ export const setTopology = (next: Topology | null): void => { topology = next }
 let cycler: ((delta: 1 | -1) => boolean) | null = null
 export const setPaneCycler = (next: ((delta: 1 | -1) => boolean) | null): void => { cycler = next }
 
-// ── Parent stops ──────────────────────────────────────────────────────────────────────────────
+// Parent stop bookkeeping lives in parentStops.ts. Focus decisions stay here.
+export const parentOf = (node: Renderable): Renderable | undefined => findParent(node, step)
 
-// A parent stop is one stop from outside that owns panels: Down enters the panel it is showing and
-// Escape from anything in that panel returns to it. Kept as renderable identity rather than a kit
-// node name, so remote and compiled trees use the same host bookkeeping.
-//
-// The panels are a getter rather than a list, because a strip's panels mount after its own ref runs
-// and change with its tabs. A strip with none — a list's Open/Closed filter — is an ordinary stop.
-//
-// `cross` is how the strip answers Left and Right, so a cross key that bubbles out of one of its
-// panels can reach it: a panel is the level below the strip, and a key nothing in the panel wanted
-// belongs to the strip before it belongs to the screen (§ crossParent).
-type ParentEntry = {
-  node: Renderable
-  panels: () => readonly Renderable[]
-  cross?: (delta: 1 | -1) => boolean
-}
-
-let parents: ParentEntry[] = []
-// The same entries by their node, because `stopsIn` asks "is this child a parent stop" of every node
-// it visits and `entryStop` asks it again (§ The step counter).
-let parentByNode = new Map<Renderable, ParentEntry>()
-
-// Every box that is somebody's panel, as one set.
-//
-// `isPanel` is asked of every child of every walk and of every ancestor of a stop, and the honest
-// answer was "ask each parent stop whether it owns this one", which walked the parents and allocated
-// a fresh panel list per parent per question (../kit/grouping.tsx § panels). The set answers the
-// common case — no — in one lookup.
-//
-// Derived rather than written, so there is still one fact and it is still the strip's: the set is
-// built from the same getters `parentOf` reads, and rebuilt when the panels move. A second registry
-// beside them would be a second answer to "is this a panel", which is the drift this module exists to
-// remove. `panelsChanged` is what says they moved; `markParent` says so for itself.
-let panelBoxes: Set<Renderable> | null = null
-
-/** The panels have moved: a `TabPanel` mounted or unmounted under some strip. Called by the kit,
- *  which owns the `idPrefix` relation the strips read (../kit/grouping.tsx § registerPanel). */
-export const panelsChanged = (): void => { panelBoxes = null }
-
-const panelSet = (): Set<Renderable> => {
-  if (panelBoxes) return panelBoxes
-  const found = new Set<Renderable>()
-  for (const parent of parents) for (const panel of parent.panels()) if (panel !== parent.node) found.add(panel)
-  panelBoxes = found
-  return found
-}
-
-const parentEntry = (node: Renderable): ParentEntry | undefined => parentByNode.get(node)
-
-/** Mark a renderable as one stop that owns the panels `panels()` returns.
- *
- *  Marking does not make it focusable. Which nodes are reachable is declared where a node is built,
- *  and for a strip that is the `Tabs` ref that calls this (../kit/grouping.tsx,
- *  ../invariants.test.ts § the renderer is the only truth about focus). */
-export function markParent(
-  node: Renderable,
-  panels: () => readonly Renderable[],
-  cross?: (delta: 1 | -1) => boolean,
-): void {
-  const entry: ParentEntry = cross ? { node, panels, cross } : { node, panels }
-  parents.push(entry)
-  parentByNode.set(node, entry)
-  panelsChanged()
-  onCleanup(() => {
-    const at = parents.indexOf(entry)
-    if (at >= 0) parents.splice(at, 1)
-    if (parentByNode.get(node) === entry) parentByNode.delete(node)
-    panelsChanged()
-  })
-}
-
-/**
- * The nearest parent stop above a node.
- *
- * Walk up and, at each ancestor, ask whether some parent owns that ancestor as a panel. A strip is a
- * sibling of its panels rather than an ancestor, so walking up alone never reaches it; the panel box
- * is what the walk reaches and the panels list is the missing edge.
- */
-export function parentOf(node: Renderable): Renderable | undefined {
-  for (let at: Renderable | null = node; at; at = at.parent) {
-    step()
-    // The set first, so the ancestors that are not panels — which is nearly all of them — cost one
-    // lookup rather than one scan of the parent stops (§ panelBoxes).
-    if (!panelSet().has(at)) continue
-    const owner = ownerOf(at)
-    if (owner) return owner.node
-  }
-  return undefined
-}
-
-/** The strip that owns this panel. */
-const ownerOf = (panel: Renderable): ParentEntry | undefined =>
-  parents.find((parent) => parent.node !== panel && parent.panels().includes(panel))
-
-/**
- * The strip above the panel the keys are in, while that panel is in scope.
- *
- * `parentOf` without the scope check is Escape's, which the trap tier answers first inside a dialog.
- * The cross keys have no such guard above them, so a dialog drawn inside a panel must not switch the
- * tab behind it (§ boxAround, § Scopes).
- */
-const parentInScope = (node: Renderable | null): ParentEntry | undefined => {
+/** Only a panel inside the top scope can hand horizontal keys to its strip. */
+const parentInScope = (node: Renderable | null): ParentStop | undefined => {
   const box = node && boxAround(node)
   return box && isPanel(box) ? ownerOf(box) : undefined
 }
 
-/**
- * What a bubbled `h` or `l` does from the thing that has the keys, as the footer's word for it.
- *
- * `column` wherever there is a column the pair can reach, which inside a panel excludes the rail;
- * `tab` inside a panel with none, because the strip is what answers there (§ crossParent). Outside a
- * panel the word is `column` even at an edge, and the footer gates the hint on a second region
- * (../chrome/bindings.ts).
- */
+/** The footer says column when another pane column is reachable, or tab when the owning strip answers. */
 export const bubbledCrossWord = (): 'tab' | 'column' => {
   if (!parentInScope(focusedNode())) return 'column'
   const current = groupAt(focused)
@@ -483,19 +269,7 @@ export const bubbledCrossWord = (): 'tab' | 'column' => {
   return beyond ? 'column' : 'tab'
 }
 
-/**
- * A cross key that nothing inside the panel wanted: the pane's next column that way, else the strip.
- *
- * A panel is the level below its strip, and the strip's Left and Right are bound to the strip by
- * focus, so a key bubbling up from a control in the panel used to skip that level and land on the
- * screen's column move — which from anywhere inside a tabbed pane threw the reader into the rail.
- * The pane's own columns still count, because Right on a file in the editor's tree is how the
- * document beside the tree is reached (docs/command-palette-and-shortcuts.md § Focus and typing);
- * the rail does not, because Escape is the way out of a pane and a control's Left is not. With no
- * column that way the strip switches its tab if it can, and the keys land on the strip either way:
- * the panel that had them is hidden after a switch, and at the strip's edge a visible move to the
- * strip beats a silent wall (docs/tui.md § The five key groups).
- */
+/** A horizontal key leaving a panel enters another pane column or returns to its strip. It cannot enter the rail. */
 export function crossParent(delta: 1 | -1): boolean {
   const entry = parentInScope(focusedNode())
   if (!entry) return false
@@ -511,13 +285,7 @@ export function enterParent(parent: Renderable): boolean {
   return focusRenderable(entryStop(panel) ?? panel)
 }
 
-/** Every region the keys can reach, in the order it draws. A layout hands its own order in and the
- *  chrome takes numbers outside the range a layout uses, so the sort reads down the screen: rail,
- *  pane strip, the pane's own regions (../chrome/Shell.tsx).
- *
- *  Scoped, and one filter is the whole of what a trap does to the region tier: with a `Modal` up no
- *  region is in scope, so `moveRegion` has nothing to move to and Tab does nothing rather than
- *  walking the keys onto a rail row behind the dialog. Nothing here names Tab (§ Scopes). */
+/** Cache visible regions by registry version and scope identity; key handling reads this order repeatedly. */
 const ordered = (): Group[] => {
   // Cached until the registry or the scope stack moves, which is what makes it safe to ask this on
   // every key: `moveColumn` asks twice, `movePane` twice more, the landing rule once and the footer
@@ -582,18 +350,8 @@ const regionOf = (node: Renderable): Group | undefined => {
   return undefined
 }
 
-// ── The one owner ─────────────────────────────────────────────────────────────────────────────
-//
-// The store decides where the keys are and everything else is told. Every arrow used to point the
-// other way: focus was the renderer's and this module a view of its `focused_renderable` event, so
-// in the gap between the renderer moving focus itself and the view catching up the two disagreed —
-// and a lit border with dead arrows was that gap, every time.
-//
-// There is no focus listener here now, because there is nothing left to hear: the renderer moves
-// focus on nothing of its own with `autoFocus` off, and a click arrives as a hit test instead
-// (§ Clicks are hit tests, ../main.tsx). One thing still goes out to the renderer and it is paint,
-// the caret; nothing reads it back and ../invariants.test.ts counts the calls to keep it that way.
-
+// ── The one owner ──
+// Focus moves through setFocus; the renderer receives a caret update and never decides focus.
 /** Remember a stop, unless it is the frame that was holding the keys for want of anything better.
  *
  *  A landing on a frame is never remembered. The frame is the last resort, taken when the thing had
@@ -603,7 +361,7 @@ const regionOf = (node: Renderable): Group | undefined => {
 const remember = (of: Memory, node: Renderable, frame: Renderable | null): void => {
   if (node === frame) return
   of.last = node
-  of.lastIdentity = itemIdentities.get(node)
+  of.lastIdentity = itemIdentity(node)
 }
 
 // Who to tell when the keys move, for a reader that is not a component. The keymap engine asks its
@@ -618,25 +376,13 @@ export const onFocusMove = (listener: (node: Renderable | null) => void): (() =>
   return () => { watchers.delete(listener) }
 }
 
-/**
- * Draw the caret, which is the one thing about focus the renderer still owns.
- *
- * A field asks this store whether it has the keys and writes the answer into its own props, where
- * paint reads it, so these two are no-ops on our nodes and the mirror is one-way: nothing here holds
- * focus state for the store to disagree with (../tree/compat.ts, ../kit/asking.tsx § fieldRef).
- */
+/** Mirror focus to the renderer for caret paint. This store never reads renderer focus back. */
 const paintCaret = (previous: Renderable | null, node: Renderable | null): void => {
   if (node) node.focus()
   else previous?.blur()
 }
 
-/**
- * Move the keys, and tell everything that is drawn from where they are.
- *
- * The one writer. Deduplicated, because a move to where the keys already are is not a move: it
- * would reveal the stop again and rewrite the memory, and `enter` reads whether anything changed to
- * decide whether the landing rule owes the screen another look (§ enter).
- */
+/** The only writer of focusedNode. It updates caret paint, listeners, focus memory, and the pending reveal. */
 const setFocus = (node: Renderable | null): void => {
   const previous = focusedNode()
   if (node === previous) return
@@ -670,41 +416,14 @@ const setFocus = (node: Renderable | null): void => {
   focused = { paneId: group.paneId, regionId: group.regionId }
 }
 
-// ── The reveal ────────────────────────────────────────────────────────────────────────────────
-//
-// `scrollChildIntoView` compares a child's laid-out `y` against its viewport's, so the reveal is only
-// as good as the geometry it reads. For a row that did not exist in the previous frame there is none:
-// it scrolls by the wrong delta and nothing corrects it, which a reader meets three common ways — a
-// region entered on a freshly mounted list, a refetch replacing a row by identity, and a virtual
-// window shift. It decides nothing about where the keys go; it only makes the viewport show where
-// they already are (docs/tui.md § Scrolling viewports).
-//
-// So the reveal runs on the renderer's `frame`, which is the side of layout where the numbers are
-// real, and that is the whole of it under our painter: a frame there is layout, then this, then
-// paint, so one reveal reads the geometry of the frame the reader is about to see. Under the old
-// painter it ran twice, once synchronously in `setFocus` and once here.
-// `../kit/scrolling.test.tsx § reveals the caret in a list that has only just mounted` is the case
-// that pins it.
-//
-// One renderer listener for the whole store rather than one per viewport, which is what the design
-// first asked for: a pull request draws enough viewports that one listener each is a crowd, and they
-// would all be doing the work this does once.
-
+// ── The reveal ──
+// Scroll after layout so newly mounted rows have valid geometry.
 /** The node the post-layout reveal still owes a scroll to. One slot and not a queue: the reveal is
  *  about where the keys are now, and where they were two frames ago is nobody's question. */
 let pendingReveal: Renderable | null = null
 
-// ── Clicks are hit tests ──────────────────────────────────────────────────────────────────────
-//
-// The renderer resolves which renderable the pointer was over; what that means is the store's. It
-// used to be the renderer's too — the old painter walked up from the hit renderable and focused the
-// first focusable ancestor by itself — which is a second opinion about focus for exactly the case
-// this module exists to have one answer to. `../tree/hit.ts` hits and this decides.
-//
-// A click focuses a clicked stop and scrolls, and does nothing else, which is the pointer rule this
-// host already states (docs/tui.md § What the TUI never does). Pressing what was clicked stays the
-// stop's own, from its `onMouseDown` (./stops.ts § pressable).
-
+// ── Clicks are hit tests ──
+// The renderer reports the hit node; this store decides which ancestor receives focus.
 /** Focus the nearest thing above a left click that could hold the keys, or nothing at all.
  *
  *  `reachable` is the whole of "is this a stop": a stop, a collection row, a region's frame and a
@@ -760,14 +479,7 @@ export function installRegions(renderer: Renderer): void {
   }
 }
 
-/**
- * Put the keys on a renderable and say whether they went.
- *
- * The one door. Every move comes through here, so every caller learns whether the keys went rather
- * than assuming: a refused move is a `false` to walk on from instead of a highlight nobody can
- * answer. It is refused for the two reasons the store has, not on screen and not something that can
- * hold the keys, and for nothing else — there is no renderer left to say no.
- */
+/** Move focus only to a live, visible, focusable node inside the top scope. */
 export function focusRenderable(node: Renderable | undefined): boolean {
   if (!node || !onScreen(node) || !node.focusable) return false
   setFocus(node)
@@ -786,97 +498,23 @@ const reachable = (node: Renderable | null | undefined): node is Renderable =>
  *  row, and never a placeholder, because the stand-in a region settled for is not what a reader
  *  coming back is looking for (§ onPlaceholder). */
 const remembered = (of: Memory): Renderable | undefined => {
-  const node = of.lastIdentity ? itemsByIdentity.get(of.lastIdentity) : of.last
+  const node = of.lastIdentity ? itemByIdentity(of.lastIdentity) : of.last
   return reachable(node) && !onPlaceholder(node) ? node : undefined
 }
 
-// ── Collections ───────────────────────────────────────────────────────────────────────────────
-
-// Which renderables are a collection's rows. A region opens on its list where it has one, and this is
-// how a region tells a row from a field without asking the kit what node drew it.
-let items = new WeakSet<Renderable>()
-const itemPicks = new WeakMap<Renderable, () => void>()
-let itemIdentities = new WeakMap<Renderable, string>()
-const itemsByIdentity = new Map<string, Renderable>()
-
-/** Whether the keys are on a row of a collection rather than on a control. The footer asks, because
- *  `activate` opens a row and presses a control (../chrome/bindings.ts). */
+// Collection bookkeeping lives in collectionRegistry.ts. The focused node stays in this store.
 export const focusedItem = (): boolean => {
   const node = focusedNode()
-  return !!node && items.has(node)
+  return !!node && isItem(node)
 }
 
-/** Called by a collection for each row it draws (./collection.ts).
- *
- *  Collections identify rows by key, while Solid's `<For>` identifies their data objects by
- *  reference, so a query refresh can replace the renderable for the same key. The identity registry
- *  is what makes the region's memory survive that: re-entry resolves the key, not the box. */
 export const markItem = (box: Renderable, pick?: () => void, identity?: string): void => {
-  items.add(box)
-  if (pick) itemPicks.set(box, pick)
-  if (!identity) return
-  itemIdentities.set(box, identity)
-  itemsByIdentity.set(identity, box)
-  onCleanup(() => {
-    if (itemsByIdentity.get(identity) === box) itemsByIdentity.delete(identity)
-    // The row that had the keys is going. Look again once reconciliation has produced the
-    // replacement, because at cleanup time the old row still reports itself live even though its
-    // disposal has begun, so nothing else on this turn would notice (§ The landing rule).
+  registerItem(box, pick, identity, () => {
     if (focusedNode() === box) scheduleSettle()
   })
 }
 
-// Which renderable is a collection's container, and which of its rows is the roving one. A list is
-// one stop from outside — a reader walking a panel passes it once, and its own collection layer takes
-// the arrows from there — so the reading-order walk has to be able to say "this box is a list"
-// without asking the kit what node drew it, the same way `items` says "this box is a row".
-type ContainerEntry = {
-  box: Renderable
-  active: () => Renderable | undefined
-  expands: () => boolean
-}
-
-let containers: ContainerEntry[] = []
-// And by their box, for the same reason the regions are: `stopsIn` asks "is this child a collection"
-// of every node it visits (§ The step counter).
-let containerByBox = new Map<Renderable, ContainerEntry>()
-
-/** Called by a collection for its container (./collection.ts).
- *
- *  `active` is the row the caret is on. `expands` is whether the collection folds its rows, which is
- *  a question about the horizontal pair rather than about focus: a tree row's Left and Right fold and
- *  a plain list's bubble to the region tier and move a column, and the footer has to say which
- *  (§ focusedExpands, ../chrome/bindings.ts). */
-export function markCollection(
-  box: Renderable,
-  active: () => Renderable | undefined,
-  expands: () => boolean = () => false,
-): void {
-  const entry: ContainerEntry = { box, active, expands }
-  containers.push(entry)
-  containerByBox.set(box, entry)
-  onCleanup(() => {
-    const at = containers.indexOf(entry)
-    if (at >= 0) containers.splice(at, 1)
-    if (containerByBox.get(box) === entry) containerByBox.delete(box)
-  })
-}
-
-/** Whether the collection the keys are in folds its rows.
- *
- *  Asked by the footer, which says `fold` beside `h/l` where it is true and `column` where it is not.
- *  The answer is the collection's own and not the row's: a tree passes `onExpand` for the whole list
- *  (../chrome/bindings.ts, client-core kit/keys/collectionIntents.ts § expand). */
-export const focusedExpands = (): boolean => {
-  const node = focusedNode()
-  if (!node) return false
-  for (let at: Renderable | null = node; at; at = at.parent) {
-    step()
-    const container = containerByBox.get(at)
-    if (container) return container.expands()
-  }
-  return false
-}
+export const focusedExpands = (): boolean => collectionExpands(focusedNode(), step)
 
 // ── Reading the tree ──────────────────────────────────────────────────────────────────────────
 
@@ -895,32 +533,15 @@ const walk = (box: Renderable, take: (child: Renderable) => boolean): Renderable
 /** Nodes that have asked to be what entering their region lands on (§ entryStop). */
 const entryMarks = new WeakSet<Renderable>()
 
-/** Ask to be the stop a reader lands on when the keys enter this node's region.
- *
- *  The default rule is "the thing the bare keys drive", which is why entering a list lands on its
- *  first row and never in the filter box above it: `j` there types a `j`. A message box is the
- *  exception and the only one so far. On a chat surface the thing a reader arrives to do is write, so
- *  the agents pane's composer marks itself and the transcript beside it is reached with Escape or Tab
- *  (../kit/asking.tsx § MentionTextarea).
- *
- *  A mark is per node and a node that leaves the tree is never walked, so nothing has to clear one. */
+/** Override the default landing stop for a region, such as the agent composer. */
 export const markEntry = (node: Renderable): void => { entryMarks.add(node) }
 
-/** The first collection in a box, landed on the row its caret is on rather than on its first row.
- *
- *  A region's own memory is a renderable, and a renderable does not survive its list being rebuilt
- *  from a different roster — so re-entering a list that has been redrawn since used to start again at
- *  the top. The collection's `active` is keyed and does survive (client-core kit/keys/collectionState.ts),
- *  and this is where the two meet. It matters wherever entering also picks: the rail's Menu is entered
- *  with `pickOnEnter`, so landing on the first row is not a caret moving, it is a source being chosen.
- *
- *  Falls back to the first row when the caret's row is not drawn, which is the virtual list's case:
- *  `stopsIn` makes the same allowance for the same reason. */
+/** Enter a collection on its active row; use the first drawn row if a virtual list omits it. */
 const activeRowIn = (box: Renderable): Renderable | undefined => {
-  const container = walk(box, (child) => containerByBox.has(child))
-  const row = container ? containerByBox.get(container)?.active() : undefined
+  const container = walk(box, (child) => collections().has(child))
+  const row = container ? collectionAt(container)?.active() : undefined
   if (row && !row.isDestroyed && row.visible) return row
-  return walk(box, (child) => items.has(child))
+  return walk(box, (child) => isItem(child))
 }
 
 const entryStop = (box: Renderable): Renderable | undefined =>
@@ -941,50 +562,16 @@ const revealInViewports = (node: Renderable): void => {
   }
 }
 
-/** Whether a box is some parent stop's panel, and so belongs to the level below this walk.
- *
- *  One lookup. It was a scan of every parent stop, each of which allocated its panel list to answer,
- *  and it is asked of every child of every walk (§ panelBoxes). A strip is never its own panel, which
- *  the scan said out loud and the set says by construction: `registerPanel` marks panels and
- *  `markParent` marks strips. */
-const isPanel = (node: Renderable): boolean => panelSet().has(node)
-
-/**
- * Reading-order stops inside a box, in reading order.
- *
- * Exported for two callers outside this module: a `Menu`'s open list moves between its own stops
- * while its scope holds the keys, and the stops behind it are not its to walk (./stops.ts).
- *
- * Six rules, and each one is a level of the model showing through:
- *
- *   another region     walked through, as it was before its frame became focusable. A region is a
- *                      level of its own, reached with Tab. The walk starts at a box's children, so a
- *                      region's own frame is never a stop inside itself and this is about nesting.
- *   a parent stop      one stop, and its panels are not walked. A panel is the level below this one,
- *                      reached with Down and left with Escape, so a strip and the controls inside the
- *                      panel it happens to be showing are never neighbours in one list.
- *   a collection       one stop, drawn as its roving row. A list is one place a reader passes
- *                      through; the arrows inside it are the collection's own layer.
- *   a scroll viewport  transparent while it holds a stop, and the stop itself otherwise. That is how
- *                      a document with no controls keeps the arrows for scrolling.
- *   a focusable node   one stop, not walked into.
- *   anything else      walked through.
- */
+/** Walk reading-order stops. Nested regions, parent panels, collections, and scrollboxes each own a separate navigation level. */
 export const stopsIn = (box: Renderable): Renderable[] => stopsInTree(box, {
   panels: panelSet(),
   regions: groupByBox,
-  parents: parentByNode,
-  collections: containerByBox,
+  parents: parentEntries(),
+  collections: collections(),
   step,
 })
 
-/**
- * The box a stop's neighbours live in: the panel it is inside, else its region's own box.
- *
- * The same walk `parentOf` makes, keeping the ancestor rather than the strip that owns it. A stop
- * that is not in a panel has the whole region for neighbours, which is what a filter strip above a
- * list wants.
- */
+/** Use the nearest panel or region as a stop's neighbours, provided it remains in scope. */
 const boxAround = (node: Renderable): Renderable | undefined => {
   // Either answer only counts while the keys can reach it. A dialog drawn inside a region has that
   // region as an ancestor, and the stops behind the dialog are not its neighbours (§ Scopes).
@@ -995,29 +582,7 @@ const boxAround = (node: Renderable): Renderable | undefined => {
 
 // ── Moving ────────────────────────────────────────────────────────────────────────────────────
 
-/**
- * Step from one stop to the next inside a box, and say whether the keys moved.
- *
- * The one walk. Three of them used to index into `stopsIn`: the reader-facing arrows, a tab strip's
- * Down, and a `Menu` list's own arrows. Each had picked up its own answer to what an edge does, which
- * is how one key came to mean three things at three levels of one screen.
- *
- * `within` defaults to the neighbours of `from`: the panel it sits in, else its region's box. A
- * caller passes one only where the walk is not about the tree the node sits in, which is an open list
- * holding a scope of its own.
- *
- * `false` at an edge, and `false` when the walk does not contain `from` at all, which a collection's
- * row and a region's frame do not, so the key carries on to the tier that does own it. Whether a
- * caller turns that into a wall is the caller's.
- *
- * `wrap` has no caller yet: every stop walk on this screen walls or bubbles, and only a collection
- * wraps, by its own rules. It is here because the key contract decides which walks wrap
- * (docs/tui.md § The five key groups).
- *
- * `stops` is the same walk already made. A caller that had to ask `stopsIn` a question before it
- * could decide to move — which is `moveStop`, and it is the reader's arrows — passes the answer in
- * rather than paying for the subtree twice per key press.
- */
+/** Move between stops in one box. Return false at an edge so the caller can decide whether to wall or bubble. */
 export function walkStops(
   from: Renderable | null | undefined,
   delta: 1 | -1,
@@ -1030,24 +595,12 @@ export function walkStops(
   return focusRenderable(adjacentStop(stops, from, delta, options.wrap))
 }
 
-/**
- * The reader-facing arrows: the next or previous stop beside the focused one, walling at an edge.
- *
- * A wall is `true` and nothing moved, the same answer a tab strip gives at its last tab. Letting a
- * failed Down bubble to the region tier would make an arrow cross regions, which is Tab's job and
- * which surprised readers the one time a strip did it. So the `|| true` below is a claim on a key
- * that moved nothing, and it stays because an arrow edge is a wall on purpose
- * (docs/tui.md § The five key groups).
- *
- * The wall is here rather than in `walkStops` because the walk answers `false` for two things and
- * only one is an edge: a stop the walk does not contain has to bubble to the tier that does own it,
- * so the membership check below is what keeps the wall off that case.
- */
+/** Arrows move among neighbouring stops and wall at an edge. Up from a panel's first stop returns to its strip. */
 export function moveStop(delta: 1 | -1): boolean {
   const node = focusedNode()
   // A row of a collection is in the walk — a list is drawn there as the row its caret is on — and it
   // is still not this function's to move. The list owns its own arrows and wraps by its own rules.
-  if (!node || items.has(node)) return false
+  if (!node || isItem(node)) return false
   const box = boxAround(node)
   if (!box) return false
   // One walk. The membership question and the move are the same list, and asking twice was a subtree
@@ -1062,23 +615,13 @@ export function moveStop(delta: 1 | -1): boolean {
   return true
 }
 
-/**
- * Put the keys in a region, on the best thing it has: where it left them, else its entry stop, else
- * its own frame. The frame is the last resort as it is on the DOM, so a region with nothing focusable
- * in it is still reachable and the cycle has no hole.
- *
- * Nothing here writes the region's memory or its claim. Both belong to the renderer event listener,
- * so both are written when the move happens rather than when it is asked for: `enter` used to write
- * them from its target, and a target whose `focus()` was refused then left the store pointing at a
- * region the keys were not in, so the first Tab after that looked lost
- * (docs/tui.md § Focus regions).
- */
+/** Enter a region on its remembered stop, entry stop, or focusable frame. Schedule a second look after a changed landing. */
 const enter = (group: Group | undefined): boolean => {
   if (!group) return false
   const target = remembered(group) ?? entryStop(group.box) ?? group.box
   const before = focusedNode()
   focusRenderable(target)
-  if (group.pickOnEnter && focusedNode() === target) itemPicks.get(target)?.()
+  if (group.pickOnEnter && focusedNode() === target) itemPick(target)?.()
   // Look again where the keys went somewhere new: a walk into a region whose list has not arrived
   // lands on its frame, and the pass is what takes them off it once the list does. A move that
   // changed nothing is not worth a second look, and scheduling one would be a loop.
@@ -1093,15 +636,7 @@ export function focusRegion(ref: RegionRef): boolean {
   return !!group && inScope(group.box) && onScreen(group.box) && enter(group)
 }
 
-/**
- * Move to the next or previous region on screen. Wraps.
- *
- * Every region, not the focused pane's alone, and that is this host's own answer: a terminal draws
- * one pane, so the rail, the pane strip, the pane's own regions and the footer are one screen and one
- * cycle (docs/tui.md § Navigation). The desktop scopes the cycle to a pane
- * because it draws several side by side and Tab into the next one would be a surprise; here there is
- * no next one to be surprised by, and the chord that switches which pane is drawn is `nextPane`.
- */
+/** Cycle visible regions. Inside a scope with no region, cycle only that scope's stops. */
 export function moveRegion(delta: 1 | -1): boolean {
   const all = ordered()
   if (all.length < 2) {
@@ -1123,20 +658,7 @@ export function moveRegion(delta: 1 | -1): boolean {
   return enter(all[(((at < 0 ? 0 : at) + delta) + all.length) % all.length])
 }
 
-/**
- * Move one column left or right, without wrapping.
- *
- * The nearest column in the direction asked, which is what makes the number an ordering rather than
- * a name: the rail is 0, a layout's regions are 1, and a layout that draws two frames side by side
- * declares its second one 2, so one rule crosses the rail-to-pane edge and the list-to-detail edge
- * alike. Left in the rail and Right from the rightmost column do nothing, deliberately: a key that
- * jumps across the whole screen from an edge is a surprise, and Tab already cycles
- * (docs/tui.md § Focus regions).
- *
- * The destination remembers the group last used in that column. On a first visit it enters the first
- * region the shell does not call chrome, which is how a first crossing into the pane skips the pane
- * strip above it (../chrome/topology.ts § skips).
- */
+/** Move to the nearest column in the requested direction. Reuse its last region when reachable. */
 export function moveColumn(delta: 1 | -1, options: { rail?: boolean } = {}): boolean {
   const current = groupAt(focused)
   if (!current) return false
@@ -1158,14 +680,7 @@ export function moveColumn(delta: 1 | -1, options: { rail?: boolean } = {}): boo
     group.x === destination && !(topology?.skips(group) ?? false)))
 }
 
-/**
- * Climb one level.
- *
- * A stop inside a panel returns to the parent stop that owns the panel; a stop with no parent above
- * it returns to the region the shell calls this one's home. With no home named — a rail region, or a
- * main region the shell has nothing above — the next edge is the column, which from the rail is
- * `false` so the shell's own Escape layer can clear a notification.
- */
+/** Escape climbs from a panel to its strip, then through the shell topology toward the rail. */
 export function moveBack(): boolean {
   const node = focusedNode()
   const current = groupAt(focused)
@@ -1177,13 +692,7 @@ export function moveBack(): boolean {
   return group ? enter(group) : moveColumn(-1)
 }
 
-/**
- * Whether the collection that currently owns the keys should enter main after activation.
- *
- * Read before the row runs: activation can replace the source or task pane and therefore rebuild
- * the destination regions. The collection performs the ordinary select/press first, then uses the
- * captured answer with `moveColumn(1)`, so Enter never substitutes for the row's own action.
- */
+/** Capture the region's Enter behavior before activation can replace its destination. */
 export function activationEntersMain(): boolean {
   return groupAt(focused)?.enterMainOnActivate ?? false
 }
@@ -1222,20 +731,7 @@ export const isParentStop = (node: Renderable | null | undefined): boolean =>
 
 let settleQueued = false
 
-/**
- * Queue the one deferred focus decision.
- *
- * A microtask rather than a frame event: OpenTUI emits per frame, but a test renderer under `flush()`
- * may render several times before one, and a pass that waits for a frame waits for the wrong thing.
- * Solid commits synchronously, so the renderables of the current render all exist at the end of the
- * current task — which is exactly when a microtask runs. Guarded, so six callers in one turn settle
- * once.
- *
- * A tree to read is the whole of what it buys. It orders nothing against the reconciler's
- * `process.nextTick` destruction, which is Suspense's and stays Suspense's: nothing here depends on a
- * corpse still reporting itself live, `pushScope`'s pop takes the keys out of a box that is going,
- * and the keys going nowhere asks for a pass of its own (§ The one owner).
- */
+/** Queue one focus decision after Solid has committed the renderable tree for this turn. */
 export function scheduleSettle(): void {
   if (settleQueued) return
   settleQueued = true
@@ -1245,43 +741,15 @@ export function scheduleSettle(): void {
   })
 }
 
-/**
- * Whether the keys are on a stand-in that something better has since replaced.
- *
- * Two things here are focusable so they can hold the keys when nothing else can, and both stop being
- * the right answer the moment their contents arrive: a region's frame, which is `enter`'s last resort
- * while a `lazy()` region or its query is on its way, and a collection's container, which `stopsIn`
- * draws in place of an active row a virtual window has scrolled off. A reader sees the same thing
- * either way: a lit border, no caret, dead arrows.
- *
- * Asked of the tree rather than remembered, which is what the `provisional` boolean did: a fact about
- * the tree kept beside the tree is a fact that can disagree with it.
- */
+/** A region frame or collection container yields focus once a real stop appears. */
 const onPlaceholder = (node: Renderable): boolean => {
   const group = groupByBox.get(node)
   if (group) return !!entryStop(group.box)
-  const container = containerByBox.get(node)
+  const container = collectionAt(node)
   return !!container && reachable(container.active())
 }
 
-/**
- * One question, then one landing.
- *
- * The question is about the renderable that has the keys. Can it still hold them, meaning alive,
- * visible all the way up, focusable and inside the top scope, and is it the real thing rather than a
- * stand-in? If so, reveal it and stop.
- *
- * If not, land. A scope holding the keys takes the stop it last had, then the first stop inside its
- * box, then the box itself. On the screen a region answers first: the region that still claims the
- * keys, else the one the shell opens on, else the first one drawn; and inside whichever answers,
- * `enter` takes the stop it last had, its entry stop, its frame.
- *
- * This replaced a pass of seven ordered steps over four module variables. Each step had been a
- * correct fix for a real bug; together they were a state machine nobody had written down, and the bug
- * they produced was always the same one: two steps ran in an order the author had not pictured, and
- * the reader got a lit frame with no caret or a caret on a destroyed row. Every path lands the same
- * way now, so a bug in landing is one bug (docs/tui.md § Focus regions).
- */
+/** Keep valid focus. Otherwise restore the top scope or enter the claimed, opening, or first region. */
 function ensureFocus(): void {
   const node = focusedNode()
   if (reachable(node) && !onPlaceholder(node)) {
@@ -1307,14 +775,7 @@ function ensureFocus(): void {
   setFocus(null)
 }
 
-/**
- * Every stop on screen, region by region, in the order the regions draw.
- *
- * Test-only, and the walk is `stopsIn` applied to each region's box rather than a second one — so a
- * panel's contents are not here, because a panel is the level below a region's own list and is
- * reached by entering the parent stop that owns it. The reachability property reads this
- * (../reachability.test.tsx).
- */
+/** Expose reachable stops to the keyboard reachability property, including an empty scope box. */
 export function _allStops(): Renderable[] {
   const scope = top().box
   if (!scope) return ordered().flatMap((group) => stopsIn(group.box))
@@ -1326,14 +787,7 @@ export function _allStops(): Renderable[] {
   return stops.length ? stops : [scope]
 }
 
-/**
- * Which columns the keys can reach, and which of them they are in.
- *
- * Test-only. The reachability property presses `l` and `h` on every kind of focused thing it met and
- * asks whether the footer's word came true, and for `column` that means the keys are in a different
- * one — with an edge as the only reason they are not, because there is no wrap
- * (../reachability.test.tsx, docs/tui.md § The invariants, invariant 11).
- */
+/** Expose reachable columns to the horizontal-key property. A panel excludes the rail. */
 export function _columns(): { at: number | null; all: readonly number[] } {
   // The rail is not a column a key bubbling out of a panel can reach (§ crossParent).
   const inPanel = !!parentInScope(focusedNode())
@@ -1363,16 +817,10 @@ export function _resetRegions(): void {
   focused = null
   cycler = null
   topology = null
-  parents = []
-  parentByNode = new Map<Renderable, ParentEntry>()
-  panelBoxes = null
+  resetParentStops()
   setScopes([screenScope()])
   orderedCache = null
-  containers = []
-  containerByBox = new Map<Renderable, ContainerEntry>()
   visited = 0
-  items = new WeakSet<Renderable>()
-  itemIdentities = new WeakMap<Renderable, string>()
-  itemsByIdentity.clear()
+  resetCollections()
   setFocus(null)
 }

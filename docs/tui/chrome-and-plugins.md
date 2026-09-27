@@ -365,7 +365,8 @@ into place — is a picker under the list instead. A plugin writes the same `Gra
 **A contribution is as reachable as the nodes it draws.** A contributor that draws a `Button` inside a
 `Slot` is a stop, reached with `↓` from the strip above it and pressed with Enter, inside the region
 its host registered. A contributor that draws only `Text` is not a stop, and `↓` walks past it. The
-kit decides which is which, on both hosts, and a plugin cannot say otherwise (`focusRoles.ts`).
+kit decides which is which on both hosts. A plugin cannot change the
+`packages/client-core/src/kit/tokens/focusRoles.ts` table.
 
 **A plugin's own chord is pressed with Ctrl here.** A manifest chord is `meta+ctrl+alt+shift+key` and
 `meta` is the platform command key, which a terminal emulator keeps for itself. The command layer

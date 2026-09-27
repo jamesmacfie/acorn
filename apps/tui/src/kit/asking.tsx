@@ -560,11 +560,8 @@ export function SegmentedControl<T extends string>(props: {
   ariaLabel: string
 }) {
   const body = () => `( ${props.options.map((option) => (option.value === props.value ? `[${option.label}]` : option.label)).join(' | ')} )`
-  // A collection whose roving place is its value rather than a renderable, which is the exception
-  // `focusRoles.ts` writes down for `Grid`: there is nothing per option to focus in one run of text,
-  // so the strip holds the keys and `←`/`→` move the value. The list rules — what wraps, what Home
-  // and End do, how far a page key moves — are the shared ones, so a segmented control cannot drift
-  // from every other collection in the app (client-core kit/keys/collectionIntents.ts).
+  // `NODE_FOCUS` calls `Grid` a collection, but its options are text with no renderable to focus.
+  // The strip holds the keys. Shared collection intents move its value with arrows and paging keys.
   const keys = createCollectionIntents({
     id: () => props.ariaLabel,
     items: () => props.options.map((option) => ({ key: option.value, label: option.label })),
@@ -666,9 +663,8 @@ export function PickerRow(props: {
   onSelect: () => void
   onHover?: () => void
 }) {
-  // `focusRoles.ts` calls this an item, and inside a `Rows` it is one. Inside an open `Menu` there is
-  // no collection to be an item of — the list is drawn by whoever opened it — so here it is a stop and
-  // the menu's own `↓`/`↑` walk its stops (../keys/regions.ts § walkStops).
+  // `NODE_FOCUS` calls this an item inside `Rows`. An open `Menu` has no collection, so its rows
+  // become stops and the menu's arrows walk them (../keys/regions.ts § walkStops).
   const control = stop({ onPress: () => props.onSelect(), disabled: () => !!props.disabled })
   return (
     <box flexDirection="row" gap={1} flexShrink={0} ref={control.ref}>

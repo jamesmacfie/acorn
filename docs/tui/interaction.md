@@ -183,8 +183,9 @@ itself.
 
 ### Focus regions
 
-`apps/tui/src/keys/regions.ts` keeps the DOM host's contract and replaces every mechanism in it. It
-describes five levels and nothing else:
+`apps/tui/src/keys/regions.ts` owns focus, scopes, and navigation. `parentStops.ts` records strips
+and their panels. `collectionRegistry.ts` records collection rows and their identities. All focus
+moves still pass through `regions.ts`, which describes five levels:
 
 ```text
 Screen
@@ -378,7 +379,8 @@ The intent half of `collection.ts` is shared. The element half has a DOM file an
 wheel movement changes the window without changing that key. `Grid` keeps its documented exception:
 a virtualised row has no renderable, so the arrows move `selected` and the view follows.
 
-`Timeline` is the exception that goes the other way. `focusRoles.ts` calls it a collection and the DOM
+`Timeline` is the exception that goes the other way. The shared
+`packages/client-core/src/kit/tokens/focusRoles.ts` table calls it a collection, and the DOM
 host roves over its turns; here a turn is a `Card`, and a card is a stop only where it takes an
 `onPress`. So the stops in a pull request's conversation are the controls and composers inside the
 turns rather than the turns themselves, and nothing roves. A reader moves through them with the arrows

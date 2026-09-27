@@ -59,7 +59,7 @@ describe('a contribution inside somebody else’s surface', () => {
       await screen.press('ARROW_DOWN')
       await screen.press('ARROW_DOWN')
       // The panel's first stop is github's own, exactly as it is with no contribution at all: a `Text`
-      // is not a stop on either host and a contributor cannot make one (focusRoles.ts).
+      // is not a stop on either host and a contributor cannot make one (the shared `NODE_FOCUS` table).
       expect(await litRuns(screen)).toContain('[ squash ▾ ]')
     } finally {
       screen.done()
