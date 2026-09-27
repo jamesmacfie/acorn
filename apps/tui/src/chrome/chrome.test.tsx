@@ -11,8 +11,12 @@ import type { Renderable } from '../tree/compat'
 import type { KeyEvent } from '../keyEvent'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { registerCommands } from '@acorn/client-core/host/registries/commands'
+import { railMarkerRegistry } from '@acorn/client-core/host/registries/rail'
+import { extensionRegistry } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
+import { clearAnnotations } from '@acorn/client-core/host/annotations/annotations.ts'
+import type { PluginAnnotationMark } from '@acorn/protocol/extensionPoints.ts'
 import { keyedRows } from '../kit/showing'
-import { recordedRequests } from '../fixture'
+import { recordedRequests, TASK } from '../fixture'
 import { renderFixture } from '../harness'
 import { activeHints } from './bindings'
 
@@ -101,6 +105,80 @@ describe('the shell', () => {
     expect(frame).toContain('fix-login')
     expect(frame).toContain('[Notes]')
     for (const line of frame.split('\n')) expect(line.length).toBeLessThanOrEqual(120)
+  }, 30_000)
+
+  it('discloses task markers beyond the visible glyph budget and lets the keyboard inspect every label', async () => {
+    const registration = railMarkerRegistry.register({
+      id: 'fixture-many-markers',
+      order: 500,
+      markers: (target) => target.kind === 'task'
+        ? Array.from({ length: 5 }, (_, index) => ({
+          id: `marker-${index}`,
+          label: `Marker ${index + 1}`,
+          dotTone: 'warn' as const,
+          placements: ['top-end', 'top-start', 'bottom-end', 'bottom-start'] as const,
+        }))
+        : [],
+    })
+    const screen = await renderFixture({
+      width: 80,
+      height: 24,
+      pane: 'notes',
+      cache: (client) => client.setQueryData(tasksKey, [{ ...TASK, title: 'Annotation lifecycle smoke' }]),
+    })
+    try {
+      expect(await screen.frame()).toContain('+5')
+      await screen.press('F10', { shift: true })
+      expect(await screen.until('Marker 1')).toContain('Marker 1')
+      await screen.press('END')
+      expect(await screen.until('Marker 5')).toContain('Marker 5')
+    } finally {
+      screen.done()
+      registration.dispose()
+    }
+  }, 30_000)
+
+  it('projects late annotation markers and a replacement contributor after a lifecycle clear', async () => {
+    let answer!: (marks: PluginAnnotationMark[]) => void
+    let registration = extensionRegistry.register({
+      id: 'fixture:late-task-markers',
+      pluginId: 'fixture',
+      point: 'core:task',
+      label: 'Late task markers',
+      order: 500,
+      carrier: 'items',
+      marks: async () => new Promise<PluginAnnotationMark[]>((resolve) => { answer = resolve }),
+    })
+    const screen = await renderFixture({ width: 80, height: 24, pane: 'notes' })
+    try {
+      expect(await screen.frame()).not.toContain('+6')
+      answer(Array.from({ length: 6 }, (_, index) => ({
+        key: { task: TASK.id },
+        severity: 'warn' as const,
+        text: `Late marker ${index + 1}`,
+      })))
+      expect(await screen.until('+6')).toContain('+6')
+
+      clearAnnotations()
+      registration.dispose()
+      registration = extensionRegistry.register({
+        id: 'fixture:late-task-markers',
+        pluginId: 'fixture',
+        point: 'core:task',
+        label: 'Replacement task markers',
+        order: 500,
+        carrier: 'items',
+        marks: async () => Array.from({ length: 10 }, (_, index) => ({
+          key: { task: TASK.id },
+          severity: 'info' as const,
+          text: `Replacement marker ${index + 1}`,
+        })),
+      })
+      expect(await screen.until('+10')).toContain('+10')
+    } finally {
+      screen.done()
+      registration.dispose()
+    }
   }, 30_000)
 
   it('opens on the first Menu source, with the keys on that row', async () => {

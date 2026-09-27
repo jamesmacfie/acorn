@@ -62,6 +62,12 @@ const stubHelper = (): Stub => {
         return node
       },
     },
+    config: {
+      path: '/tmp/acorn-helper-test.json',
+      read: () => ({ config: {} }),
+      write: (config: unknown) => ({ config }),
+      watch: () => () => {},
+    },
   } as unknown as Helper
   return { helper, remembered, upserted }
 }
@@ -91,6 +97,14 @@ afterEach(async () => {
 })
 
 const REQUEST = { sourceNodeId: 'local', providerId: 'cloud:nodes', providerNodeId: 'inst-42', label: 'Big box' }
+
+it('accepts a device configuration patch over the helper socket', async () => {
+  const { helper } = stubHelper()
+  const reply = await call(helper, 'config-write', { exclusiveSlots: { topbar: 'core' } })
+  expect(reply.ok).toBe(true)
+  expect(reply.ok === true && reply.value).toEqual({ config: { exclusiveSlots: { topbar: 'core' } } })
+  expect((await call(helper, 'config-write', 'not an object')).ok).toBe(false)
+})
 
 describe('node-adopt checks the vouched fingerprint against the certificate', () => {
   it('refuses a node presenting an identity the provider did not vouch for', async () => {

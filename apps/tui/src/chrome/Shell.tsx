@@ -33,7 +33,7 @@ import { PaneBody, PaneStrip } from './PaneRow'
 import { Footer } from './Footer'
 import { Notifications } from './Notifications'
 import { Inbox, initInbox } from './Inbox'
-import { TrustPrompt } from '../plugins/TrustPrompt'
+import { trustPromptComponent } from '../plugins/trustPromptLoader'
 import { Palette } from './Palette'
 import { createShellPalette } from './paletteSession'
 import { registerNavigationCommands } from './navigationCommands'
@@ -274,7 +274,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
               <Match when={name() === 'workspace'}><WorkspacePicker model={model} /></Match>
               <Match when={name() === 'project'}><ProjectPicker model={model} /></Match>
               <Match when={name() === 'quit'}><QuitConfirm onQuit={props.onQuit} /></Match>
-              <Match when={name() === 'trust'}><TrustPrompt /></Match>
+              <Match when={name() === 'trust'}><Dynamic component={trustPromptComponent() ?? undefined} /></Match>
               <Match when={name() === 'notifications'}><Inbox model={model} /></Match>
             </Switch>
           </box>

@@ -21,8 +21,10 @@ import { declaredSurfaces, eligiblePlugins, hasWithheldCode, type DeclaredSurfac
 import { pluginRowTarget, setPluginRowSource } from '../plugins/rowTargets'
 import { pluginCommand, usablePluginCommands } from './chromeCommands'
 import { suppliedSourcePanel } from './sourcePanel'
+import { remoteSourcePanel } from './remoteSource'
 import {
   captureAgentContext,
+  chromeDeps,
   ownsRoute,
   readAgentContextOptions,
   readAttention,
@@ -35,12 +37,14 @@ import { descriptorPromotion } from './promotion'
 import { registerPluginContextMenu } from './chromeContextMenus'
 import { registerPluginExtension, registerPluginExtensionPoint } from './chromeExtensionPoints'
 import { registerPluginTheme } from './chromeThemes'
+import { registerPluginStyle } from './chromeStyles'
 import { compileContentLinkPattern } from '@acorn/protocol/contentLinkPattern.ts'
 import { contentLinkRegistry } from '../registries/panes/contentLinks'
 import { refResolverRegistry } from '../registries/panes/refResolvers'
 import { registerNoticeTargetHandler } from '../../features/notifications/notifications'
 import { setSelectedSource } from '../../features/tasks/tasks'
 import { createLogger } from '../../infra/telemetry/logger'
+import { clearAnnotations } from '../annotations/annotations'
 
 const log = createLogger('plugin-chrome')
 
@@ -111,7 +115,7 @@ export const usableEmptyState = (
   // button would be the worse trade.
   empty?.action && !contextFreeActionUsable(pluginId, surfaces, empty.action) ? { message: empty.message } : empty
 
-function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[], metadataOnly = false): Disposable[] {
+function registerChrome(pluginId: string, hash: string, row: NodePluginRow, refreshes: number[], metadataOnly = false): Disposable[] {
   const installed = row.installed!
   const contributions = installed.contributions
   const disposables: Disposable[] = []
@@ -256,13 +260,15 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
       // split every other browse source already had (../registries/sources/SourceSurface.tsx). A cell
       // host supplies its own and gets a list instead of a reconciler refusing a `<main>`
       // (./sourcePanel.ts), which is the shape this follows.
-      ...(suppliedSourcePanel()?.({ pluginId, descriptor })
+      ...(descriptor.tree
+        ? remoteSourcePanel(pluginId, hash, descriptor)
+        : (suppliedSourcePanel()?.({ pluginId, descriptor })
         ?? {
           regions: {
             list: () => createComponent(ChromeSourceList, { pluginId, descriptor }),
             detail: () => createComponent(ChromeSourceDetail, { pluginId, descriptor }),
           },
-        }),
+        })),
       // A row's `task` block is the promotion capability. Registered independently of row selection, so
       // an integration can use the row click for detail navigation and a separate host-drawn "+Task"
       // affordance for promotion.
@@ -328,7 +334,11 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
   // Both halves ride this pass rather than the frames pass, and both are gated on the same
   // `hasWithheldCode` question every other descriptor is, because both are descriptors: a point is a
   // manifest line and a contribution is a route plus a verb. No plugin code executes on either side.
-  const pointBinding = { nodeId: chromeNode, enabled: () => pluginEnabledOnNode(chromeNode(), pluginId) }
+  const pointBinding = {
+    nodeId: chromeNode,
+    enabled: () => pluginEnabledOnNode(chromeNode(), pluginId),
+    freshnessRevision: () => chromeDeps(pluginId),
+  }
   for (const descriptor of contributions.extensionPoints ?? []) {
     // The surface is re-checked here rather than inside the adapter, because this is where the
     // manifest's own declared frames are in scope. A point hanging off a surface this manifest doesn't
@@ -431,6 +441,10 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     add('theme', descriptor.id, () => registerPluginTheme(pluginId, descriptor))
   }
 
+  for (const descriptor of contributions.styles ?? []) {
+    add('style', descriptor.id, () => registerPluginStyle(pluginId, descriptor))
+  }
+
   for (const descriptor of contributions.refResolvers ?? []) {
     // `providerId` is the plugin id and nothing else. The descriptor can't state one, because a resolver
     // claiming another provider's name is how a plugin would get its own rows rendered as that
@@ -455,6 +469,9 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
  * again when a trust decision lands, and each call replaces what the previous one contributed.
  */
 export function syncChromeContributions(): void {
+  // Descriptor registrations are replaced below. Clear their retained answers before any replacement
+  // can reuse the same public id, and notify existing readers in this turn.
+  clearAnnotations()
   disposeAll()
   const refreshes: number[] = []
   // Gated on `hasWithheldCode`, not `!trusted` (docs/plugins.md § One shared eligibility and trust
@@ -462,9 +479,9 @@ export function syncChromeContributions(): void {
   // contribute, so a rail row that opens a pane which will never mount is worse than no rail row.
   for (const entry of eligiblePlugins({ includeInactive: true })) {
     if (entry.inactive) {
-      registered.set(entry.pluginId, registerChrome(entry.pluginId, entry.row, refreshes, true))
+      registered.set(entry.pluginId, registerChrome(entry.pluginId, entry.hash, entry.row, refreshes, true))
     } else if (!hasWithheldCode(entry)) {
-      registered.set(entry.pluginId, registerChrome(entry.pluginId, entry.row, refreshes))
+      registered.set(entry.pluginId, registerChrome(entry.pluginId, entry.hash, entry.row, refreshes))
     }
   }
   // One timer at the smallest declared interval rather than one per descriptor. The polling fallback is

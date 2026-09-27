@@ -11,6 +11,7 @@ export const PrefKeys = {
   // Visual style, the appearance axis orthogonal to theme. One key rather than four, because there is
   // no OS signal to follow and nobody wants square panes by day and rounded by night.
   style: 'style',
+  devicePluginsDisabled: 'device_plugins_disabled',
   // Retired, and read by nothing. The desktop used to reopen from these three, which disagreed with
   // each other (docs/state-ownership.md). Still listed as device keys so a leftover in `localStorage`
   // stays there instead of being drained to the node.
@@ -28,6 +29,7 @@ export const PrefKeys = {
   keybindings: 'keybindings',
   diffView: 'diff_view',
   railOrder: 'rail_order',
+  leftCollapsed: 'left_collapsed',
   terminalRailDefault: 'term_rail_default',
   terminalHeight: 'term_height',
   terminalFontSize: 'term_font_size',

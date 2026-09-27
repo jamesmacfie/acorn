@@ -14,7 +14,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | Folder | What it is | Status |
 | --- | --- | --- |
-| [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; nothing blocks it. |
+| [client-plugins/](./client-plugins/README.md) | Delivered design record for device-held plugins, replacement chrome, style packs, and device configuration. Icon packs remain parked. | Five phases shipped 2026-09; web custody remains future-host work. |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
 | [dashboards/](./dashboards/README.md) | Remaining taskless database and write-back proposals. Shared data discovery and authoring now belong to workflow v2. | Redesign shipped; overlapping proposals superseded, 2026-09-13. |
@@ -28,9 +28,8 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [compiled-tier.md](./compiled-tier.md) | Which compiled plugin moves to the loaded tier next and what blocks it. | Standing map. Three of its four couplings dissolved when the remote component tree shipped. |
 | [integration-ideas.md](./integration-ideas.md) | The catalogue of integrations a workspace could hold, and the four shapes they collapse into. | Research notes. |
 | [kimi.md](./kimi.md) | Kimi Code CLI as a contributed tier 1 harness: the manifest, the four declarations to get right, and the Kimi usage API research behind the optional probes. | Proposal, 2026-09-18. Not started. |
-| [message.md](./message.md) | Agent-to-agent messaging for delegated sessions: what six reference apps do, and what is left after reports to the owner shipped. | Reports, the role note, and sender labels shipped 2026-09-24; the blocked-request wake and the children row remain. |
+| [message.md](./message.md) | Delivery record for delegated-session messaging, with reference-app research and the optional queued-report merge. | Owner reports, blocked-request wakes, and live child rows shipped by 2026-09-26; merging awaits evidence of noise. |
 | [pluginsearch.md](./pluginsearch.md) | Search within Linear, Rollbar, and GitHub lists beyond the loaded rows while retaining project mappings and state. | Proposal, 2026-09-24. Not started. |
-| [rail-tab.md](./rail-tab.md) | Rail controls and status markers, and closing the gaps in the `core:task` annotation point that replaced loaded rail markers. | Rail control and marker allocator shipped; annotation freshness, the response budget, the node-bundle check and terminal markers remain, 2026-09-12. |
 | [remote.md](./remote.md) | Web client, mobile PWA, and a relay service. | Preparation items shipped; the rest waits on a web client. |
 | [scoll_fix.md](./scoll_fix.md) | Agent transcript scroll and focus repair: retained view state, stable row identity, consumable navigation intent, and cross-session regression coverage. | Implementation proposal, 2026-09-14. Reading position, row identity and reveal intent shipped; filter and disclosure state not built. |
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
@@ -41,8 +40,8 @@ Host-owned plugin UI is the seam most of the others lean on, and it shipped in 2
 client ([tui.md](../tui.md)) was the second host built on it, which is why the kit's `tui` column is
 read rather than asserted, and what is left of shipping it is step 7 of [bundle.md](./bundle.md).
 The PWA is the layouts' narrow projections,
-compiled-tier's component couplings dissolved into slots, rail-tab's slice 3 became the `core:task`
-annotation point, and the marketing plugin docs should be written against the tree rather than the
+compiled-tier's component couplings dissolved into slots, the `core:task` annotation point carries
+loaded task status, and the marketing plugin docs should be written against the tree rather than the
 frame. Client-plugins consumes the remote root and `replace` arbitration and adds device provenance
 beside them; nothing in it waits any more. Sandbox is independent of all of that. Ecosystem's shipped
 rung-2 containment is recorded in `blockers.md` and sandbox's
@@ -54,7 +53,10 @@ rung-2 containment is recorded in `blockers.md` and sandbox's
 `events.md` follow-up (shipped on 2026-09-11), `layout/`, `structure/`,
 `structure-followup/`, `before-terminal-ui/`, `terminal/`, `terminal-updates/`, `terminal-rewrite/`,
 `notifications/`, `git-inspired/`, and
-the single files `live-qa.md`, `dx.md` and `web_search_run.md` are in git history. Each ended by saying
+the single files `live-qa.md`, `dx.md`, `web_search_run.md`, and `rail-tab.md` are in git history. The
+rail component and compiled marker contract live in [ui-design.md](../ui-design.md), and loaded task
+annotations live in
+[Cooperative extension points](../plugins/cooperative-extension-points.md#task-annotations). Each ended by saying
 where its behaviour moved.
 
 `node/` shipped on 2026-09-26. [Architecture overview](../architecture-overview.md) owns the

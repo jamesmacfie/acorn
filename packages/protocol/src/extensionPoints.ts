@@ -183,6 +183,15 @@ export type PluginAnnotationMark = {
   icon?: string
 }
 
+/**
+ * The most raw rows a host inspects from one annotation response.
+ *
+ * Diff annotation batches may legitimately cover 2,000 visible keys, so this generic transport
+ * guard stays above that contract. Point owners may apply a smaller accepted-mark limit after each
+ * row has been validated; `core:task` does so for its compact rail surface.
+ */
+export const MAX_RAW_ANNOTATION_ROWS = 4_096
+
 export type PluginAnnotationMarks = { items: PluginAnnotationMark[] }
 
 /**
@@ -282,8 +291,8 @@ export const isCoreHookPoint = (value: unknown): value is CoreHookPoint =>
  *
  * A task row on the rail is an item core draws, and what another plugin knows about a task — a
  * deploy is live, an incident is open, a ticket moved — is a fact pinned to it. That is an
- * annotation, not a rail-specific contribution: docs/future/rail-tab.md § Slice 3 says why one
- * mechanism serves a rail row, a diff line and an editor gutter, and why three would not.
+ * annotation, not a rail-specific contribution. docs/plugins/cooperative-extension-points.md
+ * § Task annotations defines why one mechanism serves task rows and other keyed owner surfaces.
  *
  * Keyed by task id alone. A row is one task and there is nothing else to disambiguate.
  *
@@ -305,7 +314,7 @@ export const CORE_TASK_KEY = ['task'] as const
  *
  * One member, and it stays one until a second surface has both a reason and a fallback worth writing.
  */
-export const CORE_EXCLUSIVE_SLOTS = ['rail.taskList'] as const
+export const CORE_EXCLUSIVE_SLOTS = ['rail.taskList', 'pane.switcher', 'rail', 'topbar'] as const
 
 export type CoreExclusiveSlot = (typeof CORE_EXCLUSIVE_SLOTS)[number]
 

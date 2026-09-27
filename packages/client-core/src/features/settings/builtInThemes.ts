@@ -20,7 +20,6 @@ if (!themeRegistry.entries().length) for (const theme of builtInThemes) themeReg
 export const THEMES = (): [string, string][] => themeContributions().map((theme) => [theme.id, theme.label])
 
 /**
-/**
  * The theme to actually apply for a stored preference.
  *
  * A plugin theme's definition lives with the plugin, so the pref can outlive it: the package is

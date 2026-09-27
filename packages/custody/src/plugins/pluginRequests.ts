@@ -4,6 +4,15 @@ import { pluginPermissionsSchema } from '@acorn/protocol/plugin/contract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 import type { PluginAck, PluginDevGrant } from './pluginTrustStore'
 import { pluginExtensionGrantSchema } from './grantSchemas'
+import { bundleSourceSchema } from '@acorn/protocol/plugin/bundles.ts'
+
+export const installSchema = z.strictObject({ source: z.union([
+  z.strictObject({ github: z.string().min(1), tag: z.string().optional() }),
+  z.strictObject({ npm: z.string().min(1), version: z.string().optional() }),
+  z.strictObject({ url: z.string().min(1) }),
+  z.strictObject({ path: z.string().min(1) }),
+]), expectedPluginId: z.string().min(1).optional() })
+export const removeSchema = z.strictObject({ pluginId: z.string().min(1) })
 
 // What the renderer may say about a third-party plugin bundle, and what it gets back. These schemas
 // live beside the stores they guard rather than in a shell, because a schema that drifted between two
@@ -18,7 +27,8 @@ import { pluginExtensionGrantSchema } from './grantSchemas'
 // for both directions, because they are one switch and revoking must never be harder than granting.
 export const devGrantSchema = z.strictObject({
   pluginId: z.string().min(1),
-  nodeId: z.string().min(1),
+  nodeId: z.string().default(''),
+  source: bundleSourceSchema.optional(),
   path: z.string().min(1).max(1024).optional(),
   grant: z.boolean(),
 })
@@ -41,7 +51,8 @@ export const putSchema = z.strictObject({
 export const decisionSchema = z.object({
   pluginId: z.string().min(1),
   hash: z.string().regex(/^[0-9a-f]{64}$/),
-  nodeId: z.string().min(1),
+  nodeId: z.string().default(''),
+  source: bundleSourceSchema.optional(),
   version: z.string().min(1),
   decision: z.enum(['accepted', 'rejected']),
 })
@@ -128,7 +139,7 @@ export const NO_DISCLOSURE = {
 export type PluginsState = {
   // Hash to what this device holds. The renderer diffs a node's listing against it to decide what to
   // fetch.
-  cached: Record<string, { pluginId: string; version: string; bytes: number }>
+  cached: Record<string, { pluginId: string; version: string; bytes: number; source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource; installSource?: import('@acorn/protocol/api.ts').PluginInstallSource; sourceLabel?: string; manifest?: unknown; nodeIds?: string[] }>
   acks: PluginAck[]
   devGrants: PluginDevGrant[]
 }

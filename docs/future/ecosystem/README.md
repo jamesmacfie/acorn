@@ -14,6 +14,9 @@ compose their own experience — dashboards, plugins, plugins talking to each ot
 authors get developer experience good enough that building a quality acorn plugin is an afternoon,
 not a week.
 
+Device-held client-only bundles are a separate provenance for this installer. They do not change
+the signing or discovery work assessed here.
+
 ## Where this stands (2026-08-16)
 
 Much of the original assessment has shipped. The agent-authored dev loop is real: the authoring

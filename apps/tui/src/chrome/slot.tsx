@@ -1,12 +1,12 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createSignal, ErrorBoundary, Show, type JSX } from 'solid-js'
+import { createSignal, ErrorBoundary, Show } from 'solid-js'
 import { Dynamic } from '../tree/renderer'
 import { createQuery } from '@tanstack/solid-query'
 import type { CoreExclusiveSlot } from '@acorn/protocol/extensionPoints.ts'
 import { PrefKeys } from '@acorn/client-core/infra/persistence'
 import { prefsOptions } from '@acorn/client-core/infra/queries.ts'
 import {
-  exclusiveSlotChoices, noteExclusiveSlotFailure, resolveExclusiveSlot,
+  CORE_SLOT_PROVIDER, exclusiveSlotChoices, noteExclusiveSlotFailure, resolveExclusiveSlot,
 } from '@acorn/client-core/host/registries/extensionPoints'
 
 // The terminal host's `ExclusiveSlotHost`: where a plugin draws in place of one of core's own
@@ -20,16 +20,17 @@ import {
 //
 // Every one of the three ways back to core is the DOM host's, line for line: nobody chose, the
 // surface threw, or the reader changed their mind.
-export function ExclusiveSlot(props: { slot: CoreExclusiveSlot; core: () => JSX.Element }) {
+export function ExclusiveSlot(props: { slot: CoreExclusiveSlot; value?: unknown }) {
   const prefs = createQuery(() => prefsOptions(true))
   const [threw, setThrew] = createSignal(false)
+  const core = () => resolveExclusiveSlot(props.slot, CORE_SLOT_PROVIDER)
   const provider = () => {
-    if (threw()) return null
+    if (threw()) return core()
     return resolveExclusiveSlot(props.slot, exclusiveSlotChoices(prefs.data?.[PrefKeys.exclusiveSlots])[props.slot])
   }
 
   return (
-    <Show when={provider()} fallback={props.core()}>
+    <Show when={provider()}>
       {(chosen) => (
         <ErrorBoundary
           fallback={() => {
@@ -38,10 +39,10 @@ export function ExclusiveSlot(props: { slot: CoreExclusiveSlot; core: () => JSX.
               noteExclusiveSlotFailure(props.slot, chosen().pluginId)
               setThrew(true)
             })
-            return null
+            return <Dynamic component={core().component} value={props.value} />
           }}
         >
-          <Dynamic component={chosen().component} />
+          <Dynamic component={chosen().component} value={props.value} />
         </ErrorBoundary>
       )}
     </Show>

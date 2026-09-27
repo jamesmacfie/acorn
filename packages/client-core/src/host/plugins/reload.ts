@@ -23,10 +23,19 @@ export async function reconcilePluginChange(nodeId: string = activeNodeId() ?? '
   await syncPluginDistribution({ nodeIds: [nodeId] })
 }
 
+/** A device install, update, toggle, or removal needs no node roster request. */
+export async function reconcileDevicePluginChange(): Promise<void> {
+  await syncPluginDistribution({ deviceOnly: true })
+  syncPluginContributions()
+}
+
 /** Plugin lifecycle events are fleet control events. Ordinary task streams still obey the active
  * node WebSocket filter. The status effect tracks transitions, so reconnects read again. */
 export function watchPluginChanges(): () => void {
   const unsubscribeCommit = onPluginDistributionCommit(syncPluginContributions)
+  // Device bundles can register before any node has connected. Reconciliation is serialized with
+  // subsequent fleet reads in distribution.ts, so an arriving node cannot overtake this pass.
+  void reconcileDevicePluginChange().catch((error: unknown) => log.warn('could not read device plugins', error))
   const unsubscribeSocket = wsOnFleetPluginsChanged((nodeId) => {
     void reconcilePluginChange(nodeId).catch((error) => log.warn('could not reconcile a plugin change', error))
   })

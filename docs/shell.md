@@ -92,6 +92,19 @@ the same fail-quiet stance `deviceTokenStore.ts` takes and the same blast radius
 The helper opens only this installation's custody root. Its handshake carries the current data key
 and paths; it does not read credentials from another application root.
 
+### Device config file
+
+The helper also owns `<userDataDir>/acorn.json`, a data-only projection of covered device
+preferences and requested device plugin sources. It watches the directory for edits and sends a
+`config-changed` push to the renderer. A read or write crosses the same helper socket as plugin
+custody through `config-read` and `config-write`; `config-location` supplies the path for Settings.
+Settings can ask the native shell to open that file; the shell creates an empty object first when
+the file does not yet exist.
+The helper writes atomically and preserves unknown keys from the last valid file. A parse error
+returns its line and column and leaves the last valid configuration active. The schema is generated
+from `@acorn/protocol/deviceConfig.ts` and committed as
+`packages/plugin-types/acorn-device.schema.json`.
+
 ## Node child
 
 The helper starts the staged `service.js` under the runtime it is itself running, the bundled Node:
@@ -369,6 +382,13 @@ tree it served is removed from the UI. The failure remains in the plugin diagnos
 replacing the contribution with an inline error.
 
 ### The renderer bridge
+
+The `plugins` group exposes `plugins-install` and `plugins-remove` beside state, cache put, trust
+recording, and development grants. The helper validates the source, reads the manifest, hashes the
+bundle, and returns metadata; no executable bytes cross into the renderer over this bridge.
+`plugins-state` includes source provenance, the source label, and the validated device manifest so
+the client can re-check admission. A host that omits either install or remove fails platform contract
+validation.
 
 `apps/desktop/src/shell/bridge.ts` is built as one IIFE and injected as the window's initialization
 script, which runs before any page script. It assembles the narrow, validated `window.acorn` surface

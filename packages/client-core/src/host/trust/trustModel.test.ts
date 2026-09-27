@@ -29,6 +29,13 @@ const { recordTrustDecision, trustTiers } = await import('./trustModel')
 
 const HASH = 'a'.repeat(64)
 
+describe('device provenance', () => {
+  it('omits the node execution tier for a device bundle', () => {
+    const device = { ...request(), nodeId: '', source: { kind: 'device' as const }, sourceLabel: 'github:owner/board' }
+    expect(trustTiers(device).some((tier) => tier.key === 'declared')).toBe(false)
+  })
+})
+
 const permissions = (over: Partial<NodePluginPermissions> = {}): NodePluginPermissions => ({
   api: [],
   events: [],

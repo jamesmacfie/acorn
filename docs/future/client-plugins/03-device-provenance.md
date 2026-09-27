@@ -1,7 +1,7 @@
 # Device provenance: a plugin a device holds
 
-Part of [docs/future/client-plugins/](./README.md). This is the design for the first stance change:
-a plugin's bundle can come from the device itself, not only from a node. Phase 0 builds it.
+Historical design record from [client plugins](./README.md). Device provenance shipped in phase 0;
+[plugins.md](../../plugins.md) and [security.md](../../security.md) own current behavior.
 
 ## What exists
 

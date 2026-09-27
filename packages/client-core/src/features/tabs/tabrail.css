@@ -10,6 +10,18 @@
   background: var(--bg-subtle);
 }
 
+.rail-host {
+  flex: none;
+  width: var(--tabrail-w);
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.rail-host > .tabrail,
+.rail-host > .remote-tree { width: 100%; flex: 1; min-height: 0; }
+.rail-host[data-collapsed] { width: 36px; }
+.rail-host[data-collapsed] .tabrail-list { display: none; }
+
 .tabrail-list {
   flex: 1;
   min-height: 0;
