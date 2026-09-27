@@ -40,6 +40,14 @@ export default function AgentUsageSection(props: { showHeader?: boolean }) {
             <Inline>
               <StatusDot tone={usageTone(provider.health)} label={provider.health} />
               <Text emphasis="eyebrow">{provider.label}</Text>
+              <IconButton
+                icon="refresh-cw"
+                label={`Refresh ${provider.label} usage`}
+                title={`Refresh ${provider.label} usage`}
+                spin={agentUsageStore.refreshingProviderId() === provider.provider}
+                disabled={agentUsageStore.refreshing()}
+                onPress={() => void agentUsageStore.refreshProvider(provider.provider)}
+              />
             </Inline>
             <Text emphasis="muted">{providerMetaLine(provider)}</Text>
             <Show when={provider.error}>{(error) => <Alert tone="warn">{error().message}</Alert>}</Show>
