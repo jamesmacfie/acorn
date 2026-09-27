@@ -13,6 +13,10 @@ const output = resolve(DESKTOP, 'dist/bundled-plugins')
 // are all generic over the resulting directories.
 const BUNDLED_PLUGINS = ['agent-cost', 'database', 'findings', 'http', 'linear', 'model-providers', 'rollbar', 'sentry-telemetry']
 
+// Client bundles import the SDK through its package exports, which point to dist/.
+// Build it before bundling plugins so staging also works in a clean checkout.
+execFileSync('pnpm', ['--filter', 'acorn-plugin-sdk', 'build'], { cwd: ROOT, stdio: 'inherit' })
+
 rmSync(output, { recursive: true, force: true })
 for (const id of BUNDLED_PLUGINS) {
   execFileSync(process.execPath, [
