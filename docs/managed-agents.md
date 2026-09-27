@@ -344,7 +344,9 @@ row reaches every client live, and a count computed only when the list is fetche
 by the next broadcast. A queued turn leaves `runtimeState` at `ready` or `working`, so without this
 count the task sidebar has no way to mark a session whose only sign of a waiting prompt is the prompt
 itself. Enqueuing a follow-up on a session held idle behind the concurrency limit broadcasts the row on
-its own, because no event would otherwise wake it.
+its own, because no event would otherwise wake it. The queue shows each waiting turn's text and its
+image or file attachments with the same tiles used in the sent transcript. An attachment-only turn
+shows the tiles without a generic input count.
 
 A subagent's own progress never touches its session's runtime state. Turn boundaries own that, and a
 child that settles after its parent's turn completed, which Codex allows, would otherwise drag the
