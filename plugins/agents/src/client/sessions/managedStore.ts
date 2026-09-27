@@ -491,6 +491,25 @@ export const managedAgentStore = {
     upsertSession(session)
     return session
   },
+  async startInlineSession(
+    taskId: string,
+    provider: { id: string; profileId: string },
+    origin: import('../../contract/inlineDiff.ts').InlineDiffOrigin,
+    requestedConfigOptions: Record<string, string>,
+    idempotencyKey: string,
+  ): Promise<AgentSession> {
+    const session = await managedAgentApi.createSession({
+      taskId,
+      providerId: provider.id,
+      profileId: provider.profileId,
+      kind: 'interactive',
+      origin,
+      title: `Ask about ${origin.path}:${origin.line}`,
+      config: { requestedConfigOptions },
+    }, idempotencyKey)
+    upsertSession(session)
+    return session
+  },
   activate(): () => void {
     subscribers++
     if (!disposeSocket) disposeSocket = wsOnAgentFrame(onFrame)

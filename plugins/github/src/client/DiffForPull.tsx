@@ -1,11 +1,14 @@
-import { Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useSearchParams } from '@solidjs/router'
-import { openPane } from '@acorn/plugin-api/client'
+import { clientCapability, openPane } from '@acorn/plugin-api/client'
 import { pullKey } from '../shared/api'
 import { fetchDiffSegments, fileBlobOptions, mentionsOptions, pullDetailOptions, pullDiffOptions, searchDiff } from './queries'
 import { addReviewComment, replyReview, resolveThread } from './mutations'
 import { Alert, DiffPane } from '@acorn/plugin-api/ui'
+import { loadDiffLineContext, type CodeRow, type DiffLineAnchor } from '@acorn/plugin-api/ui/diff'
+import { sameInlineLine, type InlineDiffOrigin } from '@acorn/plugin-agents/contract/inlineDiff.ts'
+import { AGENTS_INLINE_DIFF } from '@acorn/plugin-agents/contract/inlineDiffClient.ts'
 import type { DiffSource } from '@acorn/plugin-api/ui/diff'
 import { DIFF_LINE_POINT } from './extensionPoints'
 import { incompleteFilesMessage } from './completeness'
@@ -37,6 +40,44 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
   const detail = createQuery(() => pullDetailOptions(owner, repo, number, true))
   const mentionsQuery = createQuery(() => mentionsOptions(owner, repo, true))
   const topology = () => diff.data?.document
+  const inline = () => clientCapability(AGENTS_INLINE_DIFF)
+  createEffect(() => { if (taskId) inline()?.prime(taskId) })
+  createEffect(() => {
+    const files = topology()?.files
+    if (taskId && files) inline()?.reportPatches(
+      { taskId, source: 'pull-request', pull: { owner, repo, number } },
+      Object.fromEntries(files.map((file) => [file.path, file.patchKey])),
+    )
+  })
+  const [openInline, setOpenInline] = createSignal<InlineDiffOrigin | null>(null)
+  createEffect(() => {
+    const opened = openInline()
+    if (opened && topology()?.files.find((file) => file.path === opened.path)?.patchKey !== opened.patchKey) setOpenInline(null)
+  })
+  const inlineOrigin = (row: CodeRow): InlineDiffOrigin | null => {
+    if (!taskId) return null
+    const patchKey = topology()?.files.find((file) => file.path === row.path)?.patchKey
+    const line = row.kind === 'delete' ? row.oldNo : row.newNo
+    if (!patchKey || line == null) return null
+    return {
+      kind: 'inline-diff', source: 'pull-request', taskId, path: row.path,
+      side: row.kind === 'delete' ? 'old' : 'new', line, patchKey,
+      quote: row.raw.slice(0, 2_000),
+      pull: { owner, repo, number },
+    }
+  }
+  const inlineAnchors = createMemo<DiffLineAnchor[]>(() => {
+    if (!taskId) return []
+    const visible = (inline()?.sessionsForTask(taskId) ?? []).flatMap((session) => {
+      const origin = session.origin
+      if (!origin || origin.source !== 'pull-request' || session.archivedAt ||
+          origin.pull?.owner !== owner || origin.pull.repo !== repo || origin.pull.number !== number) return []
+      if (topology()?.files.find((file) => file.path === origin.path)?.patchKey !== origin.patchKey) return []
+      return [{ path: origin.path, side: origin.side, line: origin.line }]
+    })
+    const opened = openInline()
+    return opened ? [...visible, { path: opened.path, side: opened.side, line: opened.line }] : visible
+  })
 
   const source: DiffSource = {
     scope: { taskId: props.taskId, routeKey: props.route.key },
@@ -66,6 +107,18 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
     } : {}),
     invalidate: () => void queryClient.invalidateQueries({ queryKey: pullKey(owner, repo, number) }),
     draftPrefix: `${owner}/${repo}/${number}`,
+    ...(taskId ? { inlineChat: {
+      anchors: inlineAnchors,
+      open: (row: CodeRow) => setOpenInline(inlineOrigin(row)),
+      render: (row: CodeRow) => {
+        const origin = inlineOrigin(row)
+        const Card = inline()?.Card
+        if (!origin || !Card) return null
+        const exists = inline()?.sessionsForTask(taskId).some((session) => session.origin && sameInlineLine(session.origin, origin) && !session.archivedAt)
+        if (!exists && (!openInline() || !sameInlineLine(openInline()!, origin))) return null
+        return <Card origin={origin} loadContext={() => loadDiffLineContext(source, row)} onClose={() => setOpenInline(null)} />
+      },
+    } } : {}),
     ...(taskId ? {
       openLine: (row: Parameters<NonNullable<DiffSource['openLine']>>[0]) => {
         if (row.newNo == null) return

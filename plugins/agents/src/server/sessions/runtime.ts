@@ -149,7 +149,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       // Interactive sessions only, and not a fork. A workflow step names the model it wants in its own
       // policy, and a fork continues the session it came from, so neither is the owner opening something
       // new for the defaults to answer for.
-      if (session.kind === 'interactive' && !session.parentSessionId) {
+      if (session.kind === 'interactive' && !session.parentSessionId && !session.origin) {
         await this.applySessionDefaults(session.id, session.providerId).catch(async (error) => {
           await this.record(session.id, null, {
             type: 'diagnostic',
@@ -158,7 +158,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
           })
         })
       }
-      if (session.kind === 'delegated') {
+      if (session.kind === 'delegated' || session.origin?.kind === 'inline-diff') {
         const requested = session.config.requestedConfigOptions
         if (requested && typeof requested === 'object' && !Array.isArray(requested)) {
           const values = Object.fromEntries(Object.entries(requested).filter((entry): entry is [string, string] =>

@@ -43,6 +43,7 @@ describe('stored defaults', () => {
       followLastSession: true,
       pinned: { codex: { model: 'pinned' } },
       last: { codex: { model: 'last' } },
+      inline: { providerId: null, pinned: {} },
     }
     expect(effectiveAgentDefaults(record, 'codex')).toEqual({ model: 'last' })
     expect(effectiveAgentDefaults({ ...record, followLastSession: false }, 'codex')).toEqual({ model: 'pinned' })
@@ -51,7 +52,7 @@ describe('stored defaults', () => {
 
   it('merges a remembered change into the provider it came from', () => {
     const record = rememberAgentDefaults(
-      { continueAfterUsageLimit: true, followLastSession: true, pinned: {}, last: { codex: { model: 'a', reasoning: 'low' } } },
+      { continueAfterUsageLimit: true, followLastSession: true, pinned: {}, last: { codex: { model: 'a', reasoning: 'low' } }, inline: { providerId: null, pinned: {} } },
       'codex',
       { reasoning: 'high' },
     )
@@ -66,7 +67,7 @@ describe('stored defaults', () => {
 
   it('fills the fields a write left out', () => {
     expect(parseAgentSessionDefaults('{"followLastSession":false}'))
-      .toEqual({ continueAfterUsageLimit: true, followLastSession: false, pinned: {}, last: {} })
+      .toEqual({ continueAfterUsageLimit: true, followLastSession: false, pinned: {}, last: {}, inline: { providerId: null, pinned: {} } })
   })
 
   it('refuses a value that is not a string, and an over-long id', () => {

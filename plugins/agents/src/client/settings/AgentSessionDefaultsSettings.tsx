@@ -73,6 +73,17 @@ export default function AgentSessionDefaultsSettings() {
     else delete forProvider[optionId]
     void save({ pinned: { ...record().pinned, [providerId]: forProvider } })
   }
+  const inlineProvider = createMemo(() => record().inline.providerId ?? providers()?.find((provider) => provider.installed)?.id ?? '')
+  const chooseInlineProvider = (providerId: string) => void save({ inline: { ...record().inline, providerId } })
+  const chooseInlineOption = (providerId: string, optionId: string, value: string) => {
+    const current = { ...record().inline.pinned[providerId] }
+    if (value) current[optionId] = value
+    else delete current[optionId]
+    void save({ inline: {
+      ...record().inline,
+      pinned: { ...record().inline.pinned, [providerId]: current },
+    } })
+  }
 
   return (
     <Stack gap="section">
@@ -142,6 +153,22 @@ export default function AgentSessionDefaultsSettings() {
           )}
         </For>
       </Show>
+
+      <Section label="Inline diff chats">
+        <Field label="Provider" layout="split">
+          <Select label="Inline chat provider" size="sm" value={inlineProvider()}
+            options={(providers() ?? []).filter((provider) => provider.installed).map((provider) => ({ value: provider.id, label: provider.label }))}
+            onChange={chooseInlineProvider} />
+        </Field>
+        <For each={(advertised()[inlineProvider()] ?? []).filter((option) => option.category === 'model' || option.category === 'reasoning')}>
+          {(option) => <Field label={option.label} layout="split">
+            <Select label={`Inline chat ${option.label}`} size="sm"
+              value={record().inline.pinned[inlineProvider()]?.[option.id] ?? ''}
+              options={[{ value: '', label: 'Provider default' }, ...option.values.map((value) => ({ value: value.value, label: value.label }))]}
+              onChange={(value) => chooseInlineOption(inlineProvider(), option.id, value)} />
+          </Field>}
+        </For>
+      </Section>
 
       <Section label="Transcript">
         <Field

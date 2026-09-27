@@ -24,6 +24,8 @@ export type AgentSessionDefaults = {
   pinned: AgentDefaultValues
   /** Written by the runtime whenever a session's option changes, and used when following is on. */
   last: AgentDefaultValues
+  /** Choices for sessions opened from a diff line, independent of ordinary sessions. */
+  inline: { providerId: string | null; pinned: AgentDefaultValues }
 }
 
 // Following, because it needs no setup to be useful and it matches what a session switch means: you
@@ -33,6 +35,7 @@ export const defaultAgentSessionDefaults = (): AgentSessionDefaults => ({
   followLastSession: true,
   pinned: {},
   last: {},
+  inline: { providerId: null, pinned: {} },
 })
 
 // The client is the less-trusted side and this decides which model a provider child runs, so the
@@ -107,6 +110,22 @@ export function validateAgentSessionDefaults(
   }
   const pinned = record.pinned == null ? undefined : values(record.pinned, 'pinned', errors)
   const last = record.last == null ? undefined : values(record.last, 'last', errors)
+  const inlineRecord = record.inline
+  let inline: AgentSessionDefaults['inline'] | undefined
+  if (inlineRecord != null) {
+    if (typeof inlineRecord !== 'object' || Array.isArray(inlineRecord)) errors.push('inline must be an object.')
+    else {
+      const fields = inlineRecord as Record<string, unknown>
+      if (fields.providerId != null && (typeof fields.providerId !== 'string' || fields.providerId.length > MAX_ID)) {
+        errors.push('inline.providerId must be a provider id.')
+      }
+      const pinnedInline = values(fields.pinned, 'inline.pinned', errors)
+      if (pinnedInline) inline = {
+        providerId: typeof fields.providerId === 'string' && fields.providerId ? fields.providerId : null,
+        pinned: pinnedInline,
+      }
+    }
+  }
   if (errors.length) return { ok: false, errors }
   return {
     ok: true,
@@ -117,6 +136,7 @@ export function validateAgentSessionDefaults(
       ...(typeof record.followLastSession === 'boolean' ? { followLastSession: record.followLastSession } : {}),
       ...(pinned ? { pinned } : {}),
       ...(last ? { last } : {}),
+      ...(inline ? { inline } : {}),
     },
   }
 }

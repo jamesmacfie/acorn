@@ -1297,6 +1297,9 @@ importers:
       '@acorn/diff-document':
         specifier: workspace:*
         version: link:../../packages/diff-document
+      '@acorn/plugin-agents':
+        specifier: workspace:*
+        version: link:../agents
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api

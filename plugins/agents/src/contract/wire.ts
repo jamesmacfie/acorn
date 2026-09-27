@@ -1,4 +1,5 @@
 import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
+import type { InlineDiffOrigin } from './inlineDiff.ts'
 
 export const AGENT_EVENT_SCHEMA_VERSION = 1
 
@@ -294,6 +295,7 @@ export type AgentSession = {
   providerId: string
   profileId: string
   kind: AgentSessionKind
+  origin?: InlineDiffOrigin | null
   driverKind: string
   driverVersion: string
   providerSessionRef: string | null

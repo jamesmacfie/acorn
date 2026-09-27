@@ -159,6 +159,7 @@ export function DiffLine(props: {
   mentions?: string[]
   highlight?: FindHighlight
   openLine?: (row: CodeRow) => void
+  askAgent?: (row: CodeRow) => void
 }) {
   return (
     <>
@@ -166,6 +167,7 @@ export function DiffLine(props: {
         <span class="diff-gutter">
           {props.r.oldNo ?? ''}
           <OpenLineButton row={props.r} onOpen={props.openLine} />
+          <AskAgentButton row={props.r} onOpen={props.askAgent} />
         </span>
         <span class="diff-gutter">{props.r.newNo ?? ''}</span>
         <span class="diff-marker">{props.r.kind === 'insert' ? '+' : props.r.kind === 'delete' ? '\u2212' : ' '}</span>
@@ -193,6 +195,7 @@ export function SplitCell(props: {
   mentions?: string[]
   highlight?: FindHighlight
   openLine?: (row: CodeRow) => void
+  askAgent?: (row: CodeRow) => void
 }) {
   return (
     <div
@@ -209,6 +212,7 @@ export function SplitCell(props: {
             <span class="diff-gutter">
               {props.gutter ?? ''}
               <OpenLineButton row={r()} onOpen={props.openLine} />
+              <AskAgentButton row={r()} onOpen={props.askAgent} />
             </span>
             <span class="diff-marker">{r().kind === 'insert' ? '+' : r().kind === 'delete' ? '\u2212' : ' '}</span>
             <Show when={props.canAdd && props.composer}>
@@ -245,6 +249,18 @@ function OpenLineButton(props: { row: CodeRow; onOpen?: (row: CodeRow) => void }
       </button>
     </Show>
   )
+}
+
+function AskAgentButton(props: { row: CodeRow; onOpen?: (row: CodeRow) => void }) {
+  return <Show when={props.onOpen && (props.row.newNo != null || props.row.oldNo != null)}>
+    <button
+      type="button"
+      class="diff-ask-btn"
+      title="Ask agent about this line"
+      aria-label={`Ask agent about ${props.row.path}:${props.row.newNo ?? props.row.oldNo}`}
+      onClick={(event) => { event.stopPropagation(); props.onOpen?.(props.row) }}
+    >✦</button>
+  </Show>
 }
 
 function CodeContent(props: { r: CodeRow; highlight?: FindHighlight }) {

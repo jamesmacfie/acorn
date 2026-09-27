@@ -108,6 +108,7 @@ export class AgentStore extends AgentSessionRepository {
       providerId: input.providerId,
       profileId: input.profileId,
       kind: input.kind,
+      originJson: input.origin ? JSON.stringify(input.origin) : null,
       driverKind: provider.driverKind,
       driverVersion: provider.driverVersion,
       providerSessionRef: input.resumeProviderSessionRef ?? null,

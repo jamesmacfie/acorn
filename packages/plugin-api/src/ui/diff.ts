@@ -39,6 +39,7 @@ export type { CommentSide, DiffLineAnchor, DiffSource } from '@acorn/client-core
 // builds these on its node (./node); a client source only ever moves them, except for assembling a
 // topology from descriptors its node sent (docs/diff-rendering.md § The document).
 export { documentTopology } from '@acorn/diff-document/document'
+export { loadDiffLineContext } from '@acorn/client-core/features/diff'
 export type {
   DiffDocumentFile, DiffDocumentTopology, DiffSearchMatch, DiffSearchPage, DiffSearchRequest, DiffSegmentDescriptor,
   DiffSegmentPayload, DiffSegmentRequest, PlainDiffRow,

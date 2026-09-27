@@ -118,6 +118,12 @@ has no task editor, so its source omits the callback. The viewer hides the butto
 which have no corresponding line in the current file, and for sources without the callback. A PR's
 line number comes from the PR head; the local task file can differ if its worktree has moved on.
 
+Task-owned Changes and PR sources also supply `inlineChat`. Its gutter action opens an Ask agent card
+under a code line in either projection. The source names the card's anchor before its segment loads,
+so it uses the same measured dynamic-block path as review notes. Repository PR browsing omits the
+action because it has no task to own the agent session. Inline chat stays separate from local review
+notes and GitHub review comments.
+
 Review-note writes publish `plugin:changes:review-notes-changed` only after create, edit, delete, or
 sent-state persistence changes the public result. The frame carries `{ taskId, total, unsent }`, not
 note ids, paths, snippets, or bodies, so badges and delivery gates can react without receiving review

@@ -23,6 +23,21 @@ function mount(component: () => JSX.Element) {
 }
 
 describe('diff line editor navigation', () => {
+  it('opens an agent chat on either side without triggering a row action', () => {
+    const askAgent = vi.fn()
+    const rowClick = vi.fn()
+    const host = mount(() => <div class="diff-row" onClick={rowClick}>
+      <DiffLine r={insert} canAdd={false} addComment={async () => {}} onMutated={() => {}} askAgent={askAgent} />
+      <SplitCell r={deleted} gutter={48} canAdd={false} addComment={async () => {}} onMutated={() => {}} askAgent={askAgent} />
+    </div>)
+    const buttons = host.querySelectorAll<HTMLButtonElement>('.diff-ask-btn')
+    expect(buttons).toHaveLength(2)
+    buttons[0]!.click()
+    buttons[1]!.click()
+    expect(askAgent.mock.calls).toEqual([[insert], [deleted]])
+    expect(rowClick).not.toHaveBeenCalled()
+  })
+
   it('opens the added line from the unified gutter without triggering the row action', () => {
     const openLine = vi.fn()
     const rowClick = vi.fn()

@@ -652,6 +652,19 @@ For the full contract, see [Managed agent client surfaces](./managed-agents/clie
 
 ## New-session defaults
 
+Inline diff chats are interactive managed sessions with a typed `origin` on the durable session row.
+The origin records the task, source, path, side, line, patch key, and original quote; a local origin
+also records staged or unstaged scope, while a PR origin records its repository and number. The
+Agents client capability supplies the compact diff card to Changes and GitHub without either plugin
+owning transcripts. The task sidebar groups these sessions under Inline chats. A patch change
+detaches the card from the line while leaving the session and its original context available in
+Agents. The client marks a session stale once it has seen that diff's newer document.
+
+Inline chats have separate provider, model, and effort defaults in the existing session-defaults
+preference. They start with Read only selected. When the provider advertises a read-only permission
+profile, the requested profile is applied before the first turn; otherwise the card labels the
+choice best effort and asks the agent not to write. Full access is an explicit per-chat choice.
+
 A new session starts on the settings the owner last used, not on the provider's own choice. Switch
 Codex to a higher reasoning effort in one session and the next Codex session starts there.
 
