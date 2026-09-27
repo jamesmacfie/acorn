@@ -1623,6 +1623,9 @@ export function ListDetail(props: {
    *  The rows collapse separately, from the same signal: read it with `sidebarCollapsed(key)` and
    *  pass each row a `collapsed` slot. */
   collapseKey?: string
+  /** Hide the list's contents in the collapsed rail while keeping them mounted. Use this when the
+   *  list has no readable one-mark form, such as the editor's file tree and search panel. */
+  collapseContent?: 'rows' | 'empty'
   children: JSX.Element
 }) {
   // `list` is a prop, so every read of it re-runs the JSX the caller wrote there. This read it three
@@ -1685,7 +1688,11 @@ export function ListDetail(props: {
         <>
           {/* <aside> rather than a div: the list is a complementary landmark, and naming it is how a
               screen reader tells two same-shaped columns apart. */}
-          <aside class="ui-listdetail-list" aria-label={props.listLabel}>
+          <aside
+            class="ui-listdetail-list"
+            aria-label={props.listLabel}
+            style={collapsed() && props.collapseContent === 'empty' ? { visibility: 'hidden' } : undefined}
+          >
             {list()}
           </aside>
           {edge()}

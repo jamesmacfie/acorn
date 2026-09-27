@@ -472,7 +472,9 @@ file in the editor, so a separate rail pane made one mental model ("find somethi
 open it") into a cross-pane hop. `⌘⇧F` and the "Find in files…" palette row open the editor pane with
 the search panel focused, through an `editor:search` pane intent. Keep that entry point, or searching
 starts with "open the editor first". Tree and search stay mounted together, so flipping between them
-keeps a query, its results, and the tree's open folders.
+keeps a query, its results, and the tree's open folders. The shared sidebar collapses to an empty
+rail, with its panels kept mounted. Search and "Reveal active file" commands expand it so the requested
+panel is visible.
 
 ## Data and actions
 
