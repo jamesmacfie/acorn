@@ -101,7 +101,7 @@ mirror columns; [package-shape.md](../plugins/package-shape.md) § The plugin AP
 [tui/interaction.md](../tui/interaction.md) has the terminal's diff pane. The fixture and the flow are
 [testing.md](../testing.md) § Large-surface fixture and
 [local-development.md](../local-development.md) § Large-surface flow. Smoke items 81 to 85 in
-[testing.md](../testing.md) are the real-window acceptance it still owes: none has run on a visible
+[changes-and-large-surfaces.md](../testing/changes-and-large-surfaces.md) are the real-window acceptance it still owes: none has run on a visible
 WebKit window.
 
 `web_search_run.md` made a managed transcript show what an agent searched for, which pages it opened,
@@ -138,7 +138,7 @@ kit has the renamed picker, [features.md](../features.md) and
 [first-party-plugins.md](../first-party-plugins.md) have the Settings section and the wizard step,
 [api-reference.md](../api-reference.md) has the route, and
 [workflows.md](../workflows.md) § What an agent step sees has `decide` on Codex and why a manifest
-harness passes that check and then fails at run time. [testing.md](../testing.md) holds everything the
+harness passes that check and then fails at run time. [agents-and-providers.md](../testing/agents-and-providers.md) holds everything the
 programme owes: five manual checks, items 58 to 62, including the acceptance test that someone writes
 the OpenCode plugin from the authoring doc alone. Its refusals are in git history, and the two worth
 not re-arguing are a CLI as a synthesized connection row and a second `models:harness` permission
@@ -176,7 +176,7 @@ owner-typed row and the save that re-enters the snapshot, and
 grown row, [integrations.md](../integrations.md) has **Start workflow…** as a registry contribution
 rather than three menus, and [ui-design.md](../ui-design.md) § The closed kit and
 [tui.md](../tui.md) § What a plugin loses here have the kit's `Graph` node and its two projections.
-[testing.md](../testing.md) holds what the programme owes: nine manual checks, items 48 to 56, six
+[workflows.md](../testing/workflows.md) holds what the programme owes: nine manual checks, items 48 to 56, six
 for the editor and the run pane, two for the start-from-an-item flow and one for the graph view. None
 of them has been run.
 
@@ -200,7 +200,7 @@ message beside the database plugin's SQL as the two `generateText` consumers;
 [command-palette-and-shortcuts.md](../command-palette-and-shortcuts.md) § Plugin shortcuts has the two
 commit chords and the palette rows; [first-party-plugins.md](../first-party-plugins.md) and
 [api-reference.md](../api-reference.md) have the plugin's row and its route surface; and
-[testing.md](../testing.md) has smoke items 43 to 47.
+[changes-and-large-surfaces.md](../testing/changes-and-large-surfaces.md) has smoke items 43 to 47.
 
 `command-palette/` was seven phases that gave acorn one command graph and one host-neutral palette
 session. Shipped and deleted 2026-09-03.
@@ -250,7 +250,7 @@ promotion, native menus, dialogs and keychain prompts) stay manual.
 `unarchive.md` recorded the archive page: search, a read-only preview, and restore. Shipped
 2026-09-24 and deleted 2026-09-26. [workspaces-and-tasks.md](../workspaces-and-tasks.md) § Restoring
 a task owns the behaviour, [plugins.md](../plugins.md) § Search providers owns `ctx.search`, and
-[testing.md](../testing.md) item 79 is the manual smoke it owed. Left out on purpose: more search
+[changes-and-large-surfaces.md](../testing/changes-and-large-surfaces.md) item 79 is the manual smoke it owed. Left out on purpose: more search
 providers than core tasks and the agents plugin, a loaded-tier search route (loaded task panes can
 still opt into the preview with `readsArchived: true` on their `frames` entry), search across active
 tasks, external-content FTS (it needs stable rowids and `agent_events` has a text key), opening an
@@ -341,7 +341,7 @@ box rather than remembered in a flag. The three invariants the programme added a
 § The invariants, and the trace flag a developer turns on first is § Seeing what the keys did. What
 it refused is recorded where the refusal binds: no column wrap and an arrow edge as a wall in
 § Focus regions, no second keymap in § What must never happen, and the four manual checks it still
-owed are items 27 to 30 of [testing.md](../testing.md) § The smoke checklist.
+owed are items 27 to 30 of [terminal-and-palette.md](../testing/terminal-and-palette.md).
 
 `structure/` was eight phases that made the folder names say what the architecture doc says: `main/`
 retired everywhere, client-core regrouped into `kit/`, `host/`, `infra/`, and `features/`, one shape
