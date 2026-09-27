@@ -80,7 +80,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // One way to lose the left column: a reader asked, on `ctrl+b`. There used to be a second —
   // collapsing to a two-cell strip
   // of marks below 100 columns — and it went with the icons: the strip only ever said anything
-  // because each row had a glyph in it, and most of those glyphs drew nothing (../kit/glyphs.ts).
+  // because each row had a glyph in it, and many of those glyphs drew nothing.
   const [hidden, setHidden] = createSignal(false)
 
   const source = () => sourceRegistry.get(selectedSource() ?? '')

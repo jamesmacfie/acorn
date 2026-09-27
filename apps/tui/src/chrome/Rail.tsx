@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, Show } from 'solid-js'
 import { Dynamic } from '../tree/renderer'
 import { activeTaskId, selectedSource, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
@@ -7,7 +7,7 @@ import { markersFor } from '@acorn/client-core/host/registries/rail'
 import { resolveRailMarkers } from '@acorn/client-core/features/tabs'
 import { requestTaskAnnotations } from '@acorn/client-core/host/annotations/taskAnnotations.ts'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
-import { Icon, keyedRows, Row, Rows, StatusDot } from '../kit/showing'
+import { keyedRows, Row, Rows } from '../kit/showing'
 import { Line } from '../kit/cells'
 import { Panel, PanelBody } from '../panel'
 import { Modal, ModalBody } from '../kit/grouping'
@@ -70,28 +70,12 @@ const TASKS_ORDER = -110
 
 function Marks(props: { markers: ReturnType<typeof markersFor>; cells: number }) {
   const legend = () => resolveRailMarkers(props.markers).legend
-  const visible = () => {
-    const all = legend()
-    if (all.length <= props.cells) return all
-    // Reserve the complete `+N` token first. Re-evaluate once because the omitted count can cross a
-    // digit boundary after the visible glyphs are removed.
-    let count = Math.max(0, props.cells - (`+${all.length}`).length)
-    count = Math.max(0, props.cells - (`+${all.length - count}`).length)
-    return all.slice(0, count)
+  const label = () => {
+    const count = legend().length
+    if (!count) return ''
+    return props.cells >= 7 ? `${count} marks` : `+${count}`
   }
-  const omitted = () => Math.max(0, legend().length - visible().length)
-  return (
-    <box flexDirection="row">
-      <For each={visible()}>
-        {(marker) => (
-          <Show when={marker.g} fallback={<StatusDot tone={marker.d === 'bad' ? 'danger' : marker.d === 'ok' ? 'ok' : marker.d === 'warn' ? 'warn' : 'muted'} />}>
-            {(icon) => <Icon name={icon()} tone={marker.t === 'neutral' ? undefined : marker.t} />}
-          </Show>
-        )}
-      </For>
-      <Show when={omitted()}>{(count) => <Line role="muted">{`+${count()}`}</Line>}</Show>
-    </box>
-  )
+  return <Show when={label()}>{(text) => <Line role="muted">{text()}</Line>}</Show>
 }
 
 function TaskList(props: { model: ShellModel; markerCells: number }) {
@@ -144,9 +128,8 @@ function TaskList(props: { model: ShellModel; markerCells: number }) {
         else if (task) activateTaskSignals(task)
       }}
     >
-      {/* No leading icon. A task's glyph is a Lucide name and this host draws a name it has no
-          character for as nothing, so the column was a ragged left edge: two blanks and one mark
-          (../kit/glyphs.ts). The marks on the right carry the state that mattered. */}
+      {/* The task title carries the identity. The count at the right exposes annotations; the
+          marker modal contains their labels. Neither needs a replacement for a Lucide icon. */}
       {(row, item) => (
         <Row
           item={item}

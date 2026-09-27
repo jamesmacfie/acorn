@@ -19,6 +19,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
 | [dashboards/](./dashboards/README.md) | Remaining taskless database and write-back proposals. Shared data discovery and authoring now belong to workflow v2. | Redesign shipped; overlapping proposals superseded, 2026-09-13. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
+| [tui-review/](./tui-review/README.md) | Live terminal UX audit, feature inventory, host projections, and acceptance plan. | Icon removal and startup repair implemented; broader acceptance open. |
 
 ## The single files
 

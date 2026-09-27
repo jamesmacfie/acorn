@@ -233,7 +233,7 @@ is the whole of what makes a compiled pane draw in cells:
   which `codemirror` itself depends on and the `editor` pane really does import. A stub may only
   stand in front of a specifier no working surface reaches.
 - `lucide-static/icon-nodes.json` resolves to an empty table. It is 706 KB of SVG path data and there
-  is no SVG here: `Icon` on this host is a lookup from a Lucide name to one character, and the DOM
+  is no SVG here: `Icon` on this host draws nothing, and the DOM
   component that reads the table is in the graph because client-core's components have to resolve,
   not because any of them draw.
 
@@ -547,9 +547,9 @@ For the full contract, see [Terminal interaction and reporting](./tui/interactio
 ## Chrome
 
 For the full contract, see [Terminal chrome and plugins](./tui/chrome-and-plugins.md#chrome). Task
-rows project the allocator's complete ordered marker legend into one dimension. When every glyph does
-not fit, the row shows `+N`; focus that row and press `Shift+F10` or the menu key to inspect every
-label in the host-owned **Task markers** list. The desktop keeps its four-corner allocation.
+rows project the allocator's complete ordered marker legend as a count. At narrow widths the row
+shows `+N`; focus that row and press `Shift+F10` or the menu key to inspect every label in the
+host-owned **Task markers** list. The desktop keeps its four-corner allocation.
 
 ## Loaded plugins
 

@@ -727,7 +727,7 @@ edge, and no real-WebKit run has accepted it.
 | `Fold` | stop | `▸ label` or `▾ label`, children indented two cells |
 | `Card` | conditional | a box-drawing frame, or a blank line above and below in compact density |
 | `Timeline` | collection | cards in sequence, a grey rule between turns. `follow` makes it the scroller and holds it on the last turn until the reader scrolls away, which is what leaves a pane's header and composer pinned around it; without `follow` it is a plain column and whatever is around it scrolls. `place` and `onChange` are dropped, and `Timeline.Turn` ignores its `key`: the reader is not put back on the turn they left, because a viewport here knows its own offset and nothing about where each turn sits, so a redrawn list opens at the newest turn. `hidden` draws the same **Show earlier** button above the turns, `reveal` and `onTrim` are ignored, and a `near` child is told it is near at once. `Timeline.Turn` is a node of its own on both hosts |
-| `Tabs` | collection | `Tab  [Tab]  Tab` on one line, the selected one in brackets. A tab's `icon` becomes the glyph in front of its label, and drops out where the name has no glyph; its `title` has nowhere to hover |
+| `Tabs` | collection | `Tab  [Tab]  Tab` on one line, the selected one in brackets. Its text label carries the meaning; `icon` is omitted and `title` has nowhere to hover |
 | `Toolbar` | none | children on one line where they fit and wrapped onto the next where they do not, because a bar written for a window is drawn here in a pane column and a row that shrinks its children cuts their labels to nothing |
 | `Modal` | trap | a centred box with its title; Escape dismisses, which `keys/keys.test.tsx` drives. `Modal.Body` and `Modal.Actions` answer to their flat spellings too, on both hosts |
 | `ModalBody` | none | the lines between the title rule and the actions line |
@@ -740,7 +740,7 @@ edge, and no real-WebKit run has accepted it.
 | `Sections` | collection | reduced: a strip of tabs over one panel — the header first, then each section, then `main` below 120 cells, where a diff in half the width is a diff wrapped at 45 columns. `h` and `l` walk the strip. A section's `meta` is not drawn: a strip has room for a label and a count |
 | `SplitHandle` | stop | absent: a terminal split moves by a key, not a grip |
 | `DocumentTabs` | collection | one line of tab labels with a `×` on the current one |
-| `SectionHeader` | none | a bold line with its actions right-aligned |
+| `SectionHeader` | none | a bold heading with actions on the next line, so a long action label cannot erase the heading |
 | `TabPanel` | none | the rows under the tab strip |
 | `ToolbarSpacer` | none | the padding that pushes what follows to the right edge |
 
@@ -754,7 +754,7 @@ edge, and no real-WebKit run has accepted it.
 | `Rows` | collection | its items on successive lines; `virtual` is the window of rows that fit, and it follows the active row because there is no pointer to scroll with |
 | `Row` | item | one line: status glyph, title, meta right-aligned. `variant="stacked"` puts the second child on a second line, as it does on the DOM. `reveal` has no meaning, because there is no hover, so the trailing controls always show. `collapsed` is ignored for the same reason its column's `collapseKey` is: the full row draws, and no name is lost |
 | `TreeRow` | item | `Row` indented `depth` cells with `▸` or `▾` |
-| `RowActions` | none | the row's actions as glyphs at the right end, always drawn, never on hover |
+| `RowActions` | none | the row's actions at the right end, always drawn with their control labels, never on hover |
 | `Badge` | none | `[text]` in the tone's colour |
 | `Chip` | conditional | `(text)`, with a trailing `×` when removable |
 | `ChipRow` | collection | chips on one line, wrapping |
@@ -766,7 +766,7 @@ edge, and no real-WebKit run has accepted it.
 | `TableRow` | conditional | reduced: one line, cells separated by `│`, truncated by column priority; a tab stop only when it has an action |
 | `TableCell` | none | reduced: the cell's text in its column's width, ellipsised where it does not fit; `header` makes it bold |
 | `Grid` | collection | reduced: as `Table`, with a row-range indicator instead of a scrollbar |
-| `Graph` | collection | reduced: the indented list, one line per card — glyph, label, `⇐ n` where the card waits on more than one, detail at the far end — indented by rank and capped at four levels. No positions and no wires: a picture is what this host cannot draw, and the ranks are what the picture was saying. Where an edge can be authored, a picker under the list draws one out of the selected card |
+| `Graph` | collection | reduced: the indented list, one line per card — label, `⇐ n` where the card waits on more than one, detail at the far end — indented by rank and capped at four levels. No positions and no wires: a picture is what this host cannot draw, and the ranks are what the picture was saying. Where an edge can be authored, a picker under the list draws one out of the selected card |
 | `Meter` | none | `████░░░░ 62%`; `mark` takes over the cell it falls in, as `███▲░░░░`, rather than a row of its own |
 | `CodeBlock` | none | monospace lines, a grey rule above and below |
 | `Log` | stop | monospace lines, find as a bottom line |
@@ -781,7 +781,7 @@ edge, and no real-WebKit run has accepted it.
 | `Spinner` | none | reduced: a braille spinner, or `…` where motion is off |
 | `Kbd` | none | `⌘K` or `ctrl+k`, per host |
 | `UserAvatar` | none | reduced: initials in brackets; no image |
-| `Icon` | none | reduced: a glyph from a small name table, an emoji as itself, or nothing for a name the table has no glyph for |
+| `Icon` | none | no Lucide or SVG rendering; the node draws nothing, including a desktop hover `title` |
 
 ### Asking
 
@@ -789,7 +789,7 @@ edge, and no real-WebKit run has accepted it.
 | --- | --- | --- |
 | `Button` | stop | `[ label ]`, or `[l]abel` with a mnemonic. An icon-only button draws its `label`, because a glyph child has no text to read off it |
 | `ConfirmButton` | stop | `[ Delete? ]` after the first press; the armed button is the prompt |
-| `IconButton` | stop | reduced: one cell, the mark itself, per `apps/tui/src/kit/glyphs.ts`. A name with no glyph yet falls back to the `label`, which is wide on purpose — the width is what says which name to add to the map |
+| `IconButton` | stop | its text `label` is the control, since the terminal has no Lucide or SVG rendering |
 | `Input` | stop | a field taking the room its row has left; owns keys while focused |
 | `Textarea` | stop | a boxed multi-line field; owns keys. `rows` is a floor rather than a fixed height, so an empty field still stands its ground and a full one grows past it; the frame lights in the accent tone while the keys are inside. A caller drawing its own frame, such as `Composer`, turns this one off |
 | `Select` | stop | `[ value ▾ ]`, opening a `Menu` |
@@ -797,13 +797,13 @@ edge, and no real-WebKit run has accepted it.
 | `SegmentedControl` | collection | `( a \| [b] \| c )`, the selected one in brackets |
 | `ToggleButton` | stop | `[x] label` |
 | `Picker` | stop | a field that opens a `Menu` filtered by typing |
-| `PickerRow` | item | one line in that menu: glyph, label, grey hint |
+| `PickerRow` | item | one line in that menu: label and grey hint; a leading icon is omitted |
 | `Composer` | stop | a boxed field with a `> ` prompt; commit submits |
 | `MentionTextarea` | stop | reduced: a `Textarea` with the mention menu below it; no inline highlight of the token |
 | `KeyValueEditor` | none | a two-column table with editable cells, each cell a stop |
 | `FindBar` | stop | `/ query  3/12` on one line |
 | `Field` | none | the label above its child |
-| `CopyButton` | stop | fallback: the button copies over OSC 52 where the terminal takes it, and prints the value on its own line to copy by hand where it does not |
+| `CopyButton` | stop | a labeled Copy control sends OSC 52 where the terminal takes it, and prints the value on its own line to copy by hand where it does not |
 | `ModelBackendPicker` | stop | two `Select`s over the backends a Generate control can spend: a stored key, or an installed agent CLI |
 
 ### Pixels, and the host wrappers

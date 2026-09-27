@@ -211,7 +211,7 @@ describe('the shell', () => {
 
     // One way to lose the column, and it is a chord: the two-cell strip of marks that used to replace
     // it below 100 cells went with the icons, because the strip only said anything when every row had
-    // a glyph and most of those glyphs drew nothing (../kit/glyphs.ts).
+    // a mark and many of those marks drew nothing.
     await screen.press('b', { ctrl: true })
     const hidden = await screen.frame()
     expect(hidden).not.toContain('Browse')
