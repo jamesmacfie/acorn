@@ -16,11 +16,11 @@ export type { DataValue } from '@acorn/protocol/dataValues.ts'
 export type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
 export type { DataBinding } from '@acorn/protocol/dataBindings.ts'
 
-// A kind may also carry a `describe`: its label, its icon, and its fields as data
+// A kind carries a `describe`: its label, icon, description, fields, and output description as data
 // (docs/workflows.md § Contributed step kinds). The host draws that form on both hosts and applies
 // `required`, `min`, `max` and a static select's membership before calling `validate`, so a validator
-// can assume the shape and check the meaning. `describe` is optional, and a kind without one is
-// listed by name with a raw `with` table.
+// can assume the shape and check the meaning. Incomplete contributions are excluded from the catalog
+// and runner; other contributions from that plugin remain active.
 
 /** A step kind the runner will dispatch to. Entry id becomes the second half of `kind`. */
 export const WORKFLOW_STEP_KIND = extensionPointId<StepKindContribution>('workflows:step-kind')

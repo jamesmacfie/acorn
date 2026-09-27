@@ -26,15 +26,18 @@ const backend = (id: string): ModelBackend =>
 const authorTurn = vi.fn<(input: AuthoringTurnRequest) => Promise<AuthoringTurnResult>>()
 const modelBackends = vi.fn<() => Promise<ModelBackend[]>>()
 const toasts: string[] = []
+let currentDef = original
+let currentKinds: import('../../shared/workflowContracts').WorkflowCatalog['kinds'] = []
+let pluginChanged: (() => void) | undefined
 
 vi.mock('../workflowsClient', () => ({
   workflowApi: {
-    files: async (request: { action: string }) => request.action === 'list' ? { operations: [] } : { draft: { id: 'file', revision: 1, def: original } },
+    files: async (request: { action: string }) => request.action === 'list' ? { operations: [] } : { draft: { id: 'file', revision: 1, def: currentDef } },
     def: async (route: string) => ({
       id: 'abc', workspaceId: 'w1', projectId: null, name: original.name,
-      revision: route.startsWith('repo:') ? 0 : 1, createdAt: 1, updatedAt: 1, def: original,
+      revision: route.startsWith('repo:') ? 0 : 1, createdAt: 1, updatedAt: 1, def: currentDef,
     }),
-    catalog: async () => ({ kinds: [], policies: [], profiles: [] }),
+    catalog: async () => ({ kinds: currentKinds, policies: [], profiles: [] }),
     providers: async () => [],
     validateDef: async () => ({ problems: [] }),
     fieldOptions: async () => ({ options: [] }),
@@ -64,6 +67,10 @@ vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   activeTaskId: () => 'task-1',
   toast: (message: string) => void toasts.push(message),
+  wsOnPluginsChanged: (listener: () => void) => {
+    pluginChanged = listener
+    return () => { pluginChanged = undefined }
+  },
 }))
 
 const { default: WorkflowEditor } = await import('./WorkflowEditor')
@@ -106,6 +113,9 @@ const propose = async (): Promise<void> => {
 
 beforeEach(() => {
   localStorage.clear()
+  currentDef = original
+  currentKinds = []
+  pluginChanged = undefined
   modelBackends.mockResolvedValue([backend('c1')])
   authorTurn.mockResolvedValue({
     state: 'proposal', base: original, baseRevision: 1, candidate: generated,
@@ -142,6 +152,25 @@ describe('the AI authoring entry', () => {
     await press('AI authoring')
     expect(host.textContent).toContain('Use preview records to help AI')
   })
+})
+
+it('refreshes a missing step when its plugin returns without changing the saved definition', async () => {
+  currentDef = { baseline: 'acorn-1', formatVersion: 1, name: 'Send', steps: [
+    { id: 'send', name: 'Send', kind: 'mail:send', with: { recipient: 'team' } },
+  ] }
+  await mount('db:abc')
+  expect(host.textContent).toContain("Plugin 'mail' does not provide this step")
+  expect(host.textContent).not.toContain('Publish this workflow before running it.')
+  currentKinds = [{ id: 'mail:send', pluginId: 'mail', describe: {
+    label: 'Send mail', description: 'Send mail to the team.', icon: 'send', fields: [],
+    output: { description: 'The delivery receipt.' },
+  } }]
+  pluginChanged?.()
+  await settle()
+  expect(host.textContent).toContain('Send mail to the team.')
+  expect(host.textContent).not.toContain("Plugin 'mail' does not provide this step")
+  expect(host.textContent).toContain('Publish this workflow before running it.')
+  expect(currentDef.steps[0]?.with).toEqual({ recipient: 'team' })
 })
 
 describe('reviewing an AI proposal', () => {
