@@ -603,6 +603,9 @@ describe('architecture boundaries', () => {
         }
       }
     }
+    const protocolExports = packageExports.get('@acorn/protocol')!
+    expect(protocolExports['./plugin/contract.ts']).toBe('./src/plugin/contract.ts')
+    expect(Object.keys(protocolExports).filter((path) => path.startsWith('./plugin/manifest/'))).toEqual([])
     expect(problems.sort()).toEqual([])
   })
 
@@ -719,7 +722,7 @@ describe('architecture boundaries', () => {
       // `terminal` the channel prefix of core's own `terminal:sessions-changed` event, which is a noun
       // and not the roster id. Any plugin that starts a session emits it and the shell hears it
       // (@acorn/protocol/nodeEvents.ts).
-      ['packages/protocol/src/plugin/contract.ts', "the 'terminal' command category"],
+      ['packages/protocol/src/plugin/manifest/commandDescriptors.ts', "the 'terminal' command category"],
       // `terminal` an agent controller and a driver kind; `context` an agent input part.
       ['packages/protocol/src/agentContext.ts', "'context' the agent input part"],
       ['packages/client-core/src/features/agent/contextSnapshot.ts', "'context' the agent input part"],
@@ -1192,8 +1195,8 @@ describe('architecture boundaries', () => {
     // draws them. A frame or a remote tree targeting the palette would put one palette per plugin
     // inside the one surface that owns global focus, the reserved keys and every loading and error
     // state — and it would have no terminal half at all.
-    const contract = readFileSync(join(ROOT, 'packages/protocol/src/plugin/contract.ts'), 'utf8')
-    const targets = /target: z\.enum\(\[([^\]]*)\]\)/.exec(contract)
+    const surfaces = readFileSync(join(ROOT, 'packages/protocol/src/plugin/manifest/surfaces.ts'), 'utf8')
+    const targets = /target: z\.enum\(\[([^\]]*)\]\)/.exec(surfaces)
     expect(targets).not.toBeNull()
     expect(targets![1]).not.toMatch(/palette/)
 
