@@ -301,6 +301,7 @@ client: writeJson
 client: writeLocal
 client: wsConnect
 client: wsOnNotice
+client: wsOnPluginsChanged
 client: wsOnReconnect
 client: wsOnStatus
 client: wsOnWorkflowStepChanged

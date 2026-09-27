@@ -39,7 +39,7 @@ export type StepOutcome =
   | { status: 'cancelled'; error?: string }
 
 export type TerminalWorkflowStepKind = {
-  describe: { label: string; description?: string; icon?: string; fields: StepField[]; output?: { description: string } }
+  describe: { label: string; description: string; icon: string; fields: StepField[]; output: { description: string } }
   validate: (step: { with?: Record<string, unknown> }, context: { label: string }) => string[]
   handler: (ctx: StepContext) => Promise<StepOutcome>
 }

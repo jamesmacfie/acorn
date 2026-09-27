@@ -116,6 +116,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       let dispatcher: WorkflowDispatcher
       let scheduleService: WorkflowScheduleService | null = null
       const runner = new WorkflowRunner(store, {
+        invalidStepKind: (id, problems) => ctx.log.warn(`Workflow step '${id}' was rejected: ${problems.join('; ')}`),
         dataAccess: async (taskId, signal) => {
           const task = await core.tasks.load(taskId)
           const project = task?.projectId ? await core.projects.byId(task.projectId) : null

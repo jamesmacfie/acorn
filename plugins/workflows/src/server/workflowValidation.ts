@@ -18,6 +18,7 @@ import {
 } from './workflowDispatchValidation'
 import { narrowsToolCeiling } from './workflowTools'
 import { stepIdentity } from '../shared/workflowIdentity'
+import { stepKindPluginId, unavailableStepKindMessage } from '../shared/stepKindAvailability'
 import { workflowValueProblems, workflowText, WORKFLOW_VALUE_BYTES } from './workflowValues'
 import { validateDataValue } from '@acorn/protocol/dataSchemas.ts'
 import { dataSourceRefSchema } from '@acorn/protocol/dataSources.ts'
@@ -248,7 +249,9 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
   for (const [index, step] of def.steps.entries()) {
     const kind = step.kind ?? 'agent'
     const label = `step '${step.name || index + 1}'`
-    if (!catalog.stepKinds.has(kind) && !RUNTIME_WORKFLOW_KINDS.has(kind)) errors.push(`${label} has unknown kind '${kind}'`)
+    if (!catalog.stepKinds.has(kind) && !RUNTIME_WORKFLOW_KINDS.has(kind)) errors.push(stepKindPluginId(kind)
+      ? `${label} cannot run. ${unavailableStepKindMessage(kind)}`
+      : `${label} has unknown kind '${kind}'`)
     if (!narrowsToolCeiling(def.tools, step.tools)) errors.push(`${label} tool ceiling widens the workflow ceiling`)
     errors.push(...validateBudget(`${label} budget`, step.budget))
     if (!budgetNarrows(def.budget, step.budget)) errors.push(`${label} budget widens the workflow budget`)

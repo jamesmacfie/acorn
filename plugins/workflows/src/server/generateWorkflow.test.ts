@@ -33,6 +33,7 @@ const manyOptions = Array.from({ length: 20 }, (_, index) => ({ value: `region-$
 const httpKind: StepKindDescription = {
   label: 'HTTP request',
   description: 'One HTTP request through the project variables.',
+  icon: 'globe', output: { description: 'HTTP response.' },
   fields: [
     { id: 'method', label: 'Method', type: 'select', required: true, options: [{ value: 'GET', label: 'GET' }, { value: 'POST', label: 'POST' }] },
     { id: 'url', label: 'URL', type: 'text', required: true, hint: 'Interpolated before the scheme check.' },
@@ -165,6 +166,7 @@ describe('the kind list comes from the catalog', () => {
       describe: {
         label: 'Ship it',
         description: 'Deploy the branch.',
+        icon: 'rocket', output: { description: 'Deployment result.' },
         fields: [{ id: 'environment', label: 'Environment', type: 'select' as const, required: true, options: [{ value: 'staging', label: 'Staging' }] }],
       },
     }
