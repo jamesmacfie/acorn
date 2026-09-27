@@ -153,9 +153,8 @@ export function Row(props: {
       overflow="hidden"
       paddingLeft={props.depth ? props.depth * 2 : 0}
       ref={(element: Renderable) => {
-        // The row is where focus lands, so the collection can put it there and a region's first stop
-        // can find it. `item` is the collection's; a row outside one is not a stop, which is what
-        // `focusRoles.ts` says a `Row` is — an item, never a stop of its own.
+        // A collection row can hold focus and become a region's first stop. `NODE_FOCUS` marks a
+        // standalone `Row` as an item, so it has no stop until a collection supplies `item`.
         if (!props.item) return
         element.focusable = true
         props.item.ref(element)
@@ -837,7 +836,7 @@ export function Grid(props: {
   }
   const line = (cells: readonly string[]) => shown().map((_column, index) => pad(cells[index] ?? '', columnWidth())).join('│')
 
-  // The exception `focusRoles.ts` writes down, realised. A grid's rows are strings rather than
+  // `NODE_FOCUS` calls `Grid` a collection, but its rows are strings rather than
   // renderables — that is what makes its arithmetic possible at all — so there is nothing per row to
   // focus: the grid is the one stop, `↑`/`↓` move the `selected` index the caller holds, and the
   // window follows it. Same intents, same wrapping, same page keys as every other collection, because
