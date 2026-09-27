@@ -1,6 +1,7 @@
-import { For, Show, type JSX } from 'solid-js'
+import { createEffect, For, Show, type JSX } from 'solid-js'
 import Icon from '../content/Icon'
 import { createCollection } from '../../keys/collection'
+import { revealActiveTab } from './tabScroll'
 
 export type TabDef = {
   id: string
@@ -29,6 +30,7 @@ export function Tabs(props: {
   /** Trailing controls beside the strip. Two consumers were overriding `.ui-tabs` to get this. */
   actions?: JSX.Element
 }) {
+  let stripRef: HTMLDivElement | undefined
   // A remote tree's props arrive one at a time and the host drops a bad one on its own, so this node
   // has to survive arriving without its list rather than throw and take the whole region with it.
   const tabs = (): readonly TabDef[] => props.tabs ?? []
@@ -44,24 +46,42 @@ export function Tabs(props: {
     onSelect: (id) => props.onChange(id),
   })
 
+  const bindStrip = (element: HTMLDivElement) => {
+    stripRef = element
+    const attachCollection = collection.containerProps.ref as (element: HTMLElement) => void
+    attachCollection(element)
+  }
+
+  createEffect(() => {
+    const active = props.active
+    if (tabs().some((tab) => tab.id === active)) revealActiveTab(stripRef, `${props.idPrefix}-tab-${active}`)
+  })
+
   return (
-    <div class="ui-tabs" aria-label={props.ariaLabel} {...collection.containerProps}>
-      <For each={tabs()}>{(t) => (
-        <button
-          {...collection.itemProps(t.id)}
-          type="button"
-          aria-selected={props.active === t.id}
-          aria-controls={`${props.idPrefix}-panel-${t.id}`}
-          class="ui-tab"
-          classList={{ active: props.active === t.id }}
-          title={t.title}
-          onClick={() => props.onChange(t.id)}
-        >
-          <Show when={t.icon}>{(name) => <Icon name={name()} size={12} />}</Show>
-          {t.label}
-          <Show when={t.count != null}><span class="ui-tab-count">{t.count}</span></Show>
-        </button>
-      )}</For>
+    <div class="ui-tabs">
+      <div
+        class="ui-tab-scroll ui-tabs-strip"
+        aria-label={props.ariaLabel}
+        {...collection.containerProps}
+        ref={bindStrip}
+      >
+        <For each={tabs()}>{(t) => (
+          <button
+            {...collection.itemProps(t.id)}
+            type="button"
+            aria-selected={props.active === t.id}
+            aria-controls={`${props.idPrefix}-panel-${t.id}`}
+            class="ui-tab"
+            classList={{ active: props.active === t.id }}
+            title={t.title}
+            onClick={() => props.onChange(t.id)}
+          >
+            <Show when={t.icon}>{(name) => <Icon name={name()} size={12} />}</Show>
+            {t.label}
+            <Show when={t.count != null}><span class="ui-tab-count">{t.count}</span></Show>
+          </button>
+        )}</For>
+      </div>
       <Show when={props.actions}><span class="ui-tabs-actions">{props.actions}</span></Show>
     </div>
   )

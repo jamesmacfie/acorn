@@ -595,6 +595,13 @@ renders `dialog` with `aria-modal` and hands focus back to its opener. Hover is 
 anything a pointer can reach, focus can reach, so a `RowActions` that appears on hover appears on
 focus too.
 
+Desktop tab lists stay on one row and scroll horizontally when their labels exceed the available
+width. The selected tab is brought into view; controls beside the list stay visible. GitHub, Docker,
+HTTP, Rollbar, Linear, and host `tabs` layouts use the kit's `Tabs` for content selection. Editor and
+terminal document tabs keep their close and status controls, and Home dashboard tabs keep inline
+rename and per-tab actions; all three tab types share the same scroll rule. The rail and pane
+switcher are navigation controls with separate layout contracts.
+
 A long list says `virtual` on its `Rows` and changes nothing else. The scroller, the row placement and
 the density number all become the kit's, and the collection stays keyed over the whole list rather than
 the drawn window, so the arrows still walk past the last row on screen. Before it existed, GitHub's

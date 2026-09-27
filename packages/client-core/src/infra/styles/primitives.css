@@ -1427,7 +1427,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
    would otherwise measure whatever the buttons in `actions` come to, which left the terminal
    drawer's header at icon height until the first session started. */
 .ui-doctabs { flex: none; display: flex; align-items: stretch; min-width: 0; min-height: var(--tab-h); border-bottom: var(--chrome-divider); background: var(--bg-subtle); }
-.ui-doctabs-strip { flex: 1; min-width: 0; display: flex; align-items: stretch; overflow-x: auto; }
+.ui-doctabs-strip { flex: 1; }
 .ui-doctabs-actions { flex: none; display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-3); }
 .ui-doctab {
   flex: none;
