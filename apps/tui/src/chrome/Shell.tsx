@@ -8,6 +8,7 @@ import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import { PrefKeys } from '@acorn/client-core/infra/persistence'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
+import { isTerminalOpen, setTerminalOpen } from '@acorn/client-core/features/tasks/tasks.ts'
 import { registerCommands } from '@acorn/client-core/host/registries/commands'
 import { registerKeybindings } from '@acorn/client-core/host/registries/commands'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
@@ -24,7 +25,7 @@ import { startSpinner } from '../kit/tick'
 import { createShellModel, type ShellModel } from './model'
 import { installRestore } from './restore'
 import { chooseProject, installRouting, routedProjectId } from './routing'
-import { closeOverlay, openOverlay, topOverlay } from './state'
+import { closeOverlay, highlightedTaskId, openOverlay, topOverlay } from './state'
 import { cyclePane } from './panes'
 import { Rail, railCells } from './Rail'
 import { PANES, SOURCE, topology } from './topology'
@@ -38,6 +39,13 @@ import { Palette } from './Palette'
 import { createShellPalette } from './paletteSession'
 import { registerNavigationCommands } from './navigationCommands'
 import { CheatSheet } from './CheatSheet'
+import type { SetupStep } from './Setup'
+import { SetupHost } from './SetupHost'
+import { PromotionHost } from './PromotionHost'
+import { promotionRequest } from './promotionStore'
+import { SessionsHost } from './SessionsHost'
+import { FileDialog } from './FileDialog'
+import { activeFilePrompt } from './filePrompt'
 
 // The arrangement: topbar, rail beside the pane, notifications, footer, and whatever overlay is on
 // top of it all.
@@ -82,6 +90,29 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // of marks below 100 columns — and it went with the icons: the strip only ever said anything
   // because each row had a glyph in it, and many of those glyphs drew nothing.
   const [hidden, setHidden] = createSignal(false)
+  const [setupStep, setSetupStep] = createSignal<SetupStep>('workspace')
+  const openSetup = (step: SetupStep = 'workspace') => { setSetupStep(step); openOverlay('setup') }
+
+  // An empty node has no project or task that the rail can create. Wait for the Node's real roster
+  // before offering setup: the cached startup path may briefly look empty while the Node boots.
+  let offeredSetup = false
+  createEffect(() => {
+    if (!model.ready() || offeredSetup) return
+    offeredSetup = true
+    if (model.workspaces().every((workspace) => workspace.projects.length === 0)) openSetup()
+  })
+  // Agent handoff and terminal commands both set the shared per-task drawer flag. On this host the
+  // flag opens a full screen session view instead of a desktop drawer; closing it returns to the
+  // pane without stopping the Node-owned PTY.
+  createEffect(() => {
+    const taskId = model.task()?.id
+    if (taskId && isTerminalOpen(taskId)) openOverlay('sessions')
+    else closeOverlay('sessions')
+  })
+  createEffect(() => {
+    if (activeFilePrompt()) openOverlay('file')
+    else closeOverlay('file')
+  })
 
   const source = () => sourceRegistry.get(selectedSource() ?? '')
 
@@ -173,6 +204,12 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     const commands = registerCommands([
       { id: 'core.palette.open', title: 'Commands', category: 'navigation', run: () => palette.openRoot() },
       { id: 'core.shortcuts.cheat-sheet', title: 'Help', hint: 'what the keyboard does right here', category: 'navigation', palette: true, run: () => openOverlay('help') },
+      { id: 'core.settings.open', title: 'Settings', hint: 'workspaces, projects, tasks, and providers', category: 'workspace', palette: true, run: () => openSetup() },
+      { id: 'core.task.create', title: 'New task', hint: 'create a task in a project', category: 'task', palette: true, run: () => openSetup('task') },
+      { id: 'core.terminal.sessions', title: 'Open terminal sessions', hint: 'start or resume a task terminal', category: 'task', palette: true, requires: { plugin: 'terminal' }, when: () => !!model.task(), run: () => {
+        const task = model.task()
+        if (task) setTerminalOpen(task.id, true)
+      } },
       // Chord-only. The overlay pickers stay — `w` and `p` are how a reader switches without opening
       // the palette at all — but the palette's own row for each is the search under Go to, and two rows
       // saying "Switch workspace" is one too many (./navigationCommands.ts).
@@ -196,6 +233,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       { id: 'core.goto.workspace-last', command: 'core.goto.workspace-last', description: 'Last workspace', category: 'Global', defaultChord: ';', when: 'global' },
       { id: 'core.rail.toggle', command: 'core.rail.toggle', description: 'Rail', category: 'Global', defaultChord: 'ctrl+b', when: 'global' },
       { id: 'core.notifications.open', command: 'core.notifications.open', description: 'Notifications', category: 'Global', defaultChord: 'n', when: 'global' },
+      { id: 'core.terminal.sessions', command: 'core.terminal.sessions', description: 'Terminal sessions', category: 'Task', defaultChord: 't', when: 'task' },
       { id: 'core.quit', command: 'core.quit', description: 'Quit', category: 'Global', defaultChord: 'q', when: 'global' },
     ])
     // Go to task, switch workspace, go to project and switch node, as one group of searches. Switching
@@ -215,6 +253,9 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       onSizeChange={() => setCells(root?.width ?? 80)}
     >
       <Topbar model={model} nodeId={props.nodeId} />
+      <Show when={!topOverlay() && (model.tasks().find((task) => task.id === highlightedTaskId()) ?? model.task())}>
+        {(task) => <Line role="strong" wrap>Task: {task().title}</Line>}
+      </Show>
       {/* Hidden, not unmounted: opening an overlay must not tear down the rail and the pane
           behind it and throw away their queries and their models. `visible` is yoga's
           `display: none`, so the row gives up its height and the overlay below takes it.
@@ -223,7 +264,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       <box flexDirection="row" flexGrow={1} visible={!topOverlay()}>
         {/* No rule between the column and the pane: each panel draws its own frame, and a rule beside
             a border is two lines saying one thing (../panel.tsx). */}
-        <Show when={!hidden()}><Rail model={model} cells={railCells(cells())} /></Show>
+        <Show when={!hidden()}><Rail model={model} cells={railCells(cells())} nodeId={props.nodeId} /></Show>
         <box flexDirection="column" flexGrow={1}>
           {/* The strip is a region only while a task gives it something to draw. Keeping the ref
               outside this Show left an empty, focusable box in the source-view Tab cycle. */}
@@ -247,7 +288,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
               already has for the same reason (../layouts/index.ts, findings.md § A pending `lazy()`
               region is an empty string). It carries the error boundary too, so a surface that
               throws says what it threw rather than leaving the main panel blank (../panel.tsx). */}
-          <PanelBody name="main">
+          <PanelBody name="main" nodeId={props.nodeId} region={SOURCE}>
             <Switch fallback={<EmptyState title="Nothing open">Choose a task in the rail.</EmptyState>}>
               {/* A source that declared regions has its list in the Browse panel already, so the
                   main panel is its detail alone. One that did not keeps its whole surface here,
@@ -276,6 +317,10 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
               <Match when={name() === 'quit'}><QuitConfirm onQuit={props.onQuit} /></Match>
               <Match when={name() === 'trust'}><Dynamic component={trustPromptComponent() ?? undefined} /></Match>
               <Match when={name() === 'notifications'}><Inbox model={model} /></Match>
+              <Match when={name() === 'setup'}><SetupHost model={model} nodeId={props.nodeId} initialStep={setupStep()} onClose={() => closeOverlay('setup')} /></Match>
+              <Match when={name() === 'promotion'}><Show when={promotionRequest()}>{(request) => <PromotionHost request={request()} />}</Show></Match>
+              <Match when={name() === 'sessions'}><Show when={model.task()}>{(task) => <SessionsHost task={task()} onClose={() => closeOverlay('sessions')} />}</Show></Match>
+              <Match when={name() === 'file'}><Show when={activeFilePrompt()}>{(prompt) => <FileDialog prompt={prompt()} />}</Show></Match>
             </Switch>
           </box>
         )}

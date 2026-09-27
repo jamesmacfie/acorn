@@ -144,6 +144,7 @@ type FieldApi = {
 function fieldRef(spec: {
   value: () => string
   newline: boolean
+  masked?: boolean
   onInput?: (value: string) => void
   onSubmit?: (value: string) => void
 }): (element: unknown) => void {
@@ -237,7 +238,9 @@ function fieldRef(spec: {
     const node = box()
     if (!node) return
     const field = model()
-    node.props.value = field.text
+    // A password remains in the edit model and callback, but only mask characters enter the cell
+    // tree that capture, paint, and terminal snapshots can inspect.
+    node.props.value = spec.masked ? '*'.repeat(field.text.length) : field.text
     node.props.cursor = field.cursor
     node.props.assoc = field.assoc
     node.props.scroll = scroll()
@@ -309,6 +312,7 @@ export function Input(props: InputProps) {
   const install = fieldRef({
     value: () => (props.value === undefined ? '' : String(props.value)),
     newline: false,
+    masked: props.type === 'password',
     onInput: (value) => props.onInput?.(value),
     onSubmit: (value) => props.onSubmit?.(value),
   })

@@ -6,6 +6,10 @@ The terminal's focus model is a strength. One focused region owns the keys, a ca
 the panel border lights, and Escape climbs out through a defined topology. Keep that model. The work
 is to make the user's destination, available action, and result clear at each level.
 
+The findings below record the initial review. [The implementation pass](./README.md#implementation-pass-on-2026-09-27)
+adds recovery, a setup route, terminal sessions, and a full selected-task title; the remaining
+success criteria still need their terminal journeys.
+
 ## Keyboard findings
 
 | Priority | Finding | Change and rationale | Success criteria |
@@ -34,8 +38,8 @@ is to make the user's destination, available action, and result clear at each le
 ## First-run comprehension
 
 The initial screen needs a short path to doing work: choose or create a workspace, add a project,
-open or create a task, and choose a pane. The topbar already names workspace, project, and task count.
-Add a terminal setup route for an empty profile, and retain it in the command palette after setup.
+open or create a task, and choose a pane. The topbar names workspace, project, and task count.
+An empty profile opens setup, and the command palette can reopen it after setup.
 When no provider, source link, or agent CLI exists, state the missing dependency and offer the next
 action. An empty list must not imply that the Node succeeded and found no records if the request
 failed or a connection is missing.

@@ -10,6 +10,7 @@ import { createPluginCustody, forgetNodePluginProvenance } from './plugins/custo
 import { installDevicePreferenceStorage } from './plugins/devicePreferenceStorage'
 import { setTerminalBadge, showInTerminal } from './kit/notify'
 import { createLogger } from '@acorn/client-core/infra/telemetry'
+import { pickLocalFile, saveLocalFile } from './chrome/filePrompt'
 
 const log = createLogger('fleet')
 
@@ -195,6 +196,10 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
       onChange: (cb: Parameters<DeviceConfigStore['watch']>[0]) => configFile.watch(cb),
       location: async () => configFile.path,
     },
+
+    // A typed local path is the terminal equivalent of the desktop's file dialog. The bridge
+    // returns bytes, so the Node may be remote and never needs the host filesystem path.
+    files: { pick: pickLocalFile, save: saveLocalFile },
 
     // A terminal has no file manager to reveal a path in, so "open the data folder" is the path
     // itself. It prints on the way out rather than now, because the renderer owns the screen until
