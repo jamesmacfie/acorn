@@ -137,7 +137,7 @@ export function WorkflowsBrowseList() {
 
   // The three ways into a definition: a mouse press on the row, and the collection's own select and
   // activate for the keyboard. All of them come here, because a `Row` in a `Rows` has no click of its
-  // own unless it is given one (client-core kit/components/primitives.tsx § Row).
+  // own unless it is given one (client-core kit/components/layout/Row.tsx).
   const open = (key: string): void => {
     if (key.startsWith('problem:')) return
     navigate(workflowsSurfacePath(scope.projectId(), key))

@@ -66,7 +66,7 @@ for file placement and naming.
    through positional `Index` rows.
 6. `packages/client-core/src/kit/components/content/Timeline.tsx` owns the scroll element,
    following mode, resize handling, and a window-lifetime map of numeric offsets. `Card` in
-   `packages/client-core/src/kit/components/primitives.tsx` performs request-card focus and reveal.
+   `packages/client-core/src/kit/components/content/Card.tsx` performs request-card focus and reveal.
 
 Task navigation deliberately disposes UI. `apps/desktop/src/client/App.tsx` keys task views by
 task ID; `packages/client-core/src/features/tasks/TaskPaneHost.tsx` renders the visible panes.

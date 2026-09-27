@@ -1,6 +1,7 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import Icon from '../content/Icon'
-import { Kbd, StatusDot } from '../primitives'
+import { Kbd } from '../content/Kbd'
+import { StatusDot } from '../content/StatusDot'
 import { railDotProps } from '../../lib/displayMeta'
 import { formatRelativeTime } from '../../lib/formatRelativeTime'
 import type { RailLegendItem } from '../../../features/tabs/railMarkers'

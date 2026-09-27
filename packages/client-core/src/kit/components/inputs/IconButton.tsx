@@ -1,6 +1,6 @@
 import { splitProps } from 'solid-js'
 import Icon from '../content/Icon'
-import { Button, type ButtonProps } from '../primitives'
+import { Button, type ButtonProps } from './Button'
 
 /** IconButton: a button whose whole face is one mark. The small square affordance that sits in a
  *  bar, on a row, or beside a field — go to top, collapse all, refresh, close.

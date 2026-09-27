@@ -141,7 +141,7 @@
     "./kit/components/layout": "./src/kit/components/layout/public.ts",
     "./kit/components/overlays": "./src/kit/components/overlays/public.ts",
     "./kit/components/overlays/tips.tsx": "./src/kit/components/overlays/tips.tsx",
-    "./kit/components/primitives.tsx": "./src/kit/components/primitives.tsx",
+    "./kit/components/primitives.tsx": "./src/kit/components/primitives.ts",
     "./kit/diff": "./src/kit/diff/public.ts",
     "./kit/diff/diffModel.ts": "./src/kit/diff/diffModel.ts",
     "./kit/diff/DiffRows.tsx": "./src/kit/diff/DiffRows.tsx",
