@@ -14,6 +14,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | Folder | What it is | Status |
 | --- | --- | --- |
+| [cli/](./cli/README.md) | Scriptable commands for workspaces, projects, tasks, agents, workflows, runs, persistent local Node service, and loaded plugins. | Proposal, 2026-09-27. Five implementation phases; no CLI subcommands shipped. |
 | [client-plugins/](./client-plugins/README.md) | Delivered design record for device-held plugins, replacement chrome, style packs, and device configuration. Icon packs remain parked. | Five phases shipped 2026-09; web custody remains future-host work. |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
