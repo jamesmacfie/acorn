@@ -118,4 +118,31 @@ describe('the compiled card and the remote card are the same card', () => {
     remote.querySelector('button')!.click()
     expect(pressed).toHaveBeenCalledTimes(1)
   })
+
+  it('carries a ConfirmButton confirmation back across the port', async () => {
+    const confirmed = vi.fn()
+    const batches: TreeMutation[][] = []
+    const root = createRemoteRoot((ops) => batches.push(ops))
+    insertNode(root.node, remoteSink.node('ConfirmButton', {
+      label: 'Delete', confirmLabel: 'Confirm delete', onConfirm: confirmed,
+    }, [remoteSink.text('Delete')]), null)
+    await new Promise<void>((resolve) => queueMicrotask(resolve))
+
+    let deliver: ((ops: readonly TreeMutation[]) => void) | null = null
+    const transport: TreeTransport = {
+      onBatch: (listener) => { deliver = listener; return () => {} },
+      onFailed: () => () => {},
+      send: (handler, _event, payload) => root.dispatch(handler, payload),
+    }
+    disposers.push(render(() => <TreeHost pluginId="http" transport={transport} />, remote))
+    for (const ops of batches) deliver!(ops)
+    await frame()
+
+    const button = remote.querySelector('button')!
+    button.click()
+    expect(confirmed).not.toHaveBeenCalled()
+    expect(button.textContent).toContain('Confirm delete')
+    button.click()
+    expect(confirmed).toHaveBeenCalledTimes(1)
+  })
 })

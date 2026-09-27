@@ -53,7 +53,7 @@ export const {
  * Loose on purpose. The host validates every prop against the wire schema before it reaches a
  * component (@acorn/protocol/tree/props.ts), so a narrow type here would be a second, drifting copy
  * of a rule that is already enforced where it matters. What it does buy is the shape of the value: a
- * function survives only under one of the kit's eleven event names, and `class`, `style` and the rest
+ * function survives only under one of the kit's twelve event names, and `class`, `style` and the rest
  * of the DOM escape hatches are dropped before they cross.
  */
 export type KitNodeProps = Record<string, unknown> & { children?: unknown }

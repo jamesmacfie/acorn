@@ -306,10 +306,10 @@ rather than trusted:
 - **Only acorn's components.** Every node name is one the host knows; anything else draws a labelled
   placeholder and records a row on your plugin's page, which is the forward-compatibility rule applied
   to nodes. `class`, `style`, `innerHTML` and `ref` never cross.
-- **Only acorn's events.** A function survives as a prop only under one of eleven names: `onPress`,
+- **Only acorn's events.** A function survives as a prop only under one of twelve names: `onPress`,
   `onChange`, `onSubmit`, `onSelect`, `onActivate`, `onToggle`, `onOpenChange`, `onExpand`,
-  `onDismiss`, `onPick`, `onRemove`. A raw key, pointer or paste handler is dropped — a terminal host
-  has none of them, and every one of the eleven maps onto a key there.
+  `onDismiss`, `onPick`, `onRemove`, `onConfirm`. A raw key, pointer or paste handler is dropped — a
+  terminal host has none of them, and every one of the twelve maps onto a key there.
 - **No element in a prop, and no callback in one.** A prop is JSON. A component that takes a JSX prop
   in the shell takes data over the wire instead: `Facts` takes strings, `Picker` takes `items`, and a
   split is a `ListDetail` with `ListColumn` and `DetailColumn` children.

@@ -275,6 +275,10 @@ involved; the task pane is the linked-items view. Payloads are normalized throug
 allowlist before persistence or rendering. List, detail, occurrence history, and occurrence detail
 have independent freshness.
 
+Refreshing an open Rollbar item keeps its detail and selected tab visible while the provider answers.
+If the refresh fails, the pane shows the failure above the last loaded detail so the reader can retry
+without losing their place.
+
 The source row spends its narrow width on severity, identity, frequency and the error itself: a
 semantic error/warning/info icon, one fixed-width `#id` field, the numeric occurrence badge, and an
 ellipsised title. Environment and connection remain in the item detail and promotion seed; repeating

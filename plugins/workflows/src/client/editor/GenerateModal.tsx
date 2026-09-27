@@ -8,6 +8,7 @@ import {
   Button,
   Modal,
   ModelBackendPicker,
+  modelProviderFailure,
   Text,
   Textarea,
 } from '@acorn/plugin-api/ui'
@@ -44,14 +45,7 @@ export function generateReason(error: unknown, backend?: Pick<ModelBackend, 'kin
   const code = error && typeof error === 'object' && 'code' in error ? String((error as { code: unknown }).code) : ''
   const message = error instanceof Error && error.message ? error.message : ''
   if (code === 'model_answer_unusable') return message || 'Nothing in the reply could be read as a workflow.'
-  if (code === 'provider_needs_auth') return 'The provider key was rejected. Reconnect it in Settings, under Integrations.'
-  if (code === 'provider_not_connected') return 'That provider is no longer connected. Pick another, or add one in Settings, under Integrations.'
-  if (code === 'provider_unavailable') {
-    return backend?.kind === 'harness'
-      ? `${backend.label} did not answer. Run it once in a terminal to check it is signed in.`
-      : 'The provider did not answer. Try again shortly.'
-  }
-  return message || 'Writing the workflow failed.'
+  return modelProviderFailure(error, backend) ?? (message || 'Writing the workflow failed.')
 }
 
 export default function GenerateModal(props: {
