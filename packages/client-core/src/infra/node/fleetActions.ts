@@ -1,7 +1,7 @@
 import type { NodePairRequest, NodeProbeResult, NodeRecord } from '@acorn/protocol/broker.ts'
 import { canPairNodes, fleetBridge } from '../platform'
-import type { DevicesResponse, PairedDevice } from '@acorn/protocol/node.ts'
-import { coreDeviceRoute, coreDevicesRoute } from '@acorn/protocol/api.ts'
+import type { DevicesResponse, PairedDevice, PairingWindow } from '@acorn/protocol/node.ts'
+import { coreDeviceRoute, coreDevicesRoute, corePairRoute, corePairStartRoute } from '@acorn/protocol/api.ts'
 import { readJson, sendJson } from './apiClient'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { selectActiveNode } from './activeNode'
@@ -77,6 +77,14 @@ export const restartLocalNode = async (): Promise<void> => {
 // beside the other fleet mutations rather than in a plugin.
 export const nodeDevices = async (nodeId: string): Promise<PairedDevice[]> =>
   (await readJson<DevicesResponse>(coreDevicesRoute, { nodeId })).devices
+
+// Pair a second client with a node this device already owns. The code returns through the
+// authenticated broker to Settings; the renderer never receives the desktop's device token.
+export const openNodePairingWindow = (nodeId: string): Promise<PairingWindow> =>
+  sendJson<PairingWindow>(corePairStartRoute, { method: 'POST', nodeId })
+
+export const closeNodePairingWindow = (nodeId: string): Promise<void> =>
+  sendJson(corePairRoute, { method: 'DELETE', nodeId })
 
 // Revoking a device closes its sockets immediately and fails its in-flight requests
 // (docs/security.md § Transport and auth). Revoking this client's own row is possible and is not

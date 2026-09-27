@@ -165,6 +165,8 @@ const RULES: readonly RouteRule[] = [
   // default instead of unclassified. `destroy` is the sharpest: irreversible, on a machine that may
   // hold the only copy of something.
   { path: shape(`/v1/core/nodes/${SEG}`), scopes: {}, note: 'Every node lifecycle verb, including destroy.' },
+  { path: shape('/v1/core/pair/start'), scopes: {}, note: 'A pairing code grants a new device full owner authority.' },
+  { path: shape('/v1/core/pair'), scopes: {}, note: 'Pairing window administration belongs to the owner.' },
   { path: shape('/v1/core/devices'), scopes: {}, note: 'Pairing administration.' },
   { path: shape(`/v1/core/devices/${SEG}`), scopes: {} },
   { path: shape('/v1/core/plugins'), scopes: {}, note: 'Which code a device runs is an owner decision, not a plugin one.' },

@@ -10,9 +10,8 @@ import { panesFor, showPane, shownPane } from './panes'
 // The pane row: one line of pane labels, and the pane under it.
 //
 // `Tabs`-shaped rather than a `Tabs` layout: this is the strip the desktop draws as the pane switcher
-// (features/tasks/TaskPaneHost.tsx), and it will stop being bespoke when
-// `docs/future/client-plugins/04-replaceable-surfaces.md` makes `pane.switcher` a slot. Until then it
-// is core's, and it is already one props object over kit nodes, which is the shape that contract asks
+// (features/tasks/TaskPaneHost.tsx). There it is the `pane.switcher` exclusive slot (docs/panes.md);
+// here it stays core's. It is one props object over kit nodes, which is the shape that contract asks
 // for.
 //
 // Two components rather than one, because the shell puts the strip inside a focus region and the pane
@@ -46,40 +45,48 @@ export function PaneStrip(props: { task: Task; focused: boolean }) {
 export function PaneBody(props: { task: Task; nodeId: string }) {
   const shown = () => shownPane(props.task)
   return (
-    <Show
-      when={shown()}
-      fallback={<EmptyState title="No panes available here">Nothing this build can draw is available on this task.</EmptyState>}
-    >
-      {/* Clipped, not shrunk. A pane taller than the screen is the normal case at 24 rows, and yoga
-          answers a height deficit by shrinking every child that will give — so a one-line row shrunk to
-          half a line lands on the line above it, and the PR pane came out as two screens interleaved
-          character by character. Clipping is the honest answer and it is the one a terminal gives
-          (docs/tui.md).
-          A scroll box was the other candidate and is refused: its content box is free-sized, so every
-          layout that measures its own box to decide whether it is narrow — which all of them do —
-          measures a width that is not on screen, and the detail column of a `list-detail` pane never
-          draws at all. */}
-      {(pane) => (
-        <box flexDirection="column" flexGrow={1} overflow="hidden">
-          <ErrorBoundary fallback={(error, reset) => (
-            <PaneFailure
-              error={error}
-              nodeId={props.nodeId}
-              reset={reset}
-              name={pane().id}
-              region={{ paneId: pane().id, regionId: 'failure' }}
-            />
-          )}>
-            {/* Under a `Suspense`, because a pane whose contribution is a bare component rather than a
-                set of regions is a `lazy()` this host mounts itself, and a pending `lazy()` resolves to
-                an empty string — which a cell host refuses outright where the DOM would have drawn a
-                text node nobody sees (findings.md § A pending `lazy()` region is an empty string). The
-                layout mount path already has this guard; a component pane does not go through it. */}
-            <Suspense fallback={null}>
-              {createComponent(pane().component, { get task() { return props.task } })}
-            </Suspense>
-          </ErrorBoundary>
-        </box>
+    // A pane component can keep task-scoped resources and capture its model on mount. Reuse the
+    // chrome while changing tasks, but remount the pane tree when its task or contribution changes.
+    <Show when={props.task.id} keyed>
+      {/* Solid calls a keyed Show child on each key change only when it accepts the key. */}
+      {(_taskId) => (
+        <Show
+          when={shown()}
+          keyed
+          fallback={<EmptyState title="No panes available here">Nothing this build can draw is available on this task.</EmptyState>}
+        >
+          {/* Clipped, not shrunk. A pane taller than the screen is the normal case at 24 rows, and yoga
+              answers a height deficit by shrinking every child that will give — so a one-line row shrunk to
+              half a line lands on the line above it, and the PR pane came out as two screens interleaved
+              character by character. Clipping is the honest answer and it is the one a terminal gives
+              (docs/tui.md).
+              A scroll box was the other candidate and is refused: its content box is free-sized, so every
+              layout that measures its own box to decide whether it is narrow — which all of them do —
+              measures a width that is not on screen, and the detail column of a `list-detail` pane never
+              draws at all. */}
+          {(pane) => (
+            <box flexDirection="column" flexGrow={1} overflow="hidden">
+              <ErrorBoundary fallback={(error, reset) => (
+                <PaneFailure
+                  error={error}
+                  nodeId={props.nodeId}
+                  reset={reset}
+                  name={pane.id}
+                  region={{ paneId: pane.id, regionId: 'failure' }}
+                />
+              )}>
+                {/* Under a `Suspense`, because a pane whose contribution is a bare component rather than a
+                    set of regions is a `lazy()` this host mounts itself, and a pending `lazy()` resolves to
+                    an empty string — which a cell host refuses outright where the DOM would have drawn a
+                    text node nobody sees (findings.md § A pending `lazy()` region is an empty string). The
+                    layout mount path already has this guard; a component pane does not go through it. */}
+                <Suspense fallback={null}>
+                  {createComponent(pane.component, { get task() { return props.task } })}
+                </Suspense>
+              </ErrorBoundary>
+            </box>
+          )}
+        </Show>
       )}
     </Show>
   )

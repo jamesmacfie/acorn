@@ -124,6 +124,8 @@ selection reads back the same text. Written that way rather than as an element-i
 it fails for any reason a selection can break, not only for the one it was written after.
 
 - Agent Center aggregates sessions, search, provider health, attention, transcript import, and launch.
+  Its header places the active, attention, and session counts side by side. Provider health appears
+  in compact cards with each name and status dot; the fleet scope also explains remote refresh timing.
   Its archived filter offers **Restore** on a session someone archived on its own. A session retired
   because its task was archived has no such button: it comes back when the task is restored, because
   retirement is worked out when the list is read (docs/workspaces-and-tasks.md § Restoring a task).

@@ -1,6 +1,6 @@
 import { agentTelemetry, claimAgentSelection } from './agentTelemetry'
 import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'solid-js'
-import { Alert, EmptyState, IconButton, Text, type TimelineControls } from '@acorn/plugin-api/ui'
+import { Alert, EmptyState, IconButton, Only, Text, type TimelineControls } from '@acorn/plugin-api/ui'
 import { wsOnReconnect } from '@acorn/plugin-api/client'
 import AgentTranscript from './AgentTranscript'
 import AgentComposer from '../composer/AgentComposer'
@@ -11,6 +11,7 @@ import { latestAutomaticTaskContext } from '../composer/automaticTaskContext'
 import { managedAgentStore } from './managedStore'
 import { clearFocusedManagedRequest, clearManagedSubagent, focusedManagedRequest, selectedManagedSubagent } from './managedSelection'
 import type { AgentConversationProps } from '../../contract/conversation'
+import TerminalConversationShortcuts from './TerminalConversationShortcuts'
 
 // One session's conversation: its transcript, its queue, and the box you answer it in.
 //
@@ -53,9 +54,9 @@ function SessionConversation(input: {
   const props = input.conversation
   const sessionId = () => input.sessionId
   const [error, setError] = createSignal('')
-  // The transcript view controls, sitting above the composer because that is where the reader's hands
-  // are. They reach into the transcript, which is a sibling: the scroll jumps come back up from the kit
-  // Timeline through `onControls`, the filter and collapse-all push back down as a signal and a counter.
+  // The transcript actions reach into a sibling: scroll jumps come up from the kit Timeline through
+  // `onControls`, while the filter and collapse-all push down as a signal and a counter. The desktop
+  // draws buttons above the composer; the terminal registers shortcuts for the same actions.
   const [scrollControls, setScrollControls] = createSignal<TimelineControls>()
   const [chatsOnly, setChatsOnly] = createSignal(false)
   const [collapseTick, setCollapseTick] = createSignal(0)
@@ -124,6 +125,14 @@ function SessionConversation(input: {
 
   return (
     <Show when={sessionId()} fallback={<EmptyState size="sm">{props.noSession ?? 'No session to show.'}</EmptyState>}>
+      <Only hosts={['tui']}>
+        <TerminalConversationShortcuts
+          top={() => scrollControls()?.toTop()}
+          bottom={() => scrollControls()?.toBottom()}
+          toggleChats={() => setChatsOnly((on) => !on)}
+          collapseTools={() => setCollapseTick((tick) => tick + 1)}
+        />
+      </Only>
       <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
       <Show
         when={snapshot()}
@@ -177,7 +186,7 @@ function SessionConversation(input: {
               // The transcript view controls, on the composer's own top row so they line up with the
               // model and effort selects. They act on the sibling transcript; the composer only hosts them.
               viewControls={(
-                <>
+                <Only hosts={['dom']}>
                   <IconButton
                     icon="arrow-up-to-line"
                     label="Scroll to the top of the transcript"
@@ -203,7 +212,7 @@ function SessionConversation(input: {
                     tip="Collapse all"
                     onPress={() => setCollapseTick((tick) => tick + 1)}
                   />
-                </>
+                </Only>
               )}
               onSessionUpdated={managedAgentStore.upsertSession}
               onSent={reload}

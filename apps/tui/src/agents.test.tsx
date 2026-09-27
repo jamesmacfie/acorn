@@ -1,6 +1,8 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { describe, expect, it } from 'vitest'
-import { recordedRequests } from './fixture'
+import { tasksKey } from '@acorn/protocol/api.ts'
+import { dispatchLayout } from '@acorn/client-core/features/tasks/tasks.ts'
+import { recordedRequests, TASK } from './fixture'
 import { focusedRenderable } from './keys/regions'
 import { renderFixture } from './harness'
 import { enterDetail, openFirstSession, stopSaying } from './agentsDriving'
@@ -20,6 +22,30 @@ import { enterDetail, openFirstSession, stopSaying } from './agentsDriving'
 const posts = () => recordedRequests().filter((request) => request.method === 'POST').map((request) => request.path)
 
 describe('running an agent from a terminal', () => {
+  it('shows the sessions for the newly opened task', async () => {
+    const other = { ...TASK, id: 'task-2', title: 'other-task', branch: 'other-task', sort: 1 }
+    const screen = await renderFixture({
+      pane: 'agents', width: 120, height: 40,
+      cache: (client) => client.setQueryData(tasksKey, [TASK, other]),
+    })
+    try {
+      expect(await screen.until('Find why the old password still works')).toContain('Agents 1')
+      dispatchLayout(other.id, { type: 'show', pane: 'agents' })
+      await screen.press('ARROW_DOWN')
+      expect((await screen.caret()).text).toContain('other-task')
+      const preview = await screen.frame()
+      expect(preview.split('\n')[0]).toContain('Task to open: other-task')
+      expect(preview).toContain('Find why the old password still works')
+      await screen.press('RETURN')
+      const opened = await screen.until('Agents 0')
+      expect(opened.split('\n')[0]).toContain('Task: other-task')
+      expect(opened).toContain('Agents 0')
+      expect(opened).not.toContain('Find why the old password still works')
+    } finally {
+      screen.done()
+    }
+  }, 180_000)
+
   it('opens a run and sends a turn to it', async () => {
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     try {

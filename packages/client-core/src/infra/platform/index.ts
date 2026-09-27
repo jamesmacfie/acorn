@@ -94,6 +94,12 @@ export type DesktopExtras = {
   openConfigFile(): Promise<void>
 }
 
+export type CliInstallState = { available: boolean; installed: boolean; location: string | null; message: string }
+export type CliInstaller = {
+  status(): Promise<CliInstallState>
+  install(): Promise<CliInstallState>
+}
+
 // The native folder dialog. Its own group rather than part of `DesktopExtras`, because gating the
 // rest of the product on this probe was the original mistake (`capabilities.ts`).
 export type FolderPicker = { pick(): Promise<string | null> }
@@ -224,6 +230,7 @@ type AcornPreload = {
   onCommandPalette?: DesktopExtras['onCommandPalette']
   onWillQuit?: DesktopExtras['onWillQuit']
   openConfigFile?: DesktopExtras['openConfigFile']
+  cli?: CliInstaller
   reportResponsiveness?: (pulse: ResponsivenessPulse) => void
   nodeFetch?: NodeTransport['fetch']
   nodeAbort?: NodeTransport['abort']
@@ -339,6 +346,7 @@ export const fleetBridge = (): FleetBridge | null => {
 }
 
 export const pluginCustody = (): PluginCustody | null => acornGlobal()?.plugins ?? null
+export const cliInstaller = (): CliInstaller | null => acornGlobal()?.cli ?? null
 export const deviceConfigBridge = (): DeviceConfigBridge | null => acornGlobal()?.config ?? null
 export const desktopExtras = (): DesktopExtras | null => {
   const acorn = acornGlobal()

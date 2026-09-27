@@ -81,6 +81,7 @@ const resources = join(contents, 'Resources')
 compareTree(resolve(PKG, 'dist/client'), join(resources, 'client'), 'renderer')
 compareTree(resolve(PKG, 'dist/bridge'), join(resources, 'bridge'), 'bridge')
 compareTree(resolve(PKG, 'dist/helper'), join(resources, 'helper'), 'helper and node service')
+compareTree(resolve(PKG, 'dist/cli'), join(resources, 'cli'), 'headless CLI')
 compareTree(resolve(PKG, 'dist/bundled-plugins'), join(resources, 'plugins'), 'bundled plugins')
 
 // The named few, so a stage that produced nothing cannot pass by comparing nothing.
@@ -91,6 +92,8 @@ for (const required of [
   'Resources/helper/helper.js',
   'Resources/helper/service.js',
   'Resources/helper/mcp.js',
+  'Resources/cli/cli.js',
+  'Resources/cli/package.json',
   'Resources/helper/migrations/meta/_journal.json',
 ]) {
   if (!existsSync(join(contents, required))) fail(`the bundle is missing ${required}.`)

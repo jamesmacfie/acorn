@@ -57,10 +57,12 @@ export async function openNode(target: string | undefined, at: Custody = custody
     if (!token) {
       // A node this TUI has never met, running under a launcher that is not us — the desktop app,
       // usually. Its token is that launcher's, so the way in is the same one a stranger gets: a
-      // pairing code the owner asks the node for. A loopback route that minted a token for anyone who
-      // can read the data root would be new trust, and it is recorded as a door rather than taken.
+      // pairing code the owner asks the node for. A desktop-supervised service has no SIGUSR1
+      // handler; its paired desktop client opens the window through Settings → Nodes. A standalone
+      // node accepts SIGUSR1 and prints its code in the terminal that launched it.
       console.log(`\n  A node is already running here (pid ${running.pid}), and acorn holds no token for it.`)
-      console.log(`  Ask it for a pairing code with:  kill -USR1 ${running.pid}`)
+      console.log('  If desktop started it, open Settings → Nodes → Pair another client.')
+      console.log(`  If it is standalone, run kill -USR1 ${running.pid} and read its terminal output.`)
       const paired = await pairInteractively(running.endpoint, fleet, { label: label(running.nodeId), local: true })
       return done(paired.nodeId)
     }

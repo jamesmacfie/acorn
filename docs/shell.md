@@ -707,6 +707,10 @@ frame stylesheet, and the pinned Node runtime where the bundler will find them. 
 fetched from nodejs.org and verified against that release's `SHASUMS256.txt` rather than copied from
 whatever Node is running the build, and `node-runtime.json` is the single pin both this and
 `scripts/pack-node.mjs` read.
+Staging also copies the headless CLI bundle into `Resources/cli` with an ES module package boundary.
+Settings → Command line asks the Rust shell to write a launcher into a writable directory on the
+login shell's `PATH`. The launcher points to that build's pinned Node and CLI files; the renderer
+cannot choose a target path or command. A development build uses the checkout's staged files.
 
 `pnpm --filter @acorn/desktop run build` stages and builds the renderer, and checks the startup
 budget and the generated bundles' syntax. `pnpm --filter @acorn/desktop dist` adds the bundler pass

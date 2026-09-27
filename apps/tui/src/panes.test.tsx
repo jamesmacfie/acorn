@@ -60,6 +60,9 @@ describe('every pane at 80 by 24', () => {
     const frame = await screenFor('agents', { until: 'MANAGED SESSIONS' })
     expect(frame).toContain('MANAGED SESSIONS')
     expect(frame).toContain('Find why the old password still works')
+    // The fixture's idle state has no desktop SVG here. Its shared Icon name resolves to a terminal
+    // mark in the leading cell, before the title, even though the subtitle can be clipped at 80.
+    expect(frame).toMatch(/◌\s+Find why the old password still works/)
     // `Row variant="stacked"` puts the subtitle on its own line here, as it does on the DOM. Drawing
     // both on one line ran the title into the model name with nothing between them.
     //
@@ -90,6 +93,9 @@ describe('every pane at 80 by 24', () => {
     // row now, and the fixture's three files are two tracked edits and one new file.
     expect(frame).toContain('Tracked')
     expect(frame).toContain('login.ts')
+    const trackedLine = frame.split('\n').find((line) => line.includes('Tracked'))!
+    const firstFileLine = frame.split('\n').find((line) => line.includes('login.ts'))!
+    expect(firstFileLine.indexOf('[M]') - trackedLine.indexOf('▾')).toBe(2)
     // `+12` and not `+12 −3`: the row's counts are decoration, and at 80 the pane is 54 cells shared
     // between the badge, the name, the directory, the checkbox and the row's two verbs. The name and
     // the checkbox stay legible and the deletions fall off the end, which is what

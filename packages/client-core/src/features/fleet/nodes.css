@@ -145,6 +145,30 @@
   border-radius: var(--radius-surface);
   background: var(--bg);
 }
+.node-pairing {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+}
+.node-pairing-code {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--pane-pad);
+  border: var(--control-border);
+  border-radius: var(--radius-surface);
+  background: var(--bg);
+}
+.node-pairing-code p {
+  margin: 0;
+}
+.node-pairing-code code {
+  font-family: var(--font-mono);
+  overflow-wrap: anywhere;
+  user-select: text;
+}
 
 .node-step {
   display: flex;

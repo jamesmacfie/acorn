@@ -341,6 +341,7 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
                   <Fold
                     label={title}
                     count={section().rows.length}
+                    contentIndent="none"
                     persistKey={`changes.${key}`}
                     defaultOpen
                     actions={

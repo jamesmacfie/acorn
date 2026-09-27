@@ -144,6 +144,11 @@ provider. `spin` turns the mark, for a state that is in flight. It carries no re
 unlike `.spin`: on a state icon the turn is the whole signal that something is running, and a 12px
 rotation is not the motion that setting exists to stop.
 
+The terminal host uses the same icon names and tones but maps selected names to one-cell text marks
+in `apps/tui/src/kit/glyphs.ts`. Its `spin` prop uses the TUI's shared braille tick. An unmapped name
+or literal draws nothing, so new marks need an explicit terminal mapping when they carry meaning in
+both hosts.
+
 ### A button whose face is a mark
 
 Reach for `IconButton`, not a `Button` with `iconOnly` written out. It takes an `icon` name, a
@@ -156,13 +161,9 @@ those had lost the `size` along the way and drew a third larger than the rest. A
 reached `Icon` at all and typed a character in: the browser preview's chrome was `‹ › ↻ ⌂`, which is
 four glyphs that no style pack, tone or spin can touch.
 
-`label` is required rather than optional because a mark has no text in it. A button whose only child
-is a glyph announced itself to a screen reader as "‹", and on a terminal it is the fallback for a
-name that has no glyph yet.
-
-On the terminal the node paints the mark, one cell, which a plain `Button` cannot do: `Button` prints
-`label` for any child it cannot read text off, so the four transcript controls came to about fifty
-cells of an eighty-cell pane and the GitHub browse header clipped "Reviews" to "Revi".
+`label` is required because a mark has no text in it. A button whose only child is a glyph announced
+itself to a screen reader as "‹". The terminal's `IconButton` writes the label as its control text;
+its `icon` name does not use the status glyph mapping above.
 
 The `brand:` prefix exists so the two families can never collide (Lucide has grown brand-shaped
 names before and will again) and so brand marks stay out of the Lucide name list
@@ -724,8 +725,8 @@ edge, and no real-WebKit run has accepted it.
 | `Stack` | none | children on successive lines, `gap` as 0 or 1 blank lines. `grow` means the stack is the region rather than a run of content in one: it takes what is left of the box, so a scroller or a canvas inside it has a height to work against |
 | `Inline` | none | children on one line separated by a space; wraps to a `Stack` when too wide |
 | `Section` | conditional | label in grey uppercase, children below |
-| `Fold` | stop | `▸ label` or `▾ label`, children indented two cells |
-| `Card` | conditional | a box-drawing frame, or a blank line above and below in compact density |
+| `Fold` | stop | `▸ label` or `▾ label`, children indented two cells by default; `contentIndent="none"` aligns child content with the header |
+| `Card` | conditional | a box-drawing frame that fits its pane; a toned card uses a coloured `▍` left edge for its full height while the other edges stay neutral. Compact density keeps that left edge without the frame |
 | `Timeline` | collection | cards in sequence, a grey rule between turns. `follow` makes it the scroller and holds it on the last turn until the reader scrolls away, which is what leaves a pane's header and composer pinned around it; without `follow` it is a plain column and whatever is around it scrolls. `place` and `onChange` are dropped, and `Timeline.Turn` ignores its `key`: the reader is not put back on the turn they left, because a viewport here knows its own offset and nothing about where each turn sits, so a redrawn list opens at the newest turn. `hidden` draws the same **Show earlier** button above the turns, `reveal` and `onTrim` are ignored, and a `near` child is told it is near at once. `Timeline.Turn` is a node of its own on both hosts |
 | `Tabs` | collection | `Tab  [Tab]  Tab` on one line, the selected one in brackets. Its text label carries the meaning; `icon` is omitted and `title` has nowhere to hover |
 | `Toolbar` | none | children on one line where they fit and wrapped onto the next where they do not, because a bar written for a window is drawn here in a pane column and a row that shrinks its children cuts their labels to nothing |
@@ -781,7 +782,7 @@ edge, and no real-WebKit run has accepted it.
 | `Spinner` | none | reduced: a braille spinner, or `…` where motion is off |
 | `Kbd` | none | `⌘K` or `ctrl+k`, per host |
 | `UserAvatar` | none | reduced: initials in brackets; no image |
-| `Icon` | none | no Lucide or SVG rendering; the node draws nothing, including a desktop hover `title` |
+| `Icon` | none | a one-cell mapped mark; unmapped names and desktop hover `title` draw nothing |
 
 ### Asking
 
@@ -792,7 +793,7 @@ edge, and no real-WebKit run has accepted it.
 | `IconButton` | stop | its text `label` is the control, since the terminal has no Lucide or SVG rendering |
 | `Input` | stop | a field taking the room its row has left; owns keys while focused |
 | `Textarea` | stop | a boxed multi-line field; owns keys. `rows` is a floor rather than a fixed height, so an empty field still stands its ground and a full one grows past it; the frame lights in the accent tone while the keys are inside. A caller drawing its own frame, such as `Composer`, turns this one off |
-| `Select` | stop | `[ value ▾ ]`, opening a `Menu` |
+| `Select` | stop | `[ value ▾ ]`, or `value▾` for a bare control, opening a `Menu` |
 | `Checkbox` | stop | `[x] label`; Space toggles |
 | `SegmentedControl` | collection | `( a \| [b] \| c )`, the selected one in brackets |
 | `ToggleButton` | stop | `[x] label` |
