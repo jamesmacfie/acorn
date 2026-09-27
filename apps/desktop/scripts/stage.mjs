@@ -32,6 +32,15 @@ need(resolve(HELPER, 'helper.js'), 'run `pnpm run build:helper` first.')
 rmSync(resolve(HELPER, 'chunks'), { recursive: true, force: true })
 cpSync(dist, HELPER, { recursive: true })
 
+// The installed command runs the headless CLI under the same pinned Node runtime as the desktop.
+// Its chunks must stay beside cli.js, and Node needs this package boundary to parse them as ESM.
+const cliSource = need(resolve(ROOT, 'apps/cli/dist'), 'run `pnpm --filter @acorn/cli build` first.')
+need(resolve(cliSource, 'cli.js'), 'run `pnpm --filter @acorn/cli build` first.')
+const cliTarget = resolve(PKG, 'dist/cli')
+rmSync(cliTarget, { recursive: true, force: true })
+cpSync(cliSource, cliTarget, { recursive: true })
+writeFileSync(resolve(cliTarget, 'package.json'), '{"type":"module"}\n')
+
 // Migration chains, beside the helper for the same reason. Unset `process.resourcesPath` under a real
 // Node means node-core walks up from the service module looking for a `migrations` directory, so this
 // is the first place it looks (packages/node-core/src/server/bindings.ts, server/plugins/migrations.ts).

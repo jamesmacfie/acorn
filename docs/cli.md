@@ -272,6 +272,14 @@ acorn task list --project "$PROJECT_ID" --status all --output json
 
 From a checkout, build `@acorn/cli` and `@acorn/tui`, then run `node apps/cli/bin/acorn.mjs`.
 Build `@acorn/node` too before using `node start --background` from a checkout.
+Desktop Settings → Command line can install the headless `acorn` command in a writable directory
+already on the login shell's `PATH`. The launcher uses the desktop bundle's pinned Node and CLI, or
+the current checkout when clicked in a development build. It sets `ACORN_DATA_DIR` to that app's
+local Node root unless the caller set it explicitly. Open a new terminal after installing. The
+action refuses to replace a command it did not install. If no writable directory is on `PATH`, add
+`~/.local/bin` to the shell's `PATH`, create it, and retry. Moving the app or checkout requires
+clicking the action again to update the launcher. This desktop-installed command is headless; use
+the shared `bin/acorn.mjs` launcher from a standalone Node archive for the terminal UI.
 The standalone Node archive includes the same `bin/acorn.mjs` launcher and both client bundles.
 After `npm install --omit=dev`, run `node bin/acorn.mjs --help`. Package managers expose its
 `acorn` bin when the archive is installed as a package.

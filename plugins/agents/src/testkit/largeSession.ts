@@ -114,7 +114,16 @@ export async function seedLargeSession(
     profileId: PROVIDER.profileId,
     kind: 'imported',
     title: input.title ?? `Large-surface fixture (${input.profile})`,
-    config: { imported: true, resumeVerified: false, fixture: 'large-surfaces' },
+    config: {
+      imported: true, resumeVerified: false, fixture: 'large-surfaces',
+      // Exercise the terminal composer's compact row and permission omission in the PTY fixture.
+      configOptions: [
+        { id: 'mode', label: 'Mode', category: 'mode', currentValue: 'default', values: [{ value: 'default', label: 'Default' }] },
+        { id: 'model', label: 'Model', category: 'model', currentValue: 'fixture', values: [{ value: 'fixture', label: 'Fixture model' }] },
+        { id: 'reasoning', label: 'Effort', category: 'reasoning', currentValue: 'high', values: [{ value: 'high', label: 'high' }] },
+        { id: 'permissions', label: 'Permissions', category: 'permission', currentValue: 'workspace', values: [{ value: 'workspace', label: 'workspace' }] },
+      ],
+    },
   }, PROVIDER)
   await store.setController(session.id, 'external')
   let events = 0

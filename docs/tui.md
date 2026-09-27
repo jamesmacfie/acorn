@@ -27,12 +27,17 @@ it came to draw its own cells. Each was deleted the day it shipped. Find one wit
 ## What it is, in one screen
 
 ```text
-Topbar:   one line. Workspace > project, task count, the open branch, the node's state as a dot
+Topbar:   one line. Workspace > project and task count on the left; the open branch, node state,
+          and Task: title on the right. Focusing another task previews it as Task to open: title
 Left:     three framed panels — Menu, the sources; Browse, what is under the chosen one; Tasks
 Main:     one pane, or the chosen source's detail, with a strip of pane labels above it
 Overlays: commands, setup, file paths, task promotion, terminal sessions, and confirmations
 Footer:   one line. What the keyboard will do, and the node's state when it needs a sentence
 ```
+
+In **Tasks**, moving the caret previews a row's title in the topbar as **Task to open**. Press Enter
+to open that task. The pane then mounts the opened task's content; moving the caret alone leaves the
+open pane in place.
 
 Run it from a checkout with `pnpm --filter @acorn/tui dev`. `pnpm --filter @acorn/tui capture` prints
 one frame at a fixed size against the fixture in `apps/tui/src/fixture.ts`, on a machine with no TTY,
@@ -97,9 +102,11 @@ A second `acorn` in a second terminal finds the lock and attaches, and leaves th
 quits. The one that started it owns its lifetime, which is the desktop's rule too.
 
 Attaching needs a device token, and a node the desktop started holds a token that belongs to the
-desktop. So the first `acorn` against one prints that node's pid and the `kill -USR1 <pid>` that
-reopens its pairing window, and then runs the ordinary pairing exchange against loopback. A loopback
-mint route would remove the step and does not exist.
+desktop. The first `acorn` against one asks for a pairing code. For a desktop-supervised node, open
+**Settings → Nodes → Pair another client** in the desktop to show the code and identity words. For a
+standalone node, run `kill -USR1 <pid>` and read the code from its launching terminal. The TUI then
+runs the ordinary pairing exchange against loopback. A loopback mint route would remove the step and
+does not exist.
 
 ### Remote nodes
 
@@ -253,9 +260,9 @@ is the whole of what makes a compiled pane draw in cells:
   which `codemirror` itself depends on and the `editor` pane really does import. A stub may only
   stand in front of a specifier no working surface reaches.
 - `lucide-static/icon-nodes.json` resolves to an empty table. It is 706 KB of SVG path data and there
-  is no SVG here: `Icon` on this host draws nothing, and the DOM
-  component that reads the table is in the graph because client-core's components have to resolve,
-  not because any of them draw.
+  is no SVG here: the TUI kit resolves selected shared `Icon` names to one-cell glyphs in
+  `apps/tui/src/kit/glyphs.ts`. Unmapped names draw nothing. The DOM component that reads the table
+  remains in the graph because client-core's components have to resolve, not because it draws here.
 
   That last one is a crash, not a saving, and it is worth knowing why. **The bundle externalises every
   bare import of a package outside the workspace**, so an import left alone is one Node resolves at

@@ -5,7 +5,7 @@ import { AGENT_COMPOSER_ACTIONS_POINT } from '@acorn/protocol/extensionPoints.ts
 import { managedAgentApi } from '../sessions/managedClient'
 import { agentContextContributions, clearLocal, pickFiles, readLocal, writeLocal } from '@acorn/plugin-api/client'
 import {
-  Alert, Button, Chip, ChipRow, CodeBlock, Field, Icon, IconButton, Inline, Kbd, MentionTextarea, Picker,
+  Alert, Button, Chip, ChipRow, CodeBlock, Field, Icon, IconButton, Inline, Kbd, MentionTextarea, Only, Picker,
   Popover, Select, Stack, Text, Toolbar, type MentionSegment, type MentionSource,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
@@ -20,6 +20,7 @@ import { advertisedSuggestions, composerSegments, MAX_HIGHLIGHT_LENGTH } from '.
 import { useWorktreeFiles } from './worktreeFiles'
 import AgentContextPickerModal from './AgentContextPickerModal'
 import { AttachmentSlot } from './AttachmentSlot'
+import TerminalComposerShortcut from './TerminalComposerShortcut'
 import { decideReplacement } from './replaceAttachment'
 import {
   AUTOMATIC_TASK_CONTEXT_SOURCE,
@@ -68,9 +69,8 @@ export default function AgentComposer(props: {
    *  caret by whichever effect ran first. */
   autoFocus?: boolean
   previousAutomaticContext?: AgentContextSnapshot
-  /** Controls for the transcript above, drawn on this row's right so they line up with the config
-   *  selects. Owned by the conversation, which is the only piece that can see both the transcript and
-   *  this box; the composer just gives them a home. */
+  /** Desktop controls for the transcript above, drawn beside the config selects. The terminal uses
+   *  shortcuts instead. Owned by the conversation, which sees both transcript and composer. */
   viewControls?: JSX.Element
   onSent: () => void
   onSessionUpdated: (session: AgentSession) => void
@@ -118,6 +118,7 @@ export default function AgentComposer(props: {
     [],
     { equals: sameAgentConfigOptions },
   )
+  const terminalOptions = createMemo(() => configOptions().filter((option) => option.category !== 'permission'))
   const commands = createMemo(() => {
     const value = props.session.config.commands
     return Array.isArray(value) ? value as Array<{ name: string; description?: string }> : []
@@ -531,29 +532,57 @@ export default function AgentComposer(props: {
 
   return (
     <Stack gap="row">
-      <Show when={configOptions().length || props.viewControls}>
-        <Inline wrap>
-          <For each={configOptions()}>
-            {(option) => (
-              <Field label={option.label} layout="row">
-                <Select
-                  label={option.label}
-                  size="sm"
-                  width="auto"
-                  value={option.currentValue ?? ''}
-                  disabled={props.disabled || props.submitDisabled}
-                  onChange={(value) => void updateOption(option, value)}
-                  options={option.values.map((value) => ({ value: value.value, label: value.label, title: value.description }))}
-                />
-              </Field>
-            )}
-          </For>
-          <Show when={props.viewControls}>
-            <Toolbar.Spacer />
-            {props.viewControls}
-          </Show>
-        </Inline>
-      </Show>
+      <Only hosts={['tui']}>
+        <TerminalComposerShortcut toggle={() => setExpanded((current) => !current)} />
+      </Only>
+      <Only hosts={['dom']}>
+        <Show when={configOptions().length || props.viewControls}>
+          <Inline wrap>
+            <For each={configOptions()}>
+              {(option) => (
+                <Field label={option.label} layout="row">
+                  <Select
+                    label={option.label}
+                    size="sm"
+                    width="auto"
+                    value={option.currentValue ?? ''}
+                    disabled={props.disabled || props.submitDisabled}
+                    onChange={(value) => void updateOption(option, value)}
+                    options={option.values.map((value) => ({ value: value.value, label: value.label, title: value.description }))}
+                  />
+                </Field>
+              )}
+            </For>
+            <Show when={props.viewControls}>
+              <Toolbar.Spacer />
+              {props.viewControls}
+            </Show>
+          </Inline>
+        </Show>
+      </Only>
+      <Only hosts={['tui']}>
+        <Show when={terminalOptions().length}>
+          <Inline wrap>
+            <For each={terminalOptions()}>
+              {(option) => (
+                <Inline>
+                  <Text emphasis="muted">{option.label}</Text>
+                  <Select
+                    label={option.label}
+                    kind="bare"
+                    size="sm"
+                    width="auto"
+                    value={option.currentValue ?? ''}
+                    disabled={props.disabled || props.submitDisabled}
+                    onChange={(value) => void updateOption(option, value)}
+                    options={option.values.map((value) => ({ value: value.value, label: value.label, title: value.description }))}
+                  />
+                </Inline>
+              )}
+            </For>
+          </Inline>
+        </Show>
+      </Only>
 
       <Show when={attachments().length || contexts().length}>
         <ChipRow ariaLabel="Attached to this turn">
@@ -620,14 +649,16 @@ export default function AgentComposer(props: {
           }
         }}
         overlay={
-          <IconButton
-            icon={expanded() ? 'minimize-2' : 'maximize-2'}
-            label={expanded() ? 'Collapse the message box' : 'Expand the message box'}
-            pressed={expanded()}
-            tip={expanded() ? 'Collapse' : 'Expand'}
-            tipKey="⌘⇧↩"
-            onPress={() => setExpanded((current) => !current)}
-          />
+          <Only hosts={['dom']}>
+            <IconButton
+              icon={expanded() ? 'minimize-2' : 'maximize-2'}
+              label={expanded() ? 'Collapse the message box' : 'Expand the message box'}
+              pressed={expanded()}
+              tip={expanded() ? 'Collapse' : 'Expand'}
+              tipKey="⌘⇧↩"
+              onPress={() => setExpanded((current) => !current)}
+            />
+          </Only>
         }
       />
 

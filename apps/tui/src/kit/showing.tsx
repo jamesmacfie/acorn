@@ -19,6 +19,7 @@ import { markdownLines, type Line as MarkdownLine } from './markdown'
 import { borderCell, litControl, rule, spaceCells } from './roles'
 import { ScrollViewport, type Viewport } from './scrolling'
 import { spinnerFrame } from './tick'
+import { iconGlyph, spinnerGlyph } from './glyphs'
 import { focusRenderable, focusedRenderable, scheduleSettle } from '../keys/regions'
 
 // The kit's showing nodes in cells. One component per sentence in
@@ -530,8 +531,18 @@ export function UserAvatar(props: { login: string | null | undefined; size?: 'sm
   return <Line role="muted">{`[${initials()}]`}</Line>
 }
 
-/** SVG and Lucide names have no terminal rendering. State belongs in the surrounding text. */
-export const Icon = (_props: { name: string; size?: number | string; title?: string; tone?: Tone | 'brand'; spin?: boolean }) => null
+/** A shared icon name rendered as one cell. The host resolves its shape; callers keep their domain
+ * state, tone and title in the same shared component they use on desktop. */
+export function Icon(props: { name: string; size?: number | string; title?: string; tone?: Tone | 'brand'; spin?: boolean }) {
+  const glyph = () => iconGlyph(props.name)
+  return (
+    <Show when={glyph()}>
+      <Line tone={props.tone === 'brand' ? 'accent' : props.tone}>
+        {props.spin ? spinnerGlyph(spinnerFrame()) : glyph()}
+      </Line>
+    </Show>
+  )
+}
 
 /** `⌘K` or `ctrl+k`, per host. The chord arrives already spelled for this platform; the node is the
  *  box around it, and a terminal has no box. */
@@ -539,14 +550,11 @@ export function Kbd(props: { size?: Extract<Size, 'xs' | 'sm'>; children: JSX.El
   return <Line role="strong">{flatten(props.children)}</Line>
 }
 
-// A braille cycle, which is the one animation a terminal does well.
-const SPINNER = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
-
 /** reduced: a braille cycle, on the shell's one tick (./tick.ts). One timer for the whole screen
  *  rather than one per spinner, which is the same thing the DOM gets for free by putting the
  *  animation in CSS. Before the shell starts the tick this is frame zero and stays there. */
 export function Spinner(_props: { size?: 'sm' | 'md'; label?: string }) {
-  return <Line role="muted">{SPINNER[spinnerFrame() % SPINNER.length]}</Line>
+  return <Line role="muted">{spinnerGlyph(spinnerFrame())}</Line>
 }
 
 // ── Facts ─────────────────────────────────────────────────────────────────────────────────────

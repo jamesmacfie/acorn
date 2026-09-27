@@ -7,6 +7,7 @@ import { fleetMutable, pairNode, probeNodeEndpoint, reconnectNode, removeNode, r
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import NodeChip from '../../fleet/NodeChip'
+import NodePairingCode from './NodePairingCode'
 import '../../fleet/nodes.css'
 import { Alert, Button, ConfirmButton } from '../../../kit/components/primitives'
 
@@ -217,6 +218,7 @@ export default function NodesSettings() {
                       </Button>
                     </Show>
                   </div>
+                  <NodePairingCode node={node} />
                 </div>
               )
             }}

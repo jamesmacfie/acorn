@@ -39,6 +39,8 @@ export function Fold(props: {
    *  must not open the fold. */
   actions?: JSX.Element
   level?: 'pane' | 'group' | 'sub'
+  /** Align child content with the fold header. The terminal host otherwise indents it two cells. */
+  contentIndent?: 'default' | 'none'
   /** Draw the whole section inset behind a left rule, so it reads as owned by what sits above it.
    *  A subagent's card under its parent's stream is the case that wanted this. */
   nested?: boolean

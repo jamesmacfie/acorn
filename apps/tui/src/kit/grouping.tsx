@@ -90,6 +90,7 @@ export function Fold(props: {
   meta?: JSX.Element
   actions?: JSX.Element
   level?: 'pane' | 'group' | 'sub'
+  contentIndent?: 'default' | 'none'
   /** Inset the fold behind a left rule, matching the DOM host's ownership cue. */
   nested?: boolean
   persistKey?: string
@@ -125,14 +126,13 @@ export function Fold(props: {
         {slot(props.actions)}
       </box>
       <Show when={open()}>
-        <box flexDirection="column" paddingLeft={2}>{props.children}</box>
+        <box flexDirection="column" paddingLeft={props.contentIndent === 'none' ? 0 : 2}>{props.children}</box>
       </Show>
     </box>
   )
 }
 
-/** A box-drawing frame, or a blank line above and below in compact density. The `stripe` tone is the
- *  `border` role's own answer: one column of `▍` in the tone's colour. */
+/** A box-drawing frame whose left edge carries the stripe tone for the full height of the card. */
 export function Card(props: {
   interactive?: boolean
   selected?: boolean
@@ -151,31 +151,29 @@ export function Card(props: {
     onPress: () => props.onPress?.(),
     disabled: () => !!props.disabled,
   })
-  // A focused card draws its own frame in the accent tone, which is the nearest thing a box has to a
-  // focus ring. Compact density draws no frame at all, so there the stripe column stands in — the same
-  // one cell of `▍` a toned card already spends (../kit/roles.ts § borderCell).
+  // Focus colours the frame and takes precedence over the card's tone. In compact density a toned
+  // card keeps only its left edge, so the speaker cue still spans the whole message.
   const lit = () => control.focused()
+  const accent = () => lit() ? 'accent' : props.stripe
   return (
     <box
-      flexDirection="row"
+      flexDirection="column"
       flexShrink={0}
+      minWidth={0}
+      width={props.fit ? undefined : '100%'}
+      alignSelf={props.fit ? 'flex-start' : undefined}
       marginTop={isCompact() ? 0 : 1}
       marginBottom={isCompact() ? 0 : 1}
       ref={(element: Renderable) => { if (props.onPress) control.ref(element) }}
+      {...(isCompact()
+        ? { border: accent() ? ['left'] as const : false, borderStyle: 'single' as const }
+        : boxBorder('surface', lit() ? { tone: 'accent' } : {}))}
+      borderLeftAccent={accent() ? { glyph: borderCell('stripe').glyph, color: slotColor(accent()!) } : undefined}
+      title={props.title}
+      paddingLeft={isCompact() ? 0 : 1}
+      paddingRight={isCompact() ? 0 : 1}
     >
-      <Show when={props.stripe || lit()}>
-        <Line tone={lit() ? 'accent' : props.stripe}>{borderCell('stripe').glyph}</Line>
-      </Show>
-      <box
-        flexGrow={props.fit ? 0 : 1}
-        flexDirection="column"
-        {...boxBorder('surface', { when: !isCompact(), ...(lit() ? { tone: 'accent' as const } : {}) })}
-        title={props.title}
-        paddingLeft={isCompact() ? 0 : 1}
-        paddingRight={isCompact() ? 0 : 1}
-      >
-        {props.children}
-      </box>
+      {props.children}
     </box>
   )
 }

@@ -1,6 +1,6 @@
 // The desktop's own chrome, and why it is here rather than in client-core: it is the arrangement, not
-// the parts. Topbar, rail, routing and the overlay slots are what this composition root decides, and
-// docs/future/client-plugins/ replaces that arrangement with declared slots rather than moving it.
+// the parts. Routing and the overlay slots are what this composition root decides. The topbar and rail
+// are exclusive slots it fills with core's provider or a device plugin's (docs/frontend.md).
 import { createEffect, createMemo, createSignal, lazy, Match, on, onCleanup, onMount, Show, Switch, untrack } from 'solid-js'
 import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-query'
 import { useLocation, useMatch, useNavigate, useParams } from '@solidjs/router'

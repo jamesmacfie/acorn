@@ -83,10 +83,12 @@ describe('the shell', () => {
     screen.done()
 
     const lines = frame.split('\n')
-    // The topbar: the workspace, how many tasks are in it, and the branch of the one that is open.
+    // The task shares the topbar with the workspace, count, and branch; Menu starts on row two.
     expect(lines[0]).toContain('acorn')
     expect(lines[0]).toContain('1 task')
     expect(lines[0]).toContain('fix-login')
+    expect(lines[0]).toContain('Task: fix-login')
+    expect(lines[1]).toContain('Menu')
     // The pane strip, with the pane it is showing marked.
     expect(frame).toContain('[Notes]')
     // The pane itself, which is the notes pane and knows nothing about any of this.
@@ -94,6 +96,19 @@ describe('the shell', () => {
     // The footer, drawn from the keymap's active layers.
     expect(lines[lines.length - 2]).toContain('j/k move')
     for (const line of lines) expect(line.length).toBeLessThanOrEqual(80)
+  }, 30_000)
+
+  it('keeps a long task title inside the single topbar row', async () => {
+    const screen = await renderFixture({
+      pane: 'notes',
+      cache: (client) => client.setQueryData(tasksKey, [{ ...TASK, title: 'A task title '.repeat(20) }]),
+    })
+    const lines = (await screen.frame()).split('\n')
+    screen.done()
+
+    expect(lines[0]).toContain('Task: A task title')
+    expect(lines[1]).toContain('Menu')
+    expect(lines[0].length).toBeLessThanOrEqual(80)
   }, 30_000)
 
   it('holds together at 120 by 40, where the rail keeps its names', async () => {

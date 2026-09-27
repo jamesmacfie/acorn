@@ -14,7 +14,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | Folder | What it is | Status |
 | --- | --- | --- |
-| [client-plugins/](./client-plugins/README.md) | Delivered design record for device-held plugins, replacement chrome, style packs, and device configuration. Icon packs remain parked. | Five phases shipped 2026-09; web custody remains future-host work. |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
 | [dashboards/](./dashboards/README.md) | Remaining taskless database and write-back proposals. Shared data discovery and authoring now belong to workflow v2. | Redesign shipped; overlapping proposals superseded, 2026-09-13. |
@@ -50,6 +49,12 @@ rung-2 containment is recorded in `blockers.md` and sandbox's
 `phases.md`; `docs/security.md § The containment ladder` owns the behavior and the others point.
 
 ## Retired folders
+
+`client-plugins/` shipped its five phases in 2026-09 and was deleted on 2026-09-27.
+[Plugins](../plugins.md), [security](../security.md), [frontend composition](../frontend.md),
+[pane layout](../panes.md), [appearance](../ui-design/appearance.md), and
+[terminal chrome and plugins](../tui/chrome-and-plugins.md) own the behavior. [remote.md](./remote.md)
+owns browser custody. The parked icon-pack proposal and the refused alternatives remain in git history.
 
 `cli/` shipped on 2026-09-27 and was deleted after final review. [CLI](../cli.md) owns command
 grammar, output schemas, service lifecycle, and examples; [Node distribution](../node-distribution.md)

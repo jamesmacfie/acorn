@@ -1,5 +1,6 @@
 mod app_scheme;
 mod commands;
+mod cli_install;
 mod crash;
 mod dev_server;
 mod helper;
@@ -148,6 +149,8 @@ pub fn run() {
             commands::show_notification,
             commands::set_badge,
             commands::set_window_background,
+            cli_install::cli_install_status,
+            cli_install::cli_install,
             reset_stage::reset_export,
             reset_stage::reset_complete,
             webviews::webview_ensure,
@@ -378,13 +381,13 @@ fn env_files(app: &tauri::AppHandle, data_dir: &Path, packaged: bool) -> Result<
 /// binary beside this executable rather than under the other resources. On macOS that is
 /// `Contents/MacOS`, which `resource_dir()` does not name. Getting it wrong is invisible until
 /// somebody installs the app, which is what `scripts/verify-bundle.mjs` catches.
-fn bundled_node() -> PathBuf {
+pub(crate) fn bundled_node() -> PathBuf {
     std::env::current_exe().ok().and_then(|exe| exe.parent().map(|dir| dir.join("node"))).unwrap_or_else(|| PathBuf::from("node"))
 }
 
 /// The bundled runtime in a dev build, named the way `bundle.externalBin` names it, so dev and
 /// packaged disagree about the path and nothing else.
-fn bundled_node_for_host() -> PathBuf {
+pub(crate) fn bundled_node_for_host() -> PathBuf {
     let triple = std::env::var("ACORN_TARGET_TRIPLE").unwrap_or_else(|_| format!("{}-{}", std::env::consts::ARCH, host_suffix()));
     PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries").join(format!("node-{triple}"))
 }

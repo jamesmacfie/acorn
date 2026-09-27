@@ -65,6 +65,9 @@ importers:
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0
+      ajv:
+        specifier: ^8.20.0
+        version: 8.20.0
       typescript:
         specifier: ^6.0.3
         version: 6.0.3
@@ -448,12 +451,18 @@ importers:
       diff:
         specifier: ^9.0.0
         version: 9.0.0
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(pg@8.22.0)
       entities:
         specifier: ^7.0.1
         version: 7.0.1
       gitdiff-parser:
         specifier: ^0.3.1
         version: 0.3.1
+      hono:
+        specifier: 'catalog:'
+        version: 4.12.32
       idb-keyval:
         specifier: ^6.2.5
         version: 6.2.5

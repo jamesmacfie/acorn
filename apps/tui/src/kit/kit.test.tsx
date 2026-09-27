@@ -630,11 +630,11 @@ const CASES: Case[] = [
   },
   {
     node: 'Icon',
-    draws: 'no Lucide glyph, even when a title is supplied for desktop hover',
-    render: () => <Inline><Icon name="check" title="Ready" /><Icon name="not-a-real-icon" /></Inline>,
+    draws: 'a mapped one-cell mark; an unknown name takes no space',
+    render: () => <Inline><Icon name="circle-check" title="Ready" /><Icon name="not-a-real-icon" /></Inline>,
     check: (frame) => {
       lacks(frame, 'Ready')
-      lacks(frame, '✓')
+      has(frame, '✓')
       lacks(frame, 'not-a-real-icon')
     },
   },
@@ -889,6 +889,21 @@ const drawable = <T,>(rows: readonly (readonly [string, T])[]): (readonly [strin
   rows.filter(([title]) => !owed(title))
 
 describe('the kit in cells', () => {
+  it('keeps three bare selects on one narrow row', async () => {
+    const screen = await renderCells(() => (
+      <Inline wrap>
+        <Inline><Text>Mode</Text><Select kind="bare" value="default" options={[{ value: 'default', label: 'Default' }]} /></Inline>
+        <Inline><Text>Model</Text><Select kind="bare" value="fixture" options={[{ value: 'fixture', label: 'Fixture model' }]} /></Inline>
+        <Inline><Text>Effort</Text><Select kind="bare" value="high" options={[{ value: 'high', label: 'high' }]} /></Inline>
+      </Inline>
+    ), { width: 52, height: 3 })
+    try {
+      expect(screen.lines[0]).toContain('Mode Default▾ Model Fixture model▾ Effort high▾')
+    } finally {
+      screen.done()
+    }
+  })
+
   it('masks password input in captured terminal cells', async () => {
     const screen = await renderCells(() => <Input type="password" value="supersecret" />, { width: 24, height: 2 })
     try {
@@ -935,6 +950,23 @@ describe('the kit in cells', () => {
   // The held half, as skips rather than as absences, so the report says which node is waiting and why
   // (§ HELD).
   if (held(cases).length) it.skip.each(held(cases))('%s', drawCase)
+
+  it('keeps a striped card inside a narrow pane and colors its left edge on every row', async () => {
+    const frame = await renderCells(() => (
+      <Card stripe="ok"><Text wrap>One long agent message that wraps across several rows.</Text></Card>
+    ), { width: 28, height: 9 })
+    try {
+      const cardLines = frame.lines.filter((line) => line.startsWith('▍'))
+      expect(cardLines.length).toBeGreaterThan(3)
+      expect(cardLines[0]).toHaveLength(28)
+      expect(cardLines[0].endsWith('┐')).toBe(true)
+      expect(cardLines.at(-1)?.endsWith('┘')).toBe(true)
+      expect(cardLines.slice(1, -1).every((line) => line.endsWith('│'))).toBe(true)
+      expect(frame.text).toContain('message')
+    } finally {
+      frame.done()
+    }
+  })
 
   it('draws loose text wherever it lands, in every shape that has thrown', async () => {
     // The class, not an instance. A run of text needs a `text` parent here and on the DOM a bare

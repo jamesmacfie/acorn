@@ -68,6 +68,11 @@ Pairing uses one-time in-memory codes:
 3. The client submits the code and device name to `POST /v1/pair` over the pinned connection.
 4. The Node creates a device row and returns the device token once.
 
+In the desktop, **Settings → Nodes → Pair another client** calls the owner-authenticated start route
+for that Node and shows the code beside its pinned identity words. **Close pairing** closes the window
+early. A standalone Node prints its code in its launching terminal and reopens the window on
+`SIGUSR1`.
+
 Pairing failures use one `401 pairing_failed` response with no distinguishing details. The bundled
 local Node is a special case: the helper spawned it, so the service handshake can return a device token
 without a user-entered code. The token is still stored and authenticated as a normal device token.

@@ -4,6 +4,20 @@ Part of [tui.md](../tui.md).
 
 ## Keys and focus
 
+The agent conversation keeps Mode, Model, and Effort on a compact horizontal row, wrapping only when
+the pane is too narrow. Its permission selector and
+transcript buttons are omitted from the terminal layout. The transcript actions remain available in
+the command palette and on these terminal shortcuts, including while the message field has focus:
+
+| Keys | Action |
+| --- | --- |
+| `Alt+U` / `Alt+D` | Scroll the transcript to the top / bottom |
+| `Alt+M` | Toggle agent and user messages only |
+| `Alt+C` | Collapse every tool card |
+| `Alt+E` | Expand or collapse the message box |
+
+`?` lists the active shortcuts in the terminal cheat sheet. The desktop keeps its visible controls.
+
 [command-palette-and-shortcuts.md](../command-palette-and-shortcuts.md) § Focus and typing owns the
 intents, the four layer tiers, and the two rules a host with no pointer adds. What follows is the
 mechanism.

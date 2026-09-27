@@ -75,6 +75,8 @@ describe('the route table covers every core route', () => {
       api.coreSecurityRoute,
       api.coreAuditRoute,
       api.coreBackupRoute,
+      api.corePairStartRoute,
+      api.corePairRoute,
       api.coreDevicesRoute,
       api.coreDeviceRoute(ID),
       api.corePluginsRoute,

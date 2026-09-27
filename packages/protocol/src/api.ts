@@ -677,6 +677,8 @@ export const corePluginBundleByHashRoute = (id: string, hash: string) =>
   `/v1/core/plugins/${encodeURIComponent(id)}/bundles/${encodeURIComponent(hash)}`
 // Every client paired with a node, and the revoke for one of them. Device-only, like the plugin list:
 // this is node administration.
+export const corePairStartRoute = '/v1/core/pair/start'
+export const corePairRoute = '/v1/core/pair'
 export const coreDevicesRoute = '/v1/core/devices'
 export const coreDeviceRoute = (deviceId: string) => `/v1/core/devices/${encodeURIComponent(deviceId)}`
 

@@ -92,7 +92,7 @@ export function createPluginCustody(broker: BundleFetcher): PluginCustody {
       const { pluginId, nodeId, source, path, grant } = devGrantSchema.parse(raw)
       if (!grant) return store.revokeDev(pluginId, source ?? nodeId)
       // `{ path }` is a device-provenance install: a person at a terminal installing a plugin is
-      // installing it here (docs/future/client-plugins/03-device-provenance.md).
+      // installing it here (docs/tui/chrome-and-plugins.md § Loaded plugins).
       store.grantDev({ pluginId, nodeId, source: source ?? { kind: 'node', nodeId }, ...(path ? { path } : {}), grantedAt: Date.now() })
       if (source?.kind === 'device') {
         for (const [hash, entry] of Object.entries(bundles.list())) {

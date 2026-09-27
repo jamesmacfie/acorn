@@ -444,7 +444,7 @@ export function Textarea(props: TextareaProps) {
 }
 
 
-/** `[ value ▾ ]`, opening a `Menu`. The list is the menu's; this is the trigger and the value. */
+/** `[ value ▾ ]`, or a compact `value▾` for a bare control, opening a `Menu`. */
 export function Select(props: SelectProps) {
   const current = () => props.options.find((option) => option.value === props.value)
   return (
@@ -453,7 +453,7 @@ export function Select(props: SelectProps) {
       disabled={() => !!props.disabled}
       trigger={(state) => (
         <Line {...litControl({ focused: state.focused(), disabled: props.disabled })}>
-          {`[ ${current()?.label ?? ''} ▾ ]`}
+          {props.kind === 'bare' ? `${current()?.label ?? ''}▾` : `[ ${current()?.label ?? ''} ▾ ]`}
         </Line>
       )}
     >

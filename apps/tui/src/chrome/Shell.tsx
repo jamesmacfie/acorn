@@ -25,7 +25,7 @@ import { startSpinner } from '../kit/tick'
 import { createShellModel, type ShellModel } from './model'
 import { installRestore } from './restore'
 import { chooseProject, installRouting, routedProjectId } from './routing'
-import { closeOverlay, highlightedTaskId, openOverlay, topOverlay } from './state'
+import { closeOverlay, openOverlay, topOverlay } from './state'
 import { cyclePane } from './panes'
 import { Rail, railCells } from './Rail'
 import { PANES, SOURCE, topology } from './topology'
@@ -253,9 +253,6 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       onSizeChange={() => setCells(root?.width ?? 80)}
     >
       <Topbar model={model} nodeId={props.nodeId} />
-      <Show when={!topOverlay() && (model.tasks().find((task) => task.id === highlightedTaskId()) ?? model.task())}>
-        {(task) => <Line role="strong" wrap>Task: {task().title}</Line>}
-      </Show>
       {/* Hidden, not unmounted: opening an overlay must not tear down the rail and the pane
           behind it and throw away their queries and their models. `visible` is yoga's
           `display: none`, so the row gives up its height and the overlay below takes it.

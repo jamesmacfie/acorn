@@ -1,6 +1,7 @@
 import {
   canPairNodes,
   canPickFolder,
+  cliInstaller,
   desktopExtras,
   fileDialogs,
   fleetBridge,
@@ -14,6 +15,7 @@ import {
   previewViews,
   recoveryActions,
   type DesktopExtras,
+  type CliInstaller,
   type FileDialogs,
   type FleetBridge,
   type NodeTransport,
@@ -68,6 +70,10 @@ const GROUPS = {
   desktopExtras: {
     resolve: desktopExtras,
     members: members<DesktopExtras>()(['onClosePane', 'onCommandPalette', 'onWillQuit', 'openConfigFile']),
+  },
+  cli: {
+    resolve: cliInstaller,
+    members: members<CliInstaller>()(['status', 'install']),
   },
   // Checked by its probe alone: calling `pickFolder` would open a dialog on a real host.
   folderPicker: { resolve: () => (canPickFolder() ? {} : null), members: [] },

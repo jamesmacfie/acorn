@@ -9,8 +9,10 @@ the plugin docs (`docs/plugins.md`, `docs/security.md`).
 
 Browser-side plugin custody must implement the complete `PluginCustody` group, including device
 install and remove. It can use the fetch-injected source resolver, IndexedDB for bundles, and
-WebCrypto for hashing; a browser host offers no local-folder installation. See
-[host requirements](./client-plugins/07-hosts.md).
+WebCrypto for hashing; a browser host offers no local-folder installation. GitHub, npm, and URL
+sources need CORS or the same proxy that TLS needs. Device bundles render in the same sandboxed
+opaque-origin iframe as Node bundles. A replaced rail or topbar is a desktop surface, so the mobile
+shell hides an offer whose `formFactor` excludes it.
 
 ## The shape of the demand
 
