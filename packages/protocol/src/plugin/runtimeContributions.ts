@@ -99,7 +99,7 @@ export const boundedPluginToolSchema = z.record(z.string(), z.unknown()).superRe
     return
   }
   inspectSchema(value, [], 1, (path, message) => ctx.addIssue({ code: 'custom', path, message }))
-  if (value.type !== 'object') ctx.addIssue({ code: 'custom', path: ['type'], message: 'an agent tool input schema must have type object' })
+  if (value.type !== 'object') ctx.addIssue({ code: 'custom', path: ['type'], message: 'a plugin JSON schema must have type object' })
 })
 
 const localId = z.string().regex(/^[a-z][a-z0-9_]{0,63}$/, 'id must be lowercase snake_case and start with a letter')

@@ -1,6 +1,10 @@
 # The terminal client
 
-`acorn` is the terminal client: client-core booted under Node, drawing the same pane tree the desktop
+The `acorn` launcher opens this client with no arguments. With a subcommand it opens the
+[headless command-line client](./cli.md), which shares custody but does not load the terminal
+renderer.
+
+`acorn` with no command is the terminal client: client-core booted under Node, drawing the same pane tree the desktop
 draws, in cells. It is the second host of the closed kit and the only test that the kit is intent
 rather than layout.
 

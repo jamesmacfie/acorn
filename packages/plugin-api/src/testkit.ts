@@ -35,7 +35,7 @@ export type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 // a bad declaration fails in `pnpm test` rather than at the next boot. It takes the package root and
 // finds the file itself, so the filename constant and the result type stay its business.
 export { validatePluginConfig } from '@acorn/node-core/testkit'
-export { testAgentToolDescriptor, testContextSectionDescriptor } from '@acorn/node-core/testkit'
+export { testAgentToolDescriptor, testContextSectionDescriptor, testCliCommandDescriptor } from '@acorn/node-core/testkit'
 
 // Host services used to exercise plugin routes without constructing a full Node.
 export { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'

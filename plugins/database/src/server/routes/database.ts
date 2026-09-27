@@ -34,6 +34,7 @@ import { buildSystemPrompt, GENERATE_MAX_OUTPUT_TOKENS, stripSqlFences } from '.
 import { completeSql } from '../completions'
 import { savedQuerySearchItems } from '../paletteSearch'
 import { MAX_CONTEXT_QUERIES, savedQueryOption, savedQuerySnapshot } from '../agentContext'
+import { databaseQuery } from '../workflowSteps'
 
 // The carrier is the host's (@acorn/plugin-api/node); a request arriving without the context is a
 // wiring bug, and saying so beats answering it from host handles this bundle should no longer touch.
@@ -137,6 +138,17 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
   }
 
   return new Hono<AppEnv>()
+    .post('/cli/query', async (c) => {
+      const input = z.strictObject({ nodeId: z.string(), taskId: z.string().min(1), sql: z.string().min(1).max(20_000), maxRows: z.number().int().min(1).max(200).optional() })
+        .safeParse(await c.req.json().catch(() => null))
+      if (!input.success) return respondError(c, 400, 'bad_request')
+      try {
+        const result = await databaseQuery(bridge).query(input.data.taskId, input.data.sql, { maxRows: input.data.maxRows })
+        return c.json({ ...result, rows: result.rows.map((row) => row.map((cell) => ({ value: cell ?? '', isNull: cell === null }))) })
+      } catch (error) {
+        return respondError(c, 400, 'bad_request', [error instanceof Error ? error.message : 'Query refused.'])
+      }
+    })
     .post('/tasks/:taskId/connect', async (c) => c.json(await bridge.connect(id(c))))
     .post('/tasks/:taskId/disconnect', async (c) => c.json(await bridge.disconnect(id(c))))
     .get('/tasks/:taskId/tables', async (c) => c.json(await bridge.tables(id(c))))

@@ -12,13 +12,14 @@
 //
 // ## What goes in
 //
-//   dist/          the built artifact: standalone.js, mcp.js and the shared chunks
+//   dist/          the Node artifact plus cli/ and tui/ client bundles
+//   bin/acorn.mjs  thin command-versus-terminal launcher
 //   migrations/    every Drizzle chain: core's at the root, each plugin's under its own name
 //   package.json   generated, listing only the real runtime dependencies (see RUNTIME below)
 //   README.md      pointing at docs/node-distribution.md
 //
-// The renderer, the shell and every `@acorn/*` package are absent by construction: the build bundles
-// first-party source into the artifact, so a node needs none of them at runtime.
+// The desktop renderer, the shell and every `@acorn/*` package are absent by construction: the
+// builds bundle first-party source into the artifacts, so the archive needs none of them at runtime.
 
 import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
@@ -32,6 +33,8 @@ const RUNTIME_PIN = JSON.parse(readFileSync(new URL('../node-runtime.json', impo
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const NODE_APP = join(ROOT, 'apps/node')
+const CLI_APP = join(ROOT, 'apps/cli')
+const TUI_APP = join(ROOT, 'apps/tui')
 const OUT = join(ROOT, 'apps/node/release')
 
 // The runtime dependency set, and the one hand-maintained list in this script. Versions are read
@@ -39,13 +42,17 @@ const OUT = join(ROOT, 'apps/node/release')
 // the bundled node, so the packaged app and the standalone one cannot diverge.
 // `assertManifestCoversImports` below keeps the names honest.
 //
-// Only what the build leaves outside the bundle (apps/node/externals.ts). Every other third-party
-// package is inside dist/ already.
+// Node externals (apps/node/externals.ts), plus dependencies the terminal host externalizes. Other
+// third-party packages are inside the corresponding bundle already.
 const RUNTIME = [
   '@agentclientprotocol/claude-agent-acp',
   '@vscode/ripgrep',
   '@xterm/addon-serialize',
   '@xterm/headless',
+  // The terminal bundle leaves these Node-core imports external, even though the standalone service
+  // bundle includes them. They are required beside the shared `acorn` launcher.
+  'drizzle-orm',
+  'hono',
   'node-pty',
   'playwright-core',
 ]
@@ -104,15 +111,14 @@ function importedPackages(files) {
 // The one runnable check in this script, and the failure it exists for is silent: a package the bundle
 // imports but the manifest omits produces a tarball that installs cleanly and then throws
 // ERR_MODULE_NOT_FOUND on the operator's machine, at boot, with no clue pointing back here.
-function assertManifestCoversImports(distDir) {
-  const files = [
-    ...readdirSync(distDir).filter((name) => name.endsWith('.js')).map((name) => join(distDir, name)),
-    ...(existsSync(join(distDir, 'chunks'))
-      ? readdirSync(join(distDir, 'chunks')).map((name) => join(distDir, 'chunks', name))
-      : []),
-  ]
+function assertManifestCoversImports(distDir, runtime = RUNTIME) {
+  const visit = (dir) => readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
+    const file = join(dir, entry.name)
+    return entry.isDirectory() ? visit(file) : entry.name.endsWith('.js') ? [file] : []
+  })
+  const files = visit(distDir)
   const imported = importedPackages(files)
-  const declared = new Set(RUNTIME)
+  const declared = new Set(runtime)
   const missing = [...imported].filter((name) => !declared.has(name))
   if (missing.length) {
     throw new Error(
@@ -141,6 +147,8 @@ function stageMigrations(target) {
 
 console.log('[pack-node] building the artifact')
 execFileSync('pnpm', ['--filter', '@acorn/node', 'build'], { cwd: ROOT, stdio: 'inherit' })
+execFileSync('pnpm', ['--filter', '@acorn/cli', 'build'], { cwd: ROOT, stdio: 'inherit' })
+execFileSync('pnpm', ['--filter', '@acorn/tui', 'build'], { cwd: ROOT, stdio: 'inherit' })
 
 const dist = join(NODE_APP, 'dist')
 if (!existsSync(join(dist, 'standalone.js'))) throw new Error('apps/node/dist/standalone.js is missing after the build.')
@@ -152,6 +160,10 @@ rmSync(OUT, { recursive: true, force: true })
 const staging = join(OUT, 'acorn-node')
 mkdirSync(staging, { recursive: true })
 cpSync(dist, join(staging, 'dist'), { recursive: true })
+cpSync(join(CLI_APP, 'dist'), join(staging, 'dist/cli'), { recursive: true })
+cpSync(join(TUI_APP, 'dist'), join(staging, 'dist/tui'), { recursive: true })
+mkdirSync(join(staging, 'bin'), { recursive: true })
+cpSync(join(CLI_APP, 'bin/acorn.mjs'), join(staging, 'bin/acorn.mjs'))
 const chains = stageMigrations(join(staging, 'migrations'))
 console.log(`[pack-node] staged ${chains} migration chains`)
 
@@ -160,6 +172,7 @@ console.log(`[pack-node] staged ${chains} migration chains`)
 // which is where the single-versioned packages live (a duplicate zod means schema instances that fail
 // each other's instanceof checks, which is why they are pinned there in the first place).
 const desktop = read(join(ROOT, 'apps/desktop/package.json'))
+const tui = read(join(TUI_APP, 'package.json'))
 const catalog = Object.fromEntries(
   readFileSync(join(ROOT, 'pnpm-workspace.yaml'), 'utf8')
     .split(/\r?\n/)
@@ -169,13 +182,16 @@ const catalog = Object.fromEntries(
 )
 
 const dependencies = {}
-for (const name of RUNTIME) {
-  const declared = desktop.dependencies?.[name]
-  if (!declared) throw new Error(`${name} is in RUNTIME but not in apps/desktop's dependencies.`)
+const standaloneRuntime = new Set([...RUNTIME, ...Object.keys(tui.dependencies ?? {}).filter((name) => !name.startsWith('@acorn/'))])
+for (const name of standaloneRuntime) {
+  const declared = desktop.dependencies?.[name] ?? tui.dependencies?.[name]
+  if (!declared) throw new Error(`${name} is in the standalone runtime set but has no declared version.`)
   const version = declared === 'catalog:' ? catalog[name] : declared
   if (!version) throw new Error(`${name} is declared as 'catalog:' but pnpm-workspace.yaml has no entry for it.`)
   dependencies[name] = version
 }
+assertManifestCoversImports(join(staging, 'dist'), standaloneRuntime)
+console.log('[pack-node] service, CLI, and TUI runtime imports are declared')
 
 writeFileSync(
   join(staging, 'package.json'),
@@ -187,6 +203,7 @@ writeFileSync(
       type: 'module',
       // The entry an operator runs, and the one a launchd plist or systemd unit points at.
       main: 'dist/standalone.js',
+      bin: { acorn: 'bin/acorn.mjs' },
       // --disable-warning: `node:sqlite` is still flagged experimental and prints a warning on every
       // require. It is accurate about the API's status and useless to an operator who did not choose
       // the storage engine, and it lands in the middle of the pairing banner. Scoped to this one
@@ -214,6 +231,7 @@ writeFileSync(
     '```sh',
     'npm install --omit=dev   # builds node-pty against THIS Node, if no prebuilt binary fits',
     'SESSION_ENC_KEY=$(openssl rand -hex 32) GITHUB_CLIENT_ID=<your oauth app> node dist/standalone.js',
+    'node bin/acorn.mjs --help   # headless commands; no arguments open the terminal client',
     '```',
     '',
     'It prints one line of JSON when it is listening: the endpoint, the certificate fingerprint, the',

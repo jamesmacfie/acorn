@@ -29,7 +29,7 @@ import { workflowReviewInput } from '../server/workflowReviewInput'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
 import { encodeToolCeiling } from '../server/workflowTools'
 import { validateWorkflow } from '../server/workflowValidation'
-import { workflowRunsForTask } from '../server/workflowRunReadModel'
+import { workflowRunById, workflowRunsForTask, workflowStepStatuses } from '../server/workflowRunReadModel'
 import { workflowTaskResolutionScope } from '../server/workflowResolution'
 import { WORKFLOW_ROUTE, workflow } from '../server/routes/workflow'
 import { WORKFLOW_DEFS_ROUTE, workflowDefsRoutes } from '../server/routes/defs'
@@ -372,7 +372,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           return {
             ...files,
             // A file wins an id collision, the rule the merged rail list applies as well.
-            workflows: [...files.workflows, ...rows.filter((row) => !ids.has(row.id)).map((row) => ({ ...row.def, id: row.id, source: 'database' as const }))],
+            workflows: [...files.workflows, ...rows.filter((row) => !ids.has(row.id)).map((row) => ({ ...row.def, id: row.id, source: 'database' as const, publishedRevision: row.revision }))],
           }
         },
         catalog: (projectId) => starts.catalogForProject(projectId),
@@ -381,12 +381,14 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         startById: (taskId, defId, inputs, allowDatabaseDefinitions) =>
           starts.startById(taskId, defId, inputs, allowDatabaseDefinitions),
         runs: (taskId) => workflowRunsForTask(store, taskId),
+        run: (runId) => workflowRunById(store, runId),
         // This plugin's contribution to the merged run list (@acorn/protocol/runs.ts). A projection,
         // not the rows: the merged list is display-shaped and deliberately narrow, and a caller that
         // wants a run's steps comes back to this plugin addressing it by id.
         allRuns: () => workflowRunList(store),
         taskNavigation: () => workflowTaskNavigation(store),
         steps: (runId) => workflowStepProjections(runner, runId),
+        stepStatuses: (runId) => workflowStepStatuses(store, runId),
         records: async (runId, selectionId, after, limit, stepId, filter) =>
           workflowSelectionPage(store, runId, selectionId, after, limit, stepId, filter),
         recordAttempts: async (runId, recordId, after, limit) => workflowRecordAttemptPage(store, runId, recordId, after, limit),

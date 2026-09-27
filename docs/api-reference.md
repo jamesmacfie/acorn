@@ -24,6 +24,10 @@ validation details when changing a contract.
 | Plugin | `/v1/p/<plugin>/*` | device or permitted internal principal |
 | Events/streams | `GET /v1/events` | authenticated WebSocket upgrade |
 
+An authenticated `GET /v1/node` response includes `nodeId`. A CLI-owned background Node also
+includes an optional `serviceInstanceId` UUID for local lifecycle ownership checks. The
+unauthenticated probe never exposes either field.
+
 A request that reaches a node through the desktop broker is killed after 30 seconds. That is less
 than one model call is allowed to take, so a caller that knows its route is slow passes `timeoutMs`
 on the request and the broker uses that instead. It is the exception: the default is what everything
@@ -134,7 +138,10 @@ unchanged.
 `Idempotency-Key` is optional for most mutations and required by agent session creation, agent-turn
 enqueue, and request resolution. A device-keyed replay stores the request hash and final response;
 reuse with a different body returns `idempotency_conflict`. Internal callers have no device replay
-namespace.
+namespace. The generic replay row expires after 24 hours. A crash after a domain write but before
+the replay save can still leave an ambiguous result; callers should inspect known resource IDs and
+retain their key across retries. Managed agent session and turn creation also keep plugin-owned
+operation records.
 
 The client mints the key, never the broker: only the call site knows that a retry is the same
 logical mutation, and a broker-minted key would defeat replay entirely.
@@ -171,6 +178,7 @@ itself is broken, and marking it retryable would invite a client to hammer it.
 | `GET` | `/v1/core/devices` | List paired devices |
 | `DELETE` | `/v1/core/devices/:id` | Revoke a device |
 | `GET` | `/v1/core/plugins` | List plugin status and capabilities |
+| `POST` | `/v1/core/plugins/:id/cli/:name` | Invoke one active manifest CLI command with `{ input }`; Node rechecks device, capability, resource scope, and JSON schemas |
 | `GET` | `/v1/core/plugins/:id/bundles/:hash` | Read the exact active or installed client bundle for device custody |
 | `PUT` | `/v1/core/plugins/:name` | Enable/disable an optional plugin |
 | `POST` | `/v1/core/plugins/:id/reload` | Swap a loaded plugin's node half in the running process |
@@ -204,6 +212,10 @@ loaded runtime, alongside `installed`, the current package on disk. `active: nul
 runtime is active; an omitted field is an older response. `running` and `state` still describe the
 Node's activation and restart status. The bundle route resolves by the requested hash, including
 retained active bytes after an on-disk update, so custody can verify the hash before any trust decision.
+CLI command discovery uses only `active.contributions.cliCommands` on a running loaded Node plugin.
+The invocation route resolves the descriptor again at call time and requires an `Idempotency-Key`
+for write commands. It calls only the plugin's reserved `/v1/p/<id>/cli/<name>` path and returns
+`{ result }` after validating the plugin response. See [CLI command authoring](./plugin-authoring/cli-commands.md).
 
 `GET /v1/core/plugins` also carries `requests`, the queue of installs an agent has asked for and the
 owner has not answered, and the decision route closes one. A task-scoped agent can raise a request
@@ -470,10 +482,14 @@ failed node back to pending. Retry answers 403 to a task-confined caller, becaus
 otherwise loop a failed step past the rail that stopped it. Every other run-scoped path treats a
 foreign or unknown run as a 404.
 
-`GET /v1/p/workflows/tasks/:id/workflows/runs` returns task-scoped run projections. Each projection
+`GET /v1/p/workflows/tasks/:id/workflows/runs` returns task-scoped run projections.
+`GET /v1/p/workflows/workflows/runs/:runId` returns one run projection. Unknown and foreign run IDs
+return the same 404 to task-confined callers. Each projection
 has explicit root and parent run IDs, the corresponding task IDs and names, depth, and usage. A root
 reports aggregate tree usage; a child reports only its own turns.
-`GET /v1/p/workflows/workflows/runs/:runId/steps` adds a `children` list to each dispatch step. Every child
+`GET /v1/p/workflows/workflows/runs/:runId/step-statuses` returns up to 200 `{ id, status }` rows
+with a `truncated` marker for bounded polling. `GET /v1/p/workflows/workflows/runs/:runId/steps`
+adds a `children` list to each dispatch step. Every child
 summary carries its task and run IDs, item key, dispatch and run status, bounded result or error, and
 usage. These are durable reads, not event payload reconstruction.
 

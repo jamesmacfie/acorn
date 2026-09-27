@@ -1,8 +1,12 @@
 # Packaging and installing a node on another machine
 
-Design notes from the remote-node session (2026-08-10). The DX half shipped; the distribution half
-did not, and the terminal client rides inside it (§ Shipping `acorn`). This records what was established so a future project starts from conclusions rather than
-re-deriving them. Nothing below the "What shipped" section is scheduled.
+Design notes from the remote-node session (2026-08-10). The DX half shipped, and
+`scripts/pack-node.mjs` now stages the headless CLI, terminal client, and shared `bin/acorn.mjs`
+launcher in the Node tarball. The CI matrix, platform binaries, installer, container image, and
+desktop app embedding described below remain proposed. [Node distribution](../node-distribution.md)
+owns the current artifact shape and commands; § Shipping `acorn` below is historical design context,
+including paths and `--version` examples that were superseded by the shipped launcher. Nothing below
+the "What shipped" section is scheduled.
 
 The goal being worked towards: a node you download onto another computer, extract, run, and connect
 to. Two artifacts carry it. The desktop app ships Tauri, the helper, the node, and the `acorn` terminal
@@ -90,9 +94,9 @@ plus a `curl | sh` installer that picks the right tarball, and a container image
 compose example; service-manager units stay documentation, not an installer product
 (settled during the Tauri migration).
 
-The terminal client rides inside the node tarball rather than being a sixth artifact: `pack-node.mjs`
-grows a `dist/tui.js` entry and a `bin/acorn` wrapper, and the installer links `bin/acorn`. Five
-tarballs stays five.
+The terminal client and headless CLI ride inside the node tarball rather than being separate
+artifacts: `pack-node.mjs` stages `dist/tui/`, `dist/cli/`, and `bin/acorn.mjs`. The proposed
+installer would link the package's `acorn` bin. Five platform tarballs remains the target.
 
 ## Docker (2026-08-22)
 
@@ -185,7 +189,7 @@ two barrels that broke it was the pane sweep importing them and watching the pro
 the fix in both cases was an alias rather than a smaller barrel
 ([docs/tui.md](../tui.md) § The host switch).
 
-## Shipping `acorn`
+## Shipping `acorn` (historical design)
 
 The terminal client runs from a checkout today. This is what putting it in the two artifacts costs,
 and it is step 7 of the order below. What `acorn` draws is [docs/tui.md](../tui.md)'s; the pieces here

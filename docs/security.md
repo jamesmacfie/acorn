@@ -38,7 +38,10 @@ account, or malicious first-party plugin code. Those are OS/deployment concerns.
 - Every protected HTTP route passes request-id, principal resolution, the auth gate, and then the
   idempotency middleware before reaching a router.
 - `/v1/node` and `/v1/pair` are the only pre-auth routes. Device management, plugin toggles, audit,
-  security, backup, schedules, preferences, projects, and workspaces are device-only.
+  security, backup, schedules, preferences, projects, workspaces, and CLI plugin command dispatch are device-only.
+  A CLI command uses the active manifest descriptor, checks its declared core capability and resource
+  scope on the Node, then calls only the owner's `/cli/<name>` plugin route. The CLI never sends its
+  bearer token as command input; the worker receives its existing permission-filtered context.
 - `/v1/events` authenticates the upgrade and rechecks device activity for long-lived streams.
 - Revoking a device (`DELETE /v1/core/devices/:id`) closes that device's live sockets immediately and
   fails its in-flight requests. A device can revoke its own row; that is the same effect as unpairing

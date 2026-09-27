@@ -43,6 +43,9 @@ export type RuntimeBindings = {
   // (docs/api-reference.md § Versioning). Injected rather than read from a package.json, because the
   // service is a bundled artifact by then and only the composition root knows the real version.
   APP_VERSION: string
+  // A CLI-owned standalone process's ephemeral identity. Only the authenticated Node probe
+  // exposes it, so lifecycle commands can distinguish a restarted Node from a reused PID.
+  SERVICE_INSTANCE_ID?: string
   BLOBS: BlobCache
   SESSION_ENC_KEY: string
   // Use-scoped credential access (server/core/secrets.ts). It replaces the raw SESSION_ENC_KEY that
@@ -212,13 +215,14 @@ export type BindingsOptions = {
   blobsDir: string
   nodeId: string
   appVersion: string
+  serviceInstanceId?: string
   capabilities: Pick<CapabilityRegistry, 'get' | 'require'>
 }
 
 // Build the bindings object once at startup. The desktop shell resolves the data root, the OS
 // application-data path when packaged and the repo-local apps/node/.acorn in a checkout, and passes
 // the paths in; the standalone entry takes ACORN_DATA_DIR or that same dev root.
-export function makeBindings({ dbPath, blobsDir, nodeId, appVersion, capabilities }: BindingsOptions): RuntimeBindings {
+export function makeBindings({ dbPath, blobsDir, nodeId, appVersion, serviceInstanceId, capabilities }: BindingsOptions): RuntimeBindings {
   const databasePath = resolve(dbPath)
   const blobCachePath = resolve(blobsDir)
   const db = openDb(databasePath)
@@ -241,6 +245,7 @@ export function makeBindings({ dbPath, blobsDir, nodeId, appVersion, capabilitie
     // fingerprint without the bindings ever touching the private key.
     NODE_FINGERPRINT: ensureCert(dataDir).fingerprint,
     APP_VERSION: appVersion,
+    ...(serviceInstanceId ? { SERVICE_INSTANCE_ID: serviceInstanceId } : {}),
     BLOBS: diskBlobCache(blobCachePath),
     SESSION_ENC_KEY: encKey,
     SECRETS: new SecretService(encKey),

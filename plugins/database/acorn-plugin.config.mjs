@@ -60,6 +60,23 @@ export default {
     },
   },
   contributions: {
+    cliCommands: [{
+      name: 'query', title: 'Read database rows',
+      summary: 'Run bounded SQL in a read-only transaction for a task.',
+      risk: 'read', scope: 'task', capability: 'data:query',
+      route: { method: 'POST', path: '/cli/query' },
+      inputSchema: { type: 'object', properties: {
+        nodeId: { type: 'string', minLength: 1 }, taskId: { type: 'string', minLength: 1 },
+        sql: { type: 'string', minLength: 1, maxLength: 20000 }, maxRows: { type: 'integer', minimum: 1, maximum: 200 },
+      }, required: ['nodeId', 'taskId', 'sql'], additionalProperties: false },
+      outputSchema: { type: 'object', properties: {
+        columns: { type: 'array', items: { type: 'string' } },
+        rows: { type: 'array', items: { type: 'array', items: { type: 'object', properties: {
+          value: { type: 'string' }, isNull: { type: 'boolean' },
+        }, required: ['value', 'isNull'], additionalProperties: false } } },
+        rowCount: { type: 'integer' }, truncated: { type: 'boolean' },
+      }, required: ['columns', 'rows', 'rowCount', 'truncated'], additionalProperties: false },
+    }],
     frames: [{
       target: 'pane',
       // Keeps its id because it is a persisted layout key — a task that has the Database pane open has

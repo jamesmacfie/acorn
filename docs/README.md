@@ -94,6 +94,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [telemetry.md](./telemetry.md) | The five record kinds, the switch, the collector, the scrubber, and what a sink can see. |
 | [shell.md](./shell.md) | The Tauri shell: schemes, custody, webviews, the helper, and packaging. |
 | [tui.md](./tui.md) | The terminal client: `acorn` in a terminal, its process model, its host switch, how it draws a frame, and its chrome. |
+| [cli.md](./cli.md) | Headless `acorn` commands, Node selection, read resources, output, and exit codes. |
 | [tui/interaction.md](./tui/interaction.md) | Terminal key handling, focus, scrolling, and interaction telemetry. |
 | [tui/chrome-and-plugins.md](./tui/chrome-and-plugins.md) | Terminal chrome, loaded plugins, and their host fallbacks. |
 | [node-distribution.md](./node-distribution.md) | The standalone node tarball and how it boots without a desktop. |
@@ -110,23 +111,6 @@ Start with the plugin map, then follow the authoring guide or API reference.
   Rollbar, and GitHub list rows while keeping project and state scope.
 - `schemas/` — generated, versioned JSON Schemas that are pinned by a test and immutable by rule.
   Today that is `docs/schemas/enrollment-v1.json`.
-
-### Command-line interface proposal
-
-| Document | What it holds |
-| --- | --- |
-| [CLI programme](./future/cli/README.md) | Goal, facts, phase order, and handoff map. |
-| [Architecture](./future/cli/architecture.md) | Node boundary, custody, process lifetime, and distribution. |
-| [Interface](./future/cli/interface.md) | Command grammar, machine output, typed stdin, waits, and errors. |
-| [Phase 1: host](./future/cli/phase-1-host.md) | Headless entry, packaged CLI, workspace/project discovery, and reads. |
-| [Phase 2: service](./future/cli/phase-2-service.md) | Persistent local Node start, status, stop, and ownership. |
-| [Workspace and project commands](./future/cli/workspace-and-project-commands.md) | Phase 3 resource administration, configuration, and provider mappings. |
-| [Phase 3: tasks and agents](./future/cli/phase-3-tasks-and-agents.md) | Workspace/project writes, task creation, sessions, prompts, events, and waits. |
-| [Phase 4: workflows](./future/cli/phase-4-workflows.md) | Definition discovery, start, run and step reads, waits, and merged runs. |
-| [Phase 5: plugins](./future/cli/phase-5-plugin-commands.md) | Typed loaded-plugin commands and dispatch. |
-| [Verification](./future/cli/verification.md) | Cross-phase tests, failure matrix, and release acceptance. |
-| [References](./future/cli/references.md) | Repository contracts and external CLI precedents. |
-| [Decisions refused](./future/cli/refused.md) | Alternatives considered and conditions to reopen them. |
 
 ## Documentation ownership
 
@@ -155,8 +139,8 @@ links; review the implementation to verify API signatures and behavior.
 
 ### Authoring guides
 
+- [CLI commands](./plugin-authoring/cli-commands.md)
 - [Events and capabilities](./plugin-authoring/events-and-capabilities.md)
-
 - [Installing a hand-written package](./plugin-authoring/installing-a-hand-written-package.md)
 - [Start from the scaffold](./plugin-authoring/start-from-the-scaffold.md)
 - [The manifest](./plugin-authoring/the-manifest.md)

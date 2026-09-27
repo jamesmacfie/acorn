@@ -68,6 +68,7 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
         // field on it is a real consumer, not a plausible use. Adding one back is one line and always
         // safe, because the schema is additive forever (protocol/node.ts).
         ...(authenticated ? { nodeId: c.env.NODE_ID } : {}),
+        ...(authenticated && c.env.SERVICE_INSTANCE_ID ? { serviceInstanceId: c.env.SERVICE_INSTANCE_ID } : {}),
       }
       return c.json(info)
     })

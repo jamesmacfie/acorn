@@ -1,5 +1,9 @@
 # Managed agents
 
+The headless [CLI](./cli.md#commands) uses the same provider roster, durable session and
+turn operations, event pages, and bounded wait route as the desktop Agent Center. It queues turns
+through the Agents plugin; it does not drive raw terminal sessions or resolve approvals.
+
 Session, turn, event, request, and attachment wire types live in
 `plugins/agents/src/contract/wire.ts`. The pure tool-status tone shared with Changes lives in
 `plugins/agents/src/contract/toolTone.ts`. Core receives only the small attention snapshot defined

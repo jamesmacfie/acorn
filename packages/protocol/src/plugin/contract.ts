@@ -7,6 +7,7 @@
 import { z } from 'zod'
 import { ACORN_BASELINE } from '../baseline.ts'
 import { pluginAgentToolDescriptorSchema, pluginContextSectionDescriptorSchema } from './runtimeContributions.ts'
+import { pluginCliCommandDescriptorSchema } from './cliCommands.ts'
 import { dataSourceDiscoverySchema, dataSourceRegistrationSchema } from '../dataSourceContributions.ts'
 import { dashboardViewKinds } from '../dashboardViews.ts'
 import {
@@ -1051,6 +1052,7 @@ const contributionsShape = z.looseObject({
   // Node-runtime carriers. The host adapts these into the same registries compiled contributions use.
   agentTools: z.array(pluginAgentToolDescriptorSchema).max(16).default([]),
   contextSections: z.array(pluginContextSectionDescriptorSchema).max(8).default([]),
+  cliCommands: z.array(pluginCliCommandDescriptorSchema).max(16).default([]),
 })
 
 // Every contribution kind a manifest may declare, as a runtime list.
@@ -1312,6 +1314,7 @@ export type PluginTaskCheckDescriptor = z.infer<typeof taskCheckDescriptor>
 export type PluginAuditActionDescriptor = z.infer<typeof auditActionDescriptor>
 export type PluginHarnessDescriptor = z.infer<typeof harnessDescriptor>
 export type { PluginAgentToolDescriptor, PluginContextSectionDescriptor } from './runtimeContributions.ts'
+export type { PluginCliCommandDescriptor } from './cliCommands.ts'
 
 // Loose on the wire as well as in the schema: a client that doesn't know a future sibling key should
 // contribute less rather than fail to parse. Every list but `frames` is optional because an older node's
@@ -1341,4 +1344,5 @@ export type PluginContributions = {
   harnesses?: PluginHarnessDescriptor[]
   agentTools?: import('./runtimeContributions.ts').PluginAgentToolDescriptor[]
   contextSections?: import('./runtimeContributions.ts').PluginContextSectionDescriptor[]
+  cliCommands?: import('./cliCommands.ts').PluginCliCommandDescriptor[]
 } & Record<string, unknown>

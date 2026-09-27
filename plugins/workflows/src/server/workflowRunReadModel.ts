@@ -61,3 +61,19 @@ export async function workflowRunsForTask(db: PluginDatabase, taskId: string): P
     }
   })
 }
+
+/** Address one durable run without making the client enumerate tasks. */
+export async function workflowRunById(db: PluginDatabase, runId: string): Promise<WorkflowRunProjection | null> {
+  const [row] = await db.select({ taskId: schema.workflowRuns.taskId }).from(schema.workflowRuns)
+    .where(eq(schema.workflowRuns.id, runId)).limit(1)
+  if (!row) return null
+  return (await workflowRunsForTask(db, row.taskId)).find((run) => run.id === runId) ?? null
+}
+
+/** Bounded status-only read for clients polling a run without transferring step results. */
+export async function workflowStepStatuses(db: PluginDatabase, runId: string): Promise<{ steps: { id: string; status: string }[]; truncated: boolean }> {
+  const rows = await db.select({ id: schema.workflowSteps.id, status: schema.workflowSteps.status })
+    .from(schema.workflowSteps).where(eq(schema.workflowSteps.runId, runId))
+    .orderBy(schema.workflowSteps.idx).limit(201)
+  return { steps: rows.slice(0, 200), truncated: rows.length > 200 }
+}

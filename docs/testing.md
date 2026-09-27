@@ -10,6 +10,7 @@ pnpm lint
 pnpm test
 pnpm --filter @acorn/arch-tests test
 pnpm --filter @acorn/desktop test
+pnpm --filter @acorn/cli test
 pnpm db:check
 ```
 
@@ -27,6 +28,14 @@ The TUI agent driver has focused protocol, screen, and flow tests under
 a real Node and needs time for the terminal to draw. See
 [local-development.md](./local-development.md#agent-driven-terminal-development) for launch,
 snapshot, key, resize, flow, and stop commands.
+
+The CLI suite checks argument parsing, versioned resource projection against golden JSON Schema
+examples, Node pin selection, writes, agent and workflow waits, plugin command validation, and local
+service ownership. Node-core route tests cover device-only plugin dispatch, active declaration and
+scope checks, output validation, and keyed write replay. The standalone archive smoke starts a Node,
+reads it from a second CLI process, then stops it. See
+[local development](./local-development.md#headless-cli-development) for the commands and
+[CLI](./cli.md) for output and exit contracts.
 
 The workflow-v2 transition test creates a fixture, copies it, and runs only against the copy. It
 asserts both the targeted reset and survival of unrelated tasks, links, credentials/connections,

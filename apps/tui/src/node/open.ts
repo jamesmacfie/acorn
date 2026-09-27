@@ -1,9 +1,8 @@
 import { FleetStore, type FleetNode } from '@acorn/custody/broker'
-import { deviceTokens, LOCAL_TOKEN_SCOPE, type DeviceTokens, type TokenCipher } from '@acorn/custody/custody/deviceTokenStore.ts'
-import { configDir, dataRootDir } from './paths'
-import { knownNodeId, runningNode } from './attach'
-import { startNode, type Handshake } from './supervise'
+import { LOCAL_TOKEN_SCOPE } from '@acorn/custody/custody/deviceTokenStore.ts'
+import { custody, dataRootDir, knownNodeId, rememberedNode, runningNode, type Custody } from '@acorn/custody/local'
 import { pairInteractively } from './pair'
+import { startNode, type Handshake } from './supervise'
 
 // The `acorn` command's one decision: which node this run talks to, and whether it owns that node's
 // lifetime (docs/tui.md § Attach or start).
@@ -17,18 +16,7 @@ import { pairInteractively } from './pair'
 // "a process on this machine with the user's uid", mitigation is 0600, which is exactly what the node
 // beside it gives its own TLS private key and session key. Encrypting under a key stored in the same
 // directory would look like more and be the same.
-const fileModeOnly: TokenCipher = {
-  available: () => true,
-  encrypt: (value) => Buffer.from(value, 'utf8'),
-  decrypt: (blob) => blob.toString('utf8'),
-}
-
-export type Custody = { tokens: DeviceTokens; fleet: FleetStore }
-
-export const custody = (dir: string = configDir()): Custody => {
-  const tokens = deviceTokens(dir, fileModeOnly)
-  return { tokens, fleet: new FleetStore(dir, tokens) }
-}
+export { custody, type Custody } from '@acorn/custody/local'
 
 export type OpenedNode = {
   nodeId: string
@@ -125,9 +113,9 @@ export async function openNode(target: string | undefined, at: Custody = custody
 // `--node` names either a node this device has already paired with, by label or by id, or an endpoint
 // to pair with now. Remembered first, so the second time is `acorn --node <name>` and never a code.
 async function remoteNode(target: string, fleet: FleetStore): Promise<FleetNode> {
-  const known = fleet.list().find((node) => node.label === target || node.nodeId === target || node.endpoint === target)
+  const known = rememberedNode(fleet, target)
   if (known) return known
-  if (!/^https:\/\//.test(target)) {
+  if (!target.startsWith('https://')) {
     const names = fleet.list().map((node) => node.label)
     throw new Error(`acorn knows no node called "${target}". Pair one with an https:// endpoint${names.length ? `, or name one of: ${names.join(', ')}` : ''}.`)
   }
