@@ -9,6 +9,8 @@ import type { CapabilityId, CapabilityRegistry } from '../pluginHost/capabilitie
 import type { NodePermissions } from './manifest'
 import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/plugin/state.ts'
 import { connectionProviderRegistry } from '../integrations/connectionProviders/registry'
+import { SIMPLE_FACETS } from './coreFacets'
+export { NODE_CORE_FACETS } from './coreFacets'
 
 // What `projects:read` grants (docs/security.md § Rung 1, on why `checkouts()` needs its own
 // disclosure line in the trust prompt). `byWorkspace` is the scope-validation half used by a loaded
@@ -19,44 +21,6 @@ const PROJECT_READS = ['byId', 'byGithub', 'byWorkspace', 'checkouts', 'external
 // to assert its trust.
 const PROJECT_CONFIG = ['config', 'assertConfigTrusted', 'setup'] as const
 const PROJECT_WRITES = ['create', 'update'] as const
-
-// Facet token to CoreServices key, for the facets that map one to one. `secrets` and `proc` are
-// absent on purpose: they come from their own manifest booleans, `secrets` and `exec`, because they
-// are the two asks a reviewer should see spelled out.
-//
-// `git` is granted independently of `exec`, and that split is cosmetic. core/vcs/git wraps the same
-// runProcess the broker exposes, so `git` without `exec` still means "can run a git subprocess". It
-// stays separate because "reads this repo's history" and "runs arbitrary commands" are different
-// things to disclose.
-const SIMPLE_FACETS = {
-  fs: 'fs',
-  git: 'git',
-  context: 'context',
-  models: 'models',
-  identity: 'identity',
-  'agent-tool-provenance': 'agentToolProvenance',
-  // The one read-everything grant. A sink sees every record from every owner, which is why it is a
-  // token at all and why the trust prompt draws it high
-  // (../core/telemetry.ts, docs/security.md § Telemetry sinks). Writing telemetry needs nothing:
-  // `ctx.telemetry` and `ctx.log` are on both tiers unconditionally, because a plugin measuring its
-  // own work is not reading anybody else's.
-  telemetry: 'telemetry',
-} as const satisfies Record<string, keyof CoreServices>
-
-// The whole `permissions.node.core` vocabulary, exported as one list so the agent-facing authoring
-// projection answers "what may I declare" from the running node rather than a copied list. Derived
-// from SIMPLE_FACETS, so a facet added above lands here for free. The tokens spelled out are the ones
-// scopeCore handles itself, and pluginAuthoring.test.ts asserts each still grants something.
-export const NODE_CORE_FACETS = [
-  ...Object.keys(SIMPLE_FACETS),
-  'tasks',
-  'data:query',
-  'data:write',
-  'prefs',
-  'projects:read',
-  'projects:config',
-  'projects:write',
-] as const
 
 const pick = <T extends object, K extends keyof T>(source: T, keys: readonly K[]): Pick<T, K> =>
   Object.fromEntries(keys.map((key) => [key, source[key]])) as Pick<T, K>

@@ -23,7 +23,7 @@ import {
   type PluginBridgeWebviewRequest,
 } from '@acorn/protocol/plugin/bridge.ts'
 import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/plugin/state.ts'
-import { NODE_CORE_FACETS } from '../plugins/permissions.ts'
+import { NODE_CORE_FACETS } from '../plugins/coreFacets.ts'
 import { registerContextSection, type ContextSectionContribution } from './contextSections.ts'
 import type { AgentToolContribution } from './registry.ts'
 
