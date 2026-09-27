@@ -1086,6 +1086,13 @@ const enter = (group: Group | undefined): boolean => {
   return true
 }
 
+/** Enter a named host region after an overlay closes. The host uses this when an action inside the
+ * overlay created a task: restoring the old Menu stop would immediately select its browse source. */
+export function focusRegion(ref: RegionRef): boolean {
+  const group = groupByRef.get(refKey(ref))
+  return !!group && inScope(group.box) && onScreen(group.box) && enter(group)
+}
+
 /**
  * Move to the next or previous region on screen. Wraps.
  *
@@ -1097,7 +1104,17 @@ const enter = (group: Group | undefined): boolean => {
  */
 export function moveRegion(delta: 1 | -1): boolean {
   const all = ordered()
-  if (all.length < 2) return false
+  if (all.length < 2) {
+    // A modal owns a scope, not a region. Tab must still walk its controls, and the scope already
+    // gives us the exact subtree that can receive focus. This also keeps the wrap inside the modal
+    // rather than passing a last-field Tab through to the rail hidden behind it.
+    const box = top().box
+    if (!box) return false
+    const stops = stopsIn(box)
+    if (!stops.length) return false
+    const at = stops.indexOf(focusedNode() as Renderable)
+    return focusRenderable(stops[(((at < 0 ? (delta > 0 ? -1 : 0) : at) + delta) + stops.length) % stops.length])
+  }
   const at = all.findIndex((group) => group.paneId === focused?.paneId && group.regionId === focused?.regionId)
   // A conditional region can disappear while it holds focus (the task strip when a source opens,
   // or Browse when a component-only source replaces a split source). Recover at the start of the

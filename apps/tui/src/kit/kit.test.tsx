@@ -889,6 +889,16 @@ const drawable = <T,>(rows: readonly (readonly [string, T])[]): (readonly [strin
   rows.filter(([title]) => !owed(title))
 
 describe('the kit in cells', () => {
+  it('masks password input in captured terminal cells', async () => {
+    const screen = await renderCells(() => <Input type="password" value="supersecret" />, { width: 24, height: 2 })
+    try {
+      expect(screen.text).toContain('***********')
+      expect(screen.text).not.toContain('supersecret')
+    } finally {
+      screen.done()
+    }
+  })
+
   it('has a case for every node in the kit, and no case for a node that is gone', () => {
     expect(CASES.map((entry) => entry.node).sort()).toEqual([...KIT_NODES].sort())
     // Anti-vacuity: two empty lists compare equal, and the kit is not empty.

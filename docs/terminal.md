@@ -237,7 +237,8 @@ within five minutes or on reload.
 
 The agents plugin owns the managed session. Terminal publishes a narrow session-roster and handoff
 capability. Handoff transfers an exclusive controller lease. The managed composer is disabled while a
-raw TUI owns input, and resume returns control only after the provider reference is verified.
+raw TUI owns input. Returning to managed mode requires the linked terminal process to exit first;
+the Node then restores the managed provider session from its resumable reference.
 
 ## Sending text to an agent
 
@@ -333,10 +334,10 @@ the same file either way.
 
 That is what let two of the three callers cross. Docker's exec panel and the editor's `$EDITOR` window
 are both throwaway PTYs, both about fifteen lines now, and both work on a host with no browser in it.
-The terminal plugin's own drawer surface keeps its own xterm, because it is not throwaway: it carries
+The terminal plugin's own desktop drawer surface keeps its own xterm, because it is not throwaway: it carries
 the app's theme, the font-size preference, the WebGL renderer and the Shift+Enter rule, and none of
-those has a meaning in cells. The drawer has no home on the terminal client anyway, which is the other
-half of why it stayed ([tui.md](./tui.md) § Chrome).
+those has a meaning in cells. The terminal client presents the same Node sessions in its own cell
+view, described below ([tui.md](./tui.md) § Chrome).
 
 **The `$EDITOR` handoff needed nothing built.** The editor pane already has a terminal mode: one device
 preference swaps the CodeMirror rectangle for a throwaway PTY running the reader's own editor on the
@@ -352,6 +353,24 @@ takes a height and a maximized flag from the plugin, which owns the resize grip 
 That geometry was the plugin's own stylesheet until phase 9 of the layout programme. Where the rails
 are and how tall the top bar is are the shell's facts, and a plugin that writes them down is one
 shell change away from being wrong.
+
+### Native terminal client sessions
+
+The terminal client opens a task-scoped Sessions view from the task or palette. Terminal's activated
+session store remains the roster, and its existing HTTP verbs and `term` WebSocket channel remain the
+transport. The host renders a session picker, available profile choices, and one native `pty`
+rectangle. A new session starts in the task worktree as it does in the desktop drawer. Closing the
+view detaches the display and leaves the Node session running; reopening restores the task's last
+selected session. Resize travels from the rectangle to the Node. Enter gives the PTY the keyboard,
+Escape returns to the view, and `Ctrl+C` belongs to the PTY while entered.
+
+An agent handoff uses the same session row, including its managed-session lineage. The view can end
+the provider terminal with a second Enter confirmation and then return input control to managed mode.
+Return is disabled while the linked PTY is running, matching the Node's controller lease rule. The
+host calls the Agents plugin's public handoff client contract to update its session store after the
+Node accepts the transition.
+`plugins/terminal/src/contract/hostClient.ts` exposes Terminal's transport and roster to this host;
+other plugins keep using the narrower `sessionsClient.ts` contract.
 
 ## From the command palette
 

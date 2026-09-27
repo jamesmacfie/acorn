@@ -1,6 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createComponent } from 'solid-js'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { bootFixture } from './harness'
 import { renderCells } from './kit/render'
 import type { Cells } from './kit/render'
@@ -19,6 +19,49 @@ import { regionFocus } from './keys/regions'
 const caretLine = (screen: Cells): string => screen.lines.find((line) => line.includes('›')) ?? ''
 
 describe('a descriptor source list', () => {
+  it('opens a create-task row only on Enter, not while moving the caret', async () => {
+    await bootFixture()
+    const [{ sourcePanel }, { sourceRegistry }, { promotionRequest, closePromotion }] = await Promise.all([
+      import('./plugins/SourcePanel'),
+      import('@acorn/client-core/host/registries/sources'),
+      import('./chrome/promotionStore'),
+    ])
+    const registration = sourceRegistry.register({
+      id: 'task-items', order: 9999, glyph: 'x', label: 'Incidents',
+      promotion: { canPromote: () => true,
+        prepare: (_item, context) => ({ origin: 'probe:item', projectId: context.projectId, title: 'Second incident' }),
+        create: vi.fn(),
+      },
+    })
+    const descriptor = {
+      id: 'task-items', label: 'Incidents', glyph: 'circle', order: 10,
+      items: '/v1/p/probe/task-items', onSelect: { verb: 'createTask' },
+    } as unknown as Parameters<typeof sourcePanel>[0]['descriptor']
+    const list = sourcePanel({ pluginId: 'probe', descriptor }).regions!.list
+    let screen = await renderCells(() => (
+      <box flexDirection="column" flexGrow={1}
+        ref={regionFocus({ paneId: 'chrome', regionId: 'browse' }, 0)}>
+        {createComponent(list, {})}
+      </box>
+    ), { width: 44, height: 12 })
+    try {
+      for (let turn = 0; turn < 40 && !screen.text.includes('Second incident'); turn += 1) {
+        await new Promise((done) => setTimeout(done, 100))
+        screen = await screen.frame()
+      }
+      expect(screen.text).toContain('Second incident')
+      screen = await screen.press('ARROW_DOWN')
+      expect(caretLine(screen)).toContain('Second incident')
+      expect(promotionRequest()).toBeNull()
+      await screen.press('RETURN')
+      expect(promotionRequest()?.item.id).toBe('second')
+    } finally {
+      closePromotion()
+      screen.done()
+      registration.dispose()
+    }
+  }, 60_000)
+
   it('filters by title on / and gives the rows back on escape', async () => {
     await bootFixture()
     const { sourcePanel } = await import('./plugins/SourcePanel')

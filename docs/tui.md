@@ -10,9 +10,9 @@ and the tree protocol are `packages/client-core`'s, unchanged. No plugin writes 
 a `tui` surface, or learns which host it is on.
 
 Three docs have "terminal" in the name. This one is acorn running in a terminal.
-[terminal.md](./terminal.md) is the terminal drawer inside the desktop app, a raw PTY with nothing
-between you and it. [managed-agents.md](./managed-agents.md) is the other way to run the same
-providers, driven over a protocol with a ledger.
+[terminal.md](./terminal.md) covers raw PTY sessions in the desktop drawer and this host's native
+session view. [managed-agents.md](./managed-agents.md) is the other way to run the same providers,
+driven over a protocol with a ledger.
 
 Two design records are in git rather than in the tree, and comments in `apps/tui` cite both:
 `docs/future/terminal/`, nine phases between 2026-08-30 and 2026-08-31, which is how this client came
@@ -26,7 +26,7 @@ it came to draw its own cells. Each was deleted the day it shipped. Find one wit
 Topbar:   one line. Workspace > project, task count, the open branch, the node's state as a dot
 Left:     three framed panels — Menu, the sources; Browse, what is under the chosen one; Tasks
 Main:     one pane, or the chosen source's detail, with a strip of pane labels above it
-Overlays: the palette, the cheat sheet, the two pickers and a quit confirmation, where the pane is
+Overlays: commands, setup, file paths, task promotion, terminal sessions, and confirmations
 Footer:   one line. What the keyboard will do, and the node's state when it needs a sentence
 ```
 
@@ -125,6 +125,21 @@ so a reader never sees half a snapshot and a crash mid-write leaves the previous
 are synchronous because there is one, before the renderer exists; writes are not, because they land
 while the renderer owns the terminal.
 
+When the selected Node returns, the TUI refreshes active queries without cancelling reads already in
+flight. It then refetches failed inactive queries: an error boundary may have unmounted the observer
+that would otherwise make the failed read active. After those reads settle, failed pane and region
+boundaries remount their content. A persistent error keeps its message and a keyboard-accessible
+`Retry` control. Retry refetches failed reads in the selected Node's cache partition before remounting
+that boundary.
+
+An empty project roster opens **Set up acorn** after the Node's roster query completes. The route
+chooses or creates a workspace, adds a project from an absolute path on that Node, and creates a task
+with the shared branch rules. `Ctrl+K` keeps **Settings** and **New task** reachable afterward. The
+provider step lists connections, accepts descriptor-defined credentials with masked password fields,
+and starts device authorization when a provider offers it. Installed Claude and Codex CLIs are
+detected by the Agent pane. The terminal Settings route currently covers this setup flow; the other
+desktop Settings pages still need terminal projections.
+
 The device token is plain bytes at 0600. The desktop encrypts under the platform keychain through a
 `TokenCipher`; there is no keychain here, so the TUI supplies a pass-through, which is what the node
 beside it already does with its own TLS private key and session key. On NTFS the mode is advisory,
@@ -191,6 +206,7 @@ pane needs them before it can draw.
 | `fleet` | The fleet store: `list`, `probe`, `pair`, `rename`, `forget`, `reconnect`, `restartLocal`. `nodeAdopt` and the tunnels are not installed. |
 | `pairing` | Probe only. The probe is remembered in the seam rather than handed back, so confirming a fingerprint is a step rather than a parameter a caller could skip. |
 | `plugins` | File-backed custody. See The sandbox below. |
+| `files` | A terminal path prompt reads local bytes for attachments and writes exports or artifacts locally. It requires an absolute path, rejects attachments above the Agent route's 10 MiB limit before reading bytes, reports read/write errors, and confirms replacement of an existing file. The Node never receives that local path. |
 | `recovery` | `openDataFolder` prints the path; `quit` exits. |
 | `desktop`, `desktopExtras`, `folderPicker`, `preview`, `webviews` | Absent by design. The affordances they gate disappear, which the seam models as a product state. |
 
@@ -451,9 +467,9 @@ only; a gap on both axes puts a blank row between the wrapped lines.
   the bytes a terminal sends, reading application cursor mode and bracketed paste off the emulator's
   own `modes` at the moment a key arrives rather than remembering them. The caller's source is the
   same file either way, which is what let Docker's exec panel and the editor's `$EDITOR` window cross
-  at about fifteen lines each. The terminal plugin's own drawer
-  surface keeps its xterm, because its options are a theme, a font size, a WebGL renderer and a
-  Shift+Enter rule, none of which means anything in cells ([terminal.md](./terminal.md) § Client).
+  at about fifteen lines each. The terminal plugin's desktop drawer retains its xterm, while this
+  host opens a full-screen session list and native PTY rectangle from a task with `t` or from the
+  palette. Sessions persist when that view closes; see [terminal.md](./terminal.md) § Client.
   The bytes reach the rectangle as bytes: `term:out` is the one channel on the node's socket that is a
   binary frame rather than JSON, and the broker in this process hands it straight to the client
   ([terminal.md](./terminal.md) § The screen, and who pays for it). A `pty` rectangle also takes

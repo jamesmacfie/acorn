@@ -1,11 +1,16 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import type { Renderable } from './tree/compat'
 import { createSignal, ErrorBoundary, Suspense, type JSX } from 'solid-js'
+import { useQueryClient } from '@tanstack/solid-query'
 import { Line } from './kit/cells'
+import { Button } from './kit/asking'
+import { Alert } from './kit/showing'
 import { boxBorder, spaceLines } from './kit/roles'
 import { ScrollViewport } from './kit/scrolling'
-import { focusWithin } from './keys/regions'
+import { focusWithin, regionFocus, type RegionRef } from './keys/regions'
 import { createLogger } from '@acorn/client-core/infra/telemetry'
+import { nodeRecoveryCount } from './chrome/nodeState'
+import { resetPaneAfterRecovery, retryFailedPane } from './chrome/recovery'
 
 const log = createLogger('pane')
 
@@ -89,7 +94,7 @@ export function Panel(props: {
  *  cannot tell from an empty list. A region's component is a `lazy()`, so the boundary round it
  *  decides what the panel shows while its chunk compiles; and a throw anywhere under it takes the
  *  whole subtree down, header and all, with the message going to a console this host has turned off.
- *  So each is a line, and the line says which one happened.
+ *  Loading is a line; a failure shows the message and a Retry stop.
  *
  *  The message is drawn rather than logged on purpose. This host has one screen and no devtools; a
  *  reader who can read "Cannot read properties of undefined" off the panel can say so, and a reader
@@ -101,11 +106,43 @@ export function Panel(props: {
  *  four hundred `<Show>` elements in the graph raised it, and without a frame to read there is
  *  nowhere else for a reader to look. Printing after the screen closes is what makes this safe; a
  *  write while the renderer owns the terminal is what garbles it. */
-export function PanelBody(props: { name: string; children: JSX.Element }) {
+/** The terminal fallback for a failed pane or region, with a keyboard stop to retry its reads. */
+export function PaneFailure(props: {
+  name: string; error: unknown; nodeId: string; reset: () => void; region?: RegionRef
+}) {
+  const client = useQueryClient()
+  const [retrying, setRetrying] = createSignal(false)
+  resetPaneAfterRecovery(() => nodeRecoveryCount(props.nodeId), props.reset)
+  const retry = async (): Promise<void> => {
+    if (retrying()) return
+    setRetrying(true)
+    try {
+      await retryFailedPane(client, props.reset)
+    } finally {
+      setRetrying(false)
+    }
+  }
   return (
-    <ErrorBoundary fallback={(error: unknown) => {
+    <box
+      flexDirection="column"
+      flexShrink={0}
+      ref={(element: Renderable) => { if (props.region) regionFocus(props.region, 0)(element) }}
+    >
+      <Alert tone="warn" title={props.name}>
+        {props.error instanceof Error ? props.error.message : String(props.error)}
+      </Alert>
+      <Button disabled={retrying()} onPress={() => void retry()}>Retry</Button>
+    </box>
+  )
+}
+
+export function PanelBody(props: {
+  name: string; nodeId: string; region?: RegionRef; children: JSX.Element
+}) {
+  return (
+    <ErrorBoundary fallback={(error: unknown, reset) => {
       log.error(`the ${props.name} pane threw while rendering`, error, { 'pane.name': props.name })
-      return <Line role="muted" wrap>{error instanceof Error ? error.message : String(error)}</Line>
+      return <PaneFailure name={props.name} nodeId={props.nodeId} region={props.region} error={error} reset={reset} />
     }}>
       <Suspense fallback={<Line role="muted">Loading…</Line>}>{props.children}</Suspense>
     </ErrorBoundary>
