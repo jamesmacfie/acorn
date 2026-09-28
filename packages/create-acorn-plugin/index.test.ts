@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { copyFileSync, cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -243,6 +243,10 @@ it('runs the packed scaffold and type-checks it against the packed declarations 
     const types = join(dir, 'node_modules', 'acorn-plugin-types')
     unpackPublishedPackage('plugin-types', types)
     expect(readFileSync(join(types, 'dist', 'index.d.ts'), 'utf8')).toContain('NodePluginContext')
+    const declarations = readdirSync(join(types, 'dist', 'contracts'))
+    expect(declarations.length).toBeGreaterThan(10)
+    expect(declarations.every((name) => name.endsWith('.d.ts'))).toBe(true)
+    expect(readdirSync(join(types, 'dist')).sort()).toEqual(['contracts', 'index.d.ts'])
     expect(readFileSync(join(dir, 'acorn-plugin.json'), 'utf8')).toContain('"apiVersion": "2"')
 
     writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify({
@@ -311,9 +315,7 @@ it('type-checks the complete documented plugin example outside the workspace', (
     expect(parsed.ok ? null : parsed.reason).toBe(null)
 
     const types = join(dir, 'node_modules', 'acorn-plugin-types')
-    mkdirSync(join(types, 'dist'), { recursive: true })
-    copyFileSync(join(PACKAGES, 'plugin-types', 'src', 'public.ts'), join(types, 'dist', 'index.d.ts'))
-    copyFileSync(join(PACKAGES, 'plugin-types', 'package.json'), join(types, 'package.json'))
+    unpackPublishedPackage('plugin-types', types)
     cpSync(NODE_TYPES, join(dir, 'node_modules'), { recursive: true, dereference: true })
     writeFileSync(join(dir, 'tsconfig.json'), JSON.stringify({
       compilerOptions: {

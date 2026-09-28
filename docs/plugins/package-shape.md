@@ -189,8 +189,9 @@ telemetry has, which is that it never fails the thing it describes
 ([telemetry.md](../telemetry.md) § Never fail what you measure). Reading the stream is the separate
 `telemetry` facet on `ctx.core`, and that one is a token.
 
-`packages/plugin-types/src/public.ts` — the declarations acorn publishes as `acorn-plugin-types` — is the
-published twin of the loaded type, and `contract.test.ts` holds the two equal member for member. Adding a
+`packages/plugin-types/src/public.ts` is the root entrypoint for the declarations acorn publishes as
+`acorn-plugin-types`. It reexports the contract-owned types under `src/contracts/`. `contract.test.ts`
+holds the loaded context and core facets equal member for member. Adding a
 member to one and not the other fails that test, which is what stops the hand-written copy from quietly
 falling behind the host it describes.
 
@@ -243,9 +244,10 @@ person wrote and a person reviewed. It is held to the implementation by mutual-a
 underneath a stable name — the exact drift the name-level snapshot cannot see.
 
 `acorn-plugin-types` is the same arrangement one tier over, and it exists because the only kind of
-plugin a stranger could write was untyped JavaScript against prose. `packages/plugin-types/src/public.ts`
-is hand-written for the same reasons `public.ts` above is, copied verbatim to `index.d.ts`, and held to
-the implementation by mutual-assignability assertions in `contract.test.ts`. A plugin picks it up with a
+plugin a stranger could write was untyped JavaScript against prose. Its contract modules are hand-written,
+and a declaration-only build emits `dist/index.d.ts` with relative `.d.ts` files for each contract.
+The package has no runtime JavaScript. Mutual-assignability assertions in `contract.test.ts` hold the
+declarations to the implementation. A plugin picks it up with a
 JSDoc annotation and no build step, which is what keeps the no-bundler profile intact:
 
 ```js
