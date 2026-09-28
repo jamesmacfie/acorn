@@ -645,6 +645,19 @@ describe('wsHub backpressure', () => {
     tiny.close()
   })
 
+  // Megabyte frames until the hub pauses the producer, which it does inside the send. How many that
+  // takes is up to the kernel: loopback on a Linux runner can buffer several megabytes before the
+  // socket backs up, where macOS backs up on the first. Answers how many frames went out.
+  const floodUntilPaused = (id: string, data: string): number => {
+    let sent = 0
+    while (!paused.some(([, isPaused]) => isPaused)) {
+      if (sent === 64) throw new Error('64 frames went out and the hub never paused the producer')
+      wsBroadcast({ channel: 'term:out', id, msg: { type: 'output', data } as never })
+      sent += 1
+    }
+    return sent
+  }
+
   // One megabyte of output with the reader stopped, and the producer is asked to stop too.
   it('pauses the stream behind a socket over its mark and resumes it on drain', async () => {
     const ws = await openTiny()
@@ -674,9 +687,7 @@ describe('wsHub backpressure', () => {
   it('resumes a held stream when the socket that held it closes', async () => {
     const ws = await openTiny()
     ws.pause()
-    const big = 'y'.repeat(1_000_000)
-    for (let i = 0; i < 3; i++) wsBroadcast({ channel: 'term:out', id: 's2', msg: { type: 'output', data: big } as never })
-    await waitFor(() => paused.some(([, isPaused]) => isPaused), 'the PTY to be paused')
+    floodUntilPaused('s2', 'y'.repeat(1_000_000))
 
     ws.terminate()
     await waitFor(() => paused.some(([, isPaused]) => !isPaused), 'the PTY to be resumed on close')
@@ -720,7 +731,7 @@ describe('wsHub backpressure', () => {
     const got = frames(ws)
     ws.pause()
 
-    wsBroadcast({ channel: 'term:out', id: 's3', msg: { type: 'output', data: 'z'.repeat(1_000_000) } as never })
+    const streamed = floodUntilPaused('s3', 'z'.repeat(1_000_000))
     // Now the socket is over its mark, and these have nobody to pause.
     wsBroadcast({ channel: 'tasks:changed' })
     wsBroadcast({ channel: 'tasks:changed' })
@@ -732,7 +743,7 @@ describe('wsHub backpressure', () => {
     // would have had. Nothing after it skips a number.
     expect(got.filter((f) => f.channel === 'ws:shed')).toHaveLength(1)
     expect(got.map((f) => f.seq)).toEqual(got.map((_f, i) => i + 1))
-    expect(got.map((f) => f.channel)).toEqual(['term:out', 'ws:shed'])
+    expect(got.map((f) => f.channel)).toEqual([...Array<string>(streamed).fill('term:out'), 'ws:shed'])
     ws.close()
   })
 })
