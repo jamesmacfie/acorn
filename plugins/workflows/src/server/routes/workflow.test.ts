@@ -113,6 +113,15 @@ describe('workflow routes', () => {
     expect(gated).toEqual({ runId: 'run1', stepId: 'step1', approved: true })
   })
 
+  it('carries approved form values, and refuses values on a rejection before the bridge', async () => {
+    const seen: unknown[] = []
+    setWorkflowBridge(fake({ gate: async (_runId, _stepId, approved, values) => (seen.push({ approved, values }), { ok: true }) }))
+    const app = authed()
+    expect((await app.fetch(req('/api/workflows/runs/run1/gate', 'POST', { stepId: 's', approved: true, values: { title: 'Edited', notify: true } }), {} as Env)).status).toBe(200)
+    expect((await app.fetch(req('/api/workflows/runs/run1/gate', 'POST', { stepId: 's', approved: false, values: { title: 'x' } }), {} as Env)).status).toBe(400)
+    expect(seen).toEqual([{ approved: true, values: { title: 'Edited', notify: true } }])
+  })
+
   it('answers 409 when another device already answered the gate', async () => {
     setWorkflowBridge(fake({ gate: async () => { throw new BridgeError(409, 'gate-resolved', 'This gate was already answered.') } }))
     const res = await authed().fetch(req('/api/workflows/runs/run1/gate', 'POST', { stepId: 'step1', approved: false }), {} as Env)

@@ -39,7 +39,9 @@ export type WorkflowBridge = {
   run(runId: string): Promise<WorkflowRunProjection | null>
   steps(runId: string): Promise<WorkflowStepProjection[]>
   stepStatuses(runId: string): Promise<{ steps: { id: string; status: string }[]; truncated: boolean }>
-  gate(runId: string, stepId: string, approved: boolean): Promise<{ ok: boolean }>
+  // Throws 404 for no such gate, 409 `gate-resolved` when another answer won, and 400 `gate-invalid`
+  // when the form's values are refused. A refused answer leaves the gate waiting.
+  gate(runId: string, stepId: string, approved: boolean, values?: Record<string, DataValue>): Promise<{ ok: boolean }>
   cancel(runId: string): Promise<{ ok: boolean }>
   kill(runId: string, stepId: string): Promise<{ ok: boolean }>
   retry(runId: string, stepId: string, prompt?: string): Promise<{ ok: boolean; error?: string }>
@@ -89,7 +91,16 @@ const referencesDatabaseChild = (def: unknown): boolean => {
     return !!ref && typeof ref === 'object' && (ref as { source?: unknown }).source === 'database'
   })
 }
-const gateBody = z.object({ stepId: z.string().min(1), approved: z.boolean() })
+// `values` answers a gate's form, so it comes only with an approval. Which names and types are legal
+// is the runner's answer, because only the frozen definition knows the fields.
+const gateBody = z.object({
+  stepId: z.string().min(1),
+  approved: z.boolean(),
+  values: z.record(z.string(), z.unknown().transform((value, ctx) => {
+    try { return parseDataValue(value, DATA_LIMITS.selectionBytes) }
+    catch { ctx.addIssue({ code: 'custom', message: 'Expected a bounded JSON value' }); return z.NEVER }
+  })).optional(),
+}).refine((body) => body.approved || body.values === undefined)
 const killBody = z.object({ stepId: z.string().min(1) })
 const retryBody = z.object({ stepId: z.string().min(1), prompt: z.string().optional() })
 const recordsQuery = z.object({
@@ -184,7 +195,7 @@ export const workflow = new Hono<AppEnv>()
     if (isTaskConfined(c)) return respondError(c, 403, 'forbidden')
     const parsed = gateBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, WORKFLOW_ROUTE, (b) => b.gate(c.req.param('runId'), parsed.data.stepId, parsed.data.approved))
+    return viaBridge(c, WORKFLOW_ROUTE, (b) => b.gate(c.req.param('runId'), parsed.data.stepId, parsed.data.approved, parsed.data.values))
   })
   .post('/workflows/runs/:runId/cancel', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.cancel(c.req.param('runId'))))
   .post('/workflows/runs/:runId/kill', async (c) => {
