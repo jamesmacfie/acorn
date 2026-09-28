@@ -30,12 +30,8 @@ import { Graph } from './graph'
 // `reduced` one loses is written beside its level in client-core's kit/tokens/support.ts.
 // `tools/arch/kitTable.test.ts` fails if this table, that matrix and that appendix disagree.
 
-// Every entry is a component, and the DOM table's are not. `KitTable` allows either (client-core
-// host/tree/kitEntry.ts) and the reason to reach for a loader is absent here: this table is not in
-// this host's eager graph at all — `../plugins/RemoteTree.tsx` is lazy, so nothing below is fetched
-// until a loaded plugin draws a tree — and the heavy nodes share `./showing.tsx` with the cheap ones,
-// so a loader would cost a frame of blank and save no bytes. Splitting that file is the change that
-// would make loaders worth having here, and nothing has asked for it.
+// `RemoteTree` loads this table lazily, so its components are outside the startup graph. The
+// `showing` facade preserves the kit's public names while its implementations live by behavior.
 export const KIT_COMPONENTS: KitTable = {
   Stack, Inline, Section, Fold, Card, Timeline, Tabs, Toolbar,
   Modal, Menu, Popover, ListDetail, ListColumn, DetailColumn, Sections, SplitHandle, DocumentTabs, SectionHeader,

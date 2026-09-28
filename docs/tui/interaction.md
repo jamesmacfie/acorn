@@ -493,7 +493,7 @@ with the page keys and the wheel: `↓` lands on the button and stops there, bec
 two stops is not a place the keys can be.
 
 The diff pane is the third shape, and it is a viewport with a window inside it. `DiffPane` in
-`apps/tui/src/kit/showing.tsx` used to build one `<text>` per line of every file, which for a
+`apps/tui/src/kit/showing/diffPane.tsx` used to build one `<text>` per line of every file, which for a
 five-thousand-line patch is five thousand renderables in a pane that shows twenty. It draws from the
 same diff document the DOM viewer does ([diff rendering](../diff-rendering.md) § The document): a
 file's header is one line and each segment is as many lines as its descriptor says, so the slice

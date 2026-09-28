@@ -646,7 +646,7 @@ describe('the footer asks the keymap once per change', () => {
 //
 // `<For>` keys by object identity, so a rail that maps its tasks into fresh wrappers on every change
 // destroys and rebuilds every row renderable — including the rows that did not change
-// (../kit/showing.tsx § keyedRows).
+// (../kit/showing/collection.tsx § keyedRows).
 
 describe('the rail keeps the rows a change did not touch', () => {
   it('hands the same wrapper back for an unchanged task, and the same array when nothing moved', () => {

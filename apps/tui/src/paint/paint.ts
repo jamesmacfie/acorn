@@ -45,7 +45,7 @@ import {
 const SINGLE = { h: '─', v: '│', tl: '┌', tr: '┐', bl: '└', br: '┘' } as const
 
 /** A scroll bar's two cells: the run the viewport covers, and the rest of the content under it. The
- *  same pair `../kit/showing.tsx` draws beside a virtual `Rows`, because there is one bar in this app
+ *  same pair `../kit/showing/collection.tsx` draws beside a virtual `Rows`, because there is one bar in this app
  *  and lazygit's is the shape a reader already knows (§ drawBar). */
 const THUMB = '█'
 const TRACK = '│'
@@ -261,9 +261,7 @@ function drawBox(node: Node, buffer: Buffer, clip: Clip): void {
  * settle. Overlaying it costs the rightmost column of a scrolling document and no oscillation. No
  * frame the old painter drew held a visible bar, so nothing measured the difference either way.
  *
- * The two characters and the thumb's size and place are `../kit/showing.tsx § THUMB`'s, which is the
- * bar a virtual `Rows` draws down its own edge. There is one bar in this app and it should look like
- * itself.
+ * The thumb and track match the virtual list in `../kit/showing/collection.tsx`.
  */
 function drawBar(node: Node, buffer: Buffer, clip: Clip): void {
   const content = node.children.find((child) => laysOut(child.kind))

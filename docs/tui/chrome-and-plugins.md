@@ -329,7 +329,7 @@ lives.
 | Kind or slot | Desktop | Terminal | Where the answer lives |
 | --- | --- | --- | --- |
 | `rows` (`pane.footer`) | A strip of rows under the pane's frame | A `Rows` collection at the end of the pane, one per contributor, headed by its label and the contributing plugin's id | `apps/tui/src/kit/host.tsx` § `ExtensionRows`, drawn by `apps/tui/src/plugins/ExtendedPane.tsx` |
-| `annotation` | Marks inside the diff row, under the code; `core:task` marks become rail markers | Diff marks appear below the code; task rows show a count and offer `Shift+F10` inspection of the full legend | `apps/tui/src/kit/showing.tsx` § `AnnotatedDiffLine`; § Task markers above |
+| `annotation` | Marks inside the diff row, under the code; `core:task` marks become rail markers | Diff marks appear below the code; task rows show a count and offer `Shift+F10` inspection of the full legend | `apps/tui/src/kit/showing/diffRows.tsx` § `AnnotatedDiffLine`; § Task markers above |
 | `remote` (a `Slot`) | The contributor's tree, in the owner's surface | The same tree, in the same place, drawn from the same batch | `apps/tui/src/kit/host.tsx` § `Slot` |
 | `rectangle` (`pane.inline-*`) | Another plugin's iframe | One muted line naming the point | § Rectangles |
 | `hook` | Runs on the node | Runs on the node | Nothing to draw on either host |
