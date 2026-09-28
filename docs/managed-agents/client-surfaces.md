@@ -167,6 +167,11 @@ it fails for any reason a selection can break, not only for the one it was writt
   **Launching skill: readable** rather than **Skill**. Opening the card shows the original JSON.
   If the provider's output repeats that same sentence, the expanded body omits the duplicate. This is
   a presentation rule, so previously recorded calls gain the label without changing stored events.
+- Claude's `ToolSearch` call, which loads a tool's definition before its first use, renders as a flat
+  row named after what it loaded: **Load tools: WebFetch** rather than **ToolSearch**. Its JSON
+  input and its `Tool: WebFetch` output both restate that name, so the ACP normalizer drops them
+  unless the call failed. The names come from the structured response's `matches`, so this is a
+  normalizer rule rather than a presentation one, and calls recorded before it keep their old card.
 - Whether that toggle starts open is the reader's setting, **Tool call display** in Settings -> Agent
   defaults: start collapsed, start expanded, or carry the reader's last toggle forward. It is a device
   preference (`agent_tool_fold`), so it sits on that page beside settings the node keeps. The default is

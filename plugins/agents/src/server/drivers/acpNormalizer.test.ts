@@ -661,6 +661,14 @@ describe('Claude web activity, against the captured wire', () => {
     })
     expect(fetch.output).toContain('a session represents a conversation')
   })
+
+  it('keeps the status the page answered with, from the update that carries no request', () => {
+    expect(tools[4].web).toEqual({ status: { code: 200, text: 'OK' } })
+    expect(folded(webCapture.updates[2].toolCallId).web).toMatchObject({
+      action: { type: 'fetch_page', url: 'https://agentclientprotocol.com/protocol/overview' },
+      status: { code: 200, text: 'OK' },
+    })
+  })
 })
 
 describe('Claude web activity, unit cases', () => {
@@ -726,5 +734,57 @@ describe('Claude web activity, unit cases', () => {
         },
       },
     }).web?.results).toEqual([{ url: 'https://example.com/one', title: 'One' }])
+  })
+
+  it('reads a 404 off a fetch that the CLI reports as finished', () => {
+    // The shape Claude Code returned for https://httpbin.org/status/404 on 2026-09-28: not an error,
+    // no page, and the status only in the structured response.
+    expect(toolEvent({
+      sessionUpdate: 'tool_call_update',
+      toolCallId: 'fetch-1',
+      _meta: {
+        claudeCode: {
+          toolName: 'WebFetch',
+          toolResponse: { bytes: 0, code: 404, codeText: 'Not Found', result: 'The server returned HTTP 404 Not Found.', durationMs: 1168, url: 'https://httpbin.org/status/404' },
+        },
+      },
+    }).web).toEqual({ status: { code: 404, text: 'Not Found' } })
+  })
+})
+
+describe('Claude tool loading', () => {
+  const load = (update: Partial<SessionUpdate> & Record<string, unknown>) => toolEvent({
+    toolCallId: 'load-1',
+    ...update,
+    _meta: { claudeCode: { toolName: 'ToolSearch', ...(update._meta as object | undefined) } },
+  } as unknown as SessionUpdate)
+  const fold = (...updates: ReturnType<typeof load>[]) => {
+    const [item] = buildConversationItems(updates.map((tool, at) => ({
+      id: `e${at}`, sessionId: 's', turnId: 't', seq: at + 1, event: { type: 'tool', tool }, searchText: null, createdAt: 0,
+    })) as AgentEventRecord[])
+    if (item.event.type !== 'tool') throw new Error('expected a tool card')
+    return item.event.tool
+  }
+
+  it('names the row after the tools it loaded and has nothing to open onto', () => {
+    const card = fold(
+      load({ sessionUpdate: 'tool_call', title: 'ToolSearch', rawInput: {} }),
+      load({ sessionUpdate: 'tool_call_update', title: 'ToolSearch', rawInput: { query: 'select:WebFetch', max_results: 1 } }),
+      load({ sessionUpdate: 'tool_call_update', _meta: { toolResponse: { matches: ['WebFetch'], query: 'select:WebFetch', total_deferred_tools: 47 } } }),
+      load({ sessionUpdate: 'tool_call_update', status: 'completed', content: [{ type: 'content', content: { type: 'text', text: 'Tool: WebFetch' } }] }),
+    )
+    expect(card).toMatchObject({ title: 'Load tools: WebFetch', status: 'completed' })
+    expect(card.input).toBeUndefined()
+    expect(card.output).toBeUndefined()
+  })
+
+  it('says when nothing matched, and keeps the error of a load that failed', () => {
+    expect(load({ sessionUpdate: 'tool_call_update', _meta: { toolResponse: { matches: [], query: 'jupyter' } } }).title)
+      .toBe('Load tools: none found')
+    expect(load({
+      sessionUpdate: 'tool_call_update',
+      status: 'failed',
+      content: [{ type: 'content', content: { type: 'text', text: 'Tool search unavailable' } }],
+    }).output).toBe('Tool search unavailable')
   })
 })

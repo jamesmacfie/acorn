@@ -574,7 +574,8 @@ type AgentWebAction =
   | { type: 'fetch_page'; url?: string; prompt?: string }
   | { type: 'other' }
 
-type AgentWebActivity = { action?: AgentWebAction; results?: AgentWebResult[] }
+type AgentWebStatus = { code: number; text?: string }
+type AgentWebActivity = { action?: AgentWebAction; results?: AgentWebResult[]; status?: AgentWebStatus }
 type AgentToolCall = { /* … */ web?: AgentWebActivity }
 ```
 
@@ -615,6 +616,15 @@ this work was written from, which is why they are the authority:
 Claude reports no domain for a result and Codex does. The card reads the host off the URL when the
 field is absent rather than storing a derived one, so the two read the same without the ledger
 carrying a second thing to keep true.
+
+**A fetched page's HTTP status is its own field**, read from `toolResponse.code` and `codeText`.
+Claude Code reports a 404 as a completed call whose result is a note saying the body was not
+retrieved, so without the status a missing page finishes with a green dot. The status sits beside
+the action rather than inside it, because it arrives on an update that carries no request and the
+fold replaces an action whole. The open card always shows it. The closed row shows it only outside
+2xx, in the warning tone, after the host. `toolResponse.url` is the requested URL even when the page
+redirects, so there is no final address to show, and the redirect target appears only in the
+provider's prose.
 
 **The payload is bounded twice before it reaches SQLite**, in `boundProviderEvent.ts`: every string
 and collection on its own, and then the whole payload against the 64 KiB the inline tool budget uses.
