@@ -1,5 +1,5 @@
 import type { DiffFile } from '../../diff/diffModel'
-import { type RailMarkerDot } from '../../../features/tabs/railMarkers'
+import type { RailMarkerDot } from '../../tokens/rail'
 
 export type FileStatusTone = 'ok' | 'danger' | 'warn' | 'muted'
 
@@ -70,14 +70,7 @@ export function checksState(checks: { status: string | null }[]): 'success' | 'f
   return 'success'
 }
 
-// The domain-to-semantic hop StatusDot asks its call sites to make, declared once. Both the rail
-// (tasks/railStatus.ts) and the GitHub plugin's PR rows draw this dot. Before this they shared a
-// class defined in the plugin's own stylesheet, so core's markup went unstyled when it was
-// disabled.
-// The rail's vocabulary rather than the kit's, because the rail marker takes it as it is. A
-// StatusDot wants `railDotProps` around it.
-/** A rail dot as StatusDot's props. The rail's vocabulary is not the kit's, and this is the one
- *  translation, so core and a plugin drawing the same dot spell it the same way. */
+/** Map a rail marker's dot state to the kit's StatusDot props. */
 export const railDotProps = (dot: RailMarkerDot): { tone: 'ok' | 'warn' | 'danger'; mixed?: boolean } =>
   dot === 'mixed' ? { tone: 'danger', mixed: true } : { tone: dot === 'bad' ? 'danger' : dot }
 

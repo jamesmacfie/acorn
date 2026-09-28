@@ -137,7 +137,6 @@
     "./kit/components/inputs/MentionTextarea.tsx": "./src/kit/components/inputs/MentionTextarea.tsx",
     "./kit/components/inputs/Picker.tsx": "./src/kit/components/inputs/Picker.tsx",
     "./kit/components/inputs/PickerRow.tsx": "./src/kit/components/inputs/PickerRow.tsx",
-    "./kit/components/inputs/WorkspacePicker.tsx": "./src/kit/components/inputs/WorkspacePicker.tsx",
     "./kit/components/layout": "./src/kit/components/layout/public.ts",
     "./kit/components/overlays": "./src/kit/components/overlays/public.ts",
     "./kit/components/overlays/tips.tsx": "./src/kit/components/overlays/tips.tsx",

@@ -1009,13 +1009,14 @@ describe('architecture boundaries', () => {
   it('client-core kit/ is pure presentation: props in, DOM out', () => {
     // kit/ is what @acorn/plugin-api/ui re-exports, so its import edges are the design-system contract.
     //
-    // An allowlist of destinations, not a denylist of data modules, because a denylist silently stops
-    // covering the next directory someone adds. kit/ may import kit/ and infra/highlight/ (the shiki
-    // highlighter the diff model colours through), and nothing else.
+    // An allowlist of destinations within client-core, not a denylist of data modules, because a
+    // denylist silently stops covering the next directory someone adds. kit/ may import kit/ and
+    // infra/highlight/ (the shiki highlighter the diff model colours through). Other packages have
+    // their own import rules.
     //
-    // Type-only imports pass: kit/components/WorkspacePicker.tsx imports the `FleetWorkspace` type, a
-    // shape it renders rather than a store it reads. Known and deliberate: kit/diff/DiffRows.tsx reaches
-    // kit/lib/state/draftState, which touches localStorage, because the draft belongs to the comment box.
+    // Type-only imports count too. A type owned by a feature still makes the kit depend on that
+    // feature. kit/diff/DiffRows.tsx reaches kit/lib/state/draftState, which touches localStorage,
+    // because the draft belongs to the comment box.
     //
     const UI_MAY_IMPORT = (file: string): boolean => {
       const p = rel(file)
@@ -1023,38 +1024,28 @@ describe('architecture boundaries', () => {
       const inner = p.slice('packages/client-core/src/'.length)
       return inner.startsWith('kit/') || inner.startsWith('infra/highlight/')
     }
-    // `[^'"]*?` for the clause, because a preceding import's specifier contains the quotes that bound
-    // the statement.
-    const CLAUSE_IMPORT_RE = /\bimport\s+(?!type\b)([^'"]*?)\s+from\s*['"]([^'"\n]+)['"]/g
-    const BARE_IMPORT_RE = /\bimport\s*['"]([^'"\n]+)['"]/g
     const uiDir = join(ROOT, 'packages/client-core/src/kit')
-    const offenders: string[] = []
-    let scanned = 0
-    for (const file of walk(uiDir).filter((f) => !isTestCode(f))) {
-      scanned++
-      const text = readFileSync(file, 'utf8')
-      const specs: string[] = []
-      for (const re of [CLAUSE_IMPORT_RE, BARE_IMPORT_RE]) {
-        re.lastIndex = 0
-        let m: RegExpExecArray | null
-        while ((m = re.exec(text))) {
-          if (re === CLAUSE_IMPORT_RE) {
-            // A named clause whose every entry is `type X` is type-only in substance.
-            const named = m[1].trim().match(/^\{([\s\S]*)\}$/)
-            if (named && named[1].split(',').every((part) => !part.trim() || /^type\s/.test(part.trim()))) continue
-            specs.push(m[2])
-          } else specs.push(m[1])
-        }
-      }
-      for (const spec of specs) {
-        const target = resolveSpec(file, spec)
-        if (!target.file) continue // external, or @acorn/protocol resolved elsewhere, both fine
-        if (target.pkg && target.pkg.name !== '@acorn/client-core') continue // protocol and friends
-        if (!UI_MAY_IMPORT(target.file)) offenders.push(`${rel(file)}: ${spec}`)
-      }
-    }
+    const kitImportOffenders = (fromFile: string, specs: readonly string[]): string[] => specs.flatMap((spec) => {
+      const target = resolveSpec(fromFile, spec)
+      if (!target.file || target.pkg?.name !== '@acorn/client-core' || UI_MAY_IMPORT(target.file)) return []
+      return [`${rel(fromFile)}: ${spec}`]
+    })
+    const scanned = walk(uiDir).filter((file) => !isTestCode(file)).length
+    const offenders = EDGES
+      .filter((edge) => edge.fromFile.startsWith(uiDir + '/') && !isTestCode(edge.fromFile))
+      .flatMap((edge) => kitImportOffenders(edge.fromFile, [edge.spec]))
     // Anti-vacuity: the walker must actually be finding the design system.
     expect(scanned).toBeGreaterThan(15)
+    const syntheticFile = join(uiDir, 'components/overlays/tips.tsx')
+    const forbiddenSpec = '../../../features/tabs/railMarkers'
+    for (const statement of [
+      `import type { RailMarkerDot } from '${forbiddenSpec}'`,
+      `import { type RailMarkerDot } from '${forbiddenSpec}'`,
+      `export type { RailMarkerDot } from '${forbiddenSpec}'`,
+    ]) {
+      const specs = Array.from(statement.matchAll(IMPORT_RE), (match) => match[2])
+      expect(kitImportOffenders(syntheticFile, specs)).toEqual([`${rel(syntheticFile)}: ${forbiddenSpec}`])
+    }
     expect([...new Set(offenders)].sort()).toEqual([])
   })
 
