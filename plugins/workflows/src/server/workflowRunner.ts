@@ -1,6 +1,6 @@
 // Durable workflow engine. Rows remain the checkpoint; registered handlers own work while this
 // class alone owns validation, ordering, persistence, branching, cancellation, and reconciliation.
-import { asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 import { claimWorkflowRecordRetry } from './workflowProcessingRetry'
 import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import { agentProfileRegistry, DEFAULT_PROFILE_ID, type Extension, type ExtensionPointId, type HeadlessOpts, type HeadlessResult, type PluginDatabase, type PluginHookRegistry, type PluginTelemetry, type SpanHandle, type StreamEvent } from '@acorn/plugin-api/node'
@@ -50,6 +50,10 @@ import { parseDataValue } from '@acorn/protocol/dataValues.ts'
 
 export type { ToolCeiling, WorkflowDef, WorkflowStepDef } from '../shared/workflowContracts'
 export type { WorkflowInvocationIdentity, WorkflowStartOptions } from './workflowRunStart'
+
+/** How a gate answer landed. `already-resolved` means another answer won, or the gate was not
+ *  waiting. */
+export type WorkflowGateResolution = 'resolved' | 'already-resolved' | 'not-found'
 
 export type WorkflowChildTaskSeed = { title: string; branch: string; prompt?: string }
 export type RunStepOptions = HeadlessOpts & {
@@ -441,23 +445,30 @@ export class WorkflowRunner {
     return this.#childLifecycle.summariesForStep(parentStepId)
   }
 
-  async resolveGate(runId: string, stepId: string, approved: boolean): Promise<void> {
+  /** Answer a human gate. The step leaves `waiting-gate` through a compare-and-swap, so when two
+   *  devices answer the same gate only the first write wins, and only its caller resumes the run or
+   *  fails it. Everyone else learns that the gate was already answered. */
+  async resolveGate(runId: string, stepId: string, approved: boolean): Promise<WorkflowGateResolution> {
     const run = await this.run(runId)
     if (run?.deadlineAt != null && run.deadlineAt <= now()) {
+      // The deadline wins over any answer. The run is safety-railed, and the pane shows that once
+      // it refetches, so the caller is told its request was handled.
       await this.safetyRailRun(run.rootRunId ?? run.id, 'Safety rail: workflow deadline exhausted while waiting at a gate.')
-      return
+      return 'resolved'
     }
     const [step] = await this.db.select().from(schema.workflowSteps).where(eq(schema.workflowSteps.id, stepId))
-    if (!step || step.runId !== runId || step.status !== 'waiting-gate') return
+    if (!step || step.runId !== runId) return 'not-found'
+    if (step.status !== 'waiting-gate') return 'already-resolved'
     if (approved) {
-      await this.setStep(stepId, { status: 'done', resultJson: JSON.stringify({ approved: true }) })
+      if (!await this.setStepIf(stepId, 'waiting-gate', { status: 'done', resultJson: JSON.stringify({ approved: true }) })) return 'already-resolved'
       await this.setWaitingParentStatus(runId, 'running')
       void this.tick(runId)
-      return
+      return 'resolved'
     }
-    await this.setStep(stepId, { status: 'failed', error: 'Rejected at the human gate.' })
+    if (!await this.setStepIf(stepId, 'waiting-gate', { status: 'failed', error: 'Rejected at the human gate.' })) return 'already-resolved'
     const currentRun = await this.run(runId)
     if (currentRun) await this.finishRun(currentRun, 'failed', `Gate '${step.name}' rejected.`, step.id)
+    return 'resolved'
   }
 
   async cancelRun(runId: string, reason = 'Run cancelled.'): Promise<void> {
@@ -1055,13 +1066,26 @@ export class WorkflowRunner {
   }
 
   private async setStep(stepId: string, patch: Partial<WorkflowStepRow>): Promise<void> {
+    await this.setStepIf(stepId, undefined, patch)
+  }
+
+  /** `setStep`, but the write lands only while the step's status is still `expected`. Answers whether
+   *  it wrote. The condition is part of the UPDATE, so of two callers that both read the old status,
+   *  one changes the row and the other changes nothing. The announcements below follow the write, so
+   *  the loser raises no frame and no span. */
+  private async setStepIf(stepId: string, expected: string | undefined, patch: Partial<WorkflowStepRow>): Promise<boolean> {
     // Read first only when the status is in the patch: the frame below is a status change, and a
     // write that leaves the status alone has nothing to announce.
     const [before] = patch.status == null
       ? []
       : await this.db.select({ runId: schema.workflowSteps.runId, status: schema.workflowSteps.status })
         .from(schema.workflowSteps).where(eq(schema.workflowSteps.id, stepId))
-    await this.db.update(schema.workflowSteps).set({ ...patch, updatedAt: now() }).where(eq(schema.workflowSteps.id, stepId))
+    const written = await this.db.update(schema.workflowSteps).set({ ...patch, updatedAt: now() })
+      .where(expected == null
+        ? eq(schema.workflowSteps.id, stepId)
+        : and(eq(schema.workflowSteps.id, stepId), eq(schema.workflowSteps.status, expected)))
+      .returning({ id: schema.workflowSteps.id })
+    if (!written.length) return false
     if (before && before.status !== patch.status) {
       this.#markStepSpan(before.runId, stepId, patch.status!)
       this.deps.stepChanged?.(before.runId, stepId, patch.status!)
@@ -1071,6 +1095,7 @@ export class WorkflowRunner {
       }
     }
     this.changed()
+    return true
   }
 
   /** Open a step's span when it starts running and close it when it settles.
