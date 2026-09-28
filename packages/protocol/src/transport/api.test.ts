@@ -1,11 +1,21 @@
 import { describe, expect, it } from 'vitest'
 import * as api from './api'
-import { parseRailItemId, prefsKey, railItemId } from './api'
+import {
+  corePluginBundleByHashRoute,
+  integrationRoute,
+  parseRailItemId,
+  prefsKey,
+  projectRoute,
+  railItemId,
+  scheduleConfirmRoute,
+  taskContextRoute,
+  taskRoute,
+} from './api'
 
 describe('shared API contract helpers', () => {
-  // A net under the ~90 route literals above, which were namespaced by hand: every one must land in a
+  // A net under the route literals in the subject modules: every one must land in a
   // current /v1 namespace (docs/api-reference.md § Transport), because a path outside /v1/*
-  // escapes the server's single auth and requireUser glob and would 404 into the SPA shell. Enumerated
+  // escapes the server's single auth and requireUser glob. Enumerated
   // from the module rather than listed, so a new builder is covered the day it lands.
   it('namespaces every exported route builder under /v1/core or /v1/p', () => {
     // One dummy that satisfies every parameter shape the builders take: it interpolates and
@@ -26,6 +36,16 @@ describe('shared API contract helpers', () => {
 
   it('preserves query key shapes for cache compatibility', () => {
     expect(prefsKey).toEqual(['prefs'])
+  })
+
+  it('preserves route parameter encoding across contract owners', () => {
+    expect(projectRoute('a/b')).toBe('/v1/core/projects/a%2Fb')
+    expect(integrationRoute('a/b')).toBe('/v1/core/integrations/a/b')
+    expect(taskRoute('a/b')).toBe('/v1/core/tasks/a/b')
+    expect(corePluginBundleByHashRoute('a/b', 'c:d')).toBe('/v1/core/plugins/a%2Fb/bundles/c%3Ad')
+    expect(scheduleConfirmRoute('a:b')).toBe('/v1/core/schedules/a%3Ab/confirm')
+    expect(taskContextRoute('task', 'all')).toBe('/v1/core/tasks/task/context?include=*')
+    expect(taskContextRoute('task', ['notes', 'links'])).toBe('/v1/core/tasks/task/context?include=notes,links')
   })
 
   // The rail id is a round trip the plugin doesn't control, since the host hands the string back as a

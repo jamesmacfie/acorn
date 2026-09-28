@@ -723,7 +723,7 @@ describe('architecture boundaries', () => {
       ['packages/client-core/src/features/settings/WorkspaceProjectSettings.tsx', "the 'terminal' setup-script trigger"],
       ['packages/node-core/src/server/routes/projects/projects.ts', "the 'terminal' setup-script trigger"],
       ['packages/node-core/src/server/worktrees/taskWorktree.ts', "the 'terminal' setup-script trigger"],
-      ['packages/protocol/src/transport/api.ts', "the 'terminal' setup-script trigger"],
+      ['packages/protocol/src/transport/api/projects.ts', "the 'terminal' setup-script trigger"],
       ['packages/client-core/src/host/registries/commands/commands.ts', "the 'terminal' command category"],
       // `terminal` the channel prefix of core's own `terminal:sessions-changed` event, which is a noun
       // and not the roster id. Any plugin that starts a session emits it and the shell hears it
