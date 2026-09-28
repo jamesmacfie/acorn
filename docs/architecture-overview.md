@@ -162,6 +162,11 @@ tokens rather than DOM attributes, and a type-level test refuses `class`, `class
 any of them ([ui design](./ui-design.md) § The closed kit). Two arch rules hold the rest — no plugin
 ships a stylesheet, and no plugin mounts a Solid root of its own.
 
+Within `client-core`, the kit depends on its own modules and the syntax highlighter, not on product
+features. It also imports public protocol and diff-document contracts. The boundary test counts
+type-only imports and re-exports: a display shape shared with a feature belongs in the kit, while
+the feature keeps its public type names for consumers.
+
 Test files follow the same rules as production files unless a rule names an exception. Remaining
 shrinking baselines are named at their own tests; plugin tests have no direct core-library imports.
 

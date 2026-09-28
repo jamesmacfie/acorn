@@ -169,6 +169,10 @@ consuming render, so a plugin reads signals it already owns and the rail re-rend
 rather than the host inventing a query observer per rail button. One throwing contribution is isolated;
 the rest of the control still draws.
 
+The marker's dot, tone, and legend display types live in `kit/tokens/rail.ts`. The tabs feature
+re-exports those types from its public contract, so kit tooltip rendering does not depend on a product
+feature and plugin imports keep the same names.
+
 Loaded task markers enter through `core:task`, the generic annotation point. The rail sends the whole
 visible task-id set once per contributor. Each contributor's request identity includes its descriptor
 registration, the active node, `chromeDeps(pluginId)`, and the visible keys. The shared chrome watcher
