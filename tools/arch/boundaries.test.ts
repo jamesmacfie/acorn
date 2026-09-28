@@ -598,7 +598,7 @@ describe('architecture boundaries', () => {
       '@acorn/protocol': 80,
       // Model-provider error guidance needs a pure path for logic tests and remote trees. Importing
       // the kit/lib barrel here would pull renderer-only modules into those consumers.
-      '@acorn/client-core': 153,
+      '@acorn/client-core': 154,
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 10,

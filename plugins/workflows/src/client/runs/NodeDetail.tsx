@@ -7,13 +7,17 @@ import {
   type Task, tasksOptions,
 } from '@acorn/plugin-api/client'
 import {
-  Alert, Button, CodeBlock, EmptyState, Facts, Fold, Heading, Icon, Inline, Link, Log, Modal, Stack,
+  Alert, Badge, Button, CodeBlock, EmptyState, Facts, Fold, Heading, Icon, Inline, Link, Log, Modal, Stack,
   Table, TableCell, TableHead, TableRow, Text, Textarea, Toolbar,
 } from '@acorn/plugin-api/ui'
 import type { WorkflowStepRow } from '../../contract/wire.ts'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
 import { AGENTS_CONVERSATION } from '@acorn/plugin-agents/contract/conversation.ts'
+import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import type { WorkflowStepProjection } from '../../shared/api'
+import { gateFormProblems, type GateFormOutput, type GateFormProposal } from '../../shared/gateForm'
+import type { WorkflowGateForm } from '../../shared/workflowContracts'
+import TypedValueField from '../editor/TypedValueField'
 import { formatCost, formatDuration, kindLabel, kindRunsAgent, stepElapsed, stepGlyph, stepTone } from './runDisplay'
 import type { RunPaneModel } from './runPaneModel'
 import { ChildRuns, RunLineage } from './RunRelationships'
@@ -199,7 +203,8 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
       <Show when={current().status === 'running'}>
         <Button size="sm" tone="danger" disabled={model.busy()} onPress={() => void model.kill(current().id)}>Kill step</Button>
       </Show>
-      <Show when={current().status === 'waiting-gate'}>
+      {/* A gate with a form draws its own Approve, beside the values it approves. */}
+      <Show when={current().status === 'waiting-gate' && !model.gateForm(current() as WorkflowStepProjection)}>
         <Button size="sm" variant="solid" disabled={model.busy()} onPress={() => void model.gate(true)}>Approve</Button>
         <Button size="sm" tone="danger" disabled={model.busy()} onPress={() => void model.gate(false)}>Reject</Button>
       </Show>
@@ -294,10 +299,17 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
               <Switch>
                 <Match when={shape() === 'gate'}>
                   <Show
-                    when={current().status === 'waiting-gate'}
-                    fallback={<Text emphasis="muted">{current().status === 'done' ? 'Approved.' : `This gate is ${current().status}.`}</Text>}
+                    when={model.gateForm(current() as WorkflowStepProjection)}
+                    fallback={(
+                      <Show
+                        when={current().status === 'waiting-gate'}
+                        fallback={<Text emphasis="muted">{current().status === 'done' ? 'Approved.' : `This gate is ${current().status}.`}</Text>}
+                      >
+                        <Text>Waiting for you.</Text>
+                      </Show>
+                    )}
                   >
-                    <Text>Waiting for you.</Text>
+                    {(form) => <GateFormBody step={current()} form={form()} model={model} />}
                   </Show>
                 </Match>
 
@@ -409,6 +421,91 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
     </Show>
   )
 }
+
+/** A gate's form. While it waits: one field per declared field, filled with the frozen proposal,
+ *  with an Edited marker and Reset on each changed one. Approve stays disabled while any value is
+ *  refused, by the same check the node runs. Once answered: the approved values, edits marked. */
+function GateFormBody(props: { step: WorkflowStepRow; form: WorkflowGateForm; model: RunPaneModel }) {
+  const proposal = createMemo(() => readJson<Partial<GateFormProposal>>(props.step.inputsJson)?.form?.values ?? {})
+  const approved = createMemo(() => readJson<GateFormOutput>(props.step.structuredJson))
+  const draft = () => props.model.gateDraft(props.step.id) ?? proposal()
+  const [unparsed, setUnparsed] = createSignal<ReadonlySet<string>>(new Set())
+  const set = (name: string, value: DataValue | undefined): void => {
+    props.model.setGateDraft(props.step.id, { ...draft(), [name]: value })
+  }
+  const edited = (name: string): boolean => encode(draft()[name]) !== encode(proposal()[name])
+  const problems = createMemo(() => gateFormProblems(props.form, Object.fromEntries(
+    Object.entries(draft()).filter(([, value]) => value !== undefined),
+  )))
+  const blocked = () => unparsed().size > 0 || Object.keys(problems()).length > 0
+  const label = (field: WorkflowGateForm['fields'][number]) => field.label || field.name
+
+  return (
+    <Show
+      when={props.step.status === 'waiting-gate'}
+      fallback={(
+        <Show when={approved()} fallback={<Text emphasis="muted">{`This gate is ${props.step.status}.`}</Text>}>
+          {(output) => (
+            <Stack gap="row">
+              <Text emphasis="muted">{output().approved === 'autonomous' ? 'Approved without asking, because the run is autonomous.' : 'Approved.'}</Text>
+              <Facts
+                grouping="rows"
+                size="sm"
+                items={props.form.fields.map((field) => ({
+                  label: output().edited.includes(field.name) ? `${label(field)} (edited)` : label(field),
+                  value: output().values[field.name] === undefined ? '—' : display(output().values[field.name]!),
+                }))}
+              />
+            </Stack>
+          )}
+        </Show>
+      )}
+    >
+      <Stack gap="row">
+        <Text>Check these values, correct any that are wrong, then approve.</Text>
+        <For each={props.form.fields}>
+          {(field) => (
+            <Stack gap="row">
+              <TypedValueField
+                label={label(field)}
+                schema={field.schema}
+                required={field.required}
+                disabled={props.model.busy()}
+                value={draft()[field.name]}
+                onChange={(value) => set(field.name, value)}
+                onValidity={(valid) => setUnparsed((names) => {
+                  const next = new Set(names)
+                  if (valid) next.delete(field.name)
+                  else next.add(field.name)
+                  return next
+                })}
+              />
+              <Show when={field.description}><Text emphasis="muted" wrap>{field.description}</Text></Show>
+              <Show when={edited(field.name)}>
+                <Inline gap="inline">
+                  <Badge tone="accent" size="xs">Edited</Badge>
+                  <Button size="sm" variant="bare" disabled={props.model.busy()} onPress={() => set(field.name, proposal()[field.name])}>Reset</Button>
+                </Inline>
+              </Show>
+            </Stack>
+          )}
+        </For>
+        <Show when={Object.keys(problems()).length}>
+          <Text emphasis="muted" wrap>
+            {props.form.fields.filter((field) => problems()[field.name]).map((field) => `${label(field)}: ${problems()[field.name]}`).join(' ')}
+          </Text>
+        </Show>
+        <Inline gap="inline">
+          <Button size="sm" variant="solid" disabled={props.model.busy() || blocked()} onPress={() => void props.model.gate(true, draft())}>Approve</Button>
+          <Button size="sm" tone="danger" disabled={props.model.busy()} onPress={() => void props.model.gate(false)}>Reject</Button>
+        </Inline>
+      </Stack>
+    </Show>
+  )
+}
+
+const encode = (value: DataValue | undefined): string | undefined => value === undefined ? undefined : JSON.stringify(value)
+const display = (value: DataValue): string => typeof value === 'string' ? value : JSON.stringify(value)
 
 /** The provider, the model, and the last thing the agent said. */
 function AgentBody(props: { step: WorkflowStepRow; structured: unknown }) {

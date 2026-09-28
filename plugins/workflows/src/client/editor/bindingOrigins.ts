@@ -2,6 +2,7 @@ import type { BindingOrigin } from '@acorn/plugin-api/client'
 import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
 import type { StepKindDescription, WorkflowCatalog, WorkflowDef, WorkflowStepDef } from '../../shared/workflowContracts'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
+import { declaredOutputSchema } from '../../shared/gateForm'
 import { stepIdentity } from '../../shared/workflowIdentity'
 import { precedes } from './draft'
 
@@ -10,10 +11,8 @@ const describedKind = (step: WorkflowStepDef, catalog: WorkflowCatalog | undefin
   return catalog?.kinds.find(entry => entry.id === kind)?.describe ?? BUILTIN_STEP_DESCRIPTIONS[kind]
 }
 
-export const workflowOutputSchema = (step: WorkflowStepDef, catalog: WorkflowCatalog | undefined): DataSchema | undefined => {
-  if (step.schema) return step.schema as DataSchema
-  return describedKind(step, catalog)?.output?.schema as DataSchema | undefined
-}
+export const workflowOutputSchema = (step: WorkflowStepDef, catalog: WorkflowCatalog | undefined): DataSchema | undefined =>
+  declaredOutputSchema(step, describedKind(step, catalog)?.output?.schema)
 
 const unescapePointer = (value: string) => value.replace(/~1/g, '/').replace(/~0/g, '~')
 

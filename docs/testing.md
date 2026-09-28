@@ -754,7 +754,11 @@ Run them on the desktop and in `acorn` in a terminal.
     worktree-isolated agent step and check the conversation you get is the child task's.
 52. Let the run reach the gate. The bell rings, and the row in it lands on the gate node with Approve
     and Reject in front of you; the inbox has the same row and it stays there until you answer.
-    Approve, and the run finishes and keeps a notice.
+    Approve, and the run finishes and keeps a notice. Then run a definition whose gate has a form
+    bound to an agent step's structured output, and a later step bound to the gate's `/values`. The
+    gate node shows the proposed values. Edit one, check it is marked **Edited** and that **Reset**
+    restores it, edit it again, and approve. Confirm the later step received the edited value, and
+    that the terminal client draws the same form.
 53. Make one node fail, by pointing its command at something that exits non-zero. The pane offers
     **Retry**, and an agent node also offers **Retry with edited prompt**; both put the run back to
     running from that node. Then check the pane is not there at all on a task that has never run a
