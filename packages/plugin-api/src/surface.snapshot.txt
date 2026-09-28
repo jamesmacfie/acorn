@@ -522,6 +522,7 @@ node: parseDataSchema
 node: parseDataValue
 node: parseJson
 node: parseVersionedDataValue
+node: pastedContent
 node: patchBlobKey
 node: portableCarrier
 node: profileAvailable

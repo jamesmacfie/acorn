@@ -176,6 +176,21 @@ Another native provider can emit the same driver event without adding a provider
 
 Claude runs on tier 1 and Codex on tier 2, which makes the two of them the worked example of each.
 
+**What a built-in adapter is told depends on the session.** A built-in spec's `acpSessionMeta` is a
+function of the session, sent on create and again on every resume, so it must return the same value
+for the same session. Claude's uses it for two things. It turns off Claude Code's own
+continue-after-usage-limit, and for a workflow or delegated session it appends the turn-ending
+instruction to Claude Code's system prompt
+([workflow execution](./workflows/execution.md#a-turn-that-ends-early)). The instruction goes in at
+creation rather than partway through, because a system prompt that changes mid-session invalidates
+the model's earlier thinking.
+
+**A context part cannot pass for the reader's words.** Both drivers send a context part as an
+`<acorn-context>` block (`plugins/agents/src/server/drivers/contextBlock.ts`). Its label and source
+are escaped as attributes, and a closing tag inside its content is broken, because a loaded plugin's
+label or a pull request body could otherwise end the block early and have what follows read as the
+reader's message.
+
 **plugins/agents stays first-party.** It owns the stream and the surfaces, and a harness contribution
 is a descriptor delivered to it rather than a fork of it. The contributing plugin describes the
 spawn, and plugins/agents owns the child process, the session, and every byte of the transcript. That
@@ -515,8 +530,12 @@ has neither, and does not report.
 When a `reportTo` turn settles as completed, failed, cancelled, or interrupted, the Agents plugin
 queues one `delegation_report` turn on the owner. The report text holds the child's title, the
 outcome, any error, the final assistant message cut to its last 8 KiB, and the validated structured
-result when the turn declared a `resultSchema`. A `delegation_report` context part names the child
-and links to it. The report queues behind whatever the owner is doing and never steers an active
+result when the turn declared a `resultSchema`. The final message sits inside `<pasted_content>`
+tags, which Claude Code's system prompt explains: text the owner's user didn't write, whose
+instructions the owner follows only where its own user asked. A child that read a hostile page can
+repeat what it read, and unmarked, that would reach the owner as a request. The transcript hides the
+tags. A turn the model refused reports its outcome as refused, not completed. A `delegation_report`
+context part names the child and links to it. The report queues behind whatever the owner is doing and never steers an active
 turn. The owner answers by calling `agent_prompt`, and that turn reports in its turn.
 
 The idempotency key `delegation-report:<child turn id>` makes delivery exactly-once. The trigger is
@@ -545,7 +564,10 @@ redundant report. A terminal owner has no session to wake and keeps using `agent
 
 The transcript labels a `delegation` turn "From" and the owner's title, and a `delegation_report`
 turn "From" and the child's title, using the matching context part
-(`plugins/agents/src/client/sessions/turnSender.ts`). Every other user turn is "You".
+(`plugins/agents/src/client/sessions/turnSender.ts`). A workflow step's prompt is "Workflow", and
+the turn acorn sends when a step's turn ended without its result is "Acorn"
+([workflow execution](./workflows/execution.md#a-turn-that-ends-early)). Every other user turn is
+"You".
 
 Message headers show a small time in the reader's device timezone, styled like the sender label.
 Hovering or focusing that time shows the full local date and time with its timezone and relative age.

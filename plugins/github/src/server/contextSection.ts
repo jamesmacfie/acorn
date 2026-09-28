@@ -1,7 +1,7 @@
 // The `pr` context section (docs/agent-tools.md § Context sections). Its rows are this plugin's
 // (`repos ⋈ pull_requests ⋈ pr_files` in github.sqlite), so its shape lives here rather than in core.
 // Core keeps the assembly, the order and the byte ceiling.
-import { truncateBytes, type PluginContextSection } from '@acorn/plugin-api/node'
+import { pastedContent, truncateBytes, type PluginContextSection } from '@acorn/plugin-api/node'
 
 export type ContextPullRequestSource = (
   userId: string,
@@ -30,8 +30,10 @@ export function pullRequestSection(source: ContextPullRequestSource): PluginCont
       const item = items[0]
       if (!item) return ''
       const lines = [`## PR ${item.label}`]
+      // The body is the author's, not the reader's, so it is marked as text the model should not take
+      // instructions from. Tags are stripped first, which also keeps a forged closing tag out.
       const body = item.body?.replace(/<[^>]+>/g, '').trim()
-      if (body) lines.push(truncateBytes(body, 600))
+      if (body) lines.push(pastedContent(truncateBytes(body, 600)))
       const files = item.details ?? []
       if (files.length) {
         const shown = files.slice(0, 30)

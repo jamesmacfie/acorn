@@ -26,6 +26,7 @@ import {
 import { harnessCapabilities, type HarnessLaunchSpec } from './harness'
 import type { AgentDriver, AgentDriverMcpServer, AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from './types'
 import { providerStderrNotice } from './diagnostics'
+import { contextBlock } from './contextBlock'
 
 // Same tag as codexDriver's: both are this plugin talking about a provider child process.
 const log = createLogger('agents:provider', 'agents')
@@ -73,7 +74,7 @@ function acpPrompt(
       case 'context':
         return {
           type: 'text',
-          text: `<acorn-context source="${part.source}" label="${part.label}">\n${part.content}\n</acorn-context>`,
+          text: contextBlock(part),
         }
       case 'file':
         return {
@@ -322,12 +323,13 @@ export class AcpDriver implements AgentDriver {
     // a harness that registers them through its CLI's own config file gets none here, so nothing is
     // offered twice (docs/mcp.md § Configuration).
     const mcpServers = acpMcpServers(options.mcpServers)
+    const sessionMeta = this.spec.acpSessionMeta?.(options.session)
     const createSession = async (): Promise<void> => {
       const created = await agent.newSession({
         cwd: options.cwd,
         additionalDirectories: [],
         mcpServers,
-        ...(this.spec.acpSessionMeta ? { _meta: this.spec.acpSessionMeta } : {}),
+        ...(sessionMeta ? { _meta: sessionMeta } : {}),
       })
       providerSessionRef = created.sessionId
       configOptions = created.configOptions ?? []
@@ -343,7 +345,7 @@ export class AcpDriver implements AgentDriver {
         // it was told about, because the token in one of them is minted per start and the old one is
         // already dead.
         mcpServers,
-        ...(this.spec.acpSessionMeta ? { _meta: this.spec.acpSessionMeta } : {}),
+        ...(sessionMeta ? { _meta: sessionMeta } : {}),
       }
       try {
         const reconnected = supportsResume
