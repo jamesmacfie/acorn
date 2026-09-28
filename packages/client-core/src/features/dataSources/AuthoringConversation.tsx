@@ -37,6 +37,8 @@ export type AuthoringConversationProps = {
   base: unknown
   label: string
   disabled?: boolean
+  /** Drawn without its own fold, for a host that already frames it, such as a modal with a title. */
+  bare?: boolean
   /** Narrow injection seam for the component's own tests and embedding hosts. */
   sendTurn?(request: AuthoringTurnRequest, signal: AbortSignal): Promise<AuthoringTurnResult>
   onApply(proposal: Extract<AuthoringTurnResult, { state: 'proposal' }>): Promise<string | undefined> | string | undefined
@@ -131,7 +133,7 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
     setStatus('Applied as one undoable draft edit.')
   }
 
-  return <Fold label={`AI authoring · ${props.label}`} level="group" defaultOpen>
+  const body = (
     <Stack gap="row">
       <ModelBackendPicker backends={backends()} backendId={backendId()} modelId={modelId()} onChange={next => {
         setChoice(next)
@@ -174,5 +176,6 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
         </Alert>}</Show>
       <Show when={stopped()}>{value => <Alert tone="warn">{value().reason}</Alert>}</Show>
     </Stack>
-  </Fold>
+  )
+  return props.bare ? body : <Fold label={`AI authoring · ${props.label}`} level="group" defaultOpen>{body}</Fold>
 }
