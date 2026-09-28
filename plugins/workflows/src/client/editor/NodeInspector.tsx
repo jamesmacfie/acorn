@@ -28,6 +28,7 @@ import AgentNodeForm from './AgentNodeForm'
 import BranchesField from './BranchesField'
 import DefinitionInspector from './DefinitionInspector'
 import InputsInspector from './InputsInspector'
+import GateFormEditor from './GateFormEditor'
 import WorkflowDispatchForm from './WorkflowDispatchForm'
 import StepConfigurationFields from './StepConfigurationFields'
 import StepPreview from './StepPreview'
@@ -244,6 +245,16 @@ export default function NodeInspector(props: {
                 disabled={props.readOnly}
                 onChange={(patch) => props.actions.setStep(stepIdentity(current()), patch)}
                 onCreateChild={(schema) => props.actions.createChild(stepIdentity(current()), schema)}
+              />
+            </Show>
+
+            <Show when={kindOf(current()) === 'gate-human'}>
+              <GateFormEditor
+                def={def()}
+                step={current()}
+                catalog={props.catalog}
+                disabled={props.readOnly}
+                onChange={(form) => props.actions.setStep(stepIdentity(current()), { form })}
               />
             </Show>
 

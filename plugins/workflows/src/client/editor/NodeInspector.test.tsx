@@ -275,3 +275,32 @@ describe('typed data fields', () => {
     expect(document.body.textContent).toContain('ref')
   })
 })
+
+describe('a human gate', () => {
+  const gateDef = (form?: unknown): WorkflowDef => ({
+    baseline: 'acorn-1', formatVersion: 1, name: 'W',
+    steps: [
+      { id: 'draft', name: 'draft', prompt: 'Draft it.', schema: { type: 'object', properties: { title: { type: 'string' } } } },
+      { id: 'approve', name: 'approve', kind: 'gate-human', after: ['draft'], ...(form ? { form } : {}) },
+    ],
+  } as WorkflowDef)
+  const press = (label: string) => [...host.querySelectorAll('button')].find((el) => el.textContent?.trim() === label)!.click()
+
+  it('adds a form, and lists each field with where its proposal comes from', async () => {
+    mount(gateDef(), [], 'approve')
+    await settle()
+    press('Add a form')
+    expect(noActions.setStep).toHaveBeenLastCalledWith('approve', { form: { fields: [{ name: 'value', schema: { type: 'string' } }] } })
+
+    dispose?.()
+    host.remove()
+    mount(gateDef({
+      fields: [{ name: 'title', label: 'Title', schema: { type: 'string' } }, { name: 'note', schema: { type: 'string' } }],
+      values: { title: { address: { from: 'step', stepId: 'draft', pointer: '/title' } } },
+    }), [], 'approve')
+    await settle()
+    expect(host.textContent).toContain('Title: draft/title')
+    expect(host.textContent).toContain('note: left for the reviewer to fill')
+    expect(host.textContent).toContain('values.title')
+  })
+})
