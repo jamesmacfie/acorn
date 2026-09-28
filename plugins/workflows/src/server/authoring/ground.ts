@@ -1,28 +1,11 @@
-// Reading the answer to the prompt next door (docs/workflows.md § Authoring): strip the fence, find
-// the object, parse it, and ground it against the catalog this node really has.
+// Parse and ground model replies before validation, so repair sees the definition that would be
+// applied. Grounding removes unknown catalog values and keys; graph and budget errors stay for the
+// workflow validator to explain. An invented kind becomes an agent step because deleting it would
+// break references from other steps.
 //
-// Pure, like ./generate.ts and for the same reason: the contract with the model is the
-// product, so it has to be table-testable with no provider and no database.
-//
-// The order is fixed. Strip, extract, parse, ground, and only then validate. Grounding runs before
-// the checker so the repair pass sees the problems of the definition we would actually apply.
-//
-// Grounding touches catalog identifiers and keys outside the workflow vocabulary. A decide with
-// no branches, a widened budget, a duplicate step ID and a cycle are all left where they are. The
-// checker already says something better about each of them than this file could invent, and the
-// repair pass sends those messages back verbatim (../validation/definition.ts).
-//
-// Nothing here deletes a step. An invented kind becomes an agent step rather than a hole, because a
-// deletion cascades through every `after` and `branches` target that names it. The one exception
-// is an array entry that is not a step at all, which is dropped while parsing, before any name can
-// point at it.
-//
-// One false positive is known and accepted. A contributed kind's `with` is checked against the
-// fields its description lists, and `http:request` leaves `auth` and `vars` out of those fields on
-// purpose, because neither is a field a form can draw. So a generated step that writes `with.auth`
-// loses it and gets a note. The alternative is to check no `with` key at all, and an unknown `with`
-// key is the one mistake that passes every validator and every handler in silence, which is the
-// class this file exists for.
+// Contributed `with` keys must appear in the kind description. `http:request` leaves `auth` and
+// `vars` out of that description because the editor cannot draw them, so generation drops those
+// keys with a note. This keeps unknown `with` keys from passing through without validation.
 import type { WorkflowGenerateNote, WorkflowGenerateNoteCode } from '../../shared/api'
 import type {
   WorkflowCatalog,
@@ -30,7 +13,7 @@ import type {
   WorkflowInput,
   WorkflowStepDef,
 } from '../../shared/workflowContracts'
-import { FORBIDDEN_KEYS } from './generate'
+import { FORBIDDEN_KEYS } from './generate/forbiddenKeys'
 import { groundWorkflowDispatch } from './groundDispatch'
 
 export type GroundedWorkflow = { def: WorkflowDef; notes: WorkflowGenerateNote[] }

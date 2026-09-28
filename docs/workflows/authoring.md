@@ -211,6 +211,12 @@ wrong on its own. The definition being edited is left out of its own examples, a
 definition that does not itself pass the checker: a workspace's broken workflow is the wrong thing to
 learn house style from.
 
+`plugins/workflows/src/server/authoring/generate.ts` is the prompt API. Its private `generate/`
+modules own the fixed teaching text, catalog rendering, example selection, and prompt assembly.
+`generationRequest.ts` makes the model calls, and `ground.ts` checks the reply against the same
+forbidden-key list used by kind rendering. A prompt digest test pins the complete system, edit, and
+repair text because whitespace and section order affect model behavior and provider cache keys.
+
 Generation also receives the selected project's bounded child workflow catalog. It contains the
 same references, input signatures, and output schemas that the child workflow picker uses. Grounding
 removes a reference outside that catalog, an input binding the target does not declare, and a source

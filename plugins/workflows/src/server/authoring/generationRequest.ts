@@ -2,7 +2,7 @@
 // the answer, and give the model one chance to fix what the checker found.
 //
 // The only impure thing here is the injected `generateText`, which is `core.models.generateText`
-// with the owner already bound. Everything it depends on — the prompt in ./generate.ts, the
+// with the owner already bound. Everything it depends on — prompts in ./generate/prompts.ts, the
 // reader in ./ground.ts, the checker in ../validation/definition.ts — is pure, so this file is
 // testable against a fake and never needs a provider.
 //
