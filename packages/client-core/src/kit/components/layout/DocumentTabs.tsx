@@ -36,6 +36,8 @@ export function DocumentTabs(props: {
   actions?: JSX.Element
   idPrefix: string
   ariaLabel: string
+  /** A strip that is the pane's header rather than navigation below one. */
+  level?: 'pane'
 }) {
   let stripRef: HTMLDivElement | undefined
 
@@ -52,7 +54,7 @@ export function DocumentTabs(props: {
   }
 
   return (
-    <div class="ui-doctabs">
+    <div class="ui-doctabs" data-level={props.level}>
       <div
         ref={stripRef}
         class="ui-tab-scroll ui-doctabs-strip"

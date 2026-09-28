@@ -163,6 +163,10 @@ it fails for any reason a selection can break, not only for the one it was writt
   place. A call's parameters and output sit behind a disclosure toggle, and a call with nothing to show
   for either renders as a flat row instead, so no card opens onto nothing. A provider reports a status
   only when it changes, so an update carrying nothing but output leaves the last reported status alone.
+- Claude's `Skill` call uses the skill name in its recorded JSON input for the built-in card's label:
+  **Launching skill: readable** rather than **Skill**. Opening the card shows the original JSON.
+  If the provider's output repeats that same sentence, the expanded body omits the duplicate. This is
+  a presentation rule, so previously recorded calls gain the label without changing stored events.
 - Whether that toggle starts open is the reader's setting, **Tool call display** in Settings -> Agent
   defaults: start collapsed, start expanded, or carry the reader's last toggle forward. It is a device
   preference (`agent_tool_fold`), so it sits on that page beside settings the node keeps. The default is
