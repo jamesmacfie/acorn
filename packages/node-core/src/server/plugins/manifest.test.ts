@@ -1778,3 +1778,18 @@ describe('declared dependencies', () => {
     expect(requires([{ id: 'agents', version: '^1.2.0' }]).success).toBe(false)
   })
 })
+
+it('reports cross-field errors in author-facing order with their descriptor paths', () => {
+  const result = parsePluginManifest({
+    id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '2',
+    requires: { plugins: [{ id: 'board' }] },
+    contributions: {
+      frames: [{ target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com', hosts: ['docs.example.com'] }],
+      commands: [{ id: 'open', kind: 'action', title: 'Open', action: { verb: 'openPane', pane: 'missing' } }],
+    },
+  })
+  expect(result).toEqual({
+    ok: false,
+    reason: 'acorn-plugin.json does not match the manifest schema — requires.plugins[0].id: a plugin cannot require itself; contributions.frames[0]: a webview surface needs a client bundle; declare `client` in the manifest; contributions.commands[0].action.pane: openPane names \'missing\', which this manifest does not declare as a task-scoped pane',
+  })
+})
