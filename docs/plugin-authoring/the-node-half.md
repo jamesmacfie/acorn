@@ -385,7 +385,9 @@ an overlay in, so leave your static preview up there rather than showing a contr
 ### Reaching the bridge
 
 In-repo bundles import `connect()`, `mountFrame()` and `mountTree()` from `@acorn/plugin-api/ui/sdk`,
-and the tree path's nodes and `solidTree()` from `@acorn/plugin-api/ui/tree`. **A hand-written
+and the tree path's nodes and `solidTree()` from `@acorn/plugin-api/ui/tree`. `connect()` is for a
+frame. A tree uses the `bridge` its renderer is mounted with, because the host refuses requests on the
+bundle's shared port, which is what `connect()` returns in a worker. **A hand-written
 `client.js` cannot.** That is a bare specifier with no bundler to resolve it, and the origin would have
 nowhere to serve the resolved file from even if there were. Copying the SDK's source in is not an
 option either: `packages/client-core/src/host/frames/sdk.ts` is TypeScript and imports from

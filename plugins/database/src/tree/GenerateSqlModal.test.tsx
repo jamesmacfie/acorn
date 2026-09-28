@@ -5,8 +5,7 @@ import { solidTree } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import GenerateSqlModal, { errorMessage } from './GenerateSqlModal'
 
-const { generateSql } = vi.hoisted(() => ({ generateSql: vi.fn() }))
-vi.mock('./databaseClient', () => ({ generateSql }))
+const generateSql = vi.fn()
 
 // What a failed generate reads as. A table rather than a render: the mapping is a pure function and
 // each row is one sentence. A `.test.tsx` because the module it comes from draws kit nodes, and only
@@ -50,6 +49,7 @@ it('keeps the dialog open until an in-flight generation writes its result', asyn
     entry: 'generate',
     root,
     props: () => ({
+      client: { generateSql },
       taskId: 'task-1',
       backends: [{ id: 'harness:test', kind: 'harness', label: 'Test', models: [], defaultModelId: '' }],
       queries: [],

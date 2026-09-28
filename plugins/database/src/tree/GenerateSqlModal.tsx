@@ -6,7 +6,7 @@ import {
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { DbSavedQuery } from '../shared/database'
 import { GENERATE_MAX_PROMPT_CHARS } from '../shared/database'
-import { generateSql } from './databaseClient'
+import type { DatabaseClient } from './databaseClient'
 
 // Describe a query in words, get SQL. The prompt is built on the node from the live schema, the repo's
 // schema notes and any saved queries picked as examples; the key never comes near this frame.
@@ -18,6 +18,7 @@ export const errorMessage = (e: unknown, backend?: Pick<ModelBackend, 'kind' | '
 }
 
 export default function GenerateSqlModal(props: {
+  client: Pick<DatabaseClient, 'generateSql'>
   taskId: string
   backends: ModelBackend[]
   queries: readonly DbSavedQuery[]
@@ -55,7 +56,7 @@ export default function GenerateSqlModal(props: {
     setBusy(true)
     setError('')
     try {
-      const res = await generateSql(props.taskId, {
+      const res = await props.client.generateSql(props.taskId, {
         backendId: backendId(),
         ...(modelId() ? { modelId: modelId() } : {}),
         prompt: prompt().trim(),

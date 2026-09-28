@@ -17,7 +17,7 @@
 import { createEffect, createMemo, createResource, createRoot, createSignal, onCleanup } from 'solid-js'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import { fromCurl, toCurl, type HttpRequest, type SendResult } from '../shared/model'
-import { createRequest, deleteRequest, listRequests, sendRequest, updateRequest } from './httpClient'
+import { httpClient } from './httpClient'
 import { draftsDiffer, emptyDraft, toDraft, toSendInput, type Draft } from './draft'
 import type { SaveTarget } from './SaveRequestModal'
 
@@ -71,6 +71,8 @@ export const _resetHttpPanelModel = (): void => {
 
 function build(subject: PanelSubject) {
   const { bridge, projectId, projectName, taskId } = subject
+  const client = httpClient(bridge)
+  const { createRequest, deleteRequest, listRequests, sendRequest, updateRequest } = client
   const blank = () => emptyDraft(taskId ?? null)
   const [selection, setSelection] = createSignal<Selection>({ kind: 'new' })
   const [draft, setDraft] = createSignal<Draft>(blank())
@@ -231,6 +233,7 @@ function build(subject: PanelSubject) {
   const copyAsCurl = () => copy(toCurl(draft()))
 
   return {
+    client,
     projectId,
     projectName,
     taskId,
