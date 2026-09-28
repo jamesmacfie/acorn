@@ -3,13 +3,13 @@
 // review rows in github" split would be a redesign of the component, and the changes pane already
 // renders NonCodeRow today. What each surface actually varies is passed in as props (composers,
 // resolve/reply callbacks, gap expansion), so nothing here reaches back into a plugin.
-import { createEffect, createSignal, For, Match, on, Show, Switch } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from 'solid-js'
 import CopyButton from '../components/inputs/CopyButton'
 import { fileStatusMeta } from '../lib/displayMeta'
 import MentionTextarea from '../components/inputs/MentionTextarea'
 import type { DiffFile, DiffThread } from './diffModel'
 import { UserAvatar } from '../components/content/UserAvatar'
-import { fileAnchor, type CodeRow, type FileRow, type GapRow, type HunkRow, type LoadDiffRow, type LoadDiffStatus, type Row, type ThreadRowT } from './diffModel'
+import { buildDiffRows, fileAnchor, isCodeRow, plainTokenize, type CodeRow, type FileRow, type GapRow, type HunkRow, type LoadDiffRow, type LoadDiffStatus, type Row, type ThreadRowT } from './diffModel'
 import { markTokens, type FindHighlight } from './find'
 import { persistDraft } from '../lib/draftState'
 import { Button } from '../components/primitives'
@@ -182,6 +182,53 @@ export function DiffLine(props: {
         <LineComposer addComment={props.addComment} onMutated={props.onMutated} composer={props.composer!} mentions={props.mentions ?? []} />
       </Show>
     </>
+  )
+}
+
+/**
+ * One file's patch as a read-only stacked diff in normal document flow: the file header, then its
+ * hunks. No comments, no gap expansion, no split view and no virtual list, for a surface that shows a
+ * small patch inside something else, such as an agent's step in its thread. Rows are built when this
+ * mounts, so put it inside a closed Fold and a long thread of them costs nothing until one is opened.
+ * Plain text, since the highlighter is asynchronous and these are short.
+ *
+ * `lineNumbers={false}` blanks both number columns, for hunks whose numbers count from the top of an
+ * excerpt rather than the file.
+ */
+export function StackedDiff(props: { path: string; patch: string; lineNumbers?: boolean }) {
+  const rows = createMemo(() => {
+    const file = { path: props.path, status: null, additions: null, deletions: null, sha: null, viewed: false, patch: props.patch }
+    return buildDiffRows(file, plainTokenize).flatMap<HunkRow | CodeRow>((row) => {
+      if (row.kind === 'hunk') return [row]
+      if (!isCodeRow(row)) return []
+      return [props.lineNumbers === false ? { ...row, oldNo: null, newNo: null } : row]
+    })
+  })
+  const head = createMemo(() => ({
+    path: props.path,
+    status: /^@@ -0,0 /.test(props.patch) ? 'added' : / \+0,0 @@/.test(props.patch) ? 'removed' : null,
+    additions: rows().filter((row) => row.kind === 'insert').length,
+    deletions: rows().filter((row) => row.kind === 'delete').length,
+  }))
+  return (
+    <div class="diff diff-stacked">
+      <div class="diff-rows">
+        <div class="diff-row diff-file-row"><FileHead file={head()} /></div>
+        <For each={rows()}>
+          {(row) => (
+            <Show when={isCodeRow(row) ? row : null} fallback={
+              <div class="diff-row diff-hunk"><span class="diff-hunk-text">{(row as HunkRow).text}</span></div>
+            }>
+              {(code) => (
+                <div class="diff-row" classList={{ 'diff-add': code().kind === 'insert', 'diff-del': code().kind === 'delete' }}>
+                  <DiffLine r={code()} canAdd={false} addComment={async () => {}} onMutated={() => {}} />
+                </div>
+              )}
+            </Show>
+          )}
+        </For>
+      </div>
+    </div>
   )
 }
 

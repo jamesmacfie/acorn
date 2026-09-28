@@ -911,6 +911,9 @@ importers:
       '@xterm/headless':
         specifier: 5.5.0
         version: 5.5.0
+      diff:
+        specifier: ^9.0.0
+        version: 9.0.0
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(pg@8.22.0)

@@ -80,6 +80,64 @@ describe('ACP tool call normalization', () => {
   })
 })
 
+// Shapes from Claude's adapter 0.54.1 (dist/tools.js): `Edit` sends its old and new strings when the
+// call starts, `Write` sends the whole file with no old text, and the PostToolUse hook sends one block
+// per real hunk, with the hunk's first line in `locations`.
+describe('an ACP diff becomes a patch', () => {
+  const changes = (update: SessionUpdate) =>
+    normalizeAcpUpdate(update, 'Claude Code').filter((event) => event.type === 'file_change')
+
+  it('marks an edit’s excerpt, whose line numbers are not the file’s', () => {
+    expect(changes({
+      sessionUpdate: 'tool_call',
+      toolCallId: 'toolu_1',
+      title: 'Edit a.ts',
+      content: [{ type: 'diff', path: '/w/a.ts', oldText: 'keep\nold', newText: 'keep\nnew' }],
+      locations: [{ path: '/w/a.ts' }],
+    })).toEqual([{
+      type: 'file_change',
+      path: '/w/a.ts',
+      patch: '@@ -1,2 +1,2 @@\n keep\n-old\n+new',
+      changeId: 'toolu_1',
+      snippet: true,
+      summary: 'Claude Code updated a file.',
+      subagentId: undefined,
+    }])
+  })
+
+  it('reads a missing old text as a new file, numbered from its first line', () => {
+    const [change] = changes({
+      sessionUpdate: 'tool_call',
+      toolCallId: 'toolu_2',
+      title: 'Write b.ts',
+      content: [{ type: 'diff', path: '/w/b.ts', oldText: null, newText: 'one\ntwo\n' }],
+      locations: [{ path: '/w/b.ts' }],
+    })
+    expect(change).toMatchObject({ path: '/w/b.ts', patch: '@@ -0,0 +1,2 @@\n+one\n+two', changeId: 'toolu_2' })
+    expect(change).not.toHaveProperty('snippet')
+  })
+
+  it('places the finished edit’s hunks where they are in the file, as one change', () => {
+    const [change, ...rest] = changes({
+      sessionUpdate: 'tool_call_update',
+      toolCallId: 'toolu_1',
+      content: [
+        { type: 'diff', path: '/w/a.ts', oldText: 'k1\nold', newText: 'k1\nnew\nextra' },
+        { type: 'diff', path: '/w/a.ts', oldText: 'k2\nq', newText: 'k2\nr' },
+      ],
+      locations: [{ path: '/w/a.ts', line: 10 }, { path: '/w/a.ts', line: 40 }],
+    })
+    expect(rest).toEqual([])
+    // The second hunk's old side starts a line earlier, because the first one added a line.
+    expect(change).toMatchObject({
+      path: '/w/a.ts',
+      patch: '@@ -10,2 +10,3 @@\n k1\n-old\n+new\n+extra\n@@ -39,2 +40,2 @@\n k2\n-q\n+r',
+      changeId: 'toolu_1',
+    })
+    expect(change).not.toHaveProperty('snippet')
+  })
+})
+
 // Driven by a real capture rather than hand-written shapes. `_meta.claudeCode` is an extension bag, so
 // hand-writing what we hope is in it only tests our hopes; the fixture is what Claude Code 2.1.241
 // with adapter 0.54.1 actually sent for a two-subagent fan-out.

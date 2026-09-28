@@ -7,7 +7,7 @@ import {
   COLLECTION_INTENTS, createCollectionIntents, type CollectionItem,
 } from '@acorn/client-core/kit/keys'
 import type { Intent } from '@acorn/client-core/kit/keys'
-import { diffRowsFromPlain, type CodeRow, type DiffFile, type Row as DiffRowT } from '@acorn/client-core/kit/diff/diffModel.ts'
+import { buildDiffRows, diffRowsFromPlain, isCodeRow, plainTokenize, type CodeRow, type DiffFile, type HunkRow, type Row as DiffRowT } from '@acorn/client-core/kit/diff/diffModel.ts'
 import { segmentContentKey, type DiffDocumentFile, type DiffDocumentTopology, type DiffSegmentPayload, type DiffSegmentRequest } from '@acorn/diff-document/document'
 import type { PluginAnnotationKey } from '@acorn/protocol/extensionPoints.ts'
 import { annotationKey } from '@acorn/client-core/host/annotations/annotationKey.ts'
@@ -930,6 +930,31 @@ export function NonCodeRow(props: { row: Exclude<DiffRowT, CodeRow> }) {
     }
   }
   return <text flexShrink={0} wrapMode="none" {...runStyle('muted')}>{text()}</text>
+}
+
+/** reduced: the header and the lines above, stacked in a column, with the same losses as each. */
+export function StackedDiff(props: { path: string; patch: string; lineNumbers?: boolean }) {
+  const rows = createMemo(() => {
+    const file = { path: props.path, status: null, additions: null, deletions: null, sha: null, viewed: false, patch: props.patch }
+    return buildDiffRows(file, plainTokenize).flatMap<HunkRow | CodeRow>((row) => {
+      if (row.kind === 'hunk') return [row]
+      if (!isCodeRow(row)) return []
+      return [props.lineNumbers === false ? { ...row, oldNo: null, newNo: null } : row]
+    })
+  })
+  const head = () => ({
+    path: props.path,
+    additions: rows().filter((row) => row.kind === 'insert').length,
+    deletions: rows().filter((row) => row.kind === 'delete').length,
+  })
+  return (
+    <box flexDirection="column" flexShrink={0}>
+      <FileHead file={head()} />
+      <For each={rows()}>
+        {(row) => (isCodeRow(row) ? <DiffLine r={row} /> : <NonCodeRow row={row as Exclude<DiffRowT, CodeRow>} />)}
+      </For>
+    </box>
+  )
 }
 
 /** absent: side-by-side needs 160 cells, so a terminal diff is unified. */

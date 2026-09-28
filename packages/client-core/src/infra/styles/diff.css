@@ -24,11 +24,11 @@
    scrolls to, so the width goes back to being slightly jumpy for that one line rather than the
    text becoming unreachable. */
 .diff-rows { position: relative; width: 100%; min-width: calc(var(--diff-chrome-w) + var(--diff-cols, 0) * 1ch); }
-/* Read-only compare preview (create mode) and the changes pane: same rows in normal document flow
-   instead of the virtualizer's absolute positioning. In flow the rows really do size the canvas, so
-   ask them rather than the column count, since there is no virtual window here to make that unstable. */
-.compare-diff .diff-rows { position: static; min-width: max-content; }
-.compare-diff .diff-row { position: static; transform: none; }
+/* StackedDiff (kit/diff/DiffRows.tsx): the same rows in normal document flow instead of the
+   virtualizer's absolute positioning. In flow the rows really do size the canvas, so ask them rather
+   than the column count, since there is no virtual window here to make that unstable. */
+.diff-stacked .diff-rows { position: static; min-width: max-content; }
+.diff-stacked .diff-row { position: static; transform: none; }
 /* One virtual item: a file header, a segment of up to 64 rows, or a slice of an expanded gap. The
    item is positioned; the rows inside it are in normal flow, so a segment is as tall as its rows and
    any thread or note among them (docs/diff-rendering.md § Row geometry). */
