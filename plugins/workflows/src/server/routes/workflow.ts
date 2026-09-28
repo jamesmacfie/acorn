@@ -178,7 +178,10 @@ export const workflow = new Hono<AppEnv>()
       c.req.param('runId'), c.req.param('recordId'), parsed.data.digest, parsed.data.requestId,
     ) ?? Promise.resolve(null))
   })
+  // A gate answer is a device action too. The gate exists to stop the agent working in the run, so
+  // the agent's own task credential must not be able to approve it or reject it.
   .post('/workflows/runs/:runId/gate', async (c) => {
+    if (isTaskConfined(c)) return respondError(c, 403, 'forbidden')
     const parsed = gateBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, WORKFLOW_ROUTE, (b) => b.gate(c.req.param('runId'), parsed.data.stepId, parsed.data.approved))

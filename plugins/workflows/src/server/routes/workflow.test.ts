@@ -268,13 +268,25 @@ describe('a task-scoped credential is confined to its own runs', () => {
     expect(await (await asTask1().fetch(req('/api/workflows/runs/run1/step-statuses'), {} as Env)).json()).toEqual({ steps: [{ id: 's1', status: 'waiting-gate' }], truncated: false })
   })
 
-  // Retry is the one run action a confined caller may not take, even on its own run: an agent could
-  // otherwise loop a failed step straight past the rail that stopped it.
+  // Retry and gate are the run actions a confined caller may not take, even on its own run. Both move
+  // a run past a check that exists to stop the agent: a retry would loop a failed step straight past
+  // the rail that stopped it, and a gate answer would turn a human gate into no gate. Cancel and
+  // kill stay open because both only stop work.
   it('cannot retry even its own run', async () => {
     const calls: string[] = []
     setWorkflowBridge(fake({ retry: async (runId) => (calls.push(`retry:${runId}`), { ok: true }) }))
     const res = await asTask1().fetch(req('/api/workflows/runs/run1/retry', 'POST', { stepId: 's' }), {} as Env)
     expect(res.status).toBe(403)
+    expect(calls).toEqual([])
+  })
+
+  it('cannot approve or reject a gate even on its own run', async () => {
+    const calls: string[] = []
+    setWorkflowBridge(fake({ gate: async (runId) => (calls.push(`gate:${runId}`), { ok: true }) }))
+    for (const approved of [true, false]) {
+      const res = await asTask1().fetch(req('/api/workflows/runs/run1/gate', 'POST', { stepId: 's', approved }), {} as Env)
+      expect(res.status).toBe(403)
+    }
     expect(calls).toEqual([])
   })
 
