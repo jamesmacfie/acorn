@@ -49,6 +49,7 @@
       "agent-concurrency",
       "agent-pricing",
       "agent-defaults",
+      "custom-agents",
       "docker",
       "terminal",
       "workflows"
