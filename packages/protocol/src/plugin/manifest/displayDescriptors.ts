@@ -1,7 +1,7 @@
 import { z } from 'zod'
-import { compileContentLinkPattern, CONTENT_LINK_PATTERN_MAX_LENGTH } from '../../contentLinkPattern.ts'
-import { isThemeColorValue, THEME_COLOR_VALUE_MAX, THEME_PALETTE_TOKENS } from '../../themeTokens.ts'
-import { styleValueProblem } from '../../styleValues.ts'
+import { compileContentLinkPattern, CONTENT_LINK_PATTERN_MAX_LENGTH } from '../../content/contentLinkPattern.ts'
+import { isThemeColorValue, THEME_COLOR_VALUE_MAX, THEME_PALETTE_TOKENS } from '../../appearance/themeTokens.ts'
+import { styleValueProblem } from '../../appearance/styleValues.ts'
 import { refresh } from './chromeDescriptors.ts'
 import { pluginRoute } from './manifestFields.ts'
 

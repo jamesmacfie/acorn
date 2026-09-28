@@ -348,7 +348,7 @@ Keep the existing rule that a subagent view hides the parent composer and preser
 Persist only serializable view facts; component closures and DOM nodes remain disposable.
 
 Tool renderers can come from the `agents:tool-card` extension point. Inspect
-`packages/protocol/src/extensionPoints.ts` and the Slot implementation before selecting the controlled
+`packages/protocol/src/chrome/extensionPoints.ts` and the Slot implementation before selecting the controlled
 disclosure API. The shipped `AgentToolCardProps` includes a default, not a full retained-state
 protocol. Extend that seam with validated serializable state and an allowed action/reporting path
 if contributed cards own disclosure. Update both compiled and loaded render paths. Do not pass a

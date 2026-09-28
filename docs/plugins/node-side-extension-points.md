@@ -257,7 +257,7 @@ own invention, and still never sees a device token
 ([security.md](../security.md) § The control plane).
 
 Confirmation for the four verbs is the client's, drawn from the `ToolRisk` tiers `nodeActions`
-already uses (`NODE_LIFECYCLE_RISK` in `packages/protocol/src/nodeProviders.ts`): `create`, `start`
+already uses (`NODE_LIFECYCLE_RISK` in `packages/protocol/src/device/nodeProviders.ts`): `create`, `start`
 and `stop` are `write`, and `destroy` is `execute` and asks twice. Core decides those tiers, not the
 provider — a provider that could call its own destroy `read` would be choosing how loudly acorn warns
 about it.

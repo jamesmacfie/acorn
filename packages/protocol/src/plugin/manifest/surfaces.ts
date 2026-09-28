@@ -1,9 +1,9 @@
 import { z } from 'zod'
-import { CORE_EXCLUSIVE_SLOTS } from '../../extensionPoints.ts'
-import { isPluginKeyClaim, isReservedPluginKeyClaim } from '../../keybindings.ts'
-import { LANGUAGE_IDS } from '../../languageIds.ts'
-import { PANE_LAYOUTS, regionProblem } from '../../paneLayouts.ts'
-import { WEBVIEW_HOST_MAX_COUNT } from '../../webview.ts'
+import { CORE_EXCLUSIVE_SLOTS } from '../../chrome/extensionPoints.ts'
+import { isPluginKeyClaim, isReservedPluginKeyClaim } from '../../chrome/keybindings.ts'
+import { LANGUAGE_IDS } from '../../content/languageIds.ts'
+import { PANE_LAYOUTS, regionProblem } from '../../chrome/paneLayouts.ts'
+import { WEBVIEW_HOST_MAX_COUNT } from '../../content/webview.ts'
 import { pluginRoute, webviewHost } from './manifestFields.ts'
 
 // ── Host-owned document surfaces ──────────────────────────────────────────────────────────────────

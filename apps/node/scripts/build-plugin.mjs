@@ -104,7 +104,7 @@ if (packageRootIndex !== -1 && !packageRoot) throw new Error('--package-root req
 // Matches server/storage/paths.ts's dev root, and honours the same override the node itself reads.
 const dataRoot = process.env.ACORN_DATA_DIR || join(NODE_APP, '.acorn')
 const outDir = join(packageRoot ? resolve(packageRoot) : join(dataRoot, 'plugins'), id)
-// Imported, not scraped. This used to be a regex over the source text of packages/protocol/src/api.ts,
+// Imported, not scraped. This used to be a regex over the source text of packages/protocol/src/transport/api.ts,
 // because a .mjs script cannot import a built package — but it can import a .ts file with nothing in it
 // but one const, which is why pluginApiVersion.ts exists.
 //

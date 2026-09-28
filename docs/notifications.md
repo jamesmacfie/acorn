@@ -40,7 +40,7 @@ Both come from the same reading of a session.
 ## Five states
 
 Agents and Terminal map their own sessions to a small snapshot in
-`packages/protocol/src/attention.ts`. The delivery gate in
+`packages/protocol/src/agents/attention.ts`. The delivery gate in
 `packages/client-core/src/features/notifications/attention.ts` reads five states:
 
 | State | Meaning |

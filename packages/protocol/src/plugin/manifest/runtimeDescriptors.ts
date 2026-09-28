@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { cadenceSchema } from '../../schedules.ts'
+import { cadenceSchema } from '../../runtime/schedules.ts'
 import { entry, pluginRoute } from './manifestFields.ts'
 
 // Periodic work the node runs for this plugin, with no client open. The pair to

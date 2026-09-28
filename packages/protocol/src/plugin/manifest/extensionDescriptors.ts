@@ -2,7 +2,7 @@ import { z } from 'zod'
 import {
   ARBITRATION_MODES, EXTENSION_POINT_KINDS, EXTENSION_POINT_LOCATIONS,
   HOOK_MODES, HOOK_PAYLOAD_TYPES, parseExtensionPointRef,
-} from '../../extensionPoints.ts'
+} from '../../chrome/extensionPoints.ts'
 import { contextFreeAction, panelRegion, refresh } from './chromeDescriptors.ts'
 import { pluginRoute } from './manifestFields.ts'
 

@@ -7,7 +7,7 @@ through the Agents plugin; it does not drive raw terminal sessions or resolve ap
 Session, turn, event, request, and attachment wire types live in
 `plugins/agents/src/contract/wire.ts`. The pure tool-status tone shared with Changes lives in
 `plugins/agents/src/contract/toolTone.ts`. Core receives only the small attention snapshot defined
-by `packages/protocol/src/attention.ts`; Agents maps its session rows to that snapshot.
+by `packages/protocol/src/agents/attention.ts`; Agents maps its session rows to that snapshot.
 
 The agents plugin manages structured Claude and Codex sessions. It stores a durable normalized event
 ledger and exposes the same session through the Agent Center, task Agent pane, HTTP routes, and live

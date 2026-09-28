@@ -1,6 +1,6 @@
 import { z } from 'zod'
-import { CONTEXT_MENU_LOCATIONS, unknownWhenFacts } from '../../contextMenus.ts'
-import { dashboardViewKinds } from '../../dashboardViews.ts'
+import { CONTEXT_MENU_LOCATIONS, unknownWhenFacts } from '../../chrome/contextMenus.ts'
+import { dashboardViewKinds } from '../../dashboards/dashboardViews.ts'
 import { pluginRoute } from './manifestFields.ts'
 
 // ── Declarative chrome ────────────────────────────────────────────────────────────────────────────

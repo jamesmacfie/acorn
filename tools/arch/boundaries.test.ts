@@ -683,7 +683,8 @@ describe('architecture boundaries', () => {
     const pluginNames = PACKAGES.filter((p) => p.kind === 'plugin').map((p) => p.name.replace('@acorn/plugin-', ''))
     const proto = byName.get('@acorn/protocol')!
     const named = walk(proto.src)
-      .map((f) => relative(proto.src, f))
+      // Source ownership folders do not change whether a module names a plugin.
+      .map((f) => basename(f))
       .filter((f) => !f.endsWith('.test.ts'))
       .filter((f) => !NAME_COLLISIONS.includes(f))
       // Matched on the file name, not the contents: a comment can't create a dependency, and scanning
@@ -704,7 +705,7 @@ describe('architecture boundaries', () => {
     //
     // Ten roster ids are also core's own words. Where that is the whole reason, the entry says so.
     const NAMES_A_PLUGIN_OK = new Map([
-      ['packages/protocol/src/dataSources.ts', 'preview is a query mode, not the preview plugin'],
+      ['packages/protocol/src/data/dataSources.ts', 'preview is a query mode, not the preview plugin'],
       ['packages/plugin-types/src/public.ts', 'preview is a published query mode, not the preview plugin'],
       ['packages/node-core/src/server/dataSources/runtime.ts', 'preview is a query mode, not the preview plugin'],
       ['packages/client-core/src/features/dataSources/SourceQueryEditor.tsx', 'preview is a data-query mode, not the preview plugin'],
@@ -717,14 +718,14 @@ describe('architecture boundaries', () => {
       ['packages/client-core/src/features/settings/WorkspaceProjectSettings.tsx', "the 'terminal' setup-script trigger"],
       ['packages/node-core/src/server/routes/projects/projects.ts', "the 'terminal' setup-script trigger"],
       ['packages/node-core/src/server/worktrees/taskWorktree.ts', "the 'terminal' setup-script trigger"],
-      ['packages/protocol/src/api.ts', "the 'terminal' setup-script trigger"],
+      ['packages/protocol/src/transport/api.ts', "the 'terminal' setup-script trigger"],
       ['packages/client-core/src/host/registries/commands/commands.ts', "the 'terminal' command category"],
       // `terminal` the channel prefix of core's own `terminal:sessions-changed` event, which is a noun
       // and not the roster id. Any plugin that starts a session emits it and the shell hears it
       // (@acorn/protocol/nodeEvents.ts).
       ['packages/protocol/src/plugin/manifest/commandDescriptors.ts', "the 'terminal' command category"],
       // `terminal` an agent controller and a driver kind; `context` an agent input part.
-      ['packages/protocol/src/agentContext.ts', "'context' the agent input part"],
+      ['packages/protocol/src/agents/agentContext.ts', "'context' the agent input part"],
       ['packages/client-core/src/features/agent/contextSnapshot.ts', "'context' the agent input part"],
       ['packages/client-core/src/host/chrome/chromeData.ts', "'context' the agent input part"],
       ['packages/node-core/src/server/plugins/coreFacets.ts', "'context' the core facet name"],
@@ -750,7 +751,7 @@ describe('architecture boundaries', () => {
       ['packages/client-core/src/host/trust/permissions.ts', "'database' a Lucide icon name"],
       ['packages/client-core/src/kit/components/inputs/IconPicker.tsx', "'database' and 'terminal', Lucide icon names"],
       ['packages/node-core/src/server/repoConfigTrust.ts', "'workflows' the .acorn directory name"],
-      ['packages/protocol/src/mcp.ts', "'http' the MCP transport"],
+      ['packages/protocol/src/integrations/mcp.ts', "'http' the MCP transport"],
     ])
 
     // A `//` outside a string starts a comment. Prose is allowed to name a plugin, and most of the
@@ -1211,7 +1212,7 @@ describe('architecture boundaries', () => {
     // result that could name a verb, a route or a URL would make a changing server response more
     // powerful than the manifest somebody reviewed, so the row carries display facts and identity and
     // the manifest's search command owns the one static action.
-    const commands = readFileSync(join(ROOT, 'packages/protocol/src/commands.ts'), 'utf8')
+    const commands = readFileSync(join(ROOT, 'packages/protocol/src/chrome/commands.ts'), 'utf8')
     const item = /export const commandSearchItemSchema = z\.object\(\{([\s\S]*?)\n\}\)/.exec(commands)
     expect(item).not.toBeNull()
     const fields = [...item![1].matchAll(/^\s{2}([a-zA-Z]+):/gm)].map((m) => m[1])

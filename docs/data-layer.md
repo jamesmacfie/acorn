@@ -6,8 +6,8 @@ owning package contains the schema and migration chain.
 
 ## Shared typed values
 
-`packages/protocol/src/dataValues.ts`, `packages/protocol/src/dataSchemas.ts`, and
-`packages/protocol/src/dataBindings.ts` own the version 1 typed-data contract. Node and client
+`packages/protocol/src/data/values/dataValues.ts`, `packages/protocol/src/data/values/dataSchemas.ts`, and
+`packages/protocol/src/data/values/dataBindings.ts` own the version 1 typed-data contract. Node and client
 plugin facades export its parsers and types. `acorn-plugin-types` publishes matching declarations
 for installed plugins; its contract test checks assignability in both directions.
 

@@ -6,7 +6,7 @@ subscriptions separate.
 
 These examples use plugin API major `2`. The node context is declared in
 `packages/plugin-types/src/public.ts`; the event vocabulary is in
-`packages/protocol/src/nodeEvents.ts`.
+`packages/protocol/src/transport/nodeEvents.ts`.
 
 ## Listen to a core event
 

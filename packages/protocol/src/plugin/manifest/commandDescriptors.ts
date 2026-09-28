@@ -2,8 +2,8 @@ import { z } from 'zod'
 import {
   commandSettingOptionSchema, MAX_COMMAND_SEARCH_MIN_QUERY, MAX_COMMAND_SEARCH_DEBOUNCE_MS,
   MAX_COMMAND_SETTING_OPTIONS, MIN_COMMAND_SEARCH_DEBOUNCE_MS, MIN_COMMAND_SETTING_OPTIONS,
-} from '../../commands.ts'
-import { isNormalizedChord, isPluginShortcutChord } from '../../keybindings.ts'
+} from '../../chrome/commands.ts'
+import { isNormalizedChord, isPluginShortcutChord } from '../../chrome/keybindings.ts'
 import { contextFreeAction, selectedRowAction } from './chromeDescriptors.ts'
 import { pluginRoute } from './manifestFields.ts'
 

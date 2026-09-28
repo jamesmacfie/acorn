@@ -1,4 +1,4 @@
-import type { InstalledPluginRow, PluginRuntimeIdentity } from '../api.ts'
+import type { InstalledPluginRow, PluginRuntimeIdentity } from '../transport/api.ts'
 
 const canonical = (value: unknown): string => {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
