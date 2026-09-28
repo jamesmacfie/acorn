@@ -36,7 +36,7 @@ files no test imports. The command reports coverage for these test selections on
 | Protocol plugin contract | `packages/protocol/src/plugin/` | `packages/protocol/src/plugin/**/*.ts` |
 | Node plugin loader | `packages/node-core/src/server/plugins/` | `packages/node-core/src/server/plugins/**/*.ts` |
 | Client frame bridge and host | `packages/client-core/src/host/frames/`, including `PluginFrame.test.tsx` for iframe connection, startup deadline, and teardown | `packages/client-core/src/host/frames/**/*.{ts,tsx}` |
-| Workflow execution | Seven suites covering dispatch, child lifecycle, maps, nested runs, processing, projection, and schedules | Six matching modules, including `plugins/workflows/src/server/runs/runner.ts` |
+| Workflow execution | Seven suites covering dispatch, child lifecycle, maps, nested runs, processing, projection, and schedules | Seven modules: `runs/runner.ts`, `steps/execution.ts`, `dispatch/dispatcher.ts`, `dispatch/childLifecycle.ts`, `processing/rules.ts`, `runs/read/projection.ts`, and `schedules/service.ts` under `plugins/workflows/src/server/` |
 
 Use the report to find untested branches before changing these boundaries. It is not a monorepo
 coverage percentage. Integration tests in other packages can exercise a contract without appearing

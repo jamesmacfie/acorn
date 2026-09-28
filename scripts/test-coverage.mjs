@@ -31,6 +31,7 @@ const targets = [
     ],
     include: [
       'src/server/runs/runner.ts',
+      'src/server/steps/execution.ts',
       'src/server/dispatch/dispatcher.ts',
       'src/server/dispatch/childLifecycle.ts',
       'src/server/processing/rules.ts',

@@ -98,9 +98,10 @@ Fourteen entrypoints:
 
 The line between `/client`, `/ui`, and `/ui/host` is drawn by the runtime, not by taste. Solid
 compiles a component to code that touches `window` at module scope, so `/client` remains free of
-`.tsx`. The frame-safe `/ui` barrel reaches only the pure `client-core/src/kit/` presentation tree;
-router/query/registry-connected components sit on `/ui/host`. The facade is declared side-effect
-free so a frame bundle retains only the named presentation components it imports.
+`.tsx`. The frame-safe `/ui` barrel exposes presentation components and helpers from the kit, plus
+selected feature-owned presentation adapters such as `DiffPane` and `attachPty`. Router, query, and
+registry-connected components sit on `/ui/host`. The facade is declared side-effect free so a frame
+bundle retains only the named presentation components it imports.
 
 Boundary tests grep for those properties, and `packages/plugin-api/src/entrypoints.test.ts` executes
 them: it imports every entrypoint except `/ui`, `/ui/host` and `/ui/editor` in a node-environment

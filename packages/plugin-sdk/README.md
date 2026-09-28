@@ -1,14 +1,15 @@
 # acorn-plugin-sdk
 
-The frame bridge for [acorn](https://github.com/jamesmacfie/acorn) plugins.
+The sandbox bridge for [acorn](https://github.com/jamesmacfie/acorn) plugin frames and trees.
 
-An acorn plugin's UI runs in a sandboxed iframe with no host DOM, no `window.acorn` and
-`connect-src 'none'` — no `fetch`, no WebSocket, no network of any kind. Its only I/O is one
-`MessagePort` the host transfers in. This package is what talks over it.
+An acorn plugin's UI runs in a sandbox with no host DOM or direct network access. The host transfers
+one `MessagePort` for its I/O, and this package provides the bridge over that port.
 
 ```sh
 npm install acorn-plugin-sdk
 ```
+
+For a browser frame, import the root package:
 
 ```js
 import { mountFrame, openLinkOnClick } from 'acorn-plugin-sdk'
@@ -26,11 +27,32 @@ mount the tooltip listener, connect, render, and draw the failure if the handsha
 takes a render callback rather than a component, so this package stays framework-free: inside your own
 frame you may bundle anything, or nothing.
 
+## Remote trees
+
+A tree uses acorn's shared components in a desktop or terminal worker. Import `mountTree` from the
+root package and the Solid adapter and components from `/remote`:
+
+```tsx
+import { mountTree } from 'acorn-plugin-sdk'
+import { Card, Text, solidTree } from 'acorn-plugin-sdk/remote'
+
+function Pane() {
+  return <Card><Text>Plugin content</Text></Card>
+}
+
+mountTree({ pane: solidTree(Pane) })
+```
+
+The `pane` key matches the tree entry named in your manifest. Configure Solid's universal renderer
+with `moduleName: 'acorn-plugin-sdk/remote'` when compiling JSX. Install `solid-js` for this path;
+it is an optional peer dependency because frame-only plugins do not need it. See the
+[tree authoring guide](https://github.com/jamesmacfie/acorn/blob/main/docs/plugins/frames.md) for the
+manifest and build setup.
+
 ## You need a bundler for this
 
 Your plugin's client half is served as **exactly one file**, so a bare specifier has nothing to resolve
-against at runtime — bundling this package into your `client.js` is what makes the import work. That
-output is one file, which is all the origin requires.
+against at runtime. Bundle the SDK, the optional Solid peer for a tree, and your code into `client.js`.
 
 **If you would rather not run a bundler**, you do not need this package at all. Run
 `npm create acorn-plugin`: it writes the whole no-bundler profile, handshake included, with no
