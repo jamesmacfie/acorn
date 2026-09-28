@@ -17,6 +17,8 @@ export const agentSpawnInputSchema = z.object({
     .describe("The child's first message. The child sees none of your conversation, so write a complete brief."),
   profileId: z.string().min(1).max(100).optional()
     .describe("The agent to run, such as 'claude-code' or 'codex'. Leave it out to run the same agent as you."),
+  agent: z.string().trim().min(1).max(200).optional()
+    .describe('A custom agent the user saved, by its name or id, such as "Bug reviewer". It sets the agent to run, its settings, and its instructions, so leave profileId out. configOptions and toolCeiling still apply on top.'),
   isolation: z.enum(['shared', 'worktree']).default('shared')
     .describe("'shared' runs the child in this task's checkout, so its edits land beside yours. 'worktree' creates a new task with its own checkout and branch. Use 'worktree' for a separate change."),
   resultSchema: resultSchema.optional()

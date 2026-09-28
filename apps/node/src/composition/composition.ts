@@ -68,6 +68,7 @@ export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): 
         taskChecks: entry.manifest.contributions.taskChecks,
         auditActions: entry.manifest.contributions.auditActions,
         harnesses: entry.manifest.contributions.harnesses,
+        customAgents: entry.manifest.contributions.customAgents,
         agentTools: entry.manifest.contributions.agentTools,
         contextSections: entry.manifest.contributions.contextSections,
         destinations: entry.manifest.contributions.frames.flatMap((surface) => surface.destinations ?? []),

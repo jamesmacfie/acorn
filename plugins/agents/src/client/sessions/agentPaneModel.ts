@@ -1,4 +1,5 @@
 import { createEffect, createMemo, createResource, createSignal, on, onCleanup } from 'solid-js'
+import { createQuery } from '@tanstack/solid-query'
 import {
   activeNodeId, defaultDeliveryContext, markAttentionSeen, saveFile, setTerminalOpen, type PaneModelContext, type Task,
 } from '@acorn/plugin-api/client'
@@ -19,6 +20,8 @@ import {
   selectedManagedSession,
 } from './managedSelection'
 import { agentSessionRoster } from './sessionRoster'
+import { newSessionChoices, type NewSessionChoice } from './newSessionChoices'
+import { customAgentsOptions } from '../settings/customAgentsClient'
 
 // Everything the Agent pane's two regions have to agree on.
 //
@@ -62,6 +65,8 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
   const [dialog, setDialog] = createSignal<AgentDialog | null>(null)
   const [renameText, setRenameText] = createSignal('')
   const [providers, { refetch: refreshProviders }] = createResource(() => managedAgentApi.providers())
+  const customAgents = createQuery(() => customAgentsOptions())
+  const choices = createMemo(() => newSessionChoices(providers() ?? [], customAgents.data ?? []))
 
   const taskSessions = createMemo(() =>
     managedAgentStore.sessionsForTask(task.id)
@@ -163,12 +168,12 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
     }
   }
 
-  async function createSession(descriptor: AgentProviderDescriptor) {
+  async function createSession({ provider: descriptor, agent }: NewSessionChoice) {
     if (!descriptor.installed || creating()) return
     setCreating(true)
     setError('')
     try {
-      const session = await managedAgentStore.startSession(task.id, descriptor)
+      const session = await managedAgentStore.startSession(task.id, descriptor, agent?.id)
       selectManagedSession(task.id, session.id)
       requestComposerFocus(session.id)
       await managedAgentStore.loadSnapshot(session.id)
@@ -357,6 +362,8 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
     task,
     sessionsLoaded,
     providers: () => providers() ?? [],
+    /** New's rows: every harness, then every custom agent (./newSessionChoices.ts). */
+    choices,
     refreshProviders,
     taskSessions,
     sessionRoster,

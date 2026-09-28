@@ -50,6 +50,7 @@ export type {
   PluginExtensionPointDescriptor,
   PluginFrameSurface,
   PluginHarnessDescriptor,
+  PluginCustomAgentDescriptor,
   PluginAgentToolDescriptor,
   PluginContextSectionDescriptor,
   PluginKeybindingDescriptor,
@@ -59,6 +60,14 @@ export type {
   PluginTaskCheckDescriptor,
 } from '@acorn/protocol/plugin/contract.ts'
 export type { PluginCliCommandDescriptor } from '@acorn/protocol/plugin/cliCommands.ts'
+
+/**
+ * Whether a manifest gives the node something to hold with no node bundle behind it. Harnesses and
+ * custom agents are both data another plugin consumes, so a package made of only those still runs on
+ * the node as a plugin with an empty `init` (./loader.ts), and its row reads as node-activated.
+ */
+export const contributesNodeData = (contributions: { harnesses: readonly unknown[]; customAgents?: readonly unknown[] }): boolean =>
+  contributions.harnesses.length > 0 || (contributions.customAgents?.length ?? 0) > 0
 
 // Cross-field checks, which is why they are here and not on the fields: every one of them needs either
 // `id` or the frame list, and neither is visible from inside a nested schema.

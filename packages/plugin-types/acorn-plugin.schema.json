@@ -3337,6 +3337,73 @@
             ]
           }
         },
+        "customAgents": {
+          "default": [],
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "glyph": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "harness": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 130
+              },
+              "options": {
+                "default": {},
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "maxLength": 500
+                }
+              },
+              "instructions": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 16000
+              },
+              "maxToolRisk": {
+                "type": "string",
+                "enum": [
+                  "read",
+                  "write",
+                  "execute"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "harness"
+            ]
+          }
+        },
         "agentTools": {
           "default": [],
           "maxItems": 16,

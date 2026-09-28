@@ -193,6 +193,52 @@ describe('the generic ACP driver describes a harness before it starts one', () =
     }
   })
 
+  // A contributed harness has no system prompt acorn can reach, so a custom agent's instructions go in
+  // front of the first prompt of each provider session the driver creates, and nowhere else.
+  describe('a custom agent’s instructions on a harness with no system prompt', () => {
+    const customAgent = { id: 'a1', name: 'Bug reviewer', instructions: 'Review for correctness only.' }
+    const echoes = async (session: AgentSession, turns: number): Promise<string[]> => {
+      const events: AgentNormalizedEvent[] = []
+      const handle = await new AcpDriver({
+        id: 'stub',
+        profileId: 'stub',
+        label: 'Stub',
+        spawn: { entry: () => fileURLToPath(new URL('./__fixtures__/echoingAcpAgent.mjs', import.meta.url)) },
+      }).start({
+        session,
+        cwd: process.cwd(),
+        env: {},
+        mcpServers: [],
+        noProviderExecutionHistory: false,
+        onEvent: (event) => {
+          if (event.type !== 'generated_artifact') events.push(event)
+        },
+        onClosed: () => {},
+      })
+      try {
+        for (let turn = 0; turn < turns; turn++) {
+          await handle.sendTurn({ turn: {} as never, input: [{ type: 'text', text: `go ${turn}` }], attachments: {} })
+        }
+      } finally {
+        await handle.stop()
+      }
+      return events.flatMap((event) => event.type === 'assistant_message' ? [event.text] : [])
+    }
+
+    it('sends them once, ahead of the first prompt of a new session', async () => {
+      const said = await echoes({ ...sessionWithRef(''), providerSessionRef: null, config: { customAgent } }, 2)
+      expect(said).toEqual([
+        'echo:<acorn-context source="context.agent.instructions" label="Bug reviewer instructions">\nReview for correctness only.\n</acorn-context>',
+        'echo:go 1',
+      ])
+    })
+
+    it('does not send them again to a session it picks back up', async () => {
+      const said = await echoes({ ...sessionWithRef('kept-session'), config: { customAgent } }, 1)
+      expect(said).toEqual(['echo:go 0'])
+    })
+  })
+
   // ACP spells an environment as an ordered list of pairs, so a server naming the same variable twice
   // is a protocol error the agent reports rather than a silent last-wins.
   it('hands acorn\u2019s own tool server to the agent as ordered environment pairs', () => {

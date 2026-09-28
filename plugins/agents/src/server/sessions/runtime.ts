@@ -32,6 +32,10 @@ import {
   type WaitCondition,
 } from './runtimeEngine'
 import { mergeSessionConfigChange } from './sessionConfigMerge'
+import { customAgentRegistry, readCustomAgents } from '../customAgents'
+import { customAgentSnapshot, sessionCustomAgent, type CustomAgent } from '../../shared/customAgents'
+import { delegatedToolCeiling } from '../delegation/policy'
+import { parseToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import { CODEX_PLAN_IMPLEMENTATION_PROMPT } from '../../shared/codexPlanHandoff'
 import {
   buildSessionTitlePrompt,
@@ -125,9 +129,50 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       throw new Error(`Provider '${provider.id}' requires profile '${provider.profileId}'.`)
     }
     await this.core.tasks.requireRoot(input.taskId)
-    const session = await this.store.createSession(input, provider)
+    const session = await this.store.createSession(await this.withCustomAgent(input), provider)
     if (idempotencyKey) await this.store.saveOperation(idempotencyKey, 'session.create', session, session.id)
     return { session, created: true }
+  }
+
+  /** The owner's custom agents and every plugin's, read per call because an account switch changes
+   *  whose list this is. */
+  async customAgents(): Promise<CustomAgent[]> {
+    const userId = this.currentUserId()
+    return userId ? readCustomAgents(this.core.prefs, userId) : customAgentRegistry.list()
+  }
+
+  /**
+   * What a session started from a custom agent keeps: the snapshot the drivers read, the options to
+   * apply once the provider has listed its own, and the tool ceiling. A ceiling the caller already set
+   * is narrowed by the agent's, never replaced. A session with no `customAgentId` keeps whatever
+   * `config` it was given, which is how a fork carries its source's snapshot; the HTTP route is where a
+   * client's own `customAgent` is dropped (../routes/managed.ts).
+   */
+  private async withCustomAgent(input: CreateAgentSessionInput): Promise<CreateAgentSessionInput> {
+    if (!input.customAgentId) return input
+    const config = input.config
+    const agent = (await this.customAgents()).find((candidate) => candidate.id === input.customAgentId)
+    if (!agent) throw new Error('That custom agent no longer exists.')
+    if (agent.providerId !== input.providerId) {
+      throw new Error(`${agent.name} runs on '${agent.providerId}', not '${input.providerId}'.`)
+    }
+    const requested = typeof config.requestedConfigOptions === 'object' && config.requestedConfigOptions
+      ? config.requestedConfigOptions as Record<string, unknown>
+      : {}
+    const agentCeiling = agent.maxToolRisk ? { maxRisk: agent.maxToolRisk } : undefined
+    // An unreadable ceiling the caller sent removes every tool, the same as a corrupt persisted one.
+    const ceiling = config.toolCeiling === undefined
+      ? agentCeiling
+      : delegatedToolCeiling(parseToolCeiling(config.toolCeiling) ?? { allow: [] }, agentCeiling)
+    return {
+      ...input,
+      config: {
+        ...config,
+        customAgent: customAgentSnapshot(agent),
+        requestedConfigOptions: { ...agent.options, ...requested },
+        ...(ceiling ? { toolCeiling: ceiling } : {}),
+      },
+    }
   }
 
   private startCreatedSession(session: AgentSession): Promise<AgentSession> {
@@ -158,7 +203,11 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
           })
         })
       }
-      if (session.kind === 'delegated' || session.origin?.kind === 'inline-diff') {
+      // A custom agent's options go on top of the defaults above, so an agent that names only a model
+      // still starts on the owner's reasoning level. Not for a fork, which copies the snapshot with the
+      // rest of its source's config and continues at the settings its source was running.
+      const startsFromAgent = !!sessionCustomAgent(session.config) && !session.parentSessionId
+      if (session.kind === 'delegated' || session.origin?.kind === 'inline-diff' || startsFromAgent) {
         const requested = session.config.requestedConfigOptions
         if (requested && typeof requested === 'object' && !Array.isArray(requested)) {
           const values = Object.fromEntries(Object.entries(requested).filter((entry): entry is [string, string] =>

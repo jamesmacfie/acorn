@@ -32,7 +32,7 @@ const host = (hashes: string[], decisions: { pluginId: string; hash: string; dec
     ...decision, nodeId: 'a', version: '1', decidedAt: index + 1,
     permissions: identity('1', decision.hash).permissions,
     declaration: clientDeclaration(identity('1', decision.hash)),
-    webviews: [], keyClaims: [], navigationDestinations: [], extensions: [], schedules: [], taskChecks: [], harnesses: [], agentTools: [], contextSections: [],
+    webviews: [], keyClaims: [], navigationDestinations: [], extensions: [], schedules: [], taskChecks: [], harnesses: [], agentTools: [], contextSections: [], customAgents: [],
   })),
   devGrants: [],
 })
@@ -229,7 +229,7 @@ describe('fleet selection policy', () => {
     const state = host(['shared-hash'])
     state.acks.push({ pluginId: 'reports', hash: 'shared-hash', nodeId: 'a',
       source: { kind: 'node', nodeId: 'a' }, version: '1.0.0', permissions: offered.permissions,
-      webviews: [], keyClaims: [], navigationDestinations: [], extensions: [], schedules: [], taskChecks: [], harnesses: [], agentTools: [], contextSections: [],
+      webviews: [], keyClaims: [], navigationDestinations: [], extensions: [], schedules: [], taskChecks: [], harnesses: [], agentTools: [], contextSections: [], customAgents: [],
       decision: 'accepted', decidedAt: 1, partial: true, dev: true })
     state.devGrants.push({ pluginId: 'reports', nodeId: 'a', source: { kind: 'node', nodeId: 'a' }, grantedAt: 1 })
     const result = derivePluginDistribution(byNode, state, 1, PLUGIN_API_MAJOR)

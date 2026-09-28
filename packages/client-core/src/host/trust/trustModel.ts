@@ -4,6 +4,8 @@ import {
   agentToolPermissionLines,
   contextSectionGrants,
   contextSectionPermissionLines,
+  customAgentGrants,
+  customAgentPermissionLines,
   extensionGrants,
   extensionPermissionLines,
   harnessGrants,
@@ -103,12 +105,15 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
         // deadline, but what runs on archive is the plugin's own node code.
         ...taskCheckPermissionLines(taskCheckGrants(installed.contributions)),
         ...contextSectionPermissionLines(contextSectionGrants(installed.contributions)),
+        // Beside the context sections: both are words the plugin puts in front of an agent.
+        ...customAgentPermissionLines(customAgentGrants(installed.contributions)),
       ],
       was: previous
         ? [
           ...schedulePermissionLines(previous.schedules ?? []),
           ...taskCheckPermissionLines(previous.taskChecks ?? []),
           ...contextSectionPermissionLines(previous.contextSections ?? []),
+          ...customAgentPermissionLines(previous.customAgents ?? []),
         ]
         : null,
     },
@@ -167,6 +172,7 @@ export async function recordTrustDecision(request: PluginTrustRequest, decision:
     harnesses: harnessGrants(installed.contributions),
     agentTools: agentToolGrants(installed.contributions),
     contextSections: contextSectionGrants(installed.contributions),
+    customAgents: customAgentGrants(installed.contributions),
     decision,
   })
   // The host's durable write succeeded. One snapshot read now changes the accepted selection and

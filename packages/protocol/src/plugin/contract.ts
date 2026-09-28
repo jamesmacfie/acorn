@@ -1014,6 +1014,29 @@ const harnessDescriptor = z.object({
   oneShot: harnessOneShot.optional(),
 })
 
+// A saved start for a managed session: a harness, the provider options it starts on, text for its
+// system prompt, and a ceiling on acorn's own tools (docs/managed-agents.md § Custom agents). Data
+// only. It names no program, so it needs no grant beyond the owner reading its instructions, and it
+// cannot bring a tool server: a server is a program to run, which is what `agentTools` is for.
+const customAgentDescriptor = z.object({
+  // Namespaced by the host into `<pluginId>:<id>` and copied onto every session started from it.
+  id: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9-]*$/),
+  name: z.string().min(1).max(100),
+  glyph: z.string().min(1).max(64).optional(),
+  description: z.string().min(1).max(500).optional(),
+  // A harness id: `claude`, `codex`, another plugin's `<pluginId>:<harnessId>`, or the bare id of a
+  // harness this manifest declares, which the host qualifies.
+  harness: z.string().min(1).max(130),
+  // Provider option id to value, the same table a session default is. A value the harness does not
+  // advertise is dropped when the session starts, with a line in the transcript.
+  options: z.record(z.string().min(1).max(200), z.string().max(500))
+    .refine((value) => Object.keys(value).length <= 20, 'at most 20 options')
+    .default({}),
+  // Shown in full in the trust prompt, and a changed text asks again.
+  instructions: z.string().min(1).max(16_000).optional(),
+  maxToolRisk: z.enum(['read', 'write', 'execute']).optional(),
+})
+
 // `api` and `events` are enforced by the UI bridge (client-core/host/plugins/frames). `contributions` stays
 // loose: a manifest written for a newer acorn should contribute less on an older one rather than fail
 // to parse.
@@ -1049,6 +1072,9 @@ const contributionsShape = z.looseObject({
   // Managed agent harnesses. The ctx twin is the `agents.harnessRegistry` capability. See
   // docs/managed-agents.md § Harnesses.
   harnesses: z.array(harnessDescriptor).max(4).default([]),
+  // Custom agents. The ctx twin is the `agents.customAgentRegistry` capability. See
+  // docs/managed-agents.md § Custom agents.
+  customAgents: z.array(customAgentDescriptor).max(8).default([]),
   // Node-runtime carriers. The host adapts these into the same registries compiled contributions use.
   agentTools: z.array(pluginAgentToolDescriptorSchema).max(16).default([]),
   contextSections: z.array(pluginContextSectionDescriptorSchema).max(8).default([]),
@@ -1313,6 +1339,7 @@ export type PluginScheduleDescriptor = z.infer<typeof scheduleDescriptor>
 export type PluginTaskCheckDescriptor = z.infer<typeof taskCheckDescriptor>
 export type PluginAuditActionDescriptor = z.infer<typeof auditActionDescriptor>
 export type PluginHarnessDescriptor = z.infer<typeof harnessDescriptor>
+export type PluginCustomAgentDescriptor = z.infer<typeof customAgentDescriptor>
 export type { PluginAgentToolDescriptor, PluginContextSectionDescriptor } from './runtimeContributions.ts'
 export type { PluginCliCommandDescriptor } from './cliCommands.ts'
 
@@ -1342,6 +1369,7 @@ export type PluginContributions = {
   taskChecks?: PluginTaskCheckDescriptor[]
   auditActions?: PluginAuditActionDescriptor[]
   harnesses?: PluginHarnessDescriptor[]
+  customAgents?: PluginCustomAgentDescriptor[]
   agentTools?: import('./runtimeContributions.ts').PluginAgentToolDescriptor[]
   contextSections?: import('./runtimeContributions.ts').PluginContextSectionDescriptor[]
   cliCommands?: import('./cliCommands.ts').PluginCliCommandDescriptor[]

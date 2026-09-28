@@ -7,6 +7,7 @@ import { AgentStore } from '../sessions/store'
 import type { ManagedAgentRuntime } from '../sessions/runtime'
 import { AgentDelegationStore } from './store'
 import { AgentDelegationService } from './service'
+import type { CustomAgent } from '../../shared/customAgents'
 
 const PROVIDER: AgentProviderDescriptor = {
   id: 'codex',
@@ -49,6 +50,7 @@ describe('agent delegation service', () => {
   let service: AgentDelegationService
   let terminals: TerminalSession[]
   let runtime: ManagedAgentRuntime
+  let customAgents: CustomAgent[]
   let childTasks: Map<string, { parentTaskId: string; title: string; branch: string }>
   let createChildTask: ReturnType<typeof vi.fn<(
     parentTaskId: string,
@@ -75,9 +77,11 @@ describe('agent delegation service', () => {
       childTasks.set(intendedChildId, { parentTaskId, ...seed })
       return intendedChildId
     })
+    customAgents = []
     runtime = {
       store: sessions,
       providers: async () => [PROVIDER],
+      customAgents: async () => customAgents,
       acceptSession: vi.fn(async (input: Parameters<ManagedAgentRuntime['acceptSession']>[0]) => sessions.createSession(input, PROVIDER)),
       enqueueTurn: vi.fn(async (sessionId: string, input: Parameters<ManagedAgentRuntime['enqueueTurn']>[1]) =>
         (await sessions.enqueueTurn(sessionId, input)).turn),
@@ -173,6 +177,36 @@ describe('agent delegation service', () => {
       },
     })
     expect((await sessions.turn(first.turnId!))?.source).toBe('delegation')
+  })
+
+  it('starts a custom agent by name, with its options and a ceiling no wider than its own', async () => {
+    customAgents = [{
+      id: 'agent-1', name: 'Bug reviewer', providerId: 'codex', profileId: 'codex',
+      options: { reasoning: 'high', model: 'gpt-codex' }, maxToolRisk: 'read', source: { kind: 'user' },
+    }]
+    const parent = await managedCaller()
+    const result = await service.spawn({
+      title: 'Review',
+      prompt: 'Review the diff.',
+      isolation: 'shared',
+      agent: 'bug reviewer',
+      configOptions: { model: 'gpt-codex-mini' },
+    }, context(parent.taskId, parent.id, 'custom-agent'))
+
+    expect(runtime.acceptSession).toHaveBeenCalledWith(expect.objectContaining({ customAgentId: 'agent-1' }), expect.any(String))
+    const child = await sessions.requireSession(result.sessionId!)
+    // The caller's own choice for this child wins over the agent's.
+    expect(child.config.requestedConfigOptions).toEqual({ reasoning: 'high', model: 'gpt-codex-mini' })
+    expect(child.config.toolCeiling).toEqual({ allow: ['agent_spawn', 'agent_read', 'task_context'], maxRisk: 'read' })
+
+    await expect(service.spawn(
+      { title: 'Nobody', prompt: 'x', isolation: 'shared', agent: 'Missing' },
+      context(parent.taskId, parent.id, 'missing-agent'),
+    )).rejects.toThrow("No custom agent is called 'Missing'")
+    await expect(service.spawn(
+      { title: 'Clash', prompt: 'x', isolation: 'shared', agent: 'Bug reviewer', profileId: 'claude-code' },
+      context(parent.taskId, parent.id, 'clashing-agent'),
+    )).rejects.toThrow('Leave profileId out')
   })
 
   it('does not accept a spawn until restart reconciliation has finished', async () => {

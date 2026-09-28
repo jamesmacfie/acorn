@@ -1,4 +1,5 @@
 import { AGENT_TOOL_PASSTHROUGH, brokerEnv, createLogger } from '@acorn/plugin-api/node'
+import { sessionCustomAgent } from '../../shared/customAgents'
 import { execFile } from 'node:child_process'
 import { basename, resolve } from 'node:path'
 import { promisify } from 'node:util'
@@ -264,11 +265,16 @@ export class CodexAgentDriver implements AgentDriver {
     })
     rpc.notify('initialized')
 
+    // A custom agent's instructions, from the snapshot the session was created with. Sent on resume as
+    // well as start, and unchanged, for the reason Claude's appended system prompt is.
+    const instructions = sessionCustomAgent(options.session.config)?.instructions
+    const developerInstructions = instructions ? { developerInstructions: instructions } : {}
     const startThread = () => rpc.request<Record<string, unknown>>('thread/start', {
       cwd: options.cwd,
       runtimeWorkspaceRoots: [options.cwd],
       threadSource: 'appServer',
       ephemeral: false,
+      ...developerInstructions,
     }, 60_000)
     let sessionResponse: Record<string, unknown>
     try {
@@ -279,6 +285,7 @@ export class CodexAgentDriver implements AgentDriver {
             cwd: options.cwd,
             runtimeWorkspaceRoots: [options.cwd],
             excludeTurns: false,
+            ...developerInstructions,
           }, 60_000)
         } catch (error) {
           if (!canReplaceMissingCodexSession(error, options.noProviderExecutionHistory)) throw error

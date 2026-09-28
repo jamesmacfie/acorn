@@ -307,6 +307,7 @@ client: wsOnStatus
 client: wsOnWorkflowStepChanged
 client: wsOnWorkflowStepEvent
 client: wsSend
+node: AGENTS_CUSTOM_AGENT_REGISTRY
 node: AGENTS_HARNESS_REGISTRY
 node: AGENT_TOOL_PASSTHROUGH
 node: AgentProfileContribution
@@ -324,6 +325,7 @@ node: CoreFsService
 node: CoreGitService
 node: CoreProcService
 node: CoreServices
+node: CustomAgentRegistry
 node: DATA_LIMITS
 node: DATA_OPERATORS
 node: DATA_VERSION
@@ -381,6 +383,7 @@ node: Launcher
 node: LayoutRecipe
 node: Logger
 node: MISSING
+node: ManifestCustomAgent
 node: ManifestHarness
 node: ManifestHarnessSpawn
 node: McpCommands

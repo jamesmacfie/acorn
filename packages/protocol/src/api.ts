@@ -484,6 +484,17 @@ export type PluginContextSectionGrant = {
   maxTokens: number
 }
 
+// A custom agent a package contributes. The instructions are the grant: they are text the package puts
+// into the system prompt of every session an owner starts from it, so the prompt shows them in full and
+// a changed text asks again (docs/managed-agents.md § Custom agents).
+export type PluginCustomAgentGrant = {
+  id: string
+  name: string
+  harness: string
+  instructions: string | null
+  maxToolRisk: 'read' | 'write' | 'execute' | null
+}
+
 // What the descriptor routes answer with. Host-defined, unlike everything else a plugin route serves,
 // because the host renders these (docs/architecture-overview.md § Who owns which contract).
 // Re-exported from @acorn/plugin-api so a plugin's node half types its handlers against the same

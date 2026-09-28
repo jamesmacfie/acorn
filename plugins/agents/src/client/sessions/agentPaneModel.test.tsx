@@ -4,6 +4,7 @@
 // project runs Solid's browser build, where an effect runs at all.
 import { afterEach, expect, it, vi } from 'vitest'
 import { createEffect, createRoot } from 'solid-js'
+import { withQueryClient } from './queryClient.helper'
 import type { AgentEventRecord, AgentSession, AgentWsFrame } from '../../contract/wire.ts'
 
 let deliver: (frame: AgentWsFrame) => void = () => {}
@@ -46,7 +47,7 @@ afterEach(() => {
 it('marks read up to the newest event frame, which the row no longer carries', async () => {
   managedAgentStore.upsertSession(session)
   const dispose = createRoot((dispose) => {
-    createAgentPaneModel({ id: 't1' } as never, { shown: () => true })
+    withQueryClient(() => createAgentPaneModel({ id: 't1' } as never, { shown: () => true }))
     return dispose
   })
   vi.useFakeTimers()
@@ -70,7 +71,7 @@ it('opens the session the list will select, so a first visit reads one snapshot'
   managedAgentStore.upsertSession(older)
   const opened: (string | undefined)[] = []
   const { model, dispose } = createRoot((dispose) => {
-    const model = createAgentPaneModel({ id: 't1' } as never, { shown: () => false })
+    const model = withQueryClient(() => createAgentPaneModel({ id: 't1' } as never, { shown: () => false }))
     createEffect(() => opened.push(model.selectedSessionId()))
     return { model, dispose }
   })

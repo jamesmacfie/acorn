@@ -24,7 +24,7 @@ import { clearExtensionPoints } from './extensionPoints'
 import { clearAuditActions } from '../audit'
 import { resolveInRoot } from '../core/fs'
 import { dispatchPluginRoute } from './dispatch'
-import type { ManifestHarnessSpawn } from './harnesses'
+import { qualifiedHarnessId, type ManifestHarnessSpawn } from './harnesses'
 import { runPluginScheduleRoute } from './scheduleRun'
 import { runPluginTaskApply, runPluginTaskCheck } from './taskCheckRun'
 import { disposeUnstartedPlugin } from '../plugins/isolation'
@@ -345,6 +345,25 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     }
   }
 
+  // What a loaded plugin's manifest declared as custom agents, handed on the same way (./customAgents.ts).
+  // A harness id that names one of this manifest's own harnesses is qualified here, because the plugin
+  // cannot know the id the host minted for it; any other id is passed on as written.
+  const registerManifestCustomAgents = (ctx: HostPluginContext, name: string, binding?: LoadedPluginBinding): void => {
+    const own = new Set((binding?.harnesses ?? []).map((harness) => harness.id))
+    for (const descriptor of binding?.customAgents ?? []) {
+      ctx.customAgents.register({
+        id: descriptor.id,
+        name: descriptor.name,
+        ...(descriptor.glyph ? { glyph: descriptor.glyph } : {}),
+        ...(descriptor.description ? { description: descriptor.description } : {}),
+        providerId: own.has(descriptor.harness) ? qualifiedHarnessId(name, descriptor.harness) : descriptor.harness,
+        options: descriptor.options,
+        ...(descriptor.instructions ? { instructions: descriptor.instructions } : {}),
+        ...(descriptor.maxToolRisk ? { maxToolRisk: descriptor.maxToolRisk } : {}),
+      })
+    }
+  }
+
   // A loaded plugin's schedulable actions, synthesised from the manifest's commands whose verb is
   // `runNodeAction`, the only verb that means anything with nobody watching.
   //
@@ -486,6 +505,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   for (const { plugin, ctx, loaded } of running) {
     if (!started.includes(plugin)) continue
     registerManifestHarnesses(ctx, plugin.name, loaded)
+    registerManifestCustomAgents(ctx, plugin.name, loaded)
   }
 
   // The second pass, after every init: a plugin that must read another plugin's contributions runs here
@@ -607,6 +627,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       registerManifestTaskChecks(candidateCtx, name, next.binding)
       registerManifestHooks(candidateCtx, name, next.binding)
       registerManifestHarnesses(candidateCtx, name, next.binding)
+      registerManifestCustomAgents(candidateCtx, name, next.binding)
       registerManifestDataSources(candidateCtx, next.binding)
       registerManifestNodeActions(candidateCtx, next.binding)
       registerManifestAuditActions(candidateCtx, next.binding)
