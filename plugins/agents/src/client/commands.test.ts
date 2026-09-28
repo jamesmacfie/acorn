@@ -3,7 +3,7 @@ import type { AgentProviderDescriptor, AgentSession } from '../contract/wire.ts'
 import type { CommandExecutionContext, ContributedCommand, SearchCommand } from '@acorn/plugin-api/client'
 
 const mocks = vi.hoisted(() => ({
-  search: vi.fn(), providers: vi.fn(), startSession: vi.fn(),
+  search: vi.fn(), providers: vi.fn(), startSession: vi.fn(), readJson: vi.fn(),
   setSelectedSource: vi.fn(), openManagedSession: vi.fn(), requestComposerFocus: vi.fn(),
 }))
 vi.mock('./sessions/managedClient', () => ({
@@ -17,6 +17,7 @@ vi.mock('./sessions/managedStore', () => ({ managedAgentStore: { startSession: m
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...await importOriginal<Record<string, unknown>>(),
   setSelectedSource: mocks.setSelectedSource,
+  readJson: mocks.readJson,
 }))
 
 import { agentsCommands } from './commands'
@@ -52,7 +53,10 @@ const find = (): SearchCommand => at('agents.sessions.find') as SearchCommand
 const start = (): SearchCommand => at('agents.sessions.new') as SearchCommand
 
 describe('the agents plugin catalogue', () => {
-  beforeEach(() => vi.clearAllMocks())
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.readJson.mockResolvedValue([])
+  })
 
   it('is the rail source and two task-scoped searches, all gated on the plugin', () => {
     expect(agentsCommands.map((command) => command.id))
@@ -123,7 +127,23 @@ describe('the agents plugin catalogue', () => {
     const rows = await start().query('', world, signal())
     expect(await start().select(rows[0], world)).toEqual({ effect: 'close' })
     // The profile travels on the row, because the pick is all `select` is handed.
-    expect(mocks.startSession).toHaveBeenCalledWith('task-1', { id: 'claude-code', profileId: 'claude-code-fast' })
+    expect(mocks.startSession).toHaveBeenCalledWith('task-1', { id: 'claude-code', profileId: 'claude-code-fast' }, undefined)
     expect(mocks.openManagedSession).toHaveBeenCalledWith('task-1', 'new-1')
+  })
+
+  it('lists custom agents after the harnesses and starts one by its id', async () => {
+    mocks.providers.mockResolvedValue([provider(), provider({ id: 'codex', profileId: 'codex', label: 'Codex', installed: false })])
+    mocks.readJson.mockResolvedValue([
+      { id: 'a1', name: 'Bug reviewer', providerId: 'claude-code', profileId: 'claude-code', options: { model: 'opus' }, source: { kind: 'user' } },
+      // Its harness is not installed, so the palette leaves it out.
+      { id: 'a2', name: 'Codex reviewer', providerId: 'codex', profileId: 'codex', options: {}, source: { kind: 'user' } },
+    ])
+    mocks.startSession.mockResolvedValue(session({ id: 'new-2' }))
+    const world = context()
+    const rows = await start().query('', world, signal())
+    expect(rows.map((row) => row.title)).toEqual(['Claude Code', 'Bug reviewer'])
+    expect(rows[1]).toMatchObject({ id: 'custom-agent:a1', subtitle: 'Claude Code · opus', badge: 'Agent', ref: 'claude-code' })
+    await start().select(rows[1], world)
+    expect(mocks.startSession).toHaveBeenCalledWith('task-1', { id: 'claude-code', profileId: 'claude-code' }, 'a1')
   })
 })

@@ -51,6 +51,8 @@ export type { Extension, ExtensionPointId } from '@acorn/node-core/server/plugin
 // manifest-declared harness and neither package may import the other.
 export { AGENTS_HARNESS_REGISTRY } from '@acorn/node-core/server/pluginHost'
 export type { HarnessProbe, HarnessRegistry, ManifestHarness, ManifestHarnessSpawn } from '@acorn/node-core/server/pluginHost'
+export { AGENTS_CUSTOM_AGENT_REGISTRY } from '@acorn/node-core/server/pluginHost'
+export type { CustomAgentRegistry, ManifestCustomAgent } from '@acorn/node-core/server/pluginHost'
 
 // ── Route toolkit ─────────────────────────────────────────────────────────────────────────────
 export type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'

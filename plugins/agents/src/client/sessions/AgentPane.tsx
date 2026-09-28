@@ -5,7 +5,6 @@ import {
   AGENT_SESSION_HEADER_POINT,
   type AgentSessionHeaderProps,
 } from '@acorn/protocol/extensionPoints.ts'
-import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 import {
   Alert, Button, Card, Chip, EmptyState, Field, Heading, Icon, IconButton, Inline, Input, Menu, Modal,
   Picker, Stack, Text, Toolbar,
@@ -18,6 +17,8 @@ import AgentUsageIndicator from '../usage/AgentUsageIndicator'
 import ProviderGlyph, { providerMarkName } from './ProviderGlyph'
 import RuntimeStateIcon from './RuntimeStateIcon'
 import type { AgentPaneModel } from './agentPaneModel'
+import { choiceDescription, choiceGlyph, choiceLabel, type NewSessionChoice } from './newSessionChoices'
+import { sessionCustomAgent } from '../../shared/customAgents'
 import { canStopAgent } from './agentActivity'
 import { managedAgentApi } from './managedClient'
 import { agentPricingOptions } from '../pricingClient'
@@ -86,6 +87,11 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
           </Chip>
         )}
       </Show>
+      {/* The custom agent the session started from, by the name it had then. The snapshot is the
+          session's own, so renaming or deleting the agent later leaves this alone. */}
+      <Show when={sessionCustomAgent(model.selected()?.config ?? {})}>
+        {(agent) => <Chip leading={<Icon name="bot" />}>{agent().name}</Chip>}
+      </Show>
       <Show when={model.selectedManagedParent()}>
         {(parent) => (
           <Chip
@@ -153,21 +159,20 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
       <AgentUsageIndicator />
       {/* An archived task has no worktree to start a session in (docs/panes.md § Contributions). */}
       <Show when={props.task.status === 'active'}>
-      <Picker<AgentProviderDescriptor>
+      <Picker<NewSessionChoice>
         label="New"
         ariaLabel="New session"
         size="sm"
         placement="bottom-end"
-        placeholder="Filter providers…"
+        placeholder="Filter agents…"
         emptyText="No managed providers available."
-        results={(query) => model.providers().filter((item) =>
-          item.label.toLowerCase().includes(query.trim().toLowerCase()))}
-        leading={(item) => <ProviderGlyph glyph={item.glyph} label={item.label} />}
-        rowLabel={(item) => item.label}
-        rowDescription={(item) =>
-          item.installed ? item.executableVersion ?? 'Available' : item.diagnostics[0] ?? 'Not installed'}
+        results={(query) => model.choices().filter((item) =>
+          choiceLabel(item).toLowerCase().includes(query.trim().toLowerCase()))}
+        leading={(item) => <ProviderGlyph glyph={choiceGlyph(item)} label={choiceLabel(item)} />}
+        rowLabel={choiceLabel}
+        rowDescription={choiceDescription}
         isActive={() => false}
-        isDisabled={(item) => !item.installed || model.creating()}
+        isDisabled={(item) => !item.provider.installed || model.creating()}
         onSelect={(item) => void model.createSession(item)}
         tools={
           <IconButton
@@ -187,7 +192,7 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
 // retry, compact and the terminal hand-offs all start a harness, and the task has no worktree for one.
 const READS_STORED_SESSION: ReadonlySet<string> = new Set(['regenerate-title', 'rename', 'export-markdown', 'export-json', 'archive'])
 
-/** Nothing open yet: one card per harness this node can run. */
+/** Nothing open yet: one card per harness this node can run, then one per custom agent. */
 function AgentProviderCards(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
   return (
@@ -196,20 +201,22 @@ function AgentProviderCards(props: { task: Task; model: AgentPaneModel }) {
       title="Start a managed coding session"
       action={
         <Inline wrap>
-          <For each={model.providers()}>
-            {(provider) => (
+          <For each={model.choices()}>
+            {(choice) => (
               <Card
                 interactive
-                disabled={!provider.installed || model.creating()}
-                onPress={() => void model.createSession(provider)}
+                disabled={!choice.provider.installed || model.creating()}
+                onPress={() => void model.createSession(choice)}
               >
                 <Stack gap="row">
                   <Inline>
-                    <ProviderGlyph glyph={provider.glyph} label={provider.label} />
-                    <Text emphasis="strong">{provider.label}</Text>
+                    <ProviderGlyph glyph={choiceGlyph(choice)} label={choiceLabel(choice)} />
+                    <Text emphasis="strong">{choiceLabel(choice)}</Text>
                   </Inline>
                   <Text emphasis="muted">
-                    {provider.installed ? 'Start managed session' : provider.diagnostics[0] ?? 'Unavailable'}
+                    {!choice.provider.installed
+                      ? choice.provider.diagnostics[0] ?? 'Unavailable'
+                      : choice.agent ? choiceDescription(choice) : 'Start managed session'}
                   </Text>
                 </Stack>
               </Card>

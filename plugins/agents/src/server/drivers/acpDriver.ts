@@ -27,6 +27,7 @@ import { harnessCapabilities, type HarnessLaunchSpec } from './harness'
 import type { AgentDriver, AgentDriverMcpServer, AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from './types'
 import { providerStderrNotice } from './diagnostics'
 import { contextBlock } from './contextBlock'
+import { sessionCustomAgent } from '../../shared/customAgents'
 
 // Same tag as codexDriver's: both are this plugin talking about a provider child process.
 const log = createLogger('agents:provider', 'agents')
@@ -324,6 +325,13 @@ export class AcpDriver implements AgentDriver {
     // offered twice (docs/mcp.md § Configuration).
     const mcpServers = acpMcpServers(options.mcpServers)
     const sessionMeta = this.spec.acpSessionMeta?.(options.session)
+    // A custom agent's instructions, for a harness with no system prompt acorn can reach. Owed to each
+    // provider session this driver creates, and never to one it picks back up, which already has them.
+    const customAgent = sessionCustomAgent(options.session.config)
+    const fallbackInstructions = !this.spec.systemPromptInstructions && customAgent?.instructions
+      ? contextBlock({ source: 'context.agent.instructions', label: `${customAgent.name} instructions`, content: customAgent.instructions })
+      : null
+    let instructionsOwed = false
     const createSession = async (): Promise<void> => {
       const created = await agent.newSession({
         cwd: options.cwd,
@@ -333,6 +341,7 @@ export class AcpDriver implements AgentDriver {
       })
       providerSessionRef = created.sessionId
       configOptions = created.configOptions ?? []
+      instructionsOwed = fallbackInstructions != null
     }
     if (providerSessionRef && (supportsResume || supportsLoad)) {
       // The same four fields either way: neither call takes a prompt, and acorn names no extra roots and
@@ -416,7 +425,12 @@ export class AcpDriver implements AgentDriver {
       },
       async sendTurn(turnOptions: AgentDriverTurnOptions) {
         try {
-          const stopReason = await prompt(acpPrompt(turnOptions.input, turnOptions.attachments))
+          const blocks = acpPrompt(turnOptions.input, turnOptions.attachments)
+          if (instructionsOwed && fallbackInstructions) {
+            blocks.unshift({ type: 'text', text: fallbackInstructions })
+            instructionsOwed = false
+          }
+          const stopReason = await prompt(blocks)
           await options.onEvent({ type: 'turn_completed', ...(stopReason ? { stopReason } : {}) })
           return {}
         } catch (error) {

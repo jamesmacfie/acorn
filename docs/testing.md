@@ -1049,6 +1049,15 @@ when the annotation or rail contracts change.
     that neither the delayed answer nor either retained mark appears on the other node.
 99. In `acorn`, show more task markers than the row can fit. Confirm that the row shows `+N`, then
     focus it and press `Shift+F10` to inspect every marker label in the **Task markers** list.
+100. Under Settings > Custom agents, make a Codex agent with high reasoning and one instruction line.
+     Start it from **New**, from the empty pane's card, and from the palette's own "New *agent*
+     session" row. Confirm that the composer shows high, the header chip names the agent, and asking
+     the agent what it was told returns the instruction, including after a node restart resumes it.
+101. Repeat check 100 on Claude Code, then edit the agent's instructions. Confirm that a running session
+     keeps the old text and a new one gets the new text.
+102. Install a loaded package whose manifest declares only `customAgents`. Confirm that the trust prompt
+     shows the instructions in full, that the agent is listed with **Duplicate** but not **Edit**, and
+     that disabling the package takes it out of **New**.
 
 Checks 96–99 passed on 2026-09-27 with an isolated `dev:agent` data root and a loaded fixture plugin.
 The Tauri window refreshed only that plugin after its push, cleared marks across disable, enable,

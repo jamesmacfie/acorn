@@ -60,6 +60,11 @@ after the first accepted prompt. Delegation can share the parent task or create 
 task with a lazy worktree. Aider is available through its terminal profile and keeps the deterministic
 prompt fallback because its profile has no contained one-shot mode.
 
+Custom agents are saved starts for a session: a harness, its model, effort and mode, instructions for
+its system prompt, and a ceiling on acorn's own tools. The owner keeps them under Settings > Custom
+agents, a plugin can ship them, and each is listed under New, in the palette, and to `agent_spawn` by
+name.
+
 ## Integrations and model providers
 
 GitHub uses device-flow OAuth. Linear connections, and Rollbar connections when its loaded package is

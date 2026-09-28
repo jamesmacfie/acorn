@@ -1,4 +1,4 @@
-import type { PluginAgentToolGrant, PluginContextSectionGrant, PluginContributions, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '../api'
+import type { PluginAgentToolGrant, PluginContextSectionGrant, PluginContributions, PluginCustomAgentGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '../api'
 import {
   isCoreExclusiveSlot,
   isExtensionPointKind,
@@ -155,6 +155,17 @@ export const pluginContextSectionGrants = (contributions: PluginContributions): 
       defaultIncluded: section.defaultIncluded,
       maxBytes: section.maxBytes,
       maxTokens: section.maxTokens,
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id))
+
+export const pluginCustomAgentGrants = (contributions: PluginContributions): PluginCustomAgentGrant[] =>
+  (contributions.customAgents ?? [])
+    .map((agent) => ({
+      id: agent.id,
+      name: agent.name,
+      harness: agent.harness,
+      instructions: agent.instructions ?? null,
+      maxToolRisk: agent.maxToolRisk ?? null,
     }))
     .sort((a, b) => a.id.localeCompare(b.id))
 

@@ -7,6 +7,7 @@
 import { createRequire } from 'node:module'
 import { probeClaudeAuthentication } from './authProbe'
 import type { AgentSession } from '../../contract/wire.ts'
+import { sessionCustomAgent } from '../../shared/customAgents'
 import type { HarnessLaunchSpec } from './harness'
 
 const nodeRequire = createRequire(import.meta.url)
@@ -41,12 +42,22 @@ export const claudeHarness: HarnessLaunchSpec = {
   // recovery, and the transcript notice consistently with Codex and contributed harnesses.
   //
   // A session nobody is watching also gets the turn-ending instruction appended to Claude Code's
-  // system prompt. It is appended at creation and again, unchanged, on every resume, because a system
-  // prompt that changes partway through a session invalidates the model's earlier thinking.
-  acpSessionMeta: (session) => ({
-    claudeCode: { options: { settings: { autoContinueAtUsageLimit: false } } },
-    ...(UNATTENDED_KINDS.has(session.kind) ? { systemPrompt: { append: UNATTENDED_TURN_ENDINGS } } : {}),
-  }),
+  // system prompt, after any custom agent's own instructions. It is appended at creation and again,
+  // unchanged, on every resume, because a system prompt that changes partway through a session
+  // invalidates the model's earlier thinking.
+  acpSessionMeta: (session) => {
+    const append = [
+      sessionCustomAgent(session.config)?.instructions,
+      UNATTENDED_KINDS.has(session.kind) ? UNATTENDED_TURN_ENDINGS : undefined,
+    ].filter(Boolean).join('\n\n')
+    return {
+      claudeCode: { options: { settings: { autoContinueAtUsageLimit: false } } },
+      ...(append ? { systemPrompt: { append } } : {}),
+    }
+  },
+  // A custom agent's instructions go in the same appended system prompt, read from the snapshot the
+  // session was created with, so a resume appends exactly what the create did.
+  systemPromptInstructions: true,
   // The CLI reloads a session from its own store, which `--resume` and the terminal handoff both rely
   // on. Compaction is the CLI's `/compact`, but ACP cannot request it, so it stays undeclared until
   // the adapter carries it.

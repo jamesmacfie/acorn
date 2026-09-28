@@ -159,7 +159,7 @@ describe('running an agent from a terminal', () => {
       await screen.press('RETURN')
 
       const open = await screen.frame()
-      expect(open).toContain('Filter providers…')
+      expect(open).toContain('Filter agents…')
       expect(open).toContain('Claude Code')
 
       await stopSaying(screen, 'Claude Code')

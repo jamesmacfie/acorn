@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import type { PluginExtensionGrant } from '@acorn/protocol/api.ts'
+import type { PluginCustomAgentGrant, PluginExtensionGrant } from '@acorn/protocol/api.ts'
 import { EXTENSION_POINT_KINDS, HOOK_MODES } from '@acorn/protocol/extensionPoints.ts'
 
 // One schema for the disclosure arriving from the renderer and the acknowledgement persisted by the
@@ -13,3 +13,13 @@ export const pluginExtensionGrantSchema = z.strictObject({
   target: z.string().min(1).max(130),
   label: z.string().min(1).max(80),
 }) as z.ZodType<PluginExtensionGrant>
+
+// The same rule for a contributed custom agent. Its instructions are part of the comparison, so a
+// changed text reads as newly requested, and both sides have to accept the whole of it.
+export const pluginCustomAgentGrantSchema = z.strictObject({
+  id: z.string().min(1).max(64),
+  name: z.string().min(1).max(100),
+  harness: z.string().min(1).max(130),
+  instructions: z.string().min(1).max(16_000).nullable(),
+  maxToolRisk: z.enum(['read', 'write', 'execute']).nullable(),
+}) as z.ZodType<PluginCustomAgentGrant>

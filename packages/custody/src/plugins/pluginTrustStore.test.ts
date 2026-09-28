@@ -26,6 +26,7 @@ const ack = (over: Partial<PluginAck> = {}): PluginAck => ({
   harnesses: [],
   agentTools: [],
   contextSections: [],
+  customAgents: [],
   decision: 'accepted',
   decidedAt: 1_700_000_000_000,
   ...over,

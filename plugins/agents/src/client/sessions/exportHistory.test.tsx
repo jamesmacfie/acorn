@@ -1,4 +1,5 @@
 import { createRoot } from 'solid-js'
+import { withQueryClient } from './queryClient.helper'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentSession } from '../../contract/wire.ts'
 import type { Task } from '@acorn/plugin-api/client'
@@ -39,7 +40,7 @@ const runExport = async (id: 'export-markdown' | 'export-json') =>
   await new Promise<void>((resolve) => {
     createRoot((dispose) => {
       managedAgentStore.upsertSession(session)
-      const model = createAgentPaneModel({ id: 't1' } as Task, { shown: () => true })
+      const model = withQueryClient(() => createAgentPaneModel({ id: 't1' } as Task, { shown: () => true }))
       model.sessionActions().find((entry) => entry.id === id)!.run()
       queueMicrotask(() => { dispose(); resolve() })
     })

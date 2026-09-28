@@ -1,6 +1,6 @@
-import type { NodePluginPermissions, PluginAgentToolGrant, PluginContextSectionGrant, PluginContributions, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { NodePluginPermissions, PluginAgentToolGrant, PluginContextSectionGrant, PluginContributions, PluginCustomAgentGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import { isExtensionPointKind, isHookMode, type CoreExclusiveSlot, type ExtensionPointKind, type HookMode } from '@acorn/protocol/extensionPoints.ts'
-import { pluginAgentToolGrants, pluginContextSectionGrants, pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginNavigationDestinationGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/plugin/grants.ts'
+import { pluginAgentToolGrants, pluginContextSectionGrants, pluginCustomAgentGrants, pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginNavigationDestinationGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/plugin/grants.ts'
 import { describeCadence } from '@acorn/protocol/schedules.ts'
 import { formatChord } from '../../features/tasks/paneShortcuts'
 import { describeChannel } from '../frames/channels'
@@ -237,6 +237,26 @@ export const contextSectionPermissionLines = (grants: readonly PluginContextSect
       {
         text: `${grant.defaultIncluded ? 'Include' : 'Offer'} “${grant.label}” in task context, bounded to ${grant.maxBytes} bytes and ${grant.maxTokens} tokens`,
         icon: 'notepad-text',
+      },
+    ))
+
+export const customAgentGrants = (contributions: PluginContributions): PluginCustomAgentGrant[] =>
+  pluginCustomAgentGrants(contributions)
+
+// `Declared`, beside the context sections, because the host holds the shape but the words are the
+// plugin's own: text it puts into the system prompt of every session an owner starts from the agent.
+// The instructions are in the sentence and in the key, so the owner reads what the agent will be told
+// and a version that changes one word asks again (docs/managed-agents.md § Custom agents).
+export const customAgentPermissionLines = (grants: readonly PluginCustomAgentGrant[]): PermissionLine[] =>
+  [...grants]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((grant) => line(
+      `custom-agent:${grant.id}:${grant.harness}:${grant.maxToolRisk ?? ''}:${grant.instructions ?? ''}`,
+      {
+        text: `Add the “${grant.name}” agent to New, running on ${grant.harness}${
+          grant.instructions ? `, and tell every session started from it: “${grant.instructions}”` : ''}`,
+        icon: 'bot',
+        high: !!grant.instructions,
       },
     ))
 

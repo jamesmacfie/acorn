@@ -31,6 +31,7 @@ const InlineDiffCard = lazy(() => import('./inlineDiff/InlineDiffCard.tsx'))
 const AgentConcurrencySettings = lazy(() => import('./settings/AgentConcurrencySettings'))
 const AgentPricingSettings = lazy(() => import('./settings/AgentPricingSettings'))
 const AgentSessionDefaultsSettings = lazy(() => import('./settings/AgentSessionDefaultsSettings'))
+const CustomAgentsSettings = lazy(() => import('./settings/CustomAgentsSettings'))
 
 export const agentsClientPlugin: ClientPlugin = {
   name: 'agents',
@@ -106,6 +107,12 @@ export const agentsClientPlugin: ClientPlugin = {
     ctx.settingsPages.register({
       id: 'agent-defaults', label: 'Agent defaults', group: 'general', order: 43, requires: { plugin: 'agents' },
       component: AgentSessionDefaultsSettings,
+    })
+    // Saved starts for a session: a harness, its options, instructions and tool access
+    // (docs/managed-agents.md § Custom agents).
+    ctx.settingsPages.register({
+      id: 'custom-agents', label: 'Custom agents', group: 'general', order: 42, requires: { plugin: 'agents' },
+      component: CustomAgentsSettings,
     })
     // Fleet home's "agents running" number. Addressed at an explicit node, never the ambient one,
     // because the card exists to show several nodes at once.
