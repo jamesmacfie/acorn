@@ -151,9 +151,6 @@ export default function NodeInspector(props: {
             <Inline gap="inline">
               <Heading level={3}>{current().name}</Heading>
               <Badge>{describe()?.label ?? kindOf(current())}</Badge>
-              <Show when={!props.readOnly}>
-                <Button size="sm" variant="bare" onPress={() => props.actions.remove(stepIdentity(current()))}>Delete node</Button>
-              </Show>
             </Inline>
             <Show when={describe()?.description}>
               {(text) => <Text emphasis="muted" wrap>{text()}</Text>}
