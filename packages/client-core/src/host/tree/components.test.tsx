@@ -18,9 +18,9 @@ import { kitComponent, type KitEntry } from './kitEntry'
 // `logic` project has no Solid transform and refuses the first `.tsx` it reaches (vitest.config.ts).
 // Nothing here renders, though — it only asks what shape each entry is, and a loader is never called.
 const HEAVY: KitNodeName[] = [
-  // The diff viewer and the four rows that share `kit/diff/DiffRows.tsx` with it. `DiffPane` reaches
+  // The diff viewer and the five nodes that share `kit/diff/DiffRows.tsx` with it. `DiffPane` reaches
   // features/diff, and through it infra/highlight, which is the syntax highlighter.
-  'DiffPane', 'DiffLine', 'FileHead', 'NonCodeRow', 'SplitCell',
+  'DiffPane', 'DiffLine', 'FileHead', 'NonCodeRow', 'SplitCell', 'StackedDiff',
   // Fetches a grammar per fence at render time, and is the surface a streaming transcript re-renders.
   'Markdown',
   // Carries the follow-scroll machinery.

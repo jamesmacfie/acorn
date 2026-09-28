@@ -40,6 +40,7 @@ export type AgentToolCardCall = {
       | { type: 'fetch_page'; url?: string; prompt?: string }
       | { type: 'other' }
     results?: { url: string; title?: string; domain?: string; snippet?: string }[]
+    status?: { code: number; text?: string }
   }
 }
 

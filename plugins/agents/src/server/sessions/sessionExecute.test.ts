@@ -39,6 +39,9 @@ class ConfigDriver implements AgentDriver {
   readonly profileId = 'claude-code'
   readonly configSets: Array<[string, string]> = []
   readonly turns: AgentDriverTurnOptions[] = []
+  readonly envs: Record<string, string>[] = []
+  // What each turn answers, in order. Past the end of the script every turn answers 'Done.'.
+  replies: Array<{ text: string; stopReason: string }> = []
 
   async probe(): Promise<AgentProviderDescriptor> {
     return {
@@ -59,6 +62,7 @@ class ConfigDriver implements AgentDriver {
   }
 
   async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
+    this.envs.push(options.env)
     const providerSessionRef = options.session.providerSessionRef ?? `cfg-${randomUUID()}`
     let active = false
     let current = advertised()
@@ -73,8 +77,9 @@ class ConfigDriver implements AgentDriver {
       async sendTurn(turn: AgentDriverTurnOptions) {
         active = true
         driver.turns.push(turn)
-        await options.onEvent({ type: 'assistant_message', text: 'Done.' })
-        await options.onEvent({ type: 'turn_completed', stopReason: 'end_turn' })
+        const reply = driver.replies.shift() ?? { text: 'Done.', stopReason: 'end_turn' }
+        if (reply.text) await options.onEvent({ type: 'assistant_message', text: reply.text })
+        await options.onEvent({ type: 'turn_completed', stopReason: reply.stopReason })
         active = false
         return { providerTurnRef: `turn-${turn.turn.id}` }
       },
@@ -196,6 +201,10 @@ describe('agents.sessionExecute config options', () => {
       toolCeiling: tools,
     })
 
+    // Claude Code starts the acorn MCP server from its own registration, so the server gets only what
+    // the provider process inherits, and it lists no tools without a task ID.
+    expect(driver.envs[0]).toMatchObject({ ACORN_TASK_ID: taskId, ACORN_SESSION_ID: session.id })
+
     const patched = await runtime.patchSession(session.id, { config: { toolCeiling: { maxRisk: 'execute' } } })
     expect(patched.config.toolCeiling).toEqual(tools)
   })
@@ -215,5 +224,47 @@ describe('agents.sessionExecute config options', () => {
     const result = await execute()
     expect(result?.status).toBe('ok')
     expect(driver.configSets).toEqual([])
+  })
+
+  describe('a turn that ends without what the step needs', () => {
+    const answerSchema = { type: 'object', properties: { answer: { type: 'string' } }, required: ['answer'] }
+    const executeWithSchema = () => createSessionExecute(runtime)({
+      taskId,
+      profileId: 'claude-code',
+      title: 'Workflow: synthesise',
+      prompt: 'Write one answer.',
+      schema: answerSchema,
+      runId: 'run-1',
+      stepId: 'step-1',
+    })
+    const promptOf = (turn: AgentDriverTurnOptions) => turn.input.flatMap((part) => part.type === 'text' ? [part.text] : []).join('\n')
+
+    it('is told to carry on, and the step takes the result the next turn returns', async () => {
+      driver.replies = [
+        { text: 'I have read the files. Next I will write the answer.', stopReason: 'end_turn' },
+        { text: '```json\n{"answer":"42"}\n```', stopReason: 'end_turn' },
+      ]
+      const outcome = await executeWithSchema()
+      expect(outcome?.status).toBe('ok')
+      expect(outcome?.capture.structuredOutput).toEqual({ answer: '42' })
+      expect(driver.turns).toHaveLength(2)
+      expect(promptOf(driver.turns[1]!)).toContain('fenced `json` result block')
+      expect(driver.turns[1]!.turn.effectivePolicy.continuationOf).toBe(driver.turns[0]!.turn.id)
+    })
+
+    it('is told twice at most, then the step reports the malformed result', async () => {
+      driver.replies = [1, 2, 3, 4].map(() => ({ text: 'Still working.', stopReason: 'end_turn' }))
+      const outcome = await executeWithSchema()
+      expect(outcome?.status).toBe('malformed')
+      expect(driver.turns).toHaveLength(3)
+    })
+
+    it('fails the step on a refusal without asking again', async () => {
+      driver.replies = [{ text: '', stopReason: 'refusal' }]
+      const outcome = await executeWithSchema()
+      expect(outcome?.status).toBe('error')
+      expect(outcome?.stderrTail).toContain('The model declined this request.')
+      expect(driver.turns).toHaveLength(1)
+    })
   })
 })

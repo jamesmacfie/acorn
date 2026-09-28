@@ -130,6 +130,10 @@ export const NODE_SUPPORT = {
     dom: 'full', tui: 'reduced',
     loss: 'no per-file collapse control; the path and the counts only',
   },
+  StackedDiff: {
+    dom: 'full', tui: 'reduced',
+    loss: 'no intra-line word highlight, and the header has no copy control',
+  },
   NonCodeRow: {
     dom: 'full', tui: 'reduced',
     loss: 'a dim line saying what is not being shown, with no control to act on it',

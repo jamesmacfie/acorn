@@ -2,6 +2,8 @@ import { workflowDataHandlers } from './data'
 import { workflowIncrementalQuery } from '../processing/incremental'
 import { type HeadlessResult, type PluginDatabase } from '@acorn/plugin-api/node'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
+import type { GateFormOutput, GateFormProposal } from '../../shared/gateForm'
+import { resolveGateFormProposal } from '../validation/bindings'
 import type { PolicyEvaluator, StepHandler, StepHandlerContext, StepHandlerOutcome, StepKindContribution, StepValidator, WorkflowStepDef, WorkflowStepRow } from '../../shared/workflowContracts'
 import type { RunnerDeps, StepRunRequest } from '../runs/deps'
 
@@ -85,8 +87,7 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
     ...workflowDataHandlers({ access: services.deps.dataAccess, setStep: services.setStep,
       incremental: (runId, stepId, query) => workflowIncrementalQuery(services.db, runId, stepId, query) }),
     agent: runAgent,
-    'gate-human': async (ctx) =>
-      ctx.run.posture === 'autonomous' ? { status: 'done', result: { approved: 'autonomous' } } : { status: 'waiting-gate' },
+    'gate-human': runHumanGate,
     'gate-policy': runPolicy,
     'ci-loop': runCiLoop,
     decide: runDecision,
@@ -141,6 +142,29 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
     if (outcome.status !== 'done') return outcome
     const handoff = outcome.structured !== undefined ? JSON.stringify(outcome.structured, null, 2) : ((outcome.result as { result?: string }).result ?? '')
     return { ...outcome, inputs: { prompt: inputs, tools: ctx.tools }, ...(handoff ? { handoff } : {}) }
+  }
+
+  // A plain gate waits, or passes straight through under an autonomous posture. A gate with a form
+  // resolves its proposal first and freezes it into the step, so the reviewer edits against values
+  // that cannot move underneath them.
+  async function runHumanGate(ctx: StepHandlerContext): Promise<StepHandlerOutcome> {
+    const autonomous = ctx.run.posture === 'autonomous'
+    const form = ctx.def.form
+    if (!form) return autonomous ? { status: 'done', result: { approved: 'autonomous' } } : { status: 'waiting-gate' }
+    let values: GateFormProposal['form']['values']
+    try {
+      values = resolveGateFormProposal(form, ctx.inputs, await services.steps(ctx.run.id), ctx.predecessorValues)
+    } catch (error) {
+      return { status: 'failed', error: error instanceof Error ? error.message : 'The form proposal could not be resolved.' }
+    }
+    const inputs: GateFormProposal = { form: { values } }
+    if (!autonomous) return { status: 'waiting-gate', inputs }
+    const missing = form.fields.filter((field) => field.required && values[field.name] === undefined).map((field) => field.name)
+    if (missing.length) {
+      return { status: 'failed', error: `The run is autonomous, so nobody was asked to fill the required form fields: ${missing.join(', ')}.` }
+    }
+    const output: GateFormOutput = { approved: 'autonomous', values, edited: [] }
+    return { status: 'done', result: { approved: 'autonomous' }, structured: output, inputs }
   }
 
   async function runDecision(ctx: StepHandlerContext): Promise<StepHandlerOutcome> {

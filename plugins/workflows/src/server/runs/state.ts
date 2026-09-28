@@ -1,4 +1,4 @@
-import { asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 import type { PluginDatabase, SpanHandle } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
 import type { WorkflowRunRow, WorkflowStepRow } from '../../shared/workflowContracts'
@@ -78,12 +78,22 @@ export class WorkflowRunState {
   }
 
   async setStep(stepId: string, patch: Partial<WorkflowStepRow>): Promise<void> {
+    await this.setStepIf(stepId, undefined, patch)
+  }
+
+  /** Write only while the persisted status matches the expected status. */
+  async setStepIf(stepId: string, expected: string | undefined, patch: Partial<WorkflowStepRow>): Promise<boolean> {
     // A patch without a status edge does not emit a step or gate event.
     const [before] = patch.status == null
       ? []
       : await this.db.select({ runId: schema.workflowSteps.runId, status: schema.workflowSteps.status })
         .from(schema.workflowSteps).where(eq(schema.workflowSteps.id, stepId))
-    await this.db.update(schema.workflowSteps).set({ ...patch, updatedAt: Date.now() }).where(eq(schema.workflowSteps.id, stepId))
+    const written = await this.db.update(schema.workflowSteps).set({ ...patch, updatedAt: Date.now() })
+      .where(expected == null
+        ? eq(schema.workflowSteps.id, stepId)
+        : and(eq(schema.workflowSteps.id, stepId), eq(schema.workflowSteps.status, expected)))
+      .returning({ id: schema.workflowSteps.id })
+    if (!written.length) return false
     if (before && before.status !== patch.status) {
       this.#markStepSpan(before.runId, stepId, patch.status!)
       this.deps.stepChanged?.(before.runId, stepId, patch.status!)
@@ -93,6 +103,7 @@ export class WorkflowRunState {
       }
     }
     this.deps.statusChanged?.()
+    return true
   }
 
   #markStepSpan(runId: string, stepId: string, status: string): void {

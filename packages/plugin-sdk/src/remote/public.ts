@@ -72,6 +72,7 @@ export declare const Markdown: (props: KitNodeProps) => JSX.Element
 export declare const DiffPane: (props: KitNodeProps) => JSX.Element
 export declare const DiffLine: (props: KitNodeProps) => JSX.Element
 export declare const FileHead: (props: KitNodeProps) => JSX.Element
+export declare const StackedDiff: (props: KitNodeProps) => JSX.Element
 export declare const NonCodeRow: (props: KitNodeProps) => JSX.Element
 export declare const SplitCell: (props: KitNodeProps) => JSX.Element
 export declare const EmptyState: (props: KitNodeProps) => JSX.Element

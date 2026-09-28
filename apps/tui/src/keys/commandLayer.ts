@@ -55,7 +55,7 @@ const isBareKey = (key: string): boolean => !key.includes('+')
  * on one chord, and a duplicate that shows up in the conflict list beats a chord that silently never
  * fires.
  */
-const asCtrl = (key: string): string => (key.startsWith('super+') ? `ctrl+${key.slice('super+'.length)}` : key)
+export const asCtrl = (key: string): string => (key.startsWith('super+') ? `ctrl+${key.slice('super+'.length)}` : key)
 
 const mayFire = (binding: ResolvedKeybinding, scope: CommandScope): boolean => {
   if (binding.active && !binding.active()) return false

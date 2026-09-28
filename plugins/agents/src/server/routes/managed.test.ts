@@ -40,6 +40,7 @@ const METHODS = [
   'artifacts', 'artifact',
   'artifactContent', 'createSession', 'importTranscript', 'verifyImportedResume', 'listSessions',
   'snapshot', 'events', 'enqueueTurn', 'patchQueuedTurn', 'cancelTurn', 'resolveRequest',
+  'implementCodexPlan',
   'patchSession', 'fork', 'compact', 'regenerateTitle', 'deleteSession', 'handoffToTerminal', 'resumeManaged',
   'exportSession', 'wait', 'search',
 ] as const
@@ -89,6 +90,16 @@ describe('a task-scoped credential is confined to its own agent sessions', () =>
     const response = await asTask1().fetch(req('/api/sessions/s1/regenerate-title', 'POST'), {} as Env)
     expect(response.status).toBe(200)
     expect(seen).toEqual(['s1'])
+  })
+
+  it('confines plan implementation to the owning session', async () => {
+    const seen: string[] = []
+    setManagedAgentsBridge(fake({ implementCodexPlan: async (id, itemId) =>
+      (seen.push(`${id}:${itemId}`), { id: 'turn' } as never) }))
+    const app = asTask1()
+    expect((await app.fetch(req('/api/sessions/s2/implement-plan', 'POST', { itemId: 'plan-1' }), {} as Env)).status).toBe(404)
+    expect((await app.fetch(req('/api/sessions/s1/implement-plan', 'POST', { itemId: 'plan-1' }), {} as Env)).status).toBe(200)
+    expect(seen).toEqual(['s1:plan-1'])
   })
 
   it('cannot start or import a session into another task', async () => {

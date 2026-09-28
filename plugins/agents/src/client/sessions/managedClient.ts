@@ -22,12 +22,12 @@ const ROOT = '/v1/p/agents'
 const sessionRoute = (sessionId: string, suffix = '') =>
   `${ROOT}/sessions/${encodeURIComponent(sessionId)}${suffix}`
 
-const jsonWrite = <T>(url: string, method: string, body?: unknown, idempotent = false): Promise<T> =>
+const jsonWrite = <T>(url: string, method: string, body?: unknown, idempotent: boolean | string = false): Promise<T> =>
   writeJson<T>(url, {
     method,
     headers: {
       ...(body === undefined ? {} : { 'content-type': 'application/json' }),
-      ...(idempotent ? { 'idempotency-key': crypto.randomUUID() } : {}),
+      ...(idempotent ? { 'idempotency-key': typeof idempotent === 'string' ? idempotent : crypto.randomUUID() } : {}),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
@@ -88,8 +88,8 @@ export const managedAgentApi = {
     if (filter.workspaceId) params.set('workspaceId', filter.workspaceId)
     return readJson<AgentSession[]>(`${ROOT}/sessions/search?${params}`, options)
   },
-  createSession: (input: CreateAgentSessionInput) =>
-    jsonWrite<AgentSession>(`${ROOT}/sessions`, 'POST', input, true),
+  createSession: (input: CreateAgentSessionInput, idempotencyKey?: string) =>
+    jsonWrite<AgentSession>(`${ROOT}/sessions`, 'POST', input, idempotencyKey ?? true),
   importTranscript: (input: ImportAgentTranscriptInput) =>
     jsonWrite<AgentSession>(`${ROOT}/transcript-imports`, 'POST', input),
   // `fold=1`: this reader takes one record per tool call and pages on from `foldedThroughSeq`
@@ -98,8 +98,10 @@ export const managedAgentApi = {
     readJson<AgentSessionSnapshot>(sessionRoute(sessionId, `?afterSeq=${afterSeq}&limit=${limit}&fold=1`)),
   events: (sessionId: string, afterSeq: number, limit = 2_000) =>
     readJson<AgentEventPage>(sessionRoute(sessionId, `/events?afterSeq=${afterSeq}&limit=${limit}&fold=1`)),
-  enqueue: (sessionId: string, input: Omit<EnqueueAgentTurnInput, 'idempotencyKey'>) =>
-    jsonWrite<AgentTurn>(sessionRoute(sessionId, '/turns'), 'POST', input, true),
+  enqueue: (sessionId: string, input: Omit<EnqueueAgentTurnInput, 'idempotencyKey'>, idempotencyKey?: string) =>
+    jsonWrite<AgentTurn>(sessionRoute(sessionId, '/turns'), 'POST', input, idempotencyKey ?? true),
+  implementPlan: (sessionId: string, itemId: string) =>
+    jsonWrite<AgentTurn>(sessionRoute(sessionId, '/implement-plan'), 'POST', { itemId }),
   patchQueuedTurn: (sessionId: string, turnId: string, patch: { input?: AgentTurn['input']; ordinal?: number }) =>
     jsonWrite<AgentTurn>(
       sessionRoute(sessionId, `/turns/${encodeURIComponent(turnId)}`),

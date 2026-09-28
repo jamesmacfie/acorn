@@ -86,6 +86,7 @@ export const NODE_FOCUS = {
   DiffPane: 'none',
   DiffLine: 'none',
   FileHead: 'none',
+  StackedDiff: 'none',
   NonCodeRow: 'none',
   SplitCell: 'none',
   EmptyState: 'none',

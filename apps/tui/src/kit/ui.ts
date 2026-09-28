@@ -16,7 +16,7 @@ export {
 export {
   Alert, Badge, ChipRow, Chip, CodeBlock, DescriptionList, DiffLine, DiffPane, EmptyState, Facts,
   FileHead, Grid, Heading, Icon, Kbd, Link, Log, Markdown, Meter, NonCodeRow, Row, RowActions, Rows,
-  Spinner, SplitCell, StatusDot, Table, TableCell, TableHead, TableRow, Text, TreeRow, UserAvatar,
+  Spinner, SplitCell, StackedDiff, StatusDot, Table, TableCell, TableHead, TableRow, Text, TreeRow, UserAvatar,
 } from './showing'
 export {
   Button, Checkbox, Composer, ConfirmButton, CopyButton, Field, FindBar, IconButton, Input, KeyValueEditor,

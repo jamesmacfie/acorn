@@ -82,6 +82,22 @@ Three of them are newer than the rest and worth naming:
 checkout readers. Use it when a plugin must validate that a task-scoped record names a project in the
 same workspace. It does not grant project writes or raw filesystem access.
 
+### Contributing a workflow step
+
+Handle `workflows:step-kind` from your node entrypoint. The host qualifies your entry ID as
+`<yourPluginId>:<entryId>`, which is the `kind` a saved workflow uses. Provide a handler and a
+`describe` with a label, icon, description, field list, and output description. Add a `validate`
+callback only for checks the field rules cannot express. Fields read and write the step's `with`
+object; the handler receives its template strings already rendered. Return `status: 'done'` with
+`structured` for a typed result, or `status: 'failed'` with a clear error. Provide an output schema
+when the result has a stable shape. See [Contributed step kinds](../workflows.md#contributed-step-kinds)
+for the full contract and the HTTP plugin for a working example.
+
+If the handler needs another plugin, declare that plugin in `requires.plugins` and its capability in
+`permissions.node.capabilities`. Resolve the capability inside the handler through
+`ctx.capabilities.get(id)` or `require(id)` so a disabled or reloaded provider cannot leave a cached
+implementation. Keep the step's saved kind ID stable; a rename makes saved workflows unavailable.
+
 ### Contributing findings from an installed plugin
 
 An external producer does not import Findings' runtime or receive its storage. It requires a
@@ -369,7 +385,9 @@ an overlay in, so leave your static preview up there rather than showing a contr
 ### Reaching the bridge
 
 In-repo bundles import `connect()`, `mountFrame()` and `mountTree()` from `@acorn/plugin-api/ui/sdk`,
-and the tree path's nodes and `solidTree()` from `@acorn/plugin-api/ui/tree`. **A hand-written
+and the tree path's nodes and `solidTree()` from `@acorn/plugin-api/ui/tree`. `connect()` is for a
+frame. A tree uses the `bridge` its renderer is mounted with, because the host refuses requests on the
+bundle's shared port, which is what `connect()` returns in a worker. **A hand-written
 `client.js` cannot.** That is a bare specifier with no bundler to resolve it, and the origin would have
 nowhere to serve the resolved file from even if there were. Copying the SDK's source in is not an
 option either: the implementation behind `packages/client-core/src/host/frames/sdk.ts` is TypeScript

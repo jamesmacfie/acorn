@@ -5,7 +5,7 @@
 // (@acorn/protocol/plugin/contract.ts), which the delivery seam converts into one of these. They differ
 // only where a manifest cannot carry a function: `entry` resolves a path here and is a package-relative
 // string there, and `probeAuth` is a call here and a route there.
-import type { AgentCapability } from '../../contract/wire.ts'
+import type { AgentCapability, AgentSession } from '../../contract/wire.ts'
 
 /** What the protocol cannot ask the agent, so the harness declares it. A quirk joins this list when a
  *  second harness needs it. See docs/plugin-authoring.md § Harnesses. */
@@ -51,8 +51,10 @@ export type HarnessLaunchSpec = {
    *  Configuration only, never credentials: see the note on the generic driver's spawn. */
   envPassthrough?: readonly string[]
   /** Adapter-specific metadata on ACP session creation and resume. Built-in only: a contributed
-   *  harness's behavior must remain expressible through the public manifest contract. */
-  acpSessionMeta?: Record<string, unknown>
+   *  harness's behavior must remain expressible through the public manifest contract. A function of
+   *  the session because what an adapter is told can depend on whether anyone is watching. It is
+   *  called on every create and every resume, so it must return the same value for the same session. */
+  acpSessionMeta?: (session: AgentSession) => Record<string, unknown>
   quirks?: HarnessQuirks
   /** Whether the harness's own account is logged in, for the Agent Center's provider-health row.
    *  Absent means the row shows installed-or-not only. */

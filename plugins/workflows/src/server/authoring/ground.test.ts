@@ -13,6 +13,7 @@ import { extractJsonObject, groundWorkflow, parseGeneratedWorkflow, stripJsonFen
 // below is pinned against the shape it actually has (../../../../http/src/server/workflowStep.ts).
 const httpKind: StepKindDescription = {
   label: 'Call an HTTP endpoint',
+  description: 'Call an HTTP endpoint.', icon: 'globe', output: { description: 'HTTP response.' },
   fields: [
     { id: 'method', label: 'Method', type: 'select', required: true, options: [{ value: 'GET', label: 'GET' }] },
     { id: 'url', label: 'URL', type: 'text', required: true },
@@ -368,4 +369,29 @@ describe('the two properties that matter', () => {
       expect(JSON.stringify(result.def, null, 2)).toBe(JSON.stringify(example.def, null, 2))
     })
   }
+})
+
+describe('a generated gate form', () => {
+  const draft = { id: 'draft', name: 'draft', prompt: 'Draft it.', schema: { type: 'object', properties: { title: { type: 'string' } } } }
+  const form = { fields: [{ name: 'title', schema: { type: 'string' }, required: true }], values: { title: { address: { from: 'step', stepId: 'draft', pointer: '/title' } } } }
+
+  it('keeps a form that would load, and a later binding to its values', () => {
+    const def = workflow([
+      draft,
+      { id: 'approve', name: 'approve', kind: 'gate-human', after: ['draft'], form },
+    ])
+    const result = ground(def)
+    expect(result.notes).toEqual([])
+    expect(result.def).toBe(def)
+  })
+
+  it('drops a form that would not load and keeps the gate', () => {
+    const result = ground(workflow([
+      draft,
+      { id: 'approve', name: 'approve', kind: 'gate-human', after: ['draft'], form: { fields: [{ name: 'title' }] } },
+    ]))
+    expect(codes(result)).toEqual(['dropped-form'])
+    expect(messages(result)).toContain('still waits for a person')
+    expect((result.def as WorkflowDef).steps[1]).toEqual({ id: 'approve', name: 'approve', kind: 'gate-human', after: ['draft'] })
+  })
 })

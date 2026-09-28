@@ -6,6 +6,6 @@ export { Badge, Chip, ChipRow, Icon, Kbd, Spinner, StatusDot, UserAvatar } from 
 export { DescriptionList, Facts, Meter } from './showing/facts'
 export { CodeBlock, Lines, Log, Markdown } from './showing/documents'
 export { Grid, Table, TableCell, TableHead, TableRow } from './showing/tables'
-export { AnnotationMarks, DiffLine, FileHead, NonCodeRow, SplitCell } from './showing/diffRows'
+export { AnnotationMarks, DiffLine, FileHead, NonCodeRow, SplitCell, StackedDiff } from './showing/diffRows'
 export { DiffPane } from './showing/diffPane'
 export { Alert, EmptyState } from './showing/feedback'

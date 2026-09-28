@@ -62,6 +62,14 @@ owns packaging; [API reference](../api-reference.md) owns the invocation route; 
 [CLI command authoring](../plugin-authoring/cli-commands.md) owns the loaded-plugin descriptor.
 The five-phase proposal and its refused alternatives remain in git history.
 
+`approval.md` shipped on 2026-09-29 and was deleted. [Workflow
+execution](../workflows/execution.md#human-gates) owns the gate form's contract,
+[workflows](../workflows.md) owns the run pane, [authoring](../workflows/authoring.md) owns the
+inspector and generation, [security](../security.md) records that a gate answer is device-only, and
+[API reference](../api-reference.md) owns the gate route. The manual check is part of item 52 in
+[testing](../testing.md). The deferred rejection branch, rejection note, and tool-call gates remain
+in git history.
+
 `phased-review-steps/`, `user-extensions/`, `node-first/`, `node/`, `acp/`, `tauri/`, `events/` and the later
 `events.md` follow-up (shipped on 2026-09-11), `layout/`, `structure/`,
 `structure-followup/`, `before-terminal-ui/`, `terminal/`, `terminal-updates/`, `terminal-rewrite/`,

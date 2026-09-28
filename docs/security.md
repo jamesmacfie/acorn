@@ -280,6 +280,12 @@ child-process environment. Every call to `reveal()` sits outside the scrub-on-th
   back to the snapshot: the write is a slug of the definition name, confined to `.acorn/workflows/`
   by `resolveInRoot`, and the next start from that file asks for the acknowledgement
   ([workflows.md](./workflows.md) § Database definitions).
+- A gate answer is device-only. `POST /v1/p/workflows/workflows/runs/:runId/gate` refuses a
+  task-confined caller with 403 even on its own run, for approval and rejection alike, because the
+  agent working in the run holds that run's credential and a human gate it could answer would be no
+  gate. Retry is refused for the same reason. Cancel and kill stay open to the run's own task,
+  because both only stop work. A foreign or unknown run still answers 404 first, so the refusal does
+  not reveal which runs exist.
 - A child workflow is resolved in its parent task's workspace and project before any child task is
   created. Repository definitions re-enter the configuration trust check; database definitions stay
   device-owned. The child receives its own task-confined token, never the parent's token. Its tool

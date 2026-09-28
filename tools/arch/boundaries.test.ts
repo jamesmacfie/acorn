@@ -455,6 +455,27 @@ describe('architecture boundaries', () => {
     expect(offences.sort()).toEqual([])
   })
 
+  it('a tree reaches the host through the bridge it was mounted with, never connect()', () => {
+    // In a tree worker, `connect()` resolves to the bundle's shared port, and the host refuses every
+    // request on it from a bundle whose SDK hands each tree its own bridge (host/tree/workerHost.ts).
+    // The database and API panes both shipped that way and showed "this bridge is not bound to a
+    // mounted tree" on open. Their tests mocked the client module, so only a static rule sees it.
+    const offences: string[] = []
+    let scanned = 0
+    for (const plugin of readdirSync(join(ROOT, 'plugins'))) {
+      const dir = join(ROOT, 'plugins', plugin, 'src/tree')
+      if (!existsSync(dir)) continue
+      for (const file of walk(dir)) {
+        if (!/\.tsx?$/.test(file) || isTestCode(file)) continue
+        scanned++
+        const code = readFileSync(file, 'utf8')
+        if (/import\s*\{[^}]*\bconnect\b[^}]*\}\s*from '@acorn\/plugin-api\/ui\/sdk'/.test(code)) offences.push(rel(file))
+      }
+    }
+    expect(scanned).toBeGreaterThan(10) // anti-vacuity: the walker found the tree directories
+    expect(offences.sort()).toEqual([])
+  })
+
   it('a compiled plugin pane writes no DOM either', () => {
     // Same rule, other tier. A compiled pane runs in the shell's process and could reach for a `<form>`
     // or a `class` and have it work today, which is how seven files of raw DOM accumulated behind a
@@ -581,7 +602,7 @@ describe('architecture boundaries', () => {
       '@acorn/protocol': 80,
       // Model-provider error guidance needs a pure path for logic tests and remote trees. Importing
       // the kit/lib barrel here would pull renderer-only modules into those consumers.
-      '@acorn/client-core': 151,
+      '@acorn/client-core': 154,
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 10,

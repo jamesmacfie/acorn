@@ -192,7 +192,10 @@ export function DiffPane(props: {
 
   // What the source draws under a line, known up front, plus any other plugin's marks. As a
   // fingerprint, because whether a line's block can reuse a height measured earlier depends on it.
-  const extraLines = createMemo(() => new Set((source().lineExtra?.anchors() ?? []).map((anchor) => lineKey(anchor.path, anchor.side, anchor.line))))
+  const extraLines = createMemo(() => new Set([
+    ...(source().lineExtra?.anchors() ?? []),
+    ...(source().inlineChat?.anchors() ?? []),
+  ].map((anchor) => lineKey(anchor.path, anchor.side, anchor.line))))
   const lineExtraPrint = (row: CodeRow): string | null => {
     const side = row.kind === 'delete' ? 'old' : 'new'
     const line = side === 'old' ? row.oldNo : row.newNo
@@ -204,7 +207,8 @@ export function DiffPane(props: {
   const hasLineExtra = (row: CodeRow) => lineExtraPrint(row) != null
   const lineExtra = (row: CodeRow) => {
     const point = props.annotations
-    return [source().lineExtra?.render(row), point ? <AnnotationMarks point={point} itemKey={annotationKey(row)} /> : null]
+    const chat = source().inlineChat?.render(row)
+    return [source().lineExtra?.render(row), chat ? <div class="diff-inline-chat">{chat}</div> : null, point ? <AnnotationMarks point={point} itemKey={annotationKey(row)} /> : null]
   }
 
   // The dynamic blocks: threads, and whatever a line draws under itself (./diffLayout.ts).
@@ -226,7 +230,7 @@ export function DiffPane(props: {
   const itemBlocks = (item: DiffItem, mode: ViewMode) => {
     if (item.kind !== 'segment' && item.kind !== 'overlay') return []
     const rows = itemRows(item)
-    if (rows) return rowBlocks(rows, mode, blockInputs)
+    if (rows) return rowBlocks(rows, mode, blockInputs, item.key)
     // Not loaded yet: the segment's threads, known from their line numbers, reserved at its end until
     // its rows say where each one goes.
     const at = view.fixedHeight(item, mode)
@@ -608,8 +612,9 @@ export function DiffPane(props: {
           lineExtra,
           lineAction: source().lineAction,
           openLine: source().openLine,
-          lineBlock: (row) => lineBlock(row, blockInputs)?.id ?? null,
-          bandBlock: (left, right) => bandBlock(left, right, blockInputs)?.id ?? null,
+          askAgent: source().inlineChat?.open,
+          lineBlock: (row, itemKey) => lineBlock(row, blockInputs, itemKey)?.id ?? null,
+          bandBlock: (left, right, itemKey) => bandBlock(left, right, blockInputs, itemKey)?.id ?? null,
           observeBlock: layout.observeBlock,
         }}
       />

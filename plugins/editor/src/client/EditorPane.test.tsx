@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { EditorView } from '@codemirror/view'
 import { prefsKey } from '@acorn/protocol/api.ts'
 import type { Task } from '@acorn/plugin-api/client'
-import { Rectangle } from '@acorn/plugin-api/ui'
+import { paneCollapseKey, Rectangle, sidebarCollapse } from '@acorn/plugin-api/ui'
 
 // The editor pane against a real CodeMirror, in jsdom. What is stubbed is the worktree behind it and
 // the two sidebar panels, because neither is what this file is about; the editor, its per-file state,
@@ -90,6 +90,7 @@ afterEach(() => {
   lineMarkers.mockClear()
   read.mockImplementation(async (_taskId, path) => disk.get(path) ?? '')
   quitEditor = undefined
+  sidebarCollapse(paneCollapseKey('editor'))[1](false)
   localStorage.clear()
 })
 
@@ -127,6 +128,24 @@ const showing = async (view: () => EditorView, text: string) =>
   vi.waitFor(() => expect(view().state.doc.toString()).toContain(text))
 
 describe('the editor pane', () => {
+  it('uses the shared collapse control and keeps the sidebar panels mounted in an empty rail', async () => {
+    const { host } = mount()
+    await editor(host)
+    const sidebar = host.querySelector<HTMLElement>('.ui-listdetail-list')!
+    const tree = host.querySelector<HTMLElement>('[data-testid="file-tree-selection"]')!
+    const toggle = host.querySelector<HTMLButtonElement>('.ui-listdetail-edge .ui-btn')!
+
+    toggle.click()
+    expect(host.querySelector<HTMLElement>('.ui-listdetail')?.dataset.list).toBe('collapsed')
+    expect(sidebar.style.visibility).toBe('hidden')
+    expect(sidebar.querySelector('[data-testid="file-tree-selection"]')).toBe(tree)
+
+    toggle.click()
+    expect(host.querySelector<HTMLElement>('.ui-listdetail')?.dataset.list).toBe('default')
+    expect(sidebar.style.visibility).toBe('')
+    expect(sidebar.querySelector('[data-testid="file-tree-selection"]')).toBe(tree)
+  })
+
   it('draws independent adjacent markers for PR and uncommitted lines', async () => {
     const { host } = mount()
     const view = await editor(host)

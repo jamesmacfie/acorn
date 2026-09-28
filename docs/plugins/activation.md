@@ -274,6 +274,10 @@ data root by default, or `-- --package-root ../desktop/dist/bundled-plugins` to 
 staging directory instead, which is the one to use when iterating on a **bundled** plugin's frame under
 `pnpm dev` (that directory is the copy the app trusts and reconciles from).
 
+For a plugin that depends on the workspace `acorn-plugin-sdk`, `build-plugin.mjs` builds the SDK first:
+its package exports resolve to generated `dist/` files. The agent-cost lint task has the same build
+prerequisite, so a clean checkout can type-check it without a separate preparation command.
+
 A malformed `acorn-plugin.config.mjs` no longer waits for a rebuild or a boot to announce itself:
 `validatePluginConfig` (`@acorn/plugin-api/testkit`) runs the real manifest schema over it, and
 `apps/node/test/integration/pluginSystem/pluginConfigs.test.ts` does that for every loadable plugin at `pnpm test` time.

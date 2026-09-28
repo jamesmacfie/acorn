@@ -65,6 +65,10 @@ column. `Toolbar`'s `size="sm"` is for a strip *inside* the contents — a filte
 status line under a body — and picking it for chrome is what left the browser preview's address bar
 at half the height of the agents header one pane over. Tab strips are the deliberate exception at
 `--tab-h`: a strip under a pane header should read as subordinate to it, not as a second header.
+When a `Tabs` or `DocumentTabs` strip is itself the header, `level="pane"` gives it `--pane-head-h`.
+Both heights include the bottom divider; the tab controls subtract its width so adjacent headers
+end on the same line. The editor's file navigation and document strip, the host's `tabs` layout,
+and the terminal drawer use the pane level.
 
 ### Rail controls and status markers
 
@@ -300,6 +304,11 @@ the width the two icon rails already read, and the drag handle goes with the wid
 to. The control rides the divider rather than sitting in the list's header, because in the `split`
 form the header belongs to a `ListColumn` the caller built and this node has nothing to put a button
 into, and because a collapsed column has no header left to sit in.
+
+When its contents have no readable rail form, the kit's `ListDetail` can take
+`collapseContent="empty"`. It hides the list's contents while collapsed but keeps them mounted, so
+inputs, search results and scroll state are still there when the reader expands it. The expand
+control stays on the divider. The editor uses this for its file tree and search panel.
 
 The divider and the control on it are one node, `CollapseEdge`, and both tiers draw it: the kit's
 `ListDetail` and the host's `list-detail` layout. They each wrote their own at first, and the two
@@ -595,6 +604,13 @@ renders `dialog` with `aria-modal` and hands focus back to its opener. Hover is 
 anything a pointer can reach, focus can reach, so a `RowActions` that appears on hover appears on
 focus too.
 
+Desktop tab lists stay on one row and scroll horizontally when their labels exceed the available
+width. The selected tab is brought into view; controls beside the list stay visible. GitHub, Docker,
+HTTP, Rollbar, Linear, and host `tabs` layouts use the kit's `Tabs` for content selection. Editor and
+terminal document tabs keep their close and status controls, and Home dashboard tabs keep inline
+rename and per-tab actions; all three tab types share the same scroll rule. The rail and pane
+switcher are navigation controls with separate layout contracts.
+
 A long list says `virtual` on its `Rows` and changes nothing else. The scroller, the row placement and
 the density number all become the kit's, and the collection stays keyed over the whole list rather than
 the drawn window, so the arrows still walk past the last row on screen. Before it existed, GitHub's
@@ -775,6 +791,7 @@ edge, and no real-WebKit run has accepted it.
 | `DiffPane` | none | reduced: unified only, `+`/`-` in colour, annotations as indented lines under their row; windowed, so a long patch draws the rows around the viewport and not all of them |
 | `DiffLine` | none | reduced: one line, `+`/`-`/space in the gutter, no intra-line highlight |
 | `FileHead` | none | reduced: the path in bold with `+n −m` right-aligned |
+| `StackedDiff` | none | reduced: the `FileHead` line, then each hunk header and `DiffLine` below it |
 | `NonCodeRow` | none | reduced: a grey line saying what is not being shown, such as `binary file` |
 | `SplitCell` | none | absent: side-by-side needs 160 cells, so a terminal diff is unified |
 | `EmptyState` | none | centred grey text |

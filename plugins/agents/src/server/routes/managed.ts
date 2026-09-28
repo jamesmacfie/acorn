@@ -66,6 +66,7 @@ export type ManagedAgentsBridge = {
   snapshot(sessionId: string, afterSeq?: number, eventLimit?: number, foldTools?: boolean): Promise<AgentSessionSnapshot>
   events(sessionId: string, afterSeq?: number, limit?: number, foldTools?: boolean): Promise<AgentEventPage>
   enqueueTurn(sessionId: string, input: EnqueueAgentTurnInput): Promise<AgentTurn>
+  implementCodexPlan(sessionId: string, itemId: string): Promise<AgentTurn>
   patchQueuedTurn(sessionId: string, turnId: string, patch: { input?: AgentTurn['input']; ordinal?: number }): Promise<AgentTurn>
   cancelTurn(sessionId: string, turnId?: string): Promise<void>
   resolveRequest(sessionId: string, requestId: string, resolution: unknown, idempotencyKey: string): Promise<AgentRequest>
@@ -110,6 +111,7 @@ const pageQuerySchema = z.object({
 const exportQuerySchema = z.object({ format: z.enum(['json', 'markdown']).default('json') })
 const forkBodySchema = z.object({ title: z.string().trim().min(1).max(500).optional() })
 const cancelBodySchema = z.object({ turnId: z.string().uuid().optional() })
+const implementPlanBodySchema = z.object({ itemId: z.string().min(1).max(2_000) })
 const attachmentQuerySchema = z.object({ taskId: z.string().uuid() })
 const idempotencyKey = (headers: Headers): string | null => {
   const key = headers.get('idempotency-key')?.trim()
@@ -303,6 +305,12 @@ export const managedAgents = new Hono<AppEnv>()
     )
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.enqueueTurn(c.req.param('sessionId'), parsed.data))
+  })
+  .post('/sessions/:sessionId/implement-plan', async (c) => {
+    const parsed = implementPlanBodySchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, MANAGED_AGENTS, (bridge) =>
+      bridge.implementCodexPlan(c.req.param('sessionId'), parsed.data.itemId))
   })
   .patch('/sessions/:sessionId/turns/:turnId', async (c) => {
     const parsed = patchQueuedTurnSchema.safeParse(await c.req.json().catch(() => null))

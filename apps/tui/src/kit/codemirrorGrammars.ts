@@ -12,11 +12,10 @@
 //
 // **Why they cannot be here.** All of them are reached from one surface, client-core's
 // `features/editor/DocumentSurface.tsx`, which holds an `HTMLElement` and mounts a CodeMirror
-// `EditorView` into it. There is no DOM in a terminal, so that surface cannot draw here whatever is
-// installed; it is in the graph because a third-party plugin may declare a document region and
-// `client-core/src/host/frames/register.ts` builds a component for one. What this host draws instead
-// is the `editor` rectangle, read-only, with `$EDITOR` in a PTY behind it (./rectangle.tsx,
-// ./editor.ts).
+// `EditorView` into it. The host supplies a cell document surface for plugin regions instead
+// (`../plugins/DocumentSurface.tsx`); the DOM fallback stays in the bundle's lazy graph but is never
+// mounted here. The separate editor plugin draws its `editor` rectangle and runs `$EDITOR` in a PTY
+// (./rectangle.tsx, ./editor.ts).
 //
 // **Why an alias rather than a dependency.** The bundle externalises every bare import, so leaving
 // these to the runtime means Node resolves them when the chunk loads — which needs seventeen packages

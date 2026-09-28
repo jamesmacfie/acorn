@@ -1,6 +1,7 @@
 import type { QueryClient } from '@tanstack/solid-query'
 import { recordSample } from '../../infra/telemetry/emitter'
 import { isCodeRow, type DiffRow } from '../../kit/diff/diffModel'
+import { segmentCaches } from './segmentCaches'
 
 // The node's recently read diff segments, held in memory so returning to a diff paints its rows at
 // once (docs/diff-rendering.md § Resident segments).
@@ -282,18 +283,10 @@ export function createSegmentCache(limits: { rows: number; bytes: number } = { r
 
 export type SegmentCache = ReturnType<typeof createSegmentCache>
 
-// Keyed by the query client rather than by node id, so a pane reads the partition it is already
-// drawing from, the provider's, and two nodes cannot share one by construction.
-const caches = new WeakMap<QueryClient, SegmentCache>()
-
 export function segmentCacheFor(client: QueryClient): SegmentCache {
-  let cache = caches.get(client)
-  if (!cache) caches.set(client, (cache = createSegmentCache()))
+  let cache = segmentCaches.get(client)
+  if (!cache) segmentCaches.set(client, (cache = createSegmentCache()))
   return cache
 }
 
-/** Forget a node's segments, synchronously. Called with the rest of the node's cache. */
-export function dropSegmentCache(client: QueryClient): void {
-  caches.get(client)?.clear()
-  caches.delete(client)
-}
+export { dropSegmentCache } from './segmentCaches'

@@ -60,6 +60,7 @@ acorn-plugin-sdk/remote: value Spinner
 acorn-plugin-sdk/remote: value SplitCell
 acorn-plugin-sdk/remote: value SplitHandle
 acorn-plugin-sdk/remote: value Stack
+acorn-plugin-sdk/remote: value StackedDiff
 acorn-plugin-sdk/remote: value StatusDot
 acorn-plugin-sdk/remote: value TabPanel
 acorn-plugin-sdk/remote: value Table

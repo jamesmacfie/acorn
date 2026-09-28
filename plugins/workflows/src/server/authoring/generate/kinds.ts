@@ -47,6 +47,7 @@ const fieldType = (field: StepField, detail: KindDetail): string => {
   if (field.type === 'workflow-map-source') return 'structured map source object'
   if (field.type === 'workflow-json-pointer') return 'JSON Pointer string'
   if (field.type === 'workflow-title') return 'bound title object'
+  if (field.type === 'gate-form') return 'form object with fields and values'
   return field.type
 }
 

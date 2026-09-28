@@ -6,6 +6,8 @@
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { AGENTS_CONVERSATION } from '../contract/conversation'
+import { AGENTS_INLINE_DIFF } from '../contract/inlineDiffClient.ts'
+import { isStale, reportPatches } from './inlineDiff/patchStatus.ts'
 import { installManagedHandoff } from '../contract/handoffClient'
 import { ATTENTION_COPY, isActiveAgent, needsAttention } from './sessions/agentActivity'
 import { managedAgentApi } from './sessions/managedClient'
@@ -25,6 +27,7 @@ import { agentToolFoldSlice } from './sessions/toolFoldPrefs'
 // open one, and the terminal client holds a byte ceiling over what loads at startup
 // (apps/tui/scripts/check-startup-graph.mjs).
 const AgentConversation = lazy(() => import('./sessions/AgentConversation'))
+const InlineDiffCard = lazy(() => import('./inlineDiff/InlineDiffCard.tsx'))
 const AgentConcurrencySettings = lazy(() => import('./settings/AgentConcurrencySettings'))
 const AgentPricingSettings = lazy(() => import('./settings/AgentPricingSettings'))
 const AgentSessionDefaultsSettings = lazy(() => import('./settings/AgentSessionDefaultsSettings'))
@@ -48,6 +51,13 @@ export const agentsClientPlugin: ClientPlugin = {
     // conversation. The run pane uses it to hold the transcript, the queue and the composer for the
     // node it has selected, so a step reads the same way in either place.
     ctx.capabilities.provide(AGENTS_CONVERSATION, { Conversation: AgentConversation })
+    ctx.capabilities.provide(AGENTS_INLINE_DIFF, {
+      prime: (taskId) => { void managedAgentStore.loadTask(taskId).catch(() => undefined) },
+      sessionsForTask: managedAgentStore.sessionsForTask,
+      reportPatches,
+      isStale,
+      Card: InlineDiffCard,
+    })
     // The four places another plugin may come into this pane (docs/plugins.md § Cooperative
     // extension points). The tool card is keyed by the harness's own name for what a call did; the
     // attachment chip by the file's media type; the composer's action bar takes everyone who has

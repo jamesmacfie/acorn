@@ -47,9 +47,9 @@ for (const entry of ctx.extensionPoints.handlers(WORKFLOW_STEP_KIND)) { /* … *
 ctx.extensionPoints.handle(WORKFLOW_STEP_KIND, { id: 'request', value: { handler, validate } })
 ```
 
-**A point's value may carry a description the host draws.** A step kind's value is
-`{ handler, validate?, describe? }`, and `describe` is the kind's form as data: a label, an icon, and
-a closed list of fields. The host renders it on both hosts and applies the field rules first:
+**A point's value may carry a description the host draws.** A workflow step kind's value is
+`{ handler, validate?, describe }`, and `describe` declares its label, icon, description, fields,
+and output description. The host renders it on both hosts and applies the field rules first:
 `required`, `min`, `max`, and a static select's membership. Then it calls the plugin's own
 `validate`. That splits
 the work the way it should be split: the contributor keeps every judgement that needs its own code,

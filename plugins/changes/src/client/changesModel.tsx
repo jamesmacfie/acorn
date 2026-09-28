@@ -1,14 +1,16 @@
 import { For, createEffect, createMemo, createResource, createSignal, on, onCleanup } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
-  agentSessionsFor, clientEvents, effectiveModelPick, focusedPane, formatFileReference, isArchiving, prefsOptions,
+  agentSessionsFor, clientCapability, clientEvents, effectiveModelPick, focusedPane, formatFileReference, isArchiving, prefsOptions,
   openPane, projectsOptions, readGeneratePick, readJson, registerCommands, saveGeneratePick,
   sendReferenceToAgent, sendToSession, taskStatusRevision, type PaneModelContext, type Task,
 } from '@acorn/plugin-api/client'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import { Badge, IconButton, Inline, Stack, Text } from '@acorn/plugin-api/ui'
 import { MAX_DOCUMENT_FILES } from '@acorn/diff-document/document'
-import { documentTopology, type CodeRow, type DiffLineAnchor, type DiffSource } from '@acorn/plugin-api/ui/diff'
+import { documentTopology, loadDiffLineContext, type CodeRow, type DiffLineAnchor, type DiffSource } from '@acorn/plugin-api/ui/diff'
+import { sameInlineLine, type InlineDiffOrigin } from '@acorn/plugin-agents/contract/inlineDiff.ts'
+import { AGENTS_INLINE_DIFF } from '@acorn/plugin-agents/contract/inlineDiffClient.ts'
 import { addReviewNote, deleteReviewNote, markReviewNotesSent } from './reviewNoteMutations'
 import { emptyLocalStatus, reviewNotesRoute, type LocalDocumentResponse, type LocalScope, type ModelPick, type ReviewNote } from '../shared/api'
 import { formatReviewPrompt } from '../shared/reviewPrompt'
@@ -170,6 +172,41 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     const cut = new Map(held.answer.files.map((file) => [file.path, file]))
     return documentTopology(held.changes.map((change) => documentFile(change, cut.get(change.path))))
   })
+  const inline = () => clientCapability(AGENTS_INLINE_DIFF)
+  createEffect(() => inline()?.prime(task.id))
+  createEffect(() => {
+    const files = topology()?.files
+    if (files) inline()?.reportPatches(
+      { taskId: task.id, source: 'changes', scope: scope() },
+      Object.fromEntries(files.map((file) => [file.path, file.patchKey])),
+    )
+  })
+  const [openInline, setOpenInline] = createSignal<InlineDiffOrigin | null>(null)
+  createEffect(() => {
+    const opened = openInline()
+    if (opened && (opened.scope !== scope() || topology()?.files.find((file) => file.path === opened.path)?.patchKey !== opened.patchKey)) setOpenInline(null)
+  })
+  const inlineOrigin = (row: CodeRow): InlineDiffOrigin | null => {
+    const patchKey = topology()?.files.find((file) => file.path === row.path)?.patchKey
+    const line = row.kind === 'delete' ? row.oldNo : row.newNo
+    if (!patchKey || line == null) return null
+    return {
+      kind: 'inline-diff', source: 'changes', taskId: task.id, path: row.path,
+      side: row.kind === 'delete' ? 'old' : 'new', line, patchKey,
+      quote: row.raw.slice(0, 2_000), scope: scope(),
+    }
+  }
+  const inlineAnchors = createMemo<DiffLineAnchor[]>(() => {
+    const current = topology()
+    const visible = (inline()?.sessionsForTask(task.id) ?? []).flatMap((session) => {
+      const origin = session.origin
+      if (!origin || origin.source !== 'changes' || origin.scope !== scope() || session.archivedAt) return []
+      if (current?.files.find((file) => file.path === origin.path)?.patchKey !== origin.patchKey) return []
+      return [{ path: origin.path, side: origin.side, line: origin.line }]
+    })
+    const opened = openInline()
+    return opened ? [...visible, { path: opened.path, side: opened.side, line: opened.line }] : visible
+  })
   // A segment request the tree has moved out from under reads the document again, and the viewer
   // redraws from the new revision.
   const conflicted = (error: unknown): never => {
@@ -220,6 +257,18 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
       void refetchNotes()
     },
     draftPrefix: `changes:${task.id}`,
+    inlineChat: {
+      anchors: inlineAnchors,
+      open: (row) => setOpenInline(inlineOrigin(row)),
+      render: (row) => {
+        const origin = inlineOrigin(row)
+        const Card = inline()?.Card
+        if (!origin || !Card) return null
+        const exists = inline()?.sessionsForTask(task.id).some((session) => session.origin && sameInlineLine(session.origin, origin) && !session.archivedAt)
+        if (!exists && (!openInline() || !sameInlineLine(openInline()!, origin))) return null
+        return <Card origin={origin} loadContext={() => loadDiffLineContext(source, row)} onClose={() => setOpenInline(null)} />
+      },
+    },
     // Drawn in the same shape another plugin's marks are, which is what the host puts under a line
     // (plugins/annotations/AnnotationMarks.tsx): a state, the text, and who it belongs to. What a
     // review note has and a mark does not is a verb, because this one is the reader's own. The viewer

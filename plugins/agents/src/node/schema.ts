@@ -17,6 +17,7 @@ export const agentSessions = sqliteTable(
     providerId: text('provider_id').notNull(),
     profileId: text('profile_id').notNull(),
     kind: text('kind').notNull(), // interactive | workflow | imported
+    originJson: text('origin_json'),
     driverKind: text('driver_kind').notNull(),
     driverVersion: text('driver_version').notNull(),
     providerSessionRef: text('provider_session_ref'),

@@ -7,6 +7,7 @@ import { sep } from 'node:path'
 import { workerData, type MessagePort } from 'node:worker_threads'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { pluginFunctionMode } from './functionMode.ts'
+import { networkHostAllowed } from './networkHosts.ts'
 import { PluginRpcEndpoint, rpcError } from './pluginRpc.ts'
 import type { NodePlugin, NodePluginContext } from '../pluginHost/types.ts'
 import type { WorkerPluginDatabase } from './workerStorage.ts'
@@ -97,7 +98,7 @@ if (options.allowNetwork) {
   const anyHost = hosts.has('*')
   globalThis.fetch = ((input: string | URL | Request, init?: RequestInit) => {
     const url = input instanceof Request ? new URL(input.url) : new URL(input)
-    if (!anyHost && !hosts.has(url.hostname)) throw new Error(`acorn: loaded plugin '${options.plugin}' may not reach '${url.hostname}'`)
+    if (!networkHostAllowed(url.hostname, hosts)) throw new Error(`acorn: loaded plugin '${options.plugin}' may not reach '${url.hostname}'`)
     // An explicit any-host grant also permits redirects to any host. Keep the caller's redirect
     // policy instead of forcing manual redirects on an API client.
     if (anyHost) return nativeFetch(input, init)

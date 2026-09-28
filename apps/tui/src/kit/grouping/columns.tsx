@@ -24,6 +24,8 @@ export function ListDetail(props: {
   scrollDetail?: boolean
   detailAs?: 'div' | 'main'
   collapseKey?: string
+  /** The terminal keeps the full list readable, so it ignores this DOM collapse choice. */
+  collapseContent?: 'rows' | 'empty'
   children: JSX.Element
 }) {
   let box: Renderable | undefined

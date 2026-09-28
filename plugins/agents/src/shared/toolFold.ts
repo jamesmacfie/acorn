@@ -36,6 +36,7 @@ export const mergeToolCall = (previous: AgentToolCall, next: AgentToolCall): Age
 const mergeWebActivity = (previous: AgentWebActivity, next: AgentWebActivity): AgentWebActivity => ({
   action: next.action ?? previous.action,
   results: next.results ?? previous.results,
+  status: next.status ?? previous.status,
 })
 
 /** The key the transcript folds a call's updates under: one card per call per turn. */

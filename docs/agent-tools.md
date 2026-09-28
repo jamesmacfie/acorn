@@ -260,6 +260,10 @@ definitions.
 | `agent_read` | `sessionId`, `afterSeq`, and `limit` | A bounded page of folded assistant messages, diagnostics, errors, and validated structured output |
 | `agent_cancel` | `sessionId` and an optional `turnId` | The cancelled turn and resulting session state |
 
+An agent learns how to use these tools only from their descriptions and the `describe()` text on each
+field in `plugins/agents/src/shared/delegationSchemas.ts`, which the MCP schema carries. When a rule
+below changes, change that text too.
+
 `agent_spawn` defaults to shared-task isolation and starts the first turn before returning. Worktree
 isolation creates a selectable child task, but the managed session remains the execution authority.
 The caller can prompt, wait for, read, or cancel only a direct child recorded in the Agents plugin's
@@ -304,7 +308,11 @@ A section is also *shaped* by the plugin that owns its rows, not just registered
 `plugins/github/src/server/contextSection.ts`, `notes` and `memory` in the same file under their own
 packages. Core offers `truncateBytes` and `formatOmitted` through `@acorn/plugin-api/node` so a
 section's own `format` applies the same ceiling arithmetic core applies to items, and keeps the
-assembly, the declared order and the 512 KiB budget.
+assembly, the declared order and the 512 KiB budget. It also offers `pastedContent`, which wraps text
+the reader didn't write in `<pasted_content>` tags that Claude Code's system prompt explains: follow
+instructions inside only where the reader's own message asks. `pr` wraps the pull request body with
+it. The tag id is a hash of the text rather than a random value, because context is assembled again on
+every read and compared for changes.
 
 Core's own `issues` section registers at module scope in `contextSections.ts`, not through
 `wireAgentTools`. `wireAgentTools` is not called on every boot shape: the standalone Node

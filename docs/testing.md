@@ -552,6 +552,562 @@ threshold. See [Coverage measurement](#coverage-measurement) for its scope.
    recovery by stopping the helper's Node repeatedly; the recovery screen appears after the retry
    limit.
 
+10. Build the reference node provider into the running node's data root
+    (`pnpm --filter @acorn/node build:plugin nodes-file`, with `ACORN_NODES_FILE` set), write one
+    node into that file, and from Settings → Nodes adopt it, run a task on it, then create and destroy
+    one. Same reason as the item above: the route, provider and merge halves each have automated
+    coverage and the rendered surface has none ([plugins.md](./plugins.md) § Node providers).
+
+The next six items came from the user-extensions landing review (2026-08-15; they lived in a
+`live-qa` file under `docs/future` until 2026-08-28). Plugin suites run in a node environment with no Solid transform, so the
+chrome the extension work added has never been seen rendering by a test. Each names the behaviour to
+see, not the code to read:
+
+11. Right-click a surface with a plugin-declared context menu row; the menu appears at the pointer
+    and clamps to the viewport instead of overflowing at a screen edge.
+12. A plugin's declared `topbar` slot item renders at the topbar's right end, beside the node chip and
+    the bell, at a size that does not distort the bar.
+13. A contribution from plugin B renders inside plugin A's declared `pane.footer` point under a pane,
+    with sensible spacing, overflow, and empty state.
+14. Force a render throw in a plugin's `coreSlot` replacement; the surface falls back to core's own
+    implementation rather than going blank.
+15. Select a plugin-contributed theme; the terminal and CodeMirror pick up the right light or dark
+    self-description. Disable the plugin; the fallback to Light or Dark happens without the stored
+    preference being rewritten.
+16. Edit a dev-mode plugin's entry file; the swap lands without a restart or a trust prompt. Edit a
+    non-entry module; the one-module-deep limit surfaces as the restart hint, not silence.
+
+The next two are the remote tree's, from layout phase 3 (2026-08-29). The suites cover the wire, the
+renderer, the worker lifecycle and the two render paths producing identical DOM; what nothing
+automated covers is a real worker started from a real bundle over the shell's own scheme.
+
+17. Install a plugin declaring an `extensions` entry on `agents:tool-card`, accept its trust prompt,
+    and run an agent turn that makes a matching tool call. The card draws from the
+    plugin's worker and is indistinguishable from a compiled one: same spacing, same disclosure
+    behaviour, same style pack. Reject the bundle instead and the built-in card draws.
+18. Break that bundle so it throws on mount. The card shows the labelled placeholder, a row appears on
+    the plugin's page, and the transcript around it keeps working — scrolling, selection, every other
+    card.
+
+The next four are the loaded four's, from layout phase 5 (2026-08-30). All four panes are trees now and
+the automated tiers stop at the JSX preset, so these are the eyes-on pass on the shipped plugins.
+
+19. Open the API pane on a task. The request tree, the URL bar, the tabs and the response all draw.
+    Send a request; paste a curl command into the URL bar and press Enter — the whole request fills in,
+    on the commit rather than on the paste. Save one through the dialog, then delete one: two clicks,
+    with the label changing between them.
+20. Open the Database pane on a task with a database. The SQL editor is above, the table list, grid and
+    row detail below, and `⌘Enter` in the editor runs the query. Save a query, then load it back from
+    the picker and delete it from the picker's own row control.
+21. Open a task linked to a Linear ticket, then the same ticket's reference panel from a PR body. Both
+    draw from one worker. Post a comment, open a sub-issue from the Overview tab and come back with
+    the back affordance, and click a `linear.app` link inside the description — it re-points this view
+    rather than opening a browser.
+22. Open a task linked to a Rollbar item, pick an occurrence, and copy its context. Then reject one of
+    the four bundles at the trust prompt: its pane draws the labelled placeholder and the other three
+    keep working.
+
+The last three are layout phase 9's (2026-08-30), and they are the pass the whole programme was
+building towards. The kit invariants and the arch rules prove no plugin writes an element or a
+stylesheet; only a person can tell whether the result is usable.
+
+23. Traverse every pane with the keyboard and nothing else. Tab reaches each region in turn, arrow
+    keys move inside a list, Enter opens a rectangle and Escape leaves it, and no pane is a place the
+    keyboard can get stuck. Do the editor pane's file tree, the find-in-files results, the terminal
+    drawer, the agents transcript and the PR pane's diff at minimum. Turn on a screen reader for one
+    pass over the editor's sidebar: the file tree announces as a tree with levels and expanded state.
+24. Scaffold a fresh plugin with `npm create acorn-plugin`, install it from disk, accept its bundle,
+    and check both halves of what it declares. Its tool card draws in an agent transcript from its own
+    worker, and its diff-line annotation appears on every tenth line of the Changes pane. Then check
+    the developer view on the plugin's page, disable the plugin, and uninstall it: the card and the
+    annotation go at each step and nothing else moves.
+25. Scaffold the other shape with `--rectangle` and repeat the install. Its pane draws inside an
+    iframe, and a network call from that iframe fails.
+
+The last item is older than the rest. `docs/next-review.md`, deleted in the 2026-08-30 hygiene pass,
+was a personal checklist with no inbound links. Every other line in it was already owned by this
+checklist, by [shell.md](./shell.md) § Signing gates and the updater, or by
+[caching.md](./caching.md). This one was not.
+
+26. Run the Rollbar pane against a live project rather than the recorded fixtures, and check that the
+    privacy allowlist holds on real payloads: no request header, cookie, or `person` field outside the
+    allowlist reaches the pane or the copied context
+    ([integrations.md](./integrations.md) § Rollbar). Then narrow the window to the smallest width the
+    context pane and the Notes pane still support, and make one context section answer slowly. Both
+    panes keep their layout, and the slow section reports itself without stalling the others
+    ([notes-and-memory.md](./notes-and-memory.md) § Context integration).
+
+The next four are the terminal keyboard's, from the programme that ended on 2026-09-02 by rewriting
+[tui.md](./tui.md) § Keys and focus. Every one of them needs a real terminal and none can be
+automated: both harnesses ask for the kitty keyboard protocol, the trust queue is stubbed, and a
+suite drives one task at a time.
+
+27. Answer the plugin trust prompt at boot, against a real node offering a bundle this device has
+    never decided about. The caret starts inside the dialog, Tab does not move it out, Enter on "Run
+    it" records the decision, and Escape drops the queue entry. The harness stubs `pendingTrust`; the
+    real flow comes through custody, which is the half no test sees
+    ([tui.md](./tui.md) § The trust prompt).
+28. Press Shift+Tab in a terminal that does not negotiate the kitty keyboard protocol. Both harnesses
+    ask for it and get it, so a legacy terminal's spelling of that chord is untested; check that the
+    region cycle still goes backwards, and that a lone Escape still leaves a rectangle without
+    waiting out the parser.
+29. Enter a PTY, then let a notification activate another task while the keys are inside it. Open the
+    palette with its chord from inside the PTY, close it, and type again. Run it with
+    `ACORN_TUI_KEYS_TRACE=1` and read `keys.log`: no line may say `reason=no-match` on a key the
+    footer offers, and none may say `region=none` while the screen has regions
+    ([tui.md](./tui.md) § Seeing what the keys did).
+30. Walk the cross and page keys where five different rules used to live. In a `list-detail` pane,
+    Right crosses from the list to the detail, Left comes back, and PageDown lands on the last row
+    and then scrolls the panel instead of wrapping. On the first tab of a `Sections` strip, Left goes one
+    column left rather than doing nothing. In the editor's file tree, Right on a leaf reaches the
+    document beside the tree.
+
+The next twelve are the command palette's, owed since the graph and the shared session shipped on
+2026-09-03 and **not yet run**. The session has a fixture suite both hosts pass and every route has
+its own, and what none of them can see is the surface: the suites drive a store and assert its rows,
+while a palette is a thing a person opens over a task they are in the middle of. Run them on the
+desktop and in `acorn` in a terminal, and expect the two to agree.
+
+31. Open the palette on ⌘K with nothing typed. The top level lists the groups and the loose commands
+    and nothing else. Type a word that only a nested command matches — `archive`, `theme`, a run
+    target's name — and it appears with the trail it came from beside it.
+32. Enter a group, type inside it, enter a second group, then press Escape twice. Each frame comes
+    back with exactly the query and the cursor position it was left with, and the focus you had before
+    the palette opened comes back only on the last Escape.
+33. Press ⌘P with a task open. The palette opens straight at the editor's file search rather than at
+    the root, and picking a file opens it. Press `/` on a pull request; the same, at the changed-file
+    search. Neither chord opens a second dialog.
+34. Type quickly into a Rollbar or Linear issue search on a slow connection. One request goes out for
+    the text you stopped on, an earlier answer arriving late never replaces it, and Escape while it is
+    in flight leaves nothing behind.
+35. Submit `Generate SQL` with a prompt that fails — no model connection, or a database that is not
+    reachable. The frame stays open, your prompt is still in the field, the message says what to do,
+    and Enter tries again. A second Enter while the first is in flight does nothing.
+36. Change the theme from the Appearance setting command. The list marks the value that is set,
+    picking one restyles the app immediately, the frame stays open, and the marker moves to what was
+    actually stored. Open Settings → Appearance: it agrees.
+37. With the palette open over a task, switch node or task from another window or another pane. The
+    palette closes rather than acting on rows fetched for somewhere else.
+38. Open a plugin's search frame, then disable that plugin from Settings → Plugins. The frame closes,
+    nothing is invoked, and the plugin's whole group is gone from the root. Re-enable it: the group and
+    everything under it come back, once.
+39. Find a Rollbar issue from the palette and pick it. The URL changes and the surface beside the rail
+    list shows that item, exactly as clicking the same row in the rail does.
+40. Run `Generate SQL` successfully with the Database pane already open and with it closed. Both end
+    with the generated SQL in the editor — the open pane re-reads the scratch document rather than
+    keeping the text it had loaded.
+41. Run and then stop a configured terminal target from the palette. The run/stop decision and the
+    error copy match what the drawer shows, and a broken `.acorn/config.toml` still explains itself in
+    the list rather than yielding an empty one.
+42. Launch a workflow definition from the palette. It starts exactly as launching it from its own
+    surface does, and no approve, cancel or kill row is offered anywhere in the palette.
+
+The next four are the Changes panel's ([diff-rendering.md](./diff-rendering.md) § Data flow). The
+pane's own suites cover the parser, the routes, the checkbox, the editor's state and every remote state
+of the bar against a bare repository in a temp directory. What they cannot see is which diff the column
+swaps to when a checkbox moves, whether a keystroke in the message field reaches a command, and what a
+real remote with real credentials does.
+
+43. Open the Changes pane on a task with both staged and unstaged edits. Tick a row's checkbox: the
+    file moves, the group checkbox above it follows, and the diff column switches to the staged side
+    of that file. Untick it and the column goes back. Tick a group checkbox that is showing the
+    indeterminate mark and only the unstaged files under it move. Then check the rail: its dirty count
+    and the header's totals agree after every one of those actions.
+44. On a task with two edited files and one untracked file and nothing staged, type a message in the
+    commit field. The button reads **Commit tracked**. Narrow the pane until the diff takes the whole
+    column and come back: the message is still there, and so is it after a relaunch. Press Cmd+Enter
+    with the keys still in the field, and both edited files land in one commit with the untracked file
+    untouched. Then open the options menu, turn Amend on with the field empty, and the last commit's
+    message appears; Cmd+Option+Enter from the field amends. Press the expand button and the same text
+    is in the modal, with room for a body.
+45. On a task whose branch has never been pushed, the bar above the commit editor names the project
+    and the branch, its button reads **Publish**, and the counts beside it read "no upstream". Press
+    it: the button reads **Fetch** and the counts go quiet. Commit something and the button reads
+    **Push** with **↑1** beside it; press that, then amend the commit from the options menu and press
+    **Push** again. It is refused, and the reason ends by pointing at Force push. Open the menu
+    beside the button, press **Force push** once — the item reads **Force push?** — and press it again;
+    the push lands. Then have somebody else, or a second clone, push to the same branch and press
+    **Fetch**: the counts read **↓1** and the button reads **Pull**. Copy the project folder from the
+    button beside the branch name, which used to be in the header. Pull a branch that has diverged and
+    the refusal names Pull with rebase; take it, and if it conflicts the banner reads **Rebase in
+    progress**, the Conflicts group is first in the list, the primary button is disabled, and **Abort**
+    puts the branch back where it was. Last, commit from a terminal in the same worktree and watch the
+    ahead count move without touching the pane.
+46. With no model provider connected and no agent CLI installed, the commit toolbar has no wand at the
+    left of it. Connect one in Settings, under Integrations, reopen the pane, and stage two files.
+    Press the wand: it spins, and
+    within ten seconds the editor holds a subject and a body. Commit, and the message lands. Now type
+    a message of your own and press the wand again: it reads **Replace?** and does nothing until a
+    second press. Connect a second provider, press the chevron beside the wand, pick the other one,
+    and press the wand: the tooltip and the message both come from the provider you picked, and the
+    pick survives a relaunch. Disconnect both providers and the wand goes.
+47. On a task in a GitHub-mirrored project whose branch has never been pushed, there is nothing under
+    the branch bar. Press **Publish**, and **Open pull request** appears there; press that, and the
+    create form opens with this branch already chosen as the head. Create the pull request and go back
+    to the Changes pane: the button is gone and the PR pane is in the switcher. Then disable the GitHub
+    plugin in Settings and reopen the pane on a pushed branch: the footer is the same height it is with
+    the plugin on, with no gap where the button was.
+
+The next six are the workflow editor's and the run pane's, owed since each shipped and **not yet
+run**. The draft rules have a unit suite, the inspector and the run pane have jsdom ones, and none of
+them can see what a person building and watching the owner's first workflow actually goes through.
+Run them on the desktop and in `acorn` in a terminal.
+
+48. Open Workflows in the left rail with a project chosen. Press **+ New**, then build the owner's
+    first workflow from the empty definition using only the editor: two agent nodes with no
+    predecessor, a `terminal:command` node, a third agent node waiting on both investigators, and a
+    human gate after it. Declare an input, put it in a prompt from the chip row, and rename one of the
+    investigators. Every reference to the old name follows it, and the footer reads valid. Press
+    **Save**, reload the surface, and the same nodes come back.
+49. From the same definition, press **Save to repo** on a task with a checkout. The file appears at
+    `.acorn/workflows/<slug>.toml` in that worktree. Open it from the rail: it draws the same nodes
+    read-only, with **Copy to database** where Save was. Start a run from it and the repo trust prompt
+    appears, because the snapshot now covers the file.
+50. Press **Run** in the editor. The dialog asks for the declared input and for a task, refuses to
+    confirm until the required one is filled, and starts the run. Then run the same definition from
+    ⌘K → **Run a workflow**: it opens the same dialog rather than starting with an empty input. In the
+    terminal client, the definition list is in the Browse panel, the editor is in the main one with
+    its node list beside its inspector, and the dialog is a modal the keys stay inside.
+51. Start that run on a task and open the **Workflows** pane on it. Both investigators show running at
+    once, with the same indentation the editor drew. Select one, while it is still working: its
+    transcript is here, following the newest turn, with the node's toolbar staying put above it and the
+    composer staying put below. The composer says a turn sent now runs after the step. The command
+    node's output tails as it runs and folds away with its exit code when it stops.
+    Then press **Show in Agent pane** and put the two panes side by side on that session: both
+    transcripts move together, a file attached in one appears in the other, and the "Workflow: …" chip
+    in the Agent pane's header comes back to this pane at that node. Last, run one with child dispatch or a
+    worktree-isolated agent step and check the conversation you get is the child task's.
+52. Let the run reach the gate. The bell rings, and the row in it lands on the gate node with Approve
+    and Reject in front of you; the inbox has the same row and it stays there until you answer.
+    Approve, and the run finishes and keeps a notice. Then run a definition whose gate has a form
+    bound to an agent step's structured output, and a later step bound to the gate's `/values`. The
+    gate node shows the proposed values. Edit one, check it is marked **Edited** and that **Reset**
+    restores it, edit it again, and approve. Confirm the later step received the edited value, and
+    that the terminal client draws the same form.
+53. Make one node fail, by pointing its command at something that exits non-zero. The pane offers
+    **Retry**, and an agent node also offers **Retry with edited prompt**; both put the run back to
+    running from that node. Then check the pane is not there at all on a task that has never run a
+    workflow, and that the agents pane draws no workflow step rows anywhere. In **Agent Center**, the
+    workflow session's row carries a **Run** chip: the row body opens the session and the chip opens
+    the run at that node.
+
+The next two are the start-from-an-item flow's ([workflows.md](./workflows.md) § Starting a run).
+Three lists moved onto one registry, and the only way to see that they still offer what they used to
+is to open all three menus.
+
+54. Open the row menu on a Rollbar error, a Linear issue and a GitHub pull request. Each has **Create
+    task** at the top doing exactly what it did before — a Rollbar row opens the promote modal, a
+    pull makes or finds the pull's task with its Linear links — and **Start workflow…** under it. On a
+    row with nothing to promote, and on a source whose click already makes a task, no menu appears at
+    all.
+55. Press **Start workflow…** on a Rollbar error. Pick the owner's first workflow: the `issue` input
+    arrives filled with the error's title and its facts, editable, and the button reads **Create &
+    run** and refuses while a required input is empty. Press it; the task opens on the Workflows pane
+    with both investigators running. Do the same from a pull request that already has a task: it runs
+    on that task rather than making a second one.
+
+Next is the graph view's ([ui-design.md](./ui-design.md) § The closed kit). A canvas is the one kit
+node whose whole point is what it looks like, so a suite can check the geometry and nothing else.
+
+56. Open the owner's first workflow and press **Graph**. It draws two roots joining into the
+    synthesis node, with the list column still beside it. Drag a card: it lands on the grid and its
+    wires follow. Drag from one card's bottom port onto another: the second now waits on the first,
+    and the footer agrees. Press the `×` on that wire and it goes. Select a card and press Backspace:
+    it is removed, and the same edit is in the JSON tab. Reload the surface and the cards are where
+    you left them. Then start a run and press **Graph** in the pane's Nodes header: a card recolours
+    as its step starts and finishes. In the terminal client, both **Graph** views are the indented
+    list, the arrows walk the cards, and the editor's has a picker under it that draws an edge out of
+    the selected card.
+
+Next is the editor's **Generate** button
+([workflows.md](./workflows.md) § Generating one from a description). A pure suite pins the prompt
+and drives the reader from a table, and neither can see whether the teaching worked on a real model.
+
+57. With nothing to generate with, no key and no agent CLI, the editor toolbar has no **Generate**
+    between the tab strip and **Undo**. Connect one in Settings, under Integrations, reopen a workflow
+    row, and press it.
+    Describe the owner's first workflow in words: two agents investigate one issue from different
+    angles at the same time, a third reads both and writes the synthesis, and somebody approves
+    before anything is pushed. The dialog counts seconds while it works, and a couple of minutes is
+    normal. What lands has two roots, a step whose `after` names both of them, and a human gate.
+    That is the check the rest of the item hangs off: a straight chain of five steps means the prompt
+    failed to teach the graph. Read the footer, press **Save**, then **Run**, and watch it
+    in the run pane. Press **Undo** once and the draft you had comes back whole. Then generate again
+    from a description that asks for a `code-review` step kind, which no node has: the definition
+    still applies, and the alert above the node list says what was taken out of it. Last, open a
+    committed file from the rail and confirm there is no **Generate** on that toolbar at all.
+
+Next is the first-run wizard's AI step
+([integrations.md](./integrations.md) § Model providers). The plugin's own jsdom suite draws the step
+against a fixture route, and what it cannot see is the route answering from a real `which` on a real
+machine, or the wizard's own flow around the step.
+
+58. Clear the `onboarded` preference on a node with no projects and walk the wizard end to end. On
+    **Generate with AI**, every agent CLI on that machine is a row saying it is installed, and every
+    one that offers a one-shot mode and is not there is a quiet row saying so, with no alert. Press a
+    provider card, paste a key, and press **Connect**: the rows above gain that provider, and the
+    step's **Next** was enabled before you did any of it. Then walk the wizard again on a machine
+    with no CLI installed and no key: the step says Settings, under Integrations, is where this lives,
+    and **Next** still works.
+
+The last four are the Generate list's, owed since the backends over installed agent CLIs shipped and
+**not yet run** ([integrations.md](./integrations.md) § Model providers). The list builder, the
+dispatch, the containment and the picker all have suites, and none of them can spend a real CLI on a
+real machine, which is the whole point of the feature: the reader who has `claude` or `codex` on PATH
+and no API key at all. Run them with the keys disconnected first.
+
+59. With no model provider connected and `claude` installed, open the SQL dialog on a task with a
+    database connection, press the commit-message wand on a task with staged changes, and press
+    **Generate** in the workflow editor. All three offer Claude Code, and all three come back with an
+    answer. Then connect a key and run ⌘K → **Generate SQL**, the palette path that draws no picker:
+    it spends the key, not the CLI, because connections come first in the list and that fast path
+    takes the first backend. Last, sign out of the CLI (or rename it off PATH between the read and the
+    press) and generate again: the failure names Claude Code and says to run it once in a terminal,
+    and the node log has the stderr tail while the client gets none of it.
+60. Pick Codex in the commit wand and press it. The picker offers no model select for Codex, because
+    its model list lives in `~/.codex/config.toml` rather than here, and the message still arrives.
+    Then run a workflow with a `decide` step whose profile is `codex`: it reaches a verdict and the
+    run carries on past the gate, which is the check that Codex's own stream shape is being read
+    ([managed-agents.md](./managed-agents.md) § Harnesses).
+61. Pick Anthropic in the commit wand, then open **Generate** in the workflow editor: it opens on
+    Anthropic. Disconnect the key and open it again: it opens on Claude Code. Change the default in
+    Settings, under Integrations, and both open on that instead. The SQL dialog is expected not to
+    follow any of this and to open on the first backend every time
+    ([state-ownership.md](./state-ownership.md) § Scope rules).
+62. The acceptance test for the manifest one-shot block, which needs `opencode` installed. Write the
+    OpenCode plugin from [plugin-authoring.md](./plugin-authoring.md) § Harnesses alone, without
+    reading this repository, install it from a folder, and approve the trust prompt: it shows two
+    lines, the ACP spawn and `opencode run --model MODEL` to generate text. OpenCode then appears in
+    the Agent pane, in a task terminal, and in every Generate control, and generates a commit
+    message. That the doc is enough on its own is what is being checked, so a step that sent you to
+    the source is a failure of the doc.
+
+The next two items cover agent-driven delegation. They were not run for this implementation because
+the available checkout cannot launch the app without GitHub credentials. The automated suites cover
+the Node, storage, MCP, runtime, and component contracts; these items remain the provider-backed
+acceptance pass.
+
+63. Enable the execute tier in Settings → Agent tools. From a Claude Code terminal, call
+    `agent_spawn` once with shared isolation and once with worktree isolation. Use `agent_wait` and
+    paged `agent_read` to collect each answer, then use `agent_prompt` for a second turn and
+    `agent_cancel` on an active turn. Repeat from a Codex terminal. Confirm that retrying the original
+    MCP call does not create another task, session, or turn; the shared child appears in the same task's
+    Agent pane; and the worktree child appears under its parent task and opens its own panes.
+64. Repeat the same flow from one managed Claude Code parent and one managed Codex parent. Confirm
+    that each child nests under its managed parent, the parent chip returns to that session,
+    provider-native subagents still render under their provider session, and a child can create one
+    directly owned grandchild but the next level is refused. Trigger a permission or question request
+    in a child and confirm `agent_wait` reports attention without giving the parent an approval action.
+    Narrow the parent's tool ceiling and confirm the child cannot widen it. Run the parent as a
+    workflow-owned session and confirm `agent_spawn` is absent.
+    Then let the managed parent end its turn while a child is still working. Confirm that one
+    "From" report turn arrives in the parent with the child's final message, that the child's
+    transcript labels the parent's prompt "From" and the parent's title instead of "You", and that a
+    parent which reads the result with `agent_read` before its report runs receives no report.
+
+
+The next five items are the workflow-task release checks. They were not run in this worktree because
+the app requires the main checkout's environment and port. The workflow, integration, and host tests
+cover the corresponding state and rendering contracts.
+
+65. Run a workflow whose child stops at a human gate. Confirm the parent is gated, the child card says
+    approval is required, and opening it lands on the child gate. Approve it, then use the child
+    run's parent and root links to return to the original run.
+66. Map three structured items so one child succeeds, one fails, and one waits for approval. Confirm
+    the progress and failure counts update, every task and run link opens the right child, and the
+    parent waits for all three before failing. Check each bounded result and compare the root's tree
+    usage with each child's own usage.
+67. Cancel a running mapped workflow and confirm the dialog says it cancels the run tree. Check that
+    admitted child runs and managed sessions settle before the parent does, while the child tasks
+    remain available. Retry a failed map and confirm it reuses those tasks and runs instead of
+    creating replacements.
+68. Disconnect the active Node while viewing a parent and child, let both advance, then reconnect.
+    Confirm the run list, selected steps, child progress, gates, failures, and usage reconcile without
+    relying on the missed frames.
+69. On two Nodes, create fixtures with the same task and run IDs and different titles. Switch between
+    the Nodes and confirm navigation and history stay with the active Node. Then run one mapped child
+    workflow and one static inline workflow reference to confirm both behave as
+    documented.
+70. Run a Codex session and a Claude Code session that each search the web for a distinctive phrase,
+    then open one result. Confirm each call is one card, that the row says `Search web` with the query
+    beside it, and that opening it shows the query, any domain filter, and the sources as links. Run
+    Claude `WebFetch` and confirm it reads as a page fetch with its prompt rather than as a search.
+    Make a provider-native subagent search in each harness and confirm the card stays in the child's
+    transcript. Then search Agent Center for the phrase, a result title, a domain and a URL fragment.
+    Finish in the terminal client at 80 by 24: open and close the fold, focus a result link, and
+    confirm the address is readable. Last, open a Codex session recorded before this shipped and
+    confirm its status-only row still draws as the flat `Web search` row
+    ([managed-agents.md](./managed-agents.md) § Web activity).
+
+71. The reconnect an agent advertises rather than declares, which needs `dsh` installed and the
+    DeepSeek plugin at `../acorn-deepseek` loaded from a folder. Start a DeepSeek session, get an
+    answer, quit the app and start it again, then ask the agent about something only the earlier turn
+    could know. It should remember, and the transcript should carry no "starts fresh" warning: that is
+    `session/resume`, and before it acorn silently began a new agent under the unchanged transcript.
+    Check the pane while you are there, because DeepSeek's surface is narrower than Claude's on
+    purpose: permission cards work, the model picker lists its models and reasoning effort, cancel
+    stops a turn, and there is no plan section, no mode picker and no question card
+    ([managed-agents.md](./managed-agents.md) § Harnesses).
+
+72. The two doors a harness declares and the one it does not. With the same plugin loaded, ask DeepSeek
+    something only an acorn tool can answer, such as what the task is about or what the local diff
+    contains: it reaches them over the protocol, because it has no `mcp add` command to register
+    through ([mcp.md](./mcp.md) § Configuration). Then ask Claude Code the same in a task terminal and
+    confirm each acorn tool still appears once, not twice. Last, press the commit-message wand and open
+    **Generate** in the workflow editor: both offer DeepSeek, and it answers. Its terminal profile menu
+    entry should be absent throughout, because `dsh` alone has no interactive mode.
+
+The next six are workflow v2's release checks ([workflows.md](./workflows.md) § Typed data and
+conditions, § Record processing history, § Scheduled roots). Controlled provider fixtures cover them
+in the suites, but they need connected GitHub, Linear, and Rollbar test accounts and a configured
+model provider, and none had been run against real accounts when the programme shipped. Build each of
+the first four by hand, then again through **Generate**, and compare the resolved queries and
+bindings rather than the prose.
+
+73. Query open pull requests by one author in a real repository and preview them. Publish Find records
+    → For each → a review workflow. A closed pull request is left out whatever its merge readiness,
+    numbers stay numbers in the bindings, and each selected pull request gets one child task.
+74. Query Linear issues by project, exact state, and **Updated in last 24 hours**. The child fetches
+    details, sets a typed **Requires work** boolean, and starts an analysis grandchild only when it is
+    true. A false value creates no task and is not a failure.
+75. Query Rollbar error groups first seen since midnight in a named timezone. An older group with a
+    fresh occurrence is left out. Each child fetches the stack trace through **Get record details**.
+76. Save one of those queries, then use it from a workflow and a dashboard panel. Editing the panel's
+    display changes no source state. Publishing a change to the shared query updates the panel and
+    marks the workflow's schedule for review.
+77. Schedule the Linear workflow with **Start tracking from now**. After an issue changes, the next
+    check starts one child for it, the record history links its task and run, and **Run now** during
+    an active run is skipped with a link to that run.
+78. Build and schedule a workflow using only the keyboard in the desktop window: open the editor, pick
+    fields, publish, and activate the schedule. Focus stays visible and returns to its trigger when
+    each dialog closes.
+79. Archive a task with a committed change and find it on the Archive page by a word from its agent
+    transcript. Open the matching session in the preview, and check that its right rail holds only Agent
+    and Notes. Restore it and check that the worktree comes back with the commit. Then
+    delete the branch of another archived local task and check that restore asks before it cuts a new
+    one.
+80. Open a Shell tab on one task and run a command that prints a line a second. Switch to a task
+    without the terminal drawer open, wait ten seconds, and come back. The same terminal is there with
+    every line printed while you were away. Open more than four terminals across tasks and switch
+    between them: each draws, and none goes blank after its GPU context is given to another. Close the
+    tab and check that switching back does not bring it back.
+81. With GitHub connected, open a pull request with more than 100 files, more than 100 commits, or a
+    review thread with more than 100 comments. Every file, commit, and comment is there in GitHub's
+    order. Open one with more than 3,000 files: the diff and the file list both say GitHub returned
+    3,000 of its total. Compare two branches with more than 300 changed files in the create form: the
+    count reads "first 300 files" and the preview says the comparison may have more.
+82. Open the diff of the largest pull request to hand, in unified and then split. The scrollbar is its
+    final length at once, file headers and the widest line are in place before their rows, rows appear
+    plain and then take colour, and a thread's space is there before its segment loads. Drag the
+    scrollbar to the end and back: every segment you land on draws within a moment and nothing between
+    loads. Find a word that appears only near the end and step to it. Expand a gap, collapse a file from
+    the sticky header, and leave the pane open for a minute: the health snapshot shows nothing queued.
+    In split mode, scroll a long line sideways before its colour arrives: it stays scrolled when the
+    colour lands. Find a match in split mode: the view lands on the band that holds it. With find
+    open, expand a gap above the match: the view does not jump back to the match.
+    Then do the same in the Changes pane while an agent edits a file: only that file's segments
+    reload, and the reader stays where they were. Run `git config diff.noprefix true` in the task's
+    worktree and reopen the Changes pane: every changed file still shows its diff. Unset it afterwards,
+    because the setting is the whole repository's.
+83. In that pull request, scroll to a place with a thread a screen above you and one below. Expand
+    and collapse the one above, reply in it so the box grows, and resolve it: the line you are reading
+    does not move. Open a `<details>` block and wait for a late image in the one below: nothing on
+    screen moves. Open a line composer on screen: what follows moves down once, with no frame where the
+    composer overlaps the next line. Flick-scroll through several threads: nothing jumps while you
+    move, and the view settles without a correction you can see. Narrow the pane by dragging the
+    sidebar, then widen it: the same line stays at the top. Leave the pane and take a health snapshot:
+    no observers, no scheduled frames, and `maxAnchorDrift` under a pixel.
+84. Open that pull request's diff, scroll to the middle, and switch to another task and back: the
+    rows you left are on screen, coloured, before any segment request, and the health snapshot's
+    `resident.hits` rose. Open a dozen other large diffs one after another: `resident.rows` and
+    `resident.estimatedBytes` stay under `rowCeiling` and `byteCeiling`. In the Changes pane, let an
+    agent save the same file several times: `resident.segments` does not grow with each save.
+85. Open the `canonical` fixture's Agent pane: it opens on the newest cards with **Show earlier** above
+    them, and the health snapshot shows 200 mounted of about 3,400 turns. Scroll a little way up and
+    press **Show earlier**: the card you were reading stays put. Select text across two cards, scroll
+    to the foot, and let a live session stream past 400 cards: the selection survives, and once you
+    clear it the next page of cards trims the window back to 200. The console shows no
+    `ResizeObserver loop` error while the stream passes 400 cards. Press **Go to top**: the oldest turn
+    is on screen, and the page's find matches its text. Open a notice for an old request: its card is
+    drawn and focused. With VoiceOver, a card reads its place in the whole session. In a pull request
+    with many threads, open the conversation and scroll: each comment's HTML and each thread's snippet
+    appear before you reach them, a capped file's thread says **Snippet unavailable.**, and nothing
+    already drawn is rebuilt when the pull refetches.
+86. On two paired Nodes with different accepted versions of one loaded plugin, switch between them.
+    Each Node shows contributions from its own running version. Update the inactive Node, reject then
+    reconsider its new client hash, and switch again: its old runtime remains visible until its Node
+    commits the update. After restart, the new version appears only when its exact bytes are accepted.
+    Disconnect, reconnect, and unpair one Node; stale or removed observations authorize no loaded UI.
+87. Open two remote trees from one loaded bundle with different task or project scopes. Select in one,
+    invoke a scoped action in each, then unmount the first. The second remains functional and never
+    receives the first tree's selection, document effects, or gesture authority. Revoke the accepted
+    hash while a tree is mounted; its worker and registrations disappear immediately.
+88. On a Node without a loaded plugin, check its settings page, project importer, task footer, command,
+    shortcut, and cooperative slot. They are absent or disabled, and a previously open importer closes.
+    Repeat with a failed load and with an unaccepted active runtime. In the terminal client, confirm
+    the same selection and trust behavior for a remote tree.
+
+The plugin lifecycle checks are supported by `distributionModel.test.ts`,
+`distribution.test.ts`, `availabilityModel.test.ts`, the Node state and bundle-route tests, and the
+worker/remote-tree suites. The real desktop driver reaches the main renderer but not native dialogs
+or host-owned child webviews; use the release pass for those surfaces. On 2026-09-26 an isolated Tauri
+session verified Settings → Plugins and a Findings remote settings tree, including its two controls.
+
+The task-annotation lifecycle's automated coverage described under Test layers was implemented on
+2026-09-26. The following real-window and real-terminal checks keep the same host behavior reviewable
+when the annotation or rail contracts change.
+
+89. Check the rail under the Terminal, Modern, Cozy, and Cute style packs.
+90. Check source, task, pane, run, terminal, add, and close controls at rest, hover, focus, active,
+    and busy.
+91. Confirm that the left add control and right close control occupy equal 52-pixel boxes with aligned
+    dividers.
+92. Confirm that project accent stripes stay on the left and right-rail active stripes stay on the
+    right.
+93. Open a task with pin, Docker, unread, working, dirty, checks, and loaded-plugin annotations.
+    Confirm that markers do not overlap and that the tooltip and accessible description list every
+    accepted state.
+94. Turn on reduced motion and confirm that marker and busy animations stop.
+95. Open and dismiss a task-row menu. Confirm that it anchors to the rail button and returns focus to
+    that button.
+96. Change a loaded plugin's task status without changing the task list. Confirm that its marker
+    refreshes after a plugin push, global status, and declared polling.
+97. Disable, enable, reload, and remove that plugin. Confirm that its marks disappear synchronously
+    and return only while its contribution is eligible.
+98. Switch between two nodes that contain the same task id. Delay one node's response and confirm
+    that neither the delayed answer nor either retained mark appears on the other node.
+99. In `acorn`, show more task markers than the row can fit. Confirm that the row shows `+N`, then
+    focus it and press `Shift+F10` to inspect every marker label in the **Task markers** list.
+
+Checks 96–99 passed on 2026-09-27 with an isolated `dev:agent` data root and a loaded fixture plugin.
+The Tauri window refreshed only that plugin after its push, cleared marks across disable, enable,
+reload, and removal, and switched between two nodes whose copied task databases contained the same
+task id without retaining the other node's label. The real terminal projected six accepted markers
+as `+6`; `Shift+F10` opened **Task markers**, and End reached the sixth label. That run also caught and
+fixed a long-title layout that could previously shrink the disclosure out of the row.
+
+One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
+diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as
+a named theme block and sets `--is-dark: 1`, so with the OS in dark mode the light-palette themes
+`solarized-light` and `catppuccin-latte` tell xterm and CodeMirror they are dark while rendering light.
+The fix is two lines and changes shipped visual behaviour for users of those two themes; it belongs
+in its own change with its own note.
+
+The dashboards backlog keeps its own once-only verification pass in
+[docs/future/dashboards/README.md](./future/dashboards/README.md) § 0, because its items gate that
+folder's remaining work rather than a release.
+
+Workflow-v2 dashboard checks are split by owner:
+`packages/dashboards-core/src/typedProjection.test.ts` covers nested projection and independent exact-status mappings;
+`packages/node-core/src/server/dashboards/*.test.ts`
+uses migrated temporary SQLite stores for revision and publication behavior; and
+`packages/client-core/src/features/dashboards/dashboardEditorModel.test.ts` plus `dashboardRecovery.test.ts`
+cover local display semantics and device recovery. Real-window checks still exercise the composed
+editor and placement because those interactions are not proved by pure tests.
+
+A normal worktree development run may need the main checkout's `.env`, and an existing development
+instance may own the renderer's fixed port, 4319. `pnpm dev:agent` uses isolated data and ports for
+real-window checks from a worktree.
 Run the relevant [specialized manual checks](./testing/manual-checks.md) after changes to plugins,
 large diffs, transcripts, palette behavior, appearance, accessibility, provider integrations, or
 other surfaces not covered by this pass. The catalog retains the detailed scenarios and dated results.

@@ -160,6 +160,20 @@ describe('Codex app-server normalization', () => {
     }])
   })
 
+  it('persists only the authoritative completed proposal, separate from progress and questions', () => {
+    expect(normalizeCodexNotification({ method: 'item/plan/delta', params: {
+      itemId: 'plan-1', turnId: 'codex-turn-1', delta: 'Draft text',
+    } })).toEqual([])
+    expect(normalizeCodexNotification({ method: 'item/completed', params: {
+      turnId: 'codex-turn-1', item: { id: 'plan-1', type: 'plan', text: 'Final **plan**' },
+    } })).toEqual([{
+      type: 'plan_proposal', itemId: 'plan-1', providerTurnId: 'codex-turn-1', text: 'Final **plan**',
+    }])
+    expect(normalizeCodexServerRequest({ id: 2, method: 'item/tool/requestUserInput', params: {
+      questions: [{ id: 'go', question: 'Shall I plan it?' }],
+    } })).toMatchObject({ type: 'request', kind: 'question' })
+  })
+
   it('extracts completed generated images as transient provider artifacts', async () => {
     const result = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
     const notification = {
@@ -186,6 +200,53 @@ describe('Codex app-server normalization', () => {
     expect(normalizeCodexNotification(notification)).toEqual([{
       type: 'tool',
       tool: { id: 'image-1', title: 'Generated image', kind: 'image', status: 'completed' },
+    }])
+  })
+})
+
+// Shapes from `codex app-server generate-json-schema` (codex-cli 0.155.1): `FileUpdateChange`,
+// `FileChangePatchUpdatedNotification` and `TurnDiffUpdatedNotification`. The `diff` contents follow
+// a real rollout: an update's is headerless hunks, an added file's is the file's text.
+describe('Codex file changes', () => {
+  const update = { path: '/w/src/a.ts', kind: { type: 'update', move_path: null }, diff: '@@ -1,2 +1,2 @@\n keep\n-old\n+new' }
+  const added = { path: '/w/src/new.ts', kind: { type: 'add' }, diff: 'one\ntwo\n' }
+
+  it('keeps each file’s diff from a patch update, under the item it belongs to', () => {
+    expect(normalizeCodexNotification({
+      method: 'item/fileChange/patchUpdated',
+      params: { threadId: 't', turnId: 'turn-1', itemId: 'item-1', changes: [update, added] },
+    })).toEqual([
+      { type: 'file_change', path: '/w/src/a.ts', patch: update.diff, changeId: 'item-1' },
+      { type: 'file_change', path: '/w/src/new.ts', patch: '@@ -0,0 +1,2 @@\n+one\n+two', changeId: 'item-1' },
+    ])
+  })
+
+  it('keeps each file’s diff from a completed item, beside the tool card', () => {
+    const events = normalizeCodexNotification({
+      method: 'item/completed',
+      params: { threadId: 't', turnId: 'turn-1', item: { type: 'fileChange', id: 'item-1', status: 'completed', changes: [update] } },
+    })
+    expect(events.map((event) => event.type)).toEqual(['tool', 'file_change'])
+    expect(events[1]).toEqual({ type: 'file_change', path: '/w/src/a.ts', patch: update.diff, changeId: 'item-1' })
+  })
+
+  it('turns a deleted file’s text into removed lines', () => {
+    const [event] = normalizeCodexNotification({
+      method: 'item/fileChange/patchUpdated',
+      params: { threadId: 't', turnId: 'turn-1', itemId: 'item-1', changes: [{ path: 'gone.ts', kind: { type: 'delete' }, diff: 'bye\n' }] },
+    })
+    expect(event).toMatchObject({ patch: '@@ -1,1 +0,0 @@\n-bye' })
+  })
+
+  it('keys the whole-turn diff by its turn, so each update can replace the last', () => {
+    expect(normalizeCodexNotification({
+      method: 'turn/diff/updated',
+      params: { threadId: 't', turnId: 'turn-1', diff: 'diff --git a/x b/x\n@@ -1 +1 @@\n-a\n+b' },
+    })).toEqual([{
+      type: 'file_change',
+      patch: 'diff --git a/x b/x\n@@ -1 +1 @@\n-a\n+b',
+      summary: 'All changes this turn',
+      changeId: 'turn:turn-1',
     }])
   })
 })

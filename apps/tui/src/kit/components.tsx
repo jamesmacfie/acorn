@@ -8,7 +8,7 @@ import {
 import {
   Alert, Badge, ChipRow, Chip, CodeBlock, DescriptionList, DiffLine, DiffPane, EmptyState, Facts,
   FileHead, Grid, Heading, Icon, Kbd, Link, Log, Markdown, Meter, NonCodeRow, Row, RowActions, Rows,
-  Spinner, SplitCell, StatusDot, Table, TableCell, TableHead, TableRow, Text, TreeRow, UserAvatar,
+  Spinner, SplitCell, StackedDiff, StatusDot, Table, TableCell, TableHead, TableRow, Text, TreeRow, UserAvatar,
 } from './showing'
 import {
   Button, Checkbox, Composer, ConfirmButton, CopyButton, Field, FindBar, IconButton, Input, KeyValueEditor,
@@ -40,7 +40,7 @@ export const KIT_COMPONENTS: KitTable = {
   ModalBody, ModalActions, TabPanel, ToolbarSpacer,
   Text, Link, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip, ChipRow, StatusDot, Facts,
   DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Graph, Meter, CodeBlock, Log, Markdown, DiffPane, DiffLine,
-  FileHead, NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon,
+  FileHead, StackedDiff, NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon,
   Button, IconButton, Input, Textarea, Select, Checkbox, SegmentedControl, ToggleButton, Picker,
   PickerRow, Composer, MentionTextarea, KeyValueEditor, FindBar, Field, ConfirmButton, CopyButton,
   ModelBackendPicker,

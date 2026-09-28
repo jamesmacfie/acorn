@@ -23,6 +23,11 @@ describe('senderLabel', () => {
     expect(senderLabel(turn('delegation_report', [sender('delegation_report', 'Fix parser')]))).toBe('From Fix parser')
   })
 
+  it('names the workflow for a step prompt, and acorn for the nudge after a turn ended early', () => {
+    expect(senderLabel(turn('workflow'))).toBe('Workflow')
+    expect(senderLabel({ ...turn('workflow'), effectivePolicy: { continuationOf: 'first' } })).toBe('Acorn')
+  })
+
   it('ignores an unrelated context part and falls back for older turns', () => {
     expect(senderLabel(turn('delegation', [sender('agents', 'History copied from X')]))).toBe('From the delegating agent')
   })

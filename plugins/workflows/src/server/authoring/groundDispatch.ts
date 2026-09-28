@@ -9,6 +9,7 @@ import { sameWorkflowRef } from '../../shared/workflowRefs'
 import { parseWorkflowJsonPointer, workflowEdges } from '../validation/definition'
 import { dataBindingSchema } from '@acorn/protocol/dataBindings.ts'
 import { stepIdentity } from '../../shared/workflowIdentity'
+import { declaredOutputSchema } from '../../shared/gateForm'
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value)
@@ -91,7 +92,7 @@ export function groundWorkflowDispatch(
     const source = def.steps.find((step) => stepIdentity(step) === name)
     if (!source) return false
     if (source.schema && typeof source.schema === 'object' && !Array.isArray(source.schema)) return true
-    return !!catalog.kinds.find((kind) => kind.id === (source.kind ?? 'agent'))?.describe?.output?.schema
+    return !!declaredOutputSchema(source, catalog.kinds.find((kind) => kind.id === (source.kind ?? 'agent'))?.describe?.output?.schema)
   }
 
   const steps = def.steps.map((step) => {

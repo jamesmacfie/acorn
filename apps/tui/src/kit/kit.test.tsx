@@ -18,7 +18,7 @@ import {
 import {
   Alert, Badge, Chip, ChipRow, CodeBlock, DescriptionList, DiffLine, DiffPane, EmptyState, Facts,
   FileHead, Grid, Heading, Icon, Kbd, Link, Log, Markdown, Meter, NonCodeRow, Row, RowActions, Rows,
-  Spinner, SplitCell, StatusDot, Table, TableCell, TableHead, TableRow, Text, TreeRow, UserAvatar,
+  Spinner, SplitCell, StackedDiff, StatusDot, Table, TableCell, TableHead, TableRow, Text, TreeRow, UserAvatar,
 } from './showing'
 import {
   Button, Checkbox, Composer, ConfirmButton, CopyButton, Field, FindBar, Input, KeyValueEditor,
@@ -575,6 +575,18 @@ const CASES: Case[] = [
       const line = lineWith(frame, 'src/login.ts')
       expect(line).toContain('+3')
       expect(line.trimEnd().endsWith('−1')).toBe(true)
+    },
+  },
+  {
+    node: 'StackedDiff',
+    draws: 'reduced: the header, then each hunk and line, stacked',
+    render: () => <StackedDiff path="src/a.ts" patch={'@@ -3,2 +3,2 @@\n keep\n-old\n+new'} />,
+    size: { width: 40, height: 6 },
+    check: (frame) => {
+      expect(lineWith(frame, 'src/a.ts')).toContain('+1')
+      has(frame, '@@ -3,2 +3,2 @@')
+      expect(lineWith(frame, '+new')).toContain('4')
+      has(frame, '-old')
     },
   },
   {

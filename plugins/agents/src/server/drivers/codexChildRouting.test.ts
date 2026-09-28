@@ -253,11 +253,17 @@ describe('CodexChildRouter guards', () => {
     router.route(activity('root-1', 'child-1', '/root/alpha'))
     const routed = router.route({
       method: 'item/fileChange/patchUpdated',
-      params: { threadId: 'child-1', path: 'src/a.ts', patch: '@@ -1 +1 @@' },
+      params: {
+        threadId: 'child-1',
+        turnId: 'turn-1',
+        itemId: 'item-1',
+        changes: [{ path: 'src/a.ts', kind: { type: 'update', move_path: null }, diff: '@@ -1 +1 @@\n-a\n+b' }],
+      },
     })
     expect(routed.to === 'subagent' && routed.events[0]).toMatchObject({
       type: 'file_change',
       path: 'src/a.ts',
+      patch: '@@ -1 +1 @@\n-a\n+b',
       subagentId: 'child-1',
     })
   })

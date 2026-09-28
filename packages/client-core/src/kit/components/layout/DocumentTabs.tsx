@@ -1,6 +1,7 @@
 import { createEffect, For, Show, type JSX } from 'solid-js'
 import { IconButton } from '../inputs/IconButton'
 import { StatusDot } from '../content/StatusDot'
+import { revealActiveTab } from './tabScroll'
 
 export type DocTabDef = {
   id: string
@@ -35,19 +36,14 @@ export function DocumentTabs(props: {
   actions?: JSX.Element
   idPrefix: string
   ariaLabel: string
+  /** A strip that is the pane's header rather than navigation below one. */
+  level?: 'pane'
 }) {
   let stripRef: HTMLDivElement | undefined
 
   // A tab activated by keyboard, or opened off-screen in a long strip, has to be brought into view
   // or the selection is invisible.
-  createEffect(() => {
-    const id = props.active
-    if (!id || !stripRef) return
-    queueMicrotask(() => {
-      stripRef?.querySelector(`#${CSS.escape(`${props.idPrefix}-tab-${id}`)}`)
-        ?.scrollIntoView({ block: 'nearest', inline: 'nearest' })
-    })
-  })
+  createEffect(() => revealActiveTab(stripRef, `${props.idPrefix}-tab-${props.active}`))
 
   const move = (offset: number) => {
     if (!props.tabs.length) return
@@ -58,10 +54,10 @@ export function DocumentTabs(props: {
   }
 
   return (
-    <div class="ui-doctabs">
+    <div class="ui-doctabs" data-level={props.level}>
       <div
         ref={stripRef}
-        class="ui-doctabs-strip"
+        class="ui-tab-scroll ui-doctabs-strip"
         role="tablist"
         aria-label={props.ariaLabel}
         onKeyDown={(event) => {

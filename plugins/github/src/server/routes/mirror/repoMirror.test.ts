@@ -174,12 +174,14 @@ describe('pull files stale-while-revalidate', () => {
 
     const blobGet = vi.fn()
 
+    // GitHub never answers until the test says so, so a route that waited on it would lose this race
+    // however long the timer is. It is generous because 20ms lost on a loaded CI runner.
     const response = await Promise.race([
       app.fetch(
         new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls/12/files?summary=1'),
         { DB: core.db, BLOBS: { get: blobGet, put: vi.fn() }, ...testSecretEnv(ENC_KEY) } as unknown as Env,
       ),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 20)),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1_000)),
     ])
 
     expect(response).toBeInstanceOf(Response)
@@ -309,7 +311,7 @@ describe('pull files stale-while-revalidate', () => {
         new Request('http://acorn.test/api/repos/Runn-Fast/runn/pulls/12/diff'),
         { DB: core.db, BLOBS: { get: blobGet, put: blobPut }, ...testSecretEnv(ENC_KEY) } as unknown as Env,
       ),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 20)),
+      new Promise<null>((resolve) => setTimeout(() => resolve(null), 1_000)),
     ])
 
     expect(response).toBeInstanceOf(Response)

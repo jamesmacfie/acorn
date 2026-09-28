@@ -3,6 +3,8 @@ import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import { DEFAULT_PROFILE_ID, type HeadlessResult, type PluginDatabase } from '@acorn/plugin-api/node'
 import { validateDataValue } from '@acorn/protocol/dataSchemas.ts'
 import { parseDataValue } from '@acorn/protocol/dataValues.ts'
+import { declaredOutputSchema } from '../../shared/gateForm'
+import { stepKindPluginId, unavailableStepKindMessage } from '../../shared/stepKindAvailability'
 import * as schema from '../../node/schema'
 import type { StepHandlerContext, StepHandlerOutcome, WorkflowDef, WorkflowRunRow, WorkflowStepDef, WorkflowStepRow, StepKindContribution } from '../../shared/workflowContracts'
 import { rowIdentity, stepIdentity } from '../../shared/workflowIdentity'
@@ -90,7 +92,9 @@ export class WorkflowStepExecution {
     const kind = def.kind ?? 'agent'
     const handler = this.services.kind(kind)?.handler
     if (!handler) {
-      await this.services.finishRun(run, 'failed', `Step '${def.name}' has unknown kind '${kind}'.`, step.id)
+      await this.services.finishRun(run, 'failed', stepKindPluginId(kind)
+        ? `Step '${def.name}' cannot run. ${unavailableStepKindMessage(kind)}`
+        : `Step '${def.name}' has unknown kind '${kind}'.`, step.id)
       return
     }
     const inputs = frozenWorkflowInputs(workflow)
@@ -233,8 +237,13 @@ export class WorkflowStepExecution {
     const currentRun = await this.services.state.run(run.id)
     const [currentStep] = await this.services.db.select().from(schema.workflowSteps).where(eq(schema.workflowSteps.id, step.id))
     if (!currentRun || currentRun.status === 'cancelling' || currentRun.status === 'cancelled' || currentStep?.status === 'cancelled') return
+    const inputsJson = 'inputs' in outcome && outcome.inputs !== undefined
+      ? JSON.stringify(outcome.inputs && typeof outcome.inputs === 'object' && !Array.isArray(outcome.inputs)
+        ? { ...(outcome.inputs as Record<string, unknown>), ...carried }
+        : outcome.inputs)
+      : undefined
     if (outcome.status === 'waiting-gate') {
-      await this.services.state.setStep(step.id, { status: 'waiting-gate' })
+      await this.services.state.setStep(step.id, { status: 'waiting-gate', ...(inputsJson !== undefined ? { inputsJson } : {}) })
       // The run stays gated until its waiting steps or children settle.
       await this.services.state.setRun(run.id, { status: 'gated' })
       this.services.deps.notify(run.taskId, 'gate', `Workflow '${run.name}' needs you: ${def.name}`, { runId: run.id, stepId: step.id })
@@ -246,8 +255,8 @@ export class WorkflowStepExecution {
     }
     if (['done', 'completed-with-failures'].includes(outcome.status) && JSON.parse(run.defJson).formatVersion === 1 && 'structured' in outcome) {
       try {
-        const outputSchema = def.schema ?? this.services.kind(def.kind ?? 'agent')?.describe?.output?.schema
-        if (outputSchema) validateDataValue(outcome.structured, outputSchema as import('@acorn/protocol/dataSchemas.ts').DataSchema, WORKFLOW_VALUE_BYTES)
+        const outputSchema = declaredOutputSchema(def, this.services.kind(def.kind ?? 'agent')?.describe?.output?.schema)
+        if (outputSchema) validateDataValue(outcome.structured, outputSchema, WORKFLOW_VALUE_BYTES)
         else if (outcome.structured !== undefined) parseDataValue(outcome.structured, WORKFLOW_VALUE_BYTES)
       } catch (error) { outcome = { ...outcome, status: 'failed', error: `Invalid structured output: ${String(error)}` } }
     }
@@ -256,11 +265,6 @@ export class WorkflowStepExecution {
       await this.services.finishRun(run, 'cancelled', outcome.error ?? `Step '${def.name}' cancelled.`, step.id)
       return
     }
-    const inputsJson = outcome.inputs !== undefined
-      ? JSON.stringify(outcome.inputs && typeof outcome.inputs === 'object' && !Array.isArray(outcome.inputs)
-        ? { ...(outcome.inputs as Record<string, unknown>), ...carried }
-        : outcome.inputs)
-      : undefined
     const patch = {
       ...(inputsJson !== undefined ? { inputsJson } : {}),
       ...(outcome.result !== undefined ? { resultJson: JSON.stringify(outcome.result) } : {}),

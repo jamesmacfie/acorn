@@ -23,6 +23,7 @@ import { SessionTitleGeneration } from './sessionTitleGeneration'
 import { SessionDefaultsCommands } from './sessionDefaultsCommands'
 import { TranscriptCommands } from './transcriptCommands'
 import { waitForSessionSnapshot } from './sessionWait'
+import { CODEX_PLAN_IMPLEMENTATION_PROMPT } from '../../shared/codexPlanHandoff'
 
 /**
  * Replaces the first text part with the hook's single result and keeps every non-text part.
@@ -137,8 +138,8 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     this.holdSessionReadiness(session.id)
     try {
       await this.ensureSession(session)
-      // Workflow steps set their own options. Forks continue their source session's options.
-      if (session.kind === 'interactive' && !session.parentSessionId) {
+      // Workflow steps and sessions with an origin set their own options. Forks retain theirs.
+      if (session.kind === 'interactive' && !session.parentSessionId && !session.origin) {
         await this.sessionDefaults.applySaved(session.id, session.providerId).catch(async (error) => {
           await this.record(session.id, null, {
             type: 'diagnostic',
@@ -147,7 +148,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
           })
         })
       }
-      if (session.kind === 'delegated') {
+      if (session.kind === 'delegated' || session.origin?.kind === 'inline-diff') {
         const requested = session.config.requestedConfigOptions
         if (requested && typeof requested === 'object' && !Array.isArray(requested)) {
           const values = Object.fromEntries(Object.entries(requested).filter((entry): entry is [string, string] =>
@@ -255,7 +256,32 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     return turn
   }
 
-  /** Regenerates the title from the first durable text prompt. */
+  async implementCodexPlan(sessionId: string, itemId: string): Promise<AgentTurn> {
+    const session = await this.store.requireSession(sessionId)
+    if (session.controller !== 'acorn' || session.kind !== 'interactive'
+      || session.driverKind !== 'codex-app-server' || session.archivedAt) {
+      throw new Error('This session cannot implement a Codex plan.')
+    }
+    await this.core.tasks.requireRoot(session.taskId)
+    const changed = await this.hooks?.run('before-send', {
+      sessionId,
+      taskId: session.taskId,
+      text: CODEX_PLAN_IMPLEMENTATION_PROMPT,
+    })
+    if (changed && !changed.ok) throw new Error(`${changed.by}: ${changed.reason}`)
+    const prompt = changed?.payload.text ?? CODEX_PLAN_IMPLEMENTATION_PROMPT
+    if (!prompt.trim() || prompt.length > 1_000_000) throw new Error('The implementation prompt is invalid.')
+    const { turn, inserted } = await this.store.acceptCodexPlan(sessionId, itemId, prompt)
+    if (inserted) {
+      const updated = await this.store.requireSession(sessionId)
+      this.emit({ channel: 'agent:session', session: updated })
+      this.emit({ channel: 'agent:turn', turn })
+      void this.ensureSession(updated).then(() => this.pump()).catch(() => undefined)
+    }
+    return turn
+  }
+
+  /** Regenerate the title from the first durable text prompt. */
   async regenerateTitle(sessionId: string): Promise<AgentSession> {
     return this.titleGeneration.regenerate(sessionId)
   }

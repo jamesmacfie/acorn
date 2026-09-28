@@ -10,6 +10,9 @@ import type {
   WorkflowStepRow,
 } from '../../shared/workflowContracts'
 import type { PolicyEvaluator, StepKindContribution, WorkflowCatalog } from '../../shared/workflowContracts'
+import { stepKindContributionProblems } from '../../shared/stepKindAvailability'
+import { gateFormEdited, gateFormProblems, type GateFormOutput, type GateFormProposal } from '../../shared/gateForm'
+import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 import { managedProviderForProfile } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../../contract/extensions'
@@ -35,6 +38,11 @@ export type { RunnerDeps, RunStepOptions, StepRunRequest, WorkflowChildTaskSeed 
 export type { ToolCeiling, WorkflowDef, WorkflowStepDef } from '../../shared/workflowContracts'
 export type { WorkflowInvocationIdentity, WorkflowStartOptions } from './start'
 
+/** The outcome of answering a human gate. Invalid answers leave it waiting. */
+export type WorkflowGateResolution =
+  | { outcome: 'resolved' | 'already-resolved' | 'not-found' }
+  | { outcome: 'invalid'; problems: Record<string, string> }
+
 const TERMINAL_RUN = new Set(['done', 'completed-with-failures', 'failed', 'safety-rail', 'cancelled'])
 const TERMINAL_STEP = new Set(['done', 'completed-with-failures', 'failed', 'skipped', 'safety-rail', 'cancelled'])
 export { MAX_STEP_TURNS }
@@ -54,6 +62,7 @@ export class WorkflowRunner {
   // qualified and comes from the extension points (../../contract/extensions.ts).
   readonly #builtins: { stepKinds: Map<string, StepKindContribution>; policies: Map<string, PolicyEvaluator> }
   readonly #extensions: WorkflowExtensions
+  readonly #reportedInvalidKinds = new Map<string, string>()
   readonly #activeRuns = new Set<string>()
   // Queue a second tick when a step settles during an active graph read.
   readonly #pendingTicks = new Set<string>()
@@ -139,10 +148,29 @@ export class WorkflowRunner {
    *  host-minted `<pluginId>:<entryId>` for anything contributed. Resolved per call, never cached,
    *  because the plugin that fills the point may init after this one does. */
   #stepKind(kind: string): StepKindContribution | undefined {
-    if (kind === 'workflow') return { handler: this.#childLifecycle.handler() }
-    if (kind === 'workflow-map') return { handler: this.#childLifecycle.mapHandler() }
+    if (kind === 'workflow') return { handler: this.#childLifecycle.handler(), describe: BUILTIN_STEP_DESCRIPTIONS.workflow }
+    if (kind === 'workflow-map') return { handler: this.#childLifecycle.mapHandler(), describe: BUILTIN_STEP_DESCRIPTIONS['workflow-map'] }
     return this.#builtins.stepKinds.get(kind)
-      ?? this.#extensions.entries(WORKFLOW_STEP_KIND).find((entry) => entry.id === kind)?.value
+      ?? this.#validContributedKinds().find((entry) => entry.id === kind)?.value
+  }
+
+  #validContributedKinds() {
+    const entries = this.#extensions.entries(WORKFLOW_STEP_KIND)
+    const live = new Set(entries.map((entry) => entry.id))
+    for (const id of this.#reportedInvalidKinds.keys()) if (!live.has(id)) this.#reportedInvalidKinds.delete(id)
+    return entries.filter((entry) => {
+      const problems = stepKindContributionProblems(entry.value)
+      if (!problems.length) {
+        this.#reportedInvalidKinds.delete(entry.id)
+        return true
+      }
+      const message = problems.join('; ')
+      if (this.#reportedInvalidKinds.get(entry.id) !== message) {
+        this.#reportedInvalidKinds.set(entry.id, message)
+        this.deps.invalidStepKind?.(entry.id, problems)
+      }
+      return false
+    })
   }
 
   #policy(policy: string): PolicyEvaluator | undefined {
@@ -163,7 +191,7 @@ export class WorkflowRunner {
           describe: BUILTIN_STEP_DESCRIPTIONS[id],
         },
       })),
-      ...this.#extensions.entries(WORKFLOW_STEP_KIND).map((entry) => ({ id: entry.id, pluginId: entry.pluginId, contribution: entry.value })),
+      ...this.#validContributedKinds().map((entry) => ({ id: entry.id, pluginId: entry.pluginId, contribution: entry.value })),
     ]
   }
 
@@ -268,23 +296,40 @@ export class WorkflowRunner {
     return this.#childLifecycle.summariesForStep(parentStepId)
   }
 
-  async resolveGate(runId: string, stepId: string, approved: boolean): Promise<void> {
+  async resolveGate(runId: string, stepId: string, approved: boolean, values?: Record<string, DataValue>): Promise<WorkflowGateResolution> {
     const run = await this.run(runId)
     if (run?.deadlineAt != null && run.deadlineAt <= now()) {
       await this.safetyRailRun(run.rootRunId ?? run.id, 'Safety rail: workflow deadline exhausted while waiting at a gate.')
-      return
+      return { outcome: 'resolved' }
     }
     const [step] = await this.db.select().from(schema.workflowSteps).where(eq(schema.workflowSteps.id, stepId))
-    if (!step || step.runId !== runId || step.status !== 'waiting-gate') return
-    if (approved) {
-      await this.#state.setStep(stepId, { status: 'done', resultJson: JSON.stringify({ approved: true }) })
-      await this.#state.setWaitingParentStatus(runId, 'running')
-      void this.tick(runId)
-      return
+    if (!run || !step || step.runId !== runId) return { outcome: 'not-found' }
+    if (step.status !== 'waiting-gate') return { outcome: 'already-resolved' }
+    const workflow = JSON.parse(run.defJson) as WorkflowDef
+    const form = workflow.steps.find((candidate) => stepIdentity(candidate) === rowIdentity(workflow, step))?.form
+    if (values !== undefined && (!approved || !form)) {
+      return { outcome: 'invalid', problems: { values: approved ? 'This gate has no form.' : 'A rejection carries no values.' } }
     }
-    await this.#state.setStep(stepId, { status: 'failed', error: 'Rejected at the human gate.' })
-    const currentRun = await this.run(runId)
-    if (currentRun) await this.finishRun(currentRun, 'failed', `Gate '${step.name}' rejected.`, step.id)
+    if (!approved) {
+      if (!await this.#state.setStepIf(stepId, 'waiting-gate', { status: 'failed', error: 'Rejected at the human gate.' })) return { outcome: 'already-resolved' }
+      const currentRun = await this.run(runId)
+      if (currentRun) await this.finishRun(currentRun, 'failed', `Gate '${step.name}' rejected.`, step.id)
+      return { outcome: 'resolved' }
+    }
+    let structuredJson: string | undefined
+    if (form) {
+      const proposal = (step.inputsJson ? (JSON.parse(step.inputsJson) as Partial<GateFormProposal>).form?.values : undefined) ?? {}
+      const answer = values ?? proposal
+      const problems = gateFormProblems(form, answer)
+      if (Object.keys(problems).length) return { outcome: 'invalid', problems }
+      const output: GateFormOutput = { approved: true, values: answer, edited: gateFormEdited(form, proposal, answer) }
+      structuredJson = JSON.stringify(output)
+    }
+    const done = { status: 'done' as const, resultJson: JSON.stringify({ approved: true }), ...(structuredJson ? { structuredJson } : {}) }
+    if (!await this.#state.setStepIf(stepId, 'waiting-gate', done)) return { outcome: 'already-resolved' }
+    await this.#state.setWaitingParentStatus(runId, 'running')
+    void this.tick(runId)
+    return { outcome: 'resolved' }
   }
 
   async cancelRun(runId: string, reason = 'Run cancelled.'): Promise<void> {

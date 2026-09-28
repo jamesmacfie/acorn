@@ -3,6 +3,8 @@ import { expect, it, vi } from 'vitest'
 import type { AgentConversationItem } from './conversationItems'
 import type { AgentTurn } from '../../contract/wire.ts'
 
+const implementPlan = vi.fn(async () => ({}))
+
 let markdownMounts = 0
 vi.mock('./ManagedAgentMarkdown', () => ({
   default: (props: { text: string }) => { markdownMounts++; return <span>{props.text}</span> },
@@ -16,10 +18,134 @@ vi.mock('./managedClient', () => ({
       id, taskId: 'task', filename: 'notes.pdf', mediaType: 'application/pdf', byteSize: 2048, createdAt: 0,
     }),
     attachmentContent: async () => { throw new Error('bytes are only fetched for a picture') },
+    implementPlan,
   },
 }))
 
-const { default: AgentEventCard, withoutAttachmentPlaceholders } = await import('./AgentEventCard')
+const dispatchLayout = vi.fn()
+vi.mock('@acorn/plugin-api/client', async (original) => ({ ...await original<Record<string, unknown>>(), dispatchLayout }))
+
+const { default: AgentEventCard, withoutAttachmentPlaceholders, withoutPastedMarkers } = await import('./AgentEventCard')
+const { buildConversationItems } = await import('./conversationItems')
+
+const fileChange = (event: Extract<AgentConversationItem['event'], { type: 'file_change' }>): AgentConversationItem =>
+  ({ key: 'change', firstSeq: 1, lastSeq: 1, createdAt: 1, turnId: 'turn-1', event })
+
+const drawCard = (item: AgentConversationItem) => {
+  const host = document.createElement('div')
+  document.body.append(host)
+  const dispose = render(() => <AgentEventCard item={item} taskId="task" sessionId="session" />, host)
+  return { host, dispose: () => { dispose(); host.remove() } }
+}
+
+const openInChanges = (host: HTMLElement) =>
+  [...host.querySelectorAll('button')].find((element) => element.textContent?.includes('Open in Changes'))
+
+it('opens a file change in place to show that step’s diff, and keeps the way to Changes', () => {
+  dispatchLayout.mockClear()
+  const { host, dispose } = drawCard(fileChange({
+    type: 'file_change', path: 'src/a.ts', patch: '@@ -3,2 +3,2 @@\n keep\n-old\n+new', changeId: 'toolu_1',
+  }))
+  try {
+    const details = host.querySelector('details')!
+    expect(details.querySelector('summary')?.textContent).toContain('Changed src/a.ts')
+    // Nothing is built behind a closed row.
+    expect(host.querySelector('.diff-row')).toBeNull()
+    details.open = true
+    details.dispatchEvent(new Event('toggle'))
+    expect(host.querySelector('.diff-add')?.textContent).toContain('new')
+    expect(host.querySelector('.diff-del')?.textContent).toContain('old')
+    expect(host.querySelector('.diff-add .diff-gutter:nth-child(2)')?.textContent).toBe('4')
+    // Read-only: no comment control on any line.
+    expect(host.querySelector('.diff-add-btn')).toBeNull()
+    openInChanges(host)!.click()
+    expect(dispatchLayout).toHaveBeenCalledWith('task', { type: 'show', pane: 'changes' })
+  } finally { dispose() }
+})
+
+it('leaves an excerpt’s line numbers blank rather than counting from the excerpt', () => {
+  const { host, dispose } = drawCard(fileChange({
+    type: 'file_change', path: 'src/a.ts', patch: '@@ -1,2 +1,2 @@\n keep\n-old\n+new', changeId: 'toolu_1', snippet: true,
+  }))
+  try {
+    const details = host.querySelector('details')!
+    details.open = true
+    details.dispatchEvent(new Event('toggle'))
+    expect([...host.querySelectorAll('.diff-gutter')].map((gutter) => gutter.textContent)).toEqual(['', '', '', '', '', ''])
+  } finally { dispose() }
+})
+
+it('says a stored patch is too large, and still links to Changes', () => {
+  const { host, dispose } = drawCard(fileChange({ type: 'file_change', path: 'big.ts', patchArtifactId: 'artifact-1' }))
+  try {
+    const details = host.querySelector('details')!
+    details.open = true
+    details.dispatchEvent(new Event('toggle'))
+    expect(host.textContent).toContain('This diff is too large to show here.')
+    expect(openInChanges(host)).toBeDefined()
+  } finally { dispose() }
+})
+
+it('keeps a change with no patch as the link to Changes it always was', () => {
+  dispatchLayout.mockClear()
+  const { host, dispose } = drawCard(fileChange({ type: 'file_change', summary: 'Codex updated files.' }))
+  try {
+    expect(host.querySelector('details')).toBeNull()
+    expect(host.textContent).toContain('Changed files')
+    host.querySelector<HTMLElement>('[role="button"], button')!.click()
+    expect(dispatchLayout).toHaveBeenCalledWith('task', { type: 'show', pane: 'changes' })
+  } finally { dispose() }
+})
+
+it('draws Codex’s whole-turn diff once, as its latest version, one file after another', () => {
+  const turnDiff = (seq: number, diff: string) => ({
+    id: String(seq), sessionId: 'session', turnId: 'turn-1', seq, schemaVersion: 1, searchText: null, createdAt: seq,
+    event: { type: 'file_change' as const, patch: diff, changeId: 'turn:t1', summary: 'All changes this turn' },
+  })
+  const items = buildConversationItems([
+    turnDiff(1, 'diff --git a/a.ts b/a.ts\n@@ -1 +1 @@\n-a\n+b'),
+    turnDiff(2, 'diff --git a/a.ts b/a.ts\n@@ -1 +1 @@\n-a\n+b\ndiff --git a/c.ts b/c.ts\n@@ -1 +1 @@\n-c\n+d'),
+  ])
+  expect(items).toHaveLength(1)
+  const { host, dispose } = drawCard(items[0])
+  try {
+    const details = host.querySelector('details')!
+    expect(details.querySelector('summary')?.textContent).toContain('All changes this turn')
+    details.open = true
+    details.dispatchEvent(new Event('toggle'))
+    expect([...host.querySelectorAll('.diff-file-path')].map((path) => path.textContent)).toEqual(['a.ts', 'c.ts'])
+  } finally { dispose() }
+})
+
+it('offers the completed Codex proposal in the shared desktop and terminal card', async () => {
+  implementPlan.mockClear()
+  const item: AgentConversationItem = {
+    key: 'proposal', firstSeq: 2, lastSeq: 2, createdAt: 2, turnId: 'turn-1',
+    event: { type: 'plan_proposal', itemId: 'plan-1', providerTurnId: 'codex-turn-1', text: '1. Update the API' },
+  }
+  const host = document.createElement('div')
+  document.body.append(host)
+  const changed = vi.fn()
+  const dispose = render(() => <AgentEventCard item={item} taskId="task" sessionId="session"
+    planHandoffState="actionable" onPlanImplemented={changed} />, host)
+  try {
+    const button = [...host.querySelectorAll('button')].find((element) => element.textContent?.includes('Implement plan'))
+    expect(button).toBeDefined()
+    button!.click()
+    button!.click()
+    await vi.waitFor(() => expect(changed).toHaveBeenCalledOnce())
+    expect(implementPlan).toHaveBeenCalledOnce()
+    expect(implementPlan).toHaveBeenCalledWith('session', 'plan-1')
+  } finally { dispose(); host.remove() }
+
+  const handled = document.createElement('div')
+  const disposeHandled = render(() => <AgentEventCard item={item} taskId="task" sessionId="session"
+    planHandoffState="handled" />, handled)
+  try {
+    expect(handled.textContent).toContain('Implementation started')
+    expect(handled.textContent).not.toContain('Implement plan')
+  } finally { disposeHandled() }
+})
 
 it('puts a focusable local time with the full timestamp on both sides of a conversation', () => {
   const at = Date.parse('2026-09-25T03:24:18Z')
@@ -62,6 +188,12 @@ it('drops the attachment placeholder only when there is an attachment to draw in
     // The row is drawn once the node has answered.
     await vi.waitFor(() => expect(host.textContent).toContain('notes.pdf'))
   } finally { dispose() }
+})
+
+it('hides the marker lines around another author\'s text, and leaves other text alone', () => {
+  expect(withoutPastedMarkers('Final message:\n\n<pasted_content id="ab12cd34">\nDone.\n</pasted_content id="ab12cd34">'))
+    .toBe('Final message:\n\nDone.')
+  expect(withoutPastedMarkers('a\n\n\n\nb')).toBe('a\n\n\n\nb')
 })
 
 it('does not render a completed subagent’s history until its disclosure opens', () => {
@@ -167,11 +299,24 @@ it('closes a turn with the context window on the right of the line', () => {
 it('closes a turn that reported no context with the reason alone', () => {
   const item: AgentConversationItem = {
     key: 'done', firstSeq: 9, lastSeq: 9, createdAt: 9, turnId: 'turn-1',
+    event: { type: 'turn_completed', stopReason: 'end_turn' },
+  }
+  const host = document.createElement('div')
+  const dispose = render(() => <AgentEventCard item={item} taskId="task" sessionId="session" />, host)
+  try {
+    expect(host.textContent).toBe('Turn complete · end_turn')
+  } finally { dispose() }
+})
+
+it('says in words that the model declined a refused turn', () => {
+  const item: AgentConversationItem = {
+    key: 'done', firstSeq: 9, lastSeq: 9, createdAt: 9, turnId: 'turn-1',
     event: { type: 'turn_completed', stopReason: 'refusal' },
   }
   const host = document.createElement('div')
   const dispose = render(() => <AgentEventCard item={item} taskId="task" sessionId="session" />, host)
   try {
-    expect(host.textContent).toBe('Turn complete · refusal')
+    expect(host.querySelector('[data-tone="warn"]')?.textContent).toContain('The model declined this request.')
+    expect(host.textContent).toContain('Turn complete · refusal')
   } finally { dispose() }
 })

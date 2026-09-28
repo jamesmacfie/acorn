@@ -24,11 +24,11 @@
    scrolls to, so the width goes back to being slightly jumpy for that one line rather than the
    text becoming unreachable. */
 .diff-rows { position: relative; width: 100%; min-width: calc(var(--diff-chrome-w) + var(--diff-cols, 0) * 1ch); }
-/* Read-only compare preview (create mode) and the changes pane: same rows in normal document flow
-   instead of the virtualizer's absolute positioning. In flow the rows really do size the canvas, so
-   ask them rather than the column count, since there is no virtual window here to make that unstable. */
-.compare-diff .diff-rows { position: static; min-width: max-content; }
-.compare-diff .diff-row { position: static; transform: none; }
+/* StackedDiff (kit/diff/DiffRows.tsx): the same rows in normal document flow instead of the
+   virtualizer's absolute positioning. In flow the rows really do size the canvas, so ask them rather
+   than the column count, since there is no virtual window here to make that unstable. */
+.diff-stacked .diff-rows { position: static; min-width: max-content; }
+.diff-stacked .diff-row { position: static; transform: none; }
 /* One virtual item: a file header, a segment of up to 64 rows, or a slice of an expanded gap. The
    item is positioned; the rows inside it are in normal flow, so a segment is as tall as its rows and
    any thread or note among them (docs/diff-rendering.md § Row geometry). */
@@ -57,6 +57,14 @@
   padding-left: calc(2 * var(--diff-gutter-w) + var(--diff-marker-w));
 }
 .diff-line-extra:empty { display: none; }
+.diff-inline-chat {
+  position: sticky;
+  left: var(--diff-chrome-w);
+  width: calc(100cqw - var(--diff-chrome-w) - var(--pane-pad));
+  margin: 6px 0;
+  white-space: normal;
+}
+.diff-split-cell .diff-inline-chat { position: static; width: 100%; }
 .diff-gutter { position: relative; flex: none; width: var(--diff-gutter-w); padding-right: var(--space-4); text-align: right; color: var(--text-faint); user-select: none; }
 .diff-marker { flex: none; width: var(--diff-marker-w); text-align: center; color: var(--text-faint); user-select: none; }
 /* `flex: 1 1 0` with `min-width: 0`, even though the text no longer wraps: the row is
@@ -183,7 +191,7 @@
 
 /* Inline review threads + new-line composer. Thread rows are full-width, variable-height blocks
    (measured by the virtualizer); the add-comment "+" reveals on row hover. */
-.diff-add-btn, .diff-open-btn {
+.diff-add-btn, .diff-open-btn, .diff-ask-btn {
   flex: none;
   width: 16px;
   height: 16px;
@@ -200,9 +208,10 @@
   visibility: hidden;
 }
 .diff-open-btn { position: absolute; top: 2px; left: 2px; margin-right: 0; text-align: center; }
-.diff-row:hover .diff-add-btn, .diff-row:hover .diff-open-btn,
-.diff-add-btn:focus-visible, .diff-open-btn:focus-visible { visibility: visible; }
-.diff-add-btn:hover, .diff-open-btn:hover { color: var(--text); background: var(--bg-hover); border-color: var(--accent); }
+.diff-ask-btn { position: absolute; top: 2px; left: 20px; margin-right: 0; text-align: center; }
+.diff-row:hover .diff-add-btn, .diff-row:hover .diff-open-btn, .diff-row:hover .diff-ask-btn,
+.diff-add-btn:focus-visible, .diff-open-btn:focus-visible, .diff-ask-btn:focus-visible { visibility: visible; }
+.diff-add-btn:hover, .diff-open-btn:hover, .diff-ask-btn:hover { color: var(--text); background: var(--bg-hover); border-color: var(--accent); }
 
 /* Thread / composer rows opt out of the single-line flex layout used by code rows. `flow-root` keeps
    the thread card's margins inside the row, so the row's own box is the space it takes: the layout

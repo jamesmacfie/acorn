@@ -42,6 +42,7 @@ describe('no phantom tokens', () => {
       '--diff-gutter-w', '--diff-marker-w', '--diff-btn-w', '--diff-chrome-w',
       '--row-field-w', '--row-owner-inset',
       '--kit-grid-col',
+      '--tab-strip-h',
     ])
 
     const phantom = [...new Set(sheets.flatMap((f) => [...referenced(f.text)]))]
