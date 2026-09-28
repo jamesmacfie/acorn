@@ -12,7 +12,8 @@ import {
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import type { WorkflowRunRow } from '../../contract/wire.ts'
 import type { WorkflowChildRunSummary, WorkflowRunProjection, WorkflowStepProjection } from '../../shared/api'
-import type { WorkflowDef } from '../../shared/workflowContracts'
+import type { DataValue } from '@acorn/protocol/dataValues.ts'
+import type { WorkflowDef, WorkflowGateForm } from '../../shared/workflowContracts'
 import { isWorkflowStepEvent } from '../../shared/stepEvents'
 import { graphOrder } from '../editor/graphOrder'
 import { rowIdentity } from '../../shared/workflowIdentity'
@@ -56,6 +57,9 @@ export function createRunPaneModel(task: Task) {
   const [events, setEvents] = createSignal<Record<string, unknown[]>>({})
   const [tails, setTails] = createSignal<Record<string, string>>({})
   const [now, setNow] = createSignal(Date.now())
+  // A gate form's edits in progress, per step. Held while the app is open and saved nowhere, so
+  // closing the app loses them and the frozen proposal remains.
+  const [gateDrafts, setGateDrafts] = createSignal<Record<string, Record<string, DataValue | undefined>>>({})
 
   const [runs, { refetch: refetchRuns }] = createResource<WorkflowRunProjection[]>(() => workflowApi.runs(task.id), { initialValue: [] })
   const [steps, { refetch: refetchSteps, mutate: mutateSteps }] = createResource(
@@ -222,11 +226,18 @@ export function createRunPaneModel(task: Task) {
       return tail ? tail.split('\n') : []
     },
     refresh,
-    gate: (approved: boolean) => {
+    /** The form a top-level gate declares in the run's frozen definition, if it has one. */
+    gateForm: (step: WorkflowStepProjection): WorkflowGateForm | undefined =>
+      step.parentStepId ? undefined : parseDef(selectedRun()?.defJson)?.steps[step.idx]?.form,
+    gateDraft: (stepId: string) => gateDrafts()[stepId],
+    setGateDraft: (stepId: string, values: Record<string, DataValue | undefined>) =>
+      setGateDrafts((drafts) => ({ ...drafts, [stepId]: values })),
+    /** `values` is the complete set a form gate approves. A field left undefined is approved empty. */
+    gate: (approved: boolean, values?: Record<string, DataValue | undefined>) => {
       const run = selectedRunId()
       const step = selectedStepId()
       if (!run || !step) return Promise.resolve()
-      return act('That gate could not be resolved.', () => workflowApi.gate(run, step, approved))
+      return act('That gate could not be resolved.', () => workflowApi.gate(run, step, approved, values))
     },
     cancel: () => {
       const run = selectedRunId()
