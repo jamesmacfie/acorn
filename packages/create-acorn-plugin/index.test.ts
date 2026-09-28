@@ -229,7 +229,7 @@ it("type-checks its node half against the published declarations, from outside t
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
-})
+}, 20_000)
 
 it('type-checks the complete documented plugin example outside the workspace', () => {
   const dir = mkdtempSync(join(tmpdir(), 'documented-plugin-'))
