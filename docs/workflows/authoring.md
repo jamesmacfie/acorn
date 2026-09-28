@@ -41,6 +41,10 @@ on as removable chips with a picker beside them, the agent fields when the kind 
 the kind's own fields in declared order. A prompt field carries a chip per declared input and per
 step that is certain to have finished first, and pressing one appends the reference. A `decide` node
 draws its branches as verdict-to-step rows. For each selects a child workflow and typed item bindings.
+A **Wait for a person** node has a **Form** section: the inputs list for its fields, with a 20-field
+cap, and a typed binding picker per field that chooses where the proposal comes from. Removing every
+field makes it a plain gate again, and the step preview lists each field and where it is filled from
+([execution](./execution.md#human-gates)).
 A kind that ships no `describe` draws its `with` table as raw JSON and says so.
 
 **Find records** uses the shared query editor. Adding **For each** from a Find records step creates
@@ -221,7 +225,8 @@ taken out before the draft is touched. An invented step kind becomes a plain age
 prompt, rather than a deleted step, because deleting one cascades through every `after` and `branches`
 target that names it. An invented policy loses its value and stays a policy gate, because
 retargeting it to a human gate would silently turn a hard check into a no-op under an autonomous
-posture. An unknown `with` key goes, while the step's stable ID keeps every reference intact when its
+posture. A generated gate form that would not load is dropped and the gate is kept, never the other
+way round, so a bad answer still stops for a person. An unknown `with` key goes, while the step's stable ID keeps every reference intact when its
 display name changes. Each grounding change is reported in a dismissible alert above the node list,
 because a list of things that were changed is not something to read in a toast. What the definition
 still gets wrong is not repeated there: the footer already draws it.

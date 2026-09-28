@@ -1,7 +1,7 @@
-// Definition checks for the approval form on a `gate-human` step (docs/workflows.md § Human gates).
-// Here rather than in the kind's `validate`, because a binding check needs the declared inputs and
-// which steps declare structured output, and the step-validator context that contributed kinds share
-// carries neither.
+// Definition checks for the approval form on a `gate-human` step
+// (docs/workflows/execution.md § Human gates). Here rather than in the kind's `validate`, because a
+// binding check needs the declared inputs and which steps declare structured output, and the
+// step-validator context that contributed kinds share carries neither.
 import { parseDataSchema, validateDataValue } from '@acorn/protocol/dataSchemas.ts'
 import type { WorkflowPosture, WorkflowStepDef } from '../shared/workflowContracts'
 import { GATE_FORM_MAX_FIELDS } from '../shared/gateForm'
