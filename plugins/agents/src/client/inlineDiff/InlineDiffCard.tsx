@@ -46,7 +46,20 @@ export default function InlineDiffCard(props: Props) {
   const [recent] = createResource(() => session() ? undefined : 'new', () => managedAgentApi.sessions({}))
   const snapshot = createMemo(() => session() ? managedAgentStore.snapshots()[session()!.id] : undefined)
   const conversation = createMemo(() => chatText(buildConversationItems(snapshot()?.events ?? [])))
-  const record = () => defaults.data ?? defaultAgentSessionDefaults()
+  // A persisted query can contain defaults from before inline choices existed. The node normalizes
+  // stored preferences, but the restored client cache is visible before that response arrives.
+  const record = () => {
+    const current = defaults.data
+    const fallback = defaultAgentSessionDefaults()
+    return {
+      ...fallback,
+      ...current,
+      inline: {
+        providerId: current?.inline?.providerId ?? fallback.inline.providerId,
+        pinned: current?.inline?.pinned ?? fallback.inline.pinned,
+      },
+    }
+  }
   const installed = createMemo(() => (providers() ?? []).filter((provider) => provider.installed))
   const provider = createMemo(() => {
     const id = providerOverride() ?? record().inline.providerId
