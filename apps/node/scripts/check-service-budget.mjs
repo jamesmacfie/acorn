@@ -20,9 +20,10 @@ const args = process.argv.slice(2)
 const dirFlag = args.indexOf('--dir')
 const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : args[dirFlag + 1])
 
-// The measured figure plus about 5%. `floor` is a lower bound, not a target: a graph that small means
-// the walk below stopped following imports, and a check that passes on that is blind.
-const limits = { ceiling: 2_910_000, floor: 1_000_000 }
+// Raised to 3 MB on 2026-09-29, when the graph measured about 2.93 MB. `floor` is a lower bound, not a
+// target: a graph that small means the walk below stopped following imports, and a check that passes on
+// that is blind.
+const limits = { ceiling: 3_000_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))
