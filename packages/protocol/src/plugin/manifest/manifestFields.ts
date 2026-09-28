@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { normalizeWebviewHost, WEBVIEW_HOST_MAX_LENGTH } from '../../webview.ts'
+import { normalizeWebviewHost, WEBVIEW_HOST_MAX_LENGTH } from '../../content/webview.ts'
 
 // This id becomes the plugin's route namespace and `<dataRoot>/plugins/<id>.sqlite`. An architecture
 // rule keeps the prefix itself out of this package; node-core/server/plugins/manifest.ts confines it.

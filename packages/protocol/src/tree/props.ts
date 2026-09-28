@@ -12,7 +12,7 @@
 // entries — every caller already goes through it.
 import { z } from 'zod'
 import { FORBIDDEN_PROPS, isKitEvent, KIT_NODES, ROLE_PROPS, ROLE_VALUES, TEXT_NODE, type KitNodeName } from './nodes.ts'
-import { safeContentHref } from '../externalUrl.ts'
+import { safeContentHref } from '../content/externalUrl.ts'
 
 /** A handler on the wire. Never a function: the sandbox mints an id, the host maps it back to a
  *  closure that posts the event. */

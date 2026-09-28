@@ -78,7 +78,7 @@ does not rewrite the durable row.
 **Inside a pane** the host owns the arrangement. A pane names one of the layouts below and supplies a
 component per region; it never draws the split, the divider, or the drag handle itself. The names and
 each layout's region set are in
-[@acorn/protocol/paneLayouts.ts](../packages/protocol/src/paneLayouts.ts).
+[@acorn/protocol/paneLayouts.ts](../packages/protocol/src/chrome/paneLayouts.ts).
 
 **Which components draw them is the host package's,** the same way `KIT_COMPONENTS` is: the desktop's
 are in `client-core/src/host/layouts` and the terminal's are in `apps/tui/src/layouts`, and a host

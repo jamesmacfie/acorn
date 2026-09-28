@@ -3,7 +3,7 @@
 // and retains the public wire types used by older roster rows.
 import { z } from 'zod'
 import { ACORN_BASELINE } from '../baseline.ts'
-import { dataSourceDiscoverySchema, dataSourceRegistrationSchema } from '../dataSourceContributions.ts'
+import { dataSourceDiscoverySchema, dataSourceRegistrationSchema } from '../data/dataSourceContributions.ts'
 import { PLUGIN_API_RANGE_RE } from './apiVersion.ts'
 import { pluginCliCommandDescriptorSchema } from './cliCommands.ts'
 import {
@@ -345,8 +345,8 @@ export type PluginContributions = {
   contextMenus?: PluginContextMenuDescriptor[]
   extensionPoints?: PluginExtensionPointDescriptor[]
   extensions?: PluginExtensionDescriptor[]
-  dataSources?: import('../dataSources').DataSourceRegistration[]
-  dataSourceDiscoveries?: import('../dataSources').DataSourceDiscovery[]
+  dataSources?: import('../data/dataSources').DataSourceRegistration[]
+  dataSourceDiscoveries?: import('../data/dataSources').DataSourceDiscovery[]
   schedules?: PluginScheduleDescriptor[]
   taskChecks?: PluginTaskCheckDescriptor[]
   auditActions?: PluginAuditActionDescriptor[]

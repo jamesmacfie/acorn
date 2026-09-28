@@ -23,7 +23,7 @@ only, because nobody wrote the line. The seven routes above them in
 first fix in the folder.
 
 The tool-permission ceiling works. It lives in a prefs slice keyed `agentTools.perms`
-(`packages/protocol/src/api.ts:221`), and `loadPerms`
+(`packages/protocol/src/transport/api.ts:221`), and `loadPerms`
 (`packages/node-core/src/server/routes/plugins/agentTools.ts:22`) reads it and enforces it through
 `isToolPermitted` (`packages/node-core/src/server/agentTools/registry.ts:54`) on every task-scoped
 tool call. Turn the execute tier off and execute tools vanish from `tools/list` and are rejected on

@@ -136,6 +136,11 @@ its map enumerates its public modules one per line. That buys two things over th
 not importable from another package, and a new module is public only when someone adds the line, which
 is the decision the map exists to record.
 
+The source is grouped by contract owner: agents, appearance, chrome, content, data, dashboards,
+device, integrations, projects, runtime, and transport. The public subpaths remain flat, so moving a
+source file between these folders does not change a consumer import. `plugin/` and `tree/` keep their
+own wire families. `baseline.ts` stays at the source root because the Rust shell embeds that file.
+
 The other five libraries also publish enumerated subpaths. Their boundary map is:
 
 | Library | Public paths | Keep private |
@@ -466,7 +471,7 @@ Every Node-backed query is rendered with `live`, `refreshing`, `stale`, `offline
 the user's text as a draft. There is no automatic mutation queue.
 
 A paired Node's own connection has a smaller vocabulary. `NodeConnectionState`
-(`packages/protocol/src/broker.ts`) is `online`, `degraded`, `offline`, `incompatible`, or `revoked`,
+(`packages/protocol/src/transport/broker.ts`) is `online`, `degraded`, `offline`, `incompatible`, or `revoked`,
 and nothing else. A certificate fingerprint mismatch is not a sixth state. It surfaces as `offline`
 with an `identity_mismatch` error, because it is a reason the Node is unreachable rather than a
 steady state the UI needs its own row for. `incompatible` is decided from the protocol major the

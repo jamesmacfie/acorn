@@ -397,7 +397,7 @@ context type says which tier each member belongs to, so reaching across the line
 instead of a runtime "not a function" ([plugins.md](../plugins.md) §§ The two contexts, one per tier
 and One vocabulary across the registries). The four facts it named to keep a cloud control plane
 possible sit with their owners: the dial in [plugins.md](../plugins.md) § Node providers, the two node
-ids in `packages/protocol/src/nodeProviders.ts`, `ACORN_BUNDLED_PLUGINS_DIR` as a developer path in
+ids in `packages/protocol/src/device/nodeProviders.ts`, `ACORN_BUNDLED_PLUGINS_DIR` as a developer path in
 [node-distribution.md](../node-distribution.md) § Plugins, and the opaque `options` bag beside its
 schema.
 

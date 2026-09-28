@@ -35,7 +35,7 @@ prints to stderr. That is a developer at a terminal, not an export.
 ## The five kinds
 
 Every record is a flat object with a `kind` and an `attrs` map, declared in
-`packages/protocol/src/telemetry.ts`. Times are milliseconds since the epoch and durations are
+`packages/protocol/src/runtime/telemetry.ts`. Times are milliseconds since the epoch and durations are
 milliseconds. Ids are lowercase hex, 32 characters for a trace and 16 for a span, which are the W3C
 sizes, so a `traceparent` header round-trips with no conversion.
 
