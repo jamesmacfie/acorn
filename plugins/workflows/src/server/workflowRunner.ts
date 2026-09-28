@@ -17,6 +17,7 @@ import type {
 import type { PolicyEvaluator, StepKindContribution, WorkflowCatalog } from '../shared/workflowContracts'
 import { stepKindContributionProblems, stepKindPluginId, unavailableStepKindMessage } from '../shared/stepKindAvailability'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../shared/stepFields'
+import { declaredOutputSchema } from '../shared/gateForm'
 import { managedProviderForProfile } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
 import type { WorkflowChildChangedEvent, WorkflowGateStatus, WorkflowRunStatus } from '../contract/events'
@@ -776,8 +777,8 @@ export class WorkflowRunner {
     }
     if (['done', 'completed-with-failures'].includes(outcome.status) && JSON.parse(run.defJson).formatVersion === 1 && 'structured' in outcome) {
       try {
-        const outputSchema = def.schema ?? this.#stepKind(def.kind ?? 'agent')?.describe?.output?.schema
-        if (outputSchema) validateDataValue(outcome.structured, outputSchema as import('@acorn/protocol/dataSchemas.ts').DataSchema, WORKFLOW_VALUE_BYTES)
+        const outputSchema = declaredOutputSchema(def, this.#stepKind(def.kind ?? 'agent')?.describe?.output?.schema)
+        if (outputSchema) validateDataValue(outcome.structured, outputSchema, WORKFLOW_VALUE_BYTES)
         else if (outcome.structured !== undefined) parseDataValue(outcome.structured, WORKFLOW_VALUE_BYTES)
       } catch (error) { outcome = { ...outcome, status: 'failed', error: `Invalid structured output: ${String(error)}` } }
     }
