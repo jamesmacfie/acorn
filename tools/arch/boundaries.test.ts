@@ -323,14 +323,18 @@ describe('architecture boundaries', () => {
     const CALLS_CONSOLE = /\bconsole\s*\.\s*(?:log|warn|error|info|debug)\s*\(/
     const callsConsole = (source: string): boolean =>
       CALLS_CONSOLE.test(source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''))
-    // Baseline, not an allowlist: entries may only be removed. Five files, all deliberate.
+    // Baseline, not an allowlist: entries may only be removed. The SDK modules run in a plugin's
+    // own frame or worker, where its console is the one an author has open.
     const CONSOLE_BASELINE = [
       // IS the logger.
       'packages/client-core/src/infra/telemetry/logger.ts',
-      // Runs inside the plugin's own iframe, not in the shell. It is bundled into every plugin by
-      // scripts/build-plugin.mjs, it has no API client and no telemetry emitter to reach, and its
-      // console is the one a plugin author opens on their own frame.
-      'packages/client-core/src/host/frames/sdk.ts',
+      // These modules run inside a plugin's frame or worker. The bundle has no host logger, and its
+      // console is the one a plugin author opens while debugging.
+      'packages/client-core/src/host/frames/sdk/bridgePort.ts',
+      'packages/client-core/src/host/frames/sdk/bridgeTelemetry.ts',
+      'packages/client-core/src/host/frames/sdk/connection.ts',
+      'packages/client-core/src/host/frames/sdk/frameMount.ts',
+      'packages/client-core/src/host/frames/sdk/treeChannel.ts',
       // The terminal client's three deliberate ones. Its stderr is the screen, so none of these is
       // a log line (docs/tui.md § What the terminal client reports).
       //
@@ -1256,18 +1260,18 @@ describe('architecture boundaries', () => {
   })
 
   it('the plugin SDK carries no dependency into a stranger\'s bundle', () => {
-    // `@acorn/plugin-api/ui/sdk` is the only runtime code a third-party client bundle imports, and a
-    // foreign bundler bundles whatever it reaches. So its value-import closure has to stay inside the
-    // repo and inside modules that import nothing themselves.
+    // A third-party client bundle imports `@acorn/plugin-api/ui/sdk`. Its bundler follows value
+    // imports through these framework-free SDK modules and the protocol leaves they use. Keep external
+    // runtime dependencies out of that closure.
     //
     // The failure this catches happened on the first day of the tree path: `mountTree` wanted a
     // protocol constant and took it from the module beside the Zod schemas, which put the whole of Zod
     // into every plugin's bundle and grew the published file sixfold. The vite config says so in a
     // comment; a comment is not a check.
     //
-    // Value imports only. A `import type` is erased, which is what lets the SDK name protocol types
-    // freely.
-    const CLAUSE = /\bimport\s+(?!type\b)([^'"]*?)\s+from\s*['"]([^'"\n]+)['"]/g
+    // Value imports and re-exports. An `import type` or `export type` is erased, which lets the SDK
+    // name protocol types freely. The public sdk.ts entry re-exports private implementation modules.
+    const CLAUSE = /\b(?:import|export)\s+(?!type\b)([^'"]*?)\s+from\s*['"]([^'"\n]+)['"]/g
     const BARE = /\bimport\s*['"]([^'"\n]+)['"]/g
     const valueSpecs = (text: string): string[] => {
       const out: string[] = []

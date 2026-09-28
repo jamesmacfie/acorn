@@ -1,18 +1,19 @@
 import type { PluginBridgeRequest } from '@acorn/protocol/plugin/bridge.ts'
 import type { FrameServices } from './broker'
-import type { AcornBridge } from './sdk'
+import type { AcornBridge } from './sdk/bridgeTypes'
 
 // The frame bridge's vocabulary, declared once so the five places that spell it cannot drift apart
 // (docs/plugins.md § Loaded plugins: the client half, the paragraph on the bridge's `api` surface).
 //
 // A sandboxed frame's whole ability to affect the world is a small set of verbs, and until now each
 // one had to be written into five modules by hand: the wire union (@acorn/protocol/plugin/bridge.ts),
-// the author-facing type and its implementation (sdk.ts), the host-side contract (`FrameServices`)
-// and the host-side implementation (PluginFrame.tsx). TypeScript stitches some of those pairs together
+// the author-facing type (`bridgeTypes.ts`) and implementation (`bridgePort.ts`), the host-side
+// contract (`FrameServices`), and the host-side implementation (`PluginFrame.tsx`). TypeScript stitches
+// some of those pairs together
 // (the sdk's `api` literal is typed `AcornBridge`, so it cannot be short), but never the chain end to
 // end, because the MessagePort in the middle is untyped traffic.
 //
-// That gap has already cost something real: `sdk.ts` records that the protocol and the broker both
+// That gap has already cost something real: `bridgeTypes.ts` records that the protocol and the broker both
 // carried `PUT` from the start and only the SDK facade did not, so plugin authors simply could not
 // make PUT requests, for no reason anyone had decided, until someone noticed.
 //
@@ -48,12 +49,11 @@ export type AuthoredVerb = Exclude<FrameVerb, SdkInternalVerb>
 // ── The two projections ───────────────────────────────────────────────────────────────────────────
 //
 // Each member below is a real member access. If a verb lands on the wire and the surface never grew a
-// Each member below is a real member access. If a verb lands on the wire and the surface never grew a
 // method for it, the reference on the right-hand side fails to compile, which is the PUT bug, made
 // unwriteable. Adding a wire variant without adding a row here fails too, via the coverage checks at
 // the bottom.
 
-/** What a plugin author calls for each verb (frames/sdk.ts). */
+/** What a plugin author calls for each verb (frames/sdk/bridgeTypes.ts). */
 type AuthorSurface = {
   'api:GET': AcornBridge['api']['get']
   'api:POST': AcornBridge['api']['post']
