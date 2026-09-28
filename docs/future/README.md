@@ -24,6 +24,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | File | What it is | Status |
 | --- | --- | --- |
+| [approval.md](./approval.md) | An optional form on `gate-human`: bound proposals, edited values as the step's output, and the task-token hole on the gate route to close first. | Proposal, 2026-09-29. Not started. |
 | [bundle.md](./bundle.md) | Packaging a downloadable node: native deps, the CI matrix, the snags. | DX and CLI/TUI tarball staging shipped; platform binaries, installer, container image, and desktop embedding remain. |
 | [compiled-tier.md](./compiled-tier.md) | Which compiled plugin moves to the loaded tier next and what blocks it. | Standing map. Three of its four couplings dissolved when the remote component tree shipped. |
 | [integration-ideas.md](./integration-ideas.md) | The catalogue of integrations a workspace could hold, and the four shapes they collapse into. | Research notes. |
