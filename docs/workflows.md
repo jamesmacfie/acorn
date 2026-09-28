@@ -347,7 +347,7 @@ The detail depends on the kind and the status:
 | `terminal:run-target` | "Starting…" | the URL | Open terminal |
 | `database:*` | "Reading…" | a table of the rows and the SQL behind it | none |
 | `http:request` | "Sending…" | the status, the headers under a disclosure, the body | none |
-| `gate-human` | "Waiting for you" | approved, or the state it reached | Approve; Reject |
+| `gate-human` | "Waiting for you", or the form filled with its proposal, each changed field marked **Edited** with **Reset** | approved, or the state it reached; with a form, the approved values with edits marked | Approve; Reject |
 | any, `failed` or `safety-rail` | | the error | Retry; Retry with edited prompt, for an agent kind |
 
 A step whose harness session was captured but that never became a managed session offers **Open in
@@ -509,6 +509,12 @@ A definition that declares a required input with no default opens the start dial
 starting, so nothing runs with an empty input (§ Authoring). The rail goes to Workflows first,
 because the dialog is mounted once, in that source's list region, and one mount is what keeps the
 editor's **Run** and this row from putting two of them on screen.
+
+A gate with a form keeps its **Approve** beside the values, and disables it while any value fails the
+check the node runs, with a line naming each problem. Edits are held per step while the app is open
+and saved nowhere, so closing the app loses them and the proposal remains. When another device
+answered first, the pane shows "This gate was already answered." and refetches the node. For the
+form's contract, see [Workflow execution](./workflows/execution.md#human-gates).
 
 Approving a gate, cancelling a run and killing one stay in the run surface. Each needs the run's
 status and its consequences in front of the person doing it, and a row in a list carries neither.

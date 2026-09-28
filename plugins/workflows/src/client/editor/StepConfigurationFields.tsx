@@ -57,7 +57,7 @@ export default function StepConfigurationFields(props: {
       {(description) => (
         <For each={description().fields}>
           {(field) => (
-            <Show when={!field.type.startsWith('workflow-') && field.type !== 'child-workflow'}>
+            <Show when={!field.type.startsWith('workflow-') && field.type !== 'child-workflow' && field.type !== 'gate-form'}>
               <Show when={field.type === 'prompt'} fallback={(
                 <Show when={['schema', 'query', 'record', 'condition'].includes(field.id)} fallback={(
                   <FieldControl field={field} pluginId={pluginId()} projectId={props.projectId}

@@ -1,5 +1,6 @@
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
-import type { WorkflowStepDef, WorkflowStepRow, WorkflowValueBinding } from '../shared/workflowContracts'
+import type { WorkflowGateForm, WorkflowStepDef, WorkflowStepRow, WorkflowValueBinding } from '../shared/workflowContracts'
+import { validateDataValue } from '@acorn/protocol/dataSchemas.ts'
 import { parseWorkflowJsonPointer } from './workflowValidation'
 import { readDataBinding } from '@acorn/protocol/dataQueryResolution.ts'
 import { dataBindingSchema } from '@acorn/protocol/dataBindings.ts'
@@ -75,6 +76,29 @@ export function resolveChildWorkflowInputs(
   admitted?: Readonly<Record<string, DataValue>>,
 ): Record<string, DataValue> {
   return resolveBindings(bindings, inputs, steps, undefined, admitted)
+}
+
+/** A gate form's proposal: each field's binding, then its default, then nothing. Frozen into the
+ *  step before it waits. A missing value is legal and shows as an empty field. A value of the wrong
+ *  type fails the step, the same way a bad child input does. */
+export function resolveGateFormProposal(
+  form: WorkflowGateForm,
+  inputs: Readonly<Record<string, DataValue>>,
+  steps: readonly WorkflowStepRow[],
+  admitted?: Readonly<Record<string, DataValue>>,
+): Record<string, DataValue> {
+  const bound = resolveBindings(form.values ?? {}, inputs, steps, undefined, admitted)
+  const proposal: Record<string, DataValue> = {}
+  for (const field of form.fields) {
+    const value = Object.hasOwn(bound, field.name) ? bound[field.name] : field.default
+    if (value === undefined) continue
+    try {
+      proposal[field.name] = validateDataValue(value, field.schema ?? { type: 'string' }, WORKFLOW_VALUE_BYTES)
+    } catch (error) {
+      throw new Error(`Form field '${field.name}' was proposed a value that does not match its type: ${error instanceof Error ? error.message : String(error)}`)
+    }
+  }
+  return proposal
 }
 
 function safeTaskTitle(value: string, index: number): string {

@@ -159,6 +159,44 @@ binding_json = '{"address":{"from":"item","pointer":"/number"}}'
     expect(staticStep?.steps[0].childWorkflow).toBeUndefined()
   })
 
+  it('round trips a gate form with typed fields, defaults and bindings', () => {
+    const { parsed, written, again } = roundTrip(`
+format_version = 1
+baseline = "acorn-1"
+name = "release"
+
+[[steps]]
+id = "draft"
+name = "draft"
+schema_json = '{"type":"object"}'
+
+[[steps]]
+id = "approve"
+name = "approve"
+kind = "gate-human"
+[[steps.form.fields]]
+name = "title"
+label = "Title"
+required = true
+schema_json = '{"type":"string"}'
+[[steps.form.fields]]
+name = "notify"
+schema_json = '{"type":"boolean"}'
+default_json = 'false'
+[steps.form.values.title]
+binding_json = '{"address":{"from":"step","stepId":"draft","pointer":"/title"}}'
+`)
+    expect(again).toEqual(parsed)
+    expect(parsed.steps[1].form).toEqual({
+      fields: [
+        { name: 'title', label: 'Title', required: true, schema: { type: 'string' }, description: undefined },
+        { name: 'notify', label: undefined, schema: { type: 'boolean' }, default: false, description: undefined },
+      ],
+      values: { title: { address: { from: 'step', stepId: 'draft', pointer: '/title' } } },
+    })
+    expect(written).toContain('[[steps.form.fields]]')
+  })
+
   it('writes a multi-line prompt as a literal block, so `${…}` survives unescaped', () => {
     const { written, parsed, again } = roundTrip(`
 format_version = 1

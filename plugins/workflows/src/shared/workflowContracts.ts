@@ -45,6 +45,14 @@ export type ChildWorkflowConfig = {
   inputs?: Record<string, WorkflowValueBinding>
 }
 
+/** An editable form on a `gate-human` step. Fields are declared the way workflow inputs are, and
+ *  each binding proposes a field's value from run inputs or transitive predecessors. The reviewer
+ *  can correct the proposal before approving it, and the step's output is what they approved. */
+export type WorkflowGateForm = {
+  fields: WorkflowInput[]
+  values?: Record<string, WorkflowValueBinding>
+}
+
 export type WorkflowMapSource = {
   step: string
   pointer: string
@@ -87,6 +95,8 @@ export type WorkflowStepDef = {
   // Pointer within each item, and the title template can read only its declared bindings.
   items?: WorkflowMapSource
   itemKey?: string
+  // `gate-human` only. Absent means the gate is a plain approve-or-reject with no output values.
+  form?: WorkflowGateForm
   title?: WorkflowBoundTemplate
   branches?: Record<string, string>
   // A contributed kind's own configuration, straight off the workflow file's `[steps.with]` table
@@ -179,7 +189,9 @@ export type StepHandlerOutcome =
   | ({ status: 'completed-with-failures'; error: string } & StepHandlerData)
   | ({ status: 'failed'; error: string } & StepHandlerData)
   | ({ status: 'safety-rail'; error: string; scope?: 'admission' } & StepHandlerData)
-  | { status: 'waiting-gate' }
+  // `inputs` is frozen into the step before it waits, so a gate's proposal cannot move under its
+  // reviewer and stays readable after the run ends.
+  | { status: 'waiting-gate'; inputs?: unknown }
   | { status: 'waiting-children' }
   | { status: 'cancelled'; error?: string }
 
@@ -210,6 +222,7 @@ export type StepFieldType =
   | 'workflow-map-source'
   | 'workflow-json-pointer'
   | 'workflow-title'
+  | 'gate-form'
 
 export type StepFieldOption = { value: string; label: string; description?: string }
 
