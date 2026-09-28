@@ -171,7 +171,8 @@ child workflow contract.
 
 ### Generating and editing with AI
 
-**AI authoring** opens a bounded conversation beside the workflow draft. Each turn can request
+**AI authoring** opens a bounded conversation in a dialog over the workflow draft. Closing the dialog
+keeps the conversation on the device, and opening it again picks up the same thread. Each turn can request
 allowlisted source metadata, dynamic source discovery, option IDs, or compatible child workflows;
 ask an inline clarification; or return a proposal. API-backed model connections and text-only agent
 harnesses use the same JSON response protocol over the existing `generateText` service.
@@ -306,17 +307,24 @@ draw one with.
 
 ### Saving
 
+The header carries the editor's actions: AI authoring, Undo, Redo, Save, **Publish…** and **Run…**.
+The rarer ones are in its overflow menu: **Schedule…**, **Export to repository…** and **Delete**,
+which asks for a second press. A badge beside the name says **Not published** or which revision is
+published, because Run and Schedule use the published revision, not the draft. The tab strip under
+the header only picks the view.
+
 **Save** flushes the draft at the revision it was read at. Autosave uses the same operation.
 A stale revision answers 409 and opens conflict choices without discarding the local draft.
-**Review publication** names the dependency set. **Publish reviewed set** makes the set executable
-only after all writes complete. **Resume publication** continues an interrupted operation.
-For a repository or user file, Save persists the visual draft on the Node; **Review publication**
-checks external edits and file dependencies, and **Publish reviewed files** atomically replaces that
-file while leaving the working tree uncommitted. A database definition uses **Export to repository**
-to review and write its portable published dependency graph. The old direct Save to repo operation is
+**Publish…** opens a review dialog that names the dependency set. **Publish** makes the set
+executable only after all writes complete. **Resume publishing** continues an interrupted operation.
+For a repository or user file, Save persists the visual draft on the Node; **Publish…** checks
+external edits and file dependencies, and **Write files** atomically replaces that file while leaving
+the working tree uncommitted. A database definition uses **Export to repository…** to review and
+write its portable published dependency graph. Dismissing a review dialog keeps the prepared review
+on the Node; a strip under the header offers it again until it is published or discarded. The old direct Save to repo operation is
 refused because it cannot provide that review or preserve every workspace original.
 
-**Run published** opens the start dialog, one box per declared input with a task picker when no task is
+**Run…** opens the start dialog, one box per declared input with a task picker when no task is
 in scope, and starts the run when the required ones are filled. A definition that declares no inputs
 and already has a task starts without a dialog.
 
