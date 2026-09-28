@@ -26,18 +26,67 @@ can bind to a gate's output. `${steps.<gate>.output}` renders the `resultJson` f
 
 The gate's `describe` in `plugins/workflows/src/shared/stepFields.ts` has no fields.
 
-## Precondition: the gate route accepts a task token
+## Part one: only a device answers a gate
 
-Fix this first, whether or not the form is built. The gate route has no `isTaskConfined` refusal.
-The `ownsRun` middleware in `plugins/workflows/src/server/routes/workflow.ts` only checks that a
-task-confined caller owns the run's task, and an agent working in that task does. So an agent with the
-task's loopback credential can approve its own run's gate. The retry route beside it refuses
-task-confined callers for the reason this one should: the caller could step past the check that
-stopped it. `plugins/workflows/src/server/routes/workflow.test.ts` tests the device path only.
+This part is delivered with the form, as the first change, and the form must not ship without it.
 
-The fix is one line in the route and one test: a task-confined `POST /gate` answers 403. With a form,
-the hole gets worse, because an agent could also write the approved values. So the form must not ship
-before the fix.
+**The hole.** The gate route has no `isTaskConfined` refusal. The `ownsRun` middleware in
+`plugins/workflows/src/server/routes/workflow.ts` only checks that a task-confined caller owns the
+run's task, and an agent working in that task does. So an agent with the task's loopback credential
+can approve its own run's gate, which turns a human gate into no gate. With a form it gets worse,
+because the agent could also write the approved values.
+
+The route test says the current behaviour is intended, and it's wrong. In
+`plugins/workflows/src/server/routes/workflow.test.ts`, the block "a task-scoped credential is confined
+to its own runs" checks that a confined caller can't gate a *foreign* run. A comment above "cannot
+retry even its own run" calls retry "the one run action a confined caller may not take, even on its
+own run". Cancel and kill are safe to leave open to the agent, because both stop work. Approval moves
+a run past a check that exists to stop the agent, which is the reason retry is refused.
+
+**The change:**
+
+1. In the gate handler, refuse a confined caller before parsing the body, the same way retry does:
+   `if (isTaskConfined(c)) return respondError(c, 403, 'forbidden')`.
+2. Add a test beside "cannot retry even its own run": a confined caller posting
+   `{ stepId: 's', approved: true }` to `/api/workflows/runs/run1/gate` gets 403, and the bridge's
+   `gate` is never called. Also cover `approved: false`, because a rejection fails the run, and that
+   decision belongs to the owner as well.
+3. Reword the retry test's comment so it names both retry and gate as the run actions a confined
+   caller can't take on its own run, and says why.
+4. Record the rule in [security.md](../security.md) next to the other task-token route decisions:
+   a gate answer is device-only.
+
+The foreign-run cases in the existing test keep returning 404, because `ownsRun` runs first. That
+order is right, since a foreign caller should not learn that the run exists.
+
+## Part two: one answer per gate
+
+This is also delivered with the form, before it.
+
+**The race.** `resolveGate` in `plugins/workflows/src/server/workflowRunner.ts` reads the step, checks
+`status === 'waiting-gate'`, then writes through `setStep`. Two devices answering the same gate both
+pass the read. Today an **Approve** and a late **Reject** can both land. The step ends failed, but the
+first answer's `tick` may already have started the next step. With a form, two approvals could also
+write different values. The route answers `{ ok: true }` in every case, so neither device learns that
+it lost.
+
+**The change:**
+
+1. Make the transition a compare-and-swap. Update the step `WHERE id = ? AND status = 'waiting-gate'`
+   and check the affected-row count, as definition saves do. Only the caller whose update changed a row
+   goes on to resume the run or finish it as failed.
+2. Have `resolveGate` report the outcome as `resolved`, `already-resolved`, or `not-found`, instead of
+   returning nothing. The deadline branch keeps its safety-rail behaviour.
+3. Have the route answer 409 with the domain code `gate-resolved` for `already-resolved`, and 404 for
+   `not-found`. The run pane handles 409 by refetching the step and showing the outcome, with the line
+   "This gate was already answered."
+4. Test it by resolving the same gate twice, approve then reject, and confirming that exactly one
+   succeeds, the other gets `already-resolved`, and the run's final state matches the winner.
+
+The compare-and-swap has to go through `setStep`'s side effects: the step-changed frame, the
+gate-changed frame, and the telemetry span. So the conditional write belongs inside the runner, not in
+a raw update beside it. A small `setStepIf(stepId, expectedStatus, patch)` that returns whether it
+wrote is enough. `setStep` can then call it without an expected status.
 
 ## The definition
 
@@ -129,14 +178,8 @@ The node checks the submission before it writes anything:
 5. Every required field has a value.
 
 A refused submission answers 400 with one problem per field. The step keeps waiting, so the reviewer
-can fix the value and try again.
-
-**Two answers at once.** `resolveGate` reads the status and then writes. Two devices answering the
-same gate both pass the read, and with a form they might approve different values. The write becomes a
-compare-and-swap on `status = 'waiting-gate'` with the affected-row count checked. That is the same
-rule definition saves follow. The second answer gets 409 `gate_resolved`, and the pane says the gate
-was already answered and shows the outcome. Today's form-less gate gets the same fix, because a late
-**Reject** can race an **Approve** as well.
+can fix the value and try again. A second answer to a gate that has already been answered gets the
+409 from part two.
 
 **Rejection** is unchanged. It fails the step and the run, and any values sent with it are refused.
 
@@ -185,8 +228,11 @@ drops the form and keeps the gate, never the other way round, so the result fail
 
 ## Order of work
 
-1. Refuse task-confined callers on the gate route, with the 403 test. This ships alone.
-2. Make gate resolution compare-and-swap with a 409 for the loser, for form-less gates too.
+All seven steps are one piece of work. The first two change today's gate and are useful on their own,
+so they go first and in separate commits.
+
+1. Refuse task-confined callers on the gate route (part one).
+2. Make gate resolution a compare-and-swap with a 409 for the loser (part two).
 3. Add the `form` contract, validation, TOML round trip, and the derived output schema, with no UI.
 4. Freeze the proposal at the gate, validate answers, write the output, and handle the autonomous path.
 5. Draw the form in the run pane on both hosts.
@@ -208,7 +254,8 @@ drops the form and keeps the gate, never the other way round, so the result fail
 [workflows.md](../workflows.md) covers the run pane table and the gate's output.
 [workflows/authoring.md](../workflows/authoring.md) covers the inspector.
 [security.md](../security.md) records that a gate answer is device-only.
-[api-reference.md](../api-reference.md) gains the gate route, which it doesn't list.
+[api-reference.md](../api-reference.md) gains the gate route, which it doesn't list, with its 403,
+404, and 409 answers.
 [testing.md](../testing.md) gains a manual smoke item beside item 52: edit a proposed value,
 approve it, and confirm that a later step received the edited value.
 
