@@ -36,11 +36,13 @@ files no test imports. The command reports coverage for these test selections on
 | Protocol plugin contract | `packages/protocol/src/plugin/` | `packages/protocol/src/plugin/**/*.ts` |
 | Node plugin loader | `packages/node-core/src/server/plugins/` | `packages/node-core/src/server/plugins/**/*.ts` |
 | Client frame bridge | `packages/client-core/src/host/frames/` | `packages/client-core/src/host/frames/**/*.{ts,tsx}` |
-| Workflow execution | Five dispatch, child lifecycle, processing, projection, and schedule suites | Six matching modules, including `plugins/workflows/src/server/runs/runner.ts` |
+| Workflow execution | Seven suites covering dispatch, child lifecycle, maps, nested runs, processing, projection, and schedules | Six matching modules, including `plugins/workflows/src/server/runs/runner.ts` |
 
 Use the report to find untested branches before changing these boundaries. It is not a monorepo
 coverage percentage. Integration tests in other packages can exercise a contract without appearing
-in its package-local report. No global percentage threshold is set.
+in its package-local report. The Node plugin worker runs in a separate thread, so its source appears
+uncovered in this in-process V8 report even when loader tests exercise it. No global percentage
+threshold is set.
 
 The TUI agent driver has focused protocol, screen, and flow tests under
 `apps/tui/scripts/agent/`. A live PTY run is an opt-in acceptance check because it builds and starts
