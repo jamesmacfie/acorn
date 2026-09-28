@@ -23,7 +23,8 @@
 }
 .ui-tab {
   position: relative;
-  min-height: var(--tab-h);
+  /* The strip's divider is inside --tab-h, so the tab fills only the content box. */
+  min-height: calc(var(--tab-h) - var(--chrome-divider-w));
   /* A row, so a tab can carry a mark before its label without the svg sitting on the text baseline. */
   display: inline-flex;
   align-items: center;
