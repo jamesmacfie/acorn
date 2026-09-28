@@ -17,7 +17,7 @@ import type {
 import type { PolicyEvaluator, StepKindContribution, WorkflowCatalog } from '../shared/workflowContracts'
 import { stepKindContributionProblems, stepKindPluginId, unavailableStepKindMessage } from '../shared/stepKindAvailability'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../shared/stepFields'
-import { declaredOutputSchema } from '../shared/gateForm'
+import { declaredOutputSchema, gateFormEdited, gateFormProblems, type GateFormOutput, type GateFormProposal } from '../shared/gateForm'
 import { managedProviderForProfile } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
 import type { WorkflowChildChangedEvent, WorkflowGateStatus, WorkflowRunStatus } from '../contract/events'
@@ -47,14 +47,16 @@ import { WorkflowRunTermination } from './workflowRunTermination'
 import { stepIdentity, rowIdentity } from '../shared/workflowIdentity'
 import { predecessorValues, workflowOutputs, WORKFLOW_VALUE_BYTES } from './workflowValues'
 import { validateDataValue } from '@acorn/protocol/dataSchemas.ts'
-import { parseDataValue } from '@acorn/protocol/dataValues.ts'
+import { parseDataValue, type DataValue } from '@acorn/protocol/dataValues.ts'
 
 export type { ToolCeiling, WorkflowDef, WorkflowStepDef } from '../shared/workflowContracts'
 export type { WorkflowInvocationIdentity, WorkflowStartOptions } from './workflowRunStart'
 
 /** How a gate answer landed. `already-resolved` means another answer won, or the gate was not
- *  waiting. */
-export type WorkflowGateResolution = 'resolved' | 'already-resolved' | 'not-found'
+ *  waiting. `invalid` names one problem per form field and leaves the gate waiting. */
+export type WorkflowGateResolution =
+  | { outcome: 'resolved' | 'already-resolved' | 'not-found' }
+  | { outcome: 'invalid'; problems: Record<string, string> }
 
 export type WorkflowChildTaskSeed = { title: string; branch: string; prompt?: string }
 export type RunStepOptions = HeadlessOpts & {
@@ -448,28 +450,47 @@ export class WorkflowRunner {
 
   /** Answer a human gate. The step leaves `waiting-gate` through a compare-and-swap, so when two
    *  devices answer the same gate only the first write wins, and only its caller resumes the run or
-   *  fails it. Everyone else learns that the gate was already answered. */
-  async resolveGate(runId: string, stepId: string, approved: boolean): Promise<WorkflowGateResolution> {
+   *  fails it. Everyone else learns that the gate was already answered.
+   *
+   *  `values` is for a gate with a form, and is the complete set being approved: a field left out is
+   *  approved empty. Absent `values` approves the frozen proposal as it stands. Either way the values
+   *  are checked before anything is written, and a refusal leaves the gate waiting. */
+  async resolveGate(runId: string, stepId: string, approved: boolean, values?: Record<string, DataValue>): Promise<WorkflowGateResolution> {
     const run = await this.run(runId)
     if (run?.deadlineAt != null && run.deadlineAt <= now()) {
       // The deadline wins over any answer. The run is safety-railed, and the pane shows that once
       // it refetches, so the caller is told its request was handled.
       await this.safetyRailRun(run.rootRunId ?? run.id, 'Safety rail: workflow deadline exhausted while waiting at a gate.')
-      return 'resolved'
+      return { outcome: 'resolved' }
     }
     const [step] = await this.db.select().from(schema.workflowSteps).where(eq(schema.workflowSteps.id, stepId))
-    if (!step || step.runId !== runId) return 'not-found'
-    if (step.status !== 'waiting-gate') return 'already-resolved'
-    if (approved) {
-      if (!await this.setStepIf(stepId, 'waiting-gate', { status: 'done', resultJson: JSON.stringify({ approved: true }) })) return 'already-resolved'
-      await this.setWaitingParentStatus(runId, 'running')
-      void this.tick(runId)
-      return 'resolved'
+    if (!run || !step || step.runId !== runId) return { outcome: 'not-found' }
+    if (step.status !== 'waiting-gate') return { outcome: 'already-resolved' }
+    const workflow = JSON.parse(run.defJson) as WorkflowDef
+    const form = workflow.steps.find((candidate) => stepIdentity(candidate) === rowIdentity(workflow, step))?.form
+    if (values !== undefined && (!approved || !form)) {
+      return { outcome: 'invalid', problems: { values: approved ? 'This gate has no form.' : 'A rejection carries no values.' } }
     }
-    if (!await this.setStepIf(stepId, 'waiting-gate', { status: 'failed', error: 'Rejected at the human gate.' })) return 'already-resolved'
-    const currentRun = await this.run(runId)
-    if (currentRun) await this.finishRun(currentRun, 'failed', `Gate '${step.name}' rejected.`, step.id)
-    return 'resolved'
+    if (!approved) {
+      if (!await this.setStepIf(stepId, 'waiting-gate', { status: 'failed', error: 'Rejected at the human gate.' })) return { outcome: 'already-resolved' }
+      const currentRun = await this.run(runId)
+      if (currentRun) await this.finishRun(currentRun, 'failed', `Gate '${step.name}' rejected.`, step.id)
+      return { outcome: 'resolved' }
+    }
+    let structuredJson: string | undefined
+    if (form) {
+      const proposal = (step.inputsJson ? (JSON.parse(step.inputsJson) as Partial<GateFormProposal>).form?.values : undefined) ?? {}
+      const answer = values ?? proposal
+      const problems = gateFormProblems(form, answer)
+      if (Object.keys(problems).length) return { outcome: 'invalid', problems }
+      const output: GateFormOutput = { approved: true, values: answer, edited: gateFormEdited(form, proposal, answer) }
+      structuredJson = JSON.stringify(output)
+    }
+    const done = { status: 'done', resultJson: JSON.stringify({ approved: true }), ...(structuredJson ? { structuredJson } : {}) }
+    if (!await this.setStepIf(stepId, 'waiting-gate', done)) return { outcome: 'already-resolved' }
+    await this.setWaitingParentStatus(runId, 'running')
+    void this.tick(runId)
+    return { outcome: 'resolved' }
   }
 
   async cancelRun(runId: string, reason = 'Run cancelled.'): Promise<void> {
@@ -764,8 +785,13 @@ export class WorkflowRunner {
     const currentRun = await this.run(run.id)
     const [currentStep] = await this.db.select().from(schema.workflowSteps).where(eq(schema.workflowSteps.id, step.id))
     if (!currentRun || currentRun.status === 'cancelling' || currentRun.status === 'cancelled' || currentStep?.status === 'cancelled') return
+    const inputsJson = 'inputs' in outcome && outcome.inputs !== undefined
+      ? JSON.stringify(outcome.inputs && typeof outcome.inputs === 'object' && !Array.isArray(outcome.inputs)
+        ? { ...(outcome.inputs as Record<string, unknown>), ...carried }
+        : outcome.inputs)
+      : undefined
     if (outcome.status === 'waiting-gate') {
-      await this.setStep(step.id, { status: 'waiting-gate' })
+      await this.setStep(step.id, { status: 'waiting-gate', ...(inputsJson !== undefined ? { inputsJson } : {}) })
       // The run is gated while any step waits, and it goes back to 'running' when the gate resolves.
       await this.setRun(run.id, { status: 'gated' })
       this.deps.notify(run.taskId, 'gate', `Workflow '${run.name}' needs you: ${def.name}`, { runId: run.id, stepId: step.id })
@@ -787,11 +813,6 @@ export class WorkflowRunner {
       await this.finishRun(run, 'cancelled', outcome.error ?? `Step '${def.name}' cancelled.`, step.id)
       return
     }
-    const inputsJson = outcome.inputs !== undefined
-      ? JSON.stringify(outcome.inputs && typeof outcome.inputs === 'object' && !Array.isArray(outcome.inputs)
-        ? { ...(outcome.inputs as Record<string, unknown>), ...carried }
-        : outcome.inputs)
-      : undefined
     const patch = {
       ...(inputsJson !== undefined ? { inputsJson } : {}),
       ...(outcome.result !== undefined ? { resultJson: JSON.stringify(outcome.result) } : {}),
