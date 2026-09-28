@@ -302,7 +302,7 @@ const cellsOf = (value: unknown): number => Math.max(0, Math.trunc(Number(value)
  * for all of itself scrolls to nought.
  *
  * **The two colours are the component's, said out loud.** A field's text colour and its placeholder's
- * are both props here, for the reason `../kit/asking.tsx` already gives about the first: an edit
+ * are both props here, for the reason `../kit/asking/fieldRef.ts` already gives about the first: an edit
  * buffer that says neither draws opaque white and a hardcoded `#666666`, and neither is one of the
  * sixteen colours a terminal has or comes from any theme. So the kit names the slot and both painters
  * read it (docs/ui-design.md § Roles, and what each host makes of them).
