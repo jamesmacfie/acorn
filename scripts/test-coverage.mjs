@@ -23,6 +23,8 @@ const targets = [
     tests: [
       'src/server/dispatch/dispatcher.test.ts',
       'src/server/dispatch/childLifecycle.test.ts',
+      'src/server/dispatch/workflowMapLifecycle.test.ts',
+      'src/server/dispatch/workflowNestedDispatch.test.ts',
       'src/server/processing/rules.test.ts',
       'src/server/runs/read/projection.test.ts',
       'src/server/schedules/service.test.ts',
