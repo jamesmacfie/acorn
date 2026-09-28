@@ -1453,7 +1453,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   background: none;
   border: 0;
   padding: 0 var(--space-2) 0 var(--space-4);
-  min-height: var(--tab-h);
+  min-height: calc(var(--tab-h) - var(--chrome-divider-w));
   cursor: pointer;
 }
 .ui-doctab[data-active] .ui-doctab-label { color: var(--text); }

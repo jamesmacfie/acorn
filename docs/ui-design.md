@@ -65,6 +65,8 @@ column. `Toolbar`'s `size="sm"` is for a strip *inside* the contents — a filte
 status line under a body — and picking it for chrome is what left the browser preview's address bar
 at half the height of the agents header one pane over. Tab strips are the deliberate exception at
 `--tab-h`: a strip under a pane header should read as subordinate to it, not as a second header.
+The `Tabs` and `DocumentTabs` strips include their bottom divider inside `--tab-h`; their tab
+controls subtract the divider width from that height so adjacent strips end on the same line.
 
 ### Rail controls and status markers
 
