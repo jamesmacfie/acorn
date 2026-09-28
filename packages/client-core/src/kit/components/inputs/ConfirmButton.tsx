@@ -1,5 +1,5 @@
 import { Show, splitProps } from 'solid-js'
-import { createArmedConfirm } from '../../lib/confirm'
+import { createArmedConfirm } from '../../lib/controls/confirm'
 import { Button, type ButtonProps } from './Button'
 
 /* ConfirmButton: arm to confirm. The armed button is the prompt, and it never calls

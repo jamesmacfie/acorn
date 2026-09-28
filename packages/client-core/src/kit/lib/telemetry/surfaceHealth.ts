@@ -47,7 +47,7 @@ export type SurfaceHealth = {
     documents: number; segments: number; rows: number; estimatedBytes: number; plainBytes: number; enrichmentBytes: number
     hits: number; misses: number; inserts: number; evictions: number; oversize: number; rowCeiling: number; byteCeiling: number
   }
-  /** A timeline drawing only its newest turns (./timelineWindow.ts). `hiddenEarlier` is the older
+  /** A timeline drawing only its newest turns (../timeline/timelineWindow.ts). `hiddenEarlier` is the older
    *  turns not drawn now. `expansions` and `trims` count the window growing and shrinking since mount.
    *  `pinned` is how many turns the last trim kept past its page because the reader held a selection
    *  or focus in them. */

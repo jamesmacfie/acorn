@@ -22,7 +22,7 @@ import { PANE_SWITCHER_ACTIONS, paneSwitcherRemote } from '../plugins/paneSwitch
 import type { RailProps, TopbarProps } from '@acorn/protocol/chrome.ts'
 import { RAIL_ACTIONS, TOPBAR_ACTIONS, railRemote, topbarRemote } from '../plugins/chromeRemote'
 import { refPanelRegistry } from '../registries/panes/refPanels'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 import { settingsRegistry } from '../registries/shell/settings'
 import { uiSlotRegistry } from '../registries/extensionPoints/slots'
 import { activeTaskId } from '../../features/tasks/tasks'
@@ -200,7 +200,7 @@ function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow, tr
 function registerSurface(pluginId: string, hash: string, row: NodePluginRow, surface: PluginFrameSurface): Disposable {
   // Every registration in this function goes through `own`, so the plugin id reaches each registry's
   // owner side-map and the seams that build a telemetry record can name whose rectangle it was
-  // (kit/lib/registry.ts § the owner side-map). The same helper `host/chrome/chromeRegister.ts` uses,
+  // (kit/lib/state/registry.ts § the owner side-map). The same helper `host/chrome/chromeRegister.ts` uses,
   // and for the same reason: this is the pass that knows the owner, and a manifest cannot state one.
   const own = <T extends { id: string }>(registry: { register(entry: T, owner?: string): Disposable }, entry: T): Disposable =>
     registry.register(entry, pluginId)

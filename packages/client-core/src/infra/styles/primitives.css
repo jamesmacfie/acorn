@@ -297,7 +297,7 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   gap: var(--space-1);
   min-width: 0;
   /* The rail's width is the budget, and the row's own height is the other half of it: a virtualizer
-     writes an inline height from a token read off the document root (kit/lib/metrics.ts), so nothing
+     writes an inline height from a token read off the document root (kit/lib/layout/metrics.ts), so nothing
      in here may make the row taller than it already is. */
   max-width: 100%;
   font-size: var(--fs-xs);
@@ -833,7 +833,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-card[data-stripe='danger'] { border-left-color: var(--danger); }
 
 /* ── Graph ──────────────────────────────────────────────────────────────────────────────────
-   The canvas. Card size and card position are inline, from kit/lib/graphLayout.ts: only the
+   The canvas. Card size and card position are inline, from kit/lib/layout/graphLayout.ts: only the
    layout knows both numbers and no stylesheet can compute them, which is the same exception
    Grid and Rows already take for a virtualiser. Everything else is here.
 
@@ -1142,7 +1142,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 
    Not a prop, because there is no width at which a plugin would want to keep it. A header with a
    control in it is a different question, and a plugin answers that one by reading the collapse signal
-   and drawing the control on its own (kit/lib/collapseState.ts).
+   and drawing the control on its own (kit/lib/layout/collapseState.ts).
 
    `>` on the column so a `ListDetail` nested inside the detail keeps its own headers. */
 .ui-listdetail[data-list='collapsed'] > .ui-listdetail-list .section-header { display: none; }
@@ -1252,7 +1252,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 /* Links track the theme accent instead of the browser-default blue (clashes with non-blue themes). */
 .ui-markdown a { color: var(--accent); }
 .ui-markdown img { display: block; max-width: 100%; height: auto; border-radius: var(--radius); }
-/* The `thumb` image flavour (kit/lib/markdown.ts): a picture standing in for a file, drawn as a band the
+/* The `thumb` image flavour (kit/lib/rendering/markdown.ts): a picture standing in for a file, drawn as a band the
    width of whatever holds it and cropped to fill. Cropping rather than fitting, because a tile is as wide
    as the filename under it and a fitted image leaves a different gap for every aspect ratio. Square,
    because the rounding that suits a picture drawn as content reads as a mistake on a band inside an

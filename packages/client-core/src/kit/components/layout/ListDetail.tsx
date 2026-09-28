@@ -1,11 +1,11 @@
 import { children, createSignal, Show, type JSX } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
-import { sidebarCollapse } from '../../lib/collapseState'
-import { createSplitDrag, type SplitDrag } from '../../lib/split'
+import { sidebarCollapse } from '../../lib/layout/collapseState'
+import { createSplitDrag, type SplitDrag } from '../../lib/layout/split'
 import Icon from '../content/Icon'
 import { Button } from '../inputs/Button'
 
-/* SplitHandle: the drag-resize grip. Behaviour lives in createSplitDrag (../../lib/split.ts); this is the
+/* SplitHandle: the drag-resize grip. Behaviour lives in createSplitDrag (../../lib/layout/split.ts); this is the
    markup, a wide hit area around a hairline. */
 export function SplitHandle(props: { axis: 'x' | 'y'; drag: SplitDrag }) {
   // A remote tree may name a kit node without being able to supply this host-minted drag handle.
@@ -72,7 +72,7 @@ export function ListDetail(props: {
    *  page's `main`. */
   detailAs?: 'div' | 'main'
   /** This split's list column is a sidebar: offer the control that narrows it to the width of the
-   *  icon rails, and remember the answer under this key (../../lib/collapseState.ts).
+   *  icon rails, and remember the answer under this key (../../lib/layout/collapseState.ts).
    *
    *  Opt in, because this node also draws splits that are two halves of one document. A pull
    *  request's section nav has no rail form and nothing to collapse to. The host's `list-detail`

@@ -1,4 +1,4 @@
-import { fuzzyScore } from '../../../kit/lib/fuzzy'
+import { fuzzyScore } from '../../../kit/lib/controls/fuzzy'
 import {
   commandAvailable,
   commandHint,

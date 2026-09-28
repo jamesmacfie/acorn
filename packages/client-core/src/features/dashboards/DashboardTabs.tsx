@@ -1,7 +1,7 @@
 import { createSignal, Index, Show } from 'solid-js'
 import { Input } from '../../kit/components/primitives'
 import { IconButton } from '../../kit/components/inputs/IconButton'
-import { createArmedConfirm } from '../../kit/lib/confirm'
+import { createArmedConfirm } from '../../kit/lib/controls/confirm'
 import { isTypingTarget } from '@acorn/protocol/keybindings.ts'
 import { ContextMenu, Menu, type MenuContext } from '../../kit/components/overlays/Menu'
 import { addTab, homeTabDomId, HOME_TAB_PANEL_ID, renameTab, shiftTab } from './homeTab'

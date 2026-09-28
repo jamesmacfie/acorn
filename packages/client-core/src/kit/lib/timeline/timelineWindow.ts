@@ -3,7 +3,7 @@
 //
 // A fixed logical window, not a virtualizer. It counts turns and never measures one, so nothing here
 // can feed back into layout the way the transcript's old virtualizer did
-// (../components/content/Timeline.tsx says what that broke). The caller draws `keys()` and hands the Timeline `hidden()`;
+// (../../components/content/Timeline.tsx says what that broke). The caller draws `keys()` and hands the Timeline `hidden()`;
 // the Timeline keeps the reader's place by identity while the window changes under it.
 //
 // The window is held by its oldest drawn key. A streamed turn joins the window rather than sliding it,

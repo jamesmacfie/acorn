@@ -1,7 +1,7 @@
 import { createRoot, createSignal } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
-import type { Disposable } from '../../../kit/lib/registry'
+import type { Disposable } from '../../../kit/lib/state/registry'
 import {
   commandRegistry,
   executeCommand,

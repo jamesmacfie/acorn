@@ -1,6 +1,6 @@
 import { createSignal, For, onMount, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
-import { createAnchoredPopover, type AnchoredPopover } from '../../lib/anchor'
+import { createAnchoredPopover, type AnchoredPopover } from '../../lib/controls/anchor'
 import { createDomCollection } from '../../keys/collection'
 import { controlAttrs, type ControlOwn } from './controlAttrs'
 import { Input } from './Input'

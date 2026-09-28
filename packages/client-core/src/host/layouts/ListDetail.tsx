@@ -1,7 +1,7 @@
 import { Show } from 'solid-js'
-import { paneCollapseKey, sidebarCollapse } from '../../kit/lib/collapseState'
+import { paneCollapseKey, sidebarCollapse } from '../../kit/lib/layout/collapseState'
 import { CollapseEdge, SplitHandle } from '../../kit/components/primitives'
-import { createSplitDrag } from '../../kit/lib/split'
+import { createSplitDrag } from '../../kit/lib/layout/split'
 import { layoutState } from './state'
 // Imported for `use:regionFocus` below: Solid compiles a directive to a bare reference, so the
 // import has to be here even though nothing calls it.
@@ -26,7 +26,7 @@ import type { LayoutProps } from './regions'
 //
 // The regions are left alone while collapsed. A pane's `list-header` is the pane's own, so whether it
 // becomes one icon or nothing at all is a question only the pane can answer, and it answers it by
-// reading the same signal this does (kit/lib/collapseState.ts).
+// reading the same signal this does (kit/lib/layout/collapseState.ts).
 //
 // Narrow: one region at a time, and selecting in the list pushes the detail. Terminal: the same below
 // 80 columns, two columns above it, with a key to switch groups.

@@ -425,7 +425,7 @@ scroll write:
 - A place whose item has gone, as a collapsed file's segments do, lands on that file's header, and the
   health reading counts it as substituted.
 
-Its scroll writes are marked as its own until the frame after them (`kit/lib/scrollAuthor.ts`, which
+Its scroll writes are marked as its own until the frame after them (`kit/lib/timeline/scrollAuthor.ts`, which
 the `Timeline` shares), and the reader's wheel, touch, pointer and key input is timestamped, so a
 correction's own scroll event never reads as the reader moving, and never keeps the settling window
 open.

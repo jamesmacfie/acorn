@@ -1,7 +1,7 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
-import { _resetSurfaceHealth, surfaceHealthSnapshot, type SurfaceHealthEntry } from '../../kit/lib/surfaceHealth'
+import { _resetSurfaceHealth, surfaceHealthSnapshot, type SurfaceHealthEntry } from '../../kit/lib/telemetry/surfaceHealth'
 import { largeDiffFiles, largeDiffSource } from '../../testkit/largeDiff'
 import { installDiffLayout, type DiffLayoutModel } from './layout.helper'
 import type { DiffSource } from './source'

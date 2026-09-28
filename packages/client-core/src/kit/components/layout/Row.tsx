@@ -98,12 +98,12 @@ export function Row(props: {
    *  the row when there is room for one mark and the name has moved into the tooltip.
    *
    *  Passing it is what collapses the row, so a caller hands it down from the same signal its column
-   *  reads (../../lib/collapseState.ts) and the two cannot disagree. Leading, body, meta and trailing
+   *  reads (../../lib/layout/collapseState.ts) and the two cannot disagree. Leading, body, meta and trailing
    *  all give way to it, along with depth, nesting and revealed controls, which are about a width
    *  this row no longer has.
    *
    *  It has the row's existing height to work in, never more: a virtualized list takes its row height
-   *  from a token read off the document root (../../lib/metrics.ts), so a taller collapsed row is a
+   *  from a token read off the document root (../../lib/layout/metrics.ts), so a taller collapsed row is a
    *  height the virtualizer has not accounted for. */
   collapsed?: JSX.Element
   title?: string

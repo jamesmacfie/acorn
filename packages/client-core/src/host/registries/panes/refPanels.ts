@@ -1,7 +1,7 @@
 import { createSignal, type Component } from 'solid-js'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
-import { Registry } from '../../../kit/lib/registry'
+import { Registry } from '../../../kit/lib/state/registry'
 import { onScopeEvicted } from '../shell/scopeEviction'
 
 // A ref a host can actually produce widens `ExternalRef` to make `connectionId` optional.

@@ -1,6 +1,6 @@
 import { createMemo, createSignal, For, Show, type JSX } from 'solid-js'
 import { Portal } from 'solid-js/web'
-import { createAnchoredPopover, type Placement } from '../../lib/anchor'
+import { createAnchoredPopover, type Placement } from '../../lib/controls/anchor'
 import PickerRow from './PickerRow'
 import { Button } from './Button'
 import type { Size } from '../../tokens/tokens'

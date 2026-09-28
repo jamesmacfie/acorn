@@ -1,6 +1,6 @@
 import { Show, type JSX } from 'solid-js'
 import { Portal } from 'solid-js/web'
-import { createAnchoredPopover, type Placement } from '../../lib/anchor'
+import { createAnchoredPopover, type Placement } from '../../lib/controls/anchor'
 
 // The common case over createAnchoredPopover: a trigger and a floating surface.
 //

@@ -45,7 +45,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
   // Collapsed, a row is its run state and nothing else. That glyph is already the row's leading mark
   // and already carries the queued count, so the rail says the same thing the full row's first inch
   // said: which of these is working, which is waiting on you, which is done. The title comes back as
-  // the tooltip, from `title` below (client-core kit/lib/collapseState.ts).
+  // the tooltip, from `title` below (client-core kit/lib/layout/collapseState.ts).
   const collapsed = sidebarCollapsed(paneCollapseKey(AGENT_PANE_ID))
   const view = startAgentView('agents.sidebar.open')
   onCleanup(view.dispose)

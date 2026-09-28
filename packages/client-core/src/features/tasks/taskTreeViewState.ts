@@ -1,5 +1,5 @@
 import { createSignal } from 'solid-js'
-import { readLocal, writeLocal } from '../../kit/lib/deviceStorage'
+import { readLocal, writeLocal } from '../../kit/lib/state/deviceStorage'
 
 const KEY = 'core:task-tree-expanded-roots'
 

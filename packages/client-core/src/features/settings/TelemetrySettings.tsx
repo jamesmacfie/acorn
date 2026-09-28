@@ -1,7 +1,7 @@
 import { For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions, telemetrySummaryOptions } from '../../infra/queries'
-import { formatRelativeTime } from '../../kit/lib/formatRelativeTime'
+import { formatRelativeTime } from '../../kit/lib/rendering/formatRelativeTime'
 import { Checkbox, Field } from '../../kit/components/primitives'
 import { saveTelemetryOn, telemetryOn } from './telemetrySetting'
 import './settings.css'

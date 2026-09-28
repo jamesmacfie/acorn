@@ -464,7 +464,7 @@ asked for it.
 ### An owner on a contribution that never declared one
 
 Eight client contribution types carry no plugin id: a pane, a source, a slot, a reference panel, a
-settings page, and the rest. `Registry` in `packages/client-core/src/kit/lib/registry.ts` keeps the
+settings page, and the rest. `Registry` in `packages/client-core/src/kit/lib/state/registry.ts` keeps the
 owner in a side-map instead, filled by the three passes that know it, and `ownerOf(id)` answers for
 the seams. A field on each type would have meant changing every registration site to add something
 only telemetry reads.
@@ -497,7 +497,7 @@ bridge both use it to group `/v1/p/<plugin>` requests by plugin without recordin
 | Every plugin channel frame | `host/plugins/pluginChannel.ts` | histogram `plugin.frame` |
 | Every contribution that throws while rendering | `kit/components/content/ContributionBoundary.tsx` | a handled error with its stack, contribution id, and owner |
 | Every place a followed timeline puts the reader | `kit/components/content/Timeline.tsx` | event `ui.scroll.place` with the cause, the turn the reader is anchored to, the offsets it moved between, the list and viewport heights, and whether it was following. `opened` is a list mounting or swapping, which is the only trace a remount leaves; `unasked` is a move neither the reader nor the timeline made; `took` is the reader's place changing without the reader, which happens only when the turn they were on has left the list |
-| Every large diff or timeline becoming ready or going away | `kit/lib/surfaceHealth.ts`, installed by `infra/telemetry/emitter.ts` | histograms `ui.surface.*`, labelled only by surface kind and checkpoint. See [Rendered-surface health](#rendered-surface-health) |
+| Every large diff or timeline becoming ready or going away | `kit/lib/telemetry/surfaceHealth.ts`, installed by `infra/telemetry/emitter.ts` | histograms `ui.surface.*`, labelled only by surface kind and checkpoint. See [Rendered-surface health](#rendered-surface-health) |
 | Every diff segment cache access and change | `features/diff/segmentCache.ts` and `segmentLoader.ts` | histograms `diff.segment_cache.hit` and `.miss` (segments that entered a pane's range, found or not), `.insert` (segments per batch), `.evict`, `.evicted_rows` and `.evicted_bytes` labelled only by `reason` (`budget`, `superseded` or `node-drop`), `.oversize`, and the resident `.documents`, `.segments`, `.rows`, `.plain_bytes` and `.enrichment_bytes` after each insert. No key, path, revision or text. See [diff-rendering.md](./diff-rendering.md) § Resident segments |
 | A diff pane's first plain rows | `features/diff/DiffPane.tsx` | histogram `diff.first_plain`, the milliseconds from mount to the first segment on screen, labelled only by `cache` (`hit` or `miss`) |
 | Every delivered notice | `features/notifications/deliver.ts` | event `notice.delivered` with the kind and whether it landed read |
@@ -507,7 +507,7 @@ bridge both use it to group `/v1/p/<plugin>` requests by plugin without recordin
 
 `kit/` is the exception to the console rule's remedy. It may import `kit/` and the highlighter and
 nothing else, because it is what `@acorn/plugin-api/ui` re-exports, so a boundary in there cannot
-reach the emitter. `kit/lib/contributionErrors.ts` is the seam: the boundary reports through it, and
+reach the emitter. `kit/lib/telemetry/contributionErrors.ts` is the seam: the boundary reports through it, and
 the client's telemetry start-up installs the handler.
 
 ### The page change is a signal write, not a navigation
@@ -526,7 +526,7 @@ that to content.
 
 A large diff or timeline keeps numbers about itself, so a regression in how much it mounts, measures,
 queues, or holds can be shown without hand-added logging. One registry owns them:
-`packages/client-core/src/kit/lib/surfaceHealth.ts`. A surface registers when it mounts, hands over a
+`packages/client-core/src/kit/lib/telemetry/surfaceHealth.ts`. A surface registers when it mounts, hands over a
 reader, and disposes the registration when it unmounts. Two surfaces register today:
 
 - The shared diff viewer, as `diff` (`packages/client-core/src/features/diff/diffHealth.ts`). Its
@@ -550,7 +550,7 @@ zero, without waiting on garbage collection.
 | `measurement` | `candidates`, `reads`, `commits`, `maxCommitsInFrame`, `readMs`, `commitMs`, `fixedRebuilds`, `activeObservers`, `observedElements` | Size reads and the geometry commits they caused, counted since mount. A candidate is a dirty block a pass looked at, and a commit is one batch of changed heights. `commitMs` is the time spent applying commits. `fixedRebuilds` counts rebuilds of the exact fixed geometry, which only a change to the list of items may cause. Observers count up when created and down when disconnected, and observed elements are what they watch. |
 | `correction` | `count`, `failed`, `substituted`, `maxPixels`, `maxAnchorDrift` | Scroll writes made to keep a reading place. `failed` counts corrections whose anchor had gone and that fell back to the live end. `substituted` counts places whose anchor had gone and a neighbour stood in. `maxAnchorDrift` is the furthest the browser left the view from the place it was put back at. |
 | `resident` | `documents`, `segments`, `rows`, `estimatedBytes`, `plainBytes`, `enrichmentBytes`, `hits`, `misses`, `inserts`, `evictions`, `oversize`, `rowCeiling`, `byteCeiling` | Parsed content held in memory. For a diff, this is the node's segment cache, shared by every diff on the node: the distinct patches, segments, and rows it holds, its estimated bytes split into plain rows and colour, and the two ceilings they are held under. `inserts`, `evictions`, and `oversize` count since the cache was made. `hits` and `misses` are this pane's own since mount: segments that came into its range already held, or that it had to ask for. The bytes are the cache's budget estimate, not the heap. |
-| `window` | `hiddenEarlier`, `expansions`, `trims`, `pinned` | A timeline drawn through a fixed window (`kit/lib/timelineWindow.ts`). `hiddenEarlier` is the older turns not drawn now. `expansions` counts the window growing since mount, whether from **Show earlier**, a reveal, or a caller drawing everything. `trims` counts the window handing its oldest turns back while the reader followed the live end. `pinned` is how many turns the last trim kept past its page because they held the reader's selection or focus. |
+| `window` | `hiddenEarlier`, `expansions`, `trims`, `pinned` | A timeline drawn through a fixed window (`kit/lib/timeline/timelineWindow.ts`). `hiddenEarlier` is the older turns not drawn now. `expansions` counts the window growing since mount, whether from **Show earlier**, a reveal, or a caller drawing everything. `trims` counts the window handing its oldest turns back while the reader followed the live end. `pinned` is how many turns the last trim kept past its page because they held the reader's selection or focus. |
 
 A field a surface has no concept of stays zero. The timeline has no segments and rebuilds no fixed
 geometry. The diff has no window and builds no deferred bodies. The diff has no live end, so it

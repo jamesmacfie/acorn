@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { integrationsKey, prefsKey, projectsKey, tasksKey, workspacesKey, type Task } from '@acorn/protocol/api.ts'
 import { paneRegistry, type PaneContribution } from '../../host/registries/panes/panes'
 import { railMarkerRegistry } from '../../host/registries/rail/railMarkerFeed'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 import { activeTaskId, setActiveTaskId, setSelectedSource } from '../tasks/tasks'
 
 const { createTaskMock } = vi.hoisted(() => ({ createTaskMock: vi.fn() }))

@@ -68,7 +68,7 @@ function useScope() {
 
 export function WorkflowsBrowseList() {
   // The same signal the source's list column reads, keyed by the source id, so rows and column
-  // narrow together (client-core kit/lib/collapseState.ts).
+  // narrow together (client-core kit/lib/layout/collapseState.ts).
   const collapsed = sidebarCollapsed(WORKFLOWS_SOURCE_ID)
   const scope = useScope()
   const navigate = useNavigate()

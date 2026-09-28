@@ -2,7 +2,7 @@ import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
 import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '../registries/extensionPoints/extensionPoints'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 import ExtensionPointHost from './ExtensionPointHost'
 
 // The one place another plugin's rows are drawn inside a plugin's surface, by the host, with the

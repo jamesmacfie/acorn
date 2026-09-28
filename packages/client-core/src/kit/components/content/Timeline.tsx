@@ -1,10 +1,10 @@
 import { batch, createContext, createEffect, createSignal, on, onCleanup, onMount, Show, untrack, useContext, type Accessor, type Context, type JSX } from 'solid-js'
 import { createDomCollection } from '../../keys/collection'
-import { LIVE, placeAfterScroll, resolveAnchor, samePlace, type ReadingPlace } from '../../lib/readingPlace'
-import { createScrollAuthor } from '../../lib/scrollAuthor'
-import { reportScrollPlace } from '../../lib/scrollPlace'
-import { registerSurfaceHealth } from '../../lib/surfaceHealth'
-import { TIMELINE_PAGE } from '../../lib/timelineWindow'
+import { LIVE, placeAfterScroll, resolveAnchor, samePlace, type ReadingPlace } from '../../lib/timeline/readingPlace'
+import { createScrollAuthor } from '../../lib/timeline/scrollAuthor'
+import { reportScrollPlace } from '../../lib/telemetry/scrollPlace'
+import { registerSurfaceHealth } from '../../lib/telemetry/surfaceHealth'
+import { TIMELINE_PAGE } from '../../lib/timeline/timelineWindow'
 import { Button } from '../inputs/Button'
 
 /* Timeline: a sequence of turns. The agents transcript and github's PR conversation are the same
@@ -21,7 +21,7 @@ import { Button } from '../inputs/Button'
    cache, so every row fell back to the estimate, the canvas jumped, and the rows re-measured — on
    every event. It also rebuilt its rows from `getVirtualItems()`, which returns fresh objects on each
    scroll, replacing the DOM under any selection. A long list is instead drawn as its newest turns
-   behind a "Show earlier" control (../../lib/timelineWindow.ts): a fixed window counts turns, measures
+   behind a "Show earlier" control (../../lib/timeline/timelineWindow.ts): a fixed window counts turns, measures
    none, and has no feedback loop. The caller decides which turns exist in the DOM; this component
    keeps the reader's place by identity while that changes.
 
@@ -99,7 +99,7 @@ export function Timeline(props: {
    *  reported as the same. */
   total?: number
   /**
-   * How many older turns the caller holds and is not drawing (../../lib/timelineWindow.ts). Above
+   * How many older turns the caller holds and is not drawing (../../lib/timeline/timelineWindow.ts). Above
    * zero, a followed timeline draws a "Show earlier" control above its first turn, so hidden history
    * is always stated rather than left for a page find to miss.
    */
@@ -127,7 +127,7 @@ export function Timeline(props: {
   // rooted on it.
   let scroller: HTMLDivElement | undefined
 
-  // What this timeline says about itself (../../lib/surfaceHealth.ts). Registered before the early
+  // What this timeline says about itself (../../lib/telemetry/surfaceHealth.ts). Registered before the early
   // return, so a plain run of cards counts too, and before every cleanup below, so the final reading
   // sees the observers disconnected and the frames cancelled. Observers count up when constructed and
   // down when disconnected, which is how a teardown check sees them go without waiting on the collector.
@@ -241,7 +241,7 @@ export function Timeline(props: {
   let frame = 0
   let corrections = 0
   // Our own writes, marked until the frame after them, and when the reader last touched this
-  // (../../lib/scrollAuthor.ts). A scroll event arrives after the write that caused it, and telling
+  // (../../lib/timeline/scrollAuthor.ts). A scroll event arrives after the write that caused it, and telling
   // ours from the reader's by comparing positions does not survive the fractional device pixels a
   // WebView reports.
   const author = createScrollAuthor()
@@ -447,7 +447,7 @@ export function Timeline(props: {
     // clamped scrollTop to the only offset left.
     const clamp = !gesture && top >= geometry.scrollHeight - geometry.clientHeight - 1
     // Not the reader, not one of our own writes, and not a clamp, and yet the view has moved up by more
-    // than a screen. Said out loud, because nothing here can say what did it (../../lib/scrollPlace.ts).
+    // than a screen. Said out loud, because nothing here can say what did it (../../lib/telemetry/scrollPlace.ts).
     if (!fresh && !clamp && top < at - geometry.clientHeight) report('unasked', top)
     userDriven = false
     at = top
