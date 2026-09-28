@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AppEnv } from '@acorn/plugin-api/testkit'
 import { requireUser } from '@acorn/plugin-api/testkit'
-import { ProviderOperationError } from '@acorn/plugin-api/node'
+import { BridgeError, ProviderOperationError } from '@acorn/plugin-api/node'
 import { workflow, setWorkflowBridge, type WorkflowBridge } from './workflow'
 import { setWorkflowDefsBridge, workflowDefsRoutes, type WorkflowDefsBridge } from './defs'
 import type { Env } from '@acorn/plugin-api/testkit'
@@ -111,6 +111,13 @@ describe('workflow routes', () => {
     const res = await app.fetch(req('/api/workflows/runs/run1/gate', 'POST', { stepId: 'step1', approved: true }), {} as Env)
     expect(await res.json()).toEqual({ ok: true })
     expect(gated).toEqual({ runId: 'run1', stepId: 'step1', approved: true })
+  })
+
+  it('answers 409 when another device already answered the gate', async () => {
+    setWorkflowBridge(fake({ gate: async () => { throw new BridgeError(409, 'gate-resolved', 'This gate was already answered.') } }))
+    const res = await authed().fetch(req('/api/workflows/runs/run1/gate', 'POST', { stepId: 'step1', approved: false }), {} as Env)
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toMatchObject({ code: 'gate-resolved', message: 'This gate was already answered.' })
   })
 
   it('cancels runs and kills steps', async () => {

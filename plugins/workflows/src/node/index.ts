@@ -5,7 +5,7 @@ import { AGENTS_SESSION_CONTROL, AGENTS_SESSION_EXECUTE } from '@acorn/plugin-ag
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets.ts'
-import { buildHeadlessArgv, buildSessionEnv, describeError, type InternalEnvFactory, type NodePlugin, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
+import { BridgeError, buildHeadlessArgv, buildSessionEnv, describeError, type InternalEnvFactory, type NodePlugin, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
 import { eq } from 'drizzle-orm'
 import { loadWorkflowFiles } from '../server/workflowFiles'
 import { defsForProject, getDef, listDefs, mergedList } from '../server/workflowDefs'
@@ -401,7 +401,9 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         },
         gate: async (runId, stepId, approved) => {
           await deps.reconciled // an approval resumes a step the restart sweep could otherwise clobber
-          await runner.resolveGate(runId, stepId, approved)
+          const resolution = await runner.resolveGate(runId, stepId, approved)
+          if (resolution === 'not-found') throw new BridgeError(404, 'not_found', 'No such gate in this run.')
+          if (resolution === 'already-resolved') throw new BridgeError(409, 'gate-resolved', 'This gate was already answered.')
           return { ok: true }
         },
         cancel: async (runId) => {
