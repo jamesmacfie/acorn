@@ -63,7 +63,7 @@ const rowOf = (frame: Frame, value: string) => frame.lines.findIndex((line) => l
  *  screen at all: a caret is the terminal's own and draws no cell, so the only way to see where it is
  *  is to type at it and say which row the character appeared on (../paint/paint.ts § drawField). */
 /** The text inside a `Textarea`, which is two frames in: the panel each case is drawn in, and the
- *  field's own border inside it (./asking.tsx § Textarea). */
+ *  field's own border inside it (./asking/fields.tsx § Textarea). */
 const fieldLines = (frame: Frame, count: number): string[] =>
   frame.lines.slice(2, 2 + count).map((line) => line.replace(/^│+/, '').replace(/[│█]+$/, '').trimEnd())
 
@@ -1776,7 +1776,7 @@ describe('every control is a stop', () => {
 // Two surfaces that looked the same behaved differently, because `Sections` handed its strip a list
 // of panels and a plugin drawing `Tabs` and `TabPanel` as siblings had no way to. The pairing is
 // `idPrefix` now, which both halves already carry, so the relation is drawn rather than passed
-// (./grouping.tsx § Which panels a strip owns, docs/tui.md § Focus regions).
+// (./grouping/panelRegistry.ts § registerPanel, docs/tui.md § Focus regions).
 
 /** `Tabs` and its `TabPanel`s as siblings, the way a plugin writes them. */
 function TwoPanels() {

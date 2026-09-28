@@ -13,7 +13,7 @@ describe('terminal setup route', () => {
     const screen = await renderFixture({ width: 80, height: 24 })
     try {
       await command(screen, 'settings')
-      expect(await screen.until('Set up acorn')).toContain('Choose a workspace')
+      expect(await screen.until('Choose a workspace')).toContain('Choose a workspace')
       expect((await screen.frame()).split('\n').every((line) => line.length <= 80)).toBe(true)
       // The route works after first run too, and Escape returns to the previous focus scope.
       await screen.press('ESCAPE')

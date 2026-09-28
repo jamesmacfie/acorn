@@ -52,7 +52,7 @@ export interface Renderable extends Node {
    *  a field nor a viewport, and both askers check.
    *
    *    handleKeyPress       the dispatcher's typing hand-off, which asks whatever has the keys
-   *                         (`../kit/asking.tsx § FieldApi`, `../keys/install.ts § typeInto`).
+   *                         (`../kit/asking/fieldRef.ts § FieldApi`, `../keys/install.ts § typeInto`).
    *    scrollChildIntoView  the store's reveal, which walks up to the viewports a stop is inside
    *                         (`../kit/scrolling.tsx`, `../keys/regions.ts § revealInViewports`). */
   handleKeyPress?: (key: KeyPress) => boolean
@@ -145,7 +145,7 @@ const accessors = {
   // them unconditionally — and deliberately so now that there is a caret to draw. A field asks the
   // store whether it has the keys and writes the answer into its own props, where paint reads it, so
   // the mirror stays one-way: nothing here holds focus state for the store to disagree with
-  // (`../kit/asking.tsx § fieldRef`, `../paint/paint.ts § drawField`).
+  // (`../kit/asking/fieldRef.ts § fieldRef`, `../paint/paint.ts § drawField`).
   focus: { value() {} },
   blur: { value() {} },
   getChildren: {
