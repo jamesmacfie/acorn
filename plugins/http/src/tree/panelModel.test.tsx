@@ -13,6 +13,7 @@ const actions: ((command: string) => void)[] = []
 // pane has no URL to hold a selection, so a click or the palette's curl import arrives this way
 // (docs/plugins.md § The tree contract).
 const bridge = (item?: string) => ({
+  api: { get: async () => [] },
   context: { surface: 'http', target: 'remote', nodeId: 'node-a', ...(item ? { item } : {}) },
   onSelect: (handler: (item: string) => void) => {
     selects.push(handler)

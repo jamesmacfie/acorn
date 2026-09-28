@@ -12,7 +12,13 @@ export function delegationTools(service: AgentDelegationService): AgentToolContr
   return [
     {
       name: 'agent_spawn',
-      description: 'Start a directly owned managed agent on this task and return its durable ids immediately.',
+      description: [
+        'Start another agent that you own, send it `prompt` as its first message, and return its ids at once.',
+        "With isolation 'worktree' this also creates a new task with its own checkout and branch; that is how you hand a change to a separate task.",
+        'When a child you started from a managed chat finishes a turn, its final message comes back to you as a new message, so you do not need to poll. From a terminal, use agent_wait and agent_read.',
+        'A child can start one more level of agents; a third level is refused, and one root allows 12 live agents.',
+        'A child that stops for a permission or a question waits for a person to answer in its own pane.',
+      ].join(' '),
       input: agentSpawnInputSchema,
       scope: 'task',
       risk: 'execute',
@@ -23,7 +29,7 @@ export function delegationTools(service: AgentDelegationService): AgentToolContr
     },
     {
       name: 'agent_prompt',
-      description: 'Queue another durable turn for a directly owned delegated agent.',
+      description: 'Send another message to an agent you started. It waits behind any turn the agent is running, and its answer reports back like the first one.',
       input: agentPromptInputSchema,
       scope: 'task',
       risk: 'execute',
@@ -32,7 +38,7 @@ export function delegationTools(service: AgentDelegationService): AgentToolContr
     },
     {
       name: 'agent_wait',
-      description: 'Wait up to 30 seconds for an explicit condition on a directly owned delegated agent.',
+      description: 'Wait up to 30 seconds for an agent you started to reach a condition. Call it again if it times out.',
       input: agentWaitInputSchema,
       scope: 'task',
       risk: 'execute',
@@ -41,7 +47,7 @@ export function delegationTools(service: AgentDelegationService): AgentToolContr
     },
     {
       name: 'agent_read',
-      description: 'Read a bounded page of useful output from a directly owned delegated agent.',
+      description: 'Read a page of messages, tool calls, and results from an agent you started. Pass nextCursor back as afterSeq to read the next page.',
       input: agentReadInputSchema,
       scope: 'task',
       risk: 'execute',
@@ -50,7 +56,7 @@ export function delegationTools(service: AgentDelegationService): AgentToolContr
     },
     {
       name: 'agent_cancel',
-      description: 'Cancel the active or named turn of a directly owned delegated agent without deleting its history.',
+      description: 'Cancel the running or named turn of an agent you started. Its history stays.',
       input: agentCancelInputSchema,
       scope: 'task',
       risk: 'execute',

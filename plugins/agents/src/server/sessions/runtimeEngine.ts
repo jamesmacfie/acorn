@@ -73,13 +73,13 @@ const listedRow = (session: AgentSession): string => JSON.stringify({
  * The environment is spelled out rather than inherited. The agent process already holds these values,
  * because the session environment is what acorn spawned it with, but an agent is free to scrub
  * credential-shaped names out of what it passes its own children, and a stdio MCP server that loses
- * `ACORN_API_TOKEN` fails every call. `ACORN_SESSION_ID` is provenance for notes and memory writes, the
- * same value a task terminal passes; the token, not this, is what the node trusts for the session and
- * the tool ceiling (docs/mcp.md § Launch environment).
+ * `ACORN_API_TOKEN` or `ACORN_TASK_ID` fails every call. The session environment carries both, plus
+ * `ACORN_SESSION_ID`; the token, not these, is what the node trusts for the task, the session, and the
+ * tool ceiling (docs/mcp.md § Launch environment).
  */
 export function acornMcpServers(
   mcp: { name: string; launcher: Launcher } | null,
-  session: Pick<AgentSession, 'id' | 'profileId'>,
+  session: Pick<AgentSession, 'profileId'>,
   sessionEnv: Record<string, string>,
 ): AgentDriverMcpServer[] {
   if (!mcp) return []
@@ -89,7 +89,7 @@ export function acornMcpServers(
     name: mcp.name,
     command: mcp.launcher.command,
     args: mcp.launcher.args,
-    env: { ...mcp.launcher.env, ...sessionEnv, ACORN_SESSION_ID: session.id },
+    env: { ...mcp.launcher.env, ...sessionEnv },
   }]
 }
 
@@ -390,14 +390,21 @@ export class ManagedAgentEngine {
     const noProviderExecutionHistory = !(await this.store.hasProviderExecutionHistory(session.id))
     // Scoped to this session's task (docs/security.md § Credential handling). The credential cannot
     // drive another task's tools or read the owner's provider credentials.
-    const sessionEnv = this.internalEnv({
-      scope: 'task',
-      taskId: session.taskId,
-      sessionId: session.id,
-      // The session row is the authority across restarts. Workflow creation and later delegation
-      // persist the effective intersection here before any provider process is started.
-      toolCeiling: persistedToolCeiling(session.config),
-    })
+    const sessionEnv = {
+      ...this.internalEnv({
+        scope: 'task',
+        taskId: session.taskId,
+        sessionId: session.id,
+        // The session row is the authority across restarts. Workflow creation and later delegation
+        // persist the effective intersection here before any provider process is started.
+        toolCeiling: persistedToolCeiling(session.config),
+      }),
+      // The acorn MCP server lists no tools without a task ID. Claude Code and Codex start that server
+      // from their own registration, so it only sees what the provider process inherits from here. The
+      // node trusts the signed token for both values, never these.
+      ACORN_TASK_ID: session.taskId,
+      ACORN_SESSION_ID: session.id,
+    }
     for (const secret of secretEnvironmentValues(sessionEnv)) if (!this.mintedSecrets.includes(secret)) this.mintedSecrets.push(secret)
     // The session's span covers starting the provider, not the session's whole life. A session
     // lives for hours and outlives the process, and a span nobody can close is not a measurement;

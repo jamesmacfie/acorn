@@ -510,6 +510,7 @@ export default function EditorPane(props: { task: Task }) {
           list={
             <>
               <Tabs
+                level="pane"
                 tabs={[{ id: 'files', label: 'Files' }, { id: 'search', label: 'Search' }]}
                 active={side()}
                 onChange={(id) => setSide(id === 'search' ? 'search' : 'files')}
@@ -537,6 +538,7 @@ export default function EditorPane(props: { task: Task }) {
           {/* Was a hand-rolled strip: the dirty state was a string-concatenated ●, the close
               button was mouse-only, and there were no arrow keys. */}
           <DocumentTabs
+            level="pane"
             idPrefix="editor"
             ariaLabel="Open files"
             active={active() ?? ''}

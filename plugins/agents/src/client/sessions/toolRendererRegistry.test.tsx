@@ -88,6 +88,26 @@ it('says which call a closed row was without opening it', () => {
   expect(summary?.textContent).toContain('piranhagram')
 })
 
+it('names a skill in the closed row and keeps its JSON behind the disclosure', () => {
+  const host = draw({
+    id: 't', title: 'Skill', status: 'completed',
+    input: '{\n  "skill": "readable"\n}', output: 'Launching skill: readable',
+  }, false)
+  const fold = host.querySelector('details')!
+  expect(fold.open).toBe(false)
+  expect(fold.querySelector('summary')?.textContent).toContain('Launching skill: readable')
+  expect(host.textContent).not.toContain('"skill"')
+  fold.open = true
+  fold.dispatchEvent(new Event('toggle'))
+  expect(host.textContent).toContain('"skill": "readable"')
+  expect(host.querySelectorAll('.ui-code')).toHaveLength(1)
+})
+
+it('leaves malformed or unrelated tool inputs under their provider titles', () => {
+  expect(draw({ id: 'a', title: 'Skill', input: '{bad' }).querySelector('summary')?.textContent).toContain('Skill')
+  expect(draw({ id: 'b', title: 'Bash', input: '{"skill":"readable"}' }).querySelector('summary')?.textContent).toContain('Bash')
+})
+
 it('honours the reader’s fold setting rather than the call’s status', () => {
   expect(draw({ id: 't', title: 'Search web', web: { action: { type: 'search', queries: ['q'] } } }, false)
     .querySelector('details')?.open).toBe(false)

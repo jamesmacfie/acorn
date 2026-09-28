@@ -260,6 +260,10 @@ definitions.
 | `agent_read` | `sessionId`, `afterSeq`, and `limit` | A bounded page of folded assistant messages, diagnostics, errors, and validated structured output |
 | `agent_cancel` | `sessionId` and an optional `turnId` | The cancelled turn and resulting session state |
 
+An agent learns how to use these tools only from their descriptions and the `describe()` text on each
+field in `plugins/agents/src/shared/delegationSchemas.ts`, which the MCP schema carries. When a rule
+below changes, change that text too.
+
 `agent_spawn` defaults to shared-task isolation and starts the first turn before returning. Worktree
 isolation creates a selectable child task, but the managed session remains the execution authority.
 The caller can prompt, wait for, read, or cancel only a direct child recorded in the Agents plugin's

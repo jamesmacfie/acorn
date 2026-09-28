@@ -27,6 +27,8 @@ export function Tabs(props: {
   onChange: (id: string) => void
   idPrefix: string
   ariaLabel: string
+  /** A strip that is the pane's header rather than navigation below one. */
+  level?: 'pane'
   /** Trailing controls beside the strip. Two consumers were overriding `.ui-tabs` to get this. */
   actions?: JSX.Element
 }) {
@@ -58,7 +60,7 @@ export function Tabs(props: {
   })
 
   return (
-    <div class="ui-tabs">
+    <div class="ui-tabs" data-level={props.level}>
       <div
         class="ui-tab-scroll ui-tabs-strip"
         aria-label={props.ariaLabel}
