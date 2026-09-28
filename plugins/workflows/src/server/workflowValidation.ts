@@ -1,6 +1,8 @@
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { workflowDataProblems } from './workflowDataValidation'
+import { gateFormDefinitionProblems } from './workflowGateForm'
+import { declaredOutputSchema } from '../shared/gateForm'
 import { DEFAULT_PROFILE_ID } from '@acorn/plugin-api/node'
 import { BUILTIN_AGENT_STEP_KINDS, readStepField } from '../shared/stepFields'
 import type {
@@ -243,7 +245,7 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
     const source = stepAt(name)
     if (!source) return false
     if (source.schema && typeof source.schema === 'object' && !Array.isArray(source.schema)) return true
-    return !!catalog.describeStepKind?.(source.kind ?? 'agent')?.output?.schema
+    return !!declaredOutputSchema(source, catalog.describeStepKind?.(source.kind ?? 'agent')?.output?.schema)
   }
 
   for (const [index, step] of def.steps.entries()) {
@@ -279,6 +281,7 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
       precedes,
       structured,
     }))
+    errors.push(...gateFormDefinitionProblems({ label, step, posture: def.posture, declaredInputs, indexes, precedes, structured }))
     errors.push(...workflowDataProblems(step, { label, index, indexes, stepAt, policies: catalog.policies, after, precedes }, declaredInputs))
     if (!(catalog.agentStepKinds ?? BUILTIN_AGENT_STEP_KINDS).has(kind)) {
       for (const field of ['isolation', 'inputs', 'configOptions'] as const) {

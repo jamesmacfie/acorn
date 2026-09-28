@@ -1,3 +1,4 @@
+import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -6,6 +7,7 @@ import { provideClientCapability, type Disposable } from '@acorn/plugin-api/test
 import { AGENTS_CONVERSATION, type AgentConversationProps } from '@acorn/plugin-agents/contract/conversation.ts'
 import type { WorkflowStepRow } from '../../contract/wire.ts'
 import type { RunPaneModel } from './runPaneModel'
+import type { WorkflowGateForm } from '../../shared/workflowContracts'
 
 // Which controls a node offers is the pane's whole promise: a stale button is a race, not a bug
 // (docs/workflows.md § Routes and UI). So the check is per status, in a real render.
@@ -34,7 +36,12 @@ const kill = vi.fn()
 const retry = vi.fn()
 const gate = vi.fn()
 
-const modelFor = (row: WorkflowStepRow): RunPaneModel => ({
+const modelFor = (row: WorkflowStepRow, form?: WorkflowGateForm): RunPaneModel => {
+  const [drafts, setDrafts] = createSignal<Record<string, Record<string, unknown>>>({})
+  return {
+  gateForm: () => form,
+  gateDraft: (id: string) => drafts()[id],
+  setGateDraft: (id: string, values: Record<string, unknown>) => setDrafts((all) => ({ ...all, [id]: values })),
   selectedStep: () => row,
   selectedRun: () => undefined,
   busy: () => false,
@@ -46,17 +53,18 @@ const modelFor = (row: WorkflowStepRow): RunPaneModel => ({
   kill,
   retry,
   gate,
-} as unknown as RunPaneModel)
+  } as unknown as RunPaneModel
+}
 
 let host: HTMLDivElement
 let dispose: (() => void) | undefined
 
-const mount = (row: WorkflowStepRow): void => {
+const mount = (row: WorkflowStepRow, form?: WorkflowGateForm): void => {
   host = document.createElement('div')
   document.body.append(host)
   dispose = render(() => (
     <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
-      <NodeDetail task={{ id: 'task-1' } as never} model={modelFor(row)} />
+      <NodeDetail task={{ id: 'task-1' } as never} model={modelFor(row, form)} />
     </QueryClientProvider>
   ), host)
 }
@@ -112,6 +120,38 @@ describe('the controls a node offers', () => {
     expect(buttons()).toEqual(['Approve', 'Reject'])
     press('Approve')
     expect(gate).toHaveBeenCalledWith(true)
+  })
+
+  it('a waiting gate with a form: the proposal to correct, then approve with the edited values', () => {
+    const form: WorkflowGateForm = { fields: [
+      { name: 'title', label: 'Title', schema: { type: 'string' }, required: true },
+      { name: 'body', label: 'Release note', schema: { type: 'string' } },
+    ] }
+    mount(step({ kind: 'gate-human', status: 'waiting-gate', inputsJson: JSON.stringify({ form: { values: { title: 'Draft', body: 'Notes' } } }) }), form)
+    const title = host.querySelector<HTMLInputElement>('input[aria-label="Title"]')!
+    expect(title.value).toBe('Draft')
+    expect(buttons()).toEqual(['Approve', 'Reject'])
+
+    title.value = 'Corrected'
+    title.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(host.textContent).toContain('Edited')
+    press('Approve')
+    expect(gate).toHaveBeenCalledWith(true, { title: 'Corrected', body: 'Notes' })
+
+    press('Reset')
+    expect(title.value).toBe('Draft')
+    title.value = ''
+    title.dispatchEvent(new Event('input', { bubbles: true }))
+    const approve = [...host.querySelectorAll('button')].find((el) => el.textContent?.trim() === 'Approve')!
+    expect(approve.disabled).toBe(true)
+  })
+
+  it('an approved gate with a form: the approved values, edits marked', () => {
+    const form: WorkflowGateForm = { fields: [{ name: 'title', label: 'Title', schema: { type: 'string' } }] }
+    mount(step({ kind: 'gate-human', status: 'done', structuredJson: JSON.stringify({ approved: true, values: { title: 'Corrected' }, edited: ['title'] }) }), form)
+    expect(buttons()).toEqual([])
+    expect(host.textContent).toContain('Title (edited)')
+    expect(host.textContent).toContain('Corrected')
   })
 
   it('a finished command node: nothing to press', () => {

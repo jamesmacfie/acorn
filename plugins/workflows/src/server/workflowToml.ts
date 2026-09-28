@@ -15,6 +15,8 @@ import type {
   WorkflowBoundTemplate,
   WorkflowBudget,
   WorkflowDef,
+  WorkflowGateForm,
+  WorkflowInput,
   WorkflowMapSource,
   WorkflowStepDef,
   WorkflowValueBinding,
@@ -81,6 +83,13 @@ const tomlMapSource = (source: WorkflowMapSource | undefined): Record<string, un
 const tomlTitle = (title: WorkflowBoundTemplate | undefined): Record<string, unknown> | undefined =>
   title ? drop({ template: title.template, bindings: tomlBindings(title.bindings) }) : undefined
 
+// A workflow input, and a gate form's field, which is declared the same way.
+const tomlInput = (input: WorkflowInput): Record<string, unknown> =>
+  drop({ name: input.name, connection_json: input.connection ? JSON.stringify(input.connection) : undefined, label: input.label, description: input.description, required: input.required === true ? true : undefined, ...(input.schema ? { schema_json: JSON.stringify(input.schema), default_json: input.default === undefined ? undefined : JSON.stringify(input.default) } : { default: input.default }) })
+
+const tomlForm = (form: WorkflowGateForm | undefined): Record<string, unknown> | undefined =>
+  form ? drop({ fields: form.fields.map(tomlInput), values: tomlBindings(form.values) }) : undefined
+
 const tomlStep = (step: WorkflowStepDef): Record<string, unknown> =>
   drop({
     id: step.id,
@@ -108,6 +117,7 @@ const tomlStep = (step: WorkflowStepDef): Record<string, unknown> =>
     items: tomlMapSource(step.items),
     item_key: step.itemKey,
     title: tomlTitle(step.title),
+    form: tomlForm(step.form),
     with: step.with,
     tools: tomlTools(step.tools),
     budget: tomlBudget(step.budget),
@@ -139,7 +149,7 @@ export function writeWorkflowToml(def: WorkflowDef): string {
     budget: tomlBudget(def.budget),
     max_descendants: def.maxDescendants,
     max_concurrency: def.maxConcurrency,
-    inputs: some(def.inputs)?.map((input) => drop({ name: input.name, connection_json: input.connection ? JSON.stringify(input.connection) : undefined, label: input.label, description: input.description, required: input.required === true ? true : undefined, ...(input.schema ? { schema_json: JSON.stringify(input.schema), default_json: input.default === undefined ? undefined : JSON.stringify(input.default) } : { default: input.default }) })),
+    inputs: some(def.inputs)?.map(tomlInput),
     outputs_json: def.outputs ? JSON.stringify(def.outputs) : undefined,
     steps: def.steps.map(tomlStep),
   }))

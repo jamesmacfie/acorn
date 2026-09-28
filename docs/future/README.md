@@ -24,7 +24,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | File | What it is | Status |
 | --- | --- | --- |
-| [approval.md](./approval.md) | An optional form on `gate-human`: bound proposals and edited values as the step's output. It starts by making a gate answer device-only and one answer per gate. | Proposal, 2026-09-29. Not started. |
 | [bundle.md](./bundle.md) | Packaging a downloadable node: native deps, the CI matrix, the snags. | DX and CLI/TUI tarball staging shipped; platform binaries, installer, container image, and desktop embedding remain. |
 | [compiled-tier.md](./compiled-tier.md) | Which compiled plugin moves to the loaded tier next and what blocks it. | Standing map. Three of its four couplings dissolved when the remote component tree shipped. |
 | [integration-ideas.md](./integration-ideas.md) | The catalogue of integrations a workspace could hold, and the four shapes they collapse into. | Research notes. |
@@ -62,6 +61,14 @@ grammar, output schemas, service lifecycle, and examples; [Node distribution](..
 owns packaging; [API reference](../api-reference.md) owns the invocation route; and
 [CLI command authoring](../plugin-authoring/cli-commands.md) owns the loaded-plugin descriptor.
 The five-phase proposal and its refused alternatives remain in git history.
+
+`approval.md` shipped on 2026-09-29 and was deleted. [Workflow
+execution](../workflows/execution.md#human-gates) owns the gate form's contract,
+[workflows](../workflows.md) owns the run pane, [authoring](../workflows/authoring.md) owns the
+inspector and generation, [security](../security.md) records that a gate answer is device-only, and
+[API reference](../api-reference.md) owns the gate route. The manual check is part of item 52 in
+[testing](../testing.md). The deferred rejection branch, rejection note, and tool-call gates remain
+in git history.
 
 `phased-review-steps/`, `user-extensions/`, `node-first/`, `node/`, `acp/`, `tauri/`, `events/` and the later
 `events.md` follow-up (shipped on 2026-09-11), `layout/`, `structure/`,
