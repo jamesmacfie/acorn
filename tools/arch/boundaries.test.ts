@@ -710,7 +710,8 @@ describe('architecture boundaries', () => {
     // Ten roster ids are also core's own words. Where that is the whole reason, the entry says so.
     const NAMES_A_PLUGIN_OK = new Map([
       ['packages/protocol/src/data/dataSources.ts', 'preview is a query mode, not the preview plugin'],
-      ['packages/plugin-types/src/public.ts', 'preview is a published query mode, not the preview plugin'],
+      ['packages/plugin-types/src/contracts/data.ts', 'preview is a published query mode, not the preview plugin'],
+      ['packages/plugin-types/src/contracts/coreProjects.ts', "'terminal' is a project setup-script trigger"],
       ['packages/node-core/src/server/dataSources/runtime.ts', 'preview is a query mode, not the preview plugin'],
       ['packages/client-core/src/features/dataSources/SourceQueryEditor.tsx', 'preview is a data-query mode, not the preview plugin'],
       // `terminal` the UI style pack, which is a shape-and-density choice with no plugin behind it.

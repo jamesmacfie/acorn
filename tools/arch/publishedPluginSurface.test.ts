@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { expect, it } from 'vitest'
 import ts from 'typescript'
 import { PLUGIN_API_MAJOR } from '../../packages/protocol/src/plugin/apiVersion.ts'
@@ -23,19 +23,35 @@ function surface(entry: string, file: string): Surface {
     if (kind === 'value') values.push(name)
   }
 
-  const members = (type: ts.TypeNode | undefined, owner: string): void => {
+  const members = (type: ts.TypeNode | undefined, owner: string, containingSource = source): void => {
     if (!type) return
     if (ts.isUnionTypeNode(type) || ts.isIntersectionTypeNode(type)) {
-      for (const part of type.types) members(part, owner)
+      for (const part of type.types) members(part, owner, containingSource)
     } else if (ts.isParenthesizedTypeNode(type)) {
-      members(type.type, owner)
+      members(type.type, owner, containingSource)
     } else if (ts.isTypeLiteralNode(type)) {
       for (const member of type.members) {
         if (!ts.isPropertySignature(member) && !ts.isMethodSignature(member)) continue
-        const path = `${owner}.${member.name.getText(source)}`
+        const path = `${owner}.${member.name.getText(containingSource)}`
         names.push(`${entry}: member ${path}`)
-        if (ts.isPropertySignature(member)) members(member.type, path)
+        if (ts.isPropertySignature(member)) members(member.type, path, containingSource)
       }
+    }
+  }
+
+  const reexportedMembers = (from: ts.ExportDeclaration, name: string): void => {
+    if (!from.moduleSpecifier || !ts.isStringLiteral(from.moduleSpecifier) || !from.moduleSpecifier.text.startsWith('.')) return
+    const target = join(dirname(file), from.moduleSpecifier.text.replace(/\.js$/, '.ts'))
+    const targetSource = ts.createSourceFile(target, readFileSync(join(ROOT, target), 'utf8'), ts.ScriptTarget.Latest, true)
+    const declaration = targetSource.statements.find((statement): statement is ts.TypeAliasDeclaration | ts.InterfaceDeclaration =>
+      (ts.isTypeAliasDeclaration(statement) || ts.isInterfaceDeclaration(statement)) && statement.name.text === name)
+    if (!declaration) throw new Error(`${file} reexports ${name} without a matching local declaration`)
+    if (ts.isTypeAliasDeclaration(declaration)) members(declaration.type, name, targetSource)
+    else for (const member of declaration.members) {
+      if (!ts.isPropertySignature(member) && !ts.isMethodSignature(member)) continue
+      const path = `${name}.${member.name.getText(targetSource)}`
+      names.push(`${entry}: member ${path}`)
+      if (ts.isPropertySignature(member)) members(member.type, path, targetSource)
     }
   }
 
@@ -46,6 +62,7 @@ function surface(entry: string, file: string): Surface {
       }
       for (const specifier of statement.exportClause.elements) {
         add(statement.isTypeOnly || specifier.isTypeOnly ? 'type' : 'value', specifier.name.text)
+        if (statement.isTypeOnly || specifier.isTypeOnly) reexportedMembers(statement, specifier.propertyName?.text ?? specifier.name.text)
       }
       continue
     }
