@@ -32,6 +32,10 @@ import type {
 } from '../shared/workflowContracts'
 import { FORBIDDEN_KEYS } from './generateWorkflow'
 import { groundWorkflowDispatch } from './groundWorkflowDispatch'
+import { gateFormDefinitionProblems } from './workflowGateForm'
+import { workflowAncestors, workflowEdges } from './workflowValidation'
+import { declaredOutputSchema } from '../shared/gateForm'
+import { stepIdentity } from '../shared/workflowIdentity'
 
 export type GroundedWorkflow = { def: WorkflowDef; notes: WorkflowGenerateNote[] }
 
@@ -46,7 +50,7 @@ const DEF_KEYS = ['baseline', 'maxDescendants', 'maxConcurrency', 'formatVersion
 const STEP_KEYS = [
   'id', 'name', 'kind', 'after', 'isolation', 'inputs', 'configOptions', 'profileId', 'model', 'prompt',
   'schema', 'policy', 'maxIterations', 'requiresRun', 'childWorkflow', 'items', 'itemKey',
-  'title', 'branches', 'with', 'tools', 'budget',
+  'title', 'form', 'branches', 'with', 'tools', 'budget',
 ]
 const INPUT_KEYS = ['name', 'label', 'schema', 'description', 'required', 'default']
 
@@ -313,6 +317,30 @@ function groundKeys(def: WorkflowDef, notes: Notes): WorkflowDef {
   return steps.some((step, index) => step !== next.steps[index]) ? { ...next, steps } : next
 }
 
+/** A generated gate form that would not validate is dropped and the gate is kept, never the other
+ *  way round, so a bad answer still stops for a person. Before dispatch grounding, because a later
+ *  binding to a dropped form's /values has nothing left to read and is dropped there. */
+function groundGateForms(def: WorkflowDef, catalog: WorkflowCatalog, notes: Notes): WorkflowDef {
+  const indexes = new Map(def.steps.map((step, index) => [stepIdentity(step), index]))
+  const declaredInputs = new Set((def.inputs ?? []).map((input) => input.name))
+  const edges = workflowEdges(def.steps)
+  const precedes = (candidate: string, owner: string): boolean => workflowAncestors(edges, owner)?.has(candidate) ?? false
+  const structured = (name: string): boolean => {
+    const source = def.steps.find((step) => stepIdentity(step) === name)
+    return !!source && !!declaredOutputSchema(source, catalog.kinds.find((kind) => kind.id === (source.kind ?? 'agent'))?.describe?.output?.schema)
+  }
+  const steps = def.steps.map((step, index) => {
+    if (step.form === undefined) return step
+    const problems = gateFormDefinitionProblems({
+      label: `step '${step.name || index + 1}'`, step, posture: def.posture, declaredInputs, indexes, precedes, structured,
+    })
+    if (!problems.length) return step
+    add(notes, 'dropped-form', `Step '${step.name}' had a form that would not load (${problems[0]}), so the form was dropped and the step still waits for a person.`, step.name)
+    return without(step, 'form')
+  })
+  return steps.some((step, index) => step !== def.steps[index]) ? { ...def, steps } : def
+}
+
 /**
  * The definition as this node can run it, and everything that had to change to get there.
  *
@@ -328,6 +356,7 @@ export function groundWorkflow(def: WorkflowDef, catalog: WorkflowCatalog): Grou
   next = groundKeys(next, notes)
   const steps = next.steps.map((step) => groundStep(step, catalog, kinds, notes))
   if (steps.some((step, index) => step !== next.steps[index])) next = { ...next, steps }
+  next = groundGateForms(next, catalog, notes)
   next = groundWorkflowDispatch(next, catalog, notes)
   return { def: next, notes }
 }
