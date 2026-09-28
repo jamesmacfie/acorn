@@ -261,10 +261,21 @@ function claudeWebActivity(meta: ClaudeToolMeta, rawInput: unknown): AgentWebAct
     const results = claudeWebResults(meta.response)
     return action || results ? { ...(action ? { action } : {}), ...(results ? { results } : {}) } : undefined
   }
-  if (meta.toolName === 'WebFetch' && input) {
-    const url = str(input.url)
-    const prompt = str(input.prompt)
-    return { action: { type: 'fetch_page', ...(url ? { url } : {}), ...(prompt ? { prompt } : {}) } }
+  if (meta.toolName === 'WebFetch') {
+    const url = str(input?.url)
+    const prompt = str(input?.prompt)
+    // The status rides the response update, which carries no request. A 404 still arrives as a
+    // completed call, with `code: 404` and a note in place of the page (checked against Claude Code's
+    // own structured result on 2026-09-28), so this is the only thing that says the page was missing.
+    const code = num(meta.response?.code)
+    const text = str(meta.response?.codeText)
+    const status = code != null ? { code, ...(text ? { text } : {}) } : undefined
+    return input || status
+      ? {
+        ...(input ? { action: { type: 'fetch_page' as const, ...(url ? { url } : {}), ...(prompt ? { prompt } : {}) } } : {}),
+        ...(status ? { status } : {}),
+      }
+      : undefined
   }
   return undefined
 }
@@ -278,6 +289,26 @@ const CLAUDE_WEB_TOOLS = new Map<string, AgentWebAction['type']>([
   ['WebSearch', 'search'],
   ['WebFetch', 'fetch_page'],
 ])
+
+/**
+ * The row for Claude Code loading a deferred tool, which it does before the first use of any tool
+ * it has not described to the model yet.
+ *
+ * The adapter titles it `ToolSearch`, sends `{ "query": "select:WebFetch", "max_results": 1 }` as its
+ * input and `Tool: WebFetch` as its output, so the card opened onto two restatements of one name. The
+ * names are on the response as `matches`, and they become the title; input and output are dropped
+ * unless the call failed, so the row renders flat. The completion update names the tool too, and it
+ * returns '' here so the fold keeps the title the response set.
+ */
+function toolSearchTitle(update: SessionUpdate, meta: ClaudeToolMeta): string | undefined {
+  if (meta.toolName !== 'ToolSearch') return undefined
+  const matches = meta.response?.matches
+  if (Array.isArray(matches)) {
+    const names = strings(matches)
+    return names ? `Load tools: ${names.join(', ')}` : 'Load tools: none found'
+  }
+  return update.sessionUpdate === 'tool_call' ? 'Load tools' : ''
+}
 
 // The CLI's two names for delegating to a subagent. `Agent` is what Claude Code 2.1.241 sends, `Task`
 // is the older name the adapter still maps, and both land on the same tool.
@@ -474,6 +505,7 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
       const webAction = meta.toolName != null ? CLAUDE_WEB_TOOLS.get(meta.toolName) : undefined
       const web = claudeWebActivity(meta, 'rawInput' in update ? update.rawInput : undefined)
       const prose = toolProse(update, meta)
+      const toolSearch = toolSearchTitle(update, meta)
       // After the roster, so a brief lands in the stream the subagent card has just opened.
       const said: AgentNormalizedEvent[] = prose
         ? [{ type: prose.as, text: prose.text, subagentId }]
@@ -486,11 +518,12 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
           // and the fold keeps the name the call arrived with. A web call is the exception: its row
           // is named after what it did, so the adapter's `"query" (allowed: host)` title never
           // reaches a card and a Claude row reads like a Codex one (./webActivity.ts).
-          title: webAction ? webToolTitle(webAction) : update.title ?? '',
+          title: webAction ? webToolTitle(webAction) : toolSearch ?? update.title ?? '',
           kind: update.kind ?? undefined,
           status,
-          input: prose ? undefined : toolInput(update.rawInput),
-          output: text || undefined,
+          input: prose || toolSearch != null ? undefined : toolInput(update.rawInput),
+          // A failed load keeps its output, because that is where the error is.
+          output: toolSearch != null && status !== 'failed' ? undefined : text || undefined,
           subagentId,
           ...(web ? { web } : {}),
         },

@@ -81,6 +81,7 @@ const WEB_LIMITS = {
   snippet: 2_000,
   domains: 20,
   prompt: 8_192,
+  statusText: 100,
 } as const
 
 /** The whole payload, serialized: the same 64 KiB the inline tool input and output budget uses.
@@ -138,6 +139,7 @@ const boundedWeb = (web: AgentWebActivity | undefined): AgentWebActivity | undef
   let bounded: AgentWebActivity = {
     action: boundedWebAction(web.action),
     results: web.results?.slice(0, WEB_LIMITS.results).map(boundedWebResult),
+    status: web.status && { code: web.status.code, text: sliceText(web.status.text, WEB_LIMITS.statusText) },
   }
   // Trailing sources first and last: a reader who has forty of them is not reading the fiftieth, and
   // dropping one costs less than shortening every snippet above it.

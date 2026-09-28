@@ -5,7 +5,7 @@ import { formatRelativeTime } from '@acorn/plugin-api/client'
 import { AGENT_TOOL_CARD_POINT, type AgentToolCardProps } from '@acorn/protocol/extensionPoints.ts'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { useAgentToolFold } from './toolFoldPrefs'
-import { WebToolBody, webSummary } from './webToolCard'
+import { WebStatusText, WebToolBody, webStatusIsNews, webSummary } from './webToolCard'
 import { eventTime } from './eventTime'
 import type { AgentToolCall } from '../../contract/wire.ts'
 
@@ -63,7 +63,8 @@ const toolLabel = (tool: AgentToolCall): string => skillLabel(tool) ?? (tool.tit
  *
  *  A web call adds its one-line summary here, in the fold's `meta` slot, rather than to the label: the
  *  label is the row's accessible name and it is what a reader scans a transcript by, so it stays the
- *  stable `Search web` while the query — which can be a paragraph — sits beside it. */
+ *  stable `Search web` while the query — which can be a paragraph — sits beside it. A fetched page
+ *  that answered outside 2xx adds its status after that, because a 404 finishes with a green dot. */
 const AgentToolState: Component<AgentToolRendererProps> = (props) => {
   const summary = () => (props.tool.web ? webSummary(props.tool.web) : undefined)
   return (
@@ -77,6 +78,9 @@ const AgentToolState: Component<AgentToolRendererProps> = (props) => {
         <Text emphasis="muted">{toolStatusLabel(props)}</Text>
       </Show>
       <Show when={summary()}>{(text) => <Text emphasis="muted">{text()}</Text>}</Show>
+      <Show when={webStatusIsNews(props.tool.web?.status) && props.tool.web?.status}>
+        {(status) => <WebStatusText status={status()} />}
+      </Show>
     </Inline>
   )
 }

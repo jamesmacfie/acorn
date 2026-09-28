@@ -185,9 +185,16 @@ export type AgentWebResult = {
   snippet?: string
 }
 
+/** The HTTP status a fetched page answered with. Beside the action rather than inside it, because it
+ *  arrives on a later update that carries no request, and the fold replaces an action whole. A
+ *  provider can report a 404 as a finished call, so this is what tells a reader the page was not
+ *  there. */
+export type AgentWebStatus = { code: number; text?: string }
+
 export type AgentWebActivity = {
   action?: AgentWebAction
   results?: AgentWebResult[]
+  status?: AgentWebStatus
 }
 
 export type AgentToolCall = {
