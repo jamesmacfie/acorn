@@ -9,7 +9,8 @@ Typed dashboard panels use the matching device-only `/v1/core/dashboards/:operat
 The Node exposes one Hono application under `/v1`. It serves JSON routes and one authenticated
 WebSocket. It serves no HTML, JavaScript, or static assets.
 
-Route and response types live in `packages/protocol/src/transport/api.ts`; the server composition is
+Core route builders and response types are published through `@acorn/protocol/api.ts`. Their source is
+grouped by contract owner under `packages/protocol/src/transport/api/`. The server composition is
 `packages/node-core/src/server/index.ts`; plugin route declarations are registered by each Node
 plugin. The table below maps routes by responsibility. Use the route modules for fields and
 validation details when changing a contract.
