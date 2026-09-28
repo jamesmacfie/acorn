@@ -81,7 +81,7 @@
   --control-h-xs: 20px;
   --topbar-h: 48px;
   --pane-head-h: 48px;
-  /* Every horizontal tab strip, both the sub-nav one (Tabs) and the document one (DocumentTabs).
+  /* Horizontal tab strips beneath pane headers; pane-level strips use --pane-head-h instead.
      They had four different heights before this token: 40px, 48px, 30px and whatever the terminal
      drawer's line-height came to. A pack keeps it above --control-h, so a button can ride in the
      strip's actions slot, and below --pane-head-h, so a strip under a pane header stays subordinate

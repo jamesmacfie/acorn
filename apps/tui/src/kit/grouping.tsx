@@ -338,6 +338,8 @@ export function Tabs(props: {
   onChange: (id: string) => void
   idPrefix: string
   ariaLabel: string
+  /** DOM pane-header geometry; terminal tabs remain one text row. */
+  level?: 'pane'
   actions?: JSX.Element
 }) {
   const step = (delta: 1 | -1): boolean => {
@@ -803,6 +805,8 @@ export function DocumentTabs(props: {
   actions?: JSX.Element
   idPrefix: string
   ariaLabel: string
+  /** DOM pane-header geometry; terminal tabs remain one text row. */
+  level?: 'pane'
 }) {
   // A horizontal collection, the same shape `SegmentedControl` is and for the same reason: there is
   // nothing per tab to focus in one run of text, so the strip holds the keys and `←`/`→` move the

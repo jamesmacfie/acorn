@@ -1426,7 +1426,8 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 /* The height lives on the strip, not only on the tabs: with no tabs open the strip is empty and
    would otherwise measure whatever the buttons in `actions` come to, which left the terminal
    drawer's header at icon height until the first session started. */
-.ui-doctabs { flex: none; display: flex; align-items: stretch; min-width: 0; min-height: var(--tab-h); border-bottom: var(--chrome-divider); background: var(--bg-subtle); }
+.ui-doctabs { --tab-strip-h: var(--tab-h); flex: none; display: flex; align-items: stretch; min-width: 0; min-height: var(--tab-strip-h); border-bottom: var(--chrome-divider); background: var(--bg-subtle); }
+.ui-doctabs[data-level='pane'] { --tab-strip-h: var(--pane-head-h); }
 .ui-doctabs-strip { flex: 1; }
 .ui-doctabs-actions { flex: none; display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-3); }
 .ui-doctab {
@@ -1453,7 +1454,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   background: none;
   border: 0;
   padding: 0 var(--space-2) 0 var(--space-4);
-  min-height: calc(var(--tab-h) - var(--chrome-divider-w));
+  min-height: calc(var(--tab-strip-h) - var(--chrome-divider-w));
   cursor: pointer;
 }
 .ui-doctab[data-active] .ui-doctab-label { color: var(--text); }

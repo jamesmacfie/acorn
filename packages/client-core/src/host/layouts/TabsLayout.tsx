@@ -54,7 +54,7 @@ export function Tabs(props: LayoutProps) {
 
   return (
     <div class="pane layout-tabs" ref={bindChords}>
-      <TabStrip tabs={tabs()} active={active()} onChange={setSelected} idPrefix={props.stateKey} ariaLabel={props.label} />
+      <TabStrip level="pane" tabs={tabs()} active={active()} onChange={setSelected} idPrefix={props.stateKey} ariaLabel={props.label} />
       {/* One panel mounted at a time, which is what the region thunks are for: an unselected tab's
           region is never called, so a pane with eight tabs opens one. `Tabs.Panel` hides rather than
           unmounts, and that is the right trade inside a tree and the wrong one for a whole pane. */}

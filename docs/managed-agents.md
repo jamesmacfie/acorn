@@ -775,6 +775,8 @@ quietly fail to persist is worse than an absent row.
 **The session's own actions are registered by the pane, for as long as the pane is drawn.** They need
 a selected session, which only the pane model has, and two of them — rename and archive — are dialogs
 the detail region draws, so a row offered while that region is unmounted would run and show nothing.
+Archive skips its dialog when there is nothing to lose: the session has no turns and its draft is
+empty, not counting the task context the composer attaches on its own (`sessionIsBlank`).
 Mounted is therefore the gate: you can reach these when you are looking at the run they are about.
 The pane model stays the only place the roster is written
 (`plugins/agents/src/client/sessions/agentPaneModel.ts` § `sessionActions`). Nothing is enumerated a

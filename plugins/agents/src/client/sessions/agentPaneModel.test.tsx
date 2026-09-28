@@ -31,7 +31,7 @@ vi.mock('./managedClient', () => ({
 }))
 
 const { managedAgentStore } = await import('./managedStore')
-const { createAgentPaneModel } = await import('./agentPaneModel')
+const { createAgentPaneModel, sessionIsBlank } = await import('./agentPaneModel')
 
 const event = (seq: number): AgentEventRecord => ({
   id: `e${seq}`, sessionId: 's1', turnId: 'turn', seq, schemaVersion: 1, searchText: null, createdAt: 100 + seq,
@@ -78,4 +78,16 @@ it('opens the session the list will select, so a first visit reads one snapshot'
   await Promise.resolve()
   expect(opened).toEqual(['older'])
   dispose()
+})
+
+it('archives without asking only when nothing would be lost', () => {
+  const empty = { text: ' ', attachments: [], contexts: [] }
+  const automatic = { type: 'context', source: 'context.task.automatic' } as never
+  expect(sessionIsBlank({ turns: [] }, empty)).toBe(true)
+  expect(sessionIsBlank({ turns: [] }, { ...empty, contexts: [automatic] })).toBe(true)
+  expect(sessionIsBlank(undefined, empty)).toBe(false)
+  expect(sessionIsBlank({ turns: [{}] as never }, empty)).toBe(false)
+  expect(sessionIsBlank({ turns: [] }, { ...empty, text: 'hi' })).toBe(false)
+  expect(sessionIsBlank({ turns: [] }, { ...empty, attachments: [{}] as never })).toBe(false)
+  expect(sessionIsBlank({ turns: [] }, { ...empty, contexts: [{ type: 'context', source: 'context.task' }] as never })).toBe(false)
 })
