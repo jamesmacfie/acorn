@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
@@ -281,20 +281,52 @@ it('runs the packed scaffold and type-checks it against the packed declarations 
   }
 }, 30_000)
 
-it('imports the packed client SDK through its package export outside the repository', () => {
+it('imports and type-checks both packed client SDK exports outside the repository', () => {
   const root = mkdtempSync(join(tmpdir(), 'scaffold-sdk-'))
   try {
     const sdk = join(root, 'node_modules', 'acorn-plugin-sdk')
     unpackPublishedPackage('plugin-sdk', sdk)
+    // The remote entry imports Solid at runtime. Supply that declared peer from the local store;
+    // the SDK itself still resolves only from bytes unpacked from its tarball.
+    symlinkSync(realpathSync(join(PACKAGES, 'plugin-sdk', 'node_modules', 'solid-js')),
+      join(root, 'node_modules', 'solid-js'), 'dir')
+    writeFileSync(join(root, 'package.json'), JSON.stringify({ type: 'module' }))
     const output = execFileSync(process.execPath, [
       '--input-type=module', '-e',
-      "import('acorn-plugin-sdk').then((sdk) => console.log(typeof sdk.connect, typeof sdk.mountTree))",
+      "const [sdk, remote] = await Promise.all([import('acorn-plugin-sdk'), import('acorn-plugin-sdk/remote')]); console.log(typeof sdk.connect, typeof sdk.mountTree, typeof remote.solidTree, typeof remote.Card)",
     ], { cwd: root, encoding: 'utf8' })
-    expect(output.trim()).toBe('function function')
+    expect(output.trim()).toBe('function function function function')
+
+    writeFileSync(join(root, 'consumer.ts'), [
+      "import { mountTree, type AcornBridge } from 'acorn-plugin-sdk'",
+      "import { Card, solidTree, type KitNodeProps } from 'acorn-plugin-sdk/remote'",
+      'const props: KitNodeProps = { children: "Plugin content" }',
+      'const pane = solidTree(({ bridge }: { bridge: AcornBridge }) => Card({ ...props, children: bridge.context.surface }))',
+      'mountTree({ pane })',
+    ].join('\n'))
+    writeFileSync(join(root, 'tsconfig.json'), JSON.stringify({
+      compilerOptions: {
+        target: 'ES2023',
+        module: 'NodeNext',
+        moduleResolution: 'NodeNext',
+        lib: ['ES2023', 'DOM'],
+        noEmit: true,
+        strict: true,
+        skipLibCheck: false,
+      },
+      include: ['consumer.ts'],
+    }))
+    try {
+      execFileSync(TSC, ['--noEmit'], { cwd: root, stdio: 'pipe' })
+    } catch (error) {
+      throw new Error(String((error as { stdout?: Buffer; stderr?: Buffer }).stdout
+        ?? (error as { stderr?: Buffer }).stderr
+        ?? error))
+    }
   } finally {
     rmSync(root, { recursive: true, force: true })
   }
-}, 30_000)
+}, 60_000)
 
 it('type-checks the complete documented plugin example outside the workspace', () => {
   const dir = mkdtempSync(join(tmpdir(), 'documented-plugin-'))

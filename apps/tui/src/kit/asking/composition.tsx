@@ -103,46 +103,26 @@ export function MentionTextarea(props: MentionTextareaProps) {
         disabled={props.disabled}
         rows={props.rows ?? 3}
         onFocus={props.onFocus}
-        // The agents composer is a `MentionTextarea` rather than a `Composer`, and it wants the same
-        // send. The shared prop calls this "Enter without a modifier", which is the DOM's chat-style
-        // Enter; in a terminal Enter in a text field is a newline and nothing else can be, so it is
-        // the `commit` chord here — the same key the footer already names beside a focused field.
+        // The agents composer uses this field. Its submit prop sends on Enter, while the terminal's
+        // ordinary text field uses the commit chord.
         {...(props.onSubmit ? { onSubmit: () => props.onSubmit!() } : {})}
         ref={(element: Renderable) => {
-          // Landing here is the point of the pane. A reader who opens an agent run has come to write
-          // to it, so this field is what entering the region gives the keys to, and the transcript
-          // beside it is reached with Escape or Tab (../../keys/regions.ts § markEntry).
+          // Entering the region focuses the composer; Escape or Tab reaches the transcript.
           markEntry(element)
-          // Two keys that fire while somebody is typing, and the reason is the shape: the field IS
-          // the typing target and the list under it is the field's own, so neither can mean "type
-          // this" and there is nothing else for them to reach. They say so with their tier: `STOP`
-          // sits above the typing shadow, and both are bound to the field itself, which is the one
-          // thing the shadow deliberately leaves alone (../../keys/tiers.ts § TYPING). The palette needs
-          // the same thing for the same reason and gets it above the trap instead
-          // (../../keys/trap.ts § overlayKeys).
+          // Both keys belong to this field, even while typing. STOP outranks the typing shadow.
           bindKeys(element, [{
             key: 'down',
             cmd: () => {
               if (!list || !suggestions().length) return false
-              // Entering the list, not walking it: the field is not one of its stops, so there is
-              // nothing to step from (../../keys/regions.ts § walkStops).
+              // The field is outside the list's stops, so enter at its first row.
               return focusRenderable(stopsIn(list)[0])
             },
           }, {
-            // Enter sends, which is what the shared prop has always said this field does: `onSubmit`
-            // is documented as "Enter without a modifier. Absent leaves Enter as a newline", and the
-            // DOM half reads exactly that (client-core/kit/components/inputs/MentionTextarea.tsx).
-            // This host had it on the `commit` chord alone, so the composer's own hint — "Shift+Enter
-            // for newline" — described a keyboard nobody had. `commit` still works, and Shift+Return
-            // is not this binding, so it falls through to the typing path and inserts the newline.
-            //
-            // On a terminal that ignores the kitty keyboard protocol there is one byte for both, so
-            // Shift+Return sends too and a newline has to come from the ＋ picker or a paste. That is
-            // the same terminal on which `ctrl+return` never arrived either (../input/terminal.ts).
+            // Enter submits, and Shift+Enter remains a newline when the terminal distinguishes them.
+            // Terminals without the kitty keyboard protocol send the same byte for both.
             key: 'return',
             cmd: () => {
-              // An open list takes it first, and takes the row it is showing at the top — the DOM
-              // chooses `suggestions()[selected()]` and lands on the same row when nobody has moved.
+              // An open suggestion list takes Enter before the submit handler.
               const [first] = suggestions()
               if (first) { complete(first.value); return true }
               if (!props.onSubmit) return false
