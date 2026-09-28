@@ -3,9 +3,9 @@ import * as sdk from './index.ts'
 import type * as Published from './public.ts'
 import type { AcornBridge, PluginFrameContext } from './index.ts'
 
-// The drift lock for the hand-written published declaration. See docs/plugins.md § What is
-// published, and what acorn promises about it for why public.ts is hand-written, and what gap this
-// closes that the surface snapshot can't see.
+// The drift lock for the hand-written published declaration. See docs/plugins/package-shape.md
+// § What is published, and what acorn promises about it. The published name snapshot cannot detect a
+// type changing beneath an unchanged name; these assertions compare the declaration with the host.
 //
 // Assignability is asserted in both directions per type: one direction alone passes happily when the
 // published type is a subset, so dropping a method from `ui` would still let the published bridge
