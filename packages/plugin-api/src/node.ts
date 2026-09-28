@@ -1,5 +1,5 @@
-// The node half of the plugin API. See docs/plugins.md § The plugin API for the re-export rule,
-// the surface snapshot, and what PLUGIN_API_MAJOR guards.
+// The node half of the private compiled-plugin facade. See docs/plugins/package-shape.md for its
+// export snapshot and for the separate loaded-plugin compatibility guard.
 //
 // Off this surface, and staying off:
 //   ctx.events.streams()/channel(), PTY and WS-channel ownership. Exactly one plugin may own those,
@@ -32,8 +32,8 @@ export type { TaskConcern } from '@acorn/node-core/server/pluginHost'
 // What `ctx.search.register` takes and what its `search` answers with (server/pluginHost/search.ts).
 export type { SearchProvider, SearchQuery } from '@acorn/node-core/server/pluginHost'
 export type { SearchHit } from '@acorn/protocol/search.ts'
-// The major this build of the API speaks. docs/plugins.md § The plugin API covers what it guards, and
-// why it is the one name kept without a consumer.
+// The major this host speaks to loaded plugins. Exported here for compiled callers, but the private
+// facade's snapshot does not govern when this number changes.
 //
 // The context types are not here: a plugin keeps `ctx` inside `init`/`activate` and passes `ctx.core`
 // onward, so `NodePluginContext` never has to be named.

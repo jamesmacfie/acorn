@@ -51,10 +51,11 @@ your own `var(--bg)` rules resolve.
 
 ## Compatibility
 
-A plugin that loads under a given `PLUGIN_API_MAJOR` keeps loading under it. Removing a name from this
-surface requires that major to move, enforced in acorn's own tree. A manifest declares one major, such
-as `"2"`, or a range covering the host, such as `"1 || 2"`. Declare a range only after testing the
-plugin against each included major.
+The host speaks loaded-plugin API major `2`. Your manifest can declare `"2"` or a range such as
+`"1 || 2"` after you test against each included host major. Removing a published name or making an
+incompatible shape change requires a new manifest API major. The npm version of `acorn-plugin-sdk`
+is separate from that major. The repository guards published names and checks the SDK declarations
+against the implementation.
 
 ## Docs
 
