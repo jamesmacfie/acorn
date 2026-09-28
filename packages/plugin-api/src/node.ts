@@ -195,8 +195,9 @@ export {
 export type { PluginAgentToolDescriptor, PluginContextSectionDescriptor } from '@acorn/protocol/plugin/runtimeContributions.ts'
 export type { PluginCliCommandDescriptor } from '@acorn/protocol/plugin/cliCommands.ts'
 // The context-section helpers, not the sections: `pr`, `notes` and `memory` are shaped by the plugins
-// that own their rows (docs/agent-tools.md § Context sections).
-export { formatOmitted, truncateBytes } from '@acorn/node-core/server/agentTools'
+// that own their rows (docs/agent-tools.md § Context sections). `pastedContent` is also how agents
+// marks another agent's report.
+export { formatOmitted, pastedContent, truncateBytes } from '@acorn/node-core/server/agentTools'
 export type { PluginContextSection } from '@acorn/node-core/server/agentTools'
 export type { InternalEnvFactory } from '@acorn/node-core/server/auth'
 

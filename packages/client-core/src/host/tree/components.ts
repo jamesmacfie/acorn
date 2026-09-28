@@ -85,6 +85,7 @@ export const KIT_COMPONENTS: KitTable = {
   DiffPane: load(() => import('../../features/diff/DiffPane').then((m) => ({ default: m.DiffPane }))),
   DiffLine: load(() => import('../../kit/diff/DiffRows').then((m) => ({ default: m.DiffLine }))),
   FileHead: load(() => import('../../kit/diff/DiffRows').then((m) => ({ default: m.FileHead }))),
+  StackedDiff: load(() => import('../../kit/diff/DiffRows').then((m) => ({ default: m.StackedDiff }))),
   NonCodeRow: load(() => import('../../kit/diff/DiffRows').then((m) => ({ default: m.NonCodeRow }))),
   SplitCell: load(() => import('../../kit/diff/DiffRows').then((m) => ({ default: m.SplitCell }))),
   ModelBackendPicker: load(() => import('../../features/settings/models/ModelBackendPicker')),

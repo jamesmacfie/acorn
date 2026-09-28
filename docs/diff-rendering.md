@@ -13,7 +13,8 @@ It arrives in three layers, and the split is enforced (`tools/arch/boundaries.te
 - `kit/diff/` is the toolkit: the row model, the row components, the layout index and its measure
   scheduler, the find marks.
   Props in, DOM out, no application state, so a plugin can reach for a piece of it to build a simpler
-  surface.
+  surface. `StackedDiff` is the simplest one already built: one file's patch, read-only, in normal
+  flow, for a patch shown inside something else, such as an agent's step in its thread.
 - `features/diff/` is the viewer: `DiffPane` and the parts only it uses. This layer reads
   preferences, registers a command and a keybinding, and keeps session scroll state, none of which
   `kit/` may do.
@@ -117,6 +118,12 @@ in its first gutter that opens the task's file at that new-side line in the edit
 has no task editor, so its source omits the callback. The viewer hides the button for deleted lines,
 which have no corresponding line in the current file, and for sources without the callback. A PR's
 line number comes from the PR head; the local task file can differ if its worktree has moved on.
+
+Task-owned Changes and PR sources also supply `inlineChat`. Its gutter action opens an Ask agent card
+under a code line in either projection. The source names the card's anchor before its segment loads,
+so it uses the same measured dynamic-block path as review notes. Repository PR browsing omits the
+action because it has no task to own the agent session. Inline chat stays separate from local review
+notes and GitHub review comments.
 
 Review-note writes publish `plugin:changes:review-notes-changed` only after create, edit, delete, or
 sent-state persistence changes the public result. The frame carries `{ taskId, total, unsent }`, not

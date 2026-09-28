@@ -138,6 +138,13 @@ const AGENT_SESSIONS = [{
   updatedAt: 0,
 }]
 
+const agentSessions = () => process.env.ACORN_FIXTURE_CODEX_PLAN
+  ? [{ ...AGENT_SESSIONS[0]!, kind: 'interactive', driverKind: 'codex-app-server',
+      providerId: 'codex', profileId: 'codex', runtimeState: 'ready',
+      config: { configOptions: [{ id: 'mode', label: 'Mode', category: 'mode', currentValue: 'plan',
+        values: [{ value: 'plan', label: 'Plan' }, { value: 'default', label: 'Default' }] }] } }]
+  : AGENT_SESSIONS
+
 // One turn, a prompt, an answer, a tool card and an approval still waiting: the four things the sweep
 // has to see on the agents transcript (docs/tui.md).
 const AGENT_TURN = {
@@ -199,8 +206,23 @@ const agentWebActivity = () => (process.env.ACORN_FIXTURE_WEB_ACTIVITY
   })]
   : [])
 
-const agentSnapshot = () => ({
-  session: AGENT_SESSIONS[0],
+const agentSnapshot = () => process.env.ACORN_FIXTURE_CODEX_PLAN ? ({
+  session: agentSessions()[0],
+  turns: [{ ...AGENT_TURN, source: 'interactive', status: 'completed',
+    effectivePolicy: { mode: 'plan' }, providerTurnRef: 'codex-turn-1', stopReason: 'completed' }],
+  events: [
+    event(1, { type: 'request', requestId: 'question-1', kind: 'question', title: 'Shall I plan it?' }),
+    event(2, { type: 'tool', tool: { id: 'tool-1', title: 'Write src/login.ts', status: 'completed' } }),
+    event(3, { type: 'plan', entries: [{ id: 'step-1', text: 'Inspect code', status: 'completed' }] }),
+    event(4, { type: 'plan_proposal', itemId: 'plan-1', providerTurnId: 'codex-turn-1',
+      text: '1. Update the API\n2. Test the UI' }),
+    event(5, { type: 'turn_completed', stopReason: 'completed' }),
+  ],
+  requests: [{ id: 'question-1', sessionId: 'session-1', turnId: 'turn-1', providerRequestId: 'question-1',
+    kind: 'question', status: 'resolved', title: 'Shall I plan it?', detail: null, payload: {},
+    resolution: { answers: { go: 'Yes, plan it' } }, expiresAt: null, createdAt: 0, resolvedAt: 0 }],
+}) : ({
+  session: agentSessions()[0],
   turns: [AGENT_TURN],
   events: [
     ...agentFiller(),
@@ -481,11 +503,11 @@ const json = (value: unknown) => ({
       // whether a reader can find the thing the pane is for in 24 rows — and a pane showing one
       // `Alert` reads the same however unreadable the real thing is.
       if (path === '/v1/p/agents/providers') return json(AGENT_PROVIDERS)
-      if (path.startsWith('/v1/p/agents/sessions?')) return json({ sessions: AGENT_SESSIONS, delegations: [], nextCursor: null })
+      if (path.startsWith('/v1/p/agents/sessions?')) return json({ sessions: agentSessions(), delegations: [], nextCursor: null })
       // Before the snapshot line, which is `/sessions/:id?…` and would otherwise claim this: `search`
       // reads as a session id, and the caller would get a snapshot object where it expects an array
       // and throw inside `found.map` (plugins/agents/src/client/commands.ts § agents.sessions.find).
-      if (path.startsWith('/v1/p/agents/sessions/search?')) return json(AGENT_SESSIONS)
+      if (path.startsWith('/v1/p/agents/sessions/search?')) return json(agentSessions())
       if (/^\/v1\/p\/agents\/sessions\/[^/]+\?/.test(path)) return json(agentSnapshot())
       if (path.startsWith('/v1/p/agents/sessions/') && path.includes('/events')) return json({ events: [], nextCursor: null })
       if (path === `/v1/p/changes/tasks/${TASK.id}/local/status`) return json(LOCAL_STATUS)

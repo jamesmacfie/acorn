@@ -34,7 +34,7 @@ export function parseWorkflowJsonPointer(pointer: unknown): string[] | null {
 const unexpectedFields = (value: object, allowed: readonly string[]): string[] =>
   Object.keys(value).filter((key) => !allowed.includes(key))
 
-function bindingProblems(
+export function bindingProblems(
   label: string,
   binding: WorkflowValueBinding,
   declaredInputs: ReadonlySet<string>,

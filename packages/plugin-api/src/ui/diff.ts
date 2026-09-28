@@ -39,6 +39,9 @@ export type { CommentSide, DiffLineAnchor, DiffSource } from '@acorn/client-core
 // builds these on its node (./node); a client source only ever moves them, except for assembling a
 // topology from descriptors its node sent (docs/diff-rendering.md § The document).
 export { documentTopology } from '@acorn/diff-document/document'
+// From its own file, not the feature's barrel: the Changes pane model is on the renderer's startup
+// graph, and the barrel would bring the diff view state and segment loaders along with it.
+export { loadDiffLineContext } from '@acorn/client-core/features/diff/lineContext.ts'
 export type {
   DiffDocumentFile, DiffDocumentTopology, DiffSearchMatch, DiffSearchPage, DiffSearchRequest, DiffSegmentDescriptor,
   DiffSegmentPayload, DiffSegmentRequest, PlainDiffRow,

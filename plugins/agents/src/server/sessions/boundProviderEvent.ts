@@ -81,6 +81,7 @@ const WEB_LIMITS = {
   snippet: 2_000,
   domains: 20,
   prompt: 8_192,
+  statusText: 100,
 } as const
 
 /** The whole payload, serialized: the same 64 KiB the inline tool input and output budget uses.
@@ -138,6 +139,7 @@ const boundedWeb = (web: AgentWebActivity | undefined): AgentWebActivity | undef
   let bounded: AgentWebActivity = {
     action: boundedWebAction(web.action),
     results: web.results?.slice(0, WEB_LIMITS.results).map(boundedWebResult),
+    status: web.status && { code: web.status.code, text: sliceText(web.status.text, WEB_LIMITS.statusText) },
   }
   // Trailing sources first and last: a reader who has forty of them is not reading the fiftieth, and
   // dropping one costs less than shortening every snippet above it.
@@ -193,6 +195,13 @@ export function boundProviderEvent(
           text: entry.text.slice(0, 16_384),
         })),
       }
+    case 'plan_proposal':
+      return {
+        ...event,
+        itemId: event.itemId.slice(0, 2_000),
+        providerTurnId: event.providerTurnId.slice(0, 2_000),
+        text: event.text.slice(0, 128 * 1024),
+      }
     case 'request':
       return {
         ...event,
@@ -221,6 +230,8 @@ export function boundProviderEvent(
         path: sliceText(event.path, 4_096),
         summary: sliceText(event.summary, 16_384),
         subagentId: sliceText(event.subagentId, 2_000),
+        changeId: sliceText(event.changeId, 2_000),
+        patchArtifactId: sliceText(event.patchArtifactId, 2_000),
       }
     case 'terminal':
       return {

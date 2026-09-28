@@ -17,6 +17,7 @@ import type {
   WorkflowInput,
   WorkflowStepDef,
   WorkflowBoundTemplate,
+  WorkflowGateForm,
   WorkflowMapSource,
   WorkflowValueBinding,
 } from '../../shared/workflowContracts'
@@ -149,6 +150,13 @@ function parseTitle(value: unknown): WorkflowBoundTemplate | undefined {
   return { ...raw, bindings: parseBindings(raw.bindings) } as WorkflowBoundTemplate
 }
 
+function parseForm(value: unknown): WorkflowGateForm | undefined {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined
+  const raw = value as Record<string, unknown>
+  // Everything else on the table rides along, so validation can name the key it does not know.
+  return { ...raw, fields: parseInputs(raw.fields) ?? [], values: parseBindings(raw.values) } as WorkflowGateForm
+}
+
 function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[], source: string): RawStep | null {
   if (!v || typeof v !== 'object') {
     errors.push({ source, message: `${id}: step ${i + 1} must be a table` })
@@ -209,6 +217,7 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
     items: parseMapSource(o.items),
     itemKey: typeof o.item_key === 'string' ? o.item_key : undefined,
     title: parseTitle(o.title),
+    form: parseForm(o.form),
     branches: parseBranches(o.branches),
     // Passed through unread: `[steps.with]` belongs to whichever plugin contributed the kind.
     with: o.with && typeof o.with === 'object' && !Array.isArray(o.with) ? (o.with as Record<string, unknown>) : undefined,

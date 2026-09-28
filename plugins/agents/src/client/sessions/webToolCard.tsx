@@ -1,6 +1,6 @@
 import { For, Show, type Component } from 'solid-js'
 import { CodeBlock, Inline, Link, Section, Stack, Text } from '@acorn/plugin-api/ui'
-import type { AgentWebActivity, AgentWebResult } from '../../contract/wire.ts'
+import type { AgentWebActivity, AgentWebResult, AgentWebStatus } from '../../contract/wire.ts'
 
 /**
  * What an agent did on the web, drawn once for every harness that does it.
@@ -58,6 +58,20 @@ export function webSummary(web: AgentWebActivity): string | undefined {
   }
 }
 
+/** A page that answered with anything outside 2xx. The call itself can still have finished: a
+ *  provider reports a 404 as a completed fetch, so the dot stays green and this is what says the
+ *  page was not there. */
+export const webStatusIsNews = (status: AgentWebStatus | undefined): status is AgentWebStatus =>
+  status != null && (status.code < 200 || status.code > 299)
+
+/** `404 Not Found`, in the warning tone when it is news. The closed row shows it only then; the open
+ *  card shows it always, because `200 OK` is how a reader knows the fetch landed. */
+export const WebStatusText: Component<{ status: AgentWebStatus }> = (props) => (
+  <Text tone={webStatusIsNews(props.status) ? 'warn' : undefined} emphasis="muted">
+    {[props.status.code, props.status.text].filter(Boolean).join(' ')}
+  </Text>
+)
+
 const WebResultRow: Component<{ result: AgentWebResult }> = (props) => {
   const href = () => safeWebUrl(props.result.url)
   // The URL is the link text when there is no title, so every link says where it goes. A refused
@@ -102,20 +116,36 @@ export const WebToolBody: Component<{ web: AgentWebActivity; output?: string }> 
       ...(current.blockedDomains ?? []).map((domain) => `blocked: ${domain}`),
     ]
   }
-  const page = () => {
+  const pageUrl = () => {
     const current = action()
-    if (!current || current.type === 'search' || current.type === 'other') return []
+    return current && current.type !== 'search' && current.type !== 'other' ? current.url : undefined
+  }
+  const pageNotes = () => {
+    const current = action()
     return [
-      ...(current.url ? [current.url] : []),
-      ...(current.type === 'find_in_page' && current.pattern ? [current.pattern] : []),
-      ...(current.type === 'fetch_page' && current.prompt ? [current.prompt] : []),
+      ...(current?.type === 'find_in_page' && current.pattern ? [current.pattern] : []),
+      ...(current?.type === 'fetch_page' && current.prompt ? [current.prompt] : []),
     ]
   }
   return (
     <Stack gap="row">
       <WebLines label="Queries" values={queries()} />
       <WebLines label="Filters" values={filters()} />
-      <WebLines label="Page" values={page()} />
+      {/* The address, what the page answered, then what was asked of it. No heading: the address says
+          what these lines are about by itself. It is a link under the same scheme rule as a result. */}
+      <Show when={pageUrl() || props.web.status || pageNotes().length}>
+        <Stack gap="inline">
+          <Show when={pageUrl()}>
+            {(url) => (
+              <Show when={safeWebUrl(url())} fallback={<Text wrap>{url()}</Text>}>
+                {(href) => <Link href={href()}>{url()}</Link>}
+              </Show>
+            )}
+          </Show>
+          <Show when={props.web.status}>{(status) => <WebStatusText status={status()} />}</Show>
+          <For each={pageNotes()}>{(note) => <Text wrap>{note}</Text>}</For>
+        </Stack>
+      </Show>
       <Show when={props.web.results?.length}>
         <Section label="Results" count={props.web.results?.length}>
           <Stack gap="row">

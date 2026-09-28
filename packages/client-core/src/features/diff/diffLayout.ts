@@ -71,15 +71,15 @@ const lineNumber = (row: CodeRow) => (row.kind === 'delete' ? row.oldNo : row.ne
 
 /** A unified code row's block: its note, marks, and composer, which all draw inside the row. Null when
  *  it has none. The id ends with the path so a colon in it cannot make two ids equal. */
-export function lineBlock(row: CodeRow, inputs: DiffBlockInputs): { id: string; fingerprint: string } | null {
+export function lineBlock(row: CodeRow, inputs: DiffBlockInputs, itemKey = ''): { id: string; fingerprint: string } | null {
   const extra = inputs.extra(row)
   const composer = inputs.composer(row, null)
   if (extra == null && !composer) return null
-  return { id: `l:${lineSide(row)}:${lineNumber(row)}:${row.path}`, fingerprint: `${extra ?? ''}|${composer ? 1 : 0}` }
+  return { id: `l:${itemKey}:${lineSide(row)}:${lineNumber(row)}:${row.path}`, fingerprint: `${extra ?? ''}|${composer ? 1 : 0}` }
 }
 
 /** A split band's block: both columns' notes and composers, drawn inside the band. */
-export function bandBlock(left: CodeRow | null, right: CodeRow | null, inputs: DiffBlockInputs): { id: string; fingerprint: string } | null {
+export function bandBlock(left: CodeRow | null, right: CodeRow | null, inputs: DiffBlockInputs, itemKey = ''): { id: string; fingerprint: string } | null {
   const row = left ?? right
   if (!row) return null
   const leftExtra = left ? inputs.extra(left) : null
@@ -88,7 +88,7 @@ export function bandBlock(left: CodeRow | null, right: CodeRow | null, inputs: D
   const rightComposer = !!right && inputs.composer(right, 'RIGHT')
   if (leftExtra == null && rightExtra == null && !leftComposer && !rightComposer) return null
   return {
-    id: `b:${left?.oldNo ?? ''}:${right?.newNo ?? ''}:${row.path}`,
+    id: `b:${itemKey}:${left?.oldNo ?? ''}:${right?.newNo ?? ''}:${row.path}`,
     fingerprint: `${leftExtra ?? ''}|${rightExtra ?? ''}|${leftComposer ? 1 : 0}${rightComposer ? 1 : 0}`,
   }
 }
@@ -109,7 +109,7 @@ const fixedRowHeight = (row: Row) => (row.kind === 'gap' ? DIFF_GAP_ROW_HEIGHT :
 
 /** A loaded item's blocks, in the order they are drawn: threads where they are interleaved, and a
  *  line's block after its code line. */
-export function rowBlocks(rows: readonly Row[], mode: ViewMode, inputs: DiffBlockInputs): DiffDynamicBlock[] {
+export function rowBlocks(rows: readonly Row[], mode: ViewMode, inputs: DiffBlockInputs, itemKey = ''): DiffDynamicBlock[] {
   const out: DiffDynamicBlock[] = []
   let at = 0
   if (mode === 'unified') {
@@ -119,7 +119,7 @@ export function rowBlocks(rows: readonly Row[], mode: ViewMode, inputs: DiffBloc
         continue
       }
       at += fixedRowHeight(row)
-      const block = isCodeRow(row) ? lineBlock(row, inputs) : null
+      const block = isCodeRow(row) ? lineBlock(row, inputs, itemKey) : null
       if (block) out.push({ ...block, kind: 'line', at, estimate: 0 })
     }
     return out
@@ -131,7 +131,7 @@ export function rowBlocks(rows: readonly Row[], mode: ViewMode, inputs: DiffBloc
       continue
     }
     at += DIFF_LINE_HEIGHT
-    const block = bandBlock(band.left, band.right, inputs)
+    const block = bandBlock(band.left, band.right, inputs, itemKey)
     if (block) out.push({ ...block, kind: 'line', at, estimate: 0 })
   }
   return out

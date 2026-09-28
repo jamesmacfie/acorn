@@ -8,6 +8,7 @@ import {
   tasksOptions,
   toast,
   workspacesOptions,
+  wsOnPluginsChanged,
 } from '@acorn/plugin-api/client'
 import { Alert, Badge, Button, EmptyState, Icon, Row, Rows, SectionHeader, sidebarCollapsed, Stack, Text } from '@acorn/plugin-api/ui'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
@@ -89,6 +90,7 @@ export function WorkflowsBrowseList() {
   // and the rail list is the first consumer of `defs-changed` (../node/index.ts).
   createEffect(() => {
     const stopDefs = onPluginFrame('workflows', pluginChannel('workflows', 'defs-changed'), () => void refetchDefs())
+    const stopPlugins = wsOnPluginsChanged(() => void refetchDefs())
     const stopRuns = onPluginFrame('workflows', pluginChannel('workflows', 'run-changed'), () => {
       // A baseline run also completes schedule activation. Refresh both read models so the rail does
       // not keep showing “Activating” until its polling interval after the run has settled.
@@ -97,6 +99,7 @@ export function WorkflowsBrowseList() {
     })
     onCleanup(() => {
       stopDefs()
+      stopPlugins()
       stopRuns()
     })
   })

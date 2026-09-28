@@ -22,6 +22,31 @@ import { enterDetail, openFirstSession, stopSaying } from './agentsDriving'
 const posts = () => recordedRequests().filter((request) => request.method === 'POST').map((request) => request.path)
 
 describe('running an agent from a terminal', () => {
+  it('can activate the completed Codex plan without treating a planning answer as implementation', async () => {
+    process.env.ACORN_FIXTURE_CODEX_PLAN = '1'
+    const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
+    try {
+      await screen.until('Implement plan')
+      let found = false
+      for (let step = 0; step < 12 && !found; step += 1) {
+        found = (await screen.caret()).text.includes('Find why the old passwor')
+        if (!found) await screen.press('TAB')
+      }
+      expect(found, await screen.frame()).toBe(true)
+      await screen.press('RETURN')
+      await enterDetail(screen)
+      const frame = await screen.until('Implement plan')
+      expect(frame).toContain('Update the API')
+      expect(posts()).toEqual([])
+      await stopSaying(screen, 'Implement plan')
+      await screen.press('RETURN')
+      expect(posts()).toEqual(['/v1/p/agents/sessions/session-1/implement-plan'])
+    } finally {
+      screen.done()
+      delete process.env.ACORN_FIXTURE_CODEX_PLAN
+    }
+  }, 180_000)
+
   it('shows the sessions for the newly opened task', async () => {
     const other = { ...TASK, id: 'task-2', title: 'other-task', branch: 'other-task', sort: 1 }
     const screen = await renderFixture({

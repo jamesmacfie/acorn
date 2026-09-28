@@ -220,10 +220,17 @@ template.
 
 ### A kind describes its own form
 
-A kind can carry a `describe`: a label, an icon, and its inputs as a list of fields. The host draws
-that form, on the desktop and in the terminal, so a plugin adds an editable step kind without
-shipping a component. `describe` is optional. A kind without one is listed by name with a raw JSON
-`with`.
+A kind provides a `describe` with a label, icon, description, fields, and output description. The
+host draws that form on desktop and in the terminal, so a plugin adds an editable step kind without
+shipping a component. An output schema and semantic validator are optional. Workflows excludes a
+contributed kind with incomplete metadata from the catalog, validation, and dispatch, and logs the
+rejected kind and missing fields. The plugin's other contributions remain active.
+
+A saved workflow keeps a missing kind's qualified ID and `with` settings. The editor identifies the
+contributing plugin, allows raw JSON editing, and reports why the workflow cannot run. Admission
+refuses a new run. An active run fails if its next step requires a kind that has disappeared. When the
+same kind returns, validation runs again against its current contract; a valid definition becomes
+runnable without rewriting the saved step.
 
 A field is `text`, `textarea`, `number`, `boolean`, `select`, or `prompt`. A `prompt` field is a
 textarea that accepts template references. A `select` either lists its `options` or names an
@@ -340,7 +347,7 @@ The detail depends on the kind and the status:
 | `terminal:run-target` | "Starting…" | the URL | Open terminal |
 | `database:*` | "Reading…" | a table of the rows and the SQL behind it | none |
 | `http:request` | "Sending…" | the status, the headers under a disclosure, the body | none |
-| `gate-human` | "Waiting for you" | approved, or the state it reached | Approve; Reject |
+| `gate-human` | "Waiting for you", or the form filled with its proposal, each changed field marked **Edited** with **Reset** | approved, or the state it reached; with a form, the approved values with edits marked | Approve; Reject |
 | any, `failed` or `safety-rail` | | the error | Retry; Retry with edited prompt, for an agent kind |
 
 A step whose harness session was captured but that never became a managed session offers **Open in
@@ -502,6 +509,12 @@ A definition that declares a required input with no default opens the start dial
 starting, so nothing runs with an empty input (§ Authoring). The rail goes to Workflows first,
 because the dialog is mounted once, in that source's list region, and one mount is what keeps the
 editor's **Run** and this row from putting two of them on screen.
+
+A gate with a form keeps its **Approve** beside the values, and disables it while any value fails the
+check the node runs, with a line naming each problem. Edits are held per step while the app is open
+and saved nowhere, so closing the app loses them and the proposal remains. When another device
+answered first, the pane shows "This gate was already answered." and refetches the node. For the
+form's contract, see [Workflow execution](./workflows/execution.md#human-gates).
 
 Approving a gate, cancelling a run and killing one stay in the run surface. Each needs the run's
 status and its consequences in front of the person doing it, and a row in a list carries neither.

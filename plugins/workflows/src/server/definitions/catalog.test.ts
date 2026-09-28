@@ -18,7 +18,7 @@ const base: WorkflowCatalog = {
   kinds: [{
     id: 'agent',
     pluginId: null,
-    describe: { label: 'Ask an agent', fields: [], output: { description: 'Answer.' } },
+    describe: { label: 'Ask an agent', description: 'Ask an agent.', icon: 'bot', fields: [], output: { description: 'Answer.' } },
   }],
   policies: [],
   profiles: [{ id: 'claude-code', label: 'Claude Code', managed: true, structured: true }],

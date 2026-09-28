@@ -1,4 +1,5 @@
 import { Buffer } from 'node:buffer'
+import { createHash } from 'node:crypto'
 import { and, eq } from 'drizzle-orm'
 import type { ContextBudget, ContextItem, ContextSectionResult, TaskContext } from '@acorn/protocol/api.ts'
 import type { AppDatabase } from '../db'
@@ -59,6 +60,19 @@ export const truncateBytes = (value: string, max: number): string => {
     text = bytes.toString('utf8')
   }
   return `${text}…`
+}
+
+// Mark text that somebody other than the reader wrote, such as a pull request body or another agent's
+// report, so the model follows instructions inside it only where the reader's own message asks. Claude
+// Code's system prompt explains the tag. For the source, see
+// https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5#mark-pasted-text-in-user-messages
+//
+// The id is a hash of the text, not a random value. Context is assembled again on every read and
+// compared for changes, so a random id would report a change every time. A closing tag the text itself
+// carries cannot guess the id either, because the id depends on that same text.
+export const pastedContent = (text: string): string => {
+  const id = createHash('sha256').update(text).digest('hex').slice(0, 8)
+  return `<pasted_content id="${id}">\n${text}\n</pasted_content id="${id}">`
 }
 
 function applyBudget(items: ContextItem[], budget: ContextBudget): { items: ContextItem[]; omitted: number } {

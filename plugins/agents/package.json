@@ -24,6 +24,7 @@
     "@solidjs/router": "^0.16.1",
     "@tanstack/solid-query": "^5.101.0",
     "@xterm/headless": "5.5.0",
+    "diff": "^9.0.0",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "node-pty": "^1.0.0",

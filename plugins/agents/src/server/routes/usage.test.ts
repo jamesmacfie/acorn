@@ -25,6 +25,9 @@ const snapshot: AgentUsageSnapshot = { providers: [], refreshedAt: 123 }
 // pricing, concurrency, and session-defaults halves too. Kept as one helper rather than repeated: a
 // stub that silently answered the built-in table would make the persistence cases below pass vacuously.
 const unusedSettings = {
+  refreshProvider: async (): Promise<AgentUsageSnapshot | null> => {
+    throw new Error('provider refresh is not part of this case')
+  },
   pricing: async (): Promise<AgentPricingPreferences> => {
     throw new Error('pricing is not part of this case')
   },
@@ -79,17 +82,28 @@ describe('agent usage routes', () => {
 
   it('reads cached usage and forces refresh through the typed bridge', async () => {
     const calls: Array<{ userId: string; force?: boolean }> = []
+    const providerCalls: Array<{ userId: string; providerId: string }> = []
     setAgentUsageBridge({
       ...unusedSettings,
       read: async (options) => {
         calls.push(options)
         return snapshot
       },
+      refreshProvider: async (options) => {
+        providerCalls.push(options)
+        return options.providerId === 'missing' ? null : snapshot
+      },
     })
     const app = authed()
     expect(await (await app.fetch(request('/api/agents/usage'), {} as Env)).json()).toEqual(snapshot)
     expect(await (await app.fetch(request('/api/agents/usage/refresh', 'POST'), {} as Env)).json()).toEqual(snapshot)
+    expect(await (await app.fetch(request('/api/agents/usage/refresh/claude', 'POST'), {} as Env)).json()).toEqual(snapshot)
+    expect((await app.fetch(request('/api/agents/usage/refresh/missing', 'POST'), {} as Env)).status).toBe(404)
     expect(calls).toEqual([{ userId: 'james' }, { userId: 'james', force: true }])
+    expect(providerCalls).toEqual([
+      { userId: 'james', providerId: 'claude' },
+      { userId: 'james', providerId: 'missing' },
+    ])
   })
 
   it('401s without a principal', async () => {
@@ -242,6 +256,7 @@ describe('agent usage routes', () => {
       expect(await (await app.fetch(request('/api/agents/session-defaults'), env)).json()).toEqual({
         continueAfterUsageLimit: true,
         followLastSession: false,
+        inline: { providerId: null, pinned: {} },
         pinned: { codex: { model: 'gpt-5.1-codex-max' } },
         last: { codex: { reasoning: 'high' } },
       })

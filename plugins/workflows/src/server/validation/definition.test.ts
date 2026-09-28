@@ -27,6 +27,10 @@ const check = (def: WorkflowDef) => validateWorkflow({
 }, catalog)
 
 describe('a draft in progress', () => {
+  it('names the plugin that must return before a saved kind can run', () => {
+    expect(check({ baseline: 'acorn-1', formatVersion: 1, name: 'w', steps: [{ name: 'send', kind: 'mail:send' }] }))
+      .toContain("step 'send' cannot run. Plugin 'mail' does not provide workflow step 'mail:send' on this node. Install, enable, or update the plugin to use this step.")
+  })
   // The editor creates a definition with no steps and draws what this reports in its footer. Storing
   // it is fine; `WorkflowRunner.start` is what refuses to run it (plugins/workflows/src/node/index.ts).
   it('reports a definition with no steps rather than being a shape the store refuses', () => {
@@ -277,4 +281,51 @@ describe('decide and join under the graph rule', () => {
     expect(problems.join('\n')).toContain("target 'beside' does not wait on step 'route'")
   })
 
+})
+
+describe('the approval form on a human gate', () => {
+  const draft = { id: 'draft', name: 'draft', prompt: 'Draft a note.', schema: { type: 'object', properties: { title: { type: 'string' } } } }
+  const gate = (form: unknown, extra: Record<string, unknown> = {}) => ({ id: 'approve', name: 'approve', kind: 'gate-human', after: ['draft'], form, ...extra }) as never
+  const title = { name: 'title', schema: { type: 'string' }, required: true }
+  const fromDraft = { address: { from: 'step', stepId: 'draft', pointer: '/title' } }
+
+  it('accepts typed fields bound to a predecessor, and lets a later step bind to the approved values', () => {
+    expect(check({ name: 'W', steps: [
+      draft,
+      gate({ fields: [title, { name: 'notify', schema: { type: 'boolean' }, default: false }], values: { title: fromDraft } }),
+      { id: 'ship', name: 'ship', kind: 'workflow', after: ['approve'], childWorkflow: { ref: { source: 'database', id: 'x' }, inputs: {
+        title: { address: { from: 'step', stepId: 'approve', pointer: '/values/title' } },
+      } } },
+    ] } as never)).toEqual([])
+  })
+
+  it('refuses bad names, repeats, unknown bindings, bad defaults, and a form on another kind', () => {
+    const problems = check({ name: 'W', steps: [
+      draft,
+      gate({ fields: [title, title, { name: '1bad', schema: { type: 'string' } }, { name: 'count', schema: { type: 'number' }, default: 'many' }], values: { missing: fromDraft } }),
+      { id: 'other', name: 'other', kind: 'gate-policy', policy: 'checks-green', form: { fields: [title] } },
+    ] } as never)
+    expect(problems).toEqual(expect.arrayContaining([
+      "step 'approve' form field 'title' is declared more than once",
+      "step 'approve' form field 3 has an invalid name",
+      expect.stringContaining("step 'approve' form field 'count':"),
+      "step 'approve' form.values.missing does not name a declared field",
+      "step 'other' is a 'gate-policy' step, which cannot take form",
+    ]))
+  })
+
+  it('refuses a binding to a step that does not run first', () => {
+    const problems = check({ name: 'W', steps: [
+      { ...draft, after: [] },
+      gate({ fields: [title], values: { title: fromDraft } }, { after: [] }),
+    ] } as never)
+    expect(problems).toContain("step 'approve' form.values.title references 'draft', which is not one of its predecessors")
+  })
+
+  it('refuses more fields than the cap, and a required field nobody fills under an autonomous posture', () => {
+    const fields = Array.from({ length: 21 }, (_, index) => ({ name: `f${index}`, schema: { type: 'string' } }))
+    expect(check({ name: 'W', steps: [draft, gate({ fields })] } as never)).toContain("step 'approve' form has 21 fields; the limit is 20")
+    expect(check({ name: 'W', posture: 'autonomous', tools: { maxRisk: 'read' }, steps: [draft, gate({ fields: [title] })] } as never))
+      .toContain("step 'approve' form field 'title' is required, and this workflow is autonomous, so nobody would be asked to fill it")
+  })
 })

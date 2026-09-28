@@ -1,6 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { For, Show } from 'solid-js'
-import type { CodeRow, DiffFile, Row as DiffRowT } from '@acorn/client-core/kit/diff/diffModel.ts'
+import { createMemo, For, Show } from 'solid-js'
+import { buildDiffRows, isCodeRow, plainTokenize, type CodeRow, type DiffFile, type HunkRow, type Row as DiffRowT } from '@acorn/client-core/kit/diff/diffModel.ts'
 import type { PluginAnnotationKey } from '@acorn/protocol/extensionPoints.ts'
 import { annotationKey } from '@acorn/client-core/host/annotations/annotationKey.ts'
 import { annotationsFor } from '@acorn/client-core/host/annotations/annotations.ts'
@@ -54,6 +54,31 @@ export function NonCodeRow(props: { row: Exclude<DiffRowT, CodeRow> }) {
     }
   }
   return <text flexShrink={0} wrapMode="none" {...runStyle('muted')}>{text()}</text>
+}
+
+/** reduced: show the file header and unified rows without interactive diff controls. */
+export function StackedDiff(props: { path: string; patch: string; lineNumbers?: boolean }) {
+  const rows = createMemo(() => {
+    const file = { path: props.path, status: null, additions: null, deletions: null, sha: null, viewed: false, patch: props.patch }
+    return buildDiffRows(file, plainTokenize).flatMap<HunkRow | CodeRow>((row) => {
+      if (row.kind === 'hunk') return [row]
+      if (!isCodeRow(row)) return []
+      return [props.lineNumbers === false ? { ...row, oldNo: null, newNo: null } : row]
+    })
+  })
+  const head = () => ({
+    path: props.path,
+    additions: rows().filter((row) => row.kind === 'insert').length,
+    deletions: rows().filter((row) => row.kind === 'delete').length,
+  })
+  return (
+    <box flexDirection="column" flexShrink={0}>
+      <FileHead file={head()} />
+      <For each={rows()}>
+        {(row) => (isCodeRow(row) ? <DiffLine r={row} /> : <NonCodeRow row={row as Exclude<DiffRowT, CodeRow>} />)}
+      </For>
+    </box>
+  )
 }
 
 /** absent: side-by-side needs 160 cells, so a terminal diff is unified. */

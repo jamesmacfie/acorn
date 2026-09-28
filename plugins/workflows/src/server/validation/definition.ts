@@ -1,6 +1,8 @@
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { workflowDataProblems } from './dataSteps'
+import { gateFormDefinitionProblems } from '../workflowGateForm'
+import { declaredOutputSchema } from '../../shared/gateForm'
 import { DEFAULT_PROFILE_ID } from '@acorn/plugin-api/node'
 import { BUILTIN_AGENT_STEP_KINDS, readStepField } from '../../shared/stepFields'
 import type {
@@ -18,6 +20,7 @@ import {
 } from '../dispatch/validation'
 import { narrowsToolCeiling } from '../steps/tools'
 import { stepIdentity } from '../../shared/workflowIdentity'
+import { stepKindPluginId, unavailableStepKindMessage } from '../../shared/stepKindAvailability'
 import { workflowValueProblems, workflowText, WORKFLOW_VALUE_BYTES } from './values'
 import { validateDataValue } from '@acorn/protocol/dataSchemas.ts'
 import { dataSourceRefSchema } from '@acorn/protocol/dataSources.ts'
@@ -242,13 +245,15 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
     const source = stepAt(name)
     if (!source) return false
     if (source.schema && typeof source.schema === 'object' && !Array.isArray(source.schema)) return true
-    return !!catalog.describeStepKind?.(source.kind ?? 'agent')?.output?.schema
+    return !!declaredOutputSchema(source, catalog.describeStepKind?.(source.kind ?? 'agent')?.output?.schema)
   }
 
   for (const [index, step] of def.steps.entries()) {
     const kind = step.kind ?? 'agent'
     const label = `step '${step.name || index + 1}'`
-    if (!catalog.stepKinds.has(kind) && !RUNTIME_WORKFLOW_KINDS.has(kind)) errors.push(`${label} has unknown kind '${kind}'`)
+    if (!catalog.stepKinds.has(kind) && !RUNTIME_WORKFLOW_KINDS.has(kind)) errors.push(stepKindPluginId(kind)
+      ? `${label} cannot run. ${unavailableStepKindMessage(kind)}`
+      : `${label} has unknown kind '${kind}'`)
     if (!narrowsToolCeiling(def.tools, step.tools)) errors.push(`${label} tool ceiling widens the workflow ceiling`)
     errors.push(...validateBudget(`${label} budget`, step.budget))
     if (!budgetNarrows(def.budget, step.budget)) errors.push(`${label} budget widens the workflow budget`)
@@ -276,6 +281,7 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
       precedes,
       structured,
     }))
+    errors.push(...gateFormDefinitionProblems({ label, step, posture: def.posture, declaredInputs, indexes, precedes, structured }))
     errors.push(...workflowDataProblems(step, { label, index, indexes, stepAt, policies: catalog.policies, after, precedes }, declaredInputs))
     if (!(catalog.agentStepKinds ?? BUILTIN_AGENT_STEP_KINDS).has(kind)) {
       for (const field of ['isolation', 'inputs', 'configOptions'] as const) {

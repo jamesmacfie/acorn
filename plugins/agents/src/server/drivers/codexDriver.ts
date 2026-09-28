@@ -18,6 +18,7 @@ import {
 } from './codexNormalizer'
 import { JsonRpcProcess, type JsonRpcServerRequest } from './jsonRpcProcess'
 import type { AgentDriver, AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from './types'
+import { contextBlock } from './contextBlock'
 import { probeCodexAuthentication } from './authProbe'
 import { canReplaceMissingCodexSession } from './codexSessionRecovery'
 import { providerStderrNotice } from './diagnostics'
@@ -89,7 +90,7 @@ function codexInput(
       case 'context':
         input.push({
           type: 'text',
-          text: `<acorn-context source="${part.source}" label="${part.label}">\n${part.content}\n</acorn-context>`,
+          text: contextBlock(part),
           text_elements: [],
         })
         break

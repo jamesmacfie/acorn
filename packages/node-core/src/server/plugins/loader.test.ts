@@ -160,6 +160,34 @@ describe('loaded-plugin migration ownership', () => {
 })
 
 describe('the isolated node realm', () => {
+  it('applies wildcard network grants to one subdomain label', async () => {
+    install(
+      'networked',
+      manifest('networked', { permissions: { node: { net: ['*.ingest.us.sentry.io'] } } }),
+      `const accepted = (host) => {
+  try {
+    const pending = fetch('https://' + host + '/', { signal: AbortSignal.abort() })
+    void pending.catch(() => {})
+    return true
+  } catch { return false }
+}
+export default {
+  name: 'networked',
+  allowed: accepted('o42.ingest.us.sentry.io'),
+  parent: accepted('ingest.us.sentry.io'),
+  nested: accepted('other.o42.ingest.us.sentry.io'),
+  lookalike: accepted('o42.ingest.us.sentry.io.attacker.test'),
+  init() {},
+}
+`,
+    )
+
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+
+    expect(failures).toEqual([])
+    expect(loaded[0].plugin).toMatchObject({ allowed: true, parent: false, nested: false, lookalike: false })
+  })
+
   it('does not inherit undeclared node environment values', async () => {
     vi.stubEnv('SESSION_ENC_KEY', 'must-not-leak')
     install(

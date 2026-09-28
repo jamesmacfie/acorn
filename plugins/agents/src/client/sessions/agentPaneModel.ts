@@ -2,7 +2,11 @@ import { createEffect, createMemo, createResource, createSignal, on, onCleanup }
 import {
   activeNodeId, defaultDeliveryContext, markAttentionSeen, saveFile, setTerminalOpen, type PaneModelContext, type Task,
 } from '@acorn/plugin-api/client'
-import type { AgentProviderDescriptor, AgentSession } from '../../contract/wire.ts'
+import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
+import type { AgentAttachment, AgentProviderDescriptor, AgentSession, AgentSessionSnapshot } from '../../contract/wire.ts'
+import { AUTOMATIC_TASK_CONTEXT_SOURCE } from '../composer/automaticTaskContext'
+import { composerDraftState } from '../composer/composerState'
+import { managedDraft } from './managedDrafts'
 import { managedAgentApi } from './managedClient'
 import { downloadName } from './downloadName'
 import { managedAgentStore } from './managedStore'
@@ -36,6 +40,16 @@ export type SessionAction = {
  *  are dialogs. The session travels with the dialog, because the sidebar's row menu can act on a
  *  session that is not the open one. */
 export type AgentDialog = { kind: 'rename' | 'archive'; session: AgentSession }
+
+/** Nothing to lose by archiving: no turns and an empty draft. The task context the composer attaches
+ *  on its own does not count as input. An unloaded snapshot means we cannot tell, so we ask. */
+export function sessionIsBlank(
+  snapshot: Pick<AgentSessionSnapshot, 'turns'> | undefined,
+  draft: { text: string; attachments: AgentAttachment[]; contexts: AgentContextSnapshot[] },
+): boolean {
+  return !!snapshot && !snapshot.turns.length && !draft.text.trim() && !draft.attachments.length
+    && draft.contexts.every((context) => context.source === AUTOMATIC_TASK_CONTEXT_SOURCE)
+}
 
 export type AgentPaneModel = ReturnType<typeof createAgentPaneModel>
 
@@ -198,6 +212,13 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
   function sessionAction(session: AgentSession, kind: 'rename' | 'archive' | 'stop') {
     if (kind === 'stop') return void action(() => managedAgentApi.cancel(session.id))
     if (kind === 'rename') setRenameText(session.title)
+    if (kind === 'archive') {
+      const shared = composerDraftState(session.id)
+      const blank = sessionIsBlank(managedAgentStore.snapshots()[session.id], {
+        text: managedDraft(session.id), attachments: shared.attachments(), contexts: shared.contexts(),
+      })
+      if (blank) return void archive(session)
+    }
     setDialog({ kind, session })
   }
 

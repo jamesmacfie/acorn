@@ -76,7 +76,14 @@ export const BUILTIN_STEP_DESCRIPTIONS: Readonly<Record<string, StepKindDescript
     label: 'Wait for a person',
     description: 'Park the run until somebody approves it. An autonomous run passes straight through.',
     icon: 'hand',
-    fields: [],
+    fields: [{
+      id: 'form',
+      label: 'Form',
+      type: 'gate-form',
+      required: false,
+      hint: 'Optional fields the reviewer checks and corrects before approving. Each can be filled from an earlier step.',
+    }],
+    output: { description: 'The approval outcome. With a form, the approved values under /values and the names of the fields the reviewer changed under /edited.' },
   },
   'gate-policy': {
     label: 'Check a policy',

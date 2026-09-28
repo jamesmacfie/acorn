@@ -12,10 +12,11 @@ import {
   validateAgentSessionDefaults,
   type AgentSessionDefaults,
 } from '../../shared/sessionDefaults'
-import { type AppEnv, ownerId, requireDevice, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
+import { BridgeError, type AppEnv, ownerId, requireDevice, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 
 export type AgentUsageBridge = {
   read(options: { userId: string; force?: boolean }): Promise<AgentUsageSnapshot>
+  refreshProvider(options: { userId: string; providerId: string }): Promise<AgentUsageSnapshot | null>
   pricing(userId: string): Promise<AgentPricingPreferences>
   setPricing(userId: string, preferences: AgentPricingPreferences): Promise<void>
   concurrency(userId: string): Promise<AgentConcurrencyLimits>
@@ -89,4 +90,13 @@ export const agentUsage = new Hono<AppEnv>()
   .post('/usage/refresh', (c) => {
     const userId = ownerId(c)
     return viaBridge(c, AGENT_USAGE, (bridge) => bridge.read({ userId, force: true }))
+  })
+  .post('/usage/refresh/:providerId', (c) => {
+    const userId = ownerId(c)
+    const providerId = c.req.param('providerId')
+    return viaBridge(c, AGENT_USAGE, async (bridge) => {
+      const snapshot = await bridge.refreshProvider({ userId, providerId })
+      if (!snapshot) throw new BridgeError(404, 'not_found', 'Usage provider not found.')
+      return snapshot
+    })
   })

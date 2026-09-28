@@ -116,6 +116,7 @@ export type WorkflowGenerateNoteCode =
   | 'dropped-schema'
   | 'unknown-workflow'
   | 'unsupported-binding'
+  | 'dropped-form'
 
 export type WorkflowGenerateNote = { code: WorkflowGenerateNoteCode; message: string; step?: string }
 

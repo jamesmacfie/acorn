@@ -161,6 +161,14 @@ discovers Default and Plan through
 `thread/settings/updated` so a preset's effective model and effort stay synchronized with the generic
 configuration shown by acorn. App-servers that do not expose the experimental list endpoint continue
 without a Mode picker.
+Codex's `turn/plan/updated` steps remain a progress card. A completed `plan` item is stored as a
+separate proposal with its item and provider turn IDs and shown in the transcript. For the latest
+successfully completed interactive Plan turn under Acorn control, the shared desktop and terminal card
+offers **Implement plan**. The Node checks the proposal and turn again in one SQLite transaction,
+switches only the session's Mode option to Default, and queues one continuation in the same Codex
+thread. The accepted turn records the proposal identity, so a second click or client reuses that turn
+and a reload shows the proposal as handled. Planning question responses remain request resolutions;
+they never accept a plan. A revision turn or a rejected handoff leaves Plan selected.
 A native driver is written when a vendor protocol carries product value the generic driver cannot,
 and it lives in plugins/agents with the rest of the first-party code. The registry has two doors and
 the names are the point: `register(spec)` takes data, `registerNative(id, factory)` takes code.
@@ -173,6 +181,21 @@ this seam with the `generated_artifacts` capability and maps completed `imageGen
 Another native provider can emit the same driver event without adding a provider-specific client path.
 
 Claude runs on tier 1 and Codex on tier 2, which makes the two of them the worked example of each.
+
+**What a built-in adapter is told depends on the session.** A built-in spec's `acpSessionMeta` is a
+function of the session, sent on create and again on every resume, so it must return the same value
+for the same session. Claude's uses it for two things. It turns off Claude Code's own
+continue-after-usage-limit, and for a workflow or delegated session it appends the turn-ending
+instruction to Claude Code's system prompt
+([workflow execution](./workflows/execution.md#a-turn-that-ends-early)). The instruction goes in at
+creation rather than partway through, because a system prompt that changes mid-session invalidates
+the model's earlier thinking.
+
+**A context part cannot pass for the reader's words.** Both drivers send a context part as an
+`<acorn-context>` block (`plugins/agents/src/server/drivers/contextBlock.ts`). Its label and source
+are escaped as attributes, and a closing tag inside its content is broken, because a loaded plugin's
+label or a pull request body could otherwise end the block early and have what follows read as the
+reader's message.
 
 **plugins/agents stays first-party.** It owns the stream and the surfaces, and a harness contribution
 is a descriptor delivered to it rather than a fork of it. The contributing plugin describes the
@@ -318,6 +341,10 @@ are not stored by the model-provider plugin. The same pricing page holds the bui
 catalogues plus exact-model overrides. Plan usage is per harness: the built-in CLI probes and a
 contributed harness's `probes.usage` route feed one registry, and a harness with no collector shows no
 usage section.
+
+The Agent pane shows a refresh icon beside each harness's usage. It probes only that harness and
+keeps the other readings in place. The full refresh action and five-minute polling still check every
+harness; a single-harness refresh does not delay the next full check.
 
 Each quota row draws a bar under its sentence, coloured by the same reading as the dot beside the
 harness name, with a small triangle marking where a steady spend would have left the fill by now. A
@@ -509,8 +536,12 @@ has neither, and does not report.
 When a `reportTo` turn settles as completed, failed, cancelled, or interrupted, the Agents plugin
 queues one `delegation_report` turn on the owner. The report text holds the child's title, the
 outcome, any error, the final assistant message cut to its last 8 KiB, and the validated structured
-result when the turn declared a `resultSchema`. A `delegation_report` context part names the child
-and links to it. The report queues behind whatever the owner is doing and never steers an active
+result when the turn declared a `resultSchema`. The final message sits inside `<pasted_content>`
+tags, which Claude Code's system prompt explains: text the owner's user didn't write, whose
+instructions the owner follows only where its own user asked. A child that read a hostile page can
+repeat what it read, and unmarked, that would reach the owner as a request. The transcript hides the
+tags. A turn the model refused reports its outcome as refused, not completed. A `delegation_report`
+context part names the child and links to it. The report queues behind whatever the owner is doing and never steers an active
 turn. The owner answers by calling `agent_prompt`, and that turn reports in its turn.
 
 The idempotency key `delegation-report:<child turn id>` makes delivery exactly-once. The trigger is
@@ -539,7 +570,10 @@ redundant report. A terminal owner has no session to wake and keeps using `agent
 
 The transcript labels a `delegation` turn "From" and the owner's title, and a `delegation_report`
 turn "From" and the child's title, using the matching context part
-(`plugins/agents/src/client/sessions/turnSender.ts`). Every other user turn is "You".
+(`plugins/agents/src/client/sessions/turnSender.ts`). A workflow step's prompt is "Workflow", and
+the turn acorn sends when a step's turn ended without its result is "Acorn"
+([workflow execution](./workflows/execution.md#a-turn-that-ends-early)). Every other user turn is
+"You".
 
 Message headers show a small time in the reader's device timezone, styled like the sender label.
 Hovering or focusing that time shows the full local date and time with its timezone and relative age.
@@ -568,7 +602,8 @@ type AgentWebAction =
   | { type: 'fetch_page'; url?: string; prompt?: string }
   | { type: 'other' }
 
-type AgentWebActivity = { action?: AgentWebAction; results?: AgentWebResult[] }
+type AgentWebStatus = { code: number; text?: string }
+type AgentWebActivity = { action?: AgentWebAction; results?: AgentWebResult[]; status?: AgentWebStatus }
 type AgentToolCall = { /* … */ web?: AgentWebActivity }
 ```
 
@@ -610,6 +645,15 @@ Claude reports no domain for a result and Codex does. The card reads the host of
 field is absent rather than storing a derived one, so the two read the same without the ledger
 carrying a second thing to keep true.
 
+**A fetched page's HTTP status is its own field**, read from `toolResponse.code` and `codeText`.
+Claude Code reports a 404 as a completed call whose result is a note saying the body was not
+retrieved, so without the status a missing page finishes with a green dot. The status sits beside
+the action rather than inside it, because it arrives on an update that carries no request and the
+fold replaces an action whole. The open card always shows it. The closed row shows it only outside
+2xx, in the warning tone, after the host. `toolResponse.url` is the requested URL even when the page
+redirects, so there is no final address to show, and the redirect target appears only in the
+provider's prose.
+
 **The payload is bounded twice before it reaches SQLite**, in `boundProviderEvent.ts`: every string
 and collection on its own, and then the whole payload against the 64 KiB the inline tool budget uses.
 Overflow drops trailing sources and only that. The per-field limits are chosen so the action fits
@@ -640,11 +684,72 @@ discarded it, and they keep rendering as the flat `Web search` row they always d
 files may still hold the payload, but they are private provider storage that can be pruned or live on
 another node, so a transcript read never touches `~/.codex` or `~/.claude`.
 
+## File changes
+
+A `file_change` event records what one step of the agent did to a file. Its `patch` is that file's
+unified hunks, from the first `@@` on with no file header, which is the shape GitHub returns and the
+diff rows parse. The exception is Codex's whole-turn diff: it has no `path`, and its `patch` is a
+multi-file git patch. The transcript draws the patch in place (see
+[client surfaces](./managed-agents/client-surfaces.md#client-surfaces)). The diff is what the step
+did when it ran, so a later step that changes the same lines leaves it as it was.
+
+```ts
+type FileChange = {
+  type: 'file_change'
+  path?: string
+  patch?: string
+  summary?: string
+  subagentId?: string
+  changeId?: string        // the tool call, Codex item, or `turn:<id>` this belongs to
+  snippet?: boolean        // the hunks count lines from an excerpt, not the file
+  patchArtifactId?: string // the patch went to this artifact instead
+}
+```
+
+**Agents report one edit more than once, so `changeId` names the edit.** The transcript keeps one row
+per change id and path, holding the latest report, in the place the first one opened. Codex streams
+`item/fileChange/patchUpdated` before the `fileChange` item completes, and re-sends `turn/diff/updated`
+with the whole turn's diff every time it grows. Claude sends an excerpt when an edit starts and the
+real hunks once it has run. So each edit is one row, and each turn has one whole-turn row showing the
+latest diff.
+
+Each driver builds the patch from what its provider sends:
+
+- **Codex** sends `changes: [{ path, kind: { type }, diff }]` on both the item and the patch update. For
+  an update, `diff` is already headerless hunks. For an added or deleted file it is the file's whole
+  text, which the normalizer turns into hunks. Before this, the patch update read `params.path` and
+  `params.patch`, which Codex never sends, so every one of those events was stored empty. The item
+  kept its paths only.
+- **ACP** diff blocks carry `path`, `oldText` and `newText`, which the normalizer turns into hunks with
+  the `diff` package. A missing `oldText` is a new file. ACP means the texts to be whole files, but
+  Claude's adapter sends the edit's `old_string` and `new_string` when the call starts, so their line
+  numbers count from the top of the excerpt. That change is marked `snippet`, and the thread leaves its
+  line numbers blank rather than guess. Once the edit has run, the adapter sends each real hunk as its
+  own block, with the hunk's first line as the matching entry of `locations`. Those hunks get their
+  real line numbers, and they replace the excerpt under the same change id.
+
+A patch over 64 KiB goes to an artifact, like large command output, and the event keeps
+`patchArtifactId` in place of the patch. Events stored before patches were kept have neither, and
+their row still opens Changes, as it always did.
+
 ## Client surfaces
 
 For the full contract, see [Managed agent client surfaces](./managed-agents/client-surfaces.md#client-surfaces).
 
 ## New-session defaults
+
+Inline diff chats are interactive managed sessions with a typed `origin` on the durable session row.
+The origin records the task, source, path, side, line, patch key, and original quote; a local origin
+also records staged or unstaged scope, while a PR origin records its repository and number. The
+Agents client capability supplies the compact diff card to Changes and GitHub without either plugin
+owning transcripts. The task sidebar groups these sessions under Inline chats. A patch change
+detaches the card from the line while leaving the session and its original context available in
+Agents. The client marks a session stale once it has seen that diff's newer document.
+
+Inline chats have separate provider, model, and effort defaults in the existing session-defaults
+preference. They start with Read only selected. When the provider advertises a read-only permission
+profile, the requested profile is applied before the first turn; otherwise the card labels the
+choice best effort and asks the agent not to write. Full access is an explicit per-chat choice.
 
 A new session starts on the settings the owner last used, not on the provider's own choice. Switch
 Codex to a higher reasoning effort in one session and the next Codex session starts there.
@@ -756,6 +861,8 @@ quietly fail to persist is worse than an absent row.
 **The session's own actions are registered by the pane, for as long as the pane is drawn.** They need
 a selected session, which only the pane model has, and two of them — rename and archive — are dialogs
 the detail region draws, so a row offered while that region is unmounted would run and show nothing.
+Archive skips its dialog when there is nothing to lose: the session has no turns and its draft is
+empty, not counting the task context the composer attaches on its own (`sessionIsBlank`).
 Mounted is therefore the gate: you can reach these when you are looking at the run they are about.
 The pane model stays the only place the roster is written
 (`plugins/agents/src/client/sessions/agentPaneModel.ts` § `sessionActions`). Nothing is enumerated a

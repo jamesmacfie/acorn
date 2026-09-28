@@ -23,6 +23,7 @@ export type RunStepOptions = HeadlessOpts & {
 export type StepRunRequest = Omit<RunStepOptions, 'profileId'>
 
 export type RunnerDeps = {
+  invalidStepKind?: (id: string, problems: readonly string[]) => void
   dataAccess?: import('../steps/data').WorkflowDataServices['access']
   runStep(taskId: string, def: WorkflowStepDef, opts: RunStepOptions): Promise<HeadlessResult>
   writeHandoff(taskId: string, runId: string, stepName: string, body: string): Promise<void>

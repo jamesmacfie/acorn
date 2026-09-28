@@ -129,7 +129,7 @@ export class ProviderEventMaterializer {
         metadata: { path: event.path },
       })
       return [
-        { ...event, patch: undefined, summary: event.summary ?? 'Large patch stored as an artifact.' },
+        { ...event, patch: undefined, patchArtifactId: artifact.id, summary: event.summary ?? 'Large patch stored as an artifact.' },
         {
           type: 'artifact',
           artifactId: artifact.id,

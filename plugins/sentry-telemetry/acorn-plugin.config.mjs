@@ -26,9 +26,8 @@
 //     lends the plaintext for the length of one call. `ctx.core.secrets` is never touched, so
 //     claiming it would overstate.
 //   exec: false — nothing here spawns anything.
-//   net — disclosure rather than enforcement, and the honest thing to say is a pattern. A DSN names
-//     its own host, so `o<org>.ingest.<region>.sentry.io` is where a sentry.io project lives and a
-//     self-hosted install is wherever the owner runs it.
+//   net — the worker enforces these patterns for Sentry-hosted ingestion. A DSN names its own host,
+//     so `o<org>.ingest.<region>.sentry.io` is covered by one subdomain label under each pattern.
 export default {
   name: 'Sentry (telemetry export)',
   // The Sentry mark, as one SVG path's `d` in a 24 box. The host validates the grammar and registers

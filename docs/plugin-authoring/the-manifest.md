@@ -499,11 +499,11 @@ Filesystem, environment, process, and network grants are also absent unless decl
   exporting a capability is a contribution, not an access grant.
 - `secrets` / `exec`: booleans, separate from `core` because they are the two asks a reviewer should
   have to see spelled out.
-- `net`: exact hostnames the worker's `fetch` may reach, or `'*'` for a plugin whose user chooses any
-  destination. An any-host grant permits redirects and appears as broad network access in the
-  permission prompt. Raw network modules stay unavailable unless
-  `sockets` is also granted. Redirects are returned rather than followed so fetching the next
-  location rechecks its host.
+- `net`: exact hostnames or `*.domain` patterns that the worker's `fetch` may reach. A pattern
+  matches one subdomain label, not the parent domain or deeper subdomains. `'*'` grants access to
+  any hostname, permits redirects, and appears as broad network access in the permission prompt.
+  Raw network modules stay unavailable unless `sockets` is also granted. With a host-scoped grant,
+  redirects are returned rather than followed so fetching the next location rechecks its host.
 - `sockets`: unrestricted raw socket access for protocols that cannot use the hostname-scoped fetch
   broker. This broad, high-risk grant has no hostname allowlist.
 - `env`: parent-environment variable names the worker may inherit in addition to the process broker's

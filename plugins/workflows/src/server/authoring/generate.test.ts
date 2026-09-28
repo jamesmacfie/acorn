@@ -34,6 +34,7 @@ const manyOptions = Array.from({ length: 20 }, (_, index) => ({ value: `region-$
 const httpKind: StepKindDescription = {
   label: 'HTTP request',
   description: 'One HTTP request through the project variables.',
+  icon: 'globe', output: { description: 'HTTP response.' },
   fields: [
     { id: 'method', label: 'Method', type: 'select', required: true, options: [{ value: 'GET', label: 'GET' }, { value: 'POST', label: 'POST' }] },
     { id: 'url', label: 'URL', type: 'text', required: true, hint: 'Interpolated before the scheme check.' },
@@ -90,7 +91,7 @@ it('keeps generation, edit, and repair prompt bytes stable', () => {
     problems: ['Step A has no predecessor.'],
   })
   expect([digest(system), digest(user), digest(repair)]).toEqual([
-    'd986e87d0dbc32e0359f39ccc56f0244924a502a76d66c3b25898a434e0454d0',
+    '6bb96c343ba2646da6adbe2851713559b1e07356af67865cf5b6a6f510c62950',
     '7c05d99245a0227ce0871974a643edd54542ede256f4b4d76eb6a24a402d45bd',
     'd56c93453b6719c4f1ee299d50d01ad01cfc928c1e305cc263411b60199b003a',
   ])
@@ -185,6 +186,7 @@ describe('the kind list comes from the catalog', () => {
       describe: {
         label: 'Ship it',
         description: 'Deploy the branch.',
+        icon: 'rocket', output: { description: 'Deployment result.' },
         fields: [{ id: 'environment', label: 'Environment', type: 'select' as const, required: true, options: [{ value: 'staging', label: 'Staging' }] }],
       },
     }

@@ -6,13 +6,13 @@ import { solidTree } from '@acorn/plugin-api/ui/tree'
 import { HttpDetailApp, HttpListApp, type HttpPaneProps } from './app'
 import { _resetHttpPanelModel } from './panelModel'
 
-vi.mock('./httpClient', () => ({
+vi.mock('./httpClient', () => ({ httpClient: () => ({
   createRequest: vi.fn(),
   deleteRequest: vi.fn(),
   listRequests: async () => [],
   sendRequest: vi.fn(),
   updateRequest: vi.fn(),
-}))
+}) }))
 
 const settle = async () => {
   for (let turn = 0; turn < 4; turn++) await new Promise<void>((resolve) => setTimeout(resolve, 0))

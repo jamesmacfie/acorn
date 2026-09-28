@@ -52,6 +52,21 @@ it('draws the page of an open, a find and a fetch', () => {
   expect(find.textContent).toContain('session')
   const fetched = draw({ action: { type: 'fetch_page', url: 'https://example.com/page', prompt: 'what is a session' } })
   expect(fetched.textContent).toContain('what is a session')
+  expect(links(fetched)).toEqual([{ href: 'https://example.com/page', text: 'https://example.com/page' }])
+})
+
+it('draws what the page answered, in the warning tone only when it is not 2xx', () => {
+  const ok = draw({ action: { type: 'fetch_page', url: 'https://example.com' }, status: { code: 200, text: 'OK' } })
+  expect(ok.textContent).toContain('200 OK')
+  expect(ok.querySelector('[data-tone="warn"]')).toBeNull()
+  const missing = draw({ action: { type: 'fetch_page', url: 'https://example.com' }, status: { code: 404, text: 'Not Found' } })
+  expect(missing.querySelector('[data-tone="warn"]')?.textContent).toBe('404 Not Found')
+})
+
+it('keeps a page address with a refused scheme as words, not a link', () => {
+  const host = draw({ action: { type: 'open_page', url: 'javascript:alert(1)' } })
+  expect(host.textContent).toContain('javascript:alert(1)')
+  expect(links(host)).toEqual([])
 })
 
 it('draws a source as a link, its host, and its snippet', () => {

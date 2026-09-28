@@ -88,12 +88,12 @@ export { defaultModelIdFor } from '@acorn/client-core/features/settings'
 
 // ── Diff rows ─────────────────────────────────────────────────────────────────────────────────
 // The components of the diff toolkit; its model, virtualizer and find pass are on ./ui/diff.
-export { DiffLine, FileHead, NonCodeRow, SplitCell } from '@acorn/client-core/kit/diff/DiffRows.tsx'
+export { DiffLine, FileHead, NonCodeRow, SplitCell, StackedDiff } from '@acorn/client-core/kit/diff/DiffRows.tsx'
 export type { LineComposerController, ThreadCollapseController } from '@acorn/client-core/kit/diff'
 // The whole viewer as one component: virtualized unified and split lists, find, sticky file header,
 // per-file collapse, gap expansion, and the comment layer. Driven by a `DiffSource` from ./ui/diff.
-// A plugin reaching for the row components directly is building a simpler surface than this one, the
-// way the compare preview does.
+// A plugin reaching for the row components directly is building a simpler surface than this one.
+// StackedDiff is the read-only one already built: one file's patch shown inside something else.
 export { DiffPane } from '@acorn/client-core/features/diff/DiffPane.tsx'
 
 // ── The nodes the kit gained when it closed ───────────────────────────────────────────────────

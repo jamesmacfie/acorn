@@ -72,6 +72,30 @@ describe('a collapsed ListDetail', () => {
     // A width nobody can drag to is a width that must stop being applied.
     expect(root.style.gridTemplateColumns).toBe('')
   })
+
+  it('hides unreadable list content without unmounting it', () => {
+    let mounted = 0
+    const List = () => {
+      mounted += 1
+      return <input value="retained search" />
+    }
+    render(() => (
+      <ListDetail collapseKey="editor" collapseContent="empty" list={<List />}>the detail</ListDetail>
+    ), host)
+    const list = host.querySelector<HTMLElement>('.ui-listdetail-list')!
+    const input = list.querySelector('input')!
+    const toggle = host.querySelector<HTMLButtonElement>('.ui-listdetail-edge .ui-btn')!
+
+    toggle.click()
+    expect(list.style.visibility).toBe('hidden')
+    expect(list.querySelector('input')).toBe(input)
+    expect(toggle.getAttribute('aria-label')).toBe('Expand list')
+
+    toggle.click()
+    expect(list.style.visibility).toBe('')
+    expect(list.querySelector('input')).toBe(input)
+    expect(mounted).toBe(1)
+  })
 })
 
 describe('a pane that does not offer the control', () => {

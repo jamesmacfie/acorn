@@ -100,6 +100,33 @@ describe('agent usage service', () => {
     expect(calls).toBe(3)
   })
 
+  it('refreshes one provider without changing the other or postponing the full probe', async () => {
+    let clock = 1_000
+    let claudeCalls = 0
+    let codexCalls = 0
+    const service = createAgentUsageService({
+      probeDir: await probeDir(),
+      ttlMs: 100,
+      now: () => clock,
+      collectors: collectorsFor(
+        async () => provider('claude', ++claudeCalls),
+        async () => provider('codex', ++codexCalls),
+      ),
+    })
+    const first = await service.read({ userId: 'james' })
+    clock += 50
+    const refreshed = await service.refreshProvider({ userId: 'james', providerId: 'claude' })
+    expect(refreshed?.providers[0].quotas[0].percentRemaining).toBe(2)
+    expect(refreshed?.providers[1]).toBe(first.providers[1])
+    expect(refreshed?.refreshedAt).toBe(first.refreshedAt)
+    expect({ claudeCalls, codexCalls }).toEqual({ claudeCalls: 2, codexCalls: 1 })
+
+    clock += 51
+    await service.read({ userId: 'james' })
+    expect({ claudeCalls, codexCalls }).toEqual({ claudeCalls: 3, codexCalls: 2 })
+    expect(await service.refreshProvider({ userId: 'james', providerId: 'unknown' })).toBeNull()
+  })
+
   it('keeps one provider when the other fails and marks last-good data stale on a later failure', async () => {
     let failClaude = false
     const service = createAgentUsageService({

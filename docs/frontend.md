@@ -418,8 +418,8 @@ Both clients have a build check over what they load before they draw, and both f
 over a byte ceiling, and on a **chunk name**.
 
 - **The renderer.** `apps/desktop/scripts/check-renderer-budget.mjs`, run from `@acorn/desktop`'s
-  `build`, sums every script and stylesheet a cold window loads: 776,000 B for scripts, 200,000 B
-  for styles. The script ceiling is the 2026-09-25 measurement, 738,695 B, plus about 5%. A change
+  `build`, sums every script and stylesheet a cold window loads: 861,000 B for scripts, 200,000 B
+  for styles. The script ceiling is the 2026-09-29 measurement, 819,628 B, plus about 5%. A change
   that needs more raises it in the same commit, with the reason in the commit message. It reads the graph from Vite's manifest, which `vite.config.ts` moves out of the shipped
   client folder to `dist/renderer-manifest.json`. The startup set is the static closure of the entry
   chunk plus the modules in the script's `STARTUP_IMPORTS` list, and every script and stylesheet
