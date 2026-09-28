@@ -5,7 +5,7 @@ import {
   DIFF_GAP_ROW_HEIGHT, DIFF_LINE_HEIGHT, DIFF_RESOLVED_THREAD_HEIGHT, DIFF_THREAD_HEIGHT,
   isCodeRow, toBands, type CodeRow, type DiffThread, type Row, type ViewMode,
 } from '../../kit/diff/diffModel'
-import { createScrollAuthor } from '../../kit/lib/scrollAuthor'
+import { createScrollAuthor } from '../../kit/lib/timeline/scrollAuthor'
 import type { DiffItem } from './documentView'
 
 // The diff's range and scroll authority (docs/diff-rendering.md § Row geometry).

@@ -1,6 +1,6 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { _resetSidebarCollapse, paneCollapseKey, sidebarCollapse } from '../lib/collapseState'
+import { _resetSidebarCollapse, paneCollapseKey, sidebarCollapse } from '../lib/layout/collapseState'
 import { ListDetail, Row } from './primitives'
 
 // A collapsed sidebar is two decisions taken from one signal: the column's width and each row's rail

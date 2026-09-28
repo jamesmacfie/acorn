@@ -1009,7 +1009,7 @@ describe('architecture boundaries', () => {
     //
     // Type-only imports pass: kit/components/WorkspacePicker.tsx imports the `FleetWorkspace` type, a
     // shape it renders rather than a store it reads. Known and deliberate: kit/diff/DiffRows.tsx reaches
-    // kit/lib/draftState, which touches localStorage, because the draft belongs to the comment box.
+    // kit/lib/state/draftState, which touches localStorage, because the draft belongs to the comment box.
     //
     const UI_MAY_IMPORT = (file: string): boolean => {
       const p = rel(file)

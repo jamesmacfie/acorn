@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js'
 import { activeNodeId } from '../../../infra/node/activeNode'
-import type { Disposable } from '../../../kit/lib/registry'
+import type { Disposable } from '../../../kit/lib/state/registry'
 
 export type SessionSubmit = 'now' | 'after-ready' | 'draft'
 export type SessionSummary = {

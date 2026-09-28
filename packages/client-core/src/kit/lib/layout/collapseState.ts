@@ -1,5 +1,5 @@
 import { createSignal, type Accessor } from 'solid-js'
-import { readLocal, writeLocal } from './deviceStorage'
+import { readLocal, writeLocal } from '../state/deviceStorage'
 
 // A collapsed sidebar: the list column narrowed to the width of the icon rails, where each row keeps
 // one mark and gives its name back through the tooltip.
@@ -10,7 +10,7 @@ import { readLocal, writeLocal } from './deviceStorage'
 // this node could render would own it, and context never arrives. Keying the state instead is the
 // same answer `host/layouts/state.ts` gives for per-pane layout state, for the same reason.
 //
-// Stored per device, the shape `Fold`'s `persistKey` already uses (../components/layout/Fold.tsx).
+// Stored per device, the shape `Fold`'s `persistKey` already uses (../../components/layout/Fold.tsx).
 // Where a reader left a column is this installation's own, it never reaches a node, and a terminal
 // with nowhere to keep it reads `false` forever and draws the full column, which is what that host
 // wants anyway.

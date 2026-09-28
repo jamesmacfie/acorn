@@ -5,7 +5,7 @@
 // tested. The host that draws the resolved surface lives in a `.tsx`.
 import { createSignal, type Component } from 'solid-js'
 import { CORE_SLOT_PROVIDER, isCoreExclusiveSlot, type CoreExclusiveSlot } from '@acorn/protocol/extensionPoints.ts'
-import { Registry } from '../../../kit/lib/registry'
+import { Registry } from '../../../kit/lib/state/registry'
 
 export type { CoreExclusiveSlot }
 export { CORE_SLOT_PROVIDER }

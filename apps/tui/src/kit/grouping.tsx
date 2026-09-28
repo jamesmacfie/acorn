@@ -209,7 +209,7 @@ export function Timeline(props: {
   place?: () => ReadingPlace
   onChange?: (place: ReadingPlace) => void
   controls?: (api: TimelineControls) => void
-  /** The DOM timeline's health-reading count (client-core kit/lib/surfaceHealth.ts). Cells report no
+  /** The DOM timeline's health-reading count (client-core kit/lib/telemetry/surfaceHealth.ts). Cells report no
    *  rendered-surface health, so it is accepted and ignored. */
   total?: number
   /** Older turns the caller is not drawing. Drawn as "Show earlier" above the first turn, the same

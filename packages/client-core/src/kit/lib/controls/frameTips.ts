@@ -23,7 +23,7 @@ export function mountFrameTips(doc: Document = document): () => void {
     if (!title) return
     const rawAt = element.getAttribute('data-tip-at')
     const at = rawAt === null ? NaN : Number(rawAt)
-    // This frame copy stays importless. Match kit/lib/formatRelativeTime for timestamp tips.
+    // This frame copy stays importless. Match kit/lib/rendering/formatRelativeTime for timestamp tips.
     const relative = () => {
       const elapsed = Math.max(0, Date.now() - at)
       const minute = 60_000

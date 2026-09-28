@@ -5,7 +5,7 @@ import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { Slot } from './Slot'
 import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '../registries/extensionPoints/extensionPoints'
 import { prefsKey } from '../../infra/queries'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 
 // The pick is read through a real query client here, because what this file holds is when that query
 // exists: not at all while nothing is tied, one per tied slot once something is, gone with the slot,

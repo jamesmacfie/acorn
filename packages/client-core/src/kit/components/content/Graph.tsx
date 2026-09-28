@@ -6,7 +6,7 @@ import type { Tone } from '../../tokens/tokens'
 import {
   GRAPH_CARD_H, GRAPH_CARD_W, GRAPH_ZOOM_MAX, GRAPH_ZOOM_MIN, layoutGraph, snapToGrid,
   type GraphEdgeRef, type GraphPoint,
-} from '../../lib/graphLayout'
+} from '../../lib/layout/graphLayout'
 
 /* Graph: a picture of a graph — cards on a grid, edges as curves, one card selected.
  *
@@ -17,7 +17,7 @@ import {
  * workflows run pane, and both projections were written before it landed, which is the admission
  * rule.
  *
- * The geometry is ../../lib/graphLayout.ts and none of it is here: that owns where a card sits, this
+ * The geometry is ../../lib/layout/graphLayout.ts and none of it is here: that owns where a card sits, this
  * owns pan, zoom, the pointer gestures and the ARIA.
  *
  * A card is a real button inside a listbox, so the graph reads as a list to a screen reader and to

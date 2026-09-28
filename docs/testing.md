@@ -313,7 +313,7 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
   and a moved file drops its old patch, that a resolved thread asks for nothing, and that a
   dehydrated query client holds no segment text. `infra/node/fleet.test.ts` checks that `dropNode`
   clears that node's segments and no other's;
-- long timelines have three layers of test. `kit/lib/timelineWindow.test.tsx` holds the window's rules:
+- long timelines have three layers of test. `kit/lib/timeline/timelineWindow.test.tsx` holds the window's rules:
   the newest page on open, appended turns joining it, a page per **Show earlier**, a page-aligned
   reveal, keeping its size when its oldest key leaves, and trims that only move forward.
   `kit/components/content/Timeline.test.tsx` drives a windowed followed Timeline over geometry read
@@ -463,7 +463,7 @@ The tests that hold the fixture and the health probes to their contract:
   projects it into cards;
 - `plugins/changes/src/testkit/reviewNotes.test.ts` checks that seeded notes are the rows the route
   returns;
-- `kit/lib/surfaceHealth.test.ts` covers the registry and its privacy rule,
+- `kit/lib/telemetry/surfaceHealth.test.ts` covers the registry and its privacy rule,
   `features/diff/diffHealth.test.tsx` renders the real pane over the small profile, and
   `Timeline.test.tsx` checks projected against mounted turns, the window's counts, and exact teardown;
 - `apps/desktop/scripts/agent/flow.test.mjs` checks that a flow file with an unknown action, a

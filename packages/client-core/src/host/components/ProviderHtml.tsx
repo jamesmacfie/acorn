@@ -1,6 +1,6 @@
 import { createEffect } from 'solid-js'
 import { linkifyRefs } from '../registries/panes/contentLinks'
-import { sanitizedHtmlFragment } from '../../kit/lib/sanitizedHtml'
+import { sanitizedHtmlFragment } from '../../kit/lib/rendering/sanitizedHtml'
 
 // HTML a provider already rendered, drawn in the host's markdown skin.
 //

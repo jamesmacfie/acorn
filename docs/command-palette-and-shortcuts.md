@@ -490,7 +490,7 @@ document and cancels the wait if its owner unmounts first. A staged pane therefo
 against a destroyed target nor loses its keys when it becomes visible.
 
 Escape is the exception the engine cannot express. An open overlay answers its own Escape, and
-`kit/lib/dismissable.ts` keeps a stack of them so a pile unwinds one press at a time, so an `escape`
+`kit/lib/controls/dismissable.ts` keeps a stack of them so a pile unwinds one press at a time, so an `escape`
 binding goes inactive while focus is inside a dialog. Consuming the key in the engine would stop the
 DOM event too, and the overlay would never see it.
 

@@ -1,4 +1,4 @@
-import { Registry } from '../../../kit/lib/registry'
+import { Registry } from '../../../kit/lib/state/registry'
 
 // How a bell row is drawn and how far it is allowed to travel. One contribution per notice kind,
 // registered by the shell from a static list (features/notifications/kindContributions.ts).

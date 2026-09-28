@@ -116,7 +116,7 @@ the new offset for any scroll event other than an exact echo of its last assigne
 not restrict saved reading-position changes to reader navigation, and its helper resumed following
 whenever `nearBottom` was true, including after a browser clamp caused by a shrinking list. Both are
 fixed: the rule is `placeAfterScroll` in
-`packages/client-core/src/kit/lib/readingPlace.ts`, and a scroll with no gesture behind it changes
+`packages/client-core/src/kit/lib/timeline/readingPlace.ts`, and a scroll with no gesture behind it changes
 nothing.
 
 Two diagnostics confirmed the state transitions with simulated geometry:

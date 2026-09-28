@@ -2,7 +2,7 @@ import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Task } from '@acorn/protocol/api.ts'
 import { paneRegistry, type PaneContribution } from '../../host/registries/panes/panes'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 import TaskPaneHost from './TaskPaneHost'
 
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))

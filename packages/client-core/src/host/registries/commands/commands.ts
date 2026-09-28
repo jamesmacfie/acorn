@@ -2,7 +2,7 @@ import { DEFAULT_COMMAND_SCOPE, type CommandScope, type CommandSearchItem, type 
 import type { HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 import { hasHostCapability } from '../../../infra/node/hostCapabilities'
 import { startInteraction } from '../../../infra/telemetry/emitter'
-import { Registry, type Disposable } from '../../../kit/lib/registry'
+import { Registry, type Disposable } from '../../../kit/lib/state/registry'
 import { presentCommand } from './presenter'
 
 // The command vocabulary: what a contributor declares, what a command runs in, and what running one

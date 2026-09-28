@@ -358,7 +358,7 @@ plugin registers at boot, so it works here.
 curves on the desktop, and here it draws the indented list the workflows editor drew before the
 canvas existed: the same cards in the same reading order with the same selection, indented by rank
 instead of placed by coordinate, and `⇐ n` on a card that waits on more than one. Both hosts take the
-ranks from the same `kit/lib/graphLayout.ts`, so neither can put a card under the wrong one. Positions
+ranks from the same `kit/lib/layout/graphLayout.ts`, so neither can put a card under the wrong one. Positions
 and wires are not drawn, and the one affordance that would otherwise go with them — dragging an edge
 into place — is a picker under the list instead. A plugin writes the same `Graph` for both.
 

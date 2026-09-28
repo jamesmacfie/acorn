@@ -1,5 +1,5 @@
 import { children, createEffect, createMemo, createSignal, For, Index, Show, type JSX } from 'solid-js'
-import { activeMention, completeMention, scrollDeltaFor, type ActiveMention } from '../../lib/mentions'
+import { activeMention, completeMention, scrollDeltaFor, type ActiveMention } from '../../lib/controls/mentions'
 import { Alert } from '../content/Alert'
 import { Textarea } from './Textarea'
 import PickerRow from './PickerRow'

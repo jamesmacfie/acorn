@@ -4,7 +4,7 @@
 // This module holds no JSX import (docs/frontend.md § Registries and plugins): the host that draws
 // these rows lives in `./contextMenuHost.tsx`, a `<For>` over `contextMenuItems()`.
 import { matchesWhen, type ContextMenuLocation } from '@acorn/protocol/contextMenus.ts'
-import { Registry } from '../../../kit/lib/registry'
+import { Registry } from '../../../kit/lib/state/registry'
 import { createLogger } from '../../../infra/telemetry/logger'
 
 const log = createLogger('context-menu')
