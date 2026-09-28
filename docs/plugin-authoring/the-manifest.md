@@ -276,9 +276,10 @@ Both routes are confined like every other, and both are shown in the trust promp
 says you offer to clean up, so a version that starts changing something where it used to only warn
 reads as newly requested.
 
-Every path in every descriptor is confined at parse time to `/v1/p/<id>/` — your own namespace and
-nothing else. That check lives in `server/plugins/manifest.ts` rather than on the fields because it needs `id`,
-and it is the parse-time twin of the runtime confinement the frame bridge applies.
+Every path in every descriptor is confined at parse time to `/v1/p/<id>/`, the plugin's own
+namespace. `server/plugins/manifestValidation/references.ts` checks this after the field schema
+parses, because confinement needs the manifest's `id`. The frame bridge applies the matching rule
+at runtime.
 
 The cross-field rules are worth knowing before you write a manifest that parses and then does nothing:
 an `openPane` must name a task-scoped pane this manifest declares; a `navigate` must name a
