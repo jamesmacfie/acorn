@@ -5,7 +5,7 @@ import { AGENTS_SESSION_CONTROL, AGENTS_SESSION_EXECUTE } from '@acorn/plugin-ag
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets.ts'
-import { buildHeadlessArgv, buildSessionEnv, describeError, type InternalEnvFactory, type NodePlugin, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
+import { BridgeError, buildHeadlessArgv, buildSessionEnv, describeError, type InternalEnvFactory, type NodePlugin, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
 import { eq } from 'drizzle-orm'
 import { loadWorkflowFiles } from '../server/workflowFiles'
 import { defsForProject, getDef, listDefs, mergedList } from '../server/workflowDefs'
@@ -399,9 +399,16 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           await deps.reconciled
           return new WorkflowProcessingStore(store, dispatcher).reprocess({ sourceRunId: runId, recordId, digest, requestId })
         },
-        gate: async (runId, stepId, approved) => {
+        gate: async (runId, stepId, approved, values) => {
           await deps.reconciled // an approval resumes a step the restart sweep could otherwise clobber
-          await runner.resolveGate(runId, stepId, approved)
+          const resolution = await runner.resolveGate(runId, stepId, approved, values)
+          if (resolution.outcome === 'not-found') throw new BridgeError(404, 'not_found', 'No such gate in this run.')
+          if (resolution.outcome === 'already-resolved') throw new BridgeError(409, 'gate-resolved', 'This gate was already answered.')
+          // One line per field, so the message names every problem. The run pane runs the same check
+          // before it sends, so it has each one under its field already.
+          if (resolution.outcome === 'invalid') {
+            throw new BridgeError(400, 'gate-invalid', Object.entries(resolution.problems).map(([field, problem]) => `${field}: ${problem}`).join('\n'))
+          }
           return { ok: true }
         },
         cancel: async (runId) => {

@@ -169,7 +169,9 @@ describe('the hook chains, as the bridge runs them', () => {
     seen.length = 0
     verdict = { ok: true }
     work = mkdtempSync(join(tmpdir(), 'acorn-hooked-'))
-    git('init', '-q')
+    // Named, because the handlers are asserted to see `main` and git's default branch is the
+    // machine's choice: CI's git still says `master`.
+    git('init', '-q', '-b', 'main')
     git('config', 'user.email', 'test@acorn.dev')
     git('config', 'user.name', 'Acorn Test')
     writeFileSync(join(work, 'a.txt'), 'one\n', 'utf8')

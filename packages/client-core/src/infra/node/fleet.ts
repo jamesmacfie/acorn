@@ -7,7 +7,7 @@ import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { fleetBridge, nodeTransport } from '../platform'
 import { emitError, measure, recordDuration, recordSample, telemetryEnabled } from '../telemetry/emitter'
 import { createLogger, describeError } from '../telemetry/logger'
-import { dropSegmentCache } from '../../features/diff/segmentCache'
+import { dropSegmentCache } from '../../features/diff/segmentCaches'
 
 // The fleet store: which nodes this client knows, what state each connection is in, and one query
 // cache per node (docs/architecture-overview.md § Client state and fleet behavior,

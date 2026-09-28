@@ -1,6 +1,6 @@
 // Durable workflow engine. Rows remain the checkpoint; registered handlers own work while this
 // class alone owns validation, ordering, persistence, branching, cancellation, and reconciliation.
-import { asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 import { claimWorkflowRecordRetry } from './workflowProcessingRetry'
 import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import { agentProfileRegistry, DEFAULT_PROFILE_ID, type Extension, type ExtensionPointId, type HeadlessOpts, type HeadlessResult, type PluginDatabase, type PluginHookRegistry, type PluginTelemetry, type SpanHandle, type StreamEvent } from '@acorn/plugin-api/node'
@@ -17,6 +17,7 @@ import type {
 import type { PolicyEvaluator, StepKindContribution, WorkflowCatalog } from '../shared/workflowContracts'
 import { stepKindContributionProblems, stepKindPluginId, unavailableStepKindMessage } from '../shared/stepKindAvailability'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../shared/stepFields'
+import { declaredOutputSchema, gateFormEdited, gateFormProblems, type GateFormOutput, type GateFormProposal } from '../shared/gateForm'
 import { managedProviderForProfile } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
 import type { WorkflowChildChangedEvent, WorkflowGateStatus, WorkflowRunStatus } from '../contract/events'
@@ -46,10 +47,16 @@ import { WorkflowRunTermination } from './workflowRunTermination'
 import { stepIdentity, rowIdentity } from '../shared/workflowIdentity'
 import { predecessorValues, workflowOutputs, WORKFLOW_VALUE_BYTES } from './workflowValues'
 import { validateDataValue } from '@acorn/protocol/dataSchemas.ts'
-import { parseDataValue } from '@acorn/protocol/dataValues.ts'
+import { parseDataValue, type DataValue } from '@acorn/protocol/dataValues.ts'
 
 export type { ToolCeiling, WorkflowDef, WorkflowStepDef } from '../shared/workflowContracts'
 export type { WorkflowInvocationIdentity, WorkflowStartOptions } from './workflowRunStart'
+
+/** How a gate answer landed. `already-resolved` means another answer won, or the gate was not
+ *  waiting. `invalid` names one problem per form field and leaves the gate waiting. */
+export type WorkflowGateResolution =
+  | { outcome: 'resolved' | 'already-resolved' | 'not-found' }
+  | { outcome: 'invalid'; problems: Record<string, string> }
 
 export type WorkflowChildTaskSeed = { title: string; branch: string; prompt?: string }
 export type RunStepOptions = HeadlessOpts & {
@@ -441,23 +448,49 @@ export class WorkflowRunner {
     return this.#childLifecycle.summariesForStep(parentStepId)
   }
 
-  async resolveGate(runId: string, stepId: string, approved: boolean): Promise<void> {
+  /** Answer a human gate. The step leaves `waiting-gate` through a compare-and-swap, so when two
+   *  devices answer the same gate only the first write wins, and only its caller resumes the run or
+   *  fails it. Everyone else learns that the gate was already answered.
+   *
+   *  `values` is for a gate with a form, and is the complete set being approved: a field left out is
+   *  approved empty. Absent `values` approves the frozen proposal as it stands. Either way the values
+   *  are checked before anything is written, and a refusal leaves the gate waiting. */
+  async resolveGate(runId: string, stepId: string, approved: boolean, values?: Record<string, DataValue>): Promise<WorkflowGateResolution> {
     const run = await this.run(runId)
     if (run?.deadlineAt != null && run.deadlineAt <= now()) {
+      // The deadline wins over any answer. The run is safety-railed, and the pane shows that once
+      // it refetches, so the caller is told its request was handled.
       await this.safetyRailRun(run.rootRunId ?? run.id, 'Safety rail: workflow deadline exhausted while waiting at a gate.')
-      return
+      return { outcome: 'resolved' }
     }
     const [step] = await this.db.select().from(schema.workflowSteps).where(eq(schema.workflowSteps.id, stepId))
-    if (!step || step.runId !== runId || step.status !== 'waiting-gate') return
-    if (approved) {
-      await this.setStep(stepId, { status: 'done', resultJson: JSON.stringify({ approved: true }) })
-      await this.setWaitingParentStatus(runId, 'running')
-      void this.tick(runId)
-      return
+    if (!run || !step || step.runId !== runId) return { outcome: 'not-found' }
+    if (step.status !== 'waiting-gate') return { outcome: 'already-resolved' }
+    const workflow = JSON.parse(run.defJson) as WorkflowDef
+    const form = workflow.steps.find((candidate) => stepIdentity(candidate) === rowIdentity(workflow, step))?.form
+    if (values !== undefined && (!approved || !form)) {
+      return { outcome: 'invalid', problems: { values: approved ? 'This gate has no form.' : 'A rejection carries no values.' } }
     }
-    await this.setStep(stepId, { status: 'failed', error: 'Rejected at the human gate.' })
-    const currentRun = await this.run(runId)
-    if (currentRun) await this.finishRun(currentRun, 'failed', `Gate '${step.name}' rejected.`, step.id)
+    if (!approved) {
+      if (!await this.setStepIf(stepId, 'waiting-gate', { status: 'failed', error: 'Rejected at the human gate.' })) return { outcome: 'already-resolved' }
+      const currentRun = await this.run(runId)
+      if (currentRun) await this.finishRun(currentRun, 'failed', `Gate '${step.name}' rejected.`, step.id)
+      return { outcome: 'resolved' }
+    }
+    let structuredJson: string | undefined
+    if (form) {
+      const proposal = (step.inputsJson ? (JSON.parse(step.inputsJson) as Partial<GateFormProposal>).form?.values : undefined) ?? {}
+      const answer = values ?? proposal
+      const problems = gateFormProblems(form, answer)
+      if (Object.keys(problems).length) return { outcome: 'invalid', problems }
+      const output: GateFormOutput = { approved: true, values: answer, edited: gateFormEdited(form, proposal, answer) }
+      structuredJson = JSON.stringify(output)
+    }
+    const done = { status: 'done', resultJson: JSON.stringify({ approved: true }), ...(structuredJson ? { structuredJson } : {}) }
+    if (!await this.setStepIf(stepId, 'waiting-gate', done)) return { outcome: 'already-resolved' }
+    await this.setWaitingParentStatus(runId, 'running')
+    void this.tick(runId)
+    return { outcome: 'resolved' }
   }
 
   async cancelRun(runId: string, reason = 'Run cancelled.'): Promise<void> {
@@ -752,8 +785,13 @@ export class WorkflowRunner {
     const currentRun = await this.run(run.id)
     const [currentStep] = await this.db.select().from(schema.workflowSteps).where(eq(schema.workflowSteps.id, step.id))
     if (!currentRun || currentRun.status === 'cancelling' || currentRun.status === 'cancelled' || currentStep?.status === 'cancelled') return
+    const inputsJson = 'inputs' in outcome && outcome.inputs !== undefined
+      ? JSON.stringify(outcome.inputs && typeof outcome.inputs === 'object' && !Array.isArray(outcome.inputs)
+        ? { ...(outcome.inputs as Record<string, unknown>), ...carried }
+        : outcome.inputs)
+      : undefined
     if (outcome.status === 'waiting-gate') {
-      await this.setStep(step.id, { status: 'waiting-gate' })
+      await this.setStep(step.id, { status: 'waiting-gate', ...(inputsJson !== undefined ? { inputsJson } : {}) })
       // The run is gated while any step waits, and it goes back to 'running' when the gate resolves.
       await this.setRun(run.id, { status: 'gated' })
       this.deps.notify(run.taskId, 'gate', `Workflow '${run.name}' needs you: ${def.name}`, { runId: run.id, stepId: step.id })
@@ -765,8 +803,8 @@ export class WorkflowRunner {
     }
     if (['done', 'completed-with-failures'].includes(outcome.status) && JSON.parse(run.defJson).formatVersion === 1 && 'structured' in outcome) {
       try {
-        const outputSchema = def.schema ?? this.#stepKind(def.kind ?? 'agent')?.describe?.output?.schema
-        if (outputSchema) validateDataValue(outcome.structured, outputSchema as import('@acorn/protocol/dataSchemas.ts').DataSchema, WORKFLOW_VALUE_BYTES)
+        const outputSchema = declaredOutputSchema(def, this.#stepKind(def.kind ?? 'agent')?.describe?.output?.schema)
+        if (outputSchema) validateDataValue(outcome.structured, outputSchema, WORKFLOW_VALUE_BYTES)
         else if (outcome.structured !== undefined) parseDataValue(outcome.structured, WORKFLOW_VALUE_BYTES)
       } catch (error) { outcome = { ...outcome, status: 'failed', error: `Invalid structured output: ${String(error)}` } }
     }
@@ -775,11 +813,6 @@ export class WorkflowRunner {
       await this.finishRun(run, 'cancelled', outcome.error ?? `Step '${def.name}' cancelled.`, step.id)
       return
     }
-    const inputsJson = outcome.inputs !== undefined
-      ? JSON.stringify(outcome.inputs && typeof outcome.inputs === 'object' && !Array.isArray(outcome.inputs)
-        ? { ...(outcome.inputs as Record<string, unknown>), ...carried }
-        : outcome.inputs)
-      : undefined
     const patch = {
       ...(inputsJson !== undefined ? { inputsJson } : {}),
       ...(outcome.result !== undefined ? { resultJson: JSON.stringify(outcome.result) } : {}),
@@ -1055,13 +1088,26 @@ export class WorkflowRunner {
   }
 
   private async setStep(stepId: string, patch: Partial<WorkflowStepRow>): Promise<void> {
+    await this.setStepIf(stepId, undefined, patch)
+  }
+
+  /** `setStep`, but the write lands only while the step's status is still `expected`. Answers whether
+   *  it wrote. The condition is part of the UPDATE, so of two callers that both read the old status,
+   *  one changes the row and the other changes nothing. The announcements below follow the write, so
+   *  the loser raises no frame and no span. */
+  private async setStepIf(stepId: string, expected: string | undefined, patch: Partial<WorkflowStepRow>): Promise<boolean> {
     // Read first only when the status is in the patch: the frame below is a status change, and a
     // write that leaves the status alone has nothing to announce.
     const [before] = patch.status == null
       ? []
       : await this.db.select({ runId: schema.workflowSteps.runId, status: schema.workflowSteps.status })
         .from(schema.workflowSteps).where(eq(schema.workflowSteps.id, stepId))
-    await this.db.update(schema.workflowSteps).set({ ...patch, updatedAt: now() }).where(eq(schema.workflowSteps.id, stepId))
+    const written = await this.db.update(schema.workflowSteps).set({ ...patch, updatedAt: now() })
+      .where(expected == null
+        ? eq(schema.workflowSteps.id, stepId)
+        : and(eq(schema.workflowSteps.id, stepId), eq(schema.workflowSteps.status, expected)))
+      .returning({ id: schema.workflowSteps.id })
+    if (!written.length) return false
     if (before && before.status !== patch.status) {
       this.#markStepSpan(before.runId, stepId, patch.status!)
       this.deps.stepChanged?.(before.runId, stepId, patch.status!)
@@ -1071,6 +1117,7 @@ export class WorkflowRunner {
       }
     }
     this.changed()
+    return true
   }
 
   /** Open a step's span when it starts running and close it when it settles.
