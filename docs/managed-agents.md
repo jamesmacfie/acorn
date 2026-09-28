@@ -646,6 +646,54 @@ discarded it, and they keep rendering as the flat `Web search` row they always d
 files may still hold the payload, but they are private provider storage that can be pruned or live on
 another node, so a transcript read never touches `~/.codex` or `~/.claude`.
 
+## File changes
+
+A `file_change` event records what one step of the agent did to a file. Its `patch` is that file's
+unified hunks, from the first `@@` on with no file header, which is the shape GitHub returns and the
+diff rows parse. The exception is Codex's whole-turn diff: it has no `path`, and its `patch` is a
+multi-file git patch. The transcript draws the patch in place (see
+[client surfaces](./managed-agents/client-surfaces.md#client-surfaces)). The diff is what the step
+did when it ran, so a later step that changes the same lines leaves it as it was.
+
+```ts
+type FileChange = {
+  type: 'file_change'
+  path?: string
+  patch?: string
+  summary?: string
+  subagentId?: string
+  changeId?: string        // the tool call, Codex item, or `turn:<id>` this belongs to
+  snippet?: boolean        // the hunks count lines from an excerpt, not the file
+  patchArtifactId?: string // the patch went to this artifact instead
+}
+```
+
+**Agents report one edit more than once, so `changeId` names the edit.** The transcript keeps one row
+per change id and path, holding the latest report, in the place the first one opened. Codex streams
+`item/fileChange/patchUpdated` before the `fileChange` item completes, and re-sends `turn/diff/updated`
+with the whole turn's diff every time it grows. Claude sends an excerpt when an edit starts and the
+real hunks once it has run. So each edit is one row, and each turn has one whole-turn row showing the
+latest diff.
+
+Each driver builds the patch from what its provider sends:
+
+- **Codex** sends `changes: [{ path, kind: { type }, diff }]` on both the item and the patch update. For
+  an update, `diff` is already headerless hunks. For an added or deleted file it is the file's whole
+  text, which the normalizer turns into hunks. Before this, the patch update read `params.path` and
+  `params.patch`, which Codex never sends, so every one of those events was stored empty. The item
+  kept its paths only.
+- **ACP** diff blocks carry `path`, `oldText` and `newText`, which the normalizer turns into hunks with
+  the `diff` package. A missing `oldText` is a new file. ACP means the texts to be whole files, but
+  Claude's adapter sends the edit's `old_string` and `new_string` when the call starts, so their line
+  numbers count from the top of the excerpt. That change is marked `snippet`, and the thread leaves its
+  line numbers blank rather than guess. Once the edit has run, the adapter sends each real hunk as its
+  own block, with the hunk's first line as the matching entry of `locations`. Those hunks get their
+  real line numbers, and they replace the excerpt under the same change id.
+
+A patch over 64 KiB goes to an artifact, like large command output, and the event keeps
+`patchArtifactId` in place of the patch. Events stored before patches were kept have neither, and
+their row still opens Changes, as it always did.
+
 ## Client surfaces
 
 For the full contract, see [Managed agent client surfaces](./managed-agents/client-surfaces.md#client-surfaces).

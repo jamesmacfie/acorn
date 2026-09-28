@@ -789,6 +789,7 @@ edge, and no real-WebKit run has accepted it.
 | `DiffPane` | none | reduced: unified only, `+`/`-` in colour, annotations as indented lines under their row; windowed, so a long patch draws the rows around the viewport and not all of them |
 | `DiffLine` | none | reduced: one line, `+`/`-`/space in the gutter, no intra-line highlight |
 | `FileHead` | none | reduced: the path in bold with `+n −m` right-aligned |
+| `StackedDiff` | none | reduced: the `FileHead` line, then each hunk header and `DiffLine` below it |
 | `NonCodeRow` | none | reduced: a grey line saying what is not being shown, such as `binary file` |
 | `SplitCell` | none | absent: side-by-side needs 160 cells, so a terminal diff is unified |
 | `EmptyState` | none | centred grey text |

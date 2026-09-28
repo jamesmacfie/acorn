@@ -5,7 +5,7 @@ import AgentMarkdown from './ManagedAgentMarkdown'
 import { dispatchLayout, requestTerminalFocusIntent, setTerminalOpen } from '@acorn/plugin-api/client'
 import { AgentToolCallCard } from './toolRendererRegistry'
 import {
-  Alert, Button, Card, CodeBlock, Fold, Heading, Icon, IconButton, Inline, Menu, Row, Stack, Text,
+  Alert, Button, Card, CodeBlock, Fold, Heading, Icon, IconButton, Inline, Menu, Row, Stack, StackedDiff, Text,
 } from '@acorn/plugin-api/ui'
 import { SubagentStateIcon } from './RuntimeStateIcon'
 import { subagentSummary } from './subagentDisplay'
@@ -18,6 +18,7 @@ import AgentArtifactCard from './AgentArtifactCard'
 import AgentAttachmentCard from './AgentAttachmentCard'
 import { senderLabel } from './turnSender'
 import { eventTime } from './eventTime'
+import { patchFiles } from './patchFiles'
 import { managedAgentApi } from './managedClient'
 import type { CodexPlanHandoffState } from '../../shared/codexPlanHandoff'
 
@@ -326,14 +327,35 @@ export default function AgentEventCard(props: {
       <Show when={event().type === 'file_change'}>
         {(_shown) => {
           const change = () => event() as Extract<ReturnType<typeof event>, { type: 'file_change' }>
+          // What this one step did, opened in place. Changes answers a different question, what is
+          // different in the worktree now, so it stays one press away inside the fold. A change with
+          // nothing to show, such as one stored before patches were kept, is still just the link.
           return (
-            <Row
-              leading={<Icon name="file-diff" />}
-              meta={<Text emphasis="muted">{change().summary ?? 'Open in Changes'} →</Text>}
-              onPress={openChanges}
-            >
-              Changed {change().path ?? 'files'}
-            </Row>
+            <Show when={change().patch || change().patchArtifactId} fallback={
+              <Row
+                leading={<Icon name="file-diff" />}
+                meta={<Text emphasis="muted">{change().summary ?? 'Open in Changes'} →</Text>}
+                onPress={openChanges}
+              >
+                Changed {change().path ?? 'files'}
+              </Row>
+            }>
+              <Fold label={change().path ? `Changed ${change().path}` : change().summary ?? 'Changed files'} level="sub">
+                <Stack gap="row">
+                  {/* Fold draws its body on first open, so no rows are built for a closed one. */}
+                  <Show when={change().patch} fallback={
+                    <Text emphasis="muted">This diff is too large to show here.</Text>
+                  }>
+                    <Index each={patchFiles(change().path, change().patch ?? '')}>
+                      {(file) => <StackedDiff path={file().path} patch={file().patch} lineNumbers={!change().snippet} />}
+                    </Index>
+                  </Show>
+                  <Inline>
+                    <Button variant="bare" size="sm" onPress={openChanges}>Open in Changes</Button>
+                  </Inline>
+                </Stack>
+              </Fold>
+            </Show>
           )
         }}
       </Show>

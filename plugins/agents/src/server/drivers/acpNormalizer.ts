@@ -5,6 +5,8 @@ import type {
   RequestPermissionRequest,
   SessionConfigOption,
   SessionUpdate,
+  ToolCallContent,
+  ToolCallLocation,
 } from '@agentclientprotocol/sdk'
 import type {
   AgentCommandDescriptor,
@@ -20,6 +22,7 @@ import type {
 } from '../../contract/wire.ts'
 import { formElicitationResponse, normalizeFormElicitation } from './formElicitation'
 import { webToolTitle } from './webActivity'
+import { diffHunks, hunksText } from './patchText'
 
 const permissionKind = (kind: string): AgentPermissionOption['kind'] =>
   kind === 'allow_once' || kind === 'allow_always' || kind === 'reject_once' || kind === 'reject_always'
@@ -360,6 +363,46 @@ function toolStatus(status: string | null | undefined): AgentToolCall['status'] 
   return undefined
 }
 
+// A tool call's diff blocks as one file change per file, each carrying its hunks.
+//
+// ACP means `oldText` and `newText` to be the whole file, but Claude's adapter sends the edit's
+// `old_string` and `new_string` when the call starts: an excerpt, so hunks built from it count lines
+// from the top of the excerpt. When the edit has run, the adapter sends the real hunks again, one
+// block per hunk, with each hunk's first line in the file as the matching entry of `locations`. Those
+// get their real line numbers. A block with no line is either a new file, which starts at line 1
+// anyway, or an excerpt, and is marked as one so the thread leaves its numbers blank.
+//
+// Several blocks for one file are several hunks of one edit, so they share a change rather than each
+// replacing the last. The old side of each hunk starts where the new side does, less whatever lines
+// the hunks above it added.
+function acpFileChanges(
+  blocks: readonly ToolCallContent[],
+  locations: readonly ToolCallLocation[],
+  toolCallId: string,
+): { type: 'file_change'; path: string; patch: string; changeId: string; snippet?: boolean }[] {
+  const files = new Map<string, { hunks: ReturnType<typeof diffHunks>; added: number; snippet: boolean }>()
+  blocks.forEach((block, at) => {
+    if (block.type !== 'diff') return
+    const file = files.get(block.path) ?? { hunks: [], added: 0, snippet: false }
+    files.set(block.path, file)
+    const location = locations[at]
+    const line = locations.length === blocks.length && location?.path === block.path ? location.line : null
+    const hunks = line == null
+      ? diffHunks(block.oldText ?? '', block.newText)
+      : diffHunks(block.oldText ?? '', block.newText, { old: line - 1 - file.added, new: line - 1 })
+    file.hunks.push(...hunks)
+    file.added += hunks.reduce((sum, hunk) => sum + hunk.newLines - hunk.oldLines, 0)
+    if (line == null && block.oldText != null) file.snippet = true
+  })
+  return [...files].map(([path, file]) => ({
+    type: 'file_change',
+    path,
+    patch: hunksText(file.hunks),
+    changeId: toolCallId,
+    ...(file.snippet ? { snippet: true } : {}),
+  }))
+}
+
 // `harness` is the label of the agent whose events these are. A parameter, not a constant, because
 // this file is the shared half of the generic driver (./acpDriver.ts) and it writes the
 // label into three user-visible strings.
@@ -426,15 +469,8 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
       // A diff belongs to whoever made the edit, the same as the call it arrived on. Left unattributed
       // it rendered in the parent's stream while the Edit call that produced it sat inside the
       // subagent's, so a subagent's run showed the tool and not what it changed.
-      const diffs = blocks.flatMap((content) =>
-        content.type === 'diff'
-          ? [{
-            type: 'file_change' as const,
-            path: content.path,
-            summary: `${harness} updated a file.`,
-            subagentId,
-          }]
-          : [])
+      const diffs = acpFileChanges(blocks, update.locations ?? [], update.toolCallId)
+        .map((change) => ({ ...change, summary: `${harness} updated a file.`, subagentId }))
       const webAction = meta.toolName != null ? CLAUDE_WEB_TOOLS.get(meta.toolName) : undefined
       const web = claudeWebActivity(meta, 'rawInput' in update ? update.rawInput : undefined)
       const prose = toolProse(update, meta)

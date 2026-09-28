@@ -283,7 +283,18 @@ export type AgentNormalizedEvent =
   | { type: 'request'; requestId: string; kind: AgentRequestKind; title: string; detail?: string; options?: AgentPermissionOption[]; questions?: AgentQuestion[] }
   | { type: 'request_resolved'; requestId: string; resolution: unknown }
   | { type: 'artifact'; artifactId: string; kind: AgentArtifactKind; title: string; mediaType?: string; byteSize?: number }
-  | { type: 'file_change'; path?: string; patch?: string; summary?: string; subagentId?: string }
+  /** `patch` is the unified hunks for `path`, from the first `@@` on, with no file header. A change
+   *  with no path is Codex's whole-turn diff, which is a multi-file git patch instead.
+   *
+   *  `changeId` names the edit this belongs to: the tool call, the Codex item, or the turn. Agents
+   *  report one edit more than once as it firms up, and the thread keeps only the latest change for
+   *  each id and path. `snippet` means the hunks came from an excerpt rather than the file, so their
+   *  line numbers count from the top of the excerpt. `patchArtifactId` is set when the patch was too
+   *  large to keep inline and went to that artifact instead. */
+  | {
+    type: 'file_change'; path?: string; patch?: string; summary?: string; subagentId?: string
+    changeId?: string; snippet?: boolean; patchArtifactId?: string
+  }
   | { type: 'terminal'; terminalSessionId: string; title: string }
   | { type: 'turn_completed'; stopReason?: string }
   | { type: 'error'; code: string; message: string; retryable: boolean }

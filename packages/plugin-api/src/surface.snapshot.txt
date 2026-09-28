@@ -826,6 +826,7 @@ ui/tree: Spinner
 ui/tree: SplitCell
 ui/tree: SplitHandle
 ui/tree: Stack
+ui/tree: StackedDiff
 ui/tree: StatusDot
 ui/tree: TabPanel
 ui/tree: Table
@@ -931,6 +932,7 @@ ui: Spinner
 ui: SplitCell
 ui: SplitHandle
 ui: Stack
+ui: StackedDiff
 ui: StatusDot
 ui: TabDef
 ui: TabPanel

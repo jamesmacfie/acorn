@@ -228,6 +228,8 @@ export function boundProviderEvent(
         path: sliceText(event.path, 4_096),
         summary: sliceText(event.summary, 16_384),
         subagentId: sliceText(event.subagentId, 2_000),
+        changeId: sliceText(event.changeId, 2_000),
+        patchArtifactId: sliceText(event.patchArtifactId, 2_000),
       }
     case 'terminal':
       return {
