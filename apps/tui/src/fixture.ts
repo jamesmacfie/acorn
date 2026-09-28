@@ -282,7 +282,7 @@ const PULL_REF = { owner: 'runn-fast', repo: 'acorn', number: 42 }
 
 /** How many pull requests the browse list answers with. One, unless a test asks for more: a list
  *  longer than the panel it draws in is its own case — the window, the scrollbar, and the panels
- *  below it staying on the screen (./panel.tsx, ./kit/showing.tsx § Rows). */
+ *  below it staying on the screen (./panel.tsx, ./kit/showing/collection.tsx § Rows). */
 const pulls = () => {
   const count = Number(process.env.ACORN_FIXTURE_PULLS ?? 1)
   return count > 1

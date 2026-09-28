@@ -42,7 +42,8 @@ export function hit(node: Renderable, x: number, y: number): Renderable | null {
 type Wheeled = { scrollBy?: (delta: number, unit?: string) => void }
 
 /** A wheel step as the two handlers in this package read one, which is OpenTUI's `MouseEvent` cut
- *  down to the members they touch (`../kit/showing.tsx § Rows virtual`, § DiffPane). */
+ *  down to the members they touch (`../kit/showing/collection.tsx § Rows virtual`,
+ *  `../kit/showing/diffPane.tsx § DiffPane`). */
 export type Wheel = {
   x: number
   y: number
