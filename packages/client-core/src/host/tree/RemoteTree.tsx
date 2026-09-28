@@ -181,7 +181,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     },
   })
 
-  // ── What this tree may ask the host for (../frames/sdk.ts § TreeMount.host) ───────────────────────
+  // ── What this tree may ask the host for (../frames/sdk/treeChannel.ts § TreeMount.host) ───────────────
   //
   // Two operations, each with its own grant, and both answered here rather than on the bridge. The
   // bridge belongs to the bundle; this belongs to one mounted contribution, which is the only scope in

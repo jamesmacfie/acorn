@@ -20,7 +20,8 @@ import { createRenderer } from 'solid-js/universal'
 import { createStore, reconcile } from 'solid-js/store'
 import type { JSX } from 'solid-js'
 import { CHROME_SLOT_NODE, KIT_NODES, type KitNodeName } from '@acorn/protocol/tree/nodes.ts'
-import type { AcornBridge, TreeMount, TreeRender } from './sdk'
+import type { AcornBridge } from './sdk/bridgeTypes'
+import type { TreeMount, TreeRender } from './sdk/treeChannel'
 import {
   createNode, createText, firstChild, insertNode as attach, isTextNode, nextSibling, parentOf,
   removeNode, setProperty, setText, type RemoteNode,

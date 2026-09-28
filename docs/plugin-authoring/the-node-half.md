@@ -372,8 +372,8 @@ In-repo bundles import `connect()`, `mountFrame()` and `mountTree()` from `@acor
 and the tree path's nodes and `solidTree()` from `@acorn/plugin-api/ui/tree`. **A hand-written
 `client.js` cannot.** That is a bare specifier with no bundler to resolve it, and the origin would have
 nowhere to serve the resolved file from even if there were. Copying the SDK's source in is not an
-option either: `packages/client-core/src/host/frames/sdk.ts` is TypeScript and imports from
-`@acorn/protocol`, so it has the same problem one level down.
+option either: the implementation behind `packages/client-core/src/host/frames/sdk.ts` is TypeScript
+and imports from `@acorn/protocol`, so it has the same problem one level down.
 
 There are two answers, and which one you want is decided by a question this profile otherwise never
 asks you: **do you have a bundler?**
@@ -390,8 +390,8 @@ parts that are easy to get subtly wrong — abort signals, key-claim narrowing, 
 
 **If you do not**, which is the profile this document is about: **inline the handshake yourself.** It is
 about thirty lines, the protocol is versioned, and `npm create acorn-plugin` writes a working copy of it
-for you. Read `sdk.ts` for the semantics; it stays the reference implementation even when you are
-not importing it.
+for you. Read the SDK's `connection.ts`, `bridgePort.ts`, and `treeChannel.ts` for the semantics when
+you are not importing it.
 
 The sequence (`packages/protocol/src/plugin/bridge.ts`):
 

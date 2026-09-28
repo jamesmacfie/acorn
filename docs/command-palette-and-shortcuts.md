@@ -404,8 +404,8 @@ exempt from typing gets what it asked for whatever it spells.
 
 Two other paths already drew this line and this host was the one that refused both. The
 sandboxed-frame SDK forwards a modified chord out of a frame's own input and keeps a bare one
-(`client-core/host/frames/sdk.ts`), and the terminal host's command layer shadows bare keys while a
-field has them and lets chords through at every depth
+(`packages/client-core/src/host/frames/sdk/bridgePort.ts`). The terminal host's command layer shadows
+bare keys while a field has them and lets chords through at every depth
 (`apps/tui/src/keys/commandLayer.ts`). Escape is not a chord and is unaffected: an open overlay
 answers its own, and the matcher hands it over before any of this.
 
