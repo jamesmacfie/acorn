@@ -26,7 +26,7 @@ const runQuery = vi.fn()
 const readScratch = vi.fn(async () => 'SELECT generated;')
 let saved: () => Promise<DbSavedQuery[]> = async () => queries
 
-vi.mock('./databaseClient', () => ({
+vi.mock('./databaseClient', () => ({ databaseClient: () => ({
   connectDb: async () => ({ ok: true, database: 'dev' }),
   disconnectDb: async () => ({ ok: true }),
   listTables: async () => ({ tables: [] }),
@@ -40,7 +40,7 @@ vi.mock('./databaseClient', () => ({
   deleteRow: async () => ({ ok: true, rowCount: 1 }),
   readScratch: () => readScratch(),
   runQuery: (...args: unknown[]) => runQuery(...args),
-}))
+}) }))
 
 const settle = async () => {
   for (let at = 0; at < 4; at++) await new Promise<void>((resolve) => setTimeout(resolve, 0))

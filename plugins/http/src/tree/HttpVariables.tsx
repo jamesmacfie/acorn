@@ -12,7 +12,7 @@ import {
   Button, Checkbox, ConfirmButton, Heading, Icon, Inline, Input, Select, Stack, Text, Toolbar,
 } from '@acorn/plugin-api/ui/tree'
 import { variableKinds, type HttpVariable, type VariableKind } from '../shared/model'
-import { createVariable, deleteVariable, listVariables, updateVariable } from './httpClient'
+import type { HttpClient } from './httpClient'
 
 const KIND_HINT: Record<VariableKind, string> = {
   value: 'Used exactly as typed.',
@@ -31,7 +31,8 @@ type Row = { id: string | null; name: string; kind: VariableKind; value: string;
 const toRow = (v: HttpVariable): Row => ({ id: v.id, name: v.name, kind: v.kind, value: v.value, enabled: v.enabled, hasStoredSecret: v.kind === 'secret' })
 const blankRow = (): Row => ({ id: null, name: '', kind: 'value', value: '', enabled: true, hasStoredSecret: false })
 
-export default function HttpVariables(props: { projectId: string; projectName: string }) {
+export default function HttpVariables(props: { client: HttpClient; projectId: string; projectName: string }) {
+  const { createVariable, deleteVariable, listVariables, updateVariable } = props.client
   const [error, setError] = createSignal<string | null>(null)
   const [busy, setBusy] = createSignal<string | null>(null)
   const [stored] = createResource(() => props.projectId, listVariables)

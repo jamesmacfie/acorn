@@ -1,9 +1,13 @@
 // Typed wrapper over the /v1/p/http routes, over the frame bridge rather than core's fetch helpers.
 //
 // A frame has no network (`connect-src 'none'`), so there is no `readJson` and no CSRF envelope.
-// Every call is a message on the one MessagePort, and the host checks the path against this plugin's
-// own namespace before forwarding it (client-core/host/frames/scopes.ts).
-import { connect } from '@acorn/plugin-api/ui/sdk'
+// Every call is a message on the mounted tree's bridge, and the host checks the path against this
+// plugin's own namespace before forwarding it (client-core/host/frames/scopes.ts).
+//
+// Built from the bridge the tree was mounted with, never from module-level `connect()`. In a tree
+// worker that one is the bundle's shared port, which the host refuses for any bundle whose SDK hands
+// each tree its own bridge (client-core/host/tree/workerHost.ts).
+import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import {
   httpRequestRoute,
   httpRequestsRoute,
@@ -20,36 +24,38 @@ import {
 // HttpSendInput instead, whose executionTaskId comes from the panel context.
 export type RequestPayload = Omit<HttpRequest, 'id' | 'projectId' | 'createdAt' | 'updatedAt'>
 
-const api = async () => (await connect()).api
+export type HttpClient = ReturnType<typeof httpClient>
 
-export const listRequests = async (projectId: string, taskId?: string): Promise<HttpRequest[]> =>
-  (await api()).get(`${httpRequestsRoute(projectId)}${taskId ? `?taskId=${encodeURIComponent(taskId)}` : ''}`)
+export const httpClient = ({ api }: AcornBridge) => ({
+  listRequests: (projectId: string, taskId?: string): Promise<HttpRequest[]> =>
+    api.get(`${httpRequestsRoute(projectId)}${taskId ? `?taskId=${encodeURIComponent(taskId)}` : ''}`),
 
-export const createRequest = async (projectId: string, body: RequestPayload): Promise<HttpRequest> =>
-  (await api()).post(httpRequestsRoute(projectId), body)
+  createRequest: (projectId: string, body: RequestPayload): Promise<HttpRequest> =>
+    api.post(httpRequestsRoute(projectId), body),
 
-export const updateRequest = async (projectId: string, id: string, body: RequestPayload): Promise<HttpRequest> =>
-  (await api()).put(httpRequestRoute(projectId, id), body)
+  updateRequest: (projectId: string, id: string, body: RequestPayload): Promise<HttpRequest> =>
+    api.put(httpRequestRoute(projectId, id), body),
 
-export const deleteRequest = async (projectId: string, id: string): Promise<void> => {
-  await (await api()).del(httpRequestRoute(projectId, id))
-}
+  deleteRequest: async (projectId: string, id: string): Promise<void> => {
+    await api.del(httpRequestRoute(projectId, id))
+  },
 
-export const listVariables = async (projectId: string): Promise<HttpVariable[]> =>
-  (await api()).get(httpVariablesRoute(projectId))
+  listVariables: (projectId: string): Promise<HttpVariable[]> =>
+    api.get(httpVariablesRoute(projectId)),
 
-export const createVariable = async (projectId: string, body: Omit<HttpVariable, 'id' | 'updatedAt'>): Promise<HttpVariable> =>
-  (await api()).post(httpVariablesRoute(projectId), body)
+  createVariable: (projectId: string, body: Omit<HttpVariable, 'id' | 'updatedAt'>): Promise<HttpVariable> =>
+    api.post(httpVariablesRoute(projectId), body),
 
-export const updateVariable = async (projectId: string, id: string, body: Omit<HttpVariable, 'id' | 'updatedAt'>): Promise<HttpVariable> =>
-  (await api()).put(httpVariableRoute(projectId, id), body)
+  updateVariable: (projectId: string, id: string, body: Omit<HttpVariable, 'id' | 'updatedAt'>): Promise<HttpVariable> =>
+    api.put(httpVariableRoute(projectId, id), body),
 
-export const deleteVariable = async (projectId: string, id: string): Promise<void> => {
-  await (await api()).del(httpVariableRoute(projectId, id))
-}
+  deleteVariable: async (projectId: string, id: string): Promise<void> => {
+    await api.del(httpVariableRoute(projectId, id))
+  },
 
-export const sendRequest = async (projectId: string, body: HttpSendInput): Promise<SendResult> =>
-  (await api()).post(httpSendRoute(projectId), body)
+  sendRequest: (projectId: string, body: HttpSendInput): Promise<SendResult> =>
+    api.post(httpSendRoute(projectId), body),
+})
 
 // The response body arrives base64'd so binary survives the JSON hop. Decode as UTF-8 for display;
 // callers that know it's binary use the byte array.
