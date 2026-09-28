@@ -15,6 +15,11 @@ The Node injects only the values the MCP process needs:
   session environment or request header, is authoritative for the session ID and effective tool
   ceiling.
 
+`ACORN_TASK_ID` is what the server addresses, so without it `tools/list` is empty. A managed session
+puts both identifiers in the provider process's own environment, not only in a protocol MCP
+declaration, because Claude Code and Codex start this server from their CLI registration and pass it
+only what they inherited (`plugins/agents/src/server/sessions/runtimeEngine.ts`).
+
 The endpoint is resolved at call time because Node ports are ephemeral. The signing key is persisted
 so a tmux-reattached process still authenticates after a Node restart. Rotating the key revokes
 outstanding internal tokens.

@@ -39,6 +39,7 @@ class ConfigDriver implements AgentDriver {
   readonly profileId = 'claude-code'
   readonly configSets: Array<[string, string]> = []
   readonly turns: AgentDriverTurnOptions[] = []
+  readonly envs: Record<string, string>[] = []
 
   async probe(): Promise<AgentProviderDescriptor> {
     return {
@@ -59,6 +60,7 @@ class ConfigDriver implements AgentDriver {
   }
 
   async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
+    this.envs.push(options.env)
     const providerSessionRef = options.session.providerSessionRef ?? `cfg-${randomUUID()}`
     let active = false
     let current = advertised()
@@ -195,6 +197,10 @@ describe('agents.sessionExecute config options', () => {
       sessionId: session.id,
       toolCeiling: tools,
     })
+
+    // Claude Code starts the acorn MCP server from its own registration, so the server gets only what
+    // the provider process inherits, and it lists no tools without a task ID.
+    expect(driver.envs[0]).toMatchObject({ ACORN_TASK_ID: taskId, ACORN_SESSION_ID: session.id })
 
     const patched = await runtime.patchSession(session.id, { config: { toolCeiling: { maxRisk: 'execute' } } })
     expect(patched.config.toolCeiling).toEqual(tools)
