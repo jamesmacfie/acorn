@@ -12,8 +12,9 @@ const typedBinding = (value: WorkflowValueBinding | undefined): DataBinding | un
   return parsed.success ? parsed.data : undefined
 }
 
-/** The Form section of a human gate (docs/workflows.md § Human gates). The field list is the one the
- *  workflow's own inputs use, and each field's proposal is picked the way a child input's is. */
+/** The Form section of a human gate (docs/workflows/execution.md § Human gates). The field list is
+ *  the one the workflow's own inputs use, and each field's proposal is picked the way a child
+ *  input's is. */
 export default function GateFormEditor(props: {
   def: WorkflowDef
   step: WorkflowStepDef

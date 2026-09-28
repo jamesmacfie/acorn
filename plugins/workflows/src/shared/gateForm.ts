@@ -1,12 +1,12 @@
-// The approval form on a `gate-human` step (docs/workflows.md § Human gates). Shared, because the
-// node checks an answer with these functions and the run pane runs the same check before it sends
-// one, so a problem shows under its field before the request instead of after it.
+// The approval form on a `gate-human` step (docs/workflows/execution.md § Human gates). Shared,
+// because the node checks an answer with these functions and the run pane runs the same check
+// before it sends one, so the reviewer sees a refused value before the request rather than after.
 import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
 import { validateDataValue } from '@acorn/protocol/dataSchemas.ts'
 import { canonicalDataEncoding, DATA_LIMITS, type DataValue } from '@acorn/protocol/dataValues.ts'
 import type { WorkflowGateForm, WorkflowStepDef } from './workflowContracts'
 
-// ponytail: a proposed cap, not a measured one. Raise it if a real form needs more.
+// A proposed cap, not a measured one. Raise it if a real form needs more.
 export const GATE_FORM_MAX_FIELDS = 20
 
 /** What a gate with a form proposes and what its reviewer approved, as frozen into the step's

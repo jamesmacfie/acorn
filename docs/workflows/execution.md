@@ -136,6 +136,68 @@ Retry is a device action. A task-confined caller, meaning an agent inside the ru
 because it could otherwise loop a failed step past the rail that stopped it. The budget rule holds
 either way: a retry's usage adds to the run's persisted sum and the same rail fires again.
 
+### Human gates
+
+A `gate-human` step parks the run in `gated`, rings the bell, and raises the
+`workflow:gate:<stepId>` attention row. Under an autonomous posture it passes straight through with
+`{ approved: 'autonomous' }`. Approving resumes the run and rejecting fails the step and the run.
+
+A gate can carry a `form`. Its `fields` are declared the way workflow inputs are, and its `values`
+bind each field to a run input or a transitive predecessor, the way child inputs bind:
+
+```json
+{
+  "id": "approve", "name": "Approve the release note", "kind": "gate-human", "after": ["draft"],
+  "form": {
+    "fields": [
+      { "name": "title", "label": "Title", "schema": { "type": "string" }, "required": true },
+      { "name": "notify", "schema": { "type": "boolean" }, "default": false }
+    ],
+    "values": { "title": { "address": { "from": "step", "stepId": "draft", "pointer": "/title" } } }
+  }
+}
+```
+
+A field's proposal is its binding's value, then its `default`, then nothing. When the run reaches
+the gate, the handler resolves the proposal, checks each value against its field's type, and freezes
+it into the step's `inputs_json` as `form.values` before the step waits. The reviewer edits values
+that cannot change underneath them, and the proposal stays readable after the run ends. A value of
+the wrong type fails the step with the field's name. A missing value is allowed and shows as an empty
+field. A form holds at most 20 fields. In TOML, fields use `schema_json` and `default_json` and
+bindings use `binding_json`, as inputs and child bindings do.
+
+An approval with a form writes the step's structured output:
+
+```json
+{ "approved": true, "values": { "title": "…", "notify": true }, "edited": ["notify"] }
+```
+
+`edited` names the fields whose approved value differs from the proposal. The output schema is
+derived from the fields (`plugins/workflows/src/shared/gateForm.ts`), so a later step binds to
+`/values/<field>` and the editor's picker offers it. `approved` is left out of that schema, because it
+is `true` or `'autonomous'`. A gate without a form writes no structured output and keeps
+`{ approved: true }` in `result_json`.
+
+The route body is `{ stepId, approved, values? }`. `values` comes only with an approval, only on a
+gate with a form, and is the complete set being approved: a field left out is approved empty. Without
+it, the node approves the proposal as it stands. The node refuses an unknown field, a wrong type, and
+an empty required field with a 400 that names each one, and the gate keeps waiting.
+
+Under an autonomous posture, a form gate approves its proposal unchanged with
+`approved: 'autonomous'` and an empty `edited`. A required field with no value fails the step,
+because nobody was asked. Validation reports the same problem when the definition's own posture is
+autonomous.
+
+Only one answer lands. The step leaves `waiting-gate` through a conditional update, so of two devices
+answering together one changes the row and the other gets a 409 with the `gate-resolved` code. Only
+the winner resumes or fails the run. A gate answer is device-only: a task-confined caller gets a 403
+even on its own run ([security.md](../security.md)). A rejected gate can be retried like any failed
+step, and the re-run resolves a fresh proposal.
+
+An older node ignores `form` and runs the step as a plain gate. Any later binding to `/values` then
+fails validation, because a plain gate declares no structured output, so such a definition does not
+load there.
+
 ### What a run reports
 
 A run raises a `workflow.run` span and each of its steps a `workflow.step` span, both through
