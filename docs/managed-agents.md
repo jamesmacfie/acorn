@@ -72,6 +72,12 @@ first durable text prompt, asks the same profile again, and compares against the
 when the request started. A rename made while regeneration runs still wins. A generation failure leaves
 the current title and adds nothing to the transcript.
 
+`plugins/agents/src/server/sessions/runtime.ts` coordinates session commands with the provider
+engine. `sessionTitleGeneration.ts` owns title requests and cancellation,
+`sessionDefaultsCommands.ts` applies saved provider options, and `transcriptCommands.ts` imports,
+verifies, and exports transcripts. `sessionWait.ts` checks live frames against the durable snapshot.
+The runtime keeps the public methods and durable store boundary.
+
 ### Cross-plugin lifecycle
 
 Three plugin events reduce the durable model without copying its private content:
