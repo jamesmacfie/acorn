@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { createHash } from 'node:crypto'
 import { DEFAULT_PROFILE_ID } from '@acorn/plugin-api/node'
 import type { StepKindDescription, WorkflowCatalog, WorkflowDef } from '../../shared/workflowContracts'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
@@ -74,6 +75,25 @@ const fanIn = (name: string): WorkflowDef => ({
     { id: 'right', name: 'Right', after: [], prompt: 'Look from the right.' },
     { id: 'both', name: 'Both', after: ['left', 'right'], prompt: 'Read both.' },
   ],
+})
+
+// A prompt text change affects model behavior and provider cache keys. Review intentional edits
+// before updating these hashes; the focused tests below explain the individual rules.
+it('keeps generation, edit, and repair prompt bytes stable', () => {
+  const digest = (text: string) => createHash('sha256').update(text).digest('hex')
+  const system = buildGenerateSystemPrompt({ catalog: catalog(), examples: [{ id: 'example', def: fanIn('Example') }] })
+  const user = buildGenerateUserPrompt({ mode: 'edit', description: 'Add a gate.', currentDef: fanIn('Example') })
+  const repair = buildRepairUserPrompt({
+    userPrompt: user,
+    def: fanIn('Example'),
+    notes: [{ code: 'unknown-kind', message: 'An unavailable kind was removed.' }],
+    problems: ['Step A has no predecessor.'],
+  })
+  expect([digest(system), digest(user), digest(repair)]).toEqual([
+    'd986e87d0dbc32e0359f39ccc56f0244924a502a76d66c3b25898a434e0454d0',
+    '7c05d99245a0227ce0871974a643edd54542ede256f4b4d76eb6a24a402d45bd',
+    'd56c93453b6719c4f1ee299d50d01ad01cfc928c1e305cc263411b60199b003a',
+  ])
 })
 
 describe('the output contract', () => {
