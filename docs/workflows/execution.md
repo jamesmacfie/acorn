@@ -91,7 +91,27 @@ advertises them, such as `model` and `reasoning`. The runner hands them to the a
 applies them to the session after the provider reports its option list and before the turn is
 enqueued. A value the provider does not offer is dropped and recorded in the transcript rather than
 failing the step. Where a step sets both `model` and `config_options.model`, validation refuses the
-file.
+file. Effort names don't mean the same amount of thinking on every model: Anthropic measured
+`medium` on Opus 5.5 matching `high` on Opus 5, so a `reasoning` value carried over from Opus 5 runs
+longer and costs more than it did.
+
+### A turn that ends early
+
+A managed step is a turn, and the step's result is that turn's final message. A model can end a turn
+on a progress report instead of the finished work, so acorn guards the step three ways
+(`plugins/agents/src/server/sessions/sessionExecute.ts`):
+
+1. A Claude session for a workflow step or a delegated agent gets an extra instruction appended to
+   Claude Code's system prompt. It names the ways of ending a turn early that Anthropic has seen and
+   asks the model to carry on instead (`plugins/agents/src/server/drivers/claudeHarness.ts`). An
+   interactive chat doesn't get it, because a person is there to answer.
+2. If the turn ends without the result the step needs, meaning no message at all or no `json` block
+   that matches the step's schema, acorn sends one more turn telling the agent to finish or say what
+   blocks it. It does that twice at most, then the step is `malformed` as before. The transcript
+   labels these turns **Acorn**, and the step's own prompt **Workflow**. The step's events cover
+   every turn, but its usage and cost are the last turn's alone.
+3. A turn the model declined, with the stop reason `refusal`, fails the step with that reason and is
+   never sent again. Asking again in the same words gets the same answer.
 
 ### Isolation
 

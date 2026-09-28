@@ -40,6 +40,12 @@ const contextLine = (context: { used: number; size?: number }): string =>
 export const withoutAttachmentPlaceholders = (text: string): string =>
   text.replace(/^\[Attachment: [^\]\n]+\]$/gm, '').replace(/\n{3,}/g, '\n\n').trim()
 
+// The tags that mark another author's text for the model (a pull request body, a delegated agent's
+// report). They are for the model alone, and the reader never sees their ids.
+export const withoutPastedMarkers = (text: string): string => !text.includes('<pasted_content id=')
+  ? text
+  : text.replace(/^<\/?pasted_content id="[0-9a-f]+">$/gm, '').replace(/\n{3,}/g, '\n\n').trim()
+
 const PLAN_STATUS: Record<AgentPlanEntry['status'], { icon: string; tone: 'muted' | 'accent' | 'ok'; label: string }> = {
   pending: { icon: 'circle', tone: 'muted', label: 'Pending' },
   in_progress: { icon: 'circle-dot', tone: 'accent', label: 'In progress' },
@@ -139,7 +145,7 @@ export default function AgentEventCard(props: {
                   <Text emphasis="eyebrow" tip={time().full} tipAt={props.item.createdAt}>{time().short}</Text>
                 </Inline>
                 <AgentMarkdown
-                  text={attachments().length ? withoutAttachmentPlaceholders(message().text) : message().text}
+                  text={withoutPastedMarkers(attachments().length ? withoutAttachmentPlaceholders(message().text) : message().text)}
                   taskId={props.taskId}
                 />
                 <Show when={attachments().length}>
@@ -465,7 +471,11 @@ export default function AgentEventCard(props: {
         {/* The turn's own footer: what ended it on the left, how much of the model's context window it
             had used on the right. The figure is stamped onto the item by the fold, because the usage
             that carries it is a separate event and often arrives after this one
-            (./conversationItems.ts § stampTurnContext). */}
+            (./conversationItems.ts § stampTurnContext). A declined turn also says so in words, because
+            a safety refusal otherwise looks like a turn that finished with a short answer. */}
+        <Show when={(event() as Extract<ReturnType<typeof event>, { type: 'turn_completed' }>).stopReason === 'refusal'}>
+          <Alert tone="warn">The model declined this request. Rephrase it, or switch to another model and send it again.</Alert>
+        </Show>
         <Inline spread>
           <Text emphasis="muted">
             Turn complete

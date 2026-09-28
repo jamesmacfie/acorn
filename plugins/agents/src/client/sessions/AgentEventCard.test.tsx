@@ -25,7 +25,7 @@ vi.mock('./managedClient', () => ({
 const dispatchLayout = vi.fn()
 vi.mock('@acorn/plugin-api/client', async (original) => ({ ...await original<Record<string, unknown>>(), dispatchLayout }))
 
-const { default: AgentEventCard, withoutAttachmentPlaceholders } = await import('./AgentEventCard')
+const { default: AgentEventCard, withoutAttachmentPlaceholders, withoutPastedMarkers } = await import('./AgentEventCard')
 const { buildConversationItems } = await import('./conversationItems')
 
 const fileChange = (event: Extract<AgentConversationItem['event'], { type: 'file_change' }>): AgentConversationItem =>
@@ -190,6 +190,12 @@ it('drops the attachment placeholder only when there is an attachment to draw in
   } finally { dispose() }
 })
 
+it('hides the marker lines around another author\'s text, and leaves other text alone', () => {
+  expect(withoutPastedMarkers('Final message:\n\n<pasted_content id="ab12cd34">\nDone.\n</pasted_content id="ab12cd34">'))
+    .toBe('Final message:\n\nDone.')
+  expect(withoutPastedMarkers('a\n\n\n\nb')).toBe('a\n\n\n\nb')
+})
+
 it('does not render a completed subagent’s history until its disclosure opens', () => {
   markdownMounts = 0
   const item: AgentConversationItem = {
@@ -293,11 +299,24 @@ it('closes a turn with the context window on the right of the line', () => {
 it('closes a turn that reported no context with the reason alone', () => {
   const item: AgentConversationItem = {
     key: 'done', firstSeq: 9, lastSeq: 9, createdAt: 9, turnId: 'turn-1',
+    event: { type: 'turn_completed', stopReason: 'end_turn' },
+  }
+  const host = document.createElement('div')
+  const dispose = render(() => <AgentEventCard item={item} taskId="task" sessionId="session" />, host)
+  try {
+    expect(host.textContent).toBe('Turn complete · end_turn')
+  } finally { dispose() }
+})
+
+it('says in words that the model declined a refused turn', () => {
+  const item: AgentConversationItem = {
+    key: 'done', firstSeq: 9, lastSeq: 9, createdAt: 9, turnId: 'turn-1',
     event: { type: 'turn_completed', stopReason: 'refusal' },
   }
   const host = document.createElement('div')
   const dispose = render(() => <AgentEventCard item={item} taskId="task" sessionId="session" />, host)
   try {
-    expect(host.textContent).toBe('Turn complete · refusal')
+    expect(host.querySelector('[data-tone="warn"]')?.textContent).toContain('The model declined this request.')
+    expect(host.textContent).toContain('Turn complete · refusal')
   } finally { dispose() }
 })
