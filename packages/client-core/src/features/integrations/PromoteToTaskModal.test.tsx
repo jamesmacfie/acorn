@@ -142,3 +142,22 @@ describe('the branch field', () => {
     expect(primary().disabled).toBe(true)
   })
 })
+
+describe('the setup script', () => {
+  it('runs by default', async () => {
+    mount()
+    await settle()
+    primary().click()
+    await settle()
+    expect(created).toHaveBeenCalledWith(expect.objectContaining({ skipSetup: false }))
+  })
+
+  it('can be skipped', async () => {
+    mount()
+    await settle()
+    document.querySelector<HTMLInputElement>('input.ui-check-box')!.click()
+    primary().click()
+    await settle()
+    expect(created).toHaveBeenCalledWith(expect.objectContaining({ skipSetup: true }))
+  })
+})

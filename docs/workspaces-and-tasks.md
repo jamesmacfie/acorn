@@ -170,7 +170,8 @@ The project's setup script runs in the new worktree as an ordinary terminal sess
 so its output is readable while it works. The task's rail row says so too: a pulsing dot sits under
 the task glyph until that session exits, in the slot teardown's spinner uses at the other end of the
 task's life ([ui-design.md](./ui-design.md) § Rail controls).
-The New task dialog offers "Skip setup script" for a Git worktree task. The choice is stored on the
+The New task dialog offers "Skip setup script" for a Git worktree task, and so does the box that
+makes a task from an integration's item, "Start workflow…" included. The choice is stored on the
 task, so it also skips setup if another surface creates the worktree later or the task is restored.
 Unchecked tasks keep the project's configured setup behavior.
 
