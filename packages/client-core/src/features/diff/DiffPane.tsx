@@ -20,6 +20,7 @@ import { annotationKey } from '../../host/annotations/annotationKey'
 import { annotationsFor, requestAnnotations } from '../../host/annotations/annotations'
 import { DiffToolbar } from './DiffToolbar'
 import { createDiffFindController } from './findController'
+import { fileFilterMarks } from './fileFilter'
 import {
   DIFF_GAP_ROW_HEIGHT,
   DIFF_LINE_HEIGHT,
@@ -123,7 +124,22 @@ export function DiffPane(props: {
   // Keyed by thread id: one key per thread, set to a boolean, never an object merged by path.
   const [threadCollapsed, setThreadCollapsed] = createStore<Record<string, boolean | undefined>>({})
 
-  const view = createDocumentView({ topology, collapsed: collapsedFiles, overlays, threads })
+  // The file filter in the toolbar: the files it keeps, and where it matched each one's path. Held for
+  // the life of the pane, so a new revision keeps the reader's filter.
+  const [fileQuery, setFileQuery] = createSignal('')
+  const fileFilter = createMemo(() => {
+    const query = fileQuery().trim()
+    if (!query) return null
+    const kept = new Map<string, readonly number[]>()
+    for (const file of topology()?.files ?? []) {
+      const marks = fileFilterMarks(query, file.path)
+      if (marks) kept.set(file.path, marks)
+    }
+    return kept
+  })
+  const fileMarks = (path: string) => fileFilter()?.get(path)
+
+  const view = createDocumentView({ topology, collapsed: collapsedFiles, overlays, threads, filter: fileFilter })
   const items = view.items
 
   // Spans per batch and per coloured segment, and the batch size as a sample: what reading near the
@@ -250,6 +266,8 @@ export function DiffPane(props: {
     sourceItems,
     scrollEl,
   })
+  // A narrower list starts from its top: the old offset points into files that may no longer be there.
+  createEffect(on(fileQuery, () => layout.scrollToOffset(0), { defer: true }))
 
   // A different set of files: nothing about the old view survives.
   createEffect(on(signature, (next, previous) => {
@@ -461,7 +479,7 @@ export function DiffPane(props: {
     <Show when={stickyFile()}>
       {(f) => (
         <div class="diff-sticky-file">
-          <FileHead file={f()} collapsed={collapsedFiles().has(f().path)} onToggleCollapse={toggleFileCollapse} />
+          <FileHead file={f()} collapsed={collapsedFiles().has(f().path)} onToggleCollapse={toggleFileCollapse} marks={fileMarks(f().path)} />
         </div>
       )}
     </Show>
@@ -581,7 +599,10 @@ export function DiffPane(props: {
       when={topology()?.files.length}
       fallback={<EmptyState align="start" busy={source().loading()}>{source().loading() ? 'Loading…' : 'No files.'}</EmptyState>}
     >
-      <DiffToolbar find={findController} viewMode={viewMode} setViewMode={setViewMode} />
+      <DiffToolbar find={findController} viewMode={viewMode} setViewMode={setViewMode} fileQuery={fileQuery} setFileQuery={setFileQuery} />
+      <Show when={fileFilter()?.size === 0}>
+        <EmptyState align="start">No files match.</EmptyState>
+      </Show>
       <DiffCanvas
         viewMode={viewMode}
         items={items}
@@ -595,6 +616,7 @@ export function DiffPane(props: {
         retrySegment={loader.retry}
         fileCollapsed={(path) => collapsedFiles().has(path)}
         onToggleFileCollapse={toggleFileCollapse}
+        fileMarks={fileMarks}
         rows={{
           onMutated: invalidate,
           resolveThread: (threadId, resolved) => source().resolveThread?.(threadId, resolved) ?? rejectUnsupported(),

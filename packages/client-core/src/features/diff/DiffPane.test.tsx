@@ -172,14 +172,28 @@ describe('a segmented diff', () => {
     const host = mount({ ...source, ...withNeedle })
     await vi.waitFor(() => expect(requests.length).toBeGreaterThan(0), { timeout: 5_000 })
     ;(commandRegistry.get('large-diff.find') as unknown as { run: () => void }).run()
-    await vi.waitFor(() => expect(host.querySelector('input')).not.toBeNull(), { timeout: 5_000 })
-    const input = host.querySelector('input')!
+    await vi.waitFor(() => expect(host.querySelector('[role="search"] input')).not.toBeNull(), { timeout: 5_000 })
+    const input = host.querySelector<HTMLInputElement>('[role="search"] input')!
     input.value = word
     input.dispatchEvent(new Event('input', { bubbles: true }))
     await vi.waitFor(() => expect(requests.some((request) => request.path === target.path)).toBe(true), { timeout: 5_000 })
     host.querySelector('.diff')!.dispatchEvent(new Event('scroll'))
     await vi.waitFor(() => expect(host.querySelector('.ui-find-mark')?.textContent).toBe(word), { timeout: 5_000 })
   }, 30_000)
+
+  it('filters the files by name and marks where each one matched', async () => {
+    const files = [...largeDiffFiles('small', 1)].slice(0, 3)
+    const host = mount(largeDiffSource(files))
+    const heads = () => [...host.querySelectorAll('.diff-item .diff-file-path')].map((head) => head.textContent)
+    await vi.waitFor(() => expect(heads()[0]).toBe(files[0]!.path), { timeout: 5_000 })
+    // The last file, so it is the first header only if the two before it were filtered out.
+    const target = files[2]!.path
+    const input = host.querySelector<HTMLInputElement>('input[aria-label="Filter files"]')!
+    input.value = target
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    await vi.waitFor(() => expect(heads()).toEqual([target]), { timeout: 5_000 })
+    expect(host.querySelector('.diff-item .diff-file-path .ui-find-mark')?.textContent).toBe(target)
+  }, 20_000)
 
   it('expands a gap into context rows and collapses a file to its header', async () => {
     const files = [...largeDiffFiles('small', 1)].slice(0, 2)
