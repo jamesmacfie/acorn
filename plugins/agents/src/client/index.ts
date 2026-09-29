@@ -31,6 +31,7 @@ const InlineDiffCard = lazy(() => import('./inlineDiff/InlineDiffCard.tsx'))
 const AgentConcurrencySettings = lazy(() => import('./settings/AgentConcurrencySettings'))
 const AgentPricingSettings = lazy(() => import('./settings/AgentPricingSettings'))
 const AgentSessionDefaultsSettings = lazy(() => import('./settings/AgentSessionDefaultsSettings'))
+const AgentMcpServersSettings = lazy(() => import('./settings/AgentMcpServersSettings'))
 
 export const agentsClientPlugin: ClientPlugin = {
   name: 'agents',
@@ -106,6 +107,11 @@ export const agentsClientPlugin: ClientPlugin = {
     ctx.settingsPages.register({
       id: 'agent-defaults', label: 'Agent defaults', group: 'general', order: 43, requires: { plugin: 'agents' },
       component: AgentSessionDefaultsSettings,
+    })
+    // Beside core's MCP config files page, which lists the servers each CLI loads by itself.
+    ctx.settingsPages.register({
+      id: 'agent-mcp-servers', label: 'MCP servers', group: 'general', order: 29, requires: { plugin: 'agents' },
+      component: AgentMcpServersSettings,
     })
     // Fleet home's "agents running" number. Addressed at an explicit node, never the ambient one,
     // because the card exists to show several nodes at once.

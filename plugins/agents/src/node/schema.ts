@@ -277,3 +277,15 @@ export const agentWebhookDeliveries = sqliteTable(
     index('agent_webhook_deliveries_created_idx').on(table.webhookId, table.createdAt),
   ],
 )
+
+// The MCP servers acorn declares to agent sessions (docs/mcp.md § Your own servers). The name is the
+// key because it is also what each session stores in `config.mcpServers` and what every harness shows.
+// `config_json` holds the command or URL and the environment or headers, with each secret value
+// sealed by the node's secret service, so the plaintext exists only at spawn time.
+export const agentMcpServers = sqliteTable('agent_mcp_servers', {
+  name: text('name').primaryKey(),
+  configJson: text('config_json').notNull(),
+  enabled: integer('enabled', { mode: 'boolean' }).notNull().default(true),
+  createdAt: integer('created_at').notNull(),
+  updatedAt: integer('updated_at').notNull(),
+})

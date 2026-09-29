@@ -102,7 +102,7 @@ and variable data encrypted at rest; sending is restricted to an interactive dev
 
 ## Settings and fleet
 
-Settings includes workspaces, appearance, notifications, integrations, MCP, agent tools, pricing, workflows,
+Settings includes workspaces, appearance, notifications, integrations, MCP servers, MCP config files, agent tools, pricing, workflows,
 terminal, Docker, HTTP requests, shortcuts, Nodes, Plugins, and Security. The Notifications page
 switches sound, system notifications, the app-icon count, and each of the three things an agent can
 do that is worth interrupting for ([notifications.md](./notifications.md) § Settings). Nodes and plugins are

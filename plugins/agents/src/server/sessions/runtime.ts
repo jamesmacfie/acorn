@@ -32,6 +32,7 @@ import {
   type WaitCondition,
 } from './runtimeEngine'
 import { mergeSessionConfigChange } from './sessionConfigMerge'
+import { sessionMcpSelection, type AgentSessionMcp } from '../../shared/mcpServers'
 import { CODEX_PLAN_IMPLEMENTATION_PROMPT } from '../../shared/codexPlanHandoff'
 import {
   buildSessionTitlePrompt,
@@ -125,7 +126,10 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       throw new Error(`Provider '${provider.id}' requires profile '${provider.profileId}'.`)
     }
     await this.core.tasks.requireRoot(input.taskId)
-    const session = await this.store.createSession(input, provider)
+    // The servers switched on in Settings, decided here rather than taken from the caller: which
+    // programs a session starts is the owner's setting, not something a request body can widen.
+    const mcpServers = await this.mcpServers.enabledNames()
+    const session = await this.store.createSession({ ...input, config: { ...input.config, mcpServers } }, provider)
     if (idempotencyKey) await this.store.saveOperation(idempotencyKey, 'session.create', session, session.id)
     return { session, created: true }
   }
@@ -693,16 +697,15 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       assertBoundedJson('Agent session configuration', patch.config, MAX_AGENT_CONFIG_BYTES)
       // toolCeiling is authorization state written when the session is created. The general config
       // patch route may update provider options, but it may neither add, widen, nor remove that field.
+      // The session's MCP servers are the same kind of field, changed only through
+      // setSessionMcpServers(), which checks each name against Settings and restarts the provider.
       const clientConfig = { ...patch.config }
       delete clientConfig.toolCeiling
+      delete clientConfig.mcpServers
+      const kept = (key: string) => Object.prototype.hasOwnProperty.call(before.config, key) ? { [key]: before.config[key] } : {}
       persistedPatch = {
         ...patch,
-        config: {
-          ...clientConfig,
-          ...(Object.prototype.hasOwnProperty.call(before.config, 'toolCeiling')
-            ? { toolCeiling: before.config.toolCeiling }
-            : {}),
-        },
+        config: { ...clientConfig, ...kept('toolCeiling'), ...kept('mcpServers') },
       }
       const previousOptions = Array.isArray(before.config.configOptions)
         ? before.config.configOptions as Array<{ id?: unknown; currentValue?: unknown }>
@@ -772,6 +775,69 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     const session = await this.store.patchSession(sessionId, persistedPatch)
     this.emit({ channel: 'agent:session', session })
     return session
+  }
+
+  /** The session panel's view of MCP (docs/mcp.md § Your own servers). */
+  async sessionMcp(sessionId: string): Promise<AgentSessionMcp> {
+    const session = await this.store.requireSession(sessionId)
+    const selected = new Set(sessionMcpSelection(session.config))
+    const servers = (await this.mcpServers.list()).map((server) => ({
+      name: server.name,
+      transport: server.transport,
+      enabled: selected.has(server.name),
+    }))
+    const handle = this.live.get(sessionId)?.handle
+    const reported = handle?.mcpStatus ? await handle.mcpStatus().catch(() => null) : null
+    return { servers, reported, locked: await this.mcpLockedReason(session) }
+  }
+
+  /**
+   * Switches this session's servers. A harness reads its servers only when its process starts, so a
+   * running provider is stopped and started again, which resumes the same conversation with the new
+   * list. That is why a turn in progress blocks the change.
+   */
+  async setSessionMcpServers(sessionId: string, enabled: readonly string[]): Promise<AgentSessionMcp> {
+    const before = await this.store.requireSession(sessionId)
+    const locked = await this.mcpLockedReason(before)
+    if (locked) throw new Error(locked)
+    const known = new Set((await this.mcpServers.list()).map((server) => server.name))
+    const unknown = enabled.filter((name) => !known.has(name))
+    // Worded for the bridge's status mapping (../routes/managedBridge.ts): "not found" is a 404.
+    if (unknown.length) throw new Error(`MCP server not found: ${unknown.join(', ')}.`)
+    const previous = sessionMcpSelection(before.config)
+    const next = [...new Set(enabled)].sort()
+    const on = next.filter((name) => !previous.includes(name))
+    const off = previous.filter((name) => !next.includes(name))
+    if (!on.length && !off.length) return this.sessionMcp(sessionId)
+
+    const latest = await this.store.requireSession(sessionId)
+    const session = await this.store.patchSession(sessionId, { config: { ...latest.config, mcpServers: next } })
+    this.emit({ channel: 'agent:session', session })
+    const changes = [...on.map((name) => `${name} on`), ...off.map((name) => `${name} off`)].join(', ')
+    const live = this.live.has(sessionId)
+    await this.record(sessionId, null, {
+      type: 'diagnostic',
+      level: 'info',
+      message: live
+        ? `MCP servers changed (${changes}). The agent restarted to pick them up.`
+        : `MCP servers changed (${changes}). They apply from the next message.`,
+    })
+    if (live) {
+      await this.stopLive(sessionId)
+      // Not awaited: a start can take as long as a session start does, and the panel polls. A start that
+      // fails records its own error in the transcript, which is where the reader looks.
+      void this.ensureSession(session).catch(() => undefined)
+    }
+    return this.sessionMcp(sessionId)
+  }
+
+  // Each reason is also the error setSessionMcpServers() throws, so each is worded to land on the
+  // bridge's 409 ("archived", "controlled", "active turn").
+  private async mcpLockedReason(session: AgentSession): Promise<string | null> {
+    if (session.runtimeState === 'archived') return 'This session is archived.'
+    if (session.controller !== 'acorn') return 'This session is controlled by a terminal. Return it to acorn to change its servers.'
+    if (await this.store.activeTurn(session.id)) return 'Finish or cancel the active turn to change servers.'
+    return null
   }
 
   async fork(sessionId: string, title?: string): Promise<AgentSession> {

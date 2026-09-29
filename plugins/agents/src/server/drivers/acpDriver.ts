@@ -164,13 +164,27 @@ export function clientFor(
 
 // ACP names an environment as an ordered list of pairs rather than a map, so that a server declaring
 // the same name twice is a protocol error the agent can report instead of a silent last-wins.
-export const acpMcpServers = (servers: readonly AgentDriverMcpServer[]): McpServer[] =>
-  servers.map((server) => ({
-    name: server.name,
-    command: server.command,
-    args: server.args,
-    env: Object.entries(server.env).map(([name, value]) => ({ name, value })),
-  }))
+//
+// An HTTP server goes only to an agent that said at `initialize` it takes one. Every ACP agent takes
+// stdio, so that is the only transport with no capability to check.
+export const acpMcpServers = (
+  servers: readonly AgentDriverMcpServer[],
+  capabilities: { http?: boolean } = {},
+): { servers: McpServer[]; unsupported: string[] } => {
+  const pairs = (record: Record<string, string>) => Object.entries(record).map(([name, value]) => ({ name, value }))
+  const out: McpServer[] = []
+  const unsupported: string[] = []
+  for (const server of servers) {
+    if (server.transport === 'stdio') {
+      out.push({ name: server.name, command: server.command, args: server.args, env: pairs(server.env) })
+    } else if (capabilities.http) {
+      out.push({ type: 'http', name: server.name, url: server.url, headers: pairs(server.headers) })
+    } else {
+      unsupported.push(server.name)
+    }
+  }
+  return { servers: out, unsupported }
+}
 
 export class AcpDriver implements AgentDriver {
   constructor(private readonly spec: HarnessLaunchSpec) {}
@@ -319,10 +333,18 @@ export class AcpDriver implements AgentDriver {
 
     let providerSessionRef = options.session.providerSessionRef
     let configOptions: readonly SessionConfigOption[] = []
-    // acorn's own tool servers, named on every session call. The runtime decides whether there are any:
-    // a harness that registers them through its CLI's own config file gets none here, so nothing is
-    // offered twice (docs/mcp.md § Configuration).
-    const mcpServers = acpMcpServers(options.mcpServers)
+    // acorn's own tool server and the user's, named on every session call. The runtime decides which:
+    // a harness that registers acorn's through its CLI's own config file gets only the user's here, so
+    // nothing is offered twice (docs/mcp.md § Configuration).
+    const declared = acpMcpServers(options.mcpServers, initialized.agentCapabilities?.mcpCapabilities ?? {})
+    const mcpServers = declared.servers
+    if (declared.unsupported.length) {
+      await options.onEvent({
+        type: 'diagnostic',
+        level: 'warning',
+        message: `${label} does not take HTTP MCP servers, so this session runs without ${declared.unsupported.join(', ')}.`,
+      })
+    }
     const sessionMeta = this.spec.acpSessionMeta?.(options.session)
     const createSession = async (): Promise<void> => {
       const created = await agent.newSession({
@@ -335,8 +357,8 @@ export class AcpDriver implements AgentDriver {
       configOptions = created.configOptions ?? []
     }
     if (providerSessionRef && (supportsResume || supportsLoad)) {
-      // The same four fields either way: neither call takes a prompt, and acorn names no extra roots and
-      // no MCP servers on any session call it makes.
+      // The same four fields either way: neither call takes a prompt, and acorn names no extra roots on
+      // any session call it makes.
       const reference = {
         sessionId: providerSessionRef,
         cwd: options.cwd,
@@ -363,12 +385,16 @@ export class AcpDriver implements AgentDriver {
         if (code !== ACP_RESOURCE_NOT_FOUND && code !== ACP_INVALID_PARAMS) throw error
         await createSession()
         // Say it out loud. The transcript on screen stays, but the fresh session has never seen it,
-        // so a reader who is not told will read the next answer as if the agent remembered.
-        await options.onEvent({
-          type: 'diagnostic',
-          level: 'warning',
-          message: `${label} no longer has the earlier session, so it starts fresh and cannot see the conversation above.`,
-        })
+        // so a reader who is not told will read the next answer as if the agent remembered. Not when no
+        // turn ever ran: Claude Code stores nothing before one, so a restart then (an MCP change, say)
+        // lands here with nothing lost.
+        if (!options.noProviderExecutionHistory) {
+          await options.onEvent({
+            type: 'diagnostic',
+            level: 'warning',
+            message: `${label} no longer has the earlier session, so it starts fresh and cannot see the conversation above.`,
+          })
+        }
       }
     } else {
       await createSession()
