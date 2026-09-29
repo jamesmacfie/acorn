@@ -48,8 +48,9 @@ import {
  * It leaves out four fields. `lastEventSeq` and `updatedAt` move with every event, and the client
  * reads the event frame for the one of them it needs live (../../client/sessions/managedStore.ts
  * § eventSeqs). A
- * subagent's `updatedAt` is the node's clock for quieting a silent child, and no client reads it. The
- * status that quieting changes is still compared. `config` is too large to compare per event, and
+ * subagent's `updatedAt` is the node's clock for quieting a silent child, and moves with every tool call
+ * the child makes. The task sidebar's tooltip reads it only as of the row's last broadcast. The status
+ * that quieting changes is still compared. `config` is too large to compare per event, and
  * record() handles it separately.
  */
 const listedRow = (session: AgentSession): string => JSON.stringify({

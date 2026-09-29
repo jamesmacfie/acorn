@@ -1,3 +1,4 @@
+import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { _resetSidebarCollapse, paneCollapseKey, sidebarCollapse } from '../lib/layout/collapseState'
@@ -142,5 +143,23 @@ describe('a row in a rail', () => {
     expect(row.getAttribute('data-tip')).toBe(null)
     expect(row.dataset.depth).toBe('2')
     expect(host.querySelector('.ui-row-body')?.textContent).toBe('Fix the parser')
+  })
+})
+
+describe('a row with a tip', () => {
+  it('shows the tip at full width, its name in a rail, and never the browser tooltip too', () => {
+    const [rail, setRail] = createSignal(false)
+    render(() => (
+      <Row title="Fix the parser" tip="Last active today" tipAt={1000} collapsed={rail() ? <span>●</span> : undefined}>
+        Fix the parser
+      </Row>
+    ), host)
+    const row = host.querySelector<HTMLElement>('.ui-row')!
+    expect(row.getAttribute('data-tip')).toBe('Last active today')
+    expect(row.getAttribute('data-tip-at')).toBe('1000')
+    expect(row.getAttribute('title')).toBe(null)
+    setRail(true)
+    expect(row.getAttribute('data-tip')).toBe('Fix the parser')
+    expect(row.getAttribute('data-tip-at')).toBe('1000')
   })
 })
