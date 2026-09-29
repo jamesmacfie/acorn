@@ -687,7 +687,8 @@ asking only whether each step is filled in: a picked recipe URL, a default targe
 `urlCommand`, or a project preview setting. It runs no script and needs no running dev server, so
 stopping the dev server does not close an open preview. The client holds the answer in
 `plugins/preview/src/client/configuredStore.ts` and re-reads it on a URL change, a project change,
-a task it has not seen, a Node switch, and a reconnect.
+a task it has not seen, a Node switch, and a reconnect. A Node that answers 404, one built before the
+route, gets the pane on every task, so an unrestarted or out-of-date Node does not lose preview.
 
 The preview tunnel implementation remains in custody but the pane does not open it while remote
 preview is disabled. The following describes that dormant transport, not an enabled remote preview
