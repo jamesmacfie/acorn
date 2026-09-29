@@ -73,6 +73,7 @@
   "GET /v1/p/docker/tasks/:id/containers",
   "GET /v1/p/docker/volumes",
   "GET /v1/p/editor/tasks/:id/editor/files",
+  "GET /v1/p/editor/tasks/:id/editor/image",
   "GET /v1/p/editor/tasks/:id/editor/line-markers",
   "GET /v1/p/editor/tasks/:id/editor/list",
   "GET /v1/p/editor/tasks/:id/editor/read",
