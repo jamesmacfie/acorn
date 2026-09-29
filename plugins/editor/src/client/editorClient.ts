@@ -4,6 +4,7 @@
 // returns null now that the surface is server-backed.
 import {
   editorFilesRoute,
+  editorImageRoute,
   editorListRoute,
   editorLineMarkersRoute,
   editorReadRoute,
@@ -14,7 +15,8 @@ import {
   type EditorWriteResult,
 } from '../contract/api'
 import type { QueryClient } from '@tanstack/solid-query'
-import { readJson, writeJson } from '@acorn/plugin-api/client'
+import { readBytes, readJson, writeJson } from '@acorn/plugin-api/client'
+import { MAX_IMAGE_PREVIEW_BYTES } from '../contract/imagePreview'
 
 export type { EditorEntry } from '../contract/api'
 
@@ -23,6 +25,7 @@ export type EditorApi = {
   list(taskId: string, relPath: string): Promise<EditorEntry[]>
   files(taskId: string): Promise<string[]>
   read(taskId: string, relPath: string): Promise<string>
+  readImage(taskId: string, relPath: string): Promise<{ bytes: Uint8Array; type: string }>
   lineMarkers(taskId: string, relPath: string): Promise<EditorLineMarkerSet[]>
   write(taskId: string, relPath: string, content: string): Promise<EditorWriteResult>
 }
@@ -32,6 +35,7 @@ const api: EditorApi = {
   list: (taskId, relPath) => readJson<EditorEntry[]>(editorListRoute(taskId, relPath)),
   files: (taskId) => readJson<string[]>(editorFilesRoute(taskId)),
   read: (taskId, relPath) => readJson<{ text: string }>(editorReadRoute(taskId, relPath)).then((r) => r.text),
+  readImage: (taskId, relPath) => readBytes(editorImageRoute(taskId, relPath), 'Unable to read image.', { maxResponseBytes: MAX_IMAGE_PREVIEW_BYTES }),
   lineMarkers: (taskId, relPath) => readJson<EditorLineMarkerSet[]>(editorLineMarkersRoute(taskId, relPath)),
   write: (taskId, relPath, content) =>
     writeJson<EditorWriteResult>(editorWriteRoute(taskId), {

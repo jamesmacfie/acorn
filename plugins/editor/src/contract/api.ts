@@ -15,6 +15,7 @@ export const editorRootRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}
 export const editorFilesRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/files`
 export const editorListRoute = (taskId: string, relPath: string) => `/v1/p/editor/tasks/${taskId}/editor/list?path=${encodeURIComponent(relPath)}`
 export const editorReadRoute = (taskId: string, relPath: string) => `/v1/p/editor/tasks/${taskId}/editor/read?path=${encodeURIComponent(relPath)}`
+export const editorImageRoute = (taskId: string, relPath: string) => `/v1/p/editor/tasks/${taskId}/editor/image?path=${encodeURIComponent(relPath)}`
 export const editorLineMarkersRoute = (taskId: string, relPath: string) => `/v1/p/editor/tasks/${taskId}/editor/line-markers?path=${encodeURIComponent(relPath)}`
 export const editorWriteRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/file`
 

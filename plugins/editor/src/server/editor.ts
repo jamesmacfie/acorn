@@ -4,9 +4,10 @@
 // Process, path, and configuration controls). Pure Node, so it works in dev:node too. Wired in
 // node/index.ts.
 import { BridgeError, type CoreServices, gitOrThrow, invalidateWorktreeStatus, type PluginHookRegistry } from '@acorn/plugin-api/node'
-import { readdir, readFile, writeFile } from 'node:fs/promises'
+import { readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import type { EditorBridge, EditorEntry } from '../server/routes/editor'
 import { normalizedLineRanges, type EditorLineMarkerProvider, type EditorLineMarkerSet } from '../contract/lineMarkers'
+import { MAX_IMAGE_PREVIEW_BYTES } from '../contract/imagePreview'
 
 export type EditorCoreServices = Pick<CoreServices, 'tasks' | 'fs'>
 
@@ -65,6 +66,23 @@ export const editorBridge = (
     try {
       return await readFile(abs, 'utf8')
     } catch {
+      throw new BridgeError(404, 'not_found', 'File not found.')
+    }
+  },
+
+  readImage: async (taskId, relPath) => {
+    const abs = await confine(core, taskId, relPath)
+    try {
+      if ((await stat(abs)).size > MAX_IMAGE_PREVIEW_BYTES) {
+        throw new BridgeError(422, 'image_too_large', 'Image is too large to preview.')
+      }
+      const bytes = await readFile(abs)
+      if (bytes.byteLength > MAX_IMAGE_PREVIEW_BYTES) {
+        throw new BridgeError(422, 'image_too_large', 'Image is too large to preview.')
+      }
+      return bytes
+    } catch (error) {
+      if (error instanceof BridgeError) throw error
       throw new BridgeError(404, 'not_found', 'File not found.')
     }
   },

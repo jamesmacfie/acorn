@@ -27,6 +27,7 @@ const write = vi.fn(async (_taskId: string, path: string, content: string) => {
   return { ok: true as const }
 })
 const read = vi.fn(async (_taskId: string, path: string) => disk.get(path) ?? '')
+const readImage = vi.fn(async (_taskId: string, _path: string) => ({ bytes: Uint8Array.from([0x52, 0x49, 0x46, 0x46]), type: 'image/webp' }))
 const lineMarkers = vi.fn(async (_taskId: string, _path: string) => [
   { kind: 'pull-request' as const, ranges: [{ from: 1, to: 1 }] },
   { kind: 'uncommitted' as const, ranges: [{ from: 1, to: 1 }] },
@@ -43,6 +44,7 @@ vi.mock('./editorClient', async (importOriginal) => ({
     list: async () => [],
     files: async () => [...disk.keys()],
     read: (taskId: string, path: string) => read(taskId, path),
+    readImage: (taskId: string, path: string) => readImage(taskId, path),
     lineMarkers: (taskId: string, path: string) => lineMarkers(taskId, path),
     write: (taskId: string, path: string, content: string) => write(taskId, path, content),
   }),
@@ -87,6 +89,7 @@ afterEach(() => {
   cleanups.splice(0).forEach((dispose) => dispose())
   write.mockClear()
   read.mockClear()
+  readImage.mockClear()
   lineMarkers.mockClear()
   read.mockImplementation(async (_taskId, path) => disk.get(path) ?? '')
   quitEditor = undefined
@@ -201,6 +204,39 @@ describe('the editor pane', () => {
     await showing(() => view, 'const a = 123')
     // The unsaved edit and the cursor both came back: the state is cached, the view state restored.
     expect(view.state.selection.main.anchor).toBe(5)
+  })
+
+  it('shows image bytes in the same tabs without reading or saving them as text', async () => {
+    const createObjectURL = vi.fn(() => 'blob:editor-image')
+    const revokeObjectURL = vi.fn()
+    const oldCreate = URL.createObjectURL
+    const oldRevoke = URL.revokeObjectURL
+    let unmount = () => {}
+    URL.createObjectURL = createObjectURL
+    URL.revokeObjectURL = revokeObjectURL
+    try {
+      const pane = mount()
+      const { host } = pane
+      unmount = pane.unmount
+      const view = await editor(host)
+      editorOpen(taskId, 'a.ts', false)
+      await showing(() => view, 'const a = 1')
+
+      editorOpen(taskId, 'sub/photo.webp', false)
+      await vi.waitFor(() => expect(host.querySelector('img[alt="photo.webp"]')?.getAttribute('src')).toBe('blob:editor-image'))
+      expect(host.querySelector('.cm-editor')).toBeNull()
+      expect(readImage).toHaveBeenCalledWith(taskId, 'sub/photo.webp')
+      expect(read).not.toHaveBeenCalledWith(taskId, 'sub/photo.webp')
+      expect(write).not.toHaveBeenCalledWith(taskId, 'sub/photo.webp', expect.anything())
+
+      editorOpen(taskId, 'a.ts', false)
+      await showing(() => EditorView.findFromDOM(host.querySelector<HTMLElement>('.cm-editor')!)!, 'const a = 1')
+      expect(revokeObjectURL).toHaveBeenCalledWith('blob:editor-image')
+    } finally {
+      unmount()
+      URL.createObjectURL = oldCreate
+      URL.revokeObjectURL = oldRevoke
+    }
   })
 
   it('writes on the save chord, and the dirty marker clears', async () => {
