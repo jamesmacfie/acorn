@@ -39,7 +39,7 @@ describe('no phantom tokens', () => {
     // Local constants scoped to their own block, not tokens for `:root`
     // (docs/ui-design.md § Runtime-set custom properties).
     const locallyDeclared = new Set([
-      '--diff-gutter-w', '--diff-marker-w', '--diff-btn-w', '--diff-chrome-w',
+      '--diff-gutter-w', '--diff-marker-w', '--diff-btn-w', '--diff-chrome-w', '--diff-card-inset',
       '--row-field-w', '--row-owner-inset',
       '--kit-grid-col',
       '--tab-strip-h',

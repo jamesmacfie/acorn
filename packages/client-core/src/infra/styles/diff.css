@@ -14,6 +14,9 @@
   --diff-marker-w: 14px;
   --diff-btn-w: calc(16px + var(--space-2));
   --diff-chrome-w: calc(2 * var(--diff-gutter-w) + var(--diff-marker-w) + var(--diff-btn-w) + var(--pane-pad));
+  /* Where every card drawn inside the diff starts (review threads, the new-comment box, agent
+     chats): at the new-side line numbers, so they read as part of the diff rather than beside it. */
+  --diff-card-inset: var(--diff-gutter-w);
   /* Size container so file heads can be exactly one scrollport wide (100cqw) while the canvas
      underneath is --diff-cols wide. */
   container-type: inline-size;
@@ -57,14 +60,15 @@
   padding-left: calc(2 * var(--diff-gutter-w) + var(--diff-marker-w));
 }
 .diff-line-extra:empty { display: none; }
+/* The negative margin backs the chat out of .diff-line-extra's indent to the card inset; notes and
+   marks in the same wrapper stay under the code. */
 .diff-inline-chat {
   position: sticky;
-  left: var(--diff-chrome-w);
-  width: calc(100cqw - var(--diff-chrome-w) - var(--pane-pad));
-  margin: 6px 0;
+  left: var(--diff-card-inset);
+  width: calc(100cqw - var(--diff-card-inset) - var(--pane-pad));
+  margin: 6px 0 6px calc(var(--diff-card-inset) - 2 * var(--diff-gutter-w) - var(--diff-marker-w));
   white-space: normal;
 }
-.diff-split-cell .diff-inline-chat { position: static; width: 100%; }
 .diff-gutter { position: relative; flex: none; width: var(--diff-gutter-w); padding-right: var(--space-4); text-align: right; color: var(--text-faint); user-select: none; }
 .diff-marker { flex: none; width: var(--diff-marker-w); text-align: center; color: var(--text-faint); user-select: none; }
 /* `flex: 1 1 0` with `min-width: 0`, even though the text no longer wraps: the row is
@@ -230,9 +234,9 @@
    scrolls; the conversation stays where it can be read. */
 .diff-thread {
   position: sticky;
-  left: var(--pane-pad);
-  width: calc(100cqw - 2 * var(--pane-pad));
-  margin: 6px var(--pane-pad);
+  left: var(--diff-card-inset);
+  width: calc(100cqw - var(--diff-card-inset) - var(--pane-pad));
+  margin: 6px var(--pane-pad) 6px var(--diff-card-inset);
   padding: 9px var(--space-5);
   background: var(--bg);
   border: var(--surface-border);
@@ -258,7 +262,11 @@
 
 /* Reply box (thread) + new-line composer share the textarea + action styling. */
 .diff-reply, .diff-composer { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-3); }
-.diff-composer { flex-basis: 100%; padding: 7px var(--pane-pad) 7px 68px; white-space: normal; }
+.diff-composer { flex-basis: 100%; padding: 7px var(--pane-pad) 7px var(--diff-card-inset); white-space: normal; }
+/* The composer keeps its full basis so it wraps under the code, which makes it canvas-wide. Its
+   contents are sticky-left and one scrollport wide, like .diff-thread. Left at the canvas width, a
+   wide file pushed the box's right edge, and the pane's resize handles, out of view. */
+.diff-row > .diff-composer > * { position: sticky; left: var(--diff-card-inset); width: calc(100cqw - var(--diff-card-inset) - var(--pane-pad)); }
 .diff-composer-actions { display: flex; gap: var(--space-3); }
 .diff-thread-err { font-size: var(--fs-sm); color: var(--del-marker); }
 
