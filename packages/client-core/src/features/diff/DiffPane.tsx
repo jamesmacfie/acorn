@@ -40,7 +40,7 @@ import {
 import { createDiffScrollRestoration } from './scrollRestoration'
 import type { CommentSide, DiffSource } from './source'
 import { createDiffStickyFile } from './stickyFile'
-import { diffCollapsed, rememberDiffCollapsed } from './viewState'
+import { diffCollapsed, diffFileFilter, diffScopeKey, rememberDiffCollapsed, rememberDiffFileFilter } from './viewState'
 import { createDiffHealth } from './diffHealth'
 import { bandBlock, createDiffLayout, lineBlock, rowBlocks, threadBlock, type DiffBlockInputs } from './diffLayout'
 import { createDocumentView, overlayKey, threadAnchor, type DiffItem, type GapOverlay, type SegmentRef } from './documentView'
@@ -124,9 +124,21 @@ export function DiffPane(props: {
   // Keyed by thread id: one key per thread, set to a boolean, never an object merged by path.
   const [threadCollapsed, setThreadCollapsed] = createStore<Record<string, boolean | undefined>>({})
 
-  // The file filter in the toolbar: the files it keeps, and where it matched each one's path. Held for
-  // the life of the pane, so a new revision keeps the reader's filter.
-  const [fileQuery, setFileQuery] = createSignal('')
+  // The file filter in the toolbar: the files it keeps, and where it matched each one's path.
+  // Remembered per scope for the session like the collapsed files, so leaving the task and coming
+  // back finds the same filter, and a new revision keeps it.
+  const [fileQuery, setFileQuerySignal] = createSignal(diffFileFilter(source().scope))
+  // A pane handed a different scope takes that scope's filter. A memo, because `on` fires whenever
+  // its accessor's dependencies change, not only when the key does.
+  const scopeKey = createMemo(() => diffScopeKey(source().scope))
+  createEffect(on(scopeKey, () => setFileQuerySignal(diffFileFilter(source().scope)), { defer: true }))
+  const setFileQuery = (query: string) => {
+    setFileQuerySignal(query)
+    rememberDiffFileFilter(source().scope, query)
+    // A narrower list starts from its top: the old offset points into files that may no longer be
+    // there. Only on the reader's typing, so a restored filter keeps the restored place.
+    layout.scrollToOffset(0)
+  }
   const fileFilter = createMemo(() => {
     const query = fileQuery().trim()
     if (!query) return null
@@ -266,8 +278,6 @@ export function DiffPane(props: {
     sourceItems,
     scrollEl,
   })
-  // A narrower list starts from its top: the old offset points into files that may no longer be there.
-  createEffect(on(fileQuery, () => layout.scrollToOffset(0), { defer: true }))
 
   // A different set of files: nothing about the old view survives.
   createEffect(on(signature, (next, previous) => {
