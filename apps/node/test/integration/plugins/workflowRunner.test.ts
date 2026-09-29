@@ -7,7 +7,7 @@ import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@a
 import { buildHeadlessArgv, runHeadless } from '@acorn/node-core/server/headless.ts'
 import { NotesStore } from '@acorn/plugin-notes/testkit'
 import { workflowRuns, workflowSteps } from '@acorn/plugin-workflows/testkit'
-import { WorkflowRunner, WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER, type Extension, type RunnerDeps, type WorkflowDef } from '@acorn/plugin-workflows/testkit'
+import { inlinePrompt, WorkflowRunner, WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER, type Extension, type RunnerDeps, type WorkflowDef } from '@acorn/plugin-workflows/testkit'
 import { registerBuiltInProfiles } from '@acorn/plugin-agents/node/index.ts'
 import { WorkflowDispatcher, createPublishedDef, resolveWorkflowGraph } from '@acorn/plugin-workflows/testkit'
 
@@ -25,13 +25,16 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
   let wf: TestPluginDb
   let dir: string
   let notes: NotesStore
+  // Everything a step's agent reads, its prompt and then its context, and the prompt on its own.
   const stepInputs: Record<string, string> = {}
+  const stepPrompts: Record<string, string> = {}
   let structuredByStep: Record<string, string>
   let handoffSlug: string | null
 
   const deps = (): RunnerDeps => ({
     runStep: async (_taskId, def, opts) => {
-      stepInputs[def.name] = opts.prompt
+      stepInputs[def.name] = inlinePrompt(opts.prompt, opts.context)
+      stepPrompts[def.name] = opts.prompt
       const argv = buildHeadlessArgv('claude-code', FAKE_AGENT, opts)!
       return runHeadless(argv, {
         cwd: dir,
@@ -63,6 +66,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     structuredByStep = {}
     handoffSlug = null
     for (const k of Object.keys(stepInputs)) delete stepInputs[k]
+    for (const k of Object.keys(stepPrompts)) delete stepPrompts[k]
   })
 
   afterEach(() => {
@@ -626,7 +630,8 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     const d = deps()
     d.runStep = async (taskId, def, opts) => {
       started.push(def.name)
-      stepInputs[def.name] = opts.prompt
+      stepInputs[def.name] = inlinePrompt(opts.prompt, opts.context)
+      stepPrompts[def.name] = opts.prompt
       ;(d as { taskFor?: Record<string, string> }).taskFor = { ...(d as { taskFor?: Record<string, string> }).taskFor, [def.name]: taskId }
       await new Promise<void>((release) => gates.set(def.name, release))
       finished.push(def.name)
@@ -714,6 +719,8 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     expect(stepInputs.both).toContain('Write one answer.')
     expect(stepInputs.both).toContain('## Output of left\n\n{"found":"a null token"}')
     expect(stepInputs.both).toContain('## Output of right\n\nright says so')
+    // The outputs travel beside the prompt, not inside it, so the transcript can fold them.
+    expect(stepPrompts.both).toBe('Write one answer.')
     await script.release('both')
     await script.waitStarted('quiet')
     // The handoff context still rides along; what 'none' turns off is the per-edge block.

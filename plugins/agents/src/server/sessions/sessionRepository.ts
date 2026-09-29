@@ -101,11 +101,18 @@ export class AgentSessionRepository {
           lastEventSeq: schema.agentSessions.lastEventSeq,
           configJson: schema.agentSessions.configJson,
           subagentsJson: schema.agentSessions.subagentsJson,
+          kind: schema.agentSessions.kind,
         })
         .from(schema.agentSessions)
         .where(eq(schema.agentSessions.id, sessionId))
         .get()
       if (!current) throw new Error(`Managed agent session not found: ${sessionId}`)
+      // A workflow's session answers to its run, not to the owner. A finished or failed step is the
+      // run's news, told once by the workflows plugin as run-done or run-failed, so only a request the
+      // agent is waiting on reaches the owner from here.
+      const attention = current.kind === 'workflow' && (projection.attention === 'completed' || projection.attention === 'error')
+        ? 'none'
+        : projection.attention
       const seq = current.lastEventSeq + 1
       const configJson = event.type === 'session_metadata'
         ? JSON.stringify({
@@ -139,7 +146,7 @@ export class AgentSessionRepository {
           lastEventSeq: seq,
           updatedAt: timestamp,
           ...(projection.runtimeState ? { runtimeState: projection.runtimeState } : {}),
-          ...(projection.attention ? { attention: projection.attention } : {}),
+          ...(attention ? { attention } : {}),
           ...(projection.providerSessionRef ? { providerSessionRef: projection.providerSessionRef } : {}),
           ...(configJson ? { configJson } : {}),
           ...(subagentsJson ? { subagentsJson } : {}),

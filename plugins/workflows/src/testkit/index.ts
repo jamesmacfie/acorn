@@ -5,6 +5,7 @@
 //   apps/node/test/integration/plugins/workflowTasks.test.ts   the complete saved-child fixture
 export { loadWorkflowFiles } from '../server/definitions/files'
 export { WorkflowRunner, type RunnerDeps, type WorkflowDef, type WorkflowExtensions } from '../server/runs/runner'
+export { inlinePrompt } from '../server/runs/deps'
 export { WorkflowDispatcher } from '../server/dispatch/dispatcher'
 export { createDef } from '../server/definitions/store'
 export { createPublishedDef } from './publishedDefinition'
