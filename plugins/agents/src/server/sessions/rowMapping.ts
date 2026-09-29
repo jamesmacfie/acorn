@@ -43,6 +43,7 @@ export const mapAgentSession = (row: typeof schema.agentSessions.$inferSelect): 
   queuedTurns: row.queuedTurns,
   lastEventSeq: row.lastEventSeq,
   lastReadSeq: row.lastReadSeq,
+  lastEventAt: row.lastEventAt,
   archivedAt: row.archivedAt,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,

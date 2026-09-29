@@ -288,6 +288,13 @@ it fails for any reason a selection can break, not only for the one it was writt
   survives the toggle is the questions and whatever is still blocking.
 - The task sidebar keeps its own "Needs you" list, which is the way to reach a blocked session the
   reader is not looking at. Picking a row opens that session and brings its card into view.
+- Managed sessions, Workflow runs, and Inline chats each have an order button in their header:
+  running first, name, newest first (the default), or latest activity. The choice is saved per task
+  and per group as the `agents.session-order` state slice (plugins/agents sessions/sessionOrder.ts).
+  Subagents and delegated children follow their group's order and have no control of their own.
+  Latest activity reads the session's `lastEventAt`, not `updatedAt`, because opening or renaming a
+  session also moves `updatedAt`. The node leaves `lastEventAt` out of the row-change check (as it
+  does `updatedAt`), so the order re-sorts when a turn starts or ends, not on every streamed chunk.
 - A subagent shows up twice: as one card in its parent's transcript, holding everything that subagent
   did, and as one indented row under its session in the task Agent sidebar. The card is seeded expanded
   while the subagent is working and collapsed if it had already settled when the card was first drawn,
