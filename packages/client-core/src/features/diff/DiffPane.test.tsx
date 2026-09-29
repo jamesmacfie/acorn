@@ -183,8 +183,12 @@ describe('a segmented diff', () => {
 
   it('filters the files by name and marks where each one matched', async () => {
     const files = [...largeDiffFiles('small', 1)].slice(0, 3)
-    const host = mount(largeDiffSource(files))
-    const heads = () => [...host.querySelectorAll('.diff-item .diff-file-path')].map((head) => head.textContent)
+    // A scope of its own: the filter is remembered for the session, and another test's diff must not
+    // open filtered.
+    const source = () => largeDiffSource(files, { scope: 'file-filter' })
+    const host = mount(source())
+    const headsIn = (root: HTMLElement) => [...root.querySelectorAll('.diff-item .diff-file-path')].map((head) => head.textContent)
+    const heads = () => headsIn(host)
     await vi.waitFor(() => expect(heads()[0]).toBe(files[0]!.path), { timeout: 5_000 })
     // The last file, so it is the first header only if the two before it were filtered out.
     const target = files[2]!.path
@@ -193,6 +197,12 @@ describe('a segmented diff', () => {
     input.dispatchEvent(new Event('input', { bubbles: true }))
     await vi.waitFor(() => expect(heads()).toEqual([target]), { timeout: 5_000 })
     expect(host.querySelector('.diff-item .diff-file-path .ui-find-mark')?.textContent).toBe(target)
+
+    // Leaving the task and coming back finds the same filter.
+    host.unmount()
+    const again = mount(source())
+    await vi.waitFor(() => expect(headsIn(again)).toEqual([target]), { timeout: 5_000 })
+    expect(again.querySelector<HTMLInputElement>('input[aria-label="Filter files"]')!.value).toBe(target)
   }, 20_000)
 
   it('expands a gap into context rows and collapses a file to its header', async () => {
