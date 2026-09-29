@@ -155,6 +155,8 @@ portable wall clock; the workflow target does so below.
 300s floor a schedule *is* a poll, and polling is the client's job for a person who is present. Same
 word for the same idea, different shape where the difference is real. It was called `ctx.pollers` until
 2026-08-27, which made one idea look like two.
+The renderer starts an eligible client schedule when its plugin becomes available, including when the
+Node's plugin roster arrives after the window opens. Disabling or unloading the plugin stops it.
 
 ## Policies
 
