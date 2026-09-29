@@ -8,6 +8,7 @@ import { createPublishedDef as createDef } from '../../testkit/publishedDefiniti
 import { resolveWorkflowGraph } from '../definitions/resolution'
 import { WorkflowDispatcher } from './dispatcher'
 import { WorkflowRunner, type RunnerDeps } from '../runs/runner'
+import { inlinePrompt } from '../runs/deps'
 
 const scope = { workspaceId: 'workspace', projectId: 'project', repoDir: null, userDir: null }
 const result = (structuredOutput: unknown = null) => ({
@@ -103,7 +104,7 @@ describe('nested workflow execution', () => {
         await updateDef(store.db, analysis.id, { ...leaf, steps: [{ id: 'changed', name: 'Changed', prompt: 'Changed.' }] }, analysis.revision)
         return result({ items: [{ id: 'a', requiresWork: true }, { id: 'b', requiresWork: false }, { id: 'c', requiresWork: true }] })
       }
-      if (def.id === 'summary') { summary = opts.prompt; return result({ summarized: true }) }
+      if (def.id === 'summary') { summary = inlinePrompt(opts.prompt, opts.context); return result({ summarized: true }) }
       expect(def.id).toBe('analyze')
       calls++
       return calls === 1 ? { ...result(), status: 'error', stderrTail: 'Analysis failed.' } : result({ analyzed: true })

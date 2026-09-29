@@ -5,10 +5,12 @@
 // session store and its turn lifecycle.
 import { randomUUID } from 'node:crypto'
 import { HEADLESS_TIMEOUT_MS, type HeadlessResult, type StreamEvent } from '@acorn/plugin-api/node'
-import type { AgentSessionSnapshot } from '../../contract/wire.ts'
+import { MAX_AGENT_CONTEXT_BYTES } from '@acorn/protocol/agentContext.ts'
+import type { AgentInputPart, AgentSessionSnapshot } from '../../contract/wire.ts'
 import { managedProviderForProfile, type AgentSessionExecute, type AgentSessionExecuteRequest } from '../../contract/sessionExecute'
 import type { ManagedAgentRuntime } from './runtime'
 import { assistantResult, parseStructuredResult, promptWithResultContract } from './resultContract'
+import { contextBlock } from '../drivers/contextBlock'
 
 // The profile-to-driver map moved to ../../contract/sessionExecute.ts, so a caller can ask before it
 // calls whether a profile has a managed path at all. Re-exported here for the callers already on it.
@@ -33,6 +35,27 @@ const MAX_CONTINUATIONS = 2
 const continuationPrompt = (schema: object | undefined): string => schema
   ? 'Your turn ended before the fenced `json` result block this step needs. If the work is finished, reply with that block. If it is not, carry on and end with the block. If something is blocking you, say what it is.'
   : 'Your turn ended without a final message. If the work is finished, reply with the result. If it is not, carry on. If something is blocking you, say what it is.'
+
+// The step's prompt, then its context as parts of their own. The model reads the same tagged blocks
+// either way. Past the per-turn context cap the blocks go inline in the text instead, which only the
+// larger whole-input cap bounds, so a step with a big diff upstream still runs.
+function stepInput(request: AgentSessionExecuteRequest): AgentInputPart[] {
+  const text = promptWithResultContract(request.prompt, request.schema)
+  const context = request.context ?? []
+  const bytes = context.reduce((total, item) => total + Buffer.byteLength(item.content, 'utf8'), 0)
+  if (bytes > MAX_AGENT_CONTEXT_BYTES) return [{ type: 'text', text: [text, ...context.map(contextBlock)].join('\n\n') }]
+  return [{ type: 'text', text }, ...context.map((item): AgentInputPart => ({
+    type: 'context',
+    contextId: randomUUID(),
+    ...item,
+    provenance: request.runId ? `Workflow run ${request.runId}` : 'Workflow',
+    byteSize: Buffer.byteLength(item.content, 'utf8'),
+    estimatedTokens: Math.ceil(Buffer.byteLength(item.content, 'utf8') / 4),
+    freshness: 'live',
+    sensitivity: 'workspace',
+    capturedAt: Date.now(),
+  }))]
+}
 
 /** The step's outcome once its latest turn has settled. `turnIds` is every turn the step has sent, in
  *  order: the transcript it hands back covers all of them, and the result is the last one's. */
@@ -145,7 +168,7 @@ export function createSessionExecute(runtime: ManagedAgentRuntime): AgentSession
     await applyRequestedConfig(runtime, session.id, request.configOptions)
     const beforeSeq = session.lastEventSeq
     const first = await runtime.enqueueTurn(session.id, {
-      input: [{ type: 'text', text: promptWithResultContract(request.prompt, request.schema) }],
+      input: stepInput(request),
       source: 'workflow',
       effectivePolicy: {
         // Codex reads the model and the effort off the policy at turn time; the Claude driver takes
