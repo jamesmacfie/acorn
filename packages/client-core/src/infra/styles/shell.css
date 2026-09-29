@@ -332,6 +332,9 @@
   overflow: hidden;
 }
 .layout-list-scroll { flex: 1; min-height: 0; overflow: auto; }
+/* A list region whose root is a `Stack grow` is asking for the scroller's height, so a canvas inside it
+   has a box to fill. Only then: every other list stays a plain block and keeps its own height. */
+.layout-list-scroll:has(> .ui-stack[data-grow]) { display: flex; flex-direction: column; }
 .layout-list-footer {
   flex: none;
   padding: 0 var(--pane-pad) var(--pane-pad);
