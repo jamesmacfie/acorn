@@ -447,7 +447,7 @@ function ThreadRow(props: {
   // Persist an in-progress reply per thread so it survives navigation and reloads.
   persistDraft(() => `thread-reply:${props.thread.threadId}`, body, setBody)
   const resolved = () => optimisticResolved() ?? props.thread.resolved
-  const collapsed = () => resolved() && (props.collapse?.collapsed() ?? localCollapsed())
+  const collapsed = () => props.collapse?.collapsed() ?? localCollapsed()
   const setCollapsed = (value: boolean) => {
     if (props.collapse) props.collapse.setCollapsed(value)
     else setLocalCollapsed(value)
@@ -518,13 +518,11 @@ function ThreadRow(props: {
     >
       <div class="diff-thread-head">
         <span class="diff-thread-status">{resolved() ? 'Resolved' : 'Conversation'}</span>
-        <Show when={resolved()}>
-          <Button variant="bare" onPress={toggleCollapsed}>
-            {collapsed() ? 'Show' : 'Hide'}
-          </Button>
-        </Show>
         <Button variant="bare" disabled={busy()} onPress={toggleResolve}>
           {resolved() ? 'Unresolve' : 'Resolve'}
+        </Button>
+        <Button variant="bare" onPress={toggleCollapsed}>
+          {collapsed() ? 'Show' : 'Hide'}
         </Button>
       </div>
       <Show when={!collapsed()}>

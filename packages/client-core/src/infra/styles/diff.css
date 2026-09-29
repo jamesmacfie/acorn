@@ -244,6 +244,7 @@
 .diff-thread-head { display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-3); }
 .diff-thread-collapsed .diff-thread-head { margin-bottom: 0; }
 .diff-thread-status {
+  margin-right: auto;
   font-size: var(--fs-sm);
   text-transform: var(--label-transform);
   letter-spacing: var(--label-tracking);
