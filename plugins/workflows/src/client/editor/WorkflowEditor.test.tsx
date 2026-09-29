@@ -196,6 +196,21 @@ describe('reviewing an AI proposal', () => {
     expect(button('Undo')?.disabled).toBe(true)
   })
 
+  // A new workflow's proposal is all additions, which carry no `before`. Drawing one used to throw
+  // inside the render, so the dialog froze on its first status line and showed nothing.
+  it('draws a proposal that adds and removes paths', async () => {
+    authorTurn.mockResolvedValue({
+      state: 'proposal', base: original, baseRevision: 1, candidate: generated, summary: 'Replace the plan.',
+      diff: [{ path: '/steps/angle-one', change: 'add', after: generated.steps[0] }, { path: '/steps/plan', change: 'remove', before: original.steps[0] }],
+      problems: [], context: [], usage: { requests: 1, inputTokens: 10, outputTokens: 5 }, providerId: 'anthropic', modelId: 'opus',
+    })
+    await mount('db:abc')
+    await propose()
+    expect(document.body.textContent).toContain('add /steps/angle-one: nothing →')
+    expect(document.body.textContent).toContain('→ nothing')
+    expect(button('Apply reviewed edit')).toBeDefined()
+  })
+
   it('sends the draft revision, selected scope, backend, and sample opt-out', async () => {
     await mount('db:abc')
     await propose()
