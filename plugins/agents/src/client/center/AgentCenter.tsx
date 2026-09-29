@@ -285,7 +285,6 @@ export default function AgentCenter() {
             <Show when={nodes().length > 1}>
               <SegmentedControl
                 ariaLabel="Scope"
-                size="sm"
                 value={scope()}
                 onChange={setScope}
                 options={[
@@ -296,7 +295,6 @@ export default function AgentCenter() {
             </Show>
             <SegmentedControl
               ariaLabel="Session state"
-              size="sm"
               value={stateFilter()}
               onChange={setStateFilter}
               options={(fleetScope()

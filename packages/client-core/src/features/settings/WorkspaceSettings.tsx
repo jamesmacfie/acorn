@@ -6,7 +6,7 @@ import type { Workspace } from '@acorn/protocol/api.ts'
 import { confirmWillEvent } from '../../host/registries/shell/willPhase'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { ProjectConfig } from './WorkspaceProjectSettings'
-import { Button } from '../../kit/components/primitives'
+import { Button, Input } from '../../kit/components/primitives'
 
 // Settings → per-workspace page: workspace name + membership + delete.
 // Build/run/db/preview config is repo-level (docs/workspaces-and-tasks.md § Worktrees and setup): a
@@ -61,12 +61,10 @@ export default function WorkspaceSettings(props: { workspace: Workspace; onDelet
       <label class="settings-field">
         <span class="settings-label">Name</span>
         <div class="integration-key-row">
-          <input
-            class="ui-input"
-            type="text"
+          <Input
             value={name()}
             disabled={props.workspace.isDefault}
-            onInput={(e) => setName(e.currentTarget.value)}
+            onInput={(value) => setName(value)}
             onBlur={() => void saveName()}
             onKeyDown={(e) => e.key === 'Enter' && void saveName()}
           />

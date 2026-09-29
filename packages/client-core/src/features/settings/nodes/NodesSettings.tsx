@@ -9,7 +9,7 @@ import { NODE_PROTOCOL_VERSION } from '@acorn/protocol/node.ts'
 import NodeChip from '../../fleet/NodeChip'
 import NodePairingCode from './NodePairingCode'
 import '../../fleet/nodes.css'
-import { Alert, Button, ConfirmButton } from '../../../kit/components/primitives'
+import { Alert, Button, ConfirmButton, Input } from '../../../kit/components/primitives'
 
 // Settings → Nodes (docs/ui-design.md § Node management): add, rename, reconnect, unpair, revoke.
 //
@@ -101,11 +101,10 @@ export default function NodesSettings() {
                         </span>
                       }
                     >
-                      <input
-                        class="ui-input node-rename"
+                      <Input
                         value={renameValue()}
                         ref={(el) => queueMicrotask(() => el.focus())}
-                        onInput={(event) => setRenameValue(event.currentTarget.value)}
+                        onInput={(value) => setRenameValue(value)}
                         onKeyDown={(event) => {
                           if (event.key === 'Escape') setRenaming(null)
                           if (event.key !== 'Enter') return
@@ -236,12 +235,11 @@ export default function NodesSettings() {
             <div class="node-step">
               <label class="node-step-label">
                 Node address
-                <input
-                  class="ui-input"
+                <Input
                   value={endpoint()}
                   placeholder="https://host:port"
                   ref={(el) => queueMicrotask(() => el.focus())}
-                  onInput={(event) => setEndpoint(event.currentTarget.value)}
+                  onInput={(value) => setEndpoint(value)}
                   onKeyDown={(event) => event.key === 'Enter' && void probe()}
                 />
                 <p class="muted">The address the node prints when it starts. https only — the certificate is the identity.</p>
@@ -298,22 +296,21 @@ export default function NodesSettings() {
                 <div class="node-step">
                   <label class="node-step-label">
                     Pairing code
-                    <input
-                      class="ui-input"
+                    <Input
                       value={code()}
                       ref={(el) => queueMicrotask(() => el.focus())}
-                      onInput={(event) => setCode(event.currentTarget.value)}
+                      onInput={(value) => setCode(value)}
                       onKeyDown={(event) => event.key === 'Enter' && void pair(probed())}
                     />
                     <p class="muted">Start pairing on the node to get a code. It expires shortly and allows a few attempts.</p>
                   </label>
                   <label class="node-step-label">
                     This device's name
-                    <input class="ui-input" value={deviceName()} onInput={(event) => setDeviceName(event.currentTarget.value)} />
+                    <Input value={deviceName()} onInput={(value) => setDeviceName(value)} />
                   </label>
                   <label class="node-step-label">
                     Name for this node
-                    <input class="ui-input" value={label()} onInput={(event) => setLabel(event.currentTarget.value)} />
+                    <Input value={label()} onInput={(value) => setLabel(value)} />
                   </label>
                   <div class="node-step-actions">
                     <Button disabled={busy() || !code().trim()} onPress={() => void pair(probed())}>

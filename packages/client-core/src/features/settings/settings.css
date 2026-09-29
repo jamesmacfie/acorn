@@ -66,18 +66,6 @@
 .settings-hint { font-size: var(--fs-sm); }
 /* Was styled only by an inline `style={{ color: 'var(--danger, #d33)' }}` at its two call sites. */
 .settings-error { margin: 0; font-size: var(--fs-sm); color: var(--danger); }
-.settings-script {
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  color: var(--text);
-  background: var(--bg);
-  border: var(--control-border);
-  border-radius: var(--radius);
-  padding: var(--space-4);
-  resize: vertical;
-  outline: none;
-}
-.settings-script:focus { border-color: var(--accent); }
 .settings-actions { display: flex; align-items: center; gap: var(--space-5); }
 .settings-section-label { margin-top: var(--space-8); font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
 /* Editable shortcut key: styled like .help-key but focusable/centred; highlights on focus while it waits for a keypress. */
