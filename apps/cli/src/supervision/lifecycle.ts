@@ -123,8 +123,10 @@ function launch(root: string, logPath: string, logFd: number, instanceId: string
   })
   child.unref()
   // fd 4 carries the prior credential into the child. Empty means mint a new device. It is never
-  // an argument, environment variable, or log line.
-  ;(child.stdio[4] as Writable | null)?.end(`${previousToken ?? ''}\n`)
+  // an argument, environment variable, or log line. A child that dies before reading it leaves the
+  // bytes unread, and Linux then resets this pipe under us. The exit and timeout handlers below
+  // already report that death, so the reset needs a listener only to stop it crashing the CLI.
+  ;(child.stdio[4] as Writable | null)?.on('error', () => {}).end(`${previousToken ?? ''}\n`)
   const handshake = new Promise<Handshake>((resolve, reject) => {
     const timer = setTimeout(() => reject(new CliError('node_start_timeout', 'The Node did not become ready before the startup deadline.', 5)), START_TIMEOUT_MS)
     const lines = createInterface({ input: child.stdio[3] as Readable })

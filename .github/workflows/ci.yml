@@ -44,6 +44,10 @@ jobs:
         env:
           # Exercise both sides of the TUI's 80-cell layout breakpoint on pull requests.
           ACORN_TUI_WIDE: '1'
+          # The runner has four cores, and each package's Vitest already starts a worker per core. Six
+          # packages at once timed out tests that finish in under a second locally, and two still
+          # broke the timing-sensitive diff layout tests in a four-core Linux container.
+          ACORN_TEST_CONCURRENCY: '1'
 
   desktop:
     if: github.event_name == 'pull_request'

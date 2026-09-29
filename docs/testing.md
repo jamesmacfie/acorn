@@ -19,7 +19,10 @@ pnpm test:coverage
 concurrency, and reports every package rather than cancelling the rest on the first failure. Run it
 rather than `turbo run test` directly: the bound is what keeps the suite honest. Many of these tests
 spawn a real subprocess, mint a certificate, or run git, and turning the bound off oversubscribes the
-machine badly enough that they time out while passing in isolation.
+machine badly enough that they time out while passing in isolation. The bound is six packages at a
+time. Set `ACORN_TEST_CONCURRENCY` to change it. CI sets it to one. Each package's Vitest already
+starts a worker per core, and six packages at once on a four-core runner made tests 10 to 15 times
+slower than they run locally.
 
 The desktop package's `test` stages the bundle inputs first, including a build of the plugin SDK for
 bundled plugin imports. It then runs its Vitest suites and the Rust unit tests, so the boot test
