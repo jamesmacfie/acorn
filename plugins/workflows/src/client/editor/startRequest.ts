@@ -7,7 +7,7 @@ import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { createSignal } from 'solid-js'
 import { toast } from '@acorn/plugin-api/client'
 import type { WorkflowInput } from '../../contract/wire.ts'
-import { workflowApi } from '../workflowsClient'
+import { startWorkflow } from '../startWorkflow'
 
 export type StartRequest = {
   /** What to start: a row id, or `repo:<fileId>` / `user:<fileId>` for a committed file. */
@@ -57,7 +57,7 @@ export async function requestWorkflowStart(next: StartRequest): Promise<void> {
     return
   }
   const values = { ...(next.prefill ?? {}) }
-  const answer = await workflowApi.start(taskId, { defId: next.defId }, Object.keys(values).length ? values : undefined)
+  const answer = await startWorkflow(taskId, { defId: next.defId }, Object.keys(values).length ? values : undefined)
   if (answer.error) toast(answer.error, { tone: 'danger' })
   else if (answer.runId) next.onStarted?.(answer.runId)
 }

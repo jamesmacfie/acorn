@@ -11,6 +11,7 @@ import {
 } from '@acorn/plugin-api/client'
 import { workflowApi, type WorkflowDefSummary } from './workflowsClient'
 import { needsStartDialog, requestWorkflowStart } from './editor/startRequest'
+import { startWorkflow } from './startWorkflow'
 import { WORKFLOWS_SOURCE_ID, workflowsSurfacePath } from './surfacePath'
 import { WORKFLOWS_PANE_ID } from './runs/runPaneModel'
 
@@ -105,7 +106,7 @@ export const workflowsCommands: readonly ContributedCommand[] = [
       }
       // Started here rather than through `requestWorkflowStart`, which reports a refusal as a toast. A
       // command's refusal belongs in the frame the person is looking at, so this one throws.
-      const result = await workflowApi.start(taskId, { defId })
+      const result = await startWorkflow(taskId, { defId })
       if (result.error) throw new Error(result.error)
       return COMMAND_CLOSED
     },
