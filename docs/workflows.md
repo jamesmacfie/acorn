@@ -612,9 +612,9 @@ terminal counterpart. The rail source has both.
 **A separate start dialog from the item menu.** Refused. The promote-to-task modal already knows how
 to create a task or attach to one, and two modals that create tasks drift apart.
 
-**Grouping workflow sessions in the agent sidebar.** Refused. The run pane owns steps, and a group in
-the sidebar would draw them a second way. A glyph on the row and a chip in the header are enough to
-get from a session to its run.
+**Drawing workflow steps in the agent sidebar.** Refused. The run pane owns steps, and the sidebar
+would draw them a second way. The sidebar's Workflow runs group lists the sessions a workflow started,
+one row per session, and the chip in the header gets from a session to its run.
 
 **Rerun from an arbitrary node.** Refused for this programme. Rerunning from a node that is done
 means unwinding its successors' handoffs and outputs, and deciding what a downstream node that

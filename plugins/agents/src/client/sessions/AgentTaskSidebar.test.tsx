@@ -189,6 +189,20 @@ describe('the delegated session sidebar', () => {
     expect(selectedManagedSubagent(root.id)).toBeUndefined()
     expect(rowNamed('Parent').getAttribute('aria-selected')).toBe('true')
   })
+
+  it('lists workflow sessions, with their subagents, under Workflow runs and not Managed sessions', () => {
+    mount([
+      session('mine', { title: 'Mine' }),
+      session('run', { kind: 'workflow', title: 'Workflow step', subagents: [nativeSubagent] }),
+    ], {})
+
+    const group = (label: string) => host.querySelector(`[aria-label="${label}"]`)?.textContent ?? ''
+    expect(group('Managed sessions')).toContain('Mine')
+    expect(group('Managed sessions')).not.toContain('Workflow step')
+    expect(group('Workflow runs')).toContain('Workflow step')
+    expect(group('Workflow runs')).toContain('Provider child')
+    expect(host.textContent).toContain('Workflow runs (1)')
+  })
 })
 
 // The sidebar lists a waiting session's requests from its snapshot, so it keeps that snapshot while it
