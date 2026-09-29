@@ -499,12 +499,18 @@ offset is exact before any of its rows load. The GitHub pane reads it from `?fil
 drops its segments from the list and keeps its header; collapsing one from the sticky header scrolls
 back to that header, so the reader stays on the file they collapsed.
 
-The reading place and collapsed files are remembered per scope for the session (`diff/viewState.ts`):
+The file filter at the start of the toolbar drops every file whose path does not match, header and
+all, and scrolls the list back to its top (`diff/fileFilter.ts`). The query matches as a whole,
+ignoring case, where it appears last in the path, which is usually the file name. The header marks
+the matched characters with the find mark. Find still counts matches in the files the filter hides.
+
+The reading place, collapsed files, and file filter are remembered per scope for the session (`diff/viewState.ts`):
 a task and the classic browser keep separate entries for the same content, and a task's entries are
 evicted when it is archived. The place is the identity described in § Row geometry, not a pixel
-offset, so it survives a thread measured above it or a narrower pane. Both are tied to the source's
+offset, so it survives a thread measured above it or a narrower pane. The place and the collapsed files are tied to the source's
 signature and the place to its projection, so new commits drop the stale place and collapse choices
-instead of restoring them against a different diff. An explicit file navigation wins over a saved
+instead of restoring them against a different diff. The filter is text rather than a choice about
+particular files, so it survives new commits. An explicit file navigation wins over a saved
 place.
 
 ### Marks from other plugins

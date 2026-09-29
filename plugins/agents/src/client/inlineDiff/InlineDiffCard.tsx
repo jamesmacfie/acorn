@@ -146,10 +146,12 @@ export default function InlineDiffCard(props: Props) {
   }
 
   return <Card pad="sm"><Stack gap="row">
-      <Inline gap="inline">
-        <Show when={session()}>{(current) => <RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />}</Show>
-        <Text emphasis="strong">Ask agent · {props.origin.path}:{props.origin.line}</Text>
-        <Show when={session()}>{(current) => <Text emphasis="muted">{current().runtimeState}</Text>}</Show>
+      <Inline gap="inline" spread>
+        <Inline gap="inline">
+          <Show when={session()}>{(current) => <RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />}</Show>
+          <Text emphasis="strong">Ask agent · {props.origin.path}:{props.origin.line}</Text>
+          <Show when={session()}>{(current) => <Text emphasis="muted">{current().runtimeState}</Text>}</Show>
+        </Inline>
         <Show when={props.onClose && !session()}><Button size="sm" onPress={() => props.onClose?.()}>Close</Button></Show>
         <Show when={session()}>{(current) => <Button size="sm" onPress={() => setChatCollapsed(current().id, !collapsed())}>
           {collapsed() ? 'Show' : 'Hide'}

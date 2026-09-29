@@ -60,6 +60,8 @@ export function DiffCanvas(props: {
   retrySegment: (segment: SegmentRef) => void
   fileCollapsed: (path: string) => boolean
   onToggleFileCollapse: (path: string) => void
+  /** Where the file filter matched each path, for its header to mark. */
+  fileMarks: (path: string) => readonly number[] | undefined
   rows: DiffRowContext
 }) {
   // Mounted items by key, so an item that stays in range keeps its DOM while the range moves and a
@@ -86,7 +88,7 @@ export function DiffCanvas(props: {
   const itemBody = (item: Accessor<DiffItem>, size: Accessor<number>) => (
     <Switch>
       <Match when={item().kind === 'file'}>
-        <FileRowView file={item().file} split={split()} collapsed={props.fileCollapsed(item().file.path)} onToggleCollapse={props.onToggleFileCollapse} />
+        <FileRowView file={item().file} split={split()} collapsed={props.fileCollapsed(item().file.path)} onToggleCollapse={props.onToggleFileCollapse} marks={props.fileMarks(item().file.path)} />
       </Match>
       <Match when={item().kind === 'nodiff'}>
         <FullRow split={split()} class="diff-thread-row">
@@ -195,10 +197,10 @@ function FullRow(props: { split: boolean; class: string; children: JSX.Element }
   )
 }
 
-function FileRowView(props: { file: DiffDocumentFile; split: boolean; collapsed: boolean; onToggleCollapse: (path: string) => void }) {
+function FileRowView(props: { file: DiffDocumentFile; split: boolean; collapsed: boolean; onToggleCollapse: (path: string) => void; marks: readonly number[] | undefined }) {
   return (
     <FullRow split={props.split} class="diff-file-row">
-      <FileHead file={props.file} anchorId={`diff-file:${props.file.path}`} collapsed={props.collapsed} onToggleCollapse={props.onToggleCollapse} />
+      <FileHead file={props.file} anchorId={`diff-file:${props.file.path}`} collapsed={props.collapsed} onToggleCollapse={props.onToggleCollapse} marks={props.marks} />
     </FullRow>
   )
 }
