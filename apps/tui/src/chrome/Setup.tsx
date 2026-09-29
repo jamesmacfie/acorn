@@ -230,7 +230,7 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
               </Show>
             </Show>
             <Button variant="bare" onPress={() => setStep('workspace')}>Back to setup</Button>
-            <Button variant="bare" onPress={close}>Close settings</Button>
+            <Button variant="bare" onPress={close}>Close setup</Button>
           </Show>
         </box>
       </ModalBody>

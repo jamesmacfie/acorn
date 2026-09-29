@@ -7,8 +7,9 @@ the panel border lights, and Escape climbs out through a defined topology. Keep 
 is to make the user's destination, available action, and result clear at each level.
 
 The findings below record the initial review. [The implementation pass](./README.md#implementation-pass-on-2026-09-27)
-adds recovery, a setup route, terminal sessions, and a full selected-task title; the remaining
-success criteria still need their terminal journeys.
+adds recovery, a setup route, terminal sessions, and a full selected-task title. The settings
+redesign closed the Settings P0 on 2026-09-30. The remaining success criteria still need their
+terminal journeys.
 
 ## Keyboard findings
 
@@ -16,7 +17,7 @@ success criteria still need their terminal journeys.
 | --- | --- | --- | --- |
 | P0 | Some visible actions have no host capability. An Enter press can return no result. | Gate the control on the platform seam, or supply a terminal action with explicit text. A silent press teaches the user that Enter may not work. | Every visible press causes a state change, opens a next step, or gives a reason it cannot proceed. |
 | P0 | A pane can retain an initial connection refusal after the topbar shows the Node online. | On reconnection, refetch errored queries even if the error boundary unmounted their observers, then reset that boundary. Offer a visible Retry action if automatic recovery fails. | The reused PTY fixture reaches its Agent session list after Node startup without changing panes or restarting the TUI. |
-| P0 | Settings is absent from `Ctrl+K` search. The live palette answered `No matches` for `settings`. | Add a Settings group with terminal pages for required setup and recovery. If a setting needs an OS dialog, use a typed path, text import/export, or a specific unavailable message. | A terminal-only user can configure Node, project, provider, plugin, notifications, appearance, and shortcuts without installing desktop. |
+| P0, closed 2026-09-30 | Settings is absent from `Ctrl+K` search. The live palette answered `No matches` for `settings`. | Closed: `settings` in the palette finds **Open settings**, which opens a Settings route built from the desktop's registry, with the same nine groups and pages. Pages without a terminal form are listed and name the desktop app and the reason. [tui.md](../../tui.md#settings) owns it. | Discovery is met. Configuring every listed area without the desktop is not: the terminal draws the plugin pages and Notifications, and the rest still need terminal forms, tracked in the [feature inventory](./features.md). |
 | P1 | Tab moves regions, while a field's Tab moves controls. This rule works but is hard to infer from a truncated footer. | Keep the rule and show `Tab next control` on fields, `Tab next region` elsewhere. Include the current region and focused control name in the help sheet. | A new user can leave a filter or composer and reach the next action with keyboard only. |
 | P1 | The `?` sheet lists active keys but not the meaning of the current screen. Its pane chord appeared as `ctrl+meta+right` in the live frame. | Render human key names, explain Menu, Browse, Tasks, pane strip, and an entered PTY, and add a short "Where am I?" line. Keep the active-key source of truth. | Help names the current region and produces keys that the driver can send in both kitty and legacy modes. |
 | P1 | At 80 by 24, the footer cuts off after the first few global hints. | Prioritize Escape, Enter, movement, and one discovery key, then use `?` for the full list. Replace repeated global hints with the active local action where possible. | The footer never truncates a key or action word mid-token, and help is visible at every depth. |

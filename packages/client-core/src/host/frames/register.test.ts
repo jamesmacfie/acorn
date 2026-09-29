@@ -18,7 +18,7 @@ const { paneRegistry } = await import('../registries/panes/panes')
 const { projectImporterRegistry } = await import('../registries/sources/projectImporters')
 const { projectSurfaceRegistry } = await import('../registries/panes/projectSurfaces')
 const { refPanelRegistry } = await import('../registries/panes/refPanels')
-const { settingsRegistry } = await import('../registries/shell/settings')
+const { settingsCategoryOf, settingsRegistry, settingsScopeOf } = await import('../registries/shell/settings')
 const { uiSlotRegistry } = await import('../registries/extensionPoints/slots')
 const { _resetPluginDistribution, _seedPluginDistribution } = await import('../plugins/distribution')
 const { surfaceFailures } = await import('../plugins/surfaceFailures')
@@ -114,6 +114,59 @@ describe('syncFrameContributions', () => {
       importers: ['board-importer'],
       slots: ['board-picker'],
     })
+  })
+
+  it('places a settings frame by its declared group, scope and glyph, and in Features when it declares none', () => {
+    seedTrusted(row('board', {
+      frames: [
+        surface({ target: 'settings', id: 'board-plain' }),
+        surface({ target: 'settings', id: 'board-agents', category: 'agents', settingsScope: 'device', glyph: 'bot' }),
+        // A newer node's vocabulary, or a group only core fills: the page stays, in its default place.
+        surface({ target: 'settings', id: 'board-odd', category: 'plugins', settingsScope: 'galaxy' }),
+        surface({ target: 'settings', id: 'board-workspace', group: 'workspace' }),
+      ],
+    }))
+    syncFrameContributions()
+
+    const placed = (id: string) => {
+      const page = settingsRegistry.get(id)!
+      return { category: settingsCategoryOf(page), scope: settingsScopeOf(page), icon: page.icon, follows: page.followsNodeSwitcher }
+    }
+    expect(placed('board-plain')).toEqual({ category: 'features', scope: 'node', icon: 'puzzle', follows: undefined })
+    expect(placed('board-agents')).toEqual({ category: 'agents', scope: 'device', icon: 'bot', follows: undefined })
+    expect(placed('board-odd')).toEqual({ category: 'features', scope: 'node', icon: 'puzzle', follows: undefined })
+    expect(placed('board-workspace').scope).toBe('workspace')
+  })
+
+  it('carries a settings frame\'s sections and keywords, and drops a list past the limit rather than the page', () => {
+    const words = Array.from({ length: 17 }, (_, index) => `word${index}`)
+    seedTrusted(row('board', {
+      frames: [
+        surface({ target: 'settings', id: 'board-search', keywords: ['cards'], sections: [{ id: 'columns', label: 'Columns', keywords: ['lanes'] }] }),
+        // Bytes a newer node accepted: this build's registry would refuse the page outright.
+        surface({ target: 'settings', id: 'board-long', keywords: words }),
+      ],
+    }))
+    syncFrameContributions()
+
+    expect(settingsRegistry.get('board-search')).toMatchObject({ keywords: ['cards'], sections: [{ id: 'columns', label: 'Columns', keywords: ['lanes'] }] })
+    expect(settingsRegistry.get('board-long')?.keywords).toBeUndefined()
+  })
+
+  it('keeps a settings frame\'s rail switches only for the plugin\'s own sources', () => {
+    seedTrusted(row('board', {
+      sources: [{ id: 'board', label: 'Board', glyph: 'puzzle', order: 50, items: '/v1/p/board/items' }],
+      frames: [
+        surface({ target: 'settings', id: 'board-settings', railSourceVisibility: ['board', 'home', 'github'] }),
+        surface({ target: 'settings', id: 'board-foreign', railSourceVisibility: ['github'] }),
+      ],
+    } as Partial<PluginContributions>))
+    syncFrameContributions()
+
+    // The node already reported the other two; the page stays and draws the one switch it may.
+    expect(settingsRegistry.get('board-settings')?.railSourceVisibility).toEqual(['board'])
+    expect(settingsRegistry.get('board-foreign')).toBeDefined()
+    expect(settingsRegistry.get('board-foreign')?.railSourceVisibility).toBeUndefined()
   })
 
   it('carries a loaded task pane\'s archived-preview opt in into the pane registry', () => {

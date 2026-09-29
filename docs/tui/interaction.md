@@ -751,8 +751,9 @@ three as a baseline that may only shrink.
 
 Eleven sentences about the keyboard, each one a test rather than a scenario. A scenario pins one
 path, and every bug the fourteen focus fixes chased was a path nobody had written a scenario for.
-`apps/tui/src/reachability.test.tsx` walks every stop on eight surfaces, which are the browse rail,
-the six panes the pane sweep opens, and the cheat sheet as an open dialog. It asks five of these
+`apps/tui/src/reachability.test.tsx` walks every stop on nine surfaces, which are the browse rail,
+the six panes the pane sweep opens, the cheat sheet as an open dialog, and the Settings route open on
+Notifications. It asks five of these
 after every press, so a new pane or a new control joins the property the day it lands.
 
 | # | The invariant | Where it is checked |

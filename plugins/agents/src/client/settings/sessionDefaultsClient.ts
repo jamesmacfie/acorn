@@ -28,22 +28,27 @@ export const saveAgentSessionDefaults = (patch: Partial<AgentSessionDefaults>) =
 /**
  * The write with its cache handling, so a page and a command change this record the same way.
  *
- * Each change is the save. The query cache carries it so every reader moves at once, and a write that
- * fails refetches rather than restoring a snapshot: two quick changes would otherwise let the first
- * one's rollback undo the second. The failure is rethrown, because the two callers report it
- * differently — the page has an alert and the palette keeps the frame open with the message on it.
+ * Each change is the save. The query cache carries it so every reader moves at once. A write that
+ * fails puts back what the cache held before it, but only when it is the latest write, so the first of
+ * two quick changes cannot undo the second, and then refetches. Refetching alone left the unsaved value
+ * on screen whenever the node was the thing that failed, since the read failed too. The failure is
+ * rethrown, because the two callers report it differently — the page has an alert and the palette
+ * keeps the frame open with the message on it.
  */
+let latestWrite = 0
 export async function writeAgentSessionDefaults(
   queryClient: QueryClient,
   current: AgentSessionDefaults,
   patch: Partial<AgentSessionDefaults>,
 ): Promise<AgentSessionDefaults> {
+  const attempt = ++latestWrite
   queryClient.setQueryData(agentSessionDefaultsQueryKey, { ...current, ...patch })
   try {
     const saved = await saveAgentSessionDefaults(patch)
     queryClient.setQueryData(agentSessionDefaultsQueryKey, saved)
     return saved
   } catch (cause) {
+    if (attempt === latestWrite) queryClient.setQueryData(agentSessionDefaultsQueryKey, current)
     void queryClient.invalidateQueries({ queryKey: agentSessionDefaultsQueryKey })
     throw cause
   }

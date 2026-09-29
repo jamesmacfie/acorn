@@ -52,10 +52,10 @@ model; the table below owns the kinds themselves.
 | Project surfaces | Both | `ctx.contribute(projectSurfaceRegistry)` / a project-scoped `frames` entry plus its `contributions.routes` entry | The project view, beside the plugin's rail list |
 | Reference panels | Both | `ctx.refPanels` / `frames` (`target: 'refPanel'`) | The side panel over an external item |
 | Overlays | Both | `ctx.slots` (`slot: 'overlay'`) / `frames` (`target: 'overlay'`) | A window-level modal |
-| Settings pages | Both | `ctx.settingsPages` / `frames` (`target: 'settings'`) | Settings |
+| Settings pages | Both | `ctx.settingsPages` / `frames` (`target: 'settings'`) | Settings, in the rail group the page names as `category`, or Features. A plugin may use six of the nine groups, and names what a change affects as `scope` (`settingsScope` on a frame). `keywords` and `sections` feed the settings search and the palette's section rows, and a section id is a deep-link anchor ([frontend.md](./frontend.md) § Search and deep links). A `workspace` or `project` page has no rail row: it is a tab on every workspace's or project's page ([frontend.md](./frontend.md) § Workspaces and projects). A compiled page that absorbed another lists the old id in `aliases`, so links to it still land. The host draws the plugin strip above every plugin page, and `railSourceVisibility` names the plugin's own sources whose **Show in left rail** switch it carries ([frontend.md](./frontend.md) § The plugin strip) |
 | Importers | Both | `ctx.projectImporters` / `frames` (`target: 'importer'`) | The project-import modal |
 | Webviews | Both | — / `frames` (`target: 'webview'`) | A pane showing external web content |
-| Rail sources | Both | `ctx.sources` / `contributions.sources` | The left rail |
+| Rail sources | Both | `ctx.sources` / `contributions.sources` | The left rail. `showInRailByDefault: false` starts the icon hidden; the person's **Show in left rail** choice wins, and a hidden source stays available and opens from the palette ([frontend.md](./frontend.md) § Rail source visibility) |
 | Session sources | Compiled | `ctx.sessionSources` | Node-scoped session summaries and optional send/focus actions for shared pickers, quit concerns, and navigation. The owner keeps full rows and fetches. **Direction: stays compiled.** Loaded plugins use commands and attention descriptors; no loaded session carrier is needed without a concrete consumer. |
 | Slots | Both | `ctx.slots` / `contributions.slots` | See the slot vocabulary below |
 | Commands | Both | `ctx.commands` / `contributions.commands` | The command palette and chords. One kind, five explicit shapes: an action, a group, a search, an input, a setting ([command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md)). |
@@ -89,7 +89,7 @@ Run by the node, with or without a client attached.
 | Source discovery | Both | `ctx.dataSources.discover` / `contributions.dataSourceDiscoveries` | Scoped dynamic source catalogues |
 | Task checks | Both | `ctx.taskChecks` / `contributions.taskChecks` | The archive gate |
 | Search providers | Compiled | `ctx.search` | The grouped search the archive page draws (docs/plugins.md § Search providers). **Direction: gains a manifest twin** when a loaded plugin wants to be searchable. A provider answers a query with plain-data hits, so the twin is a route the host calls, the same shape task checks already use. |
-| Runs | Both | `ctx.runs` | The merged run list at Settings → Runs. A pointer at a route that lists this plugin's runs |
+| Runs | Both | `ctx.runs` | The merged run list at Settings → Run history. A pointer at a route that lists this plugin's runs |
 | Audit actions | Both | `ctx.audit` / `contributions.auditActions` | The owner-readable trail, qualified `<pluginId>:<actionId>` (docs/security.md § Audit) |
 | Extension points | Both | `ctx.extensionPoints` (`declare` / `handle` / `handlers`) | The node's many-to-many seam for typed values: one plugin declares a point, any number fill it |
 | Hooks | Both | `ctx.hooks` / `contributions.extensionPoints` (`kind: 'hook'`) and `contributions.extensions` (a `route` plus a `mode`) | A turn in one plugin's decision before it happens, in a chain the host runs with a timeout and a verdict (docs/plugins.md § Hooks) |

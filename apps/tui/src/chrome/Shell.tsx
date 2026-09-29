@@ -9,8 +9,9 @@ import { PrefKeys } from '@acorn/client-core/infra/persistence'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { isTerminalOpen, setTerminalOpen } from '@acorn/client-core/features/tasks/tasks.ts'
-import { registerCommands } from '@acorn/client-core/host/registries/commands'
+import { clientEvents, registerCommands } from '@acorn/client-core/host/registries/commands'
 import { registerKeybindings } from '@acorn/client-core/host/registries/commands'
+import { registerNoticeTargetHandler } from '@acorn/client-core/features/notifications'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import { pendingTrust } from '@acorn/client-core/host/plugins/distribution.ts'
 import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
@@ -46,6 +47,10 @@ import { promotionRequest } from './promotionStore'
 import { SessionsHost } from './SessionsHost'
 import { FileDialog } from './FileDialog'
 import { activeFilePrompt } from './filePrompt'
+import { SettingsHost } from './SettingsHost'
+import { closeSettings, openSettings } from './settingsStore'
+import { Confirmation } from './Confirmation'
+import { activeConfirmation } from './confirmStore'
 
 // The arrangement: topbar, rail beside the pane, notifications, footer, and whatever overlay is on
 // top of it all.
@@ -152,7 +157,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // node has gone behind the overlay. Asking for a pass is the whole fix, because the pass already
   // walks the parents before it decides (../keys/regions.ts § The landing rule, § onScreen).
   createEffect(() => {
-    if (topOverlay()) scheduleSettle()
+    if (topOverlay() || activeConfirmation()) scheduleSettle()
   })
 
   // One tick for every spinner on screen (../kit/tick.ts).
@@ -204,7 +209,8 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     const commands = registerCommands([
       { id: 'core.palette.open', title: 'Commands', category: 'navigation', run: () => palette.openRoot() },
       { id: 'core.shortcuts.cheat-sheet', title: 'Help', hint: 'what the keyboard does right here', category: 'navigation', palette: true, run: () => openOverlay('help') },
-      { id: 'core.settings.open', title: 'Settings', hint: 'workspaces, projects, tasks, and providers', category: 'workspace', palette: true, run: () => openSetup() },
+      { id: 'core.settings.open', title: 'Open settings', hint: 'every settings page, grouped as on the desktop', category: 'navigation', palette: true, run: () => openSettings() },
+      { id: 'core.setup.open', title: 'Set up acorn', hint: 'workspaces, projects, tasks, and providers', category: 'workspace', palette: true, run: () => openSetup() },
       { id: 'core.task.create', title: 'New task', hint: 'create a task in a project', category: 'task', palette: true, run: () => openSetup('task') },
       { id: 'core.terminal.sessions', title: 'Open terminal sessions', hint: 'start or resume a task terminal', category: 'task', palette: true, requires: { plugin: 'terminal' }, when: () => !!model.task(), run: () => {
         const task = model.task()
@@ -242,6 +248,26 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     onCleanup(() => { navigation.dispose(); bindings.dispose(); commands.dispose() })
   })
 
+  // Settings: core's pages from the table the desktop draws from, beside the pages the roster's plugins
+  // register, and the ways in besides the palette. A plugin or a notice asks for a page by id, the
+  // same request the desktop's shell answers (./settingsPages.tsx, ./settingsStore.ts).
+  //
+  // The desktop's palette rows for each page and section are not registered here. Every one of them
+  // carries the Settings breadcrumb and a low order, so they ranked level with or above this shell's
+  // own commands: `notifications` opened the settings page instead of the inbox, and `new task` opened
+  // Keyboard shortcuts. **Open settings** is the one row, and the route's lists reach every page.
+  //
+  // The pages register behind a loader, because the table and the page graph are not needed to draw the
+  // first frame. The registry is a signal, so the route and anything reading it fill in when they land.
+  onMount(() => {
+    let unregister: (() => void) | undefined
+    let live = true
+    void import('./settingsPages').then(({ registerCoreSettingsPages }) => { if (live) unregister = registerCoreSettingsPages() })
+    const offEvent = clientEvents.on('presentation:open-settings', ({ tab }) => openSettings(tab))
+    const offTarget = registerNoticeTargetHandler('settings', (_taskId, target) => openSettings(target.resourceId))
+    onCleanup(() => { live = false; offTarget(); offEvent(); unregister?.() })
+  })
+
   return (
     <box
       flexDirection="column"
@@ -258,7 +284,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
           `display: none`, so the row gives up its height and the overlay below takes it.
           That is what a cell host has instead of a floating layer, and it is the same thing
           `TabPanel` does for a hidden tab. */}
-      <box flexDirection="row" flexGrow={1} visible={!topOverlay()}>
+      <box flexDirection="row" flexGrow={1} visible={!topOverlay() && !activeConfirmation()}>
         {/* No rule between the column and the pane: each panel draws its own frame, and a rule beside
             a border is two lines saying one thing (../panel.tsx). */}
         <Show when={!hidden()}><Rail model={model} cells={railCells(cells())} nodeId={props.nodeId} /></Show>
@@ -305,7 +331,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
           own content height (../kit/grouping.tsx). */}
       <Show when={topOverlay()}>
         {(name) => (
-          <box flexDirection="column" flexGrow={1}>
+          <box flexDirection="column" flexGrow={1} visible={!activeConfirmation()}>
             <Switch>
               <Match when={name() === 'palette'}><Palette session={palette} /></Match>
               <Match when={name() === 'help'}><CheatSheet /></Match>
@@ -315,12 +341,19 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
               <Match when={name() === 'trust'}><Dynamic component={trustPromptComponent() ?? undefined} /></Match>
               <Match when={name() === 'notifications'}><Inbox model={model} /></Match>
               <Match when={name() === 'setup'}><SetupHost model={model} nodeId={props.nodeId} initialStep={setupStep()} onClose={() => closeOverlay('setup')} /></Match>
+              <Match when={name() === 'settings'}><SettingsHost nodeId={props.nodeId} onClose={closeSettings} onSetup={() => openSetup()} /></Match>
               <Match when={name() === 'promotion'}><Show when={promotionRequest()}>{(request) => <PromotionHost request={request()} />}</Show></Match>
               <Match when={name() === 'sessions'}><Show when={model.task()}>{(task) => <SessionsHost task={task()} onClose={() => closeOverlay('sessions')} />}</Show></Match>
               <Match when={name() === 'file'}><Show when={activeFilePrompt()}>{(prompt) => <FileDialog prompt={prompt()} />}</Show></Match>
             </Switch>
           </box>
         )}
+      </Show>
+      {/* The confirmation goes over whatever has the screen, and that stays mounted and hidden under it,
+          the way the main row stays under an overlay. So the page that asked is still there, with its
+          state, when the answer lands (./confirmStore.ts). */}
+      <Show when={activeConfirmation()} keyed>
+        {(request) => <box flexDirection="column" flexGrow={1}><Confirmation request={request} /></box>}
       </Show>
       <Notifications />
       <Footer nodeId={props.nodeId} />

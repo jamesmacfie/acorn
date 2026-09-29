@@ -52,6 +52,9 @@ export const directPreferenceSlices: readonly PersistedStateSlice<unknown>[] = [
   // changed — the stored key is still `diff_view`, so nothing migrates.
   direct('core.diff-view', PrefKeys.diffView, 'view'),
   jsonObject('core.rail-order', PrefKeys.railOrder, 'view'),
+  // Bounded like the order beside it. A source that is gone for now keeps its entry, inert, so a plugin
+  // that comes back with the same ids comes back as the person left it.
+  jsonObject('core.rail-source-visibility', PrefKeys.railSourceVisibility, 'view'),
   direct('terminal.rail-default', PrefKeys.terminalRailDefault),
   direct('terminal.height', PrefKeys.terminalHeight, 'panes'),
   direct('terminal.font-size', PrefKeys.terminalFontSize, 'panes'),

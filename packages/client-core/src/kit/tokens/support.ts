@@ -67,6 +67,13 @@ export const NODE_SUPPORT = {
   TabPanel: { dom: 'full', tui: 'full' },
   // The gap that pushes what follows to the far end of a toolbar.
   ToolbarSpacer: { dom: 'full', tui: 'full' },
+  // A settings page's titled group and its one setting. Nodes rather than a convention, so a plugin's
+  // page lines up with core's and search has an anchor to land on (docs/frontend.md § Settings).
+  SettingsSection: { dom: 'full', tui: 'full' },
+  SettingRow: {
+    dom: 'full', tui: 'reduced',
+    loss: 'a row whose value is set elsewhere names where and draws no control, so the value this machine holds is not shown',
+  },
 
   // Showing
   Text: { dom: 'full', tui: 'full' },

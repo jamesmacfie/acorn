@@ -83,6 +83,17 @@
     "leftCollapsed": {
       "type": "boolean"
     },
+    "railSourceVisibility": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 160
+      },
+      "additionalProperties": {
+        "type": "boolean"
+      }
+    },
     "exclusiveSlots": {
       "type": "object",
       "propertyNames": {

@@ -467,11 +467,13 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 }
 .ui-check-box:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: var(--focus-ring-offset); }
 .ui-check:has(.ui-check-box:disabled) { opacity: 0.5; cursor: default; }
-.ui-check[data-size='md'] .ui-check-box { width: var(--icon-size); height: var(--icon-size); }
+/* Not a switch: its own size below would lose to this and draw a labelled switch as a small circle. */
+.ui-check[data-size='md'] .ui-check-box:not([data-switch]) { width: var(--icon-size); height: var(--icon-size); }
 
 /* The switch is presentation on the same input and the same events. `appearance: none` applies
-   only here so the plain checkbox keeps its native mark. */
-.ui-check[data-switch] .ui-check-box {
+   only here so the plain checkbox keeps its native mark. On the input rather than its label, because a
+   switch in a setting row has no visible label and so no label element. */
+.ui-check-box[data-switch] {
   appearance: none;
   width: var(--space-9);
   height: var(--space-6);
@@ -481,7 +483,7 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   position: relative;
   transition: background var(--dur-short) var(--ease-out);
 }
-.ui-check[data-switch] .ui-check-box::after {
+.ui-check-box[data-switch]::after {
   content: '';
   position: absolute;
   top: 50%;
@@ -493,8 +495,8 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   transform: translateY(-50%);
   transition: left var(--dur-short) var(--ease-out), background var(--dur-short) var(--ease-out);
 }
-.ui-check[data-switch] .ui-check-box:checked { background: var(--accent); border-color: var(--accent); }
-.ui-check[data-switch] .ui-check-box:checked::after { left: calc(100% - var(--space-5)); background: var(--accent-fg); }
+.ui-check-box[data-switch]:checked { background: var(--accent); border-color: var(--accent); }
+.ui-check-box[data-switch]:checked::after { left: calc(100% - var(--space-5)); background: var(--accent-fg); }
 
 /* ── ConfirmButton ──────────────────────────────────────────────────────────────────────────
    No new box: the armed state is Button's danger tone plus this ring, so the button reads as
@@ -1614,6 +1616,74 @@ a.ui-row:hover { background: var(--bg-hover); }
 .ui-heading[data-level='3'] .ui-heading-title { font-size: var(--fs-md); }
 
 .ui-section { display: flex; flex-direction: column; min-width: 0; }
+
+/* ── SettingsSection / SettingRow ─────────────────────────────────────────────────────────────
+   A settings page is sections of rows (docs/frontend.md § Settings). An inline row is a two-column
+   grid, the words left and the control right, so every control on a page starts at the same edge
+   whatever its label measures. A stacked row is one column with the control at the full width. */
+.ui-settings-section { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; scroll-margin-top: var(--space-5); }
+.ui-settings-section-head { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
+.ui-settings-section-label { flex: 1; min-width: 0; margin: 0; font-size: var(--fs-md); font-weight: 600; color: var(--text); }
+.ui-settings-section-actions { flex: none; display: flex; align-items: center; gap: var(--space-2); }
+.ui-settings-section-description { margin: 0; font-size: var(--fs-sm); color: var(--text-muted); }
+.ui-settings-section-rows { display: flex; flex-direction: column; min-width: 0; }
+.ui-settings-section-rows > .ui-setting-row + .ui-setting-row { border-top: var(--divider); }
+/* The danger zone: a box at the foot of a detail page, outlined in the danger colour rather than
+   tinted, so the one control inside it carries the weight. */
+.ui-settings-section[data-tone='danger'] {
+  border: var(--surface-border);
+  border-color: var(--danger);
+  border-radius: var(--radius-surface);
+  padding: var(--space-5);
+}
+.ui-settings-section[data-tone='danger'] .ui-settings-section-label { color: var(--danger); }
+/* Where a search result or a deep link landed. A fill and an outline that are there at once, so the
+   reader sees it with motion reduced; the fade out is the only thing that moves. */
+.ui-settings-section[data-highlight] {
+  outline: 2px solid var(--accent);
+  outline-offset: var(--space-3);
+  border-radius: var(--radius-surface);
+  background: var(--bg-selected);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .ui-settings-section { transition: background-color 0.6s ease, outline-color 0.6s ease; }
+}
+
+.ui-setting-row {
+  display: grid;
+  /* The control column is a fixed measure rather than `auto`, so a select or a field set to the full
+     width has a width to fill and every row's control starts at one edge, as Field's split does. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 18rem);
+  align-items: center;
+  column-gap: var(--space-6);
+  row-gap: var(--space-2);
+  padding: var(--space-4) 0;
+  min-width: 0;
+}
+.ui-setting-row[data-layout='stacked'] { grid-template-columns: minmax(0, 1fr); }
+.ui-setting-text { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.ui-setting-label { font-size: var(--fs-sm); color: var(--text); }
+.ui-setting-changed { margin-left: var(--space-2); color: var(--accent); }
+/* The header's scope chip at row size, for a row stored somewhere other than its page. */
+.ui-setting-scope {
+  margin-left: var(--space-1);
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  border: var(--control-border);
+  border-radius: var(--radius-popover);
+  padding: 0 var(--space-3);
+  white-space: nowrap;
+}
+.ui-setting-description { font-size: var(--fs-sm); color: var(--text-muted); }
+.ui-setting-from { font-size: var(--fs-xs); color: var(--text-muted); }
+.ui-setting-control { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); min-width: 0; }
+.ui-setting-row[data-layout='stacked'] .ui-setting-control { justify-content: flex-start; }
+/* A fieldset is here for `disabled` and nothing else, so it draws nothing of its own. */
+.ui-setting-fieldset { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); flex: 1; border: 0; margin: 0; padding: 0; min-width: 0; }
+.ui-setting-row[data-layout='stacked'] .ui-setting-fieldset { flex-direction: column; align-items: stretch; }
+.ui-setting-status { font-size: var(--fs-xs); color: var(--state-ok); white-space: nowrap; }
+.ui-setting-status:empty { display: none; }
+.ui-setting-error { grid-column: 1 / -1; font-size: var(--fs-sm); color: var(--danger); }
 /* Beside the label, before the actions: a fact about the fold rather than a control on it. */
 .ui-fold-meta { flex: none; display: flex; align-items: center; min-width: 0; }
 

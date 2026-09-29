@@ -24,14 +24,15 @@ import {
   themeChoices,
   themeFollowsSystem,
 } from '../../../features/settings/appearancePrefs'
-import { settingsContributions } from '../shell/settings'
+import { isStandaloneSettingsPage, SETTINGS_CATEGORY_LABELS, settingsCategoryOf, settingsPagesInOrder } from '../shell/settings'
+import { sectionSearchWords, settingsSectionEntries } from '../shell/settingsSearch'
 import type { ContributedCommand } from './commands'
 
 // Core's own catalogue: the groups the shell's commands hang under, the Settings pages as rows, and
 // the two settings core owns (docs/command-palette-and-shortcuts.md).
 //
 // Builders rather than a registration, because what a host can honour differs: the desktop has a
-// Settings modal and paints themes, and the terminal has neither. Each shell registers the ones it can
+// Settings view and paints themes, and the terminal has neither. Each shell registers the ones it can
 // answer for, which is the same rule the settings pages themselves already follow — they are
 // contributed by the app, not by this package.
 //
@@ -89,11 +90,20 @@ export const goToGroup = (): ContributedCommand => ({
  * *contents*: a page is an arbitrary component, and scraping one would couple the palette to rendering
  * and create the second persistence path this whole file exists to avoid
  * (docs/command-palette-and-shortcuts.md § What the palette refuses). What is
- * generated is one action that opens the modal where the reader asked for it.
+ * generated is one action that opens settings on the page the reader asked for.
+ *
+ * Every page the rail lists, in the rail's order, with its group as the hint so two groups' pages can
+ * share a name. A workspace or project page has no row: it is drawn inside the workspace or project it
+ * describes, and a row would have to name one.
+ *
+ * Then one row per declared section, **Page › Section**, from the same index the rail's search reads
+ * (../shell/settingsSearch.ts), matching its rows' labels and keywords too. It opens the page on that
+ * section.
  *
  * The registry is a signal, so the caller re-registers when it changes.
  */
-export function settingsPageCommands(open: (pageId: string) => void): ContributedCommand[] {
+export function settingsPageCommands(open: (target: string) => void): ContributedCommand[] {
+  const pages = settingsPagesInOrder().filter(isStandaloneSettingsPage)
   return [
     {
       id: CORE_SETTINGS_GROUP,
@@ -105,19 +115,35 @@ export function settingsPageCommands(open: (pageId: string) => void): Contribute
       scope: 'none',
       order: 800,
     },
-    // Workspace pages are excluded: their row would need a workspace to name, and the modal picks one
-    // from its own list. The general pages are the ones that mean something without a selection.
-    ...settingsContributions().filter((page) => page.group === 'general').map((page): ContributedCommand => ({
+    ...pages.map((page, index): ContributedCommand => ({
       id: `${CORE_SETTINGS_GROUP}.${page.id}`,
       parentId: CORE_SETTINGS_GROUP,
       title: page.title ?? page.label,
+      hint: SETTINGS_CATEGORY_LABELS[settingsCategoryOf(page)],
       category: 'navigation',
       palette: true,
       scope: 'none',
-      order: page.order,
+      order: index,
       ...(page.requires ? { requires: page.requires } : {}),
       run: () => open(page.id),
     })),
+    ...settingsSectionEntries(pages).map((entry, index): ContributedCommand => {
+      const page = pages.find((candidate) => candidate.id === entry.page)!
+      const words = sectionSearchWords(page, entry.section!)
+      return {
+        id: `${CORE_SETTINGS_GROUP}.${entry.page}#${entry.section}`,
+        parentId: CORE_SETTINGS_GROUP,
+        title: `${entry.pageLabel} › ${entry.sectionLabel}`,
+        hint: entry.group,
+        ...(words.length ? { keywords: words } : {}),
+        category: 'navigation',
+        palette: true,
+        scope: 'none',
+        order: pages.length + index,
+        ...(page.requires ? { requires: page.requires } : {}),
+        run: () => open(`${entry.page}#${entry.section}`),
+      }
+    }),
   ]
 }
 

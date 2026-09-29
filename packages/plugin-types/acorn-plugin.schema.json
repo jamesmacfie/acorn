@@ -339,6 +339,75 @@
                   "workspace"
                 ]
               },
+              "category": {
+                "type": "string",
+                "enum": [
+                  "general",
+                  "agents",
+                  "connections",
+                  "features",
+                  "automation",
+                  "machines"
+                ]
+              },
+              "settingsScope": {
+                "type": "string",
+                "enum": [
+                  "device",
+                  "node",
+                  "workspace",
+                  "project"
+                ]
+              },
+              "keywords": {
+                "maxItems": 16,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              },
+              "sections": {
+                "maxItems": 16,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+                    },
+                    "label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "keywords": {
+                      "maxItems": 16,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "label"
+                  ]
+                }
+              },
+              "railSourceVisibility": {
+                "maxItems": 16,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              },
               "coreSlot": {
                 "type": "string",
                 "enum": [
@@ -619,6 +688,9 @@
                 "additionalProperties": false
               },
               "projectScoped": {
+                "type": "boolean"
+              },
+              "showInRailByDefault": {
                 "type": "boolean"
               },
               "defaultPane": {

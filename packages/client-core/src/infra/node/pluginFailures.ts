@@ -2,6 +2,9 @@ import { corePluginsRoute, type NodePluginRow, type NodePluginState } from '@aco
 import { readJson } from './apiClient'
 import { surfaceFailures } from '../../host/plugins/surfaceFailures'
 import type { AttentionItem, AttentionSourceContribution } from '../../host/registries/rail/attention'
+import { distribution } from '../../host/plugins/distribution'
+import { nodePluginStatus } from '../../host/plugins/pluginStatus'
+import { nodes } from './fleet'
 
 // "Plugin X failed to start", in the notification bell, so the owner learns about it without opening
 // Settings → Plugins (docs/plugins.md § Activation).
@@ -25,7 +28,7 @@ const titleFor = (row: NodePluginRow): string => {
 // Every row here sends the reader to Settings > Plugins, which is the one place a failure can be
 // acted on: disable the plugin, or read the rest of what the node knows about it. The handler for
 // this kind is registered by the shell (apps/desktop/src/client/activate.ts), because opening the
-// settings modal is the shell's business and not this file's.
+// settings view is the shell's business and not this file's.
 const SETTINGS_TARGET = { kind: 'settings', resourceId: 'plugins' } as const
 
 // The generic sentence, used only when the node sends no reason.
@@ -72,6 +75,56 @@ export const pluginFailureAttention: AttentionSourceContribution = {
         detail: failure.reason,
         severity: 'warn' as const,
         at: failure.at,
+        target: SETTINGS_TARGET,
+      })
+    }
+    return items
+  },
+}
+
+// The other half of what waits on the person under Settings > Plugins: a package an agent asked for that
+// is held for review, a bundle this device has not approved yet, and a node still running the plugins it
+// started with. Rows rather than only the settings rail's dot, because each is a decision nobody else can
+// make, and the dot is drawn from these rows (features/settings/SettingsView.tsx § waiting).
+//
+// A separate source from the failures above, because these are not failures: the node is healthy, and
+// each clears the moment the person answers.
+export const pluginWaitingAttention: AttentionSourceContribution = {
+  id: 'core.pluginsWaiting',
+  order: 6,
+  fetch: async (nodeId, signal) => {
+    const state = await readJson<NodePluginState>(corePluginsRoute, { nodeId, signal })
+    const label = nodes().find((node) => node.nodeId === nodeId)?.label ?? 'This node'
+    const items: AttentionItem[] = []
+    for (const row of state.plugins) {
+      if (row.pendingReview && !('corrupt' in row.pendingReview)) {
+        items.push({
+          id: `core.pluginsWaiting:review:${row.name}`,
+          title: `Plugin ${row.name} is waiting for your review`,
+          detail: 'An agent asked to install it. Its node code cannot start until you approve the package.',
+          severity: 'warn',
+          at: row.pendingReview.stagedAt,
+          target: SETTINGS_TARGET,
+        })
+        continue
+      }
+      if (nodePluginStatus(distribution(), nodeId, row).line !== 'waiting') continue
+      items.push({
+        id: `core.pluginsWaiting:trust:${row.name}`,
+        title: `Plugin ${row.name} is waiting for approval on this device`,
+        detail: 'Nothing it draws appears here until you approve its bundle.',
+        severity: 'warn',
+        at: row.installed?.installedAt ?? Date.now(),
+        target: SETTINGS_TARGET,
+      })
+    }
+    if (state.restartRequired) {
+      items.push({
+        id: 'core.pluginsWaiting:restart',
+        title: `${label} needs a restart`,
+        detail: 'It is still running the plugins it started with. Restart it to apply the change.',
+        severity: 'warn',
+        at: Date.now(),
         target: SETTINGS_TARGET,
       })
     }

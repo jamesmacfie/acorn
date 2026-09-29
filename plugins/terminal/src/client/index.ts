@@ -21,7 +21,12 @@ export const terminalClientPlugin: ClientPlugin = {
     for (const contribution of terminalCommands) ctx.commands.register(contribution)
     ctx.agentContexts.register(terminalAgentContextContribution)
     ctx.settingsPages.register({
-      id: 'terminal', label: 'Terminal', group: 'general', order: 60, requires: { plugin: 'terminal' },
+      id: 'terminal', label: 'Terminal', category: 'features', scope: 'device', icon: 'terminal', order: 10, requires: { plugin: 'terminal' },
+      // The page's sections and rows, for search (TerminalSettings.tsx draws the same ones).
+      keywords: ['shell', 'pty', 'font'],
+      sections: [
+        { id: 'drawer', label: 'Drawer', rows: ['When the terminal button is clicked, open', 'Text size'] },
+      ],
       component: TerminalSettings,
     })
   },

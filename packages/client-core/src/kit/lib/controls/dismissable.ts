@@ -1,5 +1,6 @@
 import { onCleanup } from 'solid-js'
 import { trapTab } from '../../keys/trap'
+import { focusInAnchoredSurface } from './anchor'
 
 // Dismissal plumbing for modal surfaces: Escape, backdrop click, and Tab focus containment. See
 // docs/ui-design.md § Chrome and overlays for why this exists and why the overlay palettes don't
@@ -37,6 +38,9 @@ export function createDismissable(opts: {
     const entry = { live: () => (opts.container ? !!opts.container()?.isConnected : true), dismiss: () => opts.onDismiss() }
     const onDocumentKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || event.defaultPrevented) return
+      // A select or menu with focus in it closes first. It listens on `window`, so this listener runs
+      // before it, and without the check one press closed the list and the overlay.
+      if (focusInAnchoredSurface()) return
       if (escapeStack.filter((e) => e.live()).at(-1) !== entry) return
       event.preventDefault()
       entry.dismiss()
@@ -56,6 +60,7 @@ export function createDismissable(opts: {
     onContainerClick: (event) => event.stopPropagation(),
     onKeyDown: (event) => {
       if (on.includes('escape') && event.key === 'Escape') {
+        if (focusInAnchoredSurface()) return
         event.preventDefault()
         opts.onDismiss()
         return

@@ -436,7 +436,7 @@ Talking across the box is a hook with one handler, so there is one concept and n
 an iframe. Past `max` the host draws a count of what was left out — a count and no names, because the
 owner set the ceiling and listing the losers would invite a person to fix somebody else's arithmetic.
 
-When two contributors match the same key in `replace` mode, the user picks in Settings → Plugins and
+When two contributors match the same key in `replace` mode, the user picks in **Settings > Advanced > Extension points** and
 **the owner's default draws until they do**. A pick naming a plugin that has stopped matching falls
 back to the owner's default rather than to the runner-up: silently promoting the other candidate would
 mean the box changed hands because somebody uninstalled something. An override is an offer, not a
@@ -472,7 +472,7 @@ of thing, reads as newly requested rather than sliding past unremarked.
 ### Seeing what matched
 
 Silent-when-absent is right for a user and the worst possible thing for an author: a typo in `point`
-produces an empty pane and no error. **Settings → Plugins** lists every point on this node, its kind
+produces an empty pane and no error. **Settings > Advanced > Extension points** lists every point on this node, its kind
 and mode, and who fills it; every contribution whose point nobody declares, with a nearest-name
 suggestion; and, for a tied `replace` slot, the picker that settles it. It reads the same registries the
 hosts read and adds no bridge verb, so it can never disagree with what is on screen.
