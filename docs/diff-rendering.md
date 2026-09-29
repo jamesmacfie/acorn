@@ -658,7 +658,9 @@ prompt, and a palette row that ran on Enter would have none.
 **A split button in the kit.** Refused. Zed's **Stage All**, **Pull** and **Commit** are split buttons.
 A `Button` that opens a menu, drawn beside a `Menu`, draws the same thing out of two nodes that already
 exist, and the admission rule asks for two surfaces that cannot be expressed in what exists
-([ui-design.md](./ui-design.md) § The closed kit). This is one surface that can.
+([ui-design.md](./ui-design.md) § The closed kit). This is one surface that can. The footer draws
+**Commit** and its options chevron inside `Toolbar.Group joined`, which shares the border between
+them so the pair reads as one control.
 
 **A separate Git pane.** Refused. It would put the file list and the checkbox that stages a file in one
 pane and the diff of that file in another. The list column of the Changes pane is the rectangle Zed's
