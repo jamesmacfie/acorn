@@ -402,8 +402,7 @@ export function ChangesFooter(props: { task: Task; model: ChangesModel }) {
             onPress={() => setExpanded(true)}
           />
           <Toolbar.Spacer />
-          <Inline gap="inline">
-            <CommitOptionsMenu model={model()} />
+          <Toolbar.Group joined>
             <Button
               size="sm"
               busy={model().committing()}
@@ -414,7 +413,8 @@ export function ChangesFooter(props: { task: Task; model: ChangesModel }) {
             >
               {commitButtonLabel(model())}
             </Button>
-          </Inline>
+            <CommitOptionsMenu model={model()} />
+          </Toolbar.Group>
         </Toolbar>
       </Stack>
       <Show when={expanded()}>

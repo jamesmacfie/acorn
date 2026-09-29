@@ -10,7 +10,7 @@ const DEVICE_KEYS: ReadonlySet<string> = new Set<string>([
   PrefKeys.devicePluginsDisabled,
   PrefKeys.keybindings,
   PrefKeys.railOrder,
-  PrefKeys.railSourceVisibility,
+  PrefKeys.railVisibility,
   PrefKeys.leftCollapsed,
   PrefKeys.diffView,
   PrefKeys.terminalRailDefault,

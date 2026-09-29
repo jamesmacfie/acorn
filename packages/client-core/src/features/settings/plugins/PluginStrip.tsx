@@ -4,7 +4,7 @@ import { activeNodeId } from '../../../infra/node/activeNode'
 import { nodePlugins } from '../../../infra/node/nodePlugins'
 import { devicePlugins, distribution } from '../../../host/plugins/distribution'
 import { Button, Checkbox } from '../../../kit/components/primitives'
-import { createRailSourceVisibility, pluginRailSources } from '../../tabs/railSourceVisibility'
+import { createRailVisibility, pluginSources } from '../../tabs/railVisibility'
 import { createSettingSave } from '../settingSave'
 import { openPluginPage, pluginOrigin, statusOf, type InstalledPlugin } from './installed'
 import { setDevicePluginEnabled, setNodePluginEnabled } from './pluginActions'
@@ -30,7 +30,7 @@ export function PluginStrip(props: {
   navigate: SettingsNavigate
 }) {
   const qc = useQueryClient()
-  const visibility = createRailSourceVisibility()
+  const visibility = createRailVisibility()
   const plugin = createMemo((): InstalledPlugin | undefined => {
     const entry = devicePlugins().find((candidate) => candidate.row.name === props.pluginId)
     if (entry) return { kind: 'device', id: props.pluginId, entry }
@@ -43,7 +43,7 @@ export function PluginStrip(props: {
   }
   // Checked again here, and not only at registration: a switch is drawn only for a source this plugin
   // really registered, under the owner the registry recorded.
-  const rail = createMemo(() => pluginRailSources(props.pluginId).filter((source) => props.railSources?.includes(source.id)))
+  const rail = createMemo(() => pluginSources(props.pluginId).map(({ pluginId, source }) => ({ pluginId, ...source })).filter((source) => props.railSources?.includes(source.id)))
   const enabled = () => {
     const current = plugin()
     return current?.kind === 'device' ? !current.entry.row.disabled : !current?.row.disabled
@@ -93,7 +93,7 @@ export function PluginStrip(props: {
                 size="sm"
                 label={rail().length > 1 ? `Show ${source.label} in left rail` : 'Show in left rail'}
                 checked={visibility.shown(source.id)}
-                onChange={(on) => railSave(source.id).run(() => visibility.setShown(source, on, { throwOnFailure: true }))}
+                onChange={(on) => railSave(source.id).run(() => visibility.setShown(source.pluginId, source.id, on, { throwOnFailure: true }))}
               />
             )}
           </For>

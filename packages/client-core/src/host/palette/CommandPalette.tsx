@@ -8,6 +8,7 @@ import { workspaceForProject } from '../../features/workspaces/activeWorkspace'
 import { createFleetWorkspaces } from '../../features/workspaces/fleetWorkspaces'
 import type { CommandExecutionContext } from '../registries/commands/commands'
 import { registerNavigationCommands } from './navigationCommands'
+import { registerHiddenSourceOpeners } from './sourceOpeners'
 import { createCommandPaletteView } from './paletteView'
 import { Alert } from '../../kit/components/primitives'
 import { PaletteSurface } from './PaletteSurface'
@@ -67,6 +68,8 @@ export default function CommandPalette() {
   // The four navigation searches, which need the session's own open flag: the task fan-out runs only
   // while somebody is looking at the palette.
   registerNavigationCommands({ open: session.open, fleetWorkspaces })
+  // A way back to every plugin source the rail is not drawing.
+  registerHiddenSourceOpeners(() => context().workspaceId)
 
   const announce = () => {
     if (session.busy()) return 'Loading…'

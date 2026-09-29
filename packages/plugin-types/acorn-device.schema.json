@@ -83,7 +83,7 @@
     "leftCollapsed": {
       "type": "boolean"
     },
-    "railSourceVisibility": {
+    "railVisibility": {
       "type": "object",
       "propertyNames": {
         "type": "string",

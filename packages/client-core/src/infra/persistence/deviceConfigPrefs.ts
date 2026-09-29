@@ -11,7 +11,7 @@ const scalarKeys = {
 const jsonKeys = {
   keybindings: PrefKeys.keybindings,
   railOrder: PrefKeys.railOrder,
-  railSourceVisibility: PrefKeys.railSourceVisibility,
+  railVisibility: PrefKeys.railVisibility,
   exclusiveSlots: PrefKeys.exclusiveSlots,
 } as const
 

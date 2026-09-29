@@ -13,9 +13,10 @@ Two questions started this folder, and they turn out to be different problems wi
    and that authority has gaps today. See [threat-model.md](./threat-model.md) and
    [api-gates.md](./api-gates.md).
 2. **Can a task be locked down for an enterprise, opt-in?** acorn is not a client that a company
-   wraps in someone else's sandbox. acorn is the harness. So the product is acorn as the control
-   plane: the thing that scopes execution, egress, tools, and audit for the agents it launches. See
-   [enterprise-policy.md](./enterprise-policy.md).
+   wraps in someone else's sandbox. acorn is the harness. Here, "control plane" means task policy
+   enforcement on a Node: the thing that scopes execution, egress, tools, and audit for the agents
+   it launches. The hosted account, placement, and billing control plane is a separate service in
+   [the cloud proposal](../cloud/architecture.md). See [enterprise-policy.md](./enterprise-policy.md).
 
 ## The framing that matters
 

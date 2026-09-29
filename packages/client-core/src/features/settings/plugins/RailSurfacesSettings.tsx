@@ -11,7 +11,7 @@ import { Text } from '../../../kit/components/content/Text'
 import { SettingRow } from '../../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../../kit/components/layout/SettingsSection'
 import { availableSources } from '../../tabs/railSources'
-import { createRailSourceVisibility, pluginRailSources, type PluginRailSource } from '../../tabs/railSourceVisibility'
+import { createRailVisibility, pluginSources } from '../../tabs/railVisibility'
 import { createSettingSave, type SettingSave } from '../settingSave'
 import { savePref } from '../savePref'
 import './plugins.css'
@@ -33,22 +33,23 @@ export default function RailSurfacesSettings() {
 }
 
 function RailSources() {
-  const visibility = createRailSourceVisibility()
+  const visibility = createRailVisibility()
   const integrations = createQuery(() => integrationsOptions(true))
-  const sources = () => pluginRailSources()
+  const sources = () => pluginSources().map(({ pluginId, source }) => ({ pluginId, ...source }))
   // Whether the source could open now. Its icon waits for that as well as for the switch, and the switch
   // keeps its value in the meantime.
   const available = () => new Set(availableSources(integrations.data?.integrations).map((source) => source.id))
+  type PluginRailSource = ReturnType<typeof sources>[number]
   const saves = new Map<string, SettingSave>()
   const saveFor = (source: PluginRailSource) => {
-    const key = `${source.pluginId}/${source.id}`
+    const key = `${source.pluginId}:${source.id}`
     let save = saves.get(key)
     if (!save) saves.set(key, save = createSettingSave())
     return save
   }
   const description = (source: PluginRailSource) => [
     `From the ${source.pluginId} plugin.`,
-    !source.shownByDefault ? 'Hidden until you show it.' : '',
+    source.showInRailByDefault === false ? 'Hidden until you show it.' : '',
     available().has(source.id)
       ? 'The command palette opens it either way.'
       : 'Its icon appears once the source is available, such as when its connection is signed in.',
@@ -67,7 +68,7 @@ function RailSources() {
               switch
               ariaLabel={`Show ${source.label} in left rail`}
               checked={visibility.shown(source.id)}
-              onChange={(on) => saveFor(source).run(() => visibility.setShown(source, on, { throwOnFailure: true }))}
+              onChange={(on) => saveFor(source).run(() => visibility.setShown(source.pluginId, source.id, on, { throwOnFailure: true }))}
             />
           </SettingRow>
         )}

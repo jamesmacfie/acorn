@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { currentWorkspaceId, hydrateWorkspaceHistory, noteWorkspaceVisit, previousWorkspaceId } from './lastWorkspace'
+import { byRecentVisit, currentWorkspaceId, hydrateWorkspaceHistory, noteWorkspaceVisit, previousWorkspaceId } from './lastWorkspace'
 
 describe('the last workspace', () => {
-  beforeEach(() => hydrateWorkspaceHistory({ current: null, previous: null }))
+  beforeEach(() => hydrateWorkspaceHistory({ recent: [] }))
 
   it('bounces between the two most recent workspaces', () => {
     expect(previousWorkspaceId()).toBe(null)
@@ -24,18 +24,26 @@ describe('the last workspace', () => {
     noteWorkspaceVisit('b')
     expect(previousWorkspaceId()).toBe('a')
 
-    // A third workspace displaces the pair rather than joining a history.
+    // A third workspace goes to the front, and the one it replaced becomes the way back.
     noteWorkspaceVisit('c')
     expect(previousWorkspaceId()).toBe('b')
   })
 
   it('keeps the pair after hydration and counts a different startup destination as a visit', () => {
-    hydrateWorkspaceHistory({ current: 'b', previous: 'a' })
+    hydrateWorkspaceHistory({ recent: ['b', 'a'] })
     noteWorkspaceVisit('b')
     expect(previousWorkspaceId()).toBe('a')
 
     noteWorkspaceVisit('c')
     expect(currentWorkspaceId()).toBe('c')
     expect(previousWorkspaceId()).toBe('b')
+  })
+
+  it('orders a list by the last visit, leaving unvisited items in their order at the end', () => {
+    noteWorkspaceVisit('a')
+    noteWorkspaceVisit('b')
+    noteWorkspaceVisit('c')
+    noteWorkspaceVisit('a')
+    expect(byRecentVisit(['x', 'b', 'y', 'c', 'a'], (id) => id)).toEqual(['a', 'c', 'b', 'x', 'y'])
   })
 })

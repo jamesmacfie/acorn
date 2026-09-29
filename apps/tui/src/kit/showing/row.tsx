@@ -67,6 +67,9 @@ export function Row(props: {
   meta?: JSX.Element
   collapsed?: JSX.Element
   title?: string
+  /** Accepted for kit parity, like Text's. A terminal has no hover to open a tooltip on. */
+  tip?: string
+  tipAt?: number
   children: JSX.Element
 }) {
   // The active row is the collection's, the selected row is the pane's, and in a terminal they are

@@ -32,11 +32,10 @@ export const PrefKeys = {
   keybindings: 'keybindings',
   diffView: 'diff_view',
   railOrder: 'rail_order',
-  // Which plugin sources the desktop's left rail shows, as a JSON `{ "<pluginId>/<sourceId>": boolean }`
-  // map of the person's choices (features/tabs/railSourceVisibility.ts). A key of its own rather than a
-  // field on `rail_order`, so a drag and a switch never overwrite each other's write. The device's, like
-  // `rail_order`: the same plugin on every node this device pairs with shows or hides together.
-  railSourceVisibility: 'rail_source_visibility',
+  // Which plugin sources the desktop rail draws, as `{ "<pluginId>:<sourceId>": shown }`
+  // (features/tabs/railVisibility.ts). Apart from `rail_order` so a drag and a switch never overwrite
+  // each other's write, and the device's for the same reason `rail_order` is.
+  railVisibility: 'rail_visibility',
   leftCollapsed: 'left_collapsed',
   terminalRailDefault: 'term_rail_default',
   terminalHeight: 'term_height',

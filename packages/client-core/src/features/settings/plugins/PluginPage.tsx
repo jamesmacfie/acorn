@@ -23,7 +23,7 @@ import { SettingRow } from '../../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../../kit/components/layout/SettingsSection'
 import { Stack } from '../../../kit/components/layout/Stack'
 import { TabPanel, Tabs } from '../../../kit/components/layout/Tabs'
-import { createRailSourceVisibility, pluginRailSources } from '../../tabs/railSourceVisibility'
+import { createRailVisibility, pluginSources } from '../../tabs/railVisibility'
 import { useSettingsDetail } from '../settingsDetail'
 import { createSettingSave } from '../settingSave'
 import { pluginOrigin, pluginRow, statusOf, type InstalledPlugin } from './installed'
@@ -156,7 +156,7 @@ const ELSEWHERE = 'Read from the node this window runs on, not the node in the h
 // What the plugin put into acorn, each linking to where it is changed. Read from the registries the
 // plugin registered into, so it says what is on this device now rather than what a manifest promised.
 function Overview(props: { plugin: InstalledPlugin; navigate: SettingsNavigate; elsewhere: boolean }) {
-  const visibility = createRailSourceVisibility()
+  const visibility = createRailVisibility()
   // One per source, so a failed switch is said on its own row only.
   const railSaves = new Map<string, ReturnType<typeof createSettingSave>>()
   const railSave = (id: string) => {
@@ -164,7 +164,7 @@ function Overview(props: { plugin: InstalledPlugin; navigate: SettingsNavigate; 
     if (!save) railSaves.set(id, save = createSettingSave())
     return save
   }
-  const sources = () => pluginRailSources(props.plugin.id)
+  const sources = () => pluginSources(props.plugin.id).map(({ pluginId, source }) => ({ pluginId, ...source }))
   const commands = () => commandRegistry.entries().filter((command) => command.ownerId === props.plugin.id && command.palette)
   const shortcuts = () => keybindingRegistry.entries().filter((binding) => keybindingRegistry.ownerOf(binding.id) === props.plugin.id)
   const contributions = () => pluginRow(props.plugin).active?.contributions ?? pluginRow(props.plugin).installed?.contributions
@@ -181,14 +181,14 @@ function Overview(props: { plugin: InstalledPlugin; navigate: SettingsNavigate; 
         {(source) => (
           <SettingRow
             label={`Rail source: ${source.label}`}
-            description={!source.shownByDefault ? 'Hidden by default. The command palette can still open it.' : 'The command palette opens it whether or not its icon shows.'}
+            description={source.showInRailByDefault === false ? 'Hidden by default. The command palette can still open it.' : 'The command palette opens it whether or not its icon shows.'}
             error={railSave(source.id).error()}
           >
             <Checkbox
               switch
               label="Show in left rail"
               checked={visibility.shown(source.id)}
-              onChange={(on) => railSave(source.id).run(() => visibility.setShown(source, on, { throwOnFailure: true }))}
+              onChange={(on) => railSave(source.id).run(() => visibility.setShown(source.pluginId, source.id, on, { throwOnFailure: true }))}
             />
           </SettingRow>
         )}

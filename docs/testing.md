@@ -19,7 +19,10 @@ pnpm test:coverage
 concurrency, and reports every package rather than cancelling the rest on the first failure. Run it
 rather than `turbo run test` directly: the bound is what keeps the suite honest. Many of these tests
 spawn a real subprocess, mint a certificate, or run git, and turning the bound off oversubscribes the
-machine badly enough that they time out while passing in isolation.
+machine badly enough that they time out while passing in isolation. The bound is six packages at a
+time. Set `ACORN_TEST_CONCURRENCY` to change it. CI sets it to one. Each package's Vitest already
+starts a worker per core, and six packages at once on a four-core runner made tests 10 to 15 times
+slower than they run locally.
 
 The desktop package's `test` stages the bundle inputs first, including a build of the plugin SDK for
 bundled plugin imports. It then runs its Vitest suites and the Rust unit tests, so the boot test
@@ -1088,6 +1091,19 @@ when the annotation or rail contracts change.
 102. Install a loaded package whose manifest declares only `customAgents`. Confirm that the trust prompt
      shows the instructions in full, that the agent is listed with **Duplicate** but not **Edit**, and
      that disabling the package takes it out of **New**.
+
+145. Install a loaded plugin whose source declares `showInRailByDefault: false` and whose settings page
+     declares `railSourceVisibility`. Confirm that no rail icon appears and the palette offers
+     **Open <label>**, which opens the source without adding the icon.
+146. Turn **Show in left rail** on from the plugin's page. Confirm that the icon appears at once, the
+     switch under Settings > Plugins agrees, and the current view does not change. Drag the icons, hide
+     it again while it is selected, and confirm that the window returns to Home and the drag kept its
+     slot.
+147. Hide a project-scoped source such as GitHub. From Home with no project routed, run its palette
+     opener and confirm that the palette keeps an error instead of closing. Disable the plugin and
+     confirm that its switch and opener disappear, then re-enable it and confirm that the saved choice
+     returns.
+148. In `acorn`, confirm that the hidden source is still listed in the terminal's source menu.
 
 Checks 96–99 passed on 2026-09-27 with an isolated `dev:agent` data root and a loaded fixture plugin.
 The Tauri window refreshed only that plugin after its push, cleared marks across disable, enable,

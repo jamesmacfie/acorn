@@ -107,6 +107,11 @@ export function Row(props: {
    *  height the virtualizer has not accounted for. */
   collapsed?: JSX.Element
   title?: string
+  /** The app's tooltip for the row at full width (docs/ui-design.md § Tooltips). A collapsed row's
+   *  tip stays its name. `tipAt` adds a relative age under whichever tip is showing. A row with a tip
+   *  drops the browser's `title` tooltip, which would otherwise open on top of it. */
+  tip?: string
+  tipAt?: number
   children: JSX.Element
 }) {
   const safeHref = safeContentHref(props.href)
@@ -115,6 +120,7 @@ export function Row(props: {
   // passes the slot or leaves it off; there is no second boolean that could disagree with the width
   // the column is actually at.
   const collapsed = () => props.collapsed !== undefined
+  const tipText = () => collapsed() ? (props.title ?? props.label) : props.tip
   const body = (
     <Show
       when={collapsed()}
@@ -143,8 +149,9 @@ export function Row(props: {
         data-density={props.density ?? 'default'}
         data-variant={props.variant ?? 'default'}
         data-meta-first={props.metaFirst && !collapsed() ? '' : undefined}
-        title={props.title}
-        data-tip={collapsed() ? (props.title ?? props.label) : undefined}
+        title={props.tip ? undefined : props.title}
+        data-tip={tipText()}
+        data-tip-at={tipText() && props.tipAt !== undefined ? props.tipAt : undefined}
         aria-label={props.label}
         aria-selected={props.item ? !!props.selected : undefined}
         style={placement(props)}
@@ -184,8 +191,9 @@ export function Row(props: {
       data-density={props.density ?? 'default'}
       data-variant={props.variant ?? 'default'}
       data-meta-first={props.metaFirst && !collapsed() ? '' : undefined}
-      title={props.title}
-      data-tip={collapsed() ? (props.title ?? props.label) : undefined}
+      title={props.tip ? undefined : props.title}
+      data-tip={tipText()}
+      data-tip-at={tipText() && props.tipAt !== undefined ? props.tipAt : undefined}
       aria-label={props.label}
       aria-selected={props.item ? !!props.selected : undefined}
       style={placement(props)}

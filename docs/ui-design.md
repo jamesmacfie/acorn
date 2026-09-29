@@ -321,7 +321,9 @@ number for a pull request, a state icon over a key for a ticket. The slot's pres
 collapses the row, and the caller passes it from the same signal the column reads
 (`kit/lib/layout/collapseState.ts`), so the two cannot disagree. Leading, body, meta and trailing give way
 to it, along with depth, nesting and revealed controls, which are about a width the row no longer
-has. The name comes back as the tooltip, from the `title` the row already carried.
+has. The name comes back as the tooltip, from the `title` the row already carried. A row's own
+`tip` and `tipAt` are its tooltip at full width, and in a rail `tipAt` stays as the name's second
+line. A row with a `tip` drops the browser's `title` tooltip so the two never open together.
 
 The slot has the row's existing height to work in and never more. A virtualized list takes its row
 height from `--row-h-virt` read off the document root (`kit/lib/layout/metrics.ts`), so a per-column

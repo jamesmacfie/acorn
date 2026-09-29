@@ -180,6 +180,9 @@ export const frameSurface = z.object({
   if (surface.collapsible && (surface.target !== 'pane' || surface.layout !== 'list-detail')) {
     ctx.addIssue({ code: 'custom', path: ['collapsible'], message: 'collapsible is only valid on a list-detail pane' })
   }
+  if (surface.railSourceVisibility && surface.target !== 'settings') {
+    ctx.addIssue({ code: 'custom', path: ['railSourceVisibility'], message: 'railSourceVisibility is only valid on a settings surface' })
+  }
   if (surface.readsArchived && (surface.target !== 'pane' || surface.scope !== 'task')) {
     ctx.addIssue({ code: 'custom', path: ['readsArchived'], message: 'readsArchived is only valid on a task pane' })
   }
