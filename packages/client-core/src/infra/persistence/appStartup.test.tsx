@@ -41,7 +41,7 @@ const boot = (prefs: Record<string, string>, workspaces: () => Workspace[] | und
 // saved id over, and not before the workspaces it names are known.
 describe('launch workspace restore', () => {
   beforeEach(() => {
-    hydrateWorkspaceHistory({ current: null, previous: null })
+    hydrateWorkspaceHistory({ recent: [] })
     // jsdom has no `matchMedia`, and the theme pass reads one to follow the system's light/dark.
     vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }))
     vi.clearAllMocks()
@@ -60,14 +60,15 @@ describe('launch workspace restore', () => {
     startup.dispose()
   })
 
-  it('restores the shortcut pair before reopening the workspace', () => {
+  it('restores the visit order before reopening the workspace', () => {
     const startup = boot({
       last_workspace: 'workspace-2',
+      // The pair saved before the order was a list still reads.
       workspace_history: JSON.stringify({ current: 'workspace-2', previous: 'workspace-1' }),
     }, () => [WORKSPACE])
 
     expect(startup.restored()).toBe(true)
-    expect(workspaceHistory()).toEqual({ current: 'workspace-2', previous: 'workspace-1' })
+    expect(workspaceHistory()).toEqual({ recent: ['workspace-2', 'workspace-1'] })
     expect(previousWorkspaceId()).toBe('workspace-1')
     startup.dispose()
   })
@@ -80,19 +81,19 @@ describe('launch workspace restore', () => {
     startup.dispose()
   })
 
-  it('saves the new pair after a workspace switch', () => {
+  it('saves the new order after a workspace switch', () => {
     vi.useFakeTimers()
     try {
       const startup = boot({
         last_workspace: 'workspace-2',
-        workspace_history: JSON.stringify({ current: 'workspace-2', previous: 'workspace-1' }),
+        workspace_history: JSON.stringify({ recent: ['workspace-2', 'workspace-1'] }),
       }, () => [WORKSPACE])
 
       noteWorkspaceVisit('workspace-1')
       vi.advanceTimersByTime(500)
       expect(mocks.savePref).toHaveBeenCalledWith(
         expect.any(QueryClient), 'workspace_history',
-        JSON.stringify({ current: 'workspace-1', previous: 'workspace-2' }),
+        JSON.stringify({ recent: ['workspace-1', 'workspace-2'] }),
         { surfaceFailure: true },
       )
       startup.dispose()

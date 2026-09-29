@@ -30,7 +30,9 @@ export const ToolbarSpacer = () => <span class="ui-toolbar-spacer" />
 
 Toolbar.Spacer = ToolbarSpacer
 
-/** A gap-tightened cluster, for pairs that read as one control (a find bar's prev/next). */
-Toolbar.Group = (props: { children: JSX.Element }) => (
-  <span class="ui-toolbar-group">{props.children}</span>
+/** A gap-tightened cluster, for pairs that read as one control (a find bar's prev/next). `joined`
+ *  closes the gap and shares the border between the buttons, so a button and the menu beside it
+ *  draw as one split button without the kit having a node for one (docs/diff-rendering.md). */
+Toolbar.Group = (props: { joined?: boolean; children: JSX.Element }) => (
+  <span class="ui-toolbar-group" data-joined={props.joined ? '' : undefined}>{props.children}</span>
 )

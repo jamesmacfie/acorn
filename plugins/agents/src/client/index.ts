@@ -21,6 +21,7 @@ import { agentsCommands } from './commands'
 import { agentCommandsSlotContribution } from './AgentCommands'
 import { harnessTerminalCommands } from './terminalProfileCommands'
 import { agentToolFoldSlice } from './sessions/toolFoldPrefs'
+import { sessionOrderSlice } from './sessions/sessionOrder'
 
 // The conversation, for whoever else has a session to draw (../contract/conversation.ts). Lazy like
 // the settings pages below: the Workflows run pane is the only other caller and most windows never
@@ -96,6 +97,7 @@ export const agentsClientPlugin: ClientPlugin = {
     // How a transcript's tool cards start out (toolFoldPrefs.ts). This device's, so the slice is
     // declared here and the key is listed as device-owned in persistence/devicePrefs.ts.
     ctx.persistedStateSlices.register(agentToolFoldSlice)
+    ctx.persistedStateSlices.register(sessionOrderSlice)
     // The Agents group's pages, each with the sections and rows it draws for search (each page's file
     // draws the same ones). Core's Tools and permissions (order 30) and MCP config files (order 50) sit
     // between them.

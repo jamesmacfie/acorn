@@ -1,6 +1,7 @@
 import { createMemo, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createFleetWorkspaces, selectFleetWorkspace, type FleetWorkspace } from '../../features/workspaces/fleetWorkspaces'
+import { byRecentVisit } from '../../features/workspaces/lastWorkspace'
 import { fuzzyScore } from '../../kit/lib/controls/fuzzy'
 import { createOverlayPalette } from './overlay'
 import { PaletteSurface } from './PaletteSurface'
@@ -22,9 +23,10 @@ export default function WorkspacePalette() {
   })
 
   const matches = createMemo<FleetWorkspace[]>(() => {
-    const all = fleet().entries
     const q = palette.query().trim()
-    if (!q) return all
+    // Most recently visited first, so the one you just left is one row down.
+    if (!q) return byRecentVisit(fleet().entries, (entry) => entry.workspace.id)
+    const all = fleet().entries
     // The node label is part of the haystack, not a separate filter: two nodes both having a "Default"
     // workspace is the normal case, and typing the node name is how the owner disambiguates.
     return all

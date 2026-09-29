@@ -160,24 +160,24 @@ between repositories in one workspace would read as a bug, so it stays and shows
 Whether a plugin's source has an icon in the desktop's left rail is the person's choice, and it is a
 presentation choice, not a gate. The four gates above answer "can this source open?" through
 `availableSources` (`packages/client-core/src/features/tabs/railSources.ts`), and nothing about
-visibility changes that answer. `features/tabs/railSourceVisibility.ts` applies the choice only where
+visibility changes that answer. `features/tabs/railVisibility.ts` applies the choice only where
 `TabRail.tsx` projects its icon list. App's selected-source check still reads availability, so a hidden
 source that a command selects, such as Docker's **Open Docker**, stays open.
 
 - A source declares `showInRailByDefault: false` to start hidden, on a compiled `SourceContribution` or
   a loaded source descriptor (`packages/protocol/src/plugin/manifest/chromeDescriptors.ts`). Absent
   means shown. The source is registered either way.
-- The choice is one device preference, `rail_source_visibility`, a JSON map from
-  `<pluginId>/<sourceId>` to `true` or `false`, mirrored to `acorn.json` as `railSourceVisibility`. The
+- The choice is one device preference, `rail_visibility`, a JSON map from
+  `<pluginId>:<sourceId>` to `true` or `false`, mirrored to `acorn.json` as `railVisibility`. The
   owner comes from the source registry, never from anything the plugin declared. An absent entry reads
   the source's default, and an entry for a source that is gone stays as inert data, so a plugin that
   comes back with the same ids comes back as the person left it. The map is bounded when it is read. It
   is a separate key from `rail_order`, so dragging and hiding never overwrite each other; a drag while a
-  source is hidden writes the order back around the hidden source's slot (`reorderShownSources`).
+  source is hidden keeps the hidden source's slot.
 - Core's sources, Home among them, are always shown.
 - Hiding the source on screen goes back to Home. Showing one adds its icon and moves nothing.
 - Every hidden, available source gets a palette row, **Open <label>**, which the host registers and
-  removes as the source becomes available or not (`createHiddenSourceOpeners`). It opens the source the
+  removes as the source becomes available or not (`host/palette/sourceOpeners.ts`). It opens the source the
   way its icon does and refuses with an error when the source needs a project and none is open. A
   plugin that already registers `source.<id>.open` keeps its own row and gets no second one.
 - The switch is drawn in two places, both the host's: **Settings > Plugins > Rail and surfaces** lists

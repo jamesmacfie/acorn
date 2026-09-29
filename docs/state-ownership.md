@@ -115,7 +115,7 @@ using Node preferences. Uninstall removes that device prefix and the device enab
 preserving manual trust acknowledgements.
 
 `acorn.json` is a second interface to selected device preferences: appearance, keybinding overrides,
-rail order and collapse, and exclusive-slot picks. The desktop helper reads and watches it in its
+rail order, collapse, and plugin source visibility, and exclusive-slot picks. The desktop helper reads and watches it in its
 user data directory; the terminal uses its own config directory. Incoming values pass through the
 normal device preference setter, which writes local storage before updating the query cache. A
 Settings change to a covered value writes the file. Unknown top-level keys survive a write, and a

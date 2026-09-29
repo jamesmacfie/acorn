@@ -336,6 +336,9 @@ export type AgentSession = {
   queuedTurns: number
   lastEventSeq: number
   lastReadSeq: number
+  /** When the session last recorded an event, or null before its first. Absent from a node older than
+   *  this field, so a reader falls back to `updatedAt`. */
+  lastEventAt?: number | null
   archivedAt: number | null
   createdAt: number
   updatedAt: number

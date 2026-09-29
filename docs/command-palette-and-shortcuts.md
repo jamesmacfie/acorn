@@ -104,6 +104,15 @@ palette item until 2026-09-03, composed into the root by hand and invoked throug
 row was about; it is a `fleet`-scoped search now, so the root shows one named row instead of every
 task the fleet has, and switching node still happens before a remote task is activated.
 
+**A hidden rail source gets a generated opener.** The desktop palette registers **Open <label>** at
+the root for every plugin source that can open but that the rail is not drawing
+(`client-core/host/palette/sourceOpeners.ts`, docs/frontend.md § Registries and plugins). The rows follow
+the availability list, so one disappears when its plugin unloads, loses trust, or its provider or
+workspace gate closes. Picking one follows a rail click's project rule. A project-scoped source with
+no project to show throws, so the palette keeps the error. A plugin that ships its own
+`source.<id>.open` command, as Docker, the agent centre, and GitHub do, keeps that row and gets no
+second one.
+
 **`Last workspace` is an action, not a search, and it is the same pair both ways.**
 `client-core/features/workspaces/lastWorkspace.ts` holds the current workspace id and the one open
 before it. Each shell reports the workspace it has settled on — the desktop from the route, the terminal
@@ -165,7 +174,7 @@ this roster without subscribing to the registry signal it writes and recursively
 | --- | --- |
 | `⌘K` | Open command palette |
 | `⌘P` | Go to a file in the worktree (the palette, at the editor's search) |
-| `⌘L` | Open workspace switcher |
+| `⌘L` | Open workspace switcher, most recently visited first |
 | `⌘⇧N` | Create a local task |
 | `⌘⇧T` | Toggle terminal drawer |
 | `⌘1`–`⌘9` | Activate the corresponding visible task |

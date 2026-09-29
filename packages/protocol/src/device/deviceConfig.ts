@@ -25,10 +25,9 @@ export const deviceConfigSchema = z.looseObject({
   keybindings: z.record(preferenceId, z.union([z.string().max(64), z.null()])).optional(),
   railOrder: z.strictObject({ pinned: z.array(preferenceId), order: z.array(preferenceId), sources: z.array(preferenceId).optional() }).optional(),
   leftCollapsed: z.boolean().optional(),
-  // Which plugin sources the left rail shows, as `<pluginId>/<sourceId>` to the person's choice. An
-  // absent key reads the source's own default. Kept apart from `railOrder`, so dragging and hiding never
-  // overwrite each other.
-  railSourceVisibility: z.record(preferenceId, z.boolean()).optional(),
+  // `<pluginId>:<sourceId>` → shown. Only explicit choices live here; an absent entry reads the
+  // source's own default.
+  railVisibility: z.record(preferenceId, z.boolean()).optional(),
   exclusiveSlots: z.partialRecord(z.enum(CORE_EXCLUSIVE_SLOTS), preferenceId).optional(),
   plugins: z.array(z.strictObject({ id: preferenceId, source: devicePluginSourceSchema })).max(128).optional(),
 }).superRefine((value, ctx) => {

@@ -1,5 +1,5 @@
 import { createSignal, onCleanup, onMount, Show } from 'solid-js'
-import { EmptyState } from '@acorn/plugin-api/ui'
+import { EmptyState, Stack } from '@acorn/plugin-api/ui'
 import { imageTypeForPath } from '../contract/imagePreview'
 import { editorApi } from './editorClient'
 
@@ -48,10 +48,10 @@ export default function ImagePreview(props: { taskId: string; path: string }) {
   })
 
   return (
-    <div role="group" aria-label={`Image preview: ${props.path}`} style={{ flex: '1', 'min-height': '0', display: 'flex', 'align-items': 'center', 'justify-content': 'center', overflow: 'auto' }}>
+    <Stack grow>
       <Show when={source()} fallback={<EmptyState busy={!error()}>{error() ? 'Unable to preview this image.' : 'Loading image…'}</EmptyState>}>
-        {(url) => <img src={url()} alt={props.path.split('/').pop() ?? props.path} onError={showError} style={{ 'max-width': '100%', 'max-height': '100%', 'object-fit': 'contain' }} />}
+        {(url) => <img src={url()} alt={props.path.split('/').pop() ?? props.path} onError={showError} style={{ 'max-width': '100%', 'max-height': '100%', 'object-fit': 'contain', margin: 'auto' }} />}
       </Show>
-    </div>
+    </Stack>
   )
 }
