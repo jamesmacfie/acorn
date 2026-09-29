@@ -500,9 +500,9 @@ drops its segments from the list and keeps its header; collapsing one from the s
 back to that header, so the reader stays on the file they collapsed.
 
 The file filter at the start of the toolbar drops every file whose path does not match, header and
-all, and scrolls the list back to its top (`diff/fileFilter.ts`). A query that appears whole in a
-path matches where it appears last, which is usually the file name. Any other query falls back to
-the kit's fuzzy subsequence match. The header marks the matched characters with the find mark. The
+all, and scrolls the list back to its top (`diff/fileFilter.ts`). The query matches as a whole,
+ignoring case, where it appears last in the path, which is usually the file name. The header marks
+the matched characters with the find mark. The
 filter lasts as long as the pane and is not remembered, and find still counts matches in the files
 it hides.
 

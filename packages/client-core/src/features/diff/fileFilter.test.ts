@@ -8,12 +8,8 @@ describe('fileFilterMarks', () => {
     expect(fileFilterMarks('cell', path)).toEqual([20, 21, 22, 23])
   })
 
-  it('falls back to a fuzzy subsequence', () => {
-    expect(fileFilterMarks('cmc', path)).toEqual([2, 6, 11])
-  })
-
-  it('filters out a path the query is not a subsequence of', () => {
-    expect(fileFilterMarks('xyz', path)).toBeNull()
+  it('filters out a path that holds the letters but not the whole query', () => {
+    expect(fileFilterMarks('cmc', path)).toBeNull()
   })
 
   it('keeps every file and marks nothing for an empty query', () => {
