@@ -1,4 +1,5 @@
-import { createRoot } from 'solid-js'
+import { createRoot, createSignal } from 'solid-js'
+import { render } from 'solid-js/web'
 import { afterEach, expect, it, vi } from 'vitest'
 
 // The Changes model's side of a revision conflict (./changesModel.tsx § conflicted): a segment asked
@@ -7,8 +8,10 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: undefined }), useQueryClient: () => ({}) }))
 vi.mock('@acorn/plugin-api/ui/host', () => ({ registerKeybindings: () => ({ dispose() {} }) }))
+const inline = vi.hoisted(() => ({ capability: undefined as unknown }))
 vi.mock('@acorn/plugin-api/client', async (original) => ({
   ...await original<Record<string, unknown>>(),
+  clientCapability: () => inline.capability,
   isArchiving: () => false,
   taskStatusRevision: () => 0,
   registerCommands: () => ({ dispose() {} }),
@@ -46,6 +49,7 @@ const answering = (...digests: string[]) => {
 afterEach(() => {
   disposers.splice(0).forEach((dispose) => dispose())
   vi.clearAllMocks()
+  inline.capability = undefined
 })
 
 it('reads the document again after a revision conflict and draws the new revision, once', async () => {
@@ -104,4 +108,33 @@ it('keeps the last document when a read of it fails', async () => {
   await vi.waitFor(() => expect(reads()).toBe(2))
   await flush()
   expect(model.source.topology()?.files[0]?.patchKey).toBe(FIRST)
+})
+
+// The host draws a line's card inside a tracked expression, and the task's sessions move whenever any
+// of them does. The card has to survive that, or its textarea loses focus mid-sentence.
+it('keeps an open inline card mounted while the task\'s sessions update', async () => {
+  const [sessions, setSessions] = createSignal<unknown[]>([])
+  const Card = vi.fn(() => <textarea />)
+  inline.capability = { prime() {}, reportPatches() {}, sessionsForTask: () => sessions(), Card }
+  api.status.mockResolvedValue({
+    branch: 'main', upstream: null, ahead: null, behind: null, operation: null,
+    changes: [{ path: 'a.txt', status: 'modified', staged: false, additions: 1, deletions: 0, contentKey: 'k' }],
+  })
+  answering(FIRST)
+  const model = createRoot((dispose) => {
+    disposers.push(dispose)
+    return createChangesModel({ id: 't1', projectId: 'p1' } as never, { shown: () => true } as never)
+  })
+  await vi.waitFor(() => expect(model.source.topology()?.files[0]?.patchKey).toBe(FIRST))
+  const row = { path: 'a.txt', kind: 'add', newNo: 1, oldNo: null, raw: '+x' } as never
+  model.source.inlineChat!.open(row)
+  const host = document.createElement('div')
+  disposers.push(render(() => <div>{model.source.inlineChat!.render(row)}</div>, host))
+  const textarea = host.querySelector('textarea')
+  expect(textarea).toBeTruthy()
+
+  setSessions([{ id: 'other', taskId: 't1', lastEventSeq: 1 }])
+  setSessions([{ id: 'other', taskId: 't1', lastEventSeq: 2 }])
+  expect(Card).toHaveBeenCalledTimes(1)
+  expect(host.querySelector('textarea')).toBe(textarea)
 })

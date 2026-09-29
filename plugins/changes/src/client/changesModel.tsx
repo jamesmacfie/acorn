@@ -1,4 +1,4 @@
-import { For, createEffect, createMemo, createResource, createSignal, on, onCleanup } from 'solid-js'
+import { For, Show, createEffect, createMemo, createResource, createSignal, on, onCleanup } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   agentSessionsFor, clientCapability, clientEvents, effectiveModelPick, focusedPane, formatFileReference, isArchiving, prefsOptions,
@@ -261,12 +261,19 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
       anchors: inlineAnchors,
       open: (row) => setOpenInline(inlineOrigin(row)),
       render: (row) => {
-        const origin = inlineOrigin(row)
-        const Card = inline()?.Card
-        if (!origin || !Card) return null
-        const exists = inline()?.sessionsForTask(task.id).some((session) => session.origin && sameInlineLine(session.origin, origin) && !session.archivedAt)
-        if (!exists && (!openInline() || !sameInlineLine(openInline()!, origin))) return null
-        return <Card origin={origin} loadContext={() => loadDiffLineContext(source, row)} onClose={() => setOpenInline(null)} />
+        // The host calls this inside a tracked expression, and the task's sessions move on every
+        // update to any of them. Read directly, each one rebuilt the card and blurred its textarea.
+        // A memo that settles on the same line keeps the card mounted until the answer changes.
+        const shown = createMemo(() => {
+          const origin = inlineOrigin(row)
+          if (!origin || !inline()?.Card) return null
+          const exists = inline()?.sessionsForTask(task.id).some((session) => session.origin && sameInlineLine(session.origin, origin) && !session.archivedAt)
+          return exists || (openInline() && sameInlineLine(openInline()!, origin)) ? origin : null
+        }, null, { equals: (a, b) => a === b || (!!a && !!b && sameInlineLine(a, b)) })
+        return <Show when={shown()} keyed>{(origin) => {
+          const Card = inline()!.Card
+          return <Card origin={origin} loadContext={() => loadDiffLineContext(source, row)} onClose={() => setOpenInline(null)} />
+        }}</Show>
       },
     },
     // Drawn in the same shape another plugin's marks are, which is what the host puts under a line
