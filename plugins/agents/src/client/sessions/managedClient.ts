@@ -16,6 +16,7 @@ import type {
   EnqueueAgentTurnInput,
   ImportAgentTranscriptInput,
 } from '../../shared/schemas'
+import type { AgentSessionMcp } from '../../shared/mcpServers'
 import { MAX_INLINE_IMAGE_BYTES } from './inlineImage'
 
 const ROOT = '/v1/p/agents'
@@ -129,6 +130,9 @@ export const managedAgentApi = {
     jsonWrite<AgentSession>(sessionRoute(sessionId, '/fork'), 'POST', title ? { title } : {}),
   compact: (sessionId: string) =>
     jsonWrite<{ ok: true }>(sessionRoute(sessionId, '/compact'), 'POST'),
+  mcp: (sessionId: string) => readJson<AgentSessionMcp>(sessionRoute(sessionId, '/mcp')),
+  setMcp: (sessionId: string, enabled: string[]) =>
+    jsonWrite<AgentSessionMcp>(sessionRoute(sessionId, '/mcp'), 'PUT', { enabled }),
   regenerateTitle: (sessionId: string) =>
     jsonWrite<AgentSession>(sessionRoute(sessionId, '/regenerate-title'), 'POST'),
   handoff: (sessionId: string) =>

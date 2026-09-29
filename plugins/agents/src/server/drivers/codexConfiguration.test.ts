@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import {
   codexCollaborationModeForTurn,
   codexCollaborationModes,
+  codexMcpConfig,
   codexReasoningOptions,
+  codexReportedMcpServers,
 } from './codexConfiguration'
 
 describe('Codex configuration', () => {
@@ -108,5 +110,32 @@ describe('Codex configuration', () => {
         developer_instructions: null,
       },
     })
+  })
+})
+
+// docs/mcp.md § Your own servers.
+describe('the MCP servers acorn declares to Codex', () => {
+  it('spells them as config.toml would and reads back what Codex reports', () => {
+    expect(codexMcpConfig([])).toBeNull()
+    expect(codexMcpConfig([
+      { transport: 'stdio', name: 'linear', command: 'npx', args: ['linear-mcp'], env: { KEY: 'v' } },
+      { transport: 'http', name: 'docs', url: 'https://docs.example/mcp', headers: { Authorization: 'Bearer t' } },
+    ])).toEqual({ mcp_servers: {
+      linear: { command: 'npx', args: ['linear-mcp'], env: { KEY: 'v' } },
+      docs: { url: 'https://docs.example/mcp', http_headers: { Authorization: 'Bearer t' } },
+    } })
+
+    const startup = new Map([['linear', { status: 'ready', error: null }], ['broken', { status: 'failed', error: 'spawn ENOENT' }]])
+    expect(codexReportedMcpServers({ data: [
+      { name: 'linear', authStatus: 'unsupported', tools: { a: {}, b: {} } },
+      { name: 'broken', authStatus: 'unsupported', tools: {} },
+      { name: 'figma', authStatus: 'notLoggedIn', tools: {} },
+      { name: 'quiet', authStatus: 'unsupported', tools: {} },
+    ] }, startup)).toEqual([
+      { name: 'linear', status: 'connected', toolCount: 2, error: null },
+      { name: 'broken', status: 'failed', toolCount: 0, error: 'spawn ENOENT' },
+      { name: 'figma', status: 'needs_auth', toolCount: 0, error: null },
+      { name: 'quiet', status: 'unknown', toolCount: 0, error: null },
+    ])
   })
 })

@@ -9,6 +9,8 @@ import type {
   AgentWsFrame,
 } from '../../contract/wire.ts'
 import type { AgentDriverEvent, AgentDriverMcpServer } from '../drivers/types'
+import { AgentMcpServerStore } from '../mcpServerStore'
+import { sessionMcpSelection } from '../../shared/mcpServers'
 import type { AgentSessionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { AgentLifecycleFrame } from '../../contract/lifecycle'
 import { parseToolCeiling } from '@acorn/protocol/toolPolicy.ts'
@@ -86,6 +88,7 @@ export function acornMcpServers(
   const profile = agentProfileRegistry.get(session.profileId)
   if (!profile || profile.mcpRegistration) return []
   return [{
+    transport: 'stdio',
     name: mcp.name,
     command: mcp.launcher.command,
     args: mcp.launcher.args,
@@ -183,6 +186,8 @@ export class ManagedAgentEngine {
   // Every internal token this engine has handed to a provider child, so a leaked value can still be
   // scrubbed out of provider messages and transcripts. Bounded by the number of sessions started.
   protected readonly mintedSecrets: string[] = []
+  /** The user's MCP servers (docs/mcp.md § Your own servers). Settings edits them through here too. */
+  readonly mcpServers: AgentMcpServerStore
   protected readonly currentUserId: () => string | null
   protected readonly registry: AgentDriverRegistry
   protected readonly publish?: (frame: PublishedFrame) => void
@@ -252,6 +257,7 @@ export class ManagedAgentEngine {
     // accumulates them and the materializer holds a live reference to the same array.
     this.eventMaterializer = new ProviderEventMaterializer(this.artifacts, this.mintedSecrets)
     this.webhooks = new AgentWebhookService(options.db, options.secrets, options.core)
+    this.mcpServers = new AgentMcpServerStore(options.db, options.secrets)
     this.providerEvents = new DurableAgentEventBuffer((entry) => this.commitProviderEvent(entry))
   }
 
@@ -406,6 +412,17 @@ export class ManagedAgentEngine {
       ACORN_SESSION_ID: session.id,
     }
     for (const secret of secretEnvironmentValues(sessionEnv)) if (!this.mintedSecrets.includes(secret)) this.mintedSecrets.push(secret)
+    // The servers this session has switched on, resolved on every start because a harness keeps none of
+    // them between processes. Their secrets join the redaction list for the same reason the token does.
+    const userMcp = await this.mcpServers.resolve(sessionMcpSelection(session.config), 'agent MCP server: start a session')
+    for (const secret of userMcp.secrets) if (!this.mintedSecrets.includes(secret)) this.mintedSecrets.push(secret)
+    if (userMcp.unavailable.length) {
+      await this.record(session.id, null, {
+        type: 'diagnostic',
+        level: 'warning',
+        message: `This session runs without ${userMcp.unavailable.join(', ')}: a stored secret could not be opened. Enter it again in Settings → MCP servers.`,
+      })
+    }
     // The session's span covers starting the provider, not the session's whole life. A session
     // lives for hours and outlives the process, and a span nobody can close is not a measurement;
     // spawning or reconnecting the child is the part something waited on
@@ -417,7 +434,7 @@ export class ManagedAgentEngine {
       session,
       cwd,
       env: sessionEnv,
-      mcpServers: acornMcpServers(this.mcp(), session, sessionEnv),
+      mcpServers: [...acornMcpServers(this.mcp(), session, sessionEnv), ...userMcp.servers],
       noProviderExecutionHistory,
       onEvent: (event) => this.onProviderEvent(session.id, event),
       onClosed: (error) => this.onProviderClosed(session.id, error),

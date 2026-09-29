@@ -1095,6 +1095,20 @@ task id without retaining the other node's label. The real terminal projected si
 as `+6`; `Shift+F10` opened **Task markers**, and End reached the sixth label. That run also caught and
 fixed a long-title layout that could previously shrink the disclosure out of the row.
 
+The following checks cover [mcp.md](./mcp.md) § Your own servers. The store, routes, runtime,
+drivers, handoff flags, and test button have automated coverage in `plugins/agents`; these checks cover
+the real harnesses and the window.
+
+100. In Settings → MCP servers, add a stdio server with one secret environment variable and press
+     **Test**. The tools are listed. Edit it, leave the secret empty, save, and test again: it still
+     connects.
+101. Open a Claude Code session and a Codex session, and ask each to call one of the server's tools.
+     Type `/mcp` in each composer: the panel opens and nothing is sent. Codex lists every server it has
+     with a status. Switch the server off, apply, and confirm that the transcript notes the restart and
+     that the agent no longer has the tool while the conversation continues.
+102. Continue each session in a terminal and run `/mcp` there. The server is listed. While the terminal
+     runs, `ps -axww` shows the server's command but never its secret value.
+
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as
 a named theme block and sets `--is-dark: 1`, so with the OS in dark mode the light-palette themes

@@ -1962,4 +1962,74 @@ describe('managed agent runtime conformance', () => {
       taskId: seed.taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', customAgentId: other.id, config: {},
     })).rejects.toThrow("runs on 'codex'")
   })
+
+  // docs/mcp.md § Your own servers. Which programs a session starts is the owner's setting: it comes from
+  // Settings at creation, only the MCP route changes it, and every start hands the harness the list.
+  it('starts a session with the servers switched on in Settings and restarts it when they change', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    const starts: AgentDriverStartOptions[] = []
+    class CaptureDriver extends FakeAgentDriver {
+      override async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
+        starts.push(options)
+        return super.start(options)
+      }
+    }
+    registry.registerNative('fake', () => new CaptureDriver())
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+    await runtime.mcpServers.save('linear', {
+      transport: 'stdio',
+      command: 'npx',
+      args: ['linear-mcp'],
+      values: [{ name: 'LINEAR_API_KEY', value: 'lin_api_0123456789', secret: true }],
+      enabled: true,
+    })
+    await runtime.mcpServers.save('docs', { transport: 'http', url: 'https://docs.example/mcp', values: [], enabled: false })
+
+    // The request body names `docs`, and is ignored.
+    const session = await runtime.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: { mcpServers: ['docs'] },
+    })
+    expect(session.config.mcpServers).toEqual(['linear'])
+    await runtime.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Use the tools.' }],
+      source: 'interactive',
+      effectivePolicy: { providerDefault: true },
+      idempotencyKey: randomUUID(),
+    })
+    await runtime.wait(session.id, 0, 'turn_completed', 2_000)
+    expect(starts.at(-1)!.mcpServers).toEqual([{
+      transport: 'stdio',
+      name: 'linear',
+      command: 'npx',
+      args: ['linear-mcp'],
+      env: { LINEAR_API_KEY: 'lin_api_0123456789' },
+    }])
+
+    // The general config patch cannot switch servers, the same way it cannot touch the tool ceiling.
+    const patched = await runtime.patchSession(session.id, { config: { ...session.config, mcpServers: ['docs'] } })
+    expect(patched.config.mcpServers).toEqual(['linear'])
+
+    await expect(runtime.setSessionMcpServers(session.id, ['nope'])).rejects.toThrow('MCP server not found: nope.')
+    const startsBefore = starts.length
+    const view = await runtime.setSessionMcpServers(session.id, ['docs'])
+    expect(view.servers).toEqual([
+      { name: 'docs', transport: 'http', enabled: true },
+      { name: 'linear', transport: 'stdio', enabled: false },
+    ])
+    await vi.waitFor(() => expect(starts.length).toBe(startsBefore + 1))
+    expect(starts.at(-1)!.mcpServers.map((server) => server.name)).toEqual(['docs'])
+  })
 })

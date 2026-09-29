@@ -25,6 +25,9 @@ import { createAgentUsageService } from '../server/usage/service'
 import { managedAgents, MANAGED_AGENTS } from '../server/routes/managed'
 import { managedAgentsBridge } from '../server/routes/managedBridge'
 import { agentUsage, AGENT_USAGE } from '../server/routes/usage'
+import { agentMcpServers, AGENT_MCP_SERVERS } from '../server/routes/mcpServers'
+import { claudeHandoffMcp, codexHandoffMcp } from '../server/profiles/mcpCommands'
+import { sessionMcpSelection } from '../shared/mcpServers'
 import { aiderProfile, claudeCodeProfile, codexProfile } from '../server/profiles/index'
 import { AgentDelegationStore } from '../server/delegation/store'
 import { AgentDelegationService } from '../server/delegation/service'
@@ -94,6 +97,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
   let delegation: AgentDelegationService | null = null
   let managedRoute: { dispose(): void } | null = null
   let usageRoute: { dispose(): void } | null = null
+  let mcpServersRoute: { dispose(): void } | null = null
   let harnessRoute: { dispose(): void } | null = null
   let customAgentRoute: { dispose(): void } | null = null
   let draftAttachmentsRoute: { dispose(): void } | null = null
@@ -178,11 +182,18 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           const sessions = ctx.capabilities.get(TERMINAL_SESSIONS)
           if (!sessions) throw new Error('Terminal engine is unavailable.')
           const resume = profile.resumeArgv(resolveCommand(profile), session.providerSessionRef)
+          // The session's MCP servers go with it, because `--resume` alone starts without them
+          // (docs/mcp.md § Your own servers). A contributed harness has no terminal spelling for them yet.
+          const mcp = await runtime!.mcpServers.resolve(sessionMcpSelection(session.config), 'agent MCP server: continue in a terminal')
+          const handoff = profile.id === claudeCodeProfile.id
+            ? claudeHandoffMcp(mcp.servers)
+            : profile.id === codexProfile.id ? codexHandoffMcp(mcp.servers, mcp.secrets) : { args: [], env: {} }
           const terminal = await sessions.create({
             taskId: session.taskId,
             profileId: session.profileId,
             title: `${session.title} · terminal`,
-            command: [resume.file, ...resume.args].map(shellQuote).join(' '),
+            command: [resume.file, ...resume.args, ...handoff.args].map(shellQuote).join(' '),
+            env: handoff.env,
             agentSessionId: session.id,
           })
           return terminal.id
@@ -273,6 +284,25 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       })
       ctx.routes.register(agentUsage, { prefix: '', note: '/usage, /pricing, /concurrency, /session-defaults, /custom-agents — account-scoped provider usage, dispatch limits, new-session defaults, and saved agents' })
 
+      // Settings → MCP servers (docs/mcp.md § Your own servers). The test reveals the server's secrets
+      // the way a session start does, and redacts them out of whatever the server printed.
+      mcpServersRoute = ctx.capabilities.provide(AGENT_MCP_SERVERS, {
+        list: () => runtime!.mcpServers.list(),
+        save: (name, input) => runtime!.mcpServers.save(name, input),
+        remove: (name) => runtime!.mcpServers.remove(name),
+        test: async (name) => {
+          const resolved = await runtime!.mcpServers.resolve([name], 'agent MCP server: test the connection')
+          if (resolved.unavailable.length) return { ok: false, error: 'A stored secret could not be opened. Enter it again and save.' }
+          const [server] = resolved.servers
+          if (!server) return null
+          // Loaded on first use: the MCP client and its transports are a large part of a boot graph that
+          // only this button needs (apps/node/scripts/check-service-budget.mjs).
+          const { probeMcpServer } = await import('../server/mcpProbe')
+          return probeMcpServer(server, resolved.secrets)
+        },
+      })
+      ctx.routes.register(agentMcpServers, { prefix: '', note: '/mcp-servers — the MCP servers acorn declares to agent sessions' })
+
       // Unattended usage collection, off by default (docs/schedules.md § What is registered today).
       ctx.schedules.register({
         scheduleId: 'usage-refresh',
@@ -319,6 +349,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       managedRoute?.dispose()
       draftAttachmentsRoute?.dispose()
       usageRoute?.dispose()
+      mcpServersRoute?.dispose()
       harnessRoute?.dispose()
       customAgentRoute?.dispose()
       for (const capability of lifecycleCapabilities) capability.dispose()

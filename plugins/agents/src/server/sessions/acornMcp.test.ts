@@ -37,6 +37,7 @@ describe('acorn hands a harness its own tool server through one door', () => {
     registered.push(profile('deepseek:deepseek'))
 
     expect(acornMcpServers(mcp, session('deepseek:deepseek'), sessionEnv)).toEqual([{
+      transport: 'stdio',
       name: 'acorn-dev',
       command: '/opt/acorn/node',
       args: ['/opt/acorn/mcp.js'],
