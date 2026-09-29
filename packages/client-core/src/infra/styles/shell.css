@@ -293,6 +293,14 @@
    so it has nothing to take back. */
 :is(.ui-card, .ui-listdetail-list) :is(.ui-toolbar, .ui-tabs, .section-header[data-level='pane'], .ui-row),
 .ui-toolbar[data-variant='actions'] { margin-inline: 0; }
+/* Except a pane-level strip at the top of a document column: it is that column's header, so it spans
+   the column the way the pane header beside it spans its own, rather than sitting inside the padding
+   (the task pull strip over the PR pane's details). The max-width keeps `.ui-tabs`' own guard against
+   overflow while allowing for the two pads it now covers. */
+.ui-listdetail-list[data-scroll] .ui-tabs[data-level='pane'] {
+  margin-inline: calc(-1 * var(--pane-pad));
+  max-width: calc(100% + 2 * var(--pane-pad));
+}
 
 /* Two bars in a row are one piece of chrome, so the column's stack gap does not go between them. That
    gap is for content, and between a pane's header and the bar under it — the agents pane over its
