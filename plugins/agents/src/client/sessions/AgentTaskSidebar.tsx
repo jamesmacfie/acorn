@@ -16,6 +16,7 @@ import { subagentSummary } from './subagentDisplay'
 import { canStopAgent } from './agentActivity'
 import { delegationSummary } from './sessionRoster'
 import { isStale } from '../inlineDiff/patchStatus.ts'
+import { eventTime } from './eventTime'
 import {
   clearManagedSubagent, openManagedSession, selectManagedSession, selectManagedSubagent,
   selectedManagedSubagent,
@@ -42,6 +43,12 @@ export function AgentSidebarHeader(props: { task: Task; model: AgentPaneModel })
   const model = props.model
   return <SectionHeader count={model.taskSessions().length}>Agents</SectionHeader>
 }
+
+/** A session or subagent row's tooltip. `updatedAt` rather than the newest event's time: the node
+ *  rebroadcasts the row only when an event changes something else on it
+ *  (../../server/sessions/runtimeEngine.ts § listedRow), such as a turn ending or a subagent finishing,
+ *  so a running one reads as of its last state change. */
+const lastActive = (at: number) => `Last active ${eventTime(at).full}`
 
 export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
@@ -160,6 +167,8 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                     nested={(found()?.depth ?? 0) > 0}
                     selected={selected()}
                     title={current().title}
+                    tip={lastActive(current().updatedAt)}
+                    tipAt={current().updatedAt}
                     collapsed={collapsed()
                       ? <RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />
                       : undefined}
@@ -224,6 +233,8 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                     nested
                     selected={selected()}
                     title={child().title}
+                    tip={lastActive(child().updatedAt)}
+                    tipAt={child().updatedAt}
                     collapsed={collapsed() ? <SubagentStateIcon status={child().status} /> : undefined}
                     leading={<SubagentStateIcon status={child().status} />}
                     onPress={() => openRow(item.key)}
@@ -327,6 +338,8 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                 density="compact"
                 selected={selected()}
                 title={session().title}
+                tip={lastActive(session().updatedAt)}
+                tipAt={session().updatedAt}
                 leading={<RuntimeStateIcon state={session().runtimeState} queued={session().queuedTurns} />}
                 trailing={<Show when={!['none', 'unread'].includes(session().attention)}><Icon {...attentionMark(session().attention)} /></Show>}
                 onPress={() => openManagedSession(props.task.id, session().id)}
