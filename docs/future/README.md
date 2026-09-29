@@ -14,6 +14,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | Folder | What it is | Status |
 | --- | --- | --- |
+| [cloud/](./cloud/README.md) | Team control plane, private Node relay, full task Nodes, plugin policy, archival, hosting, and delivery plan. | Proposed, 2026-09-29; technical gates remain. |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
 | [dashboards/](./dashboards/README.md) | Remaining taskless database and write-back proposals. Shared data discovery and authoring now belong to workflow v2. | Redesign shipped; overlapping proposals superseded, 2026-09-13. |

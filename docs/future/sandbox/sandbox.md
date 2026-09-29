@@ -11,11 +11,14 @@ One sandbox per task. The node stays on the host. Only execution crosses the bou
 is bind-mounted into the sandbox at the same absolute path, so the files are shared and the agent
 genuinely works on the real code, while everything else inside the sandbox is its own.
 
-The alternative — running a whole acorn node inside each sandbox — is architecturally tidier, because
-the node already owns PTYs and exec. Reject it. A node's unit is a machine, not a task: you would get
-one SQLite database, one plugin reconciliation, and one pairing dance per task, a fleet list full of
-fake machines, and a microVM boot on the path of an action that today costs a `git worktree add`. The
-per-task-execution shape keeps the node where it is and moves only the children.
+For local tasks on a persistent Node, reject the alternative of running a whole acorn Node inside
+each sandbox. That would add one SQLite database, plugin reconciliation, and pairing flow per local
+task, plus a microVM boot on the path of an action that today costs a `git worktree add`. This local
+design keeps the Node where it is and moves only the children. The
+[cloud proposal](../cloud/architecture.md#relationship-to-per-task-sandboxing) instead provisions
+one full Node per ephemeral cloud task to preserve Node and plugin behavior across machines. Its
+worker is hidden behind a stable logical task identity; this local-task trade-off does not decide
+the cloud worker shape.
 
 ## The three chokepoints
 
