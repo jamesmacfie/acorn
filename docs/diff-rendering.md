@@ -452,8 +452,9 @@ each head is `position: sticky; left: 0` inside its canvas-wide row, sized to th
 scrollport with `100cqw` (`.diff` is an inline-size container). That is also why the sticky
 current-file header renders inside the row canvas rather than as a direct child of the scroller —
 a sticky element can only travel within its containing block, and the scroller's content box is
-only one scrollport wide. Hunk headers and expand bands scroll away with the code, as they do on
-GitHub.
+only one scrollport wide. Comment threads and the open line's comment box are pinned and sized the
+same way, so the text box and its buttons never reach past the pane's right edge. Hunk headers and
+expand bands scroll away with the code, as they do on GitHub.
 
 The two line numbers and change marker share one sticky gutter box. A normal code line owns no local
 signals: the comment composer, including its busy and error state, mounts only for the one open line.
