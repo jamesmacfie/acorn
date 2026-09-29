@@ -34,6 +34,11 @@ export const previewPlugin = (): NodePlugin => {
 
       const serveUrl: PluginFetchHandler = async (request, context) => {
         const path = new URL(request.url, 'http://node').pathname
+        // Every active task on the node, so a task-scoped caller has no business reading it.
+        if (path === '/configured' && request.method === 'GET') {
+          if (context.principal.scope === 'task') return Response.json({ error: 'forbidden' }, { status: 403 })
+          return Response.json(await urls!.configured())
+        }
         const match = /^\/tasks\/([^/]+)\/(url|recipe-url)$/.exec(path)
         if (!match) return new Response(null, { status: 404 })
         const taskId = decodeURIComponent(match[1]!)
@@ -53,7 +58,7 @@ export const previewPlugin = (): NodePlugin => {
         }
         return new Response(null, { status: 405 })
       }
-      ctx.routes.fetch(serveUrl, { prefix: '', note: '/tasks/:taskId/url — resolved preview home' })
+      ctx.routes.fetch(serveUrl, { prefix: '', note: '/tasks/:taskId/url — resolved preview home; /configured — which tasks have one' })
 
       ctx.events.on('run:changed', (event) => {
         if (typeof event.taskId !== 'string') return

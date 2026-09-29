@@ -26,6 +26,9 @@ the button, because most tasks never will ([workflows.md](./workflows.md) § The
 the same 640px floor `agents` does, because an agent node draws the same composer and a composer in a
 narrow column is unusable.
 
+`preview` is gated by `when` too: a task with no run-target URL and no project preview setting has
+nothing to draw, so it gets no button ([shell.md](./shell.md) § Host-owned webviews has the check).
+
 The loaded Findings pane is deliberately absent from this list. Its manifest sets
 `showInSwitcher: false`, so the pane remains a valid persisted layout target and can be opened by
 **Findings: inspect task evidence**, but raw review inputs do not occupy the everyday task switcher.

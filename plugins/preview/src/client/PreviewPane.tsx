@@ -135,9 +135,9 @@ export default function PreviewPane(props: { taskId: string; url: string | null;
       </Show>
       <Show when={!props.remoteBlocked && props.url} fallback={props.remoteBlocked ? null :
         <EmptyState title="No preview URL yet">
-          Declare a run target with a <Text emphasis="mono">url</Text> — in{' '}
-          <Text emphasis="mono">.acorn/config.toml</Text> or the workspace's run targets — and start it
-          from the pane switcher's ▶ button, or set a preview URL in Settings → workspace.
+          Start the run target from the pane switcher's ▶ button. If it is already running, check its{' '}
+          <Text emphasis="mono">url</Text> in <Text emphasis="mono">.acorn/config.toml</Text> or the
+          preview URL in Settings → workspace.
         </EmptyState>
       }>
         {/* The browser chrome, as the kit's toolbar rather than a flex row of this plugin's own:
