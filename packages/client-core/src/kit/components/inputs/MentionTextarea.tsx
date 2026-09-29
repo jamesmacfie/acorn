@@ -1,6 +1,7 @@
 import { children, createEffect, createMemo, createSignal, For, Index, Show, type JSX } from 'solid-js'
-import { activeMention, completeMention, scrollDeltaFor, type ActiveMention } from '../../lib/mentions'
-import { Alert, Textarea } from '../primitives'
+import { activeMention, completeMention, scrollDeltaFor, type ActiveMention } from '../../lib/controls/mentions'
+import { Alert } from '../content/Alert'
+import { Textarea } from './Textarea'
 import PickerRow from './PickerRow'
 import type { Tone } from '../../tokens/tokens'
 
@@ -143,7 +144,7 @@ export default function MentionTextarea(props: MentionTextareaProps) {
     list.scrollTop += scrollDeltaFor(list.getBoundingClientRect(), row.getBoundingClientRect())
   })
 
-  // Read once, for the reason on RowParts (../primitives.tsx).
+  // Read once, for the reason on RowParts (../layout/Row.tsx).
   const overlay = children(() => props.overlay)
 
   return (

@@ -231,7 +231,7 @@ It is on the verification list below.
   pieces landed: github no longer imports linear's `contract/` package (that directory no longer
   exists) and no longer depends on `@acorn/plugin-linear`; extraction is a host scanner over the
   contentLinks plugins already declare, enrichment is a `refResolvers` manifest carrier
-  (`packages/protocol/src/refResolvers.ts`, linear declares the first one), and bare-id linkification
+  (`packages/protocol/src/content/refResolvers.ts`, linear declares the first one), and bare-id linkification
   is host-owned and learns its prefixes from confirmed refs. One piece remains **deliberately
   unbuilt**, kept here so it is not re-derived: cold-start bare refs (a `JIRA-42` with no confirming
   URL in context) need a bounded host-compiled token grammar — host-defined character-class atoms with

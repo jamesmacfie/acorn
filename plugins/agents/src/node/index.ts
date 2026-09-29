@@ -1,5 +1,5 @@
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
-import { acornMcp, agentProfileRegistry, AGENTS_HARNESS_REGISTRY, getProfile, type InternalEnvFactory, type NodePlugin, resolveCommand } from '@acorn/plugin-api/node'
+import { acornMcp, agentProfileRegistry, AGENTS_CUSTOM_AGENT_REGISTRY, AGENTS_HARNESS_REGISTRY, getProfile, type InternalEnvFactory, type NodePlugin, resolveCommand } from '@acorn/plugin-api/node'
 import { TERMINAL_SESSIONS } from '@acorn/plugin-terminal/contract/sessions.ts'
 import { join } from 'node:path'
 import { AGENTS_SESSION_CONTROL, AGENTS_SESSION_EXECUTE } from '../contract/sessionExecute'
@@ -18,6 +18,7 @@ import { createSessionControl } from '../server/sessions/sessionControl'
 import { agentUsageCollectors } from '../server/usage/collectors'
 import { readAgentConcurrency, writeAgentConcurrency } from '../server/concurrencyStore'
 import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../server/sessionDefaultsStore'
+import { contributedCustomAgent, customAgentRegistry, deleteCustomAgent, readCustomAgents, saveCustomAgent } from '../server/customAgents'
 import { collectClaudeUsage } from '../server/usage/claudeUsage'
 import { collectCodexUsage } from '../server/usage/codexUsage'
 import { createAgentUsageService } from '../server/usage/service'
@@ -98,6 +99,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
   let usageRoute: { dispose(): void } | null = null
   let mcpServersRoute: { dispose(): void } | null = null
   let harnessRoute: { dispose(): void } | null = null
+  let customAgentRoute: { dispose(): void } | null = null
   let draftAttachmentsRoute: { dispose(): void } | null = null
   let lifecycleCapabilities: Array<{ dispose(): void }> = []
   return {
@@ -255,11 +257,19 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           await writeAgentSessionDefaults(core.prefs, userId, merged)
           return merged
         },
+        customAgents: (userId) => readCustomAgents(core.prefs, userId),
+        saveCustomAgent: (userId, id, input) => saveCustomAgent(core.prefs, userId, id, input),
+        deleteCustomAgent: (userId, id) => deleteCustomAgent(core.prefs, userId, id),
       })
 
       // agents.harnessRegistry (docs/managed-agents.md § Harnesses). The plugin host resolves this per
       // contributed harness, so a node with agents disabled drops them and re-enabling redelivers.
       harnessRoute = ctx.capabilities.provide(AGENTS_HARNESS_REGISTRY, createHarnessRegistry())
+      // agents.customAgentRegistry (docs/managed-agents.md § Custom agents), delivered the same way, and
+      // held in memory only, so a disabled plugin's agents leave New with it.
+      customAgentRoute = ctx.capabilities.provide(AGENTS_CUSTOM_AGENT_REGISTRY, {
+        register: (agent) => ({ dispose: customAgentRegistry.register(contributedCustomAgent(agent)) }),
+      })
 
       ctx.routes.register(managedAgents, { prefix: '', note: 'managed agent sessions, turns, attachments, artifacts' })
 
@@ -272,7 +282,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         label: 'Agent sessions',
         search: (query) => runtime!.store.searchTaskSessions(query.text, query.taskIds, query.limit),
       })
-      ctx.routes.register(agentUsage, { prefix: '', note: '/usage, /pricing, /concurrency, /session-defaults — account-scoped provider usage, dispatch limits, and new-session defaults' })
+      ctx.routes.register(agentUsage, { prefix: '', note: '/usage, /pricing, /concurrency, /session-defaults, /custom-agents — account-scoped provider usage, dispatch limits, new-session defaults, and saved agents' })
 
       // Settings → MCP servers (docs/mcp.md § Your own servers). The test reveals the server's secrets
       // the way a session start does, and redacts them out of whatever the server printed.
@@ -341,6 +351,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       usageRoute?.dispose()
       mcpServersRoute?.dispose()
       harnessRoute?.dispose()
+      customAgentRoute?.dispose()
       for (const capability of lifecycleCapabilities) capability.dispose()
       lifecycleCapabilities = []
       for (const dispose of builtInProfileDisposables ?? []) dispose()

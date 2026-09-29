@@ -13,6 +13,14 @@ Runs and steps persist state transitions. A restart reconciles persisted operati
 blindly repeats an external side effect with unknown outcome. Ambiguous work parks in an explicit
 recovery/gated state. Cancellation propagates to child sessions and process groups.
 
+The Node implementation follows those boundaries under `plugins/workflows/src/server/`.
+`definitions/` loads and resolves frozen definitions. `validation/` checks their graph, bindings,
+and destination. `runs/` coordinates graph ticks, start, retry, recovery, row writes, and termination.
+Its `read/` folder projects persisted runs for the client. `steps/` renders handler inputs and records
+step outcomes. `dispatch/` reserves and waits for child workflows. `processing/` owns tracked record
+attempts and incremental checkpoints. `schedules/` owns scheduled admission. `routes/` exposes
+the Node capabilities without owning execution state.
+
 ### The graph
 
 A step declares `after`, the IDs of the steps it waits on. A step with no `after` key waits on the
@@ -50,10 +58,20 @@ run shows says what it was given.
 
 A step that runs an agent, such as `agent`, `decide`, or `ci-loop`, takes
 `inputs = "append" | "template" | "none"`, default `append`. With `append`, the runner renders the
-prompt and then adds one `## Output of <name>` block per incoming edge whose step finished `done`, in
+prompt and then adds one "Output of <name>" item per incoming edge whose step finished `done`, in
 `after` order. With `template`, nothing is added and the prompt places its own
 `${steps.<id>.output}` references. With `none`, the step sees only its prompt. The handoff context
-rides along in every mode, because that is a separate thing from the graph's edges.
+rides along in every mode as a "Task context" item, because that is a separate thing from the graph's
+edges.
+
+Those items are not written into the prompt. A managed session gets each one as a context part after
+the prompt, so the model reads it as an `<acorn-context>` block, which marks it as information rather
+than instructions. The transcript draws only the step's prompt and lists the items in its
+**Context manifest** fold. A diff or a ticket body pasted into the prompt used to fill the turn's
+bubble, and a heading inside it read the same as the prompt's own. Past the 512 KiB per-turn context
+cap, the blocks go inline in the prompt text instead, so a step with a large diff upstream still runs.
+The headless fallback takes one string, so it gets each item under a `## <label>` heading, and the
+step's recorded inputs in the run pane use that same form.
 
 All four kinds assemble that prompt through one function, which they did not until 2026-09-09. Only
 `agent` read the incoming edges, so a `decide` step was sent its prompt and nothing else: the editor
@@ -135,6 +153,68 @@ step's `inputs_json` as `originalPrompt`, so the record of what was first asked 
 Retry is a device action. A task-confined caller, meaning an agent inside the run, gets a 403,
 because it could otherwise loop a failed step past the rail that stopped it. The budget rule holds
 either way: a retry's usage adds to the run's persisted sum and the same rail fires again.
+
+### Human gates
+
+A `gate-human` step parks the run in `gated`, rings the bell, and raises the
+`workflow:gate:<stepId>` attention row. Under an autonomous posture it passes straight through with
+`{ approved: 'autonomous' }`. Approving resumes the run and rejecting fails the step and the run.
+
+A gate can carry a `form`. Its `fields` are declared the way workflow inputs are, and its `values`
+bind each field to a run input or a transitive predecessor, the way child inputs bind:
+
+```json
+{
+  "id": "approve", "name": "Approve the release note", "kind": "gate-human", "after": ["draft"],
+  "form": {
+    "fields": [
+      { "name": "title", "label": "Title", "schema": { "type": "string" }, "required": true },
+      { "name": "notify", "schema": { "type": "boolean" }, "default": false }
+    ],
+    "values": { "title": { "address": { "from": "step", "stepId": "draft", "pointer": "/title" } } }
+  }
+}
+```
+
+A field's proposal is its binding's value, then its `default`, then nothing. When the run reaches
+the gate, the handler resolves the proposal, checks each value against its field's type, and freezes
+it into the step's `inputs_json` as `form.values` before the step waits. The reviewer edits values
+that cannot change underneath them, and the proposal stays readable after the run ends. A value of
+the wrong type fails the step with the field's name. A missing value is allowed and shows as an empty
+field. A form holds at most 20 fields. In TOML, fields use `schema_json` and `default_json` and
+bindings use `binding_json`, as inputs and child bindings do.
+
+An approval with a form writes the step's structured output:
+
+```json
+{ "approved": true, "values": { "title": "…", "notify": true }, "edited": ["notify"] }
+```
+
+`edited` names the fields whose approved value differs from the proposal. The output schema is
+derived from the fields (`plugins/workflows/src/shared/gateForm.ts`), so a later step binds to
+`/values/<field>` and the editor's picker offers it. `approved` is left out of that schema, because it
+is `true` or `'autonomous'`. A gate without a form writes no structured output and keeps
+`{ approved: true }` in `result_json`.
+
+The route body is `{ stepId, approved, values? }`. `values` comes only with an approval, only on a
+gate with a form, and is the complete set being approved: a field left out is approved empty. Without
+it, the node approves the proposal as it stands. The node refuses an unknown field, a wrong type, and
+an empty required field with a 400 that names each one, and the gate keeps waiting.
+
+Under an autonomous posture, a form gate approves its proposal unchanged with
+`approved: 'autonomous'` and an empty `edited`. A required field with no value fails the step,
+because nobody was asked. Validation reports the same problem when the definition's own posture is
+autonomous.
+
+Only one answer lands. The step leaves `waiting-gate` through a conditional update, so of two devices
+answering together one changes the row and the other gets a 409 with the `gate-resolved` code. Only
+the winner resumes or fails the run. A gate answer is device-only: a task-confined caller gets a 403
+even on its own run ([security.md](../security.md)). A rejected gate can be retried like any failed
+step, and the re-run resolves a fresh proposal.
+
+An older node ignores `form` and runs the step as a plain gate. Any later binding to `/values` then
+fails validation, because a plain gate declares no structured output, so such a definition does not
+load there.
 
 ### What a run reports
 

@@ -36,7 +36,7 @@ const LIST_TABS = [{ id: 'open', label: 'Open' }, { id: 'closed', label: 'Closed
 export default function PullList() {
   const params = useParams()
   // The same signal the source's list column reads, so the rows narrow exactly when the column does
-  // (client-core kit/lib/collapseState.ts). Keyed by the source id this plugin registers.
+  // (client-core kit/lib/layout/collapseState.ts). Keyed by the source id this plugin registers.
   const collapsed = sidebarCollapsed('github')
   const navigate = useNavigate()
   // Tab and filter are kept per workspace (./pullList/filterState.ts). The active workspace is

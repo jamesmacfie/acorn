@@ -10,7 +10,7 @@
 import { isContextMenuLocation, unknownWhenFacts } from '@acorn/protocol/contextMenus.ts'
 import type { PluginContextMenuDescriptor } from '@acorn/protocol/plugin/contract.ts'
 import { compileWhen, contextMenuRegistry, type ContextMenuContribution } from '../registries/panes/contextMenus'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 import { runChromeAction } from './actions'
 
 /** `plugin:<pluginId>:<id>`. No core contribution id contains a colon, so a plugin row can never

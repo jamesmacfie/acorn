@@ -27,7 +27,7 @@ describe('a transcript that is still growing', () => {
 
         // And the composer stays there when the reader goes back through the history, because the
         // transcript is the scroller and the composer is its sibling rather than its last line
-        // (../kit/grouping.tsx § Timeline, ../layouts/ListDetail.tsx). This is the half that a
+        // (../kit/grouping/timeline.tsx § Timeline, ../layouts/ListDetail.tsx). This is the half that a
         // viewport merely held at its foot could not give: scrolling up used to take the message box
         // off the screen with it.
         await screen.press('l')

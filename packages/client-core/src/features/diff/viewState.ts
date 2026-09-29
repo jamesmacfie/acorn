@@ -37,6 +37,9 @@ export type DiffCollapsedFiles = {
 type DiffViewState = {
   scroll?: DiffScrollState
   collapsed?: DiffCollapsedFiles
+  /** The toolbar's file filter as typed. Not tied to the files signature: it is text rather than a
+      decision about particular files, so it still means the same thing after new commits. */
+  fileFilter?: string
 }
 
 const viewStates = new Map<string, DiffViewState>()
@@ -61,6 +64,14 @@ export const rememberDiffCollapsed = (scope: DiffViewScope, collapsed: DiffColla
 
 export const diffCollapsed = (scope: DiffViewScope): DiffCollapsedFiles | undefined =>
   viewStates.get(diffScopeKey(scope))?.collapsed
+
+export const rememberDiffFileFilter = (scope: DiffViewScope, fileFilter: string): void => {
+  const key = diffScopeKey(scope)
+  viewStates.set(key, { ...viewStates.get(key), fileFilter })
+}
+
+export const diffFileFilter = (scope: DiffViewScope): string =>
+  viewStates.get(diffScopeKey(scope))?.fileFilter ?? ''
 
 export function evictDiffViewStates(taskId: string): void {
   const prefix = `task:${taskId}:`

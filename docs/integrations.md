@@ -391,7 +391,7 @@ makes disconnecting stop the export inside one five-second window instead of at 
 
 A **backend** is one thing a Generate control can spend: a model-provider connection this owner has
 stored a key for, or an agent CLI installed on this machine. `ModelBackend` in
-`packages/protocol/src/modelProviders.ts` is the one read model over both, and it is deliberately
+`packages/protocol/src/integrations/modelProviders.ts` is the one read model over both, and it is deliberately
 flat: an id, a kind of `connection` or `harness`, a label, an optional glyph, a model catalog that may
 be empty, a default model id that may be `''`, and a flag for a failed CLI catalog read. A connection's
 auth kind, scopes, account and timestamps do not cross it, because no consumer reads them and a harness
@@ -454,7 +454,7 @@ Claude's catalog is the profile's stable CLI aliases. A harness with an empty se
 **`generateText` dispatches on the prefix.** A `connection:` id goes to `generateTextForConnection`
 in `server/modelProviders/runtime.ts`. A `harness:` id goes to `generateTextForHarness` in
 `server/modelProviders/harnessRuntime.ts`. Both return the same result, whose `backendId` says which
-was spent, and both run behind the same `validateInput` first: a 60-second ceiling, 100,000 system
+was spent, and both run behind the same `validateInput` first: a three-minute ceiling, 100,000 system
 characters, 1,000,000 prompt characters, and 128,000 output tokens. `maxOutputTokens` is validated
 and then ignored for a harness, because neither `claude` nor `codex` has a flag for it, and a bound
 the caller states and the backend cannot honour is still worth refusing when it is absurd.

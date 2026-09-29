@@ -3,7 +3,7 @@ import { diffLines } from 'diff'
 import { readJson, writeJson } from '../../../infra/node/apiClient'
 import { repoConfigTrustRoute, type RepoConfigTrustReview } from '@acorn/protocol/api.ts'
 import { closeRepoConfigTrust, configTrustRequest } from './configTrust'
-import { createDismissable } from '../../../kit/lib/dismissable'
+import { createDismissable } from '../../../kit/lib/controls/dismissable'
 import './config-trust.css'
 import { Alert, Button } from '../../../kit/components/primitives'
 

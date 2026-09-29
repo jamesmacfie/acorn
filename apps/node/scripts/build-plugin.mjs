@@ -112,7 +112,7 @@ const outDir = join(packageRoot ? resolve(packageRoot) : join(dataRoot, 'plugins
 if (pluginPackage.dependencies?.['acorn-plugin-sdk']?.startsWith('workspace:')) {
   execFileSync('pnpm', ['--filter', 'acorn-plugin-sdk', 'build'], { cwd: ROOT, stdio: 'inherit' })
 }
-// Imported, not scraped. This used to be a regex over the source text of packages/protocol/src/api.ts,
+// Imported, not scraped. This used to be a regex over the source text of packages/protocol/src/transport/api.ts,
 // because a .mjs script cannot import a built package — but it can import a .ts file with nothing in it
 // but one const, which is why pluginApiVersion.ts exists.
 //

@@ -3,14 +3,15 @@
 //   apps/node/test/integration/workflowFiles.test.ts    loadWorkflowFiles
 //   apps/node/test/integration/plugins/workflowRunner.test.ts  the runner and its schema tables
 //   apps/node/test/integration/plugins/workflowTasks.test.ts   the complete saved-child fixture
-export { loadWorkflowFiles } from '../server/workflowFiles'
-export { WorkflowRunner, type RunnerDeps, type WorkflowDef, type WorkflowExtensions } from '../server/workflowRunner'
-export { WorkflowDispatcher } from '../server/workflowDispatch'
-export { createDef } from '../server/workflowDefs'
+export { loadWorkflowFiles } from '../server/definitions/files'
+export { WorkflowRunner, type RunnerDeps, type WorkflowDef, type WorkflowExtensions } from '../server/runs/runner'
+export { inlinePrompt } from '../server/runs/deps'
+export { WorkflowDispatcher } from '../server/dispatch/dispatcher'
+export { createDef } from '../server/definitions/store'
 export { createPublishedDef } from './publishedDefinition'
-export { generateWorkflowRequest } from '../server/generateWorkflowRequest'
-export { catalogValidation } from '../server/generateWorkflow'
-export { resolveWorkflowGraph } from '../server/workflowResolution'
+export { generateWorkflowRequest } from '../server/authoring/generationRequest'
+export { catalogValidation } from '../server/authoring/generate'
+export { resolveWorkflowGraph } from '../server/definitions/resolution'
 export type { WorkflowCatalog } from '../shared/workflowContracts'
 export { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
 // Re-exported rather than imported from @acorn/plugin-api: apps/node's test tier does not depend on

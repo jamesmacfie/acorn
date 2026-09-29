@@ -1,5 +1,5 @@
 import { Show, type JSX } from 'solid-js'
-import { isExternal } from '../primitives'
+import { isExternal } from './isExternal'
 import { safeContentHref } from '@acorn/protocol/externalUrl.ts'
 
 /* Link: a run of words inside a sentence that acts.

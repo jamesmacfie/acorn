@@ -2,7 +2,7 @@
 //
 // Shared rather than sitting beside the editor's other draft operations because two sides need it:
 // the editor renames a node with it (../client/editor/draft.ts), and grounding a generated
-// definition renames a step the model called "Reproduce the bug" (../server/groundWorkflow.ts). The
+// definition renames a step the model called "Reproduce the bug" (../server/authoring/ground.ts). The
 // server validator checks that a name is non-empty and unique and nothing more, so this file is the
 // only place the shape is written down.
 import type { WorkflowDef } from './workflowContracts'

@@ -206,7 +206,7 @@ function waitMet(until, kind, now, previous) {
   if (!entry) return false
   if (until === 'ready') return entry.topology.ready
   if (until === 'content') return mountedOf(entry) > 0 && entry.mounted.blankBlocks === 0 && entry.mounted.uncoveredRanges === 0
-  // Every turn is either drawn or counted as hidden behind "Show earlier" (kit/lib/timelineWindow.ts).
+  // Every turn is either drawn or counted as hidden behind "Show earlier" (kit/lib/timeline/timelineWindow.ts).
   if (until === 'mounted') {
     return entry.mounted.dynamicBlocks > 0
       && entry.mounted.dynamicBlocks + (entry.window?.hiddenEarlier ?? 0) === entry.topology.dynamicBlocks

@@ -1,5 +1,5 @@
 import type { DiffDocumentTopology } from '@acorn/diff-document/document'
-import { registerSurfaceHealth, type SurfaceHealthReading } from '../../kit/lib/surfaceHealth'
+import { registerSurfaceHealth, type SurfaceHealthReading } from '../../kit/lib/telemetry/surfaceHealth'
 import { isCodeRow, type CodeRow, type DiffThread, type Row } from '../../kit/diff/diffModel'
 import type { DiffLayout } from './diffLayout'
 import type { DiffItem } from './documentView'

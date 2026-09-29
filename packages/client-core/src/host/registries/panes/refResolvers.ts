@@ -1,5 +1,5 @@
 import { MAX_REF_RESOLVE_IDENTIFIERS, type PluginRefResolution } from '@acorn/protocol/refResolvers.ts'
-import { Registry } from '../../../kit/lib/registry'
+import { Registry } from '../../../kit/lib/state/registry'
 
 // Turning identifiers of one plugin's items into something another plugin's surface can draw
 // (docs/plugins.md § "Loaded plugins: the client half", the `refResolvers` entry). The recognition

@@ -2,8 +2,8 @@ import { createEffect, Show, type JSX } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { createDomCollection } from '../../keys/collection'
 import { restoreFocusOnCleanup, trapTab } from '../../keys/trap'
-import { createAnchoredPopover, type AnchoredPopover, type Placement } from '../../lib/anchor'
-import { createArmedConfirm } from '../../lib/confirm'
+import { createAnchoredPopover, type AnchoredPopover, type Placement } from '../../lib/controls/anchor'
+import { createArmedConfirm } from '../../lib/controls/confirm'
 
 // A dropdown menu: Popover plus menu semantics. See docs/ui-design.md § Menus and right-click for
 // why this replaced four earlier implementations and how ContextMenu below reuses the same surface.
@@ -149,7 +149,7 @@ Menu.Item = (props: {
   children: JSX.Element
 }) => {
   const armed = createArmedConfirm()
-  // One item, one key, the same degenerate case ConfirmButton is (kit/lib/confirm.ts).
+  // One item, one key, the same degenerate case ConfirmButton is (kit/lib/controls/confirm.ts).
   const isArmed = () => !!props.confirm && armed.armed() !== null
   return (
     <button

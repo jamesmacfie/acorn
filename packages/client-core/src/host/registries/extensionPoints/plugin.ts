@@ -13,7 +13,7 @@ import { qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
 import { brandMarkRegistry, type BrandMark } from '../../../kit/tokens/brandMarks'
 import { railMarkerRegistry, type RailMarkerContribution } from '../rail/railMarkerFeed'
 import { clientCapability, clientCapabilityIds, provideClientCapability, requireClientCapability, type ClientCapabilityId } from '../../../infra/node/clientCapabilities'
-import type { Disposable, Registry } from '../../../kit/lib/registry'
+import type { Disposable, Registry } from '../../../kit/lib/state/registry'
 import { settingsRegistry, type SettingsContribution } from '../shell/settings'
 import { sourceRegistry, type SourceContribution } from '../sources/sources'
 import { commandRegistry, stampCommandOwner, type ContributedCommand } from '../commands/commands'
@@ -181,7 +181,7 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
   // stores: a pane may declare a layout and regions, and the registry turns that into a component.
   // The plugin name goes to `register` as the owner, so each registry's side-map can answer who
   // contributed an entry and the seams that build a telemetry record can name it
-  // (kit/lib/registry.ts § the owner side-map).
+  // (kit/lib/state/registry.ts § the owner side-map).
   const own = <T extends { id: string }>(registry: { register: (entry: T, owner?: string) => Disposable }): ClientContributionPoint<T> => ({
     register: (entry: T) => {
       const provider = declaredProvider(entry)

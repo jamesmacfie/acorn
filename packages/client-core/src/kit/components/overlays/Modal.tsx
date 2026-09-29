@@ -1,7 +1,7 @@
 import { Show, type JSX } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { restoreFocusOnCleanup } from '../../keys/trap'
-import { createDismissable } from '../../lib/dismissable'
+import { createDismissable } from '../../lib/controls/dismissable'
 
 // Modal chrome. Behaviour comes from createDismissable. See docs/ui-design.md § Chrome and
 // overlays for why that split keeps this component purely cosmetic, and why the overlay palettes

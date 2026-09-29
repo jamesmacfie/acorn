@@ -1,5 +1,6 @@
 import { lazy } from 'solid-js'
 import type { PaneLayoutContribution } from '@acorn/plugin-api/client'
+import { previewConfigured } from './configuredStore'
 
 // The pane's registration, apart from what it draws: the plugin registers this before the first draw,
 // and the pane itself only loads once a task opens it (docs/frontend.md § Startup budget).
@@ -12,6 +13,8 @@ export const previewPaneContribution: PaneLayoutContribution = {
   // a desktop shell may ship without preview views — so a host that has not installed the group
   // never lists the pane at all, rather than listing it and then saying it cannot draw it.
   defaultChord: 'meta+shift+b', requires: { seam: 'preview' },
+  // A task with no preview URL configured has nothing to draw here (./configuredStore.ts).
+  when: (task) => previewConfigured(task.id),
   // `single`, so the pane inherits the host's frame, focus group and padding rules rather than the
   // `<section class="pane workspace-preview">` it used to write for itself.
   layout: 'single', regions: { body: PreviewTaskPane },

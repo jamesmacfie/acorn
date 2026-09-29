@@ -432,7 +432,7 @@ scroll write:
 - A place whose item has gone, as a collapsed file's segments do, lands on that file's header, and the
   health reading counts it as substituted.
 
-Its scroll writes are marked as its own until the frame after them (`kit/lib/scrollAuthor.ts`, which
+Its scroll writes are marked as its own until the frame after them (`kit/lib/timeline/scrollAuthor.ts`, which
 the `Timeline` shares), and the reader's wheel, touch, pointer and key input is timestamped, so a
 correction's own scroll event never reads as the reader moving, and never keeps the settling window
 open.
@@ -452,8 +452,9 @@ each head is `position: sticky; left: 0` inside its canvas-wide row, sized to th
 scrollport with `100cqw` (`.diff` is an inline-size container). That is also why the sticky
 current-file header renders inside the row canvas rather than as a direct child of the scroller —
 a sticky element can only travel within its containing block, and the scroller's content box is
-only one scrollport wide. Hunk headers and expand bands scroll away with the code, as they do on
-GitHub.
+only one scrollport wide. Comment threads and the open line's comment box are pinned and sized the
+same way, so the text box and its buttons never reach past the pane's right edge. Hunk headers and
+expand bands scroll away with the code, as they do on GitHub.
 
 The two line numbers and change marker share one sticky gutter box. A normal code line owns no local
 signals: the comment composer, including its busy and error state, mounts only for the one open line.
@@ -499,12 +500,18 @@ offset is exact before any of its rows load. The GitHub pane reads it from `?fil
 drops its segments from the list and keeps its header; collapsing one from the sticky header scrolls
 back to that header, so the reader stays on the file they collapsed.
 
-The reading place and collapsed files are remembered per scope for the session (`diff/viewState.ts`):
+The file filter at the start of the toolbar drops every file whose path does not match, header and
+all, and scrolls the list back to its top (`diff/fileFilter.ts`). The query matches as a whole,
+ignoring case, where it appears last in the path, which is usually the file name. The header marks
+the matched characters with the find mark. Find still counts matches in the files the filter hides.
+
+The reading place, collapsed files, and file filter are remembered per scope for the session (`diff/viewState.ts`):
 a task and the classic browser keep separate entries for the same content, and a task's entries are
 evicted when it is archived. The place is the identity described in § Row geometry, not a pixel
-offset, so it survives a thread measured above it or a narrower pane. Both are tied to the source's
+offset, so it survives a thread measured above it or a narrower pane. The place and the collapsed files are tied to the source's
 signature and the place to its projection, so new commits drop the stale place and collapse choices
-instead of restoring them against a different diff. An explicit file navigation wins over a saved
+instead of restoring them against a different diff. The filter is text rather than a choice about
+particular files, so it survives new commits. An explicit file navigation wins over a saved
 place.
 
 ### Marks from other plugins

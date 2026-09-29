@@ -54,6 +54,18 @@
   --find-hit-bg: rgba(255, 200, 0, 0.28);
   --find-current-bg: rgba(255, 145, 0, 0.6);
   --scrim-color: #000000;
+
+  /* Syntax colours for code GitHub already highlighted (a suggested change), where each token
+     arrives as a class instead of a Shiki colour. Theme-independent for the same reason Shiki is:
+     these are github-light and github-dark, the two themes infra/highlight/shiki.ts loads, so a
+     suggestion matches the diff row it sits under. */
+  --syntax-comment: light-dark(#6a737d, #6a737d);
+  --syntax-keyword: light-dark(#d73a49, #f97583);
+  --syntax-string: light-dark(#032f62, #9ecbff);
+  --syntax-constant: light-dark(#005cc5, #79b8ff);
+  --syntax-entity: light-dark(#6f42c1, #b392f0);
+  --syntax-variable: light-dark(#e36209, #ffab70);
+  --syntax-tag: light-dark(#22863a, #85e89d);
 }
 
 /* Series identity: chart marks that answer "which series is this", never "how is this doing"

@@ -3,7 +3,7 @@ import { taskBridge } from './taskBridge'
 import { wsOnNodeEvent } from '../../infra/node/wsClient'
 import type { TaskStatus } from '@acorn/protocol/task.ts'
 import type { ClientScheduleContribution } from '../../host/registries/shell/schedules'
-import { latestOnly } from '../../kit/lib/latestOnly'
+import { latestOnly } from '../../kit/lib/state/latestOnly'
 
 const [statuses, setStatuses] = createSignal<Record<string, TaskStatus>>({})
 export { statuses }

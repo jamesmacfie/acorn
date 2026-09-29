@@ -280,6 +280,12 @@ child-process environment. Every call to `reveal()` sits outside the scrub-on-th
   back to the snapshot: the write is a slug of the definition name, confined to `.acorn/workflows/`
   by `resolveInRoot`, and the next start from that file asks for the acknowledgement
   ([workflows.md](./workflows.md) § Database definitions).
+- A gate answer is device-only. `POST /v1/p/workflows/workflows/runs/:runId/gate` refuses a
+  task-confined caller with 403 even on its own run, for approval and rejection alike, because the
+  agent working in the run holds that run's credential and a human gate it could answer would be no
+  gate. Retry is refused for the same reason. Cancel and kill stay open to the run's own task,
+  because both only stop work. A foreign or unknown run still answers 404 first, so the refusal does
+  not reveal which runs exist.
 - A child workflow is resolved in its parent task's workspace and project before any child task is
   created. Repository definitions re-enter the configuration trust check; database definitions stay
   device-owned. The child receives its own task-confined token, never the parent's token. Its tool
@@ -681,15 +687,19 @@ bindings display provider-rendered HTML:
   body now goes through: github's description, its comments and its review threads
 - `packages/client-core/src/kit/diff/DiffRows.tsx`
 
-Both bindings call `packages/client-core/src/kit/lib/sanitizedHtml.ts` before inserting anything into
+Both bindings call `packages/client-core/src/kit/lib/rendering/sanitizedHtml.ts` before inserting anything into
 the live DOM. It parses the provider string in an inert template, then creates fresh text and a small
 allowlist of formatting elements. The only copied attribute is a validated absolute HTTPS `href`;
 links get host-owned `target` and `rel` values. Scripts, forms, foreign namespaces, images, embeds,
-styles and other automatic resource loads are dropped, along with every provider attribute. The host
+styles and other automatic resource loads are dropped, along with every provider attribute. The one
+exception is `class`, and only as a lookup: the GitHub class names that mark the removed and added
+lines of a suggested change, and the ones that colour its code, are read and replaced with fixed
+host class names, so the
+provider's own string is never written. The host
 adds bare-reference links only after this pass. Input length, node count and depth are bounded. The
 renderer CSP remains a second layer if this sanitizer is ever wrong.
 
-The Markdown renderer (`packages/client-core/src/kit/lib/markdown.ts`) is the other sink, and it is the app's
+The Markdown renderer (`packages/client-core/src/kit/lib/rendering/markdown.ts`) is the other sink, and it is the app's
 own. It escapes first and builds tags afterwards, which holds. It only emits images from bounded raster
 data URLs; remote image URLs in Node-provided markdown become alt text so they cannot trigger requests
 from the client's network. What did not hold was its sentinel: it

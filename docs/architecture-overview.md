@@ -136,6 +136,11 @@ its map enumerates its public modules one per line. That buys two things over th
 not importable from another package, and a new module is public only when someone adds the line, which
 is the decision the map exists to record.
 
+The source is grouped by contract owner: agents, appearance, chrome, content, data, dashboards,
+device, integrations, projects, runtime, and transport. The public subpaths remain flat, so moving a
+source file between these folders does not change a consumer import. `plugin/` and `tree/` keep their
+own wire families. `baseline.ts` stays at the source root because the Rust shell embeds that file.
+
 The other five libraries also publish enumerated subpaths. Their boundary map is:
 
 | Library | Public paths | Keep private |
@@ -156,6 +161,11 @@ may draw with is one row in `packages/client-core/src/kit/tokens/support.ts`, a 
 tokens rather than DOM attributes, and a type-level test refuses `class`, `className` and `style` on
 any of them ([ui design](./ui-design.md) § The closed kit). Two arch rules hold the rest — no plugin
 ships a stylesheet, and no plugin mounts a Solid root of its own.
+
+Within `client-core`, the kit depends on its own modules and the syntax highlighter, not on product
+features. It also imports public protocol and diff-document contracts. The boundary test counts
+type-only imports and re-exports: a display shape shared with a feature belongs in the kit, while
+the feature keeps its public type names for consumers.
 
 Test files follow the same rules as production files unless a rule names an exception. Remaining
 shrinking baselines are named at their own tests; plugin tests have no direct core-library imports.
@@ -466,7 +476,7 @@ Every Node-backed query is rendered with `live`, `refreshing`, `stale`, `offline
 the user's text as a draft. There is no automatic mutation queue.
 
 A paired Node's own connection has a smaller vocabulary. `NodeConnectionState`
-(`packages/protocol/src/broker.ts`) is `online`, `degraded`, `offline`, `incompatible`, or `revoked`,
+(`packages/protocol/src/transport/broker.ts`) is `online`, `degraded`, `offline`, `incompatible`, or `revoked`,
 and nothing else. A certificate fingerprint mismatch is not a sixth state. It surfaces as `offline`
 with an `identity_mismatch` error, because it is a reason the Node is unreachable rather than a
 steady state the UI needs its own row for. `incompatible` is decided from the protocol major the

@@ -152,7 +152,7 @@ bootMark('App imported')
 // same single byte for Return with Ctrl and Return without it, so the chord does not exist to be
 // bound. Disambiguation is the one flag that fixes it, and it fixes the same ambiguity for a lone
 // Escape, which the parser otherwise has to wait out
-// (docs/tui.md § The adapter, ./kit/asking.tsx § Composer).
+// (docs/tui.md § The adapter, ./kit/asking/composition.tsx § Composer).
 //
 // Nothing here focuses anything. Focus is the region store's and the surface has no second opinion
 // about it: a click is a hit test into the store (./keys/regions.ts § Clicks are hit tests).

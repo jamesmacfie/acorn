@@ -24,7 +24,7 @@ const hostState = (): PluginHostState => ({
   acks: ['one', 'two'].map((hash) => ({ pluginId: 'reports', hash, decision: 'accepted' as const, nodeId: 'a', version: hash,
     decidedAt: 1, permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
     declaration: clientDeclaration(runtime(hash)),
-    webviews: [], keyClaims: [], navigationDestinations: [], extensions: [], schedules: [], taskChecks: [], harnesses: [], agentTools: [], contextSections: [],
+    webviews: [], keyClaims: [], navigationDestinations: [], extensions: [], schedules: [], taskChecks: [], harnesses: [], agentTools: [], contextSections: [], customAgents: [],
   })),
   devGrants: [],
 })

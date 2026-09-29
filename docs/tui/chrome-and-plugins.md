@@ -340,7 +340,7 @@ lives.
 | Kind or slot | Desktop | Terminal | Where the answer lives |
 | --- | --- | --- | --- |
 | `rows` (`pane.footer`) | A strip of rows under the pane's frame | A `Rows` collection at the end of the pane, one per contributor, headed by its label and the contributing plugin's id | `apps/tui/src/kit/host.tsx` § `ExtensionRows`, drawn by `apps/tui/src/plugins/ExtendedPane.tsx` |
-| `annotation` | Marks inside the diff row, under the code; `core:task` marks become rail markers | Diff marks appear below the code; task rows show a count and offer `Shift+F10` inspection of the full legend | `apps/tui/src/kit/showing.tsx` § `AnnotatedDiffLine`; § Task markers above |
+| `annotation` | Marks inside the diff row, under the code; `core:task` marks become rail markers | Diff marks appear below the code; task rows show a count and offer `Shift+F10` inspection of the full legend | `apps/tui/src/kit/showing/diffRows.tsx` § `AnnotatedDiffLine`; § Task markers above |
 | `remote` (a `Slot`) | The contributor's tree, in the owner's surface | The same tree, in the same place, drawn from the same batch | `apps/tui/src/kit/host.tsx` § `Slot` |
 | `rectangle` (`pane.inline-*`) | Another plugin's iframe | One muted line naming the point | § Rectangles |
 | `hook` | Runs on the node | Runs on the node | Nothing to draw on either host |
@@ -369,14 +369,15 @@ plugin registers at boot, so it works here.
 curves on the desktop, and here it draws the indented list the workflows editor drew before the
 canvas existed: the same cards in the same reading order with the same selection, indented by rank
 instead of placed by coordinate, and `⇐ n` on a card that waits on more than one. Both hosts take the
-ranks from the same `kit/lib/graphLayout.ts`, so neither can put a card under the wrong one. Positions
+ranks from the same `kit/lib/layout/graphLayout.ts`, so neither can put a card under the wrong one. Positions
 and wires are not drawn, and the one affordance that would otherwise go with them — dragging an edge
 into place — is a picker under the list instead. A plugin writes the same `Graph` for both.
 
 **A contribution is as reachable as the nodes it draws.** A contributor that draws a `Button` inside a
 `Slot` is a stop, reached with `↓` from the strip above it and pressed with Enter, inside the region
 its host registered. A contributor that draws only `Text` is not a stop, and `↓` walks past it. The
-kit decides which is which, on both hosts, and a plugin cannot say otherwise (`focusRoles.ts`).
+kit decides which is which on both hosts. A plugin cannot change the
+`packages/client-core/src/kit/tokens/focusRoles.ts` table.
 
 **A plugin's own chord is pressed with Ctrl here.** A manifest chord is `meta+ctrl+alt+shift+key` and
 `meta` is the platform command key, which a terminal emulator keeps for itself. The command layer

@@ -32,6 +32,7 @@ const AgentConcurrencySettings = lazy(() => import('./settings/AgentConcurrencyS
 const AgentPricingSettings = lazy(() => import('./settings/AgentPricingSettings'))
 const AgentSessionDefaultsSettings = lazy(() => import('./settings/AgentSessionDefaultsSettings'))
 const AgentMcpServersSettings = lazy(() => import('./settings/AgentMcpServersSettings'))
+const CustomAgentsSettings = lazy(() => import('./settings/CustomAgentsSettings'))
 
 export const agentsClientPlugin: ClientPlugin = {
   name: 'agents',
@@ -112,6 +113,12 @@ export const agentsClientPlugin: ClientPlugin = {
     ctx.settingsPages.register({
       id: 'agent-mcp-servers', label: 'MCP servers', group: 'general', order: 29, requires: { plugin: 'agents' },
       component: AgentMcpServersSettings,
+    })
+    // Saved starts for a session: a harness, its options, instructions and tool access
+    // (docs/managed-agents.md § Custom agents).
+    ctx.settingsPages.register({
+      id: 'custom-agents', label: 'Custom agents', group: 'general', order: 42, requires: { plugin: 'agents' },
+      component: CustomAgentsSettings,
     })
     // Fleet home's "agents running" number. Addressed at an explicit node, never the ambient one,
     // because the card exists to show several nodes at once.

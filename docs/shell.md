@@ -405,7 +405,7 @@ commands. It never exposes a node token, a certificate, a database handle, or a 
 
 One thing on that socket is not JSON: terminal output. The helper's push channel carries a binary
 frame beside the JSON messages, tagged with the node id, wrapping the frame the node sent, which is
-itself tagged with the session id (`packages/protocol/src/ws.ts` § The one binary frame). The bridge
+itself tagged with the session id (`packages/protocol/src/transport/ws.ts` § The one binary frame). The bridge
 sets `binaryType = 'arraybuffer'`, peels the node id, and hands the rest to
 `packages/client-core/src/infra/node/wsClient.ts` through the seam's `onBytes`, which is the one module
 that reads the session id and the one place the bytes become text. So a busy build's output crosses two
@@ -681,6 +681,14 @@ and re-reads on `plugin:preview:url-changed { taskId, url, source }`, where `url
 connected client agree on the answer. The terminal recipe picker reaches preview through the
 `preview.recipeSelection` client capability, avoiding a reverse package import.
 
+The pane button and the **Open Preview** command appear only on a task that has somewhere to find a
+URL. `/v1/p/preview/configured` answers that for every active task by walking the same order and
+asking only whether each step is filled in: a picked recipe URL, a default target with `url` or
+`urlCommand`, or a project preview setting. It runs no script and needs no running dev server, so
+stopping the dev server does not close an open preview. The client holds the answer in
+`plugins/preview/src/client/configuredStore.ts` and re-reads it on a URL change, a project change,
+a task it has not seen, a Node switch, and a reconnect.
+
 The preview tunnel implementation remains in custody but the pane does not open it while remote
 preview is disabled. The following describes that dormant transport, not an enabled remote preview
 path. A tunnel alone is not a browser network boundary: after loading a page, the
@@ -714,7 +722,7 @@ in the helper.
 
 ## Service protocol
 
-`packages/protocol/src/serviceProtocol.ts` defines the versioned lifecycle messages between the
+`packages/protocol/src/device/serviceProtocol.ts` defines the versioned lifecycle messages between the
 helper and the node it supervises: `service.start`, `service.stop`, and `service.preview-rules`. Both
 endpoints validate messages with Zod, and pending calls reject on timeout or peer exit. Product
 requests do not use this RPC; they use `/v1` over the broker.

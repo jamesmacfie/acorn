@@ -1,6 +1,5 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
-import type { AgentConfigOption } from '../../contract/wire.ts'
 import { prefsOptions } from '@acorn/plugin-api/client'
 import { Alert, Checkbox, Field, Section, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import {
@@ -9,6 +8,7 @@ import {
 } from '../../shared/sessionDefaults'
 import { managedAgentApi } from '../sessions/managedClient'
 import ProviderGlyph from '../sessions/ProviderGlyph'
+import { advertisedOptionsByProvider } from './agentConfigOptions'
 import {
   agentSessionDefaultsOptions,
   writeAgentSessionDefaults,
@@ -32,24 +32,8 @@ export default function AgentSessionDefaultsSettings() {
 
   const record = () => stored.data ?? defaultAgentSessionDefaults()
 
-  /**
-   * Which options each provider offers, read off the newest session that advertised them. A provider
-   * only reports its models and reasoning levels once a session is running, so there is nowhere else
-   * to read them from before one starts.
-   *
-   * Bounded by whatever the sessions list returns, which is the 50 most recent. A provider you have
-   * not run in that many sessions shows no pickers until you run it again. Cache the advertised list
-   * per provider in the same preference row if that starts to bite.
-   */
-  const advertised = createMemo(() => {
-    const byProvider: Record<string, AgentConfigOption[]> = {}
-    for (const session of recent()?.sessions ?? []) {
-      if (byProvider[session.providerId]) continue
-      const options = session.config.configOptions
-      if (Array.isArray(options) && options.length) byProvider[session.providerId] = options as AgentConfigOption[]
-    }
-    return byProvider
-  })
+  // Pickers only for what a recent session advertised (./agentConfigOptions.ts says why).
+  const advertised = createMemo(() => advertisedOptionsByProvider(recent()?.sessions ?? []))
 
   // Each change is the save, through the shared writer the palette's setting command also uses
   // (./sessionDefaultsClient.ts holds the cache rule). What this page adds is where the failure goes.

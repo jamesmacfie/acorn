@@ -50,7 +50,7 @@ export type TreeWorkerHandle = {
    *
    * Per slot rather than per worker, which is the point of routing these over the tree channel at all:
    * one worker draws every tree its bundle contributes, so only the slot says which mounted
-   * contribution asked (../frames/sdk.ts § TreeMount.host).
+   * contribution asked (../frames/sdk/treeChannel.ts § TreeMount.host).
    *
    * A slot with no handler denies every request, so a tree whose host cannot answer is told so rather
    * than left waiting.
@@ -362,7 +362,7 @@ function start(input: AcquireInput, key: TreeWorkerKey): Live {
         //
         // Nothing hangs without it. Every dismissal path goes through one `clear()`, and the tree
         // unmounting dismisses what it opened (../frames/overlays.ts), so the invocation always
-        // settles; the sandbox rejects its own copy on unmount too (../frames/sdk.ts § drop).
+        // settles; the sandbox rejects its own copy on unmount too (../frames/sdk/treeChannel.ts § drop).
         const timer = message.op === 'owner.invoke'
           ? setTimeout(
               () => reply({ ok: false, error: { code: 'timeout', message: 'the owner did not answer in time' } }),

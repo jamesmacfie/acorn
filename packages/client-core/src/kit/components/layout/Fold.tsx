@@ -58,7 +58,7 @@ export function Fold(props: {
   // Closed transcripts can hold thousands of nested cards. Build them on first open, then retain
   // them so closing a section does not discard drafts, selection, or a child's own disclosure state.
   const visited = createMemo((previous) => previous || open(), false)
-  // Read once, for the reason on Row's parts (../primitives.tsx): testing a slot and then inserting it
+  // Read once, for the reason on Row's parts (./Row.tsx): testing a slot and then inserting it
   // ran the caller's JSX twice, and a transcript's tool card built its whole status line twice.
   const meta = children(() => props.meta)
   const actions = children(() => props.actions)

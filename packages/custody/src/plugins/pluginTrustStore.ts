@@ -8,7 +8,7 @@ import { pluginPermissionsSchema } from '@acorn/protocol/plugin/contract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 import { writePrivateAtomic } from '@acorn/node-core/server/storage'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
-import { pluginExtensionGrantSchema } from './grantSchemas'
+import { pluginCustomAgentGrantSchema, pluginExtensionGrantSchema } from './grantSchemas'
 import { bundleSourceSchema, type BundleSource } from '@acorn/protocol/plugin/bundles.ts'
 
 const log = createLogger('plugins')
@@ -124,6 +124,9 @@ const ackSchema = z.strictObject({
   harnesses: z.array(harnessGrantSchema).max(4).default([]),
   agentTools: z.array(agentToolGrantSchema).max(16).default([]),
   contextSections: z.array(contextSectionGrantSchema).max(8).default([]),
+  // Default keeps acknowledgements written before custom agents existed readable. An old
+  // acknowledgement says the accepted bundle added no agent, which was true.
+  customAgents: z.array(pluginCustomAgentGrantSchema).max(8).default([]),
   decision: z.enum(['accepted', 'rejected']),
   decidedAt: z.number().int(),
   // Set when the disclosure behind the decision could not be fully parsed, because a node ran a newer
@@ -277,6 +280,7 @@ export class PluginTrustStore {
       harnesses: [],
       agentTools: [],
       contextSections: [],
+      customAgents: [],
       decision: 'accepted',
       decidedAt: Date.now(),
       partial: true,

@@ -1,6 +1,6 @@
 import { createEffect, For, Show, type JSX } from 'solid-js'
 import { IconButton } from '../inputs/IconButton'
-import { StatusDot } from '../primitives'
+import { StatusDot } from '../content/StatusDot'
 import { revealActiveTab } from './tabScroll'
 
 export type DocTabDef = {

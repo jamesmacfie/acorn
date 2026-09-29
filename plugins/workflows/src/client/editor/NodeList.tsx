@@ -191,7 +191,7 @@ export default function NodeList(props: {
           telling that the thing it is missing is a step. */}
       <Show when={!def().steps.length && !props.readOnly}>
         <Row density="compact">
-          <Text emphasis="muted">No steps yet. Add the first one above.</Text>
+          <Text emphasis="muted" wrap>No steps yet. Add the first one above.</Text>
         </Row>
       </Show>
       <Show when={selectedReferences().length}>

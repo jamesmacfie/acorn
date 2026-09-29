@@ -478,14 +478,20 @@ export const managedAgentStore = {
    *
    * Two surfaces open a session now — the pane's New picker and the palette's "New agent session" —
    * and neither may be the one that knows what a create looks like. The provider is named by its two
-   * ids rather than by its descriptor, because the palette only carries a picked row.
+   * ids rather than by its descriptor, because the palette only carries a picked row. A custom agent
+   * is named by id alone: the node reads it and applies what it keeps.
    */
-  async startSession(taskId: string, provider: { id: string; profileId: string }): Promise<AgentSession> {
+  async startSession(
+    taskId: string,
+    provider: { id: string; profileId: string },
+    customAgentId?: string,
+  ): Promise<AgentSession> {
     const session = await managedAgentApi.createSession({
       taskId,
       providerId: provider.id,
       profileId: provider.profileId,
       kind: 'interactive',
+      ...(customAgentId ? { customAgentId } : {}),
       config: {},
     })
     upsertSession(session)

@@ -81,7 +81,7 @@ function snapshotDocument(target) {
  *
  * The position alone is not the answer. A pixel offset means nothing once the content above it has
  * changed height, which is the entire reason the transcript's reading place is a turn
- * (client-core kit/lib/readingPlace.ts). So this also reports which turn the viewport starts in,
+ * (client-core kit/lib/timeline/readingPlace.ts). So this also reports which turn the viewport starts in,
  * read off the `data-turn` the kit publishes, and that is the thing to compare across a navigation.
  *
  * A `wheel` event before the write, because a scroller that owns its position tells the reader's

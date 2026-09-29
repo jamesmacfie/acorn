@@ -144,12 +144,13 @@ const turn = (mode: string): AgentTurn => ({
   completedAt: null,
 })
 
-async function start(mode: string | null = null, resumed = false) {
+async function start(mode: string | null = null, resumed = false, config: Record<string, unknown> = {}) {
   const events: AgentNormalizedEvent[] = []
   const driverEvents: AgentDriverEvent[] = []
   const { CodexAgentDriver } = await import('./codexDriver')
+  const base = session(mode, resumed)
   const handle = await new CodexAgentDriver().start({
-    session: session(mode, resumed),
+    session: { ...base, config: { ...base.config, ...config } },
     cwd: '/tmp',
     env: {},
     mcpServers: [],
@@ -175,6 +176,20 @@ describe('Codex collaboration modes', () => {
     }
     wire.onRequest = undefined
     wire.onNotification = undefined
+  })
+
+  // The same text on start and on resume, from the snapshot the session was created with.
+  it('gives a custom agent’s instructions to the thread as developer instructions', async () => {
+    const customAgent = { id: 'a1', name: 'Bug reviewer', instructions: 'Review for correctness only.' }
+    await (await start(null, false, { customAgent })).handle.stop()
+    expect(wire.requests.find((request) => request.method === 'thread/start')?.params)
+      .toMatchObject({ developerInstructions: 'Review for correctness only.' })
+    await (await start(null, true, { customAgent })).handle.stop()
+    expect(wire.requests.find((request) => request.method === 'thread/resume')?.params)
+      .toMatchObject({ developerInstructions: 'Review for correctness only.' })
+    wire.requests.length = 0
+    await (await start()).handle.stop()
+    expect(wire.requests.find((request) => request.method === 'thread/start')?.params).not.toHaveProperty('developerInstructions')
   })
 
   it('advertises the modes provider capability', async () => {

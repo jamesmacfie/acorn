@@ -1,6 +1,7 @@
 // The preview plugin's client part (docs/plugins.md § The plugin API).
-import { clientEvents, openPane, previewViews, type ClientPlugin, writeJson } from '@acorn/plugin-api/client'
+import { activeTaskId, clientEvents, openPane, previewViews, type ClientPlugin, writeJson } from '@acorn/plugin-api/client'
 import { PREVIEW_RECIPE_SELECTION } from '@acorn/plugin-terminal/contract/previewSelection.ts'
+import { previewConfigured, previewConfiguredSchedule } from './configuredStore'
 import { previewPaneContribution } from './paneContribution'
 import { previewRecipeUrlRoute } from '../shared/api'
 
@@ -17,6 +18,7 @@ export const previewClientPlugin: ClientPlugin = {
       },
     })
     ctx.panes.register(previewPaneContribution)
+    ctx.schedules.register(previewConfiguredSchedule)
     // One row, gated on the same seam the pane is: a terminal installs no preview seam, so this is
     // absent there rather than present and useless (docs/tui.md § What a plugin loses here). URL rules
     // are repository configuration and reloading needs a mounted preview, so neither is a command
@@ -30,6 +32,11 @@ export const previewClientPlugin: ClientPlugin = {
       palette: true,
       scope: 'task',
       requires: { seam: 'preview' },
+      // The pane's own gate, so the palette does not offer a pane the task cannot show.
+      when: () => {
+        const taskId = activeTaskId()
+        return !!taskId && previewConfigured(taskId)
+      },
       run: (context) => {
         if (context.taskId) openPane(context.taskId, 'preview')
       },

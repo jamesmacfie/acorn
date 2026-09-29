@@ -1,8 +1,8 @@
 // How the nine built-in kinds describe themselves, and where each of their fields lands
 // (docs/workflows.md § Contributed step kinds).
 //
-// Here rather than beside the handlers in ../server/workflowBuiltins.ts for two reasons. The editor
-// runs on the client and needs the same table, and ../server/workflowValidation.ts reads `runsAgent`
+// Here rather than beside the handlers in ../server/steps/builtins.ts for two reasons. The editor
+// runs on the client and needs the same table, and ../server/validation/definition.ts reads `runsAgent`
 // off it, which it cannot do from a module that imports the validator back.
 //
 // A contributed kind's fields all land in `with`, which the runner passes through unread. A built-in
@@ -76,8 +76,14 @@ export const BUILTIN_STEP_DESCRIPTIONS: Readonly<Record<string, StepKindDescript
     label: 'Wait for a person',
     description: 'Park the run until somebody approves it. An autonomous run passes straight through.',
     icon: 'hand',
-    fields: [],
-    output: { description: 'The approval outcome.' },
+    fields: [{
+      id: 'form',
+      label: 'Form',
+      type: 'gate-form',
+      required: false,
+      hint: 'Optional fields the reviewer checks and corrects before approving. Each can be filled from an earlier step.',
+    }],
+    output: { description: 'The approval outcome. With a form, the approved values under /values and the names of the fields the reviewer changed under /edited.' },
   },
   'gate-policy': {
     label: 'Check a policy',

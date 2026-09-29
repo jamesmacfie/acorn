@@ -68,6 +68,7 @@ function PullStrip(props: { tabs: PrTabsModel }) {
       <Only hosts={['dom']}>
         <Show when={tabs().tabs().length > 1}>
           <Tabs
+            level="pane"
             tabs={defs()}
             active={selected() ? pullRefKey(selected()!.pull) : ''}
             onChange={(id) => tabs().selectTab(id)}

@@ -3,10 +3,10 @@ import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Card } from '../primitives'
 import { Timeline } from './Timeline'
-import { LIVE, type ReadingPlace } from '../../lib/readingPlace'
-import { setScrollPlaceHandler, type ScrollPlaceReport } from '../../lib/scrollPlace'
-import { _resetSurfaceHealth, surfaceHealthSnapshot } from '../../lib/surfaceHealth'
-import { createTimelineWindow, TIMELINE_PAGE } from '../../lib/timelineWindow'
+import { LIVE, type ReadingPlace } from '../../lib/timeline/readingPlace'
+import { setScrollPlaceHandler, type ScrollPlaceReport } from '../../lib/telemetry/scrollPlace'
+import { _resetSurfaceHealth, surfaceHealthSnapshot } from '../../lib/telemetry/surfaceHealth'
+import { createTimelineWindow, TIMELINE_PAGE } from '../../lib/timeline/timelineWindow'
 
 // The transcript's guardrails, at the node that owns them: appending a turn must not replace the ones
 // already drawn, following the newest turn must stop when the reader scrolls away from it, and a
@@ -415,7 +415,7 @@ describe('Timeline', () => {
   })
 })
 
-// The numbers a timeline reports about itself (kit/lib/surfaceHealth.ts): the caller's projected turns
+// The numbers a timeline reports about itself (kit/lib/telemetry/surfaceHealth.ts): the caller's projected turns
 // and the turns in the DOM are separate fields, and teardown leaves no observer or frame behind.
 describe('Timeline health', () => {
   afterEach(() => _resetSurfaceHealth())
@@ -466,7 +466,7 @@ describe('Timeline health', () => {
   })
 })
 
-// A long list drawn through a window (kit/lib/timelineWindow.ts): the caller draws the newest page, the
+// A long list drawn through a window (kit/lib/timeline/timelineWindow.ts): the caller draws the newest page, the
 // timeline says how many older turns there are, and the reader's place is kept by identity while the
 // window grows and shrinks. The geometry here is read from the DOM's order at every call, so a turn
 // prepended or trimmed moves every turn after it the way a browser's layout would.

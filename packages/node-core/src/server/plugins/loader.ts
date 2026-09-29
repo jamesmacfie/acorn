@@ -14,7 +14,7 @@ import { readFile } from 'node:fs/promises'
 import { basename, join } from 'node:path'
 import { confineExistingFile, resolveInRoot } from '../core/fs'
 import { describeSource, pluginInstallRoot, readLockfile, sweepDebris } from './installer'
-import { PLUGIN_API_MAJOR, readPluginManifestResult, speaksApiVersion, type ManifestUnknown, type PluginManifest } from './manifest'
+import { contributesNodeData, PLUGIN_API_MAJOR, readPluginManifestResult, speaksApiVersion, type ManifestUnknown, type PluginManifest } from './manifest'
 import { PluginMigrationsError, pluginMigrationsChain } from './migrations'
 import { openPluginDb } from './storage'
 import { readBundledPluginState } from './bundledState'
@@ -182,7 +182,7 @@ export async function snapshotActivePlugin(entry: InstalledPlugin): Promise<Acti
     identity: {
       ...declaration,
       client: bundle ? { hash: bundle.hash, bytes: bundle.bytes.byteLength } : null,
-      activation: hasNode || declaration.contributions.harnesses.length > 0 ? 'node' : 'client-only',
+      activation: hasNode || contributesNodeData(declaration.contributions) ? 'node' : 'client-only',
     },
     bundle,
   }
@@ -381,14 +381,15 @@ async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: Rea
   // No node bundle. Its client bundle still has to reach every paired device, which is the whole
   // reason `installed` exists alongside `loaded`.
   if (!manifest.node) {
-    // But it may still contribute to the node, as data. A managed agent harness is the one kind that
-    // needs no route of its own and therefore no bundle at all (docs/managed-agents.md § Harnesses),
-    // and the whole point of that tier is that adding an agent costs one manifest.
+    // But it may still contribute to the node, as data. A managed agent harness and a custom agent are
+    // the two kinds that need no route of their own and therefore no bundle at all
+    // (docs/managed-agents.md § Harnesses), and the point of that tier is that adding an agent costs one
+    // manifest.
     //
     // It goes through the host as a real plugin with an empty `init`, rather than being delivered
     // beside it, so it gets everything a plugin row gets: a line in Settings → Plugins, an owner who
     // can disable it, and registrations that roll back with the rest.
-    if (manifest.contributions.harnesses.length === 0) return { installed: entry }
+    if (!contributesNodeData(manifest.contributions)) return { installed: entry }
     // Shadowing is a node-half concept: there is nothing here to run in a built-in's place, and
     // letting the id through would delete that built-in from the graph and put nothing back.
     if (builtins.has(manifest.id)) {

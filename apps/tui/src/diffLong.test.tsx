@@ -12,7 +12,7 @@ import { renderFixture } from './harness'
 // fit rather than clipping it, so 2,500 rows in a 40-row panel were drawn thirty deep on top of each
 // other, and the two runs inside a row — the line numbers and the code — each clipped separately, so
 // the gutter's last digit ran into the change marker. What came out was a smear of characters from
-// lines that are nowhere near each other (./kit/showing.tsx § Diff, ./kit/cells.tsx § Run).
+// lines that are nowhere near each other (./kit/showing/diffRows.tsx, ./kit/cells.tsx § Run).
 describe('a diff longer than its column', () => {
   it('draws one line per row, in order, with the gutter clear of the code', async () => {
     process.env.ACORN_FIXTURE_PATCH_LINES = '2500'
@@ -62,7 +62,7 @@ describe('a diff longer than its column', () => {
 // The pane used to say in its own comment that every row was built. A five-thousand-line diff in a
 // pane that shows twenty is five thousand renderables laid out on every frame, and the fix is the one
 // the rail already had: draw the slice around the offset and stand two boxes in for the rest
-// (./kit/showing.tsx § DiffPane).
+// (./kit/showing/diffPane.tsx § DiffPane).
 
 /** Every renderable under the root, which is what a frame costs to lay out. */
 const renderables = (root: Renderable): number => {

@@ -3,10 +3,17 @@ import type { Accessor } from 'solid-js'
 import type { DiffFindController } from './findController'
 import type { ViewMode } from '../../kit/diff/diffModel'
 import { FindBar } from '../../kit/components/inputs/FindBar'
+import { Input } from '../../kit/components/inputs/Input'
 import { SegmentedControl, ToggleButton } from '../../kit/components/primitives'
 import { tip } from '../../kit/components/overlays/tips'
 
-export function DiffToolbar(props: { find: DiffFindController; viewMode: Accessor<ViewMode>; setViewMode: (mode: ViewMode) => Promise<void> }) {
+export function DiffToolbar(props: {
+  find: DiffFindController
+  viewMode: Accessor<ViewMode>
+  setViewMode: (mode: ViewMode) => Promise<void>
+  fileQuery: Accessor<string>
+  setFileQuery: (query: string) => void
+}) {
   let findInput: HTMLInputElement | undefined
   createEffect(() => {
     props.find.findFocusTick()
@@ -18,6 +25,22 @@ export function DiffToolbar(props: { find: DiffFindController; viewMode: Accesso
 
   return (
     <div class="diff-toolbar">
+      <div class="diff-file-filter">
+        <Input
+          kind="filter"
+          size="sm"
+          label="Filter files"
+          placeholder="Filter files…"
+          value={props.fileQuery()}
+          onInput={props.setFileQuery}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape' && props.fileQuery()) {
+              event.preventDefault()
+              props.setFileQuery('')
+            }
+          }}
+        />
+      </div>
       <Show when={props.find.findOpen()}>
         <FindBar
           ref={(element) => { findInput = element }}

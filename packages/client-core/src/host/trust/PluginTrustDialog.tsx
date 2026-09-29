@@ -1,7 +1,7 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { nodes } from '../../infra/node/fleet'
 import Icon from '../../kit/components/content/Icon'
-import { createDismissable } from '../../kit/lib/dismissable'
+import { createDismissable } from '../../kit/lib/controls/dismissable'
 import { distribution, pendingTrust, resolvePendingTrust, type PluginTrustRequest } from '../plugins/distribution'
 import { recordTrustDecision, TIER_LABEL, trustTiers, type TierKey } from './trustModel'
 import './plugin-trust.css'

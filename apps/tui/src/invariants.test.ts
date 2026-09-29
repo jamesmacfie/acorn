@@ -130,9 +130,10 @@ describe('the store is the only owner of focus', () => {
     expect(said(/focusable = /g)).toEqual({
       'keys/regions.ts': 2,
       'keys/stops.ts': 2,
-      'kit/grouping.tsx': 1,
+      'kit/grouping/tabs.tsx': 1,
       'kit/rectangle.tsx': 1,
-      'kit/showing.tsx': 2,
+      'kit/showing/collection.tsx': 1,
+      'kit/showing/row.tsx': 1,
       'tree/compat.ts': 1,
     })
   })

@@ -23,7 +23,7 @@ export function SourceSurface(props: { source: SourceContribution }) {
     }>
       {(regions) => (
         // Keyed by the source, so collapsing GitHub's list leaves Linear's alone and each comes back
-        // where it was left (kit/lib/collapseState.ts). Every source that hands over two halves is a
+        // where it was left (kit/lib/layout/collapseState.ts). Every source that hands over two halves is a
         // list beside a detail, so none of them has to ask for the control.
         <ListDetail split collapseKey={props.source.id}>
           <ListColumn>

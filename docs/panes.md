@@ -26,6 +26,9 @@ the button, because most tasks never will ([workflows.md](./workflows.md) § The
 the same 640px floor `agents` does, because an agent node draws the same composer and a composer in a
 narrow column is unusable.
 
+`preview` is gated by `when` too: a task with no run-target URL and no project preview setting has
+nothing to draw, so it gets no button ([shell.md](./shell.md) § Host-owned webviews has the check).
+
 The loaded Findings pane is deliberately absent from this list. Its manifest sets
 `showInSwitcher: false`, so the pane remains a valid persisted layout target and can be opened by
 **Findings: inspect task evidence**, but raw review inputs do not occupy the everyday task switcher.
@@ -78,7 +81,7 @@ does not rewrite the durable row.
 **Inside a pane** the host owns the arrangement. A pane names one of the layouts below and supplies a
 component per region; it never draws the split, the divider, or the drag handle itself. The names and
 each layout's region set are in
-[@acorn/protocol/paneLayouts.ts](../packages/protocol/src/paneLayouts.ts).
+[@acorn/protocol/paneLayouts.ts](../packages/protocol/src/chrome/paneLayouts.ts).
 
 **Which components draw them is the host package's,** the same way `KIT_COMPONENTS` is: the desktop's
 are in `client-core/src/host/layouts` and the terminal's are in `apps/tui/src/layouts`, and a host
@@ -371,7 +374,7 @@ ctx.panes.register({
 `hidden` drops a region outright. `collapsible`, on a `list-detail` pane, is the other answer to the
 same question: the column survives and narrows to the width of the icon rails, with each row coming
 back as one mark. Opt in, because that second half is the pane's to arrange — it reads the same
-signal (`kit/lib/collapseState.ts`) and passes each `Row` a `collapsed` slot — and a pane that
+signal (`kit/lib/layout/collapseState.ts`) and passes each `Row` a `collapsed` slot — and a pane that
 collapses without doing it gets full-width rows clipped mid-word. A pane drawn from a remote tree
 cannot keep the bargain: its rows are built in a plugin worker with no way to read a host signal, so
 it leaves the flag off and keeps a column that resizes and does not collapse. See

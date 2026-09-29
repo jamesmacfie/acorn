@@ -254,7 +254,7 @@ definitions.
 
 | Tool | Input | Result |
 | --- | --- | --- |
-| `agent_spawn` | `title`, `prompt`, optional `profileId`, `isolation`, `resultSchema`, `configOptions`, and `toolCeiling` | Stable spawn, task, session, and initial-turn IDs; depth; provisioning state; and cursor |
+| `agent_spawn` | `title`, `prompt`, optional `profileId` or `agent`, `isolation`, `resultSchema`, `configOptions`, and `toolCeiling` | Stable spawn, task, session, and initial-turn IDs; depth; provisioning state; and cursor |
 | `agent_prompt` | `sessionId`, `prompt`, and optional `resultSchema` and `configOptions` | Durable turn ID, queue state and ordinal, session state, and cursor |
 | `agent_wait` | `sessionId`, `afterSeq`, one of `ready`, `attention`, `turn_completed`, or `stopped`, and `timeoutMs` | Whether the condition matched or timed out, plus state, attention, and the latest sequence |
 | `agent_read` | `sessionId`, `afterSeq`, and `limit` | A bounded page of folded assistant messages, diagnostics, errors, and validated structured output |
@@ -263,6 +263,12 @@ definitions.
 An agent learns how to use these tools only from their descriptions and the `describe()` text on each
 field in `plugins/agents/src/shared/delegationSchemas.ts`, which the MCP schema carries. When a rule
 below changes, change that text too.
+
+`agent_spawn` can start a custom agent by passing its name or id as `agent`
+([managed-agents.md](./managed-agents.md) § Custom agents). The agent picks the harness, so naming a
+different `profileId` beside it is refused. The agent's options apply first and the call's
+`configOptions` go on top, and its tool ceiling narrows between the caller's and the call's own. The
+child's system prompt gets the agent's instructions the same way an interactive session does.
 
 `agent_spawn` defaults to shared-task isolation and starts the first turn before returning. Worktree
 isolation creates a selectable child task, but the managed session remains the execution authority.

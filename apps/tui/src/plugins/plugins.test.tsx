@@ -91,6 +91,7 @@ test('a decision is recorded per (plugin, bundle), and only for bundles this dev
     harnesses: [],
     agentTools: [],
     contextSections: [],
+    customAgents: [],
     decision: 'accepted' as const,
   }
   await custody.trustRecord(decision)

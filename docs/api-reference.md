@@ -9,7 +9,8 @@ Typed dashboard panels use the matching device-only `/v1/core/dashboards/:operat
 The Node exposes one Hono application under `/v1`. It serves JSON routes and one authenticated
 WebSocket. It serves no HTML, JavaScript, or static assets.
 
-Route and response types live in `packages/protocol/src/api.ts`; the server composition is
+Core route builders and response types are published through `@acorn/protocol/api.ts`. Their source is
+grouped by contract owner under `packages/protocol/src/transport/api/`. The server composition is
 `packages/node-core/src/server/index.ts`; plugin route declarations are registered by each Node
 plugin. The table below maps routes by responsibility. Use the route modules for fields and
 validation details when changing a contract.
@@ -84,7 +85,7 @@ paired device already has full owner authority, so there is no separate self-rev
 pair result also carries `baseline: "acorn-1"`. A client rejects a missing or different baseline
 before pairing or opening a WebSocket, even when the numeric protocol is 1.
 
-The protocol number has one meaning. `NODE_PROTOCOL_VERSION` (`packages/protocol/src/node.ts`) is the
+The protocol number has one meaning. `NODE_PROTOCOL_VERSION` (`packages/protocol/src/device/node.ts`) is the
 protocol major. There is no minor, no capability negotiation,
 and no feature handshake. Each side refuses a major it does not speak. The pairing probe refuses
 before pairing, and the broker re-probes `GET /v1/node` on every connect, producing the
@@ -479,8 +480,13 @@ allowed by the definition's structural schemas.
 The runner refuses a required input with no value and a name the definition does not declare. `GET` on the same path answers the task's file layers, plus the workspace's rows for a
 device caller. `POST .../runs/:runId/retry` takes `{ stepId, prompt? }` and puts a
 failed node back to pending. Retry answers 403 to a task-confined caller, because an agent could
-otherwise loop a failed step past the rail that stopped it. Every other run-scoped path treats a
-foreign or unknown run as a 404.
+otherwise loop a failed step past the rail that stopped it. `POST .../runs/:runId/gate` takes
+`{ stepId, approved, values? }` and answers `{ ok: true }`. `values` answers a gate's form and comes
+only with an approval ([execution](./workflows/execution.md#human-gates)). The route answers 403 to a
+task-confined caller, even on its own run, because the gate exists to stop that agent. It answers 404
+`not_found` when the run has no such step, 409 `gate-resolved` when another answer already landed,
+and 400 `gate-invalid` with one line per refused form field, leaving the gate waiting. Every other
+run-scoped path treats a foreign or unknown run as a 404.
 
 `GET /v1/p/workflows/tasks/:id/workflows/runs` returns task-scoped run projections.
 `GET /v1/p/workflows/workflows/runs/:runId` returns one run projection. Unknown and foreign run IDs

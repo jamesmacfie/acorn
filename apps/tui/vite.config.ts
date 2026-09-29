@@ -149,8 +149,8 @@ export default defineConfig({
         // tiny manifest carrier from being coalesced into the much larger data-query chunk merely
         // because both lazy editors also consume it.
         manualChunks: (id: string) => {
-          if (id.endsWith('/packages/protocol/src/dataSourceContributions.ts')) return 'data-source-contributions'
-          if (id.endsWith('/packages/protocol/src/dashboardViews.ts')) return 'dashboard-views'
+          if (id.endsWith('/packages/protocol/src/data/dataSourceContributions.ts')) return 'data-source-contributions'
+          if (id.endsWith('/packages/protocol/src/dashboards/dashboardViews.ts')) return 'dashboard-views'
           return undefined
         },
       },

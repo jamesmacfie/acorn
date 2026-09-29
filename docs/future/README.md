@@ -30,6 +30,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [kimi.md](./kimi.md) | Kimi Code CLI as a contributed tier 1 harness: the manifest, the four declarations to get right, and the Kimi usage API research behind the optional probes. | Proposal, 2026-09-18. Not started. |
 | [message.md](./message.md) | Delivery record for delegated-session messaging, with reference-app research and the optional queued-report merge. | Owner reports, blocked-request wakes, and live child rows shipped by 2026-09-26; merging awaits evidence of noise. |
 | [pluginsearch.md](./pluginsearch.md) | Search within Linear, Rollbar, and GitHub lists beyond the loaded rows while retaining project mappings and state. | Proposal, 2026-09-24. Not started. |
+| [rail-source-visibility.md](./rail-source-visibility.md) | User-controlled desktop rail icons for plugin sources, with defaults, settings placement, and palette access. | Product requirements proposal, 2026-09-29. Not started. |
 | [remote.md](./remote.md) | Web client, mobile PWA, and a relay service. | Preparation items shipped; the rest waits on a web client. |
 | [scoll_fix.md](./scoll_fix.md) | Agent transcript scroll and focus repair: retained view state, stable row identity, consumable navigation intent, and cross-session regression coverage. | Implementation proposal, 2026-09-14. Reading position, row identity and reveal intent shipped; filter and disclosure state not built. |
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
@@ -61,6 +62,14 @@ grammar, output schemas, service lifecycle, and examples; [Node distribution](..
 owns packaging; [API reference](../api-reference.md) owns the invocation route; and
 [CLI command authoring](../plugin-authoring/cli-commands.md) owns the loaded-plugin descriptor.
 The five-phase proposal and its refused alternatives remain in git history.
+
+`approval.md` shipped on 2026-09-29 and was deleted. [Workflow
+execution](../workflows/execution.md#human-gates) owns the gate form's contract,
+[workflows](../workflows.md) owns the run pane, [authoring](../workflows/authoring.md) owns the
+inspector and generation, [security](../security.md) records that a gate answer is device-only, and
+[API reference](../api-reference.md) owns the gate route. The manual check is part of item 52 in
+[testing](../testing.md). The deferred rejection branch, rejection note, and tool-call gates remain
+in git history.
 
 `phased-review-steps/`, `user-extensions/`, `node-first/`, `node/`, `acp/`, `tauri/`, `events/` and the later
 `events.md` follow-up (shipped on 2026-09-11), `layout/`, `structure/`,
@@ -101,7 +110,7 @@ mirror columns; [package-shape.md](../plugins/package-shape.md) § The plugin AP
 [tui/interaction.md](../tui/interaction.md) has the terminal's diff pane. The fixture and the flow are
 [testing.md](../testing.md) § Large-surface fixture and
 [local-development.md](../local-development.md) § Large-surface flow. Smoke items 81 to 85 in
-[testing.md](../testing.md) are the real-window acceptance it still owes: none has run on a visible
+[changes-and-large-surfaces.md](../testing/changes-and-large-surfaces.md) are the real-window acceptance it still owes: none has run on a visible
 WebKit window.
 
 `web_search_run.md` made a managed transcript show what an agent searched for, which pages it opened,
@@ -138,7 +147,7 @@ kit has the renamed picker, [features.md](../features.md) and
 [first-party-plugins.md](../first-party-plugins.md) have the Settings section and the wizard step,
 [api-reference.md](../api-reference.md) has the route, and
 [workflows.md](../workflows.md) § What an agent step sees has `decide` on Codex and why a manifest
-harness passes that check and then fails at run time. [testing.md](../testing.md) holds everything the
+harness passes that check and then fails at run time. [agents-and-providers.md](../testing/agents-and-providers.md) holds everything the
 programme owes: five manual checks, items 58 to 62, including the acceptance test that someone writes
 the OpenCode plugin from the authoring doc alone. Its refusals are in git history, and the two worth
 not re-arguing are a CLI as a synthesized connection row and a second `models:harness` permission
@@ -176,7 +185,7 @@ owner-typed row and the save that re-enters the snapshot, and
 grown row, [integrations.md](../integrations.md) has **Start workflow…** as a registry contribution
 rather than three menus, and [ui-design.md](../ui-design.md) § The closed kit and
 [tui.md](../tui.md) § What a plugin loses here have the kit's `Graph` node and its two projections.
-[testing.md](../testing.md) holds what the programme owes: nine manual checks, items 48 to 56, six
+[workflows.md](../testing/workflows.md) holds what the programme owes: nine manual checks, items 48 to 56, six
 for the editor and the run pane, two for the start-from-an-item flow and one for the graph view. None
 of them has been run.
 
@@ -200,7 +209,7 @@ message beside the database plugin's SQL as the two `generateText` consumers;
 [command-palette-and-shortcuts.md](../command-palette-and-shortcuts.md) § Plugin shortcuts has the two
 commit chords and the palette rows; [first-party-plugins.md](../first-party-plugins.md) and
 [api-reference.md](../api-reference.md) have the plugin's row and its route surface; and
-[testing.md](../testing.md) has smoke items 43 to 47.
+[changes-and-large-surfaces.md](../testing/changes-and-large-surfaces.md) has smoke items 43 to 47.
 
 `command-palette/` was seven phases that gave acorn one command graph and one host-neutral palette
 session. Shipped and deleted 2026-09-03.
@@ -250,7 +259,7 @@ promotion, native menus, dialogs and keychain prompts) stay manual.
 `unarchive.md` recorded the archive page: search, a read-only preview, and restore. Shipped
 2026-09-24 and deleted 2026-09-26. [workspaces-and-tasks.md](../workspaces-and-tasks.md) § Restoring
 a task owns the behaviour, [plugins.md](../plugins.md) § Search providers owns `ctx.search`, and
-[testing.md](../testing.md) item 79 is the manual smoke it owed. Left out on purpose: more search
+[changes-and-large-surfaces.md](../testing/changes-and-large-surfaces.md) item 79 is the manual smoke it owed. Left out on purpose: more search
 providers than core tasks and the agents plugin, a loaded-tier search route (loaded task panes can
 still opt into the preview with `readsArchived: true` on their `frames` entry), search across active
 tasks, external-content FTS (it needs stable rowids and `agent_events` has a text key), opening an
@@ -341,7 +350,7 @@ box rather than remembered in a flag. The three invariants the programme added a
 § The invariants, and the trace flag a developer turns on first is § Seeing what the keys did. What
 it refused is recorded where the refusal binds: no column wrap and an arrow edge as a wall in
 § Focus regions, no second keymap in § What must never happen, and the four manual checks it still
-owed are items 27 to 30 of [testing.md](../testing.md) § The smoke checklist.
+owed are items 27 to 30 of [terminal-and-palette.md](../testing/terminal-and-palette.md).
 
 `structure/` was eight phases that made the folder names say what the architecture doc says: `main/`
 retired everywhere, client-core regrouped into `kit/`, `host/`, `infra/`, and `features/`, one shape
@@ -397,7 +406,7 @@ context type says which tier each member belongs to, so reaching across the line
 instead of a runtime "not a function" ([plugins.md](../plugins.md) §§ The two contexts, one per tier
 and One vocabulary across the registries). The four facts it named to keep a cloud control plane
 possible sit with their owners: the dial in [plugins.md](../plugins.md) § Node providers, the two node
-ids in `packages/protocol/src/nodeProviders.ts`, `ACORN_BUNDLED_PLUGINS_DIR` as a developer path in
+ids in `packages/protocol/src/device/nodeProviders.ts`, `ACORN_BUNDLED_PLUGINS_DIR` as a developer path in
 [node-distribution.md](../node-distribution.md) § Plugins, and the opaque `options` bag beside its
 schema.
 
