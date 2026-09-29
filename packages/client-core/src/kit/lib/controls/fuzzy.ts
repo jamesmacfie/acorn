@@ -13,24 +13,29 @@
 /** Subsequence fuzzy match; contiguous runs and word-start hits score higher. Empty query → `0`, so
  *  everything matches and the caller's own order survives. `null` means no match at all. */
 export function fuzzyScore(query: string, text: string): number | null {
-  const q = query.toLowerCase()
-  const t = text.toLowerCase()
-  if (!q) return 0
+  const hits = fuzzyHits(query, text)
+  if (!hits) return null
   let score = 0
-  let ti = 0
   let lastHit = -2
-  for (const ch of q) {
-    let found = -1
-    for (let i = ti; i < t.length; i++) {
-      if (t[i] === ch) {
-        found = i
-        break
-      }
-    }
-    if (found < 0) return null
-    score += found === lastHit + 1 ? 3 : found === 0 || /[\s:./-]/.test(t[found - 1] ?? '') ? 2 : 1
+  for (const found of hits) {
+    score += found === lastHit + 1 ? 3 : found === 0 || /[\s:./-]/.test(text[found - 1] ?? '') ? 2 : 1
     lastHit = found
-    ti = found + 1
   }
   return score
+}
+
+/** Where each query character landed in `text`, leftmost first, for a caller that marks the match.
+ *  Same rule as `fuzzyScore`: `null` when the query is not a subsequence, `[]` for an empty query. */
+export function fuzzyHits(query: string, text: string): number[] | null {
+  const q = query.toLowerCase()
+  const t = text.toLowerCase()
+  const hits: number[] = []
+  let ti = 0
+  for (const ch of q) {
+    const found = t.indexOf(ch, ti)
+    if (found < 0) return null
+    hits.push(found)
+    ti = found + 1
+  }
+  return hits
 }

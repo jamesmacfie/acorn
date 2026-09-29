@@ -284,6 +284,8 @@
   border-bottom: var(--chrome-divider);
   background: var(--bg);
 }
+/* Left-aligned, so the find bar and the view mode keep the end of the bar. */
+.diff-file-filter { flex: 0 1 240px; min-width: 0; margin-right: auto; display: flex; }
 
 /* Word-level intra-line diff: changed spans within a paired delete/insert line get a stronger
    background plus an inherited marker glyph on the line, never colour alone. Layers over the line bg. */

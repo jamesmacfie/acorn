@@ -105,8 +105,23 @@ export function FileHead(props: {
   anchorId?: string
   collapsed?: boolean
   onToggleCollapse?: (path: string) => void
+  /** Indexes into the path that a file filter matched, drawn as find marks. */
+  marks?: readonly number[]
 }) {
   const status = () => fileStatusMeta(props.file.status)
+  // The path as runs of marked and unmarked characters, so each run of hits is one mark.
+  const pathRuns = createMemo(() => {
+    const path = props.file.path
+    const marks = new Set(props.marks)
+    const runs: { text: string; mark: boolean }[] = []
+    for (let i = 0; i < path.length; i++) {
+      const mark = marks.has(i)
+      const last = runs[runs.length - 1]
+      if (last?.mark === mark) last.text += path[i]
+      else runs.push({ text: path[i]!, mark })
+    }
+    return runs
+  })
   return (
     <div class="diff-file-head copyable" id={props.anchorId}>
       <Show when={props.onToggleCollapse}>
@@ -123,7 +138,9 @@ export function FileHead(props: {
       <span class={`file-status file-status-${status().tone}`} title={status().label}>
         {status().letter}
       </span>
-      <span class="diff-file-path">{props.file.path}</span>
+      <span class="diff-file-path">
+        <For each={pathRuns()}>{(run) => (run.mark ? <mark class="ui-find-mark">{run.text}</mark> : run.text)}</For>
+      </span>
       <CopyButton text={() => props.file.path} title="Copy path" />
       <span class="file-stat add">+{props.file.additions ?? 0}</span>
       <span class="file-stat del">&#8722;{props.file.deletions ?? 0}</span>
