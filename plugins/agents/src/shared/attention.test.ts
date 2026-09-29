@@ -34,6 +34,16 @@ describe('the managed adapter (docs/notifications.md)', () => {
     }
   })
 
+  it('keeps a workflow session quiet unless its agent is asking', () => {
+    const workflow = (attention: AgentAttentionReason, runtimeState: AgentRuntimeState) =>
+      fromManagedSession(session({ kind: 'workflow', attention, runtimeState }), 'n1').state
+    // The run says how it went, as run-done or run-failed.
+    expect(workflow('completed', 'ready')).toBe('idle')
+    expect(workflow('error', 'failed')).toBe('idle')
+    expect(workflow('none', 'working')).toBe('working')
+    expect(workflow('question', 'waiting')).toBe('blocked')
+  })
+
   it('falls back to the provider when a session has no title', () => {
     expect(fromManagedSession(session({ title: '' }), 'n1').title).toBe('claude')
   })
