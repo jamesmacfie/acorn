@@ -163,7 +163,12 @@ describe('the generic ACP driver describes a harness before it starts one', () =
     }
   })
 
-  it('starts a fresh provider session when a resuming agent refuses the stored one', async () => {
+  // Warned only when a turn has run. Before one, Claude Code has stored nothing, so a restart (an MCP
+  // change in the session panel, say) lands here with nothing to lose.
+  it.each([
+    { history: true, warnings: 1 },
+    { history: false, warnings: 0 },
+  ])('starts a fresh provider session when a resuming agent refuses the stored one (turns ran: $history)', async ({ history, warnings }) => {
     const events: AgentNormalizedEvent[] = []
     const handle = await new AcpDriver({
       id: 'stub',
@@ -177,7 +182,7 @@ describe('the generic ACP driver describes a harness before it starts one', () =
       cwd: process.cwd(),
       env: {},
       mcpServers: [],
-      noProviderExecutionHistory: false,
+      noProviderExecutionHistory: !history,
       onEvent: (event) => {
         if (event.type !== 'generated_artifact') events.push(event)
       },
@@ -187,7 +192,7 @@ describe('the generic ACP driver describes a harness before it starts one', () =
     try {
       // Resume answers invalid params rather than resource-not-found, and it is the same dead reference.
       expect(handle.providerSessionRef).toBe('fresh-session-id')
-      expect(events.filter((event) => event.type === 'diagnostic' && event.level === 'warning')).toHaveLength(1)
+      expect(events.filter((event) => event.type === 'diagnostic' && event.level === 'warning')).toHaveLength(warnings)
     } finally {
       await handle.stop()
     }
@@ -197,11 +202,12 @@ describe('the generic ACP driver describes a harness before it starts one', () =
   // is a protocol error the agent reports rather than a silent last-wins.
   it('hands acorn\u2019s own tool server to the agent as ordered environment pairs', () => {
     expect(acpMcpServers([{
+      transport: 'stdio',
       name: 'acorn-dev',
       command: '/opt/acorn/node',
       args: ['/opt/acorn/mcp.js'],
       env: { ACORN_MCP_NAME: 'acorn-dev', ACORN_API_TOKEN: 'signed' },
-    }])).toEqual([{
+    }]).servers).toEqual([{
       name: 'acorn-dev',
       command: '/opt/acorn/node',
       args: ['/opt/acorn/mcp.js'],
@@ -210,7 +216,18 @@ describe('the generic ACP driver describes a harness before it starts one', () =
         { name: 'ACORN_API_TOKEN', value: 'signed' },
       ],
     }])
-    expect(acpMcpServers([])).toEqual([])
+    expect(acpMcpServers([])).toEqual({ servers: [], unsupported: [] })
+  })
+
+  // A user's HTTP server reaches only an agent that said at initialize it takes one. The rest are named,
+  // so the session can say which servers it is running without.
+  it('declares an HTTP server only to an agent that takes HTTP', () => {
+    const http = [{ transport: 'http' as const, name: 'docs', url: 'https://docs.example/mcp', headers: { Authorization: 'Bearer t' } }]
+    expect(acpMcpServers(http, { http: true })).toEqual({
+      servers: [{ type: 'http', name: 'docs', url: 'https://docs.example/mcp', headers: [{ name: 'Authorization', value: 'Bearer t' }] }],
+      unsupported: [],
+    })
+    expect(acpMcpServers(http, {})).toEqual({ servers: [], unsupported: ['docs'] })
   })
 
   it('derives capabilities from the protocol baseline plus the declared quirks', () => {

@@ -72,6 +72,8 @@ export default function AgentComposer(props: {
   /** Desktop controls for the transcript above, drawn beside the config selects. The terminal uses
    *  shortcuts instead. Owned by the conversation, which sees both transcript and composer. */
   viewControls?: JSX.Element
+  /** Opens the session's MCP panel. Present, `/mcp` on its own is acorn's command and is never sent. */
+  onMcp?: () => void
   onSent: () => void
   onSessionUpdated: (session: AgentSession) => void
 }) {
@@ -121,7 +123,13 @@ export default function AgentComposer(props: {
   const terminalOptions = createMemo(() => configOptions().filter((option) => option.category !== 'permission'))
   const commands = createMemo(() => {
     const value = props.session.config.commands
-    return Array.isArray(value) ? value as Array<{ name: string; description?: string }> : []
+    const advertised = Array.isArray(value) ? value as Array<{ name: string; description?: string }> : []
+    // acorn answers `/mcp` itself (../sessions/AgentMcpPanel.tsx), so it is offered to every harness and
+    // described as what it does here. Claude Code advertises its own, which in a session like this
+    // only prints a one-line count.
+    return props.onMcp
+      ? [{ name: 'mcp', description: 'Manage this session’s MCP servers' }, ...advertised.filter((command) => command.name !== 'mcp')]
+      : advertised
   })
   const skills = createMemo(() => {
     const value = props.session.config.skills
@@ -269,6 +277,14 @@ export default function AgentComposer(props: {
 
   async function send() {
     const text = draft().trim()
+    // Exactly `/mcp`. `/mcp:server:prompt` is how Claude Code runs a server's prompt, and it goes on to
+    // the agent like any other command.
+    if (props.onMcp && /^\/mcp$/.test(text)) {
+      props.onMcp()
+      setDraft('')
+      clearLocal(draftKey(props.session.id))
+      return
+    }
     // `replacing()` for the reason its declaration gives: a turn must not enqueue an attachment id that
     // is halfway through being swapped for another.
     if (nothingToSend() || sending() || replacing() || props.disabled || props.submitDisabled) return
