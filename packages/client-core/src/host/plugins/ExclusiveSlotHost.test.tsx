@@ -1,7 +1,7 @@
 import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 import { clearExclusiveSlotFailures, exclusiveSlotFailed, exclusiveSlotRegistry, registerCoreExclusiveSlot } from '../registries/extensionPoints/exclusiveSlots'
 import ExclusiveSlotHost from './ExclusiveSlotHost'
 import { TreeHost, type TreeTransport } from '../tree/TreeHost'

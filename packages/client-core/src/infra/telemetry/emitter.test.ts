@@ -1,8 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
 import { parseTraceparent } from '@acorn/protocol/telemetry.ts'
-import { reportContributionError } from '../../kit/lib/contributionErrors'
-import { _resetSurfaceHealth, registerSurfaceHealth } from '../../kit/lib/surfaceHealth'
+import { reportContributionError } from '../../kit/lib/telemetry/contributionErrors'
+import { _resetSurfaceHealth, registerSurfaceHealth } from '../../kit/lib/telemetry/surfaceHealth'
 import {
   _resetClientTelemetry,
   currentTraceparent,

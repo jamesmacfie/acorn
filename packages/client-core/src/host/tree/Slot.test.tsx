@@ -2,7 +2,7 @@ import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Slot } from './Slot'
 import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '../registries/extensionPoints/extensionPoints'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 
 // A place in one plugin's tree where another plugin's tree may be grafted (docs/plugins.md §
 // Cooperative extension points, the `remote` kind).

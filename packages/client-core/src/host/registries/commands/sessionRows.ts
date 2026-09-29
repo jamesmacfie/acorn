@@ -1,5 +1,5 @@
 import type { CommandSettingOption } from '@acorn/protocol/commands.ts'
-import { fuzzyScore } from '../../../kit/lib/fuzzy'
+import { fuzzyScore } from '../../../kit/lib/controls/fuzzy'
 import {
   isActionCommand,
   type CommandExecutionContext, type CommandOutcome, type SettingCommand,

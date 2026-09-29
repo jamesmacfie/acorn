@@ -10,7 +10,7 @@ import {
   extensionRegistry,
   type ExtensionContribution,
 } from '../registries/extensionPoints/extensionPoints'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 
 vi.mock('../plugins/surfaceFailures', () => ({ recordSurfaceFailure: vi.fn() }))
 

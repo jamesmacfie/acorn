@@ -373,7 +373,7 @@ There is no callback anywhere in that shape, and that is the design rather than 
 action a concern offers is a route declared once — on the context or in the manifest — where the node
 can confine it to the plugin's own namespace and re-confine it on every dispatch. An action arriving
 inside a response body is an action nothing checked; the same rule
-[extensionPoints.ts](../../packages/protocol/src/extensionPoints.ts) states for why an extension item
+[extensionPoints.ts](../../packages/protocol/src/chrome/extensionPoints.ts) states for why an extension item
 carries no per-item verb.
 
 **What the host binds and a plugin cannot state:** the plugin id on every concern, the qualified id

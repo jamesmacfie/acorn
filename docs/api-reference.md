@@ -9,7 +9,8 @@ Typed dashboard panels use the matching device-only `/v1/core/dashboards/:operat
 The Node exposes one Hono application under `/v1`. It serves JSON routes and one authenticated
 WebSocket. It serves no HTML, JavaScript, or static assets.
 
-Route and response types live in `packages/protocol/src/api.ts`; the server composition is
+Core route builders and response types are published through `@acorn/protocol/api.ts`. Their source is
+grouped by contract owner under `packages/protocol/src/transport/api/`. The server composition is
 `packages/node-core/src/server/index.ts`; plugin route declarations are registered by each Node
 plugin. The table below maps routes by responsibility. Use the route modules for fields and
 validation details when changing a contract.
@@ -84,7 +85,7 @@ paired device already has full owner authority, so there is no separate self-rev
 pair result also carries `baseline: "acorn-1"`. A client rejects a missing or different baseline
 before pairing or opening a WebSocket, even when the numeric protocol is 1.
 
-The protocol number has one meaning. `NODE_PROTOCOL_VERSION` (`packages/protocol/src/node.ts`) is the
+The protocol number has one meaning. `NODE_PROTOCOL_VERSION` (`packages/protocol/src/device/node.ts`) is the
 protocol major. There is no minor, no capability negotiation,
 and no feature handshake. Each side refuses a major it does not speak. The pairing probe refuses
 before pairing, and the broker re-probes `GET /v1/node` on every connect, producing the

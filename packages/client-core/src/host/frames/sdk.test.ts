@@ -138,7 +138,9 @@ describe('tree mount bridges', () => {
     await vi.waitFor(() => expect(selected[1]).toHaveBeenCalledWith('issue-2'))
     expect(selected[0]).not.toHaveBeenCalled()
 
-    const firstCall = one.api.get('/v1/p/example/one')
+    const firstController = new AbortController()
+    const removeAbort = vi.spyOn(firstController.signal, 'removeEventListener')
+    const firstCall = one.api.get('/v1/p/example/one', { signal: firstController.signal })
     const secondCall = two.api.get('/v1/p/example/two')
     await vi.waitFor(() => expect(seen.every((messages) => messages.some((message) => message.kind === 'api'))).toBe(true))
     const firstRequest = seen[0]!.find((message) => message.kind === 'api')!
@@ -149,6 +151,7 @@ describe('tree mount bridges', () => {
     await expect(secondCall).resolves.toBe('second')
     tree.port1.postMessage({ kind: 'tree:unmount', slot: 's1' })
     await expect(firstCall).rejects.toMatchObject({ code: 'unmounted' })
+    expect(removeAbort).toHaveBeenCalledWith('abort', expect.any(Function))
     await expect(one.api.get('/after')).rejects.toMatchObject({ code: 'unmounted' })
 
     tree.port1.postMessage({ kind: 'tree:unmount', slot: 's2' })
@@ -288,6 +291,19 @@ describe('api calls', () => {
     await expect(call).rejects.toBeDefined()
     await new Promise((r) => setTimeout(r, 5))
     expect(sent.at(-1)).toMatchObject({ kind: 'cancel' })
+  })
+
+  it('removes the abort listener after a request settles', async () => {
+    host((message) => message.kind === 'api' ? { id: message.id, ok: true, status: 200, body: 'done' } : undefined)
+    const acorn = await handshake()
+    const controller = new AbortController()
+    const remove = vi.spyOn(controller.signal, 'removeEventListener')
+
+    await expect(acorn.api.get('/v1/p/example/result', { signal: controller.signal })).resolves.toBe('done')
+    expect(remove).toHaveBeenCalledWith('abort', expect.any(Function))
+    controller.abort()
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    expect(sent.some((message) => message.kind === 'cancel')).toBe(false)
   })
 
   it('rejects immediately for a signal that is already aborted', async () => {

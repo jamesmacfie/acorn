@@ -1,8 +1,8 @@
 // A control as a stop, in cells.
 //
-// `focusRoles.ts` says which kit nodes are a stop; this is what a stop *is* on this host. The DOM
-// gets three of the four things for free — a `<button>` is focusable, draws a ring, and raises a
-// click on Enter and Space — and a cell renderable gets none of them, so each has to be said:
+// The shared `NODE_FOCUS` table says which kit nodes are stops. This file gives each cell stop
+// a focusable flag, an exact-node key layer, a press handler, and a visible focus mark. DOM buttons
+// provide most of these behaviors directly.
 //
 //   focusable   the renderer's own flag, the same one a `Row` sets (./collection.ts)
 //   the keys    one layer bound to the exact renderable, so Enter on a button inside a row belongs

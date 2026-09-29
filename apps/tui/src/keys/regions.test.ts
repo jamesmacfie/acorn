@@ -105,7 +105,7 @@ const control = (): Renderable => {
 }
 
 /** A row of a collection, which is focusable because `Row`'s own ref makes it one
- *  (../kit/showing.tsx § Row). `markItem` marks a row; it does not make one focusable. */
+ *  (../kit/showing/row.tsx § Row). `markItem` marks a row; it does not make one focusable. */
 const item = (): Renderable => control()
 
 /** What `Renderable.destroy` does that focus can see: the flag, and the blur it ends with, so the
@@ -273,7 +273,7 @@ describe('focus regions', () => {
 
     // And the other placeholder, which is a collection drawn with no live active row: a virtual list
     // whose caret is off its window, or one whose query has not answered
-    // (../kit/showing.tsx § Rows, ./regions.ts § stopsIn).
+    // (../kit/showing/collection.tsx § Rows, ./regions.ts § stopsIn).
     let active: Renderable | undefined
     const listRows: Renderable[] = []
     const list = node(listRows)

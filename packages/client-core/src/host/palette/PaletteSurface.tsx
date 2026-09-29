@@ -95,7 +95,7 @@ export function PaletteSurface<T>(props: {
     })
   })
 
-  // Read once, for the reason on the kit's RowParts (kit/components/primitives.tsx): testing a slot and
+  // Read once, for the reason on the kit's RowParts (kit/components/layout/Row.tsx): testing a slot and
   // then inserting it ran the caller's JSX twice.
   const status = children(() => props.status)
   const footer = children(() => props.footer)

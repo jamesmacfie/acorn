@@ -3,7 +3,7 @@ import { createVirtualizer } from '@tanstack/solid-virtual'
 import { bindIntents } from '../../keys/keymapHost'
 import { watchAppearance } from '../../tokens/appearance'
 import type { Intent } from '../../keys/intents'
-import { rowHeightSm } from '../../lib/metrics'
+import { rowHeightSm } from '../../lib/layout/metrics'
 
 /* Grid: Table for data that does not fit. Same meaning, virtualised rows, one sticky header.
 

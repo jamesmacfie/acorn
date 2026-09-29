@@ -239,7 +239,7 @@ const typeInto = (event: KeyEvent): void => {
   // Whichever painter drew it, the field answers the same call. OpenTUI's edit buffer has
   // `handleKeyPress` from `TextareaRenderable`; ours is installed on the node by the component that
   // owns the model, from its `ref`, which is where a widget's imperative API goes under this painter
-  // (../kit/asking.tsx § api).
+  // (../kit/asking/fieldRef.ts § api).
   const typed = node.handleKeyPress?.(event)
   // A multi-line field answers Up and Down by moving the caret a row, and says `false` where there is
   // no row to move to (../kit/field.ts § byRow). At that edge the key is the stop walk's, which is
@@ -267,7 +267,7 @@ const typeInto = (event: KeyEvent): void => {
  * program inside it if that program asked. The second is not a typing target — an entered rectangle
  * takes its keys by intercepting above every layer rather than through this predicate — so asking the
  * question would refuse a paste into the one place a reader most expects one to work
- * (../kit/rectangle.tsx § pasted, ../kit/asking.tsx § api).
+ * (../kit/rectangle.tsx § pasted, ../kit/asking/fieldRef.ts § api).
  */
 const pasteInto = (event: { text?: string; bytes?: Uint8Array }): void => {
   const node = focusedRenderable()

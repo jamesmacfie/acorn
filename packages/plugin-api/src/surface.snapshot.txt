@@ -1,4 +1,4 @@
-# plugin API major: 2
+# private workspace facade
 client: AttentionItem
 client: AttentionSourceContribution
 client: BindingCandidate

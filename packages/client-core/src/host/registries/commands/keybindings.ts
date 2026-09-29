@@ -7,7 +7,7 @@
 // it does not.
 import { createMemo, onMount } from 'solid-js'
 import { installKeymap } from '../../keys/install'
-import { Registry, type Disposable } from '../../../kit/lib/registry'
+import { Registry, type Disposable } from '../../../kit/lib/state/registry'
 
 export type KeybindingScope = 'global' | 'task' | 'pane' | 'typing-exempt'
 

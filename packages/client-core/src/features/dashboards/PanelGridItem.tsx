@@ -1,7 +1,7 @@
 import { For, onCleanup, Show, type Accessor, type JSX } from 'solid-js'
 import { IconButton } from '../../kit/components/inputs/IconButton'
 import { Menu } from '../../kit/components/overlays/Menu'
-import { createArmedConfirm } from '../../kit/lib/confirm'
+import { createArmedConfirm } from '../../kit/lib/controls/confirm'
 import type { PanelDefinition } from './model'
 import PublishedDashboardPanel from './PublishedDashboardPanel'
 

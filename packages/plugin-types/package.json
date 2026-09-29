@@ -23,7 +23,7 @@
   ],
   "license": "MIT",
   "scripts": {
-    "build": "mkdir -p dist && cp src/public.ts dist/index.d.ts",
+    "build": "rm -rf dist && tsc -p tsconfig.build.json && mv dist/public.d.ts dist/index.d.ts",
     "prepack": "pnpm build",
     "lint": "tsc --noEmit",
     "test": "vitest run"

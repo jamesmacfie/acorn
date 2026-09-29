@@ -20,7 +20,7 @@ import { measuredField } from '../wrap'
 // If those two ever disagreed, every wrapped paragraph in the app would be a line out.
 //
 // A field's rows are the same arrangement one question over, and the cache for them is in `../wrap.ts`
-// rather than here: `./kit/asking.tsx` reads it too, and a static import of this module from there
+// rather than here: `../kit/asking/fieldRef.ts` reads it too, and a static import of this module from there
 // would put `yoga-layout` in the eager graph of the build that does not use it
 // (../wrap.ts § The cache is here rather than in ./layout/measure.ts).
 

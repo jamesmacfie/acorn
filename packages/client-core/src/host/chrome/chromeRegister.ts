@@ -8,7 +8,7 @@ import { attentionRegistry, type AttentionItem } from '../registries/rail/attent
 import { nodeStatRegistry } from '../registries/rail/nodeStats'
 import { commandRegistry } from '../registries/commands/commands'
 import { keybindingRegistry } from '../registries/commands/keybindings'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 import { sourceRegistry } from '../registries/sources/sources'
 import { uiSlotRegistry } from '../registries/extensionPoints/slots'
 import { brandMarkRegistry } from '../../kit/tokens/brandMarks'
@@ -121,7 +121,7 @@ function registerChrome(pluginId: string, hash: string, row: NodePluginRow, refr
   const disposables: Disposable[] = []
   // Every registration below goes through this rather than calling `registry.register` directly, so
   // the plugin id lands in each registry's owner side-map and the seams that build a telemetry
-  // record can name whose contribution it was (kit/lib/registry.ts § the owner side-map). A
+  // record can name whose contribution it was (kit/lib/state/registry.ts § the owner side-map). A
   // descriptor cannot state an owner and this is the pass that knows one, which is the same rule
   // `stampCommandOwner` follows for a command's parent.
   const own = <T extends { id: string }>(registry: { register(entry: T, owner?: string): Disposable }, entry: T): Disposable =>

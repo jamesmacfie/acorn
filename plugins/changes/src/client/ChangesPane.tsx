@@ -182,7 +182,7 @@ type Section = ReturnType<ChangesModel['sections']>[number]
 export function ChangesList(props: { task: Task; model: ChangesModel }) {
   // Collapsed, the row is the git status letter it already leads with. That badge was always the
   // fastest read in this list, so the rail loses the least of any sidebar in the app: M, A, D, and
-  // the path in the tooltip (client-core kit/lib/collapseState.ts).
+  // the path in the tooltip (client-core kit/lib/layout/collapseState.ts).
   const collapsed = sidebarCollapsed(paneCollapseKey('changes'))
   const model = () => props.model
 

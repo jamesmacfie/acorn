@@ -53,7 +53,7 @@ describe('primitive adoption', () => {
   // against. cssHygiene.test.ts already bans the bare shape for Card; this is the general rule,
   // checked against what each call site actually renders.
   const CSS_CLASH = (() => {
-    // What each primitive emits unconditionally (the `?? 'default'` in primitives.tsx).
+    // What the kit components emit unconditionally from their default props.
     const DEFAULTS: Record<string, Record<string, string>> = {
       'ui-btn': { variant: 'outline', tone: 'neutral', size: 'md' },
       'ui-input': { size: 'md', width: 'full' },

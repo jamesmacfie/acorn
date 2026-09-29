@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest'
 import * as api from './api'
 import { rollbarItemsForConnectionsRoute, rollbarItemsKey } from './api'
 
-// These two assertions moved here with the routes and keys they pin (from
-// @acorn/protocol/src/api.test.ts). They are the only check that a template literal survived the move
-// intact: a typo in a route string compiles fine and 404s at runtime, and a changed query key silently
-// orphans a user's persisted IndexedDB cache, which has no buster.
+// These assertions stay beside the Rollbar routes and keys. TypeScript cannot catch a mistyped route
+// that returns 404 or a changed query key that orphans a persisted IndexedDB cache.
 describe('rollbar wire contract', () => {
   it('sorts and dedupes the connection set in the list route', () => {
     expect(rollbarItemsForConnectionsRoute(['rollbar-b', 'rollbar-a', 'rollbar-b']))

@@ -155,7 +155,7 @@ the active terminal tab, the workspace view — because switching back should re
 
 **A draft is device-local because it is losable, and keyed by the task because it belongs to a
 worktree.** Every draft goes through one helper, which writes `localStorage` under a prefix its caller
-names (`client-core/kit/lib/draftState.ts`): a comment box uses `comment-draft:`, and the Changes
+names (`client-core/kit/lib/state/draftState.ts`): a comment box uses `comment-draft:`, and the Changes
 pane's commit message uses `changes:commit-draft:<taskId>`. The node id is deliberately absent from
 that key. A commit message is about the files in front of the reader, and the same task on another
 node is another worktree with another set of changes in it.
@@ -263,7 +263,7 @@ one across a relaunch would need a scope and an eviction rule nobody has asked f
 [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) § Focus and typing.
 
 A scrolled list answers to the same rule, and for a while one list did not. A followed `Timeline` keeps
-the reader's place as the turn they were on, `ReadingPlace` in `client-core/kit/lib/readingPlace.ts`,
+the reader's place as the turn they were on, `ReadingPlace` in `client-core/kit/lib/timeline/readingPlace.ts`,
 and the timeline does not hold it: `plugins/agents/src/client/sessions/readingPlaceStore.ts` does,
 keyed by the view, cleared when the node drops the session and on a node switch. It used to be a pixel
 offset in a module map inside the kit node itself, which broke both halves of the rule above. The unit

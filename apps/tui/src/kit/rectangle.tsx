@@ -310,7 +310,7 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
   /** A paste while the rectangle is entered belongs to the program inside it, bracketed where that
    *  program asked for it. The same member a field installs and the same route the dispatcher hands
    *  one down, because "what has the keys" is one question and the box is what has them
-   *  (../keys/install.ts § pasteInto, ./asking.tsx § api). */
+   *  (../keys/install.ts § pasteInto, ./asking/fieldRef.ts § api). */
   const pasted = (event: { text: string }): void => {
     if (!entered()) return
     const bytes = inside?.paste(event.text)

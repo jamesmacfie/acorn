@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js'
-import { Registry } from '../../../kit/lib/registry'
+import { Registry } from '../../../kit/lib/state/registry'
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 
 export type ProjectImporterProps = {

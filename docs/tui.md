@@ -359,9 +359,9 @@ host decides.
 The component table is `apps/tui/src/kit/components.tsx`, keyed by `KitNodeName` exactly as the DOM
 host's is, and `tools/arch/kitTable.test.ts` holds three lists to one: the 80×24 appendix, the support
 matrix, and both hosts' tables. An entry may be a component or a loader for one
-(`client-core/host/tree/kitEntry.ts`), and on this host every entry is the component: the table is not
-in the eager graph at all, because `src/plugins/RemoteTree.tsx` is lazy, and the heavy nodes share
-`src/kit/showing.tsx` with the cheap ones, so a loader would cost a frame of blank and save no bytes.
+(`client-core/host/tree/kitEntry.ts`). On this host every entry is a component: the table loads with
+`src/plugins/RemoteTree.tsx`, outside the startup graph. Presentation components live by behavior
+under `src/kit/showing/`, with `src/kit/showing.tsx` preserving the kit import surface.
 The DOM host's table does hold loaders, because its copy is fetched on every cold window
 ([plugins.md](./plugins.md) § The tree contract). `TreeHost` draws each root under a `Suspense` with a
 `null` fallback either way, which is safe here because a node that leaves the tree is unlinked and

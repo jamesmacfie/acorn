@@ -410,7 +410,8 @@ pre-emptively.
 
 The two regions share no DOM and no JavaScript realm — the editor is in the shell, the frame is in a
 sandboxed iframe. All traffic goes through the host over the bridge that already exists (the
-`MessagePort` request/reply channel in `client-core/src/host/frames/sdk.ts`), in two directions.
+`MessagePort` request/reply channel in `packages/client-core/src/host/frames/sdk/bridgePort.ts`),
+in two directions.
 The host→frame push direction is also already established — `onSelect`, `events.on`, the webview
 listeners — so nothing below invents a channel; it adds message kinds to one.
 

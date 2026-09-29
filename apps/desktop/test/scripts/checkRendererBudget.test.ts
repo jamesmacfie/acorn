@@ -117,7 +117,7 @@ describe('check-renderer-budget', () => {
     build({
       'index.html': { file: 'assets/index-aaaa.js', isEntry: true, imports: ['_x'] },
       _x: { file: 'assets/store-bbbb.js' },
-    }, {}, { 'assets/index-aaaa.js': ['packages/client-core/src/kit/lib/draftState.ts'] })
+    }, {}, { 'assets/index-aaaa.js': ['packages/client-core/src/kit/lib/state/draftState.ts'] })
     expect(run(dir).code).toBe(0)
   })
 

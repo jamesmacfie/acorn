@@ -7,7 +7,7 @@ through the Agents plugin; it does not drive raw terminal sessions or resolve ap
 Session, turn, event, request, and attachment wire types live in
 `plugins/agents/src/contract/wire.ts`. The pure tool-status tone shared with Changes lives in
 `plugins/agents/src/contract/toolTone.ts`. Core receives only the small attention snapshot defined
-by `packages/protocol/src/attention.ts`; Agents maps its session rows to that snapshot.
+by `packages/protocol/src/agents/attention.ts`; Agents maps its session rows to that snapshot.
 
 The agents plugin manages structured Claude and Codex sessions. It stores a durable normalized event
 ledger and exposes the same session through the Agent Center, task Agent pane, HTTP routes, and live
@@ -71,6 +71,12 @@ title from an already inserted turn. **Regenerate title** is the explicit except
 first durable text prompt, asks the same profile again, and compares against the title that was current
 when the request started. A rename made while regeneration runs still wins. A generation failure leaves
 the current title and adds nothing to the transcript.
+
+`plugins/agents/src/server/sessions/runtime.ts` coordinates session commands with the provider
+engine. `sessionTitleGeneration.ts` owns title requests and cancellation,
+`sessionDefaultsCommands.ts` applies saved provider options, and `transcriptCommands.ts` imports,
+verifies, and exports transcripts. `sessionWait.ts` checks live frames against the durable snapshot.
+The runtime keeps the public methods and durable store boundary.
 
 ### Cross-plugin lifecycle
 

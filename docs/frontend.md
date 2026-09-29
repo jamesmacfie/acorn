@@ -169,6 +169,10 @@ consuming render, so a plugin reads signals it already owns and the rail re-rend
 rather than the host inventing a query observer per rail button. One throwing contribution is isolated;
 the rest of the control still draws.
 
+The marker's dot, tone, and legend display types live in `kit/tokens/rail.ts`. The tabs feature
+re-exports those types from its public contract, so kit tooltip rendering does not depend on a product
+feature and plugin imports keep the same names.
+
 Loaded task markers enter through `core:task`, the generic annotation point. The rail sends the whole
 visible task-id set once per contributor. Each contributor's request identity includes its descriptor
 registration, the active node, `chromeDeps(pluginId)`, and the visible keys. The shared chrome watcher
@@ -515,13 +519,13 @@ which runs from the host asking for the region to the child's `onMount`, so a su
 measured to content rather than to the empty rectangle.
 
 **An owner without a field for one.** Eight contribution types carry no plugin id, so `Registry` in
-`kit/lib/registry.ts` keeps one in a side-map and `ownerOf(id)` answers for the seams. The three
+`kit/lib/state/registry.ts` keeps one in a side-map and `ownerOf(id)` answers for the seams. The three
 registration passes that know the owner fill it: `host/chrome/chromeRegister.ts`,
 `host/frames/register.ts` and `makeContext` in `host/registries/extensionPoints/plugin.ts`. Core
 registers without one and reads as `core`.
 
 `kit/` may import `kit/` and the highlighter and nothing else, so the error boundary in there cannot
-reach the emitter. `kit/lib/contributionErrors.ts` is the seam it reports through, and the client's
+reach the emitter. `kit/lib/telemetry/contributionErrors.ts` is the seam it reports through, and the client's
 telemetry start-up installs the handler, the same trade `host/frames/broker.ts` makes with its
 services.
 
@@ -539,7 +543,7 @@ successful server state. Secret fields are never persisted in renderer storage.
 
 Shared work hooks cover JSON decoding, query-cache serialization/restoration, markdown, row
 reconciliation/mounting, highlighting, diff preparation, tree backlog, and terminal write completion.
-The kit calls a host-installed callback in `kit/lib/workTelemetry.ts`; it never imports the collector.
+The kit calls a host-installed callback in `kit/lib/telemetry/workTelemetry.ts`; it never imports the collector.
 The desktop installs responsiveness monitoring in the renderer entrypoint, not the separately bundled
 preload bridge, so it observes the same consent and interaction state as the application.
 [Telemetry](telemetry.md#diagnosing-an-unresponsive-view) owns the vocabulary and diagnostic workflow.

@@ -1,7 +1,7 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Graph } from './Graph'
-import { GRAPH_CARD_H, GRAPH_CARD_W, layoutGraph } from '../../lib/graphLayout'
+import { GRAPH_CARD_H, GRAPH_CARD_W, layoutGraph } from '../../lib/layout/graphLayout'
 
 // The canvas: the geometry it draws from, and the four things a reader does to it.
 //

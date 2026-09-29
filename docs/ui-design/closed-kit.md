@@ -65,7 +65,7 @@ curves: the workflows editor authors a definition on it and the run pane watches
 the kit rather than in the plugin because plugin client code may not emit raw DOM or SVG, and a canvas
 is the one thing a terminal cannot draw — so admitting it meant writing both projections first. In
 cells it is the indented list the editor already drew: the same cards, the same order, the same
-selection, indented by rank instead of placed by coordinate. `kit/lib/graphLayout.ts` is the geometry,
+selection, indented by rank instead of placed by coordinate. `kit/lib/layout/graphLayout.ts` is the geometry,
 shared by both hosts, so the two cannot disagree about which card sits under which. Where a card goes
 is a device preference the caller holds, never part of what it is drawing.
 
@@ -120,7 +120,7 @@ For `Timeline follow` it means **a place is a turn, not a pixel.** "Two thousand
 means something while everything above those two thousand pixels keeps its height, and in a live
 transcript nothing does: a message keeps streaming, a code fence grows, an image loads, highlighting
 lands a frame or two after the paint. So the reader's place is the turn the viewport starts in and how
-far into it, which is `ReadingPlace` in `kit/lib/readingPlace.ts`, and putting them back is a
+far into it, which is `ReadingPlace` in `kit/lib/timeline/readingPlace.ts`, and putting them back is a
 correction measured against that turn's current position rather than an offset replayed. Following is
 the same value's other case, not a flag beside it, because the two used to be kept in agreement by
 hand and every defect found in that code was them disagreeing.
@@ -180,8 +180,10 @@ declared axes:
 
 ### How the kit is built
 
-`primitives.css` holds the shared CSS for the components in `kit/components/primitives.tsx` and the component
-files beside it. Specificity is layered by convention: a node's base rule is a bare class, `(0,1,0)`;
+`primitives.css` holds the shared CSS for the components in `kit/components/inputs/`,
+`kit/components/content/`, and `kit/components/layout/`. The `kit/components/primitives.tsx` package
+subpath resolves to `primitives.ts` and keeps the established import contract.
+Specificity is layered by convention: a node's base rule is a bare class, `(0,1,0)`;
 a variant selector adds an attribute, `(0,2,0)`; a style pack's override adds a
 `:root[data-style="x"]` prefix, `(0,3,0)`. A pack wins because it is more specific, never because its
 stylesheet loads last.
@@ -200,7 +202,7 @@ The CSS clash and Checkbox checks stay, for the host's own code. Core still writ
 stylesheets and can still lose a rule to a primitive's own attribute selector.
 
 **`Markdown` renders block by block, and that is a contract rather than an optimisation.**
-`kit/lib/markdown.ts` exposes `renderBlocks(text)`, which returns one `{ key, html }` per block with
+`kit/lib/rendering/markdown.ts` exposes `renderBlocks(text)`, which returns one `{ key, html }` per block with
 the key hashed over that block's own source, and `renderMarkdown` is now that list joined. The
 component keeps the element it rendered for each key, so an update replaces only the blocks whose
 source moved: appending to a message changes exactly one key, its last. Three things follow, and every

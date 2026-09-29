@@ -90,7 +90,7 @@ a stranger learns what exists.
 
 **Hearing a core event.** `ctx.events.on(event, listener)` is the receive side, and it fires whether or
 not a client is attached, which is the point on a node nobody is sitting at. The event must be one core
-publishes (`NODE_EVENT_CHANNELS` in `packages/protocol/src/nodeEvents.ts`) and, for a loaded plugin,
+publishes (`NODE_EVENT_CHANNELS` in `packages/protocol/src/transport/nodeEvents.ts`) and, for a loaded plugin,
 one its manifest named in `permissions.events`, the same grant list its frames subscribe against, so
 there is one vocabulary and one trust sentence per grant rather than two of each. Disposal follows
 unload, exactly as a route registration does. The catalogue is in `nodeEvents.ts`.

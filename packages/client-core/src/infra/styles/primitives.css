@@ -1,4 +1,4 @@
-/* Base styling for the shared primitives (core/client/ui/primitives.tsx, Modal.tsx). This file is
+/* Base styling for the shared kit components (kit/components/, Modal.tsx). This file is
  * the Terminal look for these roles: every value is a token, so a pack changes the look by
  * re-pointing tokens. See docs/ui-design.md § How the kit is built for the specificity
  * model behind base/variant/pack layering.
@@ -117,7 +117,7 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 
 /* Select: the trigger wears .ui-input so it lines up with every other control, and the list is a
    .ui-popover borrowing the menu's item vocabulary. The native <select> is still in the DOM as the
-   value store; see primitives.tsx (Select) for why. */
+   value store; see kit/components/inputs/Select.tsx for why. */
 .ui-select { display: flex; align-items: center; gap: var(--space-3); text-align: left; cursor: pointer; }
 .ui-select-native { display: none; }
 .ui-select-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -278,7 +278,7 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
    14px glyph reads as a misaligned icon rather than as selection. The selected row says so with its
    background alone, the way a rail button does.
 
-   `title` and `aria-label` still carry the name, and `data-tip` (primitives.tsx § Row) turns that
+   `title` and `aria-label` still carry the name, and `data-tip` (kit/components/layout/Row.tsx) turns that
    into the app's own tooltip on hover and on focus, which is the whole reason a rail row is legible
    at all. */
 .ui-row[data-collapsed] {
@@ -297,7 +297,7 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   gap: var(--space-1);
   min-width: 0;
   /* The rail's width is the budget, and the row's own height is the other half of it: a virtualizer
-     writes an inline height from a token read off the document root (kit/lib/metrics.ts), so nothing
+     writes an inline height from a token read off the document root (kit/lib/layout/metrics.ts), so nothing
      in here may make the row taller than it already is. */
   max-width: 100%;
   font-size: var(--fs-xs);
@@ -833,7 +833,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-card[data-stripe='danger'] { border-left-color: var(--danger); }
 
 /* ── Graph ──────────────────────────────────────────────────────────────────────────────────
-   The canvas. Card size and card position are inline, from kit/lib/graphLayout.ts: only the
+   The canvas. Card size and card position are inline, from kit/lib/layout/graphLayout.ts: only the
    layout knows both numbers and no stylesheet can compute them, which is the same exception
    Grid and Rows already take for a virtualiser. Everything else is here.
 
@@ -1134,7 +1134,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
    style pack that moves the rails moves this with them (tokens-style.css § --tabrail-w). */
 .ui-listdetail[data-list='collapsed'] { grid-template-columns: var(--tabrail-w) 1px minmax(0, 1fr); }
 /* A collapsed column has no header left to hold the toggle, and in the `split` form it never had one
-   this node could reach, so the control rides the divider instead (primitives.tsx § ListDetail).
+   this node could reach, so the control rides the divider instead (kit/components/layout/ListDetail.tsx).
    Centred on the edge and on the header's line, so it reads as belonging to the column it closes. */
 /* A section's label and a pane's list header are both `.section-header`, and neither survives 48px:
    "Managed sessions · 3" has no room to draw and the rail's own icon already says which list this is.
@@ -1142,7 +1142,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 
    Not a prop, because there is no width at which a plugin would want to keep it. A header with a
    control in it is a different question, and a plugin answers that one by reading the collapse signal
-   and drawing the control on its own (kit/lib/collapseState.ts).
+   and drawing the control on its own (kit/lib/layout/collapseState.ts).
 
    `>` on the column so a `ListDetail` nested inside the detail keeps its own headers. */
 .ui-listdetail[data-list='collapsed'] > .ui-listdetail-list .section-header { display: none; }
@@ -1252,7 +1252,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 /* Links track the theme accent instead of the browser-default blue (clashes with non-blue themes). */
 .ui-markdown a { color: var(--accent); }
 .ui-markdown img { display: block; max-width: 100%; height: auto; border-radius: var(--radius); }
-/* The `thumb` image flavour (kit/lib/markdown.ts): a picture standing in for a file, drawn as a band the
+/* The `thumb` image flavour (kit/lib/rendering/markdown.ts): a picture standing in for a file, drawn as a band the
    width of whatever holds it and cropped to fill. Cropping rather than fitting, because a tile is as wide
    as the filename under it and a fitted image leaves a different gap for every aspect ratio. Square,
    because the rounding that suits a picture drawn as content reads as a mistake on a band inside an

@@ -8,9 +8,9 @@
 // renderer spans use (emitter.ts § setSpansOnTimeline), and nothing on `window`.
 //
 // A request is a plain event rather than a function a script can call, because the page exposes no
-// module to a script. The snapshot holds numbers only (kit/lib/surfaceHealth.ts § sanitize), which is
+// module to a script. The snapshot holds numbers only (kit/lib/telemetry/surfaceHealth.ts § sanitize), which is
 // why answering it needs no switch: anything that can dispatch the event can already read the DOM.
-import { surfaceHealthSnapshot } from '../../kit/lib/surfaceHealth'
+import { surfaceHealthSnapshot } from '../../kit/lib/telemetry/surfaceHealth'
 
 /** The event a reader dispatches on the page's event target to ask for a fresh snapshot. */
 export const SURFACE_HEALTH_REQUEST = 'acorn:surface-health'

@@ -13,6 +13,14 @@ Runs and steps persist state transitions. A restart reconciles persisted operati
 blindly repeats an external side effect with unknown outcome. Ambiguous work parks in an explicit
 recovery/gated state. Cancellation propagates to child sessions and process groups.
 
+The Node implementation follows those boundaries under `plugins/workflows/src/server/`.
+`definitions/` loads and resolves frozen definitions. `validation/` checks their graph, bindings,
+and destination. `runs/` coordinates graph ticks, start, retry, recovery, row writes, and termination.
+Its `read/` folder projects persisted runs for the client. `steps/` renders handler inputs and records
+step outcomes. `dispatch/` reserves and waits for child workflows. `processing/` owns tracked record
+attempts and incremental checkpoints. `schedules/` owns scheduled admission. `routes/` exposes
+the Node capabilities without owning execution state.
+
 ### The graph
 
 A step declares `after`, the IDs of the steps it waits on. A step with no `after` key waits on the

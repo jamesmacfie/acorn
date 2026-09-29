@@ -1,19 +1,18 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import Icon from '../content/Icon'
-import { Kbd, StatusDot } from '../primitives'
-import { railDotProps } from '../../lib/displayMeta'
-import { formatRelativeTime } from '../../lib/formatRelativeTime'
-import type { RailLegendItem } from '../../../features/tabs/railMarkers'
+import { Kbd } from '../content/Kbd'
+import { StatusDot } from '../content/StatusDot'
+import { railDotProps } from '../../lib/rendering/displayMeta'
+import { formatRelativeTime } from '../../lib/rendering/formatRelativeTime'
+import type { RailLegendItem } from '../../tokens/rail'
 import './tips.css'
 
 // The app's tooltip contract: data attributes, honoured on any element anywhere. See
 // docs/ui-design.md § Tooltips for the attributes, why they replace a wrapper component, and the
 // positioning rules.
 //
-// A legend row mirrors one rail status marker, placed or overflowed. RailTab serialises them into
-// `data-tip-legend`; the shape lives in tabs/railMarkers.ts.
-type LegendItem = RailLegendItem
-type Tip = { title: string; sub?: string; key?: string; legend?: LegendItem[]; anchor: number; y: number; side: 'left' | 'right' }
+// RailTab serialises each marker into `data-tip-legend`; the kit owns the display shape.
+type Tip = { title: string; sub?: string; key?: string; legend?: RailLegendItem[]; anchor: number; y: number; side: 'left' | 'right' }
 
 /** The attribute set, typed, so call sites get completion instead of guessing the spelling. */
 export const tip = (text: string, opts?: { sub?: string; key?: string; at?: number }) => ({
@@ -25,7 +24,7 @@ export const tip = (text: string, opts?: { sub?: string; key?: string; at?: numb
 
 // Our own attribute, but JSON.parse can still throw on a malformed value. Never let that kill the
 // tip.
-function parseLegend(raw: string | null): LegendItem[] | undefined {
+function parseLegend(raw: string | null): RailLegendItem[] | undefined {
   if (!raw) return undefined
   try {
     const v = JSON.parse(raw)

@@ -1,5 +1,5 @@
 import { createSignal, For, Show } from 'solid-js'
-import { createDismissable } from '../../../kit/lib/dismissable'
+import { createDismissable } from '../../../kit/lib/controls/dismissable'
 import { collectConcerns, type Concern, DETAILS_MAX, type WillEventMap } from './willPhaseModel'
 import { Button, Checkbox } from '../../../kit/components/primitives'
 import { createLogger } from '../../../infra/telemetry/logger'

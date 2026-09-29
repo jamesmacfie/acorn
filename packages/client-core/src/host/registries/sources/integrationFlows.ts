@@ -1,4 +1,4 @@
-import { Registry } from '../../../kit/lib/registry'
+import { Registry } from '../../../kit/lib/state/registry'
 
 export type DeviceFlowStart = {
   deviceCode: string

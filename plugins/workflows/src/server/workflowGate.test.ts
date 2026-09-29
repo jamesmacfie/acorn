@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestNodeContext, type TestNodeContext } from '@acorn/plugin-api/testkit'
 import type { ExtensionPointId } from '@acorn/plugin-api/node'
-import { WorkflowRunner, type RunnerDeps, type WorkflowExtensions } from './workflowRunner'
+import { WorkflowRunner, type RunnerDeps, type WorkflowExtensions } from './runs/runner'
 import type { WorkflowDef, WorkflowStepDef } from '../shared/workflowContracts'
 
 // The human gate over a real runner and a real plugin database (docs/workflows.md § Execution model).

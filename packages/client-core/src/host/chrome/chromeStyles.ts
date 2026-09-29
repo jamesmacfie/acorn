@@ -1,6 +1,6 @@
 import { styleValueProblem, STYLE_TOKEN_FAMILIES } from '@acorn/protocol/styleValues.ts'
 import type { PluginStyleDescriptor } from '@acorn/protocol/plugin/contract.ts'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 import { styleRegistry } from '../registries/shell/styles'
 
 export const PLUGIN_STYLE_PREFIX = 'plugin:'

@@ -1,5 +1,5 @@
 import { For, type JSX } from 'solid-js'
-import { DescriptionList } from '../primitives'
+import { DescriptionList } from './DescriptionList'
 
 /* Facts: label-and-value pairs in auto-fitting tiles. `DescriptionList layout="facts"` had four
    users (linear, rollbar, docker, onboarding) and no name; this is the name.

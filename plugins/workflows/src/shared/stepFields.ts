@@ -1,8 +1,8 @@
 // How the nine built-in kinds describe themselves, and where each of their fields lands
 // (docs/workflows.md § Contributed step kinds).
 //
-// Here rather than beside the handlers in ../server/workflowBuiltins.ts for two reasons. The editor
-// runs on the client and needs the same table, and ../server/workflowValidation.ts reads `runsAgent`
+// Here rather than beside the handlers in ../server/steps/builtins.ts for two reasons. The editor
+// runs on the client and needs the same table, and ../server/validation/definition.ts reads `runsAgent`
 // off it, which it cannot do from a module that imports the validator back.
 //
 // A contributed kind's fields all land in `with`, which the runner passes through unread. A built-in

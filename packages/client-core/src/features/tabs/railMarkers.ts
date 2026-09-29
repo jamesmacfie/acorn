@@ -7,9 +7,10 @@
 // and gets the first one still free. Anything that misses out stays in the tooltip legend, because
 // a rail square can hide an icon but must never hide a state.
 
-export type RailTone = 'neutral' | 'accent' | 'warn' | 'danger'
+import type { RailLegendItem, RailMarkerDot, RailTone } from '../../kit/tokens/rail'
 
-export type RailMarkerDot = 'ok' | 'warn' | 'bad' | 'mixed'
+// Keep these names on the feature entrypoint for compiled plugins and the plugin API.
+export type { RailLegendItem, RailMarkerDot, RailTone } from '../../kit/tokens/rail'
 
 export type RailMarkerPosition =
   | 'top-start'
@@ -38,10 +39,6 @@ export type RailMarker = {
 }
 
 export type PlacedRailMarker = RailMarker & { position: RailMarkerPosition }
-
-// One legend row, mirroring one marker: its glyph (`g`) or StatusDot tone (`d`), a colour tone
-// (`t`), and its meaning (`l`). ui/tips.tsx renders these; RailTab serialises them.
-export type RailLegendItem = { g?: string; d?: RailMarkerDot; t?: RailTone; l: string }
 
 export type ResolvedRailMarkers = {
   placed: readonly PlacedRailMarker[]

@@ -7,7 +7,7 @@
 // host draws cells in the sixteen slots the reader's own terminal chose (../appearance.ts). Its three
 // callers in the graph are all DOM surfaces: client-core's `DiffPane`, its `Markdown`, and the
 // terminal plugin's `TerminalPanel`. This host's own diff pane drops the highlighter and says so
-// (./showing.tsx § DiffPane), and its own markdown draws roles rather than a palette.
+// (./showing/diffPane.tsx § DiffPane), and its own markdown draws roles rather than a palette.
 //
 // **The grammars were already lazy and that hid the problem.** `client-core/src/infra/highlight/langs.ts`
 // loads each grammar behind an `import()`, so the `langs` chunk this host does load needed none of

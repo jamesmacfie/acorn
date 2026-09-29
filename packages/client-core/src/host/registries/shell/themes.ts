@@ -1,4 +1,4 @@
-import { Registry } from '../../../kit/lib/registry'
+import { Registry } from '../../../kit/lib/state/registry'
 
 export type ThemeContribution = { id: string; label: string }
 export const themeRegistry = new Registry<ThemeContribution>('theme')
