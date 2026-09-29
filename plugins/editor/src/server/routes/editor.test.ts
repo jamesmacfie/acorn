@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, truncateSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
@@ -12,6 +12,7 @@ import * as coreFs from '@acorn/plugin-api/testkit'
 import { createTaskService } from '@acorn/plugin-api/testkit'
 import { editor, setEditorBridge } from './editor'
 import type { Env } from '@acorn/plugin-api/testkit'
+import { MAX_IMAGE_PREVIEW_BYTES } from '../../contract/imagePreview'
 
 // Editor reads and writes inside the worktree, so this runs against a real one and exercises the
 // filesystem-containment contract end to end: path traversal, symlink escape, missing worktree.
@@ -45,6 +46,9 @@ describe('editor routes over a real worktree', () => {
     writeFileSync(join(work, 'hello.txt'), 'hi there', 'utf8')
     mkdirSync(join(work, 'sub'))
     writeFileSync(join(work, 'sub', 'a.ts'), 'export const a = 1\n', 'utf8')
+    writeFileSync(join(work, 'sub', 'photo.webp'), Uint8Array.from([0x52, 0x49, 0x46, 0x46, 0, 0xff]))
+    writeFileSync(join(work, 'sub', 'large.png'), '')
+    truncateSync(join(work, 'sub', 'large.png'), MAX_IMAGE_PREVIEW_BYTES + 1)
     writeFileSync(join(outside, 'secret.txt'), 'TOP SECRET', 'utf8')
     symlinkSync(outside, join(work, 'escape')) // a symlink inside the worktree pointing out of it
   })
@@ -105,6 +109,25 @@ describe('editor routes over a real worktree', () => {
     expect(readFileSync(join(work, 'sub', 'a.ts'), 'utf8')).toBe('export const a = 2\n')
   })
 
+  it('returns image bytes with their type while rejecting unsupported paths and oversized images', async () => {
+    const app = authed()
+    const res = await app.fetch(req('/api/tasks/task1/editor/image?path=sub%2Fphoto.webp'), {} as Env)
+    expect(res.status).toBe(200)
+    expect(res.headers.get('content-type')).toBe('image/webp')
+    expect(res.headers.get('x-content-type-options')).toBe('nosniff')
+    expect(res.headers.get('cache-control')).toContain('no-store')
+    expect(new Uint8Array(await res.arrayBuffer())).toEqual(Uint8Array.from([0x52, 0x49, 0x46, 0x46, 0, 0xff]))
+    expect((await app.fetch(req('/api/tasks/task1/editor/image?path=hello.txt'), {} as Env)).status).toBe(422)
+    expect((await app.fetch(req('/api/tasks/task1/editor/image?path=sub%2Flarge.png'), {} as Env)).status).toBe(422)
+  })
+
+  it('confines image reads to the task worktree', async () => {
+    const app = authed()
+    expect((await app.fetch(req('/api/tasks/task1/editor/image?path=..%2F..%2Foutside.png'), {} as Env)).status).toBe(403)
+    expect((await app.fetch(req('/api/tasks/task1/editor/image?path=escape%2Fsecret.png'), {} as Env)).status).toBe(403)
+    expect((await app.fetch(req('/api/tasks/task2/editor/image?path=photo.webp'), {} as Env)).status).toBe(404)
+  })
+
   it('merges optional marker providers and keeps a failed source isolated', async () => {
     setEditorBridge(editorBridge(
       { tasks: createTaskService(t.db), fs: coreFs },
@@ -144,6 +167,7 @@ describe('editor routes over a real worktree', () => {
   it('400s a malformed write body; 401s without a principal', async () => {
     expect((await authed().fetch(req('/api/tasks/task1/editor/file', 'PUT', { path: '' }), {} as Env)).status).toBe(400)
     expect((await authed().fetch(req('/api/tasks/task1/editor/read'), {} as Env)).status).toBe(400)
+    expect((await authed().fetch(req('/api/tasks/task1/editor/image'), {} as Env)).status).toBe(400)
     expect((await authed().fetch(req('/api/tasks/task1/editor/line-markers'), {} as Env)).status).toBe(400)
     const gated = new Hono<AppEnv>().use('/api/*', requireUser).route('/api/tasks', editor)
     expect((await gated.fetch(req('/api/tasks/task1/editor/root'), {} as Env)).status).toBe(401)

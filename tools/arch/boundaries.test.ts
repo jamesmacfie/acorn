@@ -487,7 +487,14 @@ describe('architecture boundaries', () => {
     // two download anchors, the github ref links, the editor pane's Monaco root and the preview pane's
     // — and the before-terminal-ui programme emptied it phase by phase, which is why this rule could
     // land in its endgame shape. An exception costs a line here and a comment saying why it survived.
-    const CLIENT_DOM_BASELINE: string[] = []
+    //
+    // The editor's image preview is the one exception. The kit has no image node, so it draws an
+    // `<img>` with inline sizing, and a terminal client sees nothing there. An `Image` kit node with a
+    // text projection on the terminal would empty this again.
+    const CLIENT_DOM_BASELINE: string[] = [
+      'plugins/editor/src/client/ImagePreview.tsx: a class, a style or an innerHTML',
+      'plugins/editor/src/client/ImagePreview.tsx: a raw element',
+    ]
     // Walked rather than listed, so a new plugin is covered on the commit that creates it.
     const offences: string[] = []
     let scanned = 0
