@@ -5,6 +5,7 @@ import { wsOnReconnect } from '@acorn/plugin-api/client'
 import AgentTranscript from './AgentTranscript'
 import AgentComposer from '../composer/AgentComposer'
 import QueuedAgentTurns from '../composer/QueuedAgentTurns'
+import AgentMcpPanel from './AgentMcpPanel'
 import ManagedChildRows from './ManagedChildRows'
 import { agentSessionIsStarting } from '../composer/agentComposerState'
 import { latestAutomaticTaskContext } from '../composer/automaticTaskContext'
@@ -54,6 +55,8 @@ function SessionConversation(input: {
   const props = input.conversation
   const sessionId = () => input.sessionId
   const [error, setError] = createSignal('')
+  // Opened by `/mcp` in the composer. Per conversation, which is per session: this owner is keyed by it.
+  const [mcpOpen, setMcpOpen] = createSignal(false)
   // The transcript actions reach into a sibling: scroll jumps come up from the kit Timeline through
   // `onControls`, while the filter and collapse-all push down as a signal and a counter. The desktop
   // draws buttons above the composer; the terminal registers shortcuts for the same actions.
@@ -177,8 +180,12 @@ function SessionConversation(input: {
           <>
             <Show when={props.note}>{(line) => <Text emphasis="muted" wrap>{line()}</Text>}</Show>
             <ManagedChildRows parentSessionId={current().id} parentTaskId={current().taskId} />
+            <Show when={mcpOpen()}>
+              <AgentMcpPanel sessionId={current().id} onClose={() => setMcpOpen(false)} />
+            </Show>
             <AgentComposer
               session={current()}
+              onMcp={() => setMcpOpen(true)}
               disabled={props.composerDisabled || current().controller !== 'acorn'
                 || current().runtimeState === 'archived'}
               submitDisabled={agentSessionIsStarting(current())}

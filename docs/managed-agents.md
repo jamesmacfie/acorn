@@ -299,7 +299,9 @@ on `session/new` and on the call that picks a session back up, so the driver nam
 for any harness that has no `mcp add` command of its own to register through. Claude Code and Codex
 keep the config-file door they already had, and a harness gets one door, never both.
 [mcp.md](./mcp.md) § Configuration owns this, including why the launch environment is spelled out
-rather than inherited.
+rather than inherited. The user's own servers from Settings → MCP servers reach every harness,
+Claude Code and Codex included, through the protocol on each start ([mcp.md](./mcp.md) § Your own
+servers).
 
 **What ACP offers the client side is declined, except the one that lets an agent ask.** The driver
 answers no to `fs` and `terminal` at `initialize`. `mcpServers`, the client capability, stays declined

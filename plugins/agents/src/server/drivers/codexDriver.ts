@@ -26,10 +26,12 @@ import { providerStderrNotice } from './diagnostics'
 import {
   codexCollaborationModeForTurn,
   codexCollaborationModes,
+  codexMcpConfig,
   codexModelOptions,
   codexOptionsWithThreadSettings,
   codexPermissionOptions,
   codexReasoningOptions,
+  codexReportedMcpServers,
   codexSkillsFromResponse,
   codexThreadSettings,
   type CodexThreadSettings,
@@ -188,6 +190,8 @@ export class CodexAgentDriver implements AgentDriver {
     const pendingRequests = new Map<string, JsonRpcServerRequest>()
     const childRouter = new CodexChildRouter()
     let rpc!: JsonRpcProcess
+    const mcpStartup = new Map<string, { status: string; error: string | null }>()
+    const mcpConfig = codexMcpConfig(options.mcpServers)
 
     const onServerRequest = (request: JsonRpcServerRequest): void => {
       const event = normalizeCodexServerRequest(request)
@@ -209,6 +213,14 @@ export class CodexAgentDriver implements AgentDriver {
       // credential, bypassing canUseProviderCredential and SecretService.
       env: brokerEnv({ env: options.env, passthrough: [...AGENT_TOOL_PASSTHROUGH, 'CODEX_*'] }),
       onNotification: (notification) => {
+        // Server start-up is the process's, not a thread's, so it is kept for the panel and goes no
+        // further. The transcript has nothing to say about a server that finished connecting.
+        if (notification.method === 'mcpServer/startupStatus/updated') {
+          const params = asObject(notification.params)
+          const name = stringValue(params?.name)
+          if (name) mcpStartup.set(name, { status: stringValue(params?.status) ?? 'unknown', error: stringValue(params?.error) })
+          return
+        }
         // Routed before it is normalized as the session's own. A Codex subagent is a full app-server
         // thread on this same connection, so an unrouted child `turn/completed` would end the parent's
         // turn and an unrouted child status would flip the parent's state (drivers/codexChildRouting.ts
@@ -274,6 +286,7 @@ export class CodexAgentDriver implements AgentDriver {
       runtimeWorkspaceRoots: [options.cwd],
       threadSource: 'appServer',
       ephemeral: false,
+      ...(mcpConfig ? { config: mcpConfig } : {}),
       ...developerInstructions,
     }, 60_000)
     let sessionResponse: Record<string, unknown>
@@ -285,6 +298,7 @@ export class CodexAgentDriver implements AgentDriver {
             cwd: options.cwd,
             runtimeWorkspaceRoots: [options.cwd],
             excludeTurns: false,
+            ...(mcpConfig ? { config: mcpConfig } : {}),
             ...developerInstructions,
           }, 60_000)
         } catch (error) {
@@ -415,6 +429,10 @@ export class CodexAgentDriver implements AgentDriver {
       async compact() {
         if (!threadId) return
         await rpc.request('thread/compact/start', { threadId }, 60_000)
+      },
+      async mcpStatus() {
+        const response = await rpc.request('mcpServerStatus/list', { threadId, detail: 'toolsAndAuthOnly', limit: 100 }, 15_000)
+        return codexReportedMcpServers(response, mcpStartup)
       },
       async fork() {
         if (!threadId) throw new Error('Codex thread is not initialized.')

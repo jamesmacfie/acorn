@@ -35,7 +35,7 @@ export const settingsPageContributions: SettingsContribution[] = [
   { id: 'notifications', label: 'Notifications', group: 'general', order: 15, component: () => <NotificationSettings /> },
   { id: 'cli', label: 'Command line', group: 'general', order: 16, component: () => <CliSettings /> },
   { id: 'integrations', label: 'Integrations', group: 'general', order: 20, component: () => <IntegrationsSettings /> },
-  { id: 'mcp', label: 'MCP', group: 'general', order: 30, component: () => <McpSettings /> },
+  { id: 'mcp', label: 'MCP config files', group: 'general', order: 30, component: () => <McpSettings /> },
   // Core's, not agents': the tool registry it edits permissions for is projected from every plugin's
   // contributions, so no single plugin owns the page.
   { id: 'agent-tools', label: 'Agent tools', group: 'general', order: 40, component: () => <AgentToolsSettings /> },

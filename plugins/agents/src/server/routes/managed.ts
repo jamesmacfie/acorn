@@ -4,7 +4,7 @@ import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { createMiddleware } from 'hono/factory'
 import { z } from 'zod'
-import { type AppEnv, isTaskConfined, mayActOnTask, respondError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
+import { type AppEnv, isTaskConfined, mayActOnTask, requireDevice, respondError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 import type {
   AgentEventPage,
   AgentAttachment,
@@ -29,6 +29,7 @@ import {
   type EnqueueAgentTurnInput,
   type ImportAgentTranscriptInput,
 } from '../../shared/schemas'
+import { agentMcpSessionSelectionSchema, type AgentSessionMcp } from '../../shared/mcpServers'
 
 export type ManagedAgentsBridge = {
   // Ownership resolvers for the task-scope guard below. See docs/security.md § Transport and auth.
@@ -73,6 +74,8 @@ export type ManagedAgentsBridge = {
   patchSession(sessionId: string, patch: { title?: string; archived?: boolean; lastReadSeq?: number; config?: Record<string, unknown> }): Promise<AgentSession>
   fork(sessionId: string, title?: string): Promise<AgentSession>
   compact(sessionId: string): Promise<void>
+  sessionMcp(sessionId: string): Promise<AgentSessionMcp>
+  setSessionMcp(sessionId: string, enabled: string[]): Promise<AgentSessionMcp>
   regenerateTitle(sessionId: string): Promise<AgentSession>
   deleteSession(sessionId: string): Promise<AgentDeleteResult>
   handoffToTerminal(sessionId: string): Promise<AgentSession>
@@ -355,6 +358,15 @@ export const managedAgents = new Hono<AppEnv>()
       await bridge.compact(c.req.param('sessionId'))
       return { ok: true }
     }))
+  // Device only, for the reason Settings → MCP servers is (./mcpServers.ts): the switches decide which
+  // commands the session's next start runs, and an agent must not pick its own.
+  .get('/sessions/:sessionId/mcp', requireDevice, (c) =>
+    viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.sessionMcp(c.req.param('sessionId'))))
+  .put('/sessions/:sessionId/mcp', requireDevice, async (c) => {
+    const parsed = agentMcpSessionSelectionSchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.setSessionMcp(c.req.param('sessionId'), parsed.data.enabled))
+  })
   .post('/sessions/:sessionId/regenerate-title', (c) =>
     viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.regenerateTitle(c.req.param('sessionId'))))
   .post('/sessions/:sessionId/handoff-terminal', (c) =>
