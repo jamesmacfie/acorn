@@ -17,6 +17,7 @@ import { publishedWorkflow } from '../server/publication/store'
 import { generateWorkflowRequest } from '../server/authoring/generationRequest'
 import { authorWorkflowConversation } from '../server/authoring/conversation'
 import { WorkflowDispatcher } from '../server/dispatch/dispatcher'
+import { inlinePrompt } from '../server/runs/deps'
 import { WorkflowProcessingStore } from '../server/processing/store'
 import { workflowSelectionPage, workflowRecordAttemptPage, workflowRecordSnapshot } from '../server/processing/readModel'
 import { prepareWorkflowReprocess } from '../server/processing/reprocess'
@@ -154,6 +155,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
             profileId: opts.profileId,
             title: `Workflow: ${def.name}`,
             prompt: opts.prompt,
+            context: opts.context,
             schema: opts.schema,
             model: opts.model,
             configOptions: def.configOptions,
@@ -172,7 +174,9 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           const { cwd } = task ? await core.tasks.resolveCwd(task, undefined) : { cwd: homedir() }
           const project = task?.projectId ? await core.projects.byId(task.projectId) : null
           const profile = requireProfile(opts.profileId)
-          const argv = opts.mode === 'ai' ? profile.aiArgv?.(resolveCommand(profile), opts) : buildHeadlessArgv(profile.id, resolveCommand(profile), opts)
+          // A command line takes one prompt, so the context goes into it as headed sections.
+          const oneShot = { ...opts, prompt: inlinePrompt(opts.prompt, opts.context) }
+          const argv = opts.mode === 'ai' ? profile.aiArgv?.(resolveCommand(profile), oneShot) : buildHeadlessArgv(profile.id, resolveCommand(profile), oneShot)
           if (!argv) {
             return {
               status: 'error',

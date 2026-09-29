@@ -4,7 +4,15 @@ import type { WorkflowChildChangedEvent, WorkflowGateStatus, WorkflowRunStatus }
 import type { WorkflowDispatchRequest, WorkflowDispatchResult } from '../dispatch/dispatcher'
 
 export type WorkflowChildTaskSeed = { title: string; branch: string; prompt?: string }
+/** Material a step's prompt works on: an upstream step's output, or the task context. */
+export type StepContextItem = { label: string; source: string; content: string }
+/** The prompt with its context written into it, for a runner that takes one string, and for the step
+ *  inputs the run pane shows. */
+export const inlinePrompt = (prompt: string, context: readonly StepContextItem[] = []): string =>
+  [prompt, ...context.map((item) => `## ${item.label}\n\n${item.content}`)].filter(Boolean).join('\n\n')
 export type RunStepOptions = HeadlessOpts & {
+  /** Sent after the prompt as separate context blocks, or inlined by a runner that has none. */
+  context?: StepContextItem[]
   /** The resolved harness. The managed session and headless fallback use the same profile. */
   profileId: string
   mode?: 'headless' | 'ai'

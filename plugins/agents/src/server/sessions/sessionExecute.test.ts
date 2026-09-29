@@ -226,6 +226,28 @@ describe('agents.sessionExecute config options', () => {
     expect(driver.configSets).toEqual([])
   })
 
+  // The transcript draws the prompt and folds each context part, so the step's own prompt is all the
+  // reader sees of the turn unless they open a part.
+  it('sends the context as parts of their own, and inlines them past the context cap', async () => {
+    const withContext = (content: string) => createSessionExecute(runtime)({
+      taskId,
+      profileId: 'claude-code',
+      title: 'Workflow: synthesise',
+      prompt: 'Write one answer.',
+      context: [{ label: 'Output of get-diff', source: 'workflow.upstream', content }],
+      runId: 'run-1',
+      stepId: `step-${randomUUID()}`,
+    })
+    await withContext('diff --git a/x b/x')
+    expect(driver.turns[0]!.input.map((part) => part.type)).toEqual(['text', 'context'])
+    expect(driver.turns[0]!.input[1]).toMatchObject({ label: 'Output of get-diff', content: 'diff --git a/x b/x' })
+
+    await withContext('x'.repeat(600 * 1024))
+    const [only, ...rest] = driver.turns[1]!.input
+    expect(rest).toEqual([])
+    expect(only?.type === 'text' && only.text).toContain('<acorn-context source="workflow.upstream" label="Output of get-diff">')
+  })
+
   describe('a turn that ends without what the step needs', () => {
     const answerSchema = { type: 'object', properties: { answer: { type: 'string' } }, required: ['answer'] }
     const executeWithSchema = () => createSessionExecute(runtime)({
