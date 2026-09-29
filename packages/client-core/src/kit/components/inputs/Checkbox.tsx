@@ -17,7 +17,10 @@ export function Checkbox(props: {
   title?: string
   id?: string
   name?: string
-  onChange?: (checked: boolean) => void
+  /** A handler may return the write it started. When that resolves `false`, the write failed and the box
+   *  shows `checked` again, because a native checkbox flips itself on click and nothing else would put it
+   *  back when the stored value never moved. `createSettingSave().run` returns exactly that. */
+  onChange?: (checked: boolean) => unknown
 }) {
   let ref: HTMLInputElement | undefined
   // Tri-state is a DOM property, not an attribute, so it takes an effect.
@@ -36,7 +39,18 @@ export function Checkbox(props: {
       title={props.label ? undefined : props.title}
       aria-label={props.ariaLabel}
       role={props.switch ? 'switch' : undefined}
-      onChange={(event) => props.onChange?.(event.currentTarget.checked)}
+      data-switch={props.switch ? '' : undefined}
+      onChange={(event) => {
+        const box = event.currentTarget
+        const write = props.onChange?.(box.checked)
+        if (write instanceof Promise) {
+            void write.then((saved) => {
+              if (saved !== false) return
+              box.checked = !!props.checked
+              box.indeterminate = !!props.indeterminate
+            })
+          }
+      }}
     />
   )
   return (

@@ -13,7 +13,11 @@ import {
 } from '../../../infra/node/providedNodes'
 import { nodes } from '../../../infra/node/fleet'
 import { canPairNodes } from '../../../infra/platform'
-import { Alert, Badge, Button, ConfirmButton, Input } from '../../../kit/components/primitives'
+import { Alert, Badge, Button, Input } from '../../../kit/components/primitives'
+import { confirmAction } from '../../../host/registries/shell/willPhase'
+import { SettingRow } from '../../../kit/components/layout/SettingRow'
+import { SettingsSection } from '../../../kit/components/layout/SettingsSection'
+import { useUnsavedChanges } from '../unsavedChanges'
 import '../../fleet/nodes.css'
 
 // Settings → Nodes, second half: the nodes a plugin's node provider knows about, and the four
@@ -68,6 +72,9 @@ export default function ProvidedNodes() {
   const [creating, setCreating] = createSignal<string | null>(null)
   const [newLabel, setNewLabel] = createSignal('')
 
+  // Naming a new node is a form with Create and Cancel, so a typed name counts as unsaved.
+  useUnsavedChanges(() => creating() !== null && !!newLabel().trim())
+
   const rows = () => mergeProvidedNodes(provided(), nodes())
   const run = async (work: () => Promise<void>) => {
     setBusy(true)
@@ -84,107 +91,114 @@ export default function ProvidedNodes() {
 
   return (
     <Show when={hasNodeProviders(provided())}>
-      <section class="provided-nodes">
-        <h3>Nodes from a provider</h3>
-        <p class="muted">
-          Machines a plugin on one of your nodes knows about. Adopting one adds it to this client's fleet; the plugin
-          vouches for its identity, and acorn checks that against the certificate the node presents.
-        </p>
-
+      <SettingsSection
+        id="provided"
+        label="Nodes from a provider"
+        description="Machines a plugin on one of your nodes knows about. Adopting one adds it to this client's fleet; the plugin vouches for its identity, and acorn checks that against the certificate the node presents."
+      >
         {/* A provider that could not answer is a line, never a failed page: the rest of the list is
             still true (docs/architecture-overview.md § Client state and fleet behavior). */}
         <For each={providerFailures(provided())}>
           {(failure) => <Alert tone="warn" variant="banner">{failure.providerId} could not list its nodes — {failure.reason}</Alert>}
         </For>
 
-        <div class="nodes-list">
-          <For each={rows()}>
-            {(row: ProvidedNodeRow) => (
-              <div class="node-row">
-                <div class="node-meta">
-                  <span class="node-title">{row.label}</span>
-                  <Badge tone={STATE_TONE[row.state]}>{STATE_LABEL[row.state]}</Badge>
-                  <span class="node-badge">via {row.providerLabel}</span>
-                  <Show when={row.adoptedAs}><span class="node-badge">In this fleet</span></Show>
-                </div>
-                <span class="node-sub">{row.endpoint ?? row.providerNodeId}</span>
-                <div class="node-actions">
-                  {/* Adoption needs a host that holds device tokens. In a plain browser served by a
-                      node there is none, so the row shows without the button rather than offering one
-                      that cannot work. */}
-                  <Show when={!row.adoptedAs && row.state === 'ready' && canPairNodes()}>
-                    <Button disabled={busy()} onPress={() => void run(async () => { await adoptProvidedNode(row) })}>
-                      Add to this client
-                    </Button>
-                  </Show>
-                  <For each={OFFERED[row.state].filter((verb) => row.verbs.includes(verb))}>
-                    {(verb) => (
-                      <Show
-                        when={NODE_LIFECYCLE_RISK[verb] === 'execute'}
-                        fallback={
-                          <Button disabled={busy()} onPress={() => void run(() => runNodeLifecycle(verb, row))}>
-                            {VERB_LABEL[verb]}
-                          </Button>
-                        }
-                      >
-                        {/* The `execute` tier, drawn from NODE_LIFECYCLE_RISK exactly as an armed
-                            schedule draws its confirmation from a node action's tier. Destroying a node
-                            is the most consequential button in the product, and it is the only one here
-                            that asks twice. */}
-                        <ConfirmButton
-                          disabled={busy()}
-                          confirmLabel="Destroy it?"
-                          onConfirm={() => void run(() => runNodeLifecycle(verb, row))}
-                        >
-                          {VERB_LABEL[verb]}…
-                        </ConfirmButton>
-                      </Show>
-                    )}
-                  </For>
-                </div>
-              </div>
-            )}
-          </For>
-        </div>
-
-        <For each={creatableProviders(provided())}>
-          {(target) => (
-            <Show
-              when={creating() === target.id}
-              fallback={
-                <Button onPress={() => { setCreating(target.id); setNewLabel('') }}>
-                  <span class="integration-add-icon">+</span> New node on {target.label}
-                </Button>
-              }
-            >
-              <div class="node-step">
-                <label class="node-step-label">
-                  Name for the new node
-                  <Input
-                    value={newLabel()}
-                    ref={(el) => queueMicrotask(() => el.focus())}
-                    onInput={(value) => setNewLabel(value)}
-                  />
-                </label>
-                <div class="node-step-actions">
-                  <Button
-                    disabled={busy() || !newLabel().trim()}
-                    onPress={() => void run(async () => {
-                      await createProvidedNode({ providerId: target.id, sourceNodeId: target.sourceNodeId }, newLabel().trim())
-                      setCreating(null)
-                    })}
-                  >
-                    {busy() ? 'Creating…' : 'Create'}
+        <For each={rows()}>
+          {(row: ProvidedNodeRow) => (
+            <SettingRow label={row.label} description={row.endpoint ?? row.providerNodeId}>
+              <div class="node-actions">
+                <Badge tone={STATE_TONE[row.state]}>{STATE_LABEL[row.state]}</Badge>
+                <span class="node-badge">via {row.providerLabel}</span>
+                <Show when={row.adoptedAs}><span class="node-badge">In this fleet</span></Show>
+                {/* Adoption needs a host that holds device tokens. In a plain browser served by a
+                    node there is none, so the row shows without the button rather than offering one
+                    that cannot work. */}
+                <Show when={!row.adoptedAs && row.state === 'ready' && canPairNodes()}>
+                  <Button disabled={busy()} onPress={() => void run(async () => { await adoptProvidedNode(row) })}>
+                    Add to this client
                   </Button>
-                  <Button onPress={() => setCreating(null)}>Cancel</Button>
-                </div>
+                </Show>
+                <For each={OFFERED[row.state].filter((verb) => row.verbs.includes(verb))}>
+                  {(verb) => (
+                    <Show
+                      when={NODE_LIFECYCLE_RISK[verb] === 'execute'}
+                      fallback={
+                        <Button disabled={busy()} onPress={() => void run(() => runNodeLifecycle(verb, row))}>
+                          {VERB_LABEL[verb]}
+                        </Button>
+                      }
+                    >
+                      {/* The `execute` tier, drawn from NODE_LIFECYCLE_RISK exactly as an armed
+                          schedule draws its confirmation from a node action's tier. Destroying a node
+                          is the most consequential button in the product, and it is the only one here
+                          that asks twice. */}
+                      <Button
+                        tone="danger"
+                        disabled={busy()}
+                        onPress={async () => {
+                          const confirmed = await confirmAction({
+                            title: `${VERB_LABEL[verb]} ${row.label}?`,
+                            actionLabel: VERB_LABEL[verb],
+                            goes: `${row.providerLabel} ${VERB_LABEL[verb].toLowerCase()}s ${row.label}, with everything stored on that machine.`,
+                            stays: 'Your other nodes, and everything this device keeps, stay as they are.',
+                            danger: true,
+                          })
+                          if (confirmed) void run(() => runNodeLifecycle(verb, row))
+                        }}
+                      >
+                        {VERB_LABEL[verb]}…
+                      </Button>
+                    </Show>
+                  )}
+                </For>
               </div>
-            </Show>
+            </SettingRow>
           )}
         </For>
 
+        {/* By id: each read builds new provider objects, and a row drawn again would drop the focus in
+            its name field. */}
+        <For each={creatableProviders(provided()).map((provider) => provider.id)}>
+          {(id) => {
+            let last = creatableProviders(provided()).find((provider) => provider.id === id)!
+            const target = () => (last = creatableProviders(provided()).find((provider) => provider.id === id) ?? last)
+            return (
+              <Show
+                when={creating() === target().id}
+                fallback={
+                  <Button onPress={() => { setCreating(target().id); setNewLabel('') }}>
+                    <span class="integration-add-icon">+</span> New node on {target().label}
+                  </Button>
+                }
+              >
+                <div class="node-step">
+                  <SettingRow label="Name for the new node" layout="stacked">
+                    <Input
+                      label="Name for the new node"
+                      value={newLabel()}
+                      ref={(el) => queueMicrotask(() => el.focus())}
+                      onInput={(value) => setNewLabel(value)}
+                    />
+                  </SettingRow>
+                  <div class="node-step-actions">
+                    <Button
+                      disabled={busy() || !newLabel().trim()}
+                      onPress={() => void run(async () => {
+                        await createProvidedNode({ providerId: target().id, sourceNodeId: target().sourceNodeId }, newLabel().trim())
+                        setCreating(null)
+                      })}
+                    >
+                      {busy() ? 'Creating…' : 'Create'}
+                    </Button>
+                    <Button onPress={() => setCreating(null)}>Cancel</Button>
+                  </div>
+                </div>
+              </Show>
+            )
+          }}
+        </For>
+
         <Show when={error()}><Alert>{error()}</Alert></Show>
-      </section>
+      </SettingsSection>
     </Show>
   )
 }

@@ -78,6 +78,11 @@ export type SourceContribution<Item = unknown> = {
   // never said it was project-aware almost certainly isn't. The shell shows the project picker only
   // for sources that declare it, so Home no longer offers a control that changes nothing there.
   projectScoped?: boolean
+  // Whether the desktop's left rail shows this source's icon before the person has chosen. Absent is
+  // `true`. A default rather than a gate: the source stays registered and available, the palette opens
+  // it, and the person's own **Show in left rail** choice wins (features/tabs/railSourceVisibility.ts).
+  // Core's own sources are always shown, so this is read only on a plugin's.
+  showInRailByDefault?: boolean
   // The owning plugin may declare the initial browse surface (docs/frontend.md § Registries and
   // plugins), so the shell does not need to know which provider is bundled first.
   isDefault?: boolean

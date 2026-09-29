@@ -11,13 +11,14 @@ workspace and has a stable opaque ID, display name, optional folder path, option
 optional Git/GitHub facets. A project may be a plain folder or a Git checkout. Facets are cached
 observations and may be refreshed; the project ID is the application identity.
 
-The project colour is an optional machine-local accent edited in Settings → Projects. Every task for
+The project colour is an optional machine-local accent, set on the project's settings page or for
+several projects at once from Settings → Overview. Every task for
 that project draws it as the strip down the left of its left-rail tab. Clearing the colour removes the
 project strip; an active tab still uses the application theme's normal active accent.
 
 `path` is nullable and the model tolerates a path-null project, but nothing creates one. The GitHub
 importer's "defer" action was the only producer, and it is gone. Rows that predate that stay readable
-and are repaired by giving them a folder in Settings → Projects.
+and are repaired by giving them a folder in Settings → Overview.
 
 The `Default` workspace is created lazily by the first project, not at boot: both `createProject` and
 `createProjectRef` fall back to it when no workspace is named. The owner adds folders from Settings →
@@ -29,13 +30,14 @@ path. Core compares the folder's resolved path with registered project paths, so
 aliases reuse an existing project ID. The stored path remains the spelling originally registered.
 See [Command-line client](./cli.md) for the administration commands and typed pipe contract.
 
-Settings → Projects lists projects grouped under their workspace rather than giving every row a
-workspace dropdown in isolation. The grouping is what is being edited, so it is the layout. The card
-owns the column tracks, and its header and rows subgrid into them, so names, selects, and buttons
-share one set of columns. Workspace and project names are edited in place. A row's workspace menu
-moves it, and the menu's last option creates the workspace being moved to. A workspace can be deleted
-from its own header, except the default, which is where an orphaned workspace's projects land. A
-project whose workspace has vanished appears under `Unassigned` so it can always be rescued.
+Settings → Overview is one table of projects grouped under their workspace, because the grouping is
+what is being arranged. Selecting rows opens a bar that moves them to a workspace, the last option
+creating one, hides or shows them, or sets their colour. A row opens its project's settings page,
+which holds the name, folder, colour, workspace, visibility, and the project's configuration below. A
+workspace's own page renames and deletes it, except the default, which is where a deleted workspace's
+projects land and so can be neither renamed nor deleted. A project whose workspace has vanished
+appears under `Unassigned` so it can always be rescued. [Frontend](./frontend.md) § Workspaces and
+projects has the pages.
 
 Deleting a project takes its tasks and task links with it, because `tasks.project_id` has no foreign
 key and rows left behind are invisible in every rail and impossible to remove. The confirmation names
@@ -44,7 +46,7 @@ the task count first. Nothing on disk is touched: the folder and any task worktr
 A node with zero projects opens the first-run wizard (`plugins/onboarding`) instead: welcome, add
 projects by folder or GitHub, name them and their workspace, pick what to generate text with, done. Its gate is `shouldShowOnboarding`,
 meaning zero projects and no `onboarded` preference, and both finishing and skipping write that
-preference, so it never opens twice. Everything it offers is also in Settings → Projects.
+preference, so it never opens twice. Everything it offers is also in Settings → Overview.
 
 Opening is a one-way door (`onboardingVisible`). "No projects yet" is the right trigger and the wrong
 latch, because the wizard's own first step creates a project: re-evaluating the trigger every render
@@ -71,7 +73,7 @@ A link may name one project in the workspace instead of the whole of it. That is
 repositories in one workspace show different Linear issues or different Rollbar errors: the routed
 project names the workspace, then keeps the links that either name it or name no project at all.
 
-The map is edited in Settings → Integrations, under the connection itself, and that surface is the
+The map is edited in Settings > Services, on the connection's own page, and that surface is the
 host's for every provider rather than any one plugin's. Under the connection because one Linear or
 Rollbar connection usually serves every workspace on the machine, so its whole map reads better in one
 place than a checkbox list repeated on every workspace page. The host's because of ownership: the
@@ -247,7 +249,10 @@ removal as a list of deleted files. A failed archive clears the flag and trigger
 
 Project configuration lives on `projects`: setup/dev/restart/teardown/database/preview values,
 run targets, browser rules, and branch prefix. A committed `.acorn/config.toml` can override these
-machine-local values.
+machine-local values. `GET /v1/core/projects/:id/config` returns the row as `config` and, when the
+project has a folder whose `.acorn/config.toml` exists, what that file sets as `repoConfig`: its run
+targets, and the database connection script and preview mode and value when it sets them. The
+project's settings page reads it to mark those values read-only. An older node leaves it out.
 
 The node publishes `workspace:changed { workspaceId }` after create, rename, and deletion. Project
 membership remains `project:changed`; a deletion that reassigns projects announces each affected

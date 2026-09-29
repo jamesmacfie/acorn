@@ -108,6 +108,11 @@ export { Text } from '@acorn/client-core/kit/components/content'
 export { Link } from '@acorn/client-core/kit/components/content'
 export { Heading } from '@acorn/client-core/kit/components/content'
 export { Section } from '@acorn/client-core/kit/components/layout'
+// A settings page's titled group and its one setting: the label left, the control right, and the
+// Saved signal, the error, Reset and a value set elsewhere drawn the same way on every page. The save
+// helpers that drive them are on ./client (docs/frontend.md § Settings).
+export { SettingRow, SettingsSection } from '@acorn/client-core/kit/components/layout'
+export type { SettingRowProps, SettingsSectionProps } from '@acorn/client-core/kit/components/layout'
 export { Timeline, type TimelineControls } from '@acorn/client-core/kit/components/content'
 export type { ReadingPlace } from '@acorn/client-core/kit/lib'
 // Which of a long timeline's turns to draw: the newest page, and more on "Show earlier". A rule, not a

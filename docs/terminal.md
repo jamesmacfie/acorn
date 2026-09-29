@@ -407,13 +407,15 @@ opened is stopped rather than started a second time. Starting opens the drawer, 
 refresh the session roster, and a node that refuses either reports its own reason with the frame still
 open. Those are the calls and the error copy the row source had.
 
-**The terminal's own preferences are still a page.** What the terminal button opens into, the terminal
-text size, and whether a new agent session is sent the task's startup context are not setting commands.
-On the desktop the palette reaches them through the **Settings → Terminal** row core generates from the
-settings registry, and that row opens the page rather than editing a value in the frame. Each of the
-three has one reader and one writer in `plugins/terminal/src/client/terminalPrefs.ts`, and the page and
-the drawer both call them, so the value has a single persistence path and a setting command registered
-later cannot become a second one.
+**The terminal's own preferences are still a page.** What the terminal button opens into and the
+terminal text size are not setting commands. On the desktop the palette reaches them through the
+**Settings → Terminal** row core generates from the settings registry, and that row opens the page
+rather than editing a value in the frame. Each of the two has one reader and one writer in
+`plugins/terminal/src/client/terminalPrefs.ts`, and the page and the drawer both call them, so the
+value has a single persistence path and a setting command registered later cannot become a second one.
+Whether an agent started in the drawer is sent the task's startup context is core's preference, and
+its switch is on Settings → Agents → Harnesses and defaults
+(`plugins/agents/src/client/settings/startupContext.ts`).
 
 **Creating a terminal was already a command before this group existed.** The shell owns
 `task.terminal.new-shell` under its own Terminal group, and the agents plugin owns the two harness

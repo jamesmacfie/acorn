@@ -159,6 +159,28 @@ component is a place lost on every workspace switch, and a map hidden inside a k
 scope or clear it. The agents plugin owns them, beside the drafts, in
 `plugins/agents/src/client/sessions/readingPlaceStore.ts`.
 
+**Two nodes are a settings page.** `SettingsSection` and `SettingRow` joined when settings became a
+place of its own ([docs/frontend.md](../frontend.md) § Settings), because every page, core's and each
+plugin's, was drawing the same label-left, control-right shape with its own spacing and its own idea
+of when a value had saved. The row draws the save state rather than owning it. `savedAt` is a
+timestamp, so the row keeps the two-second **Saved** timer and every page's signal lasts as long,
+and `error` is a string. Both are JSON, which is what lets a sandboxed tree use the same row. `from`
+names where a value is set instead and wraps the control in a disabled fieldset, so the row goes
+inert without reaching into its child. `scope="device"` is for a row this device stores on a page about
+the node, such as **Tool call display** on Harnesses and defaults. It draws the header's **This device**
+chip at row size, because the header can name only one scope and the row's differs. `device` is the
+only value, since no page has needed another. `onReset` is a shell-side handler: reset is not one of the
+twelve events, so a remote tree's Reset is dropped on the way, the way `onInput` is. A section's `id`
+is an anchor rather than an element id, because two pages can each have a `general` section and a
+document holds one element per id. The settings view finds it inside the page it drew, to scroll to
+a search result and mark it. On a terminal a row whose value is set elsewhere says where and draws
+no control, because that host has no read-only form of an arbitrary child, which is the `reduced`
+level and the loss written beside it.
+
+Adding them changed the published SDK by two names and removed none, so `PLUGIN_API_MAJOR` stayed
+where it was. A tree that names either node on an older acorn draws the labelled placeholder any
+unknown node draws, so an author who uses them raises the floor of their `apiVersion` range.
+
 **A prop that has to hold an element has a data form beside it.** `ListDetail`'s `list` prop cannot
 cross, so `ListColumn` and `DetailColumn` are children; `Picker`'s `results(query)` callback cannot, so
 `items` is a list it filters itself; `DescriptionList.Item` children cannot, so `Facts` takes

@@ -1,6 +1,6 @@
 import type { NodePluginRow } from '@acorn/protocol/api.ts'
 
-// The one non-obvious computation behind Settings → Plugins, split out so it has a test.
+// The one non-obvious computation behind turning a node plugin on or off, split out so it has a test.
 //
 // A toggle is not "set this row's flag": the route takes the whole disabled list, so ticking one box
 // means recomputing the list from the rows currently on screen. Doing that inline in the component
@@ -17,8 +17,3 @@ export function nextDisabledList(rows: readonly NodePluginRow[], name: string, d
   if (row?.required) throw new Error(`${name} is a required plugin and cannot be disabled.`)
   return [...without, name]
 }
-
-// Whether a row's two answers disagree: what will run after a restart versus what is running now.
-// Only then does the row carry a "still running" / "not loaded" marker, and only then is the page's
-// restart banner shown.
-export const pluginPending = (row: NodePluginRow): boolean => row.disabled === row.running

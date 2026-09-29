@@ -57,6 +57,14 @@ export function applySourceOrder<T extends { id: string }>(sources: T[], order: 
   return [...sources].sort((a, b) => (positions.get(a.id) ?? Infinity) - (positions.get(b.id) ?? Infinity))
 }
 
+/** A drag among the icons on show, written back over every available source so a hidden one keeps
+ *  its slot. `all` is the full order as it stands; `shown` is the visible subset in its new order. */
+export function reorderShownSources(all: readonly string[], shown: readonly string[]): string[] {
+  const visible = new Set(shown)
+  let next = 0
+  return all.map((id) => (visible.has(id) ? shown[next++]! : id))
+}
+
 export function pinTask(order: RailOrder, id: string): RailOrder {
   if (order.pinned.includes(id)) return order
   return { pinned: [...order.pinned, id], order: order.order.filter((x) => x !== id) }

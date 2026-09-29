@@ -66,7 +66,7 @@ Three of them are newer than the rest and worth naming:
 
 - **`ctx.runs`** — one call, `register({ runs })`, pointing at a `GET` on your own namespace that
   answers `{ runs }`. Register it if your plugin owns work that starts, takes time and ends; core
-  merges every plugin's answer into Settings → Runs. You keep your own table and your own surfaces.
+  merges every plugin's answer into Settings → Run history. You keep your own table and your own surfaces.
 - **`ctx.audit`** — `declare({ id, label })` and `record(action, entry?)`. Declare your verbs in
   `contributions.auditActions` by preference; the host qualifies each as `<yourId>:<action>` and
   refuses a `record` naming one you did not declare. Record what a person reviewing this machine would

@@ -212,7 +212,7 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
     expect(availabilityCalls).toBe(1)
   })
 
-  // An installation that has never opened Settings → Agent tools has no preference row at all, which is
+  // An installation that has never opened Settings → Tools and permissions has no preference row at all, which is
   // the state every installation is in for a tool added by a later release. Execute has to deny there,
   // or shipping a new run-target tool grants it to everyone on upgrade with nothing shown to the owner.
   it('denies the execute tier when the owner has expressed no preference', async () => {
@@ -326,16 +326,16 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
     expect((await post('/api/tasks/ready/tools/read_tool', {}, headers)).status).toBe(404)
   })
 
-  it('catalog lists every registered tool with its risk tier (settings page source)', async () => {
+  it('catalog lists every registered tool with its risk tier and its owner (settings page source)', async () => {
     const res = await get('/api/agent-tools')
     expect(await res.json()).toEqual({
       tools: [
-        { name: 'read_tool', description: 'a read tool', risk: 'read' },
-        { name: 'write_tool', description: 'a write tool', risk: 'write' },
-        { name: 'exec_tool', description: 'a dynamic execute tool', risk: 'execute', availability: 'Only when ready.' },
-        { name: 'exec_tool_2', description: 'another dynamic execute tool', risk: 'execute', availability: 'Only when ready.' },
-        { name: 'orchestration_tool', description: 'requires a signed owner session', risk: 'execute' },
-        { name: 'throws_tool', description: 'maps a typed error', risk: 'read' },
+        { name: 'read_tool', description: 'a read tool', risk: 'read', owner: OWNER },
+        { name: 'write_tool', description: 'a write tool', risk: 'write', owner: OWNER },
+        { name: 'exec_tool', description: 'a dynamic execute tool', risk: 'execute', availability: 'Only when ready.', owner: OWNER },
+        { name: 'exec_tool_2', description: 'another dynamic execute tool', risk: 'execute', availability: 'Only when ready.', owner: OWNER },
+        { name: 'orchestration_tool', description: 'requires a signed owner session', risk: 'execute', owner: OWNER },
+        { name: 'throws_tool', description: 'maps a typed error', risk: 'read', owner: OWNER },
       ],
     })
   })

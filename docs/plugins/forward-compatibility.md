@@ -29,7 +29,7 @@ with a named diagnostic. A command without `kind` is also rejected. Unknown keys
 still use the reporting path above.
 
 Those rows, and every other row a loaded plugin raises through `contributions.attention`, land on the
-plugin's own rail source when it has one and on Settings > Plugins when it does not. The manifest
+plugin's own rail source when it has one and on **Settings > Plugins > Installed** when it does not. The manifest
 names no target and the wire carries display strings only, so the host supplies it
 ([notifications.md](../notifications.md) § What a row points at).
 

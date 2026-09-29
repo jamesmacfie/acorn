@@ -297,7 +297,7 @@ The answer is a registry, not a table. A plugin
 declares a `GET` route that lists its own runs (`ctx.runs.register({ runs })`); core calls each one
 with no client attached, parses the answer, stamps who answered, and merges
 (`node-core/server/runs/registry.ts`, `@acorn/protocol/runs.ts`). `GET /v1/core/runs` is the merged
-read and Settings → Runs draws it. No migration, no ownership move, and neither producer knows the
+read and Settings → Run history draws it. No migration, no ownership move, and neither producer knows the
 other exists. A task-confined caller uses this merged route and receives only its task's rows. The
 workflow source route is a node-internal aggregation seam and rejects a direct task-confined read.
 

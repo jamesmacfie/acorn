@@ -12,7 +12,7 @@ read-only node capability so a contributor can fetch the file's bytes without be
 whole filesystem.
 
 Almost all of the machinery exists. `Slot`, `replace` arbitration, the per-key tie picker in
-**Settings > Plugins**, compiled `component` contributions, loaded `remote` contributions, iframe
+**Settings > Plugins > Rail and surfaces**, compiled `component` contributions, loaded `remote` contributions, iframe
 rectangles, and the binary bridge all shipped for other owners. The editor is the missing owner.
 
 The renderer catalogue at the end is the list of third-party plugins this makes possible. None of them
@@ -169,7 +169,7 @@ reads through the file capability.
 
 - Confirm `ctx.extensionPoints.register` on the client accepts a `remote` point from a compiled
   plugin that has no manifest, as `plugins/agents/src/client/index.ts` does, and that the point shows
-  in **Settings > Plugins**.
+  in **Settings > Advanced > Extension points**.
 - Check how the kit's `Markdown` node treats raw markdown and embedded HTML, and whether it resolves
   relative image links. A markdown preview that cannot show `./diagram.png` falls short of what
   people expect.

@@ -132,7 +132,7 @@ it fails for any reason a selection can break, not only for the one it was writt
 - On an archived task, which only the archive page's preview shows, the Agent pane is read-only: the
   transcripts draw, the composer is off, and there is no new-session picker.
 - A provider draws as its own mark wherever it is named: the onboarding cards, the New picker, each
-  block in Settings -> Agent defaults, and the session icon in Agent Center. The name comes off the
+  harness row and block in Settings -> Harnesses and defaults, and the session icon in Agent Center. The name comes off the
   descriptor's `glyph`, so a contributed harness gets the same treatment by pointing that field at a
   mark it registers. The two built-in ones are `brand:agents/claude` and `brand:agents/codex`, drawn
   by `ProviderGlyph.tsx` and coloured from the mark (docs/ui-design.md section Brand colour). The

@@ -15,7 +15,7 @@ machine, or the wizard's own flow around the step.
     one that offers a one-shot mode and is not there is a quiet row saying so, with no alert. Press a
     provider card, paste a key, and press **Connect**: the rows above gain that provider, and the
     step's **Next** was enabled before you did any of it. Then walk the wizard again on a machine
-    with no CLI installed and no key: the step says Settings, under Integrations, is where this lives,
+    with no CLI installed and no key: the step says Settings, under AI models, is where this lives,
     and **Next** still works.
 
 The last four are the Generate list's, owed since the backends over installed agent CLIs shipped and
@@ -39,7 +39,7 @@ and no API key at all. Run them with the keys disconnected first.
     ([managed-agents.md](../managed-agents.md) § Harnesses).
 61. Pick Anthropic in the commit wand, then open **Generate** in the workflow editor: it opens on
     Anthropic. Disconnect the key and open it again: it opens on Claude Code. Change the default in
-    Settings, under Integrations, and both open on that instead. The SQL dialog is expected not to
+    Settings, under AI models, and both open on that instead. The SQL dialog is expected not to
     follow any of this and to open on the first backend every time
     ([state-ownership.md](../state-ownership.md) § Scope rules).
 62. The acceptance test for the manifest one-shot block, which needs `opencode` installed. Write the
@@ -55,7 +55,7 @@ the available checkout cannot launch the app without GitHub credentials. The aut
 the Node, storage, MCP, runtime, and component contracts; these items remain the provider-backed
 acceptance pass.
 
-63. Enable the execute tier in Settings → Agent tools. From a Claude Code terminal, call
+63. Enable the execute tier in Settings → Tools and permissions. From a Claude Code terminal, call
     `agent_spawn` once with shared isolation and once with worktree isolation. Use `agent_wait` and
     paged `agent_read` to collect each answer, then use `agent_prompt` for a second turn and
     `agent_cancel` on an active turn. Repeat from a Codex terminal. Confirm that retrying the original

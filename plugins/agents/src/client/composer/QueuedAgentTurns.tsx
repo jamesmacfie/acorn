@@ -83,7 +83,7 @@ export default function QueuedAgentTurns(props: {
               <Button
                 variant="bare"
                 size="sm"
-                onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'agent-concurrency' })}
+                onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'agent-limits#limits' })}
               >
                 Change
               </Button>

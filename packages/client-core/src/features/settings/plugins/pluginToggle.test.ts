@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { NodePluginRow } from '@acorn/protocol/api.ts'
-import { nextDisabledList, pluginPending } from './pluginToggle'
+import { nextDisabledList } from './pluginToggle'
 
 const row = (name: string, over: Partial<NodePluginRow> = {}): NodePluginRow =>
   ({ name, required: false, disabled: false, running: true, state: 'active', ...over })
@@ -37,14 +37,5 @@ describe('nextDisabledList', () => {
   it('never carries a required plugin through from the rows', () => {
     const stale = [row('terminal', { required: true, disabled: true }), row('docker')]
     expect(nextDisabledList(stale, 'docker', true)).toEqual(['docker'])
-  })
-})
-
-describe('pluginPending', () => {
-  it('is true exactly when what will run differs from what is running', () => {
-    expect(pluginPending(row('a'))).toBe(false) // enabled and running
-    expect(pluginPending(row('b', { disabled: true, running: false }))).toBe(false) // off and not loaded
-    expect(pluginPending(row('c', { disabled: true, running: true }))).toBe(true) // just turned off
-    expect(pluginPending(row('d', { disabled: false, running: false }))).toBe(true) // just turned back on
   })
 })

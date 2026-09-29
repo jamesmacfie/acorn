@@ -601,8 +601,14 @@ describe('architecture boundaries', () => {
     const limits: Record<string, number> = {
       '@acorn/protocol': 80,
       // Model-provider error guidance needs a pure path for logic tests and remote trees. Importing
-      // the kit/lib barrel here would pull renderer-only modules into those consumers.
-      '@acorn/client-core': 154,
+      // the kit/lib barrel here would pull renderer-only modules into those consumers. Three more on
+      // 2026-09-29 for the settings pages split out of Security, Appearance and Plugins, each its own
+      // lazy chunk behind its own rail row. One more for `kit/lib/savedSignal`, the Saved timer both
+      // hosts' SettingRow share, which the terminal kit cannot take from the renderer-only barrel.
+      // One more for a project's own settings page, a lazy chunk the desktop registers like the others.
+      // One more for Rail and surfaces, split off the plugin list on 2026-09-30. One more when Integrations
+      // split into Services and AI models the same day.
+      '@acorn/client-core': 160,
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 10,
@@ -741,7 +747,7 @@ describe('architecture boundaries', () => {
       ['packages/client-core/src/host/frames/PluginFrame.tsx', "the 'terminal' UI style, passed to a frame"],
       ['packages/client-core/src/host/tree/RemoteTree.tsx', "the 'terminal' UI style, passed to a tree"],
       // `terminal` the moment a setup script runs, and `terminal` the command palette category.
-      ['packages/client-core/src/features/settings/WorkspaceProjectSettings.tsx', "the 'terminal' setup-script trigger"],
+      ['packages/client-core/src/features/settings/ProjectConfigTabs.tsx', "the 'terminal' setup-script trigger"],
       ['packages/node-core/src/server/routes/projects/projects.ts', "the 'terminal' setup-script trigger"],
       ['packages/node-core/src/server/worktrees/taskWorktree.ts', "the 'terminal' setup-script trigger"],
       ['packages/protocol/src/transport/api/projects.ts', "the 'terminal' setup-script trigger"],
@@ -766,7 +772,7 @@ describe('architecture boundaries', () => {
       ['packages/client-core/src/features/tabs/TabRail.tsx', 'the host-capability probe'],
       // `github` the website an installable plugin comes from, which is a different thing wearing the
       // same word, and `github` the brand mark every glyph named `brand:github` resolves through.
-      ['packages/client-core/src/features/settings/PluginsSettings.tsx', "'github' the install source kind"],
+      ['packages/client-core/src/features/settings/plugins/InstallPlugin.tsx', "'github' the install source kind"],
       ['packages/client-core/src/host/trust/approval.ts', "'github' the install source kind"],
       ['packages/node-core/src/server/agentTools/pluginRequests.ts', "'github' the install source kind"],
       ['packages/protocol/src/plugin/source.ts', "'github' the shared install source kind"],
@@ -778,6 +784,10 @@ describe('architecture boundaries', () => {
       ['packages/client-core/src/kit/components/inputs/IconPicker.tsx', "'database' and 'terminal', Lucide icon names"],
       ['packages/node-core/src/server/repoConfigTrust.ts', "'workflows' the .acorn directory name"],
       ['packages/protocol/src/integrations/mcp.ts', "'http' the MCP transport"],
+      ['packages/protocol/src/chrome/settingsPages.ts', "'agents' the settings rail group"],
+      // Moved from apps/desktop so the terminal lists the same pages. Search words name the services a
+      // Services page lists, which is text a person types, not a branch on a plugin.
+      ['packages/client-core/src/features/settings/corePages.ts', "'agents' the settings rail group, and service names as search words"],
     ])
 
     // A `//` outside a string starts a comment. Prose is allowed to name a plugin, and most of the

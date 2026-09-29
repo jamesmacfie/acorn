@@ -3,16 +3,17 @@ import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { integrationsOptions, prefsOptions, projectsOptions, tasksKey, tasksOptions, workspacesOptions, type Project, type Task } from '../../infra/queries'
 import { archiveTask, createTask, patchTask } from '../tasks/taskMutations'
-import { applyRailOrder, applySourceOrder, isPinned, moveTask, parseRailOrder, pinTask, unpinTask, type RailDropPosition, type RailOrder } from './railOrder'
+import { applyRailOrder, applySourceOrder, isPinned, moveTask, parseRailOrder, pinTask, reorderShownSources, unpinTask, type RailDropPosition, type RailOrder } from './railOrder'
 import { checksState } from '../../kit/lib/rendering/displayMeta'
 import { createDismissable } from '../../kit/lib/controls/dismissable'
 import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
-import { defaultSourceId } from '../../host/registries/sources/sources'
+import { defaultSourceId, sourceIsProjectScoped } from '../../host/registries/sources/sources'
 import { schedulePanePrefetch } from '../../host/registries/panes/panes'
 import { projectPath } from '../../host/registries/commands/corePaths'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
 import { hasHostCapability } from '../../infra/node/hostCapabilities'
 import { availableSources } from './railSources'
+import { createHiddenSourceOpeners, createRailSourceVisibility } from './railSourceVisibility'
 import { createSourceScope } from './sourceScope'
 import { taskStatus } from '../tasks/taskStatus'
 import { markersFor } from '../../host/registries/rail/railMarkerFeed'
@@ -154,7 +155,11 @@ export default function TabRail() {
   // reads them.
   createEffect(() => requestTaskAnnotations(visibleTasks().map((task) => task.id)))
 
-  const sources = () => applySourceOrder(availableSources(integrations.data?.integrations, sourceScope()), railOrder())
+  // Every source that can open, then the ones with an icon. A hidden source is still available: the
+  // palette opens it below, and the shell keeps it on screen once selected (./railSourceVisibility.ts).
+  const available = () => applySourceOrder(availableSources(integrations.data?.integrations, sourceScope()), railOrder())
+  const visibility = createRailSourceVisibility()
+  const sources = () => available().filter((source) => visibility.shown(source.id))
   function selectSource(id: SourceId) {
     setMenuId(null)
     setSelectedSource(id)
@@ -250,6 +255,17 @@ export default function TabRail() {
       })),
     ])
     onCleanup(() => { bindings.dispose(); commands.dispose(); rowActions.dispose() })
+  })
+
+  // A hidden source keeps a way in: a palette row that opens it the way its icon would.
+  createHiddenSourceOpeners(available, visibility.shown, (source) => {
+    // A source that shows one project at a time has nothing to show without one, and a row that closed
+    // on an empty surface would look like it worked.
+    const taskProject = query.data?.find((task) => task.id === activeTaskId())?.projectId
+    if (sourceIsProjectScoped(source.id) && !params.projectId && !taskProject) {
+      throw new Error(`Open a project first. ${source.label} shows one project at a time.`)
+    }
+    selectSource(source.id)
   })
 
   function openNew() {
@@ -490,9 +506,9 @@ export default function TabRail() {
     },
     toggleCollapsed: () => void saveJsonPref(queryClient, PrefKeys.leftCollapsed, prefs.data?.[PrefKeys.leftCollapsed] !== 'true'),
     reorderSources: (ids) => {
-      const available = sources().map((source) => source.id)
-      if (ids.length !== available.length || new Set(ids).size !== available.length || ids.some((id) => !available.includes(id))) return
-      void saveOrder({ ...railOrder(), sources: [...ids] })
+      const shown = sources().map((source) => source.id)
+      if (ids.length !== shown.length || new Set(ids).size !== shown.length || ids.some((id) => !shown.includes(id))) return
+      void saveOrder({ ...railOrder(), sources: reorderShownSources(available().map((source) => source.id), ids) })
     },
     createTask: openNew,
   })

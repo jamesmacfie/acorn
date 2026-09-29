@@ -3,6 +3,7 @@ import { CORE_EXCLUSIVE_SLOTS } from '../../chrome/extensionPoints.ts'
 import { isPluginKeyClaim, isReservedPluginKeyClaim } from '../../chrome/keybindings.ts'
 import { LANGUAGE_IDS } from '../../content/languageIds.ts'
 import { PANE_LAYOUTS, regionProblem } from '../../chrome/paneLayouts.ts'
+import { PLUGIN_SETTINGS_CATEGORIES, RAIL_SOURCE_VISIBILITY_MAX, SETTINGS_SCOPES, SETTINGS_SEARCH_MAX, SETTINGS_SECTION_ID_RE } from '../../chrome/settingsPages.ts'
 import { WEBVIEW_HOST_MAX_COUNT } from '../../content/webview.ts'
 import { pluginRoute, webviewHost } from './manifestFields.ts'
 
@@ -63,6 +64,8 @@ export const navigationDestination = z.object({
   noticeKind: z.string().min(1).max(64).optional(),
 }).strict()
 
+const settingsKeywords = z.array(z.string().min(1).max(64)).max(SETTINGS_SEARCH_MAX)
+
 export const frameSurface = z.object({
   // Which registry this lands in. The shell renders them all the same way; the surrounding chrome it
   // supplies is what differs.
@@ -99,8 +102,35 @@ export const frameSurface = z.object({
   // may only name its own provider. On a task pane it additionally marks the pane as a linked-items
   // view, hidden on tasks with no link from that provider.
   providerId: z.string().min(1).max(64).optional(),
-  // `settings` only.
+  // `settings` only. The older placement, still read: `workspace` makes a workspace page, `general`
+  // leaves both fields below at their defaults.
   group: z.enum(['general', 'workspace']).optional(),
+  // `settings` only. Which rail group the page sits in, `features` when absent, and what a change on it
+  // affects, `node` when absent. `settingsScope` rather than `scope`, because `scope` above is a pane's
+  // and widening its enum would make an older node refuse this manifest outright.
+  //
+  // A value outside the list is caught rather than refused: the page still registers, in its default
+  // place, and the manifest reader reports the value (node-core/server/plugins/manifest.ts). Refusing
+  // would drop the whole plugin over where one page is filed.
+  category: z.enum(PLUGIN_SETTINGS_CATEGORIES).optional().catch(undefined),
+  settingsScope: z.enum(SETTINGS_SCOPES).optional().catch(undefined),
+  // `settings` only. What search matches besides the page's label, and the page's `SettingsSection`
+  // anchors, each a search result and a deep-link target (`settings/<page>#<section>`). Caught like the
+  // two above: a list past the limit costs the page its search entries, never the page.
+  keywords: settingsKeywords.optional().catch(undefined),
+  sections: z.array(z.object({
+    id: z.string().regex(SETTINGS_SECTION_ID_RE),
+    label: z.string().min(1).max(80),
+    keywords: settingsKeywords.optional(),
+  })).max(SETTINGS_SEARCH_MAX)
+    // An id is an anchor, so two alike would leave one section unreachable, and the device refuses the list.
+    .refine((list) => new Set(list.map((section) => section.id)).size === list.length)
+    .optional().catch(undefined),
+  // `settings` only. This plugin's own sources whose **Show in left rail** switch the host draws above
+  // the page, in the plugin's source order (docs/frontend.md § Rail source visibility). Caught like
+  // the lists above. An id that names no source of this plugin is reported by the manifest reader and
+  // dropped on the device, because the host draws a switch only for a plugin's own source.
+  railSourceVisibility: z.array(z.string().min(1).max(64)).max(RAIL_SOURCE_VISIBILITY_MAX).optional().catch(undefined),
   // `coreSlot` only, and required there. An unknown slot is a parse error.
   coreSlot: z.enum(CORE_EXCLUSIVE_SLOTS).optional(),
   // A chrome replacement declares whether it places the one host-filled nested slot. Settings can

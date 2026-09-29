@@ -121,12 +121,26 @@ export const prefsOptions = (enabled: boolean) => ({
 // It refetches every five seconds while the page is open, which is the collector's own flush
 // window. Counts that move while you watch are the evidence the switch is doing something, and a
 // page that needed a reload to show that would be a page nobody believes.
+//
+// For a named node, because the page follows the settings header's node switcher rather than the
+// window's active node. `null` is the node serving this window, when there is no fleet.
 export const telemetrySummaryKey = ['telemetry-summary'] as const
-export const telemetrySummaryOptions = (enabled: boolean) => ({
-  queryKey: telemetrySummaryKey,
+export const telemetrySummaryOptions = (enabled: boolean, nodeId: string | null) => ({
+  queryKey: [...telemetrySummaryKey, nodeId ?? ''] as const,
   enabled,
   refetchInterval: 5_000,
-  queryFn: async ({ signal }: QueryContext): Promise<TelemetrySummary> => readJson<TelemetrySummary>(coreTelemetrySummaryRoute, { signal }),
+  queryFn: async ({ signal }: QueryContext): Promise<TelemetrySummary> =>
+    readJson<TelemetrySummary>(coreTelemetrySummaryRoute, { signal, nodeId: nodeId ?? undefined }),
+})
+
+// One named node's own preference rows, with no device values merged in. For a settings page that
+// reads a node other than the active one; the active node's rows, as every other reader sees them, are
+// `prefsOptions` above.
+export const nodePrefsKey = (nodeId: string | null) => ['node-prefs', nodeId ?? ''] as const
+export const nodePrefsOptions = (nodeId: string | null) => ({
+  queryKey: nodePrefsKey(nodeId),
+  queryFn: async ({ signal }: QueryContext): Promise<Record<string, string>> =>
+    readJson<Record<string, string>>(prefsRoute, { signal, nodeId: nodeId ?? undefined }),
 })
 
 // Connected integrations (gates the Sources rail + settings list). Includes the synthesized GitHub

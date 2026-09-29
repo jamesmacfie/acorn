@@ -1747,6 +1747,61 @@ describe('forward compatibility: unknown is retained and reported', () => {
     expect(result.ok && 'widgets' in result.manifest).toBe(false)
   })
 
+  it('keeps a settings page whose group or scope it does not offer, and names the value', () => {
+    // `plugins` is a group only core fills, and `galaxy` is no scope at all. Either one refused would
+    // drop the whole plugin over where one page is filed.
+    const settings = (extra: Record<string, unknown>) => ({
+      target: 'settings', id: 'board-settings', label: 'Board', layout: 'single', regions: { body: 'frame' }, ...extra,
+    })
+    const result = parse({ contributions: { frames: [settings({ category: 'plugins', settingsScope: 'galaxy' }), settings({ id: 'board-more', category: 'agents' })] } })
+    expect(result.ok && result.manifest.contributions.frames.map((frame) => [frame.id, frame.category, frame.settingsScope]))
+      .toEqual([['board-settings', undefined, undefined], ['board-more', 'agents', undefined]])
+    expect(result.ok && [...result.unknown].sort()).toEqual([
+      'contributions.frames.board-settings.category: plugins',
+      'contributions.frames.board-settings.settingsScope: galaxy',
+    ])
+  })
+
+  it('keeps a settings page whose search lists are past the limit, without those lists, and says so', () => {
+    const settings = (extra: Record<string, unknown>) => ({
+      target: 'settings', id: 'board-settings', label: 'Board', layout: 'single', regions: { body: 'frame' }, ...extra,
+    })
+    const words = Array.from({ length: 17 }, (_, index) => `word${index}`)
+    const result = parse({ contributions: { frames: [
+      settings({ keywords: words, sections: [{ id: 'bad id', label: 'Nope' }] }),
+      settings({ id: 'board-more', keywords: ['cards'], sections: [{ id: 'columns', label: 'Columns', keywords: ['lanes'] }] }),
+      // Two sections with one id: a link could reach only one of them.
+      settings({ id: 'board-twice', sections: [{ id: 'columns', label: 'Columns' }, { id: 'columns', label: 'Lanes' }] }),
+    ] } })
+    expect(result.ok && result.manifest.contributions.frames.map((frame) => [frame.id, frame.keywords, frame.sections])).toEqual([
+      ['board-settings', undefined, undefined],
+      ['board-more', ['cards'], [{ id: 'columns', label: 'Columns', keywords: ['lanes'] }]],
+      ['board-twice', undefined, undefined],
+    ])
+    expect(result.ok && [...result.unknown].sort()).toEqual([
+      'contributions.frames.board-settings.keywords: not accepted (at most 16 entries, each a short string)',
+      'contributions.frames.board-settings.sections: not accepted (at most 16 entries, each a short string or { id, label, keywords } with an id of its own)',
+      'contributions.frames.board-twice.sections: not accepted (at most 16 entries, each a short string or { id, label, keywords } with an id of its own)',
+    ])
+  })
+
+  it('keeps a settings page whose rail switch names a source the plugin does not own, and says which', () => {
+    const settings = (extra: Record<string, unknown>) => ({
+      target: 'settings', id: 'board-settings', label: 'Board', layout: 'single', regions: { body: 'frame' }, ...extra,
+    })
+    const board = { id: 'board', label: 'Board', order: 50, items: '/v1/p/board/items' }
+    const result = parse({ contributions: {
+      sources: [board],
+      frames: [settings({ railSourceVisibility: ['board', 'home', 'github'] })],
+    } })
+    // The page and its own source's switch survive. The core source and another plugin's are named.
+    expect(result.ok && result.manifest.contributions.frames[0]?.railSourceVisibility).toEqual(['board', 'home', 'github'])
+    expect(result.ok && [...result.unknown].sort()).toEqual([
+      "contributions.frames.board-settings.railSourceVisibility: 'github' is not one of this plugin's sources",
+      "contributions.frames.board-settings.railSourceVisibility: 'home' is not one of this plugin's sources",
+    ])
+  })
+
   it('reports nothing for a manifest this build understands completely', () => {
     expect(parse({ contributions: { commands: [] } })).toMatchObject({ ok: true, unknown: [] })
   })

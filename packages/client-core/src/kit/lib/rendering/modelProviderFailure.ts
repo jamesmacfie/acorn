@@ -8,9 +8,9 @@ export function modelProviderFailure(
   const code = error && typeof error === 'object' && 'code' in error ? error.code : undefined
   switch (code) {
     case 'provider_needs_auth':
-      return 'The provider key was rejected. Reconnect it in Settings, under Integrations.'
+      return 'The provider key was rejected. Reconnect it in Settings, under AI models.'
     case 'provider_not_connected':
-      return 'That provider is no longer connected. Pick another, or add one in Settings, under Integrations.'
+      return 'That provider is no longer connected. Pick another, or add one in Settings, under AI models.'
     case 'provider_rate_limited':
       return 'The provider is rate-limiting requests. Try again shortly.'
     case 'provider_unavailable':

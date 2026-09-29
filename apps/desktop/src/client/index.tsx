@@ -136,7 +136,7 @@ void startDeviceConfigSync(() => clientFor(activeCacheId()).client)
 watchTaskChanges()
 
 // …and for connected accounts. A credential that stops working demotes itself on the node mid-request,
-// so Settings → Integrations and the Sources rail hear about it here rather than at the next 401
+// so Settings → Services and the Sources rail hear about it here rather than at the next 401
 // (docs/plugins.md § Hearing a core event).
 watchConnectionChanges()
 // The rest of the core catalogue (docs/plugins.md § Hearing a core event): projects invalidate their query;

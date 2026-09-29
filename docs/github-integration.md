@@ -40,7 +40,7 @@ integration credential and its repositories/PRs are a disposable local mirror.
 
 ## Connecting
 
-Settings → Integrations and the first-run wizard both run the OAuth device authorization flow through
+Settings' Add connection and the first-run wizard both run the OAuth device authorization flow through
 the same `createDeviceFlow` helper in `packages/client-core/src/features/integrations/deviceFlow.ts`, so the
 polling cadence (the advertised interval, `slow_down`, `expires_in`) is stated once:
 
