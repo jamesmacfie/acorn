@@ -295,7 +295,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
         </Show>
       </Section>
       <Show when={inlineSessions().length}>
-        <Fold label={`Inline chats (${inlineSessions().length})`} meta={inlineNeedsYou() ? <Text emphasis="muted">{inlineNeedsYou()} need you</Text> : undefined}>
+        <Fold label={`Inline chats (${inlineSessions().length})`} persistKey="agents.inline-chats" meta={inlineNeedsYou() ? <Text emphasis="muted">{inlineNeedsYou()} need you</Text> : undefined}>
           <Rows
             id={`agents:inline:${props.task.id}`}
             ariaLabel="Inline chats"
