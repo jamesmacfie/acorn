@@ -454,7 +454,7 @@ Claude's catalog is the profile's stable CLI aliases. A harness with an empty se
 **`generateText` dispatches on the prefix.** A `connection:` id goes to `generateTextForConnection`
 in `server/modelProviders/runtime.ts`. A `harness:` id goes to `generateTextForHarness` in
 `server/modelProviders/harnessRuntime.ts`. Both return the same result, whose `backendId` says which
-was spent, and both run behind the same `validateInput` first: a 60-second ceiling, 100,000 system
+was spent, and both run behind the same `validateInput` first: a three-minute ceiling, 100,000 system
 characters, 1,000,000 prompt characters, and 128,000 output tokens. `maxOutputTokens` is validated
 and then ignored for a harness, because neither `claude` nor `codex` has a flag for it, and a bound
 the caller states and the backend cannot honour is still worth refusing when it is absurd.

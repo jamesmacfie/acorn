@@ -282,16 +282,26 @@
    ponytail: this is a `Toolbar` written out by hand, and it borrows `Toolbar`'s geometry rather
    than being one. Two things hold it back: `.layout-region-detail:has(> .diff-toolbar)` in
    shell.css is how the detail column recognises that it holds a diff and drops its padding, and
-   the find bar nested inside is itself a `Toolbar`, which would draw a second background and a
-   second divider inside this one. Untangle both and this becomes `<Toolbar>` with a spacer. */
+   the find bar nested inside is itself a `Toolbar`, whose strip is stripped below. Untangle both
+   and this becomes `<Toolbar>` with a spacer. */
 .diff-toolbar {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  /* Twice the find bar's own gap, so its controls read as one group and the view mode as another. */
+  gap: var(--space-6);
   min-height: var(--pane-head-h);
   padding: 0 var(--pane-pad);
   border-bottom: var(--chrome-divider);
   background: var(--bg);
+}
+/* The find bar is a cluster in this bar, not a strip of its own. `[data-size]` outweighs the
+   pane-edge padding rule in shell.css. */
+.diff-toolbar > .ui-toolbar[data-size='sm'] {
+  min-height: 0;
+  padding: 0;
+  background: none;
+  border-bottom: 0;
 }
 /* Left-aligned, so the find bar and the view mode keep the end of the bar. */
 .diff-file-filter { flex: 0 1 240px; min-width: 0; margin-right: auto; display: flex; }
