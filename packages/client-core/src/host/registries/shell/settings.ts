@@ -15,6 +15,10 @@ export type SettingsContribution = {
   group: 'general' | 'workspace'
   order: number
   requires?: HostCapabilityRequirement
+  // Sources of the same plugin whose "Show in left rail" switch the host draws above this page
+  // (features/settings/RailVisibilitySwitches.tsx). The host owns the switch and the preference; the
+  // page's own component never sees either.
+  railSourceVisibility?: readonly string[]
   component: Component<{ context: SettingsPageContext }>
 }
 

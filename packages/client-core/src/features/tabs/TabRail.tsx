@@ -13,6 +13,7 @@ import { projectPath } from '../../host/registries/commands/corePaths'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
 import { hasHostCapability } from '../../infra/node/hostCapabilities'
 import { availableSources } from './railSources'
+import { parseRailVisibility, shownInRail } from './railVisibility'
 import { createSourceScope } from './sourceScope'
 import { taskStatus } from '../tasks/taskStatus'
 import { markersFor } from '../../host/registries/rail/railMarkerFeed'
@@ -154,7 +155,13 @@ export default function TabRail() {
   // reads them.
   createEffect(() => requestTaskAnnotations(visibleTasks().map((task) => task.id)))
 
-  const sources = () => applySourceOrder(availableSources(integrations.data?.integrations, sourceScope()), railOrder())
+  // Every source that can open, then the ones this device draws an icon for. The palette opens the
+  // rest (./railVisibility.ts), so a hidden source is still one click away from somewhere.
+  const openableSources = () => applySourceOrder(availableSources(integrations.data?.integrations, sourceScope()), railOrder())
+  const sources = () => {
+    const visibility = parseRailVisibility(prefs.data?.[PrefKeys.railVisibility])
+    return openableSources().filter((source) => shownInRail(source.id, visibility))
+  }
   function selectSource(id: SourceId) {
     setMenuId(null)
     setSelectedSource(id)
@@ -492,7 +499,11 @@ export default function TabRail() {
     reorderSources: (ids) => {
       const available = sources().map((source) => source.id)
       if (ids.length !== available.length || new Set(ids).size !== available.length || ids.some((id) => !available.includes(id))) return
-      void saveOrder({ ...railOrder(), sources: [...ids] })
+      // The drawn icons take the drawn slots in their new order, and a hidden source keeps its own
+      // slot, so showing it again puts it back where it was.
+      const drawn = [...ids]
+      const merged = openableSources().map((source) => available.includes(source.id) ? drawn.shift()! : source.id)
+      void saveOrder({ ...railOrder(), sources: merged })
     },
     createTask: openNew,
   })

@@ -27,6 +27,19 @@ export function validateChrome(refs: ManifestReferences): void {
       })
     }
   })
+  // A settings page may carry the rail switch for this plugin's own sources only. The id is a user
+  // preference key, so a typo would draw a switch that changes nothing.
+  const sourceIds = new Set(sources.map((entry) => entry.id))
+  frames.forEach((frame, i) => {
+    frame.railSourceVisibility?.forEach((id, at) => {
+      if (sourceIds.has(id)) return
+      ctx.addIssue({
+        code: 'custom',
+        path: ['contributions', 'frames', i, 'railSourceVisibility', at],
+        message: `railSourceVisibility names '${id}', which is not one of this manifest's sources`,
+      })
+    })
+  })
   slots.forEach((entry, i) => {
     route(entry.data, ['contributions', 'slots', i, 'data'])
     if (entry.onClick) action(entry.onClick, ['contributions', 'slots', i, 'onClick'])

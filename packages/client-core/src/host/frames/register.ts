@@ -587,11 +587,19 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
       // manifest parser refuses a settings surface that names no layout, so this is a declaration
       // either way rather than a default.
       const settingsTree = singleRegionTree(surface)
+      // The node refused a switch for a source this manifest does not declare. A roster row is bytes a
+      // node sent, so the device drops one again, and the settings host checks the live owner besides.
+      const ownSources = new Set((row.installed?.contributions.sources ?? []).map((source) => source.id))
+      const railSourceVisibility = (surface.railSourceVisibility ?? []).filter((id) => ownSources.has(id))
+      if (railSourceVisibility.length !== (surface.railSourceVisibility?.length ?? 0)) {
+        log.warn(`${pluginId} settings page '${surface.id}' names a rail source it does not declare`, undefined, { 'plugin.id': pluginId })
+      }
       return own(settingsRegistry, {
         id: surface.id,
         label: surface.label,
         group: surface.group ?? 'general',
         order: surface.order,
+        ...(railSourceVisibility.length ? { railSourceVisibility } : {}),
         requires: { loadedPlugin: pluginId },
         component: () => settingsTree
           ? createComponent(RemoteTree, { contribution: settingsTree, props: () => ({}) })

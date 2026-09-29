@@ -517,6 +517,28 @@ describe('migration entrypoint confinement', () => {
   })
 })
 
+describe('rail visibility', () => {
+  const SOURCE = { id: 'board', label: 'Board', order: 60, items: '/v1/p/board/items', showInRailByDefault: false }
+  const SETTINGS = { target: 'settings', id: 'board-settings', label: 'Board', layout: 'single', regions: { body: 'frame' } }
+
+  it('accepts a hidden-by-default source and a settings page that carries its switch', () => {
+    const result = manifest({ sources: [SOURCE], frames: [{ ...SETTINGS, railSourceVisibility: ['board'] }] })
+    expect(messages(result)).toEqual([])
+    expect(result.success && result.data.contributions.sources[0]?.showInRailByDefault).toBe(false)
+  })
+
+  it('refuses a switch for a source this manifest does not declare', () => {
+    const result = manifest({ sources: [SOURCE], frames: [{ ...SETTINGS, railSourceVisibility: ['github'] }] })
+    expect(messages(result)).toEqual(["railSourceVisibility names 'github', which is not one of this manifest's sources"])
+    expect(paths(result)).toEqual(['contributions.frames.0.railSourceVisibility.0'])
+  })
+
+  it('refuses the field anywhere but a settings page', () => {
+    expect(messages(manifest({ sources: [SOURCE], frames: [{ ...PANE, railSourceVisibility: ['board'] }] })))
+      .toContain('railSourceVisibility is only valid on a settings surface')
+  })
+})
+
 describe('chrome descriptors', () => {
   it('accepts a client-only remote-tree source and requires both regions', () => {
     const source = { id: 'board', label: 'Board', order: 60, tree: { list: 'boardList', detail: 'boardDetail' } }

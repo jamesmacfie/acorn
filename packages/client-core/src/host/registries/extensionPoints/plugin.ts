@@ -1,4 +1,4 @@
-import { batch } from 'solid-js'
+import { batch, untrack } from 'solid-js'
 import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
 import { persistedStateRegistry, type PersistedStateSlice } from '../../../infra/persistence/persistedState'
 import { agentContextRegistry } from '../sources/agentContexts'
@@ -176,6 +176,20 @@ const declaredProvider = (entry: object): string | undefined =>
     ? (entry as { providerId: string }).providerId
     : undefined
 
+// A settings page may carry the rail switch for its own plugin's sources only (features/tabs/railVisibility.ts).
+// Checked once the plugin has registered everything, because a page may be registered before the
+// source it names. Thrown, like any other broken first-party registration here.
+function checkRailSourceVisibility(name: string): void {
+  untrack(() => {
+    for (const page of settingsRegistry.entries()) {
+      if (settingsRegistry.ownerOf(page.id) !== name) continue
+      for (const id of page.railSourceVisibility ?? []) {
+        if (sourceRegistry.ownerOf(id) !== name) throw new Error(`Plugin '${name}' settings page '${page.id}' names rail source '${id}', which it did not register`)
+      }
+    }
+  })
+}
+
 function makeContext(name: string, record: (disposable: Disposable) => void): CompiledClientPluginContext {
   // Structural rather than `Registry<T>`, because the pane registry accepts a wider entry than it
   // stores: a pane may declare a layout and regions, and the registry turns that into a component.
@@ -303,6 +317,7 @@ export function initClientPlugins(
       // half-registered shell is worse than one that fails loudly at boot.
       const ctx = makeContext(plugin.name, (disposable) => disposables.push(disposable))
       plugin.init(ctx)
+      checkRailSourceVisibility(plugin.name)
       enabled.push(plugin.name)
       if (plugin.activate) activations.push({ plugin, ctx, disposables })
     }

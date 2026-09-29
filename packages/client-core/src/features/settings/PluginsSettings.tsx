@@ -29,6 +29,8 @@ import { prefsOptions } from '../../infra/queries'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { savePref } from './savePref'
 import ExtensionPointsDev from './ExtensionPointsDev'
+import RailVisibilitySwitches from './RailVisibilitySwitches'
+import { pluginSources } from '../tabs/railVisibility'
 import { navigationDestinationGrants, navigationDestinationPermissionLines, nodePermissionLines, scheduleGrants, schedulePermissionLines, uiPermissionLines, webviewGrants, webviewPermissionLines } from '../../host/trust/permissions'
 import ConfigPluginOffers from './ConfigPluginOffers'
 import {
@@ -546,9 +548,27 @@ export default function PluginsSettings() {
         </For>
       </ul>
 
+      <RailSources />
       <ReplacedSurfaces />
       <ExtensionPointsDev />
     </div>
+  )
+}
+
+// Every active plugin's rail switches, whether or not the plugin has a settings page of its own, so a
+// source that starts hidden can always be found again (features/tabs/railVisibility.ts).
+function RailSources() {
+  const owners = () => [...new Set(pluginSources().map((row) => row.pluginId))]
+  return (
+    <Show when={owners().length}>
+      <div>
+        <h3 class="settings-heading">Left rail</h3>
+        <p class="muted">Hiding an icon keeps the plugin running. Open a hidden source from the command palette.</p>
+        <For each={owners()}>
+          {(pluginId) => <Field label={pluginId}><RailVisibilitySwitches pluginId={pluginId} /></Field>}
+        </For>
+      </div>
+    </Show>
   )
 }
 

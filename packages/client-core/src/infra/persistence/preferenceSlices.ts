@@ -52,6 +52,7 @@ export const directPreferenceSlices: readonly PersistedStateSlice<unknown>[] = [
   // changed — the stored key is still `diff_view`, so nothing migrates.
   direct('core.diff-view', PrefKeys.diffView, 'view'),
   jsonObject('core.rail-order', PrefKeys.railOrder, 'view'),
+  jsonObject('core.rail-visibility', PrefKeys.railVisibility, 'view', 16 * 1024),
   direct('terminal.rail-default', PrefKeys.terminalRailDefault),
   direct('terminal.height', PrefKeys.terminalHeight, 'panes'),
   direct('terminal.font-size', PrefKeys.terminalFontSize, 'panes'),
