@@ -1,9 +1,9 @@
-import { describe, expect, it } from 'vitest'
-import { noteWorkspaceVisit, previousWorkspaceId } from './lastWorkspace'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { currentWorkspaceId, hydrateWorkspaceHistory, noteWorkspaceVisit, previousWorkspaceId } from './lastWorkspace'
 
-// One sequence rather than a case each: the store is module state with no reset, which is the point
-// — it outlives every component that reports to it.
 describe('the last workspace', () => {
+  beforeEach(() => hydrateWorkspaceHistory({ current: null, previous: null }))
+
   it('bounces between the two most recent workspaces', () => {
     expect(previousWorkspaceId()).toBe(null)
 
@@ -26,6 +26,16 @@ describe('the last workspace', () => {
 
     // A third workspace displaces the pair rather than joining a history.
     noteWorkspaceVisit('c')
+    expect(previousWorkspaceId()).toBe('b')
+  })
+
+  it('keeps the pair after hydration and counts a different startup destination as a visit', () => {
+    hydrateWorkspaceHistory({ current: 'b', previous: 'a' })
+    noteWorkspaceVisit('b')
+    expect(previousWorkspaceId()).toBe('a')
+
+    noteWorkspaceVisit('c')
+    expect(currentWorkspaceId()).toBe('c')
     expect(previousWorkspaceId()).toBe('b')
   })
 })

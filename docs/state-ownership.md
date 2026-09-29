@@ -137,7 +137,8 @@ Use the persistence scope that owns the state:
 | Task layout, open files, PR filters, context selection | owning Node's prefs, keyed by Node + task/repo |
 | Dashboard panel definitions and their placements | owning Node's prefs, one app-scoped slice |
 | Last path, last task, last source, last Node | device |
-| Last view per workspace; last workspace (terminal client) | owning Node's prefs, keyed by Node + workspace |
+| Last view per workspace | owning Node's prefs, keyed by Node + workspace |
+| Last workspace and the two-workspace shortcut pair | active Node's app-scoped prefs |
 | Workspace/task selection | Node + workspace/task |
 | Draft editor/comment text, and a commit message in the Changes pane | client + current task |
 | Provider data and task mutations | owning Node |

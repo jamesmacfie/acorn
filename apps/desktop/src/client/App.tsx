@@ -340,14 +340,6 @@ export default function App() {
     if (on) emitBootSpans()
   })
 
-  // ⌘; goes back to the workspace before this one, and this derivation is the only thing that knows
-  // which one that is (client-core features/workspaces/lastWorkspace.ts). Reported from here rather
-  // than from the picker, because opening a task in another workspace is a change of workspace too.
-  createEffect(() => {
-    const ws = activeWorkspace()
-    if (ws) noteWorkspaceVisit(ws.id)
-  })
-
   // Whatever source was selected has to still be on offer. A workspace switch can take one away:
   // a browse source only appears where its provider is connected and the workspace links one of its
   // projects, and neither is a fact about the source alone.
@@ -411,6 +403,14 @@ export default function App() {
       if (ws) openWorkspaceView(ws)
     })
     setPlaceRestored(true)
+  })
+
+  // The route is the authority for what actually opened. Wait until the saved pair and the startup
+  // destination have both landed, or a transient first route would displace the previous workspace.
+  createEffect(() => {
+    if (!placeRestored()) return
+    const ws = activeWorkspace()
+    if (ws) noteWorkspaceVisit(ws.id)
   })
 
   // Record what each workspace is showing as you move, so the one open when the window closes
