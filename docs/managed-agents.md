@@ -742,7 +742,12 @@ Inline diff chats are interactive managed sessions with a typed `origin` on the 
 The origin records the task, source, path, side, line, patch key, and original quote; a local origin
 also records staged or unstaged scope, while a PR origin records its repository and number. The
 Agents client capability supplies the compact diff card to Changes and GitHub without either plugin
-owning transcripts. The task sidebar groups these sessions under Inline chats. A patch change
+owning transcripts. The card draws the thread's chats-only view with the thread's own cards: the
+messages, and any question the agent asks, which the reader answers in place. Tool calls and other
+activity stay in the full session in Agents. The header leads with the session's state mark, the same
+one the sidebar draws. **Hide** folds a chat
+down to its header line, the way a resolved review thread folds, for the rest of the app session.
+The task sidebar groups these sessions under Inline chats. A patch change
 detaches the card from the line while leaving the session and its original context available in
 Agents. The client marks a session stale once it has seen that diff's newer document.
 

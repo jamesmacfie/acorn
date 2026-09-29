@@ -1,29 +1,38 @@
-import { createEffect, createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js'
+import { createEffect, createMemo, createResource, createSignal, Index, onCleanup, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { Alert, Button, Card, Fold, Inline, Select, Stack, Text, Textarea } from '@acorn/plugin-api/ui'
-import type { AgentConfigOption, AgentProviderDescriptor } from '../../contract/wire.ts'
+import { Alert, Button, Card, Inline, Select, Stack, Text, Textarea } from '@acorn/plugin-api/ui'
+import type { AgentConfigOption, AgentNormalizedEvent, AgentProviderDescriptor } from '../../contract/wire.ts'
 import { sameInlineLine, type InlineDiffOrigin } from '../../contract/inlineDiff.ts'
 import { defaultAgentSessionDefaults } from '../../shared/sessionDefaults.ts'
 import { agentSessionDefaultsOptions, writeAgentSessionDefaults } from '../settings/sessionDefaultsClient.ts'
 import { managedAgentApi } from '../sessions/managedClient.ts'
 import { managedAgentStore } from '../sessions/managedStore.ts'
-import { buildConversationItems } from '../sessions/conversationItems.ts'
+import { buildConversationItems, isChatItem, visibleConversationItems } from '../sessions/conversationItems.ts'
 import { openManagedSession } from '../sessions/managedSelection.ts'
-import AgentTranscript from '../sessions/AgentTranscript.tsx'
+import AgentEventCard from '../sessions/AgentEventCard.tsx'
+import RuntimeStateIcon from '../sessions/RuntimeStateIcon.tsx'
 
 type Props = { origin: InlineDiffOrigin; loadContext: () => Promise<string>; onClose?: () => void }
 
-const chatText = (events: ReturnType<typeof buildConversationItems>) => {
-  return events.flatMap((item) => {
-    if (item.event.type === 'user_message') {
-      const text = item.event.text.split('\n\nQuestion:\n').at(-1)!
-        .replace(/^Please answer without changing files or running write commands\.\n\n/, '')
-      return [{ role: 'You', text }]
-    }
-    if (item.event.type === 'assistant_message') return [{ role: 'Agent', text: item.event.text }]
-    return []
-  })
-}
+// The thread's "chats only" view, drawn by the thread's own cards: messages, and the agent's questions
+// so they can be answered here. The reader's turn is cut back to the question they typed: the line
+// context and read-only instruction are for the agent.
+const chatItems = (items: ReturnType<typeof buildConversationItems>) => items.filter(isChatItem).map((item) => {
+  if (item.event.type !== 'user_message') return item
+  const text = item.event.text.split('\n\nQuestion:\n').at(-1)!
+    .replace(/^Please answer without changing files or running write commands\.\n\n/, '')
+  return { ...item, event: { ...item.event, text } }
+})
+
+// Which chats the reader has folded away, by session. Held outside the card because the diff drops a
+// line's block when it scrolls out of view, and a fold that reopened on the way back would be lost.
+const [collapsedChats, setCollapsedChats] = createSignal(new Set<string>())
+const setChatCollapsed = (id: string, collapsed: boolean) => setCollapsedChats((previous) => {
+  const next = new Set(previous)
+  if (collapsed) next.add(id)
+  else next.delete(id)
+  return next
+})
 
 export default function InlineDiffCard(props: Props) {
   const queryClient = useQueryClient()
@@ -31,7 +40,6 @@ export default function InlineDiffCard(props: Props) {
   const [draft, setDraft] = createSignal('')
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
-  const [expanded, setExpanded] = createSignal(false)
   const [access, setAccess] = createSignal<'read-only' | 'full'>('read-only')
   const [providerOverride, setProviderOverride] = createSignal<string | null>(null)
   const [modelOverride, setModelOverride] = createSignal<string | null>(null)
@@ -45,7 +53,10 @@ export default function InlineDiffCard(props: Props) {
   const [providers] = createResource(() => session() ? undefined : 'new', () => managedAgentApi.providers())
   const [recent] = createResource(() => session() ? undefined : 'new', () => managedAgentApi.sessions({}))
   const snapshot = createMemo(() => session() ? managedAgentStore.snapshots()[session()!.id] : undefined)
-  const conversation = createMemo(() => chatText(buildConversationItems(snapshot()?.events ?? [])))
+  const requestsById = createMemo(() => new Map((snapshot()?.requests ?? []).map((request) => [request.providerRequestId, request])))
+  const conversation = createMemo(() => chatItems(visibleConversationItems(
+    buildConversationItems(snapshot()?.events ?? []), (requestId) => requestsById().get(requestId))))
+  const collapsed = () => !!session() && collapsedChats().has(session()!.id)
   // A persisted query can contain defaults from before inline choices existed. The node normalizes
   // stored preferences, but the restored client cache is visible before that response arrives.
   const record = () => {
@@ -136,44 +147,45 @@ export default function InlineDiffCard(props: Props) {
 
   return <Card pad="sm"><Stack gap="row">
       <Inline gap="inline">
+        <Show when={session()}>{(current) => <RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />}</Show>
         <Text emphasis="strong">Ask agent · {props.origin.path}:{props.origin.line}</Text>
         <Show when={session()}>{(current) => <Text emphasis="muted">{current().runtimeState}</Text>}</Show>
         <Show when={props.onClose && !session()}><Button size="sm" onPress={() => props.onClose?.()}>Close</Button></Show>
+        <Show when={session()}>{(current) => <Button size="sm" onPress={() => setChatCollapsed(current().id, !collapsed())}>
+          {collapsed() ? 'Show' : 'Hide'}
+        </Button>}</Show>
       </Inline>
-      <For each={conversation()}>{(message) => <Stack gap="none">
-        <Text emphasis="muted">{message.role}</Text><Text wrap>{message.text}</Text>
-      </Stack>}</For>
-      <Show when={!session()}>
-        <Inline gap="inline" wrap>
-          <Select label="Provider" size="sm" value={provider()?.id ?? ''}
-            options={installed().map((item) => ({ value: item.id, label: item.label }))}
-            onChange={setProviderOverride} />
-          <Show when={modelOption()}>{(option) => <Select label="Model" size="sm" value={model()}
-            options={[{ value: '', label: 'Provider default' }, ...option().values.map((value) => ({ value: value.value, label: value.label }))]}
-            onChange={setModelOverride} />}</Show>
-          <Select label="Access" size="sm" value={access()} options={[{ value: 'read-only', label: 'Read only' }, { value: 'full', label: 'Full access' }]}
-            onChange={(value) => setAccess(value as 'read-only' | 'full')} />
-        </Inline>
-        <Show when={access() === 'read-only' && !readonlyProfile()}><Text emphasis="muted" wrap>Read only is best effort with this provider.</Text></Show>
-      </Show>
-      <Textarea label="Ask agent" size="sm" rows={3} value={draft()} onInput={setDraft} placeholder="Ask about this change…" />
-      <Inline gap="inline">
-        <Button size="sm" disabled={busy() || !draft().trim()} onPress={() => void submit()}>{busy() ? 'Sending…' : 'Send'}</Button>
-        <Show when={session()}>{(current) => <>
-          <Button size="sm" onPress={() => setExpanded((value) => !value)}>{expanded() ? 'Hide activity' : 'Expand activity'}</Button>
-          <Button size="sm" onPress={() => openManagedSession(props.origin.taskId, current().id)}>Open in Agents</Button>
-          <Button size="sm" onPress={() => { setSessionId('new'); setDraft(''); setPendingAttempt(null) }}>New chat</Button>
-        </>}</Show>
-      </Inline>
-      <Show when={error()}>{(message) => <Alert tone="warn">{message()}</Alert>}</Show>
-      <Show when={expanded() && snapshot()}>{(current) => <Fold label="Full transcript" defaultOpen>
-        <AgentTranscript
+      <Show when={!collapsed()}>
+        {/* Index, not For: every snapshot rebuilds the items, and For would remount each card on it. */}
+        <Index each={conversation()}>{(item) => <AgentEventCard
+          item={item()}
           taskId={props.origin.taskId}
-          snapshot={current()}
-          viewKeyPrefix="inline-diff"
-          onExitSubagent={() => undefined}
-          onRequestResolved={() => { void managedAgentStore.loadSnapshot(current().session.id).catch(() => undefined) }}
-        />
-      </Fold>}</Show>
+          sessionId={session()?.id ?? ''}
+          request={item().event.type === 'request' ? requestsById().get((item().event as Extract<AgentNormalizedEvent, { type: 'request' }>).requestId) : undefined}
+          onRequestResolved={() => { void managedAgentStore.loadSnapshot(session()!.id).catch(() => undefined) }}
+        />}</Index>
+        <Show when={!session()}>
+          <Inline gap="inline" wrap>
+            <Select label="Provider" size="sm" value={provider()?.id ?? ''}
+              options={installed().map((item) => ({ value: item.id, label: item.label }))}
+              onChange={setProviderOverride} />
+            <Show when={modelOption()}>{(option) => <Select label="Model" size="sm" value={model()}
+              options={[{ value: '', label: 'Provider default' }, ...option().values.map((value) => ({ value: value.value, label: value.label }))]}
+              onChange={setModelOverride} />}</Show>
+            <Select label="Access" size="sm" value={access()} options={[{ value: 'read-only', label: 'Read only' }, { value: 'full', label: 'Full access' }]}
+              onChange={(value) => setAccess(value as 'read-only' | 'full')} />
+          </Inline>
+          <Show when={access() === 'read-only' && !readonlyProfile()}><Text emphasis="muted" wrap>Read only is best effort with this provider.</Text></Show>
+        </Show>
+        <Textarea label="Ask agent" size="sm" rows={3} value={draft()} onInput={setDraft} placeholder="Ask about this change…" />
+        <Inline gap="inline">
+          <Button size="sm" disabled={busy() || !draft().trim()} onPress={() => void submit()}>{busy() ? 'Sending…' : 'Send'}</Button>
+          <Show when={session()}>{(current) => <>
+            <Button size="sm" onPress={() => openManagedSession(props.origin.taskId, current().id)}>Open in Agents</Button>
+            <Button size="sm" onPress={() => { setSessionId('new'); setDraft(''); setPendingAttempt(null) }}>New chat</Button>
+          </>}</Show>
+        </Inline>
+        <Show when={error()}>{(message) => <Alert tone="warn">{message()}</Alert>}</Show>
+      </Show>
   </Stack></Card>
 }
