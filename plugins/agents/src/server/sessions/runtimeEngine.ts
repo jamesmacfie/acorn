@@ -47,10 +47,11 @@ import {
  *
  * It leaves out five fields. `lastEventSeq`, `lastEventAt` and `updatedAt` move with every event, and
  * the client reads the event frame for the one of them it needs live (../../client/sessions/managedStore.ts
- * § eventSeqs). `lastEventAt` drives the sidebar's "latest activity" order, which so re-sorts when a
- * turn starts or ends rather than on every streamed chunk. A
- * subagent's `updatedAt` is the node's clock for quieting a silent child, and no client reads it. The
- * status that quieting changes is still compared. `config` is too large to compare per event, and
+ * § eventSeqs). `lastEventAt` drives the sidebar's "latest activity" order, so that order re-sorts when
+ * a turn starts or ends rather than on every streamed chunk. A
+ * subagent's `updatedAt` is the node's clock for quieting a silent child, and moves with every tool call
+ * the child makes. The task sidebar's tooltip reads it only as of the row's last broadcast. The status
+ * that quieting changes is still compared. `config` is too large to compare per event, and
  * record() handles it separately.
  */
 const listedRow = (session: AgentSession): string => JSON.stringify({
