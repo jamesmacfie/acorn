@@ -3,7 +3,7 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { basicSetup } from 'codemirror'
 import { EditorState, Prec, StateEffect, type Extension, type Text } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
-import { activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, type Task } from '@acorn/plugin-api/client'
+import { activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, toast, type Task } from '@acorn/plugin-api/client'
 import { Alert, Button, DocumentTabs, EmptyState, ListDetail, Only, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
 import { applyViewState, captureViewState, editorTheme, languageForPath, refreshEditorTheme, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
 import { editorApi, editorRootKey, EDITOR_ROOT_STALE_MS } from './editorClient'
@@ -137,21 +137,50 @@ export default function EditorPane(props: { task: Task }) {
     setTreeReveal({ path, revision: ++treeRevealRevision })
   }
 
+  // The open file's path is relative to the checkout, and the root is the checkout's absolute path.
+  const copyPath = (absolute: boolean) => {
+    const path = active()
+    const checkout = root()
+    if (!path || !checkout) return
+    const text = absolute ? `${checkout}/${path}` : path
+    void navigator.clipboard.writeText(text)
+    toast(`Copied ${text}`)
+  }
+
   onMount(() => {
+    // All three need the same thing: this task on screen, the editor focused, a file open, and a
+    // checkout mapped.
+    const when = () => canRevealActiveFile({
+      paneTaskId: taskId,
+      activeTaskId: activeTaskId(),
+      focusedPane: focusedPane(taskId),
+      activeFile: active(),
+      treeAvailable: !!root(),
+    })
     const commands = registerCommands([{
       id: 'editor.tree.reveal-active-file',
       title: 'Reveal active file in editor tree',
       category: 'navigation',
       hint: () => active() ?? undefined,
       palette: true,
-      when: () => canRevealActiveFile({
-        paneTaskId: taskId,
-        activeTaskId: activeTaskId(),
-        focusedPane: focusedPane(taskId),
-        activeFile: active(),
-        treeAvailable: !!root(),
-      }),
+      when,
       run: revealActiveFile,
+    }, {
+      id: 'editor.copy-relative-path',
+      title: 'Copy relative path of active file',
+      category: 'action',
+      hint: () => active() ?? undefined,
+      palette: true,
+      when,
+      run: () => copyPath(false),
+    }, {
+      id: 'editor.copy-absolute-path',
+      title: 'Copy absolute path of active file',
+      category: 'action',
+      hint: () => active() ?? undefined,
+      palette: true,
+      when,
+      run: () => copyPath(true),
     }])
     onCleanup(() => commands.dispose())
   })
