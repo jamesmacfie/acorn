@@ -691,7 +691,11 @@ Both bindings call `packages/client-core/src/kit/lib/rendering/sanitizedHtml.ts`
 the live DOM. It parses the provider string in an inert template, then creates fresh text and a small
 allowlist of formatting elements. The only copied attribute is a validated absolute HTTPS `href`;
 links get host-owned `target` and `rel` values. Scripts, forms, foreign namespaces, images, embeds,
-styles and other automatic resource loads are dropped, along with every provider attribute. The host
+styles and other automatic resource loads are dropped, along with every provider attribute. The one
+exception is `class`, and only as a lookup: the GitHub class names that mark the removed and added
+lines of a suggested change, and the ones that colour its code, are read and replaced with fixed
+host class names, so the
+provider's own string is never written. The host
 adds bare-reference links only after this pass. Input length, node count and depth are bounded. The
 renderer CSP remains a second layer if this sanitizer is ever wrong.
 

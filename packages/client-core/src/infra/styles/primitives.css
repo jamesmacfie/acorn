@@ -1307,6 +1307,28 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   vertical-align: top;
 }
 .ui-markdown th { background: var(--bg-subtle); font-weight: var(--fw-semibold); }
+/* A GitHub "Suggested change": the sanitizer maps GitHub's diff classes onto these
+   (kit/lib/rendering/sanitizedHtml.ts). Drawn like a diff hunk, not a data table, so it undoes the
+   table skin above. GitHub gives the "Suggested change" header no class we could rely on, so it is
+   matched as the first child. `:first-child` and not "anything without the table" because GitHub also
+   ends the block with an empty div for its apply buttons. */
+.ui-md-suggestion { margin: var(--space-4) 0; border: var(--surface-border); border-radius: var(--radius); overflow: hidden; }
+.ui-md-suggestion > :first-child:not(:has(table)) { padding: var(--space-2) var(--space-4); border-bottom: var(--surface-border); background: var(--bg-subtle); color: var(--text-muted); font-size: var(--fs-xs); }
+.ui-md-suggestion table { display: table; width: 100%; margin: 0; font-family: var(--font-mono); }
+.ui-md-suggestion td { padding: var(--space-1) var(--space-4); border: 0; white-space: pre-wrap; }
+.ui-md-suggestion .ui-md-suggestion-gutter { width: var(--space-6); padding: 0; }
+.ui-md-suggestion-del { background: var(--del-bg); }
+.ui-md-suggestion-add { background: var(--add-bg); }
+.ui-md-suggestion-gutter.ui-md-suggestion-del, .ui-md-suggestion-del .ui-md-suggestion-word { background: var(--del-word-bg); }
+.ui-md-suggestion-gutter.ui-md-suggestion-add, .ui-md-suggestion-add .ui-md-suggestion-word { background: var(--add-word-bg); }
+.ui-md-suggestion-word { border-radius: var(--radius-marker); }
+.ui-md-syn-comment { color: var(--syntax-comment); }
+.ui-md-syn-keyword { color: var(--syntax-keyword); }
+.ui-md-syn-string { color: var(--syntax-string); }
+.ui-md-syn-constant { color: var(--syntax-constant); }
+.ui-md-syn-entity { color: var(--syntax-entity); }
+.ui-md-syn-variable { color: var(--syntax-variable); }
+.ui-md-syn-tag { color: var(--syntax-tag); }
 /* The stand-in for an image the renderer refuses to fetch (ui/markdown.ts, `placeholder`).
    In primitives.css rather than the agents plugin's sheet because the renderer that emits it is core's. */
 .ui-md-omitted { color: var(--text-faint); font-style: italic; }

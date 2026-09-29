@@ -16,6 +16,36 @@ const DROP_SUBTREE = new Set([
   'svg', 'template', 'textarea', 'track', 'video', 'xmp',
 ])
 
+// GitHub draws a "Suggested change" block as a table of removed and added lines, and only its classes
+// say which row is which. We read those few tokens and write our own class names in their place, so
+// the provider's class string never reaches the page and the skin in primitives.css stays ours.
+//
+// The `pl-*` tokens are GitHub's syntax highlighting inside that code. We keep the ones that carry a
+// colour in GitHub's own stylesheet. The rest (punctuation, markdown emphasis) draw as plain text.
+// GitHub also colours by nesting: an identifier inside a template string goes back to plain text,
+// where ours keeps the string colour. Map the pair if that ever reads wrong.
+const PROVIDER_CLASSES = new Map([
+  ['js-suggested-changes-blob', 'ui-md-suggestion'],
+  ['blob-num', 'ui-md-suggestion-gutter'],
+  ['blob-num-deletion', 'ui-md-suggestion-del'],
+  ['blob-code-deletion', 'ui-md-suggestion-del'],
+  ['blob-num-addition', 'ui-md-suggestion-add'],
+  ['blob-code-addition', 'ui-md-suggestion-add'],
+  ['x', 'ui-md-suggestion-word'],
+  ['pl-c', 'ui-md-syn-comment'],
+  ['pl-k', 'ui-md-syn-keyword'],
+  ['pl-s', 'ui-md-syn-string'],
+  ['pl-pds', 'ui-md-syn-string'],
+  ['pl-sr', 'ui-md-syn-string'],
+  ['pl-corl', 'ui-md-syn-string'],
+  ['pl-c1', 'ui-md-syn-constant'],
+  ['pl-e', 'ui-md-syn-entity'],
+  ['pl-en', 'ui-md-syn-entity'],
+  ['pl-v', 'ui-md-syn-variable'],
+  ['pl-smw', 'ui-md-syn-variable'],
+  ['pl-ent', 'ui-md-syn-tag'],
+])
+
 const MAX_HTML_LENGTH = 1_000_000
 const MAX_NODES = 20_000
 const MAX_DEPTH = 64
@@ -70,6 +100,12 @@ export function sanitizedHtmlFragment(html: string): DocumentFragment {
       anchor.href = href
       anchor.target = '_blank'
       anchor.rel = 'noopener noreferrer'
+    }
+    if (output !== target) {
+      for (const token of element.classList) {
+        const mapped = PROVIDER_CLASSES.get(token)
+        if (mapped) (output as Element).classList.add(mapped)
+      }
     }
     for (const child of element.childNodes) {
       if (exceeded) break

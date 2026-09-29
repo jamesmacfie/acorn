@@ -19,6 +19,8 @@ export const DERIVED_THEME_TOKENS = [
   '--state-ok', '--state-warn', '--state-bad',
   '--find-hit-bg', '--find-current-bg', '--scrim-color',
   '--brand-legible',
+  '--syntax-comment', '--syntax-keyword', '--syntax-string', '--syntax-constant',
+  '--syntax-entity', '--syntax-variable', '--syntax-tag',
 ] as const
 
 /** Series identity, for a chart mark asking "which one" rather than "how is this doing." See
