@@ -130,7 +130,7 @@ comment box, the review box under it and its three verbs could not be reached fr
 all — Escape went back to the tab strip and Down came back to the same box. So a field binds Tab and
 Shift+Tab to the stop walk at its own tier, above the typing shadow, and says whether it moved; at
 the panel's edge it declines and the region tier's Tab answers as it always did
-(`apps/tui/src/kit/asking.tsx` § step). The footer says `tab next` in a field and `tab region`
+(`apps/tui/src/kit/asking/fieldRef.ts` § step). The footer says `tab next` in a field and `tab region`
 everywhere else. This is the DOM's own rule — Tab is the next control in a form — and it is lazygit's
 inside its commit box, where Tab toggles the summary and the description and Escape closes. gh-dash
 needs no such key because its comment box is a mode entered with `c` rather than a stop in the
@@ -158,7 +158,7 @@ The key still has to reach the field, and the dispatcher hands it over rather th
 anything under the dispatcher. `apps/tui/src/keys/install.ts` § typeInto is one ordinary listener
 after the engine's: where no binding claimed the key and the store's focused node is a field, it
 calls that node's own `handleKeyPress` and then claims the key. A field installs `handleKeyPress` on
-its node from its own `ref` (`apps/tui/src/kit/asking.tsx`), and the edit model behind it reads the
+its node from its own `ref` (`apps/tui/src/kit/asking/fieldRef.ts`), and the edit model behind it reads the
 key and nothing else — no focus of its own to check, which is what makes the hand-off possible at
 all.
 
@@ -183,8 +183,9 @@ itself.
 
 ### Focus regions
 
-`apps/tui/src/keys/regions.ts` keeps the DOM host's contract and replaces every mechanism in it. It
-describes five levels and nothing else:
+`apps/tui/src/keys/regions.ts` owns focus, scopes, and navigation. `parentStops.ts` records strips
+and their panels. `collectionRegistry.ts` records collection rows and their identities. All focus
+moves still pass through `regions.ts`, which describes five levels:
 
 ```text
 Screen
@@ -275,7 +276,7 @@ a `Map` from box to collection, and one `Set` of every panel on screen; the arra
 ordering is what they are good at, and `ordered()` — the region cycle — caches its sorted answer until
 a region registers or a scope moves. The panel set is derived from the same `panels()` getters
 `parentOf` reads rather than written beside them, so there is still one answer to "is this a panel"
-(`apps/tui/src/keys/regions.ts`, `apps/tui/src/kit/grouping.tsx` § registerPanel). A move asks
+(`apps/tui/src/keys/regions.ts`, `apps/tui/src/kit/grouping/panelRegistry.ts` § registerPanel). A move asks
 `stopsIn` once and hands the list to the walk, where it used to ask twice.
 
 **One deferred decision.** A focus decision that needs a renderable the current render has not
@@ -378,7 +379,8 @@ The intent half of `collection.ts` is shared. The element half has a DOM file an
 wheel movement changes the window without changing that key. `Grid` keeps its documented exception:
 a virtualised row has no renderable, so the arrows move `selected` and the view follows.
 
-`Timeline` is the exception that goes the other way. `focusRoles.ts` calls it a collection and the DOM
+`Timeline` is the exception that goes the other way. The shared
+`packages/client-core/src/kit/tokens/focusRoles.ts` table calls it a collection, and the DOM
 host roves over its turns; here a turn is a `Card`, and a card is a stop only where it takes an
 `onPress`. So the stops in a pull request's conversation are the controls and composers inside the
 turns rather than the turns themselves, and nothing roves. A reader moves through them with the arrows
@@ -491,7 +493,7 @@ with the page keys and the wheel: `↓` lands on the button and stops there, bec
 two stops is not a place the keys can be.
 
 The diff pane is the third shape, and it is a viewport with a window inside it. `DiffPane` in
-`apps/tui/src/kit/showing.tsx` used to build one `<text>` per line of every file, which for a
+`apps/tui/src/kit/showing/diffPane.tsx` used to build one `<text>` per line of every file, which for a
 five-thousand-line patch is five thousand renderables in a pane that shows twenty. It draws from the
 same diff document the DOM viewer does ([diff rendering](../diff-rendering.md) § The document): a
 file's header is one line and each segment is as many lines as its descriptor says, so the slice

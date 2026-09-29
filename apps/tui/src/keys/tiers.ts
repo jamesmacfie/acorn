@@ -73,7 +73,7 @@ export const COLLECTION = 40
 /**
  * An open `Menu`'s own list walk, 36. Below the collection, so a menu whose caller drew a real `Rows`
  * inside it lets that list answer the arrows; above the viewport, so the walk beats the scroll
- * (../kit/grouping.tsx § MenuList).
+ * (../kit/grouping/menu.tsx § MenuList).
  *
  * A known ceiling, recorded rather than gated. A scope contains the store's answers, not the engine's
  * layers: a `focus-within` layer on an *ancestor* of the open scope's box still matches, because

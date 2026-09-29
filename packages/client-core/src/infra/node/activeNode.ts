@@ -1,7 +1,7 @@
 import { createSignal } from 'solid-js'
 import { fleetBridge } from '../platform'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
-import { readLocal, writeLocal } from '../../kit/lib/deviceStorage'
+import { readLocal, writeLocal } from '../../kit/lib/state/deviceStorage'
 import { homeNode, nodeIsStarting, nodes, ORIGIN_NODE_ID, refreshFleet } from './fleet'
 
 // The node this window talked to last, remembered on the device so the next launch has one before the

@@ -1,4 +1,4 @@
-import { Registry } from '../../../kit/lib/registry'
+import { Registry } from '../../../kit/lib/state/registry'
 
 // Visual styles (shape, typography, space, density, chrome, motion), the second appearance axis,
 // orthogonal to themes, which own colour. Mirrors registries/themes.ts so a plugin can contribute a

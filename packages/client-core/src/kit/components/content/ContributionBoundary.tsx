@@ -1,6 +1,6 @@
 import { ErrorBoundary, type JSX } from 'solid-js'
-import { reportContributionError } from '../../lib/contributionErrors'
-import { Button } from '../primitives'
+import { reportContributionError } from '../../lib/telemetry/contributionErrors'
+import { Button } from '../inputs/Button'
 
 export function ContributionBoundary(props: { contributionId: string; owner?: string; children: JSX.Element; quiet?: boolean }) {
   return (

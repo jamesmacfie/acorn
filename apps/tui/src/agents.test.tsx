@@ -149,7 +149,7 @@ describe('running an agent from a terminal', () => {
   // is a `Menu` with a filter field over provider rows — and inside the header's `Toolbar` its panel
   // used to be laid out in the few cells the trigger was given, so `Claude Code` and `Available`
   // collided into `ClaAv` and a reader could not tell what they were choosing
-  // (../kit/grouping.tsx § ToolbarPanel).
+  // (../kit/grouping/blocks.tsx § Toolbar).
   it('starts a new run from the header, and the provider row is readable', async () => {
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     try {

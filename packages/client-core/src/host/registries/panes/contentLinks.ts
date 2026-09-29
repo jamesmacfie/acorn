@@ -1,4 +1,4 @@
-import { Registry } from '../../../kit/lib/registry'
+import { Registry } from '../../../kit/lib/state/registry'
 import { openPane } from '../commands/clientEvents'
 import { paneAvailable, paneContribution } from './panes'
 import { openRefPanel } from './refPanels'

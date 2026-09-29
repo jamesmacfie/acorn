@@ -1,5 +1,6 @@
 import { For, Show, type JSX } from 'solid-js'
-import { DetailColumn, ListColumn, ListDetail, SectionHeader } from '../primitives'
+import { DetailColumn, ListColumn, ListDetail } from './ListDetail'
+import { SectionHeader } from './SectionHeader'
 import { Fold } from './Fold'
 
 // One surface as a header, a set of named sections, and the one thing that gets the room: the shape

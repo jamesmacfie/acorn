@@ -2,6 +2,11 @@
 
 Part of [workflows.md](../workflows.md).
 
+The Node's `plugins/workflows/src/server/authoring/` generates and grounds proposed definitions.
+`definitions/` loads saved definitions, `files/` handles repository and user file writes, and
+`publication/` records published revisions and drafts. The client editor stays under
+`plugins/workflows/src/client/editor/`.
+
 ## Authoring
 
 Workflows is a source in the left rail, present in every workspace because nothing has to be
@@ -210,6 +215,12 @@ that one with a step waiting on two others comes first, because a fan-in is the 
 wrong on its own. The definition being edited is left out of its own examples, and so is any
 definition that does not itself pass the checker: a workspace's broken workflow is the wrong thing to
 learn house style from.
+
+`plugins/workflows/src/server/authoring/generate.ts` is the prompt API. Its private `generate/`
+modules own the fixed teaching text, catalog rendering, example selection, and prompt assembly.
+`generationRequest.ts` makes the model calls, and `ground.ts` checks the reply against the same
+forbidden-key list used by kind rendering. A prompt digest test pins the complete system, edit, and
+repair text because whitespace and section order affect model behavior and provider cache keys.
 
 Generation also receives the selected project's bounded child workflow catalog. It contains the
 same references, input signatures, and output schemas that the child workflow picker uses. Grounding

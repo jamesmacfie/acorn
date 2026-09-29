@@ -3,7 +3,7 @@ import { fromVisual, toVisual, type Row } from '../wrap'
 
 // What a field holds and what one key does to it: a string, an offset, and a table.
 //
-// This is the model `./asking.tsx`'s `Input` and `Textarea` own. It is a plain string rather than a
+// This is the model `./asking/fields.tsx`'s `Input` and `Textarea` own. It is a plain string rather than a
 // rope and it is not `@codemirror/state`: we wrote it both ways against the same 40 assertions and
 // the library saved 26 lines for 47,922 bytes in the eager graph. A keystroke on a 400-line note
 // costs 99 microseconds either way.
@@ -57,7 +57,7 @@ export const create = (text: string, cursor = text.length): Field =>
  *
  *  A caret that was at the end stays at the end, which is what a field being typed into from a
  *  controlled prop needs: the component writes the value back on every keystroke, and a caret pinned
- *  to an offset would fall behind by one character per key (./asking.tsx § Input). */
+ *  to an offset would fall behind by one character per key (./asking/fields.tsx § Input). */
 export const setValue = (field: Field, text: string): Field =>
   create(text, field.cursor >= field.text.length ? text.length : field.cursor)
 
@@ -235,7 +235,7 @@ function typedBy(key: Press): string {
  * note is 163 microseconds, which is affordable per key and wasteful per frame.
  *
  * `newline` is the whole of the difference between the two fields. An `Input` says no, and Return
- * then falls through to its component, which submits (./asking.tsx § Input).
+ * then falls through to its component, which submits (./asking/fields.tsx § Input).
  */
 export function edit(
   field: Field, key: Press, rows: readonly Row[], newline: boolean,

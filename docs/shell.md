@@ -405,7 +405,7 @@ commands. It never exposes a node token, a certificate, a database handle, or a 
 
 One thing on that socket is not JSON: terminal output. The helper's push channel carries a binary
 frame beside the JSON messages, tagged with the node id, wrapping the frame the node sent, which is
-itself tagged with the session id (`packages/protocol/src/ws.ts` § The one binary frame). The bridge
+itself tagged with the session id (`packages/protocol/src/transport/ws.ts` § The one binary frame). The bridge
 sets `binaryType = 'arraybuffer'`, peels the node id, and hands the rest to
 `packages/client-core/src/infra/node/wsClient.ts` through the seam's `onBytes`, which is the one module
 that reads the session id and the one place the bytes become text. So a busy build's output crosses two
@@ -714,7 +714,7 @@ in the helper.
 
 ## Service protocol
 
-`packages/protocol/src/serviceProtocol.ts` defines the versioned lifecycle messages between the
+`packages/protocol/src/device/serviceProtocol.ts` defines the versioned lifecycle messages between the
 helper and the node it supervises: `service.start`, `service.stop`, and `service.preview-rules`. Both
 endpoints validate messages with Zod, and pending calls reject on timeout or peer exit. Product
 requests do not use this RPC; they use `/v1` over the broker.

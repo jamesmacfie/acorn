@@ -2,7 +2,7 @@ import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Slot } from '../tree/Slot'
 import { extensionPointRegistry, extensionRegistry } from '../registries/extensionPoints/extensionPoints'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 
 // The direct render path into a slot: a compiled plugin's component, mounted where a loaded plugin's
 // worker tree would go (docs/plugins.md § Cooperative extension points, "two render paths").

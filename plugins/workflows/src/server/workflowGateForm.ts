@@ -6,8 +6,8 @@ import { parseDataSchema, validateDataValue } from '@acorn/protocol/dataSchemas.
 import type { WorkflowPosture, WorkflowStepDef } from '../shared/workflowContracts'
 import { GATE_FORM_MAX_FIELDS } from '../shared/gateForm'
 import { stepIdentity } from '../shared/workflowIdentity'
-import { bindingProblems } from './workflowDispatchValidation'
-import { WORKFLOW_VALUE_BYTES } from './workflowValues'
+import { bindingProblems } from './dispatch/validation'
+import { WORKFLOW_VALUE_BYTES } from './validation/values'
 
 const FIELD_NAME_RE = /^[A-Za-z][A-Za-z0-9_]*$/
 const FIELD_KEYS = ['name', 'label', 'schema', 'description', 'required', 'default']

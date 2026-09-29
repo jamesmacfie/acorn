@@ -4,7 +4,7 @@
 // The diff toolkit sits on @acorn/plugin-api/ui/diff instead of here: it is a domain toolkit rather
 // than a primitive, and its `Row` type would collide with the `Row` layout component below.
 //
-// Off this surface: ContributionBoundary (host machinery), IconPicker/iconNodes, WorkspacePicker,
+// Off this surface: ContributionBoundary (host machinery), IconPicker/iconNodes,
 // tokenAxes, focus.ts. No plugin imports them, and page-level components on a contract are how a
 // design system stops being able to change.
 

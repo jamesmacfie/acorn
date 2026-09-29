@@ -2,6 +2,11 @@
 
 [Back to plugins](../plugins.md)
 
+The public manifest schema is `@acorn/protocol/plugin/contract.ts`. Its private `manifest/` modules
+group surface, chrome, command, extension, display, and Node runtime descriptors. The Node's
+`packages/node-core/src/server/plugins/manifest.ts` applies rules that need the plugin id or compare sibling contributions.
+Clients use the wire types from `contract.ts` and recheck values received in roster rows.
+
 ## Descriptors
 
 A rail source, a badge in the task footer or the topbar, commands and keybindings, attention items,

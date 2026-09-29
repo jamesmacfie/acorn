@@ -1,5 +1,5 @@
 import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
-import { fuzzyScore } from '../../../kit/lib/fuzzy'
+import { fuzzyScore } from '../../../kit/lib/controls/fuzzy'
 import type { CommandExecutionContext, SearchCommand } from './commands'
 
 // A search whose rows are already on this machine: fetch the list once when the frame opens, then

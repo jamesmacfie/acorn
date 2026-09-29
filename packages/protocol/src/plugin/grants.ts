@@ -1,4 +1,4 @@
-import type { PluginAgentToolGrant, PluginContextSectionGrant, PluginContributions, PluginCustomAgentGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '../api'
+import type { PluginAgentToolGrant, PluginContextSectionGrant, PluginContributions, PluginCustomAgentGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '../transport/api'
 import {
   isCoreExclusiveSlot,
   isExtensionPointKind,
@@ -6,9 +6,9 @@ import {
   parseExtensionPointRef,
   qualifiedExtensionPointId,
   type ExtensionPointKind,
-} from '../extensionPoints'
-import { isPluginKeyClaim } from '../keybindings'
-import { normalizeWebviewHost } from '../webview'
+} from '../chrome/extensionPoints'
+import { isPluginKeyClaim } from '../chrome/keybindings'
+import { normalizeWebviewHost } from '../content/webview'
 
 /** Canonical executable-surface grants derived from a manifest. Both the consent UI and the desktop
  * main process use these projections, so bundled auto-trust and an owner click authorize the same

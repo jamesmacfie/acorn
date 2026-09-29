@@ -4,9 +4,9 @@ Use events to announce a completed change. Use a capability when a caller needs 
 plugin. Both belong to one Node. A client connected to several Nodes must keep each Node's data and
 subscriptions separate.
 
-These examples use plugin API major `11`. The node context is declared in
+These examples use plugin API major `2`. The node context is declared in
 `packages/plugin-types/src/public.ts`; the event vocabulary is in
-`packages/protocol/src/nodeEvents.ts`.
+`packages/protocol/src/transport/nodeEvents.ts`.
 
 ## Listen to a core event
 

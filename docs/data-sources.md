@@ -11,7 +11,7 @@ parameters. Scope is context, not record identity. Details preserve that scope a
 return the runtime-validated detail schema beside data and fetched time.
 
 The Node owns source registration and bounded reads. Providers supply typed nested records through
-their own plugin routes. The shared contract is `packages/protocol/src/dataSources.ts`; schemas,
+their own plugin routes. The shared contract is `packages/protocol/src/data/dataSources.ts`; schemas,
 values, and field bindings use the companion typed-data modules.
 
 ## Register a source
@@ -156,7 +156,7 @@ undoable edit.
 ## Workspace query library
 
 Core stores query drafts, immutable published revisions, and consumer references in its normal
-SQLite migration chain. The contract is `packages/protocol/src/dataQueries.ts`. Each query belongs
+SQLite migration chain. The contract is `packages/protocol/src/data/queries/dataQueries.ts`. Each query belongs
 to a workspace and can be restricted to one project. Project reads include workspace-wide queries;
 workspace-wide reads do not expose project-restricted queries. Scope cannot change through a save.
 
@@ -164,7 +164,7 @@ Query content contains a name, a closed object schema for declared parameters, a
 explicit `sourceParameters` bindings, and an optional connection binding. Literal source parameters
 remain ordinary data. Explicit bindings overlay named source parameters. Saved content can address
 only its own declared inputs; a consumer's outer bindings can address its admitted inputs, predecessor
-outputs, or current item. `packages/protocol/src/dataQueryResolution.ts` resolves bindings without
+outputs, or current item. `packages/protocol/src/data/queries/dataQueryResolution.ts` resolves bindings without
 string coercion. The consumer controls which predecessor outputs enter that context.
 
 POST JSON to `/v1/core/queries/:operation`, with the matching `operation` and `scope` in the body.

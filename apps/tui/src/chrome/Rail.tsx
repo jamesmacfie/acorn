@@ -94,7 +94,7 @@ function TaskList(props: { model: ShellModel; markerCells: number }) {
   })))
 
   // Kept rather than rebuilt, so a `tasks:changed` costs the rows that changed rather than all of
-  // them (../kit/showing.tsx § keyedRows).
+  // them (../kit/showing/collection.tsx § keyedRows).
   const hierarchy = createMemo(() => workflowTaskHierarchy(props.model.tasks(), expandedWorkflowRoots(), activeTaskId()))
   const depthByTask = createMemo(() => new Map(
     hierarchy().map((entry) => [entry.task.id, entry.depth]),

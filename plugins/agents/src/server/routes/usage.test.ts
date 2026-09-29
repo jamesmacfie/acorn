@@ -267,6 +267,7 @@ describe('agent usage routes', () => {
       expect(await (await app.fetch(request('/api/agents/session-defaults'), env)).json()).toEqual({
         continueAfterUsageLimit: true,
         followLastSession: false,
+        inline: { providerId: null, pinned: {} },
         pinned: { codex: { model: 'gpt-5.1-codex-max' } },
         last: { codex: { reasoning: 'high' } },
       })

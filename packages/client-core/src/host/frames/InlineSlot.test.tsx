@@ -2,7 +2,7 @@ import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { InlineSlot } from './InlineSlot'
 import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '../registries/extensionPoints/extensionPoints'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 
 // Another plugin's rectangle, drawn as a sibling region of this one's pane (docs/plugins.md §
 // Cooperative extension points, the `rectangle` kind).

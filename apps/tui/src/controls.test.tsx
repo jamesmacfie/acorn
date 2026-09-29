@@ -127,7 +127,7 @@ describe('the pull request from the keyboard', () => {
     // The arrows type in a field, so the walk of a panel used to end at its first one: on this pane
     // the `[Comment]` button, the review box under it and its verbs could not be reached at all.
     // Tab is the next control before it is the next region, and it says so in the footer
-    // (../kit/asking.tsx § step, docs/tui.md § The five key groups).
+    // (../kit/asking/fieldRef.ts § step, docs/tui.md § The five key groups).
     const screen = await renderFixture({ pane: 'pr', width: 100, height: 32 })
     try {
       await screen.until('[Merge]', 45)

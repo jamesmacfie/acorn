@@ -12,6 +12,7 @@ pnpm --filter @acorn/arch-tests test
 pnpm --filter @acorn/desktop test
 pnpm --filter @acorn/cli test
 pnpm db:check
+pnpm test:coverage
 ```
 
 `pnpm test` rebuilds native modules for plain Node and runs Vitest through Turborepo with bounded
@@ -20,8 +21,28 @@ rather than `turbo run test` directly: the bound is what keeps the suite honest.
 spawn a real subprocess, mint a certificate, or run git, and turning the bound off oversubscribes the
 machine badly enough that they time out while passing in isolation.
 
-The desktop package's `test` stages the bundle inputs first, then runs its Vitest suites and the Rust
-unit tests, so the boot test always exercises fresh artifacts.
+The desktop package's `test` stages the bundle inputs first, including a build of the plugin SDK for
+bundled plugin imports. It then runs its Vitest suites and the Rust unit tests, so the boot test
+exercises fresh artifacts.
+
+## Coverage measurement
+
+`pnpm test:coverage` runs focused Vitest suites for four contract paths and writes JSON summaries to
+`.coverage/<path>/coverage-summary.json`. Each target names the source files to include, including
+files no test imports. The command reports coverage for these test selections only:
+
+| Target | Tests | Source in report |
+| --- | --- | --- |
+| Protocol plugin contract | `packages/protocol/src/plugin/` | `packages/protocol/src/plugin/**/*.ts` |
+| Node plugin loader | `packages/node-core/src/server/plugins/` | `packages/node-core/src/server/plugins/**/*.ts` |
+| Client frame bridge and host | `packages/client-core/src/host/frames/`, including `PluginFrame.test.tsx` for iframe connection, startup deadline, and teardown | `packages/client-core/src/host/frames/**/*.{ts,tsx}` |
+| Workflow execution | Seven suites covering dispatch, child lifecycle, maps, nested runs, processing, projection, and schedules | Seven modules: `runs/runner.ts`, `steps/execution.ts`, `dispatch/dispatcher.ts`, `dispatch/childLifecycle.ts`, `processing/rules.ts`, `runs/read/projection.ts`, and `schedules/service.ts` under `plugins/workflows/src/server/` |
+
+Use the report to find untested branches before changing these boundaries. It is not a monorepo
+coverage percentage. Integration tests in other packages can exercise a contract without appearing
+in its package-local report. The Node plugin worker runs in a separate thread, so its source appears
+uncovered in this in-process V8 report even when loader tests exercise it. No global percentage
+threshold is set.
 
 The TUI agent driver has focused protocol, screen, and flow tests under
 `apps/tui/scripts/agent/`. A live PTY run is an opt-in acceptance check because it builds and starts
@@ -294,7 +315,7 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
   and a moved file drops its old patch, that a resolved thread asks for nothing, and that a
   dehydrated query client holds no segment text. `infra/node/fleet.test.ts` checks that `dropNode`
   clears that node's segments and no other's;
-- long timelines have three layers of test. `kit/lib/timelineWindow.test.tsx` holds the window's rules:
+- long timelines have three layers of test. `kit/lib/timeline/timelineWindow.test.tsx` holds the window's rules:
   the newest page on open, appended turns joining it, a page per **Show earlier**, a page-aligned
   reveal, keeping its size when its oldest key leaves, and trims that only move forward.
   `kit/components/content/Timeline.test.tsx` drives a windowed followed Timeline over geometry read
@@ -376,8 +397,9 @@ guard, the highlighter worker's separate policy, the refusal to answer a node ro
 own HTML, the handshake and ready-line parsing, the data key's shape and file fallback, the plugin
 scheme's hash grammar and frame CSP, the webview URL policies and the key grammar that picks between
 them, the navigation-history bookkeeping, the capability file's webview scoping, and the three
-packaging properties in `tauri.conf.json`. `.github/workflows/build-desktop.yml` runs both halves
-before the bundler pass, so a broken boot path fails in seconds rather than minutes.
+packaging properties in `tauri.conf.json`. The macOS pull request job in `.github/workflows/ci.yml`
+runs both halves. `.github/workflows/build-desktop.yml` runs them again before the bundler pass on
+`main` and tags, so a broken boot path fails before packaging.
 
 What no headless run reaches is compositing: a child webview positioned over a window needs a window.
 That is what items 4 and 5 of the smoke checklist are for.
@@ -443,7 +465,7 @@ The tests that hold the fixture and the health probes to their contract:
   projects it into cards;
 - `plugins/changes/src/testkit/reviewNotes.test.ts` checks that seeded notes are the rows the route
   returns;
-- `kit/lib/surfaceHealth.test.ts` covers the registry and its privacy rule,
+- `kit/lib/telemetry/surfaceHealth.test.ts` covers the registry and its privacy rule,
   `features/diff/diffHealth.test.tsx` renders the real pane over the small profile, and
   `Timeline.test.tsx` checks projected against mounted turns, the window's counts, and exact teardown;
 - `apps/desktop/scripts/agent/flow.test.mjs` checks that a flow file with an unknown action, a
@@ -463,23 +485,22 @@ is still owed for both. Run it on the host used for release checks and keep both
 
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs `pnpm lint` and `pnpm test` on every pull request and on push to
-`main`. Before it existed, the architecture rules and the path checker ran only on whoever remembered
-to run them: `.github/workflows/build-desktop.yml` has no `pull_request` trigger and tests the desktop
-package alone. That is how twelve doc paths rotted without anything going red.
+`.github/workflows/ci.yml` runs `pnpm lint` and the non-desktop `pnpm test` suites on every pull
+request and on push to `main`. A separate macOS job runs `pnpm --filter @acorn/desktop test` on pull
+requests without signing secrets. `.github/workflows/build-desktop.yml` runs the same desktop tests
+before building the signed artifact on `main` and tags.
 
-It runs on Linux, for two reasons that are both about the runner rather than the code. A macOS runner
-has no Docker for the container probes to find, and its `/var` is a symlink to `/private/var`, which is
-the artefact behind one of the pre-existing failures below.
+The non-desktop job runs on Linux. A macOS runner has no Docker for the container probes to find,
+and its `/var` is a symlink to `/private/var`, which causes one of the pre-existing failures below.
 
-`@acorn/desktop` is filtered out of the test run. Its `test` script stages the whole bundle and then
-runs `cargo test`, and `build-desktop.yml` already has the Rust toolchain, the staged inputs, and the
-pinned-runtime cache to do it in. That does mean the boot test and the Rust suite gate `main` rather
-than the pull request.
+`@acorn/desktop` is filtered out of the Linux test run. Its macOS pull request job installs Rust and
+caches the pinned Node runtime; the package's `test` script stages the bundle inputs, builds the
+renderer, runs Vitest including the helper boot test, and runs `cargo test`. It does not require
+updater signing secrets or build a distributable.
 
-Nothing is cached between runs, so CI runs the suites a local `pnpm test` usually serves from
-Turborepo's cache. A green local run with 30 of 31 tasks cached is not evidence about the one task you
-changed.
+The workflows cache dependencies and the pinned Node runtime, but not Turborepo task outputs. CI
+runs suites that a local `pnpm test` might serve from Turborepo's cache. A green local run with 30 of
+31 tasks cached is not evidence about the one task you changed.
 
 The startup budget checks live in `build` scripts because they assert properties of built output.
 `@acorn/desktop`'s `build` runs
@@ -489,43 +510,47 @@ the build over a byte ceiling or a denylisted chunk name; [frontend.md](./fronte
 enforce. The TUI build also checks that Node can resolve every external import in its emitted modules,
 including lazy chunks, through `apps/tui/scripts/check-runtime-imports.mjs`.
 
-The build checks do not run in this workflow, which only runs `lint` and `test`: the renderer's runs in
-`build-desktop.yml`, which builds the bundle, and the terminal client's runs whenever somebody builds
-that package. So each has a fixture suite beside it that drives the same script against a directory it
-writes itself — `apps/desktop/test/scripts/` and `apps/tui/src/startupGraph.test.ts`. The TUI's
-`apps/tui/src/runtimeImports.test.ts` exercises its external-import check. Those are what
-gate a pull request: they prove the rule, and the `build` invocation is what applies it to the real
-bytes.
+The desktop pull request job builds the renderer through its `test` script, but does not run the
+renderer budget check; `build-desktop.yml` applies that check to the real build output. The terminal
+client's build check runs when somebody builds that package. Each has a fixture suite that drives the
+same script against a directory it writes itself — `apps/desktop/test/scripts/` and
+`apps/tui/src/startupGraph.test.ts`. The TUI's `apps/tui/src/runtimeImports.test.ts` exercises its
+external-import check. Those fixture suites gate pull requests.
 
 ## The smoke checklist
 
-Run this checklist per release. The automation-only development launcher covers main-renderer flows,
-but it deliberately does not replace checks of the packaged app, native chrome, host-owned child
-webviews, or real external CLIs. Its first pass is still owed, on a machine that never had the Electron
-build, and nothing ships to a person until it passes (docs/shell.md § Signing gates and the updater).
+Run this pass against the packaged desktop app on a clean host before an alpha release. Record the
+artifact version, operating system, result, and any issue for each step. The development window and
+headless suites do not exercise native chrome, packaged schemes, or host-owned child webviews.
 
-1. Install and launch; the window appears and the local node reaches online.
-2. Pair a second node by code; fingerprint words match.
-3. Open a terminal; a TUI renders and survives resize.
-4. Open a preview pane against a task dev server through the tunnel. Navigate, go back, and cover it
-   with an overlay; the child webview hides rather than floating above it.
-5. Open a loaded plugin pane; it renders, and a network call from its frame fails.
-   Install a client-only plugin on this device from a remote package. Accept its trust prompt, confirm
-   its pane appears without restarting, then disable, re-enable, update, and remove it. A newer bundle
-   on a Node must not displace it. Removal must clear its state and restore core in any chosen
-   exclusive slot; a deliberately failing provider must also fall back to core.
-6. Open a loaded plugin's webview surface; a link to a host its manifest does not name is refused.
-7. Trigger the quit flow with an active agent; the concern prompt appears; quit drains cleanly.
-8. Kill the node process five times; the recovery screen appears on the sixth.
-9. Install a data-only harness plugin against an agent CLI on the machine; the trust prompt names the
-   command under `Enforced`, and after approving it the agent appears in the Agent Center and completes
-   a turn. Nothing automated can cover this one: the suites can prove the descriptor reaches the driver
-   registry, and only a real CLI can prove the transcript.
+First run `pnpm lint`, `pnpm test`, `pnpm --filter @acorn/desktop test`, and `pnpm db:check` on the
+release commit. `pnpm test:coverage` is a diagnostic for four critical code paths; it has no release
+threshold. See [Coverage measurement](#coverage-measurement) for its scope.
 
-For managed-session naming, run one detailed first prompt with both Claude Code and Codex. Confirm the
-prompt fallback appears immediately and is replaced by a short title without interrupting the turn.
-Repeat while renaming the session before the generated result arrives, and confirm the user title
-wins. Signed-out CLIs and Aider must retain the fallback without adding a transcript warning.
+1. Install the signed artifact on a clean host. Launch it, finish onboarding, open a local project,
+   create a task, and confirm the local Node reaches online. Quit and relaunch; the task and pairing
+   remain available.
+2. Pair a second Node by code. Confirm the fingerprint words, switch between Nodes, and open a task
+   on each. Disconnect and reconnect the second Node; the first Node's task data remains scoped to it.
+3. Start a managed agent with an installed CLI, approve or deny one tool request, and reopen its
+   transcript after a restart. Open a terminal session, send a command, and confirm that it survives
+   switching tasks.
+4. Open a task preview through the tunnel and a host-owned editor. Navigate the preview, open an
+   overlay, and confirm that the child webview stays behind it. Check the native menu and one file
+   dialog.
+5. Install a freshly scaffolded plugin from a local package. Accept the bundle, open its own pane,
+   run its command, and confirm its Node route result appears. Reload after editing its entry and
+   route module, then disable, enable, and remove it. Confirm that its UI and command follow each
+   transition and that an unaccepted bundle cannot draw.
+6. Open the terminal client at 80 by 24 and 120 by 40. Navigate the rail, pane strip, plugin pane,
+   palette, and a PTY with the keyboard. Confirm that Escape restores focus and that the trust prompt
+   holds focus until a decision.
+7. Create and run a workflow with a gate, inspect its child task and history, and resume or cancel it.
+   If release accounts are configured, run a query-backed schedule against a real provider and check
+   that a repeated check creates no duplicate child.
+8. Quit with an active agent and confirm the concern prompt and clean shutdown. Exercise Node
+   recovery by stopping the helper's Node repeatedly; the recovery screen appears after the retry
+   limit.
 
 10. Build the reference node provider into the running node's data root
     (`pnpm --filter @acorn/node build:plugin nodes-file`, with `ACORN_NODES_FILE` set), write one
@@ -1092,6 +1117,9 @@ editor and placement because those interactions are not proved by pure tests.
 A normal worktree development run may need the main checkout's `.env`, and an existing development
 instance may own the renderer's fixed port, 4319. `pnpm dev:agent` uses isolated data and ports for
 real-window checks from a worktree.
+Run the relevant [specialized manual checks](./testing/manual-checks.md) after changes to plugins,
+large diffs, transcripts, palette behavior, appearance, accessibility, provider integrations, or
+other surfaces not covered by this pass. The catalog retains the detailed scenarios and dated results.
 
 ## Composition-root tests
 

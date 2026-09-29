@@ -76,7 +76,7 @@ const scopeActive = (binding: ResolvedKeybinding, context: ScopeContext, event: 
   // pane's own field, which is where a reader presses it and where the changes pane's Commit lives.
   //
   // Two other paths already answer this question the same way. The sandboxed-frame SDK forwards a
-  // modified chord out of a frame's own input and refuses a bare one (../frames/sdk.ts), and the
+  // modified chord out of a frame's own input and refuses a bare one (../frames/sdk/bridgePort.ts), and the
   // terminal host's command layer shadows bare keys while a field has them and lets chords through
   // at every depth (apps/tui/src/keys/commandLayer.ts). The xterm case below is the same rule read
   // off the event rather than off the chord: a terminal focuses a hidden textarea, so it counts as a

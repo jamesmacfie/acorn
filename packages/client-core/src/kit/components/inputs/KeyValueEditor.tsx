@@ -1,6 +1,7 @@
 import { createMemo, Index, Show, type JSX } from 'solid-js'
 import { IconButton } from './IconButton'
-import { Checkbox, Input } from '../primitives'
+import { Checkbox } from './Checkbox'
+import { Input } from './Input'
 
 export type KVRow = { enabled?: boolean; key: string; value: string }
 

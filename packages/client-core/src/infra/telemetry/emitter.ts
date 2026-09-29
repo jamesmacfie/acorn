@@ -32,10 +32,10 @@ import type {
   PostedTelemetryRuntime,
 } from '@acorn/protocol/telemetry.ts'
 import { ATTRS_MAX, ATTR_KEY_MAX, ATTR_VALUE_MAX, LOG_BODY_MAX, formatTraceparent } from '@acorn/protocol/telemetry.ts'
-import { setContributionErrorHandler } from '../../kit/lib/contributionErrors'
-import { setWorkTelemetry } from '../../kit/lib/workTelemetry'
-import { setScrollPlaceHandler } from '../../kit/lib/scrollPlace'
-import { setSurfaceHealthHandler, type SurfaceHealthEntry } from '../../kit/lib/surfaceHealth'
+import { setContributionErrorHandler } from '../../kit/lib/telemetry/contributionErrors'
+import { setWorkTelemetry } from '../../kit/lib/telemetry/workTelemetry'
+import { setScrollPlaceHandler } from '../../kit/lib/telemetry/scrollPlace'
+import { setSurfaceHealthHandler, type SurfaceHealthEntry } from '../../kit/lib/telemetry/surfaceHealth'
 import { beginInteractionWork, clearInteractionWork, recordInteractionWork, takeInteractionWork } from './interactionWork'
 import { telemetryQueue, type TelemetryQueue } from './queue'
 
@@ -667,7 +667,7 @@ export function startClientTelemetry(options: StartTelemetryOptions): void {
   state.runtime = options.runtime
   state.post = options.post
   // A contribution that throws while rendering, reported through the seam `kit/` has for it
-  // (kit/lib/contributionErrors.ts). Installed here rather than imported there, because `kit/` may
+  // (kit/lib/telemetry/contributionErrors.ts). Installed here rather than imported there, because `kit/` may
   // not import this module and a plugin's UI bundle re-exports `kit/`.
   setContributionErrorHandler(({ contributionId, owner, error }) => {
     emitError(owner ?? 'core', {
@@ -679,7 +679,7 @@ export function startClientTelemetry(options: StartTelemetryOptions): void {
     })
   })
   // Where a followed timeline put the reader, through the seam `kit/` has for it
-  // (kit/lib/scrollPlace.ts). An event rather than a log: it is a fact worth counting and correlating,
+  // (kit/lib/telemetry/scrollPlace.ts). An event rather than a log: it is a fact worth counting and correlating,
   // and it rides along as a breadcrumb on any error raised near it.
   setScrollPlaceHandler((place) => {
     emitEvent('core', 'ui.scroll.place', {
@@ -693,7 +693,7 @@ export function startClientTelemetry(options: StartTelemetryOptions): void {
     })
   })
   // What a large diff or timeline said about itself when it became ready and when it went away
-  // (kit/lib/surfaceHealth.ts). A fixed handful of its numbers, as samples, so the label set stays one
+  // (kit/lib/telemetry/surfaceHealth.ts). A fixed handful of its numbers, as samples, so the label set stays one
   // row per surface kind and checkpoint. The full snapshot is a local read
   // (./surfaceHealth.ts), not a telemetry record.
   setSurfaceHealthHandler((entry, checkpoint) => {

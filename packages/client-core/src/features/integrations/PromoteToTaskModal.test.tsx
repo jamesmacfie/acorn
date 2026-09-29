@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Task } from '@acorn/protocol/api.ts'
 import { sourceRegistry } from '../../host/registries/sources/sources'
 import { PromoteToTaskModal, type PromoteTaskAction } from './PromoteToTaskModal'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 
 vi.mock('@solidjs/router', () => ({ useParams: () => ({ projectId: 'p1' }) }))
 vi.mock('@tanstack/solid-query', () => ({

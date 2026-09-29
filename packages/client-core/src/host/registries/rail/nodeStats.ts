@@ -1,4 +1,4 @@
-import { Registry } from '../../../kit/lib/registry'
+import { Registry } from '../../../kit/lib/state/registry'
 
 // A number a plugin can put on a Fleet home node card (docs/frontend.md § Registries and plugins).
 //

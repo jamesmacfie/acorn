@@ -1,7 +1,7 @@
 import { Show } from 'solid-js'
-import { paneCollapseKey, sidebarCollapse } from '../../kit/lib/collapseState'
+import { paneCollapseKey, sidebarCollapse } from '../../kit/lib/layout/collapseState'
 import { CollapseEdge, SplitHandle } from '../../kit/components/primitives'
-import { createSplitDrag } from '../../kit/lib/split'
+import { createSplitDrag } from '../../kit/lib/layout/split'
 import { layoutState } from './state'
 // Imported for `use:regionFocus` below: Solid compiles a directive to a bare reference, so the
 // import has to be here even though nothing calls it.
@@ -21,12 +21,12 @@ import type { LayoutProps } from './regions'
 // Collapsing is the other answer to the same question, and the column survives it: it narrows to the
 // width of the icon rails and each row keeps one mark. Every pane that names this layout gets the
 // control, with no field on the contribution, because a pane that names `list-detail` is a sidebar by
-// definition. The kit node has to be told (kit/components/primitives.tsx § ListDetail) since it also
+// definition. The kit node has to be told (kit/components/layout/ListDetail.tsx) since it also
 // draws splits that are two halves of one document.
 //
 // The regions are left alone while collapsed. A pane's `list-header` is the pane's own, so whether it
 // becomes one icon or nothing at all is a question only the pane can answer, and it answers it by
-// reading the same signal this does (kit/lib/collapseState.ts).
+// reading the same signal this does (kit/lib/layout/collapseState.ts).
 //
 // Narrow: one region at a time, and selecting in the list pushes the detail. Terminal: the same below
 // 80 columns, two columns above it, with a key to switch groups.
@@ -82,7 +82,7 @@ export function ListDetail(props: LayoutProps) {
           </Show>
         </aside>
         {/* The same edge the kit's split draws, from the same node, so the two collapse controls
-            cannot drift apart again (kit/components/primitives.tsx § CollapseEdge). A pane that
+            cannot drift apart again (kit/components/layout/ListDetail.tsx § CollapseEdge). A pane that
             cannot collapse gets the bare grip and no wrapper. */}
         <Show when={props.collapsible} fallback={<SplitHandle axis="x" drag={drag} />}>
           <CollapseEdge

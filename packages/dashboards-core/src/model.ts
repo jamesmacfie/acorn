@@ -155,7 +155,7 @@ export type PanelMapping = {
   unmapped?: 'catch-all' | 'hidden'
 }
 
-/** The host's own status vocabulary (ui/primitives.tsx, `StatusDot`), which is also the wire's. A
+/** The host's own status vocabulary (kit/components/content/StatusDot.tsx), which is also the wire's. A
  *  user-invented column tones itself from the same five a plugin's declared value can. */
 export type PanelTone = NonNullable<DashboardDisplayChoice['tone']>
 

@@ -5,7 +5,7 @@
 import type { Component } from 'solid-js'
 import type { HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 import type { Task } from '../../../infra/queries'
-import { Registry } from '../../../kit/lib/registry'
+import { Registry } from '../../../kit/lib/state/registry'
 
 export type TaskSlotId = 'task.footer'
 const TASK_SLOT_IDS: readonly TaskSlotId[] = ['task.footer']

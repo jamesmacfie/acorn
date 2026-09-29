@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { _resetSurfaceHealth, registerSurfaceHealth, type SurfaceHealthSnapshot } from '../../kit/lib/surfaceHealth'
+import { _resetSurfaceHealth, registerSurfaceHealth, type SurfaceHealthSnapshot } from '../../kit/lib/telemetry/surfaceHealth'
 import { answerSurfaceHealthRequests, SURFACE_HEALTH_MARK, SURFACE_HEALTH_REQUEST } from './surfaceHealth'
 
 afterEach(() => {

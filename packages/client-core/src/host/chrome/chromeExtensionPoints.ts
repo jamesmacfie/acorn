@@ -23,7 +23,7 @@ import {
   type ExtensionContribution,
   type ExtensionPointContribution,
 } from '../registries/extensionPoints/extensionPoints'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 import { runChromeAction } from './actions'
 import { ownsRoute, readAnnotationMarks, readExtensionItems } from './chromeData'
 

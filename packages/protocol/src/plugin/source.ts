@@ -1,4 +1,4 @@
-import type { PluginInstallSource } from '../api.ts'
+import type { PluginInstallSource } from '../transport/api.ts'
 
 export const RELEASE_ASSET = 'acorn-plugin.tgz'
 export type ResolvedPluginSource = { url: string; provenance: Record<string, string> }

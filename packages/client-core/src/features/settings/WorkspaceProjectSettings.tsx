@@ -1,6 +1,6 @@
 import { createQuery } from '@tanstack/solid-query'
 import { createResource, createSignal, Index, onCleanup, Show } from 'solid-js'
-import { debounce } from '../../kit/lib/debounce'
+import { debounce } from '../../kit/lib/state/debounce'
 import { taskBridge } from '../tasks/taskBridge'
 import { modelBackendsOptions } from '../../infra/queries'
 import type { BrowserRule, DbSchemaMode, PreviewMode, SetupTrigger } from '@acorn/protocol/api.ts'
