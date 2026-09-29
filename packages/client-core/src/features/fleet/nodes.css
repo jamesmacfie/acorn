@@ -71,7 +71,7 @@
   font-size: var(--fs-sm);
   color: var(--text-muted);
 }
-.node-rename {
+.node-meta > .ui-input {
   max-width: 260px;
 }
 .node-actions,

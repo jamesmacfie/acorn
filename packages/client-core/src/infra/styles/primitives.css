@@ -90,6 +90,9 @@
 .ui-input[data-width='narrow'] { flex: none; width: 90px; }
 .ui-input[data-size='sm'] { min-height: var(--control-h-sm); padding: var(--space-2) var(--space-4); }
 .ui-input[data-invalid] { border-color: var(--danger); }
+/* One line of text is centred by the control itself, so a block pad only pushes it past min-height
+   and draws an input taller than the button beside it. A textarea keeps its pads. */
+input.ui-input:not([data-kind='bare']), .ui-input.ui-select { padding-block: 0; }
 textarea.ui-input { resize: vertical; font-family: var(--font-mono); }
 /* Rectangle: the box something else fills with pixels (ui/Rectangle.tsx). Geometry and a focus ring,
    and nothing about what is inside it — that is the whole point of the node. */
@@ -716,9 +719,12 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 /* ── SegmentedControl / ToggleButton ────────────────────────────────────────────────────────
    The collapsed-border look from agent-center, promoted to the base. A pack rounds the ends via
    --radius-control. */
+/* The height sits on the group, not on each segment: the group's border counts inside it, as a
+   button's does, so a segmented control lines up with a button of the same size. */
 .ui-segments {
   flex: none;
   display: inline-flex;
+  min-height: var(--control-h-sm);
   border: var(--control-border);
   border-radius: var(--radius-control);
   overflow: hidden;
@@ -727,7 +733,6 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   flex: none;
   font: inherit;
   font-size: var(--fs-xs);
-  min-height: var(--control-h-sm);
   padding: 0 var(--space-4);
   color: var(--text-muted);
   background: transparent;
@@ -735,7 +740,8 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   border-right: var(--divider);
   cursor: pointer;
 }
-.ui-segments[data-size='md'] .ui-segment { font-size: var(--fs-sm); min-height: var(--control-h); padding: 0 var(--space-5); }
+.ui-segments[data-size='md'] { min-height: var(--control-h); }
+.ui-segments[data-size='md'] .ui-segment { font-size: var(--fs-sm); padding: 0 var(--space-5); }
 .ui-segment:last-child { border-right: 0; }
 .ui-segment:hover:not(:disabled) { color: var(--text); background: var(--bg-hover); }
 .ui-segment[aria-checked='true'] { color: var(--text); background: var(--bg-selected); }

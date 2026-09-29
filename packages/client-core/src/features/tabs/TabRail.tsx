@@ -41,7 +41,7 @@ import { loadIconNodes } from '../../kit/tokens/iconNodes'
 import './tabrail.css'
 import { RailTab } from './RailTab'
 import { taskOriginAppearance } from '../tasks/origin'
-import { Alert, Button, Checkbox, Select } from '../../kit/components/primitives'
+import { Alert, Button, Checkbox, Input, Select } from '../../kit/components/primitives'
 import { Menu } from '../../kit/components/overlays/Menu'
 import { workflowTaskHierarchy } from '../tasks/taskHierarchy'
 import { expandedWorkflowRoots, toggleWorkflowRoot } from '../tasks/taskTreeViewState'
@@ -566,27 +566,22 @@ export default function TabRail() {
                   <Show when={draftErr()}><Alert>{draftErr()}</Alert></Show>
                   <div style={{ display: 'flex', 'align-items': 'center', gap: '6px' }}>
                     <IconPicker value={iconDraft()} fallback={draftFallbackIcon()} onSelect={setIconDraft} />
-                    <input
-                      class="ui-input"
-                      style={{ flex: 1, 'min-width': 0 }}
-                      type="text"
+                    <Input
                       ref={(el) => queueMicrotask(() => el.focus())}
                       placeholder={d().mode === 'new' ? 'Task title' : 'Task name'}
                       value={text()}
-                      onInput={(e) => setText(e.currentTarget.value)}
+                      onInput={(value) => setText(value)}
                     />
                   </div>
                   <Show when={d().mode === 'new' && selectedProject()?.vcs === 'git'}>
                     <Show when={!noBranch()}>
-                      <input
-                        class="ui-input"
-                        type="text"
+                      <Input
                         placeholder="branch (from title)"
                         title="Branch name — defaults to a slug of the title"
                         value={branchTouched() ? branchText() : effectiveBranch()}
-                        onInput={(e) => {
+                        onInput={(value) => {
                           setBranchTouched(true)
-                          setBranchText(e.currentTarget.value)
+                          setBranchText(value)
                         }}
                         />
                     </Show>

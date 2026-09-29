@@ -17,7 +17,7 @@ import { createDeviceFlow } from '../integrations/deviceFlow'
 import { integrationsKey, integrationsOptions } from '../../infra/queries'
 import ConnectionProjectMap from './ConnectionProjectMap'
 import GenerateSettings from './models/GenerateSettings'
-import { Alert, Button, Chip } from '../../kit/components/primitives'
+import { Alert, Button, Chip, Input } from '../../kit/components/primitives'
 
 function IntegrationLogo(props: { provider: PublicIntegrationProvider | undefined }) {
   // The tint comes off the mark the provider names, not off a rule keyed to its id, so a plugin that
@@ -146,13 +146,12 @@ export default function IntegrationsSettings() {
                         <div class="integration-rename-row">
                           {/* Focus on the next microtask, not through `autofocus`: the input is created
                               inside a Show that swaps it in after this row already exists. */}
-                          <input
-                            class="ui-input"
+                          <Input
                             value={draftName()}
                             placeholder={connection.label}
-                            maxlength={MAX_CONNECTION_NAME}
+                            maxLength={MAX_CONNECTION_NAME}
                             ref={(el) => queueMicrotask(() => el.focus())}
-                            onInput={(event) => setDraftName(event.currentTarget.value)}
+                            onInput={(value) => setDraftName(value)}
                             onKeyDown={(event) => {
                               if (event.key === 'Enter') void rename(connection.id)
                               if (event.key === 'Escape') setRenamingId(null)
@@ -230,12 +229,11 @@ export default function IntegrationsSettings() {
                     <label class="integration-add-label">
                       {field.label}
                       <div class="integration-key-row">
-                        <input
-                          class="ui-input"
+                        <Input
                           type={field.type}
                           placeholder={field.placeholder}
                           value={form.value(field.id)}
-                          onInput={(event) => form.setValue(field.id, event.currentTarget.value)}
+                          onInput={(value) => form.setValue(field.id, value)}
                           onKeyDown={(event) => event.key === 'Enter' && void form.submit()}
                         />
                       </div>

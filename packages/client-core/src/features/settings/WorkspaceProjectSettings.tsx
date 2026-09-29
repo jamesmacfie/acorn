@@ -5,7 +5,7 @@ import { taskBridge } from '../tasks/taskBridge'
 import { modelBackendsOptions } from '../../infra/queries'
 import type { BrowserRule, DbSchemaMode, PreviewMode, SetupTrigger } from '@acorn/protocol/api.ts'
 import type { ProjectConfigPatch } from '@acorn/protocol/api.ts'
-import { Alert, Button, Checkbox, Select } from '../../kit/components/primitives'
+import { Alert, Button, Checkbox, Input, Select, Textarea } from '../../kit/components/primitives'
 
 // All project-level config for one folder project (docs/workspaces-and-tasks.md § Worktrees and
 // setup), collapsed behind a native <details> so a workspace with several projects is not a wall of
@@ -73,13 +73,11 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
             <code>jamesmacfie/fix-the-thing</code>. A trailing <code>-</code> is kept as the separator, otherwise{' '}
             <code>/</code> is added. Blank means no prefix.
           </span>
-          <input
-            class="ui-input"
-            type="text"
-            spellcheck={false}
+          <Input
+            assist={false}
             placeholder="jamesmacfie/"
             value={branchPrefix() ?? config()?.branchPrefix ?? ''}
-            onInput={(e) => { setBranchPrefix(e.currentTarget.value); debBranchPrefix() }}
+            onInput={(value) => { setBranchPrefix(value); debBranchPrefix() }}
             onBlur={() => debBranchPrefix.flush()}
           />
         </label>
@@ -89,13 +87,13 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
           <span class="muted settings-hint">
             A shell command run once in a new task's git worktree, shown as the first terminal tab. Choose when it runs below.
           </span>
-          <textarea
-            class="settings-script"
+          <Textarea
+            mono
             rows={6}
-            spellcheck={false}
+            assist={false}
             placeholder="./scripts/setup-worktree.sh"
             value={setup() ?? config()?.setupScript ?? ''}
-            onInput={(e) => { setSetup(e.currentTarget.value); debSetup() }}
+            onInput={(value) => { setSetup(value); debSetup() }}
             onBlur={() => debSetup.flush()}
           />
         </label>
@@ -110,13 +108,13 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
           <span class="muted settings-hint">
             Runs in the worktree just before it's removed on task close (e.g. <code>docker compose down</code>). Non-zero exit pauses the close.
           </span>
-          <textarea
-            class="settings-script"
+          <Textarea
+            mono
             rows={4}
-            spellcheck={false}
+            assist={false}
             placeholder="docker compose -f dev.yml down"
             value={teardown() ?? config()?.teardownScript ?? ''}
-            onInput={(e) => { setTeardown(e.currentTarget.value); debTeardown() }}
+            onInput={(value) => { setTeardown(value); debTeardown() }}
             onBlur={() => debTeardown.flush()}
           />
         </label>
@@ -129,13 +127,13 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
             worktree <code>.env</code> or the environment. Use this for setups auto-detect can't read, e.g.
             <code>bin/rails runner 'puts ActiveRecord::Base.connection_db_config.url'</code>.
           </span>
-          <textarea
-            class="settings-script"
+          <Textarea
+            mono
             rows={2}
-            spellcheck={false}
+            assist={false}
             placeholder="(blank = auto-detect)"
             value={dbUrl() ?? config()?.dbUrlScript ?? ''}
-            onInput={(e) => { setDbUrl(e.currentTarget.value); debDbUrl() }}
+            onInput={(value) => { setDbUrl(value); debDbUrl() }}
             onBlur={() => debDbUrl.flush()}
           />
         </label>
@@ -150,24 +148,22 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
               value={dbSchemaMode()}
               onChange={(value) => { setDbSchemaValue(null); void save({ dbSchemaMode: value as DbSchemaMode | '' }) }} options={[{ value: '', label: 'Live database introspection (default)' }, { value: 'script', label: 'Script — its output is the schema' }, { value: 'file', label: 'File in the worktree' }]} />
             <Show when={dbSchemaMode() === 'script'}>
-              <textarea
-                class="settings-script"
+              <Textarea
+                mono
                 rows={2}
-                spellcheck={false}
+                assist={false}
                 placeholder={'pg_dump --schema-only "$DATABASE_URL"'}
             value={dbSchemaValue() ?? config()?.dbSchemaValue ?? ''}
-                onInput={(e) => { setDbSchemaValue(e.currentTarget.value); debDbSchema() }}
+                onInput={(value) => { setDbSchemaValue(value); debDbSchema() }}
                 onBlur={() => debDbSchema.flush()}
               />
               <span class="muted settings-hint">Run in the task's worktree; its stdout is used as the schema.</span>
             </Show>
             <Show when={dbSchemaMode() === 'file'}>
-              <input
-                class="ui-input"
-                type="text"
+              <Input
                 placeholder="db/schema.sql"
             value={dbSchemaValue() ?? config()?.dbSchemaValue ?? ''}
-                onInput={(e) => { setDbSchemaValue(e.currentTarget.value); debDbSchema() }}
+                onInput={(value) => { setDbSchemaValue(value); debDbSchema() }}
                 onBlur={() => debDbSchema.flush()}
               />
               <span class="muted settings-hint">A path relative to the task's worktree root.</span>
@@ -181,13 +177,13 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
               what a <code>jsonb</code> column actually holds, what a status column's values mean, which of
               two similar tables is live. Sent with the schema on every generate.
             </span>
-            <textarea
-              class="settings-script"
+            <Textarea
+              mono
               rows={6}
-              spellcheck={false}
+              assist={false}
               placeholder={'orders.meta jsonb: { coupon: string, source: "web" | "app" }\norders.status: 0 pending, 1 paid, 2 refunded'}
             value={dbSchemaNotes() ?? config()?.dbSchemaNotes ?? ''}
-              onInput={(e) => { setDbSchemaNotes(e.currentTarget.value); debDbNotes() }}
+              onInput={(value) => { setDbSchemaNotes(value); debDbNotes() }}
               onBlur={() => debDbNotes.flush()}
             />
           </label>
@@ -199,13 +195,13 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
             A ▶ run button on a task's right rail — it starts/stops the script in its own terminal. Blank means no
             run button. A repo's <code>.acorn/config.toml</code> or named run targets override it.
           </span>
-          <textarea
-            class="settings-script"
+          <Textarea
+            mono
             rows={3}
-            spellcheck={false}
+            assist={false}
             placeholder="pnpm dev"
             value={dev() ?? config()?.devScript ?? ''}
-            onInput={(e) => { setDev(e.currentTarget.value); debDev() }}
+            onInput={(value) => { setDev(value); debDev() }}
             onBlur={() => debDev.flush()}
           />
         </label>
@@ -216,13 +212,13 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
             Optional. How to restart the dev script in place — e.g. <code>touch tmp/restart.txt</code>. Agents call this
             via the <code>run_restart</code> tool. Blank means restart just stops and starts the dev script again.
           </span>
-          <textarea
-            class="settings-script"
+          <Textarea
+            mono
             rows={2}
-            spellcheck={false}
+            assist={false}
             placeholder="(blank = stop + start)"
             value={devRestart() ?? config()?.devRestartScript ?? ''}
-            onInput={(e) => { setDevRestart(e.currentTarget.value); debDevRestart() }}
+            onInput={(value) => { setDevRestart(value); debDevRestart() }}
             onBlur={() => debDevRestart.flush()}
           />
         </label>
@@ -234,24 +230,23 @@ export function ProjectConfig(props: { projectId: string; name: string }) {
             value={previewMode()}
             onChange={(value) => { setPreviewValue(null); void save({ previewMode: value as PreviewMode | '' }) }} options={[{ value: '', label: 'Dev-server port (default)' }, { value: 'url', label: 'A fixed URL' }, { value: 'port', label: 'localhost with a port' }, { value: 'script', label: 'Script — its output is the URL' }]} />
           <Show when={previewMode() === 'script'}>
-            <textarea
-              class="settings-script"
+            <Textarea
+              mono
               rows={4}
-              spellcheck={false}
+              assist={false}
               placeholder="./scripts/preview-url.sh"
             value={previewValue() ?? config()?.previewValue ?? ''}
-              onInput={(e) => { setPreviewValue(e.currentTarget.value); debPreview() }}
+              onInput={(value) => { setPreviewValue(value); debPreview() }}
               onBlur={() => debPreview.flush()}
             />
             <span class="muted settings-hint">Run in the task's worktree; its stdout (trimmed) is loaded as the URL.</span>
           </Show>
           <Show when={previewMode() === 'url' || previewMode() === 'port'}>
-            <input
-              class="ui-input"
+            <Input
               type={previewMode() === 'port' ? 'number' : 'text'}
               placeholder={previewMode() === 'port' ? '3000' : 'https://example.test'}
             value={previewValue() ?? config()?.previewValue ?? ''}
-              onInput={(e) => { setPreviewValue(e.currentTarget.value); debPreview() }}
+              onInput={(value) => { setPreviewValue(value); debPreview() }}
               onBlur={() => debPreview.flush()}
             />
           </Show>
@@ -316,13 +311,11 @@ function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: Brows
               checked={rule().enabled}
               onChange={(checked) => { update(rule().id, (r) => ({ ...r, enabled: checked })); debSave(); debSave.flush() }}
             />
-            <input
-              class="ui-input"
-              type="text"
+            <Input
               placeholder="localhost:3000/login"
               title="URL pattern"
               value={rule().urlPattern}
-              onInput={(e) => { update(rule().id, (r) => ({ ...r, urlPattern: e.currentTarget.value })); debSave() }}
+              onInput={(value) => { update(rule().id, (r) => ({ ...r, urlPattern: value })); debSave() }}
               onBlur={() => debSave.flush()}
             />
             <input
@@ -385,13 +378,13 @@ function RepoRunTargets(props: { projectId: string }) {
 
   return (
     <Show when={row()} fallback={<span class="muted settings-hint">No local checkout mapped yet.</span>}>
-      <textarea
-        class="settings-script"
+      <Textarea
+        mono
         rows={3}
-        spellcheck={false}
+        assist={false}
         placeholder='[{"id":"dev","command":"./scripts/dev.sh","urlCommand":"./scripts/dev-url.sh","default":true}]'
         value={value()}
-        onInput={(e) => { setText(e.currentTarget.value); debSave() }}
+        onInput={(value) => { setText(value); debSave() }}
         onBlur={() => debSave.flush()}
       />
       <Show when={err()}><Alert>{err()}</Alert></Show>
