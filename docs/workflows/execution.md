@@ -58,10 +58,20 @@ run shows says what it was given.
 
 A step that runs an agent, such as `agent`, `decide`, or `ci-loop`, takes
 `inputs = "append" | "template" | "none"`, default `append`. With `append`, the runner renders the
-prompt and then adds one `## Output of <name>` block per incoming edge whose step finished `done`, in
+prompt and then adds one "Output of <name>" item per incoming edge whose step finished `done`, in
 `after` order. With `template`, nothing is added and the prompt places its own
 `${steps.<id>.output}` references. With `none`, the step sees only its prompt. The handoff context
-rides along in every mode, because that is a separate thing from the graph's edges.
+rides along in every mode as a "Task context" item, because that is a separate thing from the graph's
+edges.
+
+Those items are not written into the prompt. A managed session gets each one as a context part after
+the prompt, so the model reads it as an `<acorn-context>` block, which marks it as information rather
+than instructions. The transcript draws only the step's prompt and lists the items in its
+**Context manifest** fold. A diff or a ticket body pasted into the prompt used to fill the turn's
+bubble, and a heading inside it read the same as the prompt's own. Past the 512 KiB per-turn context
+cap, the blocks go inline in the prompt text instead, so a step with a large diff upstream still runs.
+The headless fallback takes one string, so it gets each item under a `## <label>` heading, and the
+step's recorded inputs in the run pane use that same form.
 
 All four kinds assemble that prompt through one function, which they did not until 2026-09-09. Only
 `agent` read the incoming edges, so a `decide` step was sent its prompt and nothing else: the editor

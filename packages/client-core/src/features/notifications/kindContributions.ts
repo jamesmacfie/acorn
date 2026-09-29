@@ -5,7 +5,8 @@ export const noticeKindContributions: NoticeKindContribution[] = [
   // through the same adapter (features/notifications/attention.ts), so they read the same way here.
   { id: 'error', glyph: 'x', severity: 'danger', toast: true },
   { id: 'gate', glyph: 'ban', severity: 'warn', toast: true },
-  { id: 'run-done', glyph: 'play', severity: 'info', toast: true },
+  // The workflow mark rather than a check, so a finished run never reads as one agent finishing a turn.
+  { id: 'run-done', glyph: 'workflow', severity: 'info', toast: true },
   // A run that ended `failed` or at a safety rail. Its own kind rather than `error`, so the bell says
   // which workflow stopped and the row can point at the node that stopped it.
   { id: 'run-failed', glyph: 'triangle-alert', severity: 'danger', toast: true },

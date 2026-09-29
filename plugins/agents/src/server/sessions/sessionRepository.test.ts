@@ -269,3 +269,30 @@ describe('searching the sessions of chosen tasks', () => {
     expect(await store.searchTaskSessions('improbability', [], 10)).toEqual([])
   })
 })
+
+describe('a workflow session’s attention', () => {
+  let ctx: TestNodeContext
+  let store: AgentStore
+
+  beforeEach(() => {
+    ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
+    store = new AgentStore(ctx.storage.open(), ctx.core)
+  })
+
+  afterEach(() => {
+    ctx.cleanup()
+  })
+
+  const attentionAfter = async (kind: 'interactive' | 'workflow', event: Parameters<AgentStore['recordEvent']>[2]) => {
+    const created = await store.createSession({ taskId: randomUUID(), providerId: 'fake', profileId: 'fake', kind, config: {} }, PROVIDER)
+    await store.recordEvent(created.id, null, event)
+    return (await store.requireSession(created.id)).attention
+  }
+
+  it('is not raised by a finished or failed step, only by a request', async () => {
+    expect(await attentionAfter('workflow', { type: 'turn_completed' })).toBe('none')
+    expect(await attentionAfter('workflow', { type: 'error', code: 'x', message: 'x', retryable: false })).toBe('none')
+    expect(await attentionAfter('workflow', { type: 'request', requestId: 'r', kind: 'question', title: 'Which?' })).toBe('question')
+    expect(await attentionAfter('interactive', { type: 'turn_completed' })).toBe('completed')
+  })
+})

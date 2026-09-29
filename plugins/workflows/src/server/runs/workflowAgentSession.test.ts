@@ -4,6 +4,7 @@ import { makeTestPluginDb } from '@acorn/plugin-api/testkit'
 import { agentProfileRegistry, DEFAULT_PROFILE_ID, type ExtensionPointId } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
 import { WorkflowRunner, type RunnerDeps, type WorkflowExtensions } from './runner'
+import { inlinePrompt } from './deps'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 
 // When a step's row learns which managed session it is running in.
@@ -134,7 +135,7 @@ describe('what a step that runs an agent is given', () => {
     try {
       const runner = new WorkflowRunner(testDb.db, {
         runStep: async (_taskId, def, opts) => {
-          prompts.push(opts.prompt)
+          prompts.push(inlinePrompt(opts.prompt, opts.context))
           return def.kind === 'decide'
             ? { ...ok, capture: { ...ok.capture, structuredOutput: { verdict: 'yes' } } }
             : { ...ok, capture: { ...ok.capture, result: 'the analysis' } }

@@ -843,7 +843,9 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   position: relative;
   overflow: hidden;
   flex: 1;
-  min-height: 0;
+  /* A floor rather than 0: the cards are absolutely placed, so the canvas has no height of its own and
+     a column full of other content would squeeze it to nothing. */
+  min-height: 16rem;
   touch-action: none;
   cursor: grab;
   background-color: var(--surface-sunken);
@@ -1514,7 +1516,7 @@ a.ui-row:hover { background: var(--bg-hover); }
 .remote-tree { display: contents; }
 
 .ui-stack { display: flex; flex-direction: column; min-width: 0; gap: var(--kit-gap); }
-/* `grow`: the stack IS the region. Same pair of values, and the same reason, as `.ui-graph` and
+/* `grow`: the stack IS the region. Same pair of values, and the same reason, as
    `textarea[data-grow]`: without a definite height nothing inside a stack can scroll, because a
    flex column with an `auto` height is as tall as its content and its content is then as tall as
    it likes. `min-height: 0` is the half that is easy to forget and the half that does the work. */

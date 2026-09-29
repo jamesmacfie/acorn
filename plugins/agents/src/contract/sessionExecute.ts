@@ -11,6 +11,10 @@ export type AgentSessionExecuteRequest = {
   // Session title, used only when a new session is created.
   title: string
   prompt: string
+  // Material the prompt works on, such as an earlier step's output or the task context. Each item
+  // goes to the model as its own context block after the prompt, so the model reads it as
+  // information rather than instructions and the transcript folds it instead of drawing it inline.
+  context?: { label: string; source: string; content: string }[]
   schema?: object
   model?: string
   // Provider option ids to the values this turn wants, as the provider advertises them (`model`,
