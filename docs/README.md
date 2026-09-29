@@ -112,6 +112,8 @@ Start with the plugin map, then follow the authoring guide or API reference.
 - [future/](./future/README.md) — designs, analyses, sequenced plans, and delivery records retained
   while acceptance remains open. Its README indexes every programme and single file. Shipped
   behaviour belongs in an owning doc above.
+- [Cloud tasks and control plane](./future/cloud/README.md) — proposed architecture, provider and
+  security gates, and sequenced delivery plan for team-owned projects and ephemeral task Nodes.
 - [Terminal UI review](./future/tui-review/README.md) — live UX evidence, feature coverage, host
   projections, and acceptance gates for a standalone terminal client.
 - [Plugin list search proposal](./future/pluginsearch.md) — search beyond the loaded Linear,
