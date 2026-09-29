@@ -22,7 +22,11 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 
 // The measured figure plus about 5%. `floor` is a lower bound, not a target: a graph that small means
 // the walk below stopped following imports, and a check that passes on that is blind.
-const limits = { ceiling: 2_910_000, floor: 1_000_000 }
+//
+// Raised from 2,910,000 on 2026-09-29. main already measured 2,916,482 B, and the MCP servers settings
+// added about 20 KB of routes and storage that have to load at boot. Their MCP client is loaded
+// lazily, which is most of what that feature weighs.
+const limits = { ceiling: 2_960_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))
