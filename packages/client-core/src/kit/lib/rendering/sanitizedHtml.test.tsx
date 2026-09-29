@@ -30,6 +30,12 @@ describe('provider HTML boundary', () => {
     expect(host.innerHTML).toBe('<p><b>ordinary text</b></p>')
   })
 
+  it('keeps a suggested change legible by swapping GitHub diff classes for host ones', () => {
+    // GitHub's bodyHTML for a one-line suggestion (rust-lang/rust PRRC_kwDOAAsO6M714U1V), trimmed.
+    const host = draw('<div class="my-2 border rounded-2 js-suggested-changes-blob diff-view" id=""><div class="f6 p-2 border-bottom d-flex"><div class="flex-auto color-fg-muted">Suggested change</div></div><div itemprop="text" class="blob-wrapper data file" style="margin: 0"><table class="d-table tab-size mb-0 width-full"><tbody><tr class="border-0"><td class="blob-num blob-num-deletion text-right" data-line-number="88"></td><td class="border-0 blob-code-inner blob-code-deletion js-blob-code-deletion"><span class="x x-first x-last">Incremental </span>compilation</td></tr><tr class="border-0"><td class="blob-num blob-num-addition text-right" data-line-number="88"></td><td class="border-0 blob-code-inner blob-code-addition js-blob-code-addition"><span class="x x-first x-last">In Cargo, incremental </span>compilation <span class="pl-s x x-first">`</span><span class="pl-c1 x">CI</span> <span class="pl-kos">(</span></td></tr></tbody></table></div><div class="js-apply-changes"></div></div>')
+    expect(host.innerHTML).toBe('<div class="ui-md-suggestion"><div><div>Suggested change</div></div><div><table><tbody><tr><td class="ui-md-suggestion-gutter ui-md-suggestion-del"></td><td class="ui-md-suggestion-del"><span class="ui-md-suggestion-word">Incremental </span>compilation</td></tr><tr><td class="ui-md-suggestion-gutter ui-md-suggestion-add"></td><td class="ui-md-suggestion-add"><span class="ui-md-suggestion-word">In Cargo, incremental </span>compilation <span class="ui-md-syn-string ui-md-suggestion-word">`</span><span class="ui-md-syn-constant ui-md-suggestion-word">CI</span> <span>(</span></td></tr></tbody></table></div><div></div></div>')
+  })
+
   it('bounds pathological provider markup', () => {
     expect(draw('a'.repeat(1_000_001)).textContent).toBe('[HTML content exceeds display limit]')
     expect(draw('<b>'.repeat(70) + 'x' + '</b>'.repeat(70)).textContent).toBe('[HTML content exceeds display limit]')
