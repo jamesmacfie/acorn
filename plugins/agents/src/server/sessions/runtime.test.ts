@@ -21,6 +21,7 @@ import { FakeAgentDriver } from '../drivers/fake'
 import { ManagedAgentRuntime } from './runtime'
 import { writeAgentConcurrency } from '../concurrencyStore'
 import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../sessionDefaultsStore'
+import { saveCustomAgent } from '../customAgents'
 import type { AgentLifecycleFrame } from '../../contract/lifecycle'
 
 const ENCRYPTION_KEY = '11'.repeat(32)
@@ -1896,6 +1897,70 @@ describe('managed agent runtime conformance', () => {
       expect((session.config.configOptions as Array<{ id: string; currentValue: string }>)
         .find((option) => option.id === 'mode')?.currentValue).toBe('default')
     }
+  })
+
+  it('starts a custom agent on its own options over the owner’s defaults, and keeps what it started with', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const owner = 'owner-custom-agent'
+    await writeAgentSessionDefaults(core.prefs, owner, {
+      continueAfterUsageLimit: true,
+      followLastSession: false,
+      pinned: { fake: { model: 'opus', reasoning: 'medium' } },
+      last: {},
+      inline: { providerId: null, pinned: {} },
+    })
+    const agent = await saveCustomAgent(core.prefs, owner, null, {
+      name: 'Bug reviewer',
+      providerId: 'fake',
+      profileId: 'fake',
+      options: { reasoning: 'high', mode: 'plan' },
+      instructions: 'Review for correctness only.',
+      maxToolRisk: 'read',
+    })
+    runtime = defaultsRuntime(owner)
+
+    const session = await runtime.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      customAgentId: agent.id,
+      // A snapshot already in `config` is replaced by the one the node reads from the agent.
+      config: { configOptions: advertised(), customAgent: { id: agent.id, name: 'x', instructions: 'Stale.' } },
+    })
+
+    const value = (id: string) => (session.config.configOptions as Array<{ id: string; currentValue: string }>)
+      .find((option) => option.id === id)?.currentValue
+    // The agent names reasoning and mode; the model it leaves alone follows the owner's pin.
+    expect([value('model'), value('reasoning'), value('mode')]).toEqual(['opus', 'high', 'plan'])
+    expect(session.config.customAgent).toEqual({ id: agent.id, name: 'Bug reviewer', instructions: 'Review for correctness only.' })
+    expect(session.config.toolCeiling).toEqual({ maxRisk: 'read' })
+    // Starting from an agent is not the owner switching anything.
+    expect((await readAgentSessionDefaults(core.prefs, owner)).last).toEqual({})
+
+    // Editing the agent later leaves the running session's snapshot alone.
+    await saveCustomAgent(core.prefs, owner, agent.id, { ...agent, instructions: 'Something else.' })
+    expect((await runtime.store.requireSession(session.id)).config.customAgent)
+      .toMatchObject({ instructions: 'Review for correctness only.' })
+
+    // A fork carries the snapshot and the settings its source is running, and does not re-apply the
+    // agent's options over a switch made in the source.
+    await runtime.patchSession(session.id, { config: { ...(await runtime.store.requireSession(session.id)).config,
+      configOptions: (session.config.configOptions as Array<{ id: string }>).map((option) =>
+        option.id === 'reasoning' ? { ...option, currentValue: 'medium' } : option) } })
+    const fork = await runtime.fork(session.id)
+    expect(fork.config.customAgent).toMatchObject({ id: agent.id, instructions: 'Review for correctness only.' })
+    expect((fork.config.configOptions as Array<{ id: string; currentValue: string }>)
+      .find((option) => option.id === 'reasoning')?.currentValue).toBe('medium')
+
+    // An agent on another provider, or one that no longer exists, is refused rather than half-applied.
+    await expect(runtime.createSession({
+      taskId: seed.taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', customAgentId: 'missing', config: {},
+    })).rejects.toThrow('no longer exists')
+    const other = await saveCustomAgent(core.prefs, owner, null, { name: 'Elsewhere', providerId: 'codex', profileId: 'codex', options: {} })
+    await expect(runtime.createSession({
+      taskId: seed.taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', customAgentId: other.id, config: {},
+    })).rejects.toThrow("runs on 'codex'")
   })
 
   // docs/mcp.md § Your own servers. Which programs a session starts is the owner's setting: it comes from

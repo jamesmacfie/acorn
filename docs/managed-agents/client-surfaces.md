@@ -54,7 +54,7 @@ scroll, replacing the DOM under any text selection.
 
 **A long session is drawn through a fixed window instead.** The projection covers every event, and the
 transcript draws the newest 200 cards of it, with **Show earlier (N)** above the first card
-(`createTimelineWindow`, `packages/client-core/src/kit/lib/timelineWindow.ts`, from
+(`createTimelineWindow`, `packages/client-core/src/kit/lib/timeline/timelineWindow.ts`, from
 `@acorn/plugin-api/ui`). The window counts cards and never measures one, so it has no feedback loop.
 The canonical 7,012-event session projects to 3,387 cards. Drawing all of them built about 30,000
 elements in about 840 ms in jsdom before anything painted. The window builds about 1,800 elements in

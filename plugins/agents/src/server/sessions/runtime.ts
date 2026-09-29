@@ -1,9 +1,4 @@
-import { randomUUID } from 'node:crypto'
-import { agentProfileRegistry } from '@acorn/plugin-api/node'
-import { HARNESS_BACKEND_PREFIX } from '@acorn/protocol/modelProviders.ts'
-import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import type {
-  AgentConfigOption,
   AgentDeleteResult,
   AgentRequest,
   AgentSession,
@@ -18,52 +13,26 @@ import {
   MAX_AGENT_RESOLUTION_BYTES,
   validateAgentInputFiles,
 } from './inputValidation'
-import { parseAgentTranscript } from './transcriptImport'
-import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../sessionDefaultsStore'
 import {
-  effectiveAgentDefaults,
-  optionsWithDefaults,
-  rememberAgentDefaults,
-} from '../../shared/sessionDefaults'
-import {
-  agentTurnInputText,
   ManagedAgentEngine,
   type AgentRuntimeOptions,
   type WaitCondition,
 } from './runtimeEngine'
 import { mergeSessionConfigChange } from './sessionConfigMerge'
 import { sessionMcpSelection, type AgentSessionMcp } from '../../shared/mcpServers'
+import { customAgentRegistry, readCustomAgents } from '../customAgents'
+import { customAgentSnapshot, sessionCustomAgent, type CustomAgent } from '../../shared/customAgents'
+import { delegatedToolCeiling } from '../delegation/policy'
+import { parseToolCeiling } from '@acorn/protocol/toolPolicy.ts'
+import { SessionTitleGeneration } from './sessionTitleGeneration'
+import { SessionDefaultsCommands } from './sessionDefaultsCommands'
+import { TranscriptCommands } from './transcriptCommands'
+import { waitForSessionSnapshot } from './sessionWait'
 import { CODEX_PLAN_IMPLEMENTATION_PROMPT } from '../../shared/codexPlanHandoff'
-import {
-  buildSessionTitlePrompt,
-  generationText,
-  isSessionTitlePromptEligible,
-  normalizeGeneratedSessionTitle,
-  SESSION_TITLE_SYSTEM_PROMPT,
-} from './sessionTitle'
-
-// This includes starting a second agent CLI and waiting for its final response. Five seconds was
-// shorter than real Codex runs on the development node, so every generation was cancelled after the
-// prompt fallback had already been published. The work stays detached from the accepted turn, which
-// makes a longer bound safe for the user-facing path while still giving shutdown a finite join.
-const SESSION_TITLE_TIMEOUT_MS = 30_000
-
-type SessionTitleOperation = {
-  controller: AbortController
-  promise: Promise<void>
-}
 
 /**
- * Product-facing managed-agent commands. Provider process supervision, ordered event durability,
- * and scheduling live in ManagedAgentEngine; this class owns lifecycle policy and user commands.
- */
-/**
- * The turn's input with its text replaced by what the `before-send` chain left.
- *
- * The first text part carries the whole rewritten prompt and the rest are dropped, because the chain
- * saw one string and returned one string: putting it back into several parts would mean inventing a
- * split the handler never described. Every non-text part — attachments, file references, captured
- * context — is preserved in place, since none of it was offered to the chain.
+ * Replaces the first text part with the hook's single result and keeps every non-text part.
+ * The hook receives joined text, so retaining later text parts would repeat the prompt.
  */
 const withPromptText = (parts: EnqueueAgentTurnInput['input'], text: string): EnqueueAgentTurnInput['input'] => {
   let used = false
@@ -78,9 +47,36 @@ const withPromptText = (parts: EnqueueAgentTurnInput['input'], text: string): En
   return next
 }
 
+/**
+ * Product-facing managed-agent commands. ManagedAgentEngine owns process supervision, event
+ * durability, and scheduling. This class coordinates session lifecycle and user commands.
+ */
 export class ManagedAgentRuntime extends ManagedAgentEngine {
   private readonly sessionInitializations = new Map<string, Promise<AgentSession>>()
-  private readonly sessionTitleOperations = new Map<string, SessionTitleOperation>()
+  private readonly titleGeneration = new SessionTitleGeneration({
+    store: this.store,
+    models: this.core.models,
+    currentUserId: this.currentUserId,
+    publish: (session) => this.emit({ channel: 'agent:session', session }),
+    telemetry: this.telemetry,
+  })
+  private readonly sessionDefaults = new SessionDefaultsCommands({
+    store: this.store,
+    prefs: this.core.prefs,
+    currentUserId: this.currentUserId,
+    patchSession: (sessionId, patch, options) => this.patchSession(sessionId, patch, options),
+    recordWarning: async (sessionId, message) => {
+      await this.record(sessionId, null, { type: 'diagnostic', level: 'warning', message })
+    },
+  })
+  private readonly transcripts = new TranscriptCommands({
+    store: this.store,
+    providers: () => this.providers(),
+    requireTaskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
+    record: async (sessionId, turnId, event) => { await this.record(sessionId, turnId, event) },
+    ensureSession: async (session) => { await this.ensureSession(session) },
+    publish: (session) => this.emit({ channel: 'agent:session', session }),
+  })
 
   async createSession(
     input: CreateAgentSessionInput,
@@ -128,10 +124,52 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     await this.core.tasks.requireRoot(input.taskId)
     // The servers switched on in Settings, decided here rather than taken from the caller: which
     // programs a session starts is the owner's setting, not something a request body can widen.
+    const withAgent = await this.withCustomAgent(input)
     const mcpServers = await this.mcpServers.enabledNames()
-    const session = await this.store.createSession({ ...input, config: { ...input.config, mcpServers } }, provider)
+    const session = await this.store.createSession({ ...withAgent, config: { ...withAgent.config, mcpServers } }, provider)
     if (idempotencyKey) await this.store.saveOperation(idempotencyKey, 'session.create', session, session.id)
     return { session, created: true }
+  }
+
+  /** The owner's custom agents and every plugin's, read per call because an account switch changes
+   *  whose list this is. */
+  async customAgents(): Promise<CustomAgent[]> {
+    const userId = this.currentUserId()
+    return userId ? readCustomAgents(this.core.prefs, userId) : customAgentRegistry.list()
+  }
+
+  /**
+   * What a session started from a custom agent keeps: the snapshot the drivers read, the options to
+   * apply once the provider has listed its own, and the tool ceiling. A ceiling the caller already set
+   * is narrowed by the agent's, never replaced. A session with no `customAgentId` keeps whatever
+   * `config` it was given, which is how a fork carries its source's snapshot; the HTTP route is where a
+   * client's own `customAgent` is dropped (../routes/managed.ts).
+   */
+  private async withCustomAgent(input: CreateAgentSessionInput): Promise<CreateAgentSessionInput> {
+    if (!input.customAgentId) return input
+    const config = input.config
+    const agent = (await this.customAgents()).find((candidate) => candidate.id === input.customAgentId)
+    if (!agent) throw new Error('That custom agent no longer exists.')
+    if (agent.providerId !== input.providerId) {
+      throw new Error(`${agent.name} runs on '${agent.providerId}', not '${input.providerId}'.`)
+    }
+    const requested = typeof config.requestedConfigOptions === 'object' && config.requestedConfigOptions
+      ? config.requestedConfigOptions as Record<string, unknown>
+      : {}
+    const agentCeiling = agent.maxToolRisk ? { maxRisk: agent.maxToolRisk } : undefined
+    // An unreadable ceiling the caller sent removes every tool, the same as a corrupt persisted one.
+    const ceiling = config.toolCeiling === undefined
+      ? agentCeiling
+      : delegatedToolCeiling(parseToolCeiling(config.toolCeiling) ?? { allow: [] }, agentCeiling)
+    return {
+      ...input,
+      config: {
+        ...config,
+        customAgent: customAgentSnapshot(agent),
+        requestedConfigOptions: { ...agent.options, ...requested },
+        ...(ceiling ? { toolCeiling: ceiling } : {}),
+      },
+    }
   }
 
   private startCreatedSession(session: AgentSession): Promise<AgentSession> {
@@ -150,11 +188,9 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     this.holdSessionReadiness(session.id)
     try {
       await this.ensureSession(session)
-      // Interactive sessions only, and not a fork. A workflow step names the model it wants in its own
-      // policy, and a fork continues the session it came from, so neither is the owner opening something
-      // new for the defaults to answer for.
+      // Workflow steps and sessions with an origin set their own options. Forks retain theirs.
       if (session.kind === 'interactive' && !session.parentSessionId && !session.origin) {
-        await this.applySessionDefaults(session.id, session.providerId).catch(async (error) => {
+        await this.sessionDefaults.applySaved(session.id, session.providerId).catch(async (error) => {
           await this.record(session.id, null, {
             type: 'diagnostic',
             level: 'warning',
@@ -162,7 +198,11 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
           })
         })
       }
-      if (session.kind === 'delegated' || session.origin?.kind === 'inline-diff') {
+      // A custom agent's options go on top of the defaults above, so an agent that names only a model
+      // still starts on the owner's reasoning level. Not for a fork, which copies the snapshot with the
+      // rest of its source's config and continues at the settings its source was running.
+      const startsFromAgent = !!sessionCustomAgent(session.config) && !session.parentSessionId
+      if (session.kind === 'delegated' || session.origin?.kind === 'inline-diff' || startsFromAgent) {
         const requested = session.config.requestedConfigOptions
         if (requested && typeof requested === 'object' && !Array.isArray(requested)) {
           const values = Object.fromEntries(Object.entries(requested).filter((entry): entry is [string, string] =>
@@ -179,98 +219,15 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
   }
 
   override async stop(): Promise<void> {
-    for (const operation of this.sessionTitleOperations.values()) {
-      operation.controller.abort(new Error('runtime_stop'))
-    }
-    await Promise.allSettled([...this.sessionTitleOperations.values()].map((operation) => operation.promise))
+    await this.titleGeneration.stop()
     await super.stop()
-    // Provider start is now allowed to outlive its HTTP request, but never the plugin database it may
-    // still update. super.stop() stops/awaits each live start; this joins the policy continuation too.
+    // Provider starts can outlive HTTP requests. Join initialization before closing the database.
     await Promise.allSettled(this.sessionInitializations.values())
   }
 
-  /**
-   * Fold the owner's stored defaults onto what the provider advertised while starting. It runs after
-   * the driver's `session_metadata` rather than at insert, because the advertised option list is
-   * where the values are validated and there is nothing to validate against until the provider has
-   * reported it. A refusal is recorded and dropped: a default that cannot be applied is not a reason
-   * to fail the session the owner just opened.
-   */
-  private async applySessionDefaults(sessionId: string, providerId: string): Promise<void> {
-    const userId = this.currentUserId()
-    if (!userId) return
-    const stored = await readAgentSessionDefaults(this.core.prefs, userId)
-    const wanted = effectiveAgentDefaults(stored, providerId)
-    if (!Object.keys(wanted).length) return
-    const session = await this.store.requireSession(sessionId)
-    const advertised = Array.isArray(session.config.configOptions)
-      ? session.config.configOptions as AgentConfigOption[]
-      : []
-    const configOptions = optionsWithDefaults(advertised, wanted)
-    if (configOptions === advertised) return
-    // `remember: false`, or applying the stored value would write it straight back.
-    await this.patchSession(sessionId, { config: { ...session.config, configOptions } }, { remember: false })
-      .catch(async (error) => {
-        await this.record(sessionId, null, {
-          type: 'diagnostic',
-          level: 'warning',
-          message: `Your saved defaults could not be applied to this session: ${error instanceof Error ? error.message : 'unknown error'}`,
-        })
-      })
-  }
-
-  /**
-   * Apply a caller's requested provider options to a session that has already reported its option
-   * list. `agents.sessionExecute` calls it for a workflow step that names a model or a reasoning
-   * level, which is the one path where the values come from a file rather than from a person.
-   *
-   * A value the provider does not advertise is dropped and recorded, for the same reason a stored
-   * default is: the step asked for something this provider cannot do, and failing the step over it
-   * would be worse than running on the provider's own choice.
-   */
+  /** Applies workflow-selected provider options after the provider advertises its choices. */
   async applyRequestedConfig(sessionId: string, wanted: Record<string, string>): Promise<void> {
-    if (!Object.keys(wanted).length) return
-    const session = await this.store.requireSession(sessionId)
-    const advertised = Array.isArray(session.config.configOptions)
-      ? session.config.configOptions as AgentConfigOption[]
-      : []
-    const configOptions = optionsWithDefaults(advertised, wanted)
-    const dropped = Object.entries(wanted).filter(([id, value]) =>
-      !configOptions.some((option) => option.id === id && option.currentValue === value))
-    if (dropped.length) {
-      await this.record(sessionId, null, {
-        type: 'diagnostic',
-        level: 'warning',
-        message: `This provider does not offer ${dropped.map(([id, value]) => `${id} = ${value}`).join(', ')}, so the session kept its own setting.`,
-      })
-    }
-    if (configOptions === advertised) return
-    // `remember: false`: a workflow file's choice is that run's, not the owner's next default.
-    await this.patchSession(sessionId, { config: { ...session.config, configOptions } }, { remember: false })
-      .catch(async (error) => {
-        await this.record(sessionId, null, {
-          type: 'diagnostic',
-          level: 'warning',
-          message: `The step's provider settings could not be applied: ${error instanceof Error ? error.message : 'unknown error'}`,
-        })
-      })
-  }
-
-  /** Carry an in-session switch forward, so the next session of this provider starts where this one is. */
-  private async rememberSessionDefaults(
-    providerId: string,
-    changed: ReadonlyArray<{ id: string; value: string }>,
-  ): Promise<void> {
-    const userId = this.currentUserId()
-    if (!userId) return
-    const stored = await readAgentSessionDefaults(this.core.prefs, userId)
-    if (!stored.followLastSession) return
-    const chosen = Object.fromEntries(changed.map((option) => [option.id, option.value]))
-    await writeAgentSessionDefaults(
-      this.core.prefs,
-      userId,
-      rememberAgentDefaults(stored, providerId, chosen),
-    )
+    await this.sessionDefaults.applyRequested(sessionId, wanted)
   }
 
   async importTranscript(input: {
@@ -280,85 +237,11 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     title?: string
     content: string
   }): Promise<AgentSession> {
-    const provider = (await this.providers()).find((candidate) => candidate.id === input.providerId)
-    if (!provider) throw new Error(`Managed provider is not registered: ${input.providerId}`)
-    if (provider.profileId !== input.profileId) {
-      throw new Error(`Provider '${provider.id}' requires profile '${provider.profileId}'.`)
-    }
-    await this.core.tasks.requireRoot(input.taskId)
-    const parsed = parseAgentTranscript(input.content)
-    const session = await this.store.createSession({
-      taskId: input.taskId,
-      providerId: input.providerId,
-      profileId: input.profileId,
-      title: input.title ?? parsed.title ?? `Imported ${provider.label} transcript`,
-      kind: 'imported',
-      config: {
-        imported: true,
-        importedProviderSessionRef: parsed.providerSessionRef,
-        resumeVerified: false,
-      },
-    }, provider)
-    await this.store.setController(session.id, 'external')
-    await this.record(session.id, null, {
-      type: 'diagnostic',
-      level: 'info',
-      message: 'Imported transcript. History is read-only until its provider session reference is explicitly verified.',
-    })
-    for (const imported of parsed.turns) {
-      const { turn } = await this.store.enqueueTurn(session.id, {
-        input: [{ type: 'text', text: imported.user }],
-        source: 'import',
-        effectivePolicy: { imported: true },
-        idempotencyKey: randomUUID(),
-      })
-      await this.store.dispatchTurn(turn.id)
-      await this.store.startTurn(turn.id)
-      await this.record(session.id, turn.id, { type: 'user_message', text: imported.user })
-      for (const text of imported.assistant) {
-        await this.record(session.id, turn.id, { type: 'assistant_message', text })
-      }
-      await this.record(session.id, turn.id, {
-        type: 'turn_completed',
-        stopReason: 'imported_history',
-      })
-    }
-    await this.record(session.id, null, {
-      type: 'session_state',
-      state: 'stopped',
-      detail: 'Imported historical transcript.',
-    })
-    const imported = await this.store.requireSession(session.id)
-    this.emit({ channel: 'agent:session', session: imported })
-    return imported
+    return this.transcripts.import(input)
   }
 
   async verifyImportedResume(sessionId: string): Promise<AgentSession> {
-    const session = await this.store.requireSession(sessionId)
-    if (session.kind !== 'imported') throw new Error('Only imported transcripts require resume verification.')
-    const providerSessionRef = session.config.importedProviderSessionRef
-    if (typeof providerSessionRef !== 'string' || !providerSessionRef) {
-      throw new Error('The imported transcript has no provider session reference.')
-    }
-    await this.store.setProviderSessionReference(sessionId, providerSessionRef)
-    const controlled = await this.store.setController(sessionId, 'acorn')
-    try {
-      await this.ensureSession(controlled)
-    } catch (error) {
-      await this.store.setProviderSessionReference(sessionId, null)
-      await this.store.setController(sessionId, 'external')
-      throw error
-    }
-    const verified = await this.store.patchSession(sessionId, {
-      config: { ...session.config, resumeVerified: true },
-    })
-    await this.record(sessionId, null, {
-      type: 'diagnostic',
-      level: 'info',
-      message: 'Provider resume reference verified. Acorn now owns the input controller.',
-    })
-    this.emit({ channel: 'agent:session', session: verified })
-    return this.store.requireSession(sessionId)
+    return this.transcripts.verifyResume(sessionId)
   }
 
   async enqueueTurn(sessionId: string, input: EnqueueAgentTurnInput): Promise<AgentTurn> {
@@ -368,10 +251,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     const cwd = await this.core.tasks.requireRoot(session.taskId)
     await validateAgentInputFiles(cwd, input.input)
     assertBoundedJson('Effective agent policy', input.effectivePolicy, MAX_AGENT_POLICY_BYTES)
-    // Every turn this node accepts passes here, whichever surface enqueued it, so this is where another
-    // plugin gets its turn at the prompt (docs/plugins.md § Hooks). Only the text is offered: a
-    // transform rewrites what the agent is asked, and a redaction or a policy plugin needs nothing more.
-    // Attachments and the effective policy stay the owner's.
+    // Every accepted turn passes this hook. Offer text only; attachments and policy remain with the owner.
     const prompt = await this.hooks?.run('before-send', {
       sessionId,
       taskId: session.taskId,
@@ -410,17 +290,12 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       },
     })
     const { turn } = outcome
-    // Carry the fresh queued count to every client now. A busy session re-broadcasts its row on the
-    // next event anyway, but a session held idle behind the concurrency limit produces no event, so its
-    // waiting-prompt mark would not appear until something unrelated woke it.
+    // An idle session behind the concurrency limit emits no provider event, so publish its queue count.
     this.emit({ channel: 'agent:session', session: await this.store.requireSession(sessionId) })
     if (session.runtimeState === 'failed' || session.runtimeState === 'stopped') {
       await this.stopLive(session.id)
     }
-    // The command is accepted once the turn is durable. Provider startup/reconnect is a subsequent
-    // effect: if it fails, ensureSession records the session error while the turn remains queued.
-    // Throwing here after insertion would report a false 500 and leave the client holding a draft
-    // that has already been accepted.
+    // Acceptance ends at the durable write. A startup failure is recorded against the queued turn.
     void this.ensureSession(session)
       .then(() => this.pump())
       .catch(() => undefined)
@@ -430,7 +305,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       && turn.source === 'interactive'
       && outcome.firstTurnFallback
     ) {
-      this.startSessionTitleGeneration(session, enqueued.input, outcome.firstTurnFallback)
+      this.titleGeneration.start(session, enqueued.input, outcome.firstTurnFallback)
     }
     return turn
   }
@@ -460,136 +335,12 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     return turn
   }
 
-  private startSessionTitleGeneration(
-    session: AgentSession,
-    parts: EnqueueAgentTurnInput['input'],
-    fallback: string,
-  ): void {
-    if (this.sessionTitleOperations.has(session.id)) return
-    const text = generationText(parts)
-    const userId = this.currentUserId()
-    const profile = agentProfileRegistry.get(session.profileId)
-    if (!isSessionTitlePromptEligible(text) || !userId || !profile?.aiArgv) {
-      this.logSessionTitle(
-        session.profileId,
-        profile?.aiArgv && userId ? 'skipped' : 'unavailable',
-        0,
-        text.length,
-      )
-      return
-    }
-
-    void this.runSessionTitleGeneration(session, userId, text, fallback, fallback).catch(() => undefined)
-  }
-
-  /** Generate again from the first durable text prompt. This is an explicit one-shot command, so it
-   *  may replace any current title, but compare-and-set still lets a rename made while it runs win. */
+  /** Regenerate the title from the first durable text prompt. */
   async regenerateTitle(sessionId: string): Promise<AgentSession> {
-    const inFlight = this.sessionTitleOperations.get(sessionId)
-    if (inFlight) await inFlight.promise
-
-    const session = await this.store.requireSession(sessionId)
-    const firstTurn = await this.store.firstTurn(sessionId)
-    const text = generationText(firstTurn?.input ?? [])
-    if (!text) throw new Error('Send a text prompt before regenerating the session title.')
-
-    const userId = this.currentUserId()
-    const profile = agentProfileRegistry.get(session.profileId)
-    if (!userId || !profile?.aiArgv) {
-      this.logSessionTitle(session.profileId, 'unavailable', 0, text.length)
-      throw new Error('Title generation is unavailable for this session provider.')
-    }
-    return this.runSessionTitleGeneration(session, userId, text, session.title)
+    return this.titleGeneration.regenerate(sessionId)
   }
 
-  private runSessionTitleGeneration(
-    session: AgentSession,
-    userId: string,
-    text: string,
-    expectedTitle: string,
-    excludedTitle?: string,
-  ): Promise<AgentSession> {
-    if (this.sessionTitleOperations.has(session.id)) {
-      throw new Error('Session title generation is already in progress.')
-    }
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(new Error('session_title_timeout')), SESSION_TITLE_TIMEOUT_MS)
-    const work = this.generateSessionTitle(session, userId, text, expectedTitle, excludedTitle, controller)
-    const promise = work
-      .then(() => undefined, () => undefined)
-      .finally(() => {
-        clearTimeout(timeout)
-        this.sessionTitleOperations.delete(session.id)
-      })
-    this.sessionTitleOperations.set(session.id, { controller, promise })
-    return work
-  }
-
-  private async generateSessionTitle(
-    session: AgentSession,
-    userId: string,
-    text: string,
-    expectedTitle: string,
-    excludedTitle: string | undefined,
-    controller: AbortController,
-  ): Promise<AgentSession> {
-    const startedAt = Date.now()
-    let outcome: 'generated' | 'timeout' | 'unavailable' | 'invalid' | 'superseded' | 'aborted' = 'unavailable'
-    try {
-      const generated = await this.core.models.generateText({
-        userId,
-        backendId: `${HARNESS_BACKEND_PREFIX}${session.profileId}`,
-        input: {
-          system: SESSION_TITLE_SYSTEM_PROMPT,
-          prompt: buildSessionTitlePrompt(text),
-          maxOutputTokens: 64,
-          signal: controller.signal,
-        },
-        timeoutMs: SESSION_TITLE_TIMEOUT_MS,
-      })
-      if (controller.signal.aborted) {
-        outcome = /runtime_stop|session_deleted/.test(String(controller.signal.reason)) ? 'aborted' : 'timeout'
-        throw controller.signal.reason
-      }
-      const title = normalizeGeneratedSessionTitle(generated.text, excludedTitle)
-      if (!title) {
-        outcome = 'invalid'
-        throw new Error('The provider did not return a usable session title.')
-      }
-      const renamed = await this.store.renameSession(session.id, {
-        title,
-        expectedTitle,
-        source: 'generated',
-      })
-      if (!renamed.changed) {
-        outcome = 'superseded'
-        return renamed.session
-      }
-      this.emit({ channel: 'agent:session', session: renamed.session })
-      outcome = 'generated'
-      return renamed.session
-    } catch (error) {
-      if (controller.signal.aborted) {
-        outcome = /runtime_stop|session_deleted/.test(String(controller.signal.reason)) ? 'aborted' : 'timeout'
-      }
-      throw error
-    } finally {
-      this.logSessionTitle(session.profileId, outcome, Date.now() - startedAt, text.length)
-    }
-  }
-
-  private logSessionTitle(
-    profileId: string,
-    outcome: 'generated' | 'skipped' | 'timeout' | 'unavailable' | 'invalid' | 'superseded' | 'aborted',
-    durationMs: number,
-    promptChars: number,
-  ): void {
-    this.telemetry?.event('agents.session-title.generate', { profileId, outcome, durationMs, promptChars })
-  }
-
-  // For a change outside a turn that widens what the dispatcher may start, the concurrency ceilings
-  // being the one so far. Without it a raise waits for the next enqueue or completion to take effect,
-  // which is the same stall raising the ceiling was meant to clear.
+  // A raised concurrency limit must wake the pump without waiting for another turn or completion.
   drainQueue(): void {
     void this.pump()
   }
@@ -599,10 +350,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     const active = await this.store.activeTurn(sessionId)
     const target = turnId ?? active?.id
     if (!target) {
-      // Stop with nothing to cancel used to return quietly, which made the button a no-op on exactly
-      // the session that needed it: the row said 'working', so Stop was enabled, but no turn row
-      // existed to cancel and 'working' blocks dispatch, so the next prompt queued forever. Settle the
-      // session instead. The provider child is alive and idle, and if it is not, pump respawns it.
+      // A working session can have no active turn. Settle it so queued input can dispatch.
       const session = await this.store.getSession(sessionId)
       if (!session || !['working', 'waiting', 'cancelling'].includes(session.runtimeState)) return
       await this.store.expirePendingRequests(sessionId)
@@ -740,17 +488,15 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
         const live = await this.ensureSession(before)
         for (const option of changed) {
           await live.handle?.setConfig?.(option.id, option.value)
-          // A switched model or reasoning level belongs in the transcript, since it changes what every
-          // later turn means. Recorded as a diagnostic row: the transcript already draws those.
+          // Record model and reasoning changes because they affect later turns.
           await this.record(sessionId, null, {
             type: 'diagnostic',
             level: 'info',
             message: `${option.label} changed to ${option.valueLabel}`,
           })
         }
-        // Every config change goes through this one method, whether the composer sent it or an
-        // automation did, so it is the only place that has to notice one to carry it forward.
-        if (options.remember !== false) await this.rememberSessionDefaults(before.providerId, changed)
+        // Both user and automation changes pass here before updating saved defaults.
+        if (options.remember !== false) await this.sessionDefaults.remember(before.providerId, changed)
       }
       const latest = await this.store.requireSession(sessionId)
       persistedPatch = {
@@ -870,9 +616,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
 
   async deleteSession(sessionId: string): Promise<AgentDeleteResult> {
     const session = await this.store.requireSession(sessionId)
-    const titleOperation = this.sessionTitleOperations.get(sessionId)
-    titleOperation?.controller.abort(new Error('session_deleted'))
-    if (titleOperation) await titleOperation.promise
+    await this.titleGeneration.cancel(sessionId)
     const live = this.live.get(sessionId)
       ?? (session.providerSessionRef ? await this.ensureSession(session).catch(() => null) : null)
     let provider: AgentDeleteResult['provider'] = 'unsupported'
@@ -943,19 +687,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
   }
 
   async exportSession(sessionId: string, format: 'json' | 'markdown'): Promise<string> {
-    const snapshot = await this.store.exportSnapshot(sessionId)
-    if (format === 'json') return JSON.stringify({ baseline: ACORN_BASELINE, version: 1, exportedAt: Date.now(), ...snapshot }, null, 2)
-    const lines = [`# ${snapshot.session.title}`, '', `Provider: ${snapshot.session.providerId}`, '']
-    for (const turn of snapshot.turns) {
-      lines.push('## User', '', agentTurnInputText(turn), '')
-      for (const event of snapshot.events.filter((item) => item.turnId === turn.id)) {
-        if (event.event.type === 'assistant_message') lines.push(event.event.text)
-        else if (event.event.type === 'tool') lines.push(`- Tool: ${event.event.tool.title} — ${event.event.tool.status ?? 'running'}`)
-        else if (event.event.type === 'error') lines.push(`- Error: ${event.event.message}`)
-      }
-      lines.push('')
-    }
-    return lines.join('\n')
+    return this.transcripts.export(sessionId, format)
   }
 
   async wait(
@@ -964,54 +696,11 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     until: WaitCondition,
     timeoutMs: number,
   ): Promise<AgentSessionSnapshot> {
-    const initial = await this.store.snapshot(sessionId, afterSeq)
-    if (this.conditionMet(initial, until)) return initial
-    if (timeoutMs === 0) return initial
-    return new Promise((resolve, reject) => {
-      let settled = false
-      const finish = (snapshot: AgentSessionSnapshot) => {
-        if (settled) return
-        settled = true
-        clearTimeout(timeout)
-        off()
-        resolve(snapshot)
-      }
-      const fail = (error: unknown) => {
-        if (settled) return
-        settled = true
-        clearTimeout(timeout)
-        off()
-        reject(error)
-      }
-      const check = () => {
-        void this.store.snapshot(sessionId, afterSeq).then((snapshot) => {
-          if (this.conditionMet(snapshot, until)) finish(snapshot)
-        }, fail)
-      }
-      const timeout = setTimeout(() => {
-        if (settled) return
-        settled = true
-        off()
-        void this.store.snapshot(sessionId, afterSeq).then(resolve, reject)
-      }, timeoutMs)
-      const off = this.subscribe((frame) => {
-        if (
-          (frame.channel === 'agent:event' && frame.event.sessionId !== sessionId)
-          || (frame.channel === 'agent:session' && frame.session.id !== sessionId)
-          || (frame.channel === 'agent:turn' && frame.turn.sessionId !== sessionId)
-          || (frame.channel === 'agent:request' && frame.request.sessionId !== sessionId)
-          || frame.channel === 'agent:deleted'
-        ) return
-        check()
-      })
-      // Close the gap between the initial read and listener registration. An event committed in that
-      // window has already been broadcast, so no later frame would otherwise wake this wait.
-      check()
-    })
+    return waitForSessionSnapshot({
+      store: this.store,
+      conditionMet: (snapshot, condition) => this.conditionMet(snapshot, condition),
+      subscribe: (listener) => this.subscribe(listener),
+    }, sessionId, afterSeq, until, timeoutMs)
   }
-
-
 }
-
-
 export type { AgentRuntimeOptions }

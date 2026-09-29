@@ -5,13 +5,13 @@
 // resolve/reply callbacks, gap expansion), so nothing here reaches back into a plugin.
 import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from 'solid-js'
 import CopyButton from '../components/inputs/CopyButton'
-import { fileStatusMeta } from '../lib/displayMeta'
+import { fileStatusMeta } from '../lib/rendering/displayMeta'
 import MentionTextarea from '../components/inputs/MentionTextarea'
 import type { DiffFile, DiffThread } from './diffModel'
 import { UserAvatar } from '../components/content/UserAvatar'
 import { buildDiffRows, fileAnchor, isCodeRow, plainTokenize, type CodeRow, type FileRow, type GapRow, type HunkRow, type LoadDiffRow, type LoadDiffStatus, type Row, type ThreadRowT } from './diffModel'
 import { markTokens, type FindHighlight } from './find'
-import { persistDraft } from '../lib/draftState'
+import { persistDraft } from '../lib/state/draftState'
 import { Button } from '../components/primitives'
 import SanitizedHtml from '../components/content/SanitizedHtml'
 
@@ -105,8 +105,23 @@ export function FileHead(props: {
   anchorId?: string
   collapsed?: boolean
   onToggleCollapse?: (path: string) => void
+  /** Indexes into the path that a file filter matched, drawn as find marks. */
+  marks?: readonly number[]
 }) {
   const status = () => fileStatusMeta(props.file.status)
+  // The path as runs of marked and unmarked characters, so each run of hits is one mark.
+  const pathRuns = createMemo(() => {
+    const path = props.file.path
+    const marks = new Set(props.marks)
+    const runs: { text: string; mark: boolean }[] = []
+    for (let i = 0; i < path.length; i++) {
+      const mark = marks.has(i)
+      const last = runs[runs.length - 1]
+      if (last?.mark === mark) last.text += path[i]
+      else runs.push({ text: path[i]!, mark })
+    }
+    return runs
+  })
   return (
     <div class="diff-file-head copyable" id={props.anchorId}>
       <Show when={props.onToggleCollapse}>
@@ -123,7 +138,9 @@ export function FileHead(props: {
       <span class={`file-status file-status-${status().tone}`} title={status().label}>
         {status().letter}
       </span>
-      <span class="diff-file-path">{props.file.path}</span>
+      <span class="diff-file-path">
+        <For each={pathRuns()}>{(run) => (run.mark ? <mark class="ui-find-mark">{run.text}</mark> : run.text)}</For>
+      </span>
       <CopyButton text={() => props.file.path} title="Copy path" />
       <span class="file-stat add">+{props.file.additions ?? 0}</span>
       <span class="file-stat del">&#8722;{props.file.deletions ?? 0}</span>
@@ -430,7 +447,7 @@ function ThreadRow(props: {
   // Persist an in-progress reply per thread so it survives navigation and reloads.
   persistDraft(() => `thread-reply:${props.thread.threadId}`, body, setBody)
   const resolved = () => optimisticResolved() ?? props.thread.resolved
-  const collapsed = () => resolved() && (props.collapse?.collapsed() ?? localCollapsed())
+  const collapsed = () => props.collapse?.collapsed() ?? localCollapsed()
   const setCollapsed = (value: boolean) => {
     if (props.collapse) props.collapse.setCollapsed(value)
     else setLocalCollapsed(value)
@@ -501,13 +518,11 @@ function ThreadRow(props: {
     >
       <div class="diff-thread-head">
         <span class="diff-thread-status">{resolved() ? 'Resolved' : 'Conversation'}</span>
-        <Show when={resolved()}>
-          <Button variant="bare" onPress={toggleCollapsed}>
-            {collapsed() ? 'Show' : 'Hide'}
-          </Button>
-        </Show>
         <Button variant="bare" disabled={busy()} onPress={toggleResolve}>
           {resolved() ? 'Unresolve' : 'Resolve'}
+        </Button>
+        <Button variant="bare" onPress={toggleCollapsed}>
+          {collapsed() ? 'Show' : 'Hide'}
         </Button>
       </div>
       <Show when={!collapsed()}>

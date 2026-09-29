@@ -25,10 +25,8 @@ import {
   resolveThreadRoute,
 } from './api'
 
-// Moved here from @acorn/protocol/src/api.test.ts with the routes and keys it pins. These two things
-// are invisible to tsc and expensive to get wrong: a retyped route template compiles fine and 404s at
-// runtime, and a changed query key silently orphans a user's persisted IndexedDB cache, which has no
-// buster.
+// These assertions stay beside the GitHub routes and keys. TypeScript cannot catch a mistyped route
+// that returns 404 or a changed query key that orphans a persisted IndexedDB cache.
 describe('github wire contract', () => {
   it('preserves route strings used by the client fetch layer', () => {
     expect(reposRoute).toBe('/v1/p/github/repos')

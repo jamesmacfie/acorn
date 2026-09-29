@@ -97,15 +97,17 @@ row was about; it is a `fleet`-scoped search now, so the root shows one named ro
 task the fleet has, and switching node still happens before a remote task is activated.
 
 **`Last workspace` is an action, not a search, and it is the same pair both ways.**
-`client-core/features/workspaces/lastWorkspace.ts` holds one workspace id: the one open before this
-one. Each shell reports the workspace it has settled on — the desktop from the route, the terminal
+`client-core/features/workspaces/lastWorkspace.ts` holds the current workspace id and the one open
+before it. Each shell reports the workspace it has settled on — the desktop from the route, the terminal
 from its own choice — so opening a task in another workspace counts as a switch and the picker is not
 the only way to move. Going back reports the arrival in turn, which makes the workspace just left the
 way back, so `meta+;` on the desktop and `;` in the terminal swap the same two workspaces for as long
 as the reader keeps pressing. The store keeps an id rather than a node, and the desktop looks that id
 up against the fleet when the key is pressed, so a workspace on a node that has come back is found
-again. There is no third step back: this is a toggle, not a history, and the row is hidden until a
-second workspace has been opened.
+again. The pair persists beside workspace restore state on the active Node, so it survives a reload
+or relaunch. Both shells wait for startup restoration before reporting the displayed workspace; an
+explicit desktop URL to a different workspace becomes a new visit. There is no third step back: this
+is a toggle, not a history, and the row is hidden until a second workspace has been opened.
 
 **Every row in the palette is a command.** There was a second way in until 2026-09-03: a
 `paletteRows` contribution, with `rows` and `invoke` where a command has `run`, fetched by each host
@@ -404,8 +406,8 @@ exempt from typing gets what it asked for whatever it spells.
 
 Two other paths already drew this line and this host was the one that refused both. The
 sandboxed-frame SDK forwards a modified chord out of a frame's own input and keeps a bare one
-(`client-core/host/frames/sdk.ts`), and the terminal host's command layer shadows bare keys while a
-field has them and lets chords through at every depth
+(`packages/client-core/src/host/frames/sdk/bridgePort.ts`). The terminal host's command layer shadows
+bare keys while a field has them and lets chords through at every depth
 (`apps/tui/src/keys/commandLayer.ts`). Escape is not a chord and is unaffected: an open overlay
 answers its own, and the matcher hands it over before any of this.
 
@@ -490,7 +492,7 @@ document and cancels the wait if its owner unmounts first. A staged pane therefo
 against a destroyed target nor loses its keys when it becomes visible.
 
 Escape is the exception the engine cannot express. An open overlay answers its own Escape, and
-`kit/lib/dismissable.ts` keeps a stack of them so a pile unwinds one press at a time, so an `escape`
+`kit/lib/controls/dismissable.ts` keeps a stack of them so a pile unwinds one press at a time, so an `escape`
 binding goes inactive while focus is inside a dialog. Consuming the key in the engine would stop the
 DOM event too, and the overlay would never see it.
 

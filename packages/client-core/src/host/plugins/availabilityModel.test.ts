@@ -21,7 +21,7 @@ const host = (decision?: 'accepted' | 'rejected'): PluginHostState => ({
     pluginId: 'reports', hash: 'accepted-hash', nodeId: 'a', version: '1.0.0', decision, decidedAt: 1,
     declaration: clientDeclaration(runtime),
     permissions: runtime.permissions, webviews: [], keyClaims: [], navigationDestinations: [],
-    extensions: [], schedules: [], taskChecks: [], harnesses: [], agentTools: [], contextSections: [],
+    extensions: [], schedules: [], taskChecks: [], harnesses: [], agentTools: [], contextSections: [], customAgents: [],
   }] : [],
   devGrants: [],
 })

@@ -1,8 +1,7 @@
 name: Lint and test
 
-# The gate every pull request has to pass. Until this existed the architecture rules, the path
-# checker, and every unit suite ran only on whoever remembered to run them: build-desktop.yml has no
-# pull_request trigger and runs the desktop package alone.
+# The Linux suite and the unsigned desktop suite gate pull requests. The signed desktop bundle
+# remains in build-desktop.yml on main and tags.
 on:
   pull_request:
   push:
@@ -39,9 +38,37 @@ jobs:
       # bounds Turborepo's concurrency, and without the bound the suites that spawn processes or mint
       # certificates time out under the load while passing in isolation (CLAUDE.md).
       #
-      # @acorn/desktop is excluded because its `test` stages the whole bundle and then runs cargo.
-      # build-desktop.yml already has the Rust toolchain and the staged inputs, and runs it there.
+      # The desktop suite needs macOS and Rust, so the separate job below runs it on pull requests.
+      # build-desktop.yml runs it again before packaging on main and tags.
       - run: pnpm test --filter='!@acorn/desktop'
         env:
           # Exercise both sides of the TUI's 80-cell layout breakpoint on pull requests.
           ACORN_TUI_WIDE: '1'
+
+  desktop:
+    if: github.event_name == 'pull_request'
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+
+      - name: Cache the pinned Node runtime
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/acorn/node-runtime
+          key: node-runtime-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node-runtime.json') }}
+
+      # This script stages the bundle inputs, builds the renderer, runs Vitest (including the
+      # helper boot test), and runs the Rust unit tests. It does not sign or publish an artifact.
+      - name: Test the desktop
+        run: pnpm --filter @acorn/desktop test

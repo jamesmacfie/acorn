@@ -7,7 +7,7 @@ through the Agents plugin; it does not drive raw terminal sessions or resolve ap
 Session, turn, event, request, and attachment wire types live in
 `plugins/agents/src/contract/wire.ts`. The pure tool-status tone shared with Changes lives in
 `plugins/agents/src/contract/toolTone.ts`. Core receives only the small attention snapshot defined
-by `packages/protocol/src/attention.ts`; Agents maps its session rows to that snapshot.
+by `packages/protocol/src/agents/attention.ts`; Agents maps its session rows to that snapshot.
 
 The agents plugin manages structured Claude and Codex sessions. It stores a durable normalized event
 ledger and exposes the same session through the Agent Center, task Agent pane, HTTP routes, and live
@@ -71,6 +71,12 @@ title from an already inserted turn. **Regenerate title** is the explicit except
 first durable text prompt, asks the same profile again, and compares against the title that was current
 when the request started. A rename made while regeneration runs still wins. A generation failure leaves
 the current title and adds nothing to the transcript.
+
+`plugins/agents/src/server/sessions/runtime.ts` coordinates session commands with the provider
+engine. `sessionTitleGeneration.ts` owns title requests and cancellation,
+`sessionDefaultsCommands.ts` applies saved provider options, and `transcriptCommands.ts` imports,
+verifies, and exports transcripts. `sessionWait.ts` checks live frames against the durable snapshot.
+The runtime keeps the public methods and durable store boundary.
 
 ### Cross-plugin lifecycle
 
@@ -738,7 +744,12 @@ Inline diff chats are interactive managed sessions with a typed `origin` on the 
 The origin records the task, source, path, side, line, patch key, and original quote; a local origin
 also records staged or unstaged scope, while a PR origin records its repository and number. The
 Agents client capability supplies the compact diff card to Changes and GitHub without either plugin
-owning transcripts. The task sidebar groups these sessions under Inline chats. A patch change
+owning transcripts. The card draws the thread's chats-only view with the thread's own cards: the
+messages, and any question the agent asks, which the reader answers in place. Tool calls and other
+activity stay in the full session in Agents. The header leads with the session's state mark, the same
+one the sidebar draws. **Hide** folds a chat
+down to its header line, the way a resolved review thread folds, for the rest of the app session.
+The task sidebar groups these sessions under Inline chats. A patch change
 detaches the card from the line while leaving the session and its original context available in
 Agents. The client marks a session stale once it has seen that diff's newer document.
 
@@ -797,16 +808,94 @@ The same page carries one setting that is not a session default and does not tra
 draws its tool cards (section Client surfaces). It is there because that is where somebody looks for
 it, not because it shares a store with anything above it.
 
+## Custom agents
+
+A custom agent is a saved start for a managed session: a harness, the provider options it starts on,
+text for its system prompt, and a ceiling on acorn's own tools. It shows up under **New** in the Agent
+pane, on the empty pane's cards, and in the command palette. Triggered workflows stay the tool for a
+job with several steps. A custom agent is one session with a known setup.
+
+The record is `CustomAgent` in `plugins/agents/src/shared/customAgents.ts`. Its options are the same
+`optionId -> value` table a session default is, because model, reasoning, and permission mode are all
+options a provider advertises about itself (§ New-session defaults). Nothing in the record names one.
+`maxToolRisk` is the highest risk of acorn tool the session may call, and like every ceiling it only
+narrows ([agent-tools.md](./agent-tools.md)).
+
+**Two feeders, one list.** The owner's own agents are one `prefs` row per user,
+`agents:custom-agents:v1`, beside every other agent setting. A plugin's are held in memory for as long
+as the plugin is enabled, and are never written anywhere (§ From a plugin). `GET
+/v1/p/agents/custom-agents` answers the owner's first, in order, then every plugin's. `POST`, `PUT
+/:id`, and `DELETE /:id` write the owner's and are device only, because an agent decides what a later
+session's system prompt says, and a task-scoped agent must not be able to write one. A plugin's agent
+refuses a write, and Settings offers **Duplicate** for it instead.
+
+**The node reads the agent, not the caller.** `POST /sessions` takes `customAgentId`, and
+`reserveSession` copies what the session keeps onto its `config`: a `customAgent` snapshot of id,
+name, glyph, and instructions, the agent's options as `requestedConfigOptions`, and its ceiling as
+`toolCeiling`. A `customAgent` a caller put in `config` itself is dropped, and an agent on a different
+harness from the one named is refused. The options go on after the owner's defaults, so an agent that
+names only a model still starts on the owner's reasoning level, and applying them does not write the
+owner's `last` values.
+
+**Drivers read the snapshot, never the live list.** Editing an agent changes the sessions started
+from it later, not the ones running, and a resumed session is told exactly what it was told at
+creation:
+
+- Claude Code appends the instructions to its system prompt through `acpSessionMeta`, ahead of the
+  unattended turn-ending text when both apply.
+- Codex sends them as `developerInstructions` on `thread/start` and `thread/resume`.
+- Any other harness has no system prompt acorn can reach. The generic driver sends the instructions
+  as an `<acorn-context>` block with source `context.agent.instructions`, ahead of the first prompt of
+  each provider session it creates, and never to one it picks back up. A compaction can drop them,
+  and the editor says so. A harness spec opts out of this with `systemPromptInstructions`.
+
+The session header draws a chip with the agent's name from the snapshot, so renaming or deleting the
+agent leaves it alone.
+
+**Settings > Custom agents** lists the agents with **Edit**, **Duplicate**, and **Delete**, and edits
+one in a dialog. The dialog saves on its button rather than on each change, unlike the rest of
+Settings, because an agent needs a name and a harness before it can exist. Its model, effort, and mode
+pickers are read off the newest session that advertised them, the same way Agent defaults reads
+them, with the same limit: a harness you have not run inside the 50 most recent sessions shows no
+pickers until you run it again.
+
+**Another agent can start one by name.** `agent_spawn` takes `agent`, a name or an id
+([agent-tools.md](./agent-tools.md) § Managed-session orchestration). The lookup is by id first, then by name ignoring
+case.
+
+**Not built.** Tool servers from Settings > MCP, which wait for that list to exist, and a workflow step
+naming an agent in place of `profile` and `config_options`.
+
+### From a plugin
+
+A manifest declares agents in `contributions.customAgents`, up to eight: `{ id, name, glyph?,
+description?, harness, options?, instructions?, maxToolRisk? }`. Data only. It names no program and
+cannot bring a tool server, because a server is a program to run, which is what `agentTools` is for.
+
+Delivery is the harness seam's (§ Harnesses). The composition root carries the entries on the loaded
+plugin binding, and `node-core/server/pluginHost/host.ts` hands each one to the host-only
+`customAgents` facet after every init, which forwards to the `agents.customAgentRegistry` capability
+this plugin publishes. The host mints the id as `<pluginId>:<id>`, and qualifies `harness` when it
+names one of the manifest's own harnesses; any other harness id, such as `claude`, passes as written.
+A package that declares only agents or harnesses still gets a plugin row with an empty `init`, so the
+owner can turn it off (`contributesNodeData` in `node-core/server/plugins/manifest.ts`). A compiled
+plugin calls the capability itself.
+
+The instructions are the grant. They are text the plugin puts into the system prompt of every session
+an owner starts from the agent, so the trust prompt shows them in full under **Declared**, beside the
+context sections, and they are in the grant key, so a version that changes one word asks again.
+
 ## From the command palette
 
-Seven rows plus the open session's own actions, all registered by this plugin rather than by the
-shell.
+Seven rows, one more per custom agent, plus the open session's own actions, all registered by this
+plugin rather than by the shell.
 [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) covers how the palette runs a
 search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
 
 | Row | Kind | What it does |
 | --- | --- | --- |
-| New agent session | search, task-scoped | Lists the harnesses this node has installed, and starting one creates the session, selects it, and shows the Agent pane |
+| New agent session | search, task-scoped | Lists the harnesses this node has installed, then the custom agents on them, and starting one creates the session, selects it, and shows the Agent pane |
+| New *agent* session | action, task-scoped | One row per custom agent, so typing its name finds it without opening New agent session first. Desktop only |
 | Open Agent Center | action, no scope | Selects the `agents` rail source, which is this device's view of the node rather than a property of a task |
 | Find an agent session | search, task-scoped | The node's own search over session titles, events, and artifacts, asked about the task the palette session captured |
 | New Claude Code terminal | action, needs an open task | Creates a terminal on this plugin's `claude-code` profile, opens the drawer, and focuses it |

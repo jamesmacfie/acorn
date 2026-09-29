@@ -97,7 +97,7 @@ export const WORDS: Record<FocusedKind, Words> = {
   // draws beside a field is the chord, Escape and Tab (../keys/install.ts § typing).
   //
   // Tab is the next control of the panel rather than the next region, because the arrows type here
-  // and a field would otherwise be the end of the walk (../kit/asking.tsx § step).
+  // and a field would otherwise be the end of the walk (../kit/asking/fieldRef.ts § step).
   field: { moveKeys: 'j/k', move: 'move', act: 'press', cross: 'type', commit: 'send', next: 'next' },
   opens: { moveKeys: 'j/k', move: 'move', act: 'open', cross: 'column', commit: 'commit', next: 'region' },
   // A viewport is a stop only while it holds none, and then the arrows are the scroll

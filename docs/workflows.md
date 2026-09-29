@@ -347,7 +347,7 @@ The detail depends on the kind and the status:
 | `terminal:run-target` | "Starting…" | the URL | Open terminal |
 | `database:*` | "Reading…" | a table of the rows and the SQL behind it | none |
 | `http:request` | "Sending…" | the status, the headers under a disclosure, the body | none |
-| `gate-human` | "Waiting for you" | approved, or the state it reached | Approve; Reject |
+| `gate-human` | "Waiting for you", or the form filled with its proposal, each changed field marked **Edited** with **Reset** | approved, or the state it reached; with a form, the approved values with edits marked | Approve; Reject |
 | any, `failed` or `safety-rail` | | the error | Retry; Retry with edited prompt, for an agent kind |
 
 A step whose harness session was captured but that never became a managed session offers **Open in
@@ -510,6 +510,12 @@ starting, so nothing runs with an empty input (§ Authoring). The rail goes to W
 because the dialog is mounted once, in that source's list region, and one mount is what keeps the
 editor's **Run** and this row from putting two of them on screen.
 
+A gate with a form keeps its **Approve** beside the values, and disables it while any value fails the
+check the node runs, with a line naming each problem. Edits are held per step while the app is open
+and saved nowhere, so closing the app loses them and the proposal remains. When another device
+answered first, the pane shows "This gate was already answered." and refetches the node. For the
+form's contract, see [Workflow execution](./workflows/execution.md#human-gates).
+
 Approving a gate, cancelling a run and killing one stay in the run surface. Each needs the run's
 status and its consequences in front of the person doing it, and a row in a list carries neither.
 
@@ -606,9 +612,9 @@ terminal counterpart. The rail source has both.
 **A separate start dialog from the item menu.** Refused. The promote-to-task modal already knows how
 to create a task or attach to one, and two modals that create tasks drift apart.
 
-**Grouping workflow sessions in the agent sidebar.** Refused. The run pane owns steps, and a group in
-the sidebar would draw them a second way. A glyph on the row and a chip in the header are enough to
-get from a session to its run.
+**Drawing workflow steps in the agent sidebar.** Refused. The run pane owns steps, and the sidebar
+would draw them a second way. The sidebar's Workflow runs group lists the sessions a workflow started,
+one row per session, and the chip in the header gets from a session to its run.
 
 **Rerun from an arbitrary node.** Refused for this programme. Rerunning from a node that is done
 means unwinding its successors' handoffs and outputs, and deciding what a downstream node that
@@ -639,7 +645,7 @@ that way, so the editor never offers to retarget one. Retry with an edited promp
 the frozen copy and keeps the original in the step's `inputs_json`.
 
 **A second run list.** Refused. The merged list at Settings → Runs stays as it is, the run pane is
-addressed by task, and `packages/protocol/src/runs.ts` already says when a core runs table would be
+addressed by task, and `packages/protocol/src/runtime/runs.ts` already says when a core runs table would be
 earned.
 
 **A separate agent-only batch runtime.** Refused. Structured agent output followed by

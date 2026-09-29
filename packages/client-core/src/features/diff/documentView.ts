@@ -52,6 +52,8 @@ export function createDocumentView(props: {
   /** Expanded gaps, by the content key of the segment they were in. */
   overlays: Accessor<ReadonlyMap<string, GapOverlay[]>>
   threads: Accessor<readonly DiffThread[] | undefined>
+  /** The files a file filter kept, with where it matched each path. `null` when nothing is filtered. */
+  filter: Accessor<ReadonlyMap<string, readonly number[]> | null>
 }) {
   const files = createMemo(() => props.topology()?.files ?? [])
   const fileByPath = createMemo(() => new Map(files().map((file) => [file.path, file])))
@@ -60,7 +62,9 @@ export function createDocumentView(props: {
     const out: DiffItem[] = []
     const overlays = props.overlays()
     const collapsed = props.collapsed()
+    const filter = props.filter()
     for (const file of files()) {
+      if (filter && !filter.has(file.path)) continue
       out.push({ kind: 'file', key: `f:${file.path}`, file })
       if (collapsed.has(file.path)) continue
       if (!file.patchKey || !file.segments.length) {

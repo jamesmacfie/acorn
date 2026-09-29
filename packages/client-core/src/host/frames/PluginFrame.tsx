@@ -116,6 +116,8 @@ export default function PluginFrame(props: PluginFrameProps) {
   // rather than inside `onLoad` so the effect below can have a normal reactive lifetime: `onLoad` runs from
   // an iframe load event, which is outside the component's reactive owner.
   let port: MessagePort | null = null
+  let disconnect: (() => void) | null = null
+  let removeLoadListener: (() => void) | null = null
 
   // Every routed selection after the one the frame connected with. `defer` skips the initial value:
   // that one already crossed in `context`, and posting it again would tell the frame to
@@ -156,6 +158,7 @@ export default function PluginFrame(props: PluginFrameProps) {
           attrs: { seam: 'frame.boot', 'plugin.surface': props.binding.surface },
         })
         setSilent(true)
+        disconnect?.()
       }, HANDSHAKE_DEADLINE_MS)
     const bridge = createFrameBridge({
       port: channel.port1,
@@ -165,6 +168,7 @@ export default function PluginFrame(props: PluginFrameProps) {
       onMisbehaving: (reason) => {
         log.warn(`${props.binding.pluginId} misbehaved on the bridge: ${reason}`)
         setMisbehaving(reason)
+        disconnect?.()
       },
       onConnected: () => {
         boot.end()
@@ -199,8 +203,14 @@ export default function PluginFrame(props: PluginFrameProps) {
     const unwebview = props.webview?.subscribe((eventChannel, payload) => {
       postBridgeEvent(channel.port1, eventChannel, payload)
     })
-    onCleanup(() => {
+    let disconnected = false
+    disconnect = () => {
+      if (disconnected) return
+      disconnected = true
       port = null
+      frameEl = undefined
+      removeLoadListener?.()
+      removeLoadListener = null
       // Idempotent: a frame that already connected ended this on its first message. A frame torn
       // down mid-handshake is the case worth recording, and it did not boot.
       boot.end('error', { 'error.name': 'FrameTornDown' })
@@ -210,8 +220,14 @@ export default function PluginFrame(props: PluginFrameProps) {
       unselect()
       unwatch()
       bridge.dispose()
-    })
+    }
   }
+
+  // Register cleanup while this component owns a Solid root. The load event has no reactive owner.
+  onCleanup(() => {
+    disconnect?.()
+    removeLoadListener?.()
+  })
 
   return (
     <Show
@@ -240,7 +256,12 @@ export default function PluginFrame(props: PluginFrameProps) {
           : { border: '0', width: '100%', height: '100%', display: 'block' }}
         ref={(frame) => {
           frameEl = frame
-          frame.addEventListener('load', () => onLoad(frame), { once: true })
+          const load = () => {
+            removeLoadListener = null
+            onLoad(frame)
+          }
+          frame.addEventListener('load', load, { once: true })
+          removeLoadListener = () => frame.removeEventListener('load', load)
         }}
       />
     </Show>

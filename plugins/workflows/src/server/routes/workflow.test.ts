@@ -2,14 +2,14 @@ import { Hono } from 'hono'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AppEnv } from '@acorn/plugin-api/testkit'
 import { requireUser } from '@acorn/plugin-api/testkit'
-import { ProviderOperationError } from '@acorn/plugin-api/node'
+import { BridgeError, ProviderOperationError } from '@acorn/plugin-api/node'
 import { workflow, setWorkflowBridge, type WorkflowBridge } from './workflow'
 import { setWorkflowDefsBridge, workflowDefsRoutes, type WorkflowDefsBridge } from './defs'
 import type { Env } from '@acorn/plugin-api/testkit'
 
 // Workflow start/gate execute an agent step, so the route test proves body validation, auth, and
 // the bridge-unavailable 503 (the privileged-boundary contract). The runner logic is tested in
-// ../workflowRunner.test.ts.
+// the run and dispatch tests.
 
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {
@@ -111,6 +111,22 @@ describe('workflow routes', () => {
     const res = await app.fetch(req('/api/workflows/runs/run1/gate', 'POST', { stepId: 'step1', approved: true }), {} as Env)
     expect(await res.json()).toEqual({ ok: true })
     expect(gated).toEqual({ runId: 'run1', stepId: 'step1', approved: true })
+  })
+
+  it('carries approved form values, and refuses values on a rejection before the bridge', async () => {
+    const seen: unknown[] = []
+    setWorkflowBridge(fake({ gate: async (_runId, _stepId, approved, values) => (seen.push({ approved, values }), { ok: true }) }))
+    const app = authed()
+    expect((await app.fetch(req('/api/workflows/runs/run1/gate', 'POST', { stepId: 's', approved: true, values: { title: 'Edited', notify: true } }), {} as Env)).status).toBe(200)
+    expect((await app.fetch(req('/api/workflows/runs/run1/gate', 'POST', { stepId: 's', approved: false, values: { title: 'x' } }), {} as Env)).status).toBe(400)
+    expect(seen).toEqual([{ approved: true, values: { title: 'Edited', notify: true } }])
+  })
+
+  it('answers 409 when another device already answered the gate', async () => {
+    setWorkflowBridge(fake({ gate: async () => { throw new BridgeError(409, 'gate-resolved', 'This gate was already answered.') } }))
+    const res = await authed().fetch(req('/api/workflows/runs/run1/gate', 'POST', { stepId: 'step1', approved: false }), {} as Env)
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toMatchObject({ code: 'gate-resolved', message: 'This gate was already answered.' })
   })
 
   it('cancels runs and kills steps', async () => {
@@ -268,13 +284,25 @@ describe('a task-scoped credential is confined to its own runs', () => {
     expect(await (await asTask1().fetch(req('/api/workflows/runs/run1/step-statuses'), {} as Env)).json()).toEqual({ steps: [{ id: 's1', status: 'waiting-gate' }], truncated: false })
   })
 
-  // Retry is the one run action a confined caller may not take, even on its own run: an agent could
-  // otherwise loop a failed step straight past the rail that stopped it.
+  // Retry and gate are the run actions a confined caller may not take, even on its own run. Both move
+  // a run past a check that exists to stop the agent: a retry would loop a failed step straight past
+  // the rail that stopped it, and a gate answer would turn a human gate into no gate. Cancel and
+  // kill stay open because both only stop work.
   it('cannot retry even its own run', async () => {
     const calls: string[] = []
     setWorkflowBridge(fake({ retry: async (runId) => (calls.push(`retry:${runId}`), { ok: true }) }))
     const res = await asTask1().fetch(req('/api/workflows/runs/run1/retry', 'POST', { stepId: 's' }), {} as Env)
     expect(res.status).toBe(403)
+    expect(calls).toEqual([])
+  })
+
+  it('cannot approve or reject a gate even on its own run', async () => {
+    const calls: string[] = []
+    setWorkflowBridge(fake({ gate: async (runId) => (calls.push(`gate:${runId}`), { ok: true }) }))
+    for (const approved of [true, false]) {
+      const res = await asTask1().fetch(req('/api/workflows/runs/run1/gate', 'POST', { stepId: 's', approved }), {} as Env)
+      expect(res.status).toBe(403)
+    }
     expect(calls).toEqual([])
   })
 

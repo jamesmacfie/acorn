@@ -8,7 +8,7 @@ import type { WorkflowDef } from '../../shared/workflowContracts'
 import { stepIdentity } from '../../shared/workflowIdentity'
 
 /** The steps one waits on, with the "absent means the step declared before it" rule applied. The
- *  runner reads `after` the same way (../../server/workflowValidation.ts), so the picture the editor
+ *  runner reads `after` the same way (../../server/validation/definition.ts), so the picture the editor
  *  draws is the graph that runs. */
 export function effectiveAfter(def: WorkflowDef, index: number): readonly string[] {
   const step = def.steps[index]

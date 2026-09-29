@@ -382,7 +382,7 @@ function QuitConfirm(props: { onQuit: () => void }) {
 function ProjectPicker(props: { model: ShellModel }) {
   const close = () => closeOverlay('project')
   const projects = () => props.model.workspace()?.projects ?? []
-  // Kept rather than rebuilt, for the reason the rail's are (../kit/showing.tsx § keyedRows).
+  // Kept rather than rebuilt, for the reason the rail's are (../kit/showing/collection.tsx § keyedRows).
   const rows = keyedRows(projects, (project) => ({ key: project.id, ...project }))
   return (
     <Modal onDismiss={close} title="Project" size="sm">

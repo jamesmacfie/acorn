@@ -1,10 +1,8 @@
-// Published entry point. Everything here re-exports @acorn/plugin-api/ui/sdk, so this package can't
-// drift from the facade the in-repo plugins compile against; the surface snapshot
-// (packages/plugin-api/src/surface.snapshot.txt) covers both by covering one.
+// Published entry point. Everything here re-exports @acorn/plugin-api/ui/sdk. The public name guard
+// in tools/arch/publishedPluginSurface.test.ts and the type checks in contract.test.ts cover this
+// package independently of the private facade snapshot.
 //
-// Only the frame bridge is published; the other ten entrypoints never will be, and
-// `PLUGIN_BRIDGE_VERSION` is not part of what's published either. See docs/plugins.md § What is
-// published, and what acorn promises about it.
+// Only the sandbox bridge is published. `PLUGIN_BRIDGE_VERSION` stays internal to the handshake.
 export { AcornBridgeError, connect, mountFrame, openLinkOnClick } from '@acorn/plugin-api/ui/sdk'
 export type { AcornBridge, PluginByteResponse, PluginFrameContext, PluginTelemetryAttrs } from '@acorn/plugin-api/ui/sdk'
 // The tree path, beside the frame path. Framework-free, so it belongs on this barrel; the Solid

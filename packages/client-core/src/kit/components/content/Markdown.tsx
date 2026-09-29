@@ -1,11 +1,11 @@
-import { measureWork } from '../../lib/workTelemetry'
+import { measureWork } from '../../lib/telemetry/workTelemetry'
 import { createEffect, onCleanup } from 'solid-js'
 import { render } from 'solid-js/web'
 import { isGrammar, langFor } from '../../../infra/highlight/langs'
-import { renderBlocks, type MarkdownOptions } from '../../lib/markdown'
+import { renderBlocks, type MarkdownOptions } from '../../lib/rendering/markdown'
 import CopyButton from '../inputs/CopyButton'
 
-// Markdown source to rendered DOM: the sanitizing pass in kit/lib/markdown.ts, then a Shiki
+// Markdown source to rendered DOM: the sanitizing pass in kit/lib/rendering/markdown.ts, then a Shiki
 // grammar per fence and a copy button on each one. Everything a call site would otherwise repeat.
 //
 // It renders block by block. A streaming agent message arrives about 25 times a second and grows at

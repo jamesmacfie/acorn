@@ -3,7 +3,7 @@ import type { PluginAgentToolGrant, PluginContextSectionGrant, PluginExtensionGr
 import { pluginPermissionsSchema } from '@acorn/protocol/plugin/contract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 import type { PluginAck, PluginDevGrant } from './pluginTrustStore'
-import { pluginExtensionGrantSchema } from './grantSchemas'
+import { pluginCustomAgentGrantSchema, pluginExtensionGrantSchema } from './grantSchemas'
 import { bundleSourceSchema } from '@acorn/protocol/plugin/bundles.ts'
 
 export const installSchema = z.strictObject({ source: z.union([
@@ -122,6 +122,7 @@ export const disclosureSchema = z.object({
     maxBytes: z.number().int().positive(),
     maxTokens: z.number().int().positive(),
   })).max(8).default([]) as z.ZodType<PluginContextSectionGrant[]>,
+  customAgents: z.array(pluginCustomAgentGrantSchema).max(8).default([]),
 })
 
 // Nothing recognisable to record, which is still a real acknowledgement of a real decision.
@@ -136,6 +137,7 @@ export const NO_DISCLOSURE = {
   harnesses: [],
   agentTools: [],
   contextSections: [],
+  customAgents: [],
 } satisfies Omit<z.infer<typeof disclosureSchema>, 'declaration'>
 
 export type PluginsState = {

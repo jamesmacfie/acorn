@@ -1,6 +1,7 @@
 import { children, Show, type JSX } from 'solid-js'
 import { IconButton } from './IconButton'
-import { Input, Toolbar } from '../primitives'
+import { Toolbar } from '../layout/Toolbar'
+import { Input } from './Input'
 
 // The in-content search strip. Three surfaces had one and all three disagreed on the keyboard
 // contract; this owns it so they finally agree:
@@ -27,7 +28,7 @@ export function FindBar(props: {
   placeholder?: string
   ref?: HTMLInputElement | ((element: HTMLInputElement) => void)
 }) {
-  // Read once, for the reason on RowParts (../primitives.tsx).
+  // Read once, for the reason on RowParts (../layout/Row.tsx).
   const status = children(() => props.status)
   const toggles = children(() => props.toggles)
   return (

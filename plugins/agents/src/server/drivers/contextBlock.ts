@@ -7,7 +7,7 @@ import type { AgentInputPart } from '../../contract/wire.ts'
 const attribute = (value: string): string =>
   value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
 
-export const contextBlock = (part: Extract<AgentInputPart, { type: 'context' }>): string =>
+export const contextBlock = (part: Pick<Extract<AgentInputPart, { type: 'context' }>, 'source' | 'label' | 'content'>): string =>
   `<acorn-context source="${attribute(part.source)}" label="${attribute(part.label)}">\n${
     part.content.replace(/<\/acorn-context/gi, '<\\/acorn-context')
   }\n</acorn-context>`

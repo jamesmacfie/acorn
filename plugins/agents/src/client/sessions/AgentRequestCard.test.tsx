@@ -153,7 +153,7 @@ describe('revealing a request without stealing the caret', () => {
     expect(document.activeElement).toBe(card)
 
     // A button, not a text box: a reveal is always given by a click somewhere, and the kit refuses to
-    // pull the caret out of something being typed in even for a fresh one (client-core primitives.tsx).
+    // pull the caret out of something being typed in even for a fresh one (client-core Card.tsx).
     elsewhere('button')
     setOn(false)
     await flush()

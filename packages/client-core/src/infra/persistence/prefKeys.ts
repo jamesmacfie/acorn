@@ -22,6 +22,9 @@ export const PrefKeys = {
   // (infra/persistence/stateSlices.ts). The node's, not the device's: the terminal has no
   // `localStorage`, so a device key would be written nowhere and read back as nothing.
   lastWorkspace: 'last_workspace',
+  // The two-workspace shortcut's pair. Both hosts persist it through the same app-scoped Node
+  // preference path as lastWorkspace, including when the previous workspace is on another Node.
+  workspaceHistory: 'workspace_history',
   taskLayouts: 'task_layouts',
   notices: 'notices',
   editorOpenFiles: 'editor_open_files',

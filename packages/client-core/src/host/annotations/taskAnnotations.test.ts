@@ -4,7 +4,7 @@ import { clearAnnotations } from './annotations'
 import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '../registries/extensionPoints/extensionPoints'
 import { markersFor } from '../registries/rail/railMarkerFeed'
 import { resolveRailMarkers } from '../../features/tabs/railMarkers'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 import { requestTaskAnnotations } from './taskAnnotations'
 
 vi.mock('../plugins/surfaceFailures', () => ({ recordSurfaceFailure: vi.fn() }))

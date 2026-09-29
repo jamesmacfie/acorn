@@ -229,6 +229,28 @@ describe('api calls', () => {
     expect(replyTo(h, 7)).toBeUndefined()
   })
 
+  it('aborts both transport kinds when the frame unmounts', async () => {
+    const signals: AbortSignal[] = []
+    const fetch: FrameServices['fetch'] = async (_method, _path, _body, signal) => {
+      signals.push(signal)
+      return new Promise(() => {})
+    }
+    const fetchBytes: FrameServices['fetchBytes'] = async (_method, _path, _body, signal) => {
+      signals.push(signal)
+      return new Promise(() => {})
+    }
+    const h = withBridge(undefined, services({ fetch, fetchBytes }))
+    h.send({ id: 70, kind: 'api', method: 'GET', path: tasksRoute })
+    h.send({ id: 71, kind: 'api.bytes', method: 'GET', path: '/v1/p/board/files/a' })
+    await vi.waitFor(() => expect(signals).toHaveLength(2))
+
+    h.dispose()
+    harness = null
+    expect(signals.every((signal) => signal.aborted)).toBe(true)
+    expect(replyTo(h, 70)).toBeUndefined()
+    expect(replyTo(h, 71)).toBeUndefined()
+  })
+
   it('rejects a request with no method or path', async () => {
     const h = withBridge()
     h.send({ id: 9, kind: 'api', path: tasksRoute })

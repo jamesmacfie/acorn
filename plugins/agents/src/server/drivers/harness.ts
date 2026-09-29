@@ -55,6 +55,11 @@ export type HarnessLaunchSpec = {
    *  the session because what an adapter is told can depend on whether anyone is watching. It is
    *  called on every create and every resume, so it must return the same value for the same session. */
   acpSessionMeta?: (session: AgentSession) => Record<string, unknown>
+  /** Built-in only. Set when `acpSessionMeta` puts a custom agent's instructions in the system prompt.
+   *  Without it the generic driver sends them as a context block ahead of the first prompt of every
+   *  provider session it creates, which a compaction can later drop (docs/managed-agents.md § Custom
+   *  agents). */
+  systemPromptInstructions?: true
   quirks?: HarnessQuirks
   /** Whether the harness's own account is logged in, for the Agent Center's provider-health row.
    *  Absent means the row shows installed-or-not only. */

@@ -8,7 +8,7 @@ import type {
   NodeRecord,
   NodeStatus,
 } from '@acorn/protocol/broker.ts'
-import type { NodePluginPermissions, PluginAgentToolGrant, PluginContextSectionGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { NodePluginPermissions, PluginAgentToolGrant, PluginContextSectionGrant, PluginCustomAgentGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import type { WsClientFrame } from '@acorn/protocol/ws.ts'
 import type { DeviceConfig } from '@acorn/protocol/deviceConfig.ts'
 
@@ -202,6 +202,8 @@ export type PluginTrustDecision = {
   // Task-scoped tools and bounded context carried by the installed manifest.
   agentTools: PluginAgentToolGrant[]
   contextSections: PluginContextSectionGrant[]
+  // Agents it adds to New, and what each one tells the sessions started from it.
+  customAgents: PluginCustomAgentGrant[]
   decision: 'accepted' | 'rejected'
 }
 export type PluginAckRecord = Omit<PluginTrustDecision, 'declaration'> & {

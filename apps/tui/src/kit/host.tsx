@@ -274,8 +274,7 @@ export function Slot(props: SlotProps) {
   )
 }
 
-/** One item's marks, drawn where the owner put them. In `./showing.tsx` beside the diff line that
- *  draws them, because a `text` node cannot hold a component from a module that imports it back. */
+/** Keep the host API pointed at the diff renderer that owns annotation placement. */
 export { AnnotationMarks } from './showing'
 
 /**

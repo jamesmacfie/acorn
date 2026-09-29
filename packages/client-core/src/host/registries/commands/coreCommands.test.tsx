@@ -3,7 +3,7 @@ import { QueryClient } from '@tanstack/solid-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { prefsKey } from '@acorn/protocol/api.ts'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
-import type { Disposable } from '../../../kit/lib/registry'
+import type { Disposable } from '../../../kit/lib/state/registry'
 import { PrefKeys } from '../../../infra/persistence/prefKeys'
 import { readDevicePrefs } from '../../../infra/persistence/devicePrefs'
 import {

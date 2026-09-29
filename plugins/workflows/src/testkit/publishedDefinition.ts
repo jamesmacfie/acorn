@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import type { WorkflowDef } from '../shared/workflowContracts'
-import { createDef, getDef } from '../server/workflowDefs'
-import { publicationStore } from '../server/workflowPublicationStore'
-import { workflowContentFingerprint } from '../server/workflowResolution'
+import { createDef, getDef } from '../server/definitions/store'
+import { publicationStore } from '../server/publication/store'
+import { workflowContentFingerprint } from '../server/definitions/resolution'
 
 /** Execution fixtures explicitly publish; production createDef creates only a draft. */
 export async function createPublishedDef(db: PluginDatabase, input: { workspaceId: string; projectId?: string | null; def: WorkflowDef }) {

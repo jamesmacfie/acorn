@@ -12,6 +12,7 @@ import {
   validateAgentSessionDefaults,
   type AgentSessionDefaults,
 } from '../../shared/sessionDefaults'
+import { customAgentInputSchema, type CustomAgent, type CustomAgentInput } from '../../shared/customAgents'
 import { BridgeError, type AppEnv, ownerId, requireDevice, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 
 export type AgentUsageBridge = {
@@ -23,6 +24,10 @@ export type AgentUsageBridge = {
   setConcurrency(userId: string, limits: AgentConcurrencyLimits): Promise<void>
   sessionDefaults(userId: string): Promise<AgentSessionDefaults>
   setSessionDefaults(userId: string, patch: Partial<AgentSessionDefaults>): Promise<AgentSessionDefaults>
+  customAgents(userId: string): Promise<CustomAgent[]>
+  /** `id` null creates one. A missing or plugin-owned id throws a BridgeError. */
+  saveCustomAgent(userId: string, id: string | null, input: CustomAgentInput): Promise<CustomAgent>
+  deleteCustomAgent(userId: string, id: string): Promise<void>
 }
 
 export const AGENT_USAGE = routeCapability<AgentUsageBridge>('agents.usageRoute')
@@ -82,6 +87,33 @@ export const agentUsage = new Hono<AppEnv>()
     const userId = ownerId(c)
     // The merged record, not the patch: the caller sends only the fields it owns.
     return viaBridge(c, AGENT_USAGE, (bridge) => bridge.setSessionDefaults(userId, result.value))
+  })
+  .get('/custom-agents', (c) => {
+    const userId = ownerId(c)
+    return viaBridge(c, AGENT_USAGE, (bridge) => bridge.customAgents(userId))
+  })
+  // Device only, like every write above. An agent here decides what a later session's system prompt
+  // says and which provider options it starts on, so a task-scoped agent must not be able to write one.
+  .post('/custom-agents', requireDevice, async (c) => {
+    const parsed = customAgentInputSchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((issue) => issue.message))
+    const userId = ownerId(c)
+    return viaBridge(c, AGENT_USAGE, (bridge) => bridge.saveCustomAgent(userId, null, parsed.data))
+  })
+  .put('/custom-agents/:id', requireDevice, async (c) => {
+    const parsed = customAgentInputSchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((issue) => issue.message))
+    const userId = ownerId(c)
+    const id = c.req.param('id')
+    return viaBridge(c, AGENT_USAGE, (bridge) => bridge.saveCustomAgent(userId, id, parsed.data))
+  })
+  .delete('/custom-agents/:id', requireDevice, (c) => {
+    const userId = ownerId(c)
+    const id = c.req.param('id')
+    return viaBridge(c, AGENT_USAGE, async (bridge) => {
+      await bridge.deleteCustomAgent(userId, id)
+      return { ok: true }
+    })
   })
   .get('/usage', (c) => {
     const userId = ownerId(c)

@@ -124,6 +124,7 @@ host cannot draw.
 | `extensions` | 8 | What **you** bring to another plugin's point: `{ id, point, label, order?, … }`. `point` is `<ownerPluginId>:<pointId>`, and naming the owner out loud is the disclosure. Exactly one carrier says what you bring: `items` is a route on your own namespace, read with GET for rows and POST for annotations; `remote` is a key of the object your bundle passed to `mountTree`, for a tree; `frame` is an `inline` surface of yours, for a rectangle; `route` is a POST on your own namespace, for a hook handler. `items` and `route` require a `node` entry because only the node bundle can serve them. `matches` narrows a tree or a rectangle to the key values it draws, and `onSelect` takes the narrow verb set. |
 | `auditActions` | 8 | A verb you write onto the node's audit trail: `{ id, label }`. The host qualifies it as `<yourId>:<id>` and refuses a `ctx.audit.record` naming one you did not declare, so the trail stays enumerable. Record what a person reviewing this machine would want to see, not every call you make. |
 | `harnesses` | 4 | A managed agent acorn starts, drives and draws a transcript for: `{ id, label, glyph?, spawn, envPassthrough?, quirks?, probes?, terminal? }`. The only contribution that names a program acorn will run, and the only node-side one that needs no bundle at all. See [§ Harnesses](the-manifest.md#harnesses). |
+| `customAgents` | 8 | A saved start for a managed session, listed under New beside the harnesses: `{ id, name, glyph?, description?, harness, options?, instructions?, maxToolRisk? }`. Data only, and the trust prompt shows the instructions in full. See [§ Custom agents](the-manifest.md#custom-agents). |
 | `agentTools` | 16 | A task-scoped agent tool projected through the ordinary registry: `{ id, description, inputSchema, risk, handler, scope?, requiresSession?, timeoutMs?, maxOutputBytes? }`. `handler` must be in your own `/v1/p/<id>/` namespace. The host qualifies the runtime name as `<pluginId>_<id>`, validates the bounded JSON Schema at install and validates every call again. See [Agent tools](../agent-tools.md#loaded-manifest-carriers). |
 | `contextSections` | 8 | Bounded reference data for the task prompt: `{ id, label, order, read, maxBytes, maxTokens, scope?, defaultIncluded?, timeoutMs? }`. `read` must be in your own namespace and answers the fixed host-owned response shape. See [Agent tools](../agent-tools.md#loaded-manifest-carriers). |
 | `cliCommands` | 16 | Typed headless commands under `acorn plugin <id> <name>`. Each declares a name, title, summary, read/write risk, scope, required core capability, bounded object input/output schemas, and a relative `/cli/<name>` POST route. Writes also describe effects. See [CLI command authoring](./cli-commands.md). |
@@ -171,7 +172,7 @@ complete manifest has a node bundle and one route-backed extension:
   "name": "Deploy status",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "1",
+  "apiVersion": "2",
   "node": "./node.js",
   "contributions": {
     "extensions": [
@@ -276,9 +277,10 @@ Both routes are confined like every other, and both are shown in the trust promp
 says you offer to clean up, so a version that starts changing something where it used to only warn
 reads as newly requested.
 
-Every path in every descriptor is confined at parse time to `/v1/p/<id>/` — your own namespace and
-nothing else. That check lives in `server/plugins/manifest.ts` rather than on the fields because it needs `id`,
-and it is the parse-time twin of the runtime confinement the frame bridge applies.
+Every path in every descriptor is confined at parse time to `/v1/p/<id>/`, the plugin's own
+namespace. `server/plugins/manifestValidation/references.ts` checks this after the field schema
+parses, because confinement needs the manifest's `id`. The frame bridge applies the matching rule
+at runtime.
 
 The cross-field rules are worth knowing before you write a manifest that parses and then does nothing:
 an `openPane` must name a task-scoped pane this manifest declares; a `navigate` must name a
@@ -451,6 +453,47 @@ in the Agent pane, the terminal and the Generate lists; a workflow's agent step 
 workflow `decide` step can, but it needs a JSON verdict back and a manifest cannot ask your CLI for
 one, so a `text` harness will answer prose and the step will fail. A harness that needs either is asking
 for first-party investment, not a bigger manifest.
+
+### Custom agents
+
+A custom agent is a harness with the settings, instructions, and tool access a session should start
+on. The owner makes their own under Settings > Custom agents, and a plugin can ship some. Each one is
+listed under **New** in the Agent pane and in the command palette, and another agent can start it by
+name through `agent_spawn`. For more information, see
+[Custom agents](../managed-agents.md#custom-agents).
+
+```json
+{
+  "contributions": {
+    "customAgents": [
+      {
+        "id": "reviewer",
+        "name": "Bug reviewer",
+        "harness": "codex",
+        "options": { "reasoning": "high" },
+        "instructions": "Review the change for correctness. Report each bug with its file and line.",
+        "maxToolRisk": "read"
+      }
+    ]
+  }
+}
+```
+
+The host mints the id as `<yourId>:<id>`, and it is copied onto every session started from the agent.
+`harness` is `claude`, `codex`, another plugin's `<pluginId>:<harnessId>`, or the bare id of a harness
+this same manifest declares, which the host qualifies for you. `options` is provider option id to value,
+as the harness advertises them. A value the harness does not offer is dropped when the session starts,
+with a line in the transcript, so the session still runs. `maxToolRisk` narrows acorn's own tools and
+never widens them.
+
+`instructions` go into the system prompt of every session an owner starts from the agent, on Claude Code
+and Codex, and in front of the first message on any other harness. That makes them the grant: the trust
+prompt shows the full text, and a version that changes it asks again. An agent cannot bring a tool
+server, because a server is a program to run. Declare `agentTools` for that.
+
+A package made of nothing but harnesses and custom agents needs no bundle at all. The owner sees it in
+Settings > Plugins and can turn it off, which takes its agents out of New. The owner cannot edit a
+plugin's agent, only duplicate it into one of their own.
 
 ### The action verbs
 

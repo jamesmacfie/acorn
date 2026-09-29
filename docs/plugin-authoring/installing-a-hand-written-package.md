@@ -134,7 +134,8 @@ export async function handle(request, context, core) {
 ```js
 // The bridge handshake, inlined. @acorn/plugin-api/ui/sdk is what a bundled frame imports;
 // a single-file frame has no way to resolve a bare specifier, so it sends the same messages
-// by hand. packages/client-core/src/host/frames/sdk.ts is the reference for the semantics.
+// by hand. packages/client-core/src/host/frames/sdk/connection.ts defines the handshake;
+// packages/client-core/src/host/frames/sdk/bridgePort.ts defines request behavior.
 
 const pending = new Map()
 let port = null

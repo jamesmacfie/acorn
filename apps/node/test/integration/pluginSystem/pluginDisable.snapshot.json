@@ -85,6 +85,7 @@
     "providerRoutes": [],
     "modelProviders": [],
     "capabilities": [
+      "agents.customAgentRegistry",
       "agents.draftAttachments",
       "agents.harnessRegistry",
       "agents.managedRoute",

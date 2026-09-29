@@ -1,5 +1,6 @@
 import { routeCapability } from '../bridge'
 import { pendingPluginRequests } from '../agentTools/pluginRequests'
+import { contributesNodeData } from '../plugins/manifest'
 import type { PluginRosterEntry } from './host'
 import type { InstalledPluginInfo, PluginLoadFailure } from '../plugins/loader'
 import type { ActivePluginSnapshot } from '../plugins/loader'
@@ -102,7 +103,7 @@ const runtimeFromInstalled = (entry: InstalledPluginInfo): PluginRuntimeIdentity
   const { id: _id, hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...declaration } = entry
   return {
     ...declaration,
-    activation: hasNode || declaration.contributions.harnesses.length > 0 ? 'node' : 'client-only',
+    activation: hasNode || contributesNodeData(declaration.contributions) ? 'node' : 'client-only',
   }
 }
 

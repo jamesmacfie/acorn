@@ -77,7 +77,7 @@ in UTF-16 code units.
 
 **Output crosses the wire as bytes.** `term:out` is the one channel on the authenticated socket that is
 not JSON. A frame is a fixed-width session id and then the pseudo-terminal's bytes verbatim
-(`packages/protocol/src/ws.ts` § The one binary frame), built once per broadcast rather than once per
+(`packages/protocol/src/transport/ws.ts` § The one binary frame), built once per broadcast rather than once per
 attached socket, and forwarded through the desktop broker without being read. The ids are UUIDs; an id
 that does not fit the field falls back to the JSON frame, so a stream owner with a different naming
 scheme still works. A binary frame carries no `seq` and consumes none, because sequence numbers belong
@@ -92,7 +92,7 @@ the drawer keeps the full rows and active tab. `term:status` remains a generic c
 handled by client-core.
 
 Every session, terminal or managed, reports its state from one shared vocabulary, `AgentState`
-(`packages/protocol/src/sessionActivity.ts`): `starting`, `working`, `waiting`, `idle`, and `blocked`. Every
+(`packages/protocol/src/agents/sessionActivity.ts`): `starting`, `working`, `waiting`, `idle`, and `blocked`. Every
 agent surface reuses it verbatim, so no other module redeclares it. A transport reports only the
 subset it can detect. A plain PTY session emits `working`, `idle`, `blocked`, or `unknown`, since a
 shell has no notion of `starting` or `waiting`. A managed or headless agent driver controls the

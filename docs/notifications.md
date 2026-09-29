@@ -40,7 +40,7 @@ Both come from the same reading of a session.
 ## Five states
 
 Agents and Terminal map their own sessions to a small snapshot in
-`packages/protocol/src/attention.ts`. The delivery gate in
+`packages/protocol/src/agents/attention.ts`. The delivery gate in
 `packages/client-core/src/features/notifications/attention.ts` reads five states:
 
 | State | Meaning |
@@ -100,6 +100,12 @@ state before the app opened.
 Agents marks interactive sessions, and Terminal marks PTY agent sessions. A workflow or automation
 turn is one step of a run, and the workflows plugin sends `run-done` for the run
 ([workflows.md](./workflows.md)). Ten steps used to mean ten "finished" rows.
+
+A workflow session is quieter still. Its step failing is not an `agent-error` either, because the run
+reports it as `run-failed`. The node never gives a workflow session the `completed` or `error`
+attention reason, so the rail's "needs you" count, the sidebar and Agent Center only count one when its
+agent is asking something. `run-done` draws the workflow mark, so a finished run does not look like
+an agent finishing a turn.
 
 The three kinds carry their glyphs and severities in
 `packages/client-core/src/features/notifications/kindContributions.ts`. There are no PTY-only kinds:

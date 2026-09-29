@@ -13,7 +13,7 @@ import {
 } from './contentLinks'
 import { paneRegistry } from './panes'
 import { activeRefPanel, closeRefPanel, refPanelRegistry } from './refPanels'
-import type { Disposable } from '../../../kit/lib/registry'
+import type { Disposable } from '../../../kit/lib/state/registry'
 import { sourceRegistry } from '../sources/sources'
 import { setTaskLookup } from '../../../features/tasks/taskLookup'
 import { selectedSource, setSelectedSource } from '../../../features/tasks/tasks'

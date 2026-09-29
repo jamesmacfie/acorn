@@ -76,7 +76,7 @@ export function createShellModel(): ShellModel {
   // than from `chooseWorkspace`, because following the open task changes workspace too.
   createEffect(() => {
     const current = workspace()
-    if (current) noteWorkspaceVisit(current.id)
+    if (current && placeRestored()) noteWorkspaceVisit(current.id)
   })
 
   const tasks = createMemo(() => {

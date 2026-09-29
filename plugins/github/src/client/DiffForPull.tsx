@@ -111,12 +111,18 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
       anchors: inlineAnchors,
       open: (row: CodeRow) => setOpenInline(inlineOrigin(row)),
       render: (row: CodeRow) => {
-        const origin = inlineOrigin(row)
-        const Card = inline()?.Card
-        if (!origin || !Card) return null
-        const exists = inline()?.sessionsForTask(taskId).some((session) => session.origin && sameInlineLine(session.origin, origin) && !session.archivedAt)
-        if (!exists && (!openInline() || !sameInlineLine(openInline()!, origin))) return null
-        return <Card origin={origin} loadContext={() => loadDiffLineContext(source, row)} onClose={() => setOpenInline(null)} />
+        // Memoised for the reason plugins/changes/src/client/changesModel.tsx gives: read directly,
+        // every session update rebuilt the card and blurred its textarea.
+        const shown = createMemo(() => {
+          const origin = inlineOrigin(row)
+          if (!origin || !inline()?.Card) return null
+          const exists = inline()?.sessionsForTask(taskId).some((session) => session.origin && sameInlineLine(session.origin, origin) && !session.archivedAt)
+          return exists || (openInline() && sameInlineLine(openInline()!, origin)) ? origin : null
+        }, null, { equals: (a, b) => a === b || (!!a && !!b && sameInlineLine(a, b)) })
+        return <Show when={shown()} keyed>{(origin) => {
+          const Card = inline()!.Card
+          return <Card origin={origin} loadContext={() => loadDiffLineContext(source, row)} onClose={() => setOpenInline(null)} />
+        }}</Show>
       },
     } } : {}),
     ...(taskId ? {

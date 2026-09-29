@@ -1,5 +1,5 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
-import { elementRectKey, previewViews, visibleElementRect } from '@acorn/plugin-api/client'
+import { elementRectKey, previewViews, toast, visibleElementRect } from '@acorn/plugin-api/client'
 import { EmptyState, IconButton, Input, Rectangle, Spinner, Text, Toolbar } from '@acorn/plugin-api/ui'
 
 const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
@@ -118,6 +118,11 @@ export default function PreviewPane(props: { taskId: string; url: string | null;
     if (preview && v) preview.load(props.taskId, withScheme(v))
   }
 
+  const copyAddr = () => {
+    void navigator.clipboard.writeText(addr())
+    toast('Copied the page address')
+  }
+
   return (
     <>
       {/* No "needs the desktop app" fallback: the pane's `requires: { seam: 'preview' }` means a host
@@ -130,9 +135,9 @@ export default function PreviewPane(props: { taskId: string; url: string | null;
       </Show>
       <Show when={!props.remoteBlocked && props.url} fallback={props.remoteBlocked ? null :
         <EmptyState title="No preview URL yet">
-          Declare a run target with a <Text emphasis="mono">url</Text> — in{' '}
-          <Text emphasis="mono">.acorn/config.toml</Text> or the workspace's run targets — and start it
-          from the pane switcher's ▶ button, or set a preview URL in Settings → workspace.
+          Start the run target from the pane switcher's ▶ button. If it is already running, check its{' '}
+          <Text emphasis="mono">url</Text> in <Text emphasis="mono">.acorn/config.toml</Text> or the
+          preview URL in Settings → workspace.
         </EmptyState>
       }>
         {/* The browser chrome, as the kit's toolbar rather than a flex row of this plugin's own:
@@ -155,6 +160,7 @@ export default function PreviewPane(props: { taskId: string; url: string | null;
             onInput={(value) => setAddr(value)}
             onKeyDown={(event) => { if (event.key === 'Enter') go() }}
           />
+          <IconButton icon="copy" label="Copy the page address" disabled={!addr()} onPress={copyAddr} />
           <IconButton icon="code-xml" label="Toggle preview DevTools" onPress={() => preview?.command(props.taskId, 'devtools')} />
           <Show when={loading()}><Spinner label="Loading page" /></Show>
         </Toolbar>

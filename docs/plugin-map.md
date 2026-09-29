@@ -112,7 +112,7 @@ resolve package imports. A remote tree must not import the DOM component barrel.
 `ctx.events.on` subscribes to events on the plugin's Node, including when no client is attached.
 Declare each channel in `permissions.events`.
 
-Core channels are defined in `packages/protocol/src/nodeEvents.ts`:
+Core channels are defined in `packages/protocol/src/transport/nodeEvents.ts`:
 
 - `plugins:changed`
 - `tasks:changed`

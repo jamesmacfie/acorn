@@ -1,7 +1,8 @@
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
+import ts from 'typescript'
 import type { CoreServices } from '@acorn/node-core/server/core/index.ts'
 import type { ProjectRef } from '@acorn/node-core/server/projects.ts'
 import type { TaskRef } from '@acorn/node-core/server/worktrees'
@@ -18,7 +19,7 @@ import type { DataSourceRequest, DataSourceResult, DataSourceDescription } from 
 
 // The drift lock for the hand-written published declarations, copying the pattern
 // packages/plugin-sdk/src/contract.test.ts established. See docs/plugins.md § What is published, and
-// what acorn promises about it for why public.ts is hand-written at all.
+// what acorn promises about it for why the contract modules are hand-written.
 //
 // Assignability is asserted in both directions per type: one direction alone passes happily when the
 // published type is a subset, so dropping a method from `core.tasks` would still let the published
@@ -43,7 +44,7 @@ void [_sourceRegistry, _publishedSourceRegistry]
 
 // ── The holes, named one at a time ────────────────────────────────────────────────────────────────
 //
-// Members whose type public.ts declares as `HostOwned<…>` rather than describing: a framework the
+// Members the published contract declares as `HostOwned<…>` rather than describing: a framework the
 // loaded tier's line already names (drizzle, Zod), or a shape with an owner in another contract. An
 // opaque type cannot take part in a two-way comparison in either direction, so each one is subtracted
 // from both sides here and everything around it is still compared exactly.
@@ -170,11 +171,20 @@ it('names every capability the first-party plugins publish', () => {
   expect(new Set(ids).size).toBe(23)
 })
 
-it('declares no runtime, which is what makes it publishable as a .d.ts', () => {
-  // The build copies src/public.ts to dist/index.d.ts, so anything with a runtime form would land in a
-  // declaration file and either fail to parse or ship code a stranger has to bundle. Checked on the
-  // text, because there is nothing to import: the module has no runtime exports by construction.
-  const source = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'public.ts'), 'utf8')
-  expect(source).not.toMatch(/^export (const|let|var|function|class|enum)\b/m)
-  expect(source).not.toMatch(/^import /m)
+it('keeps every published declaration module free of runtime statements', () => {
+  const src = dirname(fileURLToPath(import.meta.url))
+  const files = [join(src, 'public.ts'), ...readdirSync(join(src, 'contracts')).map((file) => join(src, 'contracts', file))]
+  expect(files.length).toBeGreaterThan(10)
+  for (const file of files) {
+    const source = ts.createSourceFile(file, readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true)
+    for (const statement of source.statements) {
+      expect(
+        ts.isTypeAliasDeclaration(statement)
+        || ts.isInterfaceDeclaration(statement)
+        || (ts.isImportDeclaration(statement) && statement.importClause?.isTypeOnly)
+        || (ts.isExportDeclaration(statement) && statement.isTypeOnly),
+        `${file}: ${statement.getText(source).slice(0, 80)}`,
+      ).toBe(true)
+    }
+  }
 })

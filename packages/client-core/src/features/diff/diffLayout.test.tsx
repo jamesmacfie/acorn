@@ -1,7 +1,7 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
-import { _resetSurfaceHealth, surfaceHealthSnapshot, type SurfaceHealthEntry } from '../../kit/lib/surfaceHealth'
+import { _resetSurfaceHealth, surfaceHealthSnapshot, type SurfaceHealthEntry } from '../../kit/lib/telemetry/surfaceHealth'
 import { largeDiffFiles, largeDiffSource } from '../../testkit/largeDiff'
 import { installDiffLayout, type DiffLayoutModel } from './layout.helper'
 import type { DiffSource } from './source'
@@ -156,6 +156,9 @@ describe('the diff reading place', () => {
 
     button.click()
     await vi.waitFor(() => expect(host.querySelector('.diff-composer')?.closest('[data-block]')).not.toBeNull(), { timeout: 5_000 })
+    // Wait for the commit itself, since a loaded CI runner can take longer than one settle to make
+    // it. The settle after it gives a second commit time to show up.
+    await vi.waitFor(() => expect(health().measurement.commits).toBeGreaterThan(commits), { timeout: 5_000 })
     await settle()
     watch.disconnect()
 

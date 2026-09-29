@@ -63,34 +63,21 @@ generic external-item store rather than owning a plugin database; a loaded plugi
 
 ## The plugin API
 
-`packages/plugin-api` (`@acorn/plugin-api`) is the only host package a plugin's production code may
-import. It adds no behavior of its own: it re-exports an enumerated slice of node-core and
-client-core, and `tools/arch/boundaries.test.ts` enforces both halves of that — plugins reach the
-host only through the facade, and the facade only re-exports.
+`packages/plugin-api` (`@acorn/plugin-api`) is the private source facade for compiled plugins in this
+repository. It re-exports an enumerated slice of node-core and client-core. The boundary test requires
+compiled plugins to reach the host through this facade and keeps the facade free of implementation.
+Loaded third-party packages use `acorn-plugin-types` and `acorn-plugin-sdk` instead; they cannot import
+`@acorn/plugin-api` from npm.
 
-**A name is on it because something imports it.** Not because it might be useful — a contract is a promise
-about what will not change, and a promise nobody asked for is one you can only break. Seventy-one names
-came off in one pass on 2026-08-14 — 441 pinned names down to 371, with `TaskRef` the single addition —
-each verified free by counting its consumers two ways: imports through the facade, and imports of the
-same declaration by the deep-import baseline that first-party tests are still migrating off. A name with
-zero on both went; a name reached only by a deep
-import stayed, because deleting it strands a migration rather than removing dead weight. The one
-deliberate exception is `PLUGIN_API_MAJOR`, which is the contract's version and is therefore on the
-surface by definition. Anything that turns out to be missing is one line to add back, under the
-add-is-free rule below.
+Keep a facade name when a compiled consumer needs it. Prune unused names after checking imports through
+the facade and direct imports of the same declaration. `PLUGIN_API_MAJOR` remains available to compiled
+plugins, but the facade's export list does not define that major. During the 2026-08 cleanup, this
+consumer check removed 71 names while retaining names still reached by direct imports.
 
-Adding a name is mechanically free, but it is still a compatibility promise the moment a third-party
-plugin exists. The 2026-08 architecture review flagged the client barrel's 173 exports at the time as
-accumulated rather than chosen, so a new addition to `/client` or `/node` should face the same
-question a new dependency gets: does a third-party plugin need this, or is it convenient for a
-first-party one that could import deeper instead?
+A comment marked `// prune candidate:` in the facade source names a compiled consumer that should use a
+`ctx` seam. Once its callers move, the export can leave the private facade.
 
-A comment marked `// prune candidate:` in the facade source flags a name that a first-party plugin
-still reaches for but a third-party plugin should not. It names the `ctx` seam that plugin should
-move to instead, so the marked name can come off the surface once every first-party caller has
-moved onto that seam.
-
-Eleven entrypoints:
+Fourteen entrypoints:
 
 | Entrypoint | What it carries |
 | --- | --- |
@@ -105,12 +92,16 @@ Eleven entrypoints:
 | `@acorn/plugin-api/ui/tokens` | The role enums and the node support matrix as data, with no components on them |
 | `@acorn/plugin-api/testkit` | Test scaffolding: a real plugin context and request context, temp-directory databases, the auth gate, core's tables for seeding fixtures, and the manifest validator |
 | `@acorn/plugin-api/testkit/client` | The client-side half of the same, including the two extension registries a plugin's own jsdom test reaches |
+| `@acorn/plugin-api/testkit/ws-client` | WebSocket client test helpers |
+| `@acorn/plugin-api/ui/data-sources` | Connected typed-data authoring components |
+| `@acorn/plugin-api/ui/model-provider-failure` | Shared model-provider failure presentation |
 
 The line between `/client`, `/ui`, and `/ui/host` is drawn by the runtime, not by taste. Solid
 compiles a component to code that touches `window` at module scope, so `/client` remains free of
-`.tsx`. The frame-safe `/ui` barrel reaches only the pure `client-core/src/kit/` presentation tree;
-router/query/registry-connected components sit on `/ui/host`. The facade is declared side-effect
-free so a frame bundle retains only the named presentation components it imports.
+`.tsx`. The frame-safe `/ui` barrel exposes presentation components and helpers from the kit, plus
+selected feature-owned presentation adapters such as `DiffPane` and `attachPty`. Router, query, and
+registry-connected components sit on `/ui/host`. The facade is declared side-effect free so a frame
+bundle retains only the named presentation components it imports.
 
 Boundary tests grep for those properties, and `packages/plugin-api/src/entrypoints.test.ts` executes
 them: it imports every entrypoint except `/ui`, `/ui/host` and `/ui/editor` in a node-environment
@@ -119,81 +110,30 @@ because the property is transitive — a `.tsx` module three hops behind `/clien
 tests just as thoroughly as one named in the barrel — and it doubles as enforcement of the
 side-effect-free claim.
 
-`packages/plugin-api/src/surface.snapshot.txt` pins every exported name. A change to the surface
-fails that test until the snapshot is regenerated
-(`UPDATE_SURFACE=1 pnpm --filter @acorn/plugin-api test`), which is the point: growing the contract
-should be a deliberate act. The implementation still lives in
-`packages/node-core/src/server/pluginHost/types.ts` and
-`packages/client-core/src/host/registries/extensionPoints/plugin.ts`, which stay free to move files around underneath.
+`packages/plugin-api/src/surface.snapshot.txt` pins the private facade's exported names. Run
+`UPDATE_SURFACE=1 pnpm --filter @acorn/plugin-api test` after reviewing an addition or removal.
+The snapshot is exact, but it carries no loaded-plugin API major. A compiled-only export can leave
+without changing the manifest contract. Source consumers and typechecking catch a compiled caller
+that still needs it.
 
-**Adding a name is free. Removing one is a major bump.** The snapshot's first line records the
-`PLUGIN_API_MAJOR` it was written under, and regeneration REFUSES to drop a name while that major is
-unchanged — it prints the names that would vanish and tells you to bump or put them back. That is not a
-style rule: a manifest's `apiVersion` range is checked at plugin load, at install, and at client bundle
-resolution, so a plugin built against a surface that has since lost a name does not degrade gracefully, it
-fails to resolve a symbol at run time in someone else's process with no version having said so. Bumping
-without regenerating fails the same test, so the pair cannot drift apart in either direction. Bumping
-means editing `packages/protocol/src/plugin/apiVersion.ts` and rebuilding every loaded package
-(`pnpm --filter @acorn/node build:plugin <id>` per package, plus
-`pnpm --filter @acorn/desktop run build:bundled-plugins`) — a stale package keeps the old number and stops
-loading. The major went to `2` on 2026-08-14, when the facade shed seventy-one names, and to `3` on
-2026-08-27, when four names moved to say what they mean: `capabilities` became `hostCapabilities`,
-`PollerContribution` became `ClientScheduleContribution`, and the two slot registries folded into one.
-It went to `4` on 2026-08-28, when `ctx.events` lost `notice` and `stepEvent` to the `workflows.notices`
-capability (`notice` came back on 2026-09-10 with a `target` in place of workflows' `runId` pair, which
-is what the objection had actually been about — adding a name is free, so no bump), a loaded plugin's capability ids became bound to its own namespace, and its pane, source and
-slot ids did too. The same `4` batch then took `hostCapabilities` and the `HostCapabilities` type: a
-contribution's `requires` used to be a closed union with one plugin's name, `terminal`, compiled into
-core, and it is now `'desktop' | { plugin: id } | { seam: group }` or an array of them, answered by
-`hasHostCapability` (2026-08-27 extensibility review, finding 8; the seam form arrived on 2026-08-31,
-docs/frontend.md § The desktop gate audit). Every bump was batched deliberately — a rename is cheap
-while every plugin is in this repository and expensive the moment one is not, and the `4` batch was the
-last window before the namespace rules would have had to grandfather an ecosystem.
+`tools/arch/publishedPluginSurface.snapshot.txt` guards the published names and declared members of
+`acorn-plugin-sdk`, `acorn-plugin-sdk/remote`, and `acorn-plugin-types`. Regeneration with
+`UPDATE_PUBLISHED_PLUGIN_SURFACE=1 pnpm --filter @acorn/arch-tests test` refuses removals while
+`PLUGIN_API_MAJOR` stays the same. The test also compares SDK runtime exports with its hand-written
+declarations. The SDK and type package contract tests compare published types with host types in
+both directions. Review signature changes as compatibility changes even when every name remains.
 
-It went to `8` on 2026-08-31, when `memorySection`, `notesSection` and `pullRequestSection` came off
-`/node`. Those three built a plugin's own context section inside core, so core knew three plugins by
-name to hand them back their own rows. Each now lives in the package that owns the rows, and what the
-facade offers instead is the arithmetic they shared: `truncateBytes`, `formatOmitted`, and the
-`PluginContextSection` type.
+A manifest's `apiVersion` range is checked by the installer, both Node loader paths, and client
+bundle selection. A breaking change to the loaded plugin contract requires a bump in
+`packages/protocol/src/plugin/apiVersion.ts`, followed by rebuilding loaded packages and the
+bundled plugin set. Adding a compatible published name does not require a bump. The npm package
+versions for `acorn-plugin-sdk` and `acorn-plugin-types` are separate from this manifest major.
 
-It went to `9` on 2026-08-31, when the editor moved off Monaco. `ui/editor` published three names
-that said Monaco out loud — `MONACO_THEME`, `watchMonacoTheme`, `monacoLanguageForPath` — and a
-theme name is not a thing CodeMirror has. What the entrypoint offers instead is `editorTheme`,
-`refreshEditorTheme` and `watchEditorTheme` (an extension, a re-read and a subscription),
-`languageForPath`, and the view-state pair
-`captureViewState`/`applyViewState` with its `EditorViewState` type, which is the selection and
-scroll a pane used to hand back to a library as an opaque blob.
-
-It went to `10` on 2026-09-03, when the command palette stopped having two vocabularies.
-`PaletteRowSource` and `PaletteItem` came off `/client` with the registry behind them: a second way to
-put a row in the palette, with `rows` and `invoke` where a command has `run`, and with no owner, no
-capability gate, no disposal and no shortcut of its own — each of those had to be arranged for it
-separately. Only a compiled plugin could supply its callbacks, so a loaded plugin could never
-contribute a live row through it at all. Its last two contributors, the terminal's run targets and the
-workflow definitions, are `search` commands their plugins register through `ctx.commands`
-([command-palette-and-shortcuts.md](../command-palette-and-shortcuts.md)). `ctx.paletteRows` went with
-them. The manifest's `contributions.palette` alias did **not**: it names a command rather than a row,
-it has always been read as one, and its removal is a separate announcement rather than something this
-batch could carry quietly. The alias was removed in the architecture reset; manifests now declare
-explicit `commands` with a `kind`.
-
-The architecture reset (`acorn-1`) started the count again at `1`. It went to `2` on 2026-09-26,
-when the diff viewer stopped taking whole patches. `DiffSource` lost `files`, `cachedFile`,
-`fetchPatches`, `contentSignature`, `contentKey`, `hasLineExtra` and `lineExtraSignature`, and gained
-`topology`, `loadSegments` and `search`; `lineExtra` became `{ anchors, render }`, so a source names
-the lines it draws under before any row is built. `createDiffHydrator` came off `/ui/diff` with the
-hydrator, and so did the helpers only the whole-document viewer used: `estimateRowSize`,
-`estimateSplitBandSize`, `splitBandIdentityKeys`, `DIFF_LOAD_ROW_HEIGHT` and `collectMatches`. What a provider now builds on its node is a diff document from `@acorn/diff-document`, and
-`/ui/diff` carries the document types the port is written in. A type change to a port is a break
-whether or not a name vanishes, so the major moved for the port as much as for the name
-([plugin-authoring.md](../plugin-authoring.md) § Drawing a diff says how to move a source).
-
-**Folding a removal into an open batch is a judgement, not a loophole.** The snapshot guard compares the
-committed major against the current one, so it cannot tell "this major already shipped" from "this major
-was bumped an hour ago in the same uncommitted change". Nothing had been released under `4` when the
-`requires` removal landed, so it joined the batch and is recorded in the paragraph above rather than
-buying a `5` nobody could have been running. Once a major is out, the guard's two remedies — put the
-name back, or bump — are the only two.
+The pre-reset API history used majors 2 through 13 for a wider compiled facade. Those numbers
+preceded the `acorn-1` architecture reset and do not describe the loaded plugin API served by this
+build. The reset began at major 1. Major 2 changed the diff source port from whole patches to a
+topology, segments, and search. The `DiffSource` change requires providers to build a diff document
+on their Node.
 
 ### One vocabulary across the registries
 
@@ -250,8 +190,9 @@ telemetry has, which is that it never fails the thing it describes
 ([telemetry.md](../telemetry.md) § Never fail what you measure). Reading the stream is the separate
 `telemetry` facet on `ctx.core`, and that one is a token.
 
-`packages/plugin-types/src/public.ts` — the declarations acorn publishes as `acorn-plugin-types` — is the
-published twin of the loaded type, and `contract.test.ts` holds the two equal member for member. Adding a
+`packages/plugin-types/src/public.ts` is the root entrypoint for the declarations acorn publishes as
+`acorn-plugin-types`. It reexports the contract-owned types under `src/contracts/`. `contract.test.ts`
+holds the loaded context and core facets equal member for member. Adding a
 member to one and not the other fails that test, which is what stops the hand-written copy from quietly
 falling behind the host it describes.
 
@@ -267,7 +208,7 @@ improved by waiting for one.
 | `acorn-plugin-sdk` | The sandbox bridge (`packages/plugin-sdk`) — `connect`, `mountFrame`, `mountTree`, `openLinkOnClick`, `AcornBridgeError` and the `AcornBridge` type, re-exported from `@acorn/plugin-api/ui/sdk` so the two cannot drift. Its `/remote` subpath is `@acorn/plugin-api/ui/tree`, for a tree written in JSX. |
 | `acorn-plugin-types` | The node-side API as declarations (`packages/plugin-types`), plus the generated manifest schema. No runtime, and `@types/node` as its only peer. |
 
-**Only the sandbox bridge and the declarations are published, and the eleven entrypoints never will be.** They re-export
+**Only the sandbox bridge and the declarations are published. The private facade entrypoints remain in the repository.** They re-export
 node-core and client-core — Hono, Drizzle, Solid, CodeMirror — and a plugin does not want a second copy of
 any of those. It wants the host's, which a compiled plugin gets from the builder and a loaded plugin
 gets through `ctx` and through the document its frame is served in. The bridge is the one thing an
@@ -276,17 +217,14 @@ also keeps the published bundle honest: 17 kB, seven modules, zero external impo
 imports it in a bare node environment so the day someone re-exports a Solid component it fails here
 rather than in a stranger's bundler.
 
-**The promise: a plugin that loads under `PLUGIN_API_MAJOR` keeps loading under it.** That is what
-publishing converts from an internal invariant into something owed to someone else, and it is the same
-invariant the snapshot already enforced — a removal requires the major to move.
+The loaded-plugin compatibility promise covers the published SDK, published declarations, and the
+manifest/runtime contract. A plugin tested against a supported major can declare it in its
+`apiVersion` range. A breaking removal or shape change needs a new major; changes to the private
+compiled facade alone do not. The two npm package versions are independent of `PLUGIN_API_MAJOR`.
 
-A manifest's `apiVersion` is a **range over majors**, not a single number: `"3"`, `"2 || 3"`, or a span
-like `"2-4"`. `speaksApiVersion` in `packages/protocol/src/plugin/apiVersion.ts` is the one comparison,
-used by both loader paths, the installer, and the client's bundle resolution. It was an exact string
-match until 2026-08-28, which meant a plugin could not support two majors and the day the number moved
-every out-of-tree package stopped loading with no version an author could ship that worked on both
-sides. Anything that is not a range reads as incompatible, so a typo fails at the manifest rather than
-matching nothing quietly.
+A manifest's `apiVersion` is a range over majors: `"2"`, `"1 || 2"`, or an inclusive span such as
+`"2-4"`. `speaksApiVersion` in `packages/protocol/src/plugin/apiVersion.ts` implements the comparison.
+The host rejects an invalid range instead of treating it as a match.
 
 `requires.plugins` uses the same grammar for a different question. `apiVersion` says which acorn a
 package speaks; `requires` says which *other packages* it needs on the node, checked at load and used
@@ -294,10 +232,8 @@ to order init ([plugin authoring](../plugin-authoring.md) § Requiring another p
 a plugin consuming another plugin's capability used to fail at whichever route reached for it first,
 with a message about a missing capability and nothing naming the package that should have provided it.
 
-What is *not* promised: that the major will never move, that a prior major keeps working once acorn
-stops naming it, or that anything below carries a deprecation window. There is no deprecation program
-and none is planned; the ceiling stays "the number cannot lie about a removal". The range is what gives
-an author a way to cross a move, not a promise that they will not have to.
+The range lets an author ship one package for tested host majors. It does not make an untested older
+major compatible or set a deprecation period.
 
 `packages/plugin-sdk/src/public.ts` is the published declaration, **hand-written** and copied verbatim
 to `dist/sdk.d.ts`. Nothing here emits declarations — `noEmit` is global and every package is consumed as
@@ -309,9 +245,10 @@ person wrote and a person reviewed. It is held to the implementation by mutual-a
 underneath a stable name — the exact drift the name-level snapshot cannot see.
 
 `acorn-plugin-types` is the same arrangement one tier over, and it exists because the only kind of
-plugin a stranger could write was untyped JavaScript against prose. `packages/plugin-types/src/public.ts`
-is hand-written for the same reasons `public.ts` above is, copied verbatim to `index.d.ts`, and held to
-the implementation by mutual-assignability assertions in `contract.test.ts`. A plugin picks it up with a
+plugin a stranger could write was untyped JavaScript against prose. Its contract modules are hand-written,
+and a declaration-only build emits `dist/index.d.ts` with relative `.d.ts` files for each contract.
+The package has no runtime JavaScript. Mutual-assignability assertions in `contract.test.ts` hold the
+declarations to the implementation. A plugin picks it up with a
 JSDoc annotation and no build step, which is what keeps the no-bundler profile intact:
 
 ```js

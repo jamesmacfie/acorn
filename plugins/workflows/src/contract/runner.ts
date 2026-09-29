@@ -11,7 +11,7 @@ import type { WorkflowDef } from '../shared/workflowContracts'
 // `start`, `gate`, and `cancel` await so a run cannot start into the sweep.
 //
 // Lives in contract/ for the same reason as agents.runtime: the composition root reaches it through a
-// declared surface rather than a deep import of server/workflowRunner.ts.
+// declared surface rather than a deep import of server/runs/runner.ts.
 type WorkflowInternalStartBase = {
   taskId: string
   inputs?: Record<string, DataValue>

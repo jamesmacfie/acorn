@@ -1,4 +1,4 @@
-/* Base styling for the shared primitives (core/client/ui/primitives.tsx, Modal.tsx). This file is
+/* Base styling for the shared kit components (kit/components/, Modal.tsx). This file is
  * the Terminal look for these roles: every value is a token, so a pack changes the look by
  * re-pointing tokens. See docs/ui-design.md § How the kit is built for the specificity
  * model behind base/variant/pack layering.
@@ -117,7 +117,7 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 
 /* Select: the trigger wears .ui-input so it lines up with every other control, and the list is a
    .ui-popover borrowing the menu's item vocabulary. The native <select> is still in the DOM as the
-   value store; see primitives.tsx (Select) for why. */
+   value store; see kit/components/inputs/Select.tsx for why. */
 .ui-select { display: flex; align-items: center; gap: var(--space-3); text-align: left; cursor: pointer; }
 .ui-select-native { display: none; }
 .ui-select-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -278,7 +278,7 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
    14px glyph reads as a misaligned icon rather than as selection. The selected row says so with its
    background alone, the way a rail button does.
 
-   `title` and `aria-label` still carry the name, and `data-tip` (primitives.tsx § Row) turns that
+   `title` and `aria-label` still carry the name, and `data-tip` (kit/components/layout/Row.tsx) turns that
    into the app's own tooltip on hover and on focus, which is the whole reason a rail row is legible
    at all. */
 .ui-row[data-collapsed] {
@@ -297,7 +297,7 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   gap: var(--space-1);
   min-width: 0;
   /* The rail's width is the budget, and the row's own height is the other half of it: a virtualizer
-     writes an inline height from a token read off the document root (kit/lib/metrics.ts), so nothing
+     writes an inline height from a token read off the document root (kit/lib/layout/metrics.ts), so nothing
      in here may make the row taller than it already is. */
   max-width: 100%;
   font-size: var(--fs-xs);
@@ -833,7 +833,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-card[data-stripe='danger'] { border-left-color: var(--danger); }
 
 /* ── Graph ──────────────────────────────────────────────────────────────────────────────────
-   The canvas. Card size and card position are inline, from kit/lib/graphLayout.ts: only the
+   The canvas. Card size and card position are inline, from kit/lib/layout/graphLayout.ts: only the
    layout knows both numbers and no stylesheet can compute them, which is the same exception
    Grid and Rows already take for a virtualiser. Everything else is here.
 
@@ -843,7 +843,9 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   position: relative;
   overflow: hidden;
   flex: 1;
-  min-height: 0;
+  /* A floor rather than 0: the cards are absolutely placed, so the canvas has no height of its own and
+     a column full of other content would squeeze it to nothing. */
+  min-height: 16rem;
   touch-action: none;
   cursor: grab;
   background-color: var(--surface-sunken);
@@ -1134,7 +1136,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
    style pack that moves the rails moves this with them (tokens-style.css § --tabrail-w). */
 .ui-listdetail[data-list='collapsed'] { grid-template-columns: var(--tabrail-w) 1px minmax(0, 1fr); }
 /* A collapsed column has no header left to hold the toggle, and in the `split` form it never had one
-   this node could reach, so the control rides the divider instead (primitives.tsx § ListDetail).
+   this node could reach, so the control rides the divider instead (kit/components/layout/ListDetail.tsx).
    Centred on the edge and on the header's line, so it reads as belonging to the column it closes. */
 /* A section's label and a pane's list header are both `.section-header`, and neither survives 48px:
    "Managed sessions · 3" has no room to draw and the rail's own icon already says which list this is.
@@ -1142,7 +1144,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 
    Not a prop, because there is no width at which a plugin would want to keep it. A header with a
    control in it is a different question, and a plugin answers that one by reading the collapse signal
-   and drawing the control on its own (kit/lib/collapseState.ts).
+   and drawing the control on its own (kit/lib/layout/collapseState.ts).
 
    `>` on the column so a `ListDetail` nested inside the detail keeps its own headers. */
 .ui-listdetail[data-list='collapsed'] > .ui-listdetail-list .section-header { display: none; }
@@ -1252,7 +1254,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 /* Links track the theme accent instead of the browser-default blue (clashes with non-blue themes). */
 .ui-markdown a { color: var(--accent); }
 .ui-markdown img { display: block; max-width: 100%; height: auto; border-radius: var(--radius); }
-/* The `thumb` image flavour (kit/lib/markdown.ts): a picture standing in for a file, drawn as a band the
+/* The `thumb` image flavour (kit/lib/rendering/markdown.ts): a picture standing in for a file, drawn as a band the
    width of whatever holds it and cropped to fill. Cropping rather than fitting, because a tile is as wide
    as the filename under it and a fitted image leaves a different gap for every aspect ratio. Square,
    because the rounding that suits a picture drawn as content reads as a mistake on a band inside an
@@ -1305,6 +1307,28 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   vertical-align: top;
 }
 .ui-markdown th { background: var(--bg-subtle); font-weight: var(--fw-semibold); }
+/* A GitHub "Suggested change": the sanitizer maps GitHub's diff classes onto these
+   (kit/lib/rendering/sanitizedHtml.ts). Drawn like a diff hunk, not a data table, so it undoes the
+   table skin above. GitHub gives the "Suggested change" header no class we could rely on, so it is
+   matched as the first child. `:first-child` and not "anything without the table" because GitHub also
+   ends the block with an empty div for its apply buttons. */
+.ui-md-suggestion { margin: var(--space-4) 0; border: var(--surface-border); border-radius: var(--radius); overflow: hidden; }
+.ui-md-suggestion > :first-child:not(:has(table)) { padding: var(--space-2) var(--space-4); border-bottom: var(--surface-border); background: var(--bg-subtle); color: var(--text-muted); font-size: var(--fs-xs); }
+.ui-md-suggestion table { display: table; width: 100%; margin: 0; font-family: var(--font-mono); }
+.ui-md-suggestion td { padding: var(--space-1) var(--space-4); border: 0; white-space: pre-wrap; }
+.ui-md-suggestion .ui-md-suggestion-gutter { width: var(--space-6); padding: 0; }
+.ui-md-suggestion-del { background: var(--del-bg); }
+.ui-md-suggestion-add { background: var(--add-bg); }
+.ui-md-suggestion-gutter.ui-md-suggestion-del, .ui-md-suggestion-del .ui-md-suggestion-word { background: var(--del-word-bg); }
+.ui-md-suggestion-gutter.ui-md-suggestion-add, .ui-md-suggestion-add .ui-md-suggestion-word { background: var(--add-word-bg); }
+.ui-md-suggestion-word { border-radius: var(--radius-marker); }
+.ui-md-syn-comment { color: var(--syntax-comment); }
+.ui-md-syn-keyword { color: var(--syntax-keyword); }
+.ui-md-syn-string { color: var(--syntax-string); }
+.ui-md-syn-constant { color: var(--syntax-constant); }
+.ui-md-syn-entity { color: var(--syntax-entity); }
+.ui-md-syn-variable { color: var(--syntax-variable); }
+.ui-md-syn-tag { color: var(--syntax-tag); }
 /* The stand-in for an image the renderer refuses to fetch (ui/markdown.ts, `placeholder`).
    In primitives.css rather than the agents plugin's sheet because the renderer that emits it is core's. */
 .ui-md-omitted { color: var(--text-faint); font-style: italic; }
@@ -1514,7 +1538,7 @@ a.ui-row:hover { background: var(--bg-hover); }
 .remote-tree { display: contents; }
 
 .ui-stack { display: flex; flex-direction: column; min-width: 0; gap: var(--kit-gap); }
-/* `grow`: the stack IS the region. Same pair of values, and the same reason, as `.ui-graph` and
+/* `grow`: the stack IS the region. Same pair of values, and the same reason, as
    `textarea[data-grow]`: without a definite height nothing inside a stack can scroll, because a
    flex column with an `auto` height is as tall as its content and its content is then as tall as
    it likes. `min-height: 0` is the half that is easy to forget and the half that does the work. */

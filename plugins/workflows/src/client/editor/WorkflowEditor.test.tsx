@@ -89,17 +89,19 @@ const mount = async (item: string): Promise<void> => {
   await settle()
 }
 
-const buttons = (scope: ParentNode = host): HTMLButtonElement[] => [...scope.querySelectorAll('button')]
-const button = (text: string, scope: ParentNode = host): HTMLButtonElement | undefined =>
-  buttons(scope).find((el) => el.textContent?.trim() === text)
-const press = async (text: string, scope: ParentNode = host): Promise<void> => {
+// The whole document, not the mount point: the AI authoring dialog portals to the body.
+const buttons = (scope: ParentNode = document.body): HTMLButtonElement[] => [...scope.querySelectorAll('button')]
+// By visible text, or by accessible name for an icon-only button such as Undo.
+const button = (text: string, scope: ParentNode = document.body): HTMLButtonElement | undefined =>
+  buttons(scope).find((el) => el.textContent?.trim() === text || (!el.textContent?.trim() && el.getAttribute('aria-label') === text))
+const press = async (text: string, scope: ParentNode = document.body): Promise<void> => {
   const found = button(text, scope)
   if (!found) throw new Error(`no ${text} button: ${buttons(scope).map((el) => el.textContent).join(', ')}`)
   found.click()
   await settle()
 }
 const type = (value: string): void => {
-  const field = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="Instruction or answer"]')
+  const field = document.body.querySelector<HTMLTextAreaElement>('textarea[aria-label="Instruction or answer"]')
   if (!field) throw new Error('the conversation has no instruction field')
   field.value = value
   field.dispatchEvent(new Event('input', { bubbles: true }))
@@ -141,16 +143,16 @@ describe('the AI authoring entry', () => {
 
   it('supports visual authoring of a file draft', async () => {
     await mount('repo:ship-it')
-    expect(host.textContent).toContain('Review publication')
+    expect(button('Publish…')).toBeDefined()
     expect(button('AI authoring')).toBeDefined()
   })
 
   it('sits beside Undo and opens the bounded conversation', async () => {
     await mount('db:abc')
-    const labels = buttons().map((el) => el.textContent?.trim())
+    const labels = buttons().map((el) => el.textContent?.trim() || el.getAttribute('aria-label'))
     expect(labels.indexOf('AI authoring')).toBe(labels.indexOf('Undo') - 1)
     await press('AI authoring')
-    expect(host.textContent).toContain('Use preview records to help AI')
+    expect(document.body.textContent).toContain('Use preview records to help AI')
   })
 })
 
@@ -159,17 +161,18 @@ it('refreshes a missing step when its plugin returns without changing the saved 
     { id: 'send', name: 'Send', kind: 'mail:send', with: { recipient: 'team' } },
   ] }
   await mount('db:abc')
-  expect(host.textContent).toContain("Plugin 'mail' does not provide this step")
-  expect(host.textContent).not.toContain('Publish this workflow before running it.')
+  expect(document.body.textContent).toContain("Plugin 'mail' does not provide this step")
+  expect(document.body.textContent).toContain('Run unavailable')
   currentKinds = [{ id: 'mail:send', pluginId: 'mail', describe: {
     label: 'Send mail', description: 'Send mail to the team.', icon: 'send', fields: [],
     output: { description: 'The delivery receipt.' },
   } }]
   pluginChanged?.()
   await settle()
-  expect(host.textContent).toContain('Send mail to the team.')
-  expect(host.textContent).not.toContain("Plugin 'mail' does not provide this step")
-  expect(host.textContent).toContain('Publish this workflow before running it.')
+  expect(document.body.textContent).toContain('Send mail to the team.')
+  expect(document.body.textContent).not.toContain("Plugin 'mail' does not provide this step")
+  expect(document.body.textContent).not.toContain('Run unavailable')
+  expect(document.body.textContent).toContain('Not published')
   expect(currentDef.steps[0]?.with).toEqual({ recipient: 'team' })
 })
 
@@ -179,18 +182,33 @@ describe('reviewing an AI proposal', () => {
     expect(button('Undo')?.disabled).toBe(true)
 
     await propose()
-    expect(host.textContent).toContain('Review AI proposal')
-    expect(host.textContent).toContain('plan')
+    expect(document.body.textContent).toContain('Review AI proposal')
+    expect(document.body.textContent).toContain('plan')
     await press('Apply reviewed edit')
-    expect(host.textContent).toContain('synthesise')
-    expect(host.textContent).not.toContain('Plan the change')
+    expect(document.body.textContent).toContain('synthesise')
+    expect(document.body.textContent).not.toContain('Plan the change')
     expect(toasts).toEqual(['AI proposal applied. Undo restores the previous draft.'])
 
     await press('Undo')
-    expect(host.textContent).toContain('plan')
-    expect(host.textContent).not.toContain('synthesise')
+    expect(document.body.textContent).toContain('plan')
+    expect(document.body.textContent).not.toContain('synthesise')
     // Exactly one entry: the second press has nothing left to undo.
     expect(button('Undo')?.disabled).toBe(true)
+  })
+
+  // A new workflow's proposal is all additions, which carry no `before`. Drawing one used to throw
+  // inside the render, so the dialog froze on its first status line and showed nothing.
+  it('draws a proposal that adds and removes paths', async () => {
+    authorTurn.mockResolvedValue({
+      state: 'proposal', base: original, baseRevision: 1, candidate: generated, summary: 'Replace the plan.',
+      diff: [{ path: '/steps/angle-one', change: 'add', after: generated.steps[0] }, { path: '/steps/plan', change: 'remove', before: original.steps[0] }],
+      problems: [], context: [], usage: { requests: 1, inputTokens: 10, outputTokens: 5 }, providerId: 'anthropic', modelId: 'opus',
+    })
+    await mount('db:abc')
+    await propose()
+    expect(document.body.textContent).toContain('add /steps/angle-one: nothing →')
+    expect(document.body.textContent).toContain('→ nothing')
+    expect(button('Apply reviewed edit')).toBeDefined()
   })
 
   it('sends the draft revision, selected scope, backend, and sample opt-out', async () => {
@@ -210,9 +228,9 @@ describe('reviewing an AI proposal', () => {
     await mount('db:abc')
     await propose()
     await press('Reject')
-    expect(host.textContent).toContain('plan')
-    expect(host.textContent).not.toContain('synthesise')
-    expect(host.textContent).toContain('Draft unchanged')
+    expect(document.body.textContent).toContain('plan')
+    expect(document.body.textContent).not.toContain('synthesise')
+    expect(document.body.textContent).toContain('Draft unchanged')
   })
 
   it('cancels an in-flight request and keeps the draft', async () => {
@@ -222,15 +240,15 @@ describe('reviewing an AI proposal', () => {
     type('Change it.')
     await press('Send')
     await press('Cancel')
-    expect(host.textContent).toContain('plan')
-    expect(host.textContent).toContain('Cancelled')
+    expect(document.body.textContent).toContain('plan')
+    expect(document.body.textContent).toContain('Cancelled')
   })
 
   it('keeps a pending clarification recoverable in device storage', async () => {
     authorTurn.mockResolvedValue({ state: 'clarification', question: 'Which state?', choices: [{ id: 'a', label: 'Active' }, { id: 'b', label: 'Backlog' }], context: [{ role: 'assistant', content: 'question' }], usage: { requests: 1, inputTokens: 2, outputTokens: 1 }, providerId: 'p', modelId: 'm' })
     await mount('db:abc')
     await propose()
-    expect(host.textContent).toContain('Which state?')
+    expect(document.body.textContent).toContain('Which state?')
     const saved = Array.from({ length: localStorage.length }, (_value, index) => localStorage.getItem(localStorage.key(index)!)).join('\n')
     expect(saved).toContain('Which state?')
   })

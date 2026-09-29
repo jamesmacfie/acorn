@@ -15,6 +15,7 @@ import { agentToolContributions } from '../agentTools/registry'
 import type { AppEnv } from '../middleware/auth'
 import { pluginRouteContributions } from '../routes/registry'
 import { AGENTS_HARNESS_REGISTRY, type ManifestHarness } from './harnesses'
+import { AGENTS_CUSTOM_AGENT_REGISTRY, type ManifestCustomAgent } from './customAgents'
 import { clearRegistrations, initPlugins, type LoadedPluginBinding } from './host'
 import type { NodePermissions } from '../plugins/manifest'
 import type { CompiledNodePluginContext, NodePlugin } from './types'
@@ -922,5 +923,52 @@ describe('order independence', () => {
     expect(result.roster.find((entry) => entry.name === 'broken')?.state).toBe('failed')
     await result.dispose()
     error.mockRestore()
+  })
+})
+
+describe('delivering a manifest-declared custom agent', () => {
+  let shared: ReturnType<typeof makeTestDb> | null = null
+  const coreDb = () => (shared ??= makeTestDb()).db
+  afterAll(() => shared?.cleanup())
+
+  it('mints the id, qualifies a harness the manifest declares, and passes any other harness on as written', async () => {
+    const registered: ManifestCustomAgent[] = []
+    const result = await initPlugins([
+      {
+        name: 'agents',
+        init: (ctx) => void ctx.capabilities.provide(AGENTS_CUSTOM_AGENT_REGISTRY, {
+          register: (agent) => {
+            registered.push(agent)
+            return { dispose: () => void registered.splice(registered.indexOf(agent), 1) }
+          },
+        }),
+      },
+      { name: 'reviews', init: () => {} },
+    ], {
+      capabilities: new CapabilityRegistry(),
+      core: createCoreServices({ secrets: new SecretService('b'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+      dataDir: '',
+      loaded: new Map([['reviews', {
+        permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+        storage: { open: () => { throw new Error('test storage is not configured') } },
+        harnesses: [{
+          id: 'reviewer-cli', label: 'Reviewer', spawn: { command: 'reviewer', args: ['acp'] }, envPassthrough: [],
+          quirks: { manualCompaction: false, sessionPersistence: false },
+        }] as never,
+        customAgents: [
+          { id: 'strict', name: 'Strict reviewer', harness: 'reviewer-cli', options: {}, instructions: 'Be strict.' },
+          { id: 'claude-review', name: 'Claude reviewer', harness: 'claude', options: { model: 'opus' }, maxToolRisk: 'read' },
+        ],
+      } satisfies Partial<LoadedPluginBinding> as never]]),
+    })
+
+    expect(registered).toEqual([
+      { id: 'reviews:strict', pluginId: 'reviews', name: 'Strict reviewer', providerId: 'reviews:reviewer-cli', options: {}, instructions: 'Be strict.' },
+      { id: 'reviews:claude-review', pluginId: 'reviews', name: 'Claude reviewer', providerId: 'claude', options: { model: 'opus' }, maxToolRisk: 'read' },
+    ])
+    // Rolled back with the plugin's other registrations, since the agents live in the consumer's list.
+    clearRegistrations('reviews')
+    expect(registered).toEqual([])
+    await result.dispose()
   })
 })

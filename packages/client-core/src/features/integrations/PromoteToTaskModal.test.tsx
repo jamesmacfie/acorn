@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Task } from '@acorn/protocol/api.ts'
 import { sourceRegistry } from '../../host/registries/sources/sources'
 import { PromoteToTaskModal, type PromoteTaskAction } from './PromoteToTaskModal'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 
 vi.mock('@solidjs/router', () => ({ useParams: () => ({ projectId: 'p1' }) }))
 vi.mock('@tanstack/solid-query', () => ({
@@ -140,5 +140,24 @@ describe('the branch field', () => {
     created.mockClear()
     type(branchField, '!!!')
     expect(primary().disabled).toBe(true)
+  })
+})
+
+describe('the setup script', () => {
+  it('runs by default', async () => {
+    mount()
+    await settle()
+    primary().click()
+    await settle()
+    expect(created).toHaveBeenCalledWith(expect.objectContaining({ skipSetup: false }))
+  })
+
+  it('can be skipped', async () => {
+    mount()
+    await settle()
+    document.querySelector<HTMLInputElement>('input.ui-check-box')!.click()
+    primary().click()
+    await settle()
+    expect(created).toHaveBeenCalledWith(expect.objectContaining({ skipSetup: true }))
   })
 })

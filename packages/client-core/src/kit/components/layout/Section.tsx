@@ -1,5 +1,5 @@
 import { children, Show, type JSX } from 'solid-js'
-import { SectionHeader } from '../primitives'
+import { SectionHeader } from './SectionHeader'
 
 /* Section: a labelled group of things. The sidebar section label agents, changes, notes and docker
    browse each wrote by hand.
@@ -15,7 +15,7 @@ export function Section(props: {
   sticky?: boolean
   children: JSX.Element
 }) {
-  // Read once, for the reason on RowParts (../primitives.tsx): testing the children and then inserting them built the
+  // Read once, for the reason on RowParts (./Row.tsx): testing the children and then inserting them built the
   // whole section body twice.
   const body = children(() => props.children)
   return (

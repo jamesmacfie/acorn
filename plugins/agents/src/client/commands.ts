@@ -3,6 +3,7 @@ import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
 import {
   COMMAND_CLOSED,
   localSearch,
+  readJson,
   registerCommands,
   setSelectedSource,
   type CommandOutcome,
@@ -12,6 +13,8 @@ import type { AgentPaneModel, SessionAction } from './sessions/agentPaneModel'
 import { managedAgentApi } from './sessions/managedClient'
 import { openManagedSession, requestComposerFocus } from './sessions/managedSelection'
 import { managedAgentStore } from './sessions/managedStore'
+import { choiceDescription, choiceGlyph, choiceLabel, newSessionChoices, type NewSessionChoice } from './sessions/newSessionChoices'
+import { customAgentsRoute, type CustomAgent } from '../shared/customAgents'
 
 // What this plugin puts in the palette: the rail source it owns, a way to start a session in the open
 // task, and one search over that task's managed sessions
@@ -34,6 +37,22 @@ import { managedAgentStore } from './sessions/managedStore'
 // refuses). The rest of the open session's menu is at the bottom of this file, registered by the pane
 // while it is on screen rather than at boot.
 
+/** The rows the open New agent session frame listed, by row id, so a pick can name the custom agent
+ *  behind it. A row carries display facts and one `ref`, and an agent needs the harness too. */
+const pickedRows = new Map<string, NewSessionChoice>()
+
+/** Start a session, open it, and put the caret in its composer: what the pane's New picker does. The
+ *  pane loads the transcript when the selection lands on it. */
+export async function startSessionFromPalette(
+  taskId: string,
+  provider: { id: string; profileId: string },
+  customAgentId?: string,
+): Promise<void> {
+  const session = await managedAgentStore.startSession(taskId, provider, customAgentId)
+  openManagedSession(taskId, session.id)
+  requestComposerFocus(session.id)
+}
+
 /** How many sessions one frame asks the node for. The host caps the rendered set at 50 as well; this
  *  is the provider keeping the same promise on the wire. */
 const MAX_SESSION_ROWS = 50
@@ -51,30 +70,43 @@ export const agentsCommands: readonly ContributedCommand[] = [
     // in and the palette hides the row rather than offering one that can only fail.
     scope: 'task',
     requires: { plugin: 'agents' },
-    placeholder: 'Pick a harness…',
-    // The pane's New picker as a palette row: the providers this node runs, read once when the frame
-    // opens and filtered here, because that list does not move while somebody types
-    // (client-core localSearch.ts). Only the installed ones — an absent CLI cannot start a session, and
-    // the pane's cards are where the diagnostic that says why belongs.
-    ...localSearch(async () => (await managedAgentApi.providers())
-      .filter((provider) => provider.installed)
-      .map((provider): CommandSearchItem => ({
-        id: provider.id,
-        title: provider.label,
-        subtitle: provider.executableVersion ?? 'Available',
-        ...(provider.glyph ? { icon: provider.glyph } : {}),
-        // The profile the session runs under. The row carries it because a picked row is all `select`
-        // gets, and the two ids differ for a provider that ships more than one profile.
-        ref: provider.profileId,
-      }))),
+    placeholder: 'Pick a harness or an agent…',
+    // The pane's New picker as a palette row: the providers this node runs and then the custom agents,
+    // read once when the frame opens and filtered here, because that list does not move while somebody
+    // types (client-core localSearch.ts). Only installed harnesses, and only agents on one — an absent
+    // CLI cannot start a session, and the pane's cards are where the diagnostic that says why belongs.
+    ...localSearch(async () => {
+      const [providers, agents] = await Promise.all([
+        managedAgentApi.providers(),
+        // A failed agents read still leaves the harnesses to pick from.
+        readJson<CustomAgent[]>(customAgentsRoute).catch(() => []),
+      ])
+      pickedRows.clear()
+      return newSessionChoices(providers.filter((provider) => provider.installed), agents)
+        .map((choice): CommandSearchItem => {
+          const glyph = choiceGlyph(choice)
+          const id = choice.agent ? `custom-agent:${choice.agent.id}` : choice.provider.id
+          pickedRows.set(id, choice)
+          return {
+            id,
+            title: choiceLabel(choice),
+            subtitle: choiceDescription(choice),
+            ...(glyph ? { icon: glyph } : {}),
+            ...(choice.agent ? { badge: 'Agent' } : {}),
+            // The profile the session runs under. The row carries it because a picked row is all
+            // `select` gets, and the two ids differ for a provider that ships more than one profile.
+            ref: choice.provider.profileId,
+          }
+        })
+    }),
     select: async (item, context) => {
       const taskId = context.taskId
       if (!taskId) return COMMAND_CLOSED
+      const choice = pickedRows.get(item.id)
       // Not caught: a failed create leaves the frame open with the reason, which is the only place a
-      // palette pick has to say anything. The pane loads the transcript when the selection lands on it.
-      const session = await managedAgentStore.startSession(taskId, { id: item.id, profileId: item.ref ?? item.id })
-      openManagedSession(taskId, session.id)
-      requestComposerFocus(session.id)
+      // palette pick has to say anything.
+      const provider = choice?.provider ?? { id: item.id, profileId: item.ref ?? item.id }
+      await startSessionFromPalette(taskId, { id: provider.id, profileId: provider.profileId }, choice?.agent?.id)
       return COMMAND_CLOSED
     },
   },

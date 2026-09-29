@@ -1,5 +1,5 @@
 import { createEffect } from 'solid-js'
-import { sanitizedHtmlFragment } from '../../lib/sanitizedHtml'
+import { sanitizedHtmlFragment } from '../../lib/rendering/sanitizedHtml'
 
 /** Provider-rendered HTML without scripts, active content, or automatic resource loads. */
 export default function SanitizedHtml(props: { html: string }) {

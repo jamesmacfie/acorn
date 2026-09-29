@@ -319,12 +319,12 @@ Collapsing is a bargain, and the other half of it is the rows. A column at 48px 
 mark, so every row in it takes a `collapsed` slot: the run state for an agent, an avatar over a
 number for a pull request, a state icon over a key for a ticket. The slot's presence is what
 collapses the row, and the caller passes it from the same signal the column reads
-(`kit/lib/collapseState.ts`), so the two cannot disagree. Leading, body, meta and trailing give way
+(`kit/lib/layout/collapseState.ts`), so the two cannot disagree. Leading, body, meta and trailing give way
 to it, along with depth, nesting and revealed controls, which are about a width the row no longer
 has. The name comes back as the tooltip, from the `title` the row already carried.
 
 The slot has the row's existing height to work in and never more. A virtualized list takes its row
-height from `--row-h-virt` read off the document root (`kit/lib/metrics.ts`), so a per-column
+height from `--row-h-virt` read off the document root (`kit/lib/layout/metrics.ts`), so a per-column
 override is invisible to the virtualizer and a taller collapsed row tears the scroll range.
 
 Opt in on both tiers, and for the same reason. The kit node is told with `collapseKey` because it
@@ -392,7 +392,7 @@ never swallows a click on the app behind it, and each toast re-enables its own.
 The command palette and the file finder share one surface, `PaletteSurface`, rather than the
 near-duplicate `.palette-*` and `.finder-*` rule sets that used to exist side by side.
 
-Modal dismissal (Escape, backdrop click, Tab focus containment) is `kit/lib/dismissable.ts`, a hook
+Modal dismissal (Escape, backdrop click, Tab focus containment) is `kit/lib/controls/dismissable.ts`, a hook
 returning handlers rather than a component; markup stays at the call site. Nine call sites
 hand-wrote this before it existed, five of them with only a backdrop click and nothing else, so Tab
 walked straight out of the dialog into the page behind it and Escape did nothing. `Modal` uses it
@@ -436,7 +436,7 @@ the edge. A legend entry mirrors one active rail status marker, placed or crowde
 both reports current state and teaches what each glyph on the rail means.
 
 A sandboxed plugin frame has its own document, so the shell's tooltip singleton cannot see elements
-inside it and `data-tip` would otherwise be silently inert there. `kit/lib/frameTips.ts` mounts the same
+inside it and `data-tip` would otherwise be silently inert there. `kit/lib/controls/frameTips.ts` mounts the same
 delegated listener and bubble markup into a frame's document, the way frames already mount their
 own copy of the shared CSS. It stays framework-free and importless on purpose: it is reached from
 `@acorn/plugin-api/ui/sdk`, which bundles into a plugin's frame and must not drag a slice of the
@@ -444,7 +444,7 @@ shell, or a second copy of Solid, across that boundary.
 
 ## Drag-to-resize
 
-`kit/lib/split.ts`'s `createSplitDrag` is the drag-resize hook behind the pane row divider, the terminal
+`kit/lib/layout/split.ts`'s `createSplitDrag` is the drag-resize hook behind the pane row divider, the terminal
 drawer's height handle, and the splits the host layouts draw. Three hand-rolled splitters existed
 before it, and none had a keyboard contract. A plugin never calls it: where a split is between two
 *regions* the layout owns the handle ([docs/panes.md § Layout model](./panes.md#layout-model)), and
@@ -496,7 +496,7 @@ set, and the layer priorities are in
 
 There is one menu. `kit/components/overlays/Menu.tsx` owns the surface — `role="menu"`/`menuitem`, close-on-select, Escape,
 outside-click, and focus returning to where it came from — and both ways of opening it mount that same
-surface (`MenuSurface`) over the same hook (`kit/lib/anchor.ts`). The roving focus is not its own: a menu is
+surface (`MenuSurface`) over the same hook (`kit/lib/controls/anchor.ts`). The roving focus is not its own: a menu is
 a collection, so the arrows, Home, End, the page keys and `j`/`k` arrive as intents from
 `keys/collection.ts`, the same ones a list of rows gets. A
 button anchors it to a rect; a right-click anchors it to a point, which is the only difference. A
@@ -538,7 +538,7 @@ plus the button's own `aria-expanded`. The last one is not redundant: the surfac
 while the menu is open, `:focus-within` on the row is false and the trigger would otherwise fade out
 from under the menu it opened.
 
-Both `Menu.tsx` and its anchoring hook (`kit/lib/anchor.ts`) replaced hand-rolled implementations that
+Both `Menu.tsx` and its anchoring hook (`kit/lib/controls/anchor.ts`) replaced hand-rolled implementations that
 had each solved less of the problem: TabRail's task menu had neither outside-click nor Escape nor
 roles, terminal's profile menu had no portal at all so an overflow ancestor clipped it, and
 AccountMenu and NotificationBell each hand-rolled their own outside-click listener. `anchor.ts` owns
@@ -558,7 +558,7 @@ item that toggles something, whose press has to leave the list open to show the 
 
 Arm-to-confirm is `Menu.Item`'s own `confirm` prop, not a `ConfirmButton` dropped into the list. The
 item keeps its place, reads `Discard?` between the first press and the second, and only then calls
-`onSelect` (`createArmedConfirm`, `kit/lib/confirm.ts`). A button among menu items is the wrong
+`onSelect` (`createArmedConfirm`, `kit/lib/controls/confirm.ts`). A button among menu items is the wrong
 height and carries no `.ui-menu-item`, so the roving focus walks straight past it and the keyboard
 cannot reach the one row in the menu that matters most. Changes' Discard and Force push were both
 that shape and are both items now.
