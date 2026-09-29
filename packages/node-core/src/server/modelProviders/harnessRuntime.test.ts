@@ -157,7 +157,7 @@ describe('generateTextForHarness', () => {
     register(profile())
     await expect(generateTextForHarness({ profileId: 'fixture-harness', input: { ...input, prompt: '  ' } }, new ProviderRequestScheduler()))
       .rejects.toMatchObject({ code: 'provider_bad_config', status: 400 })
-    await expect(generateTextForHarness({ profileId: 'fixture-harness', input, timeoutMs: 120_000 }, new ProviderRequestScheduler()))
+    await expect(generateTextForHarness({ profileId: 'fixture-harness', input, timeoutMs: 600_000 }, new ProviderRequestScheduler()))
       .rejects.toMatchObject({ code: 'provider_bad_config', status: 400 })
   })
 })
