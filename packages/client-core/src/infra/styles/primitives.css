@@ -583,6 +583,24 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 }
 .ui-toolbar-spacer { flex: 1; }
 .ui-toolbar-group { display: inline-flex; align-items: center; gap: var(--space-2); }
+/* Joined: one control out of several buttons. Each child is a button or a Menu's contents-only anchor
+   with the button inside it, so every rule names both. The overlap makes the shared edge a single
+   border, and the hovered button is lifted so its accent edge is the one that shows. */
+.ui-toolbar-group[data-joined] { gap: 0; }
+.ui-toolbar-group[data-joined] .ui-btn { border-radius: 0; }
+.ui-toolbar-group[data-joined] .ui-btn:hover { position: relative; z-index: 1; }
+.ui-toolbar-group[data-joined] > :not(:first-child).ui-btn,
+.ui-toolbar-group[data-joined] > :not(:first-child) > .ui-btn { margin-inline-start: calc(-1 * var(--control-bw)); }
+.ui-toolbar-group[data-joined] > :first-child.ui-btn,
+.ui-toolbar-group[data-joined] > :first-child > .ui-btn {
+  border-start-start-radius: var(--radius-control);
+  border-end-start-radius: var(--radius-control);
+}
+.ui-toolbar-group[data-joined] > :last-child.ui-btn,
+.ui-toolbar-group[data-joined] > :last-child > .ui-btn {
+  border-start-end-radius: var(--radius-control);
+  border-end-end-radius: var(--radius-control);
+}
 /* A heading in a bar is one line that gets cut short, never two lines that make the bar taller. A
    session title is a sentence somebody typed, and left to wrap it pushed the bar to twice its height
    and squeezed the controls at the far end off the pane. The extra end margin is so a title that
