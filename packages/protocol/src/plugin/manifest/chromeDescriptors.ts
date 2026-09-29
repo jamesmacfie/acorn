@@ -127,6 +127,11 @@ export const sourceDescriptor = z.object({
   // the shell's project picker for this source and adds `?project=` to the items route
   // (client-core/host/chrome/ChromeSourcePanel.tsx).
   projectScoped: z.boolean().optional(),
+  // Whether the desktop rail draws this source's icon before the user has chosen. Absent means `true`,
+  // so every older manifest keeps its icon. A default, not a gate: the source still registers and
+  // opens from the palette, and the user's switch in Settings wins over it
+  // (client-core/features/tabs/railVisibility.ts).
+  showInRailByDefault: z.boolean().optional(),
   // The pane a task this source tracks opens on the first time it is activated
   // (client-core/host/registries/sources/sources.ts). Has to be one of this plugin's own declared task
   // panes, re-checked on the device the way a content link's `openPane` is.

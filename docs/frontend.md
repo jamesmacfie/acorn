@@ -246,6 +246,18 @@ that declares it also gets `?project=` on its items route and the project in its
 does not is fetched once and shared across projects, because its rows are the same rows either way.
 The picker still appears in a task view, where nothing else names the task's project.
 
+**Rail visibility** is presentation, not availability. `availableSources()` still answers "can this
+source open?", and the desktop rail then drops the plugin sources this device hides
+(`features/tabs/railVisibility.ts`). The `rail_visibility` device preference holds explicit choices
+keyed `<pluginId>:<sourceId>`; an absent entry reads `showInRailByDefault`, which is `true` when
+absent. Core's sources, Home included, are always drawn. It is kept apart from `rail_order`, so a drag
+and a switch never overwrite each other, and a drag keeps a hidden source's slot. App's
+selected-source check still reads availability, so a source opened from the palette stays open with
+no icon. Hiding the source on screen is the one fallback to Home. The switch appears under
+Settings > Plugins for every plugin source, and above a plugin settings page that declares
+`railSourceVisibility`; a compiled plugin naming a source it did not register fails at
+`initClientPlugins`. The terminal's source menu ignores the preference.
+
 **A source may hand over its two halves instead of one component.** `SourceContribution.regions` takes
 a `list` and a `detail`, which is the same shape a pane declares when it names the `list-detail` layout.
 A source that declares it renders identically on the desktop — `SourceSurface` composes the

@@ -32,6 +32,10 @@ export const PrefKeys = {
   keybindings: 'keybindings',
   diffView: 'diff_view',
   railOrder: 'rail_order',
+  // Which plugin sources the desktop rail draws, as `{ "<pluginId>:<sourceId>": shown }`
+  // (features/tabs/railVisibility.ts). Apart from `rail_order` so a drag and a switch never overwrite
+  // each other's write, and the device's for the same reason `rail_order` is.
+  railVisibility: 'rail_visibility',
   leftCollapsed: 'left_collapsed',
   terminalRailDefault: 'term_rail_default',
   terminalHeight: 'term_height',

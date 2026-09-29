@@ -7,6 +7,7 @@ import { createDismissable } from '../../kit/lib/controls/dismissable'
 import { Dynamic } from 'solid-js/web'
 import './settings.css'
 import { Button } from '../../kit/components/primitives'
+import RailVisibilitySwitches from './RailVisibilitySwitches'
 
 export default function SettingsModal(props: { onClose: () => void; initialTab?: string }) {
   const workspaces = createQuery(() => workspacesOptions(true))
@@ -73,6 +74,10 @@ export default function SettingsModal(props: { onClose: () => void; initialTab?:
             {(page) => (
               <ContributionBoundary contributionId={`settings:${page().id}`} owner={settingsRegistry.ownerOf(page().id)}>
                 <div class="overlay-title">{activeWorkspace()?.name ?? page().title ?? page().label}</div>
+                {/* The host's own control, above and outside the plugin's content. */}
+                <Show when={page().railSourceVisibility?.length ? settingsRegistry.ownerOf(page().id) : undefined}>
+                  {(pluginId) => <RailVisibilitySwitches pluginId={pluginId()} sourceIds={page().railSourceVisibility} />}
+                </Show>
                 <Dynamic
                   component={page().component}
                   context={{

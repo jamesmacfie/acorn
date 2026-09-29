@@ -101,6 +101,11 @@ export const frameSurface = z.object({
   providerId: z.string().min(1).max(64).optional(),
   // `settings` only.
   group: z.enum(['general', 'workspace']).optional(),
+  // `settings` only. Sources of this same plugin whose "Show in left rail" switch the host draws above
+  // this page. The host owns the switch and its preference; the page's own code never sees either.
+  // Each id must name one of this manifest's `sources`, checked by the node's manifest pass and again
+  // on the device.
+  railSourceVisibility: z.array(z.string().min(1).max(64)).min(1).max(16).optional(),
   // `coreSlot` only, and required there. An unknown slot is a parse error.
   coreSlot: z.enum(CORE_EXCLUSIVE_SLOTS).optional(),
   // A chrome replacement declares whether it places the one host-filled nested slot. Settings can
@@ -149,6 +154,9 @@ export const frameSurface = z.object({
   }
   if (surface.collapsible && (surface.target !== 'pane' || surface.layout !== 'list-detail')) {
     ctx.addIssue({ code: 'custom', path: ['collapsible'], message: 'collapsible is only valid on a list-detail pane' })
+  }
+  if (surface.railSourceVisibility && surface.target !== 'settings') {
+    ctx.addIssue({ code: 'custom', path: ['railSourceVisibility'], message: 'railSourceVisibility is only valid on a settings surface' })
   }
   if (surface.readsArchived && (surface.target !== 'pane' || surface.scope !== 'task')) {
     ctx.addIssue({ code: 'custom', path: ['readsArchived'], message: 'readsArchived is only valid on a task pane' })

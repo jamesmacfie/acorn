@@ -87,6 +87,21 @@ describe('the client plugin host', () => {
     clear('linear')
   })
 
+  it('lets a settings page carry the rail switch for its own source only', () => {
+    const page = (railSourceVisibility: string[]) => ({
+      id: 'board.settings', label: 'Board', group: 'general' as const, order: 1, railSourceVisibility, component: () => null,
+    })
+    // The page before the source, which is why the check waits for `init` to finish.
+    initClientPlugins([{ name: 'board', init: (ctx) => {
+      ctx.settingsPages.register(page(['board']))
+      ctx.sources.register({ id: 'board', order: 50, glyph: 'kanban', label: 'Board' })
+    } }])
+    expect(() => initClientPlugins([
+      { name: 'board', init: (ctx) => ctx.settingsPages.register(page(['home'])) },
+    ])).toThrow(/names rail source 'home', which it did not register/)
+    clear('board')
+  })
+
   it('stamps the owner on a command, and a plugin cannot state its own', () => {
     // The one field on a command the host writes and the plugin may not. A contribution point takes
     // `ContributedCommand`, which has no `ownerId` to declare, and the register wrapper stamps the
