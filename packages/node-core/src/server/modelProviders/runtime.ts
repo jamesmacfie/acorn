@@ -18,8 +18,10 @@ import { broadcastConnectionChanged } from '../notify'
 import { CONNECTION_BACKEND_PREFIX } from '@acorn/protocol/modelProviders.ts'
 
 // Exported because the harness runtime applies the same ceiling to a CLI generate. One set of bounds
-// over both backend kinds, so "60 seconds and a million prompt characters" is answered in one place.
-export const DEFAULT_TIMEOUT_MS = 60_000
+// over both backend kinds, so "three minutes and a million prompt characters" is answered in one place.
+// Three minutes because a harness generate over a large prompt, such as an AI authoring turn, runs past
+// one minute.
+export const DEFAULT_TIMEOUT_MS = 180_000
 const MAX_SYSTEM_CHARS = 100_000
 const MAX_PROMPT_CHARS = 1_000_000
 const MAX_OUTPUT_TOKENS = 128_000

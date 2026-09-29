@@ -91,7 +91,7 @@ export async function generateTextForHarness(
   scheduler: ProviderRequestScheduler = providerRequestScheduler,
 ): Promise<GenerateTextResult> {
   const timeoutMs = args.timeoutMs ?? DEFAULT_TIMEOUT_MS
-  // The same bounds as the connection runtime, called rather than restated: 60 seconds, 100,000 system
+  // The same bounds as the connection runtime, called rather than restated: three minutes, 100,000 system
   // characters, 1,000,000 prompt characters, 128,000 output tokens. `maxOutputTokens` is validated here
   // and then ignored, because neither Claude Code nor Codex has a flag for it — a bound the caller
   // states and the backend cannot honour is still worth refusing when it is absurd.
