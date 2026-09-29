@@ -166,7 +166,7 @@ this roster without subscribing to the registry signal it writes and recursively
 | --- | --- |
 | `⌘K` | Open command palette |
 | `⌘P` | Go to a file in the worktree (the palette, at the editor's search) |
-| `⌘L` | Open workspace switcher |
+| `⌘L` | Open workspace switcher, most recently visited first |
 | `⌘⇧N` | Create a local task |
 | `⌘⇧T` | Toggle terminal drawer |
 | `⌘1`–`⌘9` | Activate the corresponding visible task |

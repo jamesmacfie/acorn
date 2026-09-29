@@ -9,9 +9,15 @@ import { clientEvents, onPluginFrame, readJson, wsOnReconnect, type ClientSchedu
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { previewConfiguredRoute } from '../shared/api'
 
-const [configured, setConfigured] = createSignal<Record<string, boolean>>({})
+// Null when the Node has no answer to give: a build older than the route, which is what an
+// unrestarted local Node or an out-of-date remote one is. It offers the pane on every task, as it did
+// before this gate, rather than hiding preview on a Node that can still draw it.
+const [configured, setConfigured] = createSignal<Record<string, boolean> | null>({})
 
-export const previewConfigured = (taskId: string): boolean => configured()[taskId] === true
+export const previewConfigured = (taskId: string): boolean => {
+  const answer = configured()
+  return answer === null || answer[taskId] === true
+}
 
 const same = (a: Record<string, boolean>, b: Record<string, boolean>): boolean => {
   const keys = Object.keys(a)
@@ -23,9 +29,17 @@ export const previewConfiguredSchedule: ClientScheduleContribution = {
   intervalMs: 120_000,
   requires: { seam: 'preview' },
   run: async () => {
-    const next = await readJson<Record<string, boolean>>(previewConfiguredRoute).catch(() => null)
+    let next: Record<string, boolean>
+    try {
+      next = await readJson<Record<string, boolean>>(previewConfiguredRoute)
+    } catch (error) {
+      // A 404 is a Node without the route. Any other failure keeps the last answer, so a dropped
+      // request does not flicker the button.
+      if ((error as { status?: number }).status === 404) setConfigured(null)
+      return
+    }
     // Same answer, same object: `when` is read on every pane-strip render.
-    if (next) setConfigured((current) => (same(current, next) ? current : next))
+    setConfigured((current) => (current && same(current, next) ? current : next))
   },
   subscribe: (refresh) => {
     const offs = [
@@ -33,7 +47,8 @@ export const previewConfiguredSchedule: ClientScheduleContribution = {
       clientEvents.on('project:changed', refresh),
       // Only a task this list has not seen can change the answer. Status and title changes cannot.
       clientEvents.on('tasks:changed', ({ taskId }) => {
-        if (taskId === null || !(taskId in configured())) refresh()
+        const answer = configured()
+        if (taskId === null || (answer !== null && !(taskId in answer))) refresh()
       }),
       clientEvents.on('runtime:node-switched', refresh),
       wsOnReconnect(refresh),
