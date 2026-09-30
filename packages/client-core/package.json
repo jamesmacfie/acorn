@@ -46,6 +46,7 @@
     "./features/settings/WorkspaceSettings.tsx": "./src/features/settings/WorkspaceSettings.tsx",
     "./features/settings/default-model": "./src/features/settings/models/defaultModel.ts",
     "./features/settings/models/ModelBackendPicker.tsx": "./src/features/settings/models/ModelBackendPicker.tsx",
+    "./features/settings/models/ModelPickerPopover.tsx": "./src/features/settings/models/ModelPickerPopover.tsx",
     "./features/settings/nodes/NodesSettings.tsx": "./src/features/settings/nodes/NodesSettings.tsx",
     "./features/settings/savePref.ts": "./src/features/settings/savePref.ts",
     "./features/settings/trust/ConfigTrustDialog.tsx": "./src/features/settings/trust/ConfigTrustDialog.tsx",

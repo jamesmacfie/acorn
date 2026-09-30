@@ -730,7 +730,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   overflow: hidden;
 }
 .ui-segment {
-  flex: none;
+  flex: 1 0 auto;
   font: inherit;
   font-size: var(--fs-xs);
   padding: 0 var(--space-4);
@@ -1159,6 +1159,20 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 /* Collapsed: the list column is the width of the icon rails, and it is the same token they read, so a
    style pack that moves the rails moves this with them (tokens-style.css § --tabrail-w). */
 .ui-listdetail[data-list='collapsed'] { grid-template-columns: var(--tabrail-w) 1px minmax(0, 1fr); }
+.ui-listdetail[data-list='collapsed'][data-collapse-to='edge'] { grid-template-columns: 0 1px minmax(0, 1fr); }
+.ui-listdetail[data-list='collapsed'][data-collapse-to='edge'] > .ui-listdetail-list {
+  visibility: hidden;
+  padding-inline: 0;
+}
+/* With no rail, put the toggle inside the detail header and give its label room. */
+.ui-listdetail[data-list='collapsed'][data-collapse-to='edge'] > .ui-listdetail-edge > .ui-btn {
+  left: var(--space-2);
+  right: auto;
+  transform: none;
+}
+.ui-listdetail[data-list='collapsed'][data-collapse-to='edge'] > .ui-listdetail-detail > .section-header {
+  padding-left: calc(var(--pane-pad) + var(--control-h-xs));
+}
 /* A collapsed column has no header left to hold the toggle, and in the `split` form it never had one
    this node could reach, so the control rides the divider instead (kit/components/layout/ListDetail.tsx).
    Centred on the edge and on the header's line, so it reads as belonging to the column it closes. */

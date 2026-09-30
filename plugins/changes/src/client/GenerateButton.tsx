@@ -1,6 +1,6 @@
 import { Show } from 'solid-js'
 import {
-  ConfirmButton, Icon, IconButton, Inline, ModelBackendPicker, Popover, Stack, Text,
+  ConfirmButton, Icon, Inline, ModelBackendPicker, ModelPickerPopover,
 } from '@acorn/plugin-api/ui'
 import type { ChangesModel } from './changesModel'
 
@@ -27,49 +27,6 @@ const labelFor = (model: ChangesModel): string => {
   if (!held) return 'a connected model'
   const modelId = model.modelPick()?.modelId
   return modelId ? `${held.label}, ${modelId}` : held.label
-}
-
-/** Which connection and model to spend, when more than one is connected.
- *
- *  Beside the wand rather than opening from it, on the pattern the branch bar's verb menu set: a
- *  button that does the thing and a trigger that changes what the thing will do. The wand itself
- *  never opens this, because a first press that opens a dropdown is a press that did nothing.
- *
- *  A `Popover` rather than a `Menu`, because `ModelBackendPicker` is two `Select`s and a menu item
- *  is not a control. The pick is written on change and becomes the default every other Generate
- *  control in the app opens on, so this is opened once and then not again. */
-function ModelPickerButton(props: { model: ChangesModel }) {
-  const model = () => props.model
-  return (
-    <Popover
-      placement="top-start"
-      role="dialog"
-      ariaLabel="Model for the message"
-      minWidth={220}
-      trigger={({ open, toggle }) => (
-        <IconButton
-          icon="chevron-down"
-          label="Model for the message"
-          title={`Which provider writes the message. Now: ${labelFor(model())}`}
-          opens="menu"
-          expanded={open()}
-          onPress={toggle}
-        />
-      )}
-    >
-      <Stack gap="row">
-        {/* A `Text` heading rather than `Menu.Label`, which the terminal host's table does not have.
-            This is a popover, so a heading is an ordinary node in it. */}
-        <Text emphasis="eyebrow">Model for the message</Text>
-        <ModelBackendPicker
-          backends={model().modelBackends()}
-          backendId={model().modelPick()?.backendId ?? ''}
-          modelId={model().modelPick()?.modelId ?? ''}
-          onChange={(pick) => model().setModelPick(pick)}
-        />
-      </Stack>
-    </Popover>
-  )
 }
 
 export function GenerateButton(props: { model: ChangesModel }) {
@@ -108,7 +65,14 @@ export function GenerateButton(props: { model: ChangesModel }) {
             <Icon name="sparkles" />
           </ConfirmButton>
           <Show when={model().modelBackends().length > 1}>
-            <ModelPickerButton model={model()} />
+            <ModelPickerPopover title={`Which provider writes the message. Now: ${labelFor(model())}`}>
+              <ModelBackendPicker
+                backends={model().modelBackends()}
+                backendId={model().modelPick()?.backendId ?? ''}
+                modelId={model().modelPick()?.modelId ?? ''}
+                onChange={(next) => model().setModelPick(next)}
+              />
+            </ModelPickerPopover>
           </Show>
         </Inline>
       )}

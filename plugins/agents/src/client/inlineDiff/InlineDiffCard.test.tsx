@@ -4,7 +4,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { agentSessionDefaultsQueryKey } from '../settings/sessionDefaultsClient.ts'
 import InlineDiffCard from './InlineDiffCard.tsx'
 
-const store = vi.hoisted(() => ({ sessions: [] as unknown[], snapshots: {} as Record<string, unknown> }))
+const store = vi.hoisted(() => ({
+  sessions: [] as unknown[], snapshots: {} as Record<string, unknown>, recentSessions: [] as unknown[],
+}))
 vi.mock('../sessions/managedStore.ts', () => ({
   managedAgentStore: {
     sessionsForTask: () => store.sessions,
@@ -16,7 +18,7 @@ vi.mock('../sessions/managedStore.ts', () => ({
 vi.mock('../sessions/managedClient.ts', () => ({
   managedAgentApi: {
     providers: async () => [{ id: 'codex', label: 'Codex', installed: true }],
-    sessions: async () => ({ sessions: [] }),
+    sessions: async () => ({ sessions: store.recentSessions }),
   },
 }))
 
@@ -25,6 +27,8 @@ afterEach(() => {
   disposers.splice(0).forEach((dispose) => dispose())
   store.sessions = []
   store.snapshots = {}
+  store.recentSessions = []
+  for (const surface of document.querySelectorAll('.ui-popover')) surface.remove()
 })
 
 const origin = {
@@ -45,6 +49,34 @@ const mount = () => {
 }
 
 describe('inline diff chat', () => {
+  it('moves provider, model, and per-chat permissions into the sparkle picker', async () => {
+    store.recentSessions = [{ providerId: 'codex', config: { configOptions: [
+      { id: 'model', category: 'model', values: [{ value: 'fast', label: 'Fast' }] },
+      { id: 'sandbox', category: 'permission', values: [{ value: 'read-only', label: 'Read only' }] },
+    ] } }]
+    const host = mount()
+    const picker = host.querySelector<HTMLButtonElement>('button[aria-label="Model and permissions"]')
+    expect(picker).toBeTruthy()
+    expect(host.querySelectorAll('select')).toHaveLength(0)
+
+    picker!.click()
+    const popover = document.querySelector('.ui-popover')!
+    await vi.waitFor(() => expect(popover.querySelectorAll('select')).toHaveLength(2))
+    expect(popover.textContent).toContain('Permissions')
+    expect(popover.textContent).toContain('Model for the message')
+    expect(popover.querySelector('[aria-label="Agent permissions"]')).toBeTruthy()
+    const model = popover.querySelectorAll<HTMLSelectElement>('select')[1]!
+    model.value = 'fast'
+    model.dispatchEvent(new Event('change', { bubbles: true }))
+    expect(picker!.title).toContain('Fast')
+    const read = [...popover.querySelectorAll('button')].find((button) => button.textContent === 'Read only')!
+    const write = [...popover.querySelectorAll('button')].find((button) => button.textContent === 'Write access')!
+    expect(read.getAttribute('aria-checked')).toBe('true')
+    write.click()
+    expect(write.getAttribute('aria-checked')).toBe('true')
+    expect(picker!.title).toContain('write access')
+  })
+
   it('opens with cached session defaults written before inline choices existed', () => {
     const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
     client.setQueryData(agentSessionDefaultsQueryKey, {

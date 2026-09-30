@@ -915,6 +915,7 @@ ui: Modal
 ui: ModalActions
 ui: ModalBody
 ui: ModelBackendPicker
+ui: ModelPickerPopover
 ui: NonCodeRow
 ui: Only
 ui: Picker
