@@ -1,4 +1,5 @@
 import { builtinModules } from 'node:module'
+import { requiredRuntimePackages } from '../../scripts/nodeRuntimePackages'
 
 // What the node's builds leave for Node to resolve from node_modules at run time. Everything else
 // is bundled, third-party packages included. Loading a package as its own files costs the module
@@ -10,21 +11,10 @@ import { builtinModules } from 'node:module'
 // (apps/desktop/vite.helper.config.ts), so the two cannot disagree about what has to be installed
 // beside them.
 const RUNTIME_RESOLVED = [
-  // Native addons, or packages that find a binary beside their own files.
-  'node-pty',
-  '@vscode/ripgrep',
-  'fsevents',
-  // Optional native accelerators that ws and pg try to load and do without.
-  'bufferutil',
-  'utf-8-validate',
-  'pg-native',
-  // The Claude adapter runs as its own process from its installed path, and playwright-core is
-  // imported on the first browser tool call and reads its own package files.
-  '@agentclientprotocol/claude-agent-acp',
-  'playwright-core',
+  ...requiredRuntimePackages,
+  // Optional native accelerators and platform packages that can be absent.
+  'fsevents', 'bufferutil', 'utf-8-validate', 'pg-native',
 ]
-// Also resolved at run time, but through `createRequire`, which the bundler does not follow:
-// @xterm/headless and @xterm/addon-serialize.
 
 const builtins = new Set(builtinModules)
 

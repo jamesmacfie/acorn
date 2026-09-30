@@ -142,6 +142,7 @@ Use the persistence scope that owns the state:
 | Workspace/task selection | Node + workspace/task |
 | Draft editor/comment text, and a commit message in the Changes pane | client + current task |
 | Provider data and task mutations | owning Node |
+| Computer Use app-access grants ([managed-agents.md](./managed-agents.md) § App-access approval) | the Computer Use integration on the Node's computer; the Node keeps only the decision |
 
 Module-level signals or maps that reference a task or workspace must either include the Node ID or be
 cleared on a node switch. A state owner registers its OWN evictor beside the signal it clears, through

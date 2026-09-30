@@ -24,7 +24,9 @@ for (const carrier of ['preparation', 'worker', 'loader fallback'] as const) des
     else openPluginDb(root, 'owned', { migrationsFolder: migrations, loaded: true, prepared: true }).close()
   }
 
-  it.each(['', '-wal', '-shm'])('refuses a linked %s state entry without touching the peer', (suffix) => {
+  // Windows file symlinks require developer mode or elevated privileges. Directory junctions
+  // below still exercise linked-directory refusal without either prerequisite.
+  it.skipIf(process.platform === 'win32').each(['', '-wal', '-shm'])('refuses a linked %s state entry without touching the peer', (suffix) => {
     mkdirSync(join(root, 'plugins'))
     const peer = join(root, 'synthetic-peer')
     writeFileSync(peer, 'synthetic peer contents')
@@ -36,7 +38,7 @@ for (const carrier of ['preparation', 'worker', 'loader fallback'] as const) des
     expect(lstatSync(path() + suffix).isSymbolicLink()).toBe(true)
   })
 
-  it('refuses a FIFO without waiting for a writer', () => {
+  it.skipIf(process.platform === 'win32')('refuses a FIFO without waiting for a writer', () => {
     mkdirSync(join(root, 'plugins'))
     execFileSync('mkfifo', [path() + '-wal'])
     expect(open).toThrow('Plugin database state must be a regular file.')
@@ -54,23 +56,23 @@ it('refuses a linked plugins directory without creating files or chmodding its t
   const peer = join(root, 'synthetic-directory')
   mkdirSync(peer, { mode: 0o755 })
   chmodSync(peer, 0o755)
-  symlinkSync(peer, join(root, 'plugins'))
+  symlinkSync(peer, join(root, 'plugins'), process.platform === 'win32' ? 'junction' : 'dir')
   expect(() => preparePluginDbFiles(root, 'owned')).toThrow()
   expect(existsSync(join(peer, 'owned.sqlite'))).toBe(false)
-  expect(statSync(peer).mode & 0o777).toBe(0o755)
+  if (process.platform !== 'win32') expect(statSync(peer).mode & 0o777).toBe(0o755)
 })
 
-it('supports a data-root alias and secures regular state files by descriptor', () => {
+it('prepares regular state files through a data-root alias and opens the database', () => {
   const alias = join(root, 'root-alias')
-  symlinkSync(root, alias)
+  symlinkSync(root, alias, process.platform === 'win32' ? 'junction' : 'dir')
   const paths = preparePluginDbFiles(alias, 'owned')
   for (const path of paths) {
     expect(lstatSync(path).isFile()).toBe(true)
-    expect(statSync(path).mode & 0o777).toBe(0o600)
+    if (process.platform !== 'win32') expect(statSync(path).mode & 0o777).toBe(0o600)
     chmodSync(path, 0o644)
   }
   preparePluginDbFiles(alias, 'owned')
-  expect(paths.every((path) => (statSync(path).mode & 0o777) === 0o600)).toBe(true)
+  if (process.platform !== 'win32') expect(paths.every((path) => (statSync(path).mode & 0o777) === 0o600)).toBe(true)
   const db = openPluginDb(alias, 'owned', { migrationsFolder: migrations, loaded: true })
   try { expect(db.$client.prepare('SELECT 1 AS ok').get()).toEqual({ ok: 1 }) }
   finally { db.close() }

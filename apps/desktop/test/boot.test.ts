@@ -31,11 +31,14 @@ import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
 // nothing in the boot path is unexercised.
 
 const PKG = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const STAGING = join(PKG, 'dist/helper')
+const resources = process.env.ACORN_BOOT_RESOURCES
+const STAGING = resources ? join(resources, 'helper') : join(PKG, 'dist/helper')
+const appOrigin = process.platform === 'win32' ? 'http://app.localhost' : 'app://acorn'
 
 const nodeBinary = (): string => {
+  if (process.env.ACORN_BOOT_NODE) return process.env.ACORN_BOOT_NODE
   const triple = /host: (\S+)/.exec(execFileSync('rustc', ['-vV'], { encoding: 'utf8' }))?.[1]
-  return join(PKG, 'src-tauri/binaries', `node-${triple}`)
+  return join(PKG, 'src-tauri/binaries', `node-${triple}${process.platform === 'win32' ? '.exe' : ''}`)
 }
 
 type Ready = { port: number; secret: string; nodeVersion: string; protocol: number }
@@ -96,6 +99,7 @@ beforeAll(async () => {
   // stderr piped rather than inherited, because that is where the boot marks are and the order of
   // them is an assertion below. They are still echoed, so a failing run reads the same as before.
   helper = spawn(nodeBinary(), [join(STAGING, 'helper.js')], {
+    cwd: dataDir,
     stdio: ['pipe', 'pipe', 'pipe'],
     env: { ...process.env, ACORN_PERF: '1' },
   })
@@ -133,13 +137,14 @@ beforeAll(async () => {
       mcpEntry: join(STAGING, 'mcp.js'),
       envFiles: [],
       version: '0.0.0-test',
-      isPackaged: false,
-      appOrigin: 'app://acorn',
+      isPackaged: Boolean(resources),
+      ...(resources ? { bundledPluginsDir: join(resources, 'plugins') } : {}),
+      appOrigin,
     })}\n`,
   )
 
   ready = await readyLine
-  socket = new WebSocket(`ws://127.0.0.1:${ready.port}/helper?secret=${ready.secret}`, { origin: 'app://acorn' })
+  socket = new WebSocket(`ws://127.0.0.1:${ready.port}/helper?secret=${ready.secret}`, { origin: appOrigin })
   await new Promise((done, fail) => {
     socket.once('open', done)
     socket.once('error', fail)
@@ -204,13 +209,12 @@ describe('the Tauri shell boots its world', () => {
 
   it('starts the node within a generous bound', () => {
     // From the ready line to the node answering `service.start`: spawning it, evaluating the service
-    // bundle, and its whole boot to a bound listener. About 270 ms on an M2 Pro. The bound is wide on
-    // purpose, because a timing assertion on a shared CI runner is noisy. It is here to catch a
-    // dependency that adds seconds, and the printed number is the one to read
-    // (apps/node/externals.ts).
+    // bundle, and its whole boot to a bound listener. About 270 ms on an M2 Pro, but Windows CI
+    // measured 2,705-5,126 ms on 2026-10-01. Run this separately from the unit suites and leave
+    // room for shared-runner variation while catching startup regressions.
     const elapsed = markOffsets.get('service.start')! - markOffsets.get('ready line')!
     console.log(`[boot-test] node started ${elapsed}ms after the ready line`)
-    expect(elapsed).toBeLessThan(1_500)
+    expect(elapsed).toBeLessThan(process.platform === 'win32' ? 10_000 : 1_500)
   })
 
   it('adopts the local node into the fleet behind the ready line', async () => {
@@ -235,7 +239,15 @@ describe('the Tauri shell boots its world', () => {
   })
 
   it('refuses a socket without the secret', async () => {
-    const refused = new WebSocket(`ws://127.0.0.1:${ready.port}/helper?secret=wrong`, { origin: 'app://acorn' })
+    const refused = new WebSocket(`ws://127.0.0.1:${ready.port}/helper?secret=wrong`, { origin: appOrigin })
+    await expect(new Promise((done, fail) => {
+      refused.once('open', () => done('opened'))
+      refused.once('error', fail)
+    })).rejects.toThrow()
+  })
+
+  it('refuses a different origin even with the correct secret', async () => {
+    const refused = new WebSocket(`ws://127.0.0.1:${ready.port}/helper?secret=${ready.secret}`, { origin: 'http://example.com' })
     await expect(new Promise((done, fail) => {
       refused.once('open', () => done('opened'))
       refused.once('error', fail)
