@@ -9,6 +9,7 @@ const roots = ['dist/helper', 'dist/bridge', 'dist/cli'].map((dir) => resolve(im
 async function javascriptFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true })
   const nested = await Promise.all(entries.map(async (entry) => {
+    if (entry.name === 'node_modules') return []
     const path = join(directory, entry.name)
     return entry.isDirectory() ? javascriptFiles(path) : [path]
   }))

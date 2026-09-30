@@ -123,6 +123,36 @@ and host-owned child webviews still require native computer-use control or the r
 The WebDriver dependency and server exist only behind the `agent-automation` Cargo feature used by
 this launcher; normal development and packaged builds do not expose it.
 
+#### Native control of a session
+
+On macOS the launcher runs each session's window from its own copy of the build, wrapped in
+`.acorn/agent-dev/<name>/Acorn Agent Test.app` and signed ad hoc (`apps/desktop/scripts/agent/nativeApp.mjs`).
+A raw `target/debug` executable has no bundle identifier, so a native tool such as Computer Use had
+nothing stable to recognise it by. Every session's bundle uses the identifier
+`com.acorn.desktop.agent-test`, which is not the installed app's `com.acorn.desktop`. One
+**Always allow** for that identifier therefore covers later sessions and rebuilds, and trusts test
+builds rather than the app you use day to day. It also trusts any running session, not only the one
+an agent launched. The bundle gives WebKit its own storage for that identifier, so session windows no
+longer share `localStorage` with a debug build started by `pnpm dev`. They still share it with each
+other.
+
+Before handing a window to a native tool, ask the driver for it:
+
+```sh
+pnpm dev:agent:ui -- --session my-change target
+```
+
+`target` checks that the recorded process is still the launcher's own child running this session's
+executable, so a stopped window whose process ID has been reused is refused rather than reported.
+`stop` makes the same check before it signals anything. The output gives the process ID, the bundle
+identifier, and `app`, the session's own bundle path. Address `app` rather than the identifier,
+because every session shares the identifier. `sharedWith` lists the other running sessions that share
+it. If a native tool cannot tell those windows apart by path, stop the other sessions yourself. The
+driver never picks a window for you or stops another session. Use `target` for native menus, dialogs,
+and child webviews, keep the WebDriver commands for the main renderer, and end with `stop`.
+Computer Use keeps any grant itself ([managed-agents.md](./managed-agents.md) § App-access approval).
+Windows and Linux sessions run the raw executable and have no native identity.
+
 ### Agent-driven terminal development
 
 Start an isolated terminal session from the checkout. It seeds the same Node data as the desktop

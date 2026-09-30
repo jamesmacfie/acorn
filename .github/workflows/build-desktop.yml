@@ -13,9 +13,25 @@ permissions:
 
 jobs:
   bundle:
-    # arm64 only. A second architecture is a matrix entry plus an ACORN_TARGET_TRIPLE, which the
-    # staging and verification scripts already read.
-    runs-on: macos-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            artifact: acorn-dmg
+            artifacts: |
+              apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
+              apps/desktop/src-tauri/target/release/bundle/macos/*.app.tar.gz
+              apps/desktop/src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
+          - os: windows-latest
+            artifact: acorn-windows-x64
+            artifacts: |
+              apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe
+              apps/desktop/src-tauri/target/release/bundle/nsis/*-setup.exe.sig
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -41,6 +57,17 @@ jobs:
         with:
           workspaces: apps/desktop/src-tauri
 
+      # The Node needs OpenSSL on first boot. Git for Windows includes it, but its usr/bin is
+      # outside the runner's PATH. End-user prerequisites are documented in docs/shell.md.
+      - name: Add OpenSSL to the Windows build PATH
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $gitRoot = Split-Path (Split-Path (Get-Command git.exe).Source -Parent) -Parent
+          $opensslDirectory = Join-Path $gitRoot 'usr/bin'
+          if (!(Test-Path (Join-Path $opensslDirectory 'openssl.exe'))) { throw 'Git for Windows OpenSSL was not found.' }
+          $opensslDirectory >> $env:GITHUB_PATH
+
       # One download per pin per runner image, which is worth a cache entry of its own because the
       # rust-cache key has nothing to do with it.
       - name: Cache the pinned Node runtime
@@ -53,6 +80,9 @@ jobs:
       # pinned runtime. Everything the bundler is about to copy has to exist before it runs.
       - name: Stage the bundle inputs
         run: pnpm --filter @acorn/desktop run stage
+
+      - name: Test plugin database preparation
+        run: pnpm --filter @acorn/node-core test src/server/plugins/pluginDbFiles.test.ts
 
       # The shell's own boot test plus the Rust unit tests. This is the gate that catches "the shell
       # cannot load its world" (docs/testing.md § The desktop boot test), and it runs before the
@@ -70,11 +100,8 @@ jobs:
 
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
-          name: acorn-dmg
-          path: |
-            apps/desktop/src-tauri/target/release/bundle/dmg/*.dmg
-            apps/desktop/src-tauri/target/release/bundle/macos/*.app.tar.gz
-            apps/desktop/src-tauri/target/release/bundle/macos/*.app.tar.gz.sig
+          name: ${{ matrix.artifact }}
+          path: ${{ matrix.artifacts }}
           if-no-files-found: error
 
   # Gate 1 of docs/shell.md § Signing gates and the updater. A tag builds and keeps its

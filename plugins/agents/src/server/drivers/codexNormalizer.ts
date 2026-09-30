@@ -12,6 +12,7 @@ import type {
 import type { AgentDriverGeneratedArtifact } from './types'
 import type { JsonRpcNotification, JsonRpcServerRequest } from './jsonRpcProcess'
 import { formElicitationResponse, normalizeFormElicitation } from './formElicitation'
+import { appApprovalOptions, appApprovalResponse, codexAppApproval } from './codexAppApproval'
 import { webToolTitle } from './webActivity'
 import { diffHunks, hunksText } from './patchText'
 
@@ -438,11 +439,16 @@ export function normalizeCodexServerRequest(request: JsonRpcServerRequest): Agen
         : []
       return { type: 'request', requestId, kind: 'question', title: 'Codex has a question', questions }
     }
-    case 'mcpServer/elicitation/request':
-      return normalizeFormElicitation(requestId, {
+    case 'mcpServer/elicitation/request': {
+      const event = normalizeFormElicitation(requestId, {
         message: stringValue(request.params.message) ?? 'Input requested',
         requestedSchema: request.params.requestedSchema,
       })
+      const approval = codexAppApproval(request.params)
+      return approval && event.type === 'request'
+        ? { ...event, options: appApprovalOptions(approval), approval }
+        : event
+    }
     default:
       return null
   }
@@ -472,11 +478,15 @@ export function codexServerRequestResponse(request: JsonRpcServerRequest, resolu
         ])),
       }
     }
-    case 'mcpServer/elicitation/request':
+    case 'mcpServer/elicitation/request': {
+      // Rebuilt from the provider's own request, so the answer names the app and scopes it offered.
+      const approval = codexAppApproval(request.params)
+      if (approval) return appApprovalResponse(approval, resolution)
       return formElicitationResponse({
         message: stringValue(request.params.message) ?? 'Input requested',
         requestedSchema: request.params.requestedSchema,
       }, resolution)
+    }
     default:
       return row ?? {}
   }

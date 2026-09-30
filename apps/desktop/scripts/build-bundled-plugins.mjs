@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process'
 import { rmSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { runPnpm } from '../../../scripts/run-pnpm.mjs'
 
 const DESKTOP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ROOT = resolve(DESKTOP, '../..')
@@ -15,7 +16,7 @@ const BUNDLED_PLUGINS = ['agent-cost', 'database', 'findings', 'http', 'linear',
 
 // Client bundles import the SDK through its package exports, which point to dist/.
 // Build it before bundling plugins so staging also works in a clean checkout.
-execFileSync('pnpm', ['--filter', 'acorn-plugin-sdk', 'build'], { cwd: ROOT, stdio: 'inherit' })
+runPnpm(['--filter', 'acorn-plugin-sdk', 'build'], { cwd: ROOT, stdio: 'inherit' })
 
 rmSync(output, { recursive: true, force: true })
 for (const id of BUNDLED_PLUGINS) {

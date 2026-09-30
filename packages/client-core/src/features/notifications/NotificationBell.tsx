@@ -140,7 +140,7 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
                           are two different questions, and a memory proposal is a nudge whatever it
                           is drawn with. */}
                       <span class="notify-glyph" classList={{ 'notify-warn': row.item.severity !== 'info' }}>
-                        <Icon name={row.item.glyph ?? (row.item.severity === 'info' ? 'info' : 'alert-triangle')} />
+                        <Icon name={row.item.glyph ?? (row.item.severity === 'info' ? 'info' : 'triangle-alert')} />
                       </span>
                       <span class="notify-title">{row.item.title}</span>
                       <Show when={row.item.detail}><span class="notify-detail muted">{row.item.detail}</span></Show>

@@ -43,7 +43,9 @@ export function preparePluginDbFiles(dataDir: string, plugin: string): readonly 
   const fd = openSync(dir, constants.O_RDONLY | (constants.O_DIRECTORY ?? 0) | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0))
   try {
     if (!fstatSync(fd).isDirectory()) throw new Error('Plugin database directory must be a directory.')
-    fchmodSync(fd, 0o700)
+    // Windows directory handles cannot be fchmodded. Access there is governed by the data
+    // root's ACL; POSIX hosts enforce owner-only permissions on the validated descriptor.
+    if (process.platform !== 'win32') fchmodSync(fd, 0o700)
   } finally {
     closeSync(fd)
   }
