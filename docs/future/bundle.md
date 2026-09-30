@@ -125,11 +125,10 @@ Three container-specific decisions, none of them code:
 
 ## The snags
 
-**`openssl` on PATH.** `ensureCert` (`packages/node-core/src/server/transport/tls.ts`) shells out to it to mint
-the node's certificate. Present on macOS and Linux, absent on stock Windows. Either bundle it or
-replace that call with a pure-JS certificate mint (`@peculiar/x509` is the obvious candidate — Node's
-own `crypto` cannot mint an X.509 certificate). Small either way, but it is a dependency on a machine
-we do not control, and it fails at first boot with the node refusing to start.
+**Certificate generation, resolved.** The Node mints its certificate in-process using Node's native
+RSA key generation and a packaged certificate library. It no longer needs an OpenSSL executable
+on PATH. For the implementation and persisted identity contract, see
+[Node distribution](../node-distribution.md).
 
 **macOS Gatekeeper.** A downloaded tarball containing `.node` binaries is quarantined, and clearing
 that properly means Developer ID signing and notarization — the same purchase already blocking
