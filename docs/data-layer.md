@@ -438,6 +438,46 @@ correctness, and space is what a long-lived node accumulates.
   node-local.
 - Audit rows: 90 days, pruned by the `core:audit-prune` schedule, daily at 03:20 node-local.
 - Terminal replay: bounded per session.
+- Agent tool calls and file changes: a newer update supersedes the rows before it, and those are
+  deleted in the same transaction, so a call keeps two rows
+  ([client surfaces](./managed-agents/client-surfaces.md) § The transcript store). Rows stored before
+  that are compacted once, in the background after boot. Every other agent event is kept for the life
+  of its session, unless its task is archived and the owner set a limit (next item).
+- Agent history of archived tasks: kept forever unless the owner picks 30 days, 90 days, or 1 year
+  under **Keep agent history for archived tasks** in Settings > Agent defaults. Past the limit, the
+  `agents:archived-history-prune` schedule, daily at 03:50 node-local, deletes each session's events and
+  their search rows, turns, requests, attachment references, and artifacts, and the attachment and
+  artifact files nothing else uses. The session row stays with a note in place of its transcript. The
+  archive date comes from core's `tasks.archived_at`, read through `ctx.core.tasks.archivedBefore`, and a
+  restored task has none. The removed history is gone from archive search and from the restored task,
+  and nothing brings it back. The owner has to choose this, because both of those are real costs
+  ([managed-agents.md § Operations and failure](./managed-agents.md#operations-and-failure) has what
+  is kept, what is skipped, and how the work is split into small steps).
 - Logs: size and age policy owned by the Node runtime.
 - Plugin databases: retained while a plugin is disabled, and deletion is explicit.
 - Provider mirrors and blobs: refetchable and prunable according to their cache policies.
+
+Deleting rows does not shrink a database file. The freed pages go on SQLite's free list and new rows
+reuse them, so the file stops growing until they are used up. No database here uses auto-vacuum, and
+nothing runs a VACUUM. Turning on incremental auto-vacuum takes a full VACUUM first, and a full VACUUM
+rewrites the whole file under an exclusive lock, which on the synchronous driver stops the node for its
+duration. On a copy of the 1.3 GB agents database, after its first compaction, it took 11 seconds and
+brought the file to 852 MB. SQLite also allows a VACUUM to renumber the rowids of a table whose key
+is text, and the agents search index finds its rows by rowid
+([client surfaces](./managed-agents/client-surfaces.md) § Transcript search). To get the space back,
+stop the node and run `VACUUM` on the file.
+
+### What the node reports
+
+Settings > Storage and memory shows the numbers for the active node. `GET /v1/core/storage`, device
+only, answers `NodeStorageReport` (`@acorn/protocol/api.ts`): the node process's resident memory, the
+core database, each plugin database, and the blob cache. A database's size includes its `-wal` and
+`-shm` files, because the WAL can be as large as the database between checkpoints. A plugin's
+package folder under `plugins/` is not a database and is not counted. Worktrees are left out, because
+walking them costs more than the answer is worth. Every size comes from `stat`, and the disk half is
+measured at most every 30 seconds, so a page asking every five seconds does not walk the blob cache
+each time (`server/storage/footprint.ts`). The same measurement feeds the one line the node logs at
+startup. A plugin adds its own numbers to the page through the `core:storage` point; the agents
+plugin reports its processes and its attachment and artifact folders
+([managed-agents.md § Operations and failure](./managed-agents.md#operations-and-failure)). The page
+reports and does not delete: nothing on it prunes a database or the blob cache.

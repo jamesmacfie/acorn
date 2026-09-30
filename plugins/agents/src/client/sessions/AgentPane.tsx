@@ -165,7 +165,7 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
         size="sm"
         placement="bottom-end"
         placeholder="Filter agents…"
-        emptyText="No managed providers available."
+        emptyText={model.providersLoading() ? 'Checking which agents this node can run…' : 'No managed providers available.'}
         results={(query) => model.choices().filter((item) =>
           choiceLabel(item).toLowerCase().includes(query.trim().toLowerCase()))}
         leading={(item) => <ProviderGlyph glyph={choiceGlyph(item)} label={choiceLabel(item)} />}
@@ -201,6 +201,9 @@ function AgentProviderCards(props: { task: Task; model: AgentPaneModel }) {
       title="Start a managed coding session"
       action={
         <Inline wrap>
+          <Show when={model.providersLoading()}>
+            <Text emphasis="muted">Checking which agents this node can run…</Text>
+          </Show>
           <For each={model.choices()}>
             {(choice) => (
               <Card

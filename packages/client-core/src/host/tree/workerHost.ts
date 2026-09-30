@@ -16,6 +16,7 @@ import { TREE_LIMITS, batchBytes, boundedSandboxMessage, sandboxMessage, type Tr
 import type { KitEvent } from '@acorn/protocol/tree/nodes.ts'
 import { postAppearance, postSelect, postSurfaceAction, type FrameBridge } from '../frames/broker'
 import { createLogger } from '../../infra/telemetry/logger'
+import { registerPageFact } from '../../infra/telemetry/pageFacts'
 import type { TreeTransport } from './TreeHost'
 import { createIsolatedTreeWorker, type TreeSandbox } from './isolatedWorker'
 
@@ -108,6 +109,7 @@ export type TreeWorkerKey = { pluginId: string; hash: string }
 // device cache remain hash-addressed; only the live authority uses this pair.
 const workerKey = ({ pluginId, hash }: TreeWorkerKey): string => JSON.stringify([pluginId, hash])
 const workers = new Map<string, Live>()
+registerPageFact('ui.page.workers.tree', () => workers.size)
 
 // The seam the unit suite spawns through: a real relay needs Tauri's plugin scheme and a cached
 // bundle. The relay's port and origin checks have a separate jsdom suite.

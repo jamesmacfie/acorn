@@ -253,11 +253,46 @@ export function dropNode(nodeId: string): void {
     delete next[nodeId]
     return next
   })
-  void del(cacheKeyFor(nodeId)).catch((error: unknown) => {
+  void cacheStorage.removeItem(cacheKeyFor(nodeId)).catch((error: unknown) => {
     // A snapshot that could not be deleted only matters if the same nodeId comes back, which needs a
     // re-pair. Say so rather than failing the removal the owner asked for.
     log.warn(`could not delete the persisted cache for ${nodeId}`, error)
   })
+}
+
+/**
+ * Settings > Storage and memory's Clear cache: forget what this client cached for a node that stays
+ * connected (docs/caching.md § Renderer query cache).
+ *
+ * Not `dropNode`, which also takes the node out of the fleet list and its status map, and deletes the
+ * QueryClient the mounted provider is still holding. This keeps the client and empties it: entries
+ * nothing is drawing are removed, the saved snapshot is deleted, and what is on screen is refetched.
+ * The on-screen rows stay drawn until their refetch lands, rather than the window going blank. The
+ * persister writes a new snapshot with just those entries within five seconds.
+ *
+ * The resident diff segments are left alone. They are never saved, their memory is bounded, and their
+ * `clear` is written for a node that is gone: it drops the claims a mounted diff pane holds.
+ */
+export async function clearNodeCache(nodeId: string): Promise<void> {
+  const client = caches.get(nodeId)?.client
+  client?.removeQueries({ type: 'inactive' })
+  await cacheStorage.removeItem(cacheKeyFor(nodeId))
+  void client?.invalidateQueries({ type: 'active' })
+}
+
+/** The saved snapshot for a node: its size as UTF-8 and how many entries it holds, or null when there
+ *  is none. Read from the store rather than from memory, because that is what the next launch restores. */
+export async function persistedCacheSize(nodeId: string): Promise<{ bytes: number; entries: number } | null> {
+  const text = await cacheStorage.getItem(cacheKeyFor(nodeId))
+  if (!text) return null
+  let entries = 0
+  try {
+    const parsed = JSON.parse(text) as { clientState?: { queries?: unknown[] } }
+    entries = parsed.clientState?.queries?.length ?? 0
+  } catch {
+    // A snapshot that does not parse still takes the space. The persister discards it on restore.
+  }
+  return { bytes: new TextEncoder().encode(text).byteLength, entries }
 }
 
 // Test seam: the maps and signals above outlive a single test file otherwise.

@@ -266,6 +266,8 @@ describe('agent usage routes', () => {
       expect(pinned.status).toBe(200)
       expect(await (await app.fetch(request('/api/agents/session-defaults'), env)).json()).toEqual({
         continueAfterUsageLimit: true,
+        stopIdleAfterMinutes: 30,
+        keepArchivedHistoryDays: 0,
         followLastSession: false,
         inline: { providerId: null, pinned: {} },
         pinned: { codex: { model: 'gpt-5.1-codex-max' } },

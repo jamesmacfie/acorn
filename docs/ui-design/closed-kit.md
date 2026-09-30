@@ -134,6 +134,15 @@ drag across a line, so the gesture it armed used to sit there until something el
 that move was then filed as the place the reader chose. Focus counts as a gesture when it lands on a
 turn in this list, because revealing a card scrolls it into view and then focuses it.
 
+The timeline's own moves are told apart from the reader's by where they left the view, not only by
+when. Each write marks scroll events as the timeline's own until the next frame. But the browser sends
+one scroll event per frame, whatever moved the view, so a reader who scrolls in the frame after a pin
+shares the pin's event. While a card was streaming, that event was dropped as the timeline's, and the
+next growth pinned the reader back to the bottom. So a marked event only counts as the timeline's
+while the view is still where its write left it, read back after the write so clamps and rounding are
+already in it. A resize checks the same thing before it pins, because WebKit can report a resize
+before the scroll event for the move that caused it.
+
 A list that the reader has no place in opens at the foot, and so does a list they were following.
 Those two are the same value, `{ at: 'live' }`, which is also why the timeline acts on a place equal
 to the one it already holds: the caller only reads its store again when the view has changed, so two

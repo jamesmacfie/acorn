@@ -7,8 +7,9 @@ import type { NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 const idb = vi.hoisted(() => ({ get: vi.fn(), set: vi.fn(), del: vi.fn(async () => {}) }))
 vi.mock('idb-keyval', () => idb)
 
-const { _resetFleet, cacheKeyFor, clientFor, dropNode, homeNodeId, nodeState, nodes, refreshFleet } =
+const { _resetFleet, cacheKeyFor, clearNodeCache, clientFor, dropNode, homeNodeId, nodeState, nodes, persistedCacheSize, refreshFleet, setCacheStorage } =
   await import('./fleet')
+const { QueryObserver } = await import('@tanstack/solid-query')
 const { activeCacheId, activeNodeId, nodeReadiness, selectActiveNode, setActiveNode } = await import('./activeNode')
 const { segmentCacheFor } = await import('../../features/diff/segmentCache')
 
@@ -181,5 +182,54 @@ describe('dropNode', () => {
     expect(gone.stats().segments).toBe(0)
     expect(segmentCacheFor(clientFor('remote').client).has('same-key')).toBe(false)
     expect(kept.has('same-key')).toBe(true)
+  })
+})
+
+describe('clearNodeCache', () => {
+  it('empties a connected node\'s cache and refetches what is on screen, and the node stays', async () => {
+    stubBridge([record('remote')], [{ nodeId: 'remote', state: 'online' }])
+    await refreshFleet()
+    const cache = clientFor('remote')
+    const plain = [{ kind: 'hunk' as const, text: '@@ -1 +1 @@' }]
+    const segments = segmentCacheFor(cache.client)
+    segments.insert([{ key: 'seg', path: 'a.ts', patchKey: 'p', plain }])
+    // Nothing is drawing this one.
+    cache.client.setQueryData(['pulls', 'old'], [{ id: 1 }])
+    // This one is on screen: an observer is subscribed to it, as a mounted createQuery is.
+    let fetches = 0
+    const onScreen = new QueryObserver(cache.client, { queryKey: ['tasks'], queryFn: async () => ++fetches, staleTime: Infinity })
+    const unsubscribe = onScreen.subscribe(() => {})
+    await vi.waitFor(() => expect(fetches).toBe(1))
+
+    await clearNodeCache('remote')
+
+    expect(cache.client.getQueryData(['pulls', 'old'])).toBeUndefined()
+    expect(idb.del).toHaveBeenCalledWith(cacheKeyFor('remote'))
+    await vi.waitFor(() => expect(cache.client.getQueryData(['tasks'])).toBe(2))
+    // Unlike dropNode: the same client, the node still listed, its status kept, its segments kept.
+    expect(clientFor('remote')).toBe(cache)
+    expect(nodes().map((node) => node.nodeId)).toEqual(['remote'])
+    expect(nodeState('remote')).toBe('online')
+    expect(segments.has('seg')).toBe(true)
+    unsubscribe()
+  })
+
+  it('reads the saved snapshot\'s size and entry count from the store', async () => {
+    const stored = new Map<string, string>()
+    setCacheStorage({
+      getItem: async (key) => stored.get(key) ?? null,
+      setItem: async (key, value) => void stored.set(key, value),
+      removeItem: async (key) => void stored.delete(key),
+    })
+    try {
+      expect(await persistedCacheSize('remote')).toBe(null)
+      const text = JSON.stringify({ timestamp: 1, buster: '', clientState: { queries: [{}, {}, {}], mutations: [] } })
+      stored.set(cacheKeyFor('remote'), text)
+      expect(await persistedCacheSize('remote')).toEqual({ bytes: text.length, entries: 3 })
+      await clearNodeCache('remote')
+      expect(await persistedCacheSize('remote')).toBe(null)
+    } finally {
+      setCacheStorage({ getItem: (key) => idb.get(key), setItem: idb.set, removeItem: idb.del })
+    }
   })
 })

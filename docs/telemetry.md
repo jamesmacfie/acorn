@@ -88,7 +88,7 @@ because a plugin should not be able to fail its own route by mislabelling a span
 | Key | Values | Set where |
 | --- | --- | --- |
 | `owner` | `core` or a plugin id | The seam that knows. The plugin host binds it into `ctx.telemetry` and `ctx.log`; the request middleware derives it from `/v1/p/<id>` in the path; the scheduler from the schedule key; the hook runner from the handler's registration |
-| `runtime` | `node`, `renderer`, `tui`, `helper` or `shell` | Whichever runtime built the batch. The node stamps its own; a posted batch names the sender, and cannot say `node` |
+| `runtime` | `node`, `renderer`, `tui`, `helper` or `shell` | Whichever runtime built the batch. The node stamps its own; a posted batch names the sender, and cannot say `node`. The helper posts two batches for other runtimes: the shell's crash record, and the renderer's memory, which the shell measures from outside ([shell.md](./shell.md) § What the shell reports) |
 
 The conventional ones, set by the seam that has the fact: `seam`, `route`, `method`, `status`,
 `request.id`, `task.id`, `schedule.key`, `schedule.reason`, `hook.point`, `hook.handler`,
@@ -223,7 +223,7 @@ route under one.
 
 Two compiled plugins already do this, and core adds nothing plugin-shaped for either: workflows
 raises `workflow.run` and `workflow.step` ([workflows.md](./workflows.md) § What a run reports),
-and agents raises `agent.session` and `agent.turn`
+and agents raises `agent.session` and `agent.turn`, plus the `agent.processes.*` gauges
 ([managed-agents.md](./managed-agents.md) § What a session reports).
 
 A plugin's client half has no `ctx.telemetry`, because a client context is contribution points and
@@ -498,6 +498,7 @@ bridge both use it to group `/v1/p/<plugin>` requests by plugin without recordin
 | Every contribution that throws while rendering | `kit/components/content/ContributionBoundary.tsx` | a handled error with its stack, contribution id, and owner |
 | Every place a followed timeline puts the reader | `kit/components/content/Timeline.tsx` | event `ui.scroll.place` with the cause, the turn the reader is anchored to, the offsets it moved between, the list and viewport heights, and whether it was following. `opened` is a list mounting or swapping, which is the only trace a remount leaves; `unasked` is a move neither the reader nor the timeline made; `took` is the reader's place changing without the reader, which happens only when the turn they were on has left the list |
 | Every large diff or timeline becoming ready or going away | `kit/lib/telemetry/surfaceHealth.ts`, installed by `infra/telemetry/emitter.ts` | histograms `ui.surface.*`, labelled only by surface kind and checkpoint. See [Rendered-surface health](#rendered-surface-health) |
+| Page counts, every 30 seconds while visible | `infra/telemetry/pageFacts.ts` | gauges `ui.page.*`. See [Memory over a day](#memory-over-a-day) |
 | Every diff segment cache access and change | `features/diff/segmentCache.ts` and `segmentLoader.ts` | histograms `diff.segment_cache.hit` and `.miss` (segments that entered a pane's range, found or not), `.insert` (segments per batch), `.evict`, `.evicted_rows` and `.evicted_bytes` labelled only by `reason` (`budget`, `superseded` or `node-drop`), `.oversize`, and the resident `.documents`, `.segments`, `.rows`, `.plain_bytes` and `.enrichment_bytes` after each insert. No key, path, revision or text. See [diff-rendering.md](./diff-rendering.md) § Resident segments |
 | A diff pane's first plain rows | `features/diff/DiffPane.tsx` | histogram `diff.first_plain`, the milliseconds from mount to the first segment on screen, labelled only by `cache` (`hit` or `miss`) |
 | Every delivered notice | `features/notifications/deliver.ts` | event `notice.delivered` with the kind and whether it landed read |
@@ -639,7 +640,7 @@ reports. In short:
 | --- | --- | --- | --- |
 | Terminal client | client-core's, with `runtime: 'tui'` | client-core's poster, over the platform seam | `tui.frame` and `tui.key` histograms, a `tui.boot` span, and every renderer seam it shares |
 | Desktop helper | the node's collector, in the helper's process | its own poster, over the broker with the device token | `helper.boot` spans, `broker.*` health, `node.crash`, and its log lines |
-| Rust shell | none. A panic hook writes a file | the helper reads and forwards it on the next boot | one fatal error with `runtime: shell` |
+| Rust shell | none. A panic hook writes a file, and the helper asks for memory numbers | the helper forwards the file on the next boot, and posts the numbers when they arrive | one fatal error with `runtime: shell`, and the renderer's and the helper's `runtime.memory.footprint` |
 
 Two things are worth reading across from here.
 
@@ -695,7 +696,8 @@ Fixed operation/outcome labels keep the number of series bounded.
 | Is the client cache responsible? | `cache.read`, `cache.deserialize`, `cache.serialize`, `cache.write`, cache character/entry counts, and `cache.restore_to_hydrated` on the desktop. `cache.updates` labels only the fixed query-cache action, never query keys. |
 | Is a plugin flooding the UI? | Existing `tree.apply` plus `tree.queue.wait`, `tree.batch.operations`, `tree.batch.merged`, `tree.nodes`, and `tree.batch.refused`, attributed to the owning plugin. |
 | Is terminal output flooding its parser? | `terminal.output.size`, `terminal.pending.size`, `terminal.write` (through xterm's completion callback), and `terminal.fit`. Sizes count supplied string code units or binary bytes, without copying output to measure it. |
-| Is the backend or helper under pressure? | `runtime.event_loop.p95`, `runtime.event_loop.max`, `runtime.event_loop.utilization`, `runtime.cpu`, `runtime.memory.rss`, and `runtime.memory.heap`. CPU is consumed CPU time / elapsed time; memory is bytes. |
+| Is the backend or helper under pressure? | `runtime.event_loop.p95`, `runtime.event_loop.max`, `runtime.event_loop.utilization`, `runtime.cpu`, `runtime.memory.rss`, and `runtime.memory.heap`. CPU is consumed CPU time / elapsed time; memory is bytes. `runtime.suspended` is time the process was not running, kept apart from delay. |
+| Where is the memory going? | See [Memory over a day](#memory-over-a-day): `runtime.memory.footprint` for the renderer and the helper, the `ui.page.*` counts beside it, and `agent.processes.*` on the node. |
 
 A measured client operation taking at least 100 ms can also produce a detailed span under its
 original interaction, capped at 20 exemplars per flush. Histograms retain every sample even after
@@ -715,6 +717,16 @@ owner and operation during one JavaScript turn produce one span rather than one 
 `work.ms` is the sum of time inside the wrapped factories, while `wall.ms` includes other synchronous
 work between the first factory and the microtask checkpoint. The agent transcript uses it only for
 its initial visible cards; streaming additions stay off the instrumentation path.
+
+The node and the helper share one runtime pressure sampler, in
+`packages/node-core/src/server/telemetry/runtimePressure.ts`. It reads a five-second window. On
+macOS the monotonic clock keeps running while the machine sleeps, so a sleep or a dark wake reaches
+the delay histogram as one long stall, and comparing it with the wall clock shows nothing. Only
+running code can hold the event loop, so a window whose longest delay exceeds its active time by
+more than a second, or whose idle time runs more than a second past the interval, is treated as a
+suspend. That window reports `runtime.suspended`, the lost time to within one window, instead of the delay,
+utilization and CPU numbers, which it would distort. A real block is active time and still reports,
+however long it is. A block and a suspend in the same window report only the suspend.
 
 The desktop responsiveness pulse crosses the platform seam and the authenticated helper socket once
 per second while the window is focused and visible, and immediately when the interaction changes.
@@ -740,6 +752,39 @@ Local tests exercise a renderer that never answers, recovery, sleep, consent cha
 transport, cancellation, delayed readiness, bounded workload series, slow trace attribution, and
 highlight fallback without content. Before relying on Sentry, perform the live ingestion smoke in
 Verification below, then reproduce opening a large agent history with collection enabled.
+
+### Memory over a day
+
+The desktop renderer is the WebKit web content process, and most of what it holds is WebKit's own
+memory rather than the page's JavaScript heap. The page cannot read that process's memory, so these
+gauges come from three places and are meant to be read against each other. All of them are gauges,
+so each keeps its name in Sentry with no `.p50` or `.max` suffix.
+
+| Metric | Unit | Attributes | Rate | Where |
+| --- | --- | --- | --- | --- |
+| `runtime.memory.footprint` | bytes | `runtime: renderer`, `owner: core` | 30 s | The shell reads the main window's web content process. macOS only |
+| `runtime.memory.footprint` | bytes | `runtime: helper`, `owner: core` | 30 s | The shell reads the helper's process. macOS only |
+| `ui.page.elements` | count | `runtime: renderer`, `owner: core` | 30 s, visible window only | `document.getElementsByTagName('*').length` |
+| `ui.page.timeline_turns` | count | the same | the same | Drawn timeline turns, most of them agent transcript turns |
+| `ui.page.query_entries` | count | the same | the same | Query cache entries for the active node |
+| `ui.page.diff_cache.rows`, `ui.page.diff_cache.bytes` | count, bytes | the same | the same | The active node's diff segment cache, when a diff has been opened. The bytes are the cache's own estimate, not the heap |
+| `ui.page.workers.tree`, `.highlight`, `.word_diff` | count | the same | the same | Live plugin tree workers, and the highlighter and word-diff workers, each 0 or 1. A worker module that has not loaded reports nothing |
+| `agent.processes.live`, `.idle` | count | `runtime: node`, `owner: agents` | 60 s | Provider processes, and those the idle rules would stop now |
+| `agent.processes.memory` | bytes (the record names no unit) | the same | 60 s | Resident bytes summed over each provider's process tree. Left out when `ps` fails |
+
+The footprint is the physical footprint, which is what `footprint` and Activity Monitor's Memory
+column show. Resident size undercounts on macOS because compressed pages leave it. That makes the
+footprint and `runtime.memory.rss` two different measures, and the helper reports both. The node has
+no footprint: only the shell can read one, and a batch the helper posts cannot claim the node's
+runtime. Agent memory is resident size, because it is counted with `ps`.
+
+The shell looks up the web content process's pid on every sample, so a renderer WebKit replaced
+after a crash is measured under its new pid. A sample taken while the replacement is starting has no
+process to read and reports nothing.
+
+The helper asks the shell only while the switch is on, the page counts only while it is on and the
+window is visible, and the agent count skips its `ps` while it is off. Off, each costs one boolean
+read per tick. No count carries a name, a path, a key, or a query.
 
 ## What this is not
 

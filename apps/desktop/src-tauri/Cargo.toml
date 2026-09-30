@@ -53,3 +53,7 @@ libc = "0.2"
 # are not labelled Terminal (src/commands.rs). tauri-plugin-notification already pulls this crate in
 # under notify-rust, so naming it here compiles nothing new.
 mac-notification-sys = "0.6"
+# One private selector, for one number: the pid of the renderer's web content process, so its memory
+# can be read from outside it (src/footprint.rs). Tauri already builds this crate, so naming it here
+# compiles nothing new.
+objc2 = "0.6"

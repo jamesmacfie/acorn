@@ -55,7 +55,13 @@ const handshakeSchema = z.strictObject({
 })
 type Handshake = z.infer<typeof handshakeSchema>
 
-const commandSchema = z.strictObject({ command: z.enum(['stop', 'retry']) })
+// A byte count the shell read, or null for a process it could not read.
+const footprintBytes = z.number().int().nonnegative().nullable()
+const commandSchema = z.union([
+  z.strictObject({ command: z.enum(['stop', 'retry']) }),
+  // The shell's answer to a `footprint-request` (apps/desktop/src-tauri/src/footprint.rs).
+  z.strictObject({ command: z.literal('footprint'), renderer: footprintBytes, helper: footprintBytes }),
+])
 
 // AES-256-GCM under the key Rust holds, in the shape deviceTokenStore.ts asks for. The blob is nonce,
 // then tag, then ciphertext, which is self-describing enough for a future key rotation to tell one
@@ -82,8 +88,9 @@ const dataKeyCipher = (dataKey: string): TokenCipher => {
 // line. The recovery screen is a native dialog, so the crash budget has to reach Rust, and so does
 // each preview tunnel's secret, which the shell seeds into the pane's cookie store because wry cannot
 // inject a request header. This pipe reaches Rust and nothing else, which is why a secret may travel
-// on it. See docs/shell.md, "Host-owned webviews".
-const emit = (event: 'crash-budget-exhausted' | 'tunnel-opened' | 'tunnel-closed', detail?: object): void =>
+// on it. See docs/shell.md, "Host-owned webviews". A footprint request asks Rust for memory numbers
+// only it can read, and the answer comes back as a command (docs/shell.md § What the shell reports).
+const emit = (event: 'crash-budget-exhausted' | 'tunnel-opened' | 'tunnel-closed' | 'footprint-request', detail?: object): void =>
   console.log(JSON.stringify({ [TAG]: event, ...detail }))
 
 async function boot(handshake: Handshake): Promise<{ helper: Helper; server: HelperServer }> {
@@ -128,6 +135,7 @@ async function boot(handshake: Handshake): Promise<{ helper: Helper; server: Hel
       opened: (port, secret) => emit('tunnel-opened', { port, secret }),
       closed: (port) => emit('tunnel-closed', { port }),
     },
+    requestFootprint: () => emit('footprint-request'),
   })
 
   server = await startHelperServer(helper, { secret: randomBytes(32).toString('hex'), appOrigin: handshake.appOrigin })
@@ -182,8 +190,9 @@ createInterface({ input: process.stdin }).on('line', (line) => {
       helperMark('ready line')
       return
     }
-    const { command } = commandSchema.parse(JSON.parse(trimmed))
-    if (command === 'stop') return stop(0)
+    const parsed = commandSchema.parse(JSON.parse(trimmed))
+    if (parsed.command === 'stop') return stop(0)
+    if (parsed.command === 'footprint') return (await booted).helper.footprint({ renderer: parsed.renderer, helper: parsed.helper })
     // The owner's answer to the recovery screen. Forgive the spent budget and try once more.
     await (await booted).helper.retry()
   }).catch((error: unknown) => {

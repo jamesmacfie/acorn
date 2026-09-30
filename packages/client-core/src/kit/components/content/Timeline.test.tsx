@@ -188,6 +188,65 @@ describe('Timeline', () => {
     expect(scrollTop).toBe(maxScroll())
   })
 
+  it('keeps following through its own pins, whose scroll events arrive in the next frame', () => {
+    // Nobody touches it. Each pin echoes back as a scroll event before the frame that clears the mark,
+    // and none of them may be read as the reader leaving the foot.
+    const [turns, setTurns] = createSignal(['a', 'b', 'c'])
+    const view = mount(turns)
+    for (const next of ['d', 'e', 'f', 'g']) {
+      setTurns([...turns(), next])
+      heights.set(next, 100)
+      layout()
+      observers.forEach((run) => run())
+      scroller()!.dispatchEvent(new Event('scroll', { bubbles: true }))
+      settle(1)
+    }
+    expect(view.place()).toEqual(LIVE)
+    expect(scrollTop).toBe(maxScroll())
+  })
+
+  it('keeps a scroll the reader makes in the frame after a pin', () => {
+    // The race. The newest card grows and the timeline pins the view to it, which marks the next scroll
+    // event as its own. The reader scrolls up before the frame that clears the mark, so their move and
+    // the pin's echo arrive as one scroll event. That event used to be dropped as ours, and the next
+    // growth pinned the reader back to the bottom.
+    const [turns] = createSignal(['a', 'b', 'c', 'd', 'e'])
+    const view = mount(turns)
+    heights.set('e', 160)
+    layout()
+    observers.forEach((run) => run())
+    expect(scrollTop).toBe(maxScroll())
+
+    reader(scroller()!, 200)
+    expect(view.place()).toMatchObject({ at: 'turn', key: 'c' })
+    // The card keeps growing, and the view stays where the reader put it.
+    heights.set('e', 220)
+    settle()
+    heights.set('e', 280)
+    settle()
+    expect(view.place()).toMatchObject({ at: 'turn', key: 'c' })
+    expect(turnTop('c')).toBe(0)
+  })
+
+  it('keeps a reader move whose scroll event arrives after the next resize', () => {
+    // A reveal draws new cards, and WebKit can report the resize before the scroll event. Pinning in
+    // that resize would overwrite the move before anything had read it.
+    const [turns] = createSignal(['a', 'b', 'c', 'd', 'e'])
+    const view = mount(turns)
+    const box = scroller()!
+    const card = host.querySelector<HTMLElement>('[data-turn="b"] .ui-card')!
+    card.tabIndex = -1
+    box.scrollTop = 100
+    card.focus({ preventScroll: true })
+    heights.set('e', 160)
+    layout()
+    observers.forEach((run) => run())
+    box.dispatchEvent(new Event('scroll', { bubbles: true }))
+    settle()
+    expect(view.place()).toMatchObject({ at: 'turn', key: 'b' })
+    expect(turnTop('b')).toBe(0)
+  })
+
   it('leaves the reader alone once they scroll away from the foot', () => {
     const [turns, setTurns] = createSignal(['a', 'b', 'c', 'd', 'e'])
     const view = mount(turns)

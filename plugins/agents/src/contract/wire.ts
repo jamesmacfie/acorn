@@ -436,6 +436,18 @@ export type AgentDeleteResult = {
   detail?: string
 }
 
+/** What Settings > Storage and memory shows for this plugin (docs/managed-agents.md § Operations and
+ *  failure). `idle` counts the processes Stop idle agents now would stop. `memoryBytes` is the resident
+ *  memory of every provider process and its descendants, and null where the node cannot list processes.
+ *  The two folder sizes are measured at most every 30 seconds. */
+export type AgentFootprint = {
+  live: number
+  idle: number
+  memoryBytes: number | null
+  attachmentsBytes: number
+  artifactsBytes: number
+}
+
 // `agent:turn` and `agent:request` are the node telling a client what a projected event changed.
 // Without them a client had to refetch the whole snapshot — up to 2,000 event rows, a JSON body parsed
 // per row — to learn that one turn had closed or one permission request had been answered

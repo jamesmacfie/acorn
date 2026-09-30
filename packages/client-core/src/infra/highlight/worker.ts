@@ -7,6 +7,7 @@ import { getHighlighter } from './shiki'
 import { langFor } from './langs'
 import type { HighlightLines, HighlightRequest, HighlightResponse } from './messages'
 import { createLogger } from '../telemetry/logger'
+import { registerPageFact } from '../telemetry/pageFacts'
 
 const log = createLogger('highlight')
 
@@ -26,6 +27,7 @@ let state: 'cold' | 'live' | 'dead' = 'cold'
 let worker: Worker | null = null
 let nextId = 1
 const pending = new Map<number, Pending>()
+registerPageFact('ui.page.workers.highlight', () => (worker ? 1 : 0))
 
 const failAll = () => {
   for (const [, p] of pending) p.resolve([])

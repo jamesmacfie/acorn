@@ -10,6 +10,7 @@ import { runs } from './routes/runs'
 import { search } from './routes/search'
 import { backup } from './routes/security/backup'
 import { security } from './routes/security/security'
+import { storage } from './routes/storage'
 import { attachment } from './routes/attachment'
 import { nodeProviderRoutes } from './routes/nodeProviders'
 import { integrations } from './routes/integrations'
@@ -78,6 +79,9 @@ export function createApp() {
     // reconnaissance for anything running in a task.
     .use(`${CORE_NAMESPACE}/security`, requireDevice)
     .use(`${CORE_NAMESPACE}/security/*`, requireDevice)
+    // Memory and disk sizes, same class again: a description of the machine.
+    .use(`${CORE_NAMESPACE}/storage`, requireDevice)
+    .use(`${CORE_NAMESPACE}/storage/*`, requireDevice)
     // The attachment record, same class again: it names a control plane and the device row that
     // vouches for it, and the delete revokes that credential (docs/node-enrollment.md).
     .use(`${CORE_NAMESPACE}/attachment`, requireDevice)
@@ -144,6 +148,7 @@ export function createApp() {
     .route(`${CORE_NAMESPACE}/plugins`, plugins) // Settings → Plugins: the roster + the per-node toggle
     .route(`${CORE_NAMESPACE}/audit`, audit) // Settings → Security: the append-only trail (security.md § Audit)
     .route(`${CORE_NAMESPACE}/security`, security) // Settings → Security: this node's posture (security.md § On-disk)
+    .route(`${CORE_NAMESPACE}/storage`, storage) // Settings → Storage and memory: memory and disk sizes (data-layer.md § What the node reports)
     .route(`${CORE_NAMESPACE}/attachment`, attachment) // Settings → Nodes: the control plane this node is attached to (docs/node-enrollment.md)
     .route(`${CORE_NAMESPACE}/nodes`, nodeProviderRoutes) // plugin-provided nodes and their lifecycle (docs/plugins.md § Node providers)
     .route(`${CORE_NAMESPACE}/schedules`, schedules) // Settings → Schedules: periodic work owned by the node (docs/schedules.md)

@@ -1,14 +1,14 @@
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 import type { PostedTelemetryBatch, TelemetryRecord } from '@acorn/protocol/telemetry.ts'
 import { flushTelemetry, startTelemetry } from '@acorn/node-core/server/telemetry'
 import type { NodeBroker } from './broker/nodeBroker'
 import { _resetHelperMarks, helperMark } from './bootMarks'
 import { recordCrash } from './supervision/crashBudget'
-import { startHelperTelemetry, type HelperTelemetry } from './telemetry'
+import { FOOTPRINT_MS, startHelperTelemetry, type HelperTelemetry } from './telemetry'
 
 // What the helper reports and how it leaves (docs/shell.md § What the helper reports).
 //
@@ -163,4 +163,78 @@ it('contains a crash file truncated during a shell panic', async () => {
   await start()
   expect(records('shell')).toEqual([])
   expect(existsSync(join(root, 'shell-crash.json'))).toBe(false)
+})
+
+describe('memory, measured by the shell', () => {
+  let requests: number
+
+  const startMeasured = async (platform: NodeJS.Platform = 'darwin'): Promise<void> => {
+    telemetry = startHelperTelemetry({
+      broker: stubBroker(), userDataDir: root, version: '1.2.3', platform, requestFootprint: () => (requests += 1),
+    })
+    telemetry.setNode('n1')
+    await settle()
+  }
+
+  beforeEach(() => {
+    requests = 0
+    // Only the intervals, so `settle` still waits on real turns.
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] })
+  })
+
+  afterEach(() => {
+    telemetry?.dispose()
+    telemetry = null
+    vi.useRealTimers()
+  })
+
+  it('asks the shell every thirty seconds while the switch is on', async () => {
+    await startMeasured()
+    expect(requests).toBe(0)
+    vi.advanceTimersByTime(FOOTPRINT_MS)
+    expect(requests).toBe(1)
+    vi.advanceTimersByTime(FOOTPRINT_MS * 2)
+    expect(requests).toBe(3)
+  })
+
+  it('never asks while the switch is off, or where the shell cannot measure', async () => {
+    prefValue = '0'
+    await startMeasured()
+    vi.advanceTimersByTime(FOOTPRINT_MS * 4)
+    expect(requests).toBe(0)
+    telemetry?.dispose()
+
+    prefValue = '1'
+    await startMeasured('linux')
+    vi.advanceTimersByTime(FOOTPRINT_MS * 4)
+    expect(requests).toBe(0)
+  })
+
+  it("files the renderer's footprint under the renderer and the helper's under its own runtime", async () => {
+    await startMeasured()
+    telemetry!.footprint({ renderer: 900_000_000, helper: 80_000_000 })
+    await settle()
+
+    const renderer = records('renderer')
+    expect(renderer).toHaveLength(1)
+    expect(renderer[0]).toMatchObject({ kind: 'metric', name: 'runtime.memory.footprint', type: 'gauge', value: 900_000_000, unit: 'byte' })
+    const helper = records('helper').filter((record) => record.kind === 'metric' && record.name === 'runtime.memory.footprint')
+    expect(helper).toHaveLength(1)
+    expect(helper[0]).toMatchObject({ type: 'gauge', value: 80_000_000, unit: 'byte' })
+  })
+
+  it('leaves out a process the shell could not read, and drops an answer that arrives after the switch went off', async () => {
+    await startMeasured()
+    telemetry!.footprint({ renderer: null, helper: 80_000_000 })
+    await settle()
+    expect(records('renderer')).toEqual([])
+    telemetry?.dispose()
+
+    posted = []
+    prefValue = '0'
+    await startMeasured()
+    telemetry!.footprint({ renderer: 900_000_000, helper: 80_000_000 })
+    await settle()
+    expect(posted).toEqual([])
+  })
 })

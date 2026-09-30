@@ -1,6 +1,6 @@
 /* @refresh reload */
 import { reportResponsiveness } from '@acorn/client-core/infra/platform'
-import { startResponsivenessMonitor } from '@acorn/client-core/infra/telemetry'
+import { startPageFacts, startResponsivenessMonitor } from '@acorn/client-core/infra/telemetry'
 import { render } from 'solid-js/web'
 import { applyNodePlugins } from './activate'
 import { createEffect, createRoot, Show } from 'solid-js'
@@ -33,6 +33,10 @@ const noop = () => null
 startClientTelemetry({ runtime: 'renderer', post: postTelemetryBatch('renderer') })
 const stopResponsiveness = startResponsivenessMonitor(reportResponsiveness)
 window.addEventListener('pagehide', stopResponsiveness, { once: true })
+// Counts about the page every thirty seconds while collecting, read against the memory the shell
+// measures from outside (docs/shell.md § What the shell reports).
+const stopPageFacts = startPageFacts(() => clientFor(activeCacheId()).client)
+window.addEventListener('pagehide', stopPageFacts, { once: true })
 
 // The two failures nothing in the app catches. Before this the renderer had neither handler, so an
 // error thrown outside a component's boundary was a line in a devtools console nobody had open.

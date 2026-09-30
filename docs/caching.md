@@ -128,6 +128,16 @@ snapshot only if it was fetched in the last day, which matches the query client'
 week-old entry is drawn once and then dropped unless its screen refetched it, and the longer restore
 window does not make the snapshot any bigger.
 
+**Clear cache** on Settings > Storage and memory empties the active node's cache while it stays
+connected (`clearNodeCache` in `packages/client-core/src/infra/node/fleet.ts`). It removes every entry
+nothing is drawing, deletes the saved snapshot through the host's cache store, and refetches the
+queries on screen. Those rows stay drawn until their refetch lands, so the window does not go blank.
+The persister writes a new snapshot within five seconds, holding only what was on screen. It is not
+`dropNode`, which is for a node leaving the fleet: that also removes the node from the fleet list and
+the status map and throws away the `QueryClient` the mounted provider still holds. The page shows the
+snapshot's size and entry count, read back from the store. The overflow menu's **Clear cache** is
+older and blunter: it clears every node's saved snapshot and reloads the window.
+
 The Workflows pane follows the same rule even though its selected run and steps are Solid resources
 rather than persisted query rows. Run and child-change frames re-read the relevant task, and socket
 reconnect re-reads both the task's run list and the selected run's steps. The pane model is created
@@ -145,7 +155,9 @@ The persisted cache has no version buster. An entry written before a response ty
 field survives a relaunch as-is, so change the query key whenever the shape it caches gains a
 required field. Nothing else invalidates an old entry. GitHub's file summaries key ends in `'v2'` for that
 reason: the response gained `completeness`, and file rows gained `position` and patch state. The
-compare key ends in `'v3'`: it gained `completeness`, then its `files` became a diff `document`.
+compare key ends in `'v3'`: it gained `completeness`, then its `files` became a diff `document`. The
+Agent pane's harness list, `['agents', 'providers']`, holds `AgentProviderDescriptor[]` as the Node
+answers it. A descriptor that gains a required field needs a new key there too.
 
 ## Resident diff segments
 
@@ -159,7 +171,9 @@ It is a weighted least-recently-used cache with two ceilings, 40,000 rows and 32
 bytes. Plain rows and colour are weighed apart, and colour goes first. Segments a pane shows, holds
 near, or is loading are never evicted. One held segment over a ceiling stays until nothing holds it.
 A working tree that saves a file drops that file's superseded patch at once. `dropNode` clears it with
-the node's query client, and a node switch reads the other node's. The keys, the weights, and the
+the node's query client, and a node switch reads the other node's. **Clear cache** leaves it alone. It
+is never saved and its memory is bounded, and its `clear` drops the claims a mounted diff pane holds,
+which is right only for a node that is gone. The keys, the weights, and the
 eviction order are in [diff-rendering.md](./diff-rendering.md) § Resident segments.
 
 ## Fan-out cache safety
@@ -171,7 +185,9 @@ separate from per-Node resource keys when the shapes differ.
 
 ## Measurement
 
-The Node reports storage-footprint information at startup. It does not run a general destructive
-cache sweep on every request. Provider mirrors, immutable blobs, plugin databases, logs, and
+The Node logs its storage footprint once at startup, and Settings > Storage and memory asks for the
+same sizes while it is open ([data-layer.md § What the node reports](./data-layer.md#what-the-node-reports)).
+Neither deletes anything, and the Node does not run a general destructive cache sweep on every
+request. Provider mirrors, immutable blobs, plugin databases, logs, and
 application-owned records have different retention semantics and must not share a blind deletion
 policy.

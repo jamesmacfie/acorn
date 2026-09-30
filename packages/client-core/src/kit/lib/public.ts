@@ -8,7 +8,7 @@ export {
 } from './rendering/displayMeta.ts'
 export { persistDraft, readDraft, writeDraft } from './state/draftState.ts'
 export { formatRelativeTime } from './rendering/formatRelativeTime.ts'
-export { bytesOf, formatSize } from './rendering/formatSize.ts'
+export { bytesOf, formatBytes, formatSize } from './rendering/formatSize.ts'
 export { fuzzyScore } from './controls/fuzzy.ts'
 export { graphParents, graphRanks } from './layout/graphLayout.ts'
 export type { GraphEdgeRef, GraphPoint } from './layout/graphLayout.ts'

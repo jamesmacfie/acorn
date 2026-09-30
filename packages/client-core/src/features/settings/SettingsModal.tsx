@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { workspacesOptions } from '../../infra/queries'
 import { settingsContributions, settingsRegistry } from '../../host/registries/shell/settings'
@@ -8,11 +8,15 @@ import { Dynamic } from 'solid-js/web'
 import './settings.css'
 import { Button } from '../../kit/components/primitives'
 import RailVisibilitySwitches from './RailVisibilitySwitches'
+import { clientEvents } from '../../host/registries/commands/clientEvents'
 
 export default function SettingsModal(props: { onClose: () => void; initialTab?: string }) {
   const workspaces = createQuery(() => workspacesOptions(true))
   const [tab, setTab] = createSignal(props.initialTab ?? 'workspaces')
   const [pageStatus, setPageStatus] = createSignal('')
+  // A page that links to another page sends the same event a pane does. The shell's listener only opens
+  // the modal with a first tab, so while it is open the switch is made here.
+  onCleanup(clientEvents.on('presentation:open-settings', ({ tab }) => setTab(tab)))
   const generalPages = () => settingsContributions().filter((page) => page.group === 'general')
   const workspacePage = () => settingsContributions().find((page) => page.group === 'workspace')
   const activeWorkspace = () => workspaces.data?.find((workspace) => workspace.id === tab())

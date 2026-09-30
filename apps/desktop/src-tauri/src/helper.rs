@@ -65,6 +65,9 @@ pub enum Signal {
     /// store. It travels on this pipe so the renderer never sees it.
     TunnelOpened { port: u16, secret: String },
     TunnelClosed { port: u16 },
+    /// Telemetry is on and the helper wants this machine's memory numbers. Answered on stdin by
+    /// src/footprint.rs, because only this process can find the renderer's web content process.
+    FootprintRequest,
 }
 
 fn parse_signal(line: &str) -> Option<Signal> {
@@ -77,6 +80,7 @@ fn parse_signal(line: &str) -> Option<Signal> {
         }),
         "tunnel-opened" => Some(Signal::TunnelOpened { port: port()?, secret: value.get("secret")?.as_str()?.to_string() }),
         "tunnel-closed" => Some(Signal::TunnelClosed { port: port()? }),
+        "footprint-request" => Some(Signal::FootprintRequest),
         _ => None,
     }
 }
@@ -238,11 +242,21 @@ impl Helper {
 
     /// One command line to the helper: `stop` to drain, `retry` to forgive a spent crash budget.
     pub fn command(&self, command: &str) {
+        self.send(&format!("{{\"command\":\"{command}\"}}"));
+    }
+
+    /// One JSON line to the helper's stdin, for a command that carries more than its name.
+    pub fn send(&self, line: &str) {
         let mut held = self.stdin.lock().unwrap();
         if let Some(stdin) = held.as_mut() {
-            let _ = stdin.write_all(format!("{{\"command\":\"{command}\"}}\n").as_bytes());
+            let _ = stdin.write_all(format!("{line}\n").as_bytes());
             let _ = stdin.flush();
         }
+    }
+
+    /// The helper's own pid, while it is running.
+    pub fn pid(&self) -> Option<u32> {
+        self.child.lock().ok()?.as_ref().map(Child::id)
     }
 
     /// Ask politely, then stop being polite. Group-wide both times. See the note at the top of this
@@ -278,6 +292,7 @@ mod tests {
         let Some(Signal::Ready(ready)) = ready else { panic!("expected a ready line") };
         assert_eq!(ready.port, 51234);
         assert_eq!(ready.node_version, "v24.11.0");
+        assert!(matches!(parse_signal("{\"acorn-helper\":\"footprint-request\"}"), Some(Signal::FootprintRequest)));
     }
 
     /// A shell in its own process group, with stdout piped so it can say when it is ready.

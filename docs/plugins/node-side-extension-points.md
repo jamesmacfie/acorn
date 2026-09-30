@@ -166,11 +166,12 @@ What a handler answers:
 The owner draws the refusal in its own UI with the provenance the host stamped. Whether "push anyway"
 exists is the owner's decision: the hook says no, and the owner says what no means.
 
-**The hooks open today.** Core owns three, because core owns the choke point:
+**The hooks open today.** Core owns four, because core owns the choke point:
 
 | Owner | Hook | Allows | Who wants it |
 | --- | --- | --- | --- |
 | core | `core:worktree-created` | observe, transform | setup scripts. The terminal plugin's handler is the first, and used to be a single-slot capability |
+| core | `core:task-archiving` | observe, transform | stopping work the task owns before its worktree goes. Runs on every archive, after the teardown script. The agents plugin's handler stops the task's provider processes |
 | core | `core:before-tool-call` | observe, veto | approval gates beyond the built-in tiers. `onTimeout: deny`, alone among these: a gate that opens when its keeper stops answering is not one |
 | core | `core:before-snapshot` | observe, transform, veto | budget shaping, PII stripping. The payload is section names, so a handler drops a section and nothing else |
 | changes | `changes:before-commit` | observe, transform, veto | commit lint, message helpers |
@@ -198,7 +199,9 @@ node-emitted and never renderer-local.
 
 **Two seams that are hook-shaped and are not hooks.** [Task checks](client-authoring-and-the-ui-kit.md#task-checks) already do what
 `before-archive` would, and more: a check answers with a *concern* and an opt-in cleanup plan, which a
-`{ ok, reason }` verdict cannot express. Converting it would have deleted the checkbox. And the
+`{ ok, reason }` verdict cannot express. Converting it would have deleted the checkbox.
+`core:task-archiving` is not that hook either. It has no veto, and it exists for work that must stop
+whatever the owner ticks, which a check's opt-in cleanup cannot promise. And the
 `routeCapability` seams in `server/bridge.ts` are single-provider service bridges — `scheduler.list()`,
 `sessions.archive()` — which is RPC rather than a decision; a chain in front of one would answer a
 question nobody asked.

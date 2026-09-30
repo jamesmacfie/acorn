@@ -14,3 +14,16 @@ export function formatSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   return `${(bytes / 1024).toFixed(1)} KB · ~${formatTokens(approxTokens(bytes))} tok`
 }
+
+/** A byte count for a person: `300 B`, `12 KB`, `450 MB`, `1.3 GB`, in steps of 1,024. One decimal
+ *  below ten, none above, so a column of sizes stays short. */
+export function formatBytes(bytes: number): string {
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let value = bytes
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit++
+  }
+  return `${unit === 0 || value >= 10 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`
+}

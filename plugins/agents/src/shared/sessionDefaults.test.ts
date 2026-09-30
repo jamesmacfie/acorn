@@ -40,6 +40,8 @@ describe('stored defaults', () => {
   it('reads the last values while following, and the pinned ones otherwise', () => {
     const record = {
       continueAfterUsageLimit: true,
+      stopIdleAfterMinutes: 30,
+      keepArchivedHistoryDays: 0,
       followLastSession: true,
       pinned: { codex: { model: 'pinned' } },
       last: { codex: { model: 'last' } },
@@ -52,7 +54,7 @@ describe('stored defaults', () => {
 
   it('merges a remembered change into the provider it came from', () => {
     const record = rememberAgentDefaults(
-      { continueAfterUsageLimit: true, followLastSession: true, pinned: {}, last: { codex: { model: 'a', reasoning: 'low' } }, inline: { providerId: null, pinned: {} } },
+      { continueAfterUsageLimit: true, stopIdleAfterMinutes: 30, keepArchivedHistoryDays: 0, followLastSession: true, pinned: {}, last: { codex: { model: 'a', reasoning: 'low' } }, inline: { providerId: null, pinned: {} } },
       'codex',
       { reasoning: 'high' },
     )
@@ -67,7 +69,7 @@ describe('stored defaults', () => {
 
   it('fills the fields a write left out', () => {
     expect(parseAgentSessionDefaults('{"followLastSession":false}'))
-      .toEqual({ continueAfterUsageLimit: true, followLastSession: false, pinned: {}, last: {}, inline: { providerId: null, pinned: {} } })
+      .toEqual({ continueAfterUsageLimit: true, stopIdleAfterMinutes: 30, keepArchivedHistoryDays: 0, followLastSession: false, pinned: {}, last: {}, inline: { providerId: null, pinned: {} } })
   })
 
   it('refuses a value that is not a string, and an over-long id', () => {
@@ -75,6 +77,10 @@ describe('stored defaults', () => {
     expect(validateAgentSessionDefaults({ pinned: { codex: { ['x'.repeat(201)]: 'a' } } }).ok).toBe(false)
     expect(validateAgentSessionDefaults({ followLastSession: 'yes' }).ok).toBe(false)
     expect(validateAgentSessionDefaults({ continueAfterUsageLimit: 'yes' }).ok).toBe(false)
+    expect(validateAgentSessionDefaults({ stopIdleAfterMinutes: 45 }).ok).toBe(false)
+    expect(validateAgentSessionDefaults({ stopIdleAfterMinutes: 0 })).toEqual({ ok: true, value: { stopIdleAfterMinutes: 0 } })
+    expect(validateAgentSessionDefaults({ keepArchivedHistoryDays: 7 }).ok).toBe(false)
+    expect(validateAgentSessionDefaults({ keepArchivedHistoryDays: 365 })).toEqual({ ok: true, value: { keepArchivedHistoryDays: 365 } })
     expect(validateAgentSessionDefaults([]).ok).toBe(false)
   })
 

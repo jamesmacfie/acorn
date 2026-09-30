@@ -3,9 +3,11 @@
 // A `.tsx` for the reason ./managedStore.test.tsx gives: the mark is an effect, and only the `hosts`
 // project runs Solid's browser build, where an effect runs at all.
 import { afterEach, expect, it, vi } from 'vitest'
-import { createEffect, createRoot } from 'solid-js'
+import { createEffect, createRoot, Suspense } from 'solid-js'
+import { render } from 'solid-js/web'
+import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { withQueryClient } from './queryClient.helper'
-import type { AgentEventRecord, AgentSession, AgentWsFrame } from '../../contract/wire.ts'
+import type { AgentEventRecord, AgentProviderDescriptor, AgentSession, AgentWsFrame } from '../../contract/wire.ts'
 
 let deliver: (frame: AgentWsFrame) => void = () => {}
 vi.mock('./wsChannel', () => ({
@@ -23,12 +25,19 @@ const session = {
 
 const sessions = vi.fn(async () => ({ sessions: [session], delegations: [], nextCursor: null }))
 const patch = vi.fn(async (_id: string, body: { lastReadSeq: number }) => ({ ...session, lastEventSeq: body.lastReadSeq, ...body }))
+const providers = vi.fn(async (_force?: boolean): Promise<AgentProviderDescriptor[]> => [])
 vi.mock('./managedClient', () => ({
   managedAgentApi: {
-    providers: async () => [],
+    providers: (force?: boolean) => providers(force),
     sessions: () => sessions(),
     patch: (id: string, body: { lastReadSeq: number }) => patch(id, body),
   },
+}))
+
+// The custom agents never answer, so a case that turns queries on sees them as a cold cache too, and
+// nothing reaches for a node.
+vi.mock('../settings/customAgentsClient', () => ({
+  customAgentsOptions: () => ({ queryKey: ['agents', 'custom-agents'], queryFn: () => new Promise(() => {}) }),
 }))
 
 const { managedAgentStore } = await import('./managedStore')
@@ -42,7 +51,12 @@ const event = (seq: number): AgentEventRecord => ({
 afterEach(() => {
   vi.useRealTimers()
   managedAgentStore.clear()
+  providers.mockReset()
+  providers.mockImplementation(async () => [])
 })
+
+const claude = { id: 'claude', label: 'Claude', installed: true, capabilities: [], diagnostics: [] } as unknown as AgentProviderDescriptor
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 it('marks read up to the newest event frame, which the row no longer carries', async () => {
   managedAgentStore.upsertSession(session)
@@ -91,4 +105,55 @@ it('archives without asking only when nothing would be lost', () => {
   expect(sessionIsBlank({ turns: [] }, { ...empty, text: 'hi' })).toBe(false)
   expect(sessionIsBlank({ turns: [] }, { ...empty, attachments: [{}] as never })).toBe(false)
   expect(sessionIsBlank({ turns: [] }, { ...empty, contexts: [{ type: 'context', source: 'context.task' }] as never })).toBe(false)
+})
+
+// The pane's list header only shows "Agents" and a count, but the model is built inside it, so any
+// empty-cache read the model makes while it is built holds the header back (client-core panes.ts).
+it('draws the list header while the providers are still being probed', async () => {
+  providers.mockImplementation(() => new Promise(() => {}))
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const host = document.createElement('div')
+  function Header() {
+    const model = createAgentPaneModel({ id: 't1' } as never, { shown: () => false })
+    return <p>{`Agents ${model.taskSessions().length}, ${model.choices().length} choices, loading ${model.providersLoading()}`}</p>
+  }
+  const dispose = render(() => (
+    <QueryClientProvider client={client}>
+      <Suspense fallback={<p>waiting</p>}><Header /></Suspense>
+    </QueryClientProvider>
+  ), host)
+  await settle()
+  expect(host.textContent).toBe('Agents 1, 0 choices, loading true')
+  dispose()
+})
+
+it('reads the providers from the cache on the next task, and refreshes them with a fresh probe', async () => {
+  providers.mockImplementation(async () => [claude])
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  const modelFor = (taskId: string) => {
+    let built!: ReturnType<typeof createAgentPaneModel>
+    const dispose = render(() => (
+      <QueryClientProvider client={client}>
+        {(() => { built = createAgentPaneModel({ id: taskId } as never, { shown: () => false }); return null })()}
+      </QueryClientProvider>
+    ), document.createElement('div'))
+    return { model: built, dispose }
+  }
+
+  const first = modelFor('t1')
+  await settle()
+  expect(first.model.choices().map((choice) => choice.provider.id)).toEqual(['claude'])
+  first.dispose()
+
+  const second = modelFor('t2')
+  expect(second.model.providersLoading()).toBe(false)
+  expect(second.model.choices().map((choice) => choice.provider.id)).toEqual(['claude'])
+  expect(providers).toHaveBeenCalledTimes(1)
+  expect(providers).toHaveBeenLastCalledWith(undefined)
+
+  providers.mockImplementation(async () => [claude, { ...claude, id: 'codex', label: 'Codex' }])
+  await second.model.refreshProviders()
+  expect(providers).toHaveBeenLastCalledWith(true)
+  expect(second.model.choices().map((choice) => choice.provider.id)).toEqual(['claude', 'codex'])
+  second.dispose()
 })

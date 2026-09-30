@@ -29,7 +29,7 @@ const modes = {
     send: 'sync', status: 'sync', worktreeStatus: 'sync', repoConfigTrustNotice: 'sync',
     notice: 'sync', on: 'sync',
   },
-  telemetry: { event: 'sync', count: 'sync', gauge: 'sync', error: 'sync', measure: 'sync', startSpan: 'sync' },
+  telemetry: { enabled: 'sync', event: 'sync', count: 'sync', gauge: 'sync', error: 'sync', measure: 'sync', startSpan: 'sync' },
   log: { debug: 'sync', info: 'sync', warn: 'sync', error: 'sync' },
   core: {
     agentToolProvenance: { verify: 'async' },

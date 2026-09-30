@@ -382,6 +382,9 @@ export class CodexAgentDriver implements AgentDriver {
       get ready() {
         return ready && currentTurnId == null && !rpc.closed
       },
+      get pid() {
+        return rpc.pid
+      },
       async sendTurn(turnOptions: AgentDriverTurnOptions) {
         if (!threadId) throw new Error('Codex thread is not initialized.')
         if (!ready || currentTurnId) throw new Error('Codex session is not ready for another turn.')

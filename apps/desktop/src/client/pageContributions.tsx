@@ -15,6 +15,7 @@ const PluginsSettings = lazy(() => import('@acorn/client-core/features/settings/
 const SecuritySettings = lazy(() => import('@acorn/client-core/features/settings/SecuritySettings.tsx'))
 const SchedulesSettings = lazy(() => import('@acorn/client-core/features/settings/SchedulesSettings.tsx'))
 const RunsSettings = lazy(() => import('@acorn/client-core/features/settings/RunsSettings.tsx'))
+const StorageSettings = lazy(() => import('@acorn/client-core/features/settings/StorageSettings.tsx'))
 const StyleGallery = lazy(() => import('@acorn/client-core/features/settings/StyleGallery.tsx'))
 const TelemetrySettings = lazy(() => import('@acorn/client-core/features/settings/TelemetrySettings.tsx'))
 
@@ -57,6 +58,9 @@ export const settingsPageContributions: SettingsContribution[] = [
   // plugin's, because the list is merged from every plugin that declared a run source and no one of
   // them owns it (@acorn/protocol/runs.ts).
   { id: 'runs', label: 'Runs', group: 'general', order: 96, component: () => <RunsSettings /> },
+  // Beside Runs, and the same argument: memory and disk are facts about one machine. Core's page, with
+  // a section each plugin that holds either contributes (CORE_STORAGE_POINT).
+  { id: 'storage', label: 'Storage and memory', group: 'general', order: 97, component: () => <StorageSettings /> },
   // Beside Security, and the same argument: both answer "what does this machine disclose", and
   // `telemetry.enabled` is a preference on the node rather than on this screen (docs/telemetry.md).
   { id: 'telemetry', label: 'Telemetry', group: 'general', order: 92, component: () => <TelemetrySettings /> },

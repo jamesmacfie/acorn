@@ -5,6 +5,7 @@
 // exist.
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/plugin-api/client'
+import { CORE_STORAGE_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { AGENTS_CONVERSATION } from '../contract/conversation'
 import { AGENTS_INLINE_DIFF } from '../contract/inlineDiffClient.ts'
 import { isStale, reportPatches } from './inlineDiff/patchStatus.ts'
@@ -33,6 +34,7 @@ const AgentPricingSettings = lazy(() => import('./settings/AgentPricingSettings'
 const AgentSessionDefaultsSettings = lazy(() => import('./settings/AgentSessionDefaultsSettings'))
 const AgentMcpServersSettings = lazy(() => import('./settings/AgentMcpServersSettings'))
 const CustomAgentsSettings = lazy(() => import('./settings/CustomAgentsSettings'))
+const AgentStorageSection = lazy(() => import('./settings/AgentStorageSection'))
 
 export const agentsClientPlugin: ClientPlugin = {
   name: 'agents',
@@ -116,6 +118,13 @@ export const agentsClientPlugin: ClientPlugin = {
     })
     // Saved starts for a session: a harness, its options, instructions and tool access
     // (docs/managed-agents.md § Custom agents).
+    // This plugin's numbers on core's Settings > Storage and memory page: running agents, their
+    // memory, and the stop for idle ones (./settings/AgentStorageSection.tsx).
+    ctx.extensions.register({
+      id: 'agents.storage', point: CORE_STORAGE_POINT, label: 'Running agents', order: 10,
+      requires: { plugin: 'agents' },
+      component: AgentStorageSection,
+    })
     ctx.settingsPages.register({
       id: 'custom-agents', label: 'Custom agents', group: 'general', order: 42, requires: { plugin: 'agents' },
       component: CustomAgentsSettings,

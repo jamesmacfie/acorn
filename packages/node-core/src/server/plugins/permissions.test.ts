@@ -5,6 +5,9 @@ import { AGENTS_HARNESS_REGISTRY } from '../pluginHost/harnesses'
 import type { CoreServices } from '../core'
 import { pluginManifestSchema, type NodePermissions } from './manifest'
 import { HOST_OWNED_CAPABILITY_IDS, scopeCapabilities, scopeCore } from './permissions'
+import { hostFunctionMode } from './hostCallModes'
+import { createTaskService } from '../core/tasks'
+import type { AppDatabase } from '../db'
 
 // A stand-in CoreServices: this module only picks properties off the object, so identity is all the
 // assertions need and building a real one would drag a database in for nothing.
@@ -78,11 +81,22 @@ describe('scopeCore', () => {
     expect(query).toHaveBeenCalledWith('task-1', 'update things set done = true', { readOnly: false })
   })
 
-  it('keeps intended root creation on the compiled orchestration seam', () => {
-    const tasks = { byId: marker('byId'), createChild: marker('createChild'), createRoot: marker('createRoot') }
+  it('keeps intended root creation and archive dates on the compiled seam', () => {
+    const tasks = { byId: marker('byId'), createChild: marker('createChild'), createRoot: marker('createRoot'), archivedBefore: marker('archivedBefore') }
     const granted = scoped({ core: ['tasks'] }, { ...CORE, tasks } as unknown as CoreServices).tasks as unknown as Record<string, unknown>
     expect(Object.keys(granted).sort()).toEqual(['byId', 'createChild'])
     expect(granted.createRoot).toBeUndefined()
+    expect(granted.archivedBefore).toBeUndefined()
+  })
+
+  // A compiled-only method left on the facet reaches the worker, which refuses to encode a method it
+  // has no call mode for, and every loaded plugin that asked for tasks fails its init.
+  it('lends a loaded plugin only task methods the worker has a call mode for', () => {
+    const tasks = createTaskService({} as AppDatabase)
+    const granted = scoped({ core: ['tasks'] }, { ...CORE, tasks } as unknown as CoreServices).tasks
+    for (const method of Object.keys(granted)) {
+      expect(() => hostFunctionMode(`plugin.init.args[0].core.tasks.${method}`)).not.toThrow()
+    }
   })
 
   it('ignores a facet name this build does not have, rather than failing the plugin', () => {

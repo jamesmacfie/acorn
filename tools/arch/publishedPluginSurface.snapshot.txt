@@ -644,6 +644,7 @@ acorn-plugin-types: member PluginTaskCheck.check
 acorn-plugin-types: member PluginTaskCheck.id
 acorn-plugin-types: member PluginTaskCheckRegistry.register
 acorn-plugin-types: member PluginTelemetry.count
+acorn-plugin-types: member PluginTelemetry.enabled
 acorn-plugin-types: member PluginTelemetry.error
 acorn-plugin-types: member PluginTelemetry.event
 acorn-plugin-types: member PluginTelemetry.gauge

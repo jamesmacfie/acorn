@@ -41,6 +41,7 @@
     "./features/settings/SecuritySettings.tsx": "./src/features/settings/SecuritySettings.tsx",
     "./features/settings/SettingsModal.tsx": "./src/features/settings/SettingsModal.tsx",
     "./features/settings/ShortcutsSettings.tsx": "./src/features/settings/ShortcutsSettings.tsx",
+    "./features/settings/StorageSettings.tsx": "./src/features/settings/StorageSettings.tsx",
     "./features/settings/StyleGallery.tsx": "./src/features/settings/StyleGallery.tsx",
     "./features/settings/TelemetrySettings.tsx": "./src/features/settings/TelemetrySettings.tsx",
     "./features/settings/WorkspaceSettings.tsx": "./src/features/settings/WorkspaceSettings.tsx",

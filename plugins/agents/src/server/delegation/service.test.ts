@@ -80,7 +80,7 @@ describe('agent delegation service', () => {
     customAgents = []
     runtime = {
       store: sessions,
-      providers: async () => [PROVIDER],
+      usableProvider: async (pick: (provider: typeof PROVIDER) => boolean) => [PROVIDER].find(pick),
       customAgents: async () => customAgents,
       acceptSession: vi.fn(async (input: Parameters<ManagedAgentRuntime['acceptSession']>[0]) => sessions.createSession(input, PROVIDER)),
       enqueueTurn: vi.fn(async (sessionId: string, input: Parameters<ManagedAgentRuntime['enqueueTurn']>[1]) =>

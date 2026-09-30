@@ -203,6 +203,15 @@ This loaded path is task-only. A real plugin that needs source or pane status mu
 owner-declared annotation point for that surface. It must not add a rail-specific manifest
 contribution.
 
+#### Storage and memory sections
+
+`core:storage` is the core-owned `remote` point on Settings > Storage and memory, in `stack` mode with
+room for four. A plugin that holds memory or disk on the node draws its own section there, beside
+core's numbers, and reads them from its own route. The contributor is mounted with `nodeId`, the node
+the page shows. Core declares the point where the page is drawn
+(`client-core/features/settings/StorageSettings.tsx`) and never calls a plugin's route. The agents
+plugin is the one contributor today, with a compiled component.
+
 ### Remote trees
 
 Plugin code runs in a sandbox, renders against a fake DOM, and the fake DOM serialises to a tree of the

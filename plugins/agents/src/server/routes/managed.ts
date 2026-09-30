@@ -10,6 +10,7 @@ import type {
   AgentAttachment,
   AgentArtifact,
   AgentDeleteResult,
+  AgentFootprint,
   AgentProviderDescriptor,
   AgentRequest,
   AgentSession,
@@ -43,6 +44,9 @@ export type ManagedAgentsBridge = {
   taskIdForAttachment(attachmentId: string): Promise<string | null>
   taskIdForArtifact(artifactId: string): Promise<string | null>
   providers(force?: boolean): Promise<AgentProviderDescriptor[]>
+  // Settings > Storage and memory. Node-wide, like `runs`.
+  footprint(): Promise<AgentFootprint>
+  stopIdleNow(): Promise<{ stopped: number }>
   // The merged run list's source for this plugin (@acorn/protocol/runs.ts). Node-wide by construction.
   runs(): Promise<{ runs: RunRowInput[] }>
   uploadAttachment(taskId: string, filename: string, mediaType: string, bytes: Uint8Array): Promise<AgentAttachment>
@@ -176,6 +180,11 @@ export const managedAgents = new Hono<AppEnv>()
   .get('/runs', (c) => viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.runs()))
   .get('/providers', (c) =>
     viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.providers(c.req.query('force') === 'true')))
+  // Settings > Storage and memory (docs/managed-agents.md § Operations and failure). Device only: the
+  // numbers cover every task's agents, and the stop reaches every task's processes, so neither is
+  // something a task-scoped agent may ask for.
+  .get('/footprint', requireDevice, (c) => viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.footprint()))
+  .post('/stop-idle', requireDevice, (c) => viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.stopIdleNow()))
   .post('/attachments', async (c) => {
     const parsed = attachmentQuerySchema.safeParse(c.req.query())
     if (!parsed.success) return respondError(c, 400, 'bad_request')

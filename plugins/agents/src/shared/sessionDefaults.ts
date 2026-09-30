@@ -12,9 +12,35 @@ export const agentSessionDefaultsPreferenceKey = 'agents:session-defaults:v1'
 /** providerId to optionId to the value that option is set to. */
 export type AgentDefaultValues = Record<string, Record<string, string>>
 
+/**
+ * "Stop idle agents after", in minutes, where 0 is Never. A closed list rather than a number field,
+ * because each choice is a label the transcript repeats when it stops a session.
+ */
+export const AGENT_IDLE_STOP_CHOICES = [
+  { minutes: 15, label: '15 minutes' },
+  { minutes: 30, label: '30 minutes' },
+  { minutes: 120, label: '2 hours' },
+  { minutes: 0, label: 'Never' },
+] as const
+
+/**
+ * "Keep agent history for archived tasks", in days, where 0 is Forever. Past the limit, a daily
+ * schedule removes the transcripts of that task's sessions for good (docs/data-layer.md § Retention).
+ */
+export const AGENT_ARCHIVED_HISTORY_CHOICES = [
+  { days: 30, label: '30 days' },
+  { days: 90, label: '90 days' },
+  { days: 365, label: '1 year' },
+  { days: 0, label: 'Forever' },
+] as const
+
 export type AgentSessionDefaults = {
   /** Resume a paused turn when its harness reports that the account usage window has reset. */
   continueAfterUsageLimit: boolean
+  /** Minutes an idle provider process is kept before the runtime stops it. 0 keeps it until the node exits. */
+  stopIdleAfterMinutes: number
+  /** Days an archived task keeps its agent history before the node removes it. 0 keeps it forever. */
+  keepArchivedHistoryDays: number
   /**
    * Carry each change forward instead of using `pinned`. On, a model or effort switch inside a
    * session becomes the value the next session of that provider starts with.
@@ -32,6 +58,9 @@ export type AgentSessionDefaults = {
 // picked that model because it is the one you want, not only for the session you were in.
 export const defaultAgentSessionDefaults = (): AgentSessionDefaults => ({
   continueAfterUsageLimit: true,
+  stopIdleAfterMinutes: 30,
+  // Forever, because removing history cannot be undone and has to be the owner's choice.
+  keepArchivedHistoryDays: 0,
   followLastSession: true,
   pinned: {},
   last: {},
@@ -105,6 +134,14 @@ export function validateAgentSessionDefaults(
   if (record.continueAfterUsageLimit != null && typeof record.continueAfterUsageLimit !== 'boolean') {
     errors.push('continueAfterUsageLimit must be true or false.')
   }
+  if (record.stopIdleAfterMinutes != null
+    && !AGENT_IDLE_STOP_CHOICES.some((choice) => choice.minutes === record.stopIdleAfterMinutes)) {
+    errors.push(`stopIdleAfterMinutes must be one of ${AGENT_IDLE_STOP_CHOICES.map((choice) => choice.minutes).join(', ')}.`)
+  }
+  if (record.keepArchivedHistoryDays != null
+    && !AGENT_ARCHIVED_HISTORY_CHOICES.some((choice) => choice.days === record.keepArchivedHistoryDays)) {
+    errors.push(`keepArchivedHistoryDays must be one of ${AGENT_ARCHIVED_HISTORY_CHOICES.map((choice) => choice.days).join(', ')}.`)
+  }
   if (record.followLastSession != null && typeof record.followLastSession !== 'boolean') {
     errors.push('followLastSession must be true or false.')
   }
@@ -133,6 +170,8 @@ export function validateAgentSessionDefaults(
       ...(typeof record.continueAfterUsageLimit === 'boolean'
         ? { continueAfterUsageLimit: record.continueAfterUsageLimit }
         : {}),
+      ...(typeof record.stopIdleAfterMinutes === 'number' ? { stopIdleAfterMinutes: record.stopIdleAfterMinutes } : {}),
+      ...(typeof record.keepArchivedHistoryDays === 'number' ? { keepArchivedHistoryDays: record.keepArchivedHistoryDays } : {}),
       ...(typeof record.followLastSession === 'boolean' ? { followLastSession: record.followLastSession } : {}),
       ...(pinned ? { pinned } : {}),
       ...(last ? { last } : {}),

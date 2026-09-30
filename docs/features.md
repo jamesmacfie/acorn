@@ -108,7 +108,9 @@ and variable data encrypted at rest; sending is restricted to an interactive dev
 ## Settings and fleet
 
 Settings includes workspaces, appearance, notifications, integrations, MCP servers, MCP config files, agent tools, pricing, workflows,
-terminal, Docker, HTTP requests, shortcuts, Nodes, Plugins, and Security. The Notifications page
+terminal, Docker, HTTP requests, shortcuts, Nodes, Plugins, Security, and Storage and memory. Storage
+and memory shows the node's running agents and their memory, the node's own memory, its database and
+blob cache sizes, and this device's saved cache, with buttons to stop idle agents and clear the cache. The Notifications page
 switches sound, system notifications, the app-icon count, and each of the three things an agent can
 do that is worth interrupting for ([notifications.md](./notifications.md) § Settings). Nodes and plugins are
 managed per Node. With more than one Node, the shell adds Fleet home, Node labels, aggregate Agent

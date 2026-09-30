@@ -280,7 +280,7 @@ export type HookVerdict<T extends HookPayload = HookPayload> = {
  * declaration. Same shape as `CORE_EXCLUSIVE_SLOTS` below and for the same reason: a designated list
  * a plugin may name but not extend.
  */
-export const CORE_HOOK_POINTS = ['core:worktree-created', 'core:before-tool-call', 'core:before-snapshot'] as const
+export const CORE_HOOK_POINTS = ['core:worktree-created', 'core:task-archiving', 'core:before-tool-call', 'core:before-snapshot'] as const
 
 export type CoreHookPoint = (typeof CORE_HOOK_POINTS)[number]
 
@@ -337,6 +337,12 @@ export const CORE_SLOT_PROVIDER = 'core'
  *  a literal per call site. A plugin's point never appears in this list; it is minted from its
  *  manifest like any other. */
 export const AGENT_TOOL_CARD_POINT = 'agents:tool-card'
+
+/** A section on Settings > Storage and memory. A core-owned `remote` point in `stack` mode, so a plugin
+ *  that holds memory or disk on the node shows its own numbers on that page beside core's. The page is
+ *  core's and the numbers are the plugin's, which is why it is a point rather than a page of either.
+ *  A contributor gets `nodeId`, the node the page is showing. */
+export const CORE_STORAGE_POINT = 'core:storage'
 
 /** What a contributor to `agents:tool-card` is handed. JSON, because the same props reach a compiled
  *  component in this realm and a worker's tree over a port, and the two must be handed the same thing.

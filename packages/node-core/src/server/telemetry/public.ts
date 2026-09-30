@@ -1,5 +1,5 @@
 export {
-  TELEMETRY_PREF_KEY, emitError, emitEvent, emitSpan,
+  TELEMETRY_PREF_KEY, emitError, emitEvent, emitMetric, emitSpan,
   flushTelemetry, measure, onTelemetryBatch, setTelemetryPref,
   startTelemetry, stopTelemetry, telemetryEnabled,
 } from './collector.ts'

@@ -2,14 +2,18 @@
 //
 // A scroll event says the position changed and nothing about why. A surface that corrects its own
 // scroll has to tell its writes apart from the reader's, or a correction reads as the reader choosing
-// a new place and the next correction chases it. Comparing positions does not work: a WebView reports
-// fractional device pixels, and the browser clamps a write to what the content can reach. Two facts
-// do work, and this module holds both:
+// a new place and the next correction chases it. Comparing the event's position with the value asked
+// for does not work: a WebView reports fractional device pixels, and the browser clamps a write to what
+// the content can reach. Two facts do work, and this module holds both:
 //
 // - A write this surface made is marked until the frame after it, because its scroll event arrives
 //   after the write that caused it.
 // - The reader's input (a wheel, a touch, a pointer, a key) is timestamped, and a move within
 //   `GESTURE_MS` of it is theirs to explain.
+//
+// The mark says a write is in flight, not that nothing else moved. The reader can scroll in the same
+// frame, and the browser sends one scroll event for both. The Timeline also checks that the view is
+// still where its write left it, read back after the write, before it calls an event its own.
 //
 // Shared by the Timeline (../../components/content/Timeline.tsx) and the diff
 // (features/diff/diffLayout.ts). What each does with the answer differs and stays with it: the

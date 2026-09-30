@@ -41,6 +41,9 @@ export type TelemetryErrorInput = {
  * Nothing here needs a permission. Measuring your own work reads nobody else's; reading the stream
  * is `core.telemetry` and that one is a token. */
 export type PluginTelemetry = {
+  /** Whether anything is collecting. Ask before taking a value that costs something, such as a
+   *  process list, so the work is skipped rather than thrown away. */
+  enabled(): boolean
   /** Something happened, with no duration. */
   event(name: string, attrs?: TelemetryAttrs): void
   count(name: string, value?: number, attrs?: TelemetryAttrs): void

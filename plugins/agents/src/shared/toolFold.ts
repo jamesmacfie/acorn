@@ -1,6 +1,6 @@
 import type { AgentEventRecord, AgentToolCall, AgentWebActivity } from '../contract/wire.ts'
 
-// One tool card per call, in one place, because two sides now apply it.
+// One tool card per call, in one place, because several sides apply it.
 //
 // A harness reports a tool call as a run of updates on one id: the call, its output as it streams, its
 // status. On this developer's database `tool` is half of every event recorded, and a long session is
@@ -9,8 +9,9 @@ import type { AgentEventRecord, AgentToolCall, AgentWebActivity } from '../contr
 // re-projecting rows it was only going to merge. The HTTP snapshot and event pages now fold them before
 // they serialise, for a reader that asks (../server/routes/managed.ts, `fold=1`).
 //
-// The durable ledger keeps every row, and so does every other reader: workflow execution, the wait
-// route, export and search all read it unfolded.
+// The ledger itself now keeps a call as two rows, its opener and its latest state
+// (../server/sessions/ledgerFold.ts, which merges with `mergeToolCall` below). Readers that do not ask
+// for this fold, such as workflow execution, the wait route and export, get those two rows.
 
 // Field by field rather than a spread: the normalizers write absent values as present-but-undefined
 // keys, which a spread would use to wipe what an earlier update reported.

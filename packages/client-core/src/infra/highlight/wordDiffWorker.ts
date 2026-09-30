@@ -1,4 +1,5 @@
 import { measure, recordSample } from '../telemetry/emitter'
+import { registerPageFact } from '../telemetry/pageFacts'
 import { wordDiffBatch, type DiffWordsDocument, type WordDiffInput, type WordDiffOutput } from '../../kit/diff/wordDiff'
 import type { WordDiffRequest, WordDiffResponse } from './wordDiffMessages'
 
@@ -11,6 +12,7 @@ let state: 'cold' | 'live' | 'dead' = 'cold'
 let worker: Worker | null = null
 let nextId = 1
 const pending = new Map<number, Pending>()
+registerPageFact('ui.page.workers.word_diff', () => (worker ? 1 : 0))
 
 const failAll = () => {
   for (const request of pending.values()) request.resolve(null)

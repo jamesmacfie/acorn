@@ -42,7 +42,7 @@ const METHODS = [
   'snapshot', 'events', 'enqueueTurn', 'patchQueuedTurn', 'cancelTurn', 'resolveRequest',
   'implementCodexPlan',
   'patchSession', 'fork', 'compact', 'regenerateTitle', 'deleteSession', 'handoffToTerminal', 'resumeManaged',
-  'exportSession', 'wait', 'search',
+  'exportSession', 'wait', 'search', 'footprint', 'stopIdleNow',
 ] as const
 
 const fake = (over: Partial<ManagedAgentsBridge> = {}): ManagedAgentsBridge =>
@@ -201,5 +201,32 @@ describe('a task-scoped credential is confined to its own agent sessions', () =>
     // dev:node's degraded mode. "No runtime" and "not yours" are different answers.
     expect((await asTask1().fetch(req('/api/sessions/s2'), {} as Env)).status).toBe(503)
     expect((await asTask1().fetch(req('/api/sessions/s1'), {} as Env)).status).toBe(503)
+  })
+})
+
+describe('Settings > Storage and memory', () => {
+  afterEach(() => setManagedAgentsBridge(null))
+
+  it('answers a device with the numbers and runs the stop', async () => {
+    const footprint = { live: 3, idle: 2, memoryBytes: 1_300_000_000, attachmentsBytes: 10, artifactsBytes: 20 }
+    let stops = 0
+    setManagedAgentsBridge(fake({
+      footprint: async () => footprint,
+      stopIdleNow: async () => (stops++, { stopped: 2 }),
+    }))
+    const read = await authed().fetch(req('/api/footprint'), {} as Env)
+    expect(read.status).toBe(200)
+    expect(await read.json()).toEqual(footprint)
+    const stop = await authed().fetch(req('/api/stop-idle', 'POST'), {} as Env)
+    expect(await stop.json()).toEqual({ stopped: 2 })
+    expect(stops).toBe(1)
+  })
+
+  it('refuses an agent, because both reach every task on the node', async () => {
+    setManagedAgentsBridge(fake())
+    for (const app of [asTask1(), asService()]) {
+      expect((await app.fetch(req('/api/footprint'), {} as Env)).status).toBe(403)
+      expect((await app.fetch(req('/api/stop-idle', 'POST'), {} as Env)).status).toBe(403)
+    }
   })
 })

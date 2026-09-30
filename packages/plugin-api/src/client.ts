@@ -273,7 +273,7 @@ export { getHighlighter, tokenizeAnsiLines } from '@acorn/client-core/infra/high
 export { debounce } from '@acorn/client-core/kit/lib'
 export { persistDraft, readDraft, writeDraft } from '@acorn/client-core/kit/lib'
 export { formatRelativeTime } from '@acorn/client-core/kit/lib'
-export { bytesOf, formatSize } from '@acorn/client-core/kit/lib'
+export { bytesOf, formatBytes, formatSize } from '@acorn/client-core/kit/lib'
 export { latestOnly } from '@acorn/client-core/kit/lib'
 export { onClosePaneWhen, onClosePaneWithin } from '@acorn/client-core/host/keys'
 

@@ -12,6 +12,7 @@ import { broadcastWorktreeStatusChanged } from '../../notify'
 import { buildSessionEnv } from '../../taskEnv'
 import { computeTaskStatuses, isDir, loadTask, projectForTask, projectSetup, resolveTaskCwd, taskRoot, toTaskRef } from '../../worktrees/taskWorktree'
 import { applyTaskChecks, collectTaskConcerns } from '../../pluginHost/taskChecks'
+import { runHook } from '../../pluginHost/hooks'
 import { routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '../../bridge'
 import { getDb } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
@@ -123,6 +124,9 @@ async function archive(db: ReturnType<typeof getDb>, taskId: string, opts: Archi
     applyTaskChecks: async (task, ids) => {
       const row = await loadTask(db, task.id)
       return row ? applyTaskChecks(toTaskRef(row), ids) : []
+    },
+    taskArchiving: async (id) => {
+      await runHook('core:task-archiving', { taskId: id })
     },
   })
 }

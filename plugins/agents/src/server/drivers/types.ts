@@ -65,6 +65,9 @@ export type AgentDriverTurnOptions = {
 export interface AgentDriverSession {
   readonly providerSessionRef: string | null
   readonly ready: boolean
+  /** The provider child's process id, for Settings > Storage and memory. Its descendants, the MCP
+   *  servers among them, are found from it. Absent when the harness does not know one. */
+  readonly pid?: number
   sendTurn(options: AgentDriverTurnOptions): Promise<{ providerTurnRef?: string }>
   cancel(): Promise<void>
   resolveRequest(providerRequestId: string, resolution: unknown): Promise<void>

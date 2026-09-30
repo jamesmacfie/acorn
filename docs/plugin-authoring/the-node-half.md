@@ -212,6 +212,13 @@ or a throwing sink cannot reach your code. You get a lot for free without callin
 host already times and stamps your routes, your schedules, your hook handlers and every dispatch it
 makes on your behalf.
 
+A value that costs something to take, such as a process list, can ask first, so the work is skipped
+rather than done and thrown away:
+
+```js
+if (ctx.telemetry.enabled()) ctx.telemetry.gauge('processes', (await listProcesses()).length)
+```
+
 Reading the stream is a different thing and a real grant. See § Permissions.
 
 #### When there is no `ctx` in reach
