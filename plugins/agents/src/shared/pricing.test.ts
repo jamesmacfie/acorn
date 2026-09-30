@@ -53,6 +53,9 @@ describe('agent pricing preferences', () => {
     expect(codexModelPrice('gpt-5.6-terra', Date.now(), preferences)?.input).toBe(2)
     expect(codexModelPrice('gpt-6-sol', Date.now(), preferences)?.input).toBe(2)
     expect(codexModelPrice('gpt-6-luna', Date.now(), preferences)?.cacheRead).toBe(0.01)
+    expect(codexModelPrice('gpt-6.1-sol', Date.now(), preferences)?.cacheRead).toBe(0.1)
+    expect(codexModelPrice('gpt-5.5', Date.now(), preferences)?.output).toBe(30)
+    expect(codexModelPrice('gpt-5.5-pro', Date.now(), preferences)).toBeNull()
     preferences.codex.overrides.push({
       catalogId: 'gpt-5-6-terra',
       price: { input: 3, output: 13, cacheWrite: 3.75, cacheRead: 0.3 },
