@@ -18,7 +18,7 @@ vi.mock('@tanstack/solid-query', () => ({
   useQueryClient: () => ({}),
 }))
 vi.mock('../../infra/queries', () => ({
-  prefsOptions: () => ({ of: 'prefs' }),
+  nodePrefsOptions: () => ({ of: 'prefs' }),
   telemetrySummaryOptions: () => ({ of: 'summary' }),
 }))
 vi.mock('./telemetrySetting', () => ({
@@ -47,7 +47,7 @@ let dispose: () => void
 
 const mount = () => {
   dispose?.()
-  dispose = render(() => <TelemetrySettings />, host)
+  dispose = render(() => <TelemetrySettings nodeId="node-b" />, host)
 }
 
 beforeEach(() => {
@@ -70,7 +70,7 @@ describe('Settings → Telemetry', () => {
     expect(box.checked).toBe(true)
     box.checked = false
     box.dispatchEvent(new Event('change', { bubbles: true }))
-    expect(mocks.saveTelemetryOn).toHaveBeenCalledWith(expect.anything(), false)
+    expect(mocks.saveTelemetryOn).toHaveBeenCalledWith(expect.anything(), false, 'node-b')
   })
 
   it('shows what has been collected, per owner and kind, and who is reading it', () => {

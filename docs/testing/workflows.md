@@ -77,7 +77,7 @@ Next is the editor's **Generate** button
 and drives the reader from a table, and neither can see whether the teaching worked on a real model.
 
 57. With nothing to generate with, no key and no agent CLI, the editor toolbar has no **Generate**
-    between the tab strip and **Undo**. Connect one in Settings, under Integrations, reopen a workflow
+    between the tab strip and **Undo**. Add one in Settings, under AI models, reopen a workflow
     row, and press it.
     Describe the owner's first workflow in words: two agents investigate one issue from different
     angles at the same time, a third reads both and writes the synthesis, and somebody approves

@@ -1,6 +1,6 @@
 // ── Audit ─────────────────────────────────────────────────────────────────────────────────────────
 
-/** What your plugin puts on the node's audit trail, the owner-readable log in Settings → Security.
+/** What your plugin puts on the node's audit trail, the owner-readable log in Settings → Audit log.
  *
  * Declare each verb in your manifest's `contributions.auditActions`; the host replays those
  * declarations through `declare` and qualifies each as `<yourPluginId>:<actionId>`, so you cannot file

@@ -67,10 +67,17 @@ export default {
       {
         target: 'settings',
         id: 'findings-settings',
-        label: 'Findings',
+        label: 'Review after archive',
         glyph: 'list-checks',
-        group: 'general',
-        order: 55,
+        category: 'agents',
+        settingsScope: 'node',
+        order: 70,
+        // For search. The sections are the ones src/tree/FindingsSettings.tsx draws.
+        keywords: ['findings', 'review', 'suggestions', 'archive', 'model', 'memory'],
+        sections: [
+          { id: 'review', label: 'Automatic review', keywords: ['review target', 'model', 'backend'] },
+          { id: 'notifications', label: 'Notifications', keywords: ['review bundle', 'notify'] },
+        ],
         layout: 'single', regions: { body: { kind: 'remote', entry: 'settings' } },
       },
     ],

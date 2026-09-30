@@ -38,7 +38,7 @@
 .plugin-overlay-head { display: flex; align-items: center; gap: var(--space-4); }
 .plugin-overlay-body { flex: 1; min-height: 0; }
 
-/* Padded body for simple form modals (matches the Integrations settings spacing). */
+/* Padded body for simple form modals. */
 /* The body is what scrolls: .overlay caps at 70vh and hides its own overflow, so a form taller than
    that (the panel editor) would be silently clipped with its actions unreachable. min-height:0 is
    the load-bearing half: a flex child refuses to shrink below its content without it. */
@@ -60,17 +60,8 @@
    label widens that auto column and shoves every row's message to the right. */
 .will-concerns li > .ui-check { grid-column: 2 / -1; margin-top: var(--space-2); }
 
-/* Help: two-column key → description grid. */
-.help-list {
-  display: grid;
-  grid-template-columns: max-content 1fr;
-  gap: var(--space-4) var(--space-8);
-  margin: 0;
-  padding: var(--pane-pad);
-  overflow-y: auto;
-}
-/* `.help-key` is the chord capture input in the shortcuts editor as well as a static cap in the
-   overlay, so it keeps its own rule: Kbd renders a <kbd>, and an <input> cannot be one. */
+/* `.help-key` is the chord capture input in the shortcuts editor, so it keeps its own rule: Kbd
+   renders a <kbd>, and an <input> cannot be one. */
 .help-key {
   font-family: var(--font-mono);
   font-size: var(--fs-sm);
@@ -81,7 +72,6 @@
   padding: 1px var(--space-3);
   justify-self: start;
 }
-.help-desc { margin: 0; font-size: var(--fs-sm); color: var(--text-muted); align-self: center; }
 
 /* File finder: input header + scrollable result list. See docs/ui-design.md § Chrome and overlays
    for why the `.finder-*` family that used to live here is gone. */

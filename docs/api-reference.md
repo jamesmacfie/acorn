@@ -307,14 +307,14 @@ The core worktree router covers project configuration and task lifecycle surface
 /v1/core/task-statuses
 /v1/core/projects/:id/run-targets
 /v1/core/projects/:id/config
+/v1/core/projects/:id/{mcp,mcp/starter}
 /v1/core/tasks/:id/{preview-url,on-created,archive,restore}
-/v1/core/tasks/:id/{mcp,mcp/starter}
 /v1/core/tasks/:id/config-trust
 /v1/core/tasks/:id/run/*
 ```
 
 The exact method/body contracts are in `packages/node-core/src/server/routes/projects/worktree.ts`,
-`configTrust.ts`, and `harness.ts`. Executable repo configuration is hash-gated before it can be
+`projects.ts`, `configTrust.ts`, and `harness.ts`. Executable repo configuration is hash-gated before it can be
 used.
 
 ## Plugin routes

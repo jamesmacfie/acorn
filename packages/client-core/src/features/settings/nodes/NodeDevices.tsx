@@ -3,6 +3,7 @@ import type { PairedDevice } from '@acorn/protocol/node.ts'
 import { nodeDevices, revokeNodeDevice } from '../../../infra/node/fleetActions'
 import { formatLastSeen } from '../../../infra/node/freshness'
 import { Button } from '../../../kit/components/primitives'
+import { confirmAction } from '../../../host/registries/shell/willPhase'
 
 // Every client paired with one node, with a revoke per row (docs/security.md § Trust boundaries):
 // every paired device has full owner authority, which is exactly why the list has to be visible.
@@ -20,6 +21,15 @@ export default function NodeDevices(props: { nodeId: string; onError: (message: 
   )
 
   const revoke = async (device: PairedDevice) => {
+    // Revoking cuts a device off at once and takes a new pairing code to undo, so it asks first.
+    const confirmed = await confirmAction({
+      title: `Revoke ${device.name}?`,
+      actionLabel: 'Revoke',
+      goes: `${device.name} loses its access to this node, and its open connections close.`,
+      stays: 'Everything on the node stays where it is, and every other paired client keeps its access.',
+      danger: true,
+    })
+    if (!confirmed) return
     props.onError('')
     setBusy(device.id)
     try {

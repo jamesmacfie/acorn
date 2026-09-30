@@ -15,10 +15,14 @@ import {
   type KeybindingContribution,
   type ResolvedKeybinding,
 } from '../../host/registries/commands/keybindings'
-import { saveJsonPref } from './savePref'
+import { savePref } from './savePref'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { orphanedPluginOverrideIds, removeOverrideIds, visibleShortcutBindings } from './shortcutSettingsModel'
 import { Alert, Button } from '../../kit/components/primitives'
+import { SettingRow } from '../../kit/components/layout/SettingRow'
+import { SettingsSection } from '../../kit/components/layout/SettingsSection'
+import { confirmAction } from '../../host/registries/shell/willPhase'
+import { createSettingSave, type SettingSave } from './settingSave'
 
 type ShortcutGroup = {
   key: string
@@ -29,10 +33,29 @@ type ShortcutGroup = {
   claims: PluginKeyClaimGrant[]
 }
 
+// A section anchor is one word, and a group key is `core:<category>` or `plugin:<id>` with spaces and
+// capitals in it. Plugin groups keep a `plugin.` prefix so a plugin named like a core category cannot
+// take its anchor.
+const sectionId = (group: ShortcutGroup): string => {
+  const word = (text: string) => text.toLowerCase().replace(/[^a-z0-9._-]+/g, '-').replace(/^-+|-+$/g, '')
+  return group.pluginId ? `plugin.${word(group.pluginId)}` : word(group.label) || 'shortcuts'
+}
+
 export default function ShortcutsSettings() {
   const queryClient = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
-  const [error, setError] = createSignal('')
+  // A chord refused because another binding holds it, said on the row that tried to take it.
+  const [refused, setRefused] = createSignal<{ id: string; message: string }>()
+  // Save state per binding and per group, held here rather than in the rows. Every write re-resolves
+  // the bindings and redraws the groups, so state kept in a row would vanish with the error it holds.
+  const saves = new Map<string, SettingSave>()
+  const saveFor = (key: string): SettingSave => {
+    const existing = saves.get(key)
+    if (existing) return existing
+    const created = createSettingSave()
+    saves.set(key, created)
+    return created
+  }
   const contributions = () => keybindingRegistry.entries()
   const resolved = createMemo(() => visibleShortcutBindings(resolveKeybindings(contributions(), prefs.data ?? {})))
   const overrides = createMemo(() => readKeybindingOverrides(prefs.data?.[PrefKeys.keybindings]))
@@ -79,89 +102,114 @@ export default function ShortcutsSettings() {
     return [...map.values()]
   })
 
+  // Straight to savePref with `throwOnFailure`, so a failed write is said once, beside the row that
+  // made it, rather than on the row and again as a background notice.
   const saveOverrides = (next: Record<string, string | null>) =>
-    saveJsonPref(queryClient, PrefKeys.keybindings, next)
+    savePref(queryClient, PrefKeys.keybindings, JSON.stringify(next), { throwOnFailure: true })
 
-  const saveOverride = async (binding: KeybindingContribution, chord: string | null) => {
-    await saveOverrides({ ...overrides(), [binding.id]: chord })
-  }
+  const saveOverride = (binding: KeybindingContribution, chord: string | null) =>
+    saveOverrides({ ...overrides(), [binding.id]: chord })
 
-  const resetBindings = async (bindings: readonly KeybindingContribution[]) => {
+  const resetBindings = (bindings: readonly KeybindingContribution[]) => {
     const ids = bindings.map((binding) => binding.id)
-    setError('')
-    await saveOverrides(removeOverrideIds(overrides(), ids))
+    setRefused(undefined)
+    return saveOverrides(removeOverrideIds(overrides(), ids))
   }
 
-  const captureKey = (binding: KeybindingContribution, event: KeyboardEvent) => {
+  const captureKey = (binding: KeybindingContribution, save: SettingSave, event: KeyboardEvent) => {
     event.preventDefault()
     const input = event.currentTarget as HTMLElement
     if (event.key === 'Escape' || event.key === 'Tab') return input.blur()
     const chord = eventChord(event)
     if (!chord) return
     const conflict = keybindingConflict(binding.id, chord, contributions(), prefs.data ?? {})
-    if (conflict) return setError(`${formatChord(chord)} is already used by ${conflict.conflict}`)
-    setError('')
-    void saveOverride(binding, chord)
+    if (conflict) return setRefused({ id: binding.id, message: `${formatChord(chord)} is already used by ${conflict.conflict}` })
+    setRefused(undefined)
+    void save.run(() => saveOverride(binding, chord))
     input.blur()
+  }
+
+  // Only a binding with a stored choice other than its default can go back to it.
+  const changed = (binding: KeybindingContribution) =>
+    Object.prototype.hasOwnProperty.call(overrides(), binding.id) && overrides()[binding.id] !== binding.defaultChord
+
+  const cleanup = createSettingSave()
+  const removeOrphaned = async () => {
+    const ids = orphaned()
+    const confirmed = await confirmAction({
+      title: 'Remove shortcuts for removed plugins?',
+      actionLabel: 'Remove',
+      goes: `Your custom shortcuts for ${ids.length} commands from plugins that are no longer installed. If you install one of them again, its shortcuts start from its defaults.`,
+      stays: 'Your shortcuts for acorn and for every installed plugin.',
+      danger: true,
+    })
+    if (confirmed) void cleanup.run(() => saveOverrides(removeOverrideIds(overrides(), ids)))
   }
 
   return (
     <>
       <p class="muted">Click a chord, then press its replacement. Conflicts never steal an existing binding.</p>
-      <Show when={error()}><Alert>{error()}</Alert></Show>
       <For each={groups()}>
-        {(group) => (
-          <section class="shortcut-group" classList={{ 'shortcut-group-disabled': group.disabled }}>
-            <div class="settings-section-label shortcut-group-heading">
-              <span>{group.label}<Show when={group.pluginId}> · {nodeLabel()}</Show></span>
-              <Show when={group.bindings.length}>
-                <Button variant="bare" onPress={() => void resetBindings(group.bindings)}>Reset section</Button>
-              </Show>
-            </div>
-            <Show when={group.disabled}><p class="shortcut-plugin-state muted">Plugin disabled — shortcuts remain editable and will apply when it is enabled.</p></Show>
-            {/* Stays a plain <dl>: the label cell here is an editable input and the description
-                carries inline conflict text and its own buttons, all styled by `.help-list`. */}
-            <dl class="help-list">
+        {(group) => {
+          const reset = saveFor(`group:${group.key}`)
+          return (
+            <SettingsSection
+              id={sectionId(group)}
+              label={group.pluginId ? `${group.label} · ${nodeLabel()}` : group.label}
+              description={group.disabled ? 'Plugin disabled. Its shortcuts stay editable and apply when it is enabled.' : undefined}
+              actions={
+                <Show when={group.bindings.length}>
+                  <Button variant="bare" onPress={() => void reset.run(() => resetBindings(group.bindings))}>Reset section</Button>
+                </Show>
+              }
+            >
+              <Show when={reset.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
               <For each={group.bindings}>
-                {(binding) => (
-                  <>
-                    <dt>
+                {(binding) => {
+                  const save = saveFor(`binding:${binding.id}`)
+                  return (
+                    <SettingRow
+                      label={binding.description}
+                      description={binding.conflict ? `Conflicts with ${binding.conflict}` : undefined}
+                      savedAt={save.savedAt()}
+                      error={refused()?.id === binding.id ? refused()!.message : save.error()}
+                      onReset={changed(binding) ? () => void save.run(() => resetBindings([binding])) : undefined}
+                    >
+                      {/* A plain read-only input rather than the kit's Input: it captures the next key
+                          press as a chord, and `.help-key` draws it as a keycap. */}
                       <input
                         type="text"
                         class="help-key shortcut-input"
                         classList={{ 'shortcut-conflict': !!binding.conflict }}
                         readonly
                         value={binding.chord ? formatChord(binding.chord) : 'Unbound'}
-                        onKeyDown={(event) => captureKey(binding, event)}
+                        onKeyDown={(event) => captureKey(binding, save, event)}
                         aria-label={`Shortcut for ${binding.description}`}
                       />
-                    </dt>
-                    <dd class="help-desc">
-                      {binding.description}
-                      {/* Sits mid-sentence inside the description, so it keeps inline flow — the one
-                          `.action-error` site that was not a standalone message. */}
-                      <Show when={binding.conflict}><Alert> · conflicts with {binding.conflict}</Alert></Show>
-                      <Button variant="bare" label={`Unbind ${binding.description}`} onPress={() => void saveOverride(binding, null)}>×</Button>
-                      <Button variant="bare" onPress={() => void resetBindings([binding])}>Reset</Button>
-                    </dd>
-                  </>
-                )}
+                      <Button variant="bare" label={`Unbind ${binding.description}`} onPress={() => void save.run(() => saveOverride(binding, null))}>×</Button>
+                    </SettingRow>
+                  )
+                }}
               </For>
-            </dl>
-            <Show when={group.claims.length}>
-              <div class="shortcut-claims muted">
-                <For each={group.claims}>{(claim) => <div>Handled by the {claim.label} surface: {claim.chords.map(formatChord).join(', ')}</div>}</For>
-              </div>
-            </Show>
-          </section>
-        )}
+              <Show when={group.claims.length}>
+                <div class="shortcut-claims muted">
+                  <For each={group.claims}>{(claim) => <div>Handled by the {claim.label} surface: {claim.chords.map(formatChord).join(', ')}</div>}</For>
+                </div>
+              </Show>
+            </SettingsSection>
+          )
+        }}
       </For>
       <Show when={orphaned().length}>
-        <div class="settings-actions shortcut-cleanup">
-          <Button onPress={() => void saveOverrides(removeOverrideIds(overrides(), orphaned()))}>
-            Remove settings for plugins that are no longer installed ({orphaned().length})
-          </Button>
-        </div>
+        <SettingsSection id="danger" label="Danger zone" tone="danger">
+          <SettingRow
+            label="Shortcuts for removed plugins"
+            description={`${orphaned().length} saved shortcuts belong to plugins that are no longer installed.`}
+            error={cleanup.error()}
+          >
+            <Button tone="danger" onPress={() => void removeOrphaned()}>Remove</Button>
+          </SettingRow>
+        </SettingsSection>
       </Show>
     </>
   )

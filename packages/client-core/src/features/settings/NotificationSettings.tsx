@@ -1,6 +1,8 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions } from '../../infra/queries'
-import { Button, Checkbox, Field } from '../../kit/components/primitives'
+import { Button, Checkbox } from '../../kit/components/primitives'
+import { SettingRow } from '../../kit/components/layout/SettingRow'
+import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import { canSetBadge } from '../../infra/platform'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import {
@@ -11,6 +13,7 @@ import {
 } from '../notifications/settings'
 import { defaultDeliveryContext, deliverNotice } from '../notifications/deliver'
 import { activeTaskId } from '../tasks/tasks'
+import { createSettingSave, type SettingSave } from './settingSave'
 import { Show } from 'solid-js'
 
 // Settings → Notifications: the switches the gate reads
@@ -30,8 +33,15 @@ export default function NotificationSettings() {
 
   // Both through the shared merge (../notifications/settings.ts), which is the same one the palette's
   // setting commands write with: six booleans in one key means an unmerged write turns five of them off.
-  const save = (patch: Partial<Settings>) => void saveNotificationSettings(qc, settings(), patch)
-  const saveEvent = (patch: Partial<Settings['events']>) => void saveNotificationEvent(qc, settings(), patch)
+  // Each switch has its own save state, so a failed write is reported beside the switch that moved.
+  const save = (row: SettingSave, patch: Partial<Settings>) => row.run(() => saveNotificationSettings(qc, settings(), patch))
+  const saveEvent = (row: SettingSave, patch: Partial<Settings['events']>) => row.run(() => saveNotificationEvent(qc, settings(), patch))
+  const sound = createSettingSave()
+  const system = createSettingSave()
+  const badge = createSettingSave()
+  const blocked = createSettingSave()
+  const finished = createSettingSave()
+  const failed = createSettingSave()
 
   // Unseen on purpose: the point of the button is to fire every channel the switches above allow,
   // and an edge on the task you are looking at is meant to be quiet.
@@ -42,19 +52,37 @@ export default function NotificationSettings() {
 
   return (
     <>
-      <Checkbox label="Play a sound" checked={settings().sound} onChange={(sound) => save({ sound })} />
-      <Checkbox label="Show a system notification" checked={settings().system} onChange={(system) => save({ system })} />
-      <Show when={canSetBadge()}>
-        <Checkbox label="Show a count on the app icon" checked={settings().badge} onChange={(badge) => save({ badge })} />
-      </Show>
+      <SettingsSection id="channels" label="How acorn tells you">
+        <SettingRow label="Play a sound" error={sound.error()}>
+          <Checkbox switch ariaLabel="Play a sound" checked={settings().sound} onChange={(on) => save(sound, { sound: on })} />
+        </SettingRow>
+        <SettingRow label="Show a system notification" error={system.error()}>
+          <Checkbox switch ariaLabel="Show a system notification" checked={settings().system} onChange={(on) => save(system, { system: on })} />
+        </SettingRow>
+        <Show when={canSetBadge()}>
+          <SettingRow label="Show a count on the app icon" error={badge.error()}>
+            <Checkbox switch ariaLabel="Show a count on the app icon" checked={settings().badge} onChange={(on) => save(badge, { badge: on })} />
+          </SettingRow>
+        </Show>
+      </SettingsSection>
 
-      <Field label="Notify me when" group>
-        <Checkbox label="An agent needs me" checked={settings().events.blocked} onChange={(blocked) => saveEvent({ blocked })} />
-        <Checkbox label="An agent finishes" checked={settings().events.finished} onChange={(finished) => saveEvent({ finished })} />
-        <Checkbox label="An agent fails" checked={settings().events.error} onChange={(error) => saveEvent({ error })} />
-      </Field>
+      <SettingsSection id="events" label="Notify me when" description="Turning an event off also keeps it out of the notification list.">
+        <SettingRow label="An agent needs me" error={blocked.error()}>
+          <Checkbox switch ariaLabel="An agent needs me" checked={settings().events.blocked} onChange={(on) => saveEvent(blocked, { blocked: on })} />
+        </SettingRow>
+        <SettingRow label="An agent finishes" error={finished.error()}>
+          <Checkbox switch ariaLabel="An agent finishes" checked={settings().events.finished} onChange={(on) => saveEvent(finished, { finished: on })} />
+        </SettingRow>
+        <SettingRow label="An agent fails" error={failed.error()}>
+          <Checkbox switch ariaLabel="An agent fails" checked={settings().events.error} onChange={(on) => saveEvent(failed, { error: on })} />
+        </SettingRow>
+      </SettingsSection>
 
-      <Button label="Send a test notification" onPress={sendTest} />
+      <SettingsSection id="test" label="Test">
+        <SettingRow label="Test notification" description="Uses every channel that is turned on above.">
+          <Button label="Send a test notification" onPress={sendTest} />
+        </SettingRow>
+      </SettingsSection>
     </>
   )
 }

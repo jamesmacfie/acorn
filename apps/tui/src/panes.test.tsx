@@ -106,7 +106,7 @@ describe('every pane at 80 by 24', () => {
     // index, so it is the index that gets committed.
     expect(frame).toContain('Commit message')
     expect(frame).toContain('[Commit]')
-    expect(frame).toContain('Options')
+    expect(frame).toContain('[Commit options]')
   }, 60_000)
 
   it('notes: the three scopes and the notes in them', async () => {

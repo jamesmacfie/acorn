@@ -279,7 +279,7 @@ registrations it rolls back.
 `plugins/sentry-telemetry` is the one that ships, and it is the thing this whole document was built
 for. It is a loaded plugin in the bundled roster, so it is installed on every machine and does
 nothing at all until two things are true: the switch above is on, and a Sentry DSN is connected in
-Settings → Integrations. [integrations.md](./integrations.md) § Sentry owns the connection and the
+Settings → Services. [integrations.md](./integrations.md) § Sentry owns the connection and the
 two-plugin split.
 
 Its own settings page holds what the one switch does not, and every choice there is the sink's

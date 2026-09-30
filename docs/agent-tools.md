@@ -217,7 +217,10 @@ restores the prior set; successful update and unload cannot leave a stale tool o
 
 The same registry is projected into:
 
-1. `GET /v1/core/agent-tools` for the Settings → Agent tools catalog.
+1. `GET /v1/core/agent-tools` for the Settings → Tools and permissions catalog. Each entry names its
+   `owner`, the plugin id that contributed it or `core`, so the page can group a plugin's tools
+   together. The page shows the three tiers first, then every tool grouped by owner or by tier, and a
+   row names the other grouping in a chip.
 2. `/v1/core/tasks/:id/tools` and `/v1/core/tasks/:id/tools/:name` for the renderer.
 3. The stdio MCP server for a spawned agent.
 
@@ -242,7 +245,7 @@ A tier the owner has never touched falls back to `TOOL_TIER_DEFAULTS`
 (`@acorn/protocol/toolPermissions.ts`): `read` and `write` allowed, **`execute` denied**. That is the
 state every installation is in for a tool that ships in a later release, which is why the fallback
 matters more than it looks. Adding an execute tool used to grant it to everyone on upgrade with nothing
-shown to the owner; now it is inert until someone turns the tier on in Settings → Agent tools. The
+shown to the owner; now it is inert until someone turns the tier on in Settings → Tools and permissions. The
 node's `isToolPermitted` and the settings page read the same constant, so what the page draws is what
 the wire enforces.
 

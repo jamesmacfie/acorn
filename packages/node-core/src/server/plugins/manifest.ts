@@ -4,6 +4,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { z } from 'zod'
+import { foreignRailSources, RAIL_SOURCE_VISIBILITY_MAX, SETTINGS_SEARCH_MAX } from '@acorn/protocol/settingsPages.ts'
 import { NODE_CORE_FACETS } from './coreFacets'
 import { pluginManifestShape, CONTRIBUTION_KINDS } from '@acorn/protocol/plugin/contract.ts'
 import { validateDependencies, validateNodeDeclarations, validateRuntimeContributions } from './manifestValidation/node'
@@ -97,7 +98,40 @@ function unknownIn(json: unknown, manifest: PluginManifest): string[] {
     ...manifest.permissions.node.core
       .filter((facet) => !(NODE_CORE_FACETS as readonly string[]).includes(facet))
       .map((facet) => `permissions.node.core: ${facet}`),
+    ...caughtSettingsPlacements(contributions.frames, manifest.contributions.frames),
+    ...foreignRailSourceSwitches(manifest),
   ]
+}
+
+// A settings frame's `category`, `settingsScope`, `keywords` and `sections` are caught by the schema
+// rather than refused, so a value this build does not accept leaves the page in its default place, or
+// without its search entries. The parsed frame holds `undefined` where the raw one held a value, and
+// that difference is what gets reported. A list is reported by what was wrong with it, because its
+// value printed whole is a wall of text.
+function caughtSettingsPlacements(raw: unknown, parsed: PluginManifest['contributions']['frames']): string[] {
+  if (!Array.isArray(raw)) return []
+  return parsed.flatMap((frame, index) => {
+    const source: unknown = raw[index]
+    if (!isRecord(source)) return []
+    return (['category', 'settingsScope', 'keywords', 'sections', 'railSourceVisibility'] as const)
+      .filter((key) => source[key] !== undefined && frame[key] === undefined)
+      .map((key) => `contributions.frames.${frame.id}.${key}: ${Array.isArray(source[key])
+        ? key === 'railSourceVisibility'
+          ? `not accepted (at most ${RAIL_SOURCE_VISIBILITY_MAX} source ids)`
+          : `not accepted (at most ${SETTINGS_SEARCH_MAX} entries, each a short string${key === 'sections' ? ' or { id, label, keywords } with an id of its own' : ''})`
+        : String(source[key])}`)
+  })
+}
+
+// A settings page may carry the **Show in left rail** switch only for a source its own plugin declares.
+// Reported rather than refused, like the placements above: a mistyped id costs that switch, never the
+// page or the plugin. The device drops the id again when it registers the page, because a roster row is
+// bytes a node sent (client-core/host/frames/register.ts).
+function foreignRailSourceSwitches(manifest: PluginManifest): string[] {
+  const own = (manifest.contributions.sources ?? []).map((source) => source.id)
+  return manifest.contributions.frames.flatMap((frame) =>
+    foreignRailSources(frame.railSourceVisibility ?? [], own).map((id) =>
+      `contributions.frames.${frame.id}.railSourceVisibility: '${id}' is not one of this plugin's sources`))
 }
 
 /** Validate a parsed object and retain field paths in the author-facing error. The testkit uses the

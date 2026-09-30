@@ -189,7 +189,8 @@ emulator decides. OSC 9 for iTerm2, Ghostty, WezTerm and Warp, OSC 99 for kitty,
 wrapped in a tmux DCS passthrough with every ESC doubled when `TMUX` is set, and title and body
 stripped of anything that could end the sequence early. A terminal on none of those lists gets the
 BEL and nothing else. `ACORN_TUI_NOTIFY` is the switch, in the `ACORN_TUI_OSC52` pattern: `off`,
-`bell`, `terminal`, or `both`, which is the default. There is no settings page here to hold it.
+`bell`, `terminal`, or `both`, which is the default. Settings › General › Notifications shows the
+value and where it came from, and changing it means changing the variable ([tui.md](../tui.md) § Settings).
 
 Whether the terminal is the window the reader is looking at comes from DEC 1004: the parser turns
 `ESC [ I` and `ESC [ O` into a `focus` and a `blur` event, `apps/tui/src/main.tsx` feeds them to
@@ -394,7 +395,7 @@ A `Card` that takes an `onPress` is one stop and the walk does not go inside it,
 with its own controls in it reaches the card and nothing else. No first-party pane draws one; a card
 that holds controls holds them instead of a press.
 
-Two things nothing draws yet rather than draws worse. There is no settings surface, so the four
-plugins that register a settings page contribute nothing through it, and `workflows` contributes
-nothing at all. And the rail's drawer sources are the rail's browse sources, not the terminal plugin's
-profiles.
+The four plugins that register a settings page draw it in the Settings route, except the terminal
+plugin's drawer page, which the route lists and points at the desktop ([tui.md](../tui.md) § Settings).
+One thing nothing draws rather than draws worse: the rail's drawer sources are the rail's browse
+sources, not the terminal plugin's profiles.

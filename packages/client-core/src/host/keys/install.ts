@@ -118,9 +118,13 @@ export function installKeymap(root: HTMLElement, context: ScopeContext): void {
     ['nextPane', () => movePane(1)],
     ['prevPane', () => movePane(-1)],
   ]
+  // Not from inside a modal. The regions are behind it, so moving there would put focus, and every key
+  // typed after it, somewhere nobody can see: a full-window settings layer over a terminal is the case
+  // that made this matter.
+  const inModal = () => document.activeElement?.closest('[aria-modal="true"]') != null
   onCleanup(engine.registerLayer({
     priority: 5,
-    bindings: moves.flatMap(([intent, run]) => map[intent].map((key) => ({ key, cmd: run }))),
+    bindings: moves.flatMap(([intent, run]) => map[intent].map((key) => ({ key, cmd: () => !inModal() && run() }))),
   }))
 
   // The command catalog and the bindings that reach it, rebuilt whenever either registry or the

@@ -258,7 +258,8 @@ own invention, and still never sees a device token
 
 Confirmation for the four verbs is the client's, drawn from the `ToolRisk` tiers `nodeActions`
 already uses (`NODE_LIFECYCLE_RISK` in `packages/protocol/src/device/nodeProviders.ts`): `create`, `start`
-and `stop` are `write`, and `destroy` is `execute` and asks twice. Core decides those tiers, not the
+and `stop` are `write`, and `destroy` is `execute` and asks first, in the shell's one confirmation,
+which names what goes and what stays. Core decides those tiers, not the
 provider — a provider that could call its own destroy `read` would be choosing how loudly acorn warns
 about it.
 
@@ -293,11 +294,11 @@ replacement for one of acorn's own designated surfaces:
 ```
 
 **Registering seizes nothing.** Three plugins may all offer to replace the rail's task list and the
-rail keeps drawing its own. The user picks a provider in **Settings → Plugins → replaced surfaces**,
+rail keeps drawing its own. The user picks a provider in **Settings > Plugins > Rail and surfaces > Replaced surfaces**,
 and that choice is a device preference — which list a person looks at is a property of the screen they
 are looking at.
 
-The picker lives in Settings → Plugins, not Appearance, because of what the choice is about.
+The picker lives under **Settings > Plugins > Rail and surfaces**, not Appearance, because of what the choice is about.
 Appearance's colour and shape axes exist whether or not anything is installed; this picker's options
 are named after installed plugins and exist only because something is installed. It is hidden
 entirely when nobody has offered a replacement, since a select with one option cannot do anything and

@@ -35,6 +35,12 @@ in the frame — with a complete worked example.
 
 [Activation](plugins/activation.md)
 
+## Managing installed plugins
+
+Settings > Plugins > Installed, its plugin pages, the one install flow, uninstalling, and the plugin
+strip above every plugin settings page: [What the owner sees](plugins/activation.md#what-the-owner-sees).
+Rail icon visibility: [frontend.md § Rail source visibility](frontend.md#rail-source-visibility).
+
 ## Loaded plugins
 
 

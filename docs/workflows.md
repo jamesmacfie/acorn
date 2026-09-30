@@ -647,7 +647,7 @@ budget rather than reusing these session tools.
 that way, so the editor never offers to retarget one. Retry with an edited prompt patches one step of
 the frozen copy and keeps the original in the step's `inputs_json`.
 
-**A second run list.** Refused. The merged list at Settings → Runs stays as it is, the run pane is
+**A second run list.** Refused. The merged list at Settings → Run history stays as it is, the run pane is
 addressed by task, and `packages/protocol/src/runtime/runs.ts` already says when a core runs table would be
 earned.
 

@@ -257,7 +257,7 @@ The AI authoring button is not drawn when the owner has nothing to generate with
 model provider connected and no agent CLI installed either
 ([integrations.md](../integrations.md) § Model providers), on the rule the commit-message wand
 follows: a control whose only message is "connect one first" is a control in the way of the ones
-beside it, and Settings, under Integrations, is where a connection is made. Repository file drafts
+beside it, and Settings, under AI models, is where a key is added. Repository file drafts
 use the same conversation and keep their separate review-before-publication flow.
 
 One submitted instruction can make at most eight metadata requests and two candidate attempts. The

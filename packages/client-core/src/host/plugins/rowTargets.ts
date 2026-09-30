@@ -25,7 +25,7 @@ export function setPluginRowSource(pluginId: string, sourceId: string | undefine
 }
 
 /** `source` is minted in host/chrome/chromeRegister.ts, which handles it; `settings` is the shell's,
- *  because the settings modal is (apps/desktop/src/client/activate.ts). */
+ *  because the settings view is (apps/desktop/src/client/activate.ts). */
 export function pluginRowTarget(pluginId: string): NoticeTarget {
   const source = sources.get(pluginId)
   return source ? { kind: 'source', resourceId: source } : { kind: 'settings', resourceId: 'plugins' }

@@ -167,6 +167,8 @@ export const agentToolsCatalog = new Hono<AppEnv>().get('/', (c) => {
   const registry = contributions()
   if (!registry) return respondError(c, 503, 'bridge-unavailable')
   return c.json({
-    tools: registry.map((tool) => ({ name: tool.name, description: tool.description, risk: tool.risk, availability: tool.whenDescription })),
+    tools: registry.map((tool) => ({
+      name: tool.name, description: tool.description, risk: tool.risk, availability: tool.whenDescription, owner: agentToolOwner(tool.name),
+    })),
   })
 })

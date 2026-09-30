@@ -107,6 +107,7 @@ client: SearchCommand
 client: SessionSubmit
 client: SessionSummary
 client: SettingCommand
+client: SettingSave
 client: ShellSlotContribution
 client: SlotRef
 client: SourceContribution
@@ -116,6 +117,7 @@ client: Task
 client: TaskLayout
 client: TaskRowTarget
 client: TaskSlotContribution
+client: TextSetting
 client: TopbarData
 client: TopbarProps
 client: UiSlotContribution
@@ -156,7 +158,9 @@ client: createFleetQuery
 client: createLogger
 client: createOverlayPalette
 client: createProject
+client: createSettingSave
 client: createTask
+client: createTextSetting
 client: createWorkspace
 client: dataBindingSchema
 client: dataFieldSchema
@@ -288,6 +292,8 @@ client: toast
 client: token
 client: tokenizeAnsiLines
 client: tunnelUrl
+client: useSettingsDetail
+client: useUnsavedChanges
 client: validateDataValue
 client: visibleElementRect
 client: watchAppearance
@@ -720,6 +726,7 @@ ui/host: Slot
 ui/host: SlotProps
 ui/host: Wizard
 ui/host: annotationsFor
+ui/host: confirmAction
 ui/host: registerKeybindings
 ui/host: registerWillHandler
 ui/host: requestAnnotations
@@ -825,6 +832,8 @@ ui/tree: Section
 ui/tree: SectionHeader
 ui/tree: SegmentedControl
 ui/tree: Select
+ui/tree: SettingRow
+ui/tree: SettingsSection
 ui/tree: Slot
 ui/tree: Spinner
 ui/tree: SplitCell
@@ -915,6 +924,7 @@ ui: Modal
 ui: ModalActions
 ui: ModalBody
 ui: ModelBackendPicker
+ui: ModelPickerPopover
 ui: NonCodeRow
 ui: Only
 ui: Picker
@@ -932,6 +942,10 @@ ui: SectionHeader
 ui: Sections
 ui: SegmentedControl
 ui: Select
+ui: SettingRow
+ui: SettingRowProps
+ui: SettingsSection
+ui: SettingsSectionProps
 ui: Spinner
 ui: SplitCell
 ui: SplitHandle
