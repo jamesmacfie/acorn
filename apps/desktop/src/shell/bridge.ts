@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
+import { evictPreviews, evictWebview, onWebviewState, webviewOperation, type WebviewState } from './webviewTransport'
 import { decodeIdFrame } from '@acorn/protocol/ws.ts'
 import { apiRouteNamespace } from '@acorn/protocol/telemetry.ts'
 import {
@@ -214,7 +215,6 @@ const onEvent = <T>(name: string, handler: (payload: T) => void): (() => void) =
 // Both seam groups project onto one Rust command set. Preview keys are `preview:<taskId>`; plugin
 // surfaces already arrive as `plugin:...` keys and pass through unchanged.
 
-type WebviewState = { key: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
 type WebviewBlocked = { key: string; url: string; host: string }
 
 const previewKey = (taskId: string): string => `preview:${taskId}`
@@ -222,14 +222,7 @@ const previewKey = (taskId: string): string => `preview:${taskId}`
 // Rect fields cross as-is: the renderer measures its pane in CSS pixels and Rust positions the child
 // webview in logical ones, which are the same unit on both sides of the boundary.
 const setBounds = (key: string, rect: { x: number; y: number; width: number; height: number }): void =>
-  void invoke('webview_bounds', { key, rect })
-
-// One listener per group rather than one per surface: a Tauri event listener is a round trip to
-// register, and the renderer already fans these out by key.
-const onWebviewState = (cb: (state: WebviewState) => void, matches: (key: string) => boolean): (() => void) =>
-  onEvent<WebviewState>('acorn:webview-state', (state) => {
-    if (matches(state.key)) cb(state)
-  })
+  void webviewOperation(key, 'webview_bounds', { rect }).catch(() => undefined)
 
 const toWireBody = (body: unknown): WireFetchBody | undefined => {
   const value = body as { kind: 'bytes'; bytes: Uint8Array } | { kind: 'form'; parts: Record<string, unknown>[] } | undefined
@@ -358,15 +351,16 @@ const acorn = {
   },
 
   // The browser preview pane. `show` is exclusive because one task's preview is on screen at a time,
-  // and `hide` names no task because what the caller means is "no preview right now".
+  // and cleanup hides only its task so a late hide cannot cover the incoming task.
   preview: {
-    ensure: (taskId: string, url: string) => invoke<boolean>('webview_ensure', { key: previewKey(taskId), url }),
+    ensure: (taskId: string, url: string) => webviewOperation<boolean>(previewKey(taskId), 'webview_ensure', { url }),
     setBounds: (taskId: string, rect: { x: number; y: number; width: number; height: number }) => setBounds(previewKey(taskId), rect),
-    show: (taskId: string) => void invoke('webview_show', { key: previewKey(taskId), exclusive: true }),
-    hide: () => void invoke('webview_hide_family', { prefix: 'preview:' }),
-    load: (taskId: string, url: string) => void invoke('webview_load', { key: previewKey(taskId), url }),
-    command: (taskId: string, action: string) => void invoke('webview_command', { key: previewKey(taskId), action }),
-    evict: (taskId: string) => void invoke('webview_evict', { key: previewKey(taskId) }),
+    show: (taskId: string) => void webviewOperation(previewKey(taskId), 'webview_show', { exclusive: true }).catch(() => undefined),
+    hide: (taskId: string) => void webviewOperation(previewKey(taskId), 'webview_hide').catch(() => undefined),
+    load: (taskId: string, url: string) => void webviewOperation(previewKey(taskId), 'webview_load', { url }).catch(() => undefined),
+    command: (taskId: string, action: string) => void webviewOperation(previewKey(taskId), 'webview_command', { action }).catch(() => undefined),
+    evict: (taskId: string) => evictWebview(previewKey(taskId)),
+    evictAll: evictPreviews,
     onEvent: (cb: (state: { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }) => void) =>
       onWebviewState(({ key, ...rest }) => cb({ taskId: key.slice('preview:'.length), ...rest }), (key) => key.startsWith('preview:')),
   },
@@ -375,13 +369,13 @@ const acorn = {
   // `ensure` and is checked again in Rust, which is the second of the two independent checks
   // docs/shell.md § Host-owned webviews asks for.
   webview: {
-    ensure: (key: string, url: string, hosts: readonly string[]) => invoke<boolean>('webview_ensure', { key, url, hosts: [...hosts] }),
+    ensure: (key: string, url: string, hosts: readonly string[]) => webviewOperation<boolean>(key, 'webview_ensure', { url, hosts: [...hosts] }),
     setBounds,
-    show: (key: string) => void invoke('webview_show', { key, exclusive: false }),
-    hide: (key: string) => void invoke('webview_hide', { key }),
-    load: (key: string, url: string) => invoke<boolean>('webview_load', { key, url }),
-    command: (key: string, action: string) => invoke<boolean>('webview_command', { key, action }),
-    evict: (key: string) => void invoke('webview_evict', { key }),
+    show: (key: string) => void webviewOperation(key, 'webview_show', { exclusive: false }).catch(() => undefined),
+    hide: (key: string) => void webviewOperation(key, 'webview_hide').catch(() => undefined),
+    load: (key: string, url: string) => webviewOperation<boolean>(key, 'webview_load', { url }),
+    command: (key: string, action: string) => webviewOperation<boolean>(key, 'webview_command', { action }),
+    evict: (key: string) => evictWebview(key),
     onEvent: (cb: (state: WebviewState) => void) => onWebviewState(cb, (key) => key.startsWith('plugin:')),
     onBlocked: (cb: (state: WebviewBlocked) => void) => onEvent<WebviewBlocked>('acorn:webview-blocked', cb),
   },

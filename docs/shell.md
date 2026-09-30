@@ -694,6 +694,55 @@ old view. A failed replacement is reported to the pane.
 If native close fails, the shell hides and tries to blank the invalidated view, refuses further
 show/load/command calls for it, and retries close on the next `ensure`.
 
+`ensure` reconciles a normalized configured home independently of the page's browsing location.
+Rust uses Tauri's URL parser, preserving paths, ports, queries, and fragments. Equal homes and equal
+policies reuse the native document, even after a redirect or address entry. A changed home navigates
+once after native navigation accepts it. Failed navigation leaves the applied home unchanged, so a
+return or **Retry preview** can try again. **Home**, **Reload**, address entry, and history traversal
+remain explicit browser operations.
+
+The bridge registers its state listener before invoking `ensure`. Every successful reconciliation
+replays the retained URL, loading state, and shell history cursor to the mounted toolbar. It does not
+substitute the configured home for the browsing location. Operations are ordered per native key.
+Eviction advances that key's generation immediately, suppresses queued work, and orders retirement
+before any replacement. Retired native callbacks read a denied policy and stop reporting page loads.
+
+Pane cleanup removes observers and hides only its task's view. Overlay visibility changes do not call
+`ensure`. Pending configuration reads and authoritative absent URLs hide without evicting. A resolution
+error or native refusal offers **Retry preview**. A Node switch retires the shell's preview family,
+including records that outlived a renderer reload. A family generation rejects stale commands, and
+replacement owners wait for native retirement before using any task-only key.
+Only the positively identified local Node may create previews.
+Task archive, owner removal, window close, and shutdown release the corresponding resources. Loaded
+plugin pages keep their intentional unmount eviction and policy replacement behavior.
+
+### Background scheduling and document loss
+
+Acorn leaves browser background throttling at its default. Hidden pages retain their state while the
+engine retains their document, and their timers and network activity can continue at a reduced rate.
+There is no inactivity timer or automatic eviction. The shared 32-view limit remains in force.
+Retiring an incognito page discards its document and ephemeral storage.
+
+The pinned desktop stack is Tauri 2.11.5, tauri-runtime-wry 2.11.4, and wry 0.55.1. Tauri's builder
+exposes page-load events but no content-process termination callback. wry exposes a termination handler
+on macOS and iOS, but Tauri does not forward it. Acorn cannot reliably distinguish an engine unload
+from a page-requested reload or hot update through this interface. It performs no inferred automatic
+recovery and displays no invented recovery notice. **Reload** and **Home** provide explicit recovery.
+Neither an engine crash nor application restart preserves form values or complete browser history.
+The shell's history cursor tracks navigation callbacks, rather than a native back-forward list.
+
+| Platform | Scheduling | Observable process loss and recovery |
+| --- | --- | --- |
+| macOS | Default WebKit scheduling; measured in the preview acceptance record | No termination callback through Tauri; explicit Reload or Home |
+| Windows | Default WebView2 scheduling; not measured in this delivery | No portable Tauri termination callback; explicit Reload or Home |
+| Linux | Default WebKitGTK scheduling; not measured in this delivery | No portable Tauri termination callback; explicit Reload or Home |
+
+For measurements, navigation traces, and remaining graphical checks, see
+[Preview retention acceptance](./testing/preview-retention.md). The automation-only
+`webview_diagnostics` command reports web-content process IDs and physical footprints on macOS.
+It contains no page contents or URLs, adds no production telemetry, and reports no measurements on
+other platforms. Process IDs must be deduplicated before totaling shared memory.
+
 Normal development and packaged webviews expose no automation server. The explicit
 `agent-automation` build is the exception: its main Acorn webview has a loopback-only WebDriver server
 so a local development agent can inspect and operate the renderer. The feature is absent from normal
@@ -767,7 +816,9 @@ The node receives no window handle, no webview handle, and no shell object of an
 packages are bundled into them, and into the helper, except the native addons and run-time-loaded
 packages that `apps/node/externals.ts` lists. Staging materializes their installed dependency graphs under
 `dist/helper/node_modules` without pnpm directory links, so the installed helper and service resolve
-them from application resources. The shared runtime package list belongs to `scripts/nodeRuntimePackages.ts`.
+them from application resources. Shared dependencies are hoisted to that directory to keep NSIS
+input paths within Windows' legacy path limit; conflicting versions remain nested beside their
+consumers. The shared runtime package list belongs to `scripts/nodeRuntimePackages.ts`.
 Loading packages as separate files was most of the node's and the helper's startup before that. `apps/node/scripts/check-service-budget.mjs` runs after the node build, fails it when
 `service.js` and the chunks it imports statically pass a byte ceiling, and prints what is left for
 Node to resolve. Both builds write the licence text of every package they bundled beside their

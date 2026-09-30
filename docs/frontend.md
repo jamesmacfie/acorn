@@ -854,3 +854,12 @@ The kit calls a host-installed callback in `kit/lib/telemetry/workTelemetry.ts`;
 The desktop installs responsiveness monitoring in the renderer entrypoint, not the separately bundled
 preload bridge, so it observes the same consent and interaction state as the application.
 [Telemetry](telemetry.md#diagnosing-an-unresponsive-view) owns the vocabulary and diagnostic workflow.
+
+## Preview pane lifetime
+
+The preview pane mounts its toolbar and observers for the selected task. The desktop shell retains
+its browser document when that pane unmounts. The bridge registers a native state listener before
+`ensure` requests a replay, so the toolbar resumes the browsing URL and history controls without a
+fresh navigation. Visibility changes hide or show the retained native page independently of home
+reconciliation. Pending URL reads preserve the record; resolution and capacity failures offer a retry.
+See [Host-owned webviews](./shell.md#host-owned-webviews) for ownership, policy, and recovery limits.

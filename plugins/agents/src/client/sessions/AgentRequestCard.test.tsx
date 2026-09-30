@@ -107,6 +107,53 @@ describe('answering a question that takes more than one answer', () => {
   })
 })
 
+// An app-access approval (../../server/drivers/codexAppApproval.ts). The card says which app, by the
+// identifier the grant is keyed on, and what each scope means; the buttons are the stored options.
+describe('answering an app-access approval', () => {
+  const approvalRequest = (scopes: string[], withApproval = true): AgentRequest => ({
+    ...request(false),
+    kind: 'elicitation',
+    title: 'Allow Computer Use to use "Acorn Agent Test"?',
+    payload: {
+      questions: [],
+      options: [
+        { id: 'accept', label: withApproval ? 'Allow for this session' : 'Allow', kind: 'allow_once' },
+        ...(scopes.includes('always') ? [{ id: 'acceptAlways', label: 'Always allow', kind: 'allow_always' }] : []),
+        { id: 'decline', label: 'Decline', kind: 'reject_once' },
+      ],
+      ...(withApproval
+        ? { approval: { connector: 'Computer Use', app: { id: 'com.acorn.desktop.agent-test', name: 'Acorn Agent Test' }, scopes } }
+        : {}),
+    },
+  })
+  const buttons = (host: HTMLElement) => [...host.querySelectorAll('button')].map((button) => button.textContent)
+
+  it('names the app and its identifier, explains the scopes, and posts the persistent choice', async () => {
+    const host = drawRequest(approvalRequest(['session', 'always']))
+    expect(host.textContent).toContain('App: Acorn Agent Test (com.acorn.desktop.agent-test)')
+    expect(host.textContent).toContain('any app with this identifier in future sessions')
+    expect(buttons(host)).toEqual(['Allow for this session', 'Always allow', 'Decline'])
+    const always = [...host.querySelectorAll('button')].find((button) => button.textContent === 'Always allow')!
+    always.focus()
+    expect(document.activeElement).toBe(always)
+    always.click()
+    await Promise.resolve()
+    expect(posted).toEqual([{ optionId: 'acceptAlways' }])
+  })
+
+  it('offers no persistent choice or wording when only a session was advertised', () => {
+    const host = drawRequest(approvalRequest(['session']))
+    expect(buttons(host)).toEqual(['Allow for this session', 'Decline'])
+    expect(host.textContent).not.toContain('Always allow')
+  })
+
+  it('draws an older row without approval as the plain consent it was', () => {
+    const host = drawRequest(approvalRequest(['session'], false))
+    expect(buttons(host)).toEqual(['Allow', 'Decline'])
+    expect(host.textContent).not.toContain('App:')
+  })
+})
+
 // The reveal that a "Needs you" notice drives is a navigation command, not a standing state. A pane
 // derives the card's `focus` from a row it rebuilds on every streamed event, so the reveal effect is
 // re-notified while the value stays true. It must land the reader once and then leave the caret alone.
