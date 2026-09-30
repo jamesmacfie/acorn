@@ -121,6 +121,8 @@ Start with the plugin map, then follow the authoring guide or API reference.
   Rollbar, and GitHub list rows while keeping project and state scope.
 - [Native overlay layer requirements](./future/native-overlay-layer.md) — desktop overlays above
   live preview and plugin webviews, with native composition, input routing, and acceptance gates.
+- [Computer Use test approval requirements](./future/computer-use-test-approval.md) — remembered
+  approval for test builds, grant ownership and revocation, stable app identity, and instance targeting.
 - [Preview retention requirements](./future/preview-retention.md) — resume retained browser pages
   without navigation, restore toolbar state, and assess background resource use and recovery.
 - [Outdated review comments](./future/outdated-review-comments.md) — hide outdated GitHub threads
