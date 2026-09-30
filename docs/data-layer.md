@@ -389,7 +389,9 @@ privately prepares the three exact SQLite paths before starting the worker so it
 without granting the shared `plugins/` directory; the worker still opens the database lazily on first
 use. Preparation refuses a linked `plugins/` directory and checks that each state file is regular
 before opening it. POSIX hosts also use no-follow and nonblocking flags. Preparation checks the
-opened descriptor and sets its private mode through that descriptor.
+opened descriptor and, on POSIX hosts, sets its private mode through that descriptor. Windows
+preparation retains the directory and regular-file checks but relies on the data root's access
+control list for privacy; POSIX mode bits do not restrict Windows access.
 Worker and host native opens check existing database, WAL, and SHM files before handing their paths
 to SQLite; absent sidecars remain valid. Exact grants include both lexical and canonical spellings
 for data-root aliases. These checks do not remove the path replacement race before SQLite opens.
