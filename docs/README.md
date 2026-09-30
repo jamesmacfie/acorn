@@ -123,6 +123,8 @@ Start with the plugin map, then follow the authoring guide or API reference.
   live preview and plugin webviews, with native composition, input routing, and acceptance gates.
 - [Preview retention requirements](./future/preview-retention.md) — resume retained browser pages
   without navigation, restore toolbar state, and assess background resource use and recovery.
+- [Outdated review comments](./future/outdated-review-comments.md) — hide outdated GitHub threads
+  from the review code pane while preserving history and distinguishing current and historical locations.
 - `schemas/` — generated, versioned JSON Schemas that are pinned by a test and immutable by rule.
   Today that is `docs/schemas/enrollment-v1.json`.
 
