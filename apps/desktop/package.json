@@ -11,7 +11,7 @@
     "dev:agent:smoke": "node scripts/agent/session.mjs --smoke",
     "dev:agent:ui": "node scripts/agent/ui.mjs",
     "build": "pnpm run stage && pnpm run build:renderer && pnpm run check:renderer-budget && pnpm run check:runtime-syntax",
-    "dist": "pnpm run build && CI=true tauri build --config '{\"build\":{\"beforeBuildCommand\":\"\"}}' && pnpm run verify:bundle",
+    "dist": "node scripts/dist.mjs",
     "stage": "pnpm run build:service && pnpm run build:cli && pnpm run build:bundled-plugins && pnpm run build:helper && pnpm run build:bridge && node scripts/stage.mjs",
     "build:service": "pnpm --filter @acorn/node build",
     "build:cli": "pnpm --filter @acorn/cli build",

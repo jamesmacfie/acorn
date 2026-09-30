@@ -32,13 +32,13 @@
 // The default target is the development data root. `--package-root` is the generic staging seam used
 // by the desktop build: the same validated package shape is copied into application resources and
 // reconciled into the writable data root on boot.
-import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { builtinModules } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'vite'
 import solid from 'vite-plugin-solid'
+import { runPnpm } from '../../../scripts/run-pnpm.mjs'
 
 const NODE_APP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ROOT = resolve(NODE_APP, '../..')
@@ -110,7 +110,7 @@ const outDir = join(packageRoot ? resolve(packageRoot) : join(dataRoot, 'plugins
 // packages. Build it before Vite follows a client import, including for direct build:plugin calls
 // and the integration tests that invoke this script without desktop staging.
 if (pluginPackage.dependencies?.['acorn-plugin-sdk']?.startsWith('workspace:')) {
-  execFileSync('pnpm', ['--filter', 'acorn-plugin-sdk', 'build'], { cwd: ROOT, stdio: 'inherit' })
+  runPnpm(['--filter', 'acorn-plugin-sdk', 'build'], { cwd: ROOT, stdio: 'inherit' })
 }
 // Imported, not scraped. This used to be a regex over the source text of packages/protocol/src/transport/api.ts,
 // because a .mjs script cannot import a built package — but it can import a .ts file with nothing in it
