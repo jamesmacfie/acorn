@@ -214,6 +214,14 @@ export function boundProviderEvent(
           label: option.label.slice(0, 500),
         })),
         questions: event.questions?.slice(0, 50).map(boundedQuestion),
+        // The driver already refuses an identity that does not fit (codexAppApproval.ts); these
+        // bounds only keep a future driver from widening a row.
+        approval: event.approval && {
+          connector: event.approval.connector.slice(0, 200),
+          app: { id: event.approval.app.id.slice(0, 500), name: event.approval.app.name.slice(0, 200) },
+          scopes: event.approval.scopes.slice(0, 2),
+          ...(event.approval.warning ? { warning: event.approval.warning.slice(0, 2_000) } : {}),
+        },
       }
     case 'request_resolved':
       return event

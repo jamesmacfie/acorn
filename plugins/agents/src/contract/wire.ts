@@ -146,6 +146,24 @@ export type AgentPermissionOption = {
   kind: 'allow_once' | 'allow_always' | 'reject_once' | 'reject_always' | 'other'
 }
 
+/** How long an app-access grant lasts. `session` is the provider's own session, which for Codex is
+ *  the thread a managed session drives; `always` is saved by the provider for later sessions. */
+export type AgentApprovalScope = 'session' | 'always'
+
+/**
+ * An app-access approval a driver recognised in its provider's request metadata, reduced to what a
+ * person needs to decide: which app, identified how, for how long, and any warning the provider
+ * attached. The driver builds the options and the provider response; the card only reads this.
+ * `scopes` is what the provider advertised, so a persistent choice exists only when `always` does.
+ * The provider owns any grant it saves (docs/managed-agents.md § App-access approval).
+ */
+export type AgentAppApproval = {
+  connector: string
+  app: { name: string; id: string }
+  scopes: AgentApprovalScope[]
+  warning?: string
+}
+
 export type AgentQuestion = {
   id: string
   header?: string
@@ -287,7 +305,7 @@ export type AgentNormalizedEvent =
   /** Codex's completed plan item, separate from turn/plan/updated progress steps. */
   | { type: 'plan_proposal'; itemId: string; providerTurnId: string; text: string }
   | { type: 'usage'; usage: AgentUsage }
-  | { type: 'request'; requestId: string; kind: AgentRequestKind; title: string; detail?: string; options?: AgentPermissionOption[]; questions?: AgentQuestion[] }
+  | { type: 'request'; requestId: string; kind: AgentRequestKind; title: string; detail?: string; options?: AgentPermissionOption[]; questions?: AgentQuestion[]; approval?: AgentAppApproval }
   | { type: 'request_resolved'; requestId: string; resolution: unknown }
   | { type: 'artifact'; artifactId: string; kind: AgentArtifactKind; title: string; mediaType?: string; byteSize?: number }
   /** `patch` is the unified hunks for `path`, from the first `@@` on, with no file header. A change

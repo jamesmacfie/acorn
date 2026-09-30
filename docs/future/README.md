@@ -27,7 +27,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | --- | --- | --- |
 | [bundle.md](./bundle.md) | Packaging a downloadable node: native deps, the CI matrix, the snags. | DX and CLI/TUI tarball staging shipped; platform binaries, installer, container image, and desktop embedding remain. |
 | [compiled-tier.md](./compiled-tier.md) | Which compiled plugin moves to the loaded tier next and what blocks it. | Standing map. Three of its four couplings dissolved when the remote component tree shipped. |
-| [computer-use-test-approval.md](./computer-use-test-approval.md) | Remember Computer Use approval for Acorn test builds, with verified persistence, revocation, stable app identity, and exact instance targeting. | Product requirements, 2026-10-01. Not implemented. |
 | [editor-files.md](./editor-files.md) | Letting plugins render files in the editor pane: one `replace` point keyed by file, a read-only file capability, and a catalogue of renderers for third-party plugins. | Design proposal, 2026-09-29. Not started. |
 | [integration-ideas.md](./integration-ideas.md) | The catalogue of integrations a workspace could hold, and the four shapes they collapse into. | Research notes. |
 | [kimi.md](./kimi.md) | Kimi Code CLI as a contributed tier 1 harness: the manifest, the four declarations to get right, and the Kimi usage API research behind the optional probes. | Proposal, 2026-09-18. Not started. |
