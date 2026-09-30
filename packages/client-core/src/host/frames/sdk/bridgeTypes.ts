@@ -82,6 +82,11 @@ export type AcornBridge = {
     /** Open a manifest-declared cooperative destination owned by another plugin. */
     openDestination(destinationId: string, resourceId: string, subresourceId?: string): Promise<void>
     /**
+     * Go to a task on this node. Needs the `core.tasks:read` scope, and works only from a click or
+     * key handler, the same as `openUrl`. Rejects when the task is not in the reader's task list.
+     */
+    openTask(taskId: string): Promise<void>
+    /**
      * Hand an `https` URL to the host. It resolves in-app when something recognises it, such as another
      * provider's reference panel or a task pane, and opens the owner's browser otherwise. Anything but
      * `https` is refused. The promise resolving says only that the host accepted the URL: which of those

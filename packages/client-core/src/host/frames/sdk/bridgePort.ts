@@ -225,6 +225,7 @@ export function attach(port: MessagePort): Promise<AcornBridge> {
           kind: 'ui', op: 'openDestination', destinationId, resourceId,
           ...(subresourceId === undefined ? {} : { subresourceId }),
         })),
+        openTask: async (taskId) => void (await request({ kind: 'ui', op: 'openTask', taskId })),
         openUrl: async (url) => void (await request({ kind: 'ui', op: 'openUrl', url })),
         done: async () => void (await request({ kind: 'ui', op: 'importer.done' })),
         close: async (result) => void (await request({ kind: 'ui', op: 'importer.close', ...(result === undefined ? {} : { result }) })),

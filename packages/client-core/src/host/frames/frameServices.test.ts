@@ -37,6 +37,14 @@ vi.mock('../../features/notifications/toast', () => ({ toast: (...args: unknown[
 const saveJsonPref = vi.fn(async (..._args: unknown[]) => undefined)
 vi.mock('../../features/settings/savePref', () => ({ saveJsonPref: (...args: unknown[]) => saveJsonPref(...args) }))
 
+const tasks = new Map<string, { id: string }>()
+vi.mock('../../features/tasks/taskLookup', () => ({ taskById: (id: string) => tasks.get(id) }))
+const activateTaskSignals = vi.fn()
+vi.mock('../../features/tasks/activate', () => ({
+  activateTaskSignals: (...args: unknown[]) => activateTaskSignals(...args),
+  pathForTask: (task: { id: string }) => `/t/${task.id}`,
+}))
+
 const { createFrameServices } = await import('./frameServices')
 
 // The host half of the frame bridge (docs/plugins.md).
@@ -290,5 +298,27 @@ describe('cooperative destinations', () => {
   it('does nothing when the surface has no task', () => {
     build({ binding: binding({ taskId: undefined }) }).openTarget?.({ kind: 'findings-candidate', resourceId: 'candidate-1' })
     expect(openTarget).not.toHaveBeenCalled()
+  })
+})
+
+describe('openTask', () => {
+  beforeEach(() => {
+    tasks.clear()
+    activateTaskSignals.mockClear()
+    navigated.length = 0
+  })
+
+  it('finds the task first and moves only when the returned step runs', () => {
+    tasks.set('task-9', { id: 'task-9' })
+    const go = build().openTask('task-9')
+    expect(activateTaskSignals).not.toHaveBeenCalled()
+    go?.()
+    expect(activateTaskSignals).toHaveBeenCalledWith({ id: 'task-9' })
+    expect(navigated).toEqual(['/t/task-9'])
+  })
+
+  it('returns nothing for a task the list does not have', () => {
+    expect(build().openTask('task-missing')).toBeUndefined()
+    expect(navigated).toEqual([])
   })
 })

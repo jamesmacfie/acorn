@@ -174,6 +174,11 @@ that declaration. Every other loaded notice falls back to the plugin's own sourc
 local ID, target kind, and optional notice kind form the update-diff key. Adding or retargeting one
 therefore requires a new decision.
 
+**Going to a task rides the task read scope.** `ui.openTask` moves the reader to any task in their
+task list, so a surface needs `core.tasks:read`, the scope that already lets it list those tasks. It
+holds to the same person's-act rule as `openUrl`: the surface must have focus, and the two verbs share
+one navigation per second.
+
 **Four things rung 0 refuses permanently**, and each will be asked for again in words that sound
 reasonable:
 

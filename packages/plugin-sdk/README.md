@@ -63,7 +63,7 @@ signals, key-claim narrowing, subscribe bookkeeping, `mountFrame`'s failure rend
 
 `bridge.api` (five HTTP methods against your own namespace, or a core route your manifest declared a
 scope for), `bridge.events.on`, `bridge.state` (durable, host-keyed, 1 MiB a value), `bridge.ui`
-(toast, copy, openPane, openUrl, and the importer verbs), `bridge.document` for a pane composed over
+(toast, copy, openPane, openDestination, openTask, openUrl, and the importer verbs), `bridge.document` for a pane composed over
 the host's editor, `bridge.webview`, `bridge.keys.claim`, and the `onAppearance` / `onSelect` /
 `onSurfaceAction` callbacks. `bridge.context` is a snapshot of what the frame was opened to look at.
 
