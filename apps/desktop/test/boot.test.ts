@@ -98,10 +98,13 @@ beforeAll(async () => {
 
   // stderr piped rather than inherited, because that is where the boot marks are and the order of
   // them is an assertion below. They are still echoed, so a failing run reads the same as before.
+  // First-run boot must work without host tools such as OpenSSL. Remove every spelling of PATH
+  // because Windows treats environment variable names as case-insensitive.
+  const bootEnv = Object.fromEntries(Object.entries(process.env).filter(([name]) => name.toUpperCase() !== 'PATH'))
   helper = spawn(nodeBinary(), [join(STAGING, 'helper.js')], {
     cwd: dataDir,
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, ACORN_PERF: '1' },
+    env: { ...bootEnv, PATH: join(dataDir, 'no-host-tools'), ACORN_PERF: '1' },
   })
   createInterface({ input: helper.stderr! }).on('line', (line) => {
     console.error(line)
