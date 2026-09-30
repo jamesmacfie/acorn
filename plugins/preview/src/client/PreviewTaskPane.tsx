@@ -16,7 +16,11 @@ export function PreviewTaskPane(props: { task: Task }) {
 
   // Only a local node's URL may enter the native webview. A remote page could contact the client's
   // private network from a redirect or subrequest even if its first request used a tunnel.
-  const loadable = createMemo(() => previewUrlForClient(resolved()?.url ?? null))
+  const loadable = createMemo(() => {
+    if (resolved.error) return null
+    const value = resolved.latest
+    return previewUrlForClient(value?.taskId === props.task.id ? value.url : null)
+  })
 
   // The listener is per (node, task, port) and outlives a pane re-render, since the pane reconciles
   // its URL often. It closes when the task does.
@@ -33,5 +37,5 @@ export function PreviewTaskPane(props: { task: Task }) {
     onCleanup(() => closeTunnelsForTask(id))
   })
 
-  return <PreviewPane taskId={props.task.id} url={loadable()} remoteBlocked={remotePreviewBlocked()} />
+  return <PreviewPane taskId={props.task.id} url={loadable()} remoteBlocked={remotePreviewBlocked()} resolving={resolved.loading} resolutionFailed={!!resolved.error} retryResolution={() => void refetch()} />
 }

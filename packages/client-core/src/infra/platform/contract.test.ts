@@ -37,7 +37,7 @@ const fullHost = () => ({
   folderPath: { pick: vi.fn(async () => '/tmp/picked') },
   files: { pick: vi.fn(async () => []), save: vi.fn(async () => true) },
   notify: { show: vi.fn(async () => true), onActivate: vi.fn(() => () => {}), setBadge: vi.fn() },
-  preview: { ensure: vi.fn(), setBounds: vi.fn(), show: vi.fn(), hide: vi.fn(), load: vi.fn(), command: vi.fn(), evict: vi.fn(), onEvent: vi.fn() },
+  preview: { ensure: vi.fn(), setBounds: vi.fn(), show: vi.fn(), hide: vi.fn(), load: vi.fn(), command: vi.fn(), evict: vi.fn(), evictAll: vi.fn(), onEvent: vi.fn() },
   webview: { ensure: vi.fn(), setBounds: vi.fn(), show: vi.fn(), hide: vi.fn(), load: vi.fn(), command: vi.fn(), evict: vi.fn(), onEvent: vi.fn(), onBlocked: vi.fn() },
 })
 
