@@ -204,7 +204,10 @@ one staged file should not hide twenty unstaged ones from a reader who has not c
 Filling a gap needs the new side of the diff, and for a working tree that is not a ref: `git show`
 reads objects, and the new side of an unstaged diff has never been written to one. `localNewSideText`
 serves both cases, the index for a staged diff and the file on disk for an unstaged one, and refuses a
-symlink because a repo can hold one pointing anywhere and the path arrives over HTTP. The pane carries
+symlink because a repo can hold one pointing anywhere and the path arrives over HTTP. Disk reads and
+unstaged diffs, including untracked `--no-index` diffs, also use core's canonical root guard to reject
+outside links in intermediate directories and dangling links. Staged reads remain Git object reads.
+The pane carries
 the staging area in the document file's `sha`, which the viewer never reads and hands straight back
 through `fileText`. A deleted file gets a null `sha`, which is how its gaps render inert: there is no new side
 of a file that is gone.

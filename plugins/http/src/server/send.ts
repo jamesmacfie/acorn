@@ -138,19 +138,19 @@ async function resolveVarsWithSensitivity(
             file: 'bash', args: ['-lc', opened.get(row.id)!], cwd, env,
             timeoutMs: COMMAND_TIMEOUT_MS, maxOutputBytes: COMMAND_MAX_BUFFER,
           })
-          if (result.spawnError) throw new SendError(`Variable "${row.name}": command could not start: ${result.spawnError}`)
+          if (result.spawnError) throw new SendError(`Variable "${row.name}": command could not start`)
           if (result.timedOut) throw new SendError(`Variable "${row.name}": command timed out after ${COMMAND_TIMEOUT_MS / 1000} seconds`)
           if (result.truncated) throw new SendError(`Variable "${row.name}": command produced more than ${COMMAND_MAX_BUFFER} bytes of output`)
           if (result.code !== 0) {
-            const detail = result.stderr.trim().slice(0, 500)
-            throw new SendError(`Variable "${row.name}": command exited ${result.code}${detail ? `: ${detail}` : ''}`)
+            // Command diagnostics can include private values that have not resolved successfully.
+            throw new SendError(`Variable "${row.name}": command exited ${result.code}`)
           }
           const line = lastLine(result.stdout)
           if (line === null) throw new SendError(`Variable "${row.name}": command produced no output`)
           return [row.name, line] as const
         } catch (err) {
           if (err instanceof SendError) throw err
-          throw new SendError(`Variable "${row.name}": ${err instanceof Error ? err.message : 'command failed'}`)
+          throw new SendError(`Variable "${row.name}": command failed`)
         }
       }),
     )
@@ -200,15 +200,19 @@ export function buildRequest(input: HttpSendInput, vars: Record<string, string>)
   try {
     target = new URL(url)
   } catch {
-    throw new SendError(`Not a valid URL: ${url}`)
+    throw new SendError('Not a valid URL. Check the URL and its referenced variables.')
   }
   if (target.protocol !== 'http:' && target.protocol !== 'https:') {
-    throw new SendError(`Only http and https are supported (got ${target.protocol})`)
+    throw new SendError('Only http and https URLs are supported.')
   }
 
   const headers = new Headers()
-  for (const h of [...input.headers, ...applied.headers]) {
-    if (h.enabled && h.name) headers.append(interpolate(h.name, vars), interpolate(h.value, vars))
+  try {
+    for (const h of [...input.headers, ...applied.headers]) {
+      if (h.enabled && h.name) headers.append(interpolate(h.name, vars), interpolate(h.value, vars))
+    }
+  } catch {
+    throw new SendError('Request headers are invalid. Check header names and values for unsupported characters.')
   }
 
   const body = serializeBody(input.bodyMode, interpolate(input.body, vars))
@@ -254,7 +258,15 @@ export async function send(
   input: HttpSendInput,
 ): Promise<SendResult> {
   const resolved = await resolveVarsWithSensitivity(db, core, userId, projectId, input)
-  const { target, headers, body } = buildRequest(input, resolved.values)
+  let prepared: ReturnType<typeof buildRequest>
+  try {
+    prepared = buildRequest(input, resolved.values)
+  } catch (error) {
+    // URL and Headers validation must never escape with the resolved URL or header value.
+    if (error instanceof SendError) throw error
+    throw new SendError('The request could not be built. Check its URL, headers, body, and authentication settings.')
+  }
+  const { target, headers, body } = prepared
 
   const started = Date.now()
   let res: Response
@@ -272,7 +284,7 @@ export async function send(
     const described = describeFetchFailure(err, target)
     const failure = {
       error: redactResolved(described.error, resolved.sensitiveValues),
-      code: described.code,
+      code: described.code ? redactResolved(described.code, resolved.sensitiveValues) : null,
       detail: described.detail ? redactResolved(described.detail, resolved.sensitiveValues) : null,
     }
     return {
@@ -400,7 +412,7 @@ function buildFailureTimeline(
 
 function buildRequestTimeline(method: string, url: string, sent: Headers, sensitiveValues: string[]): TimelineEntry[] {
   const out: TimelineEntry[] = [{ label: 'request', detail: `${method} ${redactResolved(url, sensitiveValues)}` }]
-  for (const [k, v] of sent.entries()) out.push({ label: 'request-header', detail: `${k}: ${redact(k, redactResolved(v, sensitiveValues))}` })
+  for (const [k, v] of sent.entries()) out.push({ label: 'request-header', detail: `${redactResolved(k, sensitiveValues)}: ${redact(k, redactResolved(v, sensitiveValues))}` })
   return out
 }
 
@@ -411,8 +423,14 @@ const redact = (name: string, value: string): string => (SENSITIVE.has(name.toLo
 
 function redactResolved(input: string, sensitiveValues: string[]): string {
   let output = input
-  for (const value of sensitiveValues) {
-    for (const form of new Set([value, encodeURIComponent(value)])) {
+  for (const value of [...sensitiveValues].sort((a, b) => b.length - a.length)) {
+    // Transport diagnostics can quote form encodings, whose spaces become '+' and whose
+    // punctuation escaping differs from this executor's encodeURIComponent serialization.
+    const formValue = new URLSearchParams({ value }).toString().slice('value='.length)
+    // URL hosts and header names normalize ASCII case. Include that known normalization rather
+    // than assuming exact raw text survives request compilation.
+    const forms = [value, encodeURIComponent(value), formValue]
+    for (const form of new Set([...forms, ...forms.map((form) => form.toLowerCase())])) {
       if (form) output = output.split(form).join('••••••')
     }
   }

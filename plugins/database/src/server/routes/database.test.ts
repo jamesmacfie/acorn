@@ -110,6 +110,79 @@ const seed = async (f: Fixture) => {
   await f.core.db.insert(schema.tasks).values([task('task1', 'widget'), task('other', 'gadget')])
 }
 
+describe('portable database task authorization', () => {
+  let f: Fixture
+  beforeEach(async () => { f = fixture(); await seed(f) })
+  afterEach(() => f.cleanup())
+  const caller: Principal = { kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1' }
+  const routes = [
+    { name: 'CLI query', request: (taskId: string): [string, RequestInit?] => ['/cli/query', json({ nodeId: 'node-a', taskId, sql: 'select 1' })] },
+    { name: 'palette queries', request: (taskId: string): [string, RequestInit?] => [`/palette/queries?taskId=${taskId}`] },
+    { name: 'context options', request: (taskId: string): [string, RequestInit?] => [`/context-options?taskId=${taskId}`] },
+    { name: 'context capture', request: (taskId: string): [string, RequestInit?] => ['/context-capture', json({ taskId })] },
+  ]
+
+  it.each(routes)('$name denies foreign and unknown scope before core, saved-query, or connection work', async ({ request }) => {
+    const coreRead = vi.spyOn(f.core.db, 'select')
+    const savedRead = vi.spyOn(f.plugin.db, 'select')
+    const query = vi.fn(async () => ({ error: 'Not connected.' }))
+    const connect = vi.fn(async () => ({ ok: true as const, database: 'dev' }))
+    const bridge = fake({ query, connect })
+    const denied = []
+    for (const taskId of ['other', 'ghost']) {
+      const [path, init] = request(taskId)
+      const response = await f.call(path, init, bridge, caller)
+      expect(response.status).toBe(404)
+      denied.push(await response.json())
+    }
+    expect(denied[0]).toEqual(denied[1])
+    expect(coreRead).not.toHaveBeenCalled()
+    expect(savedRead).not.toHaveBeenCalled()
+    expect(query).not.toHaveBeenCalled()
+    expect(connect).not.toHaveBeenCalled()
+  })
+
+  it.each(routes)('$name permits the signed task and unconfined device/service readers', async ({ request }) => {
+    for (const [principal, taskId] of [
+      [caller, 'task1'],
+      [{ kind: 'device', userId: 'james' }, 'other'],
+      [{ kind: 'internal', userId: 'james', scope: 'service' }, 'other'],
+    ] as [Principal, string][]) {
+      const [path, init] = request(taskId)
+      expect((await f.call(path, init, fake(), principal)).status).toBe(200)
+    }
+  })
+
+  it.each(routes)('$name rejects a signed task that no longer exists', async ({ request }) => {
+    const [path, init] = request('ghost')
+    const query = vi.fn()
+    expect((await f.call(path, init, fake({ query }), { ...caller, taskId: 'ghost' })).status).toBe(404)
+    expect(query).not.toHaveBeenCalled()
+  })
+
+  it('allows auto-connect only after the signed task passes the route check', async () => {
+    const query = vi.fn<DatabaseBridge['query']>()
+      .mockResolvedValueOnce({ error: 'Not connected.' })
+      .mockResolvedValueOnce({ columns: ['answer'], rows: [['1']], rowCount: 1, command: 'SELECT', ms: 1 })
+    const connect = vi.fn<DatabaseBridge['connect']>().mockResolvedValue({ ok: true, database: 'dev' })
+    expect((await f.call('/cli/query', json({ nodeId: 'node-a', taskId: 'task1', sql: 'select 1' }), fake({ query, connect }), caller)).status).toBe(200)
+    expect(query).toHaveBeenCalledTimes(2)
+    expect(connect).toHaveBeenCalledExactlyOnceWith('task1')
+  })
+
+  it('rejects missing query scope and malformed task principals before reads', async () => {
+    const coreRead = vi.spyOn(f.core.db, 'select')
+    const savedRead = vi.spyOn(f.plugin.db, 'select')
+    for (const path of ['/palette/queries', '/context-options']) expect((await f.call(path, undefined, fake(), caller)).status).toBe(404)
+    for (const { request } of routes) {
+      const [path, init] = request('task1')
+      expect((await f.call(path, init, fake(), { ...caller, taskId: undefined })).status).toBe(404)
+    }
+    expect(coreRead).not.toHaveBeenCalled()
+    expect(savedRead).not.toHaveBeenCalled()
+  })
+})
+
 describe('database routes', () => {
   it('keeps the loaded CLI descriptor valid in the built manifest', async () => {
     const root = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
@@ -119,6 +192,7 @@ describe('database routes', () => {
   it('serves the CLI query through the shared read-only service with the row cap', async () => {
     const f = fixture()
     try {
+      await seed(f)
       const query = vi.fn(async () => ({ columns: ['answer'], rows: Array.from({ length: 230 }, (_, i) => [i === 0 ? null : String(i)]), rowCount: 230, command: 'SELECT', ms: 1 }))
       const bridge = fake({ query })
       const response = await f.call('/cli/query', json({ nodeId: 'node-a', taskId: 'task1', sql: 'select answer', maxRows: 200 }), bridge)
@@ -390,9 +464,7 @@ describe('the palette routes', () => {
     expect((await search('/palette/queries?taskId=task1&q=accounts')).items.map((i) => i.title)).toEqual(['signups'])
     expect((await search('/palette/queries?taskId=task1')).items).toHaveLength(2)
     expect((await f.call('/palette/queries?taskId=ghost')).status).toBe(404)
-    // No task at all is an empty list rather than a red line: the command is task-scoped, so the host
-    // only offers it with one.
-    expect((await search('/palette/queries')).items).toEqual([])
+    expect((await f.call('/palette/queries')).status).toBe(404)
   })
 
   it('generates with the first backend and that backend’s default model, and no examples', async () => {

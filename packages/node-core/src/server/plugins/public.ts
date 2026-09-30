@@ -14,3 +14,5 @@ export { createPluginReloader } from './reload.ts'
 export { pluginDbPath } from './storage.ts'
 export { approvePluginReview, hasPendingPluginReview, pendingPluginReviewIds, pluginReviewFingerprint, readPendingPluginReview } from './pendingReview.ts'
 export type { PluginDatabase } from './storage.ts'
+
+export { MAX_CLIENT_BUNDLE_BYTES, MAX_PLUGIN_MANIFEST_BYTES, PluginPackageFileError, readPluginFile } from './packageFiles.ts'

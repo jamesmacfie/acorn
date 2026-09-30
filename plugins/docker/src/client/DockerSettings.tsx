@@ -73,11 +73,11 @@ export default function DockerSettings() {
       <SettingsSection
         id="linking"
         label="Task linking"
-        description="Task↔container linking is automatic for compose stacks started in a task worktree. Stack commands (start/stop/dev servers) belong in [scripts.run.*] run targets, which get the trust gate and the run buttons on the task."
+        description="Compose worktree metadata determines task listings and cleanup. Matcher keys add summary hints without authorizing cleanup. Stack commands belong in [scripts.run.*] run targets, which use the configuration trust gate."
       >
         <SettingRow label="Per-repo matcher" description="Set in .acorn/config.toml. Each project's settings page has a Docker tab showing what its checkout sets." layout="stacked">
           <CodeBlock size="xs" copy>{`[docker]
-compose_project = "myproject"   # always link this compose project's containers
+compose_project = "myproject"   # suggest this project in the task summary
 match_labels = ["acorn.task"]   # label keys whose value equals the task's branch slug
 match_name = true               # allow the branch-slug-in-name fallback`}</CodeBlock>
         </SettingRow>

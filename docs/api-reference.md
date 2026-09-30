@@ -69,6 +69,13 @@ an exhausted attempt budget, a wrong code, or a malformed body. A caller cannot 
 hit, so there is no oracle for "right code, wrong something". The attempt counter increments before
 the code comparison runs, so racing concurrent guesses cannot dodge the budget.
 
+The route accepts at most 4 KiB of raw request bytes. It checks `Content-Length` and counts streamed
+bytes before JSON parsing. An oversized request returns `413 payload_too_large` and spends no code
+attempt. Ordinary malformed requests retain `401 pairing_failed`. A separate per-Node ceiling admits
+20 requests per minute, including malformed and oversized requests, then returns `429 rate_limited`.
+Custody's first-contact probe has an absolute eight-second deadline across connection, headers, and
+body, and a 16 KiB response ceiling. Pairing uses the pinned connection with an eight-second deadline.
+
 `POST /v1/pair` returns the device's bearer token once, in that response, and the node stores only
 its hash from then on. The node's unauthenticated probe response carries the TLS certificate
 fingerprint for the new client to compare against the node's own screen. Sending the fingerprint over
@@ -641,11 +648,21 @@ marks the Node stale and refetches. Durable agent and workflow history is read f
 PTY output, Docker logs/stats/exec, workflow notices, agent streams, and preview tunnels use the
 same authenticated socket with feature-specific frames and bounded backpressure/replay semantics.
 
+Node and custody each enforce an 8 MiB incoming event-message ceiling before parsing or dispatch.
+Oversized messages close with WebSocket code 1009. The open channel envelope remains plugin-owned;
+the transport contains synchronous and asynchronous owner-handler failures within the connection.
+
 The preview tunnel (`/v1/tunnel`, `packages/node-core/src/server/transport/tunnel.ts`) is a separate upgrade on
 the same listener, resolved from `?task=<uuid>&port=<n>` and gated by the same device and
 internal-token authorization as `/v1/events`. It forwards raw bytes to `127.0.0.1` on the named port
 only, never to a resolved hostname. Only declared ports are tunnellable, and there is no general
 SOCKS proxy to whatever else listens on the node's loopback.
+
+Both tunnel receivers enforce 64 KiB per message. Both senders split arbitrary TCP reads, including
+the custody listener's authorized request head and any body bytes read beside it, into ordered slices.
+Each sender waits for a slice's write callback before sending the next and resumes TCP reads after
+the complete chunk. Total HTTP streams can exceed the message ceiling without dropped or reordered
+bytes. Oversized incoming messages close with code 1009 and close the corresponding TCP pipe.
 
 A port counts as declared when the task's run bridge names it as a run target's URL, or when the
 project's `previewMode` is `'port'` or `'url'`. `previewMode: 'script'` is not a source, because its

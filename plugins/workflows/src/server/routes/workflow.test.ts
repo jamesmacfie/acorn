@@ -188,36 +188,42 @@ describe('workflow routes', () => {
     expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', { def, defId: 'repo:ship' }), {} as Env)).status).toBe(400)
   })
 
-  // A row skips the repo trust snapshot because it has no committed bytes to hash. An agent inside the
-  // task may still start a file, which the snapshot does cover.
-  it('lets a task-confined caller start a file by id but never a row', async () => {
-    const started: string[] = []
-    setWorkflowBridge(fake({ startById: async (_t, defId) => (started.push(defId), { runId: 'run1' }) }))
-    const app = asTask1()
-    expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', { defId: 'repo:ship' }), {} as Env)).status).toBe(200)
-    expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', { defId: 'user:ship' }), {} as Env)).status).toBe(200)
-    expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', { defId: 'a-row-uuid' }), {} as Env)).status).toBe(403)
-    expect(started).toEqual(['repo:ship', 'user:ship'])
+  it.each([
+    ['task process', { kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1' }],
+    ['restricted session', { kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1', sessionId: 'restricted', toolCeiling: { maxRisk: 'read' } }],
+    ['workflow session', { kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1', sessionId: 'workflow-step' }],
+    ['service process', { kind: 'internal', userId: 'james', scope: 'service' }],
+  ])('refuses root starts from a %s before reading the body or calling the bridge', async (_label, principal) => {
+    const start = vi.fn()
+    const startById = vi.fn()
+    setWorkflowBridge(fake({ start, startById }))
+    const app = as(principal)
+    const path = '/api/tasks/task1/workflows'
+    const requests = [
+      ...['repo:ship', 'user:ship', 'a-row-uuid'].map(defId => req(path, 'POST', { defId })),
+      req(path, 'POST', { def: { name: 'Parent', steps: [{ kind: 'workflow', childWorkflow: { ref: { source: 'database', id: 'owner-draft' } } }] } }),
+      req(path, 'POST', {}),
+      new Request(`http://acorn.test${path}`, { method: 'POST', body: '{malformed' }),
+    ]
+    for (const request of requests) {
+      const response = await app.fetch(request, {} as Env)
+      expect(response.status).toBe(403)
+      expect(await response.json()).toMatchObject({ error: { code: 'interactive_user_required' } })
+      expect(request.bodyUsed).toBe(false)
+    }
+    expect(start).not.toHaveBeenCalled()
+    expect(startById).not.toHaveBeenCalled()
+    setWorkflowBridge(null)
+    expect((await app.fetch(req(path, 'POST', { defId: 'repo:ship' }), {} as Env)).status).toBe(403)
   })
 
-  it('keeps database child definitions behind the device gate', async () => {
-    const allowed: boolean[] = []
-    setWorkflowBridge(fake({ startById: async (_taskId, _defId, _inputs, allowDatabaseDefinitions) => {
-      allowed.push(allowDatabaseDefinitions)
-      return { runId: 'run1' }
-    } }))
-    const parent = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
-      name: 'Parent',
-      steps: [{
-        name: 'child',
-        kind: 'workflow',
-        childWorkflow: { ref: { source: 'database', id: 'owner-draft' } },
-      }],
-    }
-    expect((await asTask1().fetch(req('/api/tasks/task1/workflows', 'POST', { def: parent }), {} as Env)).status).toBe(403)
-    expect((await asTask1().fetch(req('/api/tasks/task1/workflows', 'POST', { defId: 'repo:ship' }), {} as Env)).status).toBe(200)
-    expect((await authed().fetch(req('/api/tasks/task1/workflows', 'POST', { defId: 'repo:ship' }), {} as Env)).status).toBe(200)
-    expect(allowed).toEqual([false, true])
+  it.each(['repo:ship', 'user:ship', 'published-row'])('lets a device start %s with database children permitted', async defId => {
+    const startById = vi.fn(async () => ({ runId: 'run1' }))
+    setWorkflowBridge(fake({ startById }))
+    const response = await authed().fetch(req('/api/tasks/task1/workflows', 'POST', { defId }), {} as Env)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ runId: 'run1' })
+    expect(startById).toHaveBeenCalledExactlyOnceWith('task1', defId, undefined, true)
   })
 
   it('hands a task-confined caller the file layers alone', async () => {

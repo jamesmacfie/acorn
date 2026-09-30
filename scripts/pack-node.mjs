@@ -24,12 +24,12 @@
 import { execFileSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
+import { builtinModules } from 'node:module'
 import { fileURLToPath } from 'node:url'
 
-// One runtime pin, two consumers: this tarball's engines floor and the Node binary the Tauri bundle
-// ships as an external binary (docs/shell.md § Build and packaging). Keeping them in one file is what
-// stops a desktop build from shipping a runtime the standalone artifact would refuse.
-const RUNTIME_PIN = JSON.parse(readFileSync(new URL('../node-runtime.json', import.meta.url), 'utf8'))
+// The standalone manifest uses the same supported security range as the checkout.
+const workspaceManifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+const NODE_ENGINES = workspaceManifest.engines.node
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const NODE_APP = join(ROOT, 'apps/node')
@@ -100,7 +100,7 @@ function importedPackages(files) {
       for (const match of source.matchAll(pattern)) {
         const specifier = match[1]
         if (specifier.includes('${')) continue // a template placeholder in a bundled error message
-        if (specifier.startsWith('.') || specifier.startsWith('/') || specifier.startsWith('node:')) continue
+        if (specifier.startsWith('.') || specifier.startsWith('/') || specifier.startsWith('node:') || builtinModules.includes(specifier)) continue
         found.add(specifier.startsWith('@') ? specifier.split('/').slice(0, 2).join('/') : specifier.split('/')[0])
       }
     }
@@ -173,9 +173,13 @@ console.log(`[pack-node] staged ${chains} migration chains`)
 // each other's instanceof checks, which is why they are pinned there in the first place).
 const desktop = read(join(ROOT, 'apps/desktop/package.json'))
 const tui = read(join(TUI_APP, 'package.json'))
+const workspaceLines = readFileSync(join(ROOT, 'pnpm-workspace.yaml'), 'utf8').split(/\r?\n/)
+const catalogStart = workspaceLines.indexOf('catalog:') + 1
+if (catalogStart === 0) throw new Error('pnpm-workspace.yaml has no catalog section.')
+const catalogEnd = workspaceLines.findIndex((line, index) => index >= catalogStart && /^[^\s#]/.test(line))
 const catalog = Object.fromEntries(
-  readFileSync(join(ROOT, 'pnpm-workspace.yaml'), 'utf8')
-    .split(/\r?\n/)
+  workspaceLines
+    .slice(catalogStart, catalogEnd === -1 ? undefined : catalogEnd)
     .map((line) => /^\s{2}([@\w./-]+):\s*"([^"]+)"\s*$/.exec(line))
     .filter((match) => match !== null)
     .map((match) => [match[1], match[2]]),
@@ -188,6 +192,12 @@ for (const name of standaloneRuntime) {
   if (!declared) throw new Error(`${name} is in the standalone runtime set but has no declared version.`)
   const version = declared === 'catalog:' ? catalog[name] : declared
   if (!version) throw new Error(`${name} is declared as 'catalog:' but pnpm-workspace.yaml has no entry for it.`)
+  dependencies[name] = version
+}
+// A provider's compatible range can still select a release requiring a newer Node than Acorn.
+// These narrow pins match the tested workspace graph; the root manifest owns their rationale.
+for (const [name, version] of Object.entries(workspaceManifest.acornStandalone.dependencyPins)) {
+  if (!Object.hasOwn(dependencies, name)) throw new Error(`${name} is pinned but absent from the standalone runtime set.`)
   dependencies[name] = version
 }
 assertManifestCoversImports(join(staging, 'dist'), standaloneRuntime)
@@ -209,11 +219,21 @@ writeFileSync(
       // the storage engine, and it lands in the middle of the pairing banner. Scoped to this one
       // warning class rather than --no-warnings, so a real deprecation still gets through.
       scripts: { start: 'node --disable-warning=ExperimentalWarning dist/standalone.js' },
-      // The real floor is the node:sqlite surface server/storage/sqlite.ts touches: enableForeignKeyConstraints
-      // landed in 22.18/24.4, backup() and setReturnArrays earlier. npm only warns on a mismatch, but
-      // a warning that names the requirement beats "unknown option" from deep inside boot.
-      engines: { node: RUNTIME_PIN.engines },
+      // npm warns on a mismatch; plugin worker factories also enforce this security floor.
+      engines: { node: NODE_ENGINES },
       dependencies,
+      // npm does not inherit pnpm-workspace.yaml; carry the verified runtime security floors.
+      overrides: {
+        ...Object.fromEntries(
+          Object.entries(workspaceManifest.overrides).map(([name, version]) => [
+            name,
+            // npm requires a direct dependency's override to match its declared specifier. A $ref
+            // also keeps transitive copies aligned with that dependency's patched manifest floor.
+            Object.hasOwn(dependencies, name) ? `$${name}` : version,
+          ]),
+        ),
+        ...workspaceManifest.acornStandalone.peerOverrides,
+      },
     },
     null,
     2,

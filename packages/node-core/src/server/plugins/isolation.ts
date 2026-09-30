@@ -4,6 +4,7 @@ import { existsSync, realpathSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { MessageChannel, Worker } from 'node:worker_threads'
+import { assertSupportedNodeRuntime } from '@acorn/protocol/nodeRuntime.ts'
 import { PluginRpcEndpoint } from './pluginRpc'
 import { hostFunctionMode } from './hostCallModes'
 import { pluginDbPath, preparePluginDbFiles } from './storage'
@@ -48,10 +49,16 @@ const runtimeReadRoots = (bootstrap: string): string[] => {
   if (!import.meta.url.endsWith('.ts')) return [realpathSync(dirname(bootstrap))]
   const trusted = resolve(dirname(bootstrap), '..')
   const drizzle = packageRoot(fileURLToPath(import.meta.resolve('drizzle-orm')))
-  const localDrizzle = join(packageRoot(fileURLToPath(import.meta.url)), 'node_modules', 'drizzle-orm')
+  const hostPackage = packageRoot(fileURLToPath(import.meta.url))
+  const localDrizzle = join(hostPackage, 'node_modules', 'drizzle-orm')
+  const builtinPolicy = fileURLToPath(import.meta.resolve('@acorn/protocol/plugin/nodeBuiltins.ts'))
+  // Node reads package exports and resolves the lexical dependency symlink before reading source.
+  // Mirror the resolved protocol grant at this alias, without granting the node_modules directory.
+  const localProtocol = join(hostPackage, 'node_modules', '@acorn', 'protocol')
   return [
     realpathSync(trusted),
-    dirname(drizzle),
+    realpathSync(packageRoot(builtinPolicy)),
+    ...(existsSync(localProtocol) ? [localProtocol] : []),
     drizzle,
     realpathSync(drizzle),
     ...(existsSync(localDrizzle) ? [localDrizzle, realpathSync(localDrizzle)] : []),
@@ -74,6 +81,7 @@ export async function isolateNodePlugin(options: {
   migrationsFolder: string | null
   permissions: NodePermissions
 }): Promise<NodePlugin> {
+  assertSupportedNodeRuntime(process.versions.node)
   const bootstrap = workerEntrypoint()
   const packageDir = realpathSync(options.pluginDir)
   const read = new Set([bootstrap, packageDir, resolve(options.pluginDir), ...runtimeReadRoots(bootstrap)])
@@ -84,6 +92,10 @@ export async function isolateNodePlugin(options: {
   const write = new Set<string>()
   if (options.migrationsFolder) {
     for (const path of preparePluginDbFiles(options.dataRoot, options.plugin)) {
+      // SQLite receives this lexical spelling. Descriptor preflight also needs its exact-file
+      // grant when the data root is a host alias, such as /var -> /private/var on macOS.
+      read.add(resolve(path))
+      write.add(resolve(path))
       read.add(realpathSync(path))
       write.add(realpathSync(path))
     }

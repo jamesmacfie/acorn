@@ -6,6 +6,9 @@
 // boundary.
 
 export const HELPER_PROTOCOL = 1
+// Incoming JSON requests include base64 bodies; 16 MiB leaves room for an 8 MiB body and its
+// envelope. Replies have a separate 64 MiB HTTP-body ceiling in custody, before base64 encoding.
+export const MAX_HELPER_REQUEST_BYTES = 16 * 1024 * 1024
 
 // Every call is request and reply, including the ones the seam types as void. One code path is worth
 // more than the bytes a fire-and-forget notification saves, and a reply is what lets a caller see

@@ -485,6 +485,17 @@ describe('agent delegation service', () => {
     )).rejects.toMatchObject({ kind: 'bad_request' })
   })
 
+  it('withholds delegation from durable workflow sessions even without a config marker', async () => {
+    const workflow = await sessions.createSession({
+      taskId: '11111111-1111-4111-8111-111111111111', providerId: 'codex', profileId: 'codex',
+      title: 'Workflow without legacy metadata', kind: 'workflow', config: {},
+    }, PROVIDER)
+    expect(await service.canSpawn(context(workflow.taskId, workflow.id))).toBe(false)
+    await expect(service.spawn({ title: 'No', prompt: 'No', isolation: 'shared' }, context(workflow.taskId, workflow.id)))
+      .rejects.toMatchObject({ kind: 'not_found' })
+    expect(runtime.acceptSession).not.toHaveBeenCalled()
+  })
+
   it('pages and folds useful output while omitting verbose tool payloads', async () => {
     const parent = await managedCaller()
     const child = await service.spawn({ title: 'Reader', prompt: 'Report.', isolation: 'shared' }, context(parent.taskId, parent.id))

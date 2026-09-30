@@ -13,7 +13,7 @@ import { getProject, normalizeGithubPart } from '../projects'
 // What `taskRunConfig` answers: the merged run-target config plus the cwd to run it in. Named,
 // because it is a CoreServices return value rather than an internal helper's.
 export type TaskRunConfig =
-  | { targets: RunTarget[]; cwd: string; errors: { source: string; message: string }[]; layouts: LayoutRecipe[]; repoTargetIds: string[] }
+  | { targets: RunTarget[]; cwd: string; errors: { source: string; message: string }[]; layouts: LayoutRecipe[]; repoTargetIds: string[]; repoConfigHash: string | null }
   | { error: string }
 
 // The three columns a `task_links` row is read for outside core: which provider, through which

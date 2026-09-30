@@ -1,9 +1,8 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { pluginAgentToolGrants, pluginContextSectionGrants, pluginCustomAgentGrants, pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginNavigationDestinationGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/plugin/grants.ts'
 import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
-import { resolveInRoot } from '@acorn/node-core/server/core/fs.ts'
-import { readPluginManifest } from '@acorn/node-core/server/plugins'
+import { readPluginManifest, readPluginFile, MAX_CLIENT_BUNDLE_BYTES } from '@acorn/node-core/server/plugins'
 import type { PluginCache } from './pluginCache'
 import type { PluginTrustStore } from './pluginTrustStore'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
@@ -53,10 +52,8 @@ export function trustBundledClientPlugins(
     const dir = join(bundledRoot, id)
     const manifest = readPluginManifest(dir)
     if (!manifest || manifest.id !== id || !manifest.client) continue
-    const client = resolveInRoot(dir, manifest.client)
-    if (!client) continue
     try {
-      const hash = cache.putBundled(id, manifest.version, readFileSync(client))
+      const hash = cache.putBundled(id, manifest.version, readPluginFile(dir, manifest.client, MAX_CLIENT_BUNDLE_BYTES))
       trust.record({
         pluginId: id,
         hash,

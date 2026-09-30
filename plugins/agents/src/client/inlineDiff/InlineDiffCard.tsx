@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createResource, createSignal, Index, onCleanup, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { Alert, Button, Card, Inline, ModelPickerPopover, SegmentedControl, Select, Stack, Text, Textarea } from '@acorn/plugin-api/ui'
+import { Alert, Button, Card, Inline, SegmentedControl, Select, Stack, Text, Textarea } from '@acorn/plugin-api/ui'
+import { ModelPickerPopover } from '@acorn/plugin-api/ui/host'
 import type { AgentConfigOption, AgentNormalizedEvent, AgentProviderDescriptor } from '../../contract/wire.ts'
 import { sameInlineLine, type InlineDiffOrigin } from '../../contract/inlineDiff.ts'
 import { defaultAgentSessionDefaults } from '../../shared/sessionDefaults.ts'

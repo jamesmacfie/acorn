@@ -3,6 +3,23 @@ import { isDeepStrictEqual } from 'node:util'
 const owns = (value: Record<string, unknown>, key: string): boolean =>
   Object.prototype.hasOwnProperty.call(value, key)
 
+// Written by admission or a dedicated authority operation, not generic provider configuration.
+const serverOwnedKeys = [
+  'toolCeiling', 'mcpServers', 'workflowRunId', 'workflowStepId', 'delegationSpawnId', 'customAgent',
+] as const
+
+export function retainSessionAuthority(
+  requested: Record<string, unknown>,
+  current: Record<string, unknown>,
+): Record<string, unknown> {
+  const config = { ...requested }
+  for (const key of serverOwnedKeys) {
+    delete config[key]
+    if (owns(current, key)) config[key] = current[key]
+  }
+  return config
+}
+
 /**
  * Applies the caller's changes to the latest session configuration.
  *

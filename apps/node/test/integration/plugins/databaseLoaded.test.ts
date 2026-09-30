@@ -12,6 +12,7 @@ import { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilit
 import { initPlugins } from '@acorn/node-core/server/pluginHost/host.ts'
 import { pluginRouteContributions } from '@acorn/node-core/server/routes/registry.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
+import { schema } from '@acorn/node-core/server/db/index.ts'
 
 const NODE_APP = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 
@@ -20,9 +21,12 @@ describe('database as a host-mediated loaded plugin', () => {
   let core: TestDb
   let plugins: Awaited<ReturnType<typeof initPlugins>> | null = null
 
-  beforeAll(() => {
+  beforeAll(async () => {
     dataRoot = mkdtempSync(join(tmpdir(), 'acorn-database-loaded-'))
     core = makeTestDb()
+    await core.db.insert(schema.workspaces).values({ id: 'workspace-one', name: 'Fixture', isDefault: true, sort: 0, createdAt: 0, updatedAt: 0 })
+    await core.db.insert(schema.projects).values({ id: 'project-one', workspaceId: 'workspace-one', name: 'Fixture', path: null, sort: 0, hidden: false, vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null, createdAt: 0, updatedAt: 0 })
+    await core.db.insert(schema.tasks).values({ id: 'task-one', title: 'Fixture', origin: 'local', projectId: 'project-one', branch: 'main', worktreePath: null, pullNumber: null, status: 'active', parentId: null, sort: 0, createdAt: 0, updatedAt: 0, archivedAt: null })
     execFileSync(process.execPath, [join(NODE_APP, 'scripts/build-plugin.mjs'), 'database'], {
       cwd: NODE_APP,
       env: { ...process.env, ACORN_DATA_DIR: dataRoot },

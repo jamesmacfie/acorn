@@ -31,6 +31,7 @@ orientation map over the whole plugin system and it is much shorter than the ref
 | [security.md](./security.md) | The threat model, the trust boundaries, the containment ladder, and the audit trail. |
 | [node-enrollment.md](./node-enrollment.md) | How a provisioned node introduces itself to a control plane, and the versioned protocol it speaks. |
 | [security/node-plugin-security.md](./security/node-plugin-security.md) | The threat model and containment rules for loaded Node plugin code. |
+| [security/review-2026-10-01.md](./security/review-2026-10-01.md) | Ten-area security review, completed remediation ledger, verification evidence, and remaining limits. |
 
 ## The renderer
 

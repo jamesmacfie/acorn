@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AppEnv } from '@acorn/plugin-api/testkit'
 import { requireUser } from '@acorn/plugin-api/testkit'
 import type { Env } from '@acorn/plugin-api/testkit'
@@ -19,6 +19,7 @@ const task = () => as({ kind: 'internal', userId: 'james', scope: 'task', taskId
 const service = () => as({ kind: 'internal', userId: 'james', scope: 'service' })
 
 const bridge = (over: Partial<KnowledgeBridge> = {}): KnowledgeBridge => ({
+  taskMemoryScope: async (taskId) => taskId === 'task1' ? { projectId: 'project-widget' } : null,
   memoryList: async () => [],
   memorySearch: async () => [],
   memoryAdd: async () => ({ path: '/x' }),
@@ -68,5 +69,69 @@ describe('memory routes', () => {
     for (const path of ['/workspaces/global/notes', '/workspaces/ws1/notes/slug', '/tasks/task1/notes']) {
       expect((await device().fetch(req(path), {} as Env)).status).toBe(404)
     }
+  })
+
+  it.each(['/memory', '/memory/search?q=reference'])('%s denies foreign and unknown projects before index reads', async (path) => {
+    const scope = vi.fn<KnowledgeBridge['taskMemoryScope']>().mockResolvedValue({ projectId: 'project-widget' })
+    const memoryList = vi.fn(async () => [])
+    const memorySearch = vi.fn(async () => [])
+    setKnowledgeBridge(bridge({ taskMemoryScope: scope, memoryList, memorySearch }))
+    const denied = []
+    for (const projectId of ['project-foreign', 'project-unknown']) {
+      const response = await task().fetch(req(`${path}${path.includes('?') ? '&' : '?'}projectId=${projectId}`), {} as Env)
+      expect(response.status).toBe(404)
+      denied.push(await response.json())
+    }
+    expect(denied[0]).toEqual(denied[1])
+    expect(scope.mock.calls).toEqual([['task1'], ['task1']])
+    expect(memoryList).not.toHaveBeenCalled()
+    expect(memorySearch).not.toHaveBeenCalled()
+  })
+
+  it.each(['/memory', '/memory/search?q=reference'])('%s permits own project/private scope and unconfined readers', async (path) => {
+    const scope = vi.fn<KnowledgeBridge['taskMemoryScope']>().mockResolvedValue({ projectId: 'project-widget' })
+    const memoryList = vi.fn(async () => [])
+    const memorySearch = vi.fn(async () => [])
+    setKnowledgeBridge(bridge({ taskMemoryScope: scope, memoryList, memorySearch }))
+    const withProject = (projectId: string) => `${path}${path.includes('?') ? '&' : '?'}projectId=${projectId}`
+    for (const request of [req(path), req(withProject('project-widget'))]) expect((await task().fetch(request, {} as Env)).status).toBe(200)
+    expect(scope).toHaveBeenCalledTimes(2)
+    scope.mockClear()
+    for (const app of [device(), service()]) {
+      expect((await app.fetch(req(withProject('project-foreign')), {} as Env)).status).toBe(200)
+      expect((await app.fetch(req(path), {} as Env)).status).toBe(200)
+    }
+    expect(scope).not.toHaveBeenCalled()
+    const reads = path.includes('search') ? memorySearch.mock.calls : memoryList.mock.calls
+    expect(reads).toHaveLength(6)
+    if (path.includes('search')) expect(reads).toEqual([['reference', undefined, undefined], ['reference', 'project-widget', undefined], ['reference', 'project-foreign', undefined], ['reference', undefined, undefined], ['reference', 'project-foreign', undefined], ['reference', undefined, undefined]])
+    else expect(reads).toEqual([[undefined], ['project-widget'], ['project-foreign'], [undefined], ['project-foreign'], [undefined]])
+  })
+
+  it.each(['/memory', '/memory/search?q=reference'])('%s fails closed for missing tasks, missing task claims, and scope failures', async (path) => {
+    const memoryList = vi.fn(async () => [])
+    const memorySearch = vi.fn(async () => [])
+    const taskMemoryScope = vi.fn<KnowledgeBridge['taskMemoryScope']>().mockResolvedValueOnce(null).mockRejectedValueOnce(new Error('synthetic internal detail'))
+    setKnowledgeBridge(bridge({ taskMemoryScope, memoryList, memorySearch }))
+    const denied = []
+    for (const app of [task(), task(), as({ kind: 'internal', scope: 'task', userId: 'james' })]) {
+      const response = await app.fetch(req(path), {} as Env)
+      expect(response.status).toBe(404)
+      denied.push(await response.json())
+    }
+    expect(denied[0]).toEqual(denied[1])
+    expect(denied[1]).toEqual(denied[2])
+    expect(JSON.stringify(denied)).not.toContain('synthetic internal detail')
+    expect(taskMemoryScope).toHaveBeenCalledTimes(2)
+    expect(memoryList).not.toHaveBeenCalled()
+    expect(memorySearch).not.toHaveBeenCalled()
+  })
+
+  it('allows an existing task without a project to read only private memories', async () => {
+    const memoryList = vi.fn(async () => [])
+    setKnowledgeBridge(bridge({ taskMemoryScope: async () => ({ projectId: null }), memoryList }))
+    expect((await task().fetch(req('/memory'), {} as Env)).status).toBe(200)
+    expect((await task().fetch(req('/memory?projectId=project-widget'), {} as Env)).status).toBe(404)
+    expect(memoryList).toHaveBeenCalledExactlyOnceWith(undefined)
   })
 })

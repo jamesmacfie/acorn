@@ -48,6 +48,11 @@ by a node — it is `dom`. `Only` and `Fallback` are the only things that read i
 a node that wants to know which host it is on is a node about to draw something host-specific, and the
 answer to that is a `<Fallback>` child, not a branch.
 
+Compiled controls can compose these nodes without joining the remote vocabulary. For example,
+`ModelPickerPopover` on `@acorn/plugin-api/ui/host` arranges a popover, its trigger, and the model
+choices its caller supplies as JSX. The desktop and terminal hosts provide that composition. It has
+no support-matrix row because a remote tree describes the component nodes themselves.
+
 Two hosts exist, and both draw the whole kit. `dom` is the desktop and the browser, from
 `client-core/host/tree/components.ts`. `tui` is the terminal, from `apps/tui/src/kit/components.tsx`,
 since 2026-08-31 (`docs/tui.md`). The two tables have the same

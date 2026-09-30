@@ -76,7 +76,8 @@
     "hono": "catalog:",
     "jose": "^6.2.3",
     "pg": "^8.22.0",
-    "smol-toml": "^1.7.0",
+    "smol-toml": "^1.7.1",
+    "tar": "7.5.22",
     "ws": "^8.21.0",
     "zod": "catalog:"
   },
@@ -85,10 +86,10 @@
     "@types/node": "^26.0.0",
     "@types/pg": "^8.20.0",
     "@types/ws": "^8.5.13",
-    "@vitest/coverage-v8": "4.1.9",
+    "@vitest/coverage-v8": "4.1.11",
     "drizzle-kit": "^0.31.10",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.11"
   }
 }

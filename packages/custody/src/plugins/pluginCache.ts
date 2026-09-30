@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { writePrivateAtomic } from '@acorn/node-core/server/storage'
 import { join } from 'node:path'
 import { z } from 'zod'
@@ -7,11 +7,10 @@ import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { corePluginBundleByHashRoute, corePluginBundleRoute } from '@acorn/protocol/api.ts'
 import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
-import { withPluginPackage } from '@acorn/node-core/server/plugins'
+import { withPluginPackage, readPluginFile, MAX_PLUGIN_MANIFEST_BYTES, PluginPackageFileError } from '@acorn/node-core/server/plugins'
 import { hasNodeHalf, bundleSourceSchema } from '@acorn/protocol/plugin/bundles.ts'
 import type { PluginInstallSource } from '@acorn/protocol/api.ts'
 import { describePluginSource } from '@acorn/protocol/plugin/source.ts'
-import { resolveInRoot } from '@acorn/node-core/server/core/fs.ts'
 import { installSchema } from './pluginRequests'
 import { NodeResponseTooLargeError } from '../broker/nodeRequest'
 
@@ -184,14 +183,11 @@ export class PluginCache {
   async putFromSource(source: PluginInstallSource, expectedPluginId?: string): Promise<{ hash: string; pluginId: string; version: string } | { error: PutFailure }> {
     try {
       return await withPluginPackage(this.userDataDir, source, (root, manifest) => {
-        const rawManifest: unknown = JSON.parse(readFileSync(join(root, 'acorn-plugin.json'), 'utf8'))
+        const rawManifest: unknown = JSON.parse(readPluginFile(root, 'acorn-plugin.json', MAX_PLUGIN_MANIFEST_BYTES).toString('utf8'))
         if (expectedPluginId && manifest.id !== expectedPluginId) return { error: 'plugin-id-mismatch' as const }
         if (hasNodeHalf(rawManifest)) return { error: 'has-node-half' as const }
         if (!manifest.client) return { error: 'invalid-manifest' as const }
-        const path = resolveInRoot(root, manifest.client)
-        if (!path) return { error: 'invalid-manifest' as const }
-        if (statSync(path).size > MAX_BUNDLE_BYTES) return { error: 'too-large' as const }
-        const bytes = readFileSync(path)
+        const bytes = readPluginFile(root, manifest.client, MAX_BUNDLE_BYTES)
         const hash = createHash('sha256').update(bytes).digest('hex')
         this.writeBundle(hash, bytes)
         const now = Date.now()
@@ -212,6 +208,7 @@ export class PluginCache {
         return { hash, pluginId: manifest.id, version: manifest.version }
       })
     } catch (error) {
+      if (error instanceof PluginPackageFileError && error.kind === 'too-large') return { error: 'too-large' }
       log.warn(`device plugin install failed: ${describeError(error).message}`)
       throw error
     }

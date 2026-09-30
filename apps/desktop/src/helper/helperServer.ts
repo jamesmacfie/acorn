@@ -20,7 +20,7 @@ import { encodeIdFrame, type WsClientFrame } from '@acorn/protocol/ws.ts'
 import type { Helper } from '@acorn/custody/runtime'
 import { toNodeRecord } from '@acorn/custody/broker'
 import { pairWithNode, probeNode } from '@acorn/custody/broker/nodePairing.ts'
-import { decodeBytes, encodeBytes, type HelperMessage, type HelperMethod, type HelperPush, type HelperRequest, type WireFetchRequest } from '../shell/wire'
+import { MAX_HELPER_REQUEST_BYTES, decodeBytes, encodeBytes, type HelperMessage, type HelperMethod, type HelperPush, type HelperRequest, type WireFetchRequest } from '../shell/wire'
 import {
   decisionSchema,
   devGrantSchema,
@@ -74,8 +74,10 @@ const HELPER_PATH = '/helper'
 
 // Constant-time, and length-checked first because timingSafeEqual throws on a length mismatch.
 const secretMatches = (expected: string, presented: string | null): boolean => {
-  if (!presented || presented.length !== expected.length) return false
-  return timingSafeEqual(Buffer.from(presented), Buffer.from(expected))
+  if (!presented) return false
+  const a = Buffer.from(presented)
+  const b = Buffer.from(expected)
+  return a.byteLength === b.byteLength && timingSafeEqual(a, b)
 }
 
 const toFetchRequest = (wire: WireFetchRequest): unknown => {
@@ -91,10 +93,15 @@ const toFetchRequest = (wire: WireFetchRequest): unknown => {
   }
 }
 
-export function startHelperServer(helper: Helper, options: { secret: string; appOrigin: string }): Promise<HelperServer> {
+export function startHelperServer(helper: Helper, options: { secret: string; appOrigin: string; maxRequestBytes?: number }): Promise<HelperServer> {
   const { secret, appOrigin } = options
   const sockets = new Set<WebSocket>()
   const watchdogs = new Map<WebSocket, ReturnType<typeof createRendererWatchdog>>()
+  const send = (socket: WebSocket, payload: string | Uint8Array): void => {
+    if (socket.readyState !== socket.OPEN) return
+    try { socket.send(payload, (error) => { if (error) socket.terminate() }) }
+    catch { socket.terminate() }
+  }
   const watchdogTimer = setInterval(() => { for (const watchdog of watchdogs.values()) watchdog.tick() }, 1000)
   watchdogTimer.unref()
 
@@ -116,7 +123,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
     // online is exactly what the renderer is watching for on the ones it is not looking at.
     if ('push' in message && message.push === 'node-frame' && addressed !== null && message.nodeId !== addressed) return
     const payload = JSON.stringify(message)
-    for (const socket of sockets) if (socket.readyState === socket.OPEN) socket.send(payload)
+    for (const socket of sockets) send(socket, payload)
   }
   const stopConfigWatch = helper.config.watch((state) => push({ push: 'config-changed', state }))
 
@@ -127,7 +134,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
     if (addressed !== null && nodeId !== addressed) return
     const tagged = encodeIdFrame(nodeId, frame)
     if (!tagged) return // a node id this frame cannot spell; the renderer hears nothing rather than nonsense
-    for (const socket of sockets) if (socket.readyState === socket.OPEN) socket.send(tagged, { binary: true })
+    for (const socket of sockets) send(socket, tagged)
   }
 
   // Bring a remembered node's connection up (or back up). Idempotent, so this doubles as the Reconnect
@@ -362,7 +369,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
     if (!request || typeof request.id !== 'number') return
     const receivedAt = Date.now()
     const handlerFrom = performance.now()
-    const reply = (message: object): void => socket.send(JSON.stringify({
+    const reply = (message: object): void => send(socket, JSON.stringify({
       id: request.id,
       ...message,
       timing: { receivedAt, repliedAt: Date.now(), handlerMs: performance.now() - handlerFrom },
@@ -385,29 +392,36 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
   const http = createServer((_request, response) => response.writeHead(426).end())
   http.on('close', () => { stopConfigWatch(); clearInterval(watchdogTimer); watchdogs.clear() })
   http.on('error', () => { stopConfigWatch(); clearInterval(watchdogTimer) })
-  const wss = new WebSocketServer({ noServer: true })
+  const wss = new WebSocketServer({ noServer: true, maxPayload: Math.min(options.maxRequestBytes ?? MAX_HELPER_REQUEST_BYTES, MAX_HELPER_REQUEST_BYTES) })
 
   http.on('upgrade', (request, socket, head) => {
-    const url = new URL(request.url ?? '/', 'http://127.0.0.1')
-    const origin = request.headers.origin
-    if (url.pathname !== HELPER_PATH || !secretMatches(secret, url.searchParams.get('secret')) || (origin && origin !== appOrigin)) {
-      socket.destroy()
-      return
-    }
-    wss.handleUpgrade(request, socket, head, (ws) => {
-      sockets.add(ws)
-      watchdogs.set(ws, createRendererWatchdog())
-      ws.on('close', () => { sockets.delete(ws); watchdogs.delete(ws) })
-      ws.on('message', (data) => {
-        let parsed: unknown
-        try {
-          parsed = JSON.parse(String(data))
-        } catch {
-          return
-        }
-        void serve(ws, parsed)
+    const onPeerError = (): void => { socket.destroy() }
+    socket.on('error', onPeerError)
+    try {
+      const url = new URL(request.url ?? '/', 'http://127.0.0.1')
+      const origin = request.headers.origin
+      if (url.pathname !== HELPER_PATH || !secretMatches(secret, url.searchParams.get('secret')) || (origin && origin !== appOrigin)) {
+        socket.destroy()
+        return
+      }
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        sockets.add(ws)
+        watchdogs.set(ws, createRendererWatchdog())
+        const cleanup = (): void => { sockets.delete(ws); watchdogs.delete(ws) }
+        ws.on('close', cleanup)
+        ws.on('error', () => watchdogs.delete(ws))
+        socket.off('error', onPeerError)
+        ws.on('message', (data) => {
+          let parsed: unknown
+          try {
+            parsed = JSON.parse(String(data))
+          } catch {
+            return
+          }
+          void serve(ws, parsed).catch(() => ws.terminate())
+        })
       })
-    })
+    } catch { socket.destroy() }
   })
 
   // Every node remembered from a previous launch, brought up before the listener opens, so the
@@ -429,7 +443,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
         pushBytes,
         close: () =>
           new Promise<void>((done) => {
-            for (const socket of sockets) socket.close()
+            for (const socket of wss.clients) socket.terminate()
             wss.close()
             ;(http as Server).close(() => done())
           }),

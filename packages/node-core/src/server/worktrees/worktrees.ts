@@ -1,10 +1,11 @@
 import { gitOrThrow } from '../core/git'
 import { ProcessError } from '../core/proc'
-import { copyFileSync, existsSync, mkdirSync, readFileSync } from 'node:fs'
+import { constants, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { isValidBranch } from '@acorn/protocol/branch.ts'
 import type { WorktreeResult } from '@acorn/protocol/task.ts'
 import { isContainedPath, worktreeBranchDirName } from './pathGuards'
+import { resolveInRoot } from '../core/fs'
 import { invalidateWorktreeStatus, worktreeStatus, type WorktreeStatus } from './worktreeStatus'
 
 
@@ -147,21 +148,25 @@ export function copyWorktreeFiles(checkout: string, worktree: string, entries: s
       warnings.push(`copy: '${entry}' rejected, repo-relative paths only`)
       continue
     }
-    const src = resolve(checkout, entry)
-    const dst = resolve(worktree, entry)
-    // Defence in depth after the lexical check above.
-    if (!isContainedPath(checkout, src) || !isContainedPath(worktree, dst)) {
+    const src = resolveInRoot(checkout, entry)
+    const dst = resolveInRoot(worktree, entry)
+    if (!src || !dst) {
       warnings.push(`copy: '${entry}' rejected, it escapes the repo`)
       continue
     }
-    if (!existsSync(src)) {
-      warnings.push(`copy: '${entry}' is missing in the checkout, skipped`)
-      continue
-    }
-    if (existsSync(dst)) continue // never overwrite what is already there
     try {
+      const source = statSync(src, { throwIfNoEntry: false })
+      if (!source) {
+        warnings.push(`copy: '${entry}' is missing in the checkout, skipped`)
+        continue
+      }
+      if (!source.isFile()) {
+        warnings.push(`copy: '${entry}' is not a regular file, skipped`)
+        continue
+      }
+      if (lstatSync(dst, { throwIfNoEntry: false })) continue // never overwrite an entry, even a link
       mkdirSync(dirname(dst), { recursive: true })
-      copyFileSync(src, dst)
+      copyFileSync(src, dst, constants.COPYFILE_EXCL)
       copied.push(entry)
     } catch (e) {
       warnings.push(`copy: '${entry}' failed: ${e instanceof Error ? e.message : String(e)}`)

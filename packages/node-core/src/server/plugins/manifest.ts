@@ -1,9 +1,8 @@
 // Parses acorn-plugin.json at the disk trust boundary. Protocol owns field shapes shared with clients;
 // manifestValidation owns Node-only checks that connect fields across a package. The host binds
 // namespaces, storage, and permissions from the parsed id.
-import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
 import type { z } from 'zod'
+import { MAX_PLUGIN_MANIFEST_BYTES, readPluginFile } from './packageFiles'
 import { foreignRailSources, RAIL_SOURCE_VISIBILITY_MAX, SETTINGS_SEARCH_MAX } from '@acorn/protocol/settingsPages.ts'
 import { NODE_CORE_FACETS } from './coreFacets'
 import { pluginManifestShape, CONTRIBUTION_KINDS } from '@acorn/protocol/plugin/contract.ts'
@@ -174,7 +173,7 @@ export function parsePluginManifest(json: unknown, source: string = MANIFEST_FIL
 export function readPluginManifestResult(dir: string): PluginManifestResult {
   let text: string
   try {
-    text = readFileSync(join(dir, MANIFEST_FILE), 'utf8')
+    text = readPluginFile(dir, MANIFEST_FILE, MAX_PLUGIN_MANIFEST_BYTES).toString('utf8')
   } catch (error) {
     return { ok: false, reason: `${MANIFEST_FILE} is missing or unreadable: ${error instanceof Error ? error.message : String(error)}` }
   }

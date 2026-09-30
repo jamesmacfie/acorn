@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -170,6 +171,29 @@ describe('installing a device bundle', () => {
     const folder = packageFolder()
     writeFileSync(join(folder, 'acorn-plugin.json'), '{ broken json')
     await expect(cache().putFromSource({ path: folder })).rejects.toThrow()
+  })
+
+  it('shares archive special-file refusal before adding a device bundle', async () => {
+    if (process.platform === 'win32') return
+    const folder = packageFolder()
+    execFileSync('/usr/bin/mkfifo', [join(folder, 'pipe')], { timeout: 2000 })
+    const archive = join(folder, '..', 'special.tgz')
+    execFileSync('/usr/bin/tar', ['-czf', archive, '-C', folder, '.'], { timeout: 2000 })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array(readFileSync(archive)))))
+    const store = cache()
+    try {
+      await expect(store.putFromSource({ url: 'https://example.test/special.tgz' })).rejects.toThrow(/unsupported/)
+      expect(store.list()).toEqual({})
+      expect(readdirSync(dir).filter((name) => name.startsWith('.staging-'))).toEqual([])
+    } finally { vi.unstubAllGlobals() }
+  })
+
+  it('rejects an oversized local manifest before caching', async () => {
+    const folder = packageFolder()
+    writeFileSync(join(folder, 'acorn-plugin.json'), ' '.repeat(256 * 1024 + 1))
+    const store = cache()
+    await expect(store.putFromSource({ path: folder })).rejects.toThrow(/byte limit/)
+    expect(store.list()).toEqual({})
   })
 
   it('refuses a client bundle over the size limit', async () => {

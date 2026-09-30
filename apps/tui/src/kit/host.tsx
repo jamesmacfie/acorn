@@ -48,6 +48,9 @@ export type { RemoteTreeProps } from '../plugins/RemoteTree'
 // table hands the pane registry, so onboarding's overlay and a `wizard` pane are arranged alike.
 export { Wizard } from '../layouts/Wizard'
 
+// The compiled message composer uses the terminal projection of the host's model-choice control.
+export { ModelPickerPopover } from './asking/modelPickerPopover'
+
 // ── The acorn ────────────────────────────────────────────────────────────────────────────────────
 
 const ART = [' ()', ".-''-.", '/::::::\\', "'------'", '|      |', ' \\    /', '  \\  /', '   \\/']

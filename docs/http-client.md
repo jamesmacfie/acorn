@@ -38,6 +38,17 @@ sends with `fetch` under its own bounded time and response-size limits (`plugins
 A request times out after 30 seconds and a response body over 5 MB is capped while streaming, so a
 large or endless response cannot be buffered whole before the cap applies.
 
+URL, scheme, and header validation failures name the invalid field without quoting resolved content.
+They remain `SendError` preparation failures, which the route returns as 422 and the workflow handler
+persists as a failed step. Command-variable failures report their status, deadline, or output limit,
+and withhold raw command stderr, spawn diagnostics, and thrown command messages.
+
+For request URLs, request timelines, and transport diagnostics, the executor redacts resolved secret
+variables and command outputs in raw, URI-component, form URL-encoded, and lowercase forms. These
+cover common transport encodings and ASCII case normalization; they do not cover arbitrary
+derived encodings. Complete HTTP response bodies and response headers remain deliberate response
+data and can contain values returned by the chosen endpoint.
+
 Variables resolve in one pass, lowest precedence first: task builtins, then project variables, then
 per-request overrides. Only the names a request actually references get resolved, because a command
 variable's value comes from running its shell command, and an override present at send time replaces

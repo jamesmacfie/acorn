@@ -6,7 +6,7 @@
   "type": "module",
   "//engines": "The repo's own floor, from node-runtime.json. This package used to need a newer Node than the rest of the repo, because the painter reached a native library through node:ffi; it draws its own cells in TypeScript now, so there is no reason left for it to differ (docs/tui.md \u00a7 The runtime floor).",
   "engines": {
-    "node": ">=22.18 <23 || >=24.4"
+    "node": ">=22.23.2 <23 || >=24.18.1 <25 || >=26.5.1 <27"
   },
   "scripts": {
     "build": "vite build && node scripts/check-startup-graph.mjs && node scripts/check-runtime-imports.mjs",
@@ -55,7 +55,7 @@
     "pg": "^8.22.0",
     "seroval": "^1.3.3",
     "seroval-plugins": "^1.3.3",
-    "smol-toml": "^1.7.0",
+    "smol-toml": "^1.7.1",
     "solid-js": "catalog:",
     "ws": "^8.21.0",
     "yoga-layout": "3.2.1",
@@ -68,6 +68,6 @@
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
     "vite-plugin-solid": "^2.11.12",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.11"
   }
 }

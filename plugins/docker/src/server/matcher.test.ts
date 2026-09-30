@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { defaultOverrides } from './dockerConfig'
-import { branchSlug, containerMatchesTask, type MatchableContainer } from './matcher'
+import { branchSlug, containerBelongsToTask, containerMatchesTask, type MatchableContainer } from './matcher'
 
 const container = (over: Partial<MatchableContainer> = {}): MatchableContainer => ({
   name: 'web-1',
@@ -53,5 +53,42 @@ describe('containerMatchesTask', () => {
       task,
       { ...defaultOverrides, matchName: false },
     )).toBe(false)
+  })
+
+  it('refuses foreign or invalid explicit working dirs despite every matching display hint', () => {
+    const task = { worktreePath: WT, branch: 'fix/activejob-error' }
+    for (const dir of ['/foreign', `${WT}-other`, '', 'relative', `${WT}/../foreign`]) {
+      const c = container({ composeWorkingDir: dir, composeProject: 'configured', name: 'fix-activejob-error', labels: { task: 'fix-activejob-error' } })
+      expect(containerMatchesTask(c, task, { composeProject: 'configured', matchLabels: ['task'], matchName: true }), dir).toBe(false)
+    }
+  })
+})
+
+describe('containerBelongsToTask', () => {
+  it.each([
+    [WT, WT, true], [WT, `${WT}/./services/`, true], [WT, `${WT}-other`, false],
+    [WT, `${WT}/nested/../../foreign`, false], [WT, 'relative/path', false],
+    [WT, null, false], [null, WT, false], ['', WT, false], ['relative', 'relative/sub', false],
+    ['/', '/foreign', false], [WT, `${WT}\0/child`, false],
+    ['C:\\Worktrees\\Task', 'c:/worktrees/task/service/', true],
+    ['C:\\Worktrees\\Task', 'C:\\Worktrees\\Task-other', false],
+    ['C:\\Worktrees\\Task', 'C:\\Worktrees\\Task\\..\\foreign', false],
+    ['C:\\Worktrees\\Task', 'C:Worktrees\\Task', false],
+    ['C:\\Worktrees\\Task', 'D:\\Worktrees\\Task', false],
+    ['C:\\Worktrees\\Task', 'C:\\Worktrees\\Task\\ambiguous.\\service', false],
+    ['C:\\Worktrees\\Task', '\\\\?\\C:\\Worktrees\\Task', false],
+    ['\\\\.\\C:\\Worktrees\\Task', '\\\\.\\C:\\Worktrees\\Task\\service', false],
+    ['\\\\host\\share\\task', '//HOST/share/task/service', true],
+    ['\\\\host\\share\\task', '//host/share/task-other', false],
+    ['\\\\host\\share\\task', '//other/share/task', false],
+    ['\\\\host\\share\\task', '//host/share/task/../foreign', false],
+  ])('root %s and daemon path %s => %s', (worktreePath, composeWorkingDir, expected) => {
+    expect(containerBelongsToTask(container({ composeWorkingDir }), { worktreePath, branch: 'matching-branch' })).toBe(expected)
+  })
+
+  it('does not grant authority to missing-metadata display hints', () => {
+    const c = container({ name: 'matching-branch', composeProject: 'matching-branch', labels: { task: 'matching-branch' } })
+    expect(containerMatchesTask(c, { worktreePath: WT, branch: 'matching-branch' })).toBe(true)
+    expect(containerBelongsToTask(c, { worktreePath: WT, branch: 'matching-branch' })).toBe(false)
   })
 })

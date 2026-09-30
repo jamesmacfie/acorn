@@ -32,7 +32,7 @@ describe('RuntimeService over real processes', () => {
   let targets: RunTarget[]
 
   const deps: RuntimeDeps = {
-    loadTargets: async () => ({ targets, cwd: dir, repoTargetIds: [] }),
+    loadTargets: async () => ({ targets, cwd: dir, repoTargetIds: [], repoConfigHash: null }),
     startSession: async (_taskId, target, cwd) => {
       const child = spawn('/bin/sh', ['-c', target.command], { cwd })
       const id = `s${children.size + 1}`
@@ -209,7 +209,7 @@ describe('RuntimeService over real processes', () => {
     const authorized: string[] = []
     const svc = new RuntimeService({
       ...deps,
-      loadTargets: async () => ({ targets, cwd: dir, repoTargetIds: ['repo'] }),
+      loadTargets: async () => ({ targets, cwd: dir, repoTargetIds: ['repo'], repoConfigHash: 'selected-hash' }),
       authorizeRepoConfig: async (taskId) => { authorized.push(taskId) },
     })
     await svc.start('t1', 'user')

@@ -18,7 +18,7 @@ import {
   type AgentRuntimeOptions,
   type WaitCondition,
 } from './runtimeEngine'
-import { mergeSessionConfigChange } from './sessionConfigMerge'
+import { mergeSessionConfigChange, retainSessionAuthority } from './sessionConfigMerge'
 import { sessionMcpSelection, type AgentSessionMcp } from '../../shared/mcpServers'
 import { customAgentRegistry, readCustomAgents } from '../customAgents'
 import { customAgentSnapshot, sessionCustomAgent, type CustomAgent } from '../../shared/customAgents'
@@ -449,17 +449,11 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     let persistedPatch = patch
     if (patch.config) {
       assertBoundedJson('Agent session configuration', patch.config, MAX_AGENT_CONFIG_BYTES)
-      // toolCeiling is authorization state written when the session is created. The general config
-      // patch route may update provider options, but it may neither add, widen, nor remove that field.
-      // The session's MCP servers are the same kind of field, changed only through
-      // setSessionMcpServers(), which checks each name against Settings and restarts the provider.
-      const clientConfig = { ...patch.config }
-      delete clientConfig.toolCeiling
-      delete clientConfig.mcpServers
-      const kept = (key: string) => Object.prototype.hasOwnProperty.call(before.config, key) ? { [key]: before.config[key] } : {}
+      // General replacement changes provider options, but retains admitted authority and identity.
+      // MCP selection has its own operation, which checks Settings and restarts the provider.
       persistedPatch = {
         ...patch,
-        config: { ...clientConfig, ...kept('toolCeiling'), ...kept('mcpServers') },
+        config: retainSessionAuthority(patch.config, before.config),
       }
       const previousOptions = Array.isArray(before.config.configOptions)
         ? before.config.configOptions as Array<{ id?: unknown; currentValue?: unknown }>
@@ -507,7 +501,9 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       const latest = await this.store.requireSession(sessionId)
       persistedPatch = {
         ...persistedPatch,
-        config: mergeSessionConfigChange(before.config, persistedPatch.config!, latest.config),
+        config: retainSessionAuthority(
+          mergeSessionConfigChange(before.config, persistedPatch.config!, latest.config), latest.config,
+        ),
       }
       assertBoundedJson('Agent session configuration', persistedPatch.config, MAX_AGENT_CONFIG_BYTES)
     }

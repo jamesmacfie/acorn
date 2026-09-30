@@ -230,6 +230,11 @@ failed silently, because an unresolved repo simply opens the real `github.com` U
 
 ## Importing projects
 
+`POST /v1/p/github/import` requires a paired device because importing creates or repoints a core
+project and can clone into an owner-selected folder. Task and service credentials receive
+`403 interactive_user_required` before body parsing, mirror reads, or Git and project operations.
+This gate does not change the authority of other GitHub provider routes.
+
 Projects → Import from GitHub discovers repositories from the plugin's disposable mirror. A
 repository is either mapped to an existing folder or cloned with non-interactive Git. Both ask for
 the folder before anything is written, so cancelling the dialog cancels the import. There is no third

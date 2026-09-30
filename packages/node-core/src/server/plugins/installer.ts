@@ -14,8 +14,8 @@
 // runs it at the node's next start (pluginLoader.ts), which is why every result says
 // `installed-restart-required` rather than pretending the plugin is live.
 import { createHash, randomUUID } from 'node:crypto'
-import { createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, symlinkSync } from 'node:fs'
-import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync } from 'node:fs'
+import { isAbsolute, join, resolve } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type {
@@ -26,8 +26,9 @@ import type {
 } from '@acorn/protocol/api.ts'
 import { describePluginSource, guardPluginUrl, resolvePluginSource, RELEASE_ASSET } from '@acorn/protocol/plugin/source.ts'
 import { writePrivateAtomic } from '../storage/dataRoot'
-import { runProcess } from '../core/proc'
-import { resolveInRoot } from '../core/fs'
+import { unpackPluginArchive } from './archive'
+import { assertPluginPackageTree } from './packageTree'
+import { hashPluginFile, visitPluginFile, MAX_CLIENT_BUNDLE_BYTES, MAX_PLUGIN_FILE_BYTES } from './packageFiles'
 import { MANIFEST_FILE, PLUGIN_API_MAJOR, readPluginManifestResult, speaksApiVersion, type PluginManifest } from './manifest'
 import { pluginDbPath, PLUGIN_DB_DIR } from './storage'
 import { markPluginRemoved, markPluginUserManaged } from './bundledState'
@@ -38,7 +39,6 @@ import { hasPendingPluginReview, pluginReviewFingerprint, removePluginReview, st
 // gigabyte to disk because a URL said so.
 export const MAX_ARCHIVE_BYTES = 32 * 1024 * 1024
 const DOWNLOAD_TIMEOUT_MS = 60_000
-const UNPACK_TIMEOUT_MS = 120_000
 
 // The convention this phase establishes: a GitHub release carries the package as one asset with this
 // exact name.
@@ -161,17 +161,11 @@ async function download(url: string, dest: string, expectIntegrity?: string): Pr
 }
 
 async function unpack(archive: string, into: string): Promise<void> {
-  mkdirSync(into, { recursive: true, mode: 0o700 })
-  // Shelling out to tar, the same way server/storage/backup.ts writes one. No `-P`, so absolute paths and `..`
-  // members are stripped or refused by tar itself; the symlink walk below closes the remaining escape.
-  const result = await runProcess({
-    file: '/usr/bin/tar',
-    args: ['-xzf', archive, '-C', into, '--no-same-owner'],
-    cwd: into,
-    timeoutMs: UNPACK_TIMEOUT_MS,
-  })
-  if (result.spawnError) fail(`Could not run tar: ${result.spawnError}`)
-  if (result.code !== 0) fail(`That archive could not be unpacked: ${result.stderr.trim() || 'tar reported no output'}`)
+  try {
+    await unpackPluginArchive(archive, into)
+  } catch (error) {
+    fail(error instanceof Error ? error.message : 'That archive could not be unpacked.')
+  }
 }
 
 // npm tarballs wrap everything in `package/`, and a hand-rolled `tar -czf` of a plugin folder wraps it
@@ -185,52 +179,30 @@ function packageRoot(unpacked: string): string {
   return fail(`That archive has no ${MANIFEST_FILE} at its root.`)
 }
 
-// tar refuses `..` members, but a symlink inside the package pointing at ~/.ssh survives extraction
-// and would make the plugin directory a window onto the rest of the disk, for the loader, for the
-// bundle route, and for a backup. Reject the whole package rather than pruning: a package that ships
-// one is not one to run half of.
-function assertConfined(root: string): void {
-  const realRoot = realpathSync(root)
-  const walk = (dir: string): void => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const full = join(dir, entry.name)
-      if (entry.isSymbolicLink()) {
-        let real: string
-        try {
-          real = realpathSync(full)
-        } catch {
-          return fail(`The package contains a broken symlink (${relative(root, full)}).`)
-        }
-        if (real !== realRoot && !real.startsWith(realRoot + sep)) {
-          fail(`The package contains a symlink pointing outside itself (${relative(root, full)}).`)
-        }
-      } else if (entry.isDirectory()) {
-        walk(full)
-      }
-    }
-  }
-  walk(root)
-}
-
-const digestOf = (root: string, relPath: string | undefined): string | undefined => {
+const digestOf = (root: string, relPath: string | undefined, maxBytes = MAX_PLUGIN_FILE_BYTES): string | undefined => {
   if (!relPath) return undefined
-  const abs = resolveInRoot(root, relPath)
-  if (!abs) return fail(`The entrypoint '${relPath}' resolves outside the plugin directory.`)
   try {
-    return createHash('sha256').update(readFileSync(abs)).digest('hex')
-  } catch {
-    return fail(`The manifest names '${relPath}', which the package does not contain.`)
+    return hashPluginFile(root, relPath, maxBytes)
+  } catch (error) {
+    return fail(`The package does not contain a readable regular entrypoint '${relPath}': ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
 function validate(root: string, expectId: string | null): PluginManifest {
-  assertConfined(root)
+  try { assertPluginPackageTree(root) }
+  catch (error) { fail(error instanceof Error ? error.message : 'The package could not be validated.') }
   const parsed = readPluginManifestResult(root)
   if (!parsed.ok) return fail(parsed.reason)
   const manifest = parsed.manifest
   if (!speaksApiVersion(manifest.apiVersion)) {
     fail(`That package is built for acorn plugin API ${manifest.apiVersion}; this node speaks ${PLUGIN_API_MAJOR}.`)
   }
+  if (manifest.node) {
+    try { visitPluginFile(root, manifest.node, MAX_PLUGIN_FILE_BYTES, () => undefined) }
+    catch (error) { fail(`The package does not contain a readable regular entrypoint '${manifest.node}': ${error instanceof Error ? error.message : String(error)}`) }
+  }
+  // Custody retains its established too-large projection; its callback reads client bytes with
+  // the shared descriptor guard. Node placement hashes with the client ceiling below.
   if (expectId && manifest.id !== expectId) fail(`That package is '${manifest.id}', not '${expectId}'.`)
   return manifest
 }
@@ -379,7 +351,7 @@ async function place(dataRoot: string, source: PluginInstallSource, expectId: st
     guardDowngrade(existing, manifest.version, options)
     const entrypoints = {
       ...(manifest.node ? { node: digestOf(pkg, manifest.node)! } : {}),
-      ...(manifest.client ? { client: digestOf(pkg, manifest.client)! } : {}),
+      ...(manifest.client ? { client: digestOf(pkg, manifest.client, MAX_CLIENT_BUNDLE_BYTES)! } : {}),
     }
 
     if (options.reviewRequestId) stagePluginReview(dataRoot, manifest.id, options.reviewRequestId, pluginReviewFingerprint(pkg))

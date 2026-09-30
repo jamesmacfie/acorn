@@ -50,6 +50,12 @@ lints and runs on, `apps/tui/package.json` declares that same range in its `engi
 needs no flag: the painter is this package's own TypeScript and Yoga arrives as WebAssembly, so
 drawing reaches no native library at all.
 
+The supported branches are Node 22 at 22.23.2 or later, Node 24 at 24.18.1 or later, and Node 26 at
+26.5.1 or later. Other branches are unsupported. The bundled runtime is 24.21.0. Before looking up
+a loaded client bundle or creating its worker, the terminal checks the shared policy in
+`packages/protocol/src/runtime/nodeRuntime.ts`. An unsupported runtime refuses loaded plugin
+execution with an upgrade message, even if package installation ignored the `engines` warning.
+
 So the whole suite draws on the Node the repo already has, with no skips and no second runtime to
 bundle ([testing.md](./testing.md) § Test layers, [future/bundle.md](./future/bundle.md)).
 

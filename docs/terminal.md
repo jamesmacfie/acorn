@@ -174,8 +174,18 @@ broker. It enforces task worktree confinement, allowlisted environment variables
 termination, bounded capture, and operation deadlines. Direct `spawn`/`execFile` use is limited to
 the reviewed `CHILD_PROCESS_OK` allowlist in `tools/arch/boundaries.test.ts:221`.
 
-Run targets are resolved from trusted `.acorn/config.toml`, repo settings, and task configuration. A
-run target is a terminal session; acorn does not allocate or proxy arbitrary ports. Preview uses the
+Run targets merge repository `.acorn/config.toml`, personal defaults, and project settings. Core
+returns `repoConfigHash` with the targets, parsed from the same captured repository bytes. Before a
+repository-authored start or restart, terminal passes that hash to `projects.assertConfigTrusted`.
+The gate requires both acknowledgement and an exact match with the selected snapshot. A missing or
+changed snapshot returns `needs-trust` before execution. Personal and project-settings targets retain
+their owner-authored execution path.
+
+Running instances retain their admitted command, URL command, stop command, and working directory.
+Status and default URL discovery use that captured URL command after repository edits. Fixed URLs
+remain usable without a running instance, and default target selection follows the resolved config.
+
+A run target is a terminal session; acorn does not allocate or proxy arbitrary ports. Preview uses the
 declared target/port configuration and the authenticated tunnel when necessary.
 
 Another plugin gets a turn before a process starts in a task's worktree. `terminal:before-run-target`

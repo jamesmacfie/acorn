@@ -16,11 +16,15 @@ export async function servePluginFetch(
   const raw = c.req.raw
   const url = new URL(raw.url)
   url.pathname = url.pathname.slice(args.mount.length) || '/'
+  // Authentication has already produced the verified context. Transport credentials are host
+  // authority, not a grant to the plugin receiving this request (including provider handlers).
+  const headers = new Headers(raw.headers)
+  for (const name of ['authorization', 'x-acorn-internal', 'cookie', 'proxy-authorization']) headers.delete(name)
   // Built field by field rather than `new Request(url, raw)`: handing a Request as the init bag reads
   // its body getter, and undici then demands `duplex` for the stream it finds there.
   const forwarded = new Request(url, {
     method: raw.method,
-    headers: raw.headers,
+    headers,
     ...(raw.method === 'GET' || raw.method === 'HEAD' ? {} : { body: raw.body, duplex: 'half' }),
   } as RequestInit)
   return args.fetch(forwarded, pluginRequestContext(c, args.pluginId))
