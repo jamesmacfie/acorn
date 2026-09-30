@@ -1418,6 +1418,16 @@ const BEHAVIOURS: Behaviour[] = [
     },
   },
   {
+    node: 'Textarea',
+    does: 'submits with the commit chord when the caller supplies onCommit',
+    render: (record) => <Textarea value="question" onCommit={() => record('sent')} />,
+    size: { width: 30, height: 5 },
+    drive: async (screen, pressed) => {
+      await screen.press('RETURN', { ctrl: true })
+      expect(pressed).toEqual(['sent'])
+    },
+  },
+  {
     node: 'FindBar',
     does: 'takes a query typed at it',
     render: (record) => <FindBar query="" onQuery={record} onNext={() => {}} onPrev={() => {}} />,

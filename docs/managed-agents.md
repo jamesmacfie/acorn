@@ -749,6 +749,8 @@ messages, and any question the agent asks, which the reader answers in place. To
 activity stay in the full session in Agents. The header leads with the session's state mark, the same
 one the sidebar draws. **Hide** folds a chat
 down to its header line, the way a resolved review thread folds, for the rest of the app session.
+The inline message field sends with the same commit chord as the agent thread: Command-Enter on
+macOS or Control-Enter on Windows and Linux. Enter alone inserts a newline.
 The task sidebar groups these sessions under Inline chats. A patch change
 detaches the card from the line while leaving the session and its original context available in
 Agents. The client marks a session stale once it has seen that diff's newer document.

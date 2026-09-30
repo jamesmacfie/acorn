@@ -179,7 +179,8 @@ export default function InlineDiffCard(props: Props) {
           </Inline>
           <Show when={access() === 'read-only' && !readonlyProfile()}><Text emphasis="muted" wrap>Read only is best effort with this provider.</Text></Show>
         </Show>
-        <Textarea label="Ask agent" size="sm" rows={3} value={draft()} onInput={setDraft} placeholder="Ask about this change…" />
+        <Textarea label="Ask agent" size="sm" rows={3} value={draft()} onInput={setDraft}
+          onCommit={() => void submit()} placeholder="Ask about this change…" />
         <Inline gap="inline">
           <Button size="sm" disabled={busy() || !draft().trim()} onPress={() => void submit()}>{busy() ? 'Sending…' : 'Send'}</Button>
           <Show when={session()}>{(current) => <>
