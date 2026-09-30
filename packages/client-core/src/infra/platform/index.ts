@@ -127,9 +127,9 @@ export type FileDialogs = {
 // caller gets a working verb. A host that installs this group takes over with the OS's own
 // notification centre and can draw a number on the app icon, which a page cannot.
 //
-// `tag` is the notice id, so an activation can find the notice it came from. `show` answers false
-// when nothing was shown — no permission, no notifier — so a caller can tell "the OS said no" from
-// "the OS is showing it".
+// `tag` is the notice id, so an activation can find the notice it came from. `show` answers whether
+// the notification was accepted for submission; an OS can still suppress its display. `onActivate`
+// reports an explicit notification click. Delivery and ordinary window focus never activate it.
 export type NotifyRequest = { title: string; body?: string; tag: string }
 export type Notify = {
   show(request: NotifyRequest): Promise<boolean>
@@ -428,8 +428,8 @@ const shownNotifications = new Map<string, Notification>()
 // itself, so this set stays empty there.
 const activationListeners = new Set<(tag: string) => void>()
 
-/** Raise one, through the host if it installed the group and through the page otherwise. False means
- *  nothing was shown: permission refused, or no notifier at all. Silent in both, always: the chime is
+/** Submit one, through the host if it installed the group and through the page otherwise. False means
+ *  submission failed: permission refused, or no notifier at all. Silent in both, always: the chime is
  *  the client's (features/notifications/chime.ts) and it plays whether or not a banner appeared. */
 export const showNotification = async (request: NotifyRequest): Promise<boolean> => {
   const host = acornGlobal()?.notify
