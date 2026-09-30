@@ -9,7 +9,7 @@ import type { DockerBridge } from '../server/routes/docker'
 import type { WsServerFrame } from '@acorn/protocol/ws.ts'
 import type { DockerComposeAction, DockerContainerAction, DockerContainerSummary, DockerPruneKind, DockerTaskSummary } from '../shared/model'
 import { docker, DockerCliError } from './cli'
-import { loadDockerOverrides } from './dockerConfig'
+import { loadDockerLayers, loadDockerOverrides } from './dockerConfig'
 import { containerMatchesTask } from './matcher'
 import { parseInspectOutput } from './parse'
 import { getDockerService } from './dockerService'
@@ -28,10 +28,10 @@ const run = async <T>(fn: () => Promise<T>): Promise<T> => fn().catch(toBridgeEr
 
 const isActive = (c: DockerContainerSummary): boolean => c.state === 'running' || c.state === 'paused' || c.state === 'restarting'
 
-// `tasks` is a core table and this plugin owns none, so its two task reads, one id and the whole
-// active set for the rail badge, come through the core service rather than a db handle
-// (docs/data-layer.md § Plugin databases).
-export type DockerCoreServices = Pick<CoreServices, 'tasks'>
+// `tasks` and `projects` are core tables and this plugin owns none, so its task reads, one id and the
+// whole active set for the rail badge, and the one project read for its settings tab come through the
+// core services rather than a db handle (docs/data-layer.md § Plugin databases).
+export type DockerCoreServices = Pick<CoreServices, 'tasks' | 'projects'>
 
 export function dockerBridge(core: DockerCoreServices, broadcast?: (frame: WsServerFrame) => void): DockerBridge {
   const service = getDockerService(broadcast)
@@ -137,5 +137,12 @@ export function dockerBridge(core: DockerCoreServices, broadcast?: (frame: WsSer
       broadcast?.({ channel: pluginChannel('docker', 'task-teardown'), taskId })
       return { ok: true as const }
     }),
+    // The project's own checkout, not a task's worktree: the settings page describes the project, and
+    // a worktree's copy of the file is the branch's business.
+    projectMatcher: async (projectId) => {
+      const project = await core.projects.byId(projectId)
+      if (!project) throw new BridgeError(404, 'project_not_found')
+      return loadDockerLayers(project.path)
+    },
   }
 }

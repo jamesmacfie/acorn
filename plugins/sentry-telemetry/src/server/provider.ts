@@ -2,7 +2,7 @@
 //
 // A `ConnectionProviderContribution` and not an `IntegrationProviderContribution`: this plugin
 // mirrors nothing, browses nothing and promotes nothing to a task. It owns a credential and spends
-// it. That gets the Settings → Integrations form, encryption under the node's key, the
+// it. That gets the Settings → Services form, encryption under the node's key, the
 // `secret.created` audit row, and connect, test, rotate and disconnect, with no core code
 // (docs/integrations.md § Connection and integration contributions).
 //

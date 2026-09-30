@@ -254,8 +254,12 @@ export type PluginPaneRegion =
   | 'frame'
   | { kind: 'remote'; entry: string }
   | ({ kind: 'document' } & PluginDocumentRegion)
-export type PluginFrameSurface = Omit<z.infer<typeof frameSurface>, 'scope' | 'claimsKeys' | 'destinations' | 'layout' | 'regions' | 'coreSlot'> & {
+export type PluginFrameSurface = Omit<z.infer<typeof frameSurface>, 'scope' | 'claimsKeys' | 'destinations' | 'layout' | 'regions' | 'coreSlot' | 'category' | 'settingsScope'> & {
   scope?: 'task' | 'project'
+  // Wider than the parse: a newer node can know a group or scope this build does not, and the client
+  // places the page by its own lists (client-core/host/frames/register.ts).
+  category?: string
+  settingsScope?: string
   claimsKeys?: string[]
   destinations?: z.infer<typeof navigationDestination>[]
   // Wider than the parse on both: a roster row is bytes a node sent, and the client re-checks the

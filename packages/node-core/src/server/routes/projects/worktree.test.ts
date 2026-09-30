@@ -119,22 +119,6 @@ describe('worktree routes', () => {
     expect(await res.json()).toEqual({ ok: true, url: '[absent]' })
   })
 
-  it('inspects MCP config only from known candidate files', async () => {
-    writeFileSync(join(dir, '.mcp.json'), JSON.stringify({ mcpServers: { probe: { command: 'x', env: { TOKEN: 'super-secret' } } } }))
-    const app = authed()
-    const found = (await (await app.fetch(req('/core/tasks/task1/mcp'), env())).json()) as { file: string; servers: unknown[] }[]
-    const own = found.find((entry) => entry.file === join(dir, '.mcp.json'))
-    expect(own?.servers).toHaveLength(1)
-    // Masked in core, so a raw value never reaches the renderer.
-    expect(JSON.stringify(own)).not.toContain('super-secret')
-  })
-
-  it('refuses to overwrite an existing .mcp.json starter', async () => {
-    const app = authed()
-    expect(await (await app.fetch(req('/core/tasks/task1/mcp/starter', 'POST'), env())).json()).toEqual({ ok: true })
-    expect(await (await app.fetch(req('/core/tasks/task1/mcp/starter', 'POST'), env())).json()).toMatchObject({ ok: false })
-  })
-
   it('archive goes through the PTY slot and 503s when it is unfilled', async () => {
     const app = authed()
     // Unfilled: exactly the degraded mode dev:node had when the whole terminal bridge was unset.

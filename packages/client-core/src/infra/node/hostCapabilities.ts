@@ -73,6 +73,14 @@ const meets = (requirement: HostRequirement): boolean => {
     ))
 }
 
+/** Whether `meets` has a roster to answer a plugin requirement from yet. Before it does, every plugin
+ *  requirement reads as unmet, which is "not known yet" rather than "not running". Settings asks so
+ *  that a page remembered from the last visit is not given up on in the moment after launch. */
+export const pluginRosterKnown = (): boolean => {
+  const nodeId = activeNodeId()
+  return (nodeId !== null && distribution().byNode.has(nodeId)) || !!nodePlugins()
+}
+
 export const hasHostCapability = (requirement: HostCapabilityRequirement = 'none'): boolean => {
   if (requirement === 'none') return true
   return Array.isArray(requirement) ? requirement.every(meets) : meets(requirement as HostRequirement)

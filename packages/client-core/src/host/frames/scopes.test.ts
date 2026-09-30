@@ -100,8 +100,8 @@ describe('the route table covers every core route', () => {
       api.repoConfigTrustRoute(ID),
       api.taskPreviewUrlRoute(ID),
       api.taskOnCreatedRoute(ID),
-      api.taskMcpRoute(ID),
-      api.taskMcpStarterRoute(ID),
+      api.projectMcpRoute(ID),
+      api.projectMcpStarterRoute(ID),
       api.projectRunTargetsRoute(ID),
       api.workspaceBootstrapRoute,
       api.integrationsRoute,
@@ -184,9 +184,10 @@ describe('scope checking', () => {
     expect(allowApi(board, 'DELETE', api.taskLinksRoute(ID)).allowed).toBe(false)
   })
 
-  it('does not let a read on the task collection leak the task’s MCP or preview credentials', () => {
-    // The reason the table names paths instead of globbing `/v1/core/tasks*`.
-    expect(allowApi(board, 'GET', api.taskMcpStarterRoute(ID)).allowed).toBe(false)
+  it('does not let a read on the task or project collection leak MCP config or preview credentials', () => {
+    // The reason the table names paths instead of globbing `/v1/core/tasks*` or `/v1/core/projects*`.
+    const projectReader = { pluginId: 'board', api: ['core.projects:read'] }
+    expect(allowApi(projectReader, 'GET', api.projectMcpRoute(ID)).allowed).toBe(false)
     expect(allowApi(board, 'GET', api.taskPreviewUrlRoute(ID)).allowed).toBe(false)
   })
 

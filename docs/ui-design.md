@@ -485,7 +485,7 @@ set, and the layer priorities are in
   the keyboard will do right here.
 - F6 and Shift+F6 move between the regions of a pane; Ctrl+Option+Left and Ctrl+Option+Right move
   between panes.
-- Pane chords are contribution-owned and user-overridable through Settings → Shortcuts.
+- Pane chords are contribution-owned and user-overridable through Settings → Keyboard shortcuts.
 - Typing fields, editors, terminals, and contenteditable elements stop global shortcuts unless the
   action is explicitly text-safe. That exemption is a property of the intent now, not of whoever
   remembered to declare it: `dismiss`, `commit`, and the four region and pane moves reach a focused
@@ -762,6 +762,8 @@ edge, and no real-WebKit run has accepted it.
 | `SectionHeader` | none | a bold heading with actions on the next line, so a long action label cannot erase the heading |
 | `TabPanel` | none | the rows under the tab strip |
 | `ToolbarSpacer` | none | the padding that pushes what follows to the right edge |
+| `SettingsSection` | none | the label in bold, the description in grey under it, then its rows; the danger zone's label is in the danger colour instead of a frame. `actions` draw on the line under the label |
+| `SettingRow` | none | reduced: one line, the label then the control, and `stacked` puts the control on the next line. The description in grey under it, **Saved** in green or the error in red. `onReset` adds `•` to the label and a `Reset` button. A row with `from` draws `From <where>` and no control, so the value this machine holds is not shown. A row with `scope="device"` draws `(this device)` after its label |
 
 ### Showing
 

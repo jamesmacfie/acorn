@@ -7,7 +7,7 @@ import { safeVerificationUrl } from '@acorn/protocol/externalUrl.ts'
 
 // The GitHub branch of the wizard: the device grant, then whatever GitHub registered as a project
 // importer. Neither half is written here. The grant is core's shared createDeviceFlow, the same one
-// Settings → Integrations runs, and the repo list is the github plugin's own component, reached through
+// Settings → Services runs, and the repo list is the github plugin's own component, reached through
 // projectImporterRegistry so this plugin never imports another plugin.
 //
 // The screen doesn't leave on its own after an import. An account has many repositories and taking
@@ -73,7 +73,7 @@ export default function GithubConnect(props: {
             <Show when={flow.error()}>{(text) => <Alert>{text()}</Alert>}</Show>
             <Text emphasis="muted" wrap>
               If you close this or deny the request, nothing breaks — you land in the app and can retry
-              from Settings → Integrations.
+              from Settings → Services.
             </Text>
           </Stack>
         }

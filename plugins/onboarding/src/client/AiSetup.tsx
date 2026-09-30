@@ -102,7 +102,7 @@ export default function AiSetup() {
 
       <Show when={!backends().length}>
         <Text emphasis="muted" wrap>
-          Nothing to generate with yet. Settings, under Integrations, is where this lives whenever you
+          Nothing to generate with yet. Settings, under AI models, is where this lives whenever you
           want it.
         </Text>
       </Show>

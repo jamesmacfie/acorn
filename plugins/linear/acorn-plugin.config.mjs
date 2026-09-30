@@ -113,7 +113,7 @@ export default {
       // URL and the surface beside the list follows. It is also what mounts `linear-issue` at all.
       onSelect: { verb: 'navigate', surface: 'linear-issue' },
       // Message only, no action, because no verb in the context-free set reaches a settings page:
-      // `openPane` addresses a task pane, `openUrl` leaves the app, and the settings modal is shell
+      // `openPane` addresses a task pane, `openUrl` leaves the app, and settings is shell
       // state behind a client event with no descriptor form.
       //
       // It no longer offers to link projects either. The shell hides this source outright where the

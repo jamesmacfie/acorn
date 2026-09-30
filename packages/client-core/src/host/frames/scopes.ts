@@ -7,9 +7,9 @@
 // allowlist of (path shape, method) pairs rather than a prefix match.
 //
 // Why not `core.tasks:read ⇒ GET /v1/core/tasks*`, which is what the phase doc sketches: that glob
-// also matches `GET /v1/core/tasks/:id/mcp/starter`, which hands out an MCP configuration for the
-// task, and `GET /v1/core/tasks/:id/preview-url`, which hands out a tunnel URL. Both are read-shaped
-// and neither belongs to a plugin. The star was the wrong granularity; every rule below names its
+// also matches `GET /v1/core/tasks/:id/preview-url`, which hands out a tunnel URL, and the same shape
+// over `/v1/core/projects*` would match `GET /v1/core/projects/:id/mcp`, which hands out the commands a
+// project's agents run. Both are read-shaped and neither belongs to a plugin. The star was the wrong granularity; every rule below names its
 // path.
 //
 // Three groups, and the difference between the last two is intent rather than effect:
@@ -111,6 +111,8 @@ const RULES: readonly RouteRule[] = [
     scopes: {},
     note: 'Same as config: run targets are commands the Node runs.',
   },
+  { path: shape(`/v1/core/projects/${SEG}/mcp`), scopes: {}, note: 'The MCP servers a project’s agents load, commands and masked environments included.' },
+  { path: shape(`/v1/core/projects/${SEG}/mcp/starter`), scopes: {}, note: 'Writes a file into the project folder.' },
 
   // ── Workspaces ──────────────────────────────────────────────────────────────────────────────────
   { path: shape('/v1/core/workspaces'), scopes: { GET: 'core.workspaces:read' } },
@@ -202,8 +204,6 @@ const RULES: readonly RouteRule[] = [
   { path: shape(`/v1/core/tasks/${SEG}/config-trust`), scopes: {}, note: 'Acknowledging repo config trust is the user’s act, and the whole guard on the code-execution path.' },
   { path: shape(`/v1/core/tasks/${SEG}/preview-url`), scopes: {}, note: 'Read-shaped, but hands out a tunnel URL.' },
   { path: shape(`/v1/core/tasks/${SEG}/on-created`), scopes: {}, note: 'Runs the task setup script.' },
-  { path: shape(`/v1/core/tasks/${SEG}/mcp`), scopes: {}, note: 'MCP configuration for the task.' },
-  { path: shape(`/v1/core/tasks/${SEG}/mcp/starter`), scopes: {}, note: 'Read-shaped, but hands out an MCP starter configuration.' },
   { path: shape('/v1/core/integrations'), scopes: {}, note: 'Connected-account rows. Cross-plugin reads happen server-side via capabilities, never here.' },
   { path: shape(`/v1/core/integrations/${SEG}`), scopes: {} },
   { path: shape(`/v1/core/integrations/${SEG}/test`), scopes: {}, note: 'Spends another plugin’s credential.' },

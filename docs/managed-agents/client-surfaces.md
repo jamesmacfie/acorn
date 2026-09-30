@@ -4,6 +4,11 @@ Part of [managed-agents.md](../managed-agents.md).
 
 ## Client surfaces
 
+The agents client claims the `agent` WebSocket channel when its first frame subscriber attaches and
+releases it when the last subscriber leaves. Plugin activation holds an application-lifetime
+subscription for agent attention. Loading a lazy surface, including an inline diff card, does not
+register a channel.
+
 The Agent pane is a `list-detail` layout (docs/panes.md § Layout model). The list column is the task's
 roster, with a header region of its own so the count stays put while the list scrolls; the detail
 column is the open session. The roster is managed sessions, delegated children, and provider-native
@@ -132,7 +137,7 @@ it fails for any reason a selection can break, not only for the one it was writt
 - On an archived task, which only the archive page's preview shows, the Agent pane is read-only: the
   transcripts draw, the composer is off, and there is no new-session picker.
 - A provider draws as its own mark wherever it is named: the onboarding cards, the New picker, each
-  block in Settings -> Agent defaults, and the session icon in Agent Center. The name comes off the
+  harness row and block in Settings -> Harnesses and defaults, and the session icon in Agent Center. The name comes off the
   descriptor's `glyph`, so a contributed harness gets the same treatment by pointing that field at a
   mark it registers. The two built-in ones are `brand:agents/claude` and `brand:agents/codex`, drawn
   by `ProviderGlyph.tsx` and coloured from the mark (docs/ui-design.md section Brand colour). The

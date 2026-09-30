@@ -76,7 +76,7 @@ function mount(codexCatalogAvailable: () => boolean = () => true) {
     },
   })
   const nodes = () => [...applied(ops).values()]
-  const checkbox = () => nodes().find((node) => node.type === 'Checkbox' && node.props.label === 'Prepare suggestions when I archive a task')
+  const checkbox = () => nodes().find((node) => node.type === 'Checkbox' && node.props.ariaLabel === 'Prepare suggestions when I archive a task')
   return { root, get, put, nodes, checkbox, batches }
 }
 
@@ -87,6 +87,10 @@ describe('FindingsSettings', () => {
     await settle()
 
     expect(page.checkbox()?.props.checked).toBe(false)
+    // The host's header already names the page, so the tree draws no title of its own.
+    expect(page.nodes().some((node) => node.type === 'Heading')).toBe(false)
+    expect(page.nodes().filter((node) => node.type === 'SettingsSection').map((node) => node.props.id))
+      .toEqual(['review', 'notifications'])
     for (const batch of page.batches) {
       expect(() => structuredClone(batch)).not.toThrow()
       expect(sandboxMessage.safeParse({ kind: 'tree:batch', slot: 'findings-settings-test', ops: batch }).success).toBe(true)
@@ -114,6 +118,20 @@ describe('FindingsSettings', () => {
     expect(page.nodes().some((node) => node.type === 'ModelBackendPicker')).toBe(true)
     expect(page.nodes().find((node) => node.type === 'Select' && node.props.label === 'Review target')?.props.options)
       .toEqual([{ value: 'memory:change', label: 'Memory changes' }])
+    page.root.dispose()
+  })
+
+  it('puts the switch back and names the failure on its row when the save fails', async () => {
+    const page = mount()
+    await settle()
+    await settle()
+    page.put.mockRejectedValueOnce(new Error('The node refused the settings'))
+    page.root.dispatch((page.checkbox()?.props.onChange as { $handler: number }).$handler, true)
+    await settle()
+
+    expect(page.checkbox()?.props.checked).toBe(false)
+    const row = page.nodes().find((node) => node.type === 'SettingRow' && node.props.label === 'Prepare suggestions when I archive a task')
+    expect(row?.props.error).toBe('The node refused the settings')
     page.root.dispose()
   })
 

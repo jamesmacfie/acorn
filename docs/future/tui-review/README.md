@@ -56,7 +56,8 @@ shipped behavior in the owning docs.
 
 The host now retries reads and pane boundaries after reconnect, with a visible Retry control for a
 persistent error. A first-run route creates workspaces, projects, and tasks and exposes provider
-connections; Settings and New task remain in the palette. Password fields mask their terminal cells.
+connections; Set up acorn and New task remain in the palette. On 2026-09-30 **Open settings** gained
+its own route, built from the desktop's settings registry ([tui.md](../../tui.md#settings)). Password fields mask their terminal cells.
 The file seam opens an absolute local path prompt for attachments and downloads, with errors and
 overwrite confirmation. Source rows can invoke their promotion contract through a terminal task
 picker. A task and the palette can open a native terminal session list and PTY, including an existing

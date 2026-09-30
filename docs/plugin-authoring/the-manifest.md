@@ -103,7 +103,7 @@ host cannot draw.
 
 | Key | Cap | What it declares |
 | --- | --- | --- |
-| `frames` | 32 | A surface your client file draws: `pane` (task- or project-scoped), `refPanel`, `settings`, `importer`, `webview`, `overlay`, `coreSlot`. A `pane`, a `refPanel` and a `settings` surface **must** name a `layout` and its `regions`; a region is a tree (`{ "kind": "remote", "entry": "…" }`), a rectangle (`"frame"`), or a host-drawn document. A `list-detail` pane may set `collapsible: true`; loaded panes collapse to an empty rail with the host-owned expand control because their worker cannot read host collapse state to author compact rows. A task pane may set `showInSwitcher: false` when it is deliberately command-only; it remains a valid layout and `openPane` target. Set `readsArchived: true` only when a task pane reads stored history without a worktree and disables actions that would start work; the field opts the pane into the archived-task preview and its right rail. This is also where a pane declares `claimsKeys` and up to eight cooperative `destinations`, and where a `coreSlot` surface names the core surface that it offers to replace. A `settings` surface may list `railSourceVisibility: ["<source id>"]`; the host then draws the **Show in left rail** switch for those sources above the page, outside your tree or frame, and your code never reads or writes the value. Each id must be one of this manifest's `sources`. |
+| `frames` | 32 | A surface your client file draws: `pane` (task- or project-scoped), `refPanel`, `settings`, `importer`, `webview`, `overlay`, `coreSlot`. A `pane`, a `refPanel` and a `settings` surface **must** name a `layout` and its `regions`; a region is a tree (`{ "kind": "remote", "entry": "…" }`), a rectangle (`"frame"`), or a host-drawn document. A `list-detail` pane may set `collapsible: true`; loaded panes collapse to an empty rail with the host-owned expand control because their worker cannot read host collapse state to author compact rows. A task pane may set `showInSwitcher: false` when it is deliberately command-only; it remains a valid layout and `openPane` target. Set `readsArchived: true` only when a task pane reads stored history without a worktree and disables actions that would start work; the field opts the pane into the archived-task preview and its right rail. This is also where a pane declares `claimsKeys` and up to eight cooperative `destinations`, and where a `coreSlot` surface names the core surface that it offers to replace. A `settings` surface is placed by three optional keys, described under the table. |
 | `sources` | 8 | A rail source. Rows come from a route on your node half; the host draws them and executes the `onSelect` verb. Set `showInRailByDefault: false` to start without a desktop rail icon; the user can turn it on under Settings > Plugins, and the palette opens it meanwhile. The source `id` is the key of that preference, so keep it stable across releases. |
 | `slots` | 8 | A badge in an enumerated host slot: `footer` (the **task** footer, so it is invisible until a task is open) or `topbar` (the topbar's right end — the app's status bar). Nothing else is open, and `docs/plugins.md § Descriptors for facts, trees for UI, rectangles for pixels` records why each refused slot is refused. |
 | `commands` | 32 | A command, id-qualified by the host to `plugin.<id>.<command>`. Each entry requires `kind`: an `action` with one narrow verb, a `group` that holds children, a `search` naming a GET route and one static `onSelect`, an `input` naming a POST route and one static `onSuccess`, or a `setting` naming a read route, a write route and 2-32 labelled choices. The `palette` flag on a command controls its visibility there. `docs/plugins.md § Command kinds` has the fields and bounds. |
@@ -128,6 +128,84 @@ host cannot draw.
 | `agentTools` | 16 | A task-scoped agent tool projected through the ordinary registry: `{ id, description, inputSchema, risk, handler, scope?, requiresSession?, timeoutMs?, maxOutputBytes? }`. `handler` must be in your own `/v1/p/<id>/` namespace. The host qualifies the runtime name as `<pluginId>_<id>`, validates the bounded JSON Schema at install and validates every call again. See [Agent tools](../agent-tools.md#loaded-manifest-carriers). |
 | `contextSections` | 8 | Bounded reference data for the task prompt: `{ id, label, order, read, maxBytes, maxTokens, scope?, defaultIncluded?, timeoutMs? }`. `read` must be in your own namespace and answers the fixed host-owned response shape. See [Agent tools](../agent-tools.md#loaded-manifest-carriers). |
 | `cliCommands` | 16 | Typed headless commands under `acorn plugin <id> <name>`. Each declares a name, title, summary, read/write risk, scope, required core capability, bounded object input/output schemas, and a relative `/cli/<name>` POST route. Writes also describe effects. See [CLI command authoring](./cli-commands.md). |
+
+A settings page takes three optional keys that say where it sits and what it affects:
+
+- `category` is the rail group: `general`, `agents`, `connections`, `features`, `automation`, or
+  `machines`. Without one the page is filed under **Features**. The other three groups, Workspaces and
+  projects, Plugins, and Advanced, hold acorn's own pages.
+- `settingsScope` is what a change on the page affects, named in the page's header: `device`, `node`,
+  `workspace`, or `project`. Without one it is `node`. A `workspace` or `project` page has no rail row
+  of its own: it is a tab on every workspace's or project's settings page. A `project` page's binding
+  carries that project's `projectId`, as a project pane's does.
+- `glyph` is the page's icon, a Lucide name or a `brand:` mark, as on every other surface.
+
+The compiled `SettingsContribution` spells the second and third `scope` and `icon`. The frame keeps
+`settingsScope` because `scope` on a frame already means a pane's task or project scope, and a wider
+enum there would make an older acorn refuse the whole manifest. `group` is still read: `workspace`
+means `settingsScope: "workspace"`, and `general` means the defaults.
+
+A value outside those lists does not drop the page. The page registers in its default place, and the
+roster reports the key and its value as one this version of acorn does not recognise, the same way it
+reports an unknown key ([forward compatibility](../plugins/forward-compatibility.md)). None of the
+three needs a newer `apiVersion`: an older acorn strips the keys and reports them the same way.
+
+Two more keys make the page findable from the settings search and the palette:
+
+- `keywords` is up to 16 words someone might type that are not in the page's label, such as
+  `["error tracking", "dsn"]`.
+- `sections` is up to 16 `{ id, label, keywords? }`, one per `SettingsSection` your tree draws, in the
+  order it draws them. Each is a search result reading **Page › Section** and a deep link,
+  `settings/<page id>#<section id>`, that scrolls to the section and marks it. `id` is letters, digits,
+  `.`, `_`, and `-`, and must match the `id` of the `SettingsSection` in your tree.
+
+```js
+frames: [{
+  target: 'settings', id: 'sentry-telemetry', label: 'Sentry export', category: 'machines',
+  keywords: ['error tracking', 'dsn'],
+  sections: [{ id: 'export', label: 'What to send', keywords: ['sample rate'] }],
+  layout: 'single', regions: { body: { kind: 'remote', entry: 'settings' } },
+}]
+```
+
+A compiled page's `sections` also take `rows`, the labels of the rows in each section, which search
+ranks between section names and keywords. A manifest has no `rows`: an index built from what a
+sandboxed tree draws would have to read the tree. A list past its limit costs the page its search
+entries, never the page, and the roster reports it. Neither key needs a newer `apiVersion`.
+
+The two kit nodes a settings page is drawn with, `SettingsSection` and `SettingRow`, are different: a
+tree that names them on an acorn that predates them draws the labelled placeholder any unknown node
+draws. Raise the floor of your `apiVersion` range to the release that has them if you use them
+([docs/frontend.md](../frontend.md) § Pages and the save model).
+
+A settings page's header names the node its body reads. A frame always reads the active node, so its
+header names that node as plain text rather than offering the node switcher core's own node pages use.
+
+acorn draws a plugin strip above your page: your plugin's name and origin, **Manage plugin**, the
+**Enabled** switch, and a line when the plugin is off, waiting for approval, failed, or offline. Don't draw
+your own enable switch or status line. To put the **Show in left rail** switch for one of your sources
+there, name it in `railSourceVisibility`. The host draws the switch and keeps the preference, so your
+tree never reads or writes it:
+
+```js
+sources: [{ id: 'board', label: 'Board', glyph: 'layout-dashboard', order: 50, items: '/v1/p/board/items', showInRailByDefault: false }],
+frames: [{
+  target: 'settings', id: 'board-settings', label: 'Board', railSourceVisibility: ['board'],
+  layout: 'single', regions: { body: { kind: 'remote', entry: 'settings' } },
+}]
+```
+
+- `showInRailByDefault: false` on a source starts its icon hidden. The source still registers, its
+  commands and panes still work, and the palette offers **Open <label>** for it. The person's own choice
+  wins over the default. Absent means shown.
+- `railSourceVisibility` lists up to 16 of your own source ids. An id that names a core source or another
+  plugin's is reported in the roster's `unknown` list, as
+  `contributions.frames.<id>.railSourceVisibility: '<source>' is not one of this plugin's sources`, and
+  gets no switch. The page stays. A compiled page that names one throws when its plugin registers.
+- A source id is the key the person's choice is stored under, so keep it stable across releases.
+- Without `railSourceVisibility`, the switch is still under **Settings > Plugins > Rail and surfaces**.
+
+Neither key needs a newer `apiVersion`: an older acorn strips both and shows the icon.
 
 A theme is the one contribution with no route and no bundle behind it, so it is the cheapest thing a
 plugin can be. `tokens` must carry **exactly** the palette token names and nothing else: a missing one,
@@ -245,7 +323,7 @@ one remote-tree `body`; the host gives that tree data and named actions. A rail 
 place its one nested host slot with the `Slot` node and the `slotRef` in its props. Declare
 `placesSlots: ["rail.taskList"]` or `["topbar.right"]` when you place it; Settings warns when the
 declaration is absent. Declaring a replacement **seizes nothing** — the user picks the provider in
-Settings → Plugins, and acorn draws its own again when your plugin is disabled or its surface fails.
+**Settings > Plugins > Rail and surfaces**, and acorn draws its own again when your plugin is disabled or its surface fails.
 It is not a pane, so no pane verb can name it.
 
 A `taskChecks` entry is the one contribution that runs when a person is about to lose something.
@@ -492,7 +570,7 @@ prompt shows the full text, and a version that changes it asks again. An agent c
 server, because a server is a program to run. Declare `agentTools` for that.
 
 A package made of nothing but harnesses and custom agents needs no bundle at all. The owner sees it in
-Settings > Plugins and can turn it off, which takes its agents out of New. The owner cannot edit a
+**Settings > Plugins > Installed** and can turn it off, which takes its agents out of New. The owner cannot edit a
 plugin's agent, only duplicate it into one of their own.
 
 ### The action verbs

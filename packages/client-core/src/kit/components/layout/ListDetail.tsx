@@ -75,13 +75,16 @@ export function ListDetail(props: {
    *  icon rails, and remember the answer under this key (../../lib/layout/collapseState.ts).
    *
    *  Opt in, because this node also draws splits that are two halves of one document. A pull
-   *  request's section nav has no rail form and nothing to collapse to. The host's `list-detail`
-   *  *layout* needs no such flag, since a pane that names that layout is a sidebar by definition
-   *  (host/layouts/ListDetail.tsx).
+   *  request's section nav has no rail form, so Sections closes the column to its edge. The host's
+   *  `list-detail` *layout* needs no such flag, since a pane that names that layout is a sidebar by
+   *  definition (host/layouts/ListDetail.tsx).
    *
    *  The rows collapse separately, from the same signal: read it with `sidebarCollapsed(key)` and
    *  pass each row a `collapsed` slot. */
   collapseKey?: string
+  /** `edge` removes the list column's width when collapsed, while leaving the shared toggle on the
+   *  divider. Use it when the column has no useful rail form. */
+  collapseTo?: 'rail' | 'edge'
   /** Hide list contents in a collapsed rail while keeping them mounted. */
   collapseContent?: 'rows' | 'empty'
   children: JSX.Element
@@ -131,6 +134,7 @@ export function ListDetail(props: {
       ref={root}
       class="ui-listdetail"
       data-list={list() !== undefined || props.split ? (collapsed() ? 'collapsed' : (props.listWidth ?? 'default')) : undefined}
+      data-collapse-to={props.collapseTo}
       style={width() && !collapsed() ? { 'grid-template-columns': `${width()}px 1px minmax(0, 1fr)` } : undefined}
     >
       <Show

@@ -176,7 +176,7 @@ describe('openPane', () => {
   })
 
   it('does nothing for a frame with no task', () => {
-    // A pane is a slot in a task's layout, so a settings modal or a project surface has nothing to open
+    // A pane is a slot in a task's layout, so a settings page or a project surface has nothing to open
     // into. The broker's allowlist check is separate and comes first; this is the second wall.
     build().openPane('board-pane')
     expect(openPane).not.toHaveBeenCalled()

@@ -46,7 +46,7 @@ Both halves are done. Building: `npm create acorn-plugin` writes the whole no-bu
 (`packages/create-acorn-plugin`) and `acorn-plugin-sdk` publishes the frame bridge for anyone running a
 bundler (`packages/plugin-sdk`), with the compatibility promise in `docs/plugins.md § What is
 published`. Installing: `allowLocalPath` is gone, and `{ path }` — an absolute directory on the node's
-own filesystem — is a first-class install source on every build, packaged included. Settings → Plugins
+own filesystem — is a first-class install source on every build, packaged included. Settings → Plugins → Installed
 offers a native folder picker when the target node is this machine.
 
 **Kept because the argument recurs.** The decision was a trust-boundary one, not a config flag, and

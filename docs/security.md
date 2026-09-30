@@ -555,7 +555,7 @@ ask (action, source, its stated reason) gates the *fetch*, and a second screen s
 back off disk before anything runs. A durable marker is published before the package reaches its installed
 path. Boot and reload refuse marked packages; their client bundles are withheld. Approval checks the
 marker generation and complete package fingerprint, then clears the marker. Dismissing review leaves it
-held across restarts, and Settings → Plugins can approve or remove it. A No uninstalls it again.
+held across restarts, and the plugin's page under **Settings > Plugins > Installed** can approve or remove it. A No uninstalls it again.
 `docs/plugins.md § What the owner can know before the download` records why that ordering was chosen over
 downloading first.
 
@@ -633,7 +633,7 @@ review for this `(plugin, node)` pair. That is exactly the risk the owner accept
 
 Three things keep it bounded:
 
-- **Visible.** Settings → Plugins badges the row *in development — bundle changes are auto-trusted*. The
+- **Visible.** The plugin's row under **Settings > Plugins > Installed** says *In development. Bundle changes are trusted without asking*. The
   moment dev-mode behaviour is indistinguishable from a normal install, the trust story has rotted.
 - **Revocable, and revocation means something.** Ending dev mode drops the grant *and* every
   acknowledgement it wrote. What survives is whatever the owner answered by hand, so with nothing left the
@@ -777,7 +777,7 @@ and can dominate archive size. Restore is a documented manual operation into a f
 The append-only core `audit` table retains security-relevant decisions for 90 days. Producers include
 pairing-window changes, device pair/revoke, config-trust acknowledgement, secret create/replace/delete,
 plugin toggles, plugin install/update/uninstall/reload, the owner's answer to an agent-raised plugin
-request, backup, and attaching to or detaching from a control plane. The Settings → Security surface
+request, backup, and attaching to or detaching from a control plane. Settings → Audit log
 reads it. The trail is not tamper-evident against someone who already controls the database file.
 
 ### The vocabulary is closed, and a plugin can add to it
@@ -801,7 +801,7 @@ intact:
 - **An undeclared action writes nothing.** `recordAudit` refuses it and warns. Fail closed, because
   a trail that accepts arbitrary strings is one nobody can enumerate.
 - **The vocabulary is still enumerable.** `auditVocabulary()` lists every declared verb with the label
-  its plugin chose, and it rides out on each audit page so Settings → Security can name a row it has
+  its plugin chose, and it rides out on each audit page so Settings → Audit log can name a row it has
   never seen. A row whose plugin has since been removed draws as its raw qualified verb, which is the
   honest answer: the row is still evidence of something that happened.
 - **The actor is `system`, with the plugin id as `actorId`.** Nothing asked for a plugin's row over a

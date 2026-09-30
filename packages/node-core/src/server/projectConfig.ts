@@ -13,6 +13,7 @@ import type { AppDatabase } from './db'
 import { eq } from 'drizzle-orm'
 import { schema } from './db'
 import { getProject } from './projects'
+import { readCommittedConfig } from './runConfig'
 import { broadcastProjectChanged } from './notify'
 
 const runTargetWireSchema = z.object({
@@ -52,6 +53,18 @@ export function projectConfigFromRow(row: typeof schema.projects.$inferSelect): 
 export async function getProjectConfig(db: AppDatabase, projectId: string): Promise<ProjectConfigResponse | null> {
   const project = await getProject(db, projectId)
   return project ? projectConfigFromRow(project) : null
+}
+
+// The config read the settings page makes: the row, and what the checkout's committed
+// `.acorn/config.toml` sets over it, so the page can say which values come from the repo without the
+// client parsing repo files. Only here, not in `getProjectConfig`, because the node's own callers
+// merge the layers themselves and should not pay for a file read they do not use.
+export async function getProjectConfigWithRepo(db: AppDatabase, projectId: string): Promise<ProjectConfigResponse | null> {
+  const project = await getProject(db, projectId)
+  if (!project) return null
+  const response = projectConfigFromRow(project)
+  const repoConfig = project.path ? readCommittedConfig(project.path) : null
+  return repoConfig ? { ...response, repoConfig } : response
 }
 
 export type ProjectConfigResult =

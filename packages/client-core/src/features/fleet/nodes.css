@@ -28,35 +28,27 @@
   flex-direction: column;
   gap: var(--space-4);
 }
-.nodes-list {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-}
-.node-row {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--pane-pad);
-  border: var(--surface-border);
-  border-radius: var(--radius-surface);
-  background: var(--bg-subtle);
-}
+/* Settings > Machines > Nodes. Each paired node's row sits in a box of its own, so the rows divide here
+   rather than through the section's own row rule, and a node whose identity changed is outlined in red:
+   the one thing on the page that has to stop someone. */
+.node-row + .node-row { border-top: var(--divider); }
 .node-row-alarm {
+  border: var(--surface-border);
   border-color: var(--danger);
+  border-radius: var(--radius-surface);
+  padding-inline: var(--space-4);
+}
+.node-row-alarm + .node-row { border-top: 0; }
+.node-sub {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
 }
 .node-meta {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-3);
-}
-.node-title {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-2);
-  font-weight: 600;
-  color: var(--text);
 }
 .node-badge {
   font-size: var(--fs-sm);
@@ -66,33 +58,11 @@
   border: var(--control-border);
   border-radius: var(--radius-pill-fixed);
 }
-.node-sub {
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-}
-.node-meta > .ui-input {
-  max-width: 260px;
-}
 .node-actions,
 .node-step-actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
-}
-.provided-nodes {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  margin-top: var(--space-5);
-  padding-top: var(--space-5);
-  border-top: var(--divider);
-}
-.provided-nodes h3 {
-  margin: 0;
-}
-.provided-nodes > p {
-  margin: 0;
 }
 .node-attachment {
   display: flex;
@@ -177,16 +147,6 @@
   padding: var(--pane-pad);
   border: var(--surface-border);
   border-radius: var(--radius-surface);
-}
-.node-step-label {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-}
-.node-step-label .ui-input {
-  color: var(--text);
 }
 
 /* Fleet home (node/FleetHome.tsx). Card grid rather than a table: a node has five facts and two

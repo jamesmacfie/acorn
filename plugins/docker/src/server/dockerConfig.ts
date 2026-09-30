@@ -18,12 +18,11 @@ import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
+import type { DockerMatcherKeys, DockerProjectMatcher } from '../shared/model'
 
-export type DockerMatchOverrides = {
-  composeProject: string | null // always link this compose project's containers to the task
-  matchLabels: string[] // label keys whose value must equal the task's branch slug
-  matchName: boolean // enable the name-contains-slug fallback (default true)
-}
+// composeProject: always link this compose project's containers to the task. matchLabels: label keys
+// whose value must equal the task's branch slug. matchName: the name-contains-slug fallback (default true).
+export type DockerMatchOverrides = DockerMatcherKeys
 
 export const defaultOverrides: DockerMatchOverrides = { composeProject: null, matchLabels: [], matchName: true }
 
@@ -61,9 +60,14 @@ async function readOverrides(path: string): Promise<Partial<DockerMatchOverrides
   return value
 }
 
-// Layered resolution: defaults ← ~/.acorn/config.toml ← <worktree>/.acorn/config.toml.
-export async function loadDockerOverrides(worktreePath: string | null): Promise<DockerMatchOverrides> {
+// Layered resolution: defaults ← ~/.acorn/config.toml ← <worktree>/.acorn/config.toml. The layers are
+// kept apart too, so a project's settings page can say which file set each key.
+export async function loadDockerLayers(checkout: string | null): Promise<DockerProjectMatcher> {
   const home = await readOverrides(join(homedir(), '.acorn', 'config.toml'))
-  const repo = worktreePath ? await readOverrides(join(worktreePath, '.acorn', 'config.toml')) : {}
-  return { ...defaultOverrides, ...home, ...repo }
+  const repo = checkout ? await readOverrides(join(checkout, '.acorn', 'config.toml')) : {}
+  return { repo, home, effective: { ...defaultOverrides, ...home, ...repo } }
+}
+
+export async function loadDockerOverrides(worktreePath: string | null): Promise<DockerMatchOverrides> {
+  return (await loadDockerLayers(worktreePath)).effective
 }

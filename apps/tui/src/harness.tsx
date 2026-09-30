@@ -56,6 +56,10 @@ export async function bootFixture(): Promise<{ task: typeof TASK }> {
     import('./plugins/trustPromptLoader'),
   ])
   setTrustPromptComponent(() => TrustPrompt)
+  // The shell registers core's settings pages behind a dynamic import when it mounts. Loaded here first,
+  // so a test that ends soon after mounting does not leave that import running after the environment
+  // is torn down.
+  await import('./chrome/settingsPages')
   const { refreshNodePlugins } = await import('@acorn/client-core/infra/node')
   await refreshNodePlugins('node-1')
   return { task: TASK }
@@ -204,6 +208,8 @@ export async function renderFixture(size: {
   const { _resetChrome } = await import('./chrome/state')
   const { resetPromotion } = await import('./chrome/promotionStore')
   const { resetFilePrompts } = await import('./chrome/filePrompt')
+  const { resetConfirmations } = await import('./chrome/confirmStore')
+  const { resetSettings } = await import('./chrome/settingsStore')
   const { _resetHints } = await import('./chrome/bindings')
   const { _resetRouter } = await import('./kit/router')
   const { clearAnnotations } = await import('@acorn/client-core/host/annotations/annotations.ts')
@@ -224,6 +230,8 @@ export async function renderFixture(size: {
   _resetChrome()
   resetPromotion()
   resetFilePrompts()
+  resetConfirmations()
+  resetSettings()
   // …and the footer's cached answer, which is keyed on the engine among other things and would
   // otherwise be the previous render's hints until something moved (./chrome/bindings.ts).
   _resetHints()

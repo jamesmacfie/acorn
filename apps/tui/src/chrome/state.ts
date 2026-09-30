@@ -16,7 +16,7 @@ import { createSignal } from 'solid-js'
  *  distribution pass queues a bundle and the shell raises it (../plugins/TrustPrompt.tsx).
  *  `notifications` is the bell's two sections, which on this host have no popover to live in
  *  (./Inbox.tsx). */
-export type OverlayName = 'palette' | 'help' | 'quit' | 'trust' | 'workspace' | 'project' | 'notifications' | 'setup' | 'promotion' | 'sessions' | 'file'
+export type OverlayName = 'palette' | 'help' | 'quit' | 'trust' | 'workspace' | 'project' | 'notifications' | 'setup' | 'settings' | 'promotion' | 'sessions' | 'file'
 
 // A stack rather than one slot, because the topmost is the one that owns the keys and closing it has
 // to reveal the one under it. In practice two are rarely open at once — `?` inside the palette types

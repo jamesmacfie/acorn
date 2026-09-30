@@ -85,7 +85,7 @@ describe('the AI step', () => {
     expect(next).toBeTruthy()
     expect(next!.disabled).toBe(false)
     // The one line that has to be there when there is nothing else to say.
-    expect(text()).toContain('Settings, under Integrations')
+    expect(text()).toContain('Settings, under AI models')
   })
 
   it('offers a key form built from the provider descriptor', () => {

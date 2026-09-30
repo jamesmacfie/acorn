@@ -37,7 +37,7 @@ real remote with real credentials does.
     puts the branch back where it was. Last, commit from a terminal in the same worktree and watch the
     ahead count move without touching the pane.
 46. With no model provider connected and no agent CLI installed, the commit toolbar has no wand at the
-    left of it. Connect one in Settings, under Integrations, reopen the pane, and stage two files.
+    left of it. Add one in Settings, under AI models, reopen the pane, and stage two files.
     Press the wand: it spins, and
     within ten seconds the editor holds a subject and a body. Commit, and the message lands. Now type
     a message of your own and press the wand again: it reads **Replace?** and does nothing until a

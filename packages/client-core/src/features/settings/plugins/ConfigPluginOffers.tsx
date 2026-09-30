@@ -1,9 +1,9 @@
 import { For, Show } from 'solid-js'
 import type { PluginInstallSource } from '@acorn/protocol/api.ts'
 import { describePluginSource } from '@acorn/protocol/plugin/source.ts'
-import { configPluginOffers } from '../../infra/persistence/deviceConfigSync'
-import { devicePlugins } from '../../host/plugins/distribution'
-import { Button } from '../../kit/components/primitives'
+import { configPluginOffers } from '../../../infra/persistence/deviceConfigSync'
+import { devicePlugins } from '../../../host/plugins/distribution'
+import { Button } from '../../../kit/components/primitives'
 
 export default function ConfigPluginOffers(props: {
   busy: boolean

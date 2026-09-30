@@ -46,11 +46,12 @@
       "workflows"
     ],
     "settingsPages": [
-      "agent-concurrency",
-      "agent-pricing",
       "agent-defaults",
       "custom-agents",
+      "agent-mcp-servers",
+      "agent-limits",
       "docker",
+      "docker.project",
       "terminal",
       "workflows"
     ],
@@ -91,6 +92,7 @@
     ],
     "schedules": [
       "docker.task-containers",
+      "preview.configured",
       "workflows.task-runs"
     ],
     "railMarkers": [
@@ -101,6 +103,7 @@
     ],
     "persistedStateSlices": [
       "agents.tool-fold",
+      "agents.session-order",
       "changes.view",
       "context.section-selection",
       "docker.prefs",
@@ -177,7 +180,8 @@
         "docker"
       ],
       "settingsPages": [
-        "docker"
+        "docker",
+        "docker.project"
       ],
       "slots": [
         "task.footer/docker-footer-badge"
@@ -259,6 +263,9 @@
       ],
       "commands": [
         "preview.open"
+      ],
+      "schedules": [
+        "preview.configured"
       ]
     },
     "workflows": {

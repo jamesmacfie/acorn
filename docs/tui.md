@@ -31,7 +31,7 @@ Topbar:   one line. Workspace > project and task count on the left; the open bra
           and Task: title on the right. Focusing another task previews it as Task to open: title
 Left:     three framed panels — Menu, the sources; Browse, what is under the chosen one; Tasks
 Main:     one pane, or the chosen source's detail, with a strip of pane labels above it
-Overlays: commands, setup, file paths, task promotion, terminal sessions, and confirmations
+Overlays: commands, setup, settings, file paths, task promotion, terminal sessions, and confirmations
 Footer:   one line. What the keyboard will do, and the node's state when it needs a sentence
 ```
 
@@ -145,11 +145,10 @@ that boundary.
 
 An empty project roster opens **Set up acorn** after the Node's roster query completes. The route
 chooses or creates a workspace, adds a project from an absolute path on that Node, and creates a task
-with the shared branch rules. `Ctrl+K` keeps **Settings** and **New task** reachable afterward. The
+with the shared branch rules. `Ctrl+K` keeps **Set up acorn** and **New task** reachable afterward. The
 provider step lists connections, accepts descriptor-defined credentials with masked password fields,
 and starts device authorization when a provider offers it. Installed Claude and Codex CLIs are
-detected by the Agent pane. The terminal Settings route currently covers this setup flow; the other
-desktop Settings pages still need terminal projections.
+detected by the Agent pane. Settings is its own route (§ Settings).
 
 The device token is plain bytes at 0600. The desktop encrypts under the platform keychain through a
 `TokenCipher`; there is no keychain here, so the TUI supplies a pass-through, which is what the node
@@ -578,6 +577,43 @@ rows project the allocator's complete ordered marker legend as a count. At narro
 shows `+N`; focus that row and press `Shift+F10` or the menu key to inspect every label in the
 host-owned **Task markers** list. The desktop keeps its four-corner allocation.
 
+## Settings
+
+**Open settings** in the `Ctrl+K` palette opens the Settings route. It lists the desktop's nine
+groups, then a group's pages, then one page, and Escape climbs back one level at a time: an open
+detail, the page, the group, and then the route. The list is the registry the desktop's settings view
+reads. Core's pages come from the declaration table in
+`packages/client-core/src/features/settings/corePages.ts`, which the desktop's
+`apps/desktop/src/client/pageContributions.tsx` also draws from, and the roster's plugins register
+theirs through `ctx.settingsPages`. So the groups, the page order, the labels, and each page's scope
+match the desktop. `apps/tui/src/chrome/settingsPages.tsx` decides what this host draws:
+
+- A plugin page written with the kit draws unchanged, through the terminal projections of
+  `SettingsSection` and `SettingRow`. A row with `from` shows where its value comes from and no
+  control. The agents plugin's pages, Docker, and Workflows draw this way.
+- Notifications has a terminal form of its own. Its **Terminal alerts** row shows the mode
+  `ACORN_TUI_NOTIFY` chose, whether the variable set it or the default did, and whether this terminal
+  takes a notification sequence at all. The variable is the only way to change it, and the row says
+  so. The event switches and the test notification are the desktop's, through the same accessor. The
+  desktop's sound, system notification, and app icon switches are absent, because the environment
+  variable chooses this host's channels and the topbar count is always on.
+- Every other core page, and the terminal plugin's drawer page, is listed with **desktop app** beside
+  it. Opening it says why this host does not draw it and where to go. A node page's change on the
+  desktop applies here, because the node keeps it. A device page's does not, and for Appearance,
+  Keyboard shortcuts, Rail and surfaces, and Device config file the page names this client's own
+  `acorn.json`. Overview also offers **Set up acorn**.
+
+A page runs inside the same unsaved-changes and detail seams the desktop provides, so a form with
+Save and Cancel asks before Escape drops it, and a list page's detail puts its name in the
+breadcrumb. `confirmAction` from `@acorn/plugin-api/ui/host` is a real dialog here
+(`apps/tui/src/chrome/Confirmation.tsx`). It draws over whatever has the screen and keeps that
+surface mounted underneath, and its caret starts on **Cancel**. A notice target of kind `settings`
+and `presentation:open-settings` open the route on the page they name. A section in a deep link is
+ignored, because this host cannot scroll a page to one.
+
+The place in the route lasts for the session only. The palette carries **Open settings** alone rather
+than the desktop's row per page and per section ([command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md)).
+
 ## Loaded plugins
 
 The terminal's file-backed custody implements device install and remove through the same client-core
@@ -599,7 +635,7 @@ For the full contract, see [Terminal chrome and plugins](./tui/chrome-and-plugin
 buffer, one per layout drawn from its projection, a twin of client-core's `keys.test.tsx` against the
 terminal adapter, a pane file that opens every first-party pane at exactly 80 by 24 and asks whether
 the thing the pane is for is on the first screen, a chrome file that drives the whole shell, a
-reachability file that walks every stop on seven surfaces and checks four invariants after every
+reachability file that walks every stop on nine surfaces and checks four invariants after every
 press, and five files that need no renderer at all: the focus invariants that are facts about
 the source, the palette's collapse to 16 slots, the clipboard
 sequence, the plugin sandbox, and the boot test. Nothing in the suite skips and nothing asks for a

@@ -47,7 +47,7 @@ function mount(stored: unknown) {
     },
   })
   const checkboxes = () => [...applied(ops).values()].filter((node) => node.type === 'Checkbox')
-  const checkbox = (label: string) => checkboxes().find((node) => node.props.label === label)
+  const checkbox = (label: string) => checkboxes().find((node) => node.props.ariaLabel === label)
   // A function prop crosses as a handler id, never as a function, so a click is a dispatch.
   const press = (label: string, value: unknown) => {
     const handler = checkbox(label)?.props.onChange as { $handler: number } | undefined
@@ -61,7 +61,7 @@ describe('the Sentry export settings page', () => {
   it('draws a switch for each of the five kinds and the two detail choices', async () => {
     const page = mount(null)
     await settle()
-    expect(page.checkboxes().map((node) => node.props.label)).toEqual([
+    expect(page.checkboxes().map((node) => node.props.ariaLabel)).toEqual([
       'Errors', 'Traces', 'Logs', 'Metrics', 'Events', 'Stack traces on errors', 'Task ids as tags',
     ])
     page.root.dispose()
@@ -92,12 +92,25 @@ describe('the Sentry export settings page', () => {
     page.root.dispose()
   })
 
+  it('puts a switch back and names the failure on its row when the write fails', async () => {
+    const page = mount(null)
+    await settle()
+    page.set.mockRejectedValueOnce(new Error('The node refused the settings'))
+    page.press('Logs', false)
+    await settle()
+    expect(page.checkbox('Logs')?.props.checked).toBe(true)
+    const rows = [...applied(page.ops).values()].filter((node) => node.type === 'SettingRow')
+    expect(rows.find((node) => node.props.label === 'Logs')?.props.error).toBe('The node refused the settings')
+    expect(rows.filter((node) => node.props.error)).toHaveLength(1)
+    page.root.dispose()
+  })
+
   it('says that both the core switch and a connection are needed', async () => {
     const page = mount(null)
     await settle()
     const text = [...applied(page.ops).values()].map((node) => JSON.stringify(node.props)).join(' ')
     expect(text).toContain('Settings → Telemetry')
-    expect(text).toContain('Settings → Integrations')
+    expect(text).toContain('Settings → Services')
     page.root.dispose()
   })
 })

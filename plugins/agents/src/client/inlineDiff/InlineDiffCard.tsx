@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createResource, createSignal, Index, onCleanup, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { Alert, Button, Card, Inline, Select, Stack, Text, Textarea } from '@acorn/plugin-api/ui'
+import { Alert, Button, Card, Inline, ModelPickerPopover, SegmentedControl, Select, Stack, Text, Textarea } from '@acorn/plugin-api/ui'
 import type { AgentConfigOption, AgentNormalizedEvent, AgentProviderDescriptor } from '../../contract/wire.ts'
 import { sameInlineLine, type InlineDiffOrigin } from '../../contract/inlineDiff.ts'
 import { defaultAgentSessionDefaults } from '../../shared/sessionDefaults.ts'
@@ -83,6 +83,7 @@ export default function InlineDiffCard(props: Props) {
   })
   const modelOption = createMemo(() => advertised()?.find((option) => option.category === 'model'))
   const model = createMemo(() => modelOverride() ?? record().inline.pinned[provider()?.id ?? '']?.[modelOption()?.id ?? 'model'] ?? '')
+  const modelLabel = () => modelOption()?.values.find((value) => value.value === model())?.label ?? 'provider default'
   const readonlyProfile = createMemo(() => advertised()?.find((option) => option.category === 'permission')
     ?.values.find((value) => /read.?only/i.test(`${value.value} ${value.label} ${value.description ?? ''}`)))
 
@@ -167,26 +168,42 @@ export default function InlineDiffCard(props: Props) {
           onRequestResolved={() => { void managedAgentStore.loadSnapshot(session()!.id).catch(() => undefined) }}
         />}</Index>
         <Show when={!session()}>
-          <Inline gap="inline" wrap>
-            <Select label="Provider" size="sm" value={provider()?.id ?? ''}
-              options={installed().map((item) => ({ value: item.id, label: item.label }))}
-              onChange={setProviderOverride} />
-            <Show when={modelOption()}>{(option) => <Select label="Model" size="sm" value={model()}
-              options={[{ value: '', label: 'Provider default' }, ...option().values.map((value) => ({ value: value.value, label: value.label }))]}
-              onChange={setModelOverride} />}</Show>
-            <Select label="Access" size="sm" value={access()} options={[{ value: 'read-only', label: 'Read only' }, { value: 'full', label: 'Full access' }]}
-              onChange={(value) => setAccess(value as 'read-only' | 'full')} />
-          </Inline>
           <Show when={access() === 'read-only' && !readonlyProfile()}><Text emphasis="muted" wrap>Read only is best effort with this provider.</Text></Show>
         </Show>
         <Textarea label="Ask agent" size="sm" rows={3} value={draft()} onInput={setDraft}
           onCommit={() => void submit()} placeholder="Ask about this change…" />
-        <Inline gap="inline">
-          <Button size="sm" disabled={busy() || !draft().trim()} onPress={() => void submit()}>{busy() ? 'Sending…' : 'Send'}</Button>
-          <Show when={session()}>{(current) => <>
-            <Button size="sm" onPress={() => openManagedSession(props.origin.taskId, current().id)}>Open in Agents</Button>
-            <Button size="sm" onPress={() => { setSessionId('new'); setDraft(''); setPendingAttempt(null) }}>New chat</Button>
-          </>}</Show>
+        <Inline gap="inline" spread>
+          <Show when={!session()}>
+            <ModelPickerPopover
+              label="Model and permissions"
+              title={`Choose model and permissions. Now: ${provider()?.label ?? 'no provider'}, ${modelLabel()}, ${access() === 'read-only' ? 'read only' : 'write access'}`}
+              sparkle
+              above={<Stack gap="inline">
+                <Text emphasis="eyebrow">Permissions</Text>
+                <SegmentedControl
+                  ariaLabel="Agent permissions"
+                  size="sm"
+                  value={access()}
+                  options={[{ value: 'read-only', label: 'Read only' }, { value: 'full', label: 'Write access' }]}
+                  onChange={(value) => { setAccess(value); setPendingAttempt(null) }}
+                />
+              </Stack>}
+            >
+              <Select label="Provider" size="sm" value={provider()?.id ?? ''}
+                options={installed().map((item) => ({ value: item.id, label: item.label }))}
+                onChange={(value) => { setProviderOverride(value); setModelOverride(null); setPendingAttempt(null) }} />
+              <Show when={modelOption()}>{(option) => <Select label="Model" size="sm" value={model()}
+                options={[{ value: '', label: 'Provider default' }, ...option().values.map((value) => ({ value: value.value, label: value.label }))]}
+                onChange={(value) => { setModelOverride(value); setPendingAttempt(null) }} />}</Show>
+            </ModelPickerPopover>
+          </Show>
+          <Inline gap="inline">
+            <Button size="sm" disabled={busy() || !draft().trim()} onPress={() => void submit()}>{busy() ? 'Sending…' : 'Send'}</Button>
+            <Show when={session()}>{(current) => <>
+              <Button size="sm" onPress={() => openManagedSession(props.origin.taskId, current().id)}>Open in Agents</Button>
+              <Button size="sm" onPress={() => { setSessionId('new'); setDraft(''); setAccess('read-only'); setPendingAttempt(null) }}>New chat</Button>
+            </>}</Show>
+          </Inline>
         </Inline>
         <Show when={error()}>{(message) => <Alert tone="warn">{message()}</Alert>}</Show>
       </Show>

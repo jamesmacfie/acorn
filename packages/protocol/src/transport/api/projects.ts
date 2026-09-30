@@ -1,4 +1,5 @@
 import type { ExternalRef } from '../../integrations/providers.ts'
+import type { McpServerSummary } from '../../integrations/mcp.ts'
 
 // Workspaces group projects and are the top-level unit (docs/workspaces-and-tasks.md).
 // When the worktree setup script runs: 'off' never, 'created' when the task is created, 'terminal'
@@ -84,7 +85,32 @@ export type ProjectConfigPatch = Partial<{
   browserRules: BrowserRule[]
   branchPrefix: string
 }>
-export type ProjectConfigResponse = { projectId: string; config: ProjectConfig }
+// What the project checkout's committed `.acorn/config.toml` sets, which wins over the matching
+// machine-local value in `config` (docs/workspaces-and-tasks.md § Worktrees and setup). A key is
+// present only when the file sets it. Run targets merge by id, so each one here replaces the machine
+// target with the same id and leaves the others in place, and a `dev` target replaces the dev script
+// and its restart command too. Whether the file is trusted yet decides whether a task may run it, not
+// which value wins, so this is reported either way.
+export type ProjectRepoConfig = {
+  runTargets: ProjectRunTarget[]
+  dbUrlScript?: string
+  previewMode?: PreviewMode
+  previewValue?: string
+}
+// One run target as `.acorn/config.toml` and the `runTargets` JSON declare it.
+export type ProjectRunTarget = {
+  id: string
+  command: string
+  stop?: string
+  restart?: string
+  url?: string
+  urlCommand?: string
+  icon?: string
+  default?: boolean
+}
+// `repoConfig` is only on the config read, and only when the project has a folder on disk. An older
+// node never sends it, which a client reads as "nothing set by the repo".
+export type ProjectConfigResponse = { projectId: string; config: ProjectConfig; repoConfig?: ProjectRepoConfig }
 
 // Tasks are the project-level units of work and appear as rail rows (docs/workspaces-and-tasks.md).
 // connectionId pins the link to a specific credential. providerId is stamped by core from that row.
@@ -145,6 +171,11 @@ export const projectRoute = (id: string) => `${projectsRoute}/${encodeURICompone
 export const projectDetectRoute = (id: string) => `${projectRoute(id)}/detect`
 export const projectConfigRoute = (id: string) => `${projectRoute(id)}/config`
 export const projectRunTargetsRoute = (id: string) => `${projectRoute(id)}/run-targets`
+// The MCP config files the agents in this project load, and the empty .mcp.json Settings can seed
+// (docs/mcp.md § Configuration).
+export const projectMcpRoute = (id: string) => `${projectRoute(id)}/mcp`
+export const projectMcpStarterRoute = (id: string) => `${projectRoute(id)}/mcp/starter`
+export type ProjectMcpFile = { file: string; servers: McpServerSummary[] }
 export const taskArchiveRoute = (id: string) => `/v1/core/tasks/${id}/archive`
 export const taskRestoreRoute = (id: string) => `/v1/core/tasks/${id}/restore`
 // What every plugin has to say about archiving this task, asked once when the dialog opens
@@ -152,8 +183,6 @@ export const taskRestoreRoute = (id: string) => `/v1/core/tasks/${id}/restore`
 export const taskArchiveConcernsRoute = (id: string) => `/v1/core/tasks/${id}/archive-concerns`
 export const taskPreviewUrlRoute = (id: string) => `/v1/core/tasks/${id}/preview-url`
 export const taskOnCreatedRoute = (id: string) => `/v1/core/tasks/${id}/on-created`
-export const taskMcpRoute = (id: string) => `/v1/core/tasks/${id}/mcp`
-export const taskMcpStarterRoute = (id: string) => `/v1/core/tasks/${id}/mcp/starter`
 
 // Workspaces (named groups of Projects): the top-level unit.
 export const workspacesRoute = '/v1/core/workspaces'

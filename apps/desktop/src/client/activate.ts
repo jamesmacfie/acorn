@@ -1,8 +1,9 @@
 import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints'
 import { disabledNodePlugins, refreshNodePlugins } from '@acorn/client-core/infra/node'
-import { pluginFailureAttention } from '@acorn/client-core/infra/node'
+import { pluginFailureAttention, pluginWaitingAttention } from '@acorn/client-core/infra/node'
 import { attentionRegistry } from '@acorn/client-core/host/registries/rail'
 import { noticeKindContributions } from '@acorn/client-core/features/notifications'
+import { connectionAttention } from '@acorn/client-core/features/settings'
 import { registerNoticeTargetHandler } from '@acorn/client-core/features/notifications'
 import { clientEvents } from '@acorn/client-core/host/registries/commands'
 import { directPreferenceSlices } from '@acorn/client-core/infra/persistence'
@@ -42,7 +43,12 @@ clientScheduleRegistry.register(taskStatusScheduleContribution)
 // Core's own attention source: plugins this node installed but could not start. Registered here
 // rather than by a plugin, because the plugin that failed is not running to report itself.
 attentionRegistry.register(pluginFailureAttention)
-// ...and where clicking one of its rows lands. The settings modal belongs to the shell, so the shell
+// And what waits on the person there: a review, an approval, or a node restart. The same rows put the
+// dot on Plugins in the settings rail.
+attentionRegistry.register(pluginWaitingAttention)
+// And a connection whose provider refused its credential, which puts the dot on Services or AI models.
+attentionRegistry.register(connectionAttention)
+// ...and where clicking one of its rows lands. The settings view belongs to the shell, so the shell
 // answers for this target kind; `resourceId` is the settings page id, so any row from anywhere can
 // deep-link to a page without core growing a second vocabulary for it.
 registerNoticeTargetHandler('settings', (_taskId, target) => {
