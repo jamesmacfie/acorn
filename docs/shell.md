@@ -429,19 +429,20 @@ initialised in `src-tauri/src/lib.rs` for `app.notification()` alone: the render
 plugin's own commands, so `capabilities/default.json` still grants `core:default` and nothing else,
 and a page in the preview pane or a plugin webview cannot raise a banner wearing acorn's icon.
 
-The plugin gives desktop no activation callback, so `show_notification` records the notice id it
-raised a banner for and `window_focused` emits `acorn:notification-activated` when the main window
-comes back within 30 seconds. That is a guess, and a wrong one costs a task selection the owner did
-not ask for. Both halves of the alternative are worse: no click handling at all, or a second
-notifier process to shell out to.
+Window focus never opens a notification target. On macOS, `src-tauri/src/notifications.rs` posts
+through `mac-notification-sys` and waits for the native response on a background thread. Only a
+content click focuses the main window and emits `acorn:notification-activated`, carrying that banner's
+own notice id. Delivery, dismissal, and returning through the Dock or Cmd-Tab preserve the view.
+Multiple banners retain independent tags, so clicking an earlier banner opens its own target.
+Other desktop platforms use the Tauri notification plugin to show banners; its desktop API supplies
+no activation callback, so those banners do not select a task. The notification bell remains clickable
+on every platform. The command's boolean acknowledges submission, not interaction or OS delivery.
 
 macOS attaches a banner to an installed app, not to a running process, and `tauri dev` runs a bare
-binary with no bundle around it. The plugin's answer is to post dev banners as `com.apple.Terminal`,
-which is why they arrive titled Terminal with a terminal icon. `borrow_installed_identity` in
-`src-tauri/src/commands.rs` looks up whichever acorn the machine has installed and claims its
-identity before the plugin claims Terminal's, so a dev banner carries the acorn name and icon. It
+binary with no bundle around it. `src-tauri/src/notifications.rs` looks up whichever acorn the machine
+has installed and claims its identity, so a dev banner carries the acorn name and icon. It
 needs an acorn in `/Applications` or a `tauri build` bundle the system has seen; with neither, the
-Terminal banner stands, because an identity macOS cannot resolve leaves the process unable to post at
+`com.apple.Terminal` is the fallback, because an identity macOS cannot resolve leaves the process unable to post at
 all rather than falling back.
 
 The bridge also tells the shell what colour the app is. On macOS the window is built with

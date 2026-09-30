@@ -314,8 +314,9 @@ suspended audio context on the first click or keypress.
 its own fallback: it asks permission once, shows a silent banner tagged with the notice id, and holds
 the object until it closes so the click handler survives collection. Its `canSetBadge` answers false
 and Settings hides the app-icon row. A shell that installs the group takes the banner over and gains
-the badge. For the desktop half, the two Tauri commands and the focus approximation that stands in
-for a click callback, see [shell.md](./shell.md) § The renderer bridge.
+the badge. Notification delivery and window focus preserve the selected task, pane, and session.
+Only an explicit notification activation or a click in the bell opens its target. For the desktop
+commands and macOS native click handling, see [shell.md](./shell.md) § The renderer bridge.
 
 `toast` is the kind's own answer to "may this reach the desktop", beside the owner's, and both have to
 say yes. It went unread for as long as it existed: every kind declared one, three declared `false` with
