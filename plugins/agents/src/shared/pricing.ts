@@ -149,6 +149,13 @@ export const codexPriceCatalog: readonly AgentPriceCatalogEntry[] = [
     defaultPrice: fixedPrice({ input: 10, output: 50, cacheWrite: 12.5, cacheRead: 1 }),
   },
   {
+    id: 'gpt-6-1-sol',
+    label: 'GPT-6.1 Sol',
+    models: 'gpt-6.1-sol',
+    matches: matches(/^gpt-6\.1-sol(?:-|$)/i),
+    defaultPrice: fixedPrice({ input: 2, output: 10, cacheWrite: 2.5, cacheRead: 0.1 }),
+  },
+  {
     id: 'gpt-6-sol',
     label: 'GPT-6 Sol',
     models: 'gpt-6-sol',
@@ -182,6 +189,14 @@ export const codexPriceCatalog: readonly AgentPriceCatalogEntry[] = [
     models: 'gpt-5.6, gpt-5.6-sol',
     matches: matches(/^gpt-5\.6(?:-sol)?(?:-|$)/i),
     defaultPrice: fixedPrice({ input: 4, output: 20, cacheWrite: 5, cacheRead: 0.4 }),
+  },
+  // Exact match: gpt-5.5-pro and gpt-5.5-cyber are separate models with their own prices.
+  {
+    id: 'gpt-5-5',
+    label: 'GPT-5.5',
+    models: 'gpt-5.5',
+    matches: matches(/^gpt-5\.5$/i),
+    defaultPrice: fixedPrice({ input: 5, output: 30, cacheWrite: 6.25, cacheRead: 0.5 }),
   },
 ]
 
