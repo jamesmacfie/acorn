@@ -28,7 +28,7 @@ export function verifyWindowsBundle(pkg, bundle) {
     const stagedNode = join(pkg, 'src-tauri/binaries/node-x86_64-pc-windows-msvc.exe')
     if (existsSync(node) && sha256(node) !== sha256(stagedNode)) problems.push('the installed Node runtime differs from the verified staged download.')
     if (problems.length) throw new Error(`Windows bundle verification failed:\n${problems.join('\n')}`)
-    runPnpm(['exec', 'vitest', 'run', '--project', 'shell', 'test/boot.test.ts'], {
+    runPnpm(['run', 'test:boot'], {
       cwd: pkg,
       stdio: 'inherit',
       env: { ...process.env, ACORN_BOOT_RESOURCES: installed, ACORN_BOOT_NODE: node },
