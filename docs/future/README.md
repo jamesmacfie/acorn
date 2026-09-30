@@ -18,6 +18,8 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
 | [dashboards/](./dashboards/README.md) | Remaining taskless database and write-back proposals. Shared data discovery and authoring now belong to workflow v2. | Redesign shipped; overlapping proposals superseded, 2026-09-13. |
+| [dynamic-ui/](./dynamic-ui/README.md) | Agent-built apps: task apps drawn as transcript cards and panes in host components, published to the project, edited through drafts, and exported as plugins. A spike and five phases. | Proposed, 2026-10-01; nothing built. |
+| [memory/](./memory/README.md) | Simple memory: direct agent writes, the memory index in every session's system prompt, undo instead of review, and the removal of Findings. Four phases. | Proposed, 2026-10-01; nothing built. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
 | [tui-review/](./tui-review/README.md) | Live terminal UX audit, feature inventory, host projections, and acceptance plan. | Icon removal, startup repair, and the Settings route (the navigation P0) implemented; broader acceptance open. |
 
