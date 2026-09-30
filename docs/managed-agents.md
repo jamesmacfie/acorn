@@ -756,9 +756,11 @@ detaches the card from the line while leaving the session and its original conte
 Agents. The client marks a session stale once it has seen that diff's newer document.
 
 Inline chats have separate provider, model, and effort defaults in the existing session-defaults
-preference. They start with Read only selected. When the provider advertises a read-only permission
-profile, the requested profile is applied before the first turn; otherwise the card labels the
-choice best effort and asks the agent not to write. Full access is an explicit per-chat choice.
+preference. Their sparkle picker opens above the send row with the provider and model choices beneath
+a Read only / Write access control. Each new chat starts with Read only selected. When the provider
+advertises a read-only permission profile, the requested profile is applied before the first turn;
+otherwise the card labels the choice best effort and asks the agent not to write. Write access is an
+explicit per-chat choice.
 
 A new session starts on the settings the owner last used, not on the provider's own choice. Switch
 Codex to a higher reasoning effort in one session and the next Codex session starts there.
