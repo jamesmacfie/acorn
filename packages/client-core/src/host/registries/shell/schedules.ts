@@ -1,3 +1,4 @@
+import { createEffect, createMemo, createRoot, onCleanup, untrack } from 'solid-js'
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 import { Registry } from '../../../kit/lib/state/registry'
 import { createLogger } from '../../../infra/telemetry/logger'
@@ -19,19 +20,30 @@ export type ClientScheduleContribution = {
 export const clientScheduleRegistry = new Registry<ClientScheduleContribution>('client-schedule')
 
 export function startClientSchedules(): () => void {
-  const disposers = clientScheduleRegistry.entries().filter((entry) => hasHostCapability(entry.requires)).map((entry) => {
-    const refresh = () => {
-      if (!document.hidden) void Promise.resolve(entry.run()).catch((error) => log.error(entry.id, error, { 'schedule.id': entry.id }))
-    }
-    refresh()
-    const timer = window.setInterval(refresh, entry.intervalMs)
-    const off = entry.subscribe?.(refresh)
-    document.addEventListener('visibilitychange', refresh)
-    return () => {
-      document.removeEventListener('visibilitychange', refresh)
-      off?.()
-      clearInterval(timer)
-    }
+  return createRoot((dispose) => {
+    // Plugin availability can arrive after the Node is ready, and plugins can be re-registered while
+    // the window stays open. Keep the active set in sync instead of filtering it once at startup.
+    const active = createMemo((previous: readonly ClientScheduleContribution[] = []) => {
+      const next = clientScheduleRegistry.entries().filter((entry) => hasHostCapability(entry.requires))
+      return next.length === previous.length && next.every((entry, index) => entry === previous[index]) ? previous : next
+    })
+    createEffect(() => {
+      const disposers = active().map((entry) => {
+        const refresh = () => {
+          if (!document.hidden) void Promise.resolve(entry.run()).catch((error) => log.error(entry.id, error, { 'schedule.id': entry.id }))
+        }
+        untrack(refresh)
+        const timer = window.setInterval(refresh, entry.intervalMs)
+        const off = entry.subscribe?.(refresh)
+        document.addEventListener('visibilitychange', refresh)
+        return () => {
+          document.removeEventListener('visibilitychange', refresh)
+          off?.()
+          clearInterval(timer)
+        }
+      })
+      onCleanup(() => [...disposers].reverse().forEach((stop) => stop()))
+    })
+    return dispose
   })
-  return () => [...disposers].reverse().forEach((dispose) => dispose())
 }

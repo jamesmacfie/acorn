@@ -307,7 +307,7 @@ Every GitHub surface is a host layout filled with kit components; the plugin shi
 | Surface | Arrangement |
 | --- | --- |
 | The PR pane | The `single` layout holding one split: the navigator beside the diff, which is browse's inner pair without browse's pull list. The navigator opens with the strip of pull requests this task is about. |
-| Navigator | Overview, then the changed files and the conversation as folds. Browse and the PR pane draw the same three trees over the same model. |
+| Navigator | Overview, then the changed files and the conversation as folds. Browse and the PR pane draw the same three trees over the same model. The shared split control closes this column to its edge, keeps its content mounted, and remembers the choice on this device. |
 | Overview | The pull's heading and facts, the actions toolbar, the conflict alert, description, linked tickets, labels, checks, reviewers, and the `github:summary-badges` slot. |
 | Conversation | The comment and review composers over a timeline of cards: comments, review summaries, commits, and file threads. |
 | Browse | Two splits, one inside the other: the pull list, then the navigator beside its diff, or the create form beside its compare preview. |

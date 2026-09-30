@@ -32,4 +32,21 @@ describe('workflow run navigation cache', () => {
     expect(taskHasWorkflowRuns('root')).toBe(true)
     expect(workflowTaskGroups().root).toMatchObject({ running: 1, attention: 1 })
   })
+
+  it('does not replace a confirmed start with a read sent before that start', async () => {
+    let finishRead!: (value: { runs: { taskId: string }[] }) => void
+    api.allRuns.mockReturnValueOnce(new Promise((resolve) => { finishRead = resolve }))
+    api.taskNavigation.mockResolvedValueOnce({ groups: [] })
+    const staleRead = workflowRunCountsSchedule.run()
+
+    rememberWorkflowRun('new-confirmed-run')
+    finishRead({ runs: [] })
+    await staleRead
+    expect(taskHasWorkflowRuns('new-confirmed-run')).toBe(true)
+
+    api.allRuns.mockResolvedValueOnce({ runs: [] })
+    api.taskNavigation.mockResolvedValueOnce({ groups: [] })
+    await workflowRunCountsSchedule.run()
+    expect(taskHasWorkflowRuns('new-confirmed-run')).toBe(false)
+  })
 })

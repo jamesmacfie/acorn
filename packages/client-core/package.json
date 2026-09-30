@@ -50,6 +50,7 @@
     "./features/settings/default-model": "./src/features/settings/models/defaultModel.ts",
     "./features/settings/models/AiModelsSettings.tsx": "./src/features/settings/models/AiModelsSettings.tsx",
     "./features/settings/models/ModelBackendPicker.tsx": "./src/features/settings/models/ModelBackendPicker.tsx",
+    "./features/settings/models/ModelPickerPopover.tsx": "./src/features/settings/models/ModelPickerPopover.tsx",
     "./features/settings/nodes/NodesSettings.tsx": "./src/features/settings/nodes/NodesSettings.tsx",
     "./features/settings/plugins/PluginsSettings.tsx": "./src/features/settings/plugins/PluginsSettings.tsx",
     "./features/settings/plugins/RailSurfacesSettings.tsx": "./src/features/settings/plugins/RailSurfacesSettings.tsx",
