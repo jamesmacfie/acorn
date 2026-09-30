@@ -1,4 +1,4 @@
-import { gitOrThrow } from '../core/git'
+import { gitOrThrow, gitText } from '../core/git'
 import { ProcessError } from '../core/proc'
 import { constants, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
@@ -65,6 +65,24 @@ const gitFailure = (summary: string, error: unknown): string =>
     ? `${summary} Accept the Xcode license in Terminal, or install the standalone Command Line Tools.`
     : summary
 
+// Read structured local metadata after a failed add. Git's stderr can contain credentials, so
+// expose the occupied branch and path without forwarding arbitrary command output.
+async function worktreeCreationFailure(checkout: string, branch: string, summary: string, error: unknown): Promise<string> {
+  try {
+    const roster = await gitText(['worktree', 'list', '--porcelain', '-z'], { cwd: checkout, timeoutMs: 10_000 })
+    let path = ''
+    for (const field of roster.split('\0')) {
+      if (field.startsWith('worktree ')) path = field.slice('worktree '.length)
+      else if (field === `branch refs/heads/${branch}` && path) {
+        return `${summary} Branch '${branch}' is already checked out at '${path}'. Release the branch in that worktree, then reopen this task. Setup runs after Acorn creates its worktree.`
+      }
+    }
+  } catch {
+    // A diagnostic read must preserve the original failure when Git itself is unavailable.
+  }
+  return gitFailure(summary, error)
+}
+
 export async function ensureWorktree(
   worktreesRoot: string,
   checkout: string,
@@ -111,7 +129,7 @@ export async function ensureWorktree(
     try {
       await gitOrThrow(args, { cwd: checkout, timeoutMs: 60_000 })
     } catch (error) {
-      return { ok: false, reason: gitFailure('Could not create the worktree.', error) }
+      return { ok: false, reason: await worktreeCreationFailure(checkout, branch, 'Could not create the worktree.', error) }
     }
     invalidateWorktreeStatus(path)
     return { ok: true, path, created: true }
@@ -129,7 +147,7 @@ export async function ensureWorktree(
   try {
     await gitOrThrow(args, { cwd: checkout, timeoutMs: 60_000 })
   } catch (error) {
-    return { ok: false, reason: gitFailure(`Could not create a worktree for ${branch}.`, error) }
+    return { ok: false, reason: await worktreeCreationFailure(checkout, branch, `Could not create a worktree for ${branch}.`, error) }
   }
   invalidateWorktreeStatus(path)
   return { ok: true, path, created: true }
