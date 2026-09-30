@@ -132,6 +132,7 @@ acorn-plugin-sdk: member AcornBridge.ui.copy
 acorn-plugin-sdk: member AcornBridge.ui.done
 acorn-plugin-sdk: member AcornBridge.ui.openDestination
 acorn-plugin-sdk: member AcornBridge.ui.openPane
+acorn-plugin-sdk: member AcornBridge.ui.openTask
 acorn-plugin-sdk: member AcornBridge.ui.openUrl
 acorn-plugin-sdk: member AcornBridge.ui.toast
 acorn-plugin-sdk: member AcornBridge.webview
