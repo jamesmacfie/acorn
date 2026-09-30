@@ -254,6 +254,7 @@ function registerChrome(pluginId: string, hash: string, row: NodePluginRow, refr
       ...(descriptor.providerId ? { providerId: descriptor.providerId } : {}),
       ...(descriptor.projectScoped ? { projectScoped: true } : {}),
       ...(descriptor.showInRailByDefault === false ? { showInRailByDefault: false } : {}),
+      ...(descriptor.requiresGitProject ? { requiresGitProject: true } : {}),
       ...(defaultPane ? { defaultPane } : {}),
       when: () => pluginEnabledOnNode(chromeNode(), pluginId),
       // The rail list, from whichever host is drawing. The DOM's is the fallback, and it now hands over

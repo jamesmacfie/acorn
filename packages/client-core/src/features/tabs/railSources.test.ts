@@ -51,6 +51,19 @@ describe('availableSources (docs/integrations.md — gated by integration rows)'
     }
   })
 
+  it('a git-only source hides only once the workspace is known to hold no git project', () => {
+    const worktrees = sourceRegistry.register({ id: 'worktrees-test', order: 50, glyph: 'folder-git-2', label: 'Worktrees', requiresGitProject: true })
+    try {
+      const ids = (gitProject?: boolean) => availableSources([], gitProject === undefined ? {} : { gitProject }).map((s) => s.id)
+      expect(ids(true)).toContain('worktrees-test')
+      expect(ids(false)).not.toContain('worktrees-test')
+      // Projects still loading: no answer yet, so no flicker.
+      expect(ids(undefined)).toContain('worktrees-test')
+    } finally {
+      worktrees.dispose()
+    }
+  })
+
   it('provider sources appear only when their integration is connected', () => {
     expect(availableSources(undefined).map((s) => s.id)).toEqual([])
     expect(availableSources([integration('github')]).map((s) => s.id)).toEqual(['github'])

@@ -693,6 +693,9 @@
               "showInRailByDefault": {
                 "type": "boolean"
               },
+              "requiresGitProject": {
+                "type": "boolean"
+              },
               "defaultPane": {
                 "type": "string",
                 "minLength": 1,

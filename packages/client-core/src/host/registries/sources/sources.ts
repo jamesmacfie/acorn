@@ -44,6 +44,9 @@ export type SourceContribution<Item = unknown> = {
   // An extra gate beyond `providerId`, for a source whose relevance is not an integration question.
   // Core's Fleet home is the one user of it (docs/frontend.md § Registries and plugins).
   when?: () => boolean
+  // Draw only while the active workspace has a git project. A workspace question rather than a `when`,
+  // because the active workspace is the rail's to know and `SourceScope` already carries its facts.
+  requiresGitProject?: boolean
   component?: Component
   /**
    * The surface as a list beside a detail, for a host that draws the two halves in different places.
