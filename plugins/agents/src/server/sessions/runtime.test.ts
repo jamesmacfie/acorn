@@ -362,6 +362,50 @@ class BackgroundSubagentDriver extends FakeAgentDriver {
   }
 }
 
+/** Holds a turn open until the provider is stopped, the way a real agent in the middle of a task does.
+ *  One instance serves every session, so it can say which sessions it was asked to stop and what each
+ *  start resumed. */
+class LongTurnDriver implements AgentDriver {
+  readonly providerId = 'long-turn'
+  readonly profileId = 'long-turn'
+  readonly starts: AgentDriverStartOptions[] = []
+  readonly stopped: string[] = []
+  holdTurns = true
+
+  async probe(): Promise<AgentProviderDescriptor> {
+    return descriptor(this.providerId)
+  }
+
+  async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
+    this.starts.push(options)
+    const providerSessionRef = options.session.providerSessionRef ?? randomUUID()
+    let active = false
+    let release: ((error: Error) => void) | null = null
+    await options.onEvent({ type: 'session_metadata', providerSessionRef })
+    await options.onEvent({ type: 'session_state', state: 'ready' })
+    return {
+      providerSessionRef,
+      get ready() {
+        return !active
+      },
+      sendTurn: async () => {
+        active = true
+        if (this.holdTurns) await new Promise<never>((_, reject) => { release = reject })
+        await options.onEvent({ type: 'assistant_message', text: 'Picked up where it left off.' })
+        await options.onEvent({ type: 'turn_completed', stopReason: 'end_turn' })
+        active = false
+        return {}
+      },
+      async cancel() {},
+      async resolveRequest() {},
+      stop: async () => {
+        this.stopped.push(options.session.id)
+        release?.(new Error('Agent protocol process stopped.'))
+      },
+    }
+  }
+}
+
 describe('managed agent runtime conformance', () => {
   // Two real databases, matching the shape of the thing under test. `testDb` is core's, holding the
   // workspace, project, and task rows seedTask writes, which the runtime reaches through CoreServices.
@@ -752,6 +796,54 @@ describe('managed agent runtime conformance', () => {
     await driver.push({ type: 'assistant_message', text: 'and one more' })
     expect(frames.filter((frame) => frame.channel === 'agent:session').map((frame) => frame.session!.attention))
       .toEqual(['none', 'unread'])
+  })
+
+  it('sends every tool update on the socket and stores the call as two rows', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    const driver = new TrailingEventDriver()
+    registry.registerNative('fake', () => driver)
+    const frames: AgentNormalizedEvent[] = []
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+      publish: (frame) => {
+        if (frame.channel === 'agent:event' && frame.event.event.type === 'tool') frames.push(frame.event.event)
+      },
+    })
+    const session = await runtime.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: {},
+    })
+    await runtime.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Exercise the protocol.' }],
+      source: 'interactive',
+      effectivePolicy: { providerDefault: true },
+      idempotencyKey: randomUUID(),
+    })
+    await runtime.wait(session.id, 0, 'turn_completed', 2_000)
+
+    const updates: AgentNormalizedEvent[] = [
+      { type: 'tool', tool: { id: 'cmd', title: 'Build', status: 'running', input: 'pnpm build' } },
+      { type: 'tool', tool: { id: 'cmd', title: '', output: 'one\n', outputAppend: true } },
+      { type: 'tool', tool: { id: 'cmd', title: '', output: 'two\n', outputAppend: true } },
+      { type: 'tool', tool: { id: 'cmd', title: '', status: 'completed' } },
+    ]
+    for (const update of updates) await driver.push(update)
+    expect(frames).toEqual(updates)
+    const stored = (await runtime.store.exportSnapshot(session.id)).events.filter((record) => record.event.type === 'tool')
+    expect(stored.map((record) => record.event)).toEqual([
+      updates[0],
+      { type: 'tool', tool: { id: 'cmd', title: 'Build', status: 'completed', input: 'pnpm build', output: 'one\ntwo\n' } },
+    ])
   })
 
   it('holds a settled session settled when the provider streams past its turn', async () => {
@@ -1295,6 +1387,68 @@ describe('managed agent runtime conformance', () => {
     expect(pinned.sessions.map((row) => row.id)).toEqual([session.id])
   })
 
+  it('stops the provider processes of an archived task and resumes them after a restore', async () => {
+    const archived = await seedTask(testDb, dataDir, 'archived')
+    const other = await seedTask(testDb, dataDir, 'other')
+    const registry = new AgentDriverRegistry()
+    const driver = new LongTurnDriver()
+    registry.registerNative('long-turn', () => driver)
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+    const create = (taskId: string) => runtime!.createSession({
+      taskId,
+      providerId: 'long-turn',
+      profileId: 'long-turn',
+      kind: 'interactive',
+      config: {},
+    })
+    const working = await create(archived.taskId)
+    const idle = await create(archived.taskId)
+    const bystander = await create(other.taskId)
+    const prompt = (sessionId: string, text: string) => runtime!.enqueueTurn(sessionId, {
+      input: [{ type: 'text', text }],
+      source: 'interactive',
+      effectivePolicy: { providerDefault: true },
+      idempotencyKey: randomUUID(),
+    })
+    const turn = await prompt(working.id, 'Keep going.')
+    await vi.waitFor(async () => expect((await runtime!.store.turn(turn.id))?.status).toBe('active'))
+    await vi.waitFor(async () => expect((await runtime!.store.requireSession(idle.id)).runtimeState).toBe('ready'))
+    await vi.waitFor(async () => expect((await runtime!.store.requireSession(bystander.id)).runtimeState).toBe('ready'))
+
+    await runtime.stopTaskSessions(archived.taskId)
+
+    expect([...driver.stopped].sort()).toEqual([working.id, idle.id].sort())
+    const stopped = await runtime.store.snapshot(working.id)
+    expect(stopped.session.runtimeState).toBe('stopped')
+    // Interrupted, not left active, and not retried when its send failed as the process went away.
+    expect(stopped.turns.map((row) => [row.id, row.status])).toEqual([[turn.id, 'interrupted']])
+    expect(stopped.events.at(-1)?.event).toEqual({
+      type: 'session_state',
+      state: 'stopped',
+      detail: 'The provider process stopped when this task was archived. Restore the task and send a prompt to resume.',
+    })
+    expect((await runtime.store.requireSession(idle.id)).runtimeState).toBe('stopped')
+    expect((await runtime.store.requireSession(bystander.id)).runtimeState).toBe('ready')
+
+    // Restored: the next prompt starts the provider again on the conversation it had.
+    driver.holdTurns = false
+    const startsBefore = driver.starts.length
+    await prompt(working.id, 'Carry on.')
+    const resumed = await runtime.wait(working.id, 0, 'turn_completed', 2_000)
+    expect(driver.starts.slice(startsBefore).map((start) => start.session.id)).toEqual([working.id])
+    expect(driver.starts.at(-1)!.session.providerSessionRef).toBe(stopped.session.providerSessionRef)
+    expect(resumed.turns.at(-1)?.status).toBe('completed')
+    expect(driver.stopped).not.toContain(bystander.id)
+  })
+
   it('counts queued turns onto list rows', async () => {
     const seed = await seedTask(testDb, dataDir)
     runtime = new ManagedAgentRuntime({
@@ -1814,6 +1968,8 @@ describe('managed agent runtime conformance', () => {
     const owner = 'owner-defaults'
     await writeAgentSessionDefaults(core.prefs, owner, {
       continueAfterUsageLimit: true,
+      stopIdleAfterMinutes: 30,
+      keepArchivedHistoryDays: 0,
       followLastSession: false,
       pinned: { fake: { model: 'opus', reasoning: 'nonsense' } },
       last: {},
@@ -1904,6 +2060,8 @@ describe('managed agent runtime conformance', () => {
     const owner = 'owner-custom-agent'
     await writeAgentSessionDefaults(core.prefs, owner, {
       continueAfterUsageLimit: true,
+      stopIdleAfterMinutes: 30,
+      keepArchivedHistoryDays: 0,
       followLastSession: false,
       pinned: { fake: { model: 'opus', reasoning: 'medium' } },
       last: {},

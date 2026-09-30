@@ -4,6 +4,7 @@ import type {
   AgentArtifact,
   AgentDeleteResult,
   AgentEventPage,
+  AgentFootprint,
   AgentProviderDescriptor,
   AgentRequest,
   AgentSession,
@@ -36,6 +37,10 @@ const jsonWrite = <T>(url: string, method: string, body?: unknown, idempotent: b
 export const managedAgentApi = {
   providers: (force = false) =>
     readJson<AgentProviderDescriptor[]>(`${ROOT}/providers${force ? '?force=true' : ''}`),
+  // Settings > Storage and memory. At a named node, because the page says which node it shows.
+  footprint: (options: { nodeId?: string } = {}) => readJson<AgentFootprint>(`${ROOT}/footprint`, options),
+  stopIdle: (options: { nodeId?: string } = {}) =>
+    writeJson<{ stopped: number }>(`${ROOT}/stop-idle`, { method: 'POST', ...options }),
   async uploadAttachment(taskId: string, file: File): Promise<AgentAttachment> {
     // The parts are described rather than encoded: main builds the real multipart body, so nothing here
     // hand-rolls a boundary and the upload rides the same pinned connection as every other request.

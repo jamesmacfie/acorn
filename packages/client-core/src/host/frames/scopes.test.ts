@@ -73,6 +73,7 @@ describe('the route table covers every core route', () => {
     // The blunt sweep: whatever the table says, no scope may reach any of these paths with anything.
     const forbidden = [
       api.coreSecurityRoute,
+      api.coreStorageRoute,
       api.coreAuditRoute,
       api.coreBackupRoute,
       api.corePairStartRoute,

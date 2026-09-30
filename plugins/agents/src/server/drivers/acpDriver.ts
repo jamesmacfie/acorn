@@ -449,6 +449,7 @@ export class AcpDriver implements AgentDriver {
       get ready() {
         return !active && !stopped
       },
+      pid: child.pid,
       async sendTurn(turnOptions: AgentDriverTurnOptions) {
         try {
           const blocks = acpPrompt(turnOptions.input, turnOptions.attachments)

@@ -5,6 +5,7 @@ import { getDb, schema } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
 import { respondError } from '../../respond'
 import { broadcastTasksChanged } from '../../notify'
+import { runHook } from '../../pluginHost/hooks'
 import { Hono } from 'hono'
 import { ICON_NAME_RE, type ArchivedTask, type Task, type TaskLink, type TaskLinkSeed } from '@acorn/protocol/api.ts'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
@@ -19,7 +20,7 @@ import { getProject, type ProjectRow } from '../../projects'
 // Tasks (docs/workspaces-and-tasks.md): the single-project unit of work. Machine-scoped like projects
 // and terminal_sessions, no user_id, but still auth-gated (it's a logged-in app). CRUD: create /
 // list-active / rename / archive. Worktree teardown on archive is the main process's job (it owns
-// git/fs); this route only flips the status.
+// git/fs); this route only flips the status and runs the archiving hook.
 
 type Row = typeof schema.tasks.$inferSelect
 
@@ -244,6 +245,10 @@ export const tasks = new Hono<AppEnv>()
     if (typeof body.pullNumber === 'number') patch.pullNumber = body.pullNumber
     else if (body.pullNumber === null) patch.pullNumber = null
     await db.update(schema.tasks).set(patch).where(eq(schema.tasks.id, id))
+    // The client archives this way when it has no terminal plugin to run the full archive route. The
+    // worktree stays, but the task's plugin work still stops (server/pluginHost/hooks.ts §
+    // core:task-archiving). After the write, so nothing can start new work on the task in between.
+    if (patch.status === 'archived' && existing.status !== 'archived') await runHook('core:task-archiving', { taskId: id })
     const publicStateChanged =
       (patch.title !== undefined && patch.title !== existing.title)
       || (patch.icon !== undefined && patch.icon !== existing.icon)

@@ -249,9 +249,11 @@ function openFold(): Fold {
   }
 
   // Tools, usage, subagents, and plans report evolving state rather than separate moments, so each is
-  // folded into the card it started rather than appended. The event ledger still stores a row per
-  // provider update, which is what replay and any later timing question read. A plan is a complete
-  // snapshot and folds only within its own turn; a later turn's plan is a separate piece of work.
+  // folded into the card it started rather than appended. The ledger stores a row per update for
+  // usage, subagents and plans. A tool call or a file change it stores as the opening row and one row
+  // with the latest state, which folds here to the same card (../../server/sessions/ledgerFold.ts). A
+  // plan is a complete snapshot and folds only within its own turn; a later turn's plan is a separate
+  // piece of work.
   //
   // A tool call is keyed by turn and tool id, so a command reads as one panel whose status and output
   // change in place. Plans are keyed by turn. Usage is keyed by turn, with one allowance: a turn's last

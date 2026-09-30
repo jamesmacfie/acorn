@@ -14,6 +14,15 @@ stylesheet: every surface here is a tree of kit nodes, so the same source draws 
 through the remote root when a harness plugin is loaded rather than compiled
 (docs/ui-design.md § The closed kit).
 
+The header waits for nothing but the module and the session list. The pane's model is built inside
+the first region that asks for it, which is this header, so anything the model reads while it is built
+holds the header back. It used to read the harness list that way, and the header took as long as the
+Node's providers probe, 205 ms typically and 805 ms at the 95th percentile. The harness list is now the
+shared `['agents', 'providers']` query (`plugins/agents/src/client/providersClient.ts`), fresh for a
+minute, so a second task reads it from memory. The model reads its data only once the query has an
+answer. Until then the New menu and the empty state say they are checking which agents this Node can
+run. The menu's Refresh button asks the Node for a fresh probe and writes the answer into the query.
+
 The detail column has a header, a transcript and a composer without a second set of regions. The
 transcript is a `Timeline` with `follow` set, which means the kit owns the scroll: it stays on the
 newest turn until the reader scrolls away from it, picks the bottom up again when they scroll back,
@@ -94,11 +103,21 @@ What the transcript refuses, and what would reopen it:
   on the `canonical` fixture in the real window.
 - **Dropping old events or cards to meet a budget.** The projection stays complete. The window changes
   which cards are mounted and always offers a way to draw the hidden ones.
-- **`content-visibility` on turns.** `content-visibility: auto` brings paint containment, which clips
-  anything drawn outside the turn's box. An interactive card's focus ring (`outline-offset: 2px`) and
-  a disclosure summary's ring both sit outside that box at the turn's edge. The window already bounds
-  what is laid out. Reopen it with a real-WebKit run that checks find, selection, focus traversal and
-  the accessibility tree, and with the rings drawn inside the card.
+- **`content-visibility` on turns.** It was tried in the real window on 2026-09-30, on the
+  `canonical` fixture, with `content-visibility: auto; contain-intrinsic-block-size: auto 48px` on
+  `.ui-timeline-turn`, and backed out. The accessibility tree is what rules it out. WebKit lays out no
+  text in a skipped turn, so its static text reaches the macOS accessibility API empty: 410 of 445
+  text elements in the drawn window, against 21 without it. A screen reader reads blank cards for
+  everything off screen, and no stylesheet rule changes that. Paint containment also clips the focus
+  rings drawn outside a turn's edge. A named card's reveal fails too. Drawing the cards near the new
+  position resizes the list before the scroll event arrives, so the Timeline still reads the reader
+  as following and pins them back to the newest turn. The Timeline now checks for a move before a
+  resize pins, so that one would not recur ([closed-kit.md](../ui-design/closed-kit.md)); the
+  accessibility tree still rules the property out. Selection, page find, the reading place and
+  following the newest turn all held. The gain was small at the window's size. With 200 cards drawn,
+  their first style and layout went from about 10 ms to about 7 ms, and a full relayout from about
+  3 ms to under 1 ms. With all 3,387 drawn, after **Go to top**, those were about 190 ms to 137 ms,
+  and 48 ms to 10 ms. Reopen it only if WebKit exposes skipped text to accessibility.
 
 Known limits of the window:
 
@@ -241,8 +260,8 @@ it fails for any reason a selection can break, not only for the one it was writt
   is now defensive: a replayed page, an imported transcript or an older node still folds the way it
   always did.
 - **Tool calls fold on the Node too, for a reader that asks.** A call arrives as a run of updates on
-  one id, and `tool` is about half of all rows, most of a long session. When the client sends
-  `fold=1`, the snapshot route and the event pages behind it fold each call's updates within the page
+  one id. The ledger stores it as two rows, its opener and its latest state (§ The transcript store
+  below). When the client sends `fold=1`, the snapshot route and the event pages behind it fold each call's updates within the page
   onto the record that opened it, by the rule in `plugins/agents/src/shared/toolFold.ts`, which
   `conversationItems.ts` imports too. The surviving record keeps the opener's id, sequence and
   subagent attribution, and it carries `foldedThroughSeq`, the last row it absorbed. A call that spans
@@ -416,6 +435,17 @@ events a second per streaming session, because the Node coalesces text deltas at
   a card can have gained a row without its key or its sequence span moving. The turn and request maps
   are memoised on their arrays, which the store replaces only when a turn or a request changes.
 
+**A frame costs about a millisecond, so frames are not batched.** In the plugin's jsdom tier, with
+the canonical session in the real store and the real transcript drawing 200 of its 3,387 cards, a
+streamed message delta took 0.8 ms at the median and 1.3 ms at the 95th percentile, and stayed near
+1 ms as one reply grew to 40 KB. A tool update took 0.5 ms. The store write itself was under 0.05 ms.
+The one expensive frame is an event seated behind the tail, which rebuilds the projection and wakes
+every drawn card: about 20 ms. The node commits a session's events in order, so a live frame does not
+arrive that way. Sentry agrees: over three days, the slowest agent frame in the median five-second
+window took 1 ms, and in 95% of windows it took 36 ms or less. Frames of 100 ms or more are a tail
+under 1% of frames. Batching frames into one write per animation frame would not change that, because
+one session's frames arrive about 40 ms apart and a batch would nearly always hold one frame.
+
 A snapshot read and the socket can disagree about a usage line, because both sides fold it and both
 keep the first update's id: a frame can land while the request is in flight. `managedSnapshot.ts`
 unions the two payloads, socket first, so no reported field is lost either way.
@@ -436,8 +466,12 @@ those loads used to fetch the whole ledger again. The store keeps a mark per hel
 `completeThrough`: every event at or below that sequence is held, or folded into a row that is. A
 load sets it to where its walk ended. A streamed event moves it only when it is the next sequence, so
 a frame the socket lost leaves the mark at the gap and the frames after it cannot hide it. The next
-load asks the snapshot route for events after the mark and pages on from there. The ledger only
-appends, so nothing below the mark can have changed. The turns, the requests, and the row still come
+load asks the snapshot route for events after the mark and pages on from there. Nothing below the mark
+can have changed in a way the reader would draw: the ledger appends, and the one row it deletes is a
+tool call's or a file change's superseded row, only once a newer row carries the card's whole state
+(below). The retention pass is the exception. It deletes every row of a long-archived task's session
+and appends a note past them, so a window holding that session draws the old rows until it reloads
+([managed-agents.md § Operations and failure](../managed-agents.md#operations-and-failure)). The turns, the requests, and the row still come
 back whole, because some of their changes reach the socket as no frame at all: a turn queued from
 another window, a request that a stop expired. So a resumed read answers what a full read would. When
 it brings no events, the held array passes through unchanged and is not indexed again. A shown
@@ -456,11 +490,53 @@ it, and so do its composer draft, its reading place and its live event sequence.
 dropped session appends nothing, and an `error` frame for one reads nothing. Opening it again is a
 first visit: the read starts from the beginning.
 
+**A tool call is stored as two rows: the one that opened it and one with its latest state.** A
+harness reports a call as a run of updates on one id, and each used to be a row. A measured database
+held 196,000 tool rows for 39,000 calls, 300 MB of JSON, and every reader folds them into one card
+anyway. The updates are partial: a field left out means unchanged, and Codex streams output as
+appends. So when an update arrives, `recordEvent` folds the card's stored rows and the update with
+`mergeToolCall`, writes the result at the next sequence with no `outputAppend`, and deletes the row it
+supersedes, all in the event's own transaction (`server/sessions/ledgerFold.ts`). A file change with a
+change id is stored the same way, with its latest report as the state. One without a change id is
+never folded by the transcript, so it is not folded here either.
+
+Each reader stays correct for a reason of its own:
+
+- **Resuming after the mark.** The new row is past every mark, so a reader resuming from its mark gets
+  it, and it replaces every field the reader's card could hold. An update in place would have sat
+  below the mark and never reached it, which is why the fold writes a new row.
+- **Reading from the start, and the `fold=1` pages.** They see the opener and the latest row, which
+  fold to the card they always drew. The opener stays because every reader puts a card where its
+  first row landed, keys it by that row's id, and files it in the subagent stream that row names.
+  Deleting it would move a call to where its last update landed on the next reload.
+- **The socket.** Each update still goes out as the provider reported it, at the sequence its row
+  took, so frames stay the size of the change and `completeThrough` still moves one sequence at a
+  time. A snapshot read that lands after a frame replaces it by id (`managedSnapshot.ts`), and the
+  stored row folds to the same card.
+- **The walk and `lastEventSeq`.** Sequences now have gaps, and nothing reads them as contiguous. The
+  deleted row is never the session's newest, so the walk still ends on `lastEventSeq`.
+- **Export, the wait route, workflows and delegation.** They read the rows as stored. The markdown
+  export folds tool rows so each call is one line with its last status. The others read messages,
+  turn ends and errors, which are never folded.
+
+Rows stored before the fold are put into this shape once, in the background after boot
+(`server/sessions/ledgerCompaction.ts`). Each card keeps its opener and its last row, rewritten in
+place to the folded state, and loses every row between. Rewriting the last row is safe for the same
+reason the new row is: it folds to the same card over whatever prefix a reader holds. The pass works in
+small transactions and yields between them, marks each session on `ledger_compacted_at` when done, and
+reads only unmarked sessions, so it finishes once. On the 1.3 GB database it was written for, it
+removed 118,500 rows in 34 seconds, and the median step held the node for about 3 ms. The longest,
+one card of about a thousand rows, held it for about 190 ms. It then merges the search index, because
+each deleted row left a tombstone there. The file does not shrink; see docs/data-layer.md § Retention.
+
 ### Transcript search
 
 `agent_events_fts` is a SQLite full-text index over `agent_events.search_text`, kept in step by triggers
 written by hand into the migrations (docs/data-layer.md § Migrations). Agent Center's search and the
-archive page's search provider (docs/plugins.md § Search providers) both read it.
+archive page's search provider (docs/plugins.md § Search providers) both read it. When the retention
+pass removes a session's history, the delete trigger takes its rows out of the index, so archive search
+stops finding it. The session's title still matches, and so does the note left in its place
+(docs/data-layer.md § Retention).
 
 **The search text stays on the node.** An event record's `searchText` is the index's input, and no
 client reads it. On a tool row it repeats the title, input and output the event already carries, which
@@ -481,7 +557,10 @@ Each fragment rewrites its message's search row, so indexing a message costs its
 fragment count. That is small for replies of a few kilobytes. Indexing when the stream closes is the
 upgrade if very long replies make writes slow.
 
-**Tool text ranks below the conversation.** Tool events are about two thirds of the indexed rows and
+**A tool call is indexed once, on its latest row.** That row holds the whole call, so the opener gives
+up its search text when the first update folds onto it. A file change does the same.
+
+**Tool text ranks below the conversation.** Tool events were about two thirds of the indexed rows and
 about 1 KB each, and file dumps and command output buried the conversation. They go in their own `tool`
 column, and the table's stored rank weighs a word there at 0.3 of the same word in `content`. Searching
 for a command someone ran still works.
@@ -491,6 +570,12 @@ FTS5 cannot look up, so every update or delete scanned the whole index. Inserts 
 deletes also check `event_id`, so an event table whose rowids a VACUUM renumbered repairs itself on the
 next write instead of failing it.
 
-The index still stores its own copy of the text, about 300 MB on the measured database. Pointing it at
-`agent_events` as external content would save that, but external content is keyed by rowid, and this
-table's rowids are not stable across a VACUUM because its key is text.
+The index still stores its own copy of the text: 203 MB on the measured database once the tool rows
+were folded, down from 326 MB. Pointing it at `agent_events` as external content would save that, and
+it was considered and left alone. External content is keyed by rowid, and SQLite allows a VACUUM to
+renumber the rowids of a table whose key is text, as this one's is. The current table survives that,
+because it stores `event_id` and every delete checks it. An external-content table cannot check: its
+matches would read the wrong rows, and a delete that names values the index does not hold corrupts it.
+Making the rowid stable means rebuilding `agent_events` with an integer key, and the switch means
+reindexing every row inside a migration, which blocks boot. The content and tool columns would also
+need a view, because the triggers split them on the event type.

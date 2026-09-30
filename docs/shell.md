@@ -192,6 +192,7 @@ way for the same kind of reason: it runs client-core in process
 | Every request to a node | `packages/custody/src/broker/nodeBroker.ts` | histogram `broker.request` with the node id and the method |
 | The socket's health | the same file | events `broker.reconnect`, `broker.degraded`, `broker.shed` and `broker.missed-pong`, each with the node id |
 | A node that died | `packages/custody/src/supervision/crashBudget.ts` | event `node.crash` with the count in the window; a fatal error when the budget is spent |
+| Memory, every 30 seconds on macOS | `packages/custody/src/telemetry.ts`, answered by the shell | gauge `runtime.memory.footprint` in bytes, for the helper and, in its own batch, the renderer. See § What the shell reports |
 | Every bridge call | `apps/desktop/src/shell/bridge.ts` | histogram `bridge.call` with the helper method, from the renderer |
 | Console lines | everywhere under `packages/custody/src` and `apps/desktop/src/helper` | log records through `createLogger(tag)` |
 
@@ -218,7 +219,9 @@ arrives after the boot is over. They are held either way, because `ACORN_PERF=1`
 
 ### What the shell reports
 
-One thing, and it arrives a launch late. A panic hook runs while the process is dying: it can write
+Two things: a crash record, a launch late, and memory numbers when the helper asks.
+
+A panic hook runs while the process is dying: it can write
 a file and nothing else, and the helper is this process's child and is going with it. So
 `apps/desktop/src-tauri/src/crash.rs` installs `std::panic::set_hook` as soon as `boot` has resolved
 the two roots, and a panic writes `shell-crash.json` into the custody root with the message, the
@@ -232,6 +235,24 @@ of the install.
 
 The file is the telemetry error record's own shape, minus the `kind` the reader adds. That is
 deliberate. A crash reporter in the shell, a native dialog offering to send it, reads the same file.
+
+The memory numbers exist because WebKit gives a page no way to read its own process's memory, and the
+renderer's process is the one that grows. Every 30 seconds while the switch is on, and only on macOS,
+the helper prints `{"acorn-helper":"footprint-request"}` on stdout. `apps/desktop/src-tauri/src/footprint.rs`
+answers on the helper's stdin with
+`{"command":"footprint","renderer":<bytes>|null,"helper":<bytes>|null}`. The helper emits its own
+number through its collector and posts the renderer's in a batch named `renderer`, both as
+`runtime.memory.footprint` ([telemetry.md](./telemetry.md) § Memory over a day).
+
+The helper owns the timer and the consent check, so a shell whose telemetry is off is never asked.
+The shell reads the main window's web content process through `_webProcessIdentifier`, a private
+WKWebView selector that WebKit has kept stable for years; wry and Tauri expose no public way to ask.
+It checks that the view answers the selector first, because an unknown one raises an Objective-C
+exception that would abort the process. The pid is read on every request, on the main thread,
+because WebKit replaces a crashed web content process with a new one under a new pid. The footprint is
+`proc_pid_rusage(pid, RUSAGE_INFO_V4)`'s `ri_phys_footprint`. A process that cannot be read, including
+a renderer being replaced, answers null. Host-owned child webviews are not measured. On any other
+platform the helper does not ask and the shell ignores the request.
 
 ## Renderer origin and protocol handler
 

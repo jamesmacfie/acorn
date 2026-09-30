@@ -12,6 +12,7 @@ dependencies = [
  "keyring",
  "libc",
  "mac-notification-sys",
+ "objc2",
  "serde",
  "serde_json",
  "sha2",

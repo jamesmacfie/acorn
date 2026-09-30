@@ -1,5 +1,5 @@
-import { createEffect, createMemo, createResource, createSignal, on, onCleanup } from 'solid-js'
-import { createQuery } from '@tanstack/solid-query'
+import { createEffect, createMemo, createSignal, on, onCleanup } from 'solid-js'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   activeNodeId, defaultDeliveryContext, markAttentionSeen, saveFile, setTerminalOpen, type PaneModelContext, type Task,
 } from '@acorn/plugin-api/client'
@@ -22,6 +22,7 @@ import {
 import { agentSessionRoster } from './sessionRoster'
 import { newSessionChoices, type NewSessionChoice } from './newSessionChoices'
 import { customAgentsOptions } from '../settings/customAgentsClient'
+import { agentProvidersOptions, refreshAgentProviders } from '../providersClient'
 
 // Everything the Agent pane's two regions have to agree on.
 //
@@ -64,9 +65,18 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
   const [creating, setCreating] = createSignal(false)
   const [dialog, setDialog] = createSignal<AgentDialog | null>(null)
   const [renameText, setRenameText] = createSignal('')
-  const [providers, { refetch: refreshProviders }] = createResource(() => managedAgentApi.providers())
+  const queryClient = useQueryClient()
+  const providersQuery = createQuery(() => agentProvidersOptions())
   const customAgents = createQuery(() => customAgentsOptions())
-  const choices = createMemo(() => newSessionChoices(providers() ?? [], customAgents.data ?? []))
+  // `.data` is read only once there is some. On an empty cache solid-query suspends the boundary above
+  // whoever reads it, and this model is built inside the first region that asks for it, which is the
+  // list header. Reading it bare held "Agents" off the screen for the whole providers probe. The New
+  // menu and the empty state say they are loading instead (./AgentPane.tsx).
+  const providers = (): AgentProviderDescriptor[] | undefined =>
+    providersQuery.isPending ? undefined : providersQuery.data
+  const providersLoading = () => providersQuery.isPending
+  const choices = createMemo(() =>
+    newSessionChoices(providers() ?? [], customAgents.isPending ? [] : customAgents.data ?? []))
 
   const taskSessions = createMemo(() =>
     managedAgentStore.sessionsForTask(task.id)
@@ -362,9 +372,13 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
     task,
     sessionsLoaded,
     providers: () => providers() ?? [],
+    /** True until the first providers answer arrives, so a control can say so rather than look empty. */
+    providersLoading,
     /** New's rows: every harness, then every custom agent (./newSessionChoices.ts). */
     choices,
-    refreshProviders,
+    /** Probe the harnesses again, for the Refresh button in the New menu. */
+    refreshProviders: () => refreshAgentProviders(queryClient)
+      .catch((caught) => setError(caught instanceof Error ? caught.message : 'Unable to check the agent providers.')),
     taskSessions,
     sessionRoster,
     selected,

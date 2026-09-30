@@ -572,10 +572,11 @@ export const managedAgentStore = {
    * Read a session from the node and merge it into the store.
    *
    * A session the store already holds is read on from where its events are whole
-   * (`completeThrough`), not from the start. The ledger only appends, so every row below that mark
-   * is one the store has already, and reading them again was the whole cost of switching back to a
-   * task: 2.9 MB for a 4,000-event session, 11.7 MB and about four seconds of paging for a 16,000-event
-   * one. The turns, the requests and the row still come back whole, because they change in ways no
+   * (`completeThrough`), not from the start. The ledger appends, and when it drops a tool call's
+   * superseded row the call's new state lands past every mark (server/sessions/ledgerFold.ts). So
+   * every row below the mark is one the store has already, and reading them again was the whole cost
+   * of switching back to a task: 2.9 MB for a 4,000-event session, 11.7 MB and about four seconds of
+   * paging for a 16,000-event one. The turns, the requests and the row still come back whole, because they change in ways no
    * frame reports: a turn queued from another window, a request expired by a stop. So this answers
    * what a full read would, for the size of the turns and requests plus whatever the socket missed.
    */

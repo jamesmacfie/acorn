@@ -186,6 +186,7 @@ itself is broken, and marking it retryable would invite a client to hammer it.
 | `POST` | `/v1/core/plugins/requests/:requestId` | Answer an agent-raised install request (`approved`/`denied`) |
 | `GET` | `/v1/core/audit` | Read the retained audit trail |
 | `GET` | `/v1/core/security` | Read Node security posture |
+| `GET` | `/v1/core/storage` | Node memory and database, plugin database, and blob cache sizes |
 | `GET` | `/v1/core/attachment` | Which control plane this Node is attached to, if any |
 | `DELETE` | `/v1/core/attachment` | Detach: revoke the control plane's device row and forget it |
 | `GET` | `/v1/core/nodes` | Nodes this Node's plugins know about, plus which verbs each provider declared |
@@ -381,6 +382,8 @@ it is on the Changes document routes.
 
 ```text
 /v1/p/agents/providers
+/v1/p/agents/footprint
+/v1/p/agents/stop-idle
 /v1/p/agents/usage
 /v1/p/agents/pricing
 /v1/p/agents/concurrency

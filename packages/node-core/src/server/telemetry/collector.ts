@@ -696,6 +696,10 @@ export function resetTelemetryForTest(): void {
 /** What `ctx.telemetry` is (docs/plugin-authoring.md § Telemetry and logging). The owner is closed
  *  over by the host, so every verb on it files under the plugin the context belongs to. */
 export type PluginTelemetry = {
+  /** Whether anything is collecting. For a sample that costs something to take, such as listing
+   *  processes, so it can be skipped rather than taken and thrown away. The verbs below need no
+   *  check of their own. */
+  enabled(): boolean
   event(name: string, attrs?: TelemetryAttrs): void
   count(name: string, value?: number, attrs?: TelemetryAttrs): void
   gauge(name: string, value: number, attrs?: TelemetryAttrs): void
@@ -707,6 +711,7 @@ export type PluginTelemetry = {
 }
 
 export const telemetryFor = (owner: string): PluginTelemetry => ({
+  enabled: telemetryEnabled,
   event: (name, attrs) => emitEvent(owner, name, attrs),
   count: (name, value = 1, attrs) => emitMetric(owner, { name, type: 'count', value, ...(attrs ? { attrs } : {}) }),
   gauge: (name, value, attrs) => emitMetric(owner, { name, type: 'gauge', value, ...(attrs ? { attrs } : {}) }),

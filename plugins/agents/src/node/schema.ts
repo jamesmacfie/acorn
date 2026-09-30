@@ -43,6 +43,14 @@ export const agentSessions = sqliteTable(
     lastEventSeq: integer('last_event_seq').notNull().default(0),
     lastReadSeq: integer('last_read_seq').notNull().default(0),
     archivedAt: integer('archived_at'),
+    // When the background pass last put this session's stored tool calls and file changes into the
+    // shape recordEvent writes (server/sessions/ledgerCompaction.ts). Null means it has not run yet, so
+    // the pass reads only the sessions that still need it.
+    ledgerCompactedAt: integer('ledger_compacted_at'),
+    // When the retention pass removed this session's history because its task had been archived
+    // longer than the owner keeps it (server/sessions/sessionRepository.ts § finishHistoryRemoval). The row
+    // stays so the task still lists the session. Null means the history is still here.
+    historyRemovedAt: integer('history_removed_at'),
     createdAt: integer('created_at').notNull(),
     updatedAt: integer('updated_at').notNull(),
   },
@@ -86,9 +94,12 @@ export const agentTurns = sqliteTable(
   ],
 )
 
-// Append-only normalized event ledger, the durable ordered history docs/api-reference.md § Streams
-// describes. `searchText` feeds the migration-owned FTS5 virtual table; large bytes and verbose command
-// output live in agent_artifacts instead of this row.
+// Normalized event ledger, the durable ordered history docs/api-reference.md § Streams describes. It
+// appends, and a sequence is never reused. It deletes a tool call's or a file change's superseded
+// row, once a newer row carries its whole state (server/sessions/ledgerFold.ts), and every row of a
+// session whose task was archived longer than the owner keeps history (docs/data-layer.md § Retention).
+// `searchText` feeds the migration-owned FTS5 virtual table; large bytes and verbose command output
+// live in agent_artifacts instead of this row.
 export const agentEvents = sqliteTable(
   'agent_events',
   {

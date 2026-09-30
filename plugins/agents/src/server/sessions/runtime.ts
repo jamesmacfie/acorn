@@ -29,6 +29,12 @@ import { SessionDefaultsCommands } from './sessionDefaultsCommands'
 import { TranscriptCommands } from './transcriptCommands'
 import { waitForSessionSnapshot } from './sessionWait'
 import { CODEX_PLAN_IMPLEMENTATION_PROMPT } from '../../shared/codexPlanHandoff'
+import { mergeSearchIndex } from './ledgerCompaction'
+
+// Events deleted per step by removeArchivedHistory. Each is a row and its search row. On 20,000
+// synthetic tool rows of about 2 KB, a step of 200 held the node for a median of 7 ms and 18 ms at the
+// 95th percentile, about 22,000 rows a second. A step of 500 doubled the median for little gain.
+const HISTORY_BATCH = 200
 
 /**
  * Replaces the first text part with the hook's single result and keeps every non-text part.
@@ -112,7 +118,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       const existing = await this.store.operationResult<AgentSession>(idempotencyKey, 'session.create')
       if (existing) return { session: await this.store.requireSession(existing.id), created: false }
     }
-    const provider = (await this.providers()).find((candidate) => candidate.id === input.providerId)
+    const provider = await this.usableProvider((candidate) => candidate.id === input.providerId)
     if (!provider) throw new Error(`Managed provider is not registered: ${input.providerId}`)
     if (!provider.installed) throw new Error(provider.diagnostics[0] ?? `${provider.label} is unavailable.`)
     if (provider.authenticated === false) {
@@ -638,6 +644,57 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     ])
     this.emit({ channel: 'agent:deleted', sessionId })
     return { local: 'deleted', provider, ...(detail ? { detail } : {}) }
+  }
+
+  /**
+   * Removes the stored history of the sessions of the tasks `taskIds` names, for the retention
+   * schedule (docs/data-layer.md § Retention). The rows stay, each with `note` as its transcript, so
+   * the task still lists them. Provider-side sessions are left alone: deleting one would mean
+   * starting its CLI, and the node's disk is what this is for.
+   *
+   * SQLite is synchronous here and a first pass can have a million rows to delete, so each step is one
+   * small transaction and the node gets a turn between steps. `taskIds` is asked again before each
+   * step, and nothing yields between that answer and the write, so a task restored part-way through is
+   * left alone from then on. A session with a provider process or a turn in flight is left for a
+   * later pass. Stops early on the signal; the next run carries on where this one stopped.
+   */
+  async removeArchivedHistory(options: {
+    taskIds: () => Promise<readonly string[]>
+    note: string
+    signal?: AbortSignal
+    batch?: number
+  }): Promise<{ sessions: number; events: number; complete: boolean }> {
+    const batch = options.batch ?? HISTORY_BATCH
+    const totals = { sessions: 0, events: 0, complete: false }
+    while (!this.stopped && !options.signal?.aborted) {
+      const taskIds = await options.taskIds()
+      if (this.stopped || options.signal?.aborted) break
+      const sessionId = this.store.sessionWithHistory(taskIds, new Set(this.live.keys()))
+      if (!sessionId) {
+        totals.complete = true
+        break
+      }
+      const deleted = this.store.deleteOldestEvents(sessionId, batch)
+      totals.events += deleted
+      if (deleted < batch) {
+        const finished = await this.store.finishHistoryRemoval(sessionId, options.note)
+        if (finished) {
+          totals.sessions += 1
+          await Promise.all([
+            this.attachments.collectNow(finished.attachmentIds),
+            this.artifacts.collectRemoved(finished.artifactObjects),
+          ])
+          // For a window that has the session open: the note lands, and a reload reads only the note.
+          this.emit({ channel: 'agent:event', event: finished.event })
+          this.emit({ channel: 'agent:session', session: finished.session })
+        }
+      }
+      await new Promise((resolve) => setImmediate(resolve))
+    }
+    // Each deleted event left a tombstone in the search index (./ledgerCompaction.ts says what merging
+    // gets back).
+    if (totals.events && !this.stopped) await mergeSearchIndex(this.db, undefined, options.signal)
+    return totals
   }
 
   async handoffToTerminal(sessionId: string): Promise<AgentSession> {

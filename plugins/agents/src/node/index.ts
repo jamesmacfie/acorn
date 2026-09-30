@@ -34,6 +34,7 @@ import { AgentDelegationService } from '../server/delegation/service'
 import { delegationTools } from '../server/delegation/tools'
 import { createSessionSourceHandler } from '../server/data/sessionSourceHandler'
 import { sessionSource } from '../shared/sessionSource'
+import { removeExpiredHistory } from '../server/sessions/historyRetention'
 
 let builtInProfileDisposables: (() => void)[] | null = null
 export function registerBuiltInProfiles(): void {
@@ -207,6 +208,18 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
             terminal.agentSessionId === sessionId && terminal.status === 'running')
         },
       })
+      // Archiving a task stops its provider processes, because otherwise they live until the node exits
+      // (docs/managed-agents.md § Operations and failure). A handler on core's hook rather than a task
+      // check, because a check's cleanup runs only if the client asks for it. `transform` so core
+      // waits for the stop before it removes the worktree. The payload comes back untouched.
+      ctx.hooks.handle('core:task-archiving', {
+        id: 'stop-sessions',
+        mode: 'transform',
+        run: async (payload) => {
+          await runtime?.stopTaskSessions(payload.taskId as string)
+          return { payload }
+        },
+      })
       ctx.routes.fetch(createSessionSourceHandler(runtime), { prefix: '/data/sessions' })
       ctx.dataSources.register(sessionSource)
 
@@ -319,6 +332,22 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           const snapshot = await ctx.capabilities.require(AGENT_USAGE).read({ userId, force: true })
           return `${snapshot.providers.filter((provider) => !provider.error).length} of ${snapshot.providers.length} providers answered`
         },
+      })
+
+      // The owner's "Keep agent history for archived tasks" (docs/data-layer.md § Retention). Daily,
+      // and a no-op until the owner picks a limit, so the setting is the one switch that matters.
+      ctx.schedules.register({
+        scheduleId: 'archived-history-prune',
+        name: 'Remove agent history of long-archived tasks',
+        cadence: { daily: '03:50' },
+        timeout: 300,
+        run: (signal) => removeExpiredHistory({
+          runtime: runtime!,
+          prefs: core.prefs,
+          userId: ctx.core.identity.active(),
+          archivedBefore: (before) => ctx.core.tasks.archivedBefore(before),
+          signal,
+        }),
       })
 
       // agents.sessionExecute (contract/sessionExecute.ts). The workflow runner resolves this at call

@@ -77,6 +77,7 @@
       "github:summary-badges"
     ],
     "extensions": [
+      "agents.storage",
       "changes.tool-card",
       "github.push-actions",
       "memory.section"

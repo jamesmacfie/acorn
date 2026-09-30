@@ -338,7 +338,12 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   // The shared "Generate with" default, resolved against what is actually available. The same pick
   // the workflow generator opens on, so a reader who chose an installed CLI here does not choose it
   // again there (client-core features/settings/models/generatePick.ts).
-  const modelPick = createMemo(() => effectiveModelPick(modelBackends(), readGeneratePick(prefs.data)))
+  //
+  // The list is read only once it has arrived. This memo runs while the model is built, which happens
+  // inside the header region, and reading a resource that is still loading holds that region back.
+  // The header does not draw the wand, so it must not wait for the wand's list.
+  const modelPick = createMemo(() =>
+    effectiveModelPick(modelBackends.loading ? [] : modelBackends(), readGeneratePick(prefs.data)))
 
   // The commit editor: the message, the three options, and the two verbs (./commitState.ts). Built
   // here so it lives as long as the pane's model rather than as long as the footer, which the host

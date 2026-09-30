@@ -126,6 +126,13 @@ node busy". It closes on whichever of the four endings comes first, which is a c
 error, a provider that closed underneath it, or a safe-transient retry putting the same turn back in
 the queue. A turn the process died in the middle of reports nothing.
 
+Every 60 seconds while telemetry is on, the engine also reports its provider processes as three
+gauges: `agent.processes.live` (sessions with a running process), `agent.processes.idle` (those the
+idle rules would stop now), and `agent.processes.memory` (the summed resident bytes of their process
+trees). These are the numbers Settings > Storage and memory draws, from `processFootprint()`. Counting
+memory runs `ps` through the process broker, so the sample is skipped while telemetry is off, and the
+memory gauge is left out when the process table cannot be read.
+
 ## Harnesses
 
 A harness is one agent acorn can manage. A driver adapts its protocol into the common session and
@@ -336,6 +343,17 @@ an elicitation handler, so a turn can end with a question still parked: the ACP 
 answered, the agent's own call would never settle, and the durable row would sit in the reader's
 "Needs you" for good. The driver drains whatever is still parked when `session/prompt` returns,
 answering each with `cancel` and recording a `request_resolved`, which is what releases the row.
+
+**Which harnesses are installed and signed in is served from memory.** A probe starts each harness's
+CLI, so `GET /v1/p/agents/providers` took 211 ms typically and up to 5 s. The Node keeps the last
+answer and serves it at once. Once that answer is 30 seconds old, the next read still gets it and one
+probe runs behind the read to replace it; callers that arrive meanwhile share that probe
+(`ManagedAgentEngine.providers`, `plugins/agents/src/server/sessions/runtimeEngine.ts`). Three things
+wait for a fresh probe instead: the first read after boot, a read after a harness was added or
+removed, and `?force=true`, which the New menu's Refresh button sends. A session start or a delegated
+spawn that the served answer would refuse, because the harness looks missing or signed out, probes
+once more before it refuses, so installing or signing in to a CLI never needs a Node restart. Custom
+agents, MCP servers, and session defaults are not part of this answer, so editing them drops nothing.
 
 The Node probes harness availability and usage on bounded intervals. Usage and pricing details are
 displayed in the Agent pane; pricing overrides are local preferences and provider prompts/responses
@@ -713,7 +731,8 @@ per change id and path, holding the latest report, in the place the first one op
 `item/fileChange/patchUpdated` before the `fileChange` item completes, and re-sends `turn/diff/updated`
 with the whole turn's diff every time it grows. Claude sends an excerpt when an edit starts and the
 real hunks once it has run. So each edit is one row, and each turn has one whole-turn row showing the
-latest diff.
+latest diff. The ledger stores each edit the same way: its first report, which fixes where the row
+sits, and its latest ([client surfaces](./managed-agents/client-surfaces.md) § The transcript store).
 
 Each driver builds the patch from what its provider sends:
 
@@ -766,12 +785,17 @@ when a session starts, so a default is a value keyed by the provider id and the 
 from. A harness added later is defaultable the moment it advertises anything, and a new kind of
 option, a fast mode say, needs no change on the acorn side to be remembered.
 
-One `prefs` row (`agents:session-defaults:v1`) holds four fields. `followLastSession`, on by
+One `prefs` row (`agents:session-defaults:v1`) holds seven fields. `followLastSession`, on by
 default, decides which of `last` and `pinned` applies. `last` is written by the runtime whenever a session's
 option changes, and `pinned` is written by the owner under Settings > Agent defaults. Neither writer
 sends the other's field, and the write merges server-side, so the Settings page cannot flatten a
 switch made while it was open. `continueAfterUsageLimit`, also on by default, controls the durable
-usage-window continuation described under Operations and failure.
+usage-window continuation described under Operations and failure. `stopIdleAfterMinutes`, 30 by
+default, is **Stop idle agents after** under an Idle agents heading: 15, 30, or 120 minutes, or 0 for
+Never. It is described under Operations and failure too. `keepArchivedHistoryDays`, 0 by default,
+is **Keep agent history for archived tasks** under an Archived tasks heading: 30, 90, or 365 days, or 0
+for Forever. It is described under Operations and failure as well. `inline` holds the inline chat
+choices above.
 
 Both halves hang off `ManagedAgentRuntime`, which is where every path that opens a session and every
 path that changes one already meets:
@@ -1064,6 +1088,110 @@ terminal; they continue to use the owner's Claude setting.
 Cancellation, timeout, provider disconnect, and restart are explicit states. A live stream can be
 lost without killing the provider process, and the client reattaches from the session sequence or
 terminal replay tail.
+
+A provider process runs until something stops it: the session is archived or deleted, its MCP servers
+change, it moves to a terminal, its task is archived, it sits idle past the owner's limit, or the node
+exits. Each one holds an agent CLI and its MCP servers, about 450 MB, and an idle Claude Code process
+grows over time. Archiving the task and the idle limit are the steps that keep them from piling up,
+because nothing else stops a session nobody will prompt again. The plugin handles core's
+`core:task-archiving` hook ([plugins/node-side-extension-points.md § Hooks](./plugins/node-side-extension-points.md#hooks)),
+which runs whether or not the owner ticked anything in the archive dialog. It runs before the worktree
+is removed, because a turn in progress is still writing into that folder. For each of the task's live
+sessions, `stopTaskSessions` in `runtimeEngine.ts` stops the process, marks an active turn
+`interrupted`, expires pending requests, and records `stopped` with "The provider process stopped when
+this task was archived. Restore the task and send a prompt to resume." That is the record a restart
+leaves, so nothing else changes. The sessions are not archived, and the archived task's Agent pane
+still reads them. After a restore, the next prompt resumes the session as it does after a restart.
+
+The idle limit is **Stop idle agents after** under Settings > Agent defaults, 30 minutes unless the
+owner picks 15 minutes, 2 hours, or Never. `stopIdleSessions` in `runtimeEngine.ts` runs every five
+minutes and reads the limit each time, so a change applies from the next sweep. It stops a live
+process only when all of these hold:
+
+- the process has started and is not being set up, stopped, or reconnected;
+- no turn is in flight and none is queued;
+- no request is waiting on the owner, because an approval or a question would be lost;
+- no background subagent is still running, because it lives inside the provider process;
+- nothing has come from the provider, and no turn has been dispatched or settled, for the whole limit.
+
+Idleness counts from that last event, not from the start. A `ready` session records `stopped` with
+"The provider process stopped after 30 minutes idle to free memory. Send a prompt to resume.", with
+the limit that applied. That is the same record a restart leaves, so the client shows it as resumable,
+and the next prompt starts the provider on the same conversation: Claude Code through `session/load`
+on the stored reference, Codex through `thread/resume` on the stored thread. A `failed` session's
+process is stopped too, since a turn error leaves it running, but nothing is recorded, so the failure
+still shows. The next prompt restarts a failed session anyway.
+
+Delegated children and workflow sessions get no exception. A delegation report, an `agent_prompt`,
+and a workflow step all reach a session through `enqueueTurn`, which resumes a stopped one. A workflow
+gate is a pending request, so it keeps its session. An idle child that has been stopped no longer
+counts toward a delegation tree's 12 live descendants, the same as after a restart.
+
+Settings > Storage and memory shows the agents on the node and offers the same stop without the
+wait. The agents plugin draws its own section into core's `core:storage` point
+(`client/settings/AgentStorageSection.tsx`), and reads `GET /v1/p/agents/footprint`, which answers
+`AgentFootprint`: how many provider processes are running, how many the rules above would stop now,
+their memory, and the size of the `agent-objects` and `agent-artifacts` folders. Memory is the resident
+memory of each session's process tree, the provider child and every process under it, MCP servers
+included. The engine keeps each child's process id on its driver handle (`pid` on
+`AgentDriverSession`), lists every process once with `ps -A -o pid=,ppid=,rss=`, and walks down from
+those ids (`server/sessions/footprint.ts`). Resident memory counts shared pages in every process and
+misses compressed ones on macOS, so the page says "about". Where `ps` fails, or on Windows, the counts
+are shown without memory. The folder sizes are measured at most every 30 seconds. **Stop idle agents
+now** is `POST /v1/p/agents/stop-idle`, which runs `stopIdleSessionsNow`: the same rules through the
+same code as the sweep, with no time limit and whatever the owner's limit is, Never included. A
+`ready` session records "The provider process was stopped from Settings to free memory. Send a prompt
+to resume." Both routes are device only, because they reach every task's agents. The section links to
+Agent defaults, where the idle limit and history retention are set.
+
+The sweep is a timer the engine owns, not a node schedule
+([schedules.md § What deliberately is not a schedule](./schedules.md#what-deliberately-is-not-a-schedule)).
+What it sweeps is the engine's map of live processes, which exists only in this process, and the
+owner's control is the setting above rather than a schedule row. The timer is armed by the first
+provider start and cleared by `stop()` with the other engine timers.
+
+**An archived task can give up its agent history, when the owner chooses.** Nothing else deletes a
+session's events, and they are most of `plugins/agents.sqlite`. **Keep agent history for archived
+tasks** under Settings > Agent defaults is Forever unless the owner picks 30 days, 90 days, or 1 year.
+The `agents:archived-history-prune` schedule runs daily at 03:50 and does nothing while it is Forever
+([schedules.md § What is registered](./schedules.md#what-is-registered)). Otherwise it asks core for
+the tasks archived longer than the limit, through `ctx.core.tasks.archivedBefore`, and removes the
+history of each of their sessions. A restore clears a task's archive date, so a restored task is never
+in that list, and neither is an active one.
+
+History means everything the session owns except its row: its events and their search rows, its turns
+and requests, the attachment references its turns hold, and its artifacts. Attachments and artifact
+files nothing else references are then deleted from disk. The row stays, with one diagnostic event in
+place of the transcript: "Acorn removed this session's history because its task had been archived for
+more than 90 days." It is marked with `history_removed_at`, which is what makes a second run a no-op.
+The row is kept, rather than deleted the way **Delete** deletes a session, for four reasons:
+
+- The archive page previews an archived task through its Agent pane, and a restored task opens the
+  same pane. Without the row, a pruned task would look as if it never had an agent. With it, the pane
+  lists the session and the note says what happened.
+- Other rows name the session by id: core's task pull relations, the delegation ledger, workflow
+  steps, terminal handoffs, and memory proposals. They stay valid.
+- The provider's own conversation is untouched. Deleting it would mean starting each session's CLI,
+  which is what **Delete** does and what an unattended pass should not. So a restored task can still
+  prompt the session, and the agent remembers what the transcript no longer shows.
+- The row is small. The events are what take the space.
+
+The pass never touches a session with a provider process in this node or a turn being dispatched or
+running. It leaves those for a later run. The database is synchronous, so the pass works in steps: each
+step is one transaction deleting 200 of a session's oldest events, and the node gets a turn between
+steps. On 20,000 synthetic tool rows of about 2 KB, a step took a median of 7 ms. When a session's
+events are gone, one last transaction removes its turns, requests, attachment references and
+artifacts, writes the note, and marks the row. Core is asked for the list of tasks again before every
+step, and nothing yields between that answer and the write, so a task restored part-way through keeps
+whatever it still has. The run stops itself after four minutes, inside the scheduler's 300-second
+ceiling, and the next day's run carries on. When it has deleted anything it merges the search index,
+as the ledger compaction does. The file keeps its size; see
+[data-layer.md § Retention](./data-layer.md#retention).
+
+A window that has a pruned session open keeps the events it already drew until it reloads, because a
+reader resumes after its mark and the pass deleted rows below it. The note arrives as an ordinary
+event, and a reload shows only the note. The pass sends no delete frame, because the session still
+exists.
 
 Only a turn moves a session into `working`. A harness can stream past the prompt call it was
 answering, and `turn_completed` fires only as that call's return value, so an event carrying no turn

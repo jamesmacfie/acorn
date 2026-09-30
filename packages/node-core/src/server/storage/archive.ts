@@ -55,6 +55,9 @@ export type ArchiveDeps = {
   // archive still completes, because a failed cleanup is no reason to strand the task, but the owner
   // is told.
   applyTaskChecks?: (task: { id: string; worktreePath: string | null }, ids: readonly string[]) => Promise<string[]>
+  // The `core:task-archiving` hook chain (server/pluginHost/hooks.ts), injected for the same reason.
+  // Unlike the checks above it always runs, so plugin work that must not outlive the task stops here.
+  taskArchiving?: (taskId: string) => Promise<void>
 }
 
 // The repo-level teardown script, paired with repoSetup in taskWorktree.ts.
@@ -119,6 +122,10 @@ async function archiveClaimedTask(db: AppDatabase, id: string, opts: ArchiveOpts
   }
 
   if (running) deps.killRunning(id)
+  // Plugin sessions stop at the same point as the terminal's, before removal. An agent in the middle
+  // of a turn is still writing into the worktree, and removing the folder under it can leave files
+  // behind or make git refuse.
+  await deps.taskArchiving?.(id)
 
   // Plugin cleanups, at the same point and for the same reason as the teardown script above: the
   // worktree still exists, so a check that needs it has it. This is a step with a known position and

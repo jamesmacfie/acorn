@@ -1,6 +1,6 @@
 // The task read seam (CoreServices.tasks). Plugins hold task ids and ask core to resolve them here,
 // so database handles stay private to their owning layer.
-import { and, eq, isNull, max, or, sql } from 'drizzle-orm'
+import { and, eq, isNull, lt, max, or, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { dedupeBranch, slugifyBranch } from '@acorn/protocol/branch.ts'
 import type { LayoutRecipe, RunTarget } from '../runConfig'
@@ -117,6 +117,12 @@ export type TaskService = {
 export type CompiledTaskService = TaskService & {
   /** Replay-safe root creation for internal orchestrators such as approved workflow schedules. */
   createRoot(projectId: string, seed: RootTaskSeed, intendedTaskId: string): Promise<string>
+  // Every task archived before `before`, a millisecond timestamp. plugins/agents reads it to remove the
+  // agent history of tasks archived longer than the owner keeps it (docs/data-layer.md § Retention).
+  // Only tasks still archived: a restore clears `archivedAt`, so a restored task is never in the list.
+  // First-party only, because deleting on a task's archive date is a retention policy and no loaded
+  // plugin has one. plugins/permissions.ts § scopeCore strips it from the loaded tier's facet.
+  archivedBefore(before: number): Promise<string[]>
 }
 
 export function createTaskService(db: AppDatabase): CompiledTaskService {
@@ -154,6 +160,13 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
         broadcastTasksChanged({ taskId: intendedTaskId })
       }
       return intendedTaskId
+    },
+    archivedBefore: async (before) => {
+      const rows = await db
+        .select({ id: schema.tasks.id })
+        .from(schema.tasks)
+        .where(and(eq(schema.tasks.status, 'archived'), lt(schema.tasks.archivedAt, before)))
+      return rows.map((row) => row.id)
     },
     adoptPullNumbers: async (repoOwner, repoName, branchToPull) => {
       if (!branchToPull.size) return 0

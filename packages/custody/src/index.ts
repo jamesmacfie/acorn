@@ -11,7 +11,7 @@ import { PluginTrustStore } from './plugins/pluginTrustStore'
 import { DeviceConfigStore } from './config/deviceConfig'
 import { PreviewTunnels, type TunnelEvents } from './supervision/previewTunnel'
 import { ServiceHost } from './supervision/serviceHost'
-import { startHelperTelemetry } from './telemetry'
+import { startHelperTelemetry, type FootprintSample } from './telemetry'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 
 const log = createLogger('service-host')
@@ -57,6 +57,9 @@ export type HelperOptions = {
   // why the last attempt failed, when the service said anything, and the recovery screen is the only
   // place an owner sees it.
   onCrashBudgetExhausted(reason?: string): void
+  // Ask the shell for memory numbers, which it answers through `footprint`. Only a shell that can find
+  // the renderer's process passes one (./telemetry.ts § Memory, measured by the shell).
+  requestFootprint?(): void
 }
 
 export type Helper = {
@@ -83,6 +86,8 @@ export type Helper = {
   retry(): Promise<void>
   // Page rules for a task, as the preview pane needs them.
   previewRules(taskId: string): Promise<PreviewBrowserRule[]>
+  // The shell's answer to `requestFootprint`.
+  footprint(sample: FootprintSample): void
   dispose(): Promise<void>
 }
 
@@ -155,7 +160,10 @@ export function createHelper(options: HelperOptions): Helper {
   // because the broker is what a batch leaves over and the local node is what it leaves for; started
   // before the node so a boot mark taken during `start()` is already recorded when the switch turns
   // out to be on.
-  const telemetry = startHelperTelemetry({ broker, userDataDir, version })
+  const telemetry = startHelperTelemetry({
+    broker, userDataDir, version,
+    ...(options.requestFootprint ? { requestFootprint: options.requestFootprint } : {}),
+  })
   // These bytes ship with this process. Cache and acknowledge them locally before the renderer asks
   // for plugin state, so a node cannot turn the "bundled" label into auto-trust for arbitrary remote
   // bytes. `trustsBundledClientPlugins` owns the one condition.
@@ -300,6 +308,7 @@ export function createHelper(options: HelperOptions): Helper {
       await recover()
     },
     previewRules: (taskId) => service.previewRules(taskId),
+    footprint: (sample) => telemetry.footprint(sample),
     dispose: async () => {
       if (disposed) return
       disposed = true

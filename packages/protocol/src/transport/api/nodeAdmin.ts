@@ -17,6 +17,18 @@ export const coreDeviceRoute = (deviceId: string) => `/v1/core/devices/${encodeU
 export type NodeSecurityPosture = { diskEncrypted: boolean | null; platform: string }
 export const coreSecurityRoute = '/v1/core/security'
 
+// Settings > Storage and memory (docs/data-layer.md § What the node reports). Device-only, like
+// security: sizes and memory describe the machine. `rssBytes` is the node process's own resident
+// memory. Each database counts its `-wal` and `-shm` files. Disk sizes are measured at most every 30
+// seconds. Worktrees are left out, because walking them costs more than the answer is worth.
+export type NodeStorageReport = {
+  rssBytes: number
+  coreDatabaseBytes: number
+  pluginDatabases: { plugin: string; bytes: number }[]
+  blobCacheBytes: number
+}
+export const coreStorageRoute = '/v1/core/storage'
+
 // Settings → Nodes: who this node is attached to, and the button that drops it
 // (docs/node-enrollment.md § Detaching). Device-only, like devices and plugins: an attachment is
 // node administration, and detaching revokes a credential.

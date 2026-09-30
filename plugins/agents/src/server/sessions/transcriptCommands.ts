@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import type { AgentNormalizedEvent, AgentProviderDescriptor, AgentSession } from '../../contract/wire.ts'
+import { foldToolEvents } from '../../shared/toolFold'
 import { agentTurnInputText } from './runtimeEngine'
 import type { AgentStore } from './store'
 import { parseAgentTranscript } from './transcriptImport'
@@ -109,9 +110,12 @@ export class TranscriptCommands {
     const snapshot = await this.deps.store.exportSnapshot(sessionId)
     if (format === 'json') return JSON.stringify({ baseline: ACORN_BASELINE, version: 1, exportedAt: Date.now(), ...snapshot }, null, 2)
     const lines = [`# ${snapshot.session.title}`, '', `Provider: ${snapshot.session.providerId}`, '']
+    // One line per tool call with its last status. The ledger keeps a call's opener beside its latest
+    // state (./ledgerFold.ts), and listing both would say the call was still pending.
+    const events = foldToolEvents(snapshot.events)
     for (const turn of snapshot.turns) {
       lines.push('## User', '', agentTurnInputText(turn), '')
-      for (const event of snapshot.events.filter((item) => item.turnId === turn.id)) {
+      for (const event of events.filter((item) => item.turnId === turn.id)) {
         if (event.event.type === 'assistant_message') lines.push(event.event.text)
         else if (event.event.type === 'tool') lines.push(`- Tool: ${event.event.tool.title} — ${event.event.tool.status ?? 'running'}`)
         else if (event.event.type === 'error') lines.push(`- Error: ${event.event.message}`)

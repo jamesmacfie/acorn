@@ -3,6 +3,8 @@ import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { prefsOptions } from '@acorn/plugin-api/client'
 import { Alert, Checkbox, Field, Section, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import {
+  AGENT_ARCHIVED_HISTORY_CHOICES,
+  AGENT_IDLE_STOP_CHOICES,
   defaultAgentSessionDefaults,
   type AgentSessionDefaults,
 } from '../../shared/sessionDefaults'
@@ -30,7 +32,9 @@ export default function AgentSessionDefaultsSettings() {
   const [recent] = createResource(() => managedAgentApi.sessions({}))
   const [error, setError] = createSignal('')
 
-  const record = () => stored.data ?? defaultAgentSessionDefaults()
+  // Over the defaults rather than instead of them: a cached answer from an older node can lack a field
+  // added since, and a Select with no value draws blank until the refetch lands.
+  const record = (): AgentSessionDefaults => ({ ...defaultAgentSessionDefaults(), ...stored.data })
 
   // Pickers only for what a recent session advertised (./agentConfigOptions.ts says why).
   const advertised = createMemo(() => advertisedOptionsByProvider(recent()?.sessions ?? []))
@@ -72,9 +76,10 @@ export default function AgentSessionDefaultsSettings() {
   return (
     <Stack gap="section">
       <Text emphasis="muted" wrap>
-        Defaults Acorn applies to managed agent sessions, including how a paused usage window resumes
-        and what a new session starts on. Provider option changes are written into the transcript so
-        a session reads back under the settings it ran with.
+        Defaults Acorn applies to managed agent sessions, including how a paused usage window resumes,
+        when an idle agent stops, how long an archived task keeps its history, and what a new session
+        starts on. Provider option changes are written into the transcript so a session reads back under
+        the settings it ran with.
       </Text>
 
       <Show when={stored.error}>
@@ -90,6 +95,38 @@ export default function AgentSessionDefaultsSettings() {
           hint="If an agent stops because its plan usage is exhausted and reports a reset time, Acorn keeps the turn queued and continues it after that time."
           onChange={(checked) => void save({ continueAfterUsageLimit: checked })}
         />
+      </Section>
+
+      <Section label="Idle agents">
+        <Field
+          label="Stop idle agents after"
+          hint="An agent keeps its CLI and MCP servers running between prompts, which can use hundreds of megabytes each. Acorn stops one that has had nothing to do for this long. Your next prompt starts it again on the same conversation."
+          layout="split"
+        >
+          <Select
+            label="Stop idle agents after"
+            size="sm"
+            value={String(record().stopIdleAfterMinutes)}
+            options={AGENT_IDLE_STOP_CHOICES.map((choice) => ({ value: String(choice.minutes), label: choice.label }))}
+            onChange={(value) => void save({ stopIdleAfterMinutes: Number(value) })}
+          />
+        </Field>
+      </Section>
+
+      <Section label="Archived tasks">
+        <Field
+          label="Keep agent history for archived tasks"
+          hint="Once a task has been archived for this long, Acorn deletes its agent transcripts, attachments and artifacts to free disk space. The task still lists its sessions. Removed history no longer shows in archive search, and it cannot be recovered, even if you restore the task."
+          layout="split"
+        >
+          <Select
+            label="Keep agent history for archived tasks"
+            size="sm"
+            value={String(record().keepArchivedHistoryDays)}
+            options={AGENT_ARCHIVED_HISTORY_CHOICES.map((choice) => ({ value: String(choice.days), label: choice.label }))}
+            onChange={(value) => void save({ keepArchivedHistoryDays: Number(value) })}
+          />
+        </Field>
       </Section>
 
       <Checkbox

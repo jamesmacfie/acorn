@@ -75,8 +75,10 @@ export function scopeCore(
     }
     if (token === 'tasks') {
       // Intended root creation is an internal orchestration seam. A loaded plugin may retain the
-      // existing task facet without gaining the ability to mint arbitrary top-level work.
-      const { createRoot: _createRoot, ...tasks } = core.tasks as CompiledCoreServices['tasks']
+      // existing task facet without gaining the ability to mint arbitrary top-level work. The archive
+      // dates are first-party too, and the worker refuses any method it has no call mode for, so
+      // leaving one here fails the loaded plugin's init.
+      const { createRoot: _createRoot, archivedBefore: _archivedBefore, ...tasks } = core.tasks as CompiledCoreServices['tasks']
       granted.tasks = tasks as CoreServices['tasks']
       continue
     }

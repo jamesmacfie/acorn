@@ -212,8 +212,12 @@ a file, waits 100 milliseconds, and expects the removal to be refused.
 
 Archive runs the configured teardown flow where the desktop runtime is available and reports partial
 failures instead of pretending removal succeeded. Its order is guard, review-input capture, repo
-teardown script, stop sessions, plugin cleanups, remove worktree, mark archived. Capture and the two
-teardown steps sit before removal so anything that needs the worktree still has it. A failed review
+teardown script, stop sessions, plugin cleanups, remove worktree, mark archived. Stopping sessions
+kills the task's running terminal sessions, then runs core's `core:task-archiving` hook, where the
+agents plugin stops the provider process behind each of the task's agent sessions
+([managed-agents.md § Operations and failure](./managed-agents.md)). Capture, the teardown steps, and
+the stops sit before removal, so anything that needs the worktree still has it and nothing is still
+writing into it when it goes. A failed review
 handoff does not strand the task: archive completes and the rail reports that review was not queued.
 
 Archive claims the task's worktree lifecycle before teardown starts. New root reads return no path
@@ -270,11 +274,15 @@ right, unknown or duplicate pane ids are dropped, and a recipe naming no valid p
 
 ## Restoring a task
 
-Archive deletes less than it looks like. It removes the worktree folder, stops what was running, drops
-the terminal plugin's saved sessions, and clears state the client held in memory. The task row, its
+Archive deletes less than it looks like. It removes the worktree folder, stops what was running
+(terminal sessions and agent provider processes), drops the terminal plugin's saved sessions, and
+clears state the client held in memory. The task row, its
 links and pull requests, its branch, its agent sessions, its notes, and every plugin's rows all stay.
-Plugins store `task_id` as a plain id and none of them deletes anything on archive. The one real delete
-is removing a project, which removes its task rows and leaves plugin rows with nothing to point at, so
+Plugins store `task_id` as a plain id and none of them deletes anything on archive. Later, if the owner
+set **Keep agent history for archived tasks**, a task archived longer than that loses its agent
+transcripts for good. Its sessions still list, each with a note saying so
+([data-layer.md § Retention](./data-layer.md#retention)). The one real delete on the spot is removing
+a project, which removes its task rows and leaves plugin rows with nothing to point at, so
 those tasks cannot be restored.
 
 The Archive entry at the bottom of the rail lists archived tasks, newest first, with a search box over
@@ -301,7 +309,8 @@ leaving that to the first pane, because the two ways it fails need the owner:
 
 Containers, terminal sessions and scrollback do not come back. Agent sessions come back on their own:
 a session under an archived task counts as retired when the list is read, so it returns to the live
-list with its task. A session someone archived on its own is restored from Agent Center
+list with its task. Its provider process stopped at archive, and the next prompt starts it again and
+resumes the conversation. A session someone archived on its own is restored from Agent Center
 ([managed-agents.md § Client surfaces](./managed-agents.md)).
 
 ## Task creation and navigation

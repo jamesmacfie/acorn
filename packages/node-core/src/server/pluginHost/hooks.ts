@@ -92,6 +92,24 @@ const CORE_POINTS: readonly HookPointRegistration[] = [
     collect: false,
   },
   {
+    // A task is being archived. The archive route runs it after the teardown script and before the
+    // worktree is removed (../storage/archive.ts), so a plugin can stop its own work in that folder
+    // first. A bare status change to archived runs it too (../routes/projects/tasks.ts). The agents
+    // plugin stops its provider processes here.
+    //
+    // Not a veto. The owner has already confirmed, and a task check is how a plugin speaks up before
+    // that. It differs from a task check's cleanup because it always runs: the client does not choose
+    // it. Fail open, so a handler that hangs delays the archive by the timeout and no more.
+    id: 'core:task-archiving',
+    ownerId: 'core',
+    payload: { taskId: 'string' },
+    allows: ['observe', 'transform'],
+    timeoutMs: 15_000,
+    onTimeout: 'allow',
+    order: 'priority',
+    collect: false,
+  },
+  {
     // The gate in front of every agent tool call, wherever the call came from: an MCP client, a managed
     // harness, or the renderer's own typed projection all land on one route (../routes/agentTools.ts).
     // Core's rather than the agents plugin's, because core owns the tool registry and the route; the

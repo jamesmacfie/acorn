@@ -8,7 +8,7 @@ import {
   type TelemetryRecord,
 } from '@acorn/protocol/telemetry.ts'
 import { coreTelemetryRoute, prefsRoute } from '@acorn/protocol/api.ts'
-import { flushTelemetry, onTelemetryBatch, setTelemetryPref, startTelemetry, type Disposable } from '@acorn/node-core/server/telemetry'
+import { emitMetric, flushTelemetry, onTelemetryBatch, setTelemetryPref, startTelemetry, type Disposable } from '@acorn/node-core/server/telemetry'
 import { createLogger } from '@acorn/node-core/server/telemetry'
 import type { NodeBroker } from './broker/nodeBroker'
 import { helperBootSpans } from './bootMarks'
@@ -50,10 +50,21 @@ const PREF_POLL_MS = 60_000
  *  crash record rather than a stream. */
 const QUEUE_MAX = 500
 
+/** How often to ask the shell for memory numbers while the switch is on. Memory moves over minutes,
+ *  and a sample is a line each way on the shell's pipe. */
+export const FOOTPRINT_MS = 30_000
+const FOOTPRINT = 'runtime.memory.footprint'
+
+/** What the shell answers a footprint request with: bytes, or null for a process it could not read
+ *  (apps/desktop/src-tauri/src/footprint.rs). */
+export type FootprintSample = { renderer: number | null; helper: number | null }
+
 export type HelperTelemetry = {
   /** The local node this helper posts to, or null while there is none. Called at every adoption,
    *  because a crash restart mints a new endpoint, certificate and token. */
   setNode(nodeId: string | null): void
+  /** The shell's answer to a footprint request. Dropped while the switch is off. */
+  footprint(sample: FootprintSample): void
   dispose(): void
 }
 
@@ -64,6 +75,10 @@ export function startHelperTelemetry(options: {
   /** The helper's custody root, which is where the shell writes its crash file. */
   userDataDir: string
   version: string
+  /** Ask the shell for memory numbers. Absent where no shell can answer, such as a test. */
+  requestFootprint?: () => void
+  /** The platform the shell can measure on. Only macOS can, so only there is it asked. */
+  platform?: NodeJS.Platform
 }): HelperTelemetry {
   let nodeId: string | null = null
   let counter = 0
@@ -128,6 +143,16 @@ export function startHelperTelemetry(options: {
 
   let subscription: Disposable | null = null
   let bootSpansSent = false
+  let footprintTimer: ReturnType<typeof setInterval> | null = null
+
+  // The shell answers on stdin with `footprint` below. Asked only while the switch is on, so a
+  // helper nobody is collecting from never wakes the shell.
+  const { requestFootprint } = options
+  const measurable = requestFootprint !== undefined && (options.platform ?? process.platform) === 'darwin'
+  const stopFootprint = (): void => {
+    if (footprintTimer) clearInterval(footprintTimer)
+    footprintTimer = null
+  }
 
   const apply = (on: boolean): void => {
     // Told rather than left to the collector's own five-second tick, because everything worth
@@ -135,6 +160,10 @@ export function startHelperTelemetry(options: {
     setTelemetryPref(on)
     if (on && !subscription) {
       subscription = onTelemetryBatch(sink)
+      if (measurable) {
+        footprintTimer = setInterval(() => requestFootprint(), FOOTPRINT_MS)
+        footprintTimer.unref?.()
+      }
       // The marks were recorded before the answer was known, so they become spans the first time it
       // is yes (./bootMarks.ts § helperBootSpans).
       if (!bootSpansSent) {
@@ -145,10 +174,33 @@ export function startHelperTelemetry(options: {
       return
     }
     if (!on && subscription) {
+      stopFootprint()
       subscription.dispose()
       subscription = null
       held = []
     }
+  }
+
+  // ── Memory, measured by the shell ──
+
+  /**
+   * The shell's answer, in bytes. The helper's own goes through its collector like its other runtime
+   * gauges, so it is stamped `runtime: helper`. The renderer's is posted in a batch of its own named
+   * `renderer`, because the record describes that process and a sink groups memory by runtime. The
+   * helper already speaks for the shell this way, and the renderer's own posts reach the node through
+   * this same broker, so this claims nothing the renderer could not.
+   *
+   * A renderer sample that fails to post is dropped rather than queued: the next one is thirty
+   * seconds away and says more.
+   */
+  const footprint = (sample: FootprintSample): void => {
+    if (!subscription) return
+    if (sample.helper !== null) emitMetric('core', { name: FOOTPRINT, type: 'gauge', value: sample.helper, unit: 'byte' })
+    if (sample.renderer === null) return
+    const record: TelemetryRecord = {
+      kind: 'metric', at: Date.now(), name: FOOTPRINT, type: 'gauge', value: sample.renderer, unit: 'byte', attrs: { owner: 'core' },
+    }
+    void post('renderer', [record]).catch(() => {})
   }
 
   const poll = async (): Promise<void> => {
@@ -216,8 +268,10 @@ export function startHelperTelemetry(options: {
       nodeId = id
       void poll()
     },
+    footprint,
     dispose: () => {
       clearInterval(timer)
+      stopFootprint()
       // One last flush, so the boot spans and whatever the shutdown produced are not lost to a
       // window that had four seconds left on it.
       flushTelemetry()

@@ -43,6 +43,7 @@ const modelFor = (current: AgentSession, parent?: AgentSession): AgentPaneModel 
   openManagedParent,
   sessionActions: () => [],
   providers: () => [],
+  providersLoading: () => false,
   choices: () => [],
   creating: () => false,
   refreshProviders: () => undefined,

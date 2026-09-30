@@ -1,0 +1,1 @@
+ALTER TABLE `agent_sessions` ADD `ledger_compacted_at` integer;

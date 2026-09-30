@@ -241,9 +241,10 @@ export function Timeline(props: {
   let frame = 0
   let corrections = 0
   // Our own writes, marked until the frame after them, and when the reader last touched this
-  // (../../lib/timeline/scrollAuthor.ts). A scroll event arrives after the write that caused it, and telling
-  // ours from the reader's by comparing positions does not survive the fractional device pixels a
-  // WebView reports.
+  // (../../lib/timeline/scrollAuthor.ts). A scroll event arrives after the write that caused it. The
+  // mark alone is not enough: a reader who scrolls in the frame after a pin gets one scroll event,
+  // inside the mark, and it used to be thrown away as ours. So an event only counts as ours if the view
+  // is still where our write left it (`moved`).
   const author = createScrollAuthor()
   // Armed by the reader's own input and spent on the next scroll event, which is how a decision to
   // scroll up is told apart from the browser clamping scrollTop under a shrinking list. Momentum
@@ -257,6 +258,14 @@ export function Timeline(props: {
   // Where the view was the last time anything here looked, so a report can say what the move was from
   // as well as to.
   let at = 0
+  /**
+   * Something moved the view since this timeline last wrote or read it.
+   *
+   * Compared with the value read back after our own write, not the value we asked for, so a clamp or a
+   * rounded device pixel is already in it. The pixel of slack is for a WebView that reports a
+   * fractional offset back a little differently. A reader's scroll of one pixel is not worth the risk.
+   */
+  const moved = () => !!scroller && Math.abs(scroller.scrollTop - at) > 1
 
   /** This timeline's own turns, in order. `:scope >` because a timeline drawn inside a card of another
    *  one must not have its turns harvested by the outer scroller. */
@@ -433,9 +442,12 @@ export function Timeline(props: {
   }
 
   const noteScroll = () => {
-    // Our own write, echoing back. Also the guard that stops a scroll arriving while this subtree is
-    // torn down from being read as the reader moving: cleanup drops the scroller first.
-    if (!scroller || author.applying()) return
+    // Torn down: cleanup drops the scroller first, so a scroll arriving while this subtree goes is not
+    // read as the reader moving.
+    if (!scroller) return
+    // Our own write, echoing back. Only while the view is still where the write left it: the reader's
+    // scroll in the same frame lands in this same event, and dropping it let the next pin undo it.
+    if (author.applying() && !moved()) return
     // Armed, and recently enough to be about this move. Without the second half a click that scrolled
     // nothing stayed armed until something else moved the view, and that move was then adopted as the
     // reader's place and written to the caller's store, where it outlived the mount that invented it.
@@ -492,6 +504,9 @@ export function Timeline(props: {
   // records every window error as fatal.
   let trimFrame = 0
   const growth = new ResizeObserver(() => {
+    // A move whose scroll event has not arrived yet. WebKit can report a resize first, after a reveal
+    // that draws new cards, and pinning now would overwrite the move before anything read it.
+    if (moved()) noteScroll()
     if (place.at === 'live') {
       pin()
       if (!trimFrame && props.onTrim) {

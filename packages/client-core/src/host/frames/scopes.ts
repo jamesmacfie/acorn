@@ -126,6 +126,7 @@ const RULES: readonly RouteRule[] = [
   // Node administration and owner surfaces. Nothing here has a read a plugin needs, and several would
   // hand over credentials or a way to run code.
   { path: shape('/v1/core/security'), scopes: {}, note: 'Node security posture; owner surface.' },
+  { path: shape('/v1/core/storage'), scopes: {}, note: 'Node memory and disk sizes; owner surface.' },
   { path: shape('/v1/core/audit'), scopes: {}, note: 'The audit trail must not be readable by the code it audits.' },
   { path: shape('/v1/core/backup'), scopes: {}, note: 'Writes an archive to a path on the Node.' },
   // The batch route the renderer and the other runtimes post to (docs/telemetry.md § Other
