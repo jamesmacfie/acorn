@@ -329,3 +329,13 @@ client state so effects and query clients cannot retain the previous Node's assu
 Disabling a plugin removes its client contributions at activation and stops its Node routes/services
 on the next Node initialization. Its data file remains in the Node root until the owner explicitly
 deletes it.
+
+## Retained preview documents
+
+The Node owns preview configuration. The desktop shell owns each retained local preview's normalized
+configured home, browsing location, loading state, and navigation cursor. These facts are transient
+and stay outside the Node database and client query cache. Pane unmount hides the page and removes
+renderer observers. Refetching configuration reconciles the home without reloading an equal target.
+Node switches retire all previews so task IDs cannot cross Node ownership. Archive and shell shutdown
+also release native resources. Browser process loss and application exit can discard unsaved page
+state. For the lifecycle and recovery limits, see [Host-owned webviews](./shell.md#host-owned-webviews).

@@ -234,7 +234,7 @@ describe('paneAvailable', () => {
     ;(window as unknown as { acorn?: unknown }).acorn = {
       desktop: true,
       platform: 'darwin',
-      preview: { ensure() {}, setBounds() {}, show() {}, hide() {}, load() {}, command() {}, evict() {}, onEvent: () => () => {} },
+      preview: { ensure() {}, setBounds() {}, show() {}, hide() {}, load() {}, command() {}, evict() {}, evictAll() {}, onEvent: () => () => {} },
     }
     expect(paneAvailable(entry)).toBe(true)
   })
