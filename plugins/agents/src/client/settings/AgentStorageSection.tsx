@@ -1,6 +1,6 @@
 import { createEffect, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
 import { clientEvents, formatBytes } from '@acorn/plugin-api/client'
-import { Alert, Button, Facts, Link, Section, Stack, Text } from '@acorn/plugin-api/ui'
+import { Alert, Button, Facts, Link, SettingsSection, Stack, Text } from '@acorn/plugin-api/ui'
 import type { AgentFootprint } from '../../contract/wire.ts'
 import { managedAgentApi } from '../sessions/managedClient'
 
@@ -67,7 +67,8 @@ export default function AgentStorageSection(props: { nodeId?: string | null }) {
   ]
 
   return (
-    <Section
+    <SettingsSection
+      id="agents"
       label="Agents"
       actions={
         <Button size="sm" busy={stopping()} disabled={!footprint()?.idle} onPress={() => void stopIdle()}>
@@ -92,12 +93,12 @@ export default function AgentStorageSection(props: { nodeId?: string | null }) {
         </Show>
         <Text emphasis="muted" wrap>
           When idle agents stop on their own, and how long archived tasks keep agent history, are set
-          in Agent defaults.
+          in Harnesses and defaults.
         </Text>
-        <Link onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'agent-defaults' })}>
-          Open Agent defaults
+        <Link onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'agent-defaults#idle' })}>
+          Open Harnesses and defaults
         </Link>
       </Stack>
-    </Section>
+    </SettingsSection>
   )
 }

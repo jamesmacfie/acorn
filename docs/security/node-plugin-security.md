@@ -375,7 +375,7 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
   granted it to every existing installation on upgrade, silently: the owner had approved a list that
   no longer described what the agent could do. `read` and `write` stay allowed and are written out
   rather than left implicit, so the next tier added has to say which it is. The node and the settings
-  page read the same constant, so an untouched tier draws as off in Settings → Agent tools and is
+  page read the same constant, so an untouched tier draws as off in Settings → Tools and permissions and is
   denied on the wire.
 - **Delegation authority is direct and fail-closed.** The Agents plugin records each spawn's signed
   owner task and session before it creates a child. Prompt, wait, read, and cancel require that exact

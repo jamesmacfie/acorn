@@ -13,7 +13,7 @@ export type ToolPermissions = z.infer<typeof toolPermissionsSchema>
 // `execute` is denied. It covers the tools that run a command in the worktree, and a `true` fallback
 // meant that adding one granted it to every existing installation, silently, on upgrade — the owner
 // had approved a list that no longer described what the agent could do. Denied by default, a new
-// execute tool is inert until someone turns the tier on in Settings → Agent tools.
+// execute tool is inert until someone turns the tier on in Settings → Tools and permissions.
 //
 // `read` and `write` stay allowed, and are written out rather than left implicit so the next tier
 // added has to say which it is. Read has no side effects. Write reaches notes and memory proposals,

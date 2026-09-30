@@ -14,7 +14,7 @@ audited. For a hand-written directory the source form is a local path:
 
 `linkLocal` (`server/plugins/installer.ts`) **symlinks** the directory rather than copying it, which is what
 makes the loop worth having: you edit in place and the next boot runs what you edited. This works on
-every build, packaged included — Settings → Plugins → *Local folder* has a **Choose…** button when the
+every build, packaged included — **Settings > Plugins > Installed > Install…** offers **Local folder** with a **Choose…** button when the
 target node is this machine. The path must be absolute. Uninstall unlinks rather than following the
 symlink into your working tree.
 
@@ -25,7 +25,7 @@ what it deliberately does not claim.
 
 Installing writes a lockfile and reports `installed-restart-required`. A loaded plugin's routes,
 tables and jobs wire at init, so a package is not live until the node re-runs it: restart the node,
-and under the desktop use Settings → Plugins → Restart, which also reloads the renderer because frame
+and under the desktop use **Restart node** in **Settings > Plugins > Installed**, which also reloads the renderer because frame
 contributions resolve once per session.
 
 If the package has a client file, each device asks its own owner before running those bytes, keyed by

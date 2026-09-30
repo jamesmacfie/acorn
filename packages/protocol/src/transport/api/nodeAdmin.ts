@@ -9,7 +9,7 @@ export const corePairRoute = '/v1/core/pair'
 export const coreDevicesRoute = '/v1/core/devices'
 export const coreDeviceRoute = (deviceId: string) => `/v1/core/devices/${encodeURIComponent(deviceId)}`
 
-// Settings → Security (docs/security.md § Audit, § Filesystem and backup).
+// Settings → Security and backup, and Settings → Audit log (docs/security.md § Audit, § Filesystem and backup).
 //
 // `diskEncrypted` is three-valued. `null` means "this node can't tell", the honest answer off macOS,
 // where LUKS, dm-crypt, ZFS native encryption and a dozen NAS arrangements all count. A security

@@ -297,7 +297,7 @@ The answer is a registry, not a table. A plugin
 declares a `GET` route that lists its own runs (`ctx.runs.register({ runs })`); core calls each one
 with no client attached, parses the answer, stamps who answered, and merges
 (`node-core/server/runs/registry.ts`, `@acorn/protocol/runs.ts`). `GET /v1/core/runs` is the merged
-read and Settings → Runs draws it. No migration, no ownership move, and neither producer knows the
+read and Settings → Run history draws it. No migration, no ownership move, and neither producer knows the
 other exists. A task-confined caller uses this merged route and receives only its task's rows. The
 workflow source route is a node-internal aggregation seam and rejects a direct task-confined read.
 
@@ -444,8 +444,8 @@ correctness, and space is what a long-lived node accumulates.
   that are compacted once, in the background after boot. Every other agent event is kept for the life
   of its session, unless its task is archived and the owner set a limit (next item).
 - Agent history of archived tasks: kept forever unless the owner picks 30 days, 90 days, or 1 year
-  under **Keep agent history for archived tasks** in Settings > Agent defaults. Past the limit, the
-  `agents:archived-history-prune` schedule, daily at 03:50 node-local, deletes each session's events and
+  under **Keep agent history for archived tasks** in Settings > Agents > Harnesses and defaults. Past
+  the limit, the `agents:archived-history-prune` schedule, daily at 03:50 node-local, deletes each session's events and
   their search rows, turns, requests, attachment references, and artifacts, and the attachment and
   artifact files nothing else uses. The session row stays with a note in place of its transcript. The
   archive date comes from core's `tasks.archived_at`, read through `ctx.core.tasks.archivedBefore`, and a
@@ -469,7 +469,8 @@ stop the node and run `VACUUM` on the file.
 
 ### What the node reports
 
-Settings > Storage and memory shows the numbers for the active node. `GET /v1/core/storage`, device
+Settings > Machines > Storage and memory shows the numbers for the node the settings header's node
+switcher names. `GET /v1/core/storage`, device
 only, answers `NodeStorageReport` (`@acorn/protocol/api.ts`): the node process's resident memory, the
 core database, each plugin database, and the blob cache. A database's size includes its `-wal` and
 `-shm` files, because the WAL can be as large as the database between checkpoints. A plugin's

@@ -9,10 +9,10 @@ async function command(screen: Awaited<ReturnType<typeof renderFixture>>, query:
 }
 
 describe('terminal setup route', () => {
-  it('finds Settings in the command palette and offers a typed project path', async () => {
+  it('finds Set up acorn in the command palette and offers a typed project path', async () => {
     const screen = await renderFixture({ width: 80, height: 24 })
     try {
-      await command(screen, 'settings')
+      await command(screen, 'set up acorn')
       expect(await screen.until('Choose a workspace')).toContain('Choose a workspace')
       expect((await screen.frame()).split('\n').every((line) => line.length <= 80)).toBe(true)
       // The route works after first run too, and Escape returns to the previous focus scope.
@@ -36,10 +36,10 @@ describe('terminal setup route', () => {
     }
   }, 30_000)
 
-  it('keeps provider setup reachable from Settings at 80 columns', async () => {
+  it('keeps provider setup reachable from Set up acorn at 80 columns', async () => {
     const screen = await renderFixture({ width: 80, height: 24 })
     try {
-      await command(screen, 'settings')
+      await command(screen, 'set up acorn')
       await screen.until('Choose a workspace')
       expect(await screen.reach('Set up a provider')).toBe(true)
       await screen.press('RETURN')

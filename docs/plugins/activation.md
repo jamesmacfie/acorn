@@ -13,24 +13,73 @@ Required plugins are agents, memory, notes, and terminal. GitHub is optional: wh
 the provider, PR rail, importer, and mirror routes; when disabled core Home and the remaining plugins
 still boot.
 
-Optional plugins can be disabled per Node through Settings → Plugins; their SQLite files remain on
-disk and can be re-enabled later.
+Optional plugins can be disabled per Node through **Settings > Plugins > Installed**; their SQLite
+files remain on disk and can be re-enabled later.
 
-Settings → Plugins, install included, is scoped to one Node at a time, with a node picker at the top.
-Which plugins a Node runs decides which routes exist and which SQLite files it opens, so disabling a
-plugin is a statement about one machine: a fleet is a set of independently administered nodes, and
-there is no "install everywhere" or "disable everywhere" here.
+### What the owner sees
 
-The page includes required plugins as read-only rows and optional plugins with their enable checkbox.
-Each row lists the event verbs and descriptions the plugin declares in `emits`, including built-ins;
-this is the human-readable source behind a cross-plugin live-update grant.
+**Installed** follows the settings header's node switcher. Which plugins a Node runs decides which
+routes exist and which SQLite files it opens, so disabling a plugin is a statement about one machine: a
+fleet is a set of independently administered nodes, and there is no "install everywhere" or "disable
+everywhere" here. The client-only plugins this device holds are listed beside the Node's, because they
+belong to the device whatever the header names.
 
-The page shows two activation facts per row, not one: `disabled` is what will happen (it takes effect at the
+The list has three filters. **All** shows every plugin. **Needs you** shows what only the owner can
+settle: a bundle waiting for approval on this device, a package waiting for review, a failed load, and
+a change that waits for a Node restart. **This device** shows the client-only plugins. Each row states
+its version, origin, and status in the words `host/plugins/pluginStatus.ts` computes, which is also
+what the plugin strip and the attention rows say. The same waiting states raise attention rows
+(`infra/node/pluginFailures.ts` § `pluginWaitingAttention`), and those rows put the dot on **Installed**
+in the settings rail.
+
+**Manage** opens the plugin's own page in the same pane. The page has an **Enabled** switch, a status
+banner, and four tabs:
+
+- **Overview**: what the plugin adds on this device, read from the registries it registered into. Rail
+  sources with their **Show in left rail** switch, command and shortcut counts, agent tools, and the
+  event verbs it declares in `emits`, which are the human-readable source behind a cross-plugin
+  live-update grant.
+- **Settings**: the plugin's own settings pages, each with **Open**, and any core surface it offers to
+  draw.
+- **Permissions**: the grant lines, a staged package's review with **Approve this package** and
+  **Remove staged package**, each approval this device recorded with **Revoke approval** or **Review
+  again**, and development mode with **End dev mode**. A device plugin also offers **Dev trust**.
+- **Versions**: the installed and running versions, the source, and **Update**.
+
+Uninstalling sits in a danger zone under the tabs, and each button asks through the shell's one
+confirmation. A Node plugin has two buttons, **Keep its data** and **Delete its data**, rather than a
+checkbox inside the confirmation, because a checkbox is how someone deletes a year of notes by reflex.
+A device plugin has **Remove**, which also drops every preference this device kept for it. Required
+plugins show no switch, and a bundled package shows neither update nor uninstall.
+
+A page shows two activation facts, not one: `disabled` is what will happen (it takes effect at the
 Node's next start, since routes, tables, and jobs are wired at init) and `running` is what is happening
 now. Between saving a toggle and restarting the Node, the two can differ, and the page keeps both
-visible with a restart banner rather than collapsing them into one state that would either lie about
-the checkbox or hide the pending restart. Install and update carry the same banner, for the same
-reason: a package that installed onto the Node's disk has not necessarily started running yet.
+visible, in the plugin's status and in a restart banner above the list, rather than collapsing them into
+one state that would either lie about the switch or hide the pending restart. Install and update carry
+the same banner, for the same reason: a package that installed onto the Node's disk has not necessarily
+started running yet.
+
+### Installing
+
+**Install…** on the list is one flow for both targets. The owner picks where the plugin goes, the Node
+in the header or this device, then the source: a GitHub release, an npm package, a tarball URL, or a
+local folder. A Node install goes through `installNodePlugin` and a device install through
+`installPluginOnDevice`, the same calls the two separate forms made, so neither target stores anything
+new. A local folder is offered for a device install only where the host has a folder picker, and
+**Choose…** appears for a Node only when it is this computer's, because the picker browses this device.
+A folder installed on a Node is linked, not copied, and the flow says so.
+
+### The plugin strip
+
+The settings view draws a strip above every page a plugin contributes, compiled, remote tree, or frame,
+and at the top of a plugin's tab on a workspace or project page. It names the plugin and its origin,
+offers **Manage plugin**, draws a **Show in left rail** switch for each source the page declares in
+`railSourceVisibility`, and holds the **Enabled** switch. A status line under it names the four states
+the owner has to know about: off, waiting for approval, failed, and offline. An off Node plugin's page
+stays and still saves until the Node restarts; turning a device plugin off from its strip removes the
+page at once, so the view opens the plugin's page under **Installed** instead. For where the strip sits
+and why content cannot cover it, see [frontend.md § The plugin strip](../frontend.md#the-plugin-strip).
 
 Node initialization happens before the listener accepts requests. Every plugin's `init` runs at once,
 and so does every plugin's `ready`, so **declaration order is not a contract**. A plugin whose `init`
@@ -201,10 +250,10 @@ Bundled client bytes are trusted only after the desktop helper reads and hashes 
 resource directory; a node cannot acquire that trust by labelling a roster row as bundled.
 
 A bundled package has no lockfile, so the node has no source to re-resolve and its update route can
-only refuse. The roster row says so structurally (`installed.bundled` on `InstalledPluginRow`), and
-Settings → Plugins uses that to show neither update nor uninstall on a bundled row: update would only
-ever error, and the checkbox already covers "stop running this" without the tombstone that uninstall
-leaves behind.
+only refuse. The roster row says so structurally (`installed.bundled` on `InstalledPluginRow`), and a
+bundled plugin's page under **Installed** uses that to show neither update nor uninstall: update would
+only ever error, and the **Enabled** switch already covers "stop running this" without the tombstone that
+uninstall leaves behind.
 
 ### Running identity, distribution, and availability
 
@@ -238,7 +287,7 @@ while that runtime still runs. When the Node commits unaccepted bytes, its loade
 acceptance. A changed declaration under the same hash also withholds the UI and asks for review;
 older approvals without a declaration binding re-prompt. Trust writes complete before registration changes; revoking an exact acceptance or ending
 a development grant withdraws affected registrations and stops their workers immediately. Dismissing
-a prompt makes no durable decision; Settings → Plugins can show the pending offer. Reconsidering a
+a prompt makes no durable decision; the plugin stays under **Needs you** in **Settings > Plugins > Installed**. Reconsidering a
 rejection removes that exact recorded decision so the offer can be reviewed again.
 
 The same snapshot exposes structured reasons for withheld UI: unknown or unreachable Node, absent,
@@ -284,8 +333,8 @@ A malformed `acorn-plugin.config.mjs` no longer waits for a rebuild or a boot to
 
 The node restart is the step that is real rather than ritual: a loaded plugin's routes, tables and jobs
 wire at init, so a rebuilt bundle is not live until the node re-runs it. Under `pnpm dev:node` node's own
-`--watch` sees the rewritten bundle and restarts for you. Under the desktop, use Settings → Plugins →
-Restart: it re-runs reconciliation and reloads the renderer, which is the other half — frame
+`--watch` sees the rewritten bundle and restarts for you. Under the desktop, use **Restart node** in
+**Settings > Plugins > Installed**: it re-runs reconciliation and reloads the renderer, which is the other half — frame
 contributions resolve once per session, so the client has to re-ask.
 
 ### Reloading one plugin without a restart
@@ -377,7 +426,7 @@ telling it to call again with the same arguments to collect the answer.
 
 The owner sees the notice in the bell, which opens the approval dialog in the **shell's** overlay slot —
 chrome a plugin frame cannot draw over. On approval **the device performs the install**, over the same
-`/v1/core/plugins/*` routes Settings → Plugins uses, with its own principal. The agent never holds a
+`/v1/core/plugins/*` routes **Installed** uses, with its own principal. The agent never holds a
 credential that can install code; a prompt-injected agent can produce a row in a queue and nothing else.
 
 Four properties worth stating because they are easy to lose:
@@ -412,8 +461,9 @@ cannot show one. The approval is therefore two screens, and the split is deliber
    offer their candidate bundle. Approval checks the marker generation and a fingerprint of the whole
    package tree before clearing the gate. No removes the package and marker, keeping plugin data.
 
-If the owner dismisses review, the marker remains. Settings → Plugins shows the held package and its
-permissions after reconnect or restart, with approval and removal actions. A corrupt marker or an
+If the owner dismisses review, the marker remains. The plugin's page under **Installed** shows the held
+package on its **Permissions** tab after reconnect or restart, with approval and removal actions, and
+the plugin is listed under **Needs you**. A corrupt marker or an
 interrupted install without a package can be removed there. The old process can keep serving the prior
 version during a staged update; a restart before approval never imports the replacement. Direct owner
 installs in Settings continue to use the ordinary install path, but cannot replace a candidate that is
@@ -452,8 +502,8 @@ It hangs off the local-path install seam — `{ path }`, the absolute-path symli
 in-place directory to iterate in, and a dev-mode install ends in a **reload** rather than a restart
 prompt where the plugin is reloadable.
 
-**Visibly different, and endable.** Settings → Plugins badges the row *in development — bundle changes are
-auto-trusted* and puts an **End dev mode** button beside it. That is not decoration: the moment a dev-mode
+**Visibly different, and endable.** The plugin's row under **Installed** says *In development. Bundle
+changes are trusted without asking*, and its **Permissions** tab carries **End dev mode**. That is not decoration: the moment a dev-mode
 plugin is indistinguishable from a normal install, the trust story has rotted. Ending it is one act with
 two halves — the grant goes, and so does every acknowledgement the grant wrote. Without the second half
 "revoke" would leave every auto-trusted hash still accepted. What survives is whatever the owner answered
@@ -489,7 +539,7 @@ so the approval ends in a reload rather than a restart. A reload starts a fresh 
 re-evaluates the complete node dependency graph, so splitting the node half does not create a
 restart-only development path.
 
-The entry point is **Settings → Plugins → Create a plugin**, which drafts that starting prompt into the
+The entry point is **Settings > Plugins > Installed > Create a plugin**, which drafts that starting prompt into the
 current task's agent composer through the same `sendReferenceToAgent` seam the editor and changes panes
 use. A draft, not a send: the owner reads it, says what the plugin should do and presses send themselves.
 It deliberately does not open a *new* task — `TaskSeed` carries no prompt field and settings has no project
@@ -519,8 +569,8 @@ broadcast. Both hosts call it and neither runs a pass of its own.
 
 ## Device-held plugins
 
-Settings → Plugins → On this device installs a GitHub release, npm package, HTTPS tarball, or local
-folder when the host has a folder picker. The helper resolves and validates the package, hashes its
+**Install…** under **Settings > Plugins > Installed**, with **This device** as the target, installs a
+GitHub release, npm package, HTTPS tarball, or local folder when the host has a folder picker. The helper resolves and validates the package, hashes its
 client bundle, and holds the manifest with that bundle. A folder is re-read on update; it pins no
 source bytes. Installation and update enter the ordinary per-hash trust prompt. The plugin appears
 after acceptance without restarting the application.

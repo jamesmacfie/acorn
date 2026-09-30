@@ -37,6 +37,8 @@ export { registerKeybindings } from '@acorn/client-core/host/registries/commands
 // bring a `<div>` with it. The registration and the concern type are the model's own.
 export { registerWillHandler } from '@acorn/client-core/host/registries/shell/willPhaseModel.ts'
 export type { Concern } from '@acorn/client-core/host/registries/shell/willPhaseModel.ts'
+// The shell's one confirmation, drawn by the shell over whatever has the screen (../chrome/Confirmation.tsx).
+export { confirmAction } from '../chrome/confirmStore'
 export { slotFills } from '@acorn/client-core/host/tree'
 export { requestAnnotations, annotationsFor } from '@acorn/client-core/host/annotations/annotations.ts'
 export { selectPaneTab } from '@acorn/client-core/host/layouts/state.ts'

@@ -29,18 +29,18 @@ when the annotation or rail contracts change.
 99. In `acorn`, show more task markers than the row can fit. Confirm that the row shows `+N`, then
     focus it and press `Shift+F10` to inspect every marker label in the **Task markers** list.
 
-103. Install a loaded plugin whose source declares `showInRailByDefault: false` and whose settings page
+145. Install a loaded plugin whose source declares `showInRailByDefault: false` and whose settings page
      declares `railSourceVisibility`. Confirm that no rail icon appears and the palette offers
      **Open <label>**, which opens the source without adding the icon.
-104. Turn **Show in left rail** on from the plugin's page. Confirm that the icon appears at once, the
+146. Turn **Show in left rail** on from the plugin's page. Confirm that the icon appears at once, the
      switch under Settings > Plugins agrees, and the current view does not change. Drag the icons, hide
      it again while it is selected, and confirm that the window returns to Home and the drag kept its
      slot.
-105. Hide a project-scoped source such as GitHub. From Home with no project routed, run its palette
+147. Hide a project-scoped source such as GitHub. From Home with no project routed, run its palette
      opener and confirm that the palette keeps an error instead of closing. Disable the plugin and
      confirm that its switch and opener disappear, then re-enable it and confirm that the saved choice
      returns.
-106. In `acorn`, confirm that the hidden source is still listed in the terminal's source menu.
+148. In `acorn`, confirm that the hidden source is still listed in the terminal's source menu.
 
 Checks 96–99 passed on 2026-09-27 with an isolated `dev:agent` data root and a loaded fixture plugin.
 The Tauri window refreshed only that plugin after its push, cleared marks across disable, enable,

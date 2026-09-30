@@ -42,6 +42,11 @@ export const agentSessions = sqliteTable(
     queuedTurns: integer('queued_turns').notNull().default(0),
     lastEventSeq: integer('last_event_seq').notNull().default(0),
     lastReadSeq: integer('last_read_seq').notNull().default(0),
+    // When the session last recorded an event, which is what the sidebar's "last activity" order reads.
+    // Not `updated_at`, because that also moves when you open a session, rename it or change who
+    // controls it, and a row that jumped every time you clicked it would be no order at all. Null
+    // until the first event.
+    lastEventAt: integer('last_event_at'),
     archivedAt: integer('archived_at'),
     // When the background pass last put this session's stored tool calls and file changes into the
     // shape recordEvent writes (server/sessions/ledgerCompaction.ts). Null means it has not run yet, so

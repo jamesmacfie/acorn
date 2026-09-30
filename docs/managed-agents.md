@@ -218,7 +218,7 @@ only way in). That facet forwards to the
 `agents.harnessRegistry` capability plugins/agents publishes, resolved at delivery time and never
 cached, so agents disabled means the same silent nothing every unmatched contribution gets, and
 re-enabling redelivers. A harness package with no node bundle still gets a real plugin row, so it is
-listed in Settings → Plugins and the owner can turn it off.
+listed in **Settings > Plugins > Installed** and the owner can turn it off.
 
 A harness names a program acorn will run, so it is disclosed under **Enforced** in the trust prompt,
 honestly: the host spawns the declared command with the declared arguments and nothing else. The
@@ -357,8 +357,8 @@ agents, MCP servers, and session defaults are not part of this answer, so editin
 
 The Node probes harness availability and usage on bounded intervals. Usage and pricing details are
 displayed in the Agent pane; pricing overrides are local preferences and provider prompts/responses
-are not stored by the model-provider plugin. The same pricing page holds the built-in Claude and Codex
-catalogues plus exact-model overrides. Plan usage is per harness: the built-in CLI probes and a
+are not stored by the model-provider plugin. Settings > Limits and cost holds the built-in Claude and
+Codex catalogues plus exact-model overrides, under the concurrency ceilings. Plan usage is per harness: the built-in CLI probes and a
 contributed harness's `probes.usage` route feed one registry, and a harness with no collector shows no
 usage section.
 
@@ -768,14 +768,18 @@ messages, and any question the agent asks, which the reader answers in place. To
 activity stay in the full session in Agents. The header leads with the session's state mark, the same
 one the sidebar draws. **Hide** folds a chat
 down to its header line, the way a resolved review thread folds, for the rest of the app session.
+The inline message field sends with the same commit chord as the agent thread: Command-Enter on
+macOS or Control-Enter on Windows and Linux. Enter alone inserts a newline.
 The task sidebar groups these sessions under Inline chats. A patch change
 detaches the card from the line while leaving the session and its original context available in
 Agents. The client marks a session stale once it has seen that diff's newer document.
 
 Inline chats have separate provider, model, and effort defaults in the existing session-defaults
-preference. They start with Read only selected. When the provider advertises a read-only permission
-profile, the requested profile is applied before the first turn; otherwise the card labels the
-choice best effort and asks the agent not to write. Full access is an explicit per-chat choice.
+preference. Their sparkle picker opens above the send row with the provider and model choices beneath
+a Read only / Write access control. Each new chat starts with Read only selected. When the provider
+advertises a read-only permission profile, the requested profile is applied before the first turn;
+otherwise the card labels the choice best effort and asks the agent not to write. Write access is an
+explicit per-chat choice.
 
 A new session starts on the settings the owner last used, not on the provider's own choice. Switch
 Codex to a higher reasoning effort in one session and the next Codex session starts there.
@@ -787,7 +791,7 @@ option, a fast mode say, needs no change on the acorn side to be remembered.
 
 One `prefs` row (`agents:session-defaults:v1`) holds seven fields. `followLastSession`, on by
 default, decides which of `last` and `pinned` applies. `last` is written by the runtime whenever a session's
-option changes, and `pinned` is written by the owner under Settings > Agent defaults. Neither writer
+option changes, and `pinned` is written by the owner under Settings > Harnesses and defaults. Neither writer
 sends the other's field, and the write merges server-side, so the Settings page cannot flatten a
 switch made while it was open. `continueAfterUsageLimit`, also on by default, controls the durable
 usage-window continuation described under Operations and failure. `stopIdleAfterMinutes`, 30 by
@@ -796,6 +800,15 @@ Never. It is described under Operations and failure too. `keepArchivedHistoryDay
 is **Keep agent history for archived tasks** under an Archived tasks heading: 30, 90, or 365 days, or 0
 for Forever. It is described under Operations and failure as well. `inline` holds the inline chat
 choices above.
+
+Settings > Harnesses and defaults (`plugins/agents/src/client/settings/AgentSessionDefaultsSettings.tsx`)
+lists each harness the node declares and whether this machine can run it, then these fields. Its
+new-session rows say they seed new sessions only and name the control that changes an open one: the
+pickers in the session's composer, and `/mcp` for the servers a session starts with. The same page
+holds **Send task context at startup**, core's `startup_context_injection` preference, which decides
+whether an agent started in the terminal drawer is sent the task's pull request, linked issues, and
+notes. It moved from the Terminal page because it is part of what a session starts with. It also
+holds **Tool call display**, which is this device's and carries a **This device** chip.
 
 Both halves hang off `ManagedAgentRuntime`, which is where every path that opens a session and every
 path that changes one already meets:
@@ -876,18 +889,20 @@ creation:
 The session header draws a chip with the agent's name from the snapshot, so renaming or deleting the
 agent leaves it alone.
 
-**Settings > Custom agents** lists the agents with **Edit**, **Duplicate**, and **Delete**, and edits
-one in a dialog. The dialog saves on its button rather than on each change, unlike the rest of
-Settings, because an agent needs a name and a harness before it can exist. Its model, effort, and mode
-pickers are read off the newest session that advertised them, the same way Agent defaults reads
-them, with the same limit: a harness you have not run inside the 50 most recent sessions shows no
+**Settings > Custom agents** lists your agents with **Edit** and **Duplicate**, and a plugin's under
+**From plugins** with **Duplicate** only. An agent opens in the same pane, with the settings header
+naming it and a back link to the list. The editor saves on its button rather than on each change,
+unlike the rest of Settings, because an agent needs a name and a harness before it can exist, and it
+asks before you leave with changes. **Delete agent** sits in its danger zone and asks first. Its model,
+effort, and mode pickers are read off the newest session that advertised them, the same way Harnesses
+and defaults reads them, with the same limit: a harness you have not run inside the 50 most recent sessions shows no
 pickers until you run it again.
 
 **Another agent can start one by name.** `agent_spawn` takes `agent`, a name or an id
 ([agent-tools.md](./agent-tools.md) § Managed-session orchestration). The lookup is by id first, then by name ignoring
 case.
 
-**Not built.** Tool servers from Settings > MCP, which wait for that list to exist, and a workflow step
+**Not built.** Tool servers from Settings > MCP servers, which wait for that list to exist, and a workflow step
 naming an agent in place of `profile` and `config_options`.
 
 ### From a plugin
@@ -1050,7 +1065,7 @@ what makes the agent receive the altered image.
 ## Operations and failure
 
 Only one turn dispatches per session. Workspace and provider ceilings bound concurrency, and the owner
-sets both under Settings > Agent concurrency. The provider ceiling is counted against one agent CLI
+sets both under Settings > Limits and cost. The provider ceiling is counted against one agent CLI
 across the whole node, which is what holds a single provider account to a few turns at once. The
 workspace ceiling is counted across all providers in one workspace. Both live in one `prefs` row
 (`agents:concurrency:v1`), read per scan rather than captured, so a raise applies to the scan the write
@@ -1072,7 +1087,7 @@ operation. At the stored time the dispatcher sends the continuation prompt into 
 session; the attempt counter advances and the final provider completion settles the turn normally.
 
 The queue time survives a Node restart and the transcript says when Acorn will continue. The queued
-card shows the same time and may be removed by the owner. Settings > Agent defaults exposes
+card shows the same time and may be removed by the owner. Settings > Harnesses and defaults exposes
 `continueAfterUsageLimit`; turning it off leaves later limit errors on the ordinary failure path.
 Harnesses do not need a continuation-specific hook. A built-in or contributed harness gets this
 behavior when its normalized failure names the limit and its registered usage collector returns
@@ -1103,8 +1118,8 @@ this task was archived. Restore the task and send a prompt to resume." That is t
 leaves, so nothing else changes. The sessions are not archived, and the archived task's Agent pane
 still reads them. After a restore, the next prompt resumes the session as it does after a restart.
 
-The idle limit is **Stop idle agents after** under Settings > Agent defaults, 30 minutes unless the
-owner picks 15 minutes, 2 hours, or Never. `stopIdleSessions` in `runtimeEngine.ts` runs every five
+The idle limit is **Stop idle agents after** under Settings > Agents > Harnesses and defaults, 30
+minutes unless the owner picks 15 minutes, 2 hours, or Never. `stopIdleSessions` in `runtimeEngine.ts` runs every five
 minutes and reads the limit each time, so a change applies from the next sweep. It stops a live
 process only when all of these hold:
 
@@ -1142,7 +1157,7 @@ now** is `POST /v1/p/agents/stop-idle`, which runs `stopIdleSessionsNow`: the sa
 same code as the sweep, with no time limit and whatever the owner's limit is, Never included. A
 `ready` session records "The provider process was stopped from Settings to free memory. Send a prompt
 to resume." Both routes are device only, because they reach every task's agents. The section links to
-Agent defaults, where the idle limit and history retention are set.
+Harnesses and defaults, where the idle limit and history retention are set.
 
 The sweep is a timer the engine owns, not a node schedule
 ([schedules.md § What deliberately is not a schedule](./schedules.md#what-deliberately-is-not-a-schedule)).
@@ -1152,7 +1167,8 @@ provider start and cleared by `stop()` with the other engine timers.
 
 **An archived task can give up its agent history, when the owner chooses.** Nothing else deletes a
 session's events, and they are most of `plugins/agents.sqlite`. **Keep agent history for archived
-tasks** under Settings > Agent defaults is Forever unless the owner picks 30 days, 90 days, or 1 year.
+tasks** under Settings > Agents > Harnesses and defaults is Forever unless the owner picks 30 days,
+90 days, or 1 year.
 The `agents:archived-history-prune` schedule runs daily at 03:50 and does nothing while it is Forever
 ([schedules.md § What is registered](./schedules.md#what-is-registered)). Otherwise it asks core for
 the tasks archived longer than the limit, through `ctx.core.tasks.archivedBefore`, and removes the

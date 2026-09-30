@@ -168,4 +168,5 @@ export function Toolbar(props: { variant?: 'bar' | 'actions'; size?: 'sm' | 'md'
 /** `flexGrow` on an empty box is what "push what follows to the far end" is in a cell layout. */
 export const ToolbarSpacer = () => <box flexGrow={1} />
 Toolbar.Spacer = ToolbarSpacer
-Toolbar.Group = (props: { children: JSX.Element }) => <box flexDirection="row">{props.children}</box>
+// `joined` changes nothing here: the row already has no gap, and cells have no border to share.
+Toolbar.Group = (props: { joined?: boolean; children: JSX.Element }) => <box flexDirection="row">{props.children}</box>

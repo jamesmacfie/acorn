@@ -11,7 +11,7 @@ import { renderCells, type Cells, type Frame } from './render'
 import { fixtureDocument } from '../fixture'
 import {
   Card, DetailColumn, DocumentTabs, Fold, Inline, ListColumn, ListDetail, Menu, Modal, ModalActions,
-  ModalBody, Popover, Section, SectionHeader, Sections, SplitHandle, Stack, TabPanel, Tabs, Timeline,
+  ModalBody, Popover, Section, SectionHeader, Sections, SettingRow, SettingsSection, SplitHandle, Stack, TabPanel, Tabs, Timeline,
   Toolbar,
   ToolbarSpacer,
 } from './grouping'
@@ -289,6 +289,40 @@ const CASES: Case[] = [
     render: () => <SectionHeader actions={<Button label="New" />}>Files</SectionHeader>,
     check: (frame) => {
       expect(rowOf(frame, '[New]')).toBe(rowOf(frame, 'Files') + 1)
+    },
+  },
+  {
+    node: 'SettingsSection',
+    draws: 'the label in bold, the description in grey under it, then the rows',
+    render: () => (
+      <SettingsSection id="general" label="General" description="How the drawer opens">
+        <Text>a row</Text>
+      </SettingsSection>
+    ),
+    check: (frame) => {
+      expect(rowOf(frame, 'How the drawer opens')).toBe(rowOf(frame, 'General') + 1)
+      expect(rowOf(frame, 'a row')).toBe(rowOf(frame, 'General') + 2)
+    },
+  },
+  {
+    node: 'SettingRow',
+    draws: 'the label then the control on one line, Saved after it, the error under it; a value set elsewhere draws where instead of a control; a device row says so',
+    size: { width: 60, height: 8 },
+    render: () => (
+      <Stack>
+        <SettingRow label="Port" savedAt={Date.now()} error={undefined}><Text>4000</Text></SettingRow>
+        <SettingRow label="Command" error="Could not save"><Text>pnpm dev</Text></SettingRow>
+        <SettingRow label="Setup" from=".acorn/config.toml"><Text>machine value</Text></SettingRow>
+        <SettingRow label="Tool call display" scope="device"><Text>Folded</Text></SettingRow>
+      </Stack>
+    ),
+    check: (frame) => {
+      expect(lineWith(frame, 'Port')).toContain('4000')
+      expect(lineWith(frame, 'Port')).toContain('Saved')
+      expect(rowOf(frame, 'Could not save')).toBe(rowOf(frame, 'Command') + 1)
+      expect(lineWith(frame, 'Setup')).toContain('From .acorn/config.toml')
+      lacks(frame, 'machine value')
+      expect(lineWith(frame, 'Tool call display')).toContain('(this device)')
     },
   },
   {
@@ -1415,6 +1449,16 @@ const BEHAVIOURS: Behaviour[] = [
       // with the text it was built with. Harmless — the value it reports is the value it was given —
       // and pre-existing, so it is not this phase's to change.
       expect(pressed.at(-1)).toBe('a')
+    },
+  },
+  {
+    node: 'Textarea',
+    does: 'submits with the commit chord when the caller supplies onCommit',
+    render: (record) => <Textarea value="question" onCommit={() => record('sent')} />,
+    size: { width: 30, height: 5 },
+    drive: async (screen, pressed) => {
+      await screen.press('RETURN', { ctrl: true })
+      expect(pressed).toEqual(['sent'])
     },
   },
   {

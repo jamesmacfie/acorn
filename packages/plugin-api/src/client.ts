@@ -223,6 +223,12 @@ export {
 } from '@acorn/client-core/features/settings'
 export type { ModelPick } from '@acorn/client-core/features/settings'
 export { openRepoConfigTrust } from '@acorn/client-core/features/settings'
+// The settings save model, for a page drawn with `SettingRow` (docs/frontend.md § Settings): the
+// Saved signal and the error for a switch or select, a text field that keeps what was typed when its
+// write fails, the question a Save-and-Cancel form asks before settings drops its changes, and the
+// header's name and back link for one item a list page has open.
+export { createSettingSave, createTextSetting, useSettingsDetail, useUnsavedChanges } from '@acorn/client-core/features/settings'
+export type { SettingSave, TextSetting } from '@acorn/client-core/features/settings'
 
 // ── Integrations, notifications, palette ──────────────────────────────────────────────────────
 export { createDeviceFlow } from '@acorn/client-core/features/integrations'

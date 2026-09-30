@@ -4,7 +4,6 @@
 import { createEffect, createMemo, createSignal, lazy, Match, on, onCleanup, onMount, Show, Switch, untrack } from 'solid-js'
 import { createQuery, useIsRestoring, useQueryClient } from '@tanstack/solid-query'
 import { useLocation, useMatch, useNavigate, useParams } from '@solidjs/router'
-import { clear } from 'idb-keyval'
 import { integrationsOptions, prefsOptions, type Project, projectsKey, projectsOptions, type Task, tasksKey, tasksOptions, type Workspace, workspacesOptions } from '@acorn/client-core/infra/queries.ts'
 import { setProjectsLookup } from '@acorn/client-core/features/projects/projectLookup.ts'
 import { setTaskLookup } from '@acorn/client-core/features/tasks'
@@ -27,6 +26,7 @@ import { activeNodeId, nodeGateHolds, nodeReady, setActiveNode } from '@acorn/cl
 import { nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
 import { warnOnceAboutDisk } from '@acorn/client-core/infra/node'
 import { applyNodePlugins } from './activate'
+import { clearCache } from './clearCache'
 import TaskView from './TaskView'
 import Acorn from '@acorn/client-core/kit/components/content/Acorn.tsx'
 import { clientEvents } from '@acorn/client-core/host/registries/commands'
@@ -56,11 +56,12 @@ import { mintSlotRef } from '@acorn/client-core/host/plugins/NestedChromeSlot.ts
 import { registerCoreExclusiveSlot } from '@acorn/client-core/host/registries/extensionPoints'
 import { PrefKeys } from '@acorn/client-core/infra/persistence'
 import { savePref } from '@acorn/client-core/features/settings/savePref.ts'
+import type { SettingsRequest } from '@acorn/client-core/features/settings/SettingsView.tsx'
 
 // The shell and PR list are the startup path. Heavy/conditional surfaces stay behind their actual
 // navigation intent so the editor, xterm, Shiki/diff rendering, settings plugins, and onboarding do not
 // compete with the first interactive paint.
-const SettingsModal = lazy(() => import('@acorn/client-core/features/settings/SettingsModal.tsx'))
+const SettingsView = lazy(() => import('@acorn/client-core/features/settings/SettingsView.tsx'))
 
 // Layout root (Router root): top bar + three panes. Panes are params-driven: PullList (left)
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.
@@ -70,15 +71,13 @@ export default function App() {
   const location = useLocation()
   const navigate = useNavigate()
   const isRestoring = useIsRestoring()
-  // The Settings page (account menu → Settings): workspace mapping, per-workspace pages,
-  // integrations, shortcuts. `settingsTab` seeds which tab opens.
-  const [settingsOpen, setSettingsOpen] = createSignal(false)
-  const [settingsTab, setSettingsTab] = createSignal('workspaces')
-  const openSettings = (tab = 'workspaces') => {
-    setSettingsTab(tab)
-    setSettingsOpen(true)
-  }
-  // Panes deep-link here rather than receiving an `openSettings` prop: the modal is the shell's, and
+  // Settings: a full-window layer over the shell, not a route, so the workspace under it stays mounted
+  // (client-core/features/settings/SettingsView.tsx). `null` is closed. A request is a fresh object per
+  // call, so a deep link that arrives while settings is open still navigates. With no target it opens on
+  // the last page used; a target is `settings/<pageId>#<sectionId>` or a bare page id.
+  const [settingsRequest, setSettingsRequest] = createSignal<SettingsRequest | null>(null)
+  const openSettings = (target?: string): void => { setSettingsRequest(target ? { target } : {}) }
+  // Panes deep-link here rather than receiving an `openSettings` prop: the layer is the shell's, and
   // threading a callback through every pane that might ever want one is worse than one event.
   onMount(() => onCleanup(clientEvents.on('presentation:open-settings', ({ tab }) => openSettings(tab))))
   // The terminal drawer belongs to a task, not the app: it's shown only in the Task view (a Source
@@ -112,7 +111,7 @@ export default function App() {
   // keydown listener. Maximize is focus-directed and never enters persisted TaskLayout state.
   onMount(() => {
     const commands = registerCommands([
-      { id: 'core.settings.open', title: 'Open settings', category: 'navigation', run: () => openSettings() },
+      { id: 'core.settings.open', title: 'Open settings', hint: 'on the page used last', category: 'navigation', palette: true, run: () => openSettings() },
       { id: 'core.rail.toggle', title: 'Toggle rail', category: 'navigation', run: () => toggleRail() },
       {
         id: 'core.surface.toggle-maximize', title: 'Toggle focused surface maximize', category: 'pane',
@@ -499,7 +498,7 @@ export default function App() {
       openSettings: () => openSettings(),
       collapseRail: toggleRail,
       navigate: (route) => { if (breadcrumb.some((item) => item.route === route)) navigate(route) },
-      clearCache,
+      clearCache: () => clearCache(queryClient),
     }
   }
   const coreTopbar = registerCoreExclusiveSlot('topbar', Topbar)
@@ -516,12 +515,6 @@ export default function App() {
   // New-task mode: core's own route, so the pattern is a constant rather than a registry lookup.
   const newMatch = useMatch(() => CREATE_TASK_ROUTE)
   const isNew = () => !!newMatch()
-
-  async function clearCache() {
-    queryClient.clear()
-    await clear() // wipe the persisted IndexedDB cache before reload so it can't rehydrate
-    window.location.reload()
-  }
 
   // The gate covers the helper's fleet selection and the supervised local node's first connection
   // (docs/frontend.md § Startup readiness). That keeps pane-owned resources from issuing requests
@@ -557,19 +550,22 @@ export default function App() {
           </Show>
         </Match>
       </Switch>
-      <KeybindingDispatcher prefs={prefs.data ?? {}} taskActive={inTaskView()} focusedPane={focusedPane(activeTaskId())} />
+      {/* Settings covers the task, so the task's own chords stand down while it is open: a pane chord
+          would act on a surface nobody can see, and could move focus into a terminal under the layer. */}
+      <KeybindingDispatcher prefs={prefs.data ?? {}} taskActive={inTaskView() && !settingsRequest()} focusedPane={focusedPane(activeTaskId())} />
       {/* The active bindings, read back out of the keymap's own catalog. Mounted here rather than
           from the dispatcher because `registries/keybindings.ts` is deliberately `.ts` and may not
           hold markup. */}
       <CheatSheet />
-      <WillConfirmationHost />
       {/* A referenced item from another provider, opened by any surface that renders content
           (client-core/host/registries/panes/refPanels.ts). Mounted at the shell because the state is the shell's.
           Before this, the only place in the app that could open one was github's PR conversation. */}
       <RefPanelHost />
-      <Show when={settingsOpen()}>
-        <SettingsModal initialTab={settingsTab()} onClose={() => setSettingsOpen(false)} />
+      <Show when={settingsRequest()}>
+        {(request) => <SettingsView request={request()} onClose={() => setSettingsRequest(null)} />}
       </Show>
+      {/* After settings, so a confirmation a settings page asks for paints above the layer that asked. */}
+      <WillConfirmationHost />
       {/* The terminal drawer arrives as a contribution (plugins/terminal's drawerContribution.tsx). The
           shell still owns the per-task `terminalOpen` flag, which the tab rail and topbar badge read
           too, and passes it through slotContext; it no longer knows what fills the drawer. Order

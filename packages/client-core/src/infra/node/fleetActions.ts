@@ -60,7 +60,7 @@ export function reconnectNode(nodeId: string): void {
 }
 
 // Stop and start the supervised local node, so a plugin toggle takes effect
-// (settings/PluginsSettings.tsx). Absent in a plain browser and for every remote node: nothing this
+// (settings/plugins/PluginsSettings.tsx). Absent in a plain browser and for every remote node: nothing this
 // app runs restarts another machine's service, which is why the page shows "restart required" there
 // instead of a button that cannot work.
 export const restartLocalNode = async (): Promise<void> => {

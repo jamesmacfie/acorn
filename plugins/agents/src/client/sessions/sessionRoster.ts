@@ -29,10 +29,14 @@ export type AgentSessionRosterRow =
  * Delegated managed sessions follow their managed parent. Provider-native subagents still follow
  * the provider session that reported them. Missing parents and malformed cycles stay selectable as
  * top-level rows instead of disappearing.
+ *
+ * Siblings keep the order of `sessions`. Provider subagents keep the provider's order unless
+ * `compareSubagents` is given.
  */
 export function agentSessionRoster(
   sessions: readonly AgentSession[],
   delegationBySession: Readonly<Record<string, AgentSessionDelegation>>,
+  compareSubagents?: (left: AgentSubagent, right: AgentSubagent) => number,
 ): AgentSessionRosterRow[] {
   const sessionsById = new Map(sessions.map((session) => [session.id, session]))
   const children = new Map<string, AgentSession[]>()
@@ -84,7 +88,8 @@ export function agentSessionRoster(
       delegation,
       managedParent,
     })
-    for (const subagent of session.subagents ?? []) {
+    const subagents = session.subagents ?? []
+    for (const subagent of compareSubagents ? [...subagents].sort(compareSubagents) : subagents) {
       rows.push({
         kind: 'provider-subagent',
         key: `${session.id}/${subagent.id}`,

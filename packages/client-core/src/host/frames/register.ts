@@ -4,6 +4,7 @@ import type { DocumentHandle } from '../../features/editor/documentModel'
 import { isPluginKeyClaim } from '@acorn/protocol/keybindings.ts'
 import type { PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
 import { isCoreExclusiveSlot, qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
+import { isPluginSettingsCategory, isSettingsScope } from '@acorn/protocol/settingsPages.ts'
 import { panelRegion } from '../../features/dashboards/region'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { registerPluginExtension } from '../chrome/chromeExtensionPoints'
@@ -23,7 +24,7 @@ import type { RailProps, TopbarProps } from '@acorn/protocol/chrome.ts'
 import { RAIL_ACTIONS, TOPBAR_ACTIONS, railRemote, topbarRemote } from '../plugins/chromeRemote'
 import { refPanelRegistry } from '../registries/panes/refPanels'
 import type { Disposable } from '../../kit/lib/state/registry'
-import { settingsRegistry } from '../registries/shell/settings'
+import { settingsRegistry, settingsSearchProblem } from '../registries/shell/settings'
 import { uiSlotRegistry } from '../registries/extensionPoints/slots'
 import { activeTaskId } from '../../features/tasks/tasks'
 import {
@@ -587,23 +588,37 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
       // manifest parser refuses a settings surface that names no layout, so this is a declaration
       // either way rather than a default.
       const settingsTree = singleRegionTree(surface)
-      // The node refused a switch for a source this manifest does not declare. A roster row is bytes a
-      // node sent, so the device drops one again, and the settings host checks the live owner besides.
-      const ownSources = new Set((row.installed?.contributions.sources ?? []).map((source) => source.id))
-      const railSourceVisibility = (surface.railSourceVisibility ?? []).filter((id) => ownSources.has(id))
-      if (railSourceVisibility.length !== (surface.railSourceVisibility?.length ?? 0)) {
-        log.warn(`${pluginId} settings page '${surface.id}' names a rail source it does not declare`, undefined, { 'plugin.id': pluginId })
-      }
+      // Placed by this build's own lists, because the row is bytes a node sent: a group or scope this
+      // build does not offer plugins leaves the page in its default place rather than out of settings.
+      // The node already reported the value when it read the manifest. No `followsNodeSwitcher`: a
+      // frame is pinned to the active node (`frameNode` above), so its header names that node.
       return own(settingsRegistry, {
         id: surface.id,
         label: surface.label,
+        ...(isPluginSettingsCategory(surface.category) ? { category: surface.category } : {}),
+        ...(isSettingsScope(surface.settingsScope) ? { scope: surface.settingsScope } : {}),
+        icon: surface.glyph,
+        // Checked again here for the same reason: a newer node may accept a list this build would not,
+        // and the registry refuses a page whose lists are past the limit. Losing the search entries is
+        // the cost, never the page.
+        ...(surface.keywords && !settingsSearchProblem({ keywords: surface.keywords }) ? { keywords: surface.keywords } : {}),
+        ...(surface.sections && !settingsSearchProblem({ sections: surface.sections }) ? { sections: surface.sections } : {}),
+        // Only this plugin's own sources. The node reported any other id when it read the manifest; here
+        // it is dropped, so a roster row can never put a switch for core's rail or another plugin's.
+        ...(ownRailSwitches(surface.railSourceVisibility, row) ?? {}),
         group: surface.group ?? 'general',
         order: surface.order,
-        ...(railSourceVisibility.length ? { railSourceVisibility } : {}),
         requires: { loadedPlugin: pluginId },
-        component: () => settingsTree
-          ? createComponent(RemoteTree, { contribution: settingsTree, props: () => ({}) })
-          : createComponent(PluginFrame, { binding: frameBindingFor(pluginId, surface, row), hash }),
+        // A `project` page is a tab on a project's settings page, so it is told which project, the
+        // same way a project pane is. The page is drawn afresh for each project, so a value read at
+        // mount stays right.
+        component: (props) => {
+          const project = props.context.scope.project?.id
+          const scope = project ? { projectId: project } : {}
+          return settingsTree
+            ? createComponent(RemoteTree, { contribution: settingsTree, props: () => scope, scope: () => scope })
+            : createComponent(PluginFrame, { binding: frameBindingFor(pluginId, surface, row, scope), hash })
+        },
       })
     }
     case 'importer':
@@ -624,6 +639,12 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         }),
       })
   }
+}
+
+const ownRailSwitches = (ids: readonly string[] | undefined, row: NodePluginRow): { railSourceVisibility: string[] } | undefined => {
+  const own = (row.installed?.contributions.sources ?? []).map((source) => source.id)
+  const kept = (ids ?? []).filter((id) => own.includes(id))
+  return kept.length ? { railSourceVisibility: kept } : undefined
 }
 
 /**

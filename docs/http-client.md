@@ -98,7 +98,7 @@ Three frame surfaces from one bundle, chosen by `bridge.context`:
 | --- | --- |
 | `http` (task pane) | The panel for a task: its ad-hoc requests above the project tree, with `{{worktree}}`/`{{branch}}`/`{{taskId}}` resolving against that task |
 | `http-project` (project pane) | The same panel with no task, drawn beside the rail list at `/p/:projectId`, addressed by `/p/:projectId/x/http/requests/:requestId` |
-| `http-variables` (settings) | Project variables, behind a project picker, because variables are project-scoped and the settings modal only knows a workspace |
+| `http-variables` (settings) | Project variables, behind a project picker. It is one node page under Features, **API requests**, not a tab on each project's page |
 
 All three give tabs, request history, variables, auth helpers, curl import/export, response inspection,
 and memory-only drafts. Node freshness/offline status follows the shared client model; a failed send

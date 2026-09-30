@@ -102,6 +102,16 @@ export type DockerTaskSummary = {
   projects: string[] // distinct compose projects among the matched containers
 }
 
+// The `[docker]` matcher keys (server/dockerConfig.ts) as one project sees them: what its checkout's
+// `.acorn/config.toml` sets, what `~/.acorn/config.toml` sets, and what a task on it is matched with.
+// A key is present in `repo` and `home` only when that file sets it.
+export type DockerMatcherKeys = { composeProject: string | null; matchLabels: string[]; matchName: boolean }
+export type DockerProjectMatcher = {
+  repo: Partial<DockerMatcherKeys>
+  home: Partial<DockerMatcherKeys>
+  effective: DockerMatcherKeys
+}
+
 // Route helpers (loopback HTTP; mounted at /v1/p/docker in app/server/routes.ts).
 export const dockerInfoRoute = (): string => '/v1/p/docker/info'
 export const dockerContainersRoute = (): string => '/v1/p/docker/containers'
@@ -117,5 +127,6 @@ export const dockerNetworkRemoveRoute = (ref: string): string => `/v1/p/docker/n
 export const dockerPruneRoute = (): string => '/v1/p/docker/prune'
 export const dockerComposeActionRoute = (): string => '/v1/p/docker/compose/action'
 export const dockerTaskSummaryRoute = (): string => '/v1/p/docker/task-summary'
+export const dockerProjectMatcherRoute = (projectId: string): string => `/v1/p/docker/projects/${encodeURIComponent(projectId)}/matcher`
 export const dockerTaskContainersRoute = (taskId: string): string => `/v1/p/docker/tasks/${encodeURIComponent(taskId)}/containers`
 export const dockerTaskTeardownRoute = (taskId: string): string => `/v1/p/docker/tasks/${encodeURIComponent(taskId)}/teardown`

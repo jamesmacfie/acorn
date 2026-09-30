@@ -76,6 +76,45 @@ links another provider or password while signed in. A matching verified email al
 merge accounts. Better Auth must use `disableImplicitLinking: true` if selected for the account
 service. [Better Auth account linking](https://better-auth.com/docs/concepts/users-accounts).
 
+## No public address on a hosted Node
+
+Phase 1 gives a self-hosted Node a public address as a stepping stone. From phase 4 on, team Nodes,
+workers, and restore Nodes accept connections only through the relay. A public port on each worker
+would widen the attack surface, churn addresses every few minutes, and give two reachability paths to
+test instead of one. See [relay](./relay.md#why-every-hosted-node-uses-it).
+
+## No enrollment v1 for hosted Nodes
+
+Enrollment v1 hands the control plane a device token, which is full owner authority. The account
+service already decides who holds grants, so a standing owner credential adds risk and buys nothing.
+Hosted Nodes enroll through v2, which carries no device token. v1 stays unchanged for anyone else's
+control plane. See [identity](./identity.md#what-the-enrollment-v2-change-is).
+
+## No model key in the worker's environment
+
+A key in the worker's environment is readable by every agent, terminal, and setup script, and it
+undoes the sandbox programme's child environment policy. Workers use a credential-injecting proxy
+where the harness allows, or a key scoped to the one agent process with its cost written down. See
+[plugins and secrets](./plugins-and-secrets.md#model-keys).
+
+## No relay that terminates TLS
+
+A relay that decrypts could route smarter and cache, but a compromise would expose every team's
+traffic, and clients would stop pinning Node certificates. The relay forwards TLS it cannot read.
+
+## No provider token on a hosted Node
+
+The team Node asks the provisioner for a worker. It never holds the compute provider's API token,
+because that token can create and destroy machines for every team. See
+[services](./services.md#service-to-service-authentication).
+
+## No configuration copied from a laptop to a worker
+
+A local project's scripts, trust acknowledgements, plugin databases, and connections stay local. A
+shared project gets its own settings on the team Node, reviewed there. Copying executable
+configuration to a hosted machine would bypass the project-row trust snapshot. See
+[projects and tasks](./projects-and-tasks.md#shared-projects).
+
 ## Verify before building
 
 Check whether the user requirements or shipped contracts have changed. A refusal overturned by

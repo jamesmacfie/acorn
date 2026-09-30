@@ -1,4 +1,4 @@
-import { Button, Icon, Menu, Textarea } from '@acorn/plugin-api/ui'
+import { Icon, IconButton, Menu, Textarea } from '@acorn/plugin-api/ui'
 import type { ChangesModel } from './changesModel'
 
 // The commit editor's shared parts: the field, the options menu, and the two strings that describe
@@ -78,7 +78,10 @@ export function CommitField(props: {
  *  is on, which is the same mark the view menu uses for the same reason.
  *
  *  The menu stays open on a press, because these are three switches and a reader who wants two of
- *  them should not have to open it twice. */
+ *  them should not have to open it twice.
+ *
+ *  The trigger is a chevron joined to the commit button, Zed's split button, which the footer draws
+ *  by putting both in one joined `Toolbar.Group`. */
 export function CommitOptionsMenu(props: { model: ChangesModel }) {
   const model = () => props.model
   const Toggle = (own: { menu: MenuContext; on: boolean; hint: string; onSelect: () => void; children: string }) => (
@@ -97,17 +100,16 @@ export function CommitOptionsMenu(props: { model: ChangesModel }) {
       ariaLabel="Commit options"
       placement="bottom-end"
       trigger={({ open, toggle }) => (
-        <Button
-          variant="bare"
+        <IconButton
+          icon="chevron-down"
+          variant="outline"
           size="sm"
           label="Commit options"
           title="Amend, sign-off, and skipping git's hooks"
           opens="menu"
           expanded={open()}
           onPress={toggle}
-        >
-          Options
-        </Button>
+        />
       )}
     >
       {(menu) => (

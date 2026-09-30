@@ -55,6 +55,7 @@ const fake = (over: Partial<DockerBridge> = {}): DockerBridge => ({
   taskSummary: async () => [{ taskId: 't1', running: 2, total: 3, projects: ['runn_x'] }],
   taskContainers: async () => [summary],
   taskTeardown: async () => ({ ok: true }),
+  projectMatcher: async () => ({ repo: {}, home: {}, effective: { composeProject: null, matchLabels: [], matchName: true } }),
   ...over,
 })
 

@@ -163,6 +163,8 @@ portable wall clock; the workflow target does so below.
 300s floor a schedule *is* a poll, and polling is the client's job for a person who is present. Same
 word for the same idea, different shape where the difference is real. It was called `ctx.pollers` until
 2026-08-27, which made one idea look like two.
+The renderer starts an eligible client schedule when its plugin becomes available, including when the
+Node's plugin roster arrives after the window opens. Disabling or unloading the plugin stops it.
 
 ## Policies
 
@@ -320,7 +322,7 @@ enumerates what the machine does unwatched, and creating one is a way to make co
 
 ## Settings
 
-Settings → Schedules, per node, sharing the picker with Plugins and Security — a schedule is a promise
+Settings → Schedules, per node, following the settings header's node switcher — a schedule is a promise
 one machine makes. One list, owner badge, cadence in words, last run with a status dot, next run, the
 run ring behind a disclosure, and the verbs: pause/resume, run now, and delete for user rows. A failed
 schedule shows its error inline; a backed-off one says when it will try again. A risky user schedule

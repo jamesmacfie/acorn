@@ -1,10 +1,5 @@
-import { existsSync } from 'node:fs'
-import { readFile, writeFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
-import { resolve } from 'node:path'
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON, type McpServerSummary } from '@acorn/protocol/mcp.ts'
 import type { ArchiveOpts, ArchiveResult } from '@acorn/protocol/task.ts'
 import { archiveTask, restoreTask, TEARDOWN_TIMEOUT_MS } from '../../storage/archive'
 import { runProcess } from '../../core/proc'
@@ -86,24 +81,6 @@ async function capturePreviewUrl(
   if (result.code !== 0) return { ok: false, reason: result.stderr.trim().slice(0, 200) || 'script failed' }
   const url = result.stdout.split('\n').map((line) => line.trim()).filter(Boolean).pop()
   return url ? { ok: true, url } : { ok: false, reason: 'script produced no output' }
-}
-
-// MCP config inspector (docs/mcp.md): read only the known candidate files and mask secrets here, so
-// raw values never cross to the renderer. Read-only, since acorn never launches these servers.
-async function inspectTaskMcp(db: ReturnType<typeof getDb>, taskId: string): Promise<{ file: string; servers: McpServerSummary[] }[]> {
-  const root = taskId ? await taskRoot(db, taskId) : null
-  const out: { file: string; servers: McpServerSummary[] }[] = []
-  for (const candidate of MCP_CANDIDATES) {
-    const base = candidate.root === 'home' ? homedir() : root
-    if (!base) continue
-    const file = resolve(base, candidate.rel)
-    try {
-      out.push({ file, servers: inspectMcpConfig(await readFile(file, 'utf8')) })
-    } catch {
-      // absent file → not listed
-    }
-  }
-  return out
 }
 
 // Archive is the only path allowed to tear a worktree down, and never automatic. The guard →
@@ -188,15 +165,6 @@ export const worktree = new Hono<AppEnv>()
     const parsed = restoreBody.safeParse(await c.req.json().catch(() => ({})))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return c.json(await restoreTask(getDb(c.env), c.req.param('id'), parsed.data))
-  })
-  .get('/tasks/:id/mcp', async (c) => c.json(await inspectTaskMcp(getDb(c.env), c.req.param('id'))))
-  .post('/tasks/:id/mcp/starter', async (c) => {
-    const root = await taskRoot(getDb(c.env), c.req.param('id'))
-    if (!root) return c.json({ ok: false, reason: 'No worktree yet — open a terminal first.' })
-    const file = resolve(root, '.mcp.json')
-    if (existsSync(file)) return c.json({ ok: false, reason: '.mcp.json already exists.' })
-    await writeFile(file, STARTER_MCP_JSON, 'utf8')
-    return c.json({ ok: true })
   })
 
 export { TEARDOWN_TIMEOUT_MS }

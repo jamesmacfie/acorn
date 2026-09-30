@@ -1,1 +1,0 @@
-ALTER TABLE `agent_sessions` ADD `history_removed_at` integer;

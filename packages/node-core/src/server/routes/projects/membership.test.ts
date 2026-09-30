@@ -1,9 +1,9 @@
 import { Hono } from 'hono'
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Project, Task } from '@acorn/protocol/api.ts'
+import type { Project, ProjectConfigResponse, Task } from '@acorn/protocol/api.ts'
 import { eq } from 'drizzle-orm'
 import { getDb, schema } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
@@ -169,6 +169,33 @@ describe('project rows own workspace membership and visibility', () => {
 
     const [row] = await projectRows()
     expect(row).toMatchObject({ setupScript: 'pnpm install', previewMode: 'port', previewValue: '3000', runTargets: '[{"id":"dev","command":"pnpm dev"}]' })
+  })
+
+  it('says which values the checkout\'s committed .acorn/config.toml sets, beside the row it overrides', async () => {
+    const folder = join(dir, 'with-repo-config')
+    mkdirSync(join(folder, '.acorn'), { recursive: true })
+    const created = await call('/api/projects', 'POST', { path: folder })
+    const { project } = (await created.json()) as { project: Project }
+    await call(`/api/projects/${project.id}/config`, 'PUT', { patch: { dbUrlScript: './local-db.sh', previewMode: 'port', previewValue: '3000' } })
+
+    // No file: the read carries no repo layer at all, which is what an older node sends too.
+    const plain = (await (await call(`/api/projects/${project.id}/config`, 'GET')).json()) as ProjectConfigResponse
+    expect(plain.repoConfig).toBeUndefined()
+
+    writeFileSync(join(folder, '.acorn', 'config.toml'), [
+      '[scripts.run.dev]', 'command = "./scripts/dev.sh"', 'default = true',
+      '[database]', 'url_script = "./scripts/db-url.sh"',
+      '[preview]', 'mode = "url"',
+    ].join('\n'))
+    const read = (await (await call(`/api/projects/${project.id}/config`, 'GET')).json()) as ProjectConfigResponse
+    // The machine's own values are still what `config` holds; the file's are beside them, and only the
+    // keys the file sets are there.
+    expect(read.config).toMatchObject({ dbUrlScript: './local-db.sh', previewMode: 'port', previewValue: '3000' })
+    expect(read.repoConfig).toEqual({
+      runTargets: [{ id: 'dev', command: './scripts/dev.sh', default: true }],
+      dbUrlScript: './scripts/db-url.sh',
+      previewMode: 'url',
+    })
   })
 
   it('project visibility does not affect plain-folder identity', async () => {
