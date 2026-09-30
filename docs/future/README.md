@@ -18,6 +18,8 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
 | [dashboards/](./dashboards/README.md) | Remaining taskless database and write-back proposals. Shared data discovery and authoring now belong to workflow v2. | Redesign shipped; overlapping proposals superseded, 2026-09-13. |
+| [dynamic-ui/](./dynamic-ui/README.md) | Agent-built apps: task apps drawn as transcript cards and panes in host components, published to the project, edited through drafts, and exported as plugins. A spike and five phases. | Proposed, 2026-10-01; nothing built. |
+| [memory/](./memory/README.md) | Simple memory: direct agent writes, the memory index in every session's system prompt, undo instead of review, and the removal of Findings. Four phases. | Proposed, 2026-10-01; nothing built. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
 | [tui-review/](./tui-review/README.md) | Live terminal UX audit, feature inventory, host projections, and acceptance plan. | Icon removal, startup repair, and the Settings route (the navigation P0) implemented; broader acceptance open. |
 
@@ -35,7 +37,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [native-overlay-layer.md](./native-overlay-layer.md) | Product requirements for native desktop overlays above live preview and plugin webviews, with composition, input, security, and acceptance gates. | Proposal, 2026-10-01. Not implemented. |
 | [outdated-review-comments.md](./outdated-review-comments.md) | Hide outdated GitHub review threads from the code pane while preserving conversation history, location metadata, and refresh correctness. | Product requirements, 2026-10-01. Not implemented. |
 | [pluginsearch.md](./pluginsearch.md) | Search within Linear, Rollbar, and GitHub lists beyond the loaded rows while retaining project mappings and state. | Proposal, 2026-09-24. Not started. |
-| [preview-retention.md](./preview-retention.md) | Product requirements for returning to retained browser previews without navigation, including toolbar restoration, browser recovery, and memory measurements. | Proposal, 2026-10-01. Not implemented. |
 | [remote.md](./remote.md) | Web client, mobile PWA, and a relay service. | Preparation items shipped; the rest waits on a web client. |
 | [scoll_fix.md](./scoll_fix.md) | Agent transcript scroll and focus repair: retained view state, stable row identity, consumable navigation intent, and cross-session regression coverage. | Implementation proposal, 2026-09-14. Reading position, row identity and reveal intent shipped; filter and disclosure state not built. |
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |

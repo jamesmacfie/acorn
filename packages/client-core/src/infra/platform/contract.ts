@@ -96,7 +96,7 @@ const GROUPS = {
   },
   preview: {
     resolve: previewViews,
-    members: members<PreviewViews>()(['ensure', 'setBounds', 'show', 'hide', 'load', 'command', 'evict', 'onEvent']),
+    members: members<PreviewViews>()(['ensure', 'setBounds', 'show', 'hide', 'load', 'command', 'evict', 'evictAll', 'onEvent']),
   },
   webviews: {
     resolve: pluginWebviews,

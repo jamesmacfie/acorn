@@ -93,6 +93,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [local-development.md](./local-development.md) | Getting the app running, the dev loops, and the environment. |
 | [testing.md](./testing.md) | Test commands, coverage scope, test layers, and the alpha release pass. |
 | [testing/manual-checks.md](./testing/manual-checks.md) | Index of numbered, feature-specific manual acceptance checks. |
+| [testing/preview-retention.md](./testing/preview-retention.md) | Native preview retention acceptance, process measurements, and platform recovery limits. |
 | [testing/desktop-and-plugins.md](./testing/desktop-and-plugins.md) | Packaged shell, plugin installation, host webviews, and loaded plugin lifecycle checks. |
 | [testing/terminal-and-palette.md](./testing/terminal-and-palette.md) | Terminal keyboard and shared command palette checks. |
 | [testing/changes-and-large-surfaces.md](./testing/changes-and-large-surfaces.md) | Changes pane, large diff, transcript, and task restoration checks. |
@@ -121,8 +122,6 @@ Start with the plugin map, then follow the authoring guide or API reference.
   Rollbar, and GitHub list rows while keeping project and state scope.
 - [Native overlay layer requirements](./future/native-overlay-layer.md) — desktop overlays above
   live preview and plugin webviews, with native composition, input routing, and acceptance gates.
-- [Preview retention requirements](./future/preview-retention.md) — resume retained browser pages
-  without navigation, restore toolbar state, and assess background resource use and recovery.
 - [Outdated review comments](./future/outdated-review-comments.md) — hide outdated GitHub threads
   from the review code pane while preserving history and distinguishing current and historical locations.
 - `schemas/` — generated, versioned JSON Schemas that are pinned by a test and immutable by rule.

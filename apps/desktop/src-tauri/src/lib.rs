@@ -12,6 +12,9 @@ mod notifications;
 mod plugin_scheme;
 mod reset_stage;
 mod webviews;
+mod webview_target;
+#[cfg(feature = "agent-automation")]
+mod webview_diagnostics;
 
 #[cfg(all(feature = "agent-automation", not(debug_assertions)))]
 compile_error!(
@@ -151,14 +154,18 @@ pub fn run() {
             cli_install::cli_install,
             reset_stage::reset_export,
             reset_stage::reset_complete,
+            #[cfg(feature = "agent-automation")]
+            webview_diagnostics::webview_diagnostics,
+            #[cfg(feature = "agent-automation")]
+            webview_diagnostics::webview_trial_delay,
             webviews::webview_ensure,
             webviews::webview_bounds,
             webviews::webview_show,
             webviews::webview_hide,
-            webviews::webview_hide_family,
             webviews::webview_load,
             webviews::webview_command,
             webviews::webview_evict,
+            webviews::webview_evict_previews,
         ])
         .menu(menu::build)
         .on_menu_event(|app, event| menu::on_menu_event(app.app_handle(), event.id().as_ref()))

@@ -390,10 +390,14 @@ assertion covers the custody stack end to end. Two more check the gate: a socket
 is refused, and a plain HTTP request gets 426.
 
 It also prints how long the node took to start, from the helper's ready line to its `service.start`
-mark, and fails over 1,500 ms. That span is spawning the node, evaluating the service bundle, and
-the node's boot to a bound listener, about 270 ms on an M2 Pro. The bound is loose on purpose, since
-timing on a shared CI runner is noisy. It catches a change that adds seconds, and the printed number
-is the one to compare between builds.
+mark, and fails at 10,000 ms on Windows or 1,500 ms on other hosts. That span is spawning the node,
+evaluating the service bundle, and the node's boot to a bound listener. It measured about 270 ms on
+an M2 Pro and 2,705-5,126 ms on Windows CI on 2026-10-01. The bounds leave room for shared-runner
+variation while catching startup regressions. The desktop test command runs the boot test in a
+separate Vitest invocation after the unit suites, so their Git, database, and transformation work
+does not compete with the measured startup. `pnpm --filter @acorn/desktop test:boot` runs that
+invocation against staged files; Windows installer verification uses it against installed resources.
+Compare the printed number between builds on the same host.
 
 The Rust unit tests in `apps/desktop/src-tauri/src/` cover what a headless run cannot reach through
 the helper: the renderer CSP and the dev-only widening a packaged build must not carry, the traversal
@@ -1104,6 +1108,31 @@ when the annotation or rail contracts change.
      confirm that its switch and opener disappear, then re-enable it and confirm that the saved choice
      returns.
 148. In `acorn`, confirm that the hidden source is still listed in the terminal's source menu.
+
+Checks 149–154 cover Computer Use app-access approval ([managed-agents.md](./managed-agents.md)
+§ App-access approval). Run them on macOS with Computer Use installed, against a `dev:agent` session
+whose app has no saved grant. Record the codex-cli, Computer Use, macOS, and Acorn versions with the
+result.
+
+149. From a managed Codex session, ask the agent to read the test app's state through Computer Use,
+     addressing the path that `pnpm dev:agent:ui -- target` reports. Confirm that the card names
+     **Acorn Agent Test (com.acorn.desktop.agent-test)** and offers **Allow for this session**,
+     **Always allow**, and **Decline**. Reach **Always allow** with the keyboard alone. Save the
+     sanitized request `_meta` beside `plugins/agents/src/server/drivers/__fixtures__/codexComputerUseApproval.json`
+     and correct the fixture where the two differ.
+150. After **Always allow** in check 149, start a new managed session and ask again: no card appears.
+     Quit Acorn and Codex, start them again, and ask again: no card. Stop the session, start one with a
+     different name, and ask again: no card, because every session shares the identifier.
+151. In a fresh session, choose **Allow for this session**. Ask again in the same session: no card.
+     Ask in a new session: the card appears.
+152. Revoke the grant in the ChatGPT app's Computer Use settings. Ask again: the card appears, and the
+     old session's history still reads as it did. Note whether an action already running finished.
+153. With the installed Acorn and two `dev:agent` sessions open, have each session's agent address its
+     own `target` path. Confirm that each acts only on its own window, that `target` lists the other
+     session under `sharedWith`, and that a native menu in one window is reachable while the other
+     receives no input.
+154. Stop a session, then run `target` and `stop` against its name: both refuse. Start it again and
+     confirm that `target` reports the new process.
 
 Checks 96–99 passed on 2026-09-27 with an isolated `dev:agent` data root and a loaded fixture plugin.
 The Tauri window refreshed only that plugin after its push, cleared marks across disable, enable,

@@ -142,16 +142,18 @@ export type Notify = {
 // that is not mounted behind the gate.
 export type RecoveryActions = { openDataFolder(): void; quit(): void }
 
-// Browser-preview surface: a host-owned WebContentsView per task, positioned over the pane's rect.
+// The shell retains one preview per local task. Node switches retire every preview. Ensure replays
+// browsing state after observer registration and reconciles configured home independently of it.
 export type PreviewState = { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
 export type PreviewViews = {
   ensure(taskId: string, url: string): Promise<boolean>
   setBounds(taskId: string, rect: { x: number; y: number; width: number; height: number }): void
   show(taskId: string): void
-  hide(): void
+  hide(taskId: string): void
   load(taskId: string, url: string): void
   command(taskId: string, action: 'back' | 'forward' | 'reload' | 'stop' | 'devtools'): void
   evict(taskId: string): void
+  evictAll(): void
   onEvent(cb: (state: PreviewState) => void): () => void
 }
 

@@ -1,5 +1,5 @@
 // The preview plugin's client part (docs/plugins.md § The plugin API).
-import { activeTaskId, clientEvents, openPane, previewViews, type ClientPlugin, writeJson } from '@acorn/plugin-api/client'
+import { activeNodeId, activeTaskId, clientEvents, openPane, previewViews, type ClientPlugin, writeJson } from '@acorn/plugin-api/client'
 import { PREVIEW_RECIPE_SELECTION } from '@acorn/plugin-terminal/contract/previewSelection.ts'
 import { previewConfigured, previewConfiguredSchedule } from './configuredStore'
 import { previewPaneContribution } from './paneContribution'
@@ -42,6 +42,10 @@ export const previewClientPlugin: ClientPlugin = {
       },
     })
     // Drop an archived task's preview view. Every archive path raises this event.
+    clientEvents.on('runtime:node-switched', () => previewViews()?.evictAll())
+    clientEvents.on('runtime:node-removed', ({ nodeId }) => {
+      if (nodeId === activeNodeId()) previewViews()?.evictAll()
+    })
     clientEvents.on('runtime:task-archived', ({ taskId }) => previewViews()?.evict(taskId))
   },
 }
