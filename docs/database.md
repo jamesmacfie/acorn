@@ -22,6 +22,11 @@ normalizes cells, enforces timeouts and row caps, and closes the task pools the 
 plugin is disposed. The loaded plugin receives no URL, driver, socket, project-config grant,
 `DATABASE_URL` environment grant, or process broker.
 
+HTTP routes compare task IDs in CLI bodies, palette queries, and context requests with the verified
+principal carried by the host. A task credential can address only its signed task. Missing or foreign
+query scope returns `404 not_found` before task lookup, saved-query reads, SQL, or auto-connect.
+Device and service credentials retain access to any task; an absent task returns the same `404`.
+
 The plugin declares `secrets: false`, and that is not an oversight: because the URL is resolved per
 connect and never persisted, there is no credential at rest for the host secret service to hold.
 Instead it declares `data:query` and `data:write`. The first grants host-mediated reads and schema

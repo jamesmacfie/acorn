@@ -803,6 +803,7 @@ acorn-plugin-types: member TaskRunConfig.cwd
 acorn-plugin-types: member TaskRunConfig.error
 acorn-plugin-types: member TaskRunConfig.errors
 acorn-plugin-types: member TaskRunConfig.layouts
+acorn-plugin-types: member TaskRunConfig.repoConfigHash
 acorn-plugin-types: member TaskRunConfig.repoTargetIds
 acorn-plugin-types: member TaskRunConfig.targets
 acorn-plugin-types: member TelemetryBatch.node

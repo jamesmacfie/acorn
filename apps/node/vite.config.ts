@@ -39,6 +39,7 @@ export default defineConfig({
         service: resolve(__dirname, 'src/entries/service.ts'),
         mcp: resolve(__dirname, 'src/entries/mcp.ts'),
         standalone: resolve(__dirname, 'src/entries/standalone.ts'),
+        'archive-worker': resolve(__dirname, '../../packages/node-core/src/server/plugins/archiveWorker.ts'),
         'plugin-worker': resolve(__dirname, '../../packages/node-core/src/server/plugins/nodePluginWorker.ts'),
       },
       // Builtins and the few packages that have to be installed; everything else is bundled

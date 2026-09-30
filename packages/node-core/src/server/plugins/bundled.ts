@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { cpSync, existsSync, lstatSync, readdirSync, readFileSync, renameSync, rmSync, statSync } from 'node:fs'
+import { cpSync, existsSync, lstatSync, readdirSync, renameSync, rmSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { resolveInRoot } from '../core/fs'
 import { pluginDir, pluginInstallRoot, sweepDebris } from './installer'
@@ -10,6 +10,7 @@ import {
   readBundledPluginState,
 } from './bundledState'
 import { createLogger } from '../telemetry/logger'
+import { MAX_PLUGIN_FILE_BYTES, MAX_PLUGIN_PACKAGE_BYTES, MAX_PLUGIN_PACKAGE_DEPTH, MAX_PLUGIN_PACKAGE_ENTRIES, pluginDirectoryEntries, streamPluginFile, visitPluginFile } from './packageFiles'
 
 const log = createLogger('plugins')
 
@@ -23,23 +24,28 @@ export type BundledPluginReconcileResult = {
 
 const packageFingerprint = (root: string): string => {
   const hash = createHash('sha256')
-  const walk = (dir: string): void => {
-    for (const entry of readdirSync(dir, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+  let entries = 0
+  let bytes = 0
+  const walk = (dir: string, depth: number): void => {
+    if (depth > MAX_PLUGIN_PACKAGE_DEPTH) throw new Error('Bundled package exceeds its depth limit.')
+    for (const entry of pluginDirectoryEntries(dir, MAX_PLUGIN_PACKAGE_ENTRIES - entries).sort((a, b) => a.name.localeCompare(b.name))) {
+      if (++entries > MAX_PLUGIN_PACKAGE_ENTRIES) throw new Error('Bundled package exceeds its entry limit.')
       const path = join(dir, entry.name)
       const rel = relative(root, path)
       if (entry.isSymbolicLink()) throw new Error(`bundled package contains a symlink (${rel})`)
       if (entry.isDirectory()) {
         hash.update(`d\0${rel}\0`)
-        walk(path)
+        walk(path, depth + 1)
         continue
       }
       if (!entry.isFile()) throw new Error(`bundled package contains an unsupported entry (${rel})`)
-      const bytes = readFileSync(path)
-      hash.update(`f\0${rel}\0${bytes.byteLength}\0`)
-      hash.update(bytes)
+      visitPluginFile(root, path, Math.min(MAX_PLUGIN_FILE_BYTES, MAX_PLUGIN_PACKAGE_BYTES - bytes), (fd, stats) => {
+        hash.update(`f\0${rel}\0${stats.size}\0`)
+        bytes += streamPluginFile(fd, stats.size, Math.min(MAX_PLUGIN_FILE_BYTES, MAX_PLUGIN_PACKAGE_BYTES - bytes), (chunk) => hash.update(chunk))
+      })
     }
   }
-  walk(root)
+  walk(root, 0)
   return hash.digest('hex')
 }
 

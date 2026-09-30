@@ -432,9 +432,15 @@ sets `binaryType = 'arraybuffer'`, peels the node id, and hands the rest to
 that reads the session id and the one place the bytes become text. So a busy build's output crosses two
 process boundaries with two copies and no parse, where it used to be JSON-escaped once per attached
 socket on the node and stringified again here. Request and response bodies stay base64 in the JSON
-messages: nothing else on this wire is measured in frames per second, and the largest body measured,
-the agent snapshot's first page at about 2 MB on 2026-09-03, is an order of magnitude under the
-ceiling `apps/desktop/src/shell/wire.ts` names.
+messages. The helper accepts at most 16 MiB per incoming serialized request before JSON parsing,
+including base64 and envelope bytes. This accommodates an 8 MiB binary body with encoding overhead.
+An oversized request closes with WebSocket code 1009 before dispatch.
+
+This request limit does not restrict outgoing replies. Custody bounds an HTTP response body to
+64 MiB before the helper encodes it, which can produce about 85.4 MiB of base64 plus its envelope.
+The renderer uses the browser WebSocket API, which offers no native receive-message ceiling.
+The Node broker owns the HTTP response bound and the 8 MiB Node-event receive bound. Peer errors and
+late replies are contained by the helper, and closing it terminates its live sockets and watchdogs.
 
 The file dialogs are the folder picker, `pick_files`, and `save_file`. The last two carry bytes, not
 paths: the renderer sends a byte array to save and receives one per file it picked, base64 in both
@@ -815,6 +821,58 @@ standalone node is distributed separately as a tarball; it is not an npm package
 plus the boot test and the Rust suite before the bundler pass so a broken boot path fails in seconds
 rather than minutes. A tag builds and keeps its artifacts; publishing them is refused while the build
 is ad-hoc signed.
+
+### CI permissions and signing credentials
+
+Both GitHub Actions workflows grant the repository token only `contents: read`, and checkout does
+not persist its credentials. The jobs install, test, build, and upload run artifacts; they do not
+push repository changes or publish releases. Pull requests run the unsigned suites in
+`.github/workflows/ci.yml`. The desktop bundle workflow runs on main pushes, `v*` tags, and manual
+dispatches.
+
+The bundle job passes `TAURI_SIGNING_PRIVATE_KEY` only to its required-key check and distribution
+step, and passes `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` only to distribution. Setup, dependency
+installation, staging, tests, and artifact upload do not receive these signing variables. The
+distribution command runs repository build commands before signing, so those commands share the
+signing environment and must be trusted. Step scope reduces direct credential exposure; it does
+not isolate signing from a compromised build or earlier step.
+
+Action references use full commit hashes with version comments. To update one, verify the release
+commit in the action's upstream repository, review the change, and update the hash and comment
+together. The Rust toolchain action also sets `toolchain: stable` explicitly because pinning the
+action's code does not select or pin the compiler. For the underlying practices, see
+[GitHub's secure use reference](https://docs.github.com/en/actions/reference/security/secure-use).
+
+### Rust dependency security
+
+`apps/desktop/src-tauri/Cargo.lock` pins the shell's Rust dependency graph. The rustls dependency
+through `ureq` is 0.23.45, which fixes
+[RUSTSEC-2026-0285](https://rustsec.org/advisories/RUSTSEC-2026-0285.html). Acorn calls `ureq` in
+`app_scheme.rs` to proxy renderer content and in `dev_server.rs` to probe the development entry
+module. Both use the `ACORN_DEV_SERVER` origin read by `lib.rs`; the development launchers set a
+local HTTP origin. The packaged launch uses files unless that environment variable is supplied.
+The Node helper owns paired Node HTTPS connections, separately from this Rust client. The dependency
+finding does not establish exposure of those connections or a completed attacker handshake.
+
+The 2026-10-01 RustSec review reports zero vulnerabilities and seven informational warnings. One is
+[RUSTSEC-2024-0429](https://rustsec.org/advisories/RUSTSEC-2024-0429.html), an unsound string-array
+iterator in glib 0.18.5. This version enters through the Linux GTK 0.18 stack; the macOS and Windows
+target graphs do not include it. Acorn and the 26 reverse dependency source roots reviewed contain
+no calls to `VariantStrIter` or `array_iter_str` outside glib's own implementation, documentation,
+and tests. This source review does not prove runtime unreachability. Calling the affected iterator
+on a Linux build remains a crash risk. The published fix requires glib 0.20 or later, outside the
+GTK stack's 0.18 dependency constraint, and the registry has no patched 0.18 release. A maintained
+backport or coordinated GTK/Tauri migration needs Linux build and runtime validation.
+
+The other warnings identify unmaintained dependencies: `proc-macro-error` 1.0.4 through the Linux
+GTK/glib build macros, and five UNIC 0.9 crates through `urlpattern` 0.3 and `tauri-utils` 2.9.3.
+The UNIC crates are `unic-char-property`, `unic-char-range`, `unic-common`, `unic-ucd-ident`, and
+`unic-ucd-version`. Tauri uses URL patterns for remote capability contexts; Acorn's capability file
+grants only the local main webview. These advisories provide no patched releases. A
+[`tauri-utils` 2.10 migration](https://github.com/tauri-apps/tauri/releases/tag/tauri-utils-v2.10.0)
+changes the URL pattern dependency and raises its minimum Rust version to 1.90, beyond the desktop
+manifest's declared 1.82. Review that toolchain and framework migration
+separately. Keep these warnings visible in dependency audits until their upstream paths change.
 
 ### Signing gates and the updater
 

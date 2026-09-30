@@ -40,6 +40,7 @@ describe('HTTP credential isolation', () => {
     // builder stages inside the package for the real loader.
     ctx = makeTestNodeContext({
       plugin: { name: 'http' },
+      userId: 'alice',
       permissions: config.manifest.permissions.node,
     })
     // The manifest-bound storage seam, opened and migrated by the host, exactly as init() does at boot.
@@ -71,6 +72,7 @@ describe('HTTP credential isolation', () => {
   })
 
   afterEach(() => {
+    vi.unstubAllGlobals()
     ctx.cleanup()
   })
 
@@ -82,6 +84,30 @@ describe('HTTP credential isolation', () => {
     const context = await makeTestRequestContext({ plugin: 'http', principal: caller, env: ctx.env })
     return createHttpFetch(pluginDb, ctx.core)(new Request(`http://acorn.test${path}`, init), context)
   }
+
+  it.each([
+    { url: 'invalid {{TOKEN}}/{{TOKEN}}' },
+    { url: 'https://example.test/', headers: { 'X-Token': '{{TOKEN}}\ninvalid' } },
+  ])('keeps private preparation values out of route errors: $url', async (config) => {
+    const secret = 'SyntheticPrivatePreparationValue'
+    const created = await call(principal('alice'), '/projects/project-web/vars', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name: 'TOKEN', kind: 'secret', value: secret, enabled: true }),
+    })
+    expect(created.status).toBe(201)
+    const fetcher = vi.fn()
+    vi.stubGlobal('fetch', fetcher)
+    const route = await call(principal('alice'), '/projects/project-web/send', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...requestBody, method: 'GET', url: config.url, headers: Object.entries(config.headers ?? {}).map(([name, value]) => ({ name, value, enabled: true })), auth: { mode: 'none' }, vars: {}, bodyMode: 'none', body: '' }),
+    })
+    expect(route.status).toBe(422)
+    const envelope = await route.json()
+    expect(envelope).toMatchObject({ error: { code: 'send_failed' } })
+    expect(JSON.stringify(envelope)).not.toContain(secret)
+
+    expect(fetcher).not.toHaveBeenCalled()
+  })
 
   it('encrypts saved request payloads and returns them only to their owner', async () => {
     const created = await call(principal('alice'), '/projects/project-web/requests', {

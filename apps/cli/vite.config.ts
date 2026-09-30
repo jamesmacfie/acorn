@@ -9,7 +9,7 @@ export default defineConfig({
   build: {
     target: 'node22', outDir: 'dist', ssr: true, copyPublicDir: false, minify: false,
     rollupOptions: {
-      input: { cli: resolve(import.meta.dirname, 'src/main.ts') },
+      input: { cli: resolve(import.meta.dirname, 'src/main.ts'), 'archive-worker': resolve(import.meta.dirname, '../../packages/node-core/src/server/plugins/archiveWorker.ts') },
       external: (id: string) => builtins.has(id) || builtins.has(id.replace(/^node:/, '')),
       output: { format: 'es', entryFileNames: '[name].js', chunkFileNames: 'chunks/[name]-[hash].js' },
     },

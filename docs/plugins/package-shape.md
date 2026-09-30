@@ -85,7 +85,7 @@ Fourteen entrypoints:
 | `@acorn/plugin-api/client` | `ClientPlugin`, the API client and query options, client events, contribution types, task/workspace/fleet state, the design system's plain functions (`token`, the metrics, the status/display vocabulary), and `readLocal`/`writeLocal`/`clearLocal` for a per-device scrap such as an unsent draft |
 | `@acorn/plugin-api/ui` | Frame-safe presentation components: primitives (including the `ListDetail` two-column pane layout), `Icon`, `Picker` and its `PickerRow` for a list that opens from typing rather than from a button, `Menu` and its `RowActions` wrapper for the ellipsis menu on a list row, `Modal`, `Tabs`, `Markdown`, the diff rows, and `DiffPane` for the whole diff viewer. Also `attachPty`, which fills a `pty` rectangle from the channel the caller describes rather than from a box the host hands back ([terminal.md § Client](../terminal.md)), and `createTimelineWindow`, which picks the turns a long `Timeline` draws ([ui-design.md](../ui-design.md) § Grouping) |
 | `@acorn/plugin-api/ui/diff` | The diff row model, highlighter and find marks, plus the `DiffSource` port `DiffPane` is driven through and the diff-document types it is written in: a topology, segments of plain rows, and search pages, which a provider builds on its node ([diff-rendering.md](../diff-rendering.md) § The document). Also `createDiffSnippets`, the few lines around one anchor read from the segment that holds it, through the viewer's loader and node cache ([github-integration.md](../github-integration.md) § Conversation) |
-| `@acorn/plugin-api/ui/host` | Compiled-shell-only connected components and registration seams; never import this from an isolated frame |
+| `@acorn/plugin-api/ui/host` | Compiled-shell-only connected components, composed controls, and registration seams; never import this from an isolated frame |
 | `@acorn/plugin-api/ui/editor` | The host-owned CodeMirror surface: the theme, the view-state pair, and `languageForPath`, which is async because it downloads one grammar. Compiled panes only. The terminal client aliases it to a stub, because cells have no highlighter ([tui.md](../tui.md) § The host switch) |
 | `@acorn/plugin-api/ui/sdk` | The framework-free sandbox bridge, including API/state/UI calls and declared key claims, plus `mountFrame` and `mountTree`, the two render paths' entry points |
 | `@acorn/plugin-api/ui/tree` | The kit as nodes a remote tree writes in JSX, and the Solid adapter behind them. A tree imports this and never the `/ui` barrel |
@@ -100,8 +100,11 @@ The line between `/client`, `/ui`, and `/ui/host` is drawn by the runtime, not b
 compiles a component to code that touches `window` at module scope, so `/client` remains free of
 `.tsx`. The frame-safe `/ui` barrel exposes presentation components and helpers from the kit, plus
 selected feature-owned presentation adapters such as `DiffPane` and `attachPty`. Router, query, and
-registry-connected components sit on `/ui/host`. The facade is declared side-effect free so a frame
-bundle retains only the named presentation components it imports.
+registry-connected components sit on `/ui/host`. Compiled controls that compose kit nodes, such as
+`ModelPickerPopover` around a composer's model choices, also sit there. Its `above` and `children`
+props carry JSX, so it is not a remote-tree node or an export of the published remote SDK. The facade
+is declared side-effect free so a frame bundle retains only the named presentation components it
+imports.
 
 Boundary tests grep for those properties, and `packages/plugin-api/src/entrypoints.test.ts` executes
 them: it imports every entrypoint except `/ui`, `/ui/host` and `/ui/editor` in a node-environment

@@ -13,8 +13,9 @@
 // `process.stderr.write`, because thirty-one node tests spy on those two and a logger that wrote
 // underneath them would pass every one of those tests vacuously.
 import type { TelemetryAttrs } from '@acorn/protocol/telemetry.ts'
+import { ATTR_VALUE_MAX } from '@acorn/protocol/telemetry.ts'
 import { emitLog, onTelemetryBatch, PERF, flushTelemetry } from './collector'
-import { scrub } from './scrub'
+import { scrub, scrubAttrs, scrubLine } from './scrub'
 
 export type Logger = {
   debug(message: string, attrs?: TelemetryAttrs): void
@@ -23,14 +24,22 @@ export type Logger = {
   error(message: string, attrs?: TelemetryAttrs): void
 }
 
-/** `{ a: 1, b: 'x' }` becomes ` a=1 b=x`, so a line stays one line and stays greppable. Values are
- *  scrubbed by the collector on the record; here they are only shortened. */
+// Includes the tag, body, and attributes. The record retains its independent protocol field caps.
+const STDERR_LINE_MAX = 4_000
+const boundedLine = (line: string): string => {
+  if (Buffer.byteLength(line) <= STDERR_LINE_MAX) return line
+  const bytes = Buffer.allocUnsafe(STDERR_LINE_MAX)
+  const written = bytes.write(line)
+  return bytes.toString('utf8', 0, written)
+}
+
+/** `{ a: 1, b: 'x' }` becomes ` a=1 b=x`. The caller supplies scrubbed, bounded attributes. */
 const suffix = (attrs: TelemetryAttrs | undefined): string => {
   if (!attrs) return ''
   const parts: string[] = []
   for (const [key, value] of Object.entries(attrs)) {
     if (value === undefined || value === null) continue
-    parts.push(`${key}=${typeof value === 'string' ? scrub(value).slice(0, 200) : String(value)}`)
+    parts.push(`${key}=${typeof value === 'string' ? value.slice(0, 200) : String(value)}`)
   }
   return parts.length ? ` ${parts.join(' ')}` : ''
 }
@@ -43,11 +52,14 @@ const suffix = (attrs: TelemetryAttrs | undefined): string => {
  * worth having.
  */
 export function createLogger(tag: string, owner = 'core'): Logger {
+  const logger = scrubLine(tag, 'logger', ATTR_VALUE_MAX)
   const write = (level: 'debug' | 'info' | 'warn' | 'error', message: string, attrs?: TelemetryAttrs): void => {
-    const line = `[${tag}] ${message}${suffix(attrs)}`
+    const body = scrubLine(message)
+    const { attrs: clean, truncated } = scrubAttrs(attrs)
+    const line = boundedLine(`[${logger}] ${body}${suffix(clean)}`)
     if (level === 'warn') console.warn(line)
     else console.error(line)
-    emitLog(owner, { at: Date.now(), level, logger: tag, body: message, ...(attrs ? { attrs } : {}) })
+    emitLog(owner, { at: Date.now(), level, logger, body, ...(attrs ? { attrs: clean } : {}) }, truncated)
   }
   return {
     debug: (message, attrs) => write('debug', message, attrs),
@@ -79,7 +91,7 @@ export function describeError(error: unknown): { name: string; message: string }
 
 /** One line of `ACORN_PERF=1` output at the moment it happens. A no-op with the switch off. */
 export const perfLine = (text: string): void => {
-  if (PERF) console.error(text)
+  if (PERF) console.error(boundedLine(scrubLine(text)))
 }
 
 const ms = (value: number): string => value.toFixed(1)
@@ -102,7 +114,7 @@ export function installPerfSink(): void {
       if (record.kind !== 'metric' || typeof record.value === 'number') continue
       const value = record.value
       console.error(
-        `[perf] ${record.name} count=${value.count} total=${ms(value.sum)}ms`
+        `[perf] ${scrubLine(record.name, 'metric', ATTR_VALUE_MAX)} count=${value.count} total=${ms(value.sum)}ms`
         + ` mean=${ms(value.sum / Math.max(value.count, 1))}ms p50=${ms(value.p50)}ms`
         + ` p95=${ms(value.p95)}ms max=${ms(value.max)}ms`,
       )

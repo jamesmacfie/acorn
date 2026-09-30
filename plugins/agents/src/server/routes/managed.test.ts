@@ -1,5 +1,5 @@
 import { Hono } from 'hono'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AppEnv } from '@acorn/plugin-api/testkit'
 import type { Env } from '@acorn/plugin-api/testkit'
 import { managedAgents, setManagedAgentsBridge, type ManagedAgentsBridge } from './managed'
@@ -36,13 +36,13 @@ const unreached = (name: string) => () => {
   throw new Error(`bridge.${name} should not have been reached`)
 }
 const METHODS = [
-  'providers', 'uploadAttachment', 'attachment', 'removeAttachment', 'attachmentContent',
+  'runs', 'providers', 'uploadAttachment', 'attachment', 'removeAttachment', 'attachmentContent',
   'artifacts', 'artifact',
   'artifactContent', 'createSession', 'importTranscript', 'verifyImportedResume', 'listSessions',
   'snapshot', 'events', 'enqueueTurn', 'patchQueuedTurn', 'cancelTurn', 'resolveRequest',
   'implementCodexPlan',
   'patchSession', 'fork', 'compact', 'regenerateTitle', 'deleteSession', 'handoffToTerminal', 'resumeManaged',
-  'exportSession', 'wait', 'search', 'footprint', 'stopIdleNow',
+  'exportSession', 'wait', 'search', 'footprint', 'stopIdleNow', 'sessionMcp', 'setSessionMcp',
 ] as const
 
 const fake = (over: Partial<ManagedAgentsBridge> = {}): ManagedAgentsBridge =>
@@ -53,6 +53,85 @@ const fake = (over: Partial<ManagedAgentsBridge> = {}): ManagedAgentsBridge =>
     taskIdForArtifact: async (id: string) => OWNERS[ARTIFACTS[id] ?? ''] ?? null,
     ...over,
   }) as ManagedAgentsBridge
+
+const executionControls = [
+  ['GET', '/providers', undefined, 'providers'],
+  ['POST', '/sessions', { taskId: '00000000-0000-4000-8000-000000000001', providerId: 'fake', profileId: 'fake' }, 'createSession'],
+  ['POST', '/transcript-imports', { taskId: '00000000-0000-4000-8000-000000000001', providerId: 'fake', profileId: 'fake', content: 'transcript' }, 'importTranscript'],
+  ['PATCH', '/sessions/s1', { config: { configOptions: [{ id: 'permissions', currentValue: 'full' }] } }, 'patchSession'],
+  ['DELETE', '/sessions/s1', undefined, 'deleteSession'],
+  ['POST', '/sessions/s1/turns', { input: [{ type: 'text', text: 'prompt' }], effectivePolicy: { permissions: 'full' } }, 'enqueueTurn'],
+  ['POST', '/sessions/s1/implement-plan', { itemId: 'plan' }, 'implementCodexPlan'],
+  ['PATCH', '/sessions/s1/turns/t1', { ordinal: 0 }, 'patchQueuedTurn'],
+  ['POST', '/sessions/s1/requests/r1/resolve', { resolution: { decision: 'accept' } }, 'resolveRequest'],
+  ['POST', '/sessions/s1/fork', {}, 'fork'],
+  ['POST', '/sessions/s1/compact', undefined, 'compact'],
+  ['POST', '/sessions/s1/regenerate-title', undefined, 'regenerateTitle'],
+  ['POST', '/sessions/s1/handoff-terminal', undefined, 'handoffToTerminal'],
+  ['POST', '/sessions/s1/resume-managed', undefined, 'resumeManaged'],
+  ['POST', '/sessions/s1/verify-imported-resume', undefined, 'verifyImportedResume'],
+  ['GET', '/sessions/s1/mcp', undefined, 'sessionMcp'],
+  ['PUT', '/sessions/s1/mcp', { enabled: [] }, 'setSessionMcp'],
+] as const
+
+describe('managed execution requires device authority', () => {
+  afterEach(() => setManagedAgentsBridge(null))
+
+  it.each(executionControls)('denies internal callers before runtime access: %s %s', async (method, path, body) => {
+    const ownership = vi.fn(unreached('taskIdForSession'))
+    setManagedAgentsBridge(fake({ taskIdForSession: ownership }))
+    // Creation/import name this exact signed task in the body, not a foreign task denial.
+    const taskId = body && 'taskId' in body ? body.taskId : 'task1'
+    const base = { kind: 'internal', userId: 'james', scope: 'task', taskId }
+    for (const principal of [base,
+      { ...base, sessionId: 's1', toolCeiling: { maxRisk: 'read' } },
+      { ...base, sessionId: 'workflow-session' },
+      { ...base, sessionId: 'sibling-session' },
+      { kind: 'internal', userId: 'james', scope: 'service' },
+    ]) {
+      expect((await as(principal).fetch(req(`/api${path}`, method, body), {} as Env)).status).toBe(403)
+    }
+    expect(ownership).not.toHaveBeenCalled()
+  })
+
+  it.each(executionControls)('lets a device reach the control: %s %s', async (method, path, body, operation) => {
+    const called = vi.fn(async () => ({}))
+    setManagedAgentsBridge(fake({ [operation]: called }))
+    expect((await authed().fetch(req(`/api${path}`, method, body), {} as Env)).status).toBe(200)
+    expect(called).toHaveBeenCalledOnce()
+  })
+
+  it.each(['permission', 'question', 'elicitation'])('keeps %s decisions with the device', async (kind) => {
+    setManagedAgentsBridge(fake())
+    expect((await asTask1().fetch(req('/api/sessions/s1/requests/r1/resolve', 'POST', {
+      resolution: { kind, answer: 'approved' },
+    }), {} as Env)).status).toBe(403)
+  })
+
+  it('denies task access to node-wide runs while preserving device and service aggregation', async () => {
+    const rows = { runs: [{ id: 'foreign-session', taskId: 'task2' }, { id: 'missing-task' }] }
+    const runs = vi.fn(async () => rows as never)
+    setManagedAgentsBridge(fake({ runs }))
+    expect((await asTask1().fetch(req('/api/runs'), {} as Env)).status).toBe(403)
+    expect(runs).not.toHaveBeenCalled()
+    for (const app of [authed(), asService()]) {
+      const response = await app.fetch(req('/api/runs'), {} as Env)
+      expect(response.status).toBe(200)
+      expect(await response.json()).toEqual(rows)
+    }
+    expect(runs).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps cancellation available within the task boundary', async () => {
+    const cancel = vi.fn(async () => {})
+    setManagedAgentsBridge(fake({ cancelTurn: cancel }))
+    const app = asTask1()
+    expect((await app.fetch(req('/api/sessions/s1/cancel', 'POST', {}), {} as Env)).status).toBe(200)
+    expect((await app.fetch(req('/api/sessions/s1/turns/t1', 'DELETE'), {} as Env)).status).toBe(200)
+    expect((await app.fetch(req('/api/sessions/s2/cancel', 'POST', {}), {} as Env)).status).toBe(404)
+    expect(cancel).toHaveBeenCalledTimes(2)
+  })
+})
 
 describe('a task-scoped credential is confined to its own agent sessions', () => {
   afterEach(() => setManagedAgentsBridge(null))
@@ -67,13 +146,13 @@ describe('a task-scoped credential is confined to its own agent sessions', () =>
       expect((await app.fetch(req(`/api/sessions/${sessionId}/export`), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/sessions/${sessionId}/artifacts`), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/sessions/${sessionId}/cancel`, 'POST', {}), {} as Env)).status).toBe(404)
-      expect((await app.fetch(req(`/api/sessions/${sessionId}/fork`, 'POST', {}), {} as Env)).status).toBe(404)
-      expect((await app.fetch(req(`/api/sessions/${sessionId}/compact`, 'POST'), {} as Env)).status).toBe(404)
-      expect((await app.fetch(req(`/api/sessions/${sessionId}/regenerate-title`, 'POST'), {} as Env)).status).toBe(404)
-      expect((await app.fetch(req(`/api/sessions/${sessionId}/handoff-terminal`, 'POST'), {} as Env)).status).toBe(404)
-      expect((await app.fetch(req(`/api/sessions/${sessionId}/turns`, 'POST', { input: [{ type: 'text', text: 'x' }] }), {} as Env)).status).toBe(404)
-      expect((await app.fetch(req(`/api/sessions/${sessionId}`, 'PATCH', { title: 'stolen' }), {} as Env)).status).toBe(404)
-      expect((await app.fetch(req(`/api/sessions/${sessionId}`, 'DELETE'), {} as Env)).status).toBe(404)
+      expect((await app.fetch(req(`/api/sessions/${sessionId}/fork`, 'POST', {}), {} as Env)).status).toBe(403)
+      expect((await app.fetch(req(`/api/sessions/${sessionId}/compact`, 'POST'), {} as Env)).status).toBe(403)
+      expect((await app.fetch(req(`/api/sessions/${sessionId}/regenerate-title`, 'POST'), {} as Env)).status).toBe(403)
+      expect((await app.fetch(req(`/api/sessions/${sessionId}/handoff-terminal`, 'POST'), {} as Env)).status).toBe(403)
+      expect((await app.fetch(req(`/api/sessions/${sessionId}/turns`, 'POST', { input: [{ type: 'text', text: 'x' }] }), {} as Env)).status).toBe(403)
+      expect((await app.fetch(req(`/api/sessions/${sessionId}`, 'PATCH', { title: 'stolen' }), {} as Env)).status).toBe(403)
+      expect((await app.fetch(req(`/api/sessions/${sessionId}`, 'DELETE'), {} as Env)).status).toBe(403)
     }
   })
 
@@ -84,20 +163,19 @@ describe('a task-scoped credential is confined to its own agent sessions', () =>
     expect(seen).toEqual(['s1'])
   })
 
-  it('regenerates the title only through the owning session', async () => {
+  it('lets a device regenerate the title', async () => {
     const seen: string[] = []
     setManagedAgentsBridge(fake({ regenerateTitle: async (id) => (seen.push(id), { id } as never) }))
-    const response = await asTask1().fetch(req('/api/sessions/s1/regenerate-title', 'POST'), {} as Env)
+    const response = await authed().fetch(req('/api/sessions/s1/regenerate-title', 'POST'), {} as Env)
     expect(response.status).toBe(200)
     expect(seen).toEqual(['s1'])
   })
 
-  it('confines plan implementation to the owning session', async () => {
+  it('lets a device implement a plan', async () => {
     const seen: string[] = []
     setManagedAgentsBridge(fake({ implementCodexPlan: async (id, itemId) =>
       (seen.push(`${id}:${itemId}`), { id: 'turn' } as never) }))
-    const app = asTask1()
-    expect((await app.fetch(req('/api/sessions/s2/implement-plan', 'POST', { itemId: 'plan-1' }), {} as Env)).status).toBe(404)
+    const app = authed()
     expect((await app.fetch(req('/api/sessions/s1/implement-plan', 'POST', { itemId: 'plan-1' }), {} as Env)).status).toBe(200)
     expect(seen).toEqual(['s1:plan-1'])
   })
@@ -110,8 +188,8 @@ describe('a task-scoped credential is confined to its own agent sessions', () =>
     }))
     const app = asTask1()
     const create = { taskId: '00000000-0000-4000-8000-000000000002', providerId: 'claude', profileId: 'p' }
-    expect((await app.fetch(req('/api/sessions', 'POST', create), {} as Env)).status).toBe(404)
-    expect((await app.fetch(req('/api/transcript-imports', 'POST', { ...create, content: 'hi' }), {} as Env)).status).toBe(404)
+    expect((await app.fetch(req('/api/sessions', 'POST', create), {} as Env)).status).toBe(403)
+    expect((await app.fetch(req('/api/transcript-imports', 'POST', { ...create, content: 'hi' }), {} as Env)).status).toBe(403)
     expect(started).toEqual([])
   })
 
@@ -174,6 +252,19 @@ describe('a task-scoped credential is confined to its own agent sessions', () =>
     expect((await app.fetch(req(`/api/sessions?taskId=${other}`), {} as Env)).status).toBe(404)
     expect((await app.fetch(req(`/api/sessions/search?q=hi&taskId=${other}`), {} as Env)).status).toBe(404)
     expect(filters).toHaveLength(2)
+  })
+
+  it('allows an explicit own-task query filter', async () => {
+    const taskId = '00000000-0000-4000-8000-000000000001'
+    const filters: unknown[] = []
+    setManagedAgentsBridge(fake({
+      listSessions: async (filter) => (filters.push(filter), { sessions: [], delegations: [], nextCursor: null }),
+      search: async (_q, filter) => (filters.push(filter), []),
+    }))
+    const app = as({ kind: 'internal', userId: 'james', scope: 'task', taskId })
+    expect((await app.fetch(req(`/api/sessions?taskId=${taskId}`), {} as Env)).status).toBe(200)
+    expect((await app.fetch(req(`/api/sessions/search?q=hi&taskId=${taskId}`), {} as Env)).status).toBe(200)
+    expect(filters).toEqual([{ taskId }, { taskId }])
   })
 
   it('leaves /sessions/search reachable, despite colliding with /sessions/:sessionId', async () => {

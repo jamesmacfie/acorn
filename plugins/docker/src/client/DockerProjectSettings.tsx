@@ -1,5 +1,5 @@
-// A project page's Docker tab: the `[docker]` matcher keys that decide which containers a task on this
-// project is linked to, as the node reads them from the project's checkout and the home config
+// A project page's Docker tab: the `[docker]` hints for the device's task summary,
+// as the node reads them from the project's checkout and the home config
 // (../server/dockerConfig.ts). Read only: the keys live in `.acorn/config.toml`, a file the repo
 // commits, and the tab says where to change them rather than writing a committed file for the person.
 import { createResource, Show } from 'solid-js'
@@ -12,7 +12,7 @@ type ProjectScope = { context: { scope: { project?: { id: string; name: string; 
 const KEYS: Array<{ key: keyof DockerMatcherKeys; label: string; description: string; shown: (keys: DockerMatcherKeys) => string }> = [
   {
     key: 'composeProject', label: 'Compose project',
-    description: 'Always link this compose project\'s containers to the task.',
+    description: 'Suggest this Compose project in the task summary when container worktree metadata is absent.',
     shown: (keys) => keys.composeProject ?? 'None',
   },
   {
@@ -22,7 +22,7 @@ const KEYS: Array<{ key: keyof DockerMatcherKeys; label: string; description: st
   },
   {
     key: 'matchName', label: 'Match container names',
-    description: 'Link a container whose name holds the branch slug.',
+    description: 'Suggest containers whose names contain the branch slug.',
     shown: (keys) => (keys.matchName ? 'On' : 'Off'),
   },
 ]
@@ -40,7 +40,7 @@ export default function DockerProjectSettings(props: ProjectScope) {
     <SettingsSection
       id="docker-matcher"
       label="Task linking"
-      description="Containers started from a task's worktree by compose are linked to it on their own. These keys widen or narrow that match for this project."
+      description="Compose worktree metadata determines task listings and cleanup. These keys add hints to the task summary; they do not authorize cleanup."
     >
       <Show when={!matcher.error} fallback={<Text tone="danger" wrap>Could not read this project's Docker keys from the node.</Text>}>
         <Show when={matcher.latest}>
@@ -57,7 +57,7 @@ export default function DockerProjectSettings(props: ProjectScope) {
         layout="stacked"
       >
         <CodeBlock size="xs" copy>{`[docker]
-compose_project = "myproject"   # always link this compose project's containers
+compose_project = "myproject"   # suggest this project in the task summary
 match_labels = ["acorn.task"]   # label keys whose value equals the task's branch slug
 match_name = true               # allow the branch-slug-in-name fallback`}</CodeBlock>
       </SettingRow>

@@ -1,7 +1,7 @@
 // Filesystem confinement: one canonical implementation (docs/security.md § Process, path, and
 // configuration controls). resolveInRoot is lexical and symlink aware; a lexical-only check lets a
 // worktree symlink escape its root.
-import { existsSync, realpathSync } from 'node:fs'
+import { lstatSync, realpathSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
 import { dirname, isAbsolute, resolve, sep } from 'node:path'
 
@@ -12,12 +12,24 @@ export { isContainedPath, isValidRepoIdent } from '../worktrees/pathGuards'
 // of the nearest existing ancestor and requires it to stay within root's real path. It checks the
 // ancestor because the target may not exist yet on a new-file write.
 export function resolveInRoot(root: string, relPath: string): string | null {
+  if (isAbsolute(relPath)) return null
+  root = resolve(root)
   const abs = resolve(root, relPath)
   if (abs !== root && !abs.startsWith(root + sep)) return null
   try {
     const realRoot = realpathSync(root)
     let probe = abs
-    while (probe !== root && !existsSync(probe)) probe = dirname(probe)
+    // lstat sees a dangling symlink as an existing entry. Skipping it with existsSync would
+    // approve its parent, then let a new-file write follow the link out of the root.
+    while (probe !== root) {
+      try {
+        lstatSync(probe)
+        break
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ENOENT') return null
+        probe = dirname(probe)
+      }
+    }
     const real = realpathSync(probe)
     return real === realRoot || real.startsWith(realRoot + sep) ? abs : null
   } catch {

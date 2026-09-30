@@ -82,12 +82,32 @@ makes that class of bug a compile error now: it derives the wire union, the auth
 with two `Covers<>` assertions that fail the build the moment a verb lands on the wire without a row on
 either surface, or gains a surface row the wire does not carry.
 
-Three verbs are named in that file as asking nothing of the services bag: `cancel`, which makes the
-broker drop its own record of an in-flight request, `connected`, which is the frame's evidence that
+Three verbs are named in that file as asking nothing of the services bag: `cancel`, which releases
+a request's reply ID and aborts its API signal, `connected`, which is the frame's evidence that
 it evaluated, and `telemetry`, which the broker emits through the emitter it already holds for its
 own histograms ([telemetry.md](../telemetry.md) § A frame's own records). A record is not an effect
 on the shell, so routing it through `FrameServices` would mean threading an implementation through
 `PluginFrame.tsx` and the worker path to buy nothing.
+
+### Request lifetime
+
+The bridge reserves a request ID until its API, state, document, or webview handler settles or the
+request is cancelled.
+A non-cancel message that reuses a live ID closes the bridge before dispatch. The host sends no reply
+for the duplicate because that reply could settle the original SDK promise. Completed or cancelled
+IDs can be reused. A completion may reply or release its reservation only while it owns that exact ID.
+
+Cancellation and disposal suppress late replies. API calls receive an abort signal. State writes,
+document flushes, and native webview commands have no abort interface, so cancellation does not undo
+an effect already issued. Cancellation releases the reply ID for reuse, but the operation counts
+against the cap on outstanding work until its handler settles, even if an API service ignores abort.
+Disposal aborts every active API signal, clears reply ownership and work accounting for the closed
+bridge, and suppresses late completions without waiting for native effects.
+
+The host closes a bridge after more than 1,000 messages in a ten-second window, or when any message
+arrives while 100 handlers are outstanding on that live bridge, including cancelled handlers that
+have not settled. The latter also applies to cancellation at the cap.
+The SDK uses distinct request IDs, including for cancellation messages.
 
 ### Binary bridge calls
 

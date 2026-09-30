@@ -2,7 +2,10 @@ import { existsSync, realpathSync } from 'node:fs'
 import { Worker as NodeWorker } from 'node:worker_threads'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { builtinModules } from 'node:module'
 import { _setWorkerFactory } from '@acorn/client-core/host/tree/workerHost.ts'
+import { assertSupportedNodeRuntime } from '@acorn/protocol/nodeRuntime.ts'
+import { pluginBuiltinAllowed } from '@acorn/protocol/plugin/nodeBuiltins.ts'
 import { bundlePath } from './custody'
 
 // How a loaded plugin runs here: one `node:worker_threads` worker per bundle, under `--permission`
@@ -42,6 +45,7 @@ type WorkerLike = {
 }
 
 function spawn(url: string): WorkerLike {
+  assertSupportedNodeRuntime(process.versions.node)
   // The host addresses a bundle by hash and never by path, on every host (docs/security.md §
   // Third-party plugin bundles). Here the path is looked up from the hash rather than passed in.
   const hash = url.slice(url.lastIndexOf('/') + 1).replace(/\.js$/, '')
@@ -54,7 +58,15 @@ function spawn(url: string): WorkerLike {
   const bootstrap = realpathSync(bootstrapPath())
 
   const worker = new NodeWorker(bootstrap, {
-    workerData: { bundle },
+    // Compute the shared policy in the trusted host: the standalone bootstrap needs no additional
+    // readable policy file or bundled chunk. Client presentation code has no sockets or exec grant.
+    workerData: {
+      bundle,
+      builtins: builtinModules.filter((name) => pluginBuiltinAllowed(name, { sockets: false, exec: false }))
+        .map((name) => name.replace(/^node:/, '')),
+    },
+    // Client consent grants no workstation environment access. This is set before module evaluation.
+    env: {},
     // No filesystem beyond these two files, no child processes, no native addons, no nested workers.
     // The flags are the worker's own: Node applies `execArgv` to the thread, so the parent's lack of
     // a permission model is not inherited in the other direction.

@@ -295,6 +295,12 @@ which means a batch costs its own ops rather than the tree it is applied to — 
 5,000-node cap is 71 ms rather than the 1.1 seconds the earlier scan-every-node walk took
 (measured 2026-09-03).
 
+After simulating all operations, the host walks the final projected tree once to check every node's
+depth, including descendants of moved subtrees. Unknown nodes and cycles refuse the whole batch.
+Ancestor checks stop at the depth cap. A batch may temporarily deepen descendants before moving or
+removing them again, because rendering sees only its validated final state. Subtree deletion uses an
+iterative walk, so cleanup does not recurse through a temporary deep tree.
+
 **Twelve events, host to sandbox**: `onPress`, `onChange` (the committed value), `onSubmit`,
 `onSelect`, `onActivate`, `onToggle`, `onOpenChange`, `onExpand`, `onDismiss`, `onPick`, `onRemove`,
 `onConfirm`.
@@ -342,8 +348,14 @@ shell's DOM:
   use the renderer as a memory bomb. The host checks message depth and size before recursive parsing
   and measures batch bytes itself instead of trusting the sandbox's `bytes` field. Past a cap the batch
   is dropped and recorded.
-- **Rate**: batches are coalesced per frame on the host side. A sandbox that floods is throttled, not
-  trusted.
+- **Pending updates**: the host checks the combined queue before appending each incoming batch.
+  The queue has the same 4,000-mutation and 1 MiB limits, measured as UTF-8 JSON bytes. Overflow clears
+  the whole queue, cancels its scheduled flush, records one refusal, and fails that mounted tree.
+  Later updates to that mount are ignored. Remount the tree to establish a fresh state agreement.
+  Disposal also clears the queue, and callbacks already in delivery cannot apply updates afterward.
+- **Scheduling**: batches coalesce per animation frame on the desktop and per timer turn in the
+  terminal. A hidden desktop window flushes on a zero-delay timer. A visible window also has a
+  100 ms timer fallback if its animation frame stalls.
 
 The version travels in the handshake (`TREE_PROTOCOL_VERSION`), and a mismatch leaves the contribution
 empty rather than crashing the host. `packages/protocol/src/tree/nodes.ts` carries the node names, the

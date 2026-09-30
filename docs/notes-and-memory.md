@@ -72,6 +72,13 @@ stats survive reconciliation because rows are keyed by a content-hash id.
 
 ### The Memory page
 
+Memory list and search routes constrain a task credential's `projectId` to the signed task's project.
+The plugin resolves the task and project through core services before reconciling or querying the
+memory index. Foreign scope, missing task or referenced project state, and scope lookup failures return the same
+`404 not_found`. Omitted `projectId` reads only shared private memories for an existing task.
+Device and service credentials can select any project or the private-only scope. Agent read tools
+derive project scope from their host-supplied task instead of accepting a project ID from tool input.
+
 Memory has a project-scoped rail page in `plugins/memory/src/client/MemoryCenter.tsx`. It shows
 Findings review bundles above accepted memories. The memory list includes entries for the routed
 project and private entries, which apply everywhere. The page filters the fetched list by name or

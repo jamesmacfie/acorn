@@ -46,6 +46,8 @@ const isAliased = (id: string) => id === '@solidjs/router' || id === 'lucide-sta
   || id === '@xterm/xterm' || id.startsWith('@xterm/xterm/')
   || id === '@xterm/addon-fit' || id === '@xterm/addon-webgl'
   || id === 'shiki' || id.startsWith('shiki/')
+// Archive-only entry bundles its parser closure; none of these packages enters startup.
+const isArchivePackage = (id: string) => ['tar', '@isaacs/fs-minipass', 'chownr', 'minipass', 'minizlib', 'yallist'].some((name) => id === name || id.startsWith(`${name}/`))
 const externalizeBareImports = (id: string) =>
   !id.startsWith('.') && !isAbsolute(id) && !isWorkspacePackage(id) && !isReactiveRuntime(id) && !isAliased(id)
 
@@ -138,9 +140,10 @@ export default defineConfig({
         // The plugin sandbox's bootstrap, emitted beside `main.js` because a worker is pointed at it
         // by path and it has to be one file a thread with almost no filesystem can read. Its own
         // entry rather than a chunk, so its name is stable and `workerFactory.ts` can spell it.
+        'archive-worker': resolve(import.meta.dirname, '../../packages/node-core/src/server/plugins/archiveWorker.ts'),
         pluginWorker: resolve(import.meta.dirname, 'src/plugins/pluginWorker.js'),
       },
-      external: (id: string) => externalizeBareImports(id) || builtinModules.includes(id.replace(/^node:/, '')),
+      external: (id: string) => (!isArchivePackage(id) && externalizeBareImports(id)) || builtinModules.includes(id.replace(/^node:/, '')),
       output: {
         format: 'es',
         entryFileNames: '[name].js',

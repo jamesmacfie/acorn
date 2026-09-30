@@ -384,6 +384,11 @@ table beside another plugin's. See [the dashboards doc](./dashboards.md). Each p
 all-or-nothing rather than sanitising field by field, because a half-accepted answer renders as
 complete and is not. Adding to this list means naming the same argument: untrusted wire, host-drawn.
 
+Runtime dependency security floors live in the root `package.json` overrides. The standalone packer
+carries them into npm's manifest; `tools/arch/dependencySecurity.test.ts` checks that pnpm's runtime
+overrides agree. See [dependency security policy](./node-distribution.md#dependency-security-policy)
+for direct dependency references and the standalone install's reproducibility limits.
+
 ## Product model
 
 ```text

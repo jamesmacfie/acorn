@@ -1,7 +1,8 @@
 import { Show } from 'solid-js'
 import {
-  ConfirmButton, Icon, Inline, ModelBackendPicker, ModelPickerPopover,
+  ConfirmButton, Icon, Inline, ModelBackendPicker,
 } from '@acorn/plugin-api/ui'
+import { ModelPickerPopover } from '@acorn/plugin-api/ui/host'
 import type { ChangesModel } from './changesModel'
 
 // "Write it for me", at the left of the commit toolbar where Zed's is.

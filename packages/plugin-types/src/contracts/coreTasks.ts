@@ -36,8 +36,9 @@ export type LayoutRecipe = {
   terminal?: string
   browser?: string
 }
+// repoConfigHash identifies the captured bytes used to parse repo-authored targets.
 export type TaskRunConfig =
-  | { targets: RunTarget[]; cwd: string; errors: { source: string; message: string }[]; layouts: LayoutRecipe[]; repoTargetIds: string[] }
+  | { targets: RunTarget[]; cwd: string; errors: { source: string; message: string }[]; layouts: LayoutRecipe[]; repoTargetIds: string[]; repoConfigHash: string | null }
   | { error: string }
 
 export type CoreTaskService = {

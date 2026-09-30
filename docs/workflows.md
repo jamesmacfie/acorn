@@ -66,11 +66,15 @@ the palette searches.
 so starting a run from one hashes the snapshot and asks for an acknowledgement. A row was typed by
 the node's owner in this app, behind the device gate, so there are no committed bytes to hash and the
 snapshot check does not apply. That is the whole reason every route under `/v1/p/workflows/defs` is
-device-only, and the reason a start by id refuses a row to a task-confined caller: an agent inside a
-run may start a file, because the snapshot covers it, and may not start a row.
+device-only. Task credentials can list file definitions for their own task, but cannot read the
+database definitions or create a root run through HTTP.
 
 **Starting by id.** `POST /v1/p/workflows/tasks/:id/workflows` takes `{ defId }` and optional typed
-inputs. Inline definition bodies are refused. A `defId` of `repo:<fileId>` or `user:<fileId>` names a file the task's project loads;
+inputs and requires a device principal before reading the body. Task and service credentials are
+refused for every definition layer. A root start creates fresh tool authority, budget, deadline,
+and cancellation lineage; repository trust alone does not preserve the calling agent's limits.
+Trusted schedules and frozen child dispatch use their admission capabilities directly.
+Inline definition bodies are refused. A `defId` of `repo:<fileId>` or `user:<fileId>` names a file the task's project loads;
 anything else names a row. The node resolves it and applies the layer's own rule, which is stronger
 than trusting a `source` field in the request body.
 

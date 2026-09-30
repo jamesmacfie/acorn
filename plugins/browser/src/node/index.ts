@@ -1,4 +1,5 @@
 import type { NodePlugin, PluginFetchHandler } from '@acorn/plugin-api/node'
+import { principalMayActOnTask } from '@acorn/plugin-api/node'
 import { captureStore } from '../server/captures'
 import { browserAgentTools } from '../server/agentTools'
 import { BrowserPool } from '../server/driver'
@@ -22,10 +23,10 @@ export const browserPlugin = (): NodePlugin => {
 
   // One route, read only: the bytes a screenshot produced. Nothing writes through HTTP, because a
   // capture exists only because a tool call made one.
-  const serveCapture: PluginFetchHandler = async (request) => {
+  const serveCapture: PluginFetchHandler = async (request, context) => {
     const id = new URL(request.url, 'http://node').pathname.split('/').pop() ?? ''
     const capture = await captures.current?.read(id)
-    if (!capture) return new Response(null, { status: 404 })
+    if (!capture || !principalMayActOnTask(context.principal, capture.taskId)) return new Response(null, { status: 404 })
     return new Response(new Uint8Array(capture.bytes), {
       headers: {
         'content-type': capture.mime,

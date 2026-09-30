@@ -181,7 +181,9 @@ A project's `.acorn/config.toml`, committed or personal, may list `copy` paths: 
 usually gitignored (`.env.local` and similar), copied into a freshly created worktree so it works
 without a setup script. Missing sources warn rather than fail worktree creation, existing targets
 are never overwritten, and a repo's list wins over a personal one outright rather than merging with
-it.
+it. Both source and destination use the canonical task-root path guard: links outside either root
+and dangling links are rejected with a warning. Sources must be regular files; safe aliases inside
+the roots remain supported. Existing destination entries, including links, are never replaced.
 
 ### Worktree status reads
 

@@ -238,9 +238,10 @@ export function readCommittedConfig(repoDir: string): ProjectRepoConfig | null {
 
 // Read + merge the layers. Repo overrides user overrides DB; run targets and layouts merge by id
 // (repo's id wins), scripts/copy are per-field.
-export function loadRepoConfig(repoDir: string | null, userConfigDir: string | null, db: DbConfigFallback): RepoConfig {
+export function loadRepoConfig(repoDir: string | null, userConfigDir: string | null, db: DbConfigFallback, repoText?: string | null): RepoConfig {
   const errors: ConfigError[] = []
-  const repo = readLayer(repoDir, 'repo', errors)
+  // A supplied snapshot is parsed verbatim; null means the captured snapshot had no config file.
+  const repo = repoText === undefined ? readLayer(repoDir, 'repo', errors) : repoText === null ? null : parseLayer(repoText, 'repo', errors)
   const user = readLayer(userConfigDir, 'user', errors)
 
   const run = new Map<string, RunTarget>()

@@ -1,9 +1,11 @@
+import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestDb, type TestDb } from '../testkit/db'
 import { schema } from './db'
+import { taskRunConfig } from './worktrees/taskWorktree'
 import { acknowledgeRepoConfig, assertProjectRepoConfigTrusted, assertRepoConfigTrusted, readRepoConfigSnapshot, RepoConfigTrustError, repoConfigTrustReview } from './repoConfigTrust'
 
 describe('repo config trust', () => {
@@ -45,6 +47,43 @@ describe('repo config trust', () => {
     const trusted = await acknowledgeRepoConfig(testDb.db, 'task1', snapshot.hash)
     expect(trusted.trusted).toBe(true)
     await expect(assertRepoConfigTrusted(testDb.db, 'task1')).resolves.toBeUndefined()
+  })
+
+  it('binds run-target selection to its captured snapshot and rejects stale or missing snapshots', async () => {
+    // Branchless tasks intentionally share the checkout; no Git process or command is executed.
+    await testDb.db.update(schema.tasks).set({ branch: null })
+    const config = join(repo, '.acorn', 'config.toml')
+    const approvedText = '[scripts.run.dev]\ncommand = "approved-command"\n'
+    writeFileSync(config, approvedText)
+    const approved = readRepoConfigSnapshot(repo)!
+    await acknowledgeRepoConfig(testDb.db, 'task1', approved.hash)
+    const loaded = await taskRunConfig(testDb.db, 'task1')
+    expect(loaded).toMatchObject({
+      targets: [{ id: 'dev', command: 'approved-command' }],
+      repoTargetIds: ['dev'], repoConfigHash: approved.hash,
+    })
+    await expect(assertRepoConfigTrusted(testDb.db, 'task1', approved.hash)).resolves.toBeUndefined()
+
+    writeFileSync(config, '[scripts.run.dev]\ncommand = "unreviewed-command"\n')
+    const selected = await taskRunConfig(testDb.db, 'task1')
+    if ('error' in selected || !selected.repoConfigHash) throw new Error('Missing selected snapshot')
+    await expect(assertRepoConfigTrusted(testDb.db, 'task1', selected.repoConfigHash)).rejects.toBeInstanceOf(RepoConfigTrustError)
+    // Restoring acknowledged bytes must not authorize the previously selected unreviewed command.
+    writeFileSync(config, approvedText)
+    await expect(assertRepoConfigTrusted(testDb.db, 'task1', selected.repoConfigHash)).rejects.toBeInstanceOf(RepoConfigTrustError)
+    await expect(assertRepoConfigTrusted(testDb.db, 'task1')).resolves.toBeUndefined()
+    rmSync(config)
+    await expect(assertRepoConfigTrusted(testDb.db, 'task1', approved.hash)).rejects.toBeInstanceOf(RepoConfigTrustError)
+    await expect(assertRepoConfigTrusted(testDb.db, 'unknown-task', approved.hash)).rejects.toBeInstanceOf(RepoConfigTrustError)
+  })
+
+  it('returns a configuration error and refuses trust for special snapshot files', async () => {
+    await testDb.db.update(schema.tasks).set({ branch: null })
+    execFileSync('mkfifo', [join(repo, '.acorn', 'workflows', 'special.toml')])
+    await expect(taskRunConfig(testDb.db, 'task1')).resolves.toEqual({
+      error: "Repository configuration '.acorn/workflows/special.toml' must be a regular file.",
+    })
+    await expect(assertRepoConfigTrusted(testDb.db, 'task1')).rejects.toThrow('regular file')
   })
 
   it('checks project trust before a scheduled root task exists', async () => {

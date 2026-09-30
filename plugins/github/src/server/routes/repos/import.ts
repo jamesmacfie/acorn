@@ -2,7 +2,7 @@ import { isAbsolute, join } from 'node:path'
 import { and, eq } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { type AppEnv, type CoreServices, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
+import { type AppEnv, type CoreServices, ownerId, type PluginDatabase, requireDevice, respondError } from '@acorn/plugin-api/node'
 import type { GithubImportItem, GithubImportResponse, GithubImportResult } from '../../../shared/api'
 import { repos } from '../../../node/schema'
 
@@ -33,7 +33,7 @@ const failed = (item: GithubImportItem, owner: string, name: string, error: unkn
 })
 
 export const githubImport = (db: PluginDatabase, core: ImportCore) => new Hono<AppEnv>()
-  .post('/import', async (c) => {
+  .post('/import', requireDevice, async (c) => {
     const userId = ownerId(c)
     const parsed = requestSchema.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((issue) => issue.message))

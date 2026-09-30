@@ -32,10 +32,10 @@ import type {
   TelemetryRuntime,
   TelemetrySpan,
 } from '@acorn/protocol/telemetry.ts'
-import { ATTRS_MAX, ATTR_KEY_MAX, ATTR_VALUE_MAX, LOG_BODY_MAX, TELEMETRY_PREF_KEY } from '@acorn/protocol/telemetry.ts'
+import { ATTR_VALUE_MAX, LOG_BODY_MAX, TELEMETRY_PREF_KEY } from '@acorn/protocol/telemetry.ts'
 import type { TelemetrySummary } from '@acorn/protocol/api.ts'
 import { currentTelemetryContext, runWithTelemetryContext, type TelemetryContext } from './context'
-import { scrub } from './scrub'
+import { scrub, scrubAttrs, scrubLine } from './scrub'
 
 /** The developer switch that predates all of this. With it on, the collector runs with no sink
  *  subscribed and prints to stderr, which is what `ACORN_PERF=1` has always meant
@@ -133,32 +133,8 @@ export const telemetryEnabled = (): boolean => PERF || (state.sinks.size > 0 && 
 // instead of quietly losing its tail (docs/telemetry.md § The attribute vocabulary).
 
 function cleanAttrs(attrs: TelemetryAttrs | undefined, owner: string, runtime: TelemetryRuntime = 'node'): TelemetryAttrs {
-  const out: TelemetryAttrs = {}
-  let count = 0
-  for (const [key, value] of Object.entries(attrs ?? {})) {
-    // `owner` and `runtime` are the host's to stamp, so an emitter that sets one is ignored rather
-    // than refused: a plugin should not be able to fail its own route by mislabelling a span.
-    if (key === 'owner' || key === 'runtime') continue
-    if (count >= ATTRS_MAX) {
-      state.truncated += 1
-      break
-    }
-    if (value === undefined) continue
-    const short = key.length > ATTR_KEY_MAX ? key.slice(0, ATTR_KEY_MAX) : key
-    if (typeof value === 'string') {
-      if (value.length > ATTR_VALUE_MAX) state.truncated += 1
-      out[short] = scrub(value).slice(0, ATTR_VALUE_MAX)
-    } else if (typeof value === 'number' || typeof value === 'boolean' || value === null) {
-      out[short] = value
-    } else {
-      // A nested value cannot happen through the typed verbs and can through a loaded plugin's
-      // untyped JavaScript. Dropped, because the reason attributes are scalars is that an object is
-      // where a request body hides.
-      state.truncated += 1
-      continue
-    }
-    count += 1
-  }
+  const { attrs: out, truncated } = scrubAttrs(attrs)
+  state.truncated += truncated
   out.owner = owner
   out.runtime = runtime
   return out
@@ -250,15 +226,18 @@ export function emitSpan(owner: string, span: Omit<TelemetrySpan, 'kind' | 'attr
   safely(() => push({ ...span, kind: 'span', attrs: cleanAttrs(span.attrs, resolveOwner(owner)) }))
 }
 
-export function emitLog(owner: string, log: Omit<TelemetryLog, 'kind' | 'attrs'> & { attrs?: TelemetryAttrs }): void {
+// The logger sanitizes attributes before either sink and passes the truncation count separately.
+export function emitLog(owner: string, log: Omit<TelemetryLog, 'kind' | 'attrs'> & { attrs?: TelemetryAttrs }, attributeTruncations = 0): void {
   if (!telemetryEnabled()) return
   safely(() => {
+    state.truncated += attributeTruncations
     // A line written inside a request belongs to that request's trace. The caller may still name
     // one, because a line about work that outlived its request should not be filed under it.
     const traceId = log.traceId ?? currentTelemetryContext()?.traceId
     push({
       ...log,
       kind: 'log',
+      logger: scrubLine(log.logger, 'logger', ATTR_VALUE_MAX),
       body: scrub(log.body).slice(0, LOG_BODY_MAX),
       ...(traceId ? { traceId } : {}),
       attrs: cleanAttrs(log.attrs, resolveOwner(owner)),
@@ -443,7 +422,7 @@ export function ingestTelemetry(runtime: PostedTelemetryRuntime, records: readon
     safely(() => {
       const owner = typeof record.attrs.owner === 'string' ? record.attrs.owner : 'core'
       const attrs = cleanAttrs(record.attrs, owner, runtime)
-      if (record.kind === 'log') push({ ...record, body: scrub(record.body).slice(0, LOG_BODY_MAX), attrs })
+      if (record.kind === 'log') push({ ...record, logger: scrubLine(record.logger, 'logger', ATTR_VALUE_MAX), body: scrub(record.body).slice(0, LOG_BODY_MAX), attrs })
       else if (record.kind === 'error') push({ ...record, message: scrub(record.message), ...(record.stack ? { stack: scrub(record.stack) } : {}), attrs })
       else push({ ...record, attrs })
       taken += 1

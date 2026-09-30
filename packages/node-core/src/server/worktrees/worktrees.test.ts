@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -125,6 +125,46 @@ describe('worktree branch source (docs/workspaces-and-tasks.md)', () => {
       expect(out.warnings.join(' ')).toMatch(/missing\.txt.*skipped/)
       expect(out.warnings.join(' ')).toMatch(/\.\.\/evil.*rejected/)
       expect(readFileSync(join(res.path, '.env.local'), 'utf8')).toBe('ALREADY_HERE')
+    })
+
+    it('refuses outside sources, outside destination directories, and dangling destinations', () => {
+      const destination = join(dir, 'destination')
+      const outside = join(dir, 'synthetic-outside')
+      mkdirSync(destination)
+      mkdirSync(outside)
+      writeFileSync(join(outside, 'sentinel.txt'), 'unchanged')
+      symlinkSync(join(outside, 'sentinel.txt'), join(checkout, 'external.txt'))
+      mkdirSync(join(checkout, 'redirect'))
+      writeFileSync(join(checkout, 'redirect', 'sentinel.txt'), 'copy candidate')
+      symlinkSync(outside, join(destination, 'redirect'))
+      writeFileSync(join(checkout, 'dangling.txt'), 'copy candidate')
+      symlinkSync(join(outside, 'never-created.txt'), join(destination, 'dangling.txt'))
+      const result = copyWorktreeFiles(checkout, destination, ['external.txt', 'redirect/sentinel.txt', 'dangling.txt'])
+      expect(result.copied).toEqual([])
+      expect(result.warnings).toHaveLength(3)
+      expect(result.warnings.every((warning) => warning.includes('rejected'))).toBe(true)
+      expect(readFileSync(join(outside, 'sentinel.txt'), 'utf8')).toBe('unchanged')
+      expect(existsSync(join(outside, 'never-created.txt'))).toBe(false)
+      expect(lstatSync(join(destination, 'dangling.txt')).isSymbolicLink()).toBe(true)
+      expect(existsSync(join(destination, 'external.txt'))).toBe(false)
+    })
+
+    it('copies regular files through safe aliases and never overwrites existing links', () => {
+      const destination = join(dir, 'destination')
+      mkdirSync(join(destination, 'actual'), { recursive: true })
+      mkdirSync(join(checkout, 'actual'))
+      writeFileSync(join(checkout, 'actual', 'new.txt'), 'ordinary copy')
+      symlinkSync(join(checkout, 'actual'), join(checkout, 'alias'))
+      symlinkSync(join(destination, 'actual'), join(destination, 'alias'))
+      writeFileSync(join(checkout, 'existing.txt'), 'replacement')
+      writeFileSync(join(destination, 'actual', 'existing.txt'), 'unchanged')
+      symlinkSync(join(destination, 'actual', 'existing.txt'), join(destination, 'existing.txt'))
+      const result = copyWorktreeFiles(checkout, destination, ['alias/new.txt', 'existing.txt', 'actual'])
+      expect(result.copied).toEqual(['alias/new.txt'])
+      expect(result.warnings).toEqual(["copy: 'actual' is not a regular file, skipped"])
+      expect(readFileSync(join(destination, 'actual', 'new.txt'), 'utf8')).toBe('ordinary copy')
+      expect(readFileSync(join(destination, 'actual', 'existing.txt'), 'utf8')).toBe('unchanged')
+      expect(lstatSync(join(destination, 'existing.txt')).isSymbolicLink()).toBe(true)
     })
   })
 })

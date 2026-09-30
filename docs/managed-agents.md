@@ -13,6 +13,22 @@ The agents plugin manages structured Claude and Codex sessions. It stores a dura
 ledger and exposes the same session through the Agent Center, task Agent pane, HTTP routes, and live
 WebSocket streams.
 
+## HTTP control authority
+
+The paired desktop, terminal client, and headless CLI use device authority for provider discovery and
+session execution controls. Session creation, transcript import, configuration changes, deletion,
+turn creation and editing, plan implementation, forks, compaction, title generation, terminal
+handoff, managed resume, imported resume verification, and request resolution require a device
+principal. Service and task credentials receive `403` before the runtime is called. A task credential
+cannot answer its own provider permission, question, or elicitation request on behalf of a human.
+
+Task credentials retain task-scoped session reads, event replay, search, export, wait, attachment and
+artifact access, and cancellation. An unknown or foreign opaque ID receives `404`. The direct
+`/runs` source is node-wide and accepts device and service callers, while task callers use the
+filtered core run list. Managed delegation and workflow execution call guarded capabilities and
+the runtime directly. These HTTP controls do not replace tool permissions, signed ceilings, or
+delegation admission.
+
 ## Session model
 
 A session belongs to one task and provider profile. It contains turns, normalized events, permission
@@ -49,8 +65,11 @@ Center's chip needs no names and so needs no request: the two ids are on the row
 
 The ids are also how the run pane finds a session for a step that is still running, since the step row
 records `agentSessionId` only later. Nothing there is a second copy of the truth: the config is
-written once, when the node creates the session, and every later write to a session's config spreads
-what was there.
+written when the node creates the session. General configuration replacement retains
+`workflowRunId`, `workflowStepId`, `delegationSpawnId`, the `customAgent` snapshot, `toolCeiling`, and
+`mcpServers`. It cannot add, change, or remove those fields. Dedicated MCP selection can change the
+server list after checking Settings. A fork carries its source's identity and authority snapshots.
+Both durable `kind: 'workflow'` and the workflow config marker exclude a session from managed delegation.
 
 A workspace-scoped list or search resolves the task ids first, through
 `CoreServices.tasks.idsForWorkspace()`, then narrows this plugin's own tables to those ids. An empty

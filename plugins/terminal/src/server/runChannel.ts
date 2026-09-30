@@ -59,7 +59,7 @@ export function createRuntimeService(
     exitCode: glue.exitCode,
     killSession: glue.killSession,
     runScript,
-    authorizeRepoConfig: (taskId) => core.projects.assertConfigTrusted(taskId),
+    authorizeRepoConfig: (taskId, expectedHash) => core.projects.assertConfigTrusted(taskId, expectedHash),
     onChange,
   })
 }

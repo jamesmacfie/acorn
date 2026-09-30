@@ -2,7 +2,7 @@ import { Agent as HttpAgent } from 'node:http'
 import { Agent as HttpsAgent } from 'node:https'
 import { WebSocket } from 'ws'
 import { nodeRequest, NodeResponseTooLargeError } from './nodeRequest'
-import { WS_PATH, type WsClientFrame } from '@acorn/protocol/ws.ts'
+import { MAX_NODE_WS_MESSAGE_BYTES, WS_PATH, type WsClientFrame } from '@acorn/protocol/ws.ts'
 import { NODE_PROTOCOL_VERSION, nodeInfoSchema } from '@acorn/protocol/node.ts'
 import {
   type NodeConnectionState,
@@ -45,7 +45,7 @@ const PROTOCOL_PROBE_TIMEOUT_MS = 5_000
 const PROTOCOL_PROBE_MAX_BYTES = 16 * 1024
 // ws enforces this while assembling (including inflated messages), before toString/JSON.parse or
 // the helper IPC boundary can make another copy. A malicious node must not pick the allocation size.
-export const MAX_NODE_WS_MESSAGE_BYTES = 8 * 1024 * 1024
+export { MAX_NODE_WS_MESSAGE_BYTES } from '@acorn/protocol/ws.ts'
 const MAX_NODE_HTTP_SOCKETS = 4
 
 // A node plus the material only main may hold: the bearer, and the certificate to pin against.

@@ -20,6 +20,7 @@ import {
   type PluginDatabase,
   type PluginFetchHandler,
   portableCarrier,
+  principalMayActOnTask,
   respondError,
 } from '@acorn/plugin-api/node'
 import type { CommandInputResult } from '@acorn/protocol/commands.ts'
@@ -142,6 +143,8 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       const input = z.strictObject({ nodeId: z.string(), taskId: z.string().min(1), sql: z.string().min(1).max(20_000), maxRows: z.number().int().min(1).max(200).optional() })
         .safeParse(await c.req.json().catch(() => null))
       if (!input.success) return respondError(c, 400, 'bad_request')
+      if (!principalMayActOnTask(requestContext(c).principal, input.data.taskId)) return respondError(c, 404, 'not_found')
+      if (!await taskOf(input.data.taskId)) return respondError(c, 404, 'not_found')
       try {
         const result = await databaseQuery(bridge).query(input.data.taskId, input.data.sql, { maxRows: input.data.maxRows })
         return c.json({ ...result, rows: result.rows.map((row) => row.map((cell) => ({ value: cell ?? '', isNull: cell === null }))) })
@@ -293,9 +296,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
     // connection URL is resolved per connect and never persisted (../database.ts).
     .get('/palette/queries', async (c) => {
       const taskId = c.req.query('taskId')
-      // No task means no project to resolve, which is an empty list rather than an error: the command
-      // is task-scoped, so the host only offers it with a task open, and a race is not worth a red line.
-      if (!taskId) return c.json({ items: [] })
+      if (!taskId || !principalMayActOnTask(requestContext(c).principal, taskId)) return respondError(c, 404, 'not_found')
       const saved = await savedFor(taskId)
       if (!saved) return respondError(c, 404, 'not_found')
       return c.json({ items: savedQuerySearchItems(saved, c.req.query('q') ?? '') })
@@ -397,7 +398,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
     // --- the agent composer's "Saved database queries" entry (../agentContext.ts) ---
     .get('/context-options', async (c) => {
       const taskId = c.req.query('taskId')
-      if (!taskId) return respondError(c, 404, 'not_found')
+      if (!taskId || !principalMayActOnTask(requestContext(c).principal, taskId)) return respondError(c, 404, 'not_found')
       const saved = await savedFor(taskId, MAX_CONTEXT_QUERIES)
       if (!saved) return respondError(c, 404, 'not_found')
       return c.json(saved.map(savedQueryOption))
@@ -405,6 +406,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
     .post('/context-capture', async (c) => {
       const p = contextCaptureBody.safeParse(await c.req.json().catch(() => null))
       if (!p.success) return respondError(c, 400, 'bad_request', p.error.issues.map((i) => i.message))
+      if (!principalMayActOnTask(requestContext(c).principal, p.data.taskId)) return respondError(c, 404, 'not_found')
       const saved = await savedFor(p.data.taskId, MAX_CONTEXT_QUERIES)
       if (!saved) return respondError(c, 404, 'not_found')
       const chosen = p.data.optionIds ? saved.filter((query) => p.data.optionIds?.includes(query.id)) : saved

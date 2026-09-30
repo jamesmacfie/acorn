@@ -20,7 +20,7 @@ export {
 } from './showing'
 export {
   Button, Checkbox, Composer, ConfirmButton, CopyButton, Field, FindBar, IconButton, Input, KeyValueEditor,
-  MentionTextarea, ModelBackendPicker, ModelPickerPopover, Picker, PickerRow, SegmentedControl, Select, Textarea,
+  MentionTextarea, ModelBackendPicker, Picker, PickerRow, SegmentedControl, Select, Textarea,
   ToggleButton,
 } from './asking'
 export { Fallback, Only, Rectangle } from './pixels'

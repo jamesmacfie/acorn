@@ -4,11 +4,13 @@ import type { Duplex } from 'node:stream'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { claimUpgrade } from './upgradeClaim'
 import { authorizeWsUpgrade, type WsAuthDeps } from './wsHub'
+import { MAX_TUNNEL_MESSAGE_BYTES } from '@acorn/protocol/ws.ts'
 
 export type TunnelDeps = WsAuthDeps & {
   // Ports this task legitimately serves on (docs/api-reference.md § WebSocket). Empty, or a throw,
   // means nothing is tunnellable for that task.
   declaredPorts(taskId: string): Promise<readonly number[]>
+  maxTunnelMessageBytes?: number
 }
 
 export const TUNNEL_PATH = '/v1/tunnel'
@@ -45,9 +47,9 @@ function parseTarget(url: string | undefined, host: string): Target | null {
 // HTTP server no longer listens for, having handed the socket over. That becomes an
 // `uncaughtException`, so a loop of half-open upgrades is a remote denial of service.
 const refuse = (socket: Duplex, status: number, reason: string): void => {
-  socket.on('error', () => {})
-  if (socket.writable) socket.write(`HTTP/1.1 ${status} ${reason}\r\n\r\n`)
-  socket.destroy()
+  if (!socket.destroyed && socket.writable) {
+    try { socket.end(`HTTP/1.1 ${status} ${reason}\r\nConnection: close\r\n\r\n`, () => socket.destroy()) } catch { socket.destroy() }
+  } else socket.destroy()
 }
 
 // Pipe a WebSocket and a TCP socket into each other. Binary both ways, because a dev server's bytes
@@ -57,26 +59,38 @@ const refuse = (socket: Duplex, status: number, reason: string): void => {
 // Flow control runs in both directions, and it has to block rather than drop the way the events hub
 // does. A dropped frame there costs a client a `seq` gap and a refetch. Dropped bytes here corrupt a
 // TCP stream with no way to notice.
-function bridge(ws: WebSocket, tcp: Socket): void {
+function bridge(ws: WebSocket, tcp: Socket, maxBytes: number): void {
   ws.binaryType = 'nodebuffer'
+  let closed = false
   const closeBoth = (): void => {
+    if (closed) return
+    closed = true
     tcp.destroy()
-    if (ws.readyState === ws.OPEN || ws.readyState === ws.CONNECTING) ws.close()
+    if (ws.readyState === ws.OPEN) ws.close()
   }
 
   // client to node. `write` returning false is TCP backpressure, and pausing the WebSocket stops
   // `ws` reading, which closes the kernel window back to the client.
   ws.on('message', (data: Buffer) => {
-    if (!tcp.write(data)) ws.pause()
+    try { if (!tcp.write(data)) ws.pause() } catch { closeBoth() }
   })
-  tcp.on('drain', () => ws.resume())
+  tcp.on('drain', () => { if (!closed) ws.resume() })
 
   // node to client. `ws.send`'s callback fires once the frame reaches the socket, so it is the drain
   // signal. No polling on `bufferedAmount`, and no unbounded queue here when the LAN link is slower
   // than the dev server.
   tcp.on('data', (chunk: Buffer) => {
     tcp.pause()
-    ws.send(chunk, () => tcp.resume())
+    let offset = 0
+    const next = (): void => {
+      if (closed || ws.readyState !== ws.OPEN) return closeBoth()
+      if (offset === chunk.length) { tcp.resume(); return }
+      const end = Math.min(offset + maxBytes, chunk.length)
+      const part = chunk.subarray(offset, end)
+      offset = end
+      try { ws.send(part, (error) => { if (error) closeBoth(); else next() }) } catch { closeBoth() }
+    }
+    next()
   })
 
   ws.on('close', closeBoth)
@@ -90,8 +104,12 @@ function bridge(ws: WebSocket, tcp: Socket): void {
 type Pipe = { ws: WebSocket; tcp: Socket; deviceId: string | null }
 
 export function attachTunnel(server: Server, deps: TunnelDeps): void {
-  const wss = new WebSocketServer({ noServer: true })
+  const maxBytes = Math.min(deps.maxTunnelMessageBytes ?? MAX_TUNNEL_MESSAGE_BYTES, MAX_TUNNEL_MESSAGE_BYTES)
+  const wss = new WebSocketServer({ noServer: true, maxPayload: maxBytes })
   const pipes = new Set<Pipe>()
+  const pending = new Map<Duplex, Socket | null>()
+  let disposed = false
+  const ready = (socket: Duplex): boolean => !disposed && !socket.destroyed && socket.writable
 
   const closePipe = (pipe: Pipe): void => {
     pipes.delete(pipe)
@@ -106,7 +124,7 @@ export function attachTunnel(server: Server, deps: TunnelDeps): void {
   const sweep = setInterval(() => {
     void (async () => {
       for (const pipe of [...pipes]) {
-        if (pipe.deviceId && !(await deps.devices.isActive(pipe.deviceId))) closePipe(pipe)
+        if (pipe.deviceId && !(await deps.devices.isActive(pipe.deviceId).catch(() => false))) closePipe(pipe)
       }
     })()
   }, deps.revocationCheckMs ?? 60_000)
@@ -121,17 +139,24 @@ export function attachTunnel(server: Server, deps: TunnelDeps): void {
     if (!target) return
     // Synchronously, because the sweeper in server/transport/upgradeClaim.ts cannot await our auth.
     claimUpgrade(socket)
+    pending.set(socket, null)
+    const onPeerError = (): void => { socket.destroy() }
+    socket.on('error', onPeerError)
+    socket.once('close', () => { pending.get(socket)?.destroy(); pending.delete(socket) })
     void (async () => {
       const authorized = await authorizeWsUpgrade(req, deps)
+      if (!ready(socket)) { socket.destroy(); return }
       if (!authorized) return refuse(socket, 403, 'Forbidden')
       const claims = authorized.internal
       if (claims?.scope === 'task' && claims.taskId !== target.taskId) return refuse(socket, 403, 'Forbidden')
 
       // A throw means the same as an empty list: nothing is tunnellable.
       const ports: readonly number[] = await deps.declaredPorts(target.taskId).catch(() => [] as number[])
+      if (!ready(socket)) { socket.destroy(); return }
       if (!ports.includes(target.port)) return refuse(socket, 403, 'Forbidden')
 
       const tcp = connect({ host: LOOPBACK, port: target.port })
+      pending.set(socket, tcp)
       // The listener stays attached through the handshake. Clearing it on connect leaves a window
       // with no error listener, so a dev server that resets between `connect` and the upgrade write
       // emits an unhandled `'error'` that takes the process down.
@@ -140,23 +165,36 @@ export function attachTunnel(server: Server, deps: TunnelDeps): void {
         if (!handedOver) refuse(socket, 502, 'Bad Gateway')
         tcp.destroy()
       })
+      tcp.once('close', () => { if (!handedOver && ready(socket)) refuse(socket, 502, 'Bad Gateway') })
       tcp.once('connect', () => {
-        handedOver = true
-        wss.handleUpgrade(req, socket, head, (ws) => {
-          const pipe: Pipe = { ws, tcp, deviceId: authorized.deviceId }
-          pipes.add(pipe)
-          ws.on('close', () => pipes.delete(pipe))
-          bridge(ws, tcp)
-        })
+        if (!ready(socket)) { tcp.destroy(); socket.destroy(); return }
+        try {
+          wss.handleUpgrade(req, socket, head, (ws) => {
+            if (disposed || tcp.destroyed) { ws.on('error', () => {}); ws.terminate(); tcp.destroy(); return }
+            handedOver = true
+            pending.delete(socket)
+            const pipe: Pipe = { ws, tcp, deviceId: authorized.deviceId }
+            pipes.add(pipe)
+            ws.on('close', () => pipes.delete(pipe))
+            bridge(ws, tcp, maxBytes)
+            socket.off('error', onPeerError)
+          })
+        } catch {
+          tcp.destroy()
+          refuse(socket, 502, 'Bad Gateway')
+        }
       })
-    })()
+    })().catch(() => refuse(socket, 403, 'Forbidden'))
   }
 
   server.on('upgrade', onUpgrade)
   tunnelDisposers.set(server, () => {
+    disposed = true
     server.off('upgrade', onUpgrade)
     clearInterval(sweep)
     offRevoked()
+    for (const [socket, tcp] of pending) { tcp?.destroy(); socket.destroy() }
+    pending.clear()
     for (const pipe of [...pipes]) closePipe(pipe)
     wss.close()
   })

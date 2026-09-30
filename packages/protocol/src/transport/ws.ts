@@ -14,6 +14,10 @@
 import { z } from 'zod'
 
 export const WS_PATH = '/v1/events'
+// Symmetric event carrier ceiling, enforced by Node and custody before parsing a message.
+export const MAX_NODE_WS_MESSAGE_BYTES = 8 * 1024 * 1024
+// Raw preview streams use smaller messages and split arbitrary TCP chunks at both senders.
+export const MAX_TUNNEL_MESSAGE_BYTES = 64 * 1024
 
 // The index signature is load-bearing twice over: it lets an owner's frame satisfy this without a cast
 // at every send site, and it suppresses excess-property checks so existing literal sends still

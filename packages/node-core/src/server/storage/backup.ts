@@ -1,4 +1,4 @@
-import { mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, closeSync, mkdtempSync, openSync, readdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, isAbsolute, join, resolve } from 'node:path'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
@@ -91,6 +91,7 @@ export function suggestBackupPath(now = new Date()): string {
 export async function createBackup(dataDir: string, destPath: string): Promise<BackupResult> {
   if (!isAbsolute(destPath)) throw new Error('The backup destination must be an absolute path.')
   const staging = mkdtempSync(join(tmpdir(), 'acorn-backup-'))
+  let outputStaging: string | undefined
   try {
     const files: string[] = []
     const corePath = resolveDatabasePath(dataDir)
@@ -112,19 +113,30 @@ export async function createBackup(dataDir: string, destPath: string): Promise<B
       { mode: 0o600 },
     )
 
+    // Precreate the archive privately, under a private sibling on the destination filesystem.
+    // tar truncates this file rather than creating a public one; rename replaces an old archive
+    // only after success. A failed snapshot must not destroy the previous backup.
+    outputStaging = mkdtempSync(join(dirname(destPath), '.acorn-backup-'))
+    chmodSync(outputStaging, 0o700)
+    const archive = join(outputStaging, 'archive.tar.gz')
+    closeSync(openSync(archive, 'wx', 0o600))
     const result = await runProcess({
       file: '/usr/bin/tar',
-      args: ['-czf', destPath, '-C', staging, '.'],
+      args: ['-czf', archive, '-C', staging, '.'],
       cwd: dirname(destPath),
       timeoutMs: 10 * 60_000,
     })
     if (result.spawnError) throw new Error(`Could not run tar: ${result.spawnError}`)
+    if (result.timedOut || result.aborted) throw new Error('The backup archive was interrupted before completion.')
     if (result.code !== 0) throw new Error(`tar failed (${result.code}): ${result.stderr.trim() || 'no output'}`)
+    const bytes = statSync(archive).size
+    renameSync(archive, destPath)
 
-    return { path: destPath, bytes: statSync(destPath).size, files, excluded: EXCLUDED }
+    return { path: destPath, bytes, files, excluded: EXCLUDED }
   } finally {
     // The staging copy holds a core database that was briefly unscrubbed, so remove it whether or
     // not the archive was written.
     rmSync(staging, { recursive: true, force: true })
+    if (outputStaging) rmSync(outputStaging, { recursive: true, force: true })
   }
 }

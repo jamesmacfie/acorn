@@ -12,6 +12,7 @@ import { auditActor, auditRequest } from '../auditRequest'
 import { PAIRING_WINDOW_MS } from '../auth/pairingCodes'
 import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
+import { readPairingBody } from './pairingBody'
 
 // Pairing and device management (docs/api-reference.md § Pairing, docs/security.md
 // § Transport and auth).
@@ -74,7 +75,9 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
     })
     .post('/pair', async (c) => {
       if (!withinCeiling()) return respondError(c, 429, 'rate_limited', ['Too many pairing attempts. Try again shortly.'])
-      const parsed = pairRequestSchema.safeParse(await c.req.json().catch(() => null))
+      const body = await readPairingBody(c.req.raw)
+      if (body.oversized) return respondError(c, 413, 'payload_too_large', ['Pairing request exceeds 4 KiB.'])
+      const parsed = pairRequestSchema.safeParse(body.value)
       // Short-circuit order is load-bearing: a malformed body never reaches consume(), so it cannot
       // spend one of the window's five attempts, and it still answers with the same error.
       if (!parsed.success || !c.env.PAIRING_CODES.consume(parsed.data.code)) return pairingFailed(c)

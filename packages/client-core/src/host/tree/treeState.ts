@@ -1,7 +1,7 @@
 import { batch, createSignal } from 'solid-js'
 import { createStore, produce } from 'solid-js/store'
 import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
-import { TREE_LIMITS } from '@acorn/protocol/tree/messages.ts'
+import { batchBytes, TREE_LIMITS } from '@acorn/protocol/tree/messages.ts'
 import type { KitEvent } from '@acorn/protocol/tree/nodes.ts'
 import { isHandlerRef, sanitizeProps } from '@acorn/protocol/tree/props.ts'
 import { measure, recordDuration, recordSample, telemetryEnabled } from '../../infra/telemetry/emitter'
@@ -149,7 +149,9 @@ export function createTreeState(input: TreeStateInput) {
           // Into itself, or into one of its own descendants. Either makes a cycle, and a cycle is an
           // infinite render rather than a wrong one.
           let ancestor = op.parent
+          let steps = 0
           while (ancestor !== null) {
+            if (++steps > TREE_LIMITS.depth) return `tree deeper than ${TREE_LIMITS.depth}`
             if (ancestor === op.id) return `move of ${op.id} inside itself`
             ancestor = projected.get(ancestor) ?? null
           }
@@ -183,6 +185,17 @@ export function createTreeState(input: TreeStateInput) {
           break
       }
     }
+    // Moving a subtree changes every descendant's depth. Check the final projection once, rather
+    // than walking that subtree for every move in a batch. Intermediate trees are never rendered.
+    const pending = [...(kids.get(null) ?? [])].map((id) => ({ id, depth: 1 }))
+    let visited = 0
+    while (pending.length) {
+      const { id, depth } = pending.pop()!
+      if (depth > TREE_LIMITS.depth) return `tree deeper than ${TREE_LIMITS.depth}`
+      visited++
+      for (const child of kids.get(id) ?? []) pending.push({ id: child, depth: depth + 1 })
+    }
+    if (visited !== projected.size) return 'tree contains a cycle'
     return null
   }
 
@@ -192,6 +205,7 @@ export function createTreeState(input: TreeStateInput) {
   }
 
   const apply = (ops: readonly TreeMutation[]): void => {
+    if (stopped) return
     const problem = acceptable(ops)
     if (problem) return refuse(`dropped a whole batch: ${problem}`)
     // Every child list the batch touches, as a plain array edited in place and written to the store
@@ -210,10 +224,16 @@ export function createTreeState(input: TreeStateInput) {
       if (at >= 0) siblings.splice(at, 1)
     }
     const forget = (id: string): void => {
-      for (const child of lists.get(id) ?? nodes[id]?.children ?? []) forget(child)
-      lists.delete(id)
-      parents.delete(id)
-      setNodes(produce((table) => { delete table[id] }))
+      // A batch can temporarily deepen a subtree before removing it. Do not recurse through that
+      // intermediate structure, even though only the final projection is rendered.
+      const pending = [id]
+      while (pending.length) {
+        const at = pending.pop()!
+        for (const child of lists.get(at) ?? nodes[at]?.children ?? []) pending.push(child)
+        lists.delete(at)
+        parents.delete(at)
+        setNodes(produce((table) => { delete table[at] }))
+      }
     }
     batch(() => {
       for (const op of ops) {
@@ -261,13 +281,17 @@ export function createTreeState(input: TreeStateInput) {
   // Coalesced per tick. The sandbox already batches its own render pass, so this only matters for a
   // bundle sending faster than the screen redraws, which is the case the throttle exists for.
   let queued: TreeMutation[] = []
+  let queuedBytes = 2 // The enclosing JSON array.
+  let stopped = false
   let handle = 0
   let queuedAt = 0
   let batches = 0
   const flush = (): void => {
     handle = 0
+    if (stopped) return
     const ops = queued
     queued = []
+    queuedBytes = 2
     if (!ops.length) return
     // A histogram, owned by the plugin whose tree this is. One coalesced batch per frame while a
     // remote pane is animating is well past the ten-a-second line a span has to stay under
@@ -282,13 +306,31 @@ export function createTreeState(input: TreeStateInput) {
     recordSample(input.pluginId, 'tree.nodes', parents.size)
   }
   const detachBatch = input.transport.onBatch((ops) => {
+    if (stopped || !ops.length) return
+    // Measure only the incoming bounded message, never a concatenation of the retained queue.
+    const exceedsOps = queued.length + ops.length > TREE_LIMITS.batchOps
+    const nextBytes = exceedsOps ? queuedBytes : queuedBytes + batchBytes(ops) - 2 + (queued.length ? 1 : 0)
+    if (exceedsOps || nextBytes > TREE_LIMITS.batchBytes) {
+      stopped = true
+      queued = []
+      queuedBytes = 2
+      batches = 0
+      queuedAt = 0
+      if (handle) scheduler.cancel(handle)
+      handle = 0
+      const reason = 'pending tree update exceeds the operation or byte cap'
+      setFailed(reason)
+      refuse(`dropped a whole queued update: ${reason}`)
+      return
+    }
     if (!queued.length && telemetryEnabled()) queuedAt = performance.now()
     batches++
+    queuedBytes = nextBytes
     queued.push(...ops)
     if (handle) return
     handle = scheduler.schedule(flush)
   })
-  const detachFailed = input.transport.onFailed((message) => setFailed(message))
+  const detachFailed = input.transport.onFailed((message) => { if (!stopped) setFailed(message) })
 
   return {
     nodes,
@@ -308,9 +350,15 @@ export function createTreeState(input: TreeStateInput) {
       return out
     },
     dispose(): void {
+      stopped = true
       detachBatch()
       detachFailed()
       if (handle) scheduler.cancel(handle)
+      handle = 0
+      queued = []
+      queuedBytes = 2
+      queuedAt = 0
+      batches = 0
     },
     /** Test seam: apply a batch without waiting for a tick. */
     _apply: apply,

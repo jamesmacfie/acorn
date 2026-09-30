@@ -263,8 +263,28 @@ describe('local diff over a real worktree', () => {
     await expect(localNewSideText(dir, '../etc', 'unstaged')).rejects.toThrow('Invalid path')
     await expect(localNewSideText(dir, '/etc/passwd', 'unstaged')).rejects.toThrow('Invalid path')
     // A repo can hold a symlink pointing anywhere, and this path arrives over HTTP.
-    symlinkSync('/etc/passwd', join(dir, 'src', 'link.ts'))
+    symlinkSync(join(dir, 'src', 'a.ts'), join(dir, 'src', 'link.ts'))
     await expect(localNewSideText(dir, 'src/link.ts', 'unstaged')).rejects.toThrow('Not a regular file')
+  })
+
+  it('withholds text and untracked diffs through an intermediate link outside the worktree', async () => {
+    const outside = mkdtempSync(join(tmpdir(), 'acorn-diff-outside-'))
+    try {
+      writeFileSync(join(outside, 'sentinel.txt'), 'synthetic outside content\n')
+      symlinkSync(outside, join(dir, 'external'))
+      await expect(localNewSideText(dir, 'external/sentinel.txt', 'unstaged')).rejects.toThrow('Invalid path')
+      await expect(localDiff(dir, 'external/sentinel.txt', 'unstaged')).rejects.toThrow('Invalid path')
+      symlinkSync(join(outside, 'missing.txt'), join(dir, 'dangling.txt'))
+      await expect(localNewSideText(dir, 'dangling.txt', 'unstaged')).rejects.toThrow('Invalid path')
+      await expect(localDiff(dir, 'dangling.txt', 'unstaged')).rejects.toThrow('Invalid path')
+    } finally { rmSync(outside, { recursive: true, force: true }) }
+  })
+
+  it('retains working-tree text and untracked diffs through safe directory aliases', async () => {
+    writeFileSync(join(dir, 'src', 'new.txt'), 'synthetic new content\n')
+    symlinkSync(join(dir, 'src'), join(dir, 'internal'))
+    expect((await localNewSideText(dir, 'internal/new.txt', 'unstaged')).text).toBe('synthetic new content\n')
+    expect((await localDiff(dir, 'internal/new.txt', 'unstaged')).patch).toContain('+synthetic new content')
   })
 
   // About 15 sequential git spawns, over vitest's 5s default on a busy machine.

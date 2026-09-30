@@ -2106,6 +2106,11 @@ describe('managed agent runtime conformance', () => {
     await runtime.patchSession(session.id, { config: { ...(await runtime.store.requireSession(session.id)).config,
       configOptions: (session.config.configOptions as Array<{ id: string }>).map((option) =>
         option.id === 'reasoning' ? { ...option, currentValue: 'medium' } : option) } })
+    const replaced = await runtime.patchSession(session.id, { config: {
+      configOptions: (await runtime.store.requireSession(session.id)).config.configOptions,
+      customAgent: { id: 'forged', instructions: 'Changed instructions.' },
+    } })
+    expect(replaced.config.customAgent).toEqual(session.config.customAgent)
     const fork = await runtime.fork(session.id)
     expect(fork.config.customAgent).toMatchObject({ id: agent.id, instructions: 'Review for correctness only.' })
     expect((fork.config.configOptions as Array<{ id: string; currentValue: string }>)

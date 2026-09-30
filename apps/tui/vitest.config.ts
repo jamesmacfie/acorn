@@ -7,7 +7,7 @@ import base from './vite.config'
 // `@acorn/plugin-api/ui` alias, so a pane under test imports the kit exactly as the bundle does.
 //
 // Nothing here passes a flag and nothing here skips. The painter is TypeScript, Yoga through wasm and
-// cells in an array, so every drawing test runs on the 24.11.0 the repo pins
+// cells in an array, so every drawing test runs on the 24.21.0 the repo pins
 // (../../node-runtime.json, docs/tui.md § The runtime floor).
 
 export default mergeConfig(base, defineConfig({

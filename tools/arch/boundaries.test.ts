@@ -772,6 +772,8 @@ describe('architecture boundaries', () => {
       ['packages/client-core/src/host/chrome/chromeData.ts', "'context' the agent input part"],
       ['packages/node-core/src/server/plugins/coreFacets.ts', "'context' the core facet name"],
       ['packages/node-core/src/server/plugins/nodePluginWorker.ts', "'context' the RPC path and 'http' the Node builtin"],
+      ['packages/protocol/src/plugin/nodeBuiltins.ts', "'http' the Node builtin family"],
+      ['packages/node-core/src/server/plugins/storagePolicy.ts', "'memory' the SQLite temp_store value"],
       // `database` the layer a workflow definition was found in: a row in acorn's own store rather
       // than a file somebody committed. Nothing to do with the database plugin.
       // Where a task's terminals live is a node question, asked of the roster
@@ -792,7 +794,6 @@ describe('architecture boundaries', () => {
       ['packages/client-core/src/kit/components/content/Rectangle.tsx', "'editor' the rectangle kind"],
       ['packages/client-core/src/host/trust/permissions.ts', "'database' a Lucide icon name"],
       ['packages/client-core/src/kit/components/inputs/IconPicker.tsx', "'database' and 'terminal', Lucide icon names"],
-      ['packages/node-core/src/server/repoConfigTrust.ts', "'workflows' the .acorn directory name"],
       ['packages/protocol/src/integrations/mcp.ts', "'http' the MCP transport"],
       ['packages/protocol/src/chrome/settingsPages.ts', "'agents' the settings rail group"],
       // Moved from apps/desktop so the terminal lists the same pages. Search words name the services a
