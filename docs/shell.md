@@ -765,9 +765,10 @@ The node receives no window handle, no webview handle, and no shell object of an
 
 `apps/node` emits `service.js`, `mcp.js`, `standalone.js`, and shared chunks. Third-party
 packages are bundled into them, and into the helper, except the native addons and run-time-loaded
-packages that `apps/node/externals.ts` lists. Node resolves those from `apps/desktop`'s
-`node_modules`. Loading packages as separate files was most of the node's and the helper's startup
-before that. `apps/node/scripts/check-service-budget.mjs` runs after the node build, fails it when
+packages that `apps/node/externals.ts` lists. Staging materializes their installed dependency graphs under
+`dist/helper/node_modules` without pnpm directory links, so the installed helper and service resolve
+them from application resources. The shared runtime package list belongs to `scripts/nodeRuntimePackages.ts`.
+Loading packages as separate files was most of the node's and the helper's startup before that. `apps/node/scripts/check-service-budget.mjs` runs after the node build, fails it when
 `service.js` and the chunks it imports statically pass a byte ceiling, and prints what is left for
 Node to resolve. Both builds write the licence text of every package they bundled beside their
 output, as `THIRD-PARTY-NOTICES.txt` and `helper-THIRD-PARTY-NOTICES.txt`, so it ships in the
@@ -817,10 +818,39 @@ That process is the pinned Node in both a checkout and a bundle, so there is one
 standalone node is distributed separately as a tarball; it is not an npm package
 (`docs/node-distribution.md`).
 
-`.github/workflows/build-desktop.yml` runs the same commands on a push to main and on a `v*` tag,
-plus the boot test and the Rust suite before the bundler pass so a broken boot path fails in seconds
+`.github/workflows/build-desktop.yml` builds macOS Apple silicon and Windows x64 on a push to main
+and on a `v*` tag, plus manual dispatches. Both jobs run the boot test and the Rust suite before the bundler pass so a broken boot path fails in seconds
 rather than minutes. A tag builds and keeps its artifacts; publishing them is refused while the build
 is ad-hoc signed.
+
+### Windows test installer
+
+The Windows matrix entry uploads `acorn-windows-x64`, containing an NSIS setup executable and its
+updater signature. The macOS job uploads `acorn-dmg`. Both artifacts belong to the Actions run;
+the workflow does not publish GitHub Releases. Windows Authenticode signing is not configured.
+
+The platform override in `apps/desktop/src-tauri/tauri.windows.conf.json` selects NSIS, a Windows
+icon, installation for the current user, and the WebView2 bootstrapper. The installer downloads
+WebView2 if it is absent, so installation can require internet access. The runtime staging script
+fetches the pinned Windows `node.exe` directly and checks its published SHA-256 before caching it.
+The installed runtime lives beside `acorn-desktop.exe`; the helper, service, CLI, plugins, and renderer live
+under the installation directory. The helper's origin gate expects `http://app.localhost` on
+Windows, matching Wry's mapping of the app scheme.
+
+The Windows target needs Git and OpenSSL on PATH. Acorn invokes OpenSSL to generate the local Node's
+certificate on first boot. Git for Windows includes OpenSSL under its `usr/bin` directory; add that
+directory to PATH and restart Acorn. CI adds it before boot verification. Acorn bundles Node and its
+runtime packages, so the target does not need Node, pnpm, Rust, or a compiler installed. For the Node's
+other host requirements and Windows file permission limits, see [Node distribution](./node-distribution.md).
+
+Windows distribution verification installs the generated setup executable into a temporary directory,
+compares the installed resources with staging, checks the installed Node version and digest, and runs
+the helper boot test against that installation. The test uses a fresh data root outside the checkout
+and verifies an authenticated broker request to the local Node. It also checks the WebSocket secret
+and origin gates. It uninstalls the temporary application after verification. Run Windows distribution
+builds on a disposable build host: NSIS also writes application shortcuts and uninstall metadata.
+This check does not drive the WebView2 window or prove connectivity between different machines;
+those remain manual acceptance checks using the uploaded installer.
 
 ### CI permissions and signing credentials
 

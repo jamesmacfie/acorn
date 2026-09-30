@@ -26,6 +26,7 @@ import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, write
 import { dirname, join, resolve } from 'node:path'
 import { builtinModules } from 'node:module'
 import { fileURLToPath } from 'node:url'
+import { requiredRuntimePackages } from './nodeRuntimePackages.ts'
 
 // The standalone manifest uses the same supported security range as the checkout.
 const workspaceManifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
@@ -37,7 +38,7 @@ const CLI_APP = join(ROOT, 'apps/cli')
 const TUI_APP = join(ROOT, 'apps/tui')
 const OUT = join(ROOT, 'apps/node/release')
 
-// The runtime dependency set, and the one hand-maintained list in this script. Versions are read
+// The shared service/helper runtime set plus the terminal client's extra externals. Versions are read
 // from apps/desktop's manifest rather than repeated here, since that package already pins them for
 // the bundled node, so the packaged app and the standalone one cannot diverge.
 // `assertManifestCoversImports` below keeps the names honest.
@@ -45,16 +46,11 @@ const OUT = join(ROOT, 'apps/node/release')
 // Node externals (apps/node/externals.ts), plus dependencies the terminal host externalizes. Other
 // third-party packages are inside the corresponding bundle already.
 const RUNTIME = [
-  '@agentclientprotocol/claude-agent-acp',
-  '@vscode/ripgrep',
-  '@xterm/addon-serialize',
-  '@xterm/headless',
+  ...requiredRuntimePackages,
   // The terminal bundle leaves these Node-core imports external, even though the standalone service
   // bundle includes them. They are required beside the shared `acorn` launcher.
   'drizzle-orm',
   'hono',
-  'node-pty',
-  'playwright-core',
 ]
 
 // Loaded through `createRequire(...)` rather than a static import. The scanner below matches both

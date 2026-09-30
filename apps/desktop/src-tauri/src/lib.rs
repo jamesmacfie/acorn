@@ -322,7 +322,7 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
                 env_files: env_files(app, &data_dir, packaged)?,
                 version: app.package_info().version.to_string(),
                 is_packaged: packaged,
-                app_origin: APP_ORIGIN.to_string(),
+                app_origin: renderer_origin(cfg!(windows) || cfg!(target_os = "android")).to_string(),
             },
         },
         move |signal| match signal {
@@ -376,14 +376,16 @@ fn env_files(app: &tauri::AppHandle, data_dir: &Path, packaged: bool) -> Result<
 /// `Contents/MacOS`, which `resource_dir()` does not name. Getting it wrong is invisible until
 /// somebody installs the app, which is what `scripts/verify-bundle.mjs` catches.
 pub(crate) fn bundled_node() -> PathBuf {
-    std::env::current_exe().ok().and_then(|exe| exe.parent().map(|dir| dir.join("node"))).unwrap_or_else(|| PathBuf::from("node"))
+    let name = if cfg!(windows) { "node.exe" } else { "node" };
+    std::env::current_exe().ok().and_then(|exe| exe.parent().map(|dir| dir.join(name))).unwrap_or_else(|| PathBuf::from(name))
 }
 
 /// The bundled runtime in a dev build, named the way `bundle.externalBin` names it, so dev and
 /// packaged disagree about the path and nothing else.
 pub(crate) fn bundled_node_for_host() -> PathBuf {
     let triple = std::env::var("ACORN_TARGET_TRIPLE").unwrap_or_else(|_| format!("{}-{}", std::env::consts::ARCH, host_suffix()));
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries").join(format!("node-{triple}"))
+    let extension = if triple.contains("-windows-") { ".exe" } else { "" };
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries").join(format!("node-{triple}{extension}"))
 }
 
 fn host_suffix() -> &'static str {
@@ -443,6 +445,10 @@ fn open_reset_window(app: &tauri::AppHandle, fixture: bool) -> tauri::Result<()>
 
 fn is_renderer_url(url: &tauri::Url) -> bool {
     is_renderer_url_for(url, cfg!(windows) || cfg!(target_os = "android"))
+}
+
+fn renderer_origin(mapped_schemes: bool) -> &'static str {
+    if mapped_schemes { "http://app.localhost" } else { APP_ORIGIN }
 }
 
 fn is_renderer_url_for(url: &tauri::Url, mapped_schemes: bool) -> bool {
@@ -525,12 +531,22 @@ fn show_recovery(app: &tauri::AppHandle, reason: Option<&str>) {
 mod tests {
     use super::*;
 
-    /// The origin the window loads and the origin the helper checks on the WebSocket upgrade are one
-    /// constant, not two spellings.
+    /// Wry maps the app scheme to HTTP on Windows. The helper must check the browser's origin.
     #[test]
     fn the_window_url_is_the_origin_the_helper_checks() {
         assert!(format!("{APP_ORIGIN}/").starts_with(APP_ORIGIN));
         assert_eq!(APP_ORIGIN, "app://acorn");
+        assert_eq!(renderer_origin(false), APP_ORIGIN);
+        assert_eq!(renderer_origin(true), "http://app.localhost");
+        assert!(is_renderer_url_for(&renderer_origin(true).parse().unwrap(), true));
+    }
+
+    #[test]
+    fn the_runtime_paths_use_the_host_executable_extension() {
+        let name = if cfg!(windows) { "node.exe" } else { "node" };
+        assert_eq!(bundled_node().file_name().unwrap(), name);
+        let staged = bundled_node_for_host();
+        assert_eq!(staged.extension().is_some_and(|ext| ext == "exe"), cfg!(windows));
     }
 
     #[test]

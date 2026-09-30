@@ -120,6 +120,12 @@ fn spawn(launch: &Launch) -> std::io::Result<Child> {
         });
     }
 
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000); // CREATE_NO_WINDOW: Node is a background helper.
+    }
+
     command.spawn()
 }
 
@@ -175,7 +181,22 @@ fn terminate_group(child: &mut Child, escalation: Duration) -> bool {
 }
 
 #[cfg(not(unix))]
-fn terminate_group(child: &mut Child, _escalation: Duration) -> bool {
+fn terminate_group(child: &mut Child, escalation: Duration) -> bool {
+    // The stop command has already asked the helper to drain its Node. Give it time before
+    // forcing termination; Windows has no SIGTERM process-group delivery.
+    let deadline = std::time::Instant::now() + escalation;
+    while std::time::Instant::now() < deadline {
+        if matches!(child.try_wait(), Ok(Some(_))) { return false; }
+        std::thread::sleep(Duration::from_millis(50));
+    }
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        let _ = Command::new("taskkill")
+            .args(["/PID", &child.id().to_string(), "/T", "/F"])
+            .creation_flags(0x08000000)
+            .output();
+    }
     let _ = child.kill();
     let _ = child.wait();
     true

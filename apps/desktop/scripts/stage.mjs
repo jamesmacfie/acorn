@@ -3,6 +3,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, write
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { stageNodeRuntime, targetTriple } from './node-runtime.mjs'
+import { stageRuntimeDependencies } from './stage-runtime-dependencies.mjs'
 
 // Everything the Rust shell needs on disk before `tauri dev` or `tauri build` runs: the bundled Node
 // runtime, the node service beside the helper, and the migration chains where the node's own walk-up
@@ -31,6 +32,7 @@ need(resolve(HELPER, 'helper.js'), 'run `pnpm run build:helper` first.')
 // ones. Cleared first, or each old chunk stays beside the helper and ships as a resource.
 rmSync(resolve(HELPER, 'chunks'), { recursive: true, force: true })
 cpSync(dist, HELPER, { recursive: true })
+stageRuntimeDependencies(PKG, HELPER)
 
 // The installed command runs the headless CLI under the same pinned Node runtime as the desktop.
 // Its chunks must stay beside cli.js, and Node needs this package boundary to parse them as ESM.
