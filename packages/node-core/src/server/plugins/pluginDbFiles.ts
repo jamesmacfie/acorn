@@ -22,7 +22,9 @@ function checkFile(path: string, create: boolean, privateMode: boolean): void {
   }
   try {
     if (!fstatSync(fd).isFile()) throw new Error('Plugin database state must be a regular file.')
-    if (privateMode) fchmodSync(fd, 0o600)
+    // POSIX mode bits do not restrict Windows ACLs. Keep the same regular-file preflight
+    // there, and let the data root's ACL control access.
+    if (privateMode && process.platform !== 'win32') fchmodSync(fd, 0o600)
   } finally {
     closeSync(fd)
   }

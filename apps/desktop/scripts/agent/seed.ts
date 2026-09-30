@@ -37,7 +37,11 @@ if (!['small', 'scale', 'canonical'].includes(profile) || !Number.isInteger(seed
 const git = (cwd: string, ...command: string[]) => execFileSync('git', command, {
   cwd,
   stdio: ['ignore', 'ignore', 'inherit'],
-  env: { ...process.env, GIT_CONFIG_GLOBAL: '/dev/null', GIT_CONFIG_SYSTEM: '/dev/null' },
+  env: {
+    ...process.env,
+    GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null',
+    GIT_CONFIG_SYSTEM: process.platform === 'win32' ? 'NUL' : '/dev/null',
+  },
 })
 
 const write = (root: string, path: string, text: string, binary: boolean) => {

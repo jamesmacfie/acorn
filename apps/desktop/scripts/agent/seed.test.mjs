@@ -7,14 +7,13 @@ import { promisify } from 'node:util'
 import { expect, test } from 'vitest'
 
 const run = promisify(execFile)
-const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
 
 test('the navigation fixture gives both hosts tasks in two workspaces', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'acorn-tui-fixture-'))
   const dataDir = join(directory, 'data')
   const project = join(directory, 'fixture', 'repo')
   try {
-    const { stdout } = await run(pnpm, ['exec', 'node', '--import', 'tsx', 'scripts/agent/seed.ts',
+    const { stdout } = await run(process.execPath, ['--import', 'tsx', 'scripts/agent/seed.ts',
       '--data-dir', dataDir, '--project', project, '--fixture', 'tui-navigation',
       '--profile', 'small', '--seed', '1'], {
       cwd: resolve(import.meta.dirname, '../..'),
