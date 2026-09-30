@@ -352,8 +352,7 @@ const acorn = {
   // the client's and plays whether or not the OS agreed to show a banner.
   notify: {
     show: (request: { title: string; body?: string; tag: string }) => invoke<boolean>('show_notification', request),
-    // `tauri-plugin-notification` gives desktop no activation callback, so Rust approximates one from
-    // a window focus soon after a banner (src-tauri/src/commands.rs).
+    // Native notification clicks only. Window focus never requests navigation.
     onActivate: (cb: (tag: string) => void) => onEvent<string>('acorn:notification-activated', cb),
     setBadge: (count: number | null) => void invoke('set_badge', { count }),
   },
