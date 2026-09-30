@@ -132,6 +132,10 @@ export const sourceDescriptor = z.object({
   // opens from the palette, and the user's switch in Settings wins over it
   // (client-core/features/tabs/railVisibility.ts).
   showInRailByDefault: z.boolean().optional(),
+  // Draw this source only while the active workspace has a project that is a git repository. For a
+  // source about git itself, whose rail would sit empty in a workspace of plain folders. Absent means
+  // the source draws whatever the workspace holds (client-core/features/tabs/railSources.ts).
+  requiresGitProject: z.boolean().optional(),
   // The pane a task this source tracks opens on the first time it is activated
   // (client-core/host/registries/sources/sources.ts). Has to be one of this plugin's own declared task
   // panes, re-checked on the device the way a content link's `openPane` is.
