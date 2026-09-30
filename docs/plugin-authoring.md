@@ -27,6 +27,12 @@ descriptor, with both entries exported through `mountTree`. The older `items` ro
 Node handler and is refused for a device install. The same rule covers route-backed slots, commands,
 document regions, attention, node stats, agent contexts, reference resolvers, and extensions.
 
+A Node-backed package can use the `tree` form too. The host pads the detail and makes it scroll, the
+way it does a pane body. The list's mount props carry `collapsed`, which is `true` while the reader has
+the list at icon width. The worker can't read that state any other way. While it's `true`, give each
+row a `collapsedIcon` (a Lucide name) and a `label` for its tooltip, and leave out headers and
+toolbars. An icon element can't be a prop, because tree props are JSON.
+
 For short integration examples, see [Events and capabilities](./plugin-authoring/events-and-capabilities.md).
 
 ## Start from the scaffold
