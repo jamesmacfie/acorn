@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { cpSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, mkdirSync, mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -106,6 +106,21 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
 
     await t.db.update(schema.projects).set({ path: null })
     await expect(requireTaskRoot(t.db, TASK)).rejects.toThrow('The task has no mapped checkout.')
+  })
+
+  it('runs setup only after an occupied branch is released and creation is retried', async () => {
+    const occupied = join(dir, 'external-worktree')
+    git(checkout, 'worktree', 'add', '-b', 'feat-x', occupied)
+    await expect(requireTaskRoot(t.db, TASK)).rejects.toThrow(`already checked out at '${realpathSync(occupied)}'`)
+    expect((await loadTask(t.db, TASK))?.worktreePath).toBeNull()
+    expect(created).toEqual([])
+
+    git(occupied, 'switch', '--detach')
+    const cwd = await requireTaskRoot(t.db, TASK)
+    expect(cwd).not.toBe(occupied)
+    expect(created).toEqual([`${TASK}:${cwd}`])
+    await requireTaskRoot(t.db, TASK)
+    expect(created).toHaveLength(1)
   })
 
   it('a failing handler does not break worktree resolution', async () => {

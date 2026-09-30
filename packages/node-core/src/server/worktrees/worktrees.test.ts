@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -97,6 +97,27 @@ describe('worktree branch source (docs/workspaces-and-tasks.md)', () => {
     const res = await ensureWorktree(root, checkout, 'acme', 'widget', 'feat/existing', null)
     expect(res.ok).toBe(true)
     if (res.ok) expect(git(res.path, 'rev-parse', 'HEAD').trim()).toBe(originMainSha)
+  })
+
+  it.each([null, 7])('identifies a branch occupied by another worktree (pull %s)', async (pullNumber) => {
+    const occupied = join(dir, 'outside worktrees\noccupied')
+    git(checkout, 'worktree', 'add', '-b', 'feat/occupied', occupied)
+    writeFileSync(join(occupied, 'a.txt'), 'uncommitted work')
+    const res = await ensureWorktree(root, checkout, 'acme', 'widget', 'feat/occupied', pullNumber)
+    expect(res).toEqual({
+      ok: false,
+      reason: expect.stringContaining(`Branch 'feat/occupied' is already checked out at '${realpathSync(occupied)}'.`),
+    })
+    if (res.ok) return
+    expect(res.reason).toContain('Release the branch in that worktree, then reopen this task.')
+    expect(readFileSync(join(occupied, 'a.txt'), 'utf8')).toBe('uncommitted work')
+    expect(git(occupied, 'branch', '--show-current').trim()).toBe('feat/occupied')
+    expect(existsSync(join(root, 'acme-widget-feat-occupied'))).toBe(false)
+  })
+
+  it('identifies a branch occupied by the project checkout', async () => {
+    const res = await ensureWorktree(root, checkout, 'acme', 'widget', 'local-topic', null)
+    expect(res).toEqual({ ok: false, reason: expect.stringContaining(`already checked out at '${realpathSync(checkout)}'`) })
   })
 
   describe('copyWorktreeFiles (docs/workflows.md §2 copy)', () => {

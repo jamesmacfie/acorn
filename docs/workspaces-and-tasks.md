@@ -163,6 +163,11 @@ worktree failure remain distinct errors. On macOS, the Node retries Git with the
 Line Tools binary when Apple's selected Xcode Git refuses a command solely because its license has
 not been accepted.
 
+If another worktree or the project checkout already has the task's branch checked out, Git refuses
+creation. Acorn reports the occupied branch and path from Git's worktree roster. Release that branch
+in the reported checkout, then reopen the task to retry creation. Acorn leaves the other checkout
+and its uncommitted files untouched. Setup runs only after creation succeeds.
+
 A new task branch starts from the branch checked out in the mapped project folder. Acorn runs
 `git worktree add -b` from that folder without an explicit start point, so Git uses the folder's
 current `HEAD`. Remote-tracking refs such as `origin/main` do not take precedence over local commits.
