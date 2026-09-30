@@ -88,6 +88,9 @@ export type FrameServices = {
   copy(text: string): void
   openPane(paneId: string): void
   openTarget?(target: { kind: string; resourceId: string; subresourceId?: string }): void
+  // Find a task in the reader's task list and hand back the move to it, or nothing when the list does
+  // not have it. Two steps so the broker can reply between them (see the `openTask` case).
+  openTask(taskId: string): (() => void) | undefined
   // Resolve an https URL somewhere: in-app if a content-link recogniser claims it, the owner's browser
   // otherwise. Returns nothing on purpose; see the `openUrl` case below for why the frame is told neither
   // the outcome nor when it happened.
@@ -138,7 +141,7 @@ const MEASURED_KINDS: ReadonlySet<string> = new Set([
 // focus check alone is a raised bar rather than a wall: a visible frame's own script can pull focus to
 // itself. If that is ever abused the upgrade is real user-activation plumbing through the sandbox, not a
 // longer window here.
-const OPEN_URL_MIN_GAP_MS = 1000
+const NAVIGATION_MIN_GAP_MS = 1000
 
 export type FrameBridge = { dispose(): void; setContext?(context: PluginFrameContext): void }
 
@@ -203,7 +206,8 @@ export function createFrameBridge(input: {
   const subscribed = new Set<string>()
   let windowStart = Date.now()
   let windowCount = 0
-  let lastOpenUrlAt = 0
+  // Shared by `openUrl` and `openTask`: both move the reader, so they share one budget.
+  let lastNavigationAt = 0
   let alive = true
 
   const post = (message: PluginBridgeMessage): void => {
@@ -452,6 +456,33 @@ export function createFrameBridge(input: {
         services.openTarget?.({ kind: destination.targetKind, resourceId, ...(subresourceId === undefined ? {} : { subresourceId }) })
         return void post({ id, ok: true, status: 200, body: null })
       }
+      case 'openTask': {
+        const taskId = data.taskId
+        if (typeof taskId !== 'string' || !taskId || taskId.length > 300) {
+          return void post(failed(id, 'bad_request', 'openTask needs a task id'))
+        }
+        // Knowing which tasks exist is a read, so the verb rides the read scope rather than adding a
+        // grant of its own.
+        if (!binding.api.includes('core.tasks:read')) {
+          return void post(denied(id, 'openTask needs the core.tasks:read scope'))
+        }
+        // The same person's-act rule as `openUrl` below, and the same budget.
+        if (!services.frameHasFocus()) {
+          return void post(denied(id, 'openTask works from a click or key handler: the frame must be focused'))
+        }
+        const now = Date.now()
+        if (now - lastNavigationAt < NAVIGATION_MIN_GAP_MS) {
+          return void post(denied(id, 'openTask is limited to one navigation per second'))
+        }
+        lastNavigationAt = now
+        // Look up, reply, then move. The move can unmount the surface that asked, a rail source's tree
+        // most of all, and a reply posted after that is dropped (see `openUrl` below).
+        const go = services.openTask(taskId)
+        if (!go) return void post(failed(id, 'not_found', 'that task is not in the task list'))
+        post({ id, ok: true, status: 200, body: null })
+        go()
+        return
+      }
       case 'openUrl': {
         const url = data.url
         // The boundary. A URL from a frame is untrusted input on its way to the navigation layer, so the
@@ -463,16 +494,16 @@ export function createFrameBridge(input: {
         }
         // A navigation must be a person's act. A click or keypress inside the frame's document gives the
         // iframe focus, so honouring the verb only while the frame holds it means background code cannot
-        // move the reader, which the SDK's `openLinkOnClick` satisfies for free. See OPEN_URL_MIN_GAP_MS
+        // move the reader, which the SDK's `openLinkOnClick` satisfies for free. See NAVIGATION_MIN_GAP_MS
         // above for why the throttle backs the focus check up.
         if (!services.frameHasFocus()) {
           return void post(denied(id, 'openUrl works from a click or key handler: the frame must be focused'))
         }
         const now = Date.now()
-        if (now - lastOpenUrlAt < OPEN_URL_MIN_GAP_MS) {
+        if (now - lastNavigationAt < NAVIGATION_MIN_GAP_MS) {
           return void post(denied(id, 'openUrl is limited to one navigation per second'))
         }
-        lastOpenUrlAt = now
+        lastNavigationAt = now
         // The reply goes out before the effect, the opposite of every other verb here. The ladder can
         // replace the reference panel this very frame is rendering inside, which is the whole point of the
         // refPanel presentation, and doing so disposes this bridge from inside the call, so a reply posted

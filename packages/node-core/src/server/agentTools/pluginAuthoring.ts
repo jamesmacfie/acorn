@@ -100,6 +100,7 @@ const UI_OPS = {
   copy: 'write text to the clipboard — `navigator.clipboard` does not work in a frame',
   openPane: 'open a pane by id',
   openDestination: 'open a manifest-declared cooperative destination with a bounded resource id',
+  openTask: 'go to a task by id. Needs core.tasks:read, a focused frame, and shares openUrl\'s once-a-second budget',
   openUrl: 'https only, focused frame only, at most once a second, and you learn nothing back',
   'importer.done': 'importer surfaces only: close and run the host refresh',
   'importer.close': 'importers and overlays: plain dismissal. An overlay a remote tree opened may pass a '

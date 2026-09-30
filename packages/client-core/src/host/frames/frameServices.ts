@@ -10,6 +10,8 @@ import { openInAppUrl } from '../registries/panes/contentLinks'
 import { keybindingRegistry, resolveFrameKeybinding, resolveKeybindings } from '../registries/commands/keybindings'
 import { saveJsonPref } from '../../features/settings/savePref'
 import { activeTaskId } from '../../features/tasks/tasks'
+import { activateTaskSignals, pathForTask } from '../../features/tasks/activate'
+import { taskById } from '../../features/tasks/taskLookup'
 import type { FrameBinding, FrameServices } from './broker'
 import { isSubscribable } from './channels'
 import { onPluginFrame } from '../plugins/pluginChannel'
@@ -164,6 +166,19 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
     openTarget: (target) => {
       const taskId = props.binding.taskId
       if (taskId) openTarget(taskId, target)
+    },
+    // The same activate-then-navigate every task link in the shell runs (host/chrome/actions.ts).
+    //
+    // The lookup is the active node's task cache, so a surface bound to another node gets
+    // `not_found` rather than a node switch. Switch first, as the attention inbox does, if a plugin
+    // surface on a remote node ever needs this.
+    openTask: (taskId) => {
+      const task = taskById(taskId)
+      if (!task) return undefined
+      return () => {
+        activateTaskSignals(task)
+        host.navigate(pathForTask(task))
+      }
     },
     // A link clicked inside a frame's rendered content, resolved on the host's side of the port through
     // the same content-link ladder and rung-preference rule every shell surface follows

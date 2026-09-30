@@ -27,7 +27,7 @@ function host(target: FrameBinding['target'] = 'pane', authorize?: () => boolean
     fetch: vi.fn((_method, _path, _body, signal) => { signals.push(signal); return json.promise }),
     fetchBytes: vi.fn((_method, _path, _body, signal) => { signals.push(signal); return bytes.promise }),
     subscribe: () => () => {}, stateGet: () => null, stateSet: vi.fn(() => native.promise),
-    toast: vi.fn(), copy: vi.fn(), openPane: vi.fn(), openUrl: vi.fn(), frameHasFocus: () => true,
+    toast: vi.fn(), copy: vi.fn(), openPane: vi.fn(), openTask: vi.fn(), openUrl: vi.fn(), frameHasFocus: () => true,
     importerDone: vi.fn(), importerClose: vi.fn(), keydown: vi.fn(),
     document: { read: () => '', write: vi.fn(), flush: vi.fn(() => native.promise) },
     webviewNavigate: vi.fn(() => navigate.promise), webviewCommand: vi.fn(() => navigate.promise),
