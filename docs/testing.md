@@ -390,10 +390,14 @@ assertion covers the custody stack end to end. Two more check the gate: a socket
 is refused, and a plain HTTP request gets 426.
 
 It also prints how long the node took to start, from the helper's ready line to its `service.start`
-mark, and fails at 5,000 ms on Windows or 1,500 ms on other hosts. That span is spawning the node,
+mark, and fails at 10,000 ms on Windows or 1,500 ms on other hosts. That span is spawning the node,
 evaluating the service bundle, and the node's boot to a bound listener. It measured about 270 ms on
-an M2 Pro and 2,705 ms on Windows CI on 2026-10-01. The bounds leave room for shared-runner variation
-while catching startup regressions. Compare the printed number between builds on the same host.
+an M2 Pro and 2,705-5,126 ms on Windows CI on 2026-10-01. The bounds leave room for shared-runner
+variation while catching startup regressions. The desktop test command runs the boot test in a
+separate Vitest invocation after the unit suites, so their Git, database, and transformation work
+does not compete with the measured startup. `pnpm --filter @acorn/desktop test:boot` runs that
+invocation against staged files; Windows installer verification uses it against installed resources.
+Compare the printed number between builds on the same host.
 
 The Rust unit tests in `apps/desktop/src-tauri/src/` cover what a headless run cannot reach through
 the helper: the renderer CSP and the dev-only widening a packaged build must not carry, the traversal
