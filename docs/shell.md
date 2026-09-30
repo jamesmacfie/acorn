@@ -767,7 +767,9 @@ The node receives no window handle, no webview handle, and no shell object of an
 packages are bundled into them, and into the helper, except the native addons and run-time-loaded
 packages that `apps/node/externals.ts` lists. Staging materializes their installed dependency graphs under
 `dist/helper/node_modules` without pnpm directory links, so the installed helper and service resolve
-them from application resources. The shared runtime package list belongs to `scripts/nodeRuntimePackages.ts`.
+them from application resources. Shared dependencies are hoisted to that directory to keep NSIS
+input paths within Windows' legacy path limit; conflicting versions remain nested beside their
+consumers. The shared runtime package list belongs to `scripts/nodeRuntimePackages.ts`.
 Loading packages as separate files was most of the node's and the helper's startup before that. `apps/node/scripts/check-service-budget.mjs` runs after the node build, fails it when
 `service.js` and the chunks it imports statically pass a byte ceiling, and prints what is left for
 Node to resolve. Both builds write the licence text of every package they bundled beside their

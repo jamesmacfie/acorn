@@ -420,8 +420,10 @@ export class CodexAgentDriver implements AgentDriver {
       async resolveRequest(providerRequestId, resolution) {
         const request = pendingRequests.get(providerRequestId)
         if (!request) throw new Error('Codex request is no longer pending.')
+        // Built first: an answer the request never offered throws here, before anything is sent.
+        const response = codexServerRequestResponse(request, resolution)
         pendingRequests.delete(providerRequestId)
-        rpc.respond(request.id, codexServerRequestResponse(request, resolution))
+        rpc.respond(request.id, response)
       },
       async setConfig(optionId, value) {
         configOptions = configOptions.map((option) => option.id === optionId ? { ...option, currentValue: value } : option)

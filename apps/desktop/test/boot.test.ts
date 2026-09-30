@@ -209,13 +209,12 @@ describe('the Tauri shell boots its world', () => {
 
   it('starts the node within a generous bound', () => {
     // From the ready line to the node answering `service.start`: spawning it, evaluating the service
-    // bundle, and its whole boot to a bound listener. About 270 ms on an M2 Pro. The bound is wide on
-    // purpose, because a timing assertion on a shared CI runner is noisy. It is here to catch a
-    // dependency that adds seconds, and the printed number is the one to read
-    // (apps/node/externals.ts).
+    // bundle, and its whole boot to a bound listener. About 270 ms on an M2 Pro, but Windows CI
+    // measured 2,705-5,126 ms on 2026-10-01. Run this separately from the unit suites and leave
+    // room for shared-runner variation while catching startup regressions.
     const elapsed = markOffsets.get('service.start')! - markOffsets.get('ready line')!
     console.log(`[boot-test] node started ${elapsed}ms after the ready line`)
-    expect(elapsed).toBeLessThan(1_500)
+    expect(elapsed).toBeLessThan(process.platform === 'win32' ? 10_000 : 1_500)
   })
 
   it('adopts the local node into the fleet behind the ready line', async () => {

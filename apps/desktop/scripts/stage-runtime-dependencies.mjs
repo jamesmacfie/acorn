@@ -20,8 +20,13 @@ export function stageRuntimeDependencies(pkg, helper, names = requiredRuntimePac
   rmSync(modules, { recursive: true, force: true })
   const require = createRequire(join(pkg, 'package.json'))
   const roots = new Map(names.map((name) => [name, installedPackage(name, require)]))
+  const copiedRoots = new Set()
 
   function copyPackage(name, source, directory, ancestors) {
+    if (directory === modules) {
+      if (copiedRoots.has(name)) return
+      copiedRoots.add(name)
+    }
     const target = join(directory, name)
     mkdirSync(target, { recursive: true })
     cpSync(source, target, {
@@ -42,12 +47,19 @@ export function stageRuntimeDependencies(pkg, helper, names = requiredRuntimePac
       const optional = Object.hasOwn(manifest.optionalDependencies ?? {}, dependency)
         || manifest.peerDependenciesMeta?.[dependency]?.optional === true
       const installed = installedPackage(dependency, localRequire, optional)
-      if (!installed || parents.get(dependency) === installed) continue
-      copyPackage(dependency, installed, join(target, 'node_modules'), parents)
+      if (!installed || (parents.get(dependency) ?? roots.get(dependency)) === installed) continue
+      // Hoist shared packages so NSIS can read their paths within Windows' legacy path limit.
+      // A conflicting version stays beside its consumer, where Node resolves it first.
+      if (!parents.has(dependency) && !roots.has(dependency)) {
+        roots.set(dependency, installed)
+        copyPackage(dependency, installed, modules, new Map())
+      } else {
+        copyPackage(dependency, installed, join(target, 'node_modules'), parents)
+      }
     }
   }
 
-  for (const [name, source] of roots) copyPackage(name, source, modules, roots)
+  for (const [name, source] of roots) copyPackage(name, source, modules, new Map())
   writeFileSync(resolve(helper, 'package.json'), '{"type":"module"}\n')
-  console.log(`[stage] ${roots.size} runtime packages and their dependencies -> dist/helper/node_modules`)
+  console.log(`[stage] ${names.length} runtime entries, ${roots.size} hoisted packages -> dist/helper/node_modules`)
 }
