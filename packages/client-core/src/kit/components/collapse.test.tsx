@@ -200,3 +200,14 @@ describe('a row with a tip', () => {
     expect(row.getAttribute('data-tip-at')).toBe('1000')
   })
 })
+
+describe('a rail form sent as data', () => {
+  it('collapses a row from an icon name alone and keeps the label as its tip', () => {
+    render(() => <Row collapsedIcon="git-branch" label="feature/login" onPress={() => {}}>the full row</Row>, host)
+    const row = host.querySelector('.ui-row')!
+    expect(row.hasAttribute('data-collapsed')).toBe(true)
+    expect(row.getAttribute('data-tip')).toBe('feature/login')
+    expect(row.querySelector('.ui-row-collapsed svg')).not.toBe(null)
+    expect(row.textContent).not.toContain('the full row')
+  })
+})

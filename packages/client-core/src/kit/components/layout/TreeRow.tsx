@@ -26,6 +26,10 @@ export function TreeRow(props: {
   /** This row at rail width: `Row`'s slot, forwarded. The twist goes with the indentation it belongs
    *  to, since a tree at 48px has no room to show depth and nothing to reparent by. */
   collapsed?: JSX.Element
+  /** `Row`'s `collapsedIcon`, forwarded. */
+  collapsedIcon?: string
+  /** The accessible name, and a collapsed row's tooltip. */
+  label?: string
   title?: string
   children: JSX.Element
 }) {
@@ -36,8 +40,10 @@ export function TreeRow(props: {
       depth={props.depth}
       reveal={props.reveal}
       collapsed={props.collapsed}
+      collapsedIcon={props.collapsedIcon}
       density="compact"
       variant="tree"
+      label={props.label}
       title={props.title}
       meta={props.meta}
       onPress={props.onPress}

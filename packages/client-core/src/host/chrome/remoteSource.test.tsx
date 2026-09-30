@@ -20,5 +20,7 @@ it('mounts both source regions from the accepted bundle through the remote rende
     {createComponent(panel.regions!.detail, {})}
   </>, container)
   await vi.waitFor(() => expect(container.textContent).toBe(`list:browse:${hash}detail:card:${hash}`))
+  // A tree is a run of kit nodes, so its detail asks for the padded, scrolling column a pane body gets.
+  expect(panel.regions!.scroll).toBe(true)
   dispose()
 })

@@ -29,7 +29,7 @@ export function SourceSurface(props: { source: SourceContribution }) {
           <ListColumn>
             <Dynamic component={regions().list} />
           </ListColumn>
-          <DetailColumn>
+          <DetailColumn scroll={regions().scroll}>
             <Dynamic component={regions().detail} />
           </DetailColumn>
         </ListDetail>
