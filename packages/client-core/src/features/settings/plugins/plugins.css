@@ -1,0 +1,47 @@
+/* Settings > Plugins (./PluginsSettings.tsx, ./PluginPage.tsx, ./RailSurfacesSettings.tsx) and the plugin
+   strip every plugin settings page carries (./PluginStrip.tsx). */
+
+/* The strip. Outlined in the accent colour so it reads as acorn's frame around the plugin's page rather
+   than as one more of the plugin's own rows. Between the page header and the scrolling body on a plugin's
+   own page, and at the top of the tab on a workspace's or project's page. */
+.settings-plugin-strip {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: 720px;
+  margin: var(--space-5) var(--pane-pad) 0;
+  padding: var(--space-3) var(--space-5);
+  border: var(--surface-border);
+  border-color: var(--accent);
+  border-radius: var(--radius-surface);
+  background: var(--bg-subtle);
+}
+.ui-tab-panel .settings-plugin-strip { margin: 0; }
+.settings-plugin-strip-row { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-5); }
+.settings-plugin-strip-name { font-size: var(--fs-sm); color: var(--text); }
+.settings-plugin-strip-controls { margin-inline-start: auto; display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-5); }
+.settings-plugin-strip-status { margin: 0; font-size: var(--fs-sm); color: var(--text-muted); }
+.settings-plugin-strip-status[data-tone='warn'] { color: var(--warn); }
+.settings-plugin-strip-status[data-tone='danger'] { color: var(--danger); }
+
+/* Plugins acorn.json asks for (./ConfigPluginOffers.tsx): name, source, install. */
+.plugin-list {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr) max-content;
+  column-gap: var(--space-5);
+  row-gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.plugin-row { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; }
+.plugin-name { font-family: var(--font-mono); font-size: var(--fs-sm); }
+.plugin-source { font-family: var(--font-mono); font-size: var(--fs-xs); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* The events a plugin announces, on its Overview tab. */
+.plugin-emits { display: grid; gap: var(--space-1); margin: 0; padding-inline-start: var(--space-5); font-size: var(--fs-xs); }
+.plugin-emits li { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-2); }
+.plugin-emits li span { color: var(--text-muted); }
+
+.plugin-failed { font-size: var(--fs-xs); color: var(--danger); }

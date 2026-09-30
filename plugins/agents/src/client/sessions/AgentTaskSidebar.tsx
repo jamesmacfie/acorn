@@ -1,8 +1,9 @@
 import { agentTelemetry, startAgentView } from './agentTelemetry'
 import { createMemo, createEffect, onCleanup, Show } from 'solid-js'
 import type { Task } from '@acorn/plugin-api/client'
+import type { AgentSession } from '../../contract/wire.ts'
 import {
-  EmptyState, Fold, Icon, Inline, Menu, paneCollapseKey, Row, RowActions, Rows, Section, SectionHeader,
+  EmptyState, Fold, Icon, IconButton, Inline, Menu, paneCollapseKey, Row, RowActions, Rows, Section, SectionHeader,
   sidebarCollapsed, Stack, Text,
 } from '@acorn/plugin-api/ui'
 import { managedAgentStore } from './managedStore'
@@ -14,8 +15,12 @@ import RuntimeStateIcon, { SubagentStateIcon } from './RuntimeStateIcon'
 import { attentionMark } from './stateTone'
 import { subagentSummary } from './subagentDisplay'
 import { canStopAgent } from './agentActivity'
-import { delegationSummary } from './sessionRoster'
+import { agentSessionRoster, delegationSummary } from './sessionRoster'
+import {
+  compareSessions, compareSubagents, SESSION_ORDER_CHOICES, sessionOrderFor, setSessionOrder, type SessionGroup,
+} from './sessionOrder'
 import { isStale } from '../inlineDiff/patchStatus.ts'
+import { eventTime } from './eventTime'
 import {
   clearManagedSubagent, openManagedSession, selectManagedSession, selectManagedSubagent,
   selectedManagedSubagent,
@@ -36,12 +41,45 @@ import {
 // (plugins/workflows runs/paneContribution.ts), and the terminal drawer owns PTY sessions, so the
 // rows had two better homes and one confusing one (docs/workflows.md § What workflows refuses).
 
+/** The order button in a group's header. The choice is this task's and this group's alone
+ *  (./sessionOrder.ts). */
+function OrderMenu(props: { taskId: string; group: SessionGroup; label: string }) {
+  const chosen = () => sessionOrderFor(props.taskId, props.group)
+  return (
+    <Menu
+      ariaLabel={`Order ${props.label}`}
+      placement="bottom-end"
+      trigger={({ open, toggle }) => (
+        <IconButton icon="arrow-up-down" label={`Order ${props.label}`} opens="menu" expanded={open()} onPress={toggle} />
+      )}
+    >
+      {(menu) => SESSION_ORDER_CHOICES.map((choice) => (
+        <Menu.Item
+          context={menu}
+          // The same chosen mark as the changes pane's view menu, because `Menu.Item` has no checked
+          // state (plugins/changes ChangesPane.tsx).
+          leading={<Icon name={chosen() === choice.value ? 'circle-dot' : 'circle'} title={chosen() === choice.value ? 'Chosen' : undefined} />}
+          onSelect={() => setSessionOrder(props.taskId, props.group, choice.value)}
+        >
+          {choice.label}
+        </Menu.Item>
+      ))}
+    </Menu>
+  )
+}
+
 /** The list column's header: how many sessions this task has. Its own region, so it stays put while
  *  the list under it scrolls (docs/panes.md § Layout model). */
 export function AgentSidebarHeader(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
   return <SectionHeader count={model.taskSessions().length}>Agents</SectionHeader>
 }
+
+/** A session or subagent row's tooltip. `updatedAt` rather than the newest event's time: the node
+ *  rebroadcasts the row only when an event changes something else on it
+ *  (../../server/sessions/runtimeEngine.ts § listedRow), such as a turn ending or a subagent finishing,
+ *  so a running one reads as of its last state change. */
+const lastActive = (at: number) => `Last active ${eventTime(at).full}`
 
 export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
@@ -90,15 +128,25 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
   // Sessions and their subagents in one list, because they are one thing to walk with the arrows.
   // The key says which: `<session id>` or `<session id>/<subagent id>`.
   // A subagent row carries its parent session, so it lands in the same group as its parent.
+  //
+  // Each group builds the roster from every session sorted by that group's order and then keeps its
+  // own rows, so a delegated child nests exactly as it did before there was a choice, and its
+  // siblings and subagents take the group's order with it.
+  const groupRows = (group: SessionGroup, keep: (session: AgentSession) => boolean) => {
+    const order = sessionOrderFor(props.task.id, group)
+    return agentSessionRoster(
+      [...model.taskSessions()].sort(compareSessions(order)),
+      managedAgentStore.delegations(),
+      compareSubagents(order),
+    ).filter((row) => keep(row.session)).map(({ key, label }) => ({ key, label }))
+  }
   const sessionRows = createMemo(() => agentTelemetry.measure('agents.sidebar.rows', () =>
-    model.sessionRoster().filter((row) => !row.session.origin && row.session.kind !== 'workflow')
-      .map(({ key, label }) => ({ key, label }))))
-  const workflowRows = createMemo(() => model.sessionRoster()
-    .filter((row) => !row.session.origin && row.session.kind === 'workflow')
-    .map(({ key, label }) => ({ key, label })))
+    groupRows('managed', (session) => !session.origin && session.kind !== 'workflow')))
+  const workflowRows = createMemo(() => groupRows('workflow', (session) => !session.origin && session.kind === 'workflow'))
   const workflowSessionCount = createMemo(() =>
     model.taskSessions().filter((session) => !session.origin && session.kind === 'workflow').length)
-  const inlineSessions = createMemo(() => model.taskSessions().filter((session) => session.origin?.kind === 'inline-diff'))
+  const inlineSessions = createMemo(() => model.taskSessions().filter((session) => session.origin?.kind === 'inline-diff')
+    .sort(compareSessions(sessionOrderFor(props.task.id, 'inline'))))
   const inlineNeedsYou = createMemo(() => inlineSessions().filter((session) => !['none', 'unread'].includes(session.attention)).length)
   createEffect(() => agentTelemetry.observe('agents.sidebar.row_count', sessionRows().length))
   const sessionOf = (key: string) => model.sessionRoster().find((candidate) => candidate.key === key) ?? null
@@ -160,6 +208,8 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                     nested={(found()?.depth ?? 0) > 0}
                     selected={selected()}
                     title={current().title}
+                    tip={lastActive(current().updatedAt)}
+                    tipAt={current().updatedAt}
                     collapsed={collapsed()
                       ? <RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />
                       : undefined}
@@ -224,6 +274,8 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                     nested
                     selected={selected()}
                     title={child().title}
+                    tip={lastActive(child().updatedAt)}
+                    tipAt={child().updatedAt}
                     collapsed={collapsed() ? <SubagentStateIcon status={child().status} /> : undefined}
                     leading={<SubagentStateIcon status={child().status} />}
                     onPress={() => openRow(item.key)}
@@ -296,7 +348,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
         </Section>
       </Show>
 
-      <Section label="Managed sessions">
+      <Section label="Managed sessions" actions={<OrderMenu taskId={props.task.id} group="managed" label="managed sessions" />}>
         <Show
           when={sessionRows().length}
           fallback={<EmptyState size="sm" align="start">No managed sessions</EmptyState>}
@@ -305,12 +357,15 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
         </Show>
       </Section>
       <Show when={workflowRows().length}>
-        <Fold label={`Workflow runs (${workflowSessionCount()})`} persistKey="agents.workflow-runs" defaultOpen>
+        <Fold label={`Workflow runs (${workflowSessionCount()})`} persistKey="agents.workflow-runs" defaultOpen
+          actions={<OrderMenu taskId={props.task.id} group="workflow" label="workflow runs" />}>
           <SessionRows id={`agents:workflows:${props.task.id}`} ariaLabel="Workflow runs" items={workflowRows()} />
         </Fold>
       </Show>
       <Show when={inlineSessions().length}>
-        <Fold label={`Inline chats (${inlineSessions().length})`} persistKey="agents.inline-chats" meta={inlineNeedsYou() ? <Text emphasis="muted">{inlineNeedsYou()} need you</Text> : undefined}>
+        <Fold label={`Inline chats (${inlineSessions().length})`} persistKey="agents.inline-chats"
+          actions={<OrderMenu taskId={props.task.id} group="inline" label="inline chats" />}
+          meta={inlineNeedsYou() ? <Text emphasis="muted">{inlineNeedsYou()} need you</Text> : undefined}>
           <Rows
             id={`agents:inline:${props.task.id}`}
             ariaLabel="Inline chats"
@@ -327,6 +382,8 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                 density="compact"
                 selected={selected()}
                 title={session().title}
+                tip={lastActive(session().updatedAt)}
+                tipAt={session().updatedAt}
                 leading={<RuntimeStateIcon state={session().runtimeState} queued={session().queuedTurns} />}
                 trailing={<Show when={!['none', 'unread'].includes(session().attention)}><Icon {...attentionMark(session().attention)} /></Show>}
                 onPress={() => openManagedSession(props.task.id, session().id)}

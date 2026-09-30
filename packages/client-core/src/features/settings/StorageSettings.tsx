@@ -1,15 +1,14 @@
 import { createEffect, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
 import { CORE_STORAGE_POINT } from '@acorn/protocol/extensionPoints.ts'
 import type { NodeStorageReport } from '@acorn/protocol/api.ts'
-import { activeCacheId, activeNodeId } from '../../infra/node/activeNode'
-import { clearNodeCache, nodes, persistedCacheSize } from '../../infra/node/fleet'
+import { clearNodeCache, nodes, ORIGIN_NODE_ID, persistedCacheSize } from '../../infra/node/fleet'
 import { nodeStorageReport } from '../../infra/node/nodeStorage'
 import { extensionPointRegistry } from '../../host/registries/extensionPoints/extensionPoints'
 import { Slot } from '../../host/tree/Slot'
 import { formatBytes } from '../../kit/lib/rendering/formatSize'
 import { Facts } from '../../kit/components/content/Facts'
 import { Text } from '../../kit/components/content/Text'
-import { Section } from '../../kit/components/layout/Section'
+import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import { Stack } from '../../kit/components/layout/Stack'
 import { Alert, Button } from '../../kit/components/primitives'
 
@@ -19,8 +18,8 @@ import { Alert, Button } from '../../kit/components/primitives'
 // Core draws its own numbers. A plugin that holds memory or disk on the node draws its own section
 // through CORE_STORAGE_POINT, so core never calls a plugin's route. Agents is the one that does today.
 //
-// The node is the active one. Every read below names it, so the page can follow a node picker later
-// by changing `nodeId` alone.
+// Per node, following the settings header's node switcher: every read below names `props.nodeId`, and
+// the device's saved cache is the one kept for that node. `null` is the window's own node.
 
 // Registered with the page, like `core:task` is with the rail: the point exists where it is drawn.
 extensionPointRegistry.register({
@@ -37,8 +36,11 @@ const POLL_MS = 5_000
 
 type SavedCache = { bytes: number; entries: number } | null
 
-export default function StorageSettings() {
-  const nodeId = () => activeNodeId()
+export default function StorageSettings(props: { nodeId: string | null }) {
+  const nodeId = () => props.nodeId
+  // The key the fleet keeps this node's cache under, the same one `activeCacheId` names for the
+  // active node.
+  const cacheId = () => nodeId() ?? ORIGIN_NODE_ID
   const nodeLabel = () => nodes().find((node) => node.nodeId === nodeId())?.label ?? 'This node'
   const [report, setReport] = createSignal<NodeStorageReport | null>(null)
   const [saved, setSaved] = createSignal<SavedCache | undefined>(undefined)
@@ -53,7 +55,7 @@ export default function StorageSettings() {
     try {
       const [next, snapshot] = await Promise.all([
         nodeStorageReport(nodeId() ?? undefined),
-        persistedCacheSize(activeCacheId()),
+        persistedCacheSize(cacheId()),
       ])
       if (mine !== generation) return
       setReport(next)
@@ -80,7 +82,7 @@ export default function StorageSettings() {
     setClearing(true)
     setCleared('')
     try {
-      await clearNodeCache(activeCacheId())
+      await clearNodeCache(cacheId())
       setCleared('Cleared. What is on screen is loading again.')
       await read()
     } catch (failure) {
@@ -110,13 +112,13 @@ export default function StorageSettings() {
 
       <Slot point={CORE_STORAGE_POINT} props={() => ({ nodeId: nodeId() })} />
 
-      <Section label="Node process">
+      <SettingsSection id="process" label="Node process">
         <Show when={report()} fallback={<Text emphasis="muted">Loading</Text>}>
           {(value) => <Facts grouping="rows" items={[{ label: 'Memory', value: `about ${formatBytes(value().rssBytes)}` }]} />}
         </Show>
-      </Section>
+      </SettingsSection>
 
-      <Section label="Disk">
+      <SettingsSection id="disk" label="Disk">
         <Stack gap="row">
           <Show when={report()} fallback={<Text emphasis="muted">Loading</Text>}>
             {(value) => <Facts grouping="rows" items={diskFacts(value())} />}
@@ -126,9 +128,10 @@ export default function StorageSettings() {
             most every 30 seconds.
           </Text>
         </Stack>
-      </Section>
+      </SettingsSection>
 
-      <Section
+      <SettingsSection
+        id="cache"
         label="Saved cache on this device"
         actions={<Button size="sm" busy={clearing()} onPress={() => void clear()}>Clear cache</Button>}
       >
@@ -151,7 +154,7 @@ export default function StorageSettings() {
             <Text emphasis="muted" wrap>{cleared()}</Text>
           </Show>
         </Stack>
-      </Section>
+      </SettingsSection>
     </Stack>
   )
 }

@@ -1,8 +1,8 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "793aac15-e52e-4ad0-a9e6-169bea5ef4c2",
-  "prevId": "e52fb939-bfad-467e-925b-a0db22b90d83",
+  "id": "6c247142-61cf-4d84-8411-3bc3f2c4434d",
+  "prevId": "f2676b78-89ee-4314-b966-ff7022eda30b",
   "tables": {
     "agent_artifacts": {
       "name": "agent_artifacts",
@@ -722,6 +722,13 @@
           "notNull": true,
           "autoincrement": false,
           "default": 0
+        },
+        "last_event_at": {
+          "name": "last_event_at",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false,
+          "autoincrement": false
         },
         "archived_at": {
           "name": "archived_at",

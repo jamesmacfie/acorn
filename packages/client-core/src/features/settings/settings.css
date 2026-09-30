@@ -1,31 +1,42 @@
-/* Settings page (SettingsModal.tsx): a wide two-column modal, left tab rail, right scrolling pane.
-   Reuses .overlay-backdrop / .overlay from overlays.css; this widens it and lays out the columns. */
-.overlay.settings {
-  flex-direction: row;
-  width: min(820px, 94vw);
-  height: 72vh;
-  max-height: 72vh;
+/* Settings (SettingsView.tsx): a full-window layer over the shell, top bar included. The rail is a
+   fixed column, the main column scrolls, and a page is a column capped at a readable width unless it
+   asks for the whole of it. At the modal's z-level, so a menu, a select's list or a confirmation a page
+   opens, all of which portal to the body, still paint above it. */
+.settings-view {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  background: var(--bg);
 }
 
-.settings-nav {
+.settings-rail {
   flex: none;
-  width: 200px;
+  width: 248px;
   display: flex;
   flex-direction: column;
-  gap: 1px;
-  padding: var(--space-4);
-  overflow-y: auto;
+  gap: var(--space-4);
+  padding: var(--space-5) var(--space-4);
   border-right: var(--chrome-divider);
   background: var(--bg-subtle);
+  min-height: 0;
 }
-.settings-nav-group {
-  font-size: var(--fs-sm);
+.settings-rail > .ui-btn { align-self: flex-start; }
+.settings-rail > .ui-input { flex: none; }
+.settings-rail-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
+.settings-rail-group { display: flex; flex-direction: column; gap: 1px; }
+.settings-rail-heading {
+  font-size: var(--fs-xs);
   text-transform: var(--label-transform);
   letter-spacing: var(--label-tracking);
   color: var(--text-muted);
   padding: var(--space-5) var(--space-4) var(--space-2);
 }
-.settings-nav-item {
+.settings-rail-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
   font: inherit;
   font-size: var(--fs-sm);
   text-align: left;
@@ -35,58 +46,99 @@
   border-radius: var(--radius);
   padding: var(--space-3) var(--space-4);
   cursor: pointer;
+}
+.settings-rail-item[data-depth='1'] { padding-left: var(--space-8); }
+.settings-rail-item[data-depth='2'] { padding-left: calc(var(--space-8) * 2); }
+/* Hangs in the row's left padding, so a workspace's name starts where its neighbours' do whether or
+   not it has projects to show. */
+.settings-rail-chevron { flex: none; width: 1em; margin-left: -1.25em; color: var(--text-muted); text-align: center; }
+.settings-rail-item:hover { background: var(--bg-hover); }
+.settings-rail-item[aria-current='page'] { background: var(--bg-selected); }
+.settings-rail-label { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* A search result: **Page › Section** over the row label or keyword that matched, and the scope a
+   change there affects. */
+.settings-rail-result { align-items: flex-start; }
+.settings-rail-result-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
+/* A result's title wraps rather than cutting the section name, which is the half someone searched for. */
+.settings-rail-result .settings-rail-label { white-space: normal; }
+.settings-rail-result-match { font-size: var(--fs-xs); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.settings-rail-result-scope {
+  flex: none;
+  font-size: var(--fs-xs);
+  color: var(--text-muted);
+  border: var(--control-border);
+  border-radius: var(--radius-popover);
+  padding: 0 var(--space-3);
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
-.settings-nav-item:hover { background: var(--bg-hover); }
-.settings-nav-item.active { background: var(--bg-selected); color: var(--text); }
-.settings-nav-sub { padding-left: var(--space-8); }
+.settings-rail-empty { padding: var(--space-4); font-size: var(--fs-sm); }
 
-.settings-pane {
-  position: relative;
-  flex: 1;
-  min-width: 0;
+.settings-main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
+.settings-header {
+  flex: none;
   display: flex;
-  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: var(--space-5);
-  padding: var(--pane-pad);
-  overflow-y: auto;
+  padding: var(--space-7) var(--pane-pad) var(--space-5);
+  border-bottom: var(--chrome-divider);
 }
-.settings-pane .overlay-title { padding: 0 0 var(--space-4); margin: 0 var(--space-11) 0 0; }
+.settings-heading-text { min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.settings-breadcrumb { font-size: var(--fs-sm); }
+.settings-title { margin: 0; font-size: var(--fs-xl); font-weight: 600; color: var(--text); }
+.settings-header-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-3); }
+.settings-scopes { display: flex; align-items: center; gap: var(--space-2); }
+.settings-scope {
+  font-size: var(--fs-sm);
+  color: var(--text);
+  border: var(--control-border);
+  border-radius: var(--radius-popover);
+  padding: var(--space-1) var(--space-4);
+  white-space: nowrap;
+}
+.settings-back-to-rail { display: none; }
 
-.settings-section { display: flex; flex-direction: column; gap: 18px; }
+/* The scroll container is the full-width column, so the scrollbar sits at the window's edge. The page
+   grows to at least the column's height, which is what lets a plugin's frame, a flex child that takes
+   the space left, fill it the way it filled the modal's fixed-height pane. */
+.settings-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; padding: var(--pane-pad); }
+.settings-page { flex: 1 0 auto; width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: var(--space-5); }
+.settings-page[data-width='full'] { max-width: none; }
+/* A detail page's tabs (ProjectSettings.tsx): the settings body is the scroller, so a panel does not
+   clip. Clipped, it cut off the outline a search result draws around the section it landed on. */
+.settings-page .ui-tab-panel { overflow: visible; }
+/* A plugin's content, on its own page or as a tab on a workspace's or project's. Its own containing block
+   and stacking context, so nothing inside, positioned or not, can be placed or stacked over the plugin
+   strip drawn just before it (plugins/PluginStrip.tsx). Plugins cannot style their content in the first
+   place: the kit takes no class or style, a remote tree is kit nodes, and a frame is its own iframe. This
+   is the second wall. */
+.settings-body[data-plugin],
+.settings-plugin-content { contain: layout; isolation: isolate; }
+
+/* Narrow: the rail is a screen of its own, and a page opens over it with a link back. */
+@media (max-width: 900px) {
+  .settings-rail { width: 100%; border-right: 0; }
+  .settings-view[data-page-open] .settings-rail { display: none; }
+  .settings-view:not([data-page-open]) .settings-main { display: none; }
+  .settings-back-to-rail { display: block; }
+}
+
 .settings-field { display: flex; flex-direction: column; gap: var(--space-3); }
-.settings-field-row { flex-direction: row; align-items: center; gap: var(--space-4); margin-bottom: var(--space-7); }
-/* A provider block inside a section: a heading and its rows. The heading and any hint are <h3>/<p>,
-   so their UA margins would stack on top of the gap and space the rows unevenly. */
-.settings-subsection { display: flex; flex-direction: column; gap: var(--space-4); }
-.settings-subsection > :is(h3, p) { margin: 0; }
 .settings-label { font-size: var(--fs-sm); color: var(--text); }
 .settings-hint { font-size: var(--fs-sm); }
 /* Was styled only by an inline `style={{ color: 'var(--danger, #d33)' }}` at its two call sites. */
 .settings-error { margin: 0; font-size: var(--fs-sm); color: var(--danger); }
-.settings-script {
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  color: var(--text);
-  background: var(--bg);
-  border: var(--control-border);
-  border-radius: var(--radius);
-  padding: var(--space-4);
-  resize: vertical;
-  outline: none;
-}
-.settings-script:focus { border-color: var(--accent); }
 .settings-actions { display: flex; align-items: center; gap: var(--space-5); }
-.settings-section-label { margin-top: var(--space-8); font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
 /* Editable shortcut key: styled like .help-key but focusable/centred; highlights on focus while it waits for a keypress. */
 .shortcut-input { width: 3.5em; text-align: center; text-transform: lowercase; outline: none; cursor: pointer; }
 .shortcut-input:focus { border-color: var(--accent); color: var(--accent); }
-.settings-danger { margin-top: var(--space-4); padding-top: var(--space-7); border-top: var(--chrome-divider); }
+
+/* A run target's form under the project page's table (RunTargetsTable.tsx): its fields in two columns,
+   the switch and the buttons across both. */
+.run-target-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); padding: var(--space-4); border: var(--surface-border); border-radius: var(--radius-surface); }
+.run-target-form > :not(.ui-field) { grid-column: 1 / -1; }
 
 /* MCP inspector (docs/mcp.md). */
-.mcp-file { font-family: var(--font-mono); font-size: var(--fs-sm); }
 .mcp-server { display: flex; align-items: baseline; gap: var(--space-5); padding: 3px 0 3px var(--space-6); font-size: var(--fs-sm); flex-wrap: wrap; }
 .mcp-server-name { font-family: var(--font-mono); color: var(--text); }
 .mcp-server-status { color: var(--add-marker); }
@@ -95,20 +147,7 @@
 .mcp-server-cmd { max-width: 40ch; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--font-mono); }
 .mcp-server-env { font-family: var(--font-mono); }
 .shortcut-conflict { border-color: var(--del-marker); }
-.shortcut-group { display: contents; }
-/* `.help-list` is the help overlay's own scroll container, where it is the only child and owns the
-   height. Here it is one of many blocks inside the scrolling settings body, and an overflow:auto flex
-   child shrinks to nothing rather than to its content, which clipped every row in half. */
-.shortcut-group .help-list { flex: none; overflow: visible; padding: 0 0 0 var(--space-5); }
-.shortcut-group-heading { display: flex; align-items: baseline; justify-content: space-between; gap: var(--space-4); }
-.shortcut-group-disabled .help-list { opacity: 0.62; }
-.shortcut-plugin-state { margin: 0; font-size: var(--fs-xs); }
 .shortcut-claims { display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--fs-xs); }
-.shortcut-cleanup { margin-top: var(--space-8); }
-/* The runs toggle sits mid-sentence in a schedule's meta line, so it reads as the faint link the
-   sentence already is — no leading margin, which is what `.shortcut-reset` was giving it. */
-.schedule-runs.ui-btn[data-variant='bare'] { color: var(--text-faint); font-size: inherit; }
-.schedule-runs:hover { text-decoration: underline; }
 
 /* Dev-only style gallery (StyleGallery.tsx): every primitive × variant in one place so a style
    pack can be authored against the whole vocabulary at once. */
@@ -127,76 +166,9 @@
   white-space: pre;
 }
 
-/* Settings → Plugins (settings/PluginsSettings.tsx). The list is a four-column table drawn as a grid —
-   checkbox+name, version, source/status, actions — with subgrid rows so every column keeps one edge
-   across rows whatever a name or source string measures. */
-.plugin-list {
-  display: grid;
-  grid-template-columns: max-content max-content minmax(0, 1fr) max-content;
-  column-gap: var(--space-5);
-  row-gap: var(--space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.plugin-row { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; }
-.plugin-row label { display: flex; align-items: center; gap: var(--space-2); }
-.plugin-name { font-family: var(--font-mono); font-size: var(--fs-sm); }
-.plugin-required { padding-inline-start: var(--space-5); }
-.plugin-pending { font-size: var(--fs-xs); }
-/* Only present on a plugin loaded from the node's disk; a built-in's version is the app's. */
-.plugin-version { font-family: var(--font-mono); font-size: var(--fs-xs); }
-/* Source and status share the one flexible column; the source ellipsises (full text in its title)
-   rather than wrapping an absolute path across the row. */
-.plugin-meta { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
-.plugin-emits { font-size: var(--fs-xs); }
-.plugin-emits summary { cursor: pointer; color: var(--text-muted); }
-.plugin-emits ul { display: grid; gap: var(--space-1); margin: var(--space-2) 0 0; padding-inline-start: var(--space-5); }
-.plugin-emits li { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-2); }
-.plugin-emits li span { color: var(--text-muted); }
-.plugin-source { font-family: var(--font-mono); font-size: var(--fs-xs); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.plugin-failed { font-size: var(--fs-xs); color: var(--danger); }
-/* Development mode. Drawn as a warning rather than as muted meta text on purpose: it says this device
-   accepts new code for this plugin without asking, which is the loudest thing a row on this page can say
-   (docs/security.md § The dev grant). */
-.plugin-dev { font-size: var(--fs-xs); color: var(--warn); }
-/* What the node said broke. One line that shrinks and ellipsises rather than wrapping: the row is a flex
-   line with actions pinned right, and a thrown message can be a paragraph. The full text is the element's
-   `title`, and the attention row in the bell renders it unclipped. */
-.plugin-failed-reason { font-size: var(--fs-xs); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Row actions are the last grid column, pinned right. */
-.plugin-actions { display: flex; align-items: center; gap: var(--space-2); justify-self: end; }
-.plugin-confirm { font-size: var(--fs-sm); }
-.plugin-install { display: flex; align-items: center; gap: var(--space-2); }
-.plugin-install .ui-input[data-width='full'] { flex: 1; }
-.plugin-install-hint { font-size: var(--fs-xs); }
-/* The pull-up hugs the form, so it is scoped to the hint that actually follows one. The second hint
-   (folder installs only) sits under the first and keeps normal spacing rather than inheriting a negative
-   margin meant for a different neighbour. */
-.plugin-install + .plugin-install-hint { margin-top: calc(var(--space-2) * -1); }
-/* "Create a plugin" is a panel of its own — explanation first, the button under it, pinned right —
-   because it is the one control on this page that reaches an agent rather than the install route. */
-.plugin-authoring {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  border: var(--surface-border);
-  border-radius: var(--radius-surface);
-  background: var(--bg-subtle);
-}
-.plugin-authoring .muted { align-self: stretch; margin: 0; font-size: var(--fs-xs); }
-
-/* Section headings inside a settings page. Settings → Security is the first page with two independent
-   halves (backup, audit trail), and an unstyled <h3> inherits a browser default that fights every style
-   pack's type scale. */
-.settings-heading { margin: var(--space-5) 0 0; font-size: var(--fs-sm); font-weight: 600; }
-.settings-heading:first-child { margin-top: 0; }
-
-/* Settings → Security's audit trail. A list rather than a table: the rows have one strong field (what
-   happened) and one weak one (when, by whom, about what), and a table would give six columns equal
-   weight and then wrap them all on a narrow modal. */
+/* Settings → Audit log (AuditLogSettings.tsx). A list rather than a table: the rows have one strong
+   field (what happened) and one weak one (when, by whom, about what), and a table would give six
+   columns equal weight and then wrap them all in a readable-width column. */
 .audit-list { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .audit-row { display: flex; flex-direction: column; gap: var(--space-1); }
 .audit-action { font-size: var(--fs-sm); }

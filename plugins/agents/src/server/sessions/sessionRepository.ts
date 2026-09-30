@@ -153,6 +153,7 @@ export class AgentSessionRepository {
       tx.update(schema.agentSessions)
         .set({
           lastEventSeq: seq,
+          lastEventAt: timestamp,
           updatedAt: timestamp,
           ...(projection.runtimeState ? { runtimeState: projection.runtimeState } : {}),
           ...(attention ? { attention } : {}),

@@ -22,8 +22,8 @@ Every Node has its own data root and is addressed through the same HTTPS protoco
   provider sessions.
 - Workflows run file-defined orchestration with durable run state, gates, budgets, branching, and
   joins.
-- Settings covers integrations, model providers, terminals, Docker, HTTP requests, workflows,
-  MCP, agent tools, nodes, plugins, security, and appearance.
+- Settings is a full-window, searchable place for connections, model providers, agents, MCP,
+  terminals, Docker, HTTP requests, workflows, nodes, plugins, security, and appearance.
 - The headless CLI manages workspaces, projects, tasks, managed agents, workflows, and plugin commands
   through the same paired Node API. It can explicitly start a persistent local Node service.
 

@@ -84,6 +84,16 @@ The profile launchers and the Node's `mcp` entrypoint (`apps/node/src/entries/mc
 `mcp.js` beside the service) handle MCP registration. Settings → MCP config files lists the servers
 each CLI loads from its own config files, with secret values masked, and never starts one.
 
+**MCP config files reads one project, picked on the page.** It starts on the open task's project when
+there is one, and it reads the same files either way: `.mcp.json` and `.cursor/mcp.json` in the
+project's folder, and `~/.claude.json` (`GET /v1/core/projects/:id/mcp`,
+`packages/node-core/src/server/routes/projects/projects.ts`). A task's worktree checks out the same
+committed files, so the open task does not change what the page shows. **Create .mcp.json** writes
+an empty file into the project's folder and refuses any path already there, a committed symlink
+included, so it never writes where a link points (`POST /v1/core/projects/:id/mcp/starter`). A task on a new branch picks it up once it is committed.
+Both routes are device-only, like every project route. Until 2026-09-29 the two were task routes,
+`/v1/core/tasks/:id/mcp` and `/mcp/starter`, which read the open task's worktree; they are deleted.
+
 Which CLI a harness registers through, and what that CLI wants on its command line, is the harness's
 own declaration (`plugins/agents/src/server/profiles/mcpCommands.ts`). Core owns the shape of the
 exchange only — remove, then add, through a login shell, with the failure turned into a sentence — and
@@ -116,7 +126,10 @@ pass it would keep pointing at a launcher that no longer exists and show as disc
 
 ## Your own servers
 
-Settings → MCP servers holds the MCP servers acorn declares to agent sessions. The agents plugin owns
+Settings → MCP servers holds the MCP servers acorn declares to agent sessions. The page is a list,
+then one server's editor in the same pane, a form with **Save** and **Cancel**, and **Remove server**
+in the editor's danger zone. It links to MCP config files, and that page links back, because the two
+have different owners and different powers. The agents plugin owns
 them (`plugins/agents/src/server/mcpServerStore.ts`), in one row per server in its own database. A
 server is a command with arguments and an environment, or a URL with headers. A value marked secret is
 sealed by the node's secret service on the way in. The settings page reads it back as a name with no
@@ -144,6 +157,9 @@ sessions, decided on the node rather than taken from the request. The list lives
 tool ceiling. A server removed from Settings drops out of every session's next start. A server whose
 secret no longer opens, for example after the node's key changed, is left out with a transcript
 warning rather than failing the start.
+
+Nothing in Settings changes a session that is already open. **On for new sessions** seeds the next
+start, and the page says so and names `/mcp`.
 
 **`/mcp` in the composer opens the session's panel** (`plugins/agents/src/client/sessions/AgentMcpPanel.tsx`)
 instead of sending a turn. Exactly `/mcp`: `/mcp:server:prompt` is how Claude Code runs a server's

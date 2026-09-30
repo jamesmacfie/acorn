@@ -8,6 +8,7 @@ import type {
   DockerImage,
   DockerInfo,
   DockerNetwork,
+  DockerProjectMatcher,
   DockerPruneKind,
   DockerTaskSummary,
   DockerVolume,
@@ -23,6 +24,7 @@ import {
   dockerInfoRoute,
   dockerNetworkRemoveRoute,
   dockerNetworksRoute,
+  dockerProjectMatcherRoute,
   dockerPruneRoute,
   dockerTaskContainersRoute,
   dockerTaskSummaryRoute,
@@ -35,6 +37,7 @@ const post = <T>(url: string, body: unknown): Promise<T> =>
   writeJson<T>(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 
 export const fetchDockerInfo = (): Promise<DockerInfo> => readJson<DockerInfo>(dockerInfoRoute())
+export const fetchProjectMatcher = (projectId: string): Promise<DockerProjectMatcher> => readJson<DockerProjectMatcher>(dockerProjectMatcherRoute(projectId))
 export const fetchContainers = (): Promise<DockerContainerSummary[]> => readJson<DockerContainerSummary[]>(dockerContainersRoute())
 export const fetchContainerDetail = (ref: string): Promise<DockerContainerDetail> => readJson<DockerContainerDetail>(dockerContainerInspectRoute(ref))
 export const containerAction = (ref: string, action: DockerContainerAction): Promise<{ ok: true }> => post(dockerContainerActionRoute(ref), { action })

@@ -1,7 +1,9 @@
+import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { _resetSidebarCollapse, paneCollapseKey, sidebarCollapse } from '../lib/layout/collapseState'
 import { ListDetail, Row } from './primitives'
+import { Sections } from './layout/Sections'
 
 // A collapsed sidebar is two decisions taken from one signal: the column's width and each row's rail
 // form. They are made in different files and cannot reach each other, so what these pin is that both
@@ -68,6 +70,7 @@ describe('a collapsed ListDetail', () => {
     // The toggle is the one button on the edge; the grip is a separator, not a button.
     host.querySelector<HTMLElement>('.ui-listdetail-edge .ui-btn')!.click()
     expect(root.dataset.list).toBe('collapsed')
+    expect(root.dataset.collapseTo).toBeUndefined()
     expect(host.querySelector('[role="separator"]')).toBe(null)
     // A width nobody can drag to is a width that must stop being applied.
     expect(root.style.gridTemplateColumns).toBe('')
@@ -94,6 +97,41 @@ describe('a collapsed ListDetail', () => {
     toggle.click()
     expect(list.style.visibility).toBe('')
     expect(list.querySelector('input')).toBe(input)
+    expect(mounted).toBe(1)
+  })
+})
+
+describe('a pull request Sections sidebar', () => {
+  it('uses the shared collapse control and keeps its content mounted', () => {
+    let mounted = 0
+    const Overview = () => {
+      mounted += 1
+      return <input value="pull request details" />
+    }
+    render(() => (
+      <Sections
+        id="github.pull"
+        ariaLabel="Pull request"
+        header={{ id: 'details', label: 'Details', render: () => <Overview /> }}
+        sections={[]}
+        main={{ id: 'diff', label: 'Diff', render: () => <span>diff</span> }}
+      />
+    ), host)
+    const root = host.querySelector<HTMLElement>('.ui-listdetail')!
+    const input = host.querySelector<HTMLInputElement>('.ui-listdetail-list input')!
+    const toggle = host.querySelector<HTMLButtonElement>('.ui-listdetail-edge .ui-btn')!
+
+    expect(toggle.getAttribute('aria-label')).toBe('Collapse Pull request list')
+    toggle.click()
+    expect(root.dataset.list).toBe('collapsed')
+    expect(root.dataset.collapseTo).toBe('edge')
+    expect(localStorage.getItem('sidebar:sections:github.pull')).toBe('1')
+    expect(host.querySelector('.ui-listdetail-list input')).toBe(input)
+    expect(host.querySelector('.ui-listdetail-detail')?.textContent).toContain('diff')
+
+    toggle.click()
+    expect(root.dataset.list).toBe('wide')
+    expect(host.querySelector('.ui-listdetail-list input')).toBe(input)
     expect(mounted).toBe(1)
   })
 })
@@ -142,5 +180,23 @@ describe('a row in a rail', () => {
     expect(row.getAttribute('data-tip')).toBe(null)
     expect(row.dataset.depth).toBe('2')
     expect(host.querySelector('.ui-row-body')?.textContent).toBe('Fix the parser')
+  })
+})
+
+describe('a row with a tip', () => {
+  it('shows the tip at full width, its name in a rail, and never the browser tooltip too', () => {
+    const [rail, setRail] = createSignal(false)
+    render(() => (
+      <Row title="Fix the parser" tip="Last active today" tipAt={1000} collapsed={rail() ? <span>●</span> : undefined}>
+        Fix the parser
+      </Row>
+    ), host)
+    const row = host.querySelector<HTMLElement>('.ui-row')!
+    expect(row.getAttribute('data-tip')).toBe('Last active today')
+    expect(row.getAttribute('data-tip-at')).toBe('1000')
+    expect(row.getAttribute('title')).toBe(null)
+    setRail(true)
+    expect(row.getAttribute('data-tip')).toBe('Fix the parser')
+    expect(row.getAttribute('data-tip-at')).toBe('1000')
   })
 })

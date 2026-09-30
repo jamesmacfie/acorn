@@ -31,6 +31,8 @@ import { Menu } from '../../kit/components/overlays/Menu'
 import { RowActions } from '../../kit/components/layout/RowActions'
 import { Fold } from '../../kit/components/layout/Fold'
 import { Sections } from '../../kit/components/layout/Sections'
+import { SettingsSection } from '../../kit/components/layout/SettingsSection'
+import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { Composer } from '../../kit/components/inputs/Composer'
 import { DocumentTabs } from '../../kit/components/layout/DocumentTabs'
 import { FindBar } from '../../kit/components/inputs/FindBar'
@@ -73,6 +75,7 @@ export const KIT_COMPONENTS: KitTable = {
   // The compound halves, flattened: a node names one type, so `Modal.Body` and `Tabs.Panel` reach a
   // remote tree only under a name of their own.
   ModalBody: Modal.Body, ModalActions: Modal.Actions, TabPanel: Tabs.Panel, ToolbarSpacer: Toolbar.Spacer,
+  SettingsSection, SettingRow,
   Text, Link, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip, ChipRow, StatusDot, Facts,
   DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Graph, Meter, CodeBlock, Log,
   EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon,

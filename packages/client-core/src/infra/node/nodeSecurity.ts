@@ -14,7 +14,7 @@ import { readDevicePrefs } from '../persistence/devicePrefs'
 import { PrefKeys } from '../persistence/prefKeys'
 import { savePref } from '../../features/settings/savePref'
 
-// Settings → Security's reads, addressed at a named node (docs/security.md § Audit, § Filesystem and
+// The reads behind Settings → Security and backup and Settings → Audit log, addressed at a named node (docs/security.md § Audit, § Filesystem and
 // backup). The audit trail and the disk-encryption answer are facts about one machine, so a fleet-wide
 // roll-up would mislead.
 //

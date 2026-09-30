@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "e52fb939-bfad-467e-925b-a0db22b90d83",
+  "id": "f2676b78-89ee-4314-b966-ff7022eda30b",
   "prevId": "08b33b24-8bb6-482f-b8ac-f29696418eba",
   "tables": {
     "agent_artifacts": {
@@ -723,15 +723,15 @@
           "autoincrement": false,
           "default": 0
         },
-        "archived_at": {
-          "name": "archived_at",
+        "last_event_at": {
+          "name": "last_event_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,
           "autoincrement": false
         },
-        "ledger_compacted_at": {
-          "name": "ledger_compacted_at",
+        "archived_at": {
+          "name": "archived_at",
           "type": "integer",
           "primaryKey": false,
           "notNull": false,

@@ -2,16 +2,17 @@ import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NodeStorageReport } from '@acorn/protocol/api.ts'
 
-// The page polls while it is open and stops when it closes, and Clear cache clears the node on
-// screen. What clearing does to the cache is fleet.test.ts's; this pins that the button reaches it.
+// The page polls while it is open and stops when it closes, and Clear cache clears the node the
+// settings header names. What clearing does to the cache is fleet.test.ts's; this pins that the
+// button reaches it.
 const mocks = vi.hoisted(() => ({
   report: vi.fn(),
   saved: vi.fn(),
   clear: vi.fn(async () => {}),
 }))
 vi.mock('../../infra/node/nodeStorage', () => ({ nodeStorageReport: mocks.report }))
-vi.mock('../../infra/node/activeNode', () => ({ activeNodeId: () => 'node-1', activeCacheId: () => 'node-1' }))
 vi.mock('../../infra/node/fleet', () => ({
+  ORIGIN_NODE_ID: 'origin',
   nodes: () => [{ nodeId: 'node-1', label: 'Studio', endpoint: '', local: true }],
   persistedCacheSize: mocks.saved,
   clearNodeCache: mocks.clear,
@@ -38,7 +39,7 @@ beforeEach(() => {
   mocks.clear.mockClear()
   host = document.createElement('div')
   document.body.append(host)
-  dispose = render(() => <StorageSettings />, host)
+  dispose = render(() => <StorageSettings nodeId="node-1" />, host)
 })
 
 afterEach(() => {

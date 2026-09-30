@@ -55,6 +55,8 @@ acorn-plugin-sdk/remote: value Section
 acorn-plugin-sdk/remote: value SectionHeader
 acorn-plugin-sdk/remote: value SegmentedControl
 acorn-plugin-sdk/remote: value Select
+acorn-plugin-sdk/remote: value SettingRow
+acorn-plugin-sdk/remote: value SettingsSection
 acorn-plugin-sdk/remote: value Slot
 acorn-plugin-sdk/remote: value Spinner
 acorn-plugin-sdk/remote: value SplitCell

@@ -10,7 +10,7 @@ vi.mock('@tanstack/solid-query', () => ({
   useQueryClient: () => ({}),
 }))
 vi.mock('../../infra/queries', () => ({ prefsOptions: () => ({}) }))
-vi.mock('./savePref', () => ({ saveJsonPref: mocks.saveJsonPref }))
+vi.mock('./savePref', () => ({ saveJsonPref: mocks.saveJsonPref, withFailuresThrown: (write: () => unknown) => write() }))
 vi.mock('../notifications/deliver', () => ({ defaultDeliveryContext: {}, deliverNotice: vi.fn() }))
 vi.mock('../tasks/tasks', () => ({ activeTaskId: () => 't1' }))
 
@@ -40,7 +40,8 @@ afterEach(() => {
 })
 
 const boxes = () => [...host.querySelectorAll<HTMLInputElement>('input[type=checkbox]')]
-const box = (label: string) => boxes().find((el) => el.closest('label')?.textContent?.includes(label))!
+// Each switch is named by its row's label, which is the only visible text beside it.
+const box = (label: string) => host.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!
 
 const toggle = (label: string) => {
   const el = box(label)

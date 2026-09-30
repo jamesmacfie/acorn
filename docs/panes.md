@@ -284,7 +284,8 @@ named by the pane contribution, so a surface that wants a different arrangement 
 regions everywhere has to be a layout — except a browse source's detail region is not a pane and cannot
 name one. So the shape is a kit node instead, and both call sites reach it: the desktop draws a header
 over a column of folds beside the main region, and the terminal draws a strip of tabs over one panel
-([ui-design.md § The closed kit](./ui-design.md)).
+([ui-design.md § The closed kit](./ui-design.md)). When there is a main region, the desktop's shared
+`ListDetail` control closes the section column to its edge while keeping the content mounted.
 
 The node takes its two columns two ways, and both matter. A caller with an element to spare passes the
 left one as `list`; a caller that cannot — a remote tree, whose props are JSON on a message port —

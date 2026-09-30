@@ -84,6 +84,7 @@ export { rowHeightSm } from '@acorn/client-core/kit/lib'
 // it is presentation only, a protocol type in and two selects out, and a plugin whose own route calls
 // `core.models.generateText` needs to offer the picker from a frame.
 export { default as ModelBackendPicker } from '@acorn/client-core/features/settings/models/ModelBackendPicker.tsx'
+export { default as ModelPickerPopover } from '@acorn/client-core/features/settings/models/ModelPickerPopover.tsx'
 export { defaultModelIdFor } from '@acorn/client-core/features/settings'
 
 // ── Diff rows ─────────────────────────────────────────────────────────────────────────────────
@@ -108,6 +109,11 @@ export { Text } from '@acorn/client-core/kit/components/content'
 export { Link } from '@acorn/client-core/kit/components/content'
 export { Heading } from '@acorn/client-core/kit/components/content'
 export { Section } from '@acorn/client-core/kit/components/layout'
+// A settings page's titled group and its one setting: the label left, the control right, and the
+// Saved signal, the error, Reset and a value set elsewhere drawn the same way on every page. The save
+// helpers that drive them are on ./client (docs/frontend.md § Settings).
+export { SettingRow, SettingsSection } from '@acorn/client-core/kit/components/layout'
+export type { SettingRowProps, SettingsSectionProps } from '@acorn/client-core/kit/components/layout'
 export { Timeline, type TimelineControls } from '@acorn/client-core/kit/components/content'
 export type { ReadingPlace } from '@acorn/client-core/kit/lib'
 // Which of a long timeline's turns to draw: the newest page, and more on "Show earlier". A rule, not a

@@ -11,9 +11,10 @@
 // mounted by the shell once the seam is up.
 import { createSignal } from 'solid-js'
 
-/** `off`, `bell`, `terminal`, or `both`, the same shape as `ACORN_TUI_OSC52`. There is no device
- *  preference store here, so the environment is the switch. Anything unrecognised reads as `both`,
- *  which is the default.
+/** `off`, `bell`, `terminal`, or `both`, the same shape as `ACORN_TUI_OSC52`. The environment is the
+ *  switch, read once at startup, and Settings › General › Notifications shows what it chose rather
+ *  than writing a preference of its own (../chrome/TerminalNotifications.tsx). Anything unrecognised
+ *  reads as `both`, which is the default.
  *
  *  Here rather than in ./bell.ts, where phase 3 left it, because both channels read it and this is
  *  the file the platform seam may import. `bell.ts` re-exports it. */

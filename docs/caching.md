@@ -128,8 +128,8 @@ snapshot only if it was fetched in the last day, which matches the query client'
 week-old entry is drawn once and then dropped unless its screen refetched it, and the longer restore
 window does not make the snapshot any bigger.
 
-**Clear cache** on Settings > Storage and memory empties the active node's cache while it stays
-connected (`clearNodeCache` in `packages/client-core/src/infra/node/fleet.ts`). It removes every entry
+**Clear cache** on Settings > Machines > Storage and memory empties the cache of the node the settings
+header's node switcher names, while it stays connected (`clearNodeCache` in `packages/client-core/src/infra/node/fleet.ts`). It removes every entry
 nothing is drawing, deletes the saved snapshot through the host's cache store, and refetches the
 queries on screen. Those rows stay drawn until their refetch lands, so the window does not go blank.
 The persister writes a new snapshot within five seconds, holding only what was on screen. It is not

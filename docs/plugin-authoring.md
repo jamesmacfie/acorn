@@ -18,7 +18,7 @@ Install `acorn-plugin-types` for editor completion on the node context.
 To install a plugin on a device, include a `client` entry and client contributions in
 `acorn-plugin.json`. Omit `node`, `migrations`, Node permissions, and contributions that need a Node
 handler (routes, schedules, tools, context sections, providers, harnesses, task checks, audit actions,
-data sources, and discovery handlers). Settings → Plugins → On this device accepts GitHub releases,
+data sources, and discovery handlers). **Install…** under **Settings > Plugins > Installed**, aimed at **This device**, accepts GitHub releases,
 npm packages, HTTPS tarballs, and local folders on hosts with a folder picker. Each new bundle hash
 requires trust on that device. See [Device-held plugins](./plugins/activation.md#device-held-plugins).
 

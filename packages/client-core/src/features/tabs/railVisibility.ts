@@ -1,10 +1,12 @@
-import type { QueryClient } from '@tanstack/solid-query'
+import { createMemo } from 'solid-js'
+import { createQuery, useQueryClient, type QueryClient } from '@tanstack/solid-query'
+import { prefsOptions } from '../../infra/queries'
 import { defaultSourceId, sourceRegistry, type SourceContribution } from '../../host/registries/sources/sources'
 import { commandRegistry } from '../../host/registries/commands/commands'
 import type { SourceEntry } from './railSources'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { readDevicePrefs } from '../../infra/persistence/devicePrefs'
-import { saveJsonPref } from '../settings/savePref'
+import { saveJsonPref, type SavePrefOptions } from '../settings/savePref'
 import { selectedSource, setSelectedSource } from '../tasks/tasks'
 
 // Whether the desktop rail draws a plugin source's icon (docs/frontend.md § Registries and plugins).
@@ -57,11 +59,28 @@ export function pluginSources(pluginId?: string): { pluginId: string; source: So
 
 /** Save one switch. Read from the device store rather than the query cache, so two quick writes build
  *  on each other instead of the second one undoing the first. Hiding the source on screen takes the
- *  user Home, which is the one place this preference changes what is selected. */
-export async function setShownInRail(queryClient: QueryClient, pluginId: string, sourceId: string, shown: boolean): Promise<void> {
+ *  user Home, which is the one place this preference changes what is selected. Resolves whether the
+ *  write landed, so a settings switch can show the stored value again when it did not. */
+export async function setShownInRail(
+  queryClient: QueryClient, pluginId: string, sourceId: string, shown: boolean, options?: SavePrefOptions,
+): Promise<boolean> {
   const next = { ...parseRailVisibility(readDevicePrefs()[PrefKeys.railVisibility]), [railVisibilityKey(pluginId, sourceId)]: shown }
-  await saveJsonPref(queryClient, PrefKeys.railVisibility, next)
-  if (!shown && selectedSource() === sourceId) setSelectedSource(defaultSourceId() ?? null)
+  const saved = await saveJsonPref(queryClient, PrefKeys.railVisibility, next, options)
+  if (saved && !shown && selectedSource() === sourceId) setSelectedSource(defaultSourceId() ?? null)
+  return saved
+}
+
+/** The switch's two halves for a settings page: whether a source is drawn, read reactively from the
+ *  preference, and a write that reports whether it landed. */
+export function createRailVisibility() {
+  const queryClient = useQueryClient()
+  const prefs = createQuery(() => prefsOptions(true))
+  const visibility = createMemo(() => parseRailVisibility(prefs.data?.[PrefKeys.railVisibility]))
+  return {
+    shown: (sourceId: string) => shownInRail(sourceId, visibility()),
+    setShown: (pluginId: string, sourceId: string, shown: boolean, options?: SavePrefOptions) =>
+      setShownInRail(queryClient, pluginId, sourceId, shown, options),
+  }
 }
 
 /** The command id docker, agents and github already use for "open my source". The palette's

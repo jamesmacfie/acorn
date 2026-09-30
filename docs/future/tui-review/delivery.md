@@ -31,6 +31,8 @@ this phase, not its completion.
    identifies the local Node, and offers agent/provider setup without requiring it.
 2. Add a Settings command group and terminal pages for the settings needed by the feature inventory.
    Use existing Node and device config APIs; expose editable paths where the desktop uses pickers.
+   The route and its listing shipped on 2026-09-30 ([tui.md](../../tui.md#settings)); the terminal
+   forms for the pages it lists as **desktop app** remain.
 3. Add clear help for absent external integrations, offline Nodes, and missing CLIs. Return to setup
    from the palette after onboarding.
 

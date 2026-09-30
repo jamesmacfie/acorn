@@ -67,6 +67,7 @@
     "./schedules.ts": "./src/runtime/schedules.ts",
     "./search.ts": "./src/content/search.ts",
     "./serviceProtocol.ts": "./src/device/serviceProtocol.ts",
+    "./settingsPages.ts": "./src/chrome/settingsPages.ts",
     "./sessionActivity.ts": "./src/agents/sessionActivity.ts",
     "./styleValues.ts": "./src/appearance/styleValues.ts",
     "./task.ts": "./src/projects/task.ts",

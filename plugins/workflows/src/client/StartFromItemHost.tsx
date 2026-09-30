@@ -15,6 +15,7 @@ import {
 import { PromoteToTaskModal } from '@acorn/plugin-api/ui/host'
 import { Field, Input, Select } from '@acorn/plugin-api/ui'
 import { workflowApi } from './workflowsClient'
+import { startWorkflow } from './startWorkflow'
 import { closeStartFromItem, collectItemWorkflowInputs, itemWorkflowInputsReady, prefillFromItem, prefillFromRecord, startFromItemTarget } from './startFromItem'
 
 // "Start workflow…" on an integration's row, drawn (docs/workflows.md § Starting a run).
@@ -90,7 +91,7 @@ function StartFromItem(props: { target: import('./startFromItem').WorkflowSource
   // editor's Run and the palette make, so a refusal reads the same everywhere; the modal catches the
   // throw and keeps itself open with the message.
   const start = async (taskId: string, defId: string, inputs: Record<string, DataValue>): Promise<void> => {
-    const answer = await workflowApi.start(taskId, { defId }, Object.keys(inputs).length ? inputs : undefined)
+    const answer = await startWorkflow(taskId, { defId }, Object.keys(inputs).length ? inputs : undefined)
     if (answer.error) throw new Error(answer.error)
     if (answer.runId) started.set(taskId, answer.runId)
   }

@@ -1,7 +1,7 @@
 import type { KitTable } from '@acorn/client-core/host/tree'
 import {
   Card, DetailColumn, DocumentTabs, Fold, Inline, ListColumn, ListDetail, Menu, Modal, ModalActions,
-  ModalBody, Popover, Section, SectionHeader, Sections, SplitHandle, Stack, TabPanel, Tabs, Timeline,
+  ModalBody, Popover, Section, SectionHeader, Sections, SettingRow, SettingsSection, SplitHandle, Stack, TabPanel, Tabs, Timeline,
   Toolbar,
   ToolbarSpacer,
 } from './grouping'
@@ -37,7 +37,7 @@ export const KIT_COMPONENTS: KitTable = {
   Modal, Menu, Popover, ListDetail, ListColumn, DetailColumn, Sections, SplitHandle, DocumentTabs, SectionHeader,
   // The compound halves, flattened: a node names one type, so `Modal.Body` and `Tabs.Panel` reach a
   // remote tree only under a name of their own.
-  ModalBody, ModalActions, TabPanel, ToolbarSpacer,
+  ModalBody, ModalActions, TabPanel, ToolbarSpacer, SettingsSection, SettingRow,
   Text, Link, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip, ChipRow, StatusDot, Facts,
   DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Graph, Meter, CodeBlock, Log, Markdown, DiffPane, DiffLine,
   FileHead, StackedDiff, NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon,

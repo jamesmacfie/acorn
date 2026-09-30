@@ -96,7 +96,11 @@ export const workflowsClientPlugin: ClientPlugin = {
       component: () => createComponent(StartFromItemHost, {}),
     })
     ctx.settingsPages.register({
-      id: 'workflows', label: 'Workflows', group: 'general', order: 50, requires: { plugin: 'workflows' },
+      id: 'workflows', label: 'Workflows', category: 'automation', scope: 'node', icon: 'workflow', order: 30, requires: { plugin: 'workflows' },
+      // The page's one section, for search (WorkflowsSettings.tsx draws it). Its rows are the loaded
+      // definitions, which are per task, so there are no row labels to declare.
+      keywords: ['definitions', 'toml', 'parse errors', 'rescan'],
+      sections: [{ id: 'loaded', label: 'Loaded workflows', keywords: ['.acorn/workflows'] }],
       component: WorkflowsSettings,
     })
   },

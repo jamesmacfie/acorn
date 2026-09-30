@@ -54,7 +54,7 @@ desktop and in `acorn` in a terminal, and expect the two to agree.
     actually stored. Open Settings → Appearance: it agrees.
 37. With the palette open over a task, switch node or task from another window or another pane. The
     palette closes rather than acting on rows fetched for somewhere else.
-38. Open a plugin's search frame, then disable that plugin from Settings → Plugins. The frame closes,
+38. Open a plugin's search frame, then disable that plugin from Settings → Plugins → Installed. The frame closes,
     nothing is invoked, and the plugin's whole group is gone from the root. Re-enable it: the group and
     everything under it come back, once.
 39. Find a Rollbar issue from the palette and pick it. The URL changes and the surface beside the rail

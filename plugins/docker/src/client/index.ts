@@ -10,6 +10,7 @@ import { dockerSourceContribution } from './sourceContribution'
 import { CONTAINER_KEY } from './extensionPoints'
 
 const DockerSettings = lazy(() => import('./DockerSettings'))
+const DockerProjectSettings = lazy(() => import('./DockerProjectSettings'))
 
 export const dockerClientPlugin: ClientPlugin = {
   name: 'docker',
@@ -49,7 +50,23 @@ export const dockerClientPlugin: ClientPlugin = {
     ctx.agentContexts.register(dockerAgentContextContribution)
     ctx.persistedStateSlices.register(dockerPrefsSlice)
     ctx.settingsPages.register({
-      id: 'docker', label: 'Docker', group: 'general', order: 65, component: DockerSettings,
+      id: 'docker', label: 'Docker', category: 'features', scope: 'device', icon: 'container', order: 20,
+      // The host draws the rail icon's switch in the plugin strip above the page.
+      railSourceVisibility: ['docker'],
+      // The page's sections and rows, for search (DockerSettings.tsx draws the same ones).
+      keywords: ['containers', 'compose', 'daemon', 'engine'],
+      sections: [
+        { id: 'daemon', label: 'Daemon', rows: ['Docker engine'] },
+        { id: 'behaviour', label: 'Behaviour', rows: ['Ask twice before destructive actions', 'Show stopped containers in the Docker source'], keywords: ['confirm', 'prune', 'stopped'] },
+        { id: 'linking', label: 'Task linking', rows: ['Per-repo matcher'], keywords: ['config.toml', 'labels', 'compose project'] },
+      ],
+      component: DockerSettings,
+    })
+    // The per-project half: a Docker tab on every project's settings page, for the `[docker]` keys
+    // each project's checkout sets. A project page draws it, so it has no rail row of its own.
+    ctx.settingsPages.register({
+      id: 'docker.project', label: 'Docker', category: 'features', scope: 'project', icon: 'container', order: 20,
+      component: DockerProjectSettings,
     })
   },
 }

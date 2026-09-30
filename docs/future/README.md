@@ -14,12 +14,12 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | Folder | What it is | Status |
 | --- | --- | --- |
-| [cloud/](./cloud/README.md) | Team control plane, private Node relay, full task Nodes, plugin policy, archival, hosting, and delivery plan. | Proposed, 2026-09-29; technical gates remain. |
+| [cloud/](./cloud/README.md) | Hosted cloud tasks: account service, team Nodes, relay, task workers, archive, isolation, plugin policy, billing, and eleven deployable phases. | Proposed, 2026-09-29; nothing built. |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
 | [dashboards/](./dashboards/README.md) | Remaining taskless database and write-back proposals. Shared data discovery and authoring now belong to workflow v2. | Redesign shipped; overlapping proposals superseded, 2026-09-13. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
-| [tui-review/](./tui-review/README.md) | Live terminal UX audit, feature inventory, host projections, and acceptance plan. | Icon removal and startup repair implemented; broader acceptance open. |
+| [tui-review/](./tui-review/README.md) | Live terminal UX audit, feature inventory, host projections, and acceptance plan. | Icon removal, startup repair, and the Settings route (the navigation P0) implemented; broader acceptance open. |
 
 ## The single files
 
@@ -64,6 +64,11 @@ grammar, output schemas, service lifecycle, and examples; [Node distribution](..
 owns packaging; [API reference](../api-reference.md) owns the invocation route; and
 [CLI command authoring](../plugin-authoring/cli-commands.md) owns the loaded-plugin descriptor.
 The five-phase proposal and its refused alternatives remain in git history.
+
+`rail-source-visibility.md` shipped on 2026-09-30 and was deleted. [Frontend](../frontend.md#rail-source-visibility)
+owns the preference, the rail projection, and the palette opener; [the manifest](../plugin-authoring/the-manifest.md)
+owns `showInRailByDefault` and `railSourceVisibility`; [activation](../plugins/activation.md#the-plugin-strip)
+owns the plugin strip; and [testing](../testing.md) holds the manual checks.
 
 `approval.md` shipped on 2026-09-29 and was deleted. [Workflow
 execution](../workflows/execution.md#human-gates) owns the gate form's contract,

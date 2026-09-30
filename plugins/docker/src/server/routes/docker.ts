@@ -12,6 +12,7 @@ import type {
   DockerImage,
   DockerInfo,
   DockerNetwork,
+  DockerProjectMatcher,
   DockerPruneKind,
   DockerTaskSummary,
   DockerVolume,
@@ -35,6 +36,8 @@ export type DockerBridge = {
   taskSummary(): Promise<DockerTaskSummary[]>
   taskContainers(taskId: string): Promise<DockerContainerSummary[]>
   taskTeardown(taskId: string): Promise<{ ok: true }>
+  /** A project's `[docker]` keys, read from its checkout and the home config (../dockerConfig.ts). */
+  projectMatcher(projectId: string): Promise<DockerProjectMatcher>
 }
 
 export const DOCKER = routeCapability<DockerBridge>('docker.route')
@@ -75,6 +78,7 @@ export const docker = new Hono<AppEnv>()
   .use('/prune', requireDevice)
   .use('/compose/*', requireDevice)
   .use('/task-summary', requireDevice)
+  .use('/projects/*', requireDevice)
   .get('/info', (c) => viaBridge(c, DOCKER, (b) => b.info()))
   .get('/containers', (c) => viaBridge(c, DOCKER, (b) => b.containers()))
   .get('/containers/:ref/inspect', (c) => {
@@ -125,5 +129,8 @@ export const docker = new Hono<AppEnv>()
     return viaBridge(c, DOCKER, (b) => b.composeAction(p.data.project, p.data.action))
   })
   .get('/task-summary', (c) => viaBridge(c, DOCKER, (b) => b.taskSummary()))
+  // Read only. The keys are in a committed file, and a write there would change the repo-config trust
+  // snapshot, so every task would ask to trust the repo again for an edit to three matcher keys.
+  .get('/projects/:id/matcher', (c) => viaBridge(c, DOCKER, (b) => b.projectMatcher(c.req.param('id'))))
   .get('/tasks/:id/containers', (c) => viaBridge(c, DOCKER, (b) => b.taskContainers(c.req.param('id'))))
   .post('/tasks/:id/teardown', (c) => viaBridge(c, DOCKER, (b) => b.taskTeardown(c.req.param('id'))))

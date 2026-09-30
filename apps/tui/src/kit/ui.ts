@@ -10,7 +10,7 @@
 // of saying which node has not been drawn yet.
 export {
   Card, DetailColumn, DocumentTabs, Fold, Inline, ListColumn, ListDetail, Menu, Modal, ModalActions,
-  ModalBody, Popover, Section, SectionHeader, Sections, SplitHandle, Stack, TabPanel, Tabs, Timeline,
+  ModalBody, Popover, Section, SectionHeader, Sections, SettingRow, SettingsSection, SplitHandle, Stack, TabPanel, Tabs, Timeline,
   Toolbar, ToolbarSpacer,
 } from './grouping'
 export {
@@ -20,7 +20,7 @@ export {
 } from './showing'
 export {
   Button, Checkbox, Composer, ConfirmButton, CopyButton, Field, FindBar, IconButton, Input, KeyValueEditor,
-  MentionTextarea, ModelBackendPicker, Picker, PickerRow, SegmentedControl, Select, Textarea,
+  MentionTextarea, ModelBackendPicker, ModelPickerPopover, Picker, PickerRow, SegmentedControl, Select, Textarea,
   ToggleButton,
 } from './asking'
 export { Fallback, Only, Rectangle } from './pixels'
@@ -37,6 +37,7 @@ export type { ItemProps } from '../keys/collection'
 // The prop-shape types a pane names in its own signatures. Types only, from the kit's own
 // declarations, so the two hosts cannot disagree about what a node takes.
 export type { ButtonProps, InputProps, SelectOption, SelectProps } from '@acorn/client-core/kit/components/primitives.tsx'
+export type { SettingRowProps, SettingsSectionProps } from '@acorn/client-core/kit/components/layout'
 export type { PickerItem, PickerProps } from '@acorn/client-core/kit/components/inputs/Picker.tsx'
 export type { KitSection } from '@acorn/client-core/kit/components/layout'
 export type { TimelineControls } from '@acorn/client-core/kit/components/content'

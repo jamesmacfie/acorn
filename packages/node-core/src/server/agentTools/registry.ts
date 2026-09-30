@@ -72,8 +72,9 @@ export function isToolPermitted(tool: Pick<AgentToolContribution, 'name' | 'risk
 
 // ─── The contribution point ─────────────────────────────────────────────────────────────────────
 // Who contributed a tool. The plugin host binds a plugin id, so a plugin can't register on another's
-// behalf; 'core' identifies core-owned tools. Not projected anywhere: it exists so a contributor can be
-// removed as a unit, which is why routes carry a `plugin` field too.
+// behalf; 'core' identifies core-owned tools. It exists so a contributor can be removed as a unit,
+// which is why routes carry a `plugin` field too. The only projection is the Settings catalog, which
+// groups a plugin's tools together; an agent never sees it.
 type Registration = { owner: string; tool: AgentToolContribution }
 
 class AgentToolRegistry {

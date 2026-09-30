@@ -195,8 +195,9 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
   back at 100, the palette opening on its chord and giving the keys back where it found them, a
   notification appearing above the footer without taking focus, and `q` asking before it stops a node
   this `acorn` started. A reachability file (`src/reachability.test.tsx`) is the keyboard's property
-  rather than a scenario: it walks every stop on eight surfaces, which are the browse rail, the six
-  panes the pane sweep opens, and the browse rail again with the cheat sheet open over it. After
+  rather than a scenario: it walks every stop on nine surfaces, which are the browse rail, the six
+  panes the pane sweep opens, the browse rail again with the cheat sheet open over it, and the
+  Settings route open on Notifications, the one core page the terminal draws a form for. After
   every press it asks that at most one caret is drawn, that focus is on a node still on screen, that
   the word the footer puts beside each bare key is what that key does there, that the one focus value
   names a node that is in the tree and can hold the keys, and that the keys have not reached out of
@@ -691,7 +692,7 @@ desktop and in `acorn` in a terminal, and expect the two to agree.
     actually stored. Open Settings → Appearance: it agrees.
 37. With the palette open over a task, switch node or task from another window or another pane. The
     palette closes rather than acting on rows fetched for somewhere else.
-38. Open a plugin's search frame, then disable that plugin from Settings → Plugins. The frame closes,
+38. Open a plugin's search frame, then disable that plugin from Settings → Plugins → Installed. The frame closes,
     nothing is invoked, and the plugin's whole group is gone from the root. Re-enable it: the group and
     everything under it come back, once.
 39. Find a Rollbar issue from the palette and pick it. The URL changes and the surface beside the rail
@@ -737,7 +738,7 @@ real remote with real credentials does.
     puts the branch back where it was. Last, commit from a terminal in the same worktree and watch the
     ahead count move without touching the pane.
 46. With no model provider connected and no agent CLI installed, the commit toolbar has no wand at the
-    left of it. Connect one in Settings, under Integrations, reopen the pane, and stage two files.
+    left of it. Add one in Settings, under AI models, reopen the pane, and stage two files.
     Press the wand: it spins, and
     within ten seconds the editor holds a subject and a body. Commit, and the message lands. Now type
     a message of your own and press the wand again: it reads **Replace?** and does nothing until a
@@ -827,7 +828,7 @@ Next is the editor's **Generate** button
 and drives the reader from a table, and neither can see whether the teaching worked on a real model.
 
 57. With nothing to generate with, no key and no agent CLI, the editor toolbar has no **Generate**
-    between the tab strip and **Undo**. Connect one in Settings, under Integrations, reopen a workflow
+    between the tab strip and **Undo**. Add one in Settings, under AI models, reopen a workflow
     row, and press it.
     Describe the owner's first workflow in words: two agents investigate one issue from different
     angles at the same time, a third reads both and writes the synthesis, and somebody approves
@@ -850,7 +851,7 @@ machine, or the wizard's own flow around the step.
     one that offers a one-shot mode and is not there is a quiet row saying so, with no alert. Press a
     provider card, paste a key, and press **Connect**: the rows above gain that provider, and the
     step's **Next** was enabled before you did any of it. Then walk the wizard again on a machine
-    with no CLI installed and no key: the step says Settings, under Integrations, is where this lives,
+    with no CLI installed and no key: the step says Settings, under AI models, is where this lives,
     and **Next** still works.
 
 The last four are the Generate list's, owed since the backends over installed agent CLIs shipped and
@@ -874,7 +875,7 @@ and no API key at all. Run them with the keys disconnected first.
     ([managed-agents.md](./managed-agents.md) § Harnesses).
 61. Pick Anthropic in the commit wand, then open **Generate** in the workflow editor: it opens on
     Anthropic. Disconnect the key and open it again: it opens on Claude Code. Change the default in
-    Settings, under Integrations, and both open on that instead. The SQL dialog is expected not to
+    Settings, under AI models, and both open on that instead. The SQL dialog is expected not to
     follow any of this and to open on the first backend every time
     ([state-ownership.md](./state-ownership.md) § Scope rules).
 62. The acceptance test for the manifest one-shot block, which needs `opencode` installed. Write the
@@ -890,7 +891,7 @@ the available checkout cannot launch the app without GitHub credentials. The aut
 the Node, storage, MCP, runtime, and component contracts; these items remain the provider-backed
 acceptance pass.
 
-63. Enable the execute tier in Settings → Agent tools. From a Claude Code terminal, call
+63. Enable the execute tier in Settings → Tools and permissions. From a Claude Code terminal, call
     `agent_spawn` once with shared isolation and once with worktree isolation. Use `agent_wait` and
     paged `agent_read` to collect each answer, then use `agent_prompt` for a second turn and
     `agent_cancel` on an active turn. Repeat from a Codex terminal. Confirm that retrying the original
@@ -1091,18 +1092,18 @@ when the annotation or rail contracts change.
      shows the instructions in full, that the agent is listed with **Duplicate** but not **Edit**, and
      that disabling the package takes it out of **New**.
 
-103. Install a loaded plugin whose source declares `showInRailByDefault: false` and whose settings page
+145. Install a loaded plugin whose source declares `showInRailByDefault: false` and whose settings page
      declares `railSourceVisibility`. Confirm that no rail icon appears and the palette offers
      **Open <label>**, which opens the source without adding the icon.
-104. Turn **Show in left rail** on from the plugin's page. Confirm that the icon appears at once, the
+146. Turn **Show in left rail** on from the plugin's page. Confirm that the icon appears at once, the
      switch under Settings > Plugins agrees, and the current view does not change. Drag the icons, hide
      it again while it is selected, and confirm that the window returns to Home and the drag kept its
      slot.
-105. Hide a project-scoped source such as GitHub. From Home with no project routed, run its palette
+147. Hide a project-scoped source such as GitHub. From Home with no project routed, run its palette
      opener and confirm that the palette keeps an error instead of closing. Disable the plugin and
      confirm that its switch and opener disappear, then re-enable it and confirm that the saved choice
      returns.
-106. In `acorn`, confirm that the hidden source is still listed in the terminal's source menu.
+148. In `acorn`, confirm that the hidden source is still listed in the terminal's source menu.
 
 Checks 96–99 passed on 2026-09-27 with an isolated `dev:agent` data root and a loaded fixture plugin.
 The Tauri window refreshed only that plugin after its push, cleared marks across disable, enable,
@@ -1111,18 +1112,173 @@ task id without retaining the other node's label. The real terminal projected si
 as `+6`; `Shift+F10` opened **Task markers**, and End reached the sixth label. That run also caught and
 fixed a long-title layout that could previously shrink the disclosure out of the row.
 
+The following checks cover [frontend.md](./frontend.md) § Settings. The rail's order, deep links, the
+remembered page, and the settings-local node switcher have automated coverage in
+`packages/client-core/src/features/settings/SettingsView.test.tsx`; these checks cover the window.
+
+103. Open a task with a running agent session and a terminal running `top`. Press ⌘, and confirm that
+     settings covers the whole window, top bar included. Wait ten seconds, press Escape, and confirm
+     that the agent's transcript and `top` kept updating and that the terminal has focus again.
+104. Open settings, click into the search field, and type into it. Confirm that nothing reaches the
+     terminal underneath. Press F6 or the region chord from a rail row and confirm that focus stays
+     in settings.
+105. Walk every group in the rail and open each page once. Confirm that each page's body draws, that
+     its breadcrumb names its group, and that the scope chip reads **This device**, **Node: <label>**,
+     or **Workspace: <name>** as the page's registration says.
+106. Pair a second node. On Installed, Security and backup, Audit log, Schedules, Run history, and
+     Telemetry, switch the header to the second node and confirm that the page shows that node's
+     data while the top bar's node, after closing settings, is still the first. On Services and
+     on a loaded plugin's page, confirm that the chip is plain text naming the active node.
+107. From the GitHub pane's shortcuts link, confirm that settings opens on **Keyboard shortcuts**.
+     From the palette's **Settings** group, confirm that every page in the rail has a row and that
+     picking one while settings is open moves to that page.
+108. With a Select open on Appearance, press Escape once. Confirm that the list closes and settings
+     stays open. Press Escape again and confirm that settings closes.
+109. Narrow the window below 900 px. Confirm that the rail fills the window, that picking a page shows
+     the page with a **‹ Settings** link, and that the link returns to the rail.
+
+The next checks cover [frontend.md](./frontend.md) § Search and deep links and § Pages and the save
+model. Saved, a failed write, the unsaved-changes question on Escape, and search ranking with the
+section highlight have automated coverage in `settingSave.test.tsx` and `SettingsView.test.tsx` beside
+the view; these checks cover the window and the pages.
+
+110. Walk every settings page. Confirm that no page has a **Save** button outside a form, and that
+     every text field shows **Saved** beside it after you change it and press Tab or Enter.
+111. Stop the node, or take the machine offline, and change a text field on a node page such as Limits
+     and cost. Confirm that the field keeps what you typed and the row shows the error. Bring the
+     node back and commit again, and confirm that **Saved** appears.
+112. Type a declared section's keyword in the rail's search, for example `text size` for Terminal › Drawer.
+     Confirm that the result reads **Page › Section** with a scope chip, and that Enter opens the page,
+     scrolls to the section, and outlines it for about three seconds. With Reduce Motion on, confirm
+     that the outline still shows. Repeat from the palette's **Settings** group, and with
+     `openSettings('terminal#drawer')`.
+113. Start a new schedule or edit an MCP server, type into it, and press Escape. Confirm that settings
+     asks before discarding, that **Cancel** keeps the form, and that **Discard changes** closes
+     settings. Repeat with a rail row and with **Back to acorn**.
+114. On a page with a danger zone, such as a workspace's page, press its delete button. Confirm that the
+     confirmation paints above settings and names what goes and what stays, and that **Cancel** leaves
+     the workspace in place.
+115. Change the terminal text size away from its default. Confirm that the row shows a dot and
+     **Reset**, and that Reset puts the default back and the dot goes.
+
+The next checks cover [frontend.md](./frontend.md) § Workspaces and projects. The run-targets table's
+round trip, the read-only provenance row, Default's protection, a plugin's project tab, and the rail's
+tree with ⌘[ have automated coverage in `RunTargetsTable.test.tsx`, `ProjectSettings.test.tsx`,
+`WorkspaceSettings.test.tsx`, and `SettingsView.test.tsx`, and the node's `repoConfig` in
+`packages/node-core/src/server/routes/projects/membership.test.ts`.
+
+116. On Overview, select two projects in different workspaces. Confirm that the bar says **2 selected**,
+     and that **Move to workspace**, **Hide**, **Set colour**, and **New workspace…** each change both
+     rows and say so under the bar. Confirm that **Clear** empties the selection.
+117. Open a workspace from the rail. Confirm that its projects appear under it only while it is
+     expanded, that the chevron and the Right and Left arrows expand and collapse it, and that typing a
+     project's name in the rail's search finds its page with the workspace collapsed.
+118. Open a project from Overview, then press ⌘[. Confirm that it returns to Overview. Open the same
+     project from its workspace's page and press ⌘[ twice: the workspace, then Overview. Confirm that
+     the header reads **Project: <name>**, and names the node too with two paired.
+119. Walk each tab of a project's page and change one field on each. Confirm that each shows **Saved**,
+     and that the value is still there after closing and reopening settings.
+120. Add, edit, and remove a run target from the table. Confirm that a task on that project shows the
+     run buttons the table lists, and that a second default moves the default rather than adding one.
+121. Commit a `.acorn/config.toml` to a project with a `[scripts.run.dev]` target, a `[database]
+     url_script`, and a `[preview] mode`. Confirm that the dev script, the database connection script,
+     and the preview URL rows read **From .acorn/config.toml**, cannot be edited, and show the file's
+     value above this machine's. Delete the file and confirm that the rows are editable again.
+122. Try to rename or delete Default from its page, from Overview, and from the rail. Confirm that
+     none of them offers it.
+
+The next checks cover [frontend.md](./frontend.md) § Agents. The header's detail and back link, old
+page ids, and the device chip have automated coverage in `SettingsView.test.tsx` and the terminal kit
+test. The custom agent and MCP server editors, Harnesses and defaults, and both core pages are covered
+in `plugins/agents/src/client/settings/*.test.tsx`, `AgentToolsSettings.test.tsx`, and
+`McpSettings.test.tsx`, and the project MCP routes and the catalog's owners in
+`packages/node-core/src/server/routes/projects/projects.test.ts` and `agentTools.test.ts`.
+
+123. On Harnesses and defaults, turn **Send task context at startup** off, then open Claude Code in a
+     task's terminal drawer. Confirm that no task context arrives. Turn it back on and confirm that the
+     next one gets it, and that the Terminal page no longer shows the switch.
+124. On Custom agents, create an agent, then edit it. Confirm that the editor opens in the pane, that
+     the header names it with a back link, and that ⌘[ with an unsaved change asks before going back.
+     Delete it from the danger zone and confirm that it leaves New and the palette.
+125. On MCP servers, add a server, edit it, and remove it from its danger zone. Confirm that each step
+     happens in the pane, that the list names `/mcp`, and that its link opens MCP config files.
+126. With no task open, open MCP config files, pick a project with a committed `.mcp.json`, and note
+     its servers. Open a task in that project, open the page again, and confirm that it starts on that
+     project and lists the same servers.
+127. On Tools and permissions, switch between **By owner** and **By tier**. Confirm that a loaded
+     plugin's tools sit under its id, and that turning the Execute tier on and off moves every execute
+     tool's switch.
+128. From a queued agent turn's **Change** link, and with `openSettings('agent-pricing')`, confirm that
+     Limits and cost opens on **Turns at once** and on **Claude prices**.
+129. Under **Settings > Plugins > Installed**, install a GitHub package on the node and a client-only
+     package on this device from **Install…**. Confirm that each target asks for trust, that the device
+     plugin appears under **This device**, and that a package waiting for approval appears under
+     **Needs you** with a dot on **Installed** in the settings rail.
+130. On a plugin page, open each of **Overview**, **Settings**, **Permissions**, and **Versions**. Approve
+     a staged package an agent requested, end dev mode for a plugin in development, and revoke one
+     approval. Uninstall one plugin with **Keep its data** and another with **Delete its data**, and
+     confirm that each confirmation names what goes and what stays.
+131. Turn an optional node plugin off from its page's strip. Confirm that the strip says it is off, that
+     the page still saves, that **Installed** shows the restart banner, and that the settings rail shows
+     a dot until the node restarts. Turn a device plugin off from its strip and confirm that settings
+     opens its page under **Installed**.
+132. Open the plugin strip on a compiled plugin page (Docker), a remote tree (Sentry export), and a frame
+     page. Confirm that the strip sits above the page, outside it, and stays in place while the page
+     scrolls.
+133. On **Rail and surfaces**, hide a plugin source. Confirm that its icon leaves the rail, that the
+     palette offers **Open <source>** and opens it, that the source stays open after it is opened from
+     the palette, and that hiding it while it is selected returns to Home. Reorder the rail while it is
+     hidden, show it again, and confirm that it returns to its slot. In the terminal client, confirm
+     that the source is still in the source menu.
+134. With a switch whose write fails (stop the node, then flip **Hidden** on a project page), confirm
+     that the switch returns to the stored value and the row shows the error. After confirming a
+     danger-zone delete from a clicked button, confirm that Escape still closes settings.
+135. With a real Linear key, connect it from **Settings > Connections > Services > Add connection**.
+     Confirm that the Linear card asks for **Personal API key**, that typing a key and pressing Escape
+     asks before it drops it, and that Save lands back on the list with the connection in it. Open
+     **Add connection** again after connecting GitHub: its card says **Connected, one allowed** and
+     opens the GitHub connection.
+136. Revoke that Linear key at Linear, then press **Test** on its page. Confirm that it moves to the top
+     of Services with an amber dot, that the settings rail shows the dot beside **Services**, that the
+     bell has a row for it, and that its page starts with the refusal and **Replace key**. Replace the
+     key and confirm that the dot, the row, and the banner all clear without reopening settings.
+137. On a Linear connection's page, follow a project into one workspace from **Where it shows up**.
+     Confirm that the workspace's page lists it under **Connections**, that the project's
+     **Connections** tab lists it too, and that **Manage** there opens the connection's page. Search
+     for the connection's name and confirm that Enter opens its page, not just Services.
+138. On **AI models**, confirm that **Generate with** carries the **This device** chip, that an
+     Anthropic key is listed under **API keys** and not on Services, and that an installed `claude`
+     is listed under **Agent CLIs**. Search `startup context` and confirm that Enter lands on
+     **Harnesses and defaults › New sessions**.
+139. In the terminal client at 80 by 24, search `settings` in the palette and confirm that **Open
+     settings** is the first row and opens the route on the nine groups. Open a page in each group and
+     confirm that a page marked **desktop app** says why and where to go, that Escape climbs one level
+     at a time with the caret back on the row it left, and that the plugin pages (Harnesses and
+     defaults, Docker, Workflows) draw and scroll to their last row. Repeat at 120 by 40.
+140. Start the terminal client with `ACORN_TUI_NOTIFY=bell`, then with no value, and open
+     **Settings > General > Notifications**. Confirm that **Terminal alerts** says **Bell only** and
+     **From ACORN_TUI_NOTIFY**, then **Bell and terminal notification** and **The default**. In a
+     terminal acorn has no notification sequence for (Apple Terminal), confirm that the row says only
+     the bell reaches you. Turn **An agent needs me** off and confirm that the change survives a
+     restart, then press **Send a test notification** and confirm that the terminal rings.
+141. In the terminal client, add an MCP server or a custom agent, type into its form, and press Escape.
+     Confirm that **Discard unsaved changes?** opens with the caret on **Cancel**, that Cancel keeps
+     the typed value, and that **Discard changes** returns to the list. Save one, then remove it from
+     its danger zone, and confirm that the confirmation names what goes and that the list no longer
+     shows it.
+
 The following checks cover [mcp.md](./mcp.md) § Your own servers. The store, routes, runtime,
 drivers, handoff flags, and test button have automated coverage in `plugins/agents`; these checks cover
 the real harnesses and the window.
 
-100. In Settings → MCP servers, add a stdio server with one secret environment variable and press
+142. In Settings → MCP servers, add a stdio server with one secret environment variable and press
      **Test**. The tools are listed. Edit it, leave the secret empty, save, and test again: it still
      connects.
-101. Open a Claude Code session and a Codex session, and ask each to call one of the server's tools.
+143. Open a Claude Code session and a Codex session, and ask each to call one of the server's tools.
      Type `/mcp` in each composer: the panel opens and nothing is sent. Codex lists every server it has
      with a status. Switch the server off, apply, and confirm that the transcript notes the restart and
      that the agent no longer has the tool while the conversation continues.
-102. Continue each session in a terminal and run `/mcp` there. The server is listed. While the terminal
+144. Continue each session in a terminal and run `/mcp` there. The server is listed. While the terminal
      runs, `ps -axww` shows the server's command but never its secret value.
 
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated

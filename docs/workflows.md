@@ -326,6 +326,9 @@ A task with at least one run has a **Workflows** pane
 newest first, then the selected run's nodes, and one node's detail beside them. The pane is hidden on
 a task that has never run a workflow, so the pane strip does not grow a button for every task; which
 tasks those are is one node-wide read the plugin keeps in memory (`runs/runStore.ts`).
+Every client-side start marks its task as soon as the node confirms a run ID. Opening a confirmed run
+from the recent-run list or a schedule does the same before navigating, so the pane is available while
+the node-wide read catches up. A read started before the confirmation cannot clear that hint.
 
 **Rows | Graph** in the Nodes header picks how the nodes are drawn: as the list, or as the same
 picture the editor authors on, coloured by status. The choice is remembered per device. The run's
@@ -644,7 +647,7 @@ budget rather than reusing these session tools.
 that way, so the editor never offers to retarget one. Retry with an edited prompt patches one step of
 the frozen copy and keeps the original in the step's `inputs_json`.
 
-**A second run list.** Refused. The merged list at Settings → Runs stays as it is, the run pane is
+**A second run list.** Refused. The merged list at Settings → Run history stays as it is, the run pane is
 addressed by task, and `packages/protocol/src/runtime/runs.ts` already says when a core runs table would be
 earned.
 

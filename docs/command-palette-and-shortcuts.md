@@ -90,7 +90,15 @@ Appearance page has no Appearance command to disagree with it.
 
 **Core's own catalogue is a small tree.** `Go to` holds the task, workspace, project and node
 searches and the `Last workspace` action, `Panes` and `Terminal` hold the task-scoped operations that
-were loose at the root, `Settings` holds one row per registered settings page, and `Appearance` and
+were loose at the root, `Settings` holds one row per page the settings rail lists, in the rail's
+order and with the page's group as its hint (a workspace or project page has no row, because it needs a
+workspace or project to name), then one row per section a page declares, titled **Page › Section**, matching the section's
+row labels and keywords and opening the page on that section. Both lists come from the index the
+settings search reads (`host/registries/shell/settingsSearch.ts`), so the palette and the rail name the
+same sections the same way. The terminal client registers **Open settings** instead of those rows:
+each of them matches the Settings breadcrumb, so on that host they outranked the shell's own
+**Notifications** and **New task** commands, and its route lists every page anyway
+([tui.md](./tui.md) § Settings). `Appearance` and
 `Notifications` hold the settings core owns. Going to a task or a workspace was a special kind of
 palette item until 2026-09-03, composed into the root by hand and invoked through a switch on what a
 row was about; it is a `fleet`-scoped search now, so the root shows one named row instead of every
@@ -166,11 +174,11 @@ this roster without subscribing to the registry signal it writes and recursively
 | --- | --- |
 | `⌘K` | Open command palette |
 | `⌘P` | Go to a file in the worktree (the palette, at the editor's search) |
-| `⌘L` | Open workspace switcher |
+| `⌘L` | Open workspace switcher, most recently visited first |
 | `⌘⇧N` | Create a local task |
 | `⌘⇧T` | Toggle terminal drawer |
 | `⌘1`–`⌘9` | Activate the corresponding visible task |
-| `⌘,` | Open Settings |
+| `⌘,` | Open Settings on the last page used |
 | `Shift+F10` / menu key | Open the context menu for the focused row (the platform fires `contextmenu`; the shell does not bind this itself) |
 | `Escape` | Close the topmost overlay or cancel the current action |
 
@@ -180,6 +188,11 @@ The desktop also owns a fixed Cmd/Ctrl+K application-menu accelerator. A preview
 webview whose key events cannot bubble into the renderer, so the menu forwards that accelerator to
 the palette's registered toggle command. Other global shortcuts remain renderer-owned, and changing
 the palette binding in shortcut settings does not change this native fallback.
+
+A plugin source whose rail icon the person hid still opens from the palette. The desktop host registers
+**Open <source>** for every hidden, available source and removes it when the source is shown again or
+stops being available. A plugin that registers its own `source.<id>.open`, as Docker, Agent Center, and
+GitHub do, keeps its row and gets no second one ([frontend.md](./frontend.md) § Rail source visibility).
 
 ## Palette data
 
@@ -329,7 +342,7 @@ manifest. The host qualifies both ids as `plugin.<plugin-id>.<command-id>`, refu
 does not expose `typing-exempt`. A `surface` binding is host-bound to a surface declared by that same
 manifest.
 
-Settings → Shortcuts shows plugin bindings under the plugin id and names the active Node because
+Settings → Keyboard shortcuts shows plugin bindings under the plugin id and names the active Node because
 shortcut preferences are per Node, per user. Disabled-plugin rows remain visible, inert and editable;
 plugins absent from the active Node do not appear. Uninstalling never deletes overrides, so reinstalling
 restores them. The explicit orphan-cleanup action is the only path that removes settings for plugins
@@ -383,7 +396,7 @@ about the focused thing.
 **There is no second keymap, and there will not be.** One engine, one command catalog, one adapter per
 host. No plugin and no first-party pane installs a key handler of its own outside an input and the
 inside of a rectangle. A pane that wants a chord registers a command and a binding, which is how it
-reaches Settings → Shortcuts, the palette, and the cheat sheet at once; a handler installed beside the
+reaches Settings → Keyboard shortcuts, the palette, and the cheat sheet at once; a handler installed beside the
 engine reaches none of them and cannot be rebound, overridden, or shown to the reader in a conflict.
 
 The `pane.switcher` replacement receives the resolved shortcut labels and calls host-owned layout
@@ -405,6 +418,12 @@ inside of a rectangle.
 An unhandled intent bubbles. A binding whose handler returns `false` is not handled, so the engine
 carries on to the next layer: the focused collection answers, or an ancestor does, or the region
 layer does, or nothing does.
+
+**A modal surface holds the keyboard.** The region and pane moves do nothing while focus is inside an
+`aria-modal` element, because the regions are behind it. Settings is one of those, and it covers the
+whole window, so the shell also passes `taskActive: false` to the dispatcher while it is open: no task
+or pane chord acts on a surface nobody can see, and no key typed in settings reaches a terminal
+underneath ([frontend.md](./frontend.md) § Settings).
 
 **A bare key belongs to whoever is typing; a chord does not.** While a text field has focus, a
 binding fires only if its chord carries a command modifier — meta, ctrl or alt — because nothing types

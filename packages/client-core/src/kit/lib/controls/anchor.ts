@@ -23,6 +23,15 @@ const GAP = 4
 // not a press outside.
 const openSurfaces: Array<() => HTMLElement | undefined> = []
 
+/** Whether focus is inside an open anchored surface: a menu, a select's list, a popover. That surface
+ *  answers the Escape, and it hears it on `window`, after any document listener has already had it.
+ *  Asked of focus rather than of "is one open", because a menu left open under a full-window layer is
+ *  not what the person pressing Escape is looking at. */
+export const focusInAnchoredSurface = (): boolean => {
+  const focused = typeof document === 'undefined' ? null : document.activeElement
+  return !!focused && openSurfaces.some((surface) => surface()?.contains(focused))
+}
+
 /** Pure collision pass for every anchored surface. Element anchors may flip to the opposite side;
  * point anchors keep the pointer as their origin and clamp, because there is no trigger edge to
  * flip around. The final clamp also covers a surface wider or taller than the available side. */

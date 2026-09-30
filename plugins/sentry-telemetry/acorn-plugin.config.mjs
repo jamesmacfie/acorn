@@ -55,8 +55,15 @@ export default {
       id: 'sentry-telemetry',
       label: 'Sentry export',
       glyph: 'brand:sentry-telemetry',
-      group: 'general',
-      order: 68,
+      category: 'machines',
+      settingsScope: 'node',
+      order: 50,
+      // For search. The sections are the ones src/tree/settings.tsx draws.
+      keywords: ['sentry', 'telemetry', 'export', 'sample rate', 'dsn'],
+      sections: [
+        { id: 'sending', label: 'What to send', keywords: ['sample rate', 'traces', 'errors', 'logs', 'metrics', 'events'] },
+        { id: 'detail', label: 'How much detail', keywords: ['stack traces', 'task ids', 'tags'] },
+      ],
       // One tree fills the page, so the layout is the trivial one. Naming it is still what says
       // "draw this from my tree" rather than "give me a rectangle", and it is what the surface
       // inherits its focus group and padding from (docs/panes.md § Layout model).
