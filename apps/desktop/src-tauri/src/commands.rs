@@ -1,12 +1,11 @@
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
 
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::Engine as _;
 use serde::Serialize;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Manager, State};
 use tauri_plugin_dialog::DialogExt;
 use tauri_plugin_notification::{NotificationExt, PermissionState};
 
@@ -160,65 +159,34 @@ pub async fn save_file(app: AppHandle, bytes: String, suggested_name: String) ->
 // process. See docs/notifications.md for the gate upstream of them, which decides what
 // is worth one.
 
-/// The tag of the last banner shown, and when. `tauri-plugin-notification` v2 gives desktop no
-/// activation callback — its `show()` returns nothing to hang one off — so this approximates the
-/// click: the window coming back within half a minute of a banner is nearly always somebody having
-/// clicked it. herdr does the same thing with `terminal-notifier -activate`.
-///
-/// A static rather than a `Shell` field, because the notification path never needs the rest of the
-/// shell's state and a focus event has no `State` to hand.
-static LAST_BANNER: Mutex<Option<(String, Instant)>> = Mutex::new(None);
-const ACTIVATION_WINDOW: Duration = Duration::from_secs(30);
-
-/// Raise one. False when nothing was shown, so the renderer can tell "the OS said no" from "the OS
-/// is showing it". `tag` is the notice id, handed back on activation so the renderer can find it.
+/// Submit a banner. False when permission or submission fails. `tag` is the notice id,
+/// handed back only on a native click so the renderer can find the exact notice.
 ///
 /// No sound is ever asked for. The chime is the client's, and it plays whether or not the OS agreed
 /// to draw a banner, so asking for both is how you get two sounds for one event.
-/// Dev banners say "Terminal" because `tauri-plugin-notification` hands macOS `com.apple.Terminal`
-/// whenever `tauri::is_dev()`: an unbundled binary has no identity LaunchServices can resolve, and a
-/// banner needs one. An installed acorn has an identity we can borrow, and the plugin sets its own
-/// through a `Once`, so getting in first is the whole trick.
-///
-/// No installed acorn means no change, on purpose: an identity macOS cannot resolve does not fall
-/// back to Terminal, it burns the `Once` and leaves the process unable to post at all. The ceiling
-/// is that the banner then belongs to whichever acorn is installed rather than to the dev build, so
-/// a click on it may wake that copy instead. Clicks are read from window focus (`window_focused`),
-/// which is unaffected.
-#[cfg(target_os = "macos")]
-fn borrow_installed_identity() {
-    static ONCE: std::sync::Once = std::sync::Once::new();
-    ONCE.call_once(|| {
-        if !tauri::is_dev() {
-            return;
-        }
-        if let Some(bundle) = mac_notification_sys::get_bundle_identifier("acorn") {
-            let _ = mac_notification_sys::set_application(&bundle);
-        }
-    });
-}
-
 #[tauri::command]
 pub fn show_notification(app: AppHandle, title: String, body: Option<String>, tag: String) -> bool {
-    #[cfg(target_os = "macos")]
-    borrow_installed_identity();
     let notification = app.notification();
     let granted = matches!(notification.permission_state(), Ok(PermissionState::Granted))
         || matches!(notification.request_permission(), Ok(PermissionState::Granted));
     if !granted {
         return false;
     }
-    let mut builder = notification.builder().title(title);
-    if let Some(body) = body {
-        builder = builder.body(body);
+    #[cfg(target_os = "macos")]
+    {
+        crate::notifications::show(app, title, body, tag)
     }
-    if builder.show().is_err() {
-        return false;
+    #[cfg(not(target_os = "macos"))]
+    {
+        // Tauri supplies no desktop activation callback here. A focus event cannot identify
+        // a click or its notice, so these hosts show banners without inventing navigation.
+        let _ = tag;
+        let mut builder = notification.builder().title(title);
+        if let Some(body) = body {
+            builder = builder.body(body);
+        }
+        builder.show().is_ok()
     }
-    if let Ok(mut last) = LAST_BANNER.lock() {
-        *last = Some((tag, Instant::now()));
-    }
-    true
 }
 
 /// The number on the app icon, or none. Safe everywhere: Windows draws no badge from this call and
@@ -239,23 +207,6 @@ pub fn set_badge(app: AppHandle, count: Option<i64>) {
 pub fn set_window_background(app: AppHandle, red: u8, green: u8, blue: u8) {
     if let Some(window) = app.get_webview_window("main") {
         let _ = window.set_background_color(Some(tauri::webview::Color(red, green, blue, 0xff)));
-    }
-}
-
-/// The tag to hand the renderer when the window comes back, given what was last shown and how long
-/// ago. None when nothing was shown, and none when it was long enough ago that the focus is more
-/// likely the owner coming back to work than a click on a banner.
-fn activation_tag(last: Option<(String, Instant)>, now: Instant) -> Option<String> {
-    let (tag, at) = last?;
-    (now.duration_since(at) <= ACTIVATION_WINDOW).then_some(tag)
-}
-
-/// The main window has been focused. Takes the tag either way: a banner old enough to be stale must
-/// not fire on some later focus instead.
-pub fn window_focused(app: &AppHandle) {
-    let taken = LAST_BANNER.lock().ok().and_then(|mut last| last.take());
-    if let Some(tag) = activation_tag(taken, Instant::now()) {
-        let _ = app.emit("acorn:notification-activated", tag);
     }
 }
 
@@ -311,9 +262,8 @@ pub fn shutdown(app: &AppHandle) {
 
 #[cfg(test)]
 mod tests {
-    use super::{activation_tag, mime_for, safe_suggested_name, ACTIVATION_WINDOW, MAX_SAVE_BYTES, MAX_SAVE_ENCODED_CHARS};
+    use super::{mime_for, safe_suggested_name, MAX_SAVE_BYTES, MAX_SAVE_ENCODED_CHARS};
     use std::path::Path;
-    use std::time::{Duration, Instant};
 
     #[test]
     fn a_picked_file_gets_a_media_type_from_its_extension() {
@@ -333,15 +283,5 @@ mod tests {
         assert_eq!(safe_suggested_name("\u{0000}../.."), "download");
         assert_eq!(safe_suggested_name("résumé.pdf"), "résumé.pdf");
         assert_eq!(MAX_SAVE_ENCODED_CHARS, MAX_SAVE_BYTES.div_ceil(3) * 4);
-    }
-
-    #[test]
-    fn a_focus_soon_after_a_banner_counts_as_a_click_and_a_late_one_does_not() {
-        let now = Instant::now();
-        let shown = now - ACTIVATION_WINDOW + Duration::from_secs(1);
-        assert_eq!(activation_tag(Some(("n1".into(), shown)), now), Some("n1".into()));
-        let stale = now - ACTIVATION_WINDOW - Duration::from_secs(1);
-        assert_eq!(activation_tag(Some(("n1".into(), stale)), now), None);
-        assert_eq!(activation_tag(None, now), None);
     }
 }
