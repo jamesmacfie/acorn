@@ -1,4 +1,5 @@
 import { splitProps } from 'solid-js'
+import { bindIntents } from '../../keys/keymapHost'
 import { assistAttrs, controlAttrs, type ControlOwn } from './controlAttrs'
 
 export type TextareaProps = ControlOwn & {
@@ -14,6 +15,8 @@ export type TextareaProps = ControlOwn & {
   readOnly?: boolean
   maxLength?: number
   onInput?: (value: string) => void
+  /** The host's commit chord: Command-Enter on macOS, Control-Enter elsewhere. */
+  onCommit?: () => void
   /** The committed value: blur, or Enter. See `InputProps.onChange`. */
   onChange?: (value: string) => void
   /** A textarea owns its keys and its own surface while focused: the composer completes mentions,
@@ -40,7 +43,14 @@ export function Textarea(props: TextareaProps) {
     <textarea
       {...controlAttrs(own)}
       {...assistAttrs(own)}
-      ref={props.ref}
+      ref={props.onCommit ? (element) => {
+        if (typeof props.ref === 'function') props.ref(element)
+        bindIntents(element, ['commit'], () => {
+          if (props.disabled || props.readOnly || !props.onCommit) return false
+          props.onCommit()
+          return true
+        }, { mode: 'focus' })
+      } : props.ref}
       name={own.name}
       required={own.required}
       autofocus={own.autofocus}
