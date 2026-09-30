@@ -119,6 +119,8 @@ Start with the plugin map, then follow the authoring guide or API reference.
   projections, and acceptance gates for a standalone terminal client.
 - [Plugin list search proposal](./future/pluginsearch.md) — search beyond the loaded Linear,
   Rollbar, and GitHub list rows while keeping project and state scope.
+- [Native overlay layer requirements](./future/native-overlay-layer.md) — desktop overlays above
+  live preview and plugin webviews, with native composition, input routing, and acceptance gates.
 - `schemas/` — generated, versioned JSON Schemas that are pinned by a test and immutable by rule.
   Today that is `docs/schemas/enrollment-v1.json`.
 
