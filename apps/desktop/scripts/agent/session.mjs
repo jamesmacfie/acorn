@@ -6,6 +6,7 @@ import { createServer as createNetServer } from 'node:net'
 import { join, resolve } from 'node:path'
 import { createServer as createViteServer } from 'vite'
 import { WebDriverClient } from './webdriver.mjs'
+import { stageTestApp } from './nativeApp.mjs'
 import {
   desktopRoot,
   manifestPath,
@@ -208,7 +209,11 @@ async function main() {
 
     const webdriverPort = await freePort()
     const endpoint = `http://127.0.0.1:${webdriverPort}`
-    const executable = join(desktopRoot, 'src-tauri', 'target', 'debug', `acorn-desktop${process.platform === 'win32' ? '.exe' : ''}`)
+    const built = join(desktopRoot, 'src-tauri', 'target', 'debug', `acorn-desktop${process.platform === 'win32' ? '.exe' : ''}`)
+    // On macOS the window runs from a test app bundle, so native tools see one stable identity for
+    // every session and a path of its own for this one (./nativeApp.mjs).
+    const nativeApp = process.platform === 'darwin' ? await stageTestApp(directory, built) : null
+    const executable = nativeApp?.executable ?? built
     log = createWriteStream(join(logDir, 'desktop.log'), { flags: 'a', mode: 0o600 })
     app = spawn(executable, [], {
       cwd: desktopRoot,
@@ -238,6 +243,7 @@ async function main() {
       viteUrl,
       webdriverEndpoint: endpoint,
       webdriverSessionId: driver.sessionId,
+      nativeApp,
       startedAt: new Date().toISOString(),
     })
     console.log(`[agent-dev:${name}] ready`)

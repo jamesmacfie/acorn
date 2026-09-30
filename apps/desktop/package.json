@@ -23,7 +23,8 @@
     "check:runtime-syntax": "node scripts/check-runtime-syntax.mjs",
     "verify:bundle": "node scripts/verify-bundle.mjs",
     "lint": "tsc --noEmit",
-    "test": "pnpm run stage && pnpm run build:renderer && vitest run && cargo test --manifest-path src-tauri/Cargo.toml",
+    "test": "pnpm run stage && pnpm run build:renderer && vitest run --exclude test/boot.test.ts && pnpm run test:boot && cargo test --manifest-path src-tauri/Cargo.toml",
+    "test:boot": "vitest run --project shell test/boot.test.ts",
     "tauri": "tauri"
   },
   "//dev:no-watch": "`tauri dev` rebuilds and relaunches the app whenever a file under src-tauri changes, which takes the window away from whoever is using it. This is the same dev run with the watcher off: the app keeps running while the Rust changes, and you pick the new binary up by restarting with `dev`. The renderer's own hot reload is Vite's and is unaffected either way.",
