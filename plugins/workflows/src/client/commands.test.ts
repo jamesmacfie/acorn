@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkflowDefSummary } from '../contract/wire.ts'
 import type { CommandExecutionContext, CommandOutcome, SearchCommand } from '@acorn/plugin-api/client'
+import { taskHasWorkflowRuns } from './runs/runStore'
 
 const mocks = vi.hoisted(() => ({
   defs: vi.fn(), start: vi.fn(), createDef: vi.fn(), runs: vi.fn(),
@@ -94,11 +95,13 @@ describe('the workflows plugin catalogue', () => {
   // By id, not by definition: the node resolves it, and for a committed file that is what makes the
   // repo trust snapshot apply to the bytes on disk rather than to whatever the request carried.
   it('starts the picked definition by its layered id', async () => {
+    mocks.start.mockResolvedValueOnce({ runId: 'run-1' })
     mocks.defs.mockResolvedValue({ workflows: [def('ship'), { ...def('mine'), source: 'database' }], errors: [] })
     const world = context('task-1')
     const rows = await run.query('', world, signal())
     expect(await run.select(rows[0], world)).toEqual({ effect: 'close' })
     expect(mocks.start).toHaveBeenCalledWith('task-1', { defId: 'repo:ship' })
+    expect(taskHasWorkflowRuns('task-1')).toBe(true)
     // A row is addressed by its own id, because it belongs to no layer.
     await run.select(rows[1], world)
     expect(mocks.start).toHaveBeenLastCalledWith('task-1', { defId: 'mine' })

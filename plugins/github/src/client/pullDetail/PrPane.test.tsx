@@ -105,9 +105,18 @@ describe('the PR pane', () => {
     const node = draw()
     // The kit's split, which is what makes this look like the browse surface rather than like a
     // second design (docs/panes.md § Layout model).
-    expect(node.querySelector('.ui-listdetail')).not.toBeNull()
+    const split = node.querySelector<HTMLElement>('.ui-listdetail')!
+    expect(split).not.toBeNull()
     expect(node.querySelector('[aria-label="Pull request"]')).not.toBeNull()
     expect(node.textContent ?? '').toContain('Diff')
+
+    const toggle = node.querySelector<HTMLButtonElement>('button[aria-label="Collapse Pull request list"]')!
+    expect(toggle).not.toBeNull()
+    toggle.click()
+    expect(split.dataset.list).toBe('collapsed')
+    expect(node.querySelector('.ui-listdetail-detail')?.textContent).toContain('Diff')
+    toggle.click()
+    expect(split.dataset.list).toBe('wide')
   })
 
   it('draws the pull, its actions, its files and its conversation in the navigator', () => {

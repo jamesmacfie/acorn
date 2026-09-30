@@ -64,9 +64,9 @@ type TextareaProps = {
   maxLength?: number
   onInput?: (value: string) => void
   onChange?: (value: string) => void
-  /** The `commit` intent, with the buffer's own text. Not on the shared `TextareaProps`, which has no
-   *  submit at all: on the DOM a composer's Enter is a `keydown` the caller reads, and here it is an
-   *  intent the field has to bind because nothing else can reach a focused edit buffer. */
+  /** Shared `commit` intent for fields that submit their own draft. */
+  onCommit?: () => void
+  /** The composer's existing `commit` callback receives the buffer's text. */
   onSubmit?: (value: string) => void
   onBlur?: () => void
   onFocus?: () => void
@@ -84,8 +84,9 @@ function textareaRef(props: TextareaProps, element: Renderable & FieldApi): void
   // the typing-exempt intents by design (client-core kit/keys/intents.ts § TYPING_EXEMPT). Bound
   // in `focus` mode, so a composer inside a list does not answer for the list.
   onCleanup(registerIntentLayer(element, ['commit'], () => {
-    if (props.disabled || !props.onSubmit) return false
-    props.onSubmit(element.plainText)
+    if (props.disabled || props.readOnly || (!props.onCommit && !props.onSubmit)) return false
+    if (props.onCommit) props.onCommit()
+    else props.onSubmit?.(element.plainText)
     return true
   }, { priority: STOP, mode: 'focus' }))
 }

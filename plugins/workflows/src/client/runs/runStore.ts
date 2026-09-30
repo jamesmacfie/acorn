@@ -20,10 +20,13 @@ export { taskGroups as workflowTaskGroups }
 
 export const taskHasWorkflowRuns = (taskId: string): boolean => (runCounts()[taskId] ?? 0) > 0
 
-// A run link already proves that this task has a run. Make its pane available before the
-// deep link is consumed; the next node read replaces this hint with authoritative counts.
+// A confirmed start or run link proves that this task has a run. Make its pane available before
+// navigation; a later node read replaces the hint with authoritative counts.
+let hintRevision = 0
 export const rememberWorkflowRun = (taskId: string): void => {
-  setRunCounts((current) => current[taskId] ? current : { ...current, [taskId]: 1 })
+  if (runCounts()[taskId]) return
+  hintRevision += 1
+  setRunCounts((current) => ({ ...current, [taskId]: 1 }))
 }
 
 const same = (a: Record<string, number>, b: Record<string, number>): boolean => {
@@ -36,11 +39,13 @@ export const workflowRunCountsSchedule: ClientScheduleContribution = {
   intervalMs: 120_000,
   requires: { plugin: 'workflows' },
   run: async () => {
+    const readRevision = hintRevision
     const [runList, navigation] = await Promise.all([
       workflowApi.allRuns().catch(() => null),
       workflowApi.taskNavigation().catch(() => null),
     ])
-    if (runList) {
+    // A read sent before a start cannot erase the confirmed run when its older answer arrives later.
+    if (runList && readRevision === hintRevision) {
       const next: Record<string, number> = {}
       for (const run of runList.runs) if (run.taskId) next[run.taskId] = (next[run.taskId] ?? 0) + 1
       // Same counts, same object: `when` is read on every pane-strip render, and a fresh object every

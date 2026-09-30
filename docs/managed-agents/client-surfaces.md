@@ -4,6 +4,11 @@ Part of [managed-agents.md](../managed-agents.md).
 
 ## Client surfaces
 
+The agents client claims the `agent` WebSocket channel when its first frame subscriber attaches and
+releases it when the last subscriber leaves. Plugin activation holds an application-lifetime
+subscription for agent attention. Loading a lazy surface, including an inline diff card, does not
+register a channel.
+
 The Agent pane is a `list-detail` layout (docs/panes.md § Layout model). The list column is the task's
 roster, with a header region of its own so the count stays put while the list scrolls; the detail
 column is the open session. The roster is managed sessions, delegated children, and provider-native

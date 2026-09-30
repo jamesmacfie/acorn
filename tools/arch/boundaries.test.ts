@@ -614,8 +614,9 @@ describe('architecture boundaries', () => {
       // hosts' SettingRow share, which the terminal kit cannot take from the renderer-only barrel.
       // One more for a project's own settings page, a lazy chunk the desktop registers like the others.
       // One more for Rail and surfaces, split off the plugin list on 2026-09-30. One more when Integrations
-      // split into Services and AI models the same day.
-      '@acorn/client-core': 160,
+      // split into Services and AI models the same day. One more for the shared model picker popover
+      // (settings/models/ModelPickerPopover.tsx), merged in from main the same day.
+      '@acorn/client-core': 161,
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 10,
