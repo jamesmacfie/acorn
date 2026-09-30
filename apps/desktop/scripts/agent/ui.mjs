@@ -2,7 +2,8 @@ import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { parseFlow, runFlow, summarizeReport } from './flow.mjs'
 import { renderPlace, renderSnapshot, WebDriverClient } from './webdriver.mjs'
-import { readJson, refsPath, resolveManifest, writePrivateJson } from './state.mjs'
+import { activeManifests, readJson, refsPath, resolveManifest, writePrivateJson } from './state.mjs'
+import { nativeTarget, requireSessionApp } from './nativeApp.mjs'
 
 function parseArgs(argv) {
   let session = null
@@ -13,7 +14,7 @@ function parseArgs(argv) {
     else rest.push(argv[index])
   }
   const [command, ...args] = rest
-  if (!command) throw new Error('Usage: pnpm dev:agent:ui -- [--session NAME] snapshot|click|fill|scroll|screenshot|flow|status|stop')
+  if (!command) throw new Error('Usage: pnpm dev:agent:ui -- [--session NAME] snapshot|click|fill|scroll|screenshot|flow|status|target|stop')
   return { session, command, args }
 }
 
@@ -34,7 +35,15 @@ async function main() {
     process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`)
     return
   }
+  // The window to hand a native tool such as Computer Use, checked live: this session's own process,
+  // its app path, and any other running session that shares the identity (./nativeApp.mjs).
+  if (command === 'target') {
+    process.stdout.write(`${JSON.stringify(await nativeTarget(manifest, await activeManifests()), null, 2)}\n`)
+    return
+  }
   if (command === 'stop') {
+    // Checked first, so a recorded PID that now belongs to something else is never signalled.
+    await requireSessionApp(manifest)
     process.kill(manifest.appPid, 'SIGTERM')
     console.log(`Stopping agent session ${manifest.name}.`)
     return

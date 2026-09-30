@@ -352,7 +352,9 @@ One schema property becomes one question (`server/drivers/formElicitation.ts`), 
 mapping knows a vendor's field names, so property-bearing ACP and Codex app-server forms map the same
 way. Claude pairs every choice with a free-text box, which lands as its own question titled "Other".
 For Codex, a form with no properties is consent rather than an empty question: the card offers Allow
-and Decline, and sends the chosen MCP action back to the provider. An answer travels back as the
+and Decline, and sends the chosen MCP action back to the provider. A Computer Use app-access request
+is the one consent form that offers more, because it says how long a grant can last
+(§ App-access approval). An answer travels back as the
 option's own value behind the label a person picked, because the card answers with labels and Codex
 numbers its own question options positionally. A question is answered in the same card, by the same
 route, and against the same durable row as a permission (§ Client surfaces).
@@ -394,6 +396,46 @@ draws the bar without the mark. The built-in probes know their own windows; a co
 no way to declare one yet. A reset further out than the whole window drops the mark as well: Codex
 labels a row "Session (5h)" and then reports it resetting in four days, and a mark pinned to the right
 end would read as miles ahead of pace when the truth is that the window is not the one acorn assumed.
+
+### App-access approval
+
+When a Codex agent asks Computer Use to operate an app, Computer Use sends a consent form through the
+app-server's `mcpServer/elicitation/request`. Its `_meta` names the app by bundle identifier
+(`tool_params.app`), gives the name a person reads (`tool_params_display`), and lists the scopes its
+policy allows in `persist`: `['session', 'always']`, or `['session']` when policy forbids a saved grant.
+The Codex adapter reads that shape into a typed `approval` on the request event
+(`plugins/agents/src/server/drivers/codexAppApproval.ts`). The card then offers **Allow for this
+session**, **Always allow** only when `always` was advertised, and **Decline**. It names the app with
+its identifier, explains both scopes, and shows any warning Computer Use attached.
+
+Computer Use owns every grant. Acorn stores the decision and never the grant. The answer goes back as
+`_meta: { persist: 'session' | 'always' }`, and the integration's `node_repl` keeps a session grant per
+Codex thread under `$CODEX_HOME/computer-use/sessions/` and an always grant in its own approvals file.
+A later request it already holds a grant for is answered by the integration and never reaches Acorn.
+A Codex thread is one managed session, so a session grant lasts as long as that session, and a fork
+asks again. The grant belongs to the computer the agent runs on, which for a remote node is that
+node's computer. Nothing synchronises it across nodes or devices.
+
+To revoke an always grant, use Computer Use's own settings in the ChatGPT app. Acorn has no second
+list, because two stores would disagree about what is allowed. A sent response is not proof the grant
+was saved, so the settled card says Computer Use saves it and names where to revoke it. It never says
+the grant exists.
+
+The descriptor is additive in the request's stored payload. A row written before it existed, or a
+request whose metadata is missing, malformed, oversized, or from another connector, reads as the
+plain Allow and Decline it always was. An app identifier too long to store is refused, not cut short,
+because a shortened bundle identifier names a different app. A form with fields stays a question
+whatever its metadata says. Before claiming an answer, the runtime checks it against the options the
+stored request offered. The adapter then rebuilds the response from the provider's original request,
+so a forged option, an unadvertised scope, or a changed target never reaches Computer Use. The route
+stays device-only (§ HTTP control authority), so an agent cannot approve its own access.
+
+Always allow trusts an app identifier, not only the windows an agent launched. The agent test app has
+an identifier of its own for this reason ([Local development](./local-development.md#native-control-of-a-session)).
+
+The request shape was read from the integration's source (Codex Computer Use 26.915.1001093,
+`@oai/sky` 0.7.5, codex-cli 0.159.2). A live capture and the grant lifetimes still need a real run
+([Testing](./testing.md), checks 149-154).
 
 ## Provider-native subagents
 

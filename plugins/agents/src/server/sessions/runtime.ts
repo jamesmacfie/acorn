@@ -54,6 +54,22 @@ const withPromptText = (parts: EnqueueAgentTurnInput['input'], text: string): En
 }
 
 /**
+ * A button answer must be one the stored request offered. The client builds its buttons from that
+ * same list, so only a forged or stale answer fails here, and it fails before the claim: the request
+ * stays open and nothing reaches the provider. A request that offered no buttons is left alone.
+ */
+const assertOfferedOption = (request: AgentRequest, resolution: unknown): void => {
+  const optionId = typeof resolution === 'object' && resolution != null
+    ? (resolution as { optionId?: unknown }).optionId
+    : undefined
+  if (typeof optionId !== 'string') return
+  const offered = Array.isArray(request.payload.options) ? request.payload.options as Array<{ id?: unknown }> : []
+  if (offered.length && !offered.some((option) => option?.id === optionId)) {
+    throw new Error('That choice was not offered for this request.')
+  }
+}
+
+/**
  * Product-facing managed-agent commands. ManagedAgentEngine owns process supervision, event
  * durability, and scheduling. This class coordinates session lifecycle and user commands.
  */
@@ -400,6 +416,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       throw new Error('Agent request not found.')
     }
     if (existing.status === 'resolved' || existing.status === 'expired') return existing
+    assertOfferedOption(existing, resolution)
     const claim = await this.store.claimRequestResolution(
       sessionId,
       providerRequestId,
