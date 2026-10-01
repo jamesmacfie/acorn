@@ -1,4 +1,4 @@
-// How a run and its nodes read: the glyph per status, the tone, and elapsed as words.
+// How a run and its steps read: the glyph per status, the tone, the word, and elapsed as words.
 //
 // Shared by the list and the detail so the two cannot disagree about what "running" looks like.
 // Each map is one line, because the icon census reads a line for a literal only when that line
@@ -11,12 +11,23 @@ type Tone = 'ok' | 'warn' | 'danger' | 'muted'
 
 const STEP_GLYPH: Record<string, string> = { pending: 'circle-dashed', running: 'loader-circle', 'waiting-gate': 'hand', done: 'circle-check', 'completed-with-failures': 'circle-alert', failed: 'circle-x', 'safety-rail': 'octagon-alert', skipped: 'circle-dashed', cancelled: 'ban' }
 const STEP_TONE: Record<string, Tone> = { running: 'ok', 'waiting-gate': 'warn', done: 'ok', 'completed-with-failures': 'warn', failed: 'danger', 'safety-rail': 'danger' }
-const RUN_GLYPH: Record<string, string> = { running: 'loader-circle', gated: 'hand', cancelling: 'ban', done: 'circle-check', 'completed-with-failures': 'circle-alert', failed: 'circle-x', 'safety-rail': 'octagon-alert', cancelled: 'ban' }
+// `waiting` is the merged run list's word for `gated` (@acorn/protocol/runtime/runs.ts), which the rail reads.
+const RUN_GLYPH: Record<string, string> = { running: 'loader-circle', gated: 'hand', waiting: 'hand', cancelling: 'ban', done: 'circle-check', 'completed-with-failures': 'circle-alert', failed: 'circle-x', 'safety-rail': 'octagon-alert', cancelled: 'ban' }
+// One map for step and run statuses, because where the two vocabularies share a word they mean the same thing.
+const STATUS_LABEL: Record<string, string> = {
+  pending: 'Not started', running: 'Running', 'waiting-gate': 'Needs you', gated: 'Needs you', waiting: 'Needs you',
+  'waiting-children': 'Waiting', cancelling: 'Cancelling', done: 'Done', 'completed-with-failures': 'Finished with failures',
+  failed: 'Failed', skipped: 'Skipped', 'safety-rail': 'Stopped at a limit', cancelled: 'Cancelled',
+  // A child run's dispatch, before the run itself has a status.
+  reserved: 'Starting', 'task-created': 'Starting', 'run-started': 'Starting', terminal: 'Finished',
+}
 
 export const stepGlyph = (status: string | undefined): string => STEP_GLYPH[status ?? 'pending'] ?? 'circle-dashed'
 export const stepTone = (status: string | undefined): Tone => STEP_TONE[status ?? 'pending'] ?? 'muted'
 export const runGlyph = (status: string): string => RUN_GLYPH[status] ?? 'circle-dashed'
-export const runTone = (status: string): Tone => STEP_TONE[status] ?? (status === 'gated' ? 'warn' : 'muted')
+export const runTone = (status: string): Tone => STEP_TONE[status] ?? (status === 'gated' || status === 'waiting' ? 'warn' : 'muted')
+/** The word a person reads for a step or run status: "Needs you", not `waiting-gate`. */
+export const statusLabel = (status: string | undefined): string => STATUS_LABEL[status ?? 'pending'] ?? status ?? 'Not started'
 
 export const kindLabel = (kind: string): string => BUILTIN_STEP_DESCRIPTIONS[kind]?.label ?? kind
 export const kindRunsAgent = (kind: string): boolean => BUILTIN_STEP_DESCRIPTIONS[kind]?.runsAgent ?? false
@@ -46,7 +57,6 @@ export const formatUsage = (usage: WorkflowUsageSummary | null | undefined): str
   return [
     formatCost(usage.costUsd),
     `${usage.turns.toLocaleString()} ${usage.turns === 1 ? 'turn' : 'turns'}`,
-    `${usage.inputTokens.toLocaleString()} input`,
-    `${usage.outputTokens.toLocaleString()} output`,
+    `${usage.inputTokens.toLocaleString()} tokens in, ${usage.outputTokens.toLocaleString()} out`,
   ].filter(Boolean).join(' · ')
 }

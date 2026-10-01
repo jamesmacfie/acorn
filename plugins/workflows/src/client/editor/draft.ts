@@ -74,7 +74,8 @@ export const select = (draft: WorkflowDraft, selection: DraftSelection): Workflo
   ({ ...draft, selection })
 
 /**
- * A new node, after the selection or as a root.
+ * A new node, after the selection or as a root, named `base` (the kind's label, from the caller) or
+ * the kind's id.
  *
  * Never inserted between two nodes: a node the editor added takes one edge from the node that was
  * selected and nothing downstream moves. That is proliferate's rule and it is why adding a step never

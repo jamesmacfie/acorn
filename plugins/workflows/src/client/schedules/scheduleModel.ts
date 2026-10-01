@@ -56,8 +56,9 @@ export function nextScheduleOccurrences(cadence: Cadence, timezone: string, afte
   return result
 }
 
+/** "Oct 3, 2026, 9:00 AM GMT+13": to the minute, because a schedule never fires on a second. */
 export const formatOccurrence = (instant: number, timezone: string): string => new Intl.DateTimeFormat(undefined, {
-  timeZone: timezone, dateStyle: 'medium', timeStyle: 'long',
+  timeZone: timezone, year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short',
 }).format(instant)
 
 export const scheduleStateLabel = (state: WorkflowScheduleDisplayState): string => ({
@@ -65,10 +66,9 @@ export const scheduleStateLabel = (state: WorkflowScheduleDisplayState): string 
   'needs-review': 'Needs review', unavailable: 'Unavailable',
 })[state]
 
-export const limitsSummary = (limits: WorkflowScheduleLimits): string => {
-  const hours = limits.budget.maxWallTimeMs / (60 * 60_000)
-  return `${limits.maxDescendants} descendants · ${limits.maxConcurrency} at once · ${hours}h maximum`
-}
+/** In minutes, the unit the Definition inspector and this dialog's own field use. */
+export const limitsSummary = (limits: WorkflowScheduleLimits): string =>
+  `Up to ${limits.maxDescendants} tasks, ${limits.maxConcurrency} at a time, ${limits.budget.maxWallTimeMs / 60_000} minutes.`
 
 export const cadenceChoice = (cadence: Cadence): 'hourly' | 'daily' | 'weekly' =>
   'every' in cadence ? 'hourly' : 'daily' in cadence ? 'daily' : 'weekly'

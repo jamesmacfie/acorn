@@ -2,7 +2,7 @@ import { For, Show } from 'solid-js'
 import type { Task } from '@acorn/plugin-api/client'
 import { Alert, Badge, Card, CodeBlock, Fold, Icon, Inline, Link, Stack, Text } from '@acorn/plugin-api/ui'
 import type { WorkflowChildRunSummary, WorkflowRunProjection, WorkflowStepProjection } from '../../shared/api'
-import { formatUsage, runGlyph, runTone } from './runDisplay'
+import { formatUsage, runGlyph, runTone, statusLabel } from './runDisplay'
 
 const TERMINAL = new Set(['done', 'completed-with-failures', 'failed', 'safety-rail', 'cancelled'])
 const FAILED = new Set(['completed-with-failures', 'failed', 'safety-rail', 'cancelled'])
@@ -13,14 +13,14 @@ const taskLink = (tasks: readonly Task[], taskId: string, onOpen: OpenTarget) =>
   const task = tasks.find((candidate) => candidate.id === taskId)
   return task
     ? <Link onPress={() => onOpen(taskId)}>{task.title}</Link>
-    : <Text emphasis="muted">Task unavailable ({taskId})</Text>
+    : <Text emphasis="muted">Task archived or deleted</Text>
 }
 
 const runLink = (tasks: readonly Task[], taskId: string, runId: string, label: string, onOpen: OpenTarget) => {
   const task = tasks.find((candidate) => candidate.id === taskId)
   return task
     ? <Link onPress={() => onOpen(taskId, runId)}>{label}</Link>
-    : <Text emphasis="muted">Run retained; task unavailable ({runId})</Text>
+    : <Text emphasis="muted">Its task is archived or deleted</Text>
 }
 
 /** Explicit ancestor links for a child run. */
@@ -34,16 +34,14 @@ export function RunLineage(props: {
       <Card pad="sm">
         <Stack gap="row">
           <Inline wrap>
-            <Text emphasis="muted">{props.run!.rootRunId === props.run!.parentRunId ? 'Parent and root task' : 'Parent task'}</Text>
+            <Text emphasis="muted">Started by:</Text>
             {taskLink(props.tasks, props.run!.parentTaskId!, props.onOpen)}
-            <Text emphasis="muted">{props.run!.rootRunId === props.run!.parentRunId ? 'Parent and root run' : 'Parent run'}</Text>
-            {runLink(props.tasks, props.run!.parentTaskId!, props.run!.parentRunId!, props.run!.parentRunName ?? props.run!.parentRunId!, props.onOpen)}
+            {runLink(props.tasks, props.run!.parentTaskId!, props.run!.parentRunId!, props.run!.parentRunName ?? 'its run', props.onOpen)}
           </Inline>
           <Show when={props.run!.rootRunId !== props.run!.parentRunId}>
             <Inline wrap>
-              <Text emphasis="muted">Root task</Text>
+              <Text emphasis="muted">Part of:</Text>
               {taskLink(props.tasks, props.run!.rootTaskId, props.onOpen)}
-              <Text emphasis="muted">Root run</Text>
               {runLink(props.tasks, props.run!.rootTaskId, props.run!.rootRunId!, props.run!.rootRunName, props.onOpen)}
             </Inline>
           </Show>
@@ -77,9 +75,6 @@ export function ChildRuns(props: {
           <Show when={gated()}>{(count) => <Badge size="xs" tone="warn">{count()} need approval</Badge>}</Show>
           <Show when={failed()}>{(count) => <Badge size="xs" tone="danger">{count()} failed</Badge>}</Show>
         </Inline>
-        <Show when={FAILED.has(props.step.status)}>
-          <Text emphasis="muted" wrap>Retry reuses these tasks and runs. It does not create replacements.</Text>
-        </Show>
         <For each={children()}>
           {(child) => (
             <Card
@@ -90,7 +85,7 @@ export function ChildRuns(props: {
                 <Inline wrap>
                   <Icon name={runGlyph(child.runStatus ?? child.dispatchState)} tone={runTone(child.runStatus ?? child.dispatchState)} spin={child.runStatus === 'running'} />
                   <Text emphasis="strong">{childLabel(child)}</Text>
-                  <Badge size="xs" tone={child.runStatus === 'gated' ? 'warn' : undefined}>{child.runStatus ?? child.dispatchState}</Badge>
+                  <Badge size="xs" tone={child.runStatus === 'gated' ? 'warn' : undefined}>{statusLabel(child.runStatus ?? child.dispatchState)}</Badge>
                   <Show when={formatUsage(child.usage)}>{(usage) => <Text emphasis="muted">{usage()}</Text>}</Show>
                 </Inline>
                 <Inline wrap>
@@ -100,9 +95,9 @@ export function ChildRuns(props: {
                   {runLink(props.tasks, child.taskId, child.runId, child.name ?? child.runId, props.onOpen)}
                 </Inline>
                 <Show when={child.runStatus === 'gated'}>
-                  <Alert title="Approval required">Open the child run to review its gate.</Alert>
+                  <Alert title="Needs approval">Open the child run to approve it.</Alert>
                 </Show>
-                <Show when={child.error}>{(error) => <Alert title="Child run stopped">{error()}</Alert>}</Show>
+                <Show when={child.error}>{(error) => <Alert tone="danger" title="Child run failed">{error()}</Alert>}</Show>
                 <Show when={child.resultSummary}>
                   {(result) => <Fold label="Result"><CodeBlock wrap maxHeight="block">{result()}</CodeBlock></Fold>}
                 </Show>

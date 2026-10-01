@@ -1,12 +1,12 @@
 import { createMemo } from 'solid-js'
 import { Graph, type GraphCard } from '@acorn/plugin-api/ui'
-import { stepGlyph, stepTone } from './runDisplay'
+import { statusLabel, stepGlyph, stepTone } from './runDisplay'
 import type { RunPaneModel } from './runPaneModel'
 
-// The run's nodes as a picture, in place of the rows (docs/workflows.md § The run pane).
+// The run's steps as a picture, in place of the list (docs/workflows.md § The run pane).
 //
-// The same model, the same reading order and the same selection as the rows above it: the toggle in
-// the Nodes header swaps which one is drawn and nothing else. No ports and no dragging, because a
+// The same model, the same reading order and the same selection as the list: the toggle in the Runs
+// header swaps which one is drawn and nothing else. No ports and no dragging, because a
 // run's graph is a record rather than a draft — the definition it froze at the start is what an edge
 // came from.
 
@@ -24,8 +24,8 @@ export function RunGraph(props: { model: RunPaneModel }) {
     // The step's name, not its row id: an edge is `after`, which names steps, and a pending node has
     // no row yet. Selecting maps the name back to the row.
     id: node.name,
-    label: node.step?.name ?? node.name,
-    detail: node.step?.status ?? 'pending',
+    label: node.label,
+    detail: statusLabel(node.step?.status),
     glyph: stepGlyph(node.step?.status),
     tone: cardTone(node.step?.status),
     selected: !!node.step && node.step.id === model.selectedStepId(),
@@ -36,7 +36,7 @@ export function RunGraph(props: { model: RunPaneModel }) {
   return (
     <Graph
       id={`workflows:graph:${model.selectedRunId() ?? 'none'}`}
-      ariaLabel="Workflow nodes"
+      ariaLabel="Workflow steps"
       nodes={cards()}
       edges={edges()}
       onSelect={(name) => {

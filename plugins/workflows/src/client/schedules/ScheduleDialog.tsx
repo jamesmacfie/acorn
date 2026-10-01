@@ -1,10 +1,10 @@
 import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { clientEvents, pathForTask, projectsOptions, tasksOptions } from '@acorn/plugin-api/client'
+import { clientEvents, projectsOptions, tasksOptions } from '@acorn/plugin-api/client'
 import {
   Alert, Badge, Button, Checkbox, ConfirmButton, Field, Fold, Inline, Input,
-  Modal, ModalActions, ModalBody, Select, Stack, Text, Toolbar,
+  Modal, ModalActions, ModalBody, SectionHeader, Select, Stack, Text, Toolbar,
 } from '@acorn/plugin-api/ui'
 import { TypedBindingPicker } from '@acorn/plugin-api/ui/data-sources'
 import type { DataBinding } from '@acorn/protocol/dataBindings.ts'
@@ -19,7 +19,7 @@ import type {
   WorkflowScheduleView,
 } from '../../shared/workflowSchedules'
 import TypedValueField from '../editor/TypedValueField'
-import { rememberWorkflowRun } from '../runs/runStore'
+import { openWorkflowRun } from '../runs/runStore'
 import { workflowsSurfacePath } from '../surfacePath'
 import { workflowApi } from '../workflowsClient'
 import { closeWorkflowSchedule, scheduleRequest, type ScheduleRequest } from './scheduleRequest'
@@ -27,6 +27,12 @@ import {
   cadenceChoice, cadenceForChoice, formatOccurrence, limitsSummary,
   nextScheduleOccurrences, scheduleStateLabel,
 } from './scheduleModel'
+
+/** Every zone this runtime knows, with the chosen one kept even when it does not. */
+const timezoneOptions = (current: string) => {
+  const zones = Intl.supportedValuesOf('timeZone')
+  return (current && !zones.includes(current) ? [current, ...zones] : zones).map(zone => ({ value: zone, label: zone.replaceAll('_', ' ') }))
+}
 
 const STATE_TONE = {
   draft: 'neutral', activating: 'warn', active: 'ok', paused: 'neutral',
@@ -170,9 +176,8 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
     const latest = schedule()?.latest
     const task = (tasks.data ?? []).find(candidate => candidate.id === latest?.taskId)
     if (!latest || !task) return
-    rememberWorkflowRun(task.id)
     closeWorkflowSchedule()
-    navigate(`${pathForTask(task)}?pane=workflows&item=${encodeURIComponent(latest.runId)}`)
+    openWorkflowRun(task, latest.runId, navigate)
   }
   const reviewWorkflow = (): void => {
     closeWorkflowSchedule()
@@ -206,7 +211,7 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
             </Alert>
           )}</Show>
 
-          <Field label="Project" hint="Every unattended run creates its root task in this project." group>
+          <Field label="Project" hint="Each scheduled run makes its task in this project." group>
             <Select label="Project" value={projectId()} options={(projects.data ?? []).map(project => ({ value: project.id, label: project.name }))}
               onChange={value => editSetup(() => setProjectId(value))} />
           </Field>
@@ -235,13 +240,13 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
               { value: 'weekly', label: 'Every Monday at 09:00' },
             ]} onChange={value => editSetup(() => setCadence(cadenceForChoice(value as 'hourly' | 'daily' | 'weekly')))} />
           </Field>
-          <Field label="Timezone" hint="Calendar schedules and time windows use this IANA timezone." group>
-            <Input label="Timezone" value={timezone()} placeholder="Pacific/Auckland" onInput={value => editSetup(() => setTimezone(value))} />
+          <Field label="Timezone" group>
+            <Select label="Timezone" value={timezone()} options={timezoneOptions(timezone())} onChange={value => editSetup(() => setTimezone(value))} />
           </Field>
 
           <Show when={occurrences().length}>
             <Stack gap="row">
-              <Text emphasis="strong">Next three checks</Text>
+              <SectionHeader level="sub">Next three checks</SectionHeader>
               <For each={occurrences()}>{instant => <Text emphasis="muted">{formatOccurrence(instant, timezone())}</Text>}</For>
             </Stack>
           </Show>
@@ -293,30 +298,29 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
 
           <Show when={preparation()}>{reviewed => (
             <Stack gap="stack">
-              <Field label="First check" group>
+              <Field
+                label="First check"
+                help="Start tracking from now notes today's matches without running anything. Process current matches runs them on the first check."
+                group
+              >
                 <Select label="First check" value={firstCheck()} options={[
                   { value: 'process-current', label: 'Process current matches' },
                   { value: 'track-now', label: 'Start tracking from now' },
                 ]} onChange={value => setFirstCheck(value as WorkflowScheduleFirstCheck)} />
               </Field>
-              <Text emphasis="muted" wrap>
-                {firstCheck() === 'track-now'
-                  ? 'The initial baseline records current matches without running child workflows. Activation completes only after that baseline succeeds.'
-                  : 'Current matches inside the workflow query window are eligible on the first check.'}
-              </Text>
-              <Alert title="Effective limits">{limitsSummary(effectiveLimits() ?? reviewed().limits)}</Alert>
+              <Alert title="Limits">{limitsSummary(effectiveLimits() ?? reviewed().limits)}</Alert>
               <Fold label="Execution limits" level="group">
                 <Stack gap="row">
                   <Field label="Most child tasks" group><Input type="number" width="narrow" label="Most child tasks" value={String(limitValue('maxDescendants', reviewed().limits.maxDescendants))} onInput={raw => setLimit('maxDescendants', raw)} /></Field>
                   <Field label="Agents at once" group><Input type="number" width="narrow" label="Agents at once" value={String(limitValue('maxConcurrency', reviewed().limits.maxConcurrency))} onInput={raw => setLimit('maxConcurrency', raw)} /></Field>
-                  <Field label="Time limit in minutes" group><Input type="number" width="narrow" label="Time limit in minutes" value={String(wallMinutes(reviewed().limits))} onInput={setWallMinutes} /></Field>
+                  <Field label="Workflow timeout in minutes" group><Input type="number" width="narrow" label="Workflow timeout in minutes" value={String(wallMinutes(reviewed().limits))} onInput={setWallMinutes} /></Field>
                 </Stack>
               </Fold>
               <Show when={reviewed().changes.length}>
                 <Alert tone="warn" title="Published dependencies changed">
                   <Stack gap="row">
                     <For each={reviewed().changes}>{change => <Text>{`${change.kind === 'query' ? 'Query' : change.kind === 'field' ? 'Record policy' : change.kind === 'source' ? 'Source' : 'Workflow'}: ${change.label}`}</Text>}</For>
-                    <Text wrap>Existing processing history is retained, so unchanged records do not run again.</Text>
+                    <Text wrap>Records that already ran won't run again unless they change.</Text>
                     <Button size="sm" onPress={reviewWorkflow}>Review published workflow</Button>
                   </Stack>
                 </Alert>
@@ -324,7 +328,7 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
               <Show when={schedule()?.id}>
                 <Fold label="Advanced change review" level="group">
                   <Checkbox label="Start fresh" checked={freshStart()} onChange={setFreshStart}
-                    hint="Creates a new processing history. Matching records may run again; old attempts remain available." />
+                    hint="Forget which records already ran. They may run again. Past runs stay in history." />
                 </Fold>
               </Show>
             </Stack>
@@ -341,7 +345,6 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
           <Show when={schedule()?.state === 'unavailable'}>
             <Button size="sm" onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}>Reconnect in Settings</Button>
           </Show>
-          <Text emphasis="muted" wrap>Saving keeps this draft on the Node. Activation is a separate device action and is never queued while offline.</Text>
         </Stack>
       </ModalBody>
       <ModalActions>
@@ -356,7 +359,7 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
         <Button variant="ghost" onPress={closeWorkflowSchedule}>Close</Button>
         <Button disabled={!readyForReview() || !!busy()} busy={busy() === 'review'} onPress={() => void review()}>Review activation</Button>
         <Button disabled={!readyForReview() || !!busy()} busy={busy() === 'save'} onPress={() => void saveDraft()}>Save draft</Button>
-        <Button variant="solid" disabled={!preparation() || !!busy()} busy={busy() === 'activate'} onPress={() => void activate()}>
+        <Button variant="solid" disabled={!preparation() || !!busy()} busy={busy() === 'activate'} title="Activation never waits in a queue while you're offline." onPress={() => void activate()}>
           {schedule()?.state === 'needs-review' ? 'Approve changes' : 'Activate'}
         </Button>
       </ModalActions>

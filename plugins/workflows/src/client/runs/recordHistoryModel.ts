@@ -1,3 +1,4 @@
+import { statusLabel } from './runDisplay'
 import type { WorkflowRecordCounts, WorkflowRecordFilter, WorkflowRecordHistory } from '../../shared/workflowProcessing'
 
 export const RECORD_FILTERS: readonly { value: WorkflowRecordFilter; label: string }[] = [
@@ -17,9 +18,7 @@ export const recordStatus = (row: WorkflowRecordHistory): string => {
   if (row.decision === 'seen') return 'Previously processed'
   if (row.decision === 'unchanged') return 'Unchanged'
   if (!row.status) return row.decision === 'admitted' ? 'Pending' : 'Skipped'
-  if (row.status === 'completed-with-failures') return 'Completed with failures'
-  if (row.status === 'safety-rail') return 'Safety rail'
-  return row.status.replaceAll('-', ' ')
+  return statusLabel(row.status)
 }
 
 export const progressSummary = (counts: WorkflowRecordCounts): string => {

@@ -18,6 +18,6 @@ describe('workflow schedule editor model', () => {
     expect(scheduleStateLabel('needs-review')).toBe('Needs review')
     expect(cadenceForChoice('weekly')).toEqual({ weekly: { day: 1, at: '09:00' } })
     expect(limitsSummary({ maxDescendants: 80, maxConcurrency: 3, budget: { maxWallTimeMs: 7_200_000 } }))
-      .toBe('80 descendants · 3 at once · 2h maximum')
+      .toBe('Up to 80 tasks, 3 at a time, 120 minutes.')
   })
 })

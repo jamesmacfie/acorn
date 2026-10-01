@@ -73,7 +73,7 @@ export default function JsonTab(props: {
         {(message) => <Alert tone="danger">{message()}</Alert>}
       </Show>
       <Show when={!error() && applied()}>
-        <Text emphasis="muted">Applied to the draft. Save to keep it.</Text>
+        <Text emphasis="muted">Applied.</Text>
       </Show>
       <Rectangle
         kind="editor"

@@ -7,8 +7,8 @@ import {
   type Task, tasksOptions,
 } from '@acorn/plugin-api/client'
 import {
-  Alert, Badge, Button, CodeBlock, EmptyState, Facts, Fold, Heading, Icon, Inline, Link, Log, Modal, Stack,
-  Table, TableCell, TableHead, TableRow, Text, Textarea, Toolbar,
+  Alert, Badge, Button, CodeBlock, ConfirmButton, EmptyState, Facts, Fold, Heading, Icon, Inline, Link, Log, Modal,
+  Stack, Table, TableCell, TableHead, TableRow, Text, Textarea, Toolbar,
 } from '@acorn/plugin-api/ui'
 import type { WorkflowStepRow } from '../../contract/wire.ts'
 import { terminalSessions } from '@acorn/plugin-terminal/contract/sessionsClient.ts'
@@ -18,13 +18,15 @@ import type { WorkflowStepProjection } from '../../shared/api'
 import { gateFormProblems, type GateFormOutput, type GateFormProposal } from '../../shared/gateForm'
 import type { WorkflowGateForm } from '../../shared/workflowContracts'
 import TypedValueField from '../editor/TypedValueField'
-import { formatCost, formatDuration, kindLabel, kindRunsAgent, stepElapsed, stepGlyph, stepTone } from './runDisplay'
+import { formatCost, formatDuration, kindRunsAgent, statusLabel, stepElapsed, stepGlyph, stepTone } from './runDisplay'
 import type { RunPaneModel } from './runPaneModel'
 import { ChildRuns, RunLineage } from './RunRelationships'
 import { RunRecords } from './RunRecords'
 
-// The run pane's `detail` region: what one node is doing, and the controls that are legal for the
-// state it is in (docs/workflows.md § Routes and UI).
+// The run pane's `detail` region: what one step is doing, and the controls that are legal for the
+// state it is in (docs/workflows.md § Routes and UI). The controls sit in the step's header bar for
+// every kind, so Retry on a failed command is beside its name rather than under its output. A gate's
+// Approve and Reject are the exception: they answer the gate, so they sit under what they approve.
 //
 // An agent node draws the conversation itself, through the capability plugins/agents publishes
 // (@acorn/plugin-agents/contract/conversation.ts): the same transcript, queue and composer the Agent
@@ -32,9 +34,9 @@ import { RunRecords } from './RunRecords'
 // answers "what is it doing" the way it always has.
 //
 // Two shapes, and the difference is not cosmetic. The conversation's timeline is the scroller and it
-// sizes against the region, so that branch is a fragment with the controls folded into the toolbar;
-// a `Stack` around it, or a row of buttons after it, and the composer ends up below the fold with the
-// pane's own scroll broken (client-core infra/styles/shell.css, docs/panes.md § Layout model).
+// sizes against the region, so that branch is a fragment; a `Stack` around it, or a row of buttons
+// after it, and the composer ends up below the fold with the pane's own scroll broken (client-core
+// infra/styles/shell.css, docs/panes.md § Layout model).
 
 const readJson = <T,>(raw: string | null | undefined): T | null => {
   if (!raw) return null
@@ -65,6 +67,12 @@ const shapeOf = (kind: string): 'gate' | 'command' | 'run-target' | 'data' | 'ht
 const pretty = (value: unknown): string => JSON.stringify(value, null, 2)
 
 const FAILED = new Set(['failed', 'safety-rail'])
+
+/** What a stopped step's error is headed with: its status as a sentence, not "this node stopped". */
+const STOPPED_TITLE: Record<string, string> = {
+  failed: 'This step failed', 'safety-rail': 'This step stopped at a limit', cancelled: 'This step was cancelled',
+  'completed-with-failures': 'This step finished with failures',
+}
 
 export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
   const model = props.model
@@ -164,15 +172,19 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
   // would stop the toolbar moving as the step's status does.
   const meta = (current: () => WorkflowStepRow) => (
     <Text emphasis="muted">
-      {[kindLabel(current().kind), current().status, formatCost(current().costUsd ?? 0), stepElapsed(current(), model.now())]
+      {[model.kindLabel(current().kind), statusLabel(current().status), formatCost(current().costUsd ?? 0), stepElapsed(current(), model.now())]
         .filter(Boolean).join(' · ')}
     </Text>
   )
 
   const alerts = (current: () => WorkflowStepRow) => (
     <>
-      <Show when={model.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
-      <Show when={current().error}>{(message) => <Alert title="This node stopped">{message()}</Alert>}</Show>
+      <Show when={model.error()}>{(message) => <Alert tone="danger">{message()}</Alert>}</Show>
+      <Show when={current().error}>
+        {(message) => (
+          <Alert tone={failed() ? 'danger' : 'warn'} title={STOPPED_TITLE[current().status] ?? 'This step stopped'}>{message()}</Alert>
+        )}
+      </Show>
     </>
   )
 
@@ -201,20 +213,23 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
         )}
       </Show>
       <Show when={current().status === 'running'}>
-        <Button size="sm" tone="danger" disabled={model.busy()} onPress={() => void model.kill(current().id)}>Kill step</Button>
-      </Show>
-      {/* A gate with a form draws its own Approve, beside the values it approves. */}
-      <Show when={current().status === 'waiting-gate' && !model.gateForm(current() as WorkflowStepProjection)}>
-        <Button size="sm" variant="solid" disabled={model.busy()} onPress={() => void model.gate(true)}>Approve</Button>
-        <Button size="sm" tone="danger" disabled={model.busy()} onPress={() => void model.gate(false)}>Reject</Button>
+        <Button size="sm" tone="danger" disabled={model.busy()} onPress={() => void model.kill(current().id)}>Stop step</Button>
       </Show>
       <Show when={failed()}>
-        <Button size="sm" variant="solid" disabled={model.busy()} onPress={() => void model.retry(current().id)}>Retry</Button>
         <Show when={shape() === 'agent'}>
           <Button size="sm" disabled={model.busy()} onPress={() => setRetrying(inputs()?.prompt ?? '')}>
-            Retry with edited prompt
+            Edit prompt and retry
           </Button>
         </Show>
+        <Button
+          size="sm"
+          variant="solid"
+          disabled={model.busy()}
+          title={(current() as WorkflowStepProjection).children?.length ? 'Retry reuses the child tasks and runs. It doesn\'t make new ones.' : undefined}
+          onPress={() => void model.retry(current().id)}
+        >
+          Retry
+        </Button>
       </Show>
     </>
   )
@@ -244,7 +259,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
     <Show when={childTask()}>
       {(child) => (
         <Text>
-          Runs on its own task. <Link onPress={() => navigate(pathForTask(child()))}>{child().title}</Link>
+          Runs in its own task: <Link onPress={() => navigate(pathForTask(child()))}>{child().title}</Link>
         </Text>
       )}
     </Show>
@@ -253,7 +268,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
   // What a turn sent from here actually does. The step waits on its own turn and nothing else, so a
   // turn typed now queues behind it and runs once the run has already recorded the step as done.
   const note = (current: () => WorkflowStepRow) => current().status === 'running'
-    ? 'This step is still working. A turn you send now runs after it finishes, by which time the run has moved on.'
+    ? 'This step is still working. A message you send now runs after it finishes, once the run has moved on.'
     : undefined
 
   // Why there is no conversation, when there is none. Only two reasons: the step has not run, or it
@@ -261,16 +276,16 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
   // rather than in the conversation, because the reason is this pane's to know.
   const noSession = (current: () => WorkflowStepRow) => current().status === 'pending'
     ? 'This step has not started yet.'
-    : 'This step runs headless, outside a managed session, so there is no transcript. Its output is under Step details.'
+    : 'This step ran without a conversation, so there\'s no transcript. Its output is under Step details.'
 
   return (
-    <Show when={step()} fallback={<EmptyState size="sm">Pick a node to see what it is doing.</EmptyState>}>
+    <Show when={step()} fallback={<EmptyState title="No step selected">Choose a step to see what it's doing.</EmptyState>}>
       {(current) => (
         <Show
           when={drawsConversation()}
           fallback={(
             <Stack gap="section">
-              <Toolbar ariaLabel="Workflow node">
+              <Toolbar ariaLabel="Workflow step">
                 <Icon
                   name={stepGlyph(current().status)}
                   tone={stepTone(current().status)}
@@ -279,13 +294,14 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
                 <Heading level={2}>{current().name}</Heading>
                 <Toolbar.Spacer />
                 {meta(current)}
+                {controls(current)}
               </Toolbar>
 
               <RunLineage run={model.selectedRun()} tasks={tasks.data ?? []} onOpen={openTaskTarget} />
               <Show when={search.workflowReturnRun && search.workflowReturnRecord}>
                 <Show
                   when={returnTaskAvailable()}
-                  fallback={<Text emphasis="muted">The original task is missing or archived. Its selected record history remains retained on the Node.</Text>}
+                  fallback={<Text emphasis="muted">The original task is archived or gone. Its record history is still here.</Text>}
                 >
                   <Button size="sm" variant="bare" onPress={returnToRecord}>Back to selected record</Button>
                 </Show>
@@ -301,11 +317,11 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
                   <Show
                     when={model.gateForm(current() as WorkflowStepProjection)}
                     fallback={(
-                      <Show
-                        when={current().status === 'waiting-gate'}
-                        fallback={<Text emphasis="muted">{current().status === 'done' ? 'Approved.' : `This gate is ${current().status}.`}</Text>}
-                      >
-                        <Text>Waiting for you.</Text>
+                      <Show when={current().status === 'waiting-gate'} fallback={<Text emphasis="muted">{gateOutcome(current().status)}</Text>}>
+                        <Stack gap="row">
+                          <Text>Waiting for you.</Text>
+                          <GateAnswer model={model} />
+                        </Stack>
                       </Show>
                     )}
                   >
@@ -357,14 +373,13 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
                 </Fold>
               </Show>
 
-              <Inline wrap>{controls(current)}</Inline>
               {retryModal()}
             </Stack>
           )}
         >
-          {/* The agent shape. A fragment, and the controls live in the toolbar, because the
-              conversation below owns the scroll and takes the height that is left. */}
-          <Toolbar ariaLabel="Workflow node">
+          {/* The agent shape. A fragment, because the conversation below owns the scroll and takes
+              the height that is left. */}
+          <Toolbar ariaLabel="Workflow step">
             <Icon
               name={stepGlyph(current().status)}
               tone={stepTone(current().status)}
@@ -444,10 +459,10 @@ function GateFormBody(props: { step: WorkflowStepRow; form: WorkflowGateForm; mo
     <Show
       when={props.step.status === 'waiting-gate'}
       fallback={(
-        <Show when={approved()} fallback={<Text emphasis="muted">{`This gate is ${props.step.status}.`}</Text>}>
+        <Show when={approved()} fallback={<Text emphasis="muted">{gateOutcome(props.step.status)}</Text>}>
           {(output) => (
             <Stack gap="row">
-              <Text emphasis="muted">{output().approved === 'autonomous' ? 'Approved without asking, because the run is autonomous.' : 'Approved.'}</Text>
+              <Text emphasis="muted">{output().approved === 'autonomous' ? 'Approved on its own, because this run skips approvals.' : 'Approved.'}</Text>
               <Facts
                 grouping="rows"
                 size="sm"
@@ -468,6 +483,8 @@ function GateFormBody(props: { step: WorkflowStepRow; form: WorkflowGateForm; mo
             <Stack gap="row">
               <TypedValueField
                 label={label(field)}
+                hint={field.description}
+                error={problems()[field.name]}
                 schema={field.schema}
                 required={field.required}
                 disabled={props.model.busy()}
@@ -480,27 +497,36 @@ function GateFormBody(props: { step: WorkflowStepRow; form: WorkflowGateForm; mo
                   return next
                 })}
               />
-              <Show when={field.description}><Text emphasis="muted" wrap>{field.description}</Text></Show>
               <Show when={edited(field.name)}>
                 <Inline gap="inline">
                   <Badge tone="accent" size="xs">Edited</Badge>
-                  <Button size="sm" variant="ghost" disabled={props.model.busy()} onPress={() => set(field.name, proposal()[field.name])}>Reset</Button>
+                  <Button size="xs" variant="ghost" disabled={props.model.busy()} onPress={() => set(field.name, proposal()[field.name])}>Reset</Button>
                 </Inline>
               </Show>
             </Stack>
           )}
         </For>
-        <Show when={Object.keys(problems()).length}>
-          <Text emphasis="muted" wrap>
-            {props.form.fields.filter((field) => problems()[field.name]).map((field) => `${label(field)}: ${problems()[field.name]}`).join(' ')}
-          </Text>
-        </Show>
-        <Inline gap="inline">
-          <Button size="sm" variant="solid" disabled={props.model.busy() || blocked()} onPress={() => void props.model.gate(true, draft())}>Approve</Button>
-          <Button size="sm" tone="danger" disabled={props.model.busy()} onPress={() => void props.model.gate(false)}>Reject</Button>
-        </Inline>
+        <GateAnswer model={props.model} blocked={blocked()} onApprove={() => void props.model.gate(true, draft())} />
       </Stack>
     </Show>
+  )
+}
+
+/** A gate that is no longer waiting, in a word. */
+const gateOutcome = (status: string): string =>
+  status === 'done' ? 'Approved.' : status === 'cancelled' ? 'Cancelled.' : status === 'failed' ? 'Rejected.' : `${statusLabel(status)}.`
+
+/** Approve and Reject, under whatever they answer. Reject fails the run, so it takes a second press. */
+function GateAnswer(props: { model: RunPaneModel; blocked?: boolean; onApprove?: () => void }) {
+  return (
+    <Inline gap="row">
+      <Button variant="solid" disabled={props.model.busy() || props.blocked} onPress={() => props.onApprove ? props.onApprove() : void props.model.gate(true)}>
+        Approve
+      </Button>
+      <ConfirmButton variant="ghost" tone="danger" confirmLabel="Reject?" disabled={props.model.busy()} onConfirm={() => void props.model.gate(false)}>
+        Reject
+      </ConfirmButton>
+    </Inline>
   )
 }
 

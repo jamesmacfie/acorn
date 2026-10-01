@@ -552,10 +552,10 @@ export class WorkflowRunner {
     await this.#execution.queueHandoff(() => this.deps.finishHandoffs?.(run.taskId, run.id) ?? Promise.resolve()).catch(() => undefined)
     await this.deps.onRunTerminal?.(run.taskId, run.id).catch(() => undefined)
     const ref = { runId: run.id, ...(stepId ? { stepId } : {}) }
-    if (status === 'done') this.deps.notify(run.taskId, 'run-done', `Workflow '${run.name}' finished`, ref)
-    if (status === 'failed') this.deps.notify(run.taskId, 'run-failed', `Workflow '${run.name}' failed`, ref)
-    if (status === 'completed-with-failures') this.deps.notify(run.taskId, 'run-failed', `Workflow '${run.name}' completed with failures`, ref)
-    if (status === 'safety-rail') this.deps.notify(run.taskId, 'run-failed', `Workflow '${run.name}' stopped at a safety rail.`, ref)
+    if (status === 'done') this.deps.notify(run.taskId, 'run-done', `${run.name} finished`, ref)
+    if (status === 'failed') this.deps.notify(run.taskId, 'run-failed', `${run.name} failed`, ref)
+    if (status === 'completed-with-failures') this.deps.notify(run.taskId, 'run-failed', `${run.name} finished with failures`, ref)
+    if (status === 'safety-rail') this.deps.notify(run.taskId, 'run-failed', `${run.name} stopped at a limit`, ref)
   }
 
   private armDeadline(run: Pick<WorkflowRunRow, 'id' | 'deadlineAt'>): void {

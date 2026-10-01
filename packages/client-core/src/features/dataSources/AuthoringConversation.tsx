@@ -2,14 +2,14 @@ import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, 
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { AuthoringContextEntry, AuthoringTurnRequest, AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import type { QueryScope } from '@acorn/protocol/dataQueries.ts'
-import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import { modelBackendsOptions, prefsOptions } from '../../infra/queries'
 import { writeJson } from '../../infra/node/apiClient'
 import { activeCacheId } from '../../infra/node/activeNode'
 import { effectiveModelPick, readGeneratePick, saveGeneratePick, type ModelPick } from '../settings/models/generatePick'
 import ModelBackendPicker from '../settings/models/ModelBackendPicker'
-import { Alert, Badge, Button, Checkbox, Textarea } from '../../kit/components/primitives'
+import { Alert, Button, Checkbox, Field, Textarea } from '../../kit/components/primitives'
 import { Fold } from '../../kit/components/layout/Fold'
+import { ModalActions, ModalBody } from '../../kit/components/overlays/Modal'
 import { Inline } from '../../kit/components/layout/Inline'
 import { Stack } from '../../kit/components/layout/Stack'
 import { Text } from '../../kit/components/content/Text'
@@ -22,6 +22,8 @@ type Saved = {
   modelId?: string
   samplesEnabled: boolean
 }
+
+const CHANGE_WORD: Record<string, string> = { add: 'Added', remove: 'Removed', change: 'Changed' }
 
 const clipped = (value: unknown): string => {
   // An added path has no `before` and a removed one no `after`, and JSON.stringify(undefined) is
@@ -39,8 +41,13 @@ export type AuthoringConversationProps = {
   base: unknown
   label: string
   disabled?: boolean
-  /** Drawn without its own fold, for a host that already frames it, such as a modal with a title. */
-  bare?: boolean
+  /** Drawn as a modal's body and footer, with Send and Close in the footer, for a host that frames
+   *  it in a `Modal`. Close calls this. Without it the conversation draws in its own fold. */
+  onClose?: () => void
+  /** How a proposal names what a change touches, such as a workflow step by its name rather than
+   *  its id. `candidate` is the proposed value, which holds anything the change adds. The path is
+   *  the default. */
+  describePath?(path: string, candidate: unknown): string
   /** Narrow injection seam for the component's own tests and embedding hosts. */
   sendTurn?(request: AuthoringTurnRequest, signal: AbortSignal): Promise<AuthoringTurnResult>
   onApply(proposal: Extract<AuthoringTurnResult, { state: 'proposal' }>): Promise<string | undefined> | string | undefined
@@ -74,7 +81,6 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
   const pick = createMemo(() => choice() ?? effectiveModelPick(backends(), readGeneratePick(prefs.data)))
   const backendId = () => pick()?.backendId ?? ''
   const modelId = () => pick()?.modelId ?? ''
-  const backend = (): ModelBackend | undefined => backends().find(value => value.id === backendId())
   const clarification = () => pending()?.state === 'clarification' ? pending() as Extract<AuthoringTurnResult, { state: 'clarification' }> : undefined
   const proposal = () => pending()?.state === 'proposal' ? pending() as Extract<AuthoringTurnResult, { state: 'proposal' }> : undefined
   const stopped = () => pending()?.state === 'stopped' ? pending() as Extract<AuthoringTurnResult, { state: 'stopped' }> : undefined
@@ -144,8 +150,19 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
     setStatus('Applied as one undoable draft edit.')
   }
 
+  const stop = (): void => { controller?.abort(); setBusy(false); setStatus('Cancelled. The draft was not changed.') }
+  const send = () => (
+    <Button variant="solid" disabled={busy() || props.disabled || !instruction().trim() || !backendId()} busy={busy()} onPress={() => void submit()}>Send</Button>
+  )
+  const describe = (path: string, candidate: unknown): string => props.describePath?.(path, candidate) ?? path
+
+  // What to ask comes first, then who answers it, then what they may read.
   const body = (
     <Stack gap="row">
+      <Field label="What should AI change?" group>
+        <Textarea label="What should AI change?" assist={false} rows={4} maxLength={8_000} value={instruction()}
+          disabled={busy() || props.disabled} onInput={setInstruction} />
+      </Field>
       <ModelBackendPicker backends={backends()} backendId={backendId()} modelId={modelId()} onChange={next => {
         setChoice(next)
         void saveGeneratePick(queryClient, next)
@@ -157,13 +174,12 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
           ? 'Up to 3 records and 16 KiB from a model-requested preview may be sent through the selected backend.'
           : 'Only source metadata is shared. Preview record contents stay off.'}
       </Text>
-      <Textarea label="Instruction or answer" assist={false} rows={4} maxLength={8_000} value={instruction()}
-        disabled={busy() || props.disabled} onInput={setInstruction} />
-      <Inline gap="inline" wrap>
-        <Button variant="solid" disabled={busy() || props.disabled || !instruction().trim() || !backendId()} busy={busy()} onPress={() => void submit()}>Send</Button>
-        <Show when={busy()}><Button variant="bare" onPress={() => { controller?.abort(); setBusy(false); setStatus('Cancelled. The draft was not changed.') }}>Cancel</Button></Show>
-        <Show when={backend()}>{value => <Badge>{value().label}</Badge>}</Show>
-      </Inline>
+      <Show when={!props.onClose}>
+        <Inline gap="inline" wrap>
+          {send()}
+          <Show when={busy()}><Button variant="bare" onPress={stop}>Cancel</Button></Show>
+        </Inline>
+      </Show>
       <Show when={status()}>{value => <Text emphasis="muted" wrap>{value()}</Text>}</Show>
       <Show when={error()}>{value => <Alert tone="warn">{value()}</Alert>}</Show>
       {/* The reply is model-shaped data, and a throw while drawing it would otherwise leave the whole
@@ -183,7 +199,7 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
       <Show when={proposal()}>{value => <Alert tone={value().problems.length ? 'warn' : undefined} title="Review AI proposal">
           <Stack gap="row">
             <Text wrap>{value().summary}</Text>
-            <For each={value().diff.slice(0, 20)}>{change => <Text emphasis="mono" wrap>{`${change.change} ${change.path}: ${clipped(change.before)} → ${clipped(change.after)}`}</Text>}</For>
+            <For each={value().diff.slice(0, 20)}>{change => <Text wrap>{`${CHANGE_WORD[change.change] ?? change.change} ${describe(change.path, value().candidate)}: ${clipped(change.before)} → ${clipped(change.after)}`}</Text>}</For>
             <Show when={value().diff.length > 20}><Text emphasis="muted">{`and ${value().diff.length - 20} more changes`}</Text></Show>
             <For each={value().problems}>{problem => <Text wrap>{problem}</Text>}</For>
             <Text emphasis="muted">{`${value().usage.requests} model request${value().usage.requests === 1 ? '' : 's'} · ${value().usage.inputTokens} input tokens · ${value().usage.outputTokens} output tokens`}</Text>
@@ -197,5 +213,17 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
       </ErrorBoundary>
     </Stack>
   )
-  return props.bare ? body : <Fold label={`AI authoring · ${props.label}`} level="group" defaultOpen>{body}</Fold>
+  if (!props.onClose) return <Fold label={`AI authoring · ${props.label}`} level="group" defaultOpen>{body}</Fold>
+  // While a turn is out, the ghost button stops it rather than closing over it.
+  return (
+    <>
+      <ModalBody>{body}</ModalBody>
+      <ModalActions>
+        <Show when={busy()} fallback={<Button variant="ghost" onPress={() => props.onClose?.()}>Close</Button>}>
+          <Button variant="ghost" onPress={stop}>Cancel</Button>
+        </Show>
+        {send()}
+      </ModalActions>
+    </>
+  )
 }

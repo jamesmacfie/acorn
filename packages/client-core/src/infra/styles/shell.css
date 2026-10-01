@@ -373,6 +373,9 @@
   border-top: var(--chrome-divider);
 }
 .layout-list-footer > .ui-stack > .ui-toolbar:first-child { border-bottom: 0; }
+/* A footer that is only a bar, such as a status line, sits on the column's bottom edge. */
+.layout-list-footer:has(> .ui-toolbar:only-child) { padding-bottom: 0; }
+.layout-list-footer > .ui-toolbar:only-child { border-bottom: 0; }
 /* Footer chrome still reaches the column edges; fields and action rows keep the footer inset. */
 .layout-list-footer .ui-toolbar:not([data-variant='actions']) {
   width: auto;

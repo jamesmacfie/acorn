@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, Show } from 'solid-js'
-import { formatRelativeTime, onPluginFrame, type Task } from '@acorn/plugin-api/client'
+import { formatRelativeTime, onPluginFrame, pluginLabel, type Task } from '@acorn/plugin-api/client'
 import {
   Alert, Badge, Button, CodeBlock, ConfirmButton, EmptyState, Facts, Fold, Heading, Icon, Inline,
   Row, Rows, SectionHeader, SegmentedControl, Stack, Text,
@@ -12,7 +12,7 @@ import type {
   WorkflowRecordPage,
 } from '../../shared/workflowProcessing'
 import { workflowApi } from '../workflowsClient'
-import { runGlyph, runTone } from './runDisplay'
+import { runGlyph, runTone, statusLabel } from './runDisplay'
 import { progressSummary, RECORD_FILTERS, recordCanReprocess, recordCanRetry, recordStatus } from './recordHistoryModel'
 
 type Detail = Awaited<ReturnType<typeof workflowApi.record>>
@@ -38,7 +38,7 @@ export function RunRecords(props: {
 
   const selected = createMemo(() => records().find(row => row.id === selectedId()))
   const source = createMemo(() => page()?.provenance?.source)
-  const sourceLabel = () => source() ? `${source()!.pluginId} · ${source()!.sourceId}` : 'Structured records'
+  const sourceLabel = () => source() ? `${pluginLabel(source()!.pluginId)} · ${source()!.sourceId}` : 'Records'
 
   const readPage = async (append: boolean): Promise<void> => {
     const current = ++generation
@@ -258,29 +258,34 @@ export function RunRecords(props: {
         </Rows>
       </Show>
       <Show when={page()?.next !== null && page()?.next !== undefined}>
-        <Button size="sm" disabled={busy()} onPress={() => void readPage(true)}>Load next 100</Button>
+        <Button size="sm" disabled={busy()} onPress={() => void readPage(true)}>Show more</Button>
       </Show>
 
       <Show when={selected()}>
         {row => (
           <Stack gap="row">
             <SectionHeader level="sub">{row().title}</SectionHeader>
+            {/* What a reader checks first stays in view; how the record was read folds away. */}
             <Facts grouping="rows" size="sm" items={[
               { label: 'Status', value: recordStatus(row()) },
-              { label: 'Decision', value: row().decision },
               { label: 'Source', value: sourceLabel() },
-              ...(detail()?.provenance?.connectionId ? [{ label: 'Connection', value: detail()!.provenance!.connectionId! }] : []),
-              ...(detail()?.provenance?.sourceRevision ? [{ label: 'Source revision', value: detail()!.provenance!.sourceRevision! }] : []),
-              ...(detail()?.provenance?.savedQuery ? [{ label: 'Saved query', value: `${detail()!.provenance!.savedQuery!.id} · revision ${detail()!.provenance!.savedQuery!.revision}` }] : []),
-              ...(detail()?.provenance?.completeness ? [{ label: 'Completeness', value: `${detail()!.provenance!.completeness!.kind}${detail()!.provenance!.completeness!.cause ? ` · ${detail()!.provenance!.completeness!.cause}` : ''}` }] : []),
               ...(detail()?.provenance?.evaluationTime ? [{ label: 'Evaluated', value: formatRelativeTime(detail()!.provenance!.evaluationTime!) }] : []),
-              ...(detail()?.provenance?.readTime ? [{ label: 'Read', value: formatRelativeTime(detail()!.provenance!.readTime!) }] : []),
-              ...(row().reason ? [{ label: 'Reason', value: row().reason }] : []),
             ]} />
-            <Show when={row().result}>{result => <Fold label="Short result"><CodeBlock wrap maxHeight="block">{result()}</CodeBlock></Fold>}</Show>
-            <Show when={detail()?.snapshot}>{snapshot => <Fold label="Frozen input"><CodeBlock wrap maxHeight="block">{JSON.stringify(snapshot(), null, 2)}</CodeBlock></Fold>}</Show>
+            <Fold label="Details">
+              <Facts grouping="rows" size="sm" items={[
+                { label: 'Decision', value: row().decision },
+                ...(row().reason ? [{ label: 'Reason', value: row().reason }] : []),
+                ...(detail()?.provenance?.connectionId ? [{ label: 'Connection', value: detail()!.provenance!.connectionId! }] : []),
+                ...(detail()?.provenance?.sourceRevision ? [{ label: 'Source revision', value: detail()!.provenance!.sourceRevision! }] : []),
+                ...(detail()?.provenance?.savedQuery ? [{ label: 'Saved query', value: `${detail()!.provenance!.savedQuery!.id} · revision ${detail()!.provenance!.savedQuery!.revision}` }] : []),
+                ...(detail()?.provenance?.completeness ? [{ label: 'Completeness', value: `${detail()!.provenance!.completeness!.kind}${detail()!.provenance!.completeness!.cause ? ` · ${detail()!.provenance!.completeness!.cause}` : ''}` }] : []),
+                ...(detail()?.provenance?.readTime ? [{ label: 'Read', value: formatRelativeTime(detail()!.provenance!.readTime!) }] : []),
+              ]} />
+            </Fold>
+            <Show when={row().result}>{result => <Fold label="Result"><CodeBlock wrap maxHeight="block">{result()}</CodeBlock></Fold>}</Show>
+            <Show when={detail()?.snapshot}>{snapshot => <Fold label="Input"><CodeBlock wrap maxHeight="block">{JSON.stringify(snapshot(), null, 2)}</CodeBlock></Fold>}</Show>
             <Show when={detail()?.record?.outputs.length}>
-              <Fold label="Declared outputs" count={detail()!.record!.outputs.length}>
+              <Fold label="Outputs" count={detail()!.record!.outputs.length}>
                 <Stack gap="row"><For each={detail()!.record!.outputs}>{output => <CodeBlock wrap maxHeight="block">{`${output.name}: ${output.preview}`}</CodeBlock>}</For></Stack>
               </Fold>
             </Show>
@@ -291,20 +296,20 @@ export function RunRecords(props: {
                 </Button>
               </Show>
               <Show when={row().taskId && !props.tasks.some(task => task.id === row().taskId)}>
-                <Text emphasis="muted">The child task is missing or archived. Its run history is retained here.</Text>
+                <Text emphasis="muted">The task is archived or gone. Its runs are still listed here.</Text>
               </Show>
               <Show when={recordCanRetry(row())}>
                 <ConfirmButton size="sm" confirmLabel="Retry attempt?" tip="Runs this failed attempt again from its original snapshot" disabled={busy()} onConfirm={() => void retry(row())}>Retry attempt</ConfirmButton>
               </Show>
               <Show when={recordCanReprocess(row())}>
-                <Button size="sm" disabled={busy()} onPress={() => void prepare(row())}>Reprocess…</Button>
+                <Button size="sm" disabled={busy()} onPress={() => void prepare(row())}>Run again…</Button>
               </Show>
             </Inline>
             <Show when={prepared()}>{review => (
-              <Alert tone="warn" title={`Reprocess ${review().title}`}>
+              <Alert tone="warn" title={`Run ${review().title} again`}>
                 <Stack gap="row">
-                  <Text>This creates a new root attempt from the frozen input. It does not rerun the source query or restart successful siblings.</Text>
-                  <ConfirmButton size="sm" confirmLabel="Start attempt?" disabled={busy()} onConfirm={() => void reprocess(row())}>Create new attempt</ConfirmButton>
+                  <Text>This runs the record again with the same input. Other records don't run again.</Text>
+                  <ConfirmButton size="sm" confirmLabel="Run again?" disabled={busy()} onConfirm={() => void reprocess(row())}>Run again</ConfirmButton>
                 </Stack>
               </Alert>
             )}</Show>
@@ -314,7 +319,7 @@ export function RunRecords(props: {
                   <For each={attempts()}>{attempt => (
                     <Stack gap="row">
                       <Inline wrap>
-                        <Badge size="xs" tone={attempt.status === 'failed' ? 'danger' : attempt.status === 'gated' ? 'warn' : undefined}>{attempt.status}</Badge>
+                        <Badge size="xs" tone={attempt.status === 'failed' ? 'danger' : attempt.status === 'gated' ? 'warn' : undefined}>{statusLabel(attempt.status)}</Badge>
                         <Text emphasis="muted">{formatRelativeTime(attempt.createdAt)}</Text>
                         <Show when={props.tasks.some(task => task.id === attempt.taskId)} fallback={<Text emphasis="muted">Task unavailable</Text>}>
                           <Button size="sm" variant="bare" onPress={() => props.onOpen(attempt.taskId, attempt.runId, { rootRunId: props.runId, recordId: row().id })}>Open attempt</Button>
@@ -329,7 +334,7 @@ export function RunRecords(props: {
                       </Show>
                     </Stack>
                   )}</For>
-                  <Show when={attemptNext()}><Button size="sm" disabled={busy()} onPress={() => void loadAttempts()}>More attempts</Button></Show>
+                  <Show when={attemptNext()}><Button size="sm" disabled={busy()} onPress={() => void loadAttempts()}>Show more</Button></Show>
                 </Stack>
               </Fold>
             </Show>

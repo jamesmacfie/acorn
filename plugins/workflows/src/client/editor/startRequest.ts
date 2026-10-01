@@ -19,7 +19,8 @@ export type StartRequest = {
   /** The task to run on. Absent means the dialog asks. */
   taskId?: string
   projectId?: string
-  onStarted?: (runId: string) => void
+  /** Where to go once it starts. The dialog opens the run when this is absent. */
+  onStarted?: (runId: string, taskId: string) => void
 }
 
 const [request, setRequest] = createSignal<StartRequest | null>(null)
@@ -59,5 +60,5 @@ export async function requestWorkflowStart(next: StartRequest): Promise<void> {
   const values = { ...(next.prefill ?? {}) }
   const answer = await startWorkflow(taskId, { defId: next.defId }, Object.keys(values).length ? values : undefined)
   if (answer.error) toast(answer.error, { tone: 'danger' })
-  else if (answer.runId) next.onStarted?.(answer.runId)
+  else if (answer.runId) next.onStarted?.(answer.runId, taskId)
 }

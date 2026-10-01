@@ -1,43 +1,62 @@
 import { createMemo, createSignal, Show } from 'solid-js'
 import { formatRelativeTime, readLocal, type Task, writeLocal } from '@acorn/plugin-api/client'
 import {
-  Badge, Button, ConfirmButton, EmptyState, Icon, Inline, Row, Rows, SectionHeader, SegmentedControl, Stack,
-  Text,
+  Badge, ConfirmButton, EmptyState, Icon, IconButton, Inline, Row, Rows, SectionHeader, SegmentedControl, Stack,
+  Text, Toolbar,
 } from '@acorn/plugin-api/ui'
 import { RunGraph } from './RunGraph'
-import { formatUsage, kindLabel, runGlyph, runTone, stepElapsed, stepGlyph, stepTone } from './runDisplay'
+import { formatUsage, runGlyph, runTone, statusLabel, stepElapsed, stepGlyph, stepTone } from './runDisplay'
 import { isLiveRun, type RunPaneModel } from './runPaneModel'
 
-// The run pane's list column: this task's runs, then the selected run's nodes in the same reading
+// The run pane's list column: this task's runs, then the selected run's steps in the same reading
 // order and the same indentation the editor draws (docs/workflows.md § Routes and UI).
 //
 // Two `Rows` collections rather than one, because they answer different questions and the arrows
-// should not walk from a run into a node. Each is the kit's, so the keyboard, the type-ahead and the
+// should not walk from a run into a step. Each is the kit's, so the keyboard, the type-ahead and the
 // selection that survives a refetch come for free.
 //
-// The nodes half draws either way: rows, or the kit's `Graph` over the same model. Which one is a
+// The steps half draws either way: a list, or the kit's `Graph` over the same model. Which one is a
 // per-device preference, because it is a reading habit rather than anything about the run
-// (docs/state-ownership.md § Device).
+// (docs/state-ownership.md § Device). A module signal, because the switch sits in the header region
+// and the list region draws what it chose.
 
 type NodeView = 'rows' | 'graph'
 const NODE_VIEW_KEY = 'plugin:workflows:runs:nodeView'
 const CHILD_TERMINAL = new Set(['done', 'completed-with-failures', 'failed', 'safety-rail', 'cancelled'])
 
-/** The list header: how many runs this task has. */
+const [nodeView, setNodeView] = createSignal<NodeView>(readLocal(NODE_VIEW_KEY) === 'graph' ? 'graph' : 'rows')
+const showNodes = (view: NodeView): void => {
+  writeLocal(NODE_VIEW_KEY, view)
+  setNodeView(view)
+}
+
+/** The list header: how many runs this task has, and how to draw the selected run's steps. */
 export function RunPaneHeader(props: { task: Task; model: RunPaneModel }) {
-  return <SectionHeader count={props.model.runs().length}>Runs</SectionHeader>
+  return (
+    <SectionHeader
+      count={props.model.runs().length}
+      actions={(
+        <Show when={props.model.selectedRun()}>
+          <SegmentedControl
+            size="sm"
+            ariaLabel="Step view"
+            value={nodeView()}
+            options={[{ value: 'rows' as const, label: 'List' }, { value: 'graph' as const, label: 'Graph' }]}
+            onChange={showNodes}
+          />
+        </Show>
+      )}
+    >
+      Runs
+    </SectionHeader>
+  )
 }
 
 export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
   const model = props.model
-  const [nodeView, setNodeView] = createSignal<NodeView>(readLocal(NODE_VIEW_KEY) === 'graph' ? 'graph' : 'rows')
-  const showNodes = (view: NodeView): void => {
-    writeLocal(NODE_VIEW_KEY, view)
-    setNodeView(view)
-  }
 
   const runItems = createMemo(() => model.runs().map((run) => ({ key: run.id, label: run.name })))
-  const nodeItems = createMemo(() => model.nodes().map((node) => ({ key: node.step?.id ?? `pending:${node.name}`, label: node.step?.name ?? node.name })))
+  const nodeItems = createMemo(() => model.nodes().map((node) => ({ key: node.step?.id ?? `pending:${node.name}`, label: node.label })))
   const nodeFor = (key: string) => model.nodes().find((node) => (node.step?.id ?? `pending:${node.name}`) === key)
 
   const selectNode = (key: string): void => {
@@ -80,21 +99,7 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
       </Show>
 
       <Show when={model.selectedRun()}>
-        <SectionHeader
-          level="group"
-          count={model.nodes().length}
-          actions={(
-            <SegmentedControl
-              size="sm"
-              ariaLabel="Node view"
-              value={nodeView()}
-              options={[{ value: 'rows' as const, label: 'Rows' }, { value: 'graph' as const, label: 'Graph' }]}
-              onChange={showNodes}
-            />
-          )}
-        >
-          Nodes
-        </SectionHeader>
+        <SectionHeader level="group" count={model.nodes().length}>Steps</SectionHeader>
         <Show when={nodeView() === 'graph'}>
           <RunGraph model={model} />
         </Show>
@@ -102,7 +107,7 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
           <Rows
             tree
             id={`workflows:nodes:${props.task.id}`}
-            ariaLabel="Workflow nodes"
+            ariaLabel="Workflow steps"
             items={nodeItems()}
             selected={model.selectedStepId() ?? null}
             onSelect={selectNode}
@@ -117,7 +122,7 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
                     depth={node().depth}
                     density="compact"
                     variant="tree"
-                    title={node().parents.length > 1 ? `Waits on ${node().parents.join(', ')}` : kindLabel(node().step?.kind ?? 'agent')}
+                    title={node().parents.length > 1 ? `Waits on ${node().parentLabels.join(', ')}` : model.kindLabel(node().step?.kind ?? 'agent')}
                     leading={(
                       <Icon
                         name={stepGlyph(node().step?.status)}
@@ -132,12 +137,12 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
                         </Show>
                         {/* The leading check already says done; every other status keeps its word. */}
                         <Show when={node().step?.status !== 'done'}>
-                          <Text emphasis="muted">{node().step?.status ?? 'pending'}</Text>
+                          <Text emphasis="muted">{statusLabel(node().step?.status)}</Text>
                         </Show>
                         <Show when={node().step?.children.length}>
                           {(count) => (
                             <Text emphasis="muted">
-                              {`${node().step!.children.filter((child) => child.runStatus && CHILD_TERMINAL.has(child.runStatus)).length}/${count()} children`}
+                              {`${node().step!.children.filter((child) => child.runStatus && CHILD_TERMINAL.has(child.runStatus)).length} of ${count()} child runs done`}
                             </Text>
                           )}
                         </Show>
@@ -146,7 +151,7 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
                     )}
                     onPress={() => selectNode(item.key)}
                   >
-                    {node().name}
+                    {node().label}
                   </Row>
                 )}
               </Show>
@@ -158,38 +163,33 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
   )
 }
 
-/** Under the list: what the run has cost, and the one control that acts on the whole run. */
+/** Under the list: the run's status and what it has cost, and the one control that acts on the
+ *  whole run. */
 export function RunPaneFooter(props: { task: Task; model: RunPaneModel }) {
   const model = props.model
   const usage = createMemo(() => formatUsage(model.selectedRun()?.usage))
   return (
     <Show when={model.selectedRun()}>
       {(run) => (
-        <SectionHeader
-          level="sub"
-          actions={(
-            <Show
-              when={isLiveRun(run())}
-              fallback={<Button size="sm" variant="bare" disabled={model.busy()} onPress={() => model.refresh()}>Refresh</Button>}
+        <Toolbar size="sm" ariaLabel="Run status">
+          <Text emphasis="muted">{[statusLabel(run().status), usage()].filter(Boolean).join(' · ')}</Text>
+          <Toolbar.Spacer />
+          <Show
+            when={isLiveRun(run())}
+            fallback={<IconButton icon="refresh-cw" label="Refresh" size="sm" disabled={model.busy()} onPress={() => model.refresh()} />}
+          >
+            <ConfirmButton
+              size="sm"
+              variant="ghost"
+              tone="danger"
+              confirmLabel="Cancel run?"
+              disabled={model.busy()}
+              onConfirm={() => void model.cancel()}
             >
-              <ConfirmButton
-                size="sm"
-                tone="danger"
-                confirmLabel="Cancel run?"
-                disabled={model.busy()}
-                onConfirm={() => void model.cancel()}
-              >
-                Cancel run tree
-              </ConfirmButton>
-            </Show>
-          )}
-        >
-          {[
-            run().status,
-            run().depth === 0 && run().usage ? 'Tree usage' : run().usage ? 'Run usage' : '',
-            usage(),
-          ].filter(Boolean).join(' · ')}
-        </SectionHeader>
+              Cancel run
+            </ConfirmButton>
+          </Show>
+        </Toolbar>
       )}
     </Show>
   )

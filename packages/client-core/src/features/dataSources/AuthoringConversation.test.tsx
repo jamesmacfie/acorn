@@ -35,7 +35,7 @@ it('reports a reply it cannot draw instead of freezing', async () => {
   dispose = render(() => (
     <QueryClientProvider client={new QueryClient()}>
       <AuthoringConversation endpoint="/unused" target="workflow" targetId="t" scope={{ workspaceId: 'w', projectId: 'p' }}
-        baseRevision={0} base={{}} label="Draft" bare onApply={() => undefined} sendTurn={async () => reply} />
+        baseRevision={0} base={{}} label="Draft" onClose={() => undefined} onApply={() => undefined} sendTurn={async () => reply} />
     </QueryClientProvider>
   ), host)
   await settle()

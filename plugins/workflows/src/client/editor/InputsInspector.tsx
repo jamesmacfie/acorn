@@ -42,6 +42,10 @@ export default function InputsInspector(props: {
                   invalid={!INPUT_NAME_RE.test(input().name)} value={input().name}
                   onInput={(value) => patch(at, { name: value })} />
               </Field>
+              <Field label="Label" hint="Shown in place of the name. Leave it empty to show the name." group>
+                <Input label="Label" disabled={props.disabled} value={input().label ?? ''}
+                  onInput={(value) => patch(at, { label: value || undefined })} />
+              </Field>
               <Field label="Description" hint="Shown beside the box." group>
                 <Input label="Description" disabled={props.disabled} value={input().description ?? ''}
                   onInput={(value) => patch(at, { description: value || undefined })} />

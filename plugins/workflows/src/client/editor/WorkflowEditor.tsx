@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { useNavigate, useSearchParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { activeTaskId, projectPath, toast, workspacesOptions } from '@acorn/plugin-api/client'
+import { activeTaskId, projectPath, tasksOptions, toast, workspacesOptions } from '@acorn/plugin-api/client'
 import { addAiList } from './aiListDraft'
 import {
   Alert,
@@ -60,6 +60,7 @@ import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
 import type { AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import { mergeWorkflow } from '../../shared/workflowMerge'
 import { requestWorkflowSchedule } from '../schedules/scheduleRequest'
+import { openWorkflowRun } from '../runs/runStore'
 
 // The editor: one definition as a list of nodes with an inspector, on both hosts
 // (docs/workflows.md § Authoring).
@@ -75,6 +76,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
   const store = createDraftStore({ projectId: () => props.projectId, item: () => props.item })
   const [tab, setTab] = createSignal<'nodes' | 'graph' | 'json'>('nodes')
   const workspaces = createQuery(() => workspacesOptions(true))
+  const tasks = createQuery(() => tasksOptions(true))
   const workspaceId = () => workspaces.data?.find((entry) => entry.projects.some((project) => project.id === props.projectId))?.id ?? ''
 
   const draft = () => store.draft()
@@ -237,6 +239,12 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       inputs: executable.inputs,
       projectId: props.projectId,
       taskId: activeTaskId() ?? undefined,
+      // A run that starts with no dialog still lands where it went, rather than leaving the editor
+      // looking as if nothing happened.
+      onStarted: (runId, taskId) => {
+        const task = (tasks.data ?? []).find((candidate) => candidate.id === taskId)
+        if (task) openWorkflowRun(task, runId, navigate)
+      },
     })
   }
 
@@ -327,6 +335,10 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
         <Badge tip={store.publishedRevision() ? `Version ${store.publishedRevision()}. Runs and schedules use this version.` : undefined}>
           {store.publishedRevision() ? 'Published' : 'Not published'}
         </Badge>
+      </Show>
+      {/* A file, so Publish… writes the working tree rather than a version on the node. */}
+      <Show when={store.ref()?.source === 'repo' || store.ref()?.source === 'user'}>
+        <Badge>{store.ref()?.source === 'repo' ? 'File in the repository' : 'File on this computer'}</Badge>
       </Show>
       <ToolbarSpacer />
       <Show when={canGenerate()}>
@@ -457,10 +469,10 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
         <Modal title="Publish workflow" size="md" onDismiss={() => setReview(undefined)}>
           <ModalBody>
             <Stack gap="row">
-              <Text wrap>Runs and schedules use the published revision. These definitions will be written:</Text>
-              <For each={operation().writes}>{write => <Text>{`${write.name} · ${write.kind} · revision ${write.kind === 'workflow' ? write.revision : write.plan.intendedRevision}`}</Text>}</For>
+              <Text wrap>Runs and schedules use the published version. Publishing saves:</Text>
+              <For each={operation().writes}>{write => <Text>{`${write.name}${write.kind === 'query' ? ' (saved query)' : ''}, version ${write.kind === 'workflow' ? write.revision : write.plan.intendedRevision}`}</Text>}</For>
               <Show when={operation().consumers.length}><Text wrap>{`Also affects: ${operation().consumers.map(consumer => consumer.name).join(', ')}`}</Text></Show>
-              <Show when={operation().landed.length}><Text wrap>{`Already published: ${operation().landed.map(write => `${write.kind} ${write.id} revision ${write.revision}`).join(', ')}`}</Text></Show>
+              <Show when={operation().landed.length}><Text wrap>{`Already published: ${operation().landed.map(landed => operation().writes.find(write => write.id === landed.id)?.name ?? (landed.kind === 'query' ? 'a saved query' : 'a workflow')).join(', ')}`}</Text></Show>
               <Show when={operation().error ?? store.message()}>{text => <Alert tone="warn">{text()}</Alert>}</Show>
             </Stack>
           </ModalBody>
@@ -476,7 +488,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
         <Modal title={isDatabase() ? 'Export to repository' : 'Publish to file'} size="md" onDismiss={() => setReview(undefined)}>
           <ModalBody>
             <Stack gap="row">
-              <Text wrap>These files will be written to the working tree and left uncommitted. Files already in the workspace are kept.</Text>
+              <Text wrap>acorn writes these files into the project folder and doesn't commit them. The workflow here stays as it is.</Text>
               <For each={operation().writes}>{write => <Text wrap>{`${write.landed ? 'Written' : 'Pending'}: ${write.path}`}</Text>}</For>
               <For each={operation().setup}>{item => <Text wrap>{item}</Text>}</For>
               <Show when={operation().error ?? store.message()}>{text => <Alert tone="warn">{text()}</Alert>}</Show>
@@ -494,21 +506,20 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
         {/* A dialog, not a strip over the editor: the conversation is a side trip from the draft, and
             drawn inline it pushed the outline half off the screen. It keeps its thread on the device,
             so closing it and opening it again picks up where it was. */}
-        <Modal title={`AI authoring · ${draft().def.name}`} size="lg" onDismiss={() => setAuthoringOpen(false)}>
-          <ModalBody>
-            <AuthoringConversation
-              bare
-              endpoint="/v1/p/workflows/defs/authoring/turn"
-              target="workflow"
-              targetId={store.ref()?.id ?? `new:${props.projectId}`}
-              scope={{ workspaceId: workspaceId(), projectId: props.projectId }}
-              baseRevision={store.revision()}
-              base={draft().def}
-              label={draft().def.name}
-              disabled={store.readOnly() || store.busy()}
-              onApply={applyProposal}
-            />
-          </ModalBody>
+        <Modal title={`Edit ${draft().def.name} with AI`} size="lg" onDismiss={() => setAuthoringOpen(false)}>
+          <AuthoringConversation
+            onClose={() => setAuthoringOpen(false)}
+            endpoint="/v1/p/workflows/defs/authoring/turn"
+            target="workflow"
+            targetId={store.ref()?.id ?? `new:${props.projectId}`}
+            scope={{ workspaceId: workspaceId(), projectId: props.projectId }}
+            baseRevision={store.revision()}
+            base={draft().def}
+            label={draft().def.name}
+            disabled={store.readOnly() || store.busy()}
+            describePath={(path, candidate) => changeSubject(path, [draft().def, candidate as { steps?: readonly { id?: string; name: string }[] }])}
+            onApply={applyProposal}
+          />
         </Modal>
       </Show>
       <Show when={store.readOnly()}>
@@ -533,7 +544,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
                 catalog={store.catalog()}
                 readOnly={store.readOnly()}
                 onSelect={(selection: DraftSelection) => store.select((current) => selectRow(current, selection))}
-                onAdd={(kind) => apply((current) => kind === 'ai-list' ? addAiList(current) : addNode(current, kind))}
+                onAdd={(kind) => apply((current) => kind === 'ai-list' ? addAiList(current) : addNode(current, kind, describeFor(kind)?.label))}
               />
             )}</Show>
           </ListColumn>
@@ -587,6 +598,15 @@ const asText = (value: unknown): string =>
 
 /** The step a merge conflict sits in, by name, or the definition field it touches. Merge paths name
  *  a step as `/steps/@{id}` (../../shared/workflowMerge.ts). */
+/** "Approve the release › prompt" for a proposal's `/steps/<id>/prompt`. The step is looked up in the
+ *  draft, then in the proposal, which holds a step the change adds. */
+const changeSubject = (path: string, defs: readonly ({ steps?: readonly { id?: string; name: string }[] } | undefined)[]): string => {
+  const [top, key, ...rest] = path.split('/').filter(Boolean)
+  if (top !== 'steps' || !key) return path.split('/').filter(Boolean).join(' › ') || 'the workflow'
+  const name = defs.flatMap((def) => def?.steps ?? []).find((step) => (step.id ?? step.name) === key)?.name ?? key
+  return [name, ...rest].join(' › ')
+}
+
 const conflictSubject = (path: string, def: { steps: readonly { id?: string; name: string }[] }): string => {
   const id = /^\/steps\/@([^/]+)/.exec(path)?.[1]
   if (id) return def.steps.find((step) => step.id === id)?.name ?? id

@@ -38,7 +38,7 @@ Run them on the desktop and in `acorn` in a terminal.
     and Reject in front of you; the inbox has the same row and it stays there until you answer.
     Approve, and the run finishes and keeps a notice.
 53. Make one node fail, by pointing its command at something that exits non-zero. The pane offers
-    **Retry**, and an agent node also offers **Retry with edited prompt**; both put the run back to
+    **Retry**, and an agent node also offers **Edit prompt and retry**; both put the run back to
     running from that node. Then check the pane is not there at all on a task that has never run a
     workflow, and that the agents pane draws no workflow step rows anywhere. In **Agent Center**, the
     workflow session's row carries a **Run** chip: the row body opens the session and the chip opens
@@ -67,7 +67,7 @@ node whose whole point is what it looks like, so a suite can check the geometry 
     wires follow. Drag from one card's bottom port onto another: the second now waits on the first,
     and the footer agrees. Press the `×` on that wire and it goes. Select a card and press Backspace:
     it is removed, and the same edit is in the JSON tab. Reload the surface and the cards are where
-    you left them. Then start a run and press **Graph** in the pane's Nodes header: a card recolours
+    you left them. Then start a run and press **Graph** in the pane's Runs header: a card recolours
     as its step starts and finishes. In the terminal client, both **Graph** views are the indented
     list, the arrows walk the cards, and the editor's has a picker under it that draws an edge out of
     the selected card.

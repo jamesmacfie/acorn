@@ -13,11 +13,12 @@ import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import type { WorkflowRunRow } from '../../contract/wire.ts'
 import type { WorkflowChildRunSummary, WorkflowRunProjection, WorkflowStepProjection } from '../../shared/api'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
-import type { WorkflowDef, WorkflowGateForm } from '../../shared/workflowContracts'
+import type { WorkflowCatalog, WorkflowDef, WorkflowGateForm } from '../../shared/workflowContracts'
 import { isWorkflowStepEvent } from '../../shared/stepEvents'
 import { graphOrder } from '../editor/graphOrder'
-import { rowIdentity } from '../../shared/workflowIdentity'
+import { rowIdentity, stepIdentity } from '../../shared/workflowIdentity'
 import { workflowApi } from '../workflowsClient'
+import { kindLabel } from './runDisplay'
 
 export const WORKFLOWS_PANE_ID = 'workflows'
 
@@ -26,11 +27,15 @@ export const WORKFLOWS_PANE_ID = 'workflows'
 const EVENT_CAP = 200
 const TAIL_CHARS = 4000
 
-/** One row of the node list: the graph position the editor draws, plus the row that ran it. */
+/** One row of the step list: the graph position the editor draws, plus the row that ran it. `name`
+ *  is the step's stable id, which edges and selection key on; `label` and `parentLabels` are what a
+ *  person reads. */
 export type RunNode = {
   name: string
+  label: string
   depth: number
   parents: readonly string[]
+  parentLabels: readonly string[]
   step: WorkflowStepProjection | undefined
 }
 
@@ -72,8 +77,9 @@ export function createRunPaneModel(task: Task) {
   const selectedStep = createMemo(() => steps().find((step) => step.id === selectedStepId()))
 
   // The newest run, until somebody says otherwise. Also the recovery when the selected run is gone.
+  // Not while the list is being read: a run that just started is named before it is listed.
   createEffect(() => {
-    if (runs().some((run) => run.id === selectedRunId())) return
+    if (runs.loading || runs().some((run) => run.id === selectedRunId())) return
     const newest = runs()[0]
     if (newest) setSelectedRunId(newest.id)
   })
@@ -90,10 +96,20 @@ export function createRunPaneModel(task: Task) {
     setSelectedStepId(focus.id)
   })
 
-  // The elapsed column, and only while something is running. A finished step's elapsed is two stored
-  // timestamps and needs no clock at all.
+  // A contributed kind's name ("Run a command") lives in the node's catalog, not in this bundle. Read
+  // once per pane; until it answers, or if it fails, the kind's id stands in.
+  const [catalog] = createResource(async (): Promise<WorkflowCatalog | undefined> => {
+    try {
+      return await workflowApi.catalog(task.projectId)
+    } catch {
+      return undefined
+    }
+  })
+
+  // The elapsed column, and only while something is running or waiting on a person. A finished
+  // step's elapsed is two stored timestamps and needs no clock at all.
   createEffect(() => {
-    if (!steps().some((step) => step.status === 'running')) return
+    if (!steps().some((step) => step.status === 'running' || step.status === 'waiting-gate')) return
     const timer = setInterval(() => setNow(Date.now()), 1000)
     onCleanup(() => clearInterval(timer))
   })
@@ -109,13 +125,17 @@ export function createRunPaneModel(task: Task) {
     const order = def
       ? graphOrder(def)
       : top.map((step) => ({ name: step.name, depth: 0, parents: [] as string[] }))
+    // A step not yet run has no row to name it, so its name comes from the definition.
+    const labelOf = (name: string): string =>
+      byName.get(name)?.name ?? def?.steps.find((candidate) => stepIdentity(candidate) === name)?.name ?? name
     const out: RunNode[] = []
     for (const row of order) {
       const step = byName.get(row.name)
-      out.push({ ...row, step })
+      const label = labelOf(row.name)
+      out.push({ ...row, label, parentLabels: row.parents.map(labelOf), step })
       if (!step) continue
       for (const child of rows.filter((candidate) => candidate.parentStepId === step.id)) {
-        out.push({ name: child.name, depth: row.depth + 1, parents: [row.name], step: child })
+        out.push({ name: child.name, label: child.name, depth: row.depth + 1, parents: [row.name], parentLabels: [label], step: child })
       }
     }
     return out
@@ -171,10 +191,14 @@ export function createRunPaneModel(task: Task) {
   //
   // A bell row, an attention row, the agent pane's chip, or the deep link `?pane=workflows&item=`,
   // which the host turns into a `plugin:select` naming the run.
+  const showRun = (runId: string): void => {
+    if (!runs().some((run) => run.id === runId)) void refetchRuns()
+    selectRun(runId)
+  }
   const applyIntent = (intent: PaneIntent | undefined): void => {
-    if (intent?.kind === 'plugin:select') return void selectRun(intent.item)
+    if (intent?.kind === 'plugin:select') return void showRun(intent.item)
     if (intent?.kind !== 'workflows:show-run') return
-    selectRun(intent.runId)
+    showRun(intent.runId)
     if (intent.stepId) setSelectedStepId(intent.stepId)
   }
   applyIntent(consumePaneIntent(task.id, WORKFLOWS_PANE_ID))
@@ -214,6 +238,10 @@ export function createRunPaneModel(task: Task) {
     selectedStepId,
     selectRun,
     selectStep: (stepId: string) => setSelectedStepId(stepId),
+    /** "Run a command" for `terminal:command`: the catalog for a contributed kind, the built-in table
+     *  for the rest, the id when neither knows it. */
+    kindLabel: (kind: string): string =>
+      catalog()?.kinds.find((entry) => entry.id === kind)?.describe?.label ?? kindLabel(kind),
     now,
     busy,
     error,

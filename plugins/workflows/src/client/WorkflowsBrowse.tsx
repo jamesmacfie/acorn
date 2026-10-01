@@ -2,8 +2,8 @@ import { createEffect, createMemo, createResource, onCleanup, Show } from 'solid
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import {
+  formatRelativeTime,
   onPluginFrame,
-  pathForTask,
   projectsOptions,
   tasksOptions,
   toast,
@@ -21,7 +21,8 @@ import WorkflowEditor from './editor/WorkflowEditor'
 import ScheduleDialogHost from './schedules/ScheduleDialog'
 import { requestWorkflowSchedule } from './schedules/scheduleRequest'
 import { scheduleStateLabel } from './schedules/scheduleModel'
-import { rememberWorkflowRun } from './runs/runStore'
+import { openWorkflowRun } from './runs/runStore'
+import { runGlyph, runTone, statusLabel } from './runs/runDisplay'
 import { workflowsSurfacePath, WORKFLOWS_SOURCE_ID } from './surfacePath'
 import { workflowApi } from './workflowsClient'
 
@@ -37,10 +38,15 @@ const RECENT_RUNS = 20
 // One line, so the icon census sees every name in it: it scans a line for a literal only when the
 // line mentions an icon, and a map spread over five lines mentions one on none of them
 // (client-core scripts/icon-census.mjs).
-const STATUS_GLYPH: Record<string, string> = { running: 'loader-circle', waiting: 'hand', done: 'check', failed: 'circle-x', cancelled: 'ban' }
-
-// Same one-line rule as STATUS_GLYPH above, for the same reason.
 const SCHEDULE_GLYPH: Record<WorkflowScheduleDisplayState, string> = { draft: 'pencil', activating: 'loader-circle', active: 'clock', paused: 'circle-dashed', 'needs-review': 'triangle-alert', unavailable: 'circle-x' }
+
+/** A collapsed row's mark: the first letters of the name, which tell two workflows apart where two
+ *  copies of the same source icon did not. */
+const initials = (name: string): string =>
+  name.split(/\s+/).filter(Boolean).slice(0, 2).map((word) => word[0]!.toUpperCase()).join('') || '?'
+
+/** `repo:nightly` is the layer and the file's id; a reader knows the file. */
+const fileName = (source: string): string => `${source.replace(/^[a-z]+:/, '')}.toml`
 
 const scheduleTone = (state: WorkflowScheduleDisplayState): 'ok' | 'danger' | 'warn' | undefined =>
   state === 'active' ? 'ok' : state === 'unavailable' ? 'danger' : state === 'needs-review' ? 'warn' : undefined
@@ -118,8 +124,10 @@ export function WorkflowsBrowseList() {
     .slice(0, RECENT_RUNS))
   const projectSchedules = createMemo(() => (schedules.data ?? []).filter(schedule => schedule.projectId === scope.projectId()))
 
+  // A file that does not parse keys on its own address, so pressing it opens the editor, which says
+  // what is wrong with it.
   const items = createMemo(() => [
-    ...errors().map((error, at) => ({ key: `problem:${at}`, label: error.source })),
+    ...errors().map((error) => ({ key: error.source, label: fileName(error.source) })),
     ...definitions().map((definition) => ({ key: defRefKey({ source: definition.source, id: definition.id }), label: definition.name })),
   ])
 
@@ -142,16 +150,13 @@ export function WorkflowsBrowseList() {
   // activate for the keyboard. All of them come here, because a `Row` in a `Rows` has no click of its
   // own unless it is given one (client-core kit/components/layout/Row.tsx).
   const open = (key: string): void => {
-    if (key.startsWith('problem:')) return
     navigate(workflowsSurfacePath(scope.projectId(), key))
   }
 
   const openRun = (runId: string): void => {
     const run = recent().find((entry) => entry.id === runId)
     const task = (tasks.data ?? []).find((entry) => entry.id === run?.taskId)
-    if (!task) return
-    rememberWorkflowRun(task.id)
-    navigate(`${pathForTask(task)}?pane=workflows&item=${encodeURIComponent(runId)}`)
+    if (task) openWorkflowRun(task, runId, navigate)
   }
 
   const openSchedule = (scheduleId: string): void => {
@@ -170,14 +175,15 @@ export function WorkflowsBrowseList() {
   return (
     <Stack gap="none">
       <SectionHeader
-        count={definitions().length}
+        count={items().length}
+        help="A workflow is a list of steps acorn runs for you in a task."
         actions={<Button size="sm" disabled={!scope.workspaceId()} onPress={() => void create()}><Icon name="plus" /> New</Button>}
       >
-        Definitions
+        Workflows
       </SectionHeader>
       <Show
         when={scope.projectId()}
-        fallback={<EmptyState align="start">Choose a project to see the workflows it can run.</EmptyState>}
+        fallback={<EmptyState align="start">Choose a project to see its workflows.</EmptyState>}
       >
         <Show
           when={items().length}
@@ -199,11 +205,16 @@ export function WorkflowsBrowseList() {
                     item={itemProps}
                     selected={selected()}
                     variant="stacked"
+                    onPress={() => open(item.key)}
                     title={item.label}
+                    tip={errors().find((error) => error.source === item.key)?.message}
                     collapsed={collapsed() ? <Icon name="triangle-alert" tone="warn" /> : undefined}
-                    leading={<Icon name="triangle-alert" />}
+                    leading={<Icon name="triangle-alert" tone="warn" />}
                   >
-                    <Text tone="warn" wrap>{item.label}</Text>
+                    <Stack gap="none">
+                      <Text>{item.label}</Text>
+                      <Text emphasis="muted">{errors().find((error) => error.source === item.key)?.message}</Text>
+                    </Stack>
                   </Row>
                 )}
               >
@@ -212,17 +223,12 @@ export function WorkflowsBrowseList() {
                     item={itemProps}
                     selected={selected()}
                     onPress={() => open(item.key)}
-                    title={definition().problems?.join(' ') || definition().name}
-                    // Collapsed: where the definition came from, which is the one thing that tells
-                    // two same-named workflows apart, and the problem badge, which is the reason a
-                    // reader would go looking. The name is the tooltip.
+                    title={definition().name}
+                    tip={definition().problems?.join(' ') || undefined}
+                    // Collapsed: the name's first letters, warn-toned when it has a problem, which is
+                    // the reason a reader would go looking. The name is the tooltip.
                     collapsed={collapsed()
-                      ? (
-                        <>
-                          <Icon name={SOURCE_GLYPH[definition().source].icon} title={SOURCE_GLYPH[definition().source].title} />
-                          <Show when={definition().problems?.length}><Badge tone="warn" size="xs">!</Badge></Show>
-                        </>
-                      )
+                      ? <Text tone={definition().problems?.length ? 'warn' : undefined}>{initials(definition().name)}</Text>
                       : undefined}
                     meta={(
                       <Text emphasis="muted">
@@ -234,7 +240,7 @@ export function WorkflowsBrowseList() {
                     )}
                     trailing={(
                       <>
-                        <Show when={definition().problems?.length}><Badge tone="warn" size="xs">problem</Badge></Show>
+                        <Show when={definition().problems?.length}><Badge tone="warn" size="xs">Can't read</Badge></Show>
                         <Icon name={SOURCE_GLYPH[definition().source].icon} title={SOURCE_GLYPH[definition().source].title} />
                       </>
                     )}
@@ -249,7 +255,7 @@ export function WorkflowsBrowseList() {
       </Show>
 
       <Show when={projectSchedules().length}>
-        <SectionHeader count={projectSchedules().length}>Schedules</SectionHeader>
+        <SectionHeader level="group" count={projectSchedules().length}>Schedules</SectionHeader>
         <Rows
           id="workflows.browse.schedules"
           ariaLabel="Workflow schedules"
@@ -264,7 +270,7 @@ export function WorkflowsBrowseList() {
                 // Collapsed: the state, because a schedule that has stopped checking is the only
                 // reason to look at this list at a glance. The workflow name is the tooltip.
                 collapsed={collapsed() ? <Icon name={SCHEDULE_GLYPH[schedule().state]} tone={scheduleTone(schedule().state)} /> : undefined}
-                meta={<Text emphasis="muted">{schedule().nextRunAt ? new Date(schedule().nextRunAt!).toLocaleString() : schedule().error ?? 'No next check'}</Text>}
+                meta={<Text emphasis="muted">{schedule().nextRunAt ? new Date(schedule().nextRunAt!).toLocaleString() : schedule().error ?? 'No check planned'}</Text>}
                 trailing={<Badge tone={scheduleTone(schedule().state)} size="xs">{scheduleStateLabel(schedule().state)}</Badge>}>
                 {schedule().workflowName}
               </Row>
@@ -274,7 +280,7 @@ export function WorkflowsBrowseList() {
       </Show>
 
       <Show when={recent().length}>
-        <SectionHeader count={recent().length}>Recent runs</SectionHeader>
+        <SectionHeader level="group" count={recent().length}>Recent runs</SectionHeader>
         <Rows
           id="workflows.browse.runs"
           ariaLabel="Recent runs"
@@ -290,9 +296,11 @@ export function WorkflowsBrowseList() {
                   selected={selected()}
                   onPress={() => openRun(run().id)}
                   title={run().title}
-                  collapsed={collapsed() ? <Icon name={STATUS_GLYPH[run().status] ?? 'circle'} /> : undefined}
-                  leading={<Icon name={STATUS_GLYPH[run().status] ?? 'circle'} />}
-                  meta={<Text emphasis="muted">{run().detail ?? run().status}</Text>}
+                  // Which task, and why it stopped, so two runs of one workflow read apart.
+                  tip={[(tasks.data ?? []).find((task) => task.id === run().taskId)?.title, run().detail].filter(Boolean).join('. ') || undefined}
+                  collapsed={collapsed() ? <Icon name={runGlyph(run().status)} tone={runTone(run().status)} /> : undefined}
+                  leading={<Icon name={runGlyph(run().status)} tone={runTone(run().status)} spin={run().status === 'running'} />}
+                  meta={<Text emphasis="muted">{`${statusLabel(run().status)} · ${formatRelativeTime(run().startedAt)}`}</Text>}
                 >
                   {run().title}
                 </Row>
@@ -303,7 +311,7 @@ export function WorkflowsBrowseList() {
       </Show>
 
       <Show when={runs.error}>
-        <Alert tone="warn">The run list could not be read from this node.</Alert>
+        <Alert tone="warn">Couldn't load recent runs.</Alert>
       </Show>
       {/* The one mount for the start dialog: this region is on screen whenever the source is, and the
           editor's Run button asks for it from the other half of the layout (./editor/StartDialog.tsx). */}
@@ -321,11 +329,7 @@ export function WorkflowsBrowseDetail() {
     <Show
       when={scope.item()}
       keyed
-      fallback={(
-        <EmptyState align="start">
-          Choose a workflow, or make a new one. A workflow is a list of steps acorn runs for you in a task.
-        </EmptyState>
-      )}
+      fallback={<EmptyState title="No workflow open">Choose one, or make a new one.</EmptyState>}
     >
       {(item) => <WorkflowEditor projectId={scope.projectId()} item={item} />}
     </Show>

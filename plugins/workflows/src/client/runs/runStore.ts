@@ -9,7 +9,9 @@
 // list loses its pane. That is the same window the rail and the merged run list show, and a longer
 // one would mean a count query per task.
 import { createSignal } from 'solid-js'
-import { onPluginFrame, wsOnReconnect, type ClientScheduleContribution } from '@acorn/plugin-api/client'
+import {
+  activateTaskSignals, onPluginFrame, openPane, pathForTask, wsOnReconnect, type ClientScheduleContribution, type Task,
+} from '@acorn/plugin-api/client'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { workflowApi } from '../workflowsClient'
 import type { WorkflowTaskGroup } from '../../shared/api'
@@ -27,6 +29,16 @@ export const rememberWorkflowRun = (taskId: string): void => {
   if (runCounts()[taskId]) return
   hintRevision += 1
   setRunCounts((current) => ({ ...current, [taskId]: 1 }))
+}
+
+/** Open a run in its task's Workflows pane. The shell draws what the rail source says, not the
+ *  address, so navigating alone left the reader on Workflows with an empty list. These are the calls
+ *  the agents center makes to open a session's run, in its order (plugins/agents center/AgentCenter.tsx). */
+export function openWorkflowRun(task: Task, runId: string, navigate: (path: string) => void): void {
+  rememberWorkflowRun(task.id)
+  activateTaskSignals(task, { pane: 'workflows' })
+  openPane(task.id, 'workflows', { kind: 'workflows:show-run', runId })
+  navigate(pathForTask(task))
 }
 
 const same = (a: Record<string, number>, b: Record<string, number>): boolean => {

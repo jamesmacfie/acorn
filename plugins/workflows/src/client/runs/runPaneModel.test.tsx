@@ -116,6 +116,33 @@ describe('the run pane model', () => {
     expect(model.selectedStepId()).toBe('st1')
   })
 
+  // A step's id is what edges and selection key on; a person reads its name. Rows printed the id
+  // once steps gained one, and a step that has not run has only the definition to name it.
+  it('names each step by its name, not its id, including one not yet run', async () => {
+    runRows = [run({ defJson: JSON.stringify({ baseline: 'acorn-1', formatVersion: 1, name: 'Release', steps: [
+      { id: 'c25f-1', name: 'Build the release' },
+      { id: 'c25f-2', name: 'Approve the release', after: ['c25f-1'] },
+      { id: 'c25f-3', name: 'Tag it', after: ['c25f-1', 'c25f-2'] },
+    ] }) })]
+    stepRows = [step({ name: 'Build the release' }), step({ id: 'st2', idx: 1, name: 'Approve the release', status: 'waiting-gate' })]
+    const model = await mount()
+    expect(model.nodes().map((node) => node.label)).toEqual(['Build the release', 'Approve the release', 'Tag it'])
+    expect(model.nodes().at(-1)?.parentLabels).toEqual(['Build the release', 'Approve the release'])
+  })
+
+  it('keeps the clock moving while a gate waits on a person', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'Date'] })
+    try {
+      stepRows = [step({ status: 'waiting-gate' })]
+      const model = await mount()
+      const before = model.now()
+      vi.advanceTimersByTime(3000)
+      expect(model.now()).toBeGreaterThan(before)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('moves one node on a step-changed frame and reads nothing', async () => {
     const model = await mount()
     const before = stepsCalls.mock.calls.length
@@ -179,6 +206,16 @@ describe('the run pane model', () => {
     await settle()
     expect(model.selectedRunId()).toBe('run-0')
     expect(model.selectedStepId()).toBe('st9')
+  })
+
+  // Run… opens the run it just started, before this pane has listed it. The newest-run fallback
+  // used to take the selection back to the previous run while the list was still being read.
+  it('follows an intent to a run it has not listed yet', async () => {
+    const model = await mount()
+    runRows = [run({ id: 'run-new', createdAt: 300 }), ...runRows]
+    openPane('task-1', 'workflows', { kind: 'workflows:show-run', runId: 'run-new' })
+    await settle()
+    expect(model.selectedRunId()).toBe('run-new')
   })
 
   it('takes the deep link plugin:select as a run id', async () => {

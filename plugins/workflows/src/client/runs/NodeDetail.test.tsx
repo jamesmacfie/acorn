@@ -48,6 +48,7 @@ const modelFor = (row: WorkflowStepRow, form?: WorkflowGateForm): RunPaneModel =
   error: () => '',
   setError: () => undefined,
   now: () => 100_000,
+  kindLabel: (kind: string) => kind,
   eventsFor: () => [],
   tailFor: () => [],
   kill,
@@ -112,7 +113,7 @@ afterEach(() => {
 describe('the controls a node offers', () => {
   it('a running agent node: its session and a way to stop it', () => {
     mount(step({ agentSessionId: 'sess-1' }))
-    expect(buttons()).toEqual(['Open in Agent pane', 'Kill step'])
+    expect(buttons()).toEqual(['Open in Agent pane', 'Stop step'])
   })
 
   it('a waiting gate: approve or reject', () => {
@@ -161,7 +162,7 @@ describe('the controls a node offers', () => {
 
   it('a failed agent node: retry, and retry with different words', () => {
     mount(step({ status: 'failed', error: 'it broke', inputsJson: JSON.stringify({ prompt: 'find the bug' }) }))
-    expect(buttons()).toEqual(['Retry', 'Retry with edited prompt'])
+    expect(buttons()).toEqual(['Edit prompt and retry', 'Retry'])
     press('Retry')
     expect(retry).toHaveBeenCalledWith('st1')
   })
@@ -216,7 +217,7 @@ describe('which shape a node draws', () => {
     provideConversation()
     mount(step({ agentSessionId: 'sess-1' }))
     // Not "Open": the conversation is already open, here.
-    expect(buttons()).toEqual(['Show in Agent pane', 'Kill step'])
+    expect(buttons()).toEqual(['Show in Agent pane', 'Stop step'])
   })
 
   it('says why there is no transcript, in the words this pane knows', () => {
@@ -224,7 +225,7 @@ describe('which shape a node draws', () => {
     mount(step({ status: 'done' }))
     // A step with no managed session ran as a bare process. "No session" on its own reads as a bug;
     // the reason and where the output went are the useful part.
-    expect(drawn[0]?.noSession).toContain('headless')
+    expect(drawn[0]?.noSession).toContain('without a conversation')
     expect(drawn[0]?.noSession).toContain('Step details')
   })
 
@@ -238,7 +239,7 @@ describe('which shape a node draws', () => {
     mount(step({}))
     // The harness and the model, which is what this pane drew before the transcript was here.
     expect(host.textContent).toContain('claude-code')
-    expect(buttons()).toEqual(['Kill step'])
+    expect(buttons()).toEqual(['Stop step'])
   })
 
   it('leaves every other kind the shape it had', () => {

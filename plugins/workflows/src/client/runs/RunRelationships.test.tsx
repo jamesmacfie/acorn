@@ -51,7 +51,7 @@ describe('workflow run relationships', () => {
     expect(host.textContent).toContain('1 of 2 finished')
     expect(host.textContent).toContain('1 need approval')
     expect(host.textContent).toContain('1 failed')
-    expect(host.textContent).toContain('1 turn · 1,200 input · 340 output')
+    expect(host.textContent).toContain('1 turn · 1,200 tokens in, 340 out')
     expect(host.textContent).toContain('Review failed.')
     const result = [...host.querySelectorAll('summary')].find((summary) => summary.textContent?.includes('Result'))
     const details = result?.parentElement as HTMLDetailsElement | undefined
@@ -78,8 +78,8 @@ describe('workflow run relationships', () => {
     document.body.append(host)
     dispose = render(() => <RunLineage run={run} tasks={tasks} onOpen={open} />, host)
 
-    expect(host.textContent).toContain('Parent and root task')
-    expect(host.textContent).toContain('Parent and root run')
+    expect(host.textContent).toContain('Started by:')
+    expect(host.textContent).not.toContain('Part of:')
     const parentRun = [...host.querySelectorAll('button')].filter((button) => button.textContent === 'Ticket review batch').at(-1)
     parentRun?.click()
     expect(open).toHaveBeenCalledWith('root-task', 'root-run')

@@ -1,9 +1,11 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
+import { useNavigate } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import { activeTaskId, tasksOptions } from '@acorn/plugin-api/client'
 import { Button, Field, Modal, ModalActions, ModalBody, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import TypedValueField from './TypedValueField'
+import { openWorkflowRun } from '../runs/runStore'
 import { startWorkflow } from '../startWorkflow'
 import { closeWorkflowStart, startRequest, type StartRequest } from './startRequest'
 
@@ -24,6 +26,7 @@ export default function StartDialogHost() {
 }
 
 function StartDialog(props: { request: StartRequest }) {
+  const navigate = useNavigate()
   const inputs = () => props.request.inputs ?? []
   const [values, setValues] = createSignal<Record<string, DataValue>>({
     ...Object.fromEntries(inputs().filter((input) => input.default !== undefined).map((input) => [input.name, input.default!])),
@@ -54,7 +57,10 @@ function StartDialog(props: { request: StartRequest }) {
       return
     }
     closeWorkflowStart()
-    if (answer.runId) props.request.onStarted?.(answer.runId)
+    if (!answer.runId) return
+    if (props.request.onStarted) return props.request.onStarted(answer.runId, taskId())
+    const task = (tasks.data ?? []).find((candidate) => candidate.id === taskId())
+    if (task) openWorkflowRun(task, answer.runId, navigate)
   }
 
   return (
@@ -63,7 +69,7 @@ function StartDialog(props: { request: StartRequest }) {
         <Stack gap="row">
           <Show when={error()}>{(message) => <Text tone="danger" wrap>{message()}</Text>}</Show>
           <Show when={!props.request.taskId}>
-            <Field label="Task" hint="The run happens in this task's checkout." group>
+            <Field label="Task" group>
               <Select
                 label="Task"
                 value={taskId()}
@@ -91,7 +97,7 @@ function StartDialog(props: { request: StartRequest }) {
             )}
           </For>
           <Show when={!inputs().length}>
-            <Text emphasis="muted" wrap>This workflow asks for nothing. Pick a task and run it.</Text>
+            <Text emphasis="muted" wrap>This workflow needs no inputs.</Text>
           </Show>
         </Stack>
       </ModalBody>

@@ -75,13 +75,13 @@ afterEach(() => {
 describe('workflow schedule setup', () => {
   it('progressively reveals record policy, first check, concrete times, and limits', async () => {
     expect(document.body.textContent).not.toContain('Repeat handling')
-    expect(document.body.textContent).toContain('Activation is a separate device action and is never queued while offline.')
+    expect(document.body.textContent).not.toContain('Activation is a separate device action')
     await press('Review activation')
     expect(document.body.textContent).toContain('Review issues · repeat handling')
     expect(document.body.textContent).toContain('Previously unseen records')
     expect(document.body.textContent).not.toContain('Since the last completed check')
     expect(document.body.textContent).toContain('Process current matches')
-    expect(document.body.textContent).toContain('80 descendants · 3 at once · 2h maximum')
+    expect(document.body.textContent).toContain('Up to 80 tasks, 3 at a time, 120 minutes.')
     expect(document.body.textContent?.match(/GMT\+12|UTC\+12/)).toBeTruthy()
   })
 

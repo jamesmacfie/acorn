@@ -4,11 +4,10 @@ import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { AuthoringTurnRequest, AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import type { AuthoringConversationProps } from '@acorn/plugin-api/ui/data-sources'
 import type { WorkflowDef } from '../../shared/workflowContracts'
-import { generateReason } from './GenerateModal'
 
 // Generate, in the tier that can answer what a press does (docs/workflows.md § Authoring): whether
-// the button is drawn at all, whether a whole definition lands as one undo entry, and what a refusal
-// reads as. The prompt and the grounding are pure and tested on the node side.
+// the button is drawn at all and whether a whole definition lands as one undo entry. The prompt and
+// the grounding are pure and tested on the node side.
 
 const original: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Ship it', steps: [{ name: 'plan', prompt: 'Plan the change' }] }
 const generated: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
@@ -101,7 +100,7 @@ const press = async (text: string, scope: ParentNode = document.body): Promise<v
   await settle()
 }
 const type = (value: string): void => {
-  const field = document.body.querySelector<HTMLTextAreaElement>('textarea[aria-label="Instruction or answer"]')
+  const field = document.body.querySelector<HTMLTextAreaElement>('textarea[aria-label="What should AI change?"]')
   if (!field) throw new Error('the conversation has no instruction field')
   field.value = value
   field.dispatchEvent(new Event('input', { bubbles: true }))
@@ -199,15 +198,18 @@ describe('reviewing an AI proposal', () => {
 
   // A new workflow's proposal is all additions, which carry no `before`. Drawing one used to throw
   // inside the render, so the dialog froze on its first status line and showed nothing.
+  // A change names the step it touches, found in the proposal when the change adds it.
   it('draws a proposal that adds and removes paths', async () => {
+    const candidate = { ...generated, steps: [{ ...generated.steps[0]!, id: 'step-7', name: 'Angle one' }] }
     authorTurn.mockResolvedValue({
-      state: 'proposal', base: original, baseRevision: 1, candidate: generated, summary: 'Replace the plan.',
-      diff: [{ path: '/steps/angle-one', change: 'add', after: generated.steps[0] }, { path: '/steps/plan', change: 'remove', before: original.steps[0] }],
+      state: 'proposal', base: original, baseRevision: 1, candidate, summary: 'Replace the plan.',
+      diff: [{ path: '/steps/step-7', change: 'add', after: candidate.steps[0] }, { path: '/steps/plan', change: 'remove', before: original.steps[0] }],
       problems: [], context: [], usage: { requests: 1, inputTokens: 10, outputTokens: 5 }, providerId: 'anthropic', modelId: 'opus',
     })
     await mount('db:abc')
     await propose()
-    expect(document.body.textContent).toContain('add /steps/angle-one: nothing →')
+    expect(document.body.textContent).toContain('Added Angle one: nothing →')
+    expect(document.body.textContent).toContain('Removed plan:')
     expect(document.body.textContent).toContain('→ nothing')
     expect(button('Apply reviewed edit')).toBeDefined()
   })
@@ -252,41 +254,5 @@ describe('reviewing an AI proposal', () => {
     expect(document.body.textContent).toContain('Which state?')
     const saved = Array.from({ length: localStorage.length }, (_value, index) => localStorage.getItem(localStorage.key(index)!)).join('\n')
     expect(saved).toContain('Which state?')
-  })
-})
-
-// A table rather than five renders: the mapping is a pure function and each row is one sentence.
-describe('what a refusal reads as', () => {
-  const reason = (code: string, message = 'raw') => generateReason(Object.assign(new Error(message), { code }))
-
-  it('keeps the node prose for a reply nothing could be read out of', () => {
-    expect(reason('model_answer_unusable', 'No JSON object in the reply.')).toBe('No JSON object in the reply.')
-  })
-
-  it('sends a rejected key back to Settings', () => {
-    expect(reason('provider_needs_auth')).toContain('Reconnect it in Settings')
-  })
-
-  it('offers another connection when that one is gone', () => {
-    expect(reason('provider_not_connected')).toContain('no longer connected')
-  })
-
-  it('says to try again when the provider is silent', () => {
-    expect(reason('provider_unavailable')).toContain('did not answer')
-  })
-
-  // An installed CLI that is signed out fails the same way an unreachable provider does, and no
-  // amount of retrying fixes it: the next step is to run it once in a terminal.
-  it('sends a silent CLI to a terminal instead of telling it to try again', () => {
-    const unavailable = Object.assign(new Error('raw'), { code: 'provider_unavailable' })
-    expect(generateReason(unavailable, { kind: 'harness', label: 'Claude Code' }))
-      .toBe('Claude Code did not answer. Run it once in a terminal to check it is signed in.')
-    expect(generateReason(unavailable, { kind: 'connection', label: 'Anthropic' }))
-      .toBe('The provider did not answer. Try again shortly.')
-  })
-
-  it('falls back to the message, then to a sentence of its own', () => {
-    expect(reason('something_else', 'Boom.')).toBe('Boom.')
-    expect(generateReason(null)).toBe('Writing the workflow failed.')
   })
 })

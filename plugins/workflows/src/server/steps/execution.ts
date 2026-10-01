@@ -246,7 +246,7 @@ export class WorkflowStepExecution {
       await this.services.state.setStep(step.id, { status: 'waiting-gate', ...(inputsJson !== undefined ? { inputsJson } : {}) })
       // The run stays gated until its waiting steps or children settle.
       await this.services.state.setRun(run.id, { status: 'gated' })
-      this.services.deps.notify(run.taskId, 'gate', `Workflow '${run.name}' needs you: ${def.name}`, { runId: run.id, stepId: step.id })
+      this.services.deps.notify(run.taskId, 'gate', `${run.name} needs you: ${def.name}`, { runId: run.id, stepId: step.id })
       return
     }
     if (outcome.status === 'waiting-children') {

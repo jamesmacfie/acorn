@@ -31,7 +31,7 @@ const bindingLabel = (binding: DataBinding | undefined, def: WorkflowDef): strin
 }
 
 function conditionLabel(condition: DataPredicate | undefined, def: WorkflowDef): string {
-  if (!condition) return 'Choose a field and comparison.'
+  if (!condition) return 'No condition yet.'
   if (condition.kind !== 'comparison') return `${condition.kind === 'all' ? 'All' : 'Any'} of ${condition.predicates.length} conditions match.`
   const operator = ({ eq: 'is', ne: 'is not', lt: 'is less than', lte: 'is at most', gt: 'is greater than',
     gte: 'is at least', contains: 'contains', in: 'is in', missing: 'is missing', present: 'is present' } as const)[condition.operator]
@@ -58,7 +58,7 @@ export function stepSummary(step: WorkflowStepDef, def: WorkflowDef, catalog: Wo
     return `For each result from ${source}, run ${targetName(step, catalog)}.`
   }
   if (kind === 'workflow') return `Run ${targetName(step, catalog)}.`
-  if (kind === 'if') return `If ${conditionLabel(step.condition, def)}`
+  if (kind === 'if') return step.condition ? `If ${conditionLabel(step.condition, def)}` : conditionLabel(undefined, def)
   const described = catalog?.kinds.find(entry => entry.id === kind)?.describe ?? BUILTIN_STEP_DESCRIPTIONS[kind]
   return described?.label ?? kind
 }

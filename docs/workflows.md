@@ -327,19 +327,22 @@ Durable run history is paged from the plugin database.
 
 A task with at least one run has a **Workflows** pane
 (`plugins/workflows/src/client/runs/paneContribution.ts`). It is `list-detail`: the task's runs
-newest first, then the selected run's nodes, and one node's detail beside them. The pane is hidden on
+newest first, then the selected run's steps, and one step's detail beside them. The pane is hidden on
 a task that has never run a workflow, so the pane strip does not grow a button for every task; which
 tasks those are is one node-wide read the plugin keeps in memory (`runs/runStore.ts`).
 Every client-side start marks its task as soon as the node confirms a run ID. Opening a confirmed run
 from the recent-run list or a schedule does the same before navigating, so the pane is available while
 the node-wide read catches up. A read started before the confirmation cannot clear that hint.
+Every way into a run (a recent-run row, a schedule's **Open run**, and **Run…** in the editor or the
+start dialog) goes through `openWorkflowRun` in `runs/runStore.ts`, which activates the task with the
+Workflows pane showing before it navigates: the shell draws what the rail source says, not the address.
 
-**Rows | Graph** in the Nodes header picks how the nodes are drawn: as the list, or as the same
+**List | Graph** in the Runs header picks how the steps are drawn: as the list, or as the same
 picture the editor authors on, coloured by status. The choice is remembered per device. The run's
 graph has no ports and nothing to drag — a run froze its definition when it started, so an edge here
 is a record.
 
-The node list is the editor's list. Both call `graphOrder` in
+The step list is the editor's list, and names each step by its name; the id is only the key. Both call `graphOrder` in
 `plugins/workflows/src/client/editor/graphOrder.ts`, over the definition the run froze when it started, so
 the indentation in the run cannot disagree with the indentation in the editor. Only a fork indents:
 a branch target, or a node that waits on more than one step. A node that waits on
@@ -350,13 +353,19 @@ The detail depends on the kind and the status:
 
 | Kind | While running | When done | Controls |
 | --- | --- | --- | --- |
-| agent kinds | the conversation: transcript, queue and composer | the same conversation, and the structured value under a disclosure | Show in Agent pane; Kill step |
-| `terminal:command` | the streamed tail | exit code, duration, the whole output under a disclosure | Kill step |
+| agent kinds | the conversation: transcript, queue and composer | the same conversation, and the structured value under a disclosure | Show in Agent pane; Stop step |
+| `terminal:command` | the streamed tail | exit code, duration, the whole output under a disclosure | Stop step |
 | `terminal:run-target` | "Starting…" | the URL | Open terminal |
 | `database:*` | "Reading…" | a table of the rows and the SQL behind it | none |
 | `http:request` | "Sending…" | the status, the headers under a disclosure, the body | none |
 | `gate-human` | "Waiting for you", or the form filled with its proposal, each changed field marked **Edited** with **Reset** | approved, or the state it reached; with a form, the approved values with edits marked | Approve; Reject |
-| any, `failed` or `safety-rail` | | the error | Retry; Retry with edited prompt, for an agent kind |
+| any, `failed` or `safety-rail` | | the error | Retry; Edit prompt and retry, for an agent kind |
+
+Every control sits in the step's header bar, except a gate's **Approve** and **Reject**, which sit
+under what they approve. **Reject** fails the run, so it asks "Reject?" first. Statuses read as words
+(**Needs you**, **Stopped at a limit**) from `statusLabel` in `runs/runDisplay.ts`, and a contributed
+kind is named from the node's catalog. The footer is the run's status, cost, and tokens, with
+**Cancel run** while the run is live.
 
 A step whose harness session was captured but that never became a managed session offers **Open in
 terminal**, which resumes it: the agents sidebar used to be where that lived. A step given its own
