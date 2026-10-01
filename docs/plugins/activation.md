@@ -26,11 +26,19 @@ belong to the device whatever the header names.
 
 The list has three filters. **All** shows every plugin. **Needs you** shows what only the owner can
 settle: a bundle waiting for approval on this device, a package waiting for review, a failed load, and
-a change that waits for a Node restart. **This device** shows the client-only plugins. Each row states
-its version, origin, and status in the words `host/plugins/pluginStatus.ts` computes, which is also
+a change that waits for a Node restart. **This device** shows the client-only plugins. Each row names the
+plugin and states its version, origin, and status in the words `host/plugins/pluginStatus.ts` computes, which is also
 what the plugin strip and the attention rows say. The same waiting states raise attention rows
 (`infra/node/pluginFailures.ts` § `pluginWaitingAttention`), and those rows put the dot on **Installed**
 in the settings rail.
+
+A plugin is shown by its name, such as "GitHub" or "API requests", not by its id. The roster row
+carries an optional `label` for that. A compiled plugin sets `label` in its `NodePlugin` definition,
+and a loaded or device-held plugin takes its manifest `name`. The client reads it through
+`pluginLabel` (`client-core/host/plugins/pluginLabel.ts`, also exported from
+`@acorn/plugin-api/client`) and falls back to the id when a node sends no label. The id still shows on
+a plugin's **Status** line, in every trust prompt and review, and in the audit log. A loaded plugin
+picks its own name, and the id is the one that is unique on the node.
 
 **Manage** opens the plugin's own page in the same pane. The page has an **Enabled** switch, a status
 banner, and four tabs:

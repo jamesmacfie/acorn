@@ -1,9 +1,10 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { registerCommands } from '../registries/commands/commands'
 import { registerKeybindings } from '../registries/commands/keybindings'
-import { Kbd, Table, TableCell, TableRow } from '../../kit/components/primitives'
+import { Button, Kbd, Table, TableCell, TableRow } from '../../kit/components/primitives'
+import { Section } from '../../kit/components/layout/Section'
+import { formatChord } from '../../kit/lib/rendering/formatChord'
 import { Modal } from '../../kit/components/overlays/Modal'
-import { Text } from '../../kit/components/content/Text'
 import { keymap } from '../../kit/keys/keymapHost'
 
 // The cheat sheet: what the keyboard will do right now.
@@ -17,24 +18,29 @@ import { keymap } from '../../kit/keys/keymapHost'
 // Textual draws the same data as a footer strip; a terminal host would read this function too.
 
 type Line = { display: string; group: string; desc: string }
+type Group = { name: string; lines: Line[] }
 
-const lines = (): Line[] => {
+// One section per owner, named as the owner registered it, in the app's own chord notation.
+const groups = (): Group[] => {
   const engine = keymap()
   if (!engine) return []
-  return engine.getActiveKeys({ includeMetadata: true })
+  const lines = engine.getActiveKeys({ includeMetadata: true })
     .map((key): Line => ({
-      display: engine.formatKey(key.display, { separator: ' ' }),
+      display: formatChord(engine.formatKey(key.display, { separator: ' ' })),
       group: String(key.commandAttrs?.group ?? key.bindingAttrs?.group ?? 'Other'),
       desc: String(key.bindingAttrs?.desc ?? key.commandAttrs?.desc ?? ''),
     }))
     .filter((line) => line.desc)
     .sort((a, b) => a.group.localeCompare(b.group) || a.desc.localeCompare(b.desc))
+  const byName = new Map<string, Line[]>()
+  for (const line of lines) byName.set(line.group, [...(byName.get(line.group) ?? []), line])
+  return [...byName].map(([name, entries]) => ({ name, lines: entries }))
 }
 
 export function CheatSheet() {
   const [open, setOpen] = createSignal(false)
   // Snapshotted on open, because the modal itself changes what is active the moment it takes focus.
-  const [rows, setRows] = createSignal<Line[]>([])
+  const [sections, setSections] = createSignal<Group[]>([])
 
   onMount(() => {
     const commands = registerCommands([{
@@ -43,7 +49,7 @@ export function CheatSheet() {
       hint: 'what the keyboard does right here',
       category: 'navigation',
       palette: true,
-      run: () => { setRows(lines()); setOpen(true) },
+      run: () => { setSections(groups()); setOpen(true) },
     }])
     const bindings = registerKeybindings([{
       id: 'core.shortcuts.cheat-sheet',
@@ -60,18 +66,29 @@ export function CheatSheet() {
     <Show when={open()}>
       <Modal title="Keyboard shortcuts" size="md" onDismiss={() => setOpen(false)}>
         <Modal.Body>
-          <Table size="sm">
-            <For each={rows()}>
-              {(line) => (
-                <TableRow>
-                  <TableCell><Kbd>{line.display}</Kbd></TableCell>
-                  <TableCell>{line.desc}</TableCell>
-                  <TableCell><Text emphasis="muted">{line.group}</Text></TableCell>
-                </TableRow>
-              )}
-            </For>
-          </Table>
+          <For each={sections()}>
+            {(group) => (
+              <Section label={group.name}>
+                <Table size="sm">
+                  <For each={group.lines}>
+                    {(line) => (
+                      // What it does first and the key at the end, as a menu shows them. With the key
+                      // first, each section's table sized its own key column and the descriptions
+                      // started at a different edge in every section.
+                      <TableRow>
+                        <TableCell>{line.desc}</TableCell>
+                        <TableCell align="end"><Kbd>{line.display}</Kbd></TableCell>
+                      </TableRow>
+                    )}
+                  </For>
+                </Table>
+              </Section>
+            )}
+          </For>
         </Modal.Body>
+        <Modal.Actions>
+          <Button variant="ghost" onPress={() => setOpen(false)}>Close</Button>
+        </Modal.Actions>
       </Modal>
     </Show>
   )

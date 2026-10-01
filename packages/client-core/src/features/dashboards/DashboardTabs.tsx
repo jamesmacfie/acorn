@@ -6,7 +6,7 @@ import { isTypingTarget } from '@acorn/protocol/keybindings.ts'
 import { ContextMenu, Menu, type MenuContext } from '../../kit/components/overlays/Menu'
 import { addTab, homeTabDomId, HOME_TAB_PANEL_ID, renameTab, shiftTab } from './homeTab'
 import { MAX_TABS, removeHomeTab, setHomeTabs, type DashboardTab } from './persist'
-import { revealActiveTab } from '../../kit/components/layout/tabScroll'
+import { revealActiveTab, trackTabOverflow } from '../../kit/components/layout/tabScroll'
 
 // The Home tab bar (docs/dashboards.md § Persistence). It draws one workspace's list of names and
 // calls three functions; a tab's content is the ordinary `home/<tabId>/<workspaceId>` placement the
@@ -164,7 +164,7 @@ export default function DashboardTabs(props: {
     <span class="dash-tabs">
       <span
         class="ui-tab-scroll dash-tabs-strip"
-        ref={(element) => { stripRef = element }}
+        ref={(element) => { stripRef = element; trackTabOverflow(element) }}
         role="tablist"
         aria-label="Dashboards"
         onKeyDown={onKeyDown}

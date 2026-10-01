@@ -40,6 +40,9 @@ export type SettingsSearchObject = {
   pageLabel: string
   group: string
   scope: SettingsScopeKind
+  /** Other words that find it, matched as keywords: a plugin's id, which is what the command line and
+   *  config files call it, beside the name it shows. */
+  keywords?: readonly string[]
   /** A page of its own, as a workspace is, rather than a thing listed on another page. */
   isPage?: boolean
   /** The sections of the page drawn for it, for a thing whose page is one registration drawn once per
@@ -79,7 +82,9 @@ export function buildSettingsIndex(
       page: object.page, pageLabel: object.isPage ? object.name : object.pageLabel, group: object.group, scope: object.scope,
       ...(object.open ? { open: object.open } : {}),
     }
-    entries.push({ ...base, ...(object.isPage ? {} : { sectionLabel: object.name }), text: object.name, tier: object.isPage ? 0 : 1 })
+    const named = { ...base, ...(object.isPage ? {} : { sectionLabel: object.name }) }
+    entries.push({ ...named, text: object.name, tier: object.isPage ? 0 : 1 })
+    for (const word of object.keywords ?? []) entries.push({ ...named, text: word, tier: 3 })
     addSections(base, object.sections ?? [])
   }
   return entries

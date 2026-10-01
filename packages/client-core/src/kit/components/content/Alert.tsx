@@ -1,6 +1,6 @@
 import { Show, type JSX } from 'solid-js'
 import type { Tone } from '../../tokens/tokens'
-import { Button } from '../inputs/Button'
+import { IconButton } from '../inputs/IconButton'
 
 /* Alert. `variant='inline'` is red text with no box; `variant='banner'` is the bordered callout.
 
@@ -28,9 +28,7 @@ export function Alert(props: {
       </span>
       <Show when={props.actions}><span class="ui-alert-actions">{props.actions}</span></Show>
       <Show when={props.onDismiss}>
-        {/* Keep the literal mark: the terminal host prints Button's label when it cannot read a
-            child icon, so an Icon here would widen dismiss to the word "Dismiss". */}
-        <Button variant="bare" size="sm" iconOnly label="Dismiss" onPress={() => props.onDismiss?.()}>✕</Button>
+        <IconButton icon="x" label="Dismiss" onPress={() => props.onDismiss?.()} />
       </Show>
     </div>
   )

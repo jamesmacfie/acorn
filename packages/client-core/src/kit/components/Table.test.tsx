@@ -1,6 +1,6 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { Table, TableCell, TableHead, TableRow } from './primitives'
+import { Checkbox, Table, TableCell, TableHead, TableRow } from './primitives'
 
 // Table's rows as kit nodes (docs/ui-design.md § Every node at 80 by 24). Two things
 // here are not obvious from reading the components: a `head` row is what `stickyHead`'s CSS pins, so
@@ -68,5 +68,21 @@ describe('the kit table', () => {
     // A key inside a cell's own control belongs to that control, not to the row.
     pressable.querySelector('td')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     expect(presses).toHaveLength(1)
+  })
+
+  it('leaves a click on a control in a cell to that control', () => {
+    const presses: string[] = []
+    dispose = render(() => (
+      <Table>
+        <TableRow onPress={() => presses.push('row')}>
+          <TableCell><Checkbox ariaLabel="Select" /></TableCell>
+          <TableCell>name</TableCell>
+        </TableRow>
+      </Table>
+    ), host)
+    host.querySelector('input')!.click()
+    expect(presses).toEqual([])
+    host.querySelectorAll('td')[1]!.click()
+    expect(presses).toEqual(['row'])
   })
 })

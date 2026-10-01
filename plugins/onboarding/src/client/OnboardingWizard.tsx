@@ -1,23 +1,26 @@
 import { createMemo, createSignal, Index, lazy, Show, Suspense } from 'solid-js'
+import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   canPickFolder,
   createProject,
   createWorkspace,
+  integrationsOptions,
   nodeReady,
   patchProject,
   pickFolder,
   type Project,
+  projectPath,
   projectsOptions,
   workspacesKey,
   workspacesOptions,
 } from '@acorn/plugin-api/client'
 import { Acorn, Wizard } from '@acorn/plugin-api/ui/host'
 import {
-  Alert, Badge, Button, Card, Field, Heading, Inline, Input, Kbd, Modal, Select, Stack, Text,
-  Toolbar,
+  Alert, Badge, Button, Card, DescriptionList, Field, Heading, Inline, Input, Kbd, Modal, Select, Stack, Text,
 } from '@acorn/plugin-api/ui'
 
+import { AddedTally } from './AddedTally'
 import { saveOnboardingCompletion } from './onboardingCompletion'
 
 const GithubConnect = lazy(() => import('./GithubConnect'))
@@ -27,10 +30,12 @@ type Step = 'welcome' | 'add' | 'github' | 'organize' | 'ai' | 'done'
 
 // The steps the host draws in its indicator. `github` is a detour on the way to `organize`, so it
 // shares `add`'s place in the strip rather than taking an entry of its own, which is what the
-// hand-drawn dot strip's `DOT_OF` map used to say.
+// hand-drawn dot strip's `DOT_OF` map used to say. `welcome` has a place of its own, so the host
+// draws Next on it and Back on the step after it, which is the GitHub detour's way out.
 export const STEPS = [
+  { id: 'welcome', label: 'Welcome' },
   { id: 'add', label: 'Add a project' },
-  { id: 'organize', label: 'Name it' },
+  { id: 'organize', label: 'Name' },
   { id: 'ai', label: 'Generate with AI' },
   { id: 'done', label: 'Ready' },
 ] as const
@@ -40,10 +45,14 @@ export const STEPS = [
  *
  * Exported so the check can see it. The rule is "a step whose only way forward is doing something on
  * it says so", which is true of adding a project and of nothing else: the AI step offers a CLI it
- * found and a key form, and someone who wants neither must still be able to leave.
+ * found and a key form, and someone who wants neither must still be able to leave. The naming step
+ * also holds while a name is blank, because saving would quietly keep the old name.
  */
-export const canAdvanceOn = (step: Step, addedCount: number): boolean =>
-  step === 'add' || step === 'github' ? addedCount > 0 : true
+export const canAdvanceOn = (step: Step, addedCount: number, blankNames = 0): boolean => {
+  if (step === 'add' || step === 'github') return addedCount > 0
+  if (step === 'organize') return blankNames === 0
+  return true
+}
 
 const place = (step: Step): string => (step === 'github' ? 'add' : step)
 
@@ -55,16 +64,18 @@ const NEW_WORKSPACE = '__new__'
 // registry would pull registries/keybindings.ts onto the @acorn/plugin-api/client barrel, which a
 // plugin's node-environment test suite has to be able to import.
 const SHORTCUTS: [string, string][] = [
-  ['⌘⇧N', 'new task'],
-  ['⌘K', 'command palette'],
-  ['⌘⇧T', 'terminal'],
-  ['⌘P', 'find file'],
+  ['⌘⇧N', 'New task'],
+  ['⌘K', 'Command palette'],
+  ['⌘⇧T', 'Open a terminal'],
+  ['⌘P', 'Find a file'],
 ]
 
 export default function OnboardingWizard(props: { onClose: () => void }) {
   const queryClient = useQueryClient()
+  const navigate = useNavigate()
   const projects = createQuery(() => projectsOptions(nodeReady()))
   const workspaces = createQuery(() => workspacesOptions(nodeReady()))
+  const integrations = createQuery(() => integrationsOptions(nodeReady()))
 
   const [step, setStep] = createSignal<Step>('welcome')
   const [trail, setTrail] = createSignal<Step[]>([])
@@ -87,6 +98,19 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
     const byId = new Map((projects.data ?? []).map((project) => [project.id, project]))
     return addedIds().map((id) => byId.get(id)).filter((project): project is Project => !!project)
   })
+  const nameOf = (project: Project): string => names()[project.id] ?? project.name
+  const blankNames = () => added().filter((project) => !nameOf(project).trim()).length
+
+  // GitHub is offered only when this node can start a sign-in, or already holds one. A build without
+  // a GitHub client id reports the provider as not connectable, and the card used to lead to an
+  // error the reader could do nothing about.
+  const githubOffered = () => {
+    const data = integrations.data
+    return !!data && (
+      data.providers.some((provider) => provider.id === 'github' && provider.connection.connectable) ||
+      data.integrations.some((entry) => entry.providerId === 'github')
+    )
+  }
 
   const go = (next: Step) => {
     setTrail((seen) => [...seen, step()])
@@ -102,16 +126,20 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
   // Projects refetch on the node's `project:changed` frame now; workspaces still have no event.
   const refresh = () => queryClient.invalidateQueries({ queryKey: workspacesKey })
 
-  // Both Finish and Skip land here. Skipping writes the same preference as finishing, so the wizard
-  // does not ambush the user again on the next launch. Everything it offered is in Settings.
-  const finish = async () => {
+  // Finish and Skip both save the same preference, so the wizard does not ambush the user again on
+  // the next launch. Everything it offered is in Settings. Finish also opens the first project it
+  // added, so the first screen of the app shows the setup that was just done. Skip leaves the window
+  // where it was.
+  const close = async (landOn?: string) => {
     setBusy(true)
     try {
-      await saveOnboardingCompletion(queryClient, props.onClose)
+      if (await saveOnboardingCompletion(queryClient, props.onClose) && landOn) navigate(landOn)
     } finally {
       setBusy(false)
     }
   }
+  const finish = () => close(added()[0] ? projectPath(added()[0].id) : undefined)
+  const skip = () => close()
 
   const remember = (ids: readonly string[]) => {
     setAddedIds((current) => [...current, ...ids.filter((id) => !current.includes(id))])
@@ -141,6 +169,13 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
     await refresh()
   }
 
+  const dropDraft = (project: Project) =>
+    setDrafts((current) => {
+      const next = { ...current }
+      delete next[project.id]
+      return next
+    })
+
   // A row can ask for a workspace that does not exist yet. Create it, point that project at it, and
   // let the refreshed list offer it to every other row. That is how a batch ends up spread across
   // several new workspaces.
@@ -150,11 +185,7 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
     try {
       const workspace = await createWorkspace(name)
       setHomes((current) => ({ ...current, [project.id]: workspace.id }))
-      setDrafts((current) => {
-        const next = { ...current }
-        delete next[project.id]
-        return next
-      })
+      dropDraft(project)
       await queryClient.invalidateQueries({ queryKey: workspacesKey })
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Could not create that workspace.')
@@ -194,55 +225,68 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
     if (step() === 'organize') return void saveNames()
     go(id as Step)
   }
-  const canAdvance = () => canAdvanceOn(step(), added().length)
+  const canAdvance = () => canAdvanceOn(step(), added().length, blankNames())
+
+  // What the host's Next says on each step. A blocked step says what would unblock it.
+  const nextLabel = (): string => {
+    switch (step()) {
+      case 'welcome': return 'Get started'
+      case 'add': return canAdvance() ? 'Continue' : 'Add a project to continue'
+      case 'github': return canAdvance() ? 'Done adding' : 'Add a repository to continue'
+      default: return 'Continue'
+    }
+  }
 
   const StepBody = () => (
     <Stack gap="section">
       <Show when={step() === 'welcome'}>
         <Stack gap="row">
           <Acorn />
-          <Heading level={2}>Welcome.</Heading>
+          <Heading level={2}>Welcome to acorn</Heading>
           <Text emphasis="muted" wrap>
-            acorn is a workspace for running coding tasks — agents, terminals, editors — against your
-            projects. Setup takes about a minute.
+            acorn is where you run coding tasks on your projects, with agents, terminals, and editors side
+            by side. Setup takes about a minute.
           </Text>
-          <Toolbar variant="actions" size="sm">
-            <Button variant="solid" tone="accent" onPress={() => go('add')}>Get started</Button>
-          </Toolbar>
         </Stack>
       </Show>
 
       <Show when={step() === 'add'}>
         <Stack gap="row">
-          <Heading level={2}>Add your first project.</Heading>
+          <Heading
+            level={2}
+            help={githubOffered()
+              ? 'Not sure? Open a folder. If you connect GitHub later, acorn links it to the folders you already added.'
+              : undefined}
+          >
+            {added().length ? 'Add another project' : 'Add your first project'}
+          </Heading>
           <Text emphasis="muted" wrap>
-            A project is just a folder on your machine. Git and GitHub are optional — features light
-            up as they're detected.
+            A project is a folder on your computer. It doesn't need Git or GitHub, but acorn uses them
+            when they're there.
           </Text>
-          <Inline gap="stack" wrap>
+          <AddedTally added={added()} />
+          <Inline gap="stack" even>
             <Card interactive disabled={!canPickFolder() || busy()} onPress={() => void openFolder()}>
               <Stack gap="row">
+                <Show when={githubOffered()}><Text emphasis="eyebrow">Recommended</Text></Show>
                 <Text emphasis="strong">Open a folder</Text>
-                <Text emphasis="muted" wrap>Point acorn at any folder. Plain folders work fine.</Text>
-                <Text emphasis="eyebrow">recommended</Text>
+                <Text emphasis="muted" wrap>Choose a folder on this computer.</Text>
               </Stack>
             </Card>
-            <Card interactive onPress={() => go('github')}>
-              <Stack gap="row">
-                <Text emphasis="strong">Connect GitHub</Text>
-                <Text emphasis="muted" wrap>Import repositories — clone them, or map ones you already have locally.</Text>
-                <Text emphasis="eyebrow">optional · anytime in settings</Text>
-              </Stack>
-            </Card>
+            <Show when={githubOffered()}>
+              <Card interactive onPress={() => go('github')}>
+                <Stack gap="row">
+                  <Text emphasis="eyebrow">Optional</Text>
+                  <Text emphasis="strong">Connect GitHub</Text>
+                  <Text emphasis="muted" wrap>Clone your repositories, or link ones you already have on this computer.</Text>
+                </Stack>
+              </Card>
+            </Show>
           </Inline>
           <Show when={!canPickFolder()}>
-            <Text emphasis="muted">Choosing a folder needs the desktop app.</Text>
+            <Text emphasis="muted">To choose a folder, use the desktop app.</Text>
           </Show>
           <Show when={error()}>{(text) => <Alert>{text()}</Alert>}</Show>
-          <Text emphasis="muted" wrap>
-            Not sure? Open a folder. You can connect GitHub later and acorn will match it up
-            automatically.
-          </Text>
         </Stack>
       </Show>
 
@@ -252,100 +296,99 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
             onBack={back}
             onImported={(ids) => void afterImport(ids)}
             added={added()}
-            onContinue={() => go('organize')}
           />
         </Suspense>
       </Show>
 
       <Show when={step() === 'organize'}>
         <Stack gap="row">
-          <Heading level={2}>{added().length > 1 ? 'Name them your way.' : 'Name it your way.'}</Heading>
-          <Text emphasis="muted" wrap>
-            Rename {added().length > 1 ? 'these projects' : 'the project'} and the workspace they live
-            in. Names are yours — they don't touch the folder or the repo.
-          </Text>
-          <Show when={added().length} fallback={<Text emphasis="muted">No project yet — you can add one from Settings whenever you like.</Text>}>
+          <Heading
+            level={2}
+            help="A workspace is a group of projects. The switcher at the top of the window shows one workspace at a time."
+          >
+            {added().length > 1 ? 'Name your projects' : 'Name your project'}
+          </Heading>
+          <Text emphasis="muted" wrap>Renaming a project doesn't change its folder.</Text>
+          <Show when={added().length} fallback={<Text emphasis="muted">No project yet. You can add one later in Settings.</Text>}>
             {/* Index, not For: these are editable inputs, and For keys by object identity, so a
                 refetch would destroy the row mid-typing along with the caret. */}
             <Index each={added()}>
               {(current) => (
                 <Card>
                   <Stack gap="row">
-                    <Inline gap="stack" wrap>
-                      <Field label="Name">
+                    {/* The folder is what tells two cards apart, so it is the card's title. */}
+                    <Inline gap="inline" wrap>
+                      <Show when={current().path} fallback={<Badge tone="warn">No folder</Badge>}>
+                        {(path) => <Text emphasis="strong" wrap>{path()}</Text>}
+                      </Show>
+                      <Show when={current().vcs === 'git'}><Badge>Git</Badge></Show>
+                      <Show when={current().github}><Badge>GitHub</Badge></Show>
+                    </Inline>
+                    <Show when={!current().path}>
+                      <Text emphasis="muted" wrap>No folder yet. You can add one later in Settings.</Text>
+                    </Show>
+                    <Inline gap="stack" even>
+                      <Field
+                        label="Project name"
+                        error={nameOf(current()).trim() ? undefined : 'A project needs a name.'}
+                      >
                         <Input
-                          width="auto"
-                          value={names()[current().id] ?? current().name}
+                          value={nameOf(current())}
                           onInput={(value) => setNames((all) => ({ ...all, [current().id]: value }))}
                         />
                       </Field>
-                      <Inline gap="inline" wrap>
-                        <Show when={current().path} fallback={<Badge>no folder yet</Badge>}><Badge tone="ok">Folder</Badge></Show>
-                        <Show when={current().vcs === 'git'}><Badge tone="ok">Git</Badge></Show>
-                        <Show when={current().github}><Badge tone="ok">GitHub</Badge></Show>
-                      </Inline>
+                      {/* Per project, not per batch. Adding four repositories at once is normal, and
+                          they do not all belong together, so each picks its workspace, and each can
+                          make one the next row will find waiting in its list. */}
+                      <Show
+                        when={drafts()[current().id] === undefined}
+                        fallback={
+                          <Stack gap="row">
+                            <Field label="New workspace">
+                              <Input
+                                placeholder="Workspace name"
+                                value={drafts()[current().id] ?? ''}
+                                ref={(el: HTMLInputElement) => queueMicrotask(() => el.focus())}
+                                onInput={(value) => setDrafts((all) => ({ ...all, [current().id]: value }))}
+                                onSubmit={(value) => {
+                                  if (value.trim()) void createHome(current(), value.trim())
+                                }}
+                              />
+                            </Field>
+                            <Inline gap="row">
+                              <Button
+                                busy={busy()}
+                                disabled={!drafts()[current().id]?.trim()}
+                                onPress={() => void createHome(current(), drafts()[current().id]!.trim())}
+                              >
+                                Create
+                              </Button>
+                              <Button variant="ghost" onPress={() => dropDraft(current())}>Cancel</Button>
+                            </Inline>
+                          </Stack>
+                        }
+                      >
+                        <Field label="Workspace">
+                          <Select
+                            value={homes()[current().id] ?? current().workspaceId}
+                            options={[
+                              ...(workspaces.data ?? []).map((workspace) => ({ value: workspace.id, label: workspace.name })),
+                              { value: NEW_WORKSPACE, label: 'New workspace…' },
+                            ]}
+                            onChange={(value) => {
+                              if (value === NEW_WORKSPACE) setDrafts((all) => ({ ...all, [current().id]: '' }))
+                              else setHomes((all) => ({ ...all, [current().id]: value }))
+                            }}
+                          />
+                        </Field>
+                      </Show>
                     </Inline>
-                    <Text emphasis="muted" wrap>
-                      {current().path
-                        ? current().vcs === 'git'
-                          ? current().path
-                          : `${current().path} · plain folder — git features light up if you add git later`
-                        : 'no folder on disk yet — add one anytime from Settings'}
-                    </Text>
-                    {/* Per project, not per batch. Adding four repositories at once is normal, and
-                        they do not all belong together — so each picks its workspace, and each can
-                        mint one the next row will find waiting in its list. */}
-                    <Show
-                      when={drafts()[current().id] === undefined}
-                      fallback={
-                        <Inline gap="inline" wrap>
-                          <Field label="New workspace">
-                            <Input
-                              width="auto"
-                              placeholder="Workspace name"
-                              value={drafts()[current().id] ?? ''}
-                              ref={(el: HTMLInputElement) => queueMicrotask(() => el.focus())}
-                              onInput={(value) => setDrafts((all) => ({ ...all, [current().id]: value }))}
-                              onSubmit={(value) => {
-                                if (value.trim()) void createHome(current(), value.trim())
-                              }}
-                            />
-                          </Field>
-                          <Button
-                            size="sm"
-                            busy={busy()}
-                            disabled={!drafts()[current().id]?.trim()}
-                            onPress={() => void createHome(current(), drafts()[current().id]!.trim())}
-                          >
-                            Create
-                          </Button>
-                        </Inline>
-                      }
-                    >
-                      <Field label="Workspace">
-                        <Select
-                          width="auto"
-                          value={homes()[current().id] ?? current().workspaceId}
-                          options={[
-                            ...(workspaces.data ?? []).map((workspace) => ({ value: workspace.id, label: workspace.name })),
-                            { value: NEW_WORKSPACE, label: 'New workspace…' },
-                          ]}
-                          onChange={(value) => {
-                            if (value === NEW_WORKSPACE) setDrafts((all) => ({ ...all, [current().id]: '' }))
-                            else setHomes((all) => ({ ...all, [current().id]: value }))
-                          }}
-                        />
-                      </Field>
-                    </Show>
                   </Stack>
                 </Card>
               )}
             </Index>
           </Show>
           <Show when={error()}>{(text) => <Alert>{text()}</Alert>}</Show>
-          <Toolbar variant="actions" size="sm">
-            <Button variant="solid" tone="accent" busy={busy()} onPress={() => void saveNames()}>Continue</Button>
-          </Toolbar>
         </Stack>
       </Show>
 
@@ -353,34 +396,23 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
         {/* Lazy for the same reason the GitHub screen is: it opens two queries of its own, and a run
             that skips out before this step never pays for them. */}
         <Suspense fallback={<Text emphasis="muted">Loading…</Text>}>
-          <Stack gap="row">
-            <AiSetup />
-            <Toolbar variant="actions" size="sm">
-              <Button variant="solid" tone="accent" onPress={() => go('done')}>Continue</Button>
-            </Toolbar>
-          </Stack>
+          <AiSetup />
         </Suspense>
       </Show>
 
       <Show when={step() === 'done'}>
         <Stack gap="row">
-          <Heading level={2}>You're set.</Heading>
-          <Text emphasis="muted" wrap>Start a task whenever you're ready. A few keys worth knowing:</Text>
+          <Heading level={2}>You're set</Heading>
+          <Text emphasis="muted" wrap>Start a task whenever you like. These keys help you get around:</Text>
           {/* The chord is the label and the words are the value, so the key caps line up in one
               column the way a shortcut sheet does. */}
-          <Stack gap="row">
+          <DescriptionList layout="columns">
             <Index each={SHORTCUTS}>
               {(entry) => (
-                <Inline gap="inline">
-                  <Kbd>{entry()[0]}</Kbd>
-                  <Text emphasis="muted">{entry()[1]}</Text>
-                </Inline>
+                <DescriptionList.Item label={<Kbd>{entry()[0]}</Kbd>}>{entry()[1]}</DescriptionList.Item>
               )}
             </Index>
-          </Stack>
-          <Toolbar variant="actions" size="sm">
-            <Button variant="solid" tone="accent" busy={busy()} onPress={() => void finish()}>Open acorn</Button>
-          </Toolbar>
+          </DescriptionList>
         </Stack>
       </Show>
     </Stack>
@@ -388,24 +420,26 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
 
   // `dismissOn={[]}`: a full-run setup must not vanish on a stray Escape or a backdrop click. The
   // custom full-screen backdrop this used to draw is gone, and so is the hand-rolled dot strip — the
-  // `wizard` layout draws the step indicator and the back and next controls (docs/panes.md § Layout
-  // model). What is left for the plugin is the step body and "skip for now".
+  // `wizard` layout draws the step indicator and every action in its footer, including skip and the
+  // last step's finish (docs/panes.md § Layout model). What is left for the plugin is the step body.
+  // Busy blocks Next and finish, so a slow save cannot be pressed twice.
   return (
-    <Modal onDismiss={() => {}} dismissOn={[]} size="wide" title="Set up acorn">
+    <Modal onDismiss={() => {}} dismissOn={[]} size="lg" title="Set up acorn">
       <Wizard
         stateKey="onboarding"
         label="Set up acorn"
         steps={STEPS}
         current={place(step())}
         onStep={onStep}
-        canAdvance={canAdvance()}
+        canAdvance={canAdvance() && !busy()}
+        nextLabel={nextLabel()}
+        finishLabel="Open acorn"
+        onFinish={() => void finish()}
+        skipLabel="Skip setup"
+        skipTip="You can do all of this later in Settings."
+        onSkip={() => void skip()}
         regions={{ step: () => <StepBody /> }}
       />
-      <Toolbar variant="actions" size="sm">
-        <Show when={step() !== 'done'}>
-          <Button variant="bare" busy={busy()} onPress={() => void finish()}>skip for now</Button>
-        </Show>
-      </Toolbar>
     </Modal>
   )
 }

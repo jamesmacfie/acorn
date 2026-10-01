@@ -9,6 +9,7 @@ import { integrationsOptions, projectsOptions, workspacesOptions, type Project, 
 import { activeNodeId } from '../../infra/node/activeNode'
 import { nodes } from '../../infra/node/fleet'
 import { nodePlugins } from '../../infra/node/nodePlugins'
+import { pluginLabel } from '../../host/plugins/pluginLabel'
 import { pluginRosterKnown } from '../../infra/node/hostCapabilities'
 import { confirmAction } from '../../host/registries/shell/willPhase'
 import { buildSettingsIndex, searchSettings, type SettingsSearchObject, type SettingsSearchResult } from '../../host/registries/shell/settingsSearch'
@@ -22,7 +23,10 @@ import { createDismissable } from '../../kit/lib/controls/dismissable'
 import { createDomCollection } from '../../kit/keys/collection'
 import { restoreFocusOnCleanup } from '../../kit/keys/trap'
 import { readLocal, writeLocal } from '../../kit/lib/state/deviceStorage'
-import { Button, Input, Select, StatusDot } from '../../kit/components/primitives'
+import { Badge, Button, EmptyState, Input, Select, StatusDot } from '../../kit/components/primitives'
+import { IconButton } from '../../kit/components/inputs/IconButton'
+import Icon from '../../kit/components/content/Icon'
+import { Text } from '../../kit/components/content/Text'
 import { createAttentionInbox } from '../notifications/attentionInbox'
 import { createUnsavedChanges, UnsavedChangesContext } from './unsavedChanges'
 import { createSettingsDetails, SettingsDetailContext } from './settingsDetail'
@@ -77,7 +81,8 @@ type Resolved = {
  *  projects carries `expanded`. */
 type RailRow = { key: string; label: string; category: SettingsCategory; depth?: 1 | 2; expanded?: boolean; workspaceId?: string }
 
-const SCOPE_LABELS = { device: 'This device', node: 'Node', workspace: 'Workspace', project: 'Project' } as const
+/** One step of the header's path above the title. `to` names the page it opens, for its tip. */
+type Crumb = { label: string; to?: string; run?: () => void }
 
 /** Scroll to the section a search result or a deep link named, inside the page that was drawn for it,
  *  and mark it for a few seconds. The mark is an attribute the kit's stylesheet draws, so it is there
@@ -193,7 +198,7 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
     if (selected.page.startsWith(WORKSPACE_SETTINGS_PREFIX) && workspaces.isLoading) return
     if (selected.page.startsWith(PROJECT_SETTINGS_PREFIX) && (projects.isLoading || workspaces.isLoading)) return
     setSelection({ page: first.id })
-    if (selected.page) setStatus('The selected settings page is no longer available on this node.')
+    if (selected.page) setStatus("This page isn't available any more.")
   })
   createEffect(() => {
     if (current()) writeLocal(LAST_PAGE_KEY, targetOf(selection()))
@@ -215,9 +220,9 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
     }
     if (!unsaved.dirty()) return then()
     void confirmAction({
-      title: 'Discard unsaved changes?',
+      title: 'Discard unsaved changes',
       actionLabel: 'Discard changes',
-      goes: 'This page has changes that are not saved yet. Leaving drops them.',
+      goes: "Your changes on this page aren't saved.",
       stays: 'Everything already saved stays as it is.',
       danger: true,
     }).then((discard) => { if (discard) then() })
@@ -286,11 +291,11 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
   // things settings holds a page for. Each name lands on the page that holds it today.
   const searchObjects = createMemo((): SettingsSearchObject[] => {
     const pageFor = (id: string) => railPages().find((page) => page.id === id)
-    const on = (id: string, names: readonly string[]): SettingsSearchObject[] => {
+    const on = (id: string, names: readonly (string | { name: string; keywords: readonly string[] })[]): SettingsSearchObject[] => {
       const page = pageFor(id)
       if (!page) return []
       const at = { page: id, pageLabel: page.title ?? page.label, group: SETTINGS_CATEGORY_LABELS[settingsCategoryOf(page)], scope: settingsScopeOf(page) }
-      return names.map((name) => ({ ...at, name }))
+      return names.map((name) => ({ ...at, ...(typeof name === 'string' ? { name } : name) }))
     }
     const group = SETTINGS_CATEGORY_LABELS.workspaces
     // Every workspace and every project is a page of its own, whether or not the rail has it expanded,
@@ -311,11 +316,18 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
           .map((object) => ({ ...object, open: (navigate: SettingsNavigate) => openConnectionPage(navigate, connection, provider) }))
       }),
       ...on('nodes', nodes().map((node) => node.label)),
-      ...on('plugins', (nodePlugins()?.plugins ?? []).map((plugin) => plugin.name)),
+      // A plugin shows its name, and its id still finds it: "http" lands on API requests.
+      ...on('plugins', (nodePlugins()?.plugins ?? []).map((plugin) => ({ name: pluginLabel(plugin), keywords: [plugin.name] }))),
     ]
   })
   const index = createMemo(() => buildSettingsIndex(railPages(), searchObjects()))
-  const matches = createMemo(() => searchSettings(index(), query()))
+  // A section named like its page reads as the page, so the page's own result would be a second line
+  // with the same words. The section's lands deeper, so it is the one kept.
+  const matches = createMemo(() => {
+    const found = searchSettings(index(), query())
+    const echoed = new Set(found.filter((result) => result.section && result.sectionLabel === result.pageLabel).map((result) => result.page))
+    return found.filter((result) => result.section || result.sectionLabel || !echoed.has(result.page))
+  })
   const groups = createMemo(() =>
     SETTINGS_CATEGORIES.map((category) => ({ category, rows: rows().filter((row) => row.category === category) }))
       .filter((group) => group.rows.length))
@@ -371,6 +383,25 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
     return { label: workspace.name, run: () => go({ page: workspaceSettingsTarget(workspace.id) }) }
   })
   const goBack = () => back()?.run()
+
+  // The path above the title: the page's group, then whatever the page sits under. The title is the
+  // last step, so it is not repeated here. A step that is a page of its own opens it, and the one ⌘[
+  // goes to says so in its tip.
+  const crumbs = createMemo((): Crumb[] => {
+    const resolved = current()
+    if (!resolved) return []
+    const overview = overviewPage()
+    const group: Crumb = { label: SETTINGS_CATEGORY_LABELS[resolved.category] }
+    if (overview && (resolved.workspace || resolved.project)) Object.assign(group, { to: overview.label, run: () => go({ page: overview.id }) })
+    const steps = [group]
+    const workspace = resolved.workspace
+    if (resolved.project && workspace) {
+      steps.push({ label: workspace.name, to: workspace.name, run: () => go({ page: workspaceSettingsTarget(workspace.id) }) })
+    }
+    const open = detail()
+    if (open) steps.push({ label: resolved.name, to: open.backLabel?.() ?? resolved.name, run: () => leave(open.back) })
+    return steps
+  })
 
   // The plugin that contributed the page on screen, if one did. Its strip is drawn by this view, above
   // and outside the box the page's own content sits in (./plugins/PluginStrip.tsx).
@@ -460,7 +491,7 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
             if (workspaceId) setOpen(workspaceId, !row().expanded)
           }}
         >
-          {row().expanded ? '▾' : '▸'}
+          <Icon name={row().expanded ? 'chevron-down' : 'chevron-right'} />
         </span>
       </Show>
       <span class="settings-rail-label">{row().label}</span>
@@ -470,12 +501,12 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
 
   const scopeChip = (resolved: Resolved) => {
     const scope = settingsScopeOf(resolved.page)
-    if (scope === 'device') return <span class="settings-scope">This device</span>
+    if (scope === 'device') return <Badge>This device</Badge>
     if (scope === 'node') {
       return (
         <Show
           when={resolved.page.followsNodeSwitcher && nodes().length > 1}
-          fallback={<span class="settings-scope">Node: {nodeLabel(pageNode())}</span>}
+          fallback={<Badge>Node: {nodeLabel(pageNode())}</Badge>}
         >
           <Select
             size="sm"
@@ -489,11 +520,12 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
         </Show>
       )
     }
-    // A workspace or project page reads the active node, the one the workspaces list came from.
+    // A workspace or project page reads the active node, the one the workspaces list came from. The
+    // title already names the workspace or project, so the chip says only which kind it is.
     return (
       <>
-        <span class="settings-scope">{resolved.project ? 'Project' : 'Workspace'}: {resolved.name}</span>
-        <Show when={nodes().length > 1}><span class="settings-scope">Node: {nodeLabel(activeNodeId())}</span></Show>
+        <Badge>{resolved.project ? 'Project' : 'Workspace'}</Badge>
+        <Show when={nodes().length > 1}><Badge>Node: {nodeLabel(activeNodeId())}</Badge></Show>
       </>
     )
   }
@@ -526,14 +558,14 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
       }}
     >
       <nav class="settings-rail" aria-label="Settings pages">
-        <Button variant="ghost" size="sm" onPress={close}>← Back to acorn</Button>
+        <Button variant="ghost" size="sm" onPress={close}><Icon name="arrow-left" /> Back to acorn</Button>
         <Input
           ref={(element) => { search = element }}
           type="search"
           kind="filter"
           size="sm"
           label="Search settings"
-          placeholder="Search settings"
+          placeholder="Search settings…"
           assist={false}
           value={query()}
           onInput={setQuery}
@@ -558,26 +590,33 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
               </Index>
             }
           >
-            <Show when={matches().length} fallback={<p class="muted settings-rail-empty">Nothing in settings matches.</p>}>
+            <Show
+              when={matches().length}
+              fallback={<div class="settings-rail-empty"><EmptyState align="start" size="sm">No settings match "{query().trim()}".</EmptyState></div>}
+            >
               <Index each={matches()}>
-                {(result) => (
-                  <button
-                    type="button"
-                    class="settings-rail-item settings-rail-result"
-                    tabindex={-1}
-                    onClick={() => openResult(result())}
-                  >
-                    <span class="settings-rail-result-text">
-                      <span class="settings-rail-label">
-                        {result().sectionLabel ? `${result().pageLabel} › ${result().sectionLabel}` : result().pageLabel}
-                      </span>
+                {(result) => {
+                  // The section is what someone searched for, so it is the result's name, with its page
+                  // as a faint step above it. A section named like its page says the name once.
+                  const crumb = () => {
+                    const { pageLabel, sectionLabel } = result()
+                    return sectionLabel && sectionLabel !== pageLabel ? pageLabel : undefined
+                  }
+                  return (
+                    <button
+                      type="button"
+                      class="settings-rail-item settings-rail-result"
+                      tabindex={-1}
+                      onClick={() => openResult(result())}
+                    >
+                      <Show when={crumb()}>{(page) => <span class="settings-rail-result-page">{page()} ›</span>}</Show>
+                      <span class="settings-rail-label">{crumb() ? result().sectionLabel : result().pageLabel}</span>
                       <Show when={result().matched}>
-                        {(matched) => <span class="settings-rail-result-match muted">{matched()}</span>}
+                        {(matched) => <span class="settings-rail-result-match">{matched()}</span>}
                       </Show>
-                    </span>
-                    <span class="settings-rail-result-scope">{SCOPE_LABELS[result().scope]}</span>
-                  </button>
-                )}
+                    </button>
+                  )
+                }}
               </Index>
             </Show>
           </Show>
@@ -588,28 +627,40 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
         <Show when={current()}>
           {(resolved) => (
             <>
-              <header class="settings-header">
+              <header class="settings-header" data-width={resolved().page.fullWidth ? 'full' : undefined}>
                 <div class="settings-heading-text">
                   <div class="settings-back-to-rail">
-                    <Button variant="bare" size="sm" onPress={() => setPageOpen(false)}>‹ Settings</Button>
+                    <Button variant="ghost" size="sm" onPress={() => setPageOpen(false)}><Icon name="chevron-left" /> Settings</Button>
                   </div>
-                  <Show when={back()}>
-                    {(target) => (
-                      <div class="settings-back">
-                        <Button variant="bare" size="sm" tip={`Back to ${target().label}`} tipKey="⌘[" onPress={goBack}>‹ {target().label}</Button>
-                      </div>
-                    )}
-                  </Show>
-                  <div class="settings-breadcrumb muted">
-                    {SETTINGS_CATEGORY_LABELS[resolved().category]}
-                    {resolved().project && resolved().workspace ? ` › ${resolved().workspace?.name}` : ''} › {resolved().name}
-                    {detail() ? ` › ${detail()?.title()}` : ''}
+                  <nav class="settings-breadcrumb" aria-label="Breadcrumb">
+                    <Index each={crumbs()}>
+                      {(crumb, at) => (
+                        <>
+                          <Show when={at > 0}><span aria-hidden="true"> › </span></Show>
+                          <Show when={crumb().run} fallback={crumb().label}>
+                            {(run) => (
+                              <button
+                                type="button"
+                                class="settings-crumb"
+                                data-tip={`Back to ${crumb().to}`}
+                                data-tip-key={crumb().to === back()?.label ? '⌘[' : undefined}
+                                onClick={() => run()()}
+                              >
+                                {crumb().label}
+                              </button>
+                            )}
+                          </Show>
+                        </>
+                      )}
+                    </Index>
+                  </nav>
+                  <div class="settings-title-line">
+                    <h1 class="settings-title">{detail()?.title() ?? resolved().name}</h1>
+                    <span class="settings-scopes">{scopeChip(resolved())}</span>
+                    <span class="settings-close">
+                      <IconButton icon="x" label="Close settings" tipKey="Esc" onPress={close} />
+                    </span>
                   </div>
-                  <h1 class="settings-title">{detail()?.title() ?? resolved().name}</h1>
-                </div>
-                <div class="settings-header-side">
-                  <Button variant="outline" size="sm" label="Close settings" title="Close settings" onPress={close}>Esc</Button>
-                  <div class="settings-scopes">{scopeChip(resolved())}</div>
                 </div>
               </header>
               {/* Between the header and the scrolling body, so a plugin's page cannot scroll over it, and
@@ -620,7 +671,8 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
               </Show>
               <div class="settings-body" data-plugin={pluginOwner() ? '' : undefined}>
                 <div ref={pageElement} class="settings-page" data-width={resolved().page.fullWidth ? 'full' : undefined}>
-                  <Show when={status()}><p class="muted" role="status">{status()}</p></Show>
+                  {/* A plain wrapper carries the live region, so the line is announced when it appears. */}
+                  <Show when={status()}><div role="status"><Text emphasis="muted" wrap>{status()}</Text></div></Show>
                   {/* Its own boundary, so a page's lazy chunk holds only the page and not the rail. */}
                   <Suspense>
                     <Show when={pageKey()} keyed>

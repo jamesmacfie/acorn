@@ -7,28 +7,32 @@ import { Menu, type MenuContext } from '../overlays/Menu'
 // sidebar, which had it as bespoke markup and a bespoke stylesheet rule.
 //
 // It carries its own reveal rather than leaning on Row's `reveal`, because a row's trailing slot
-// usually holds a badge or a status as well, and those are meant to stay visible.
+// usually holds a badge or a status as well, and those are meant to stay visible. The reveal rides a
+// wrapper around the whole Menu, not the trigger inside it, because Menu anchors its surface on the
+// trigger it finds as its anchor's first element.
 export function RowActions(props: {
   ariaLabel: string
   children: (menu: MenuContext) => JSX.Element
 }) {
   return (
-    <Menu
-      ariaLabel={props.ariaLabel}
-      placement="bottom-end"
-      trigger={({ toggle, open }) => (
-        <IconButton
-          icon="ellipsis"
-          label={props.ariaLabel}
-          opens="menu"
-          expanded={open()}
-          // The row underneath is usually a button or a link. Row ignores a click that landed on a
-          // control inside it, so there is nothing to stop here.
-          onPress={toggle}
-        />
-      )}
-    >
-      {props.children}
-    </Menu>
+    <span class="ui-row-actions">
+      <Menu
+        ariaLabel={props.ariaLabel}
+        placement="bottom-end"
+        trigger={({ toggle, open }) => (
+          <IconButton
+            icon="ellipsis"
+            label={props.ariaLabel}
+            opens="menu"
+            expanded={open()}
+            // The row underneath is usually a button or a link. Row ignores a click that landed on a
+            // control inside it, so there is nothing to stop here.
+            onPress={toggle}
+          />
+        )}
+      >
+        {props.children}
+      </Menu>
+    </span>
   )
 }

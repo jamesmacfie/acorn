@@ -9,6 +9,7 @@ export const dockerPlugin = (): NodePlugin => {
   let capability: { dispose(): void } | null = null
   return {
   name: 'docker',
+  label: 'Docker',
   init: (ctx) => {
     const bridge = dockerBridge(ctx.core, ctx.events.send)
     capability = ctx.capabilities.provide(DOCKER, bridge)

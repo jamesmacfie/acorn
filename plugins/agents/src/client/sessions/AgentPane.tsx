@@ -129,7 +129,6 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
               placement="bottom-end"
               trigger={({ toggle, open }) => (
                 <IconButton
-                  variant="outline"
                   icon="ellipsis"
                   label="Session actions"
                   opens="menu"
@@ -141,14 +140,20 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
               {(menu) => (
                 <For each={model.sessionActions().filter((item) => props.task.status === 'active' || READS_STORED_SESSION.has(item.id))}>
                   {(item) => (
-                    <Menu.Item
-                      context={menu}
-                      disabled={!!item.disabled}
-                      title={item.description}
-                      onSelect={() => item.run()}
-                    >
-                      {item.label}
-                    </Menu.Item>
+                    <>
+                      {/* The one destructive action is last, below a rule (docs/ui-design.md § Menus and right-click). */}
+                      <Show when={item.tone === 'danger'}><Menu.Separator /></Show>
+                      <Menu.Item
+                        context={menu}
+                        disabled={!!item.disabled}
+                        tone={item.tone}
+                        title={item.description}
+                        leading={item.icon ? <Icon name={item.icon} /> : undefined}
+                        onSelect={() => item.run()}
+                      >
+                        {item.label}
+                      </Menu.Item>
+                    </>
                   )}
                 </For>
               )}
@@ -250,7 +255,7 @@ function AgentSessionDialogs(props: { task: Task; model: AgentPaneModel }) {
             </Field>
           </Modal.Body>
           <Modal.Actions>
-            <Button variant="bare" onPress={() => model.setDialog(null)}>Cancel</Button>
+            <Button variant="ghost" onPress={() => model.setDialog(null)}>Cancel</Button>
             <Button variant="solid" onPress={() => void model.rename()}>Rename</Button>
           </Modal.Actions>
         </Modal>
@@ -260,13 +265,13 @@ function AgentSessionDialogs(props: { task: Task; model: AgentPaneModel }) {
           <Modal onDismiss={() => model.setDialog(null)} title="Archive session" size="sm" role="alertdialog">
             <Modal.Body>
               <Text wrap>
-                Archive “{session().title}”? It leaves this task’s list and stays readable under the
-                archived filter in Agent Center.
+                “{session().title}” leaves this task’s list. You can still read it in Agent Center, under
+                Archived.
               </Text>
             </Modal.Body>
             <Modal.Actions>
-              <Button variant="bare" onPress={() => model.setDialog(null)}>Cancel</Button>
-              <Button variant="solid" onPress={() => void model.archive(session())}>Archive</Button>
+              <Button variant="ghost" onPress={() => model.setDialog(null)}>Cancel</Button>
+              <Button variant="solid" onPress={() => void model.archive(session())}>Archive session</Button>
             </Modal.Actions>
           </Modal>
         )}

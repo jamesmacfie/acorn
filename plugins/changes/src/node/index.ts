@@ -11,6 +11,7 @@ export const changesPlugin = (): NodePlugin => {
   let capability: { dispose(): void } | null = null
   return {
   name: 'changes',
+  label: 'Changes',
   emits: [
     { verb: 'review-notes-changed', description: 'A task’s local review notes or delivery state changed' },
   ],

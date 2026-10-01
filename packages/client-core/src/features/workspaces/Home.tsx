@@ -1,4 +1,5 @@
 import { createEffect, createMemo } from 'solid-js'
+import { Heading } from '../../kit/components/content/Heading'
 import DashboardTabs from '../dashboards/DashboardTabs'
 import { activeHomeTab, homeTabDomId, HOME_TAB_PANEL_ID, setActiveHomeTab } from '../dashboards/homeTab'
 import { adoptLegacyHomeDashboards, dashboards, homeTabs, homeTabScope } from '../dashboards/persist'
@@ -39,9 +40,7 @@ export default function Home() {
 
   return (
     <main class="panes home-source">
-      <header class="fleet-home-head">
-        <h1>Home</h1>
-      </header>
+      <Heading level={1}>Home</Heading>
       <PanelGrid
         scope={homeTabScope(activeTab(), workspaceId())}
         heading={tabs().length > 1 ? bar : undefined}

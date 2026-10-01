@@ -1,6 +1,7 @@
 import { children, Show, type JSX } from 'solid-js'
 import { IconButton } from './IconButton'
 import { Toolbar } from '../layout/Toolbar'
+import { formatChord } from '../../lib/rendering/formatChord'
 import { Input } from './Input'
 
 // The in-content search strip. Three surfaces had one and all three disagreed on the keyboard
@@ -67,7 +68,7 @@ export function FindBar(props: {
           icon="chevron-up"
           disabled={!props.count?.total}
           tip="Previous match"
-          tipKey="⇧⏎"
+          tipKey={formatChord('shift+enter')}
           label="Previous match"
           onPress={() => props.onPrev()}
         />
@@ -75,14 +76,14 @@ export function FindBar(props: {
           icon="chevron-down"
           disabled={!props.count?.total}
           tip="Next match"
-          tipKey="⏎"
+          tipKey={formatChord('enter')}
           label="Next match"
           onPress={() => props.onNext()}
         />
       </Toolbar.Group>
       <Show when={toggles()}>{toggles()}</Show>
       <Show when={props.onClose}>
-        <IconButton icon="x" tip="Close find" tipKey="Esc" label="Close find" onPress={() => props.onClose?.()} />
+        <IconButton icon="x" tip="Close find" tipKey={formatChord('escape')} label="Close find" onPress={() => props.onClose?.()} />
       </Show>
     </Toolbar>
   )

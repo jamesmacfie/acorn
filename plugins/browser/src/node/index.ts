@@ -39,6 +39,7 @@ export const browserPlugin = (): NodePlugin => {
 
   return {
     name: 'browser',
+    label: 'Browser',
     emits: [
       { verb: 'captures-changed', description: 'A task’s retained browser-capture collection changed' },
       { verb: 'capture-created', description: 'A browser capture was created (compatibility event)' },

@@ -127,7 +127,7 @@ needs a `node` entrypoint, because only a node half serves `/v1/p/<id>/`.
       { "id": "issues", "title": "Linear", "category": "navigation", "kind": "group" },
       {
         "id": "find",
-        "title": "Linear: find an issue",
+        "title": "Find a Linear issue",
         "kind": "search",
         "parentId": "issues",
         "scope": "project",
@@ -369,6 +369,9 @@ invent that string. `action` draws a checkbox, and the cleanup behind it is `app
 archive itself after the repo teardown script and **before the worktree is removed**, so a cleanup
 that needs the worktree still has it.
 
+The dialog shows `message` on its own, beside a warning icon, without the plugin's name. Write it so
+it says what it is about: "2 terminals are still running", not "2 active".
+
 There is no callback anywhere in that shape, and that is the design rather than an omission. The
 action a concern offers is a route declared once — on the context or in the manifest — where the node
 can confine it to the plugin's own namespace and re-confine it on every dispatch. An action arriving
@@ -400,7 +403,7 @@ a parse error rather than a check that 404s on every archive.
 
 Three checks ship today: docker (running containers, with a `compose down` cleanup), changes
 (uncommitted files, naming the first five paths — advisory, because committing or discarding on the
-owner's behalf is exactly what a confirmation exists to avoid), and terminal (active sessions —
+owner's behalf is exactly what a confirmation exists to avoid), and terminal (running terminals —
 disclosure, since core stops them itself).
 
 The client-side seam this replaced, `registerWillHandler`, is still on `@acorn/plugin-api/ui/host`

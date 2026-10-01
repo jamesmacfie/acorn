@@ -5,6 +5,7 @@ import { byRecentVisit } from '../../features/workspaces/lastWorkspace'
 import { fuzzyScore } from '../../kit/lib/controls/fuzzy'
 import { createOverlayPalette } from './overlay'
 import { PaletteSurface } from './PaletteSurface'
+import { projectCount } from './navigationCommands'
 import './palette.css'
 
 export default function WorkspacePalette() {
@@ -47,7 +48,7 @@ export default function WorkspacePalette() {
       palette={palette}
       items={matches()}
       ariaLabel="Switch workspace"
-      placeholder="Switch workspace…"
+      placeholder="Find a workspace…"
       emptyText="No workspaces."
       onPick={(entry) => pick(entry)}
       row={(entry) => {
@@ -59,7 +60,7 @@ export default function WorkspacePalette() {
               <span class="palette-hint muted">{entry.node.label}</span>
             </Show>
             <Show when={w.projects.length}>
-              <span class="palette-hint muted">{w.projects.length} projects</span>
+              <span class="palette-hint muted">{projectCount(w.projects.length)}</span>
             </Show>
           </>
         )

@@ -1,5 +1,5 @@
 import { children, createEffect, createSignal, Index, onCleanup, Show, type JSX } from 'solid-js'
-import { Input } from '../../kit/components/primitives'
+import { Button, Input } from '../../kit/components/primitives'
 import type { PaletteView } from './overlay'
 // The component owns its stylesheet, so a consumer can't depend on some other palette having been
 // mounted first to get the chrome styled.
@@ -39,6 +39,9 @@ export function PaletteSurface<T>(props: {
   /** Where in the command tree this frame is, drawn above the field. The command palette's; a file
    *  finder has no hierarchy and passes nothing (./paletteView.ts). */
   breadcrumb?: readonly string[]
+  /** What pressing a breadcrumb segment does, by its index: go back to that frame. A segment with no
+   *  action, such as the frame on screen, is plain text. */
+  crumbAction?: (index: number) => (() => void) | undefined
   /** Something is being fetched or invoked. Becomes `aria-busy` on the dialog. */
   busy?: boolean
   /** One line for a screen reader, announced when it changes: how many results, or what failed. */
@@ -114,7 +117,23 @@ export function PaletteSurface<T>(props: {
           onClick={(event) => event.stopPropagation()}
         >
           <Show when={props.breadcrumb?.length}>
-            <div class="palette-crumbs muted">{props.breadcrumb?.join(' › ')}</div>
+            <div class="palette-crumbs muted">
+              <Index each={props.breadcrumb}>
+                {(label, index) => {
+                  const action = () => props.crumbAction?.(index)
+                  return (
+                    <>
+                      <Show when={index > 0}><span aria-hidden="true"> › </span></Show>
+                      <Show when={action()} fallback={<span>{label()}</span>}>
+                        {(go) => (
+                          <Button variant="bare" size="sm" onPress={() => { go()(); input()?.focus() }}>{label()}</Button>
+                        )}
+                      </Show>
+                    </>
+                  )
+                }}
+              </Index>
+            </div>
           </Show>
           <Input
             ref={(el) => {

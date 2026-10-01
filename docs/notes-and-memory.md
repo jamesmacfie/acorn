@@ -158,7 +158,7 @@ review; without one it asks the owner to configure review instead of creating un
 Findings validates generated payloads against Memory's target-owned contract before publication. If
 the model returns an invalid payload, Findings sends the validation error through one bounded
 correction pass; a second invalid response leaves the bundle failed and retryable.
-The Findings plugin also contributes **Findings: inspect task evidence**, the command-only route to
+The Findings plugin also contributes **Show what acorn recorded for this task**, the command-only route to
 raw observations and provenance.
 
 What stays out is deliberate. Deleting a note and changing whether an agent sees one stay in the note

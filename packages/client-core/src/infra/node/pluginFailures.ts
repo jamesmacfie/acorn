@@ -4,6 +4,7 @@ import { surfaceFailures } from '../../host/plugins/surfaceFailures'
 import type { AttentionItem, AttentionSourceContribution } from '../../host/registries/rail/attention'
 import { distribution } from '../../host/plugins/distribution'
 import { nodePluginStatus } from '../../host/plugins/pluginStatus'
+import { pluginLabel } from '../../host/plugins/pluginLabel'
 import { nodes } from './fleet'
 
 // "Plugin X failed to start", in the notification bell, so the owner learns about it without opening
@@ -20,9 +21,12 @@ import { nodes } from './fleet'
 // parse, its bundle did not import, or its apiVersion is not this node's. 'failed' means it started
 // and threw. A reason on a row whose state is not 'failed' means the copy on disk claimed a name
 // something else answers to, so what is running is fine and the installed copy is not.
+//
+// These rows use the plugin's name. The two waiting rows below keep the id, because they lead to a
+// trust decision and a loaded plugin chooses its own name.
 const titleFor = (row: NodePluginRow): string => {
-  if (row.state !== 'failed') return `Plugin ${row.name}: the copy installed on this node did not load`
-  return `Plugin ${row.name} failed to ${row.stage === 'load' ? 'load' : 'start'}`
+  if (row.state !== 'failed') return `Plugin ${pluginLabel(row)}: the copy installed on this node did not load`
+  return `Plugin ${pluginLabel(row)} failed to ${row.stage === 'load' ? 'load' : 'start'}`
 }
 
 // Every row here sends the reader to Settings > Plugins, which is the one place a failure can be

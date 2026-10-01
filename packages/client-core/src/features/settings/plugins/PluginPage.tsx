@@ -26,7 +26,7 @@ import { TabPanel, Tabs } from '../../../kit/components/layout/Tabs'
 import { createRailVisibility, pluginSources } from '../../tabs/railVisibility'
 import { useSettingsDetail } from '../settingsDetail'
 import { createSettingSave } from '../settingSave'
-import { pluginOrigin, pluginRow, statusOf, type InstalledPlugin } from './installed'
+import { pluginName, pluginOrigin, pluginRow, statusOf, type InstalledPlugin } from './installed'
 import { removeDevicePlugin, setDevicePluginEnabled, setNodePluginEnabled } from './pluginActions'
 import './plugins.css'
 
@@ -67,7 +67,7 @@ export function PluginPage(props: PluginPageProps) {
   const [tab, setTab] = createSignal<Tab>('overview')
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
-  const hostDrawsBack = useSettingsDetail(() => props.plugin.id, props.onBack)
+  const hostDrawsBack = useSettingsDetail(() => pluginName(props.plugin), props.onBack)
   const row = () => pluginRow(props.plugin)
   const nodeRow = () => (props.plugin.kind === 'node' ? props.plugin.row : undefined)
 
@@ -110,10 +110,11 @@ export function PluginPage(props: PluginPageProps) {
       <Show when={!hostDrawsBack}>
         <Inline><Button variant="bare" size="sm" onPress={props.onBack}>‹ Installed</Button></Inline>
       </Show>
+      {/* The one place the page shows the id, which is what the command line and config files use. */}
       <SettingsSection id="plugin" label="Status" description={`${props.plugin.id}${row().installed?.version ? ` ${row().installed?.version}` : ''}, ${pluginOrigin(props.plugin)}.`}>
         <SettingRow label="Enabled" description={props.plugin.kind === 'node' ? 'Takes effect when the node next starts.' : 'Takes effect at once on this device.'} error={enableSave.error()}>
           <Show when={togglable()} fallback={<Text emphasis="muted">Required. acorn needs it to run.</Text>}>
-            <Checkbox switch ariaLabel={`Enable ${props.plugin.id}`} checked={!row().disabled} disabled={busy()} onChange={setEnabled} />
+            <Checkbox switch ariaLabel={`Enable ${pluginName(props.plugin)}`} checked={!row().disabled} disabled={busy()} onChange={setEnabled} />
           </Show>
         </SettingRow>
         <Show when={status().tone !== 'ok'}>
@@ -128,7 +129,7 @@ export function PluginPage(props: PluginPageProps) {
         <Show when={error()}><Alert>{error()}</Alert></Show>
       </SettingsSection>
 
-      <Tabs tabs={TABS} active={tab()} onChange={(id) => setTab(id as Tab)} idPrefix={ID_PREFIX} ariaLabel={`About ${props.plugin.id}`} />
+      <Tabs tabs={TABS} active={tab()} onChange={(id) => setTab(id as Tab)} idPrefix={ID_PREFIX} ariaLabel={`About ${pluginName(props.plugin)}`} />
       <TabPanel idPrefix={ID_PREFIX} id="overview" active={tab()}>
         <Stack gap="section"><Overview plugin={props.plugin} navigate={props.navigate} elsewhere={elsewhere()} /></Stack>
       </TabPanel>
@@ -368,7 +369,7 @@ function Versions(props: PluginPageProps & Actions) {
     }
     const result = await updateNodePlugin(props.plugin.id, {}, props.nodeId ?? undefined)
     await props.settleNode()
-    if (result.fromVersion === result.toVersion) throw new Error(`${props.plugin.id} is already at ${result.toVersion}.`)
+    if (result.fromVersion === result.toVersion) throw new Error(`${pluginName(props.plugin)} is already at ${result.toVersion}.`)
   })
   const source = () => (props.plugin.kind === 'device' ? props.plugin.entry.sourceLabel : installed()?.source)
   const offeredBy = () => (props.plugin.kind === 'device' ? props.plugin.entry.nodeIds : [])
@@ -399,12 +400,13 @@ function DangerZone(props: PluginPageProps & Actions & { nodeRow: NodePluginRow 
   const removable = () => (props.plugin.kind === 'device' ? true : !!props.nodeRow && ((!!props.nodeRow.installed && !props.nodeRow.installed.bundled) || !!props.nodeRow.pendingReview))
   const uninstall = (purgeData: boolean) => props.run(async () => {
     const id = props.plugin.id
+    const name = pluginName(props.plugin)
     const confirmed = await confirmAction({
-      title: `Uninstall ${id}`,
+      title: `Uninstall ${name}`,
       actionLabel: purgeData ? 'Uninstall and delete its data' : 'Uninstall',
       goes: purgeData
-        ? `${id} is removed from this node, with everything it stored there.`
-        : `${id} is removed from this node. It stops when the node next restarts.`,
+        ? `${name} is removed from this node, with everything it stored there.`
+        : `${name} is removed from this node. It stops when the node next restarts.`,
       stays: purgeData ? 'Other plugins and their data stay as they are.' : 'Its data stays on the node, so installing it again picks up where it left off.',
       danger: true,
     })
@@ -415,10 +417,11 @@ function DangerZone(props: PluginPageProps & Actions & { nodeRow: NodePluginRow 
   })
   const remove = () => props.run(async () => {
     const id = props.plugin.id
+    const name = pluginName(props.plugin)
     const confirmed = await confirmAction({
-      title: `Remove ${id} from this device`,
+      title: `Remove ${name} from this device`,
       actionLabel: 'Remove',
-      goes: `${id} and every preference this device kept for it are removed.`,
+      goes: `${name} and every preference this device kept for it are removed.`,
       stays: 'Nothing on any node changes.',
       danger: true,
     })

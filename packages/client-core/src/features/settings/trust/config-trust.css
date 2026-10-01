@@ -2,8 +2,6 @@
    trust, with a diff when they changed. Every colour here used to be a hardcoded fallback for an
    undefined token (--surface-sunken → #111, --success-fg → #8dd49b, --danger-fg → #ff9a9a), which
    assumed a dark background and rendered near-unreadable under all four light themes. */
-.config-trust-dialog { width: min(760px, calc(100vw - 32px)); max-height: min(760px, calc(100vh - 32px)); }
-.config-trust-body { overflow: auto; }
 .config-trust-file h3 { margin: var(--space-8) 0 var(--space-3); font-size: var(--fs-sm); }
 .config-trust-file pre, .config-trust-diff {
   margin: 0;

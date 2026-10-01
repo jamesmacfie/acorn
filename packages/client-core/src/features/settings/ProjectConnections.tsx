@@ -13,20 +13,24 @@ import type { SettingsNavigate } from '../../host/registries/shell/settings'
 // (./ConnectionProjectMap.tsx), so every page reads and writes the same rows. Each connection links to
 // its own page, where it is renamed, signed in again, or disconnected.
 
-function FollowedServices(props: { workspace?: Workspace; project?: Project; navigate: SettingsNavigate; description: string }) {
+function FollowedServices(props: { workspace?: Workspace; project?: Project; navigate: SettingsNavigate; label: string; help: string }) {
   const status = createQuery(() => integrationsOptions(true))
   const providers = () => new Map((status.data?.providers ?? []).map((provider) => [provider.id, provider]))
   const listing = () => (status.data?.integrations ?? []).filter((connection) => providers().get(connection.providerId)?.supportsProjects)
   return (
     <SettingsSection
       id="connections"
-      label="Connections"
-      description={props.description}
+      label={props.label}
+      help={props.help}
       actions={<Button size="sm" variant="ghost" onPress={() => props.navigate(SERVICES_PAGE)}>Open Services</Button>}
     >
       <Show
         when={listing().length}
-        fallback={<EmptyState align="start">{status.isPending ? 'Reading connections…' : 'No connection on this node lists projects. Add one on Services.'}</EmptyState>}
+        fallback={
+          <EmptyState align="start" size="sm" busy={status.isPending}>
+            {status.isPending ? 'Loading…' : 'No connected service has projects to follow. Add one in Services.'}
+          </EmptyState>
+        }
       >
         <For each={listing()}>
           {(connection) => (
@@ -45,10 +49,11 @@ function FollowedServices(props: { workspace?: Workspace; project?: Project; nav
 
 /** A project page's Connections tab. */
 export function ProjectConnections(props: { project: Project; navigate: SettingsNavigate }) {
-  return <FollowedServices project={props.project} navigate={props.navigate} description="Which projects from each connection show up in the rail for this project." />
+  // Named for what it holds, because the tab is already called Connections.
+  return <FollowedServices project={props.project} navigate={props.navigate} label="Followed services" help="Pick which projects from each connected service show in this project's rail." />
 }
 
 /** A workspace page's Connections section. */
 export function WorkspaceConnections(props: { workspace: Workspace; navigate: SettingsNavigate }) {
-  return <FollowedServices workspace={props.workspace} navigate={props.navigate} description="Which projects from each connection show up in this workspace's rail." />
+  return <FollowedServices workspace={props.workspace} navigate={props.navigate} label="Connections" help="Pick which projects from each connected service show in this workspace's rail." />
 }

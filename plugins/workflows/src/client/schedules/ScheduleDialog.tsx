@@ -4,7 +4,7 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { clientEvents, pathForTask, projectsOptions, tasksOptions } from '@acorn/plugin-api/client'
 import {
   Alert, Badge, Button, Checkbox, ConfirmButton, Field, Fold, Inline, Input,
-  Modal, ModalActions, ModalBody, Select, Stack, Text,
+  Modal, ModalActions, ModalBody, Select, Stack, Text, Toolbar,
 } from '@acorn/plugin-api/ui'
 import { TypedBindingPicker } from '@acorn/plugin-api/ui/data-sources'
 import type { DataBinding } from '@acorn/protocol/dataBindings.ts'
@@ -344,13 +344,14 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
       </ModalBody>
       <ModalActions>
         <Show when={schedule()?.id}>
-          <Button variant="bare" disabled={!!busy() || !['active', 'paused'].includes(schedule()!.state)} onPress={() => void runNow()}>Run now</Button>
-          <Show when={schedule()?.state === 'active'} fallback={<Show when={schedule()?.state === 'paused'}><Button variant="bare" disabled={!!busy()} onPress={() => void pause(false)}>Resume</Button></Show>}>
-            <Button variant="bare" disabled={!!busy()} onPress={() => void pause(true)}>Pause</Button>
+          <Button variant="ghost" disabled={!!busy() || !['active', 'paused'].includes(schedule()!.state)} onPress={() => void runNow()}>Run now</Button>
+          <Show when={schedule()?.state === 'active'} fallback={<Show when={schedule()?.state === 'paused'}><Button variant="ghost" disabled={!!busy()} onPress={() => void pause(false)}>Resume</Button></Show>}>
+            <Button variant="ghost" disabled={!!busy()} onPress={() => void pause(true)}>Pause</Button>
           </Show>
-          <ConfirmButton tone="danger" disabled={!!busy()} onConfirm={() => void remove()}>Delete schedule</ConfirmButton>
+          <ConfirmButton tone="danger" confirmLabel="Delete schedule?" disabled={!!busy()} onConfirm={() => void remove()}>Delete schedule</ConfirmButton>
+          <Toolbar.Spacer />
         </Show>
-        <Button variant="bare" onPress={closeWorkflowSchedule}>Close</Button>
+        <Button variant="ghost" onPress={closeWorkflowSchedule}>Close</Button>
         <Button disabled={!readyForReview() || !!busy()} busy={busy() === 'review'} onPress={() => void review()}>Review activation</Button>
         <Button disabled={!readyForReview() || !!busy()} busy={busy() === 'save'} onPress={() => void saveDraft()}>Save draft</Button>
         <Button variant="solid" disabled={!preparation() || !!busy()} busy={busy() === 'activate'} onPress={() => void activate()}>

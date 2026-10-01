@@ -182,7 +182,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
                   {props.taskId ? 'Terminal' : 'Copy exec'}
                 </Button>
               </Show>
-              <ConfirmButton size="sm" tone="danger" label="Remove" disabled={busy()} onConfirm={() => void remove()}>Remove</ConfirmButton>
+              <ConfirmButton size="sm" tone="danger" label="Remove" confirmLabel="Remove container?" disabled={busy()} onConfirm={() => void remove()}>Remove</ConfirmButton>
               {props.actions}
             </Toolbar>
             <Text emphasis="muted">{d().image} · {d().status}{d().health ? ` · ${d().health}` : ''}</Text>

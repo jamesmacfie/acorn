@@ -10,10 +10,10 @@
   min-width: 120px;
   max-width: 260px;
   padding: var(--space-3) var(--space-5);
-  background: var(--bg);
-  border: var(--control-border);
+  background: var(--popover-bg);
+  border: var(--surface-border);
   border-radius: var(--radius-popover);
-  box-shadow: var(--shadow-2);
+  box-shadow: var(--elev-popover);
   pointer-events: none;
   animation: rail-tip-in 90ms ease-out;
 }
@@ -35,6 +35,10 @@
   color: var(--text-muted);
   line-height: 1.35;
 }
+/* A help mark's tip is an explanation, not a label: body weight, a paragraph's line height, and room
+   for a sentence or three. */
+.rail-tip[data-kind='help'] { max-width: min(22rem, 90vw); }
+.rail-tip[data-kind='help'] .rail-tip-title { font-weight: var(--fw-normal); line-height: var(--lh); }
 
 /* Status-icon legend: see docs/ui-design.md § Tooltips for why it re-shows each active marker
    next to its meaning. */

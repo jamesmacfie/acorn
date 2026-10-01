@@ -4,6 +4,7 @@ import type { Task } from '@acorn/protocol/api.ts'
 import { paneRegistry, type PaneContribution } from '../../host/registries/panes/panes'
 import type { Disposable } from '../../kit/lib/state/registry'
 import TaskPaneHost from './TaskPaneHost'
+import { applyLayoutAction, type LayoutAction, type TaskLayout } from './taskLayout'
 
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))
 
@@ -118,7 +119,30 @@ describe('TaskPaneHost', () => {
     mount(task({ github: null }))
 
     expect(drawn()).toEqual(['changes'])
-    expect(host.textContent).not.toContain('No panes available here')
+    expect(host.textContent).not.toContain('No pane to show')
+  })
+
+  it('marks the fallback pane as shown, and opens a second pane beside it', () => {
+    pane({ id: 'pr', label: 'PR', order: 0, when: (subject) => subject.github !== null })
+    pane({ id: 'agents', label: 'Agent', order: 1 })
+    pane({ id: 'changes', label: 'Changes', order: 2 })
+    layout.panes = ['pr']
+
+    mount(task({ github: null }))
+
+    const tabs = () => [...host.querySelectorAll<HTMLElement>('.pane-switcher [aria-pressed]')]
+    const pressed = () => tabs().filter((tab) => tab.getAttribute('aria-pressed') === 'true').map((tab) => tab.getAttribute('aria-label'))
+    expect(pressed()).toEqual(['Agent'])
+    // One pane on screen, so there is nothing to close.
+    expect(host.querySelector('[aria-label="Close Agent"]')).toBeNull()
+
+    tabs().find((tab) => tab.getAttribute('aria-label') === 'Changes')
+      ?.dispatchEvent(new MouseEvent('click', { bubbles: true, metaKey: true }))
+
+    // The layout as drawn is what the add applies to, so the person gets the pane they were looking
+    // at and the one they asked for, rather than the PR pane nobody can see plus Changes.
+    const next = (dispatched as LayoutAction[]).reduce<TaskLayout>((current, action) => applyLayoutAction(current, action), { panes: ['pr'] })
+    expect(next.panes).toEqual(['agents', 'changes'])
   })
 
   it('says so when the layout has nothing left to draw', () => {
@@ -131,7 +155,7 @@ describe('TaskPaneHost', () => {
     mount()
 
     expect(drawn()).toEqual([])
-    expect(host.textContent).toContain('No panes available here')
+    expect(host.textContent).toContain('No pane to show')
   })
 
   it('drops a pane this environment cannot host from the switcher too', () => {

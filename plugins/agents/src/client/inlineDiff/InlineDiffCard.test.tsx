@@ -68,13 +68,13 @@ describe('inline diff chat', () => {
     const model = popover.querySelectorAll<HTMLSelectElement>('select')[1]!
     model.value = 'fast'
     model.dispatchEvent(new Event('change', { bubbles: true }))
-    expect(picker!.title).toContain('Fast')
+    expect(picker!.dataset.tip).toContain('Fast')
     const read = [...popover.querySelectorAll('button')].find((button) => button.textContent === 'Read only')!
     const write = [...popover.querySelectorAll('button')].find((button) => button.textContent === 'Write access')!
     expect(read.getAttribute('aria-checked')).toBe('true')
     write.click()
     expect(write.getAttribute('aria-checked')).toBe('true')
-    expect(picker!.title).toContain('write access')
+    expect(picker!.dataset.tip).toContain('write access')
   })
 
   it('opens with cached session defaults written before inline choices existed', () => {

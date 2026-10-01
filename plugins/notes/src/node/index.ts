@@ -12,6 +12,7 @@ export type NotesPluginDeps = { internalEnv: InternalEnvFactory }
 
 export const notesPlugin = (dataDir: string, deps: NotesPluginDeps = { internalEnv: () => ({}) }): NodePlugin => ({
   name: 'notes',
+  label: 'Notes',
   required: true,
   init: (ctx) => {
     const store = new NotesStore(join(dataDir, 'notes'), ctx.events.send)

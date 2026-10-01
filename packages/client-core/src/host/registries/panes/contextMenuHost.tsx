@@ -21,9 +21,15 @@ export function ContextMenuItems(props: {
   location: ContextMenuLocation
   target: ContextMenuTarget
 }) {
+  const items = () => contextMenuItems(props.location, props.target)
+  // A destructive item sits below a rule, apart from the safe ones (docs/ui-design.md § Menus and
+  // right-click). Registered rows have no groups, so the rule goes before the first danger row.
+  const firstDanger = () => items().findIndex((item) => item.tone === 'danger')
   return (
-    <For each={contextMenuItems(props.location, props.target)}>
-      {(item) => (
+    <For each={items()}>
+      {(item, index) => (
+        <>
+        <Show when={index() > 0 && index() === firstDanger()}><Menu.Separator /></Show>
         <Menu.Item
           context={props.context}
           tone={item.tone ?? 'neutral'}
@@ -32,6 +38,7 @@ export function ContextMenuItems(props: {
         >
           {item.label}
         </Menu.Item>
+        </>
       )}
     </For>
   )

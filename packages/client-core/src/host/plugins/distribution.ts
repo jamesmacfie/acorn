@@ -90,7 +90,7 @@ export function deviceEntries(state: PluginHostState): DevicePluginEntry[] {
     }
     const manifest = parsed.data
     entries.push({ hash, row: {
-      name: manifest.id, required: false, disabled: disabled.has(manifest.id),
+      name: manifest.id, label: manifest.name, required: false, disabled: disabled.has(manifest.id),
       running: !disabled.has(manifest.id), state: disabled.has(manifest.id) ? 'disabled' : 'active',
       emits: manifest.emits,
       installed: {

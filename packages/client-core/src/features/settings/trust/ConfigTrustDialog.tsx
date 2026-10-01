@@ -3,9 +3,9 @@ import { diffLines } from 'diff'
 import { readJson, writeJson } from '../../../infra/node/apiClient'
 import { repoConfigTrustRoute, type RepoConfigTrustReview } from '@acorn/protocol/api.ts'
 import { closeRepoConfigTrust, configTrustRequest } from './configTrust'
-import { createDismissable } from '../../../kit/lib/controls/dismissable'
 import './config-trust.css'
 import { Alert, Button } from '../../../kit/components/primitives'
+import { Modal } from '../../../kit/components/overlays/Modal'
 
 export default function ConfigTrustDialog() {
   const [review, setReview] = createSignal<RepoConfigTrustReview | null>(null)
@@ -47,57 +47,46 @@ export default function ConfigTrustDialog() {
     return value?.current && value.previous ? diffLines(value.previous.text, value.current.text) : []
   }
 
-  let dialog!: HTMLElement
-  const dismiss = createDismissable({ onDismiss: closeRepoConfigTrust, container: () => dialog })
-
+  // An `alertdialog`, so focus starts on **Not now** rather than on the button that runs commands.
+  // One primary: the button says **Trust and run** when a run is waiting on the answer, and
+  // **Trust configuration** when the person opened the review from a notice.
   return (
     <Show when={configTrustRequest()}>
-      <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>
-        <section
-          ref={dialog}
-          class="overlay config-trust-dialog"
-          role="alertdialog"
-          aria-modal="true"
-          aria-labelledby="config-trust-title"
-          onClick={dismiss.onContainerClick}
-          onKeyDown={dismiss.onKeyDown}
-        >
-          <div class="overlay-title" id="config-trust-title">Review project configuration</div>
-          <div class="overlay-body config-trust-body">
-            <p>
-              <strong>This project</strong> contains committed configuration that can run commands on this machine.
-              Trust only text you have reviewed.
-            </p>
-            <Show when={error()}><Alert>{error()}</Alert></Show>
-            <Show when={review()?.current} fallback={<p class="muted">Loading configuration…</p>}>
-              <Show
-                when={review()?.previous}
-                fallback={
-                  <For each={review()?.current?.files ?? []}>
-                    {(file) => (
-                      <section class="config-trust-file">
-                        <h3>{file.path}</h3>
-                        <pre>{file.content}</pre>
-                      </section>
-                    )}
-                  </For>
-                }
-              >
-                <p class="muted">This configuration changed since it was last trusted. Review the exact diff:</p>
-                <pre class="config-trust-diff">
-                  <For each={changes()}>{(part) => <span classList={{ added: part.added, removed: part.removed }}>{part.value}</span>}</For>
-                </pre>
-              </Show>
+      <Modal title="Review project configuration" size="lg" role="alertdialog" onDismiss={closeRepoConfigTrust}>
+        <Modal.Body>
+          <p>
+            This project has settings in its repository that can run commands on this computer. Only
+            trust them if you've read them.
+          </p>
+          <Show when={error()}><Alert>{error()}</Alert></Show>
+          <Show when={review()?.current} fallback={<p class="muted">Loading configuration…</p>}>
+            <Show
+              when={review()?.previous}
+              fallback={
+                <For each={review()?.current?.files ?? []}>
+                  {(file) => (
+                    <section class="config-trust-file">
+                      <h3>{file.path}</h3>
+                      <pre>{file.content}</pre>
+                    </section>
+                  )}
+                </For>
+              }
+            >
+              <p class="muted">These settings changed since you last trusted them.</p>
+              <pre class="config-trust-diff">
+                <For each={changes()}>{(part) => <span classList={{ added: part.added, removed: part.removed }}>{part.value}</span>}</For>
+              </pre>
             </Show>
-          </div>
-          <div class="overlay-actions">
-            <Button variant="ghost" onPress={closeRepoConfigTrust}>Not now</Button>
-            <Button disabled={saving() || !review()?.current} onPress={() => void trustAndRun()}>
-              {saving() ? 'Trusting…' : configTrustRequest()?.retry ? 'Trust and run' : 'Trust configuration'}
-            </Button>
-          </div>
-        </section>
-      </div>
+          </Show>
+        </Modal.Body>
+        <Modal.Actions>
+          <Button variant="ghost" onPress={closeRepoConfigTrust}>Not now</Button>
+          <Button variant="solid" disabled={saving() || !review()?.current} onPress={() => void trustAndRun()}>
+            {saving() ? 'Trusting…' : configTrustRequest()?.retry ? 'Trust and run' : 'Trust configuration'}
+          </Button>
+        </Modal.Actions>
+      </Modal>
     </Show>
   )
 }

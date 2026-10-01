@@ -85,7 +85,7 @@ function RequestRow(props: { model: HttpPanelModel; row: HttpRequest }) {
           size="sm"
           title={`Delete ${props.row.name}`}
           label="Delete"
-          confirmLabel="Confirm delete"
+          confirmLabel="Delete request?"
           onConfirm={() => void props.model.remove(props.row)}
         >
           <Icon name="trash-2" />

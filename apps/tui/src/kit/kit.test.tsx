@@ -94,24 +94,27 @@ const CASES: Case[] = [
   {
     node: 'Section',
     draws: 'label in dim uppercase, children below',
-    render: () => <Section label="notes" count={3}><Text>body</Text></Section>,
+    render: () => <Section label="notes" count={3} help="what they are for"><Text>body</Text></Section>,
     check: (frame) => {
       has(frame, 'NOTES')
+      expect(rowOf(frame, 'what they are for')).toBe(rowOf(frame, 'NOTES') + 1)
       expect(rowOf(frame, 'body')).toBeGreaterThan(rowOf(frame, 'NOTES'))
     },
   },
   {
     node: 'Fold',
-    draws: '▸ label closed, ▾ label open, children indented two cells',
+    draws: '▸ label closed, ▾ label open, children indented two cells, a leading control before the label',
     render: () => (
       <Stack>
         <Fold label="shut"><Text>hidden</Text></Fold>
         <Fold label="open" defaultOpen><Text>shown</Text></Fold>
+        <Fold label="picked" leading={<Text>[x]</Text>}><Text>hidden</Text></Fold>
       </Stack>
     ),
     check: (frame) => {
       has(frame, '▸ shut')
       has(frame, '▾ open')
+      has(frame, '▸ [x] picked')
       lacks(frame, 'hidden')
       expect(lineWith(frame, 'shown').indexOf('shown')).toBe(2)
     },
@@ -285,28 +288,30 @@ const CASES: Case[] = [
   },
   {
     node: 'SectionHeader',
-    draws: 'a bold heading with its actions on the next line',
-    render: () => <SectionHeader actions={<Button label="New" />}>Files</SectionHeader>,
+    draws: 'a bold heading, its help in grey under it, then its actions',
+    render: () => <SectionHeader help="what the files are" actions={<Button label="New" />}>Files</SectionHeader>,
     check: (frame) => {
-      expect(rowOf(frame, '[New]')).toBe(rowOf(frame, 'Files') + 1)
+      expect(rowOf(frame, 'what the files are')).toBe(rowOf(frame, 'Files') + 1)
+      expect(rowOf(frame, '[New]')).toBe(rowOf(frame, 'Files') + 2)
     },
   },
   {
     node: 'SettingsSection',
-    draws: 'the label in bold, the description in grey under it, then the rows',
+    draws: 'the label in bold, the description and the help in grey under it, then the rows',
     render: () => (
-      <SettingsSection id="general" label="General" description="How the drawer opens">
+      <SettingsSection id="general" label="General" description="How the drawer opens" help="Why it opens there">
         <Text>a row</Text>
       </SettingsSection>
     ),
     check: (frame) => {
       expect(rowOf(frame, 'How the drawer opens')).toBe(rowOf(frame, 'General') + 1)
-      expect(rowOf(frame, 'a row')).toBe(rowOf(frame, 'General') + 2)
+      expect(rowOf(frame, 'Why it opens there')).toBe(rowOf(frame, 'General') + 2)
+      expect(rowOf(frame, 'a row')).toBe(rowOf(frame, 'General') + 3)
     },
   },
   {
     node: 'SettingRow',
-    draws: 'the label then the control on one line, Saved after it, the error under it; a value set elsewhere draws where instead of a control; a device row says so',
+    draws: 'the label then the control on one line, Saved after it, the error and the help under it; a value set elsewhere draws where instead of a control; a device row says so',
     size: { width: 60, height: 8 },
     render: () => (
       <Stack>
@@ -314,6 +319,7 @@ const CASES: Case[] = [
         <SettingRow label="Command" error="Could not save"><Text>pnpm dev</Text></SettingRow>
         <SettingRow label="Setup" from=".acorn/config.toml"><Text>machine value</Text></SettingRow>
         <SettingRow label="Tool call display" scope="device"><Text>Folded</Text></SettingRow>
+        <SettingRow label="Idle stop" help="Frees memory"><Text>30 minutes</Text></SettingRow>
       </Stack>
     ),
     check: (frame) => {
@@ -323,6 +329,7 @@ const CASES: Case[] = [
       expect(lineWith(frame, 'Setup')).toContain('From .acorn/config.toml')
       lacks(frame, 'machine value')
       expect(lineWith(frame, 'Tool call display')).toContain('(this device)')
+      expect(rowOf(frame, 'Frees memory')).toBe(rowOf(frame, 'Idle stop') + 1)
     },
   },
   {
@@ -355,11 +362,12 @@ const CASES: Case[] = [
   },
   {
     node: 'Heading',
-    draws: 'eyebrow in dim uppercase, heading in bold',
-    render: () => <Heading eyebrow="task">fix login</Heading>,
+    draws: 'eyebrow in dim uppercase, heading in bold, help in grey under it',
+    render: () => <Heading eyebrow="task" help="what it fixes">fix login</Heading>,
     check: (frame) => {
       has(frame, 'TASK')
       expect(rowOf(frame, 'fix login')).toBe(rowOf(frame, 'TASK') + 1)
+      expect(rowOf(frame, 'what it fixes')).toBe(rowOf(frame, 'fix login') + 1)
     },
   },
   {
@@ -825,8 +833,11 @@ const CASES: Case[] = [
   {
     node: 'Field',
     draws: 'the label above its child',
-    render: () => <Field label="Title"><Text>a note</Text></Field>,
-    check: (frame) => expect(rowOf(frame, 'a note')).toBe(rowOf(frame, 'Title') + 1),
+    render: () => <Field label="Title" help="shown in the list"><Text>a note</Text></Field>,
+    check: (frame) => {
+      expect(rowOf(frame, 'a note')).toBe(rowOf(frame, 'Title') + 1)
+      expect(rowOf(frame, 'shown in the list')).toBe(rowOf(frame, 'a note') + 1)
+    },
   },
   {
     node: 'CopyButton',
@@ -1152,6 +1163,16 @@ const BEHAVIOURS: Behaviour[] = [
     },
   },
   {
+    node: 'ConfirmButton',
+    does: 'shows a written prompt as it is, with one question mark',
+    render: (record) => <ConfirmButton label="Delete" confirmLabel="Delete note?" onConfirm={() => record('confirm')} />,
+    drive: async (screen) => {
+      const armed = await screen.press('RETURN')
+      expect(armed.text).toContain('[Delete note?]')
+      expect(armed.text).not.toContain('??')
+    },
+  },
+  {
     node: 'CopyButton',
     does: 'copies on Enter',
     render: (record) => <CopyButton text={() => 'copied text'} onCopy={record} />,
@@ -1335,6 +1356,31 @@ const BEHAVIOURS: Behaviour[] = [
       const chosen = await open.press('RETURN')
       expect(pressed).toEqual(['chosen'])
       expect(chosen.text).not.toContain('choice')
+    },
+  },
+  {
+    node: 'Menu',
+    does: 'marks a chosen item, and stays open for a checkbox item',
+    render: (record) => (
+      <Menu ariaLabel="Menu" trigger={() => <Line>open me</Line>}>
+        {(context) => (
+          <>
+            <Menu.Item context={context} kind="radio" checked onSelect={() => record('list')}>List</Menu.Item>
+            <Menu.Separator />
+            <Menu.Item context={context} kind="checkbox" checked={false} onSelect={() => record('amend')}>Amend</Menu.Item>
+          </>
+        )}
+      </Menu>
+    ),
+    size: { width: 30, height: 8 },
+    drive: async (screen, pressed) => {
+      const open = await screen.press('RETURN')
+      expect(open.text).toContain('(•) List')
+      expect(open.text).toContain('[ ] Amend')
+      const moved = await open.press('ARROW_DOWN')
+      const chosen = await moved.press('RETURN')
+      expect(pressed).toEqual(['amend'])
+      expect(chosen.text).toContain('Amend')
     },
   },
   {

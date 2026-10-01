@@ -107,7 +107,7 @@ export function ConnectionPage(props: ConnectionPageProps) {
   // takes with it.
   const disconnect = async () => {
     const confirmed = await confirmAction({
-      title: `Disconnect ${connectionName(props.connection)}?`,
+      title: `Disconnect ${connectionName(props.connection)}`,
       actionLabel: 'Disconnect',
       goes: 'acorn deletes its stored credentials, its project links, the issues it cached, and the links from tasks to those issues.',
       stays: 'Your tasks and worktrees stay, and so does the account at the provider.',

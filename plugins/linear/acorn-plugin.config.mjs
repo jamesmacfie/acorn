@@ -159,7 +159,7 @@ export default {
       // `navigate`, matching the source above: an issue's detail belongs to the project, so picking a
       // row changes the URL and `linear-issue` draws beside the list.
       id: 'find-issue',
-      title: 'Linear: find an issue',
+      title: 'Find a Linear issue',
       hint: 'active issues in the Linear projects this repository follows',
       keywords: ['issue', 'ticket', 'linear'],
       category: 'navigation',

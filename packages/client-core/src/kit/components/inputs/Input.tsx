@@ -1,5 +1,5 @@
 import { For, Show, splitProps } from 'solid-js'
-import { assistAttrs, controlAttrs, type ControlOwn } from './controlAttrs'
+import { assistAttrs, claimField, controlAttrs, type ControlOwn } from './controlAttrs'
 
 /** The text-entry kinds a control may be. No `file`, no `range`, no `color`: each of those is a
  *  different control wearing an input's clothes. */
@@ -48,10 +48,11 @@ export function Input(props: InputProps) {
     ['onInput', 'onChange', 'onSubmit', 'onKeyDown', 'onPaste', 'onFocus', 'onBlur', 'ref'],
   )
   const listId = `ui-suggest-${++suggestionSeq}`
+  const field = claimField(own.id)
   return (
     <>
     <input
-      {...controlAttrs(own)}
+      {...controlAttrs(own, 'ui-input', field)}
       {...assistAttrs(own)}
       ref={rest.ref}
       name={own.name}

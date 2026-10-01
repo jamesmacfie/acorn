@@ -35,6 +35,7 @@ import {
 } from '../plugins/distribution'
 import { eligiblePlugins, isTaskPane } from '../plugins/contributions'
 import { clearSurfaceFailures, recordSurfaceFailure } from '../plugins/surfaceFailures'
+import { pluginLabel } from '../plugins/pluginLabel'
 import type { FrameBinding } from './broker'
 import { isHostOwnedSurface, paneLayoutFor, remoteRegionEntry } from './layouts'
 import { closePluginOverlay, pluginOverlayOpen } from './overlays'
@@ -554,7 +555,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
           id: closeId,
           command: closeId,
           description: `Close ${surface.label}`,
-          category: row.name,
+          category: pluginLabel(row),
           defaultChord: 'escape',
           when: 'typing-exempt',
           active: open,

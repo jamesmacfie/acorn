@@ -61,15 +61,15 @@ describe('ProjectSettings', () => {
   it('makes a value the repo sets read-only, names the file, and keeps this machine\'s value in view', async () => {
     mocks.response = { projectId: 'p-1', config: CONFIG, repoConfig: { runTargets: [{ id: 'dev', command: './scripts/dev.sh' }] } }
     mount()
-    await vi.waitFor(() => expect(rowNamed('Dev script')).toBeTruthy())
+    await vi.waitFor(() => expect(rowNamed('Command')).toBeTruthy())
 
-    const dev = rowNamed('Dev script')!
+    const dev = rowNamed('Command')!
     expect(dev.querySelector('.ui-setting-from')?.textContent).toBe('From .acorn/config.toml')
     expect(dev.querySelector('fieldset')?.disabled).toBe(true)
     expect(dev.textContent).toContain('./scripts/dev.sh')
     expect(dev.querySelector('textarea')?.value).toBe('pnpm dev')
     // A value the repo leaves alone stays editable.
-    const setup = rowNamed('Worktree setup script')!
+    const setup = rowNamed('Setup script')!
     expect(setup.querySelector('.ui-setting-from')).toBeNull()
     expect(setup.querySelector('fieldset')?.disabled).toBe(false)
   })

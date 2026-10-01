@@ -63,6 +63,9 @@ const draw = (file: AgentAttachment): string => {
     () => <AttachmentSlot attachment={file} taskId="t1" sessionId="s1" onRemove={() => {}} onReplace={async () => {}} />,
     host,
   )
+  // Each remove control reads as one ✕, whether it is the chip's own or the one outside the slot:
+  // both draw the `x` icon, which has no text of its own.
+  for (const remove of host.querySelectorAll('button[aria-label^="Remove"]')) remove.append('✕')
   const text = host.textContent ?? ''
   dispose()
   host.remove()

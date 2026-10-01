@@ -20,6 +20,7 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
   let runTargets: ReturnType<typeof createRuntimeService> | null = null
   return {
     name: 'terminal',
+    label: 'Terminal',
     required: true,
     emits: [{ verb: 'completed', description: 'A task agent terminal exited with bounded input available for a short read window' }],
     // This module's own URL: the chain sits at plugins/terminal/migrations beside it, and the host owns
@@ -90,7 +91,7 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
             ? {
               id: 'running',
               severity: 'warn' as const,
-              message: `${running} active session${running === 1 ? '' : 's'}`,
+              message: `${running} terminal${running === 1 ? ' is' : 's are'} still running`,
             }
             : null
         },

@@ -15,6 +15,7 @@ const NO_CONTRIBUTIONS = {
 }
 const installed = (id: string, over: Partial<InstalledPluginInfo> = {}): InstalledPluginInfo => ({
   id,
+  label: `Plugin ${id}`,
   version: '1.0.0',
   apiVersion: '1',
   permissions: NO_PERMISSIONS,
@@ -25,7 +26,7 @@ const installed = (id: string, over: Partial<InstalledPluginInfo> = {}): Install
   ...over,
 })
 const activeSnapshot = (id: string, version: string): ActivePluginSnapshot => {
-  const { id: _id, hasNode: _hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...identity } = installed(id, { version })
+  const { id: _id, label: _label, hasNode: _hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...identity } = installed(id, { version })
   return { id, identity: { ...identity, activation: 'node' }, bundle: null }
 }
 
@@ -101,6 +102,27 @@ describe('pluginState', () => {
       state: 'active',
       emits: [{ verb: 'pr-synced', description: 'A pull request mirror changed' }],
     })
+  })
+
+  it('names each plugin for people, from its definition or its manifest', () => {
+    const result = pluginState(bridge({
+      roster: [
+        { name: 'github', label: 'GitHub', required: false, disabled: false, state: 'active' },
+        { name: 'ntfy', required: false, disabled: false, state: 'active' },
+        { name: 'bare', required: false, disabled: false, state: 'active' },
+      ],
+      installed: [installed('ntfy'), installed('fresh')],
+      booted: [{ id: 'ntfy', version: '1.0.0' }],
+    }))
+    expect(row(result, 'github')?.label).toBe('GitHub')
+    expect(row(result, 'ntfy')?.label).toBe('Plugin ntfy')
+    expect(row(result, 'fresh')?.label).toBe('Plugin fresh')
+    // No name to give, so the key is absent and the client falls back to the id.
+    expect(row(result, 'bare')).not.toHaveProperty('label')
+    // The label rides the row, never the declaration, so a rename cannot read as a different package.
+    expect(row(result, 'ntfy')?.installed).not.toHaveProperty('label')
+    expect(row(result, 'ntfy')?.active).not.toHaveProperty('label')
+    expect(row(result, 'ntfy')?.state).toBe('active')
   })
 
   it('raises the banner for a plugin turned off but still serving', () => {

@@ -61,7 +61,7 @@ export const createAnthropicProviders = (
         label: 'API key',
         type: 'password',
         placeholder: 'sk-ant-…',
-        hint: 'Claude Console → API keys. The key stays encrypted on this Mac.',
+        hint: 'Claude Console → API keys. acorn stores it encrypted.',
         required: true,
       }],
       async validate(credentials) {

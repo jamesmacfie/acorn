@@ -26,7 +26,7 @@ offers the topbar project picker while the source is on screen. It is opt in, so
 before the field and a plugin that never thought about projects both get one shared list instead of
 an identical one refetched per project (docs/frontend.md § the router is registry-driven). A source may declare `showInRailByDefault: false` to start with no desktop rail icon. It is a default, not a gate: the source still registers, the palette offers **Open <label>** for it, and the user's **Show in left rail** switch under Settings > Plugins overrides it (docs/frontend.md § Registries and plugins). A source may also declare an `emptyState` — one bounded message and at most
 one context-free action — shown when its route answered with *no items*, in place of the host's fixed
-"Nothing here yet.". Not when the fetch failed: an unreachable node already has its own banner, and
+"Nothing to show.". Not when the fetch failed: an unreachable node already has its own banner, and
 telling someone "nothing is assigned to you" because a request timed out is a claim the host has no
 business making on a plugin's behalf. It is deliberately no richer than a sentence and a button; the
 field exists because a rail that cannot say what empty *means* pushes sources into showing a wrong

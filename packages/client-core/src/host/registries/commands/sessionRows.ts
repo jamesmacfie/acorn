@@ -38,8 +38,8 @@ export const searchRows = (
   select: (result: SessionSearchResult) => Promise<CommandOutcome | void> | CommandOutcome | void,
 ): SessionRow[] => {
   const failures: SessionRow[] = state.errors.map((error, at) => ({
-    id: `error:${error.source}:${at}`,
-    label: `${error.source}: ${error.message}`,
+    id: `error:${error.source ?? 'search'}:${at}`,
+    label: `Couldn't search${error.source ? ` ${error.source}` : ''}. ${error.message}`,
     action: { effect: 'none' },
   }))
   const found: SessionRow[] = state.results.map((result) => ({

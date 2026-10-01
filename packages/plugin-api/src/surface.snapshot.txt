@@ -179,6 +179,7 @@ client: focusSession
 client: focusedPane
 client: forgetAttentionSource
 client: formatBytes
+client: formatChord
 client: formatFileReference
 client: formatRelativeTime
 client: formatSize
@@ -225,6 +226,7 @@ client: pathForTask
 client: persistDraft
 client: pickFiles
 client: pickFolder
+client: pluginLabel
 client: postJson
 client: prefsOptions
 client: previewUrlForClient

@@ -1,6 +1,7 @@
 import { onMount } from 'solid-js'
 import Picker from './Picker'
 import Icon from '../content/Icon'
+import { IconButton } from './IconButton'
 import { iconNames, loadIconNodes } from '../../tokens/iconNodes'
 import { fuzzyScore } from '../../lib/controls/fuzzy'
 
@@ -22,6 +23,12 @@ const LEAD = [
 export const randomIconName = (): string => {
   const names = iconNames()
   return names[Math.floor(Math.random() * names.length)]
+}
+
+// A Lucide name read as words: "flask-conical" is "Flask conical". Typing still matches the name.
+const iconWords = (name: string): string => {
+  const words = name.replace(/-/g, ' ')
+  return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
 export default function IconPicker(props: {
@@ -51,29 +58,19 @@ export default function IconPicker(props: {
   return (
     <Picker<string>
       label={<Icon name={props.value ?? props.fallback} />}
+      ariaLabel="Task icon"
       placeholder="Filter icons…"
       emptyText="No icon matches."
       results={results}
-      rowLabel={(name) => name}
+      rowLabel={iconWords}
       isActive={(name) => name === props.value}
       onSelect={props.onSelect}
       leading={(name) => <Icon name={name} />}
       disabled={props.disabled}
       tools={
         <>
-          <button type="button" class="repo-picker-refresh" title="Random icon" aria-label="Random icon" onClick={() => props.onSelect(randomIconName())}>
-            <Icon name="dices" />
-          </button>
-          <button
-            type="button"
-            class="repo-picker-refresh"
-            title="Use the default icon"
-            aria-label="Use the default icon"
-            disabled={!props.value}
-            onClick={() => props.onSelect(null)}
-          >
-            <Icon name="rotate-ccw" />
-          </button>
+          <IconButton icon="dices" label="Random icon" onPress={() => props.onSelect(randomIconName())} />
+          <IconButton icon="rotate-ccw" label="Use the default icon" disabled={!props.value} onPress={() => props.onSelect(null)} />
         </>
       }
     />

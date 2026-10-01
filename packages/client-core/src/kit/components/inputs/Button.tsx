@@ -14,11 +14,16 @@ type Tipped = {
   tipKey?: string
 }
 
-const tipAttrs = (own: Tipped) => ({
-  'data-tip': own.tip,
-  'data-tip-sub': own.tip ? own.tipSub : undefined,
-  'data-tip-key': own.tip ? own.tipKey : undefined,
-})
+// `title` becomes the app's tip when no `tip` is given, so a button never shows the browser's own
+// tooltip beside the styled one.
+const tipAttrs = (own: Tipped & { title?: string }) => {
+  const text = own.tip ?? own.title
+  return {
+    'data-tip': text,
+    'data-tip-sub': text ? own.tipSub : undefined,
+    'data-tip-key': text ? own.tipKey : undefined,
+  }
+}
 
 /* Button: the action buttons only. Rows, tabs, tree nodes and popover triggers that happen to be
    <button> belong to Row, Tabs, or Picker instead. */
@@ -33,7 +38,8 @@ export type ButtonProps = Tipped & {
   iconOnly?: boolean
   busy?: boolean
   disabled?: boolean
-  /** The long form of the label, on hover. `tip` is the richer one; this is the browser's. */
+  /** The long form of the label, on hover. Drawn as the tip when `tip` is not given; kept because
+   *  plugins pass it. */
   title?: string
   /** Submits the form it sits in. A button that is not told to submit does not. */
   submit?: boolean
@@ -74,7 +80,6 @@ const buttonAttrs = (own: ButtonProps) => ({
   'aria-expanded': own.expanded,
   'aria-describedby': own.describedBy,
   id: own.id,
-  title: own.title,
   hidden: own.hidden,
 })
 
@@ -84,11 +89,13 @@ export function Button(props: ButtonProps) {
   // icon button's mark twice.
   const content = children(() => props.children)
   // The label doubles as the visible text, so a call site that has only words never writes them
-  // twice.
+  // twice. A remote tree hands every node its children as a list, empty when there are none, and an
+  // empty list is truthy, so "has content" means a child that draws something.
+  const hasContent = () => content.toArray().some((child) => child != null && child !== '' && typeof child !== 'boolean')
   const body = () => (
     <>
       <Show when={props.busy}><Spinner size="sm" /></Show>
-      <Show when={content()} fallback={props.label}>{content()}</Show>
+      <Show when={hasContent()} fallback={props.label}>{content()}</Show>
     </>
   )
   return (

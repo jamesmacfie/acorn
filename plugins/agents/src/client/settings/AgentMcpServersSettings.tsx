@@ -106,7 +106,7 @@ export default function AgentMcpServersSettings(props: { context?: PageContext }
 
   const remove = async (name: string) => {
     const confirmed = await confirmAction({
-      title: `Remove ${name}?`,
+      title: `Remove ${name}`,
       actionLabel: 'Remove server',
       goes: `The server ${name} and its stored secrets. Every session drops it the next time it starts, open ones included.`,
       stays: "Servers set up in a CLI's own config files.",
@@ -263,7 +263,7 @@ function ServerEditor(props: {
   const back = () => {
     if (!dirty()) return props.onCancel()
     void confirmAction({
-      title: 'Discard unsaved changes?',
+      title: 'Discard unsaved changes',
       actionLabel: 'Discard changes',
       goes: 'The changes to this server that are not saved yet.',
       stays: props.draft.existing ? 'The server as it was last saved.' : undefined,

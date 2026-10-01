@@ -127,7 +127,7 @@ export default function HttpVariables(props: { client: HttpClient; projectId: st
                   size="sm"
                   title={`Delete ${row().name}`}
                   label="Delete"
-                  confirmLabel="Confirm delete"
+                  confirmLabel="Delete variable?"
                   skipConfirm={!row().id}
                   onConfirm={() => void remove(index)}
                 ><Icon name="trash-2" /></ConfirmButton>

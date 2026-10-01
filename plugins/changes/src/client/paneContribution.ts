@@ -10,7 +10,7 @@ const ChangesFooter = lazy(async () => ({ default: (await import('./ChangesPane'
 const ChangesDiff = lazy(async () => ({ default: (await import('./ChangesPane')).ChangesDiff }))
 
 export const changesPaneContribution: PaneLayoutContribution<ChangesModel> = {
-  id: 'changes', label: 'Changes', glyph: 'git-compare', description: 'Uncommitted working tree', order: 20,
+  id: 'changes', label: 'Changes', glyph: 'git-compare', description: 'Files changed since your last commit', order: 20,
   defaultChord: 'meta+shift+g', requires: { plugin: 'changes' },
   layout: 'list-detail',
   // The change list, the selection, the diff source and the armed commit confirm, held once per task

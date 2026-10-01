@@ -23,7 +23,7 @@ import { galleryCards, providerAsks, type GalleryCard } from './connections'
 // A provider at its `maxConnections` stays in the gallery, marked as connected, and its card opens the
 // connection. Hiding it left the reader looking for a provider that was already there.
 //
-// The steps are what the descriptor asks for. Typed fields are a form with Save and Cancel, and
+// The steps are what the descriptor asks for. Typed fields are a form with Connect and Cancel, and
 // anything typed counts as unsaved. A device-flow provider shows the code to enter at the provider, and
 // a code that is still waiting counts as unsaved too, because leaving stops the polling that would
 // finish it. The fields, the write and the pacing live in ../../integrations/, because first-run
@@ -144,7 +144,7 @@ export function AddConnection(props: AddConnectionProps) {
                     )}
                   </For>
                   <Inline>
-                    <Button onPress={() => void form.submit()} disabled={form.busy() || !form.complete()}>{form.busy() ? 'Saving…' : 'Save'}</Button>
+                    <Button variant="solid" tone="accent" busy={form.busy()} disabled={!form.complete()} onPress={() => void form.submit()}>Connect</Button>
                     <Button variant="ghost" onPress={backToGallery} disabled={form.busy()}>Cancel</Button>
                   </Inline>
                 </>

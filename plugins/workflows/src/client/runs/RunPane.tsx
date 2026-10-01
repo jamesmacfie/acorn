@@ -175,7 +175,7 @@ export function RunPaneFooter(props: { task: Task; model: RunPaneModel }) {
               <ConfirmButton
                 size="sm"
                 tone="danger"
-                confirmLabel="Cancel this run and its child runs?"
+                confirmLabel="Cancel run?"
                 disabled={model.busy()}
                 onConfirm={() => void model.cancel()}
               >

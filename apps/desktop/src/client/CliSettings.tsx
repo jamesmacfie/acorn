@@ -1,7 +1,16 @@
 import { createResource, createSignal, Show } from 'solid-js'
-import { cliInstaller } from '@acorn/client-core/infra/platform'
-import { Button } from '@acorn/client-core/kit/components/primitives.tsx'
+import { cliInstaller, type CliInstallState } from '@acorn/client-core/infra/platform'
+import { Button, EmptyState } from '@acorn/client-core/kit/components/primitives.tsx'
+import { Text } from '@acorn/client-core/kit/components/content'
 import { SettingRow, SettingsSection } from '@acorn/client-core/kit/components/layout'
+
+// What the install button says, by what is at the location. Undefined when there is nothing to
+// press: another program holds the name, or the location could not be read.
+const actionLabel = (state: CliInstallState): string | undefined => {
+  if (state.installed) return 'Installed'
+  if (!state.available) return undefined
+  return state.outdated ? 'Update the acorn command' : 'Add acorn to PATH'
+}
 
 // The desktop owns the local command location and packaged runtime. The Node selected in the UI is
 // unrelated: a shell command chooses its Node when it runs, through the CLI's custody store.
@@ -37,19 +46,29 @@ export default function CliSettings() {
     <SettingsSection
       id="command"
       label="acorn command"
-      description="Install the headless acorn command in a directory on your login shell PATH. It uses this app's CLI and Node runtime. Development builds use the current checkout."
+      description="Run acorn from your terminal."
+      help="Adds an acorn command to a folder on your shell's PATH. It runs with this app, so it stays in step when the app updates."
     >
-      <Show when={installer} fallback={<p class="muted">Command installation is available in the desktop app.</p>}>
-        <Show when={status()} fallback={<p class="muted">{error() || 'Checking the command location…'}</p>}>
+      <Show when={installer} fallback={<EmptyState align="start" size="sm">Command installation is available in the desktop app.</EmptyState>}>
+        <Show
+          when={status()}
+          fallback={
+            <Show when={error()} fallback={<EmptyState align="start" size="sm" busy>Checking…</EmptyState>}>
+              {(message) => <Text tone="danger" wrap>{message()}</Text>}
+            </Show>
+          }
+        >
           {(current) => (
-            <SettingRow label="Command location" layout="stacked" error={error() || undefined}>
-              <Show when={current().location}><code>{current().location}</code></Show>
+            <SettingRow label="Location" layout="stacked" error={error() || undefined}>
+              <Show when={current().location}>{(location) => <Text emphasis="mono" wrap>{location()}</Text>}</Show>
               {/* A status rather than the row's description, so a screen reader hears it change
                   after an install. */}
-              <span class="muted" role="status">{current().message}</span>
-              <Button onPress={() => void install()} disabled={!current().available || current().installed} busy={busy()}>
-                {current().installed ? 'Installed' : 'Add acorn to PATH'}
-              </Button>
+              <div role="status"><Text emphasis="muted" wrap>{current().message}</Text></div>
+              <Show when={actionLabel(current())}>
+                {(label) => (
+                  <Button onPress={() => void install()} disabled={current().installed} busy={busy()}>{label()}</Button>
+                )}
+              </Show>
             </SettingRow>
           )}
         </Show>

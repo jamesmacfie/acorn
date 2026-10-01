@@ -49,7 +49,7 @@ export default function AgentUsageIndicator() {
         </Button>
       )}
     >
-      <AgentUsageSection showHeader={false} />
+      <AgentUsageSection />
     </Popover>
   )
 }

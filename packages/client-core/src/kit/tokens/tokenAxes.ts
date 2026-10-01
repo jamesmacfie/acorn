@@ -53,13 +53,13 @@ export const STYLE_TOKENS = [
   // space
   '--space-0', '--space-1', '--space-2', '--space-3', '--space-4', '--space-5',
   '--space-6', '--space-7', '--space-8', '--space-9', '--space-10', '--space-11',
-  '--pane-pad', '--pane-pad-y', '--pane-measure',
+  '--pane-pad', '--pane-pad-y', '--pane-measure', '--page-measure',
   '--gap-inline', '--gap-row', '--gap-stack', '--gap-section',
   '--pad-control', '--pad-control-lg', '--pad-chip', '--pad-cell', '--pad-surface', '--pad-body',
   // density
   '--row-h', '--row-h-sm', '--row-h-virt', '--control-h', '--control-h-sm', '--control-h-xs',
   '--topbar-h', '--pane-head-h', '--tab-h', '--tabrail-w', '--task-footer-h',
-  '--listdetail-w', '--listdetail-w-narrow', '--listdetail-w-wide',
+  '--listdetail-w', '--listdetail-w-narrow', '--listdetail-w-wide', '--setting-control-w',
   '--icon-size', '--icon-box', '--avatar-sm', '--avatar-md', '--diff-line-h', '--term-fs',
   // typography
   '--font-mono', '--font-ui', '--font-glyph', '--font-display',
@@ -73,7 +73,7 @@ export const STYLE_TOKENS = [
   '--shadow-drawer-l', '--shadow-drawer-l-sm',
   '--elev-popover', '--elev-menu', '--elev-modal', '--elev-drawer', '--elev-panel',
   '--elev-card', '--elev-pane', '--elev-row-hover',
-  '--ring', '--focus-ring-w', '--focus-ring-offset', '--focus-ring-style',
+  '--ring', '--ring-highlight', '--focus-ring-w', '--focus-ring-offset', '--focus-ring-style',
   '--scrim-alpha', '--scrim', '--scrim-filter',
   '--card-bg', '--pane-bg', '--popover-bg', '--input-bg', '--chip-bg',
   '--shell-pad', '--pane-gap', '--pane-radius',

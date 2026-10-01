@@ -56,12 +56,26 @@ export function mountFrameTips(doc: Document = document): () => void {
       subRow.textContent = sub
       bubble.append(subRow)
     }
-    // Inside a frame the viewport is the frame, so there is no rail to fly around: always right.
+    // A help mark's explanation draws at body weight in a wider bubble (tips.css).
+    if (element.getAttribute('data-tip-kind') === 'help') bubble.dataset.kind = 'help'
+    else delete bubble.dataset.kind
+    // Inside a frame the viewport is the frame, so there is no rail to fly around: right, unless the
+    // bubble would run past the frame's right edge. The same fit as the host's tips.tsx.
     const rect = element.getBoundingClientRect()
     bubble.style.left = `${rect.right + 8}px`
     bubble.style.right = ''
     bubble.style.top = `${rect.top + rect.height / 2}px`
     bubble.hidden = false
+    const view = doc.defaultView
+    if (!view) return
+    const margin = 8
+    const { offsetWidth: width, offsetHeight: height } = bubble
+    if (rect.right + 8 + width > view.innerWidth - margin && rect.left - 8 - width >= margin) {
+      bubble.style.left = ''
+      bubble.style.right = `${view.innerWidth - rect.left + 8}px`
+    }
+    const middle = Math.max(margin + height / 2, Math.min(rect.top + rect.height / 2, view.innerHeight - margin - height / 2))
+    bubble.style.top = `${middle}px`
   }
 
   const onOver = (event: Event) => {

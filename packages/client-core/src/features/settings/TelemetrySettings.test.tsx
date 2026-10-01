@@ -75,11 +75,11 @@ describe('Settings → Telemetry', () => {
 
   it('shows what has been collected, per owner and kind, and who is reading it', () => {
     const text = host.textContent ?? ''
-    expect(text).toContain('built 452 records so far')
-    expect(text).toContain('core')
+    expect(text).toContain('Collecting. 452 records since the node started')
+    expect(text).toContain('acorn')
     expect(text).toContain('github')
     expect(text).toContain('412')
-    expect(text).toContain('Read by: sentry-telemetry')
+    expect(text).toContain('Sent to sentry-telemetry')
   })
 
   it('says nothing is collected when no plugin is reading, even with the switch on', () => {
@@ -88,14 +88,14 @@ describe('Settings → Telemetry', () => {
     mocks.summary.data = { ...SUMMARY, collecting: false, sinks: [], records: [] }
     mount()
     const text = host.textContent ?? ''
-    expect(text).toContain('Nothing is being collected')
-    expect(text).toContain('no plugin has asked to read the stream')
-    expect(text).toContain('Read by: nobody')
+    expect(text).toContain('Not collecting')
+    expect(text).toContain('No plugin is set up to receive it')
+    expect(text).toContain('Sent to nothing')
   })
 
   it('waits for the node rather than drawing zeros', () => {
     mocks.summary.data = undefined
     mount()
-    expect(host.textContent).toContain('Asking the node')
+    expect(host.textContent).toContain('Loading…')
   })
 })

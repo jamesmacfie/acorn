@@ -182,7 +182,19 @@ only value, since no page has needed another. `onReset` is a shell-side handler:
 twelve events, so a remote tree's Reset is dropped on the way, the way `onInput` is. A section's `id`
 is an anchor rather than an element id, because two pages can each have a `general` section and a
 document holds one element per id. The settings view finds it inside the page it drew, to scroll to
-a search result and mark it. On a terminal a row whose value is set elsewhere says where and draws
+a search result and mark it. `description` holds only what a person needs to choose right now, and
+`help` holds how it works or why it exists, behind a "?" after the label (docs/ui-design.md § The
+help mark). A `help` string reaches an older acorn as a prop it ignores, so the explanation goes
+missing there and nothing breaks.
+
+A row's label is a `<label for>` its one control, so clicking **Play a sound** flips the switch
+beside it. `Field` does the same for its caption, and links its hint, error, and help to the control
+by `aria-describedby`, rather than wrapping all of them in one `<label>`, which made the hint and any
+error part of the control's name. The control claims the id itself through a small context in
+`kit/components/inputs/controlAttrs.ts`: `Input`, `Textarea`, `Select`, `Picker`, and a `Checkbox`
+without words of its own call `claimField`. A second claim means the host holds several controls, so
+the label names none of them, each keeps its own name, and the row stays a `role="group"`. A caller
+never writes the id. On a terminal a row whose value is set elsewhere says where and draws
 no control, because that host has no read-only form of an arbitrary child, which is the `reduced`
 level and the loss written beside it.
 

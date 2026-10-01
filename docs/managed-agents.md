@@ -939,8 +939,8 @@ search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
 | Find an agent session | search, task-scoped | The node's own search over session titles, events, and artifacts, asked about the task the palette session captured |
 | New Claude Code terminal | action, needs an open task | Creates a terminal on this plugin's `claude-code` profile, opens the drawer, and focuses it |
 | New Codex terminal | action, needs an open task | The same for the `codex` profile |
-| Carry the last session's model forward | setting, no scope | On and Off over `followLastSession` (section New-session defaults) |
-| How a tool call starts out | setting, no scope | The three Tool call display choices: start collapsed, start expanded, and carry my last one forward |
+| Start new sessions with my last model | setting, no scope | On and Off over `followLastSession` (section New-session defaults) |
+| Tool call display | setting, no scope | The three Tool call display choices: start collapsed, start expanded, and carry my last one forward |
 | Agent session | group, task-scoped | Fork, retry, compact, continue in terminal, regenerate title, rename, the two exports and archive — the open session's ••• menu, while the pane is on screen |
 
 The JSON session export includes `version: 1` and `baseline: "acorn-1"` alongside its snapshot.

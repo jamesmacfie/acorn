@@ -13,9 +13,10 @@ import { ContributionBoundary } from '../../kit/components/content/ContributionB
 // eslint-disable-next-line no-unused-vars -- used by the `use:paneFocus` directive on the pane element.
 import { paneFocus } from './paneFocus'
 import { dispatchLayout, layoutForTask, maximizedPane, setMaximizedPane } from './tasks'
-import { defaultLayout, type LayoutAction } from './taskLayout'
+import { applyLayoutAction, defaultLayout, type LayoutAction, type TaskLayout } from './taskLayout'
 import { formatChord } from './paneShortcuts'
-import { Button, EmptyState } from '../../kit/components/primitives'
+import { EmptyState } from '../../kit/components/primitives'
+import { IconButton } from '../../kit/components/inputs/IconButton'
 import { RailTab } from '../tabs/RailTab'
 import { createSplitDrag } from '../../kit/lib/layout/split'
 import PaneSwitcher from './PaneSwitcher'
@@ -32,18 +33,29 @@ export default function TaskPaneHost(props: {
   closing?: boolean // archive/teardown in flight → the close button shows a spinner
   shortcutFor?: (id: string) => string | null | undefined
 }) {
-  const layout = () => layoutForTask(props.task.id) ?? defaultLayout()
-  const dispatch = (action: LayoutAction) => dispatchLayout(props.task.id, action)
+  const stored = () => layoutForTask(props.task.id) ?? defaultLayout()
   const switcherPanes = () => paneContributions().filter((pane) => pane.showInSwitcher !== false && paneAvailable(pane, props.task))
+  const chosenPanes = () => stored().panes.flatMap((id) => {
+    const pane = paneContribution(id)
+    return pane && paneAvailable(pane, props.task) ? [pane] : []
+  })
+  // A layout can name only panes this task cannot show: DEFAULT_PANE is the PR pane, and a task on a
+  // project with no GitHub remote has no PR. Then the task draws the first pane it does offer, and
+  // `layout()` is the layout as drawn, so the switcher marks that pane and add, close, and pin act on
+  // it. The repair is written only when the person acts (`dispatch`), never from render, because a
+  // render can run before the saved layouts have loaded and would overwrite them.
+  const fallbackPane = () => (chosenPanes().length ? undefined : switcherPanes()[0])
+  const layout = (): TaskLayout => {
+    const fallback = fallbackPane()
+    return fallback ? { ...stored(), panes: [fallback.id] } : stored()
+  }
+  const dispatch = (action: LayoutAction) => dispatchLayout(
+    props.task.id,
+    fallbackPane() ? { type: 'replace', layout: applyLayoutAction(layout(), action) } : action,
+  )
   const registeredLayoutPanes = () => {
-    const chosen = layout().panes.flatMap((id) => {
-      const pane = paneContribution(id)
-      return pane && paneAvailable(pane, props.task) ? [pane] : []
-    })
-    // A layout can name a pane this task cannot show: DEFAULT_PANE is the PR pane, and a task on a
-    // project with no GitHub remote has no PR. Fall back to the first pane the task does offer, so
-    // the empty state below means what it says.
-    return chosen.length ? chosen : switcherPanes().slice(0, 1)
+    const fallback = fallbackPane()
+    return fallback ? [fallback] : chosenPanes()
   }
   const visiblePanes = () => {
     const panes = registeredLayoutPanes()
@@ -57,7 +69,7 @@ export default function TaskPaneHost(props: {
       label: pane.label,
       description: pane.description,
       icon: pane.glyph,
-      shown: layout().panes.includes(pane.id),
+      shown: registeredLayoutPanes().some((drawn) => drawn.id === pane.id),
       pinned: isPinned(pane.id),
       shortcut: props.shortcutFor?.(`pane.show.${pane.id}`)
         ? formatChord(props.shortcutFor(`pane.show.${pane.id}`)!)
@@ -121,10 +133,7 @@ export default function TaskPaneHost(props: {
           each={visiblePanes()}
           fallback={
             <section class="pane pane-empty workspace-empty contribution-unavailable">
-              <EmptyState title="No panes available here">
-                This layout's panes are all unavailable in the current environment. Choose another
-                from the pane switcher.
-              </EmptyState>
+              <EmptyState title="No pane to show">Pick one from the bar on the right.</EmptyState>
             </section>
           }
         >
@@ -148,22 +157,23 @@ export default function TaskPaneHost(props: {
                   <Show when={nodeFreshness() !== 'live'}>
                     <NodeChip nodeId={activeNodeId() ?? ''} compact />
                   </Show>
-                  <Button
-                    variant="bare"
-                    tip={isPinned(pane.id) ? 'Unpin pane' : 'Pin pane'}
+                  <IconButton
+                    size="xs"
+                    icon={isPinned(pane.id) ? 'pin-off' : 'pin'}
+                    tip={isPinned(pane.id) ? 'Unpin' : 'Keep open'}
+                    tipSub="A pinned pane stays when you switch panes."
                     label={isPinned(pane.id) ? `Unpin ${pane.label}` : `Pin ${pane.label}`}
                     pressed={isPinned(pane.id)}
                     onPress={() => dispatch({ type: 'pin', pane: pane.id })}
-                  >
-                    {isPinned(pane.id) ? '◆' : '◇'}
-                  </Button>
-                  <Show when={layout().panes.length > 1 || isPinned(pane.id)}>
-                    <Button
-                      variant="bare"
-                      tip={isPinned(pane.id) ? 'Unpin pane before closing' : 'Close pane'}
+                  />
+                  <Show when={registeredLayoutPanes().length > 1 || isPinned(pane.id)}>
+                    <IconButton
+                      size="xs"
+                      icon="x"
+                      tip={isPinned(pane.id) ? 'Unpin to close' : 'Close pane'}
                       label={isPinned(pane.id) ? `Unpin ${pane.label}` : `Close ${pane.label}`}
                       onPress={() => dispatch({ type: 'close', pane: pane.id })}
-                    >✕</Button>
+                    />
                   </Show>
                 </div>
                 <ContributionBoundary contributionId={pane.id} owner={paneRegistry.ownerOf(pane.id)}>
@@ -197,11 +207,11 @@ export default function TaskPaneHost(props: {
           {(close) => (
             <RailTab
               class="tabrail-bottom"
-              label="Close task"
+              label="Archive task"
               glyph="x"
               tone="danger"
               busy={props.closing}
-              busyLabel="Removing…"
+              busyLabel="Archiving…"
               onClick={() => close()()}
             />
           )}

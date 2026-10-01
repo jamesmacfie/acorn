@@ -96,7 +96,7 @@ export const terminalCommands: readonly ContributedCommand[] = [
     id: TERMINAL_GROUP,
     kind: 'group',
     title: 'Run',
-    hint: 'run targets, layout recipes and the terminals in this task',
+    hint: 'run commands and open terminals in this task',
     category: 'terminal',
     palette: true,
     scope: 'task',

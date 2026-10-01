@@ -3,6 +3,9 @@ import { Portal } from 'solid-js/web'
 import { createAnchoredPopover, type Placement } from '../../lib/controls/anchor'
 import PickerRow from './PickerRow'
 import { Button } from './Button'
+import { ConfirmButton } from './ConfirmButton'
+import Icon from '../content/Icon'
+import { claimField, FieldProvider, NO_FIELD } from './controlAttrs'
 import type { Size } from '../../tokens/tokens'
 
 // Searchable popover picker: a button showing the current value opens a filter input + scrollable
@@ -45,8 +48,11 @@ export type PickerProps<T> = {
   /** Search text as it changes. Metadata-backed pickers use this to request another bounded option
    *  page; record previews must never hang off it. Callback props are compiled-client only. */
   onSearch?: (query: string) => void
-  /** A removable row's control was pressed, by id. */
+  /** A removable row's control was pressed twice, by id. */
   onRemove?: (id: string) => void
+  /** The remove control's name, such as "Remove query". It arms on the first press and asks
+   *  "Remove query?". Defaults to "Remove". */
+  removeLabel?: string
   results?: (query: string) => T[]
   rowLabel?: (item: T) => string
   rowDescription?: (item: T) => string | undefined
@@ -66,6 +72,8 @@ export type PickerProps<T> = {
 
 export default function Picker<T>(props: PickerProps<T>) {
   const [filter, setFilter] = createSignal('')
+  // The trigger takes the caption of the field or setting row it sits in, as a select does.
+  const field = claimField()
   let rootRef: HTMLDivElement | undefined
   let inputRef: HTMLInputElement | undefined
 
@@ -124,6 +132,8 @@ export default function Picker<T>(props: PickerProps<T>) {
           button stood 6px taller than it wherever the two met. */}
       <Button
         label={props.ariaLabel}
+        id={field?.id}
+        describedBy={field?.describedBy()}
         size={props.size}
         opens="listbox"
         expanded={open()}
@@ -136,6 +146,8 @@ export default function Picker<T>(props: PickerProps<T>) {
         </span>
       </Button>
       <Show when={open()}>
+        {/* A control a caller puts in `tools` is not the one the caption names. */}
+        <FieldProvider value={NO_FIELD}>
         <Portal>
           <div
             ref={(el) => popover.setSurface(el)}
@@ -167,7 +179,19 @@ export default function Picker<T>(props: PickerProps<T>) {
                       active={row.active}
                       disabled={row.disabled}
                       leading={row.removable
-                        ? <Button variant="bare" size="sm" tone="danger" label="Remove" onPress={() => props.onRemove?.(row.id)}>✕</Button>
+                        ? (
+                          <ConfirmButton
+                            variant="bare"
+                            size="xs"
+                            iconOnly
+                            label={props.removeLabel ?? 'Remove'}
+                            tip={props.removeLabel ?? 'Remove'}
+                            confirmLabel={`${props.removeLabel ?? 'Remove'}?`}
+                            onConfirm={() => props.onRemove?.(row.id)}
+                          >
+                            <Icon name="x" />
+                          </ConfirmButton>
+                        )
                         : props.leading?.((props.results?.(filter()) ?? [])[index()] as T)}
                       onSelect={() => choose(row)}
                     />
@@ -177,6 +201,7 @@ export default function Picker<T>(props: PickerProps<T>) {
             </Show>
           </div>
         </Portal>
+        </FieldProvider>
       </Show>
     </div>
   )

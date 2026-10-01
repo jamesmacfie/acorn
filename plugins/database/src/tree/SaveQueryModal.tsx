@@ -74,7 +74,7 @@ export default function SaveQueryModal(props: {
         </Show>
       </ModalBody>
       <ModalActions>
-        <Button disabled={busy()} onPress={props.onDismiss}>Cancel</Button>
+        <Button variant="ghost" disabled={busy()} onPress={props.onDismiss}>Cancel</Button>
         <Button variant="solid" disabled={busy() || !name().trim()} onPress={() => void submit()}>
           {busy() ? 'Saving…' : overwrites() ? 'Overwrite' : 'Save'}
         </Button>

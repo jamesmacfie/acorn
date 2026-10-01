@@ -110,7 +110,7 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
       <SettingsSection
         id="harnesses"
         label="Harnesses"
-        description="The agent CLIs this node can run a session on. A plugin can add one, and it shows here as well."
+        help="The agent command-line tools this computer can run. Plugins can add more."
       >
         <For each={providers() ?? []} fallback={<Text emphasis="muted">{providers.loading ? 'Loading harnesses…' : 'No harnesses on this node.'}</Text>}>
           {(provider) => (
@@ -124,7 +124,7 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
       <SettingsSection id="usage" label="Usage limits">
         <SettingRow
           label="Continue when usage resets"
-          description="If an agent stops because its plan usage is exhausted and reports a reset time, Acorn keeps the turn queued and continues it after that time."
+          help="If an agent runs out of plan usage, acorn waits for the reset and then carries on."
           error={continueAfterLimit.error()}
         >
           <Checkbox
@@ -139,7 +139,7 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
       <SettingsSection id="idle" label="Idle agents">
         <SettingRow
           label="Stop idle agents after"
-          description="An agent keeps its CLI and MCP servers running between prompts, which can use hundreds of megabytes each. Acorn stops one that has had nothing to do for this long. Your next prompt starts it again on the same conversation."
+          help="An idle agent can hold hundreds of megabytes. acorn stops it after this long, and your next message starts it again in the same conversation."
           error={idleStop.error()}
         >
           <Select
@@ -154,7 +154,8 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
       <SettingsSection id="archived" label="Archived tasks">
         <SettingRow
           label="Keep agent history for archived tasks"
-          description="Once a task has been archived for this long, Acorn deletes its agent transcripts, attachments and artifacts to free disk space. The task still lists its sessions. Removed history no longer shows in archive search, and it cannot be recovered, even if you restore the task."
+          description="After this long, acorn deletes the agent history of archived tasks. You can't get it back."
+          help="The task still lists its sessions, but the transcripts, attachments, and files are gone, and archive search no longer finds them."
           error={archivedHistory.error()}
         >
           <Select
@@ -169,11 +170,11 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
       <SettingsSection
         id="new-sessions"
         label="New sessions"
-        description="What a new session of each harness starts on. A session keeps the settings it started with: to change an open one, use the pickers in its composer. Option changes are written into the transcript, so a session reads back under the settings it ran with."
+        help="Each new session starts with these. To change a running session, use the pickers under its message box."
       >
         <SettingRow
           label="Carry my last session's settings forward"
-          description="Switch model or effort inside a session and the next session of that provider starts there. Turn this off to pin the settings below instead."
+          help="When on, a new session starts with the model and effort you last picked. Turn it off to always use the settings below."
           error={followLast.error()}
         >
           <Checkbox

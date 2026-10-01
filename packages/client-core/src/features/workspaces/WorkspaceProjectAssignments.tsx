@@ -11,7 +11,7 @@ import Icon from '../../kit/components/content/Icon'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import { Stack } from '../../kit/components/layout/Stack'
 import { ProjectTable, type ProjectGroup } from './ProjectTable'
-import './onboarding.css'
+import './projects.css'
 
 // Settings → Overview: every project on the node in one table, grouped under the workspace it belongs
 // to, because the grouping is what is being arranged. Selecting rows opens a bar for moving, hiding and
@@ -37,7 +37,7 @@ export default function WorkspaceProjectAssignments(props: { navigate: (target: 
   createEffect(() => {
     if (!activeImporter() || importer()) return
     setActiveImporter(null)
-    setError('This importer is no longer available on this node.')
+    setError('That importer was turned off or removed.')
   })
 
   const refresh = () => Promise.all([
@@ -82,27 +82,27 @@ export default function WorkspaceProjectAssignments(props: { navigate: (target: 
   async function addFolder() {
     const path = await pickFolder()
     if (!path) return
-    await guard(() => createProject({ path }), 'Could not add folder.')
+    await guard(() => createProject({ path }), "Couldn't add the folder.")
   }
 
   async function mapFolder(id: string) {
     const path = await pickFolder()
     if (!path) return
-    await guard(() => patchProject(id, { path }), 'Could not map folder.')
+    await guard(() => patchProject(id, { path }), "Couldn't link the folder.")
   }
 
   async function addWorkspace(event: Event) {
     event.preventDefault()
     const name = newWorkspace()?.trim()
     if (!name) return
-    if (await guard(() => createWorkspace(name), 'Could not add workspace.')) setNewWorkspace(null)
+    if (await guard(() => createWorkspace(name), "Couldn't add the workspace.")) setNewWorkspace(null)
   }
 
   return (
     <SettingsSection
       id="projects"
       label="Projects"
-      description="Projects are local folders grouped into workspaces. Add a folder directly, or connect GitHub to map or clone repository projects. Git and GitHub badges describe detected facets, and plain folders are valid too."
+      help="A project is a folder on this computer, and workspaces group them. Add a folder, or import repositories from GitHub."
       actions={
         <>
           <Show when={canPickFolder()}>
@@ -123,7 +123,7 @@ export default function WorkspaceProjectAssignments(props: { navigate: (target: 
     >
       <Stack>
         <Show when={error()}><Alert>{error()}</Alert></Show>
-        <Show when={projects.isError}><Alert>Could not read this node's projects.</Alert></Show>
+        <Show when={projects.isError}><Alert>Couldn't load projects.</Alert></Show>
 
         <Show when={importer()}>
           {(entry) => (
@@ -143,14 +143,14 @@ export default function WorkspaceProjectAssignments(props: { navigate: (target: 
           <form class="ws-add-form" onSubmit={addWorkspace}>
             <Input
               label="Workspace name"
-              placeholder="Workspace name (e.g. Runn)"
+              placeholder="Workspace name"
               value={newWorkspace() ?? ''}
               ref={(el: HTMLInputElement) => queueMicrotask(() => el.focus())}
               onInput={(value) => setNewWorkspace(value)}
               onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); setNewWorkspace(null) } }}
             />
             <Button submit disabled={busy() || !newWorkspace()?.trim()}>Add</Button>
-            <Button variant="bare" onPress={() => setNewWorkspace(null)}>Cancel</Button>
+            <Button variant="ghost" onPress={() => setNewWorkspace(null)}>Cancel</Button>
           </form>
         </Show>
 

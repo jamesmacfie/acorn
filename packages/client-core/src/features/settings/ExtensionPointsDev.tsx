@@ -1,6 +1,8 @@
 import { For, Show, createMemo } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { Badge, Select } from '../../kit/components/primitives'
+import { Badge, EmptyState, Select } from '../../kit/components/primitives'
+import { Text } from '../../kit/components/content/Text'
+import { pluginLabel } from '../../host/plugins/pluginLabel'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import { createSettingSave } from './settingSave'
@@ -33,6 +35,10 @@ const KIND_HELP: Record<string, string> = {
   hook: 'a turn other plugins take before this one acts',
 }
 
+/** The registries' phrases start lowercase, because they used to run on from the id. On a line of
+ *  their own they read as sentences. */
+const sentence = (text: string): string => `${text.charAt(0).toUpperCase()}${text.slice(1)}.`
+
 export default function ExtensionPointsDev() {
   const qc = useQueryClient()
   const prefs = createQuery(() => prefsOptions(true))
@@ -42,8 +48,12 @@ export default function ExtensionPointsDev() {
 
   return (
     <>
-      <SettingsSection id="points" label="Points on this node" description="What each plugin has opened to the others, and who has taken it up.">
-        <Show when={points().length} fallback={<p class="muted">No plugin here has opened a point.</p>}>
+      <SettingsSection
+        id="points"
+        label="Available points"
+        help="Places where a plugin lets other plugins add to it, and which plugins do."
+      >
+        <Show when={points().length} fallback={<EmptyState align="start" size="sm">No plugin offers an extension point.</EmptyState>}>
           <ul class="plugin-point-list">
             <For each={points()}>
               {(point) => {
@@ -56,25 +66,24 @@ export default function ExtensionPointsDev() {
                 const save = createSettingSave()
                 return (
                   <li class="plugin-point">
-                    <span class="plugin-point-id">{point.id}</span>
-                    <Badge>{point.kind}</Badge>
-                    <Show when={point.mode}>{(mode) => <Badge>{mode()}</Badge>}</Show>
-                    <span class="muted">{KIND_HELP[point.kind] ?? point.label}</span>
-                    <Show
-                      when={filled().length}
-                      fallback={<span class="muted">nobody fills it</span>}
-                    >
-                      <span class="muted">
-                        filled by {filled().map((entry) => entry.pluginId).join(', ')}
-                      </span>
-                    </Show>
+                    {/* Two lines: the id and its badges, then what it is and who uses it, so the parts
+                        do not run together into one false sentence. */}
+                    <span class="plugin-point-head">
+                      <span class="plugin-point-id">{point.id}</span>
+                      <Badge>{point.kind}</Badge>
+                      <Show when={point.mode}>{(mode) => <Badge>{mode()}</Badge>}</Show>
+                    </span>
+                    <Text emphasis="muted" wrap>
+                      {sentence(KIND_HELP[point.kind] ?? point.label)}{' '}
+                      {filled().length ? `Used by ${filled().map((entry) => pluginLabel(entry.pluginId)).join(', ')}.` : 'Not used.'}
+                    </Text>
                     <Show when={tied().length}>
                       <SettingRow label="Which plugin draws this" error={save.error()}>
                         <Select
                           label="Which plugin draws this"
                           value={slotChoices(stored())[point.id] ?? ''}
                           options={[
-                            { value: '', label: `${point.ownerId}’s own` },
+                            { value: '', label: `${pluginLabel(point.ownerId)}’s own` },
                             ...tied().map((entry) => ({ value: entry.pluginId, label: `${entry.label} (${entry.pluginId})` })),
                           ]}
                           onChange={(value) =>
@@ -96,21 +105,21 @@ export default function ExtensionPointsDev() {
       <SettingsSection
         id="unmatched"
         label="Contributions that match nothing"
-        description="A contribution that matches nothing is silent everywhere else in acorn, so this is where it shows."
+        help="When a plugin tries to add to a place that doesn't exist, it shows here and nowhere else."
       >
         <Show
           when={unmatched().length}
-          fallback={<p class="muted">Everything contributed here has somewhere to go.</p>}
+          fallback={<EmptyState align="start" size="sm">Everything contributed here has somewhere to go.</EmptyState>}
         >
           <ul class="plugin-point-list">
             <For each={unmatched()}>
               {(miss) => (
                 <li class="plugin-point">
                   <span class="plugin-point-id">{miss.entry.pluginId} → {miss.entry.point}</span>
-                  <span class="muted">{miss.reason}</span>
-                  <Show when={miss.suggestion}>
-                    {(suggestion) => <span class="muted">did you mean {suggestion()}?</span>}
-                  </Show>
+                  <Text emphasis="muted" wrap>
+                    {sentence(miss.reason)}
+                    <Show when={miss.suggestion}>{(suggestion) => ` Did you mean ${suggestion()}?`}</Show>
+                  </Text>
                 </li>
               )}
             </For>

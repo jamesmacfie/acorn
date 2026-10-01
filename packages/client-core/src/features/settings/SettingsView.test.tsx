@@ -81,7 +81,9 @@ const search = (text: string) => {
   field.dispatchEvent(new InputEvent('input', { bubbles: true }))
   return field
 }
-const results = () => [...host.querySelectorAll('.settings-rail-result .settings-rail-label')].map((label) => label.textContent)
+// A result's page step and its name, read as one line: "Terminal › Text".
+const results = () => [...host.querySelectorAll('.settings-rail-result')].map((item) =>
+  [item.querySelector('.settings-rail-result-page')?.textContent, item.querySelector('.settings-rail-label')?.textContent].filter(Boolean).join(' '))
 const title = () => host.querySelector('.settings-title')?.textContent
 const railItem = (label: string) =>
   [...host.querySelectorAll<HTMLButtonElement>('.settings-rail-item')].find((item) => item.textContent === label)
@@ -127,8 +129,9 @@ describe('SettingsView', () => {
   it('opens the page a deep link names, prefix and section included', () => {
     open({ target: 'settings/shortcuts#bindings' })
     expect(title()).toBe('Keyboard shortcuts')
-    expect(host.querySelector('.settings-breadcrumb')?.textContent).toBe('General › Keyboard shortcuts')
-    expect(host.querySelector('.settings-scope')?.textContent).toBe('This device')
+    // The path above the title names only what the page sits under.
+    expect(host.querySelector('.settings-breadcrumb')?.textContent).toBe('General')
+    expect(host.querySelector('.settings-scopes .ui-badge')?.textContent).toBe('This device')
     // Focus is in the rail, on the open page's row, so nothing typed reaches what had it before.
     expect(document.activeElement?.textContent).toBe('Keyboard shortcuts')
   })
@@ -166,7 +169,7 @@ describe('SettingsView', () => {
   it('names the node a page reads, as plain text, when the page does not follow the switcher', () => {
     open({ target: 'board-settings' })
     expect(host.querySelector('.settings-header select')).toBeNull()
-    expect(host.querySelector('.settings-scope')?.textContent).toBe('Node: Laptop')
+    expect(host.querySelector('.settings-scopes .ui-badge')?.textContent).toBe('Node: Laptop')
   })
 
   it('reopens on the last page used when nothing asks for another', () => {
@@ -181,7 +184,7 @@ describe('SettingsView', () => {
   it('falls back to the first page, and says so, when the page asked for is not on this node', () => {
     open({ target: 'gone' })
     expect(title()).toBe('Appearance')
-    expect(host.querySelector('[role="status"]')?.textContent).toBe('The selected settings page is no longer available on this node.')
+    expect(host.querySelector('[role="status"]')?.textContent).toBe("This page isn't available any more.")
   })
 
   it('waits for the plugin roster before giving up on a remembered page', () => {
@@ -209,7 +212,7 @@ describe('SettingsView', () => {
     expect(rows).toEqual(['Overview', 'Runn'])
     railItem('Runn')!.click()
     expect(host.querySelector('[data-page="workspace"]')?.textContent).toBe('Runn')
-    expect([...host.querySelectorAll('.settings-scope')].map((chip) => chip.textContent)).toEqual(['Workspace: Runn', 'Node: Laptop'])
+    expect([...host.querySelectorAll('.settings-scopes .ui-badge')].map((chip) => chip.textContent)).toEqual(['Workspace', 'Node: Laptop'])
     // A refetch hands back new objects. The row keeps its button, and with it the focus.
     railItem('Runn')!.focus()
     setWorkspaces([{ id: 'ws-1', name: 'Runn', projects: [] }])
@@ -228,18 +231,25 @@ describe('SettingsView', () => {
         component: (props) => <p data-page="project">{props.context.scope.project?.name} in {props.context.scope.workspace?.name}</p>,
       })),
     )
-    const railRows = () => [...host.querySelectorAll('[aria-label="Workspaces and projects"] .settings-rail-item')].map((item) => item.textContent)
+    // A workspace with projects reads as its name and whether it is open: "Runn (closed)".
+    const railRows = () => [...host.querySelectorAll('[aria-label="Workspaces and projects"] .settings-rail-item')].map((item) => {
+      const expanded = item.getAttribute('aria-expanded')
+      return expanded === null ? item.textContent : `${item.textContent} (${expanded === 'true' ? 'open' : 'closed'})`
+    })
     open({ target: 'workspaces' })
-    expect(railRows()).toEqual(['Overview', '▸Runn'])
-    railItem('▸Runn')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
-    expect(railRows()).toEqual(['Overview', '▾Runn', 'acorn'])
+    expect(railRows()).toEqual(['Overview', 'Runn (closed)'])
+    railItem('Runn')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))
+    expect(railRows()).toEqual(['Overview', 'Runn (open)', 'acorn'])
 
     open({ target: 'settings/project/p-1' })
     expect(host.querySelector('[data-page="project"]')?.textContent).toBe('acorn in Runn')
-    expect(host.querySelector('.settings-breadcrumb')?.textContent).toBe('Workspaces and projects › Runn › acorn')
-    expect([...host.querySelectorAll('.settings-scope')].map((chip) => chip.textContent)).toEqual(['Project: acorn', 'Node: Laptop'])
+    expect(host.querySelector('.settings-breadcrumb')?.textContent).toBe('Workspaces and projects › Runn')
+    expect([...host.querySelectorAll('.settings-scopes .ui-badge')].map((chip) => chip.textContent)).toEqual(['Project', 'Node: Laptop'])
+    // The workspace in the path is the way back, and its tip names the chord.
+    const crumb = [...host.querySelectorAll<HTMLElement>('.settings-crumb')].find((item) => item.textContent === 'Runn')!
+    expect(crumb.dataset.tipKey).toBe('⌘[')
     // Opening a project expands its workspace, and its list is the workspace's page.
-    expect(railRows()).toEqual(['Overview', '▾Runn', 'acorn'])
+    expect(railRows()).toEqual(['Overview', 'Runn (open)', 'acorn'])
     const back = () => host.querySelector('.settings-view')!.dispatchEvent(new KeyboardEvent('keydown', { key: '[', code: 'BracketLeft', metaKey: true, bubbles: true, cancelable: true }))
     back()
     expect(title()).toBe('Runn')
@@ -270,9 +280,11 @@ describe('SettingsView', () => {
 
     search('drawer')
     // The page called Drawer, then the section, then the row, and the page whose keyword matched last.
-    // Each shows where it lands, **Page › Section**, and the scope a change there affects.
+    // Each shows where it lands: the section, with its page as a step above it.
     expect(results()).toEqual(['Drawer', 'Terminal › Drawer defaults', 'Terminal › Text', 'Terminal'])
-    expect(host.querySelector('.settings-rail-result-scope')?.textContent).toBe('Node')
+
+    search('zzz')
+    expect(host.querySelector('.settings-rail-empty')?.textContent).toBe('No settings match "zzz".')
 
     search('font')
     expect(results()).toEqual(['Terminal › Text'])
@@ -298,10 +310,10 @@ describe('SettingsView', () => {
     })))
     open({ target: 'agents' })
     const escape = () => host.querySelector('.settings-view')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
-    const button = (label: string) => [...document.querySelectorAll<HTMLButtonElement>('.will-confirmation button')].find((item) => item.textContent === label)
+    const button = (label: string) => [...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] .ui-modal-actions button')].find((item) => item.textContent === label)
 
     escape()
-    expect(document.querySelector('.will-confirmation')?.textContent).toContain('Discard unsaved changes?')
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('Discard unsaved changes')
     button('Cancel')!.click()
     await Promise.resolve()
     expect(closed).toBe(0)
@@ -314,7 +326,7 @@ describe('SettingsView', () => {
     // A saved form leaves without a word.
     setDirty(false)
     escape()
-    expect(document.querySelector('.will-confirmation')).toBeNull()
+    expect(document.querySelector('[role="alertdialog"]')).toBeNull()
     expect(closed).toBe(2)
   })
 
@@ -401,7 +413,7 @@ describe('SettingsView', () => {
     }
     open({ target: 'form' })
     const answer = async (label: string) => {
-      ;[...document.querySelectorAll<HTMLButtonElement>('.will-confirmation button')].find((item) => item.textContent === label)!.click()
+      ;[...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] .ui-modal-actions button')].find((item) => item.textContent === label)!.click()
       await Promise.resolve()
     }
 
@@ -458,13 +470,14 @@ describe('SettingsView', () => {
     })))
     open({ target: 'custom-agents' })
     expect(title()).toBe('Reviewer')
-    expect(host.querySelector('.settings-breadcrumb')?.textContent).toBe('Agents › Custom agents › Reviewer')
-    const backLink = () => [...host.querySelectorAll<HTMLButtonElement>('.settings-back button')].find((item) => item.textContent === '‹ Custom agents')
+    expect(host.querySelector('.settings-breadcrumb')?.textContent).toBe('Agents › Custom agents')
+    // The page in the path is the link back to its list.
+    const backLink = () => [...host.querySelectorAll<HTMLButtonElement>('.settings-crumb')].find((item) => item.textContent === 'Custom agents')
 
     setDirty(true)
     backLink()!.click()
-    expect(document.querySelector('.will-confirmation')?.textContent).toContain('Discard unsaved changes?')
-    ;[...document.querySelectorAll<HTMLButtonElement>('.will-confirmation button')].find((item) => item.textContent === 'Discard changes')!.click()
+    expect(document.querySelector('[role="alertdialog"]')?.textContent).toContain('Discard unsaved changes')
+    ;[...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] .ui-modal-actions button')].find((item) => item.textContent === 'Discard changes')!.click()
     await Promise.resolve()
     expect(editing()).toBe(false)
     // Back on the list, the header is the page's own again and has no back link.

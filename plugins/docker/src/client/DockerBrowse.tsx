@@ -202,7 +202,7 @@ export default function DockerBrowse() {
               tone="danger"
               label="Remove container"
               title="Remove container"
-              confirmLabel="?"
+              confirmLabel="Remove container?"
               skipConfirm={skipConfirm()}
               disabled={rowBusy() === c.id}
               onConfirm={() => void rowAction(c, 'remove')}
@@ -253,7 +253,7 @@ export default function DockerBrowse() {
                 tone="danger"
                 label="Compose down"
                 title="Compose down (remove the project's containers and networks; volumes kept)"
-                confirmLabel="?"
+                confirmLabel="Remove project?"
                 skipConfirm={skipConfirm()}
                 disabled={groupBusy() === g.project}
                 onConfirm={() => void groupAction(g.project!, 'down')}
@@ -286,10 +286,12 @@ export default function DockerBrowse() {
 
   const list = (
     <>
+      {/* The running count in the header's count slot, where every list header keeps its number. */}
       <SectionHeader
+        count={dockerInfo()?.available ? runningCount() : undefined}
         actions={<IconButton icon="refresh-cw" title="Refresh" label="Refresh" busy={loading()} onPress={() => void refreshDocker()} />}
       >
-        Docker{dockerInfo()?.available ? ` · ${runningCount()} running` : ''}
+        Docker
       </SectionHeader>
       <Show when={loadError()}>{(error) => <Alert>{error()}</Alert>}</Show>
 
@@ -326,7 +328,7 @@ export default function DockerBrowse() {
               actions={
                 <ConfirmButton
                   label="Clean up"
-                  confirmLabel="Sure? Composes down all stale"
+                  confirmLabel="Remove stale projects?"
                   skipConfirm={skipConfirm()}
                   onConfirm={() => void cleanUpStale()}
                 >Clean up</ConfirmButton>
@@ -348,7 +350,7 @@ export default function DockerBrowse() {
         </TabPanel>
 
         <TabPanel id="images" active={section()} idPrefix="docker-section">
-          <ObjectBar count={(images() ?? []).length} noun="images" kind="images" pruneLabel="Prune dangling" confirmLabel="Sure?" />
+          <ObjectBar count={(images() ?? []).length} noun="images" kind="images" pruneLabel="Prune dangling" confirmLabel="Prune images?" />
           <Rows
             id="docker.images"
             ariaLabel="Images"
@@ -369,7 +371,7 @@ export default function DockerBrowse() {
                     tone="danger"
                     label="Remove image"
                     title="Remove image"
-                    confirmLabel="?"
+                    confirmLabel="Remove image?"
                     skipConfirm={skipConfirm()}
                     onConfirm={() => void failing(removeImage(entry.img.id, false)).then(() => imagesCtl.refetch())}
                   >🗑</ConfirmButton>
@@ -385,7 +387,7 @@ export default function DockerBrowse() {
         </TabPanel>
 
         <TabPanel id="volumes" active={section()} idPrefix="docker-section">
-          <ObjectBar count={(volumes() ?? []).length} noun="volumes" kind="volumes" pruneLabel="Prune unused" confirmLabel="Sure? Deletes unused data" />
+          <ObjectBar count={(volumes() ?? []).length} noun="volumes" kind="volumes" pruneLabel="Prune unused" confirmLabel="Remove unused volumes?" />
           <Rows
             id="docker.volumes"
             ariaLabel="Volumes"
@@ -406,7 +408,7 @@ export default function DockerBrowse() {
                     tone="danger"
                     label="Remove volume"
                     title="Remove volume (deletes its data)"
-                    confirmLabel="?"
+                    confirmLabel="Remove volume?"
                     skipConfirm={skipConfirm()}
                     onConfirm={() => void failing(removeVolume(entry.volume.name, false)).then(() => volumesCtl.refetch())}
                   >🗑</ConfirmButton>
@@ -422,7 +424,7 @@ export default function DockerBrowse() {
         </TabPanel>
 
         <TabPanel id="networks" active={section()} idPrefix="docker-section">
-          <ObjectBar count={(networks() ?? []).length} noun="networks" kind="networks" pruneLabel="Prune unused" confirmLabel="Sure?" />
+          <ObjectBar count={(networks() ?? []).length} noun="networks" kind="networks" pruneLabel="Prune unused" confirmLabel="Prune networks?" />
           <Rows
             id="docker.networks"
             ariaLabel="Networks"
@@ -444,7 +446,7 @@ export default function DockerBrowse() {
                       tone="danger"
                       label="Remove network"
                       title="Remove network"
-                      confirmLabel="?"
+                      confirmLabel="Remove network?"
                       skipConfirm={skipConfirm()}
                       onConfirm={() => void failing(removeNetwork(entry.network.id)).then(() => networksCtl.refetch())}
                     >🗑</ConfirmButton>

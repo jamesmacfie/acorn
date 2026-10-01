@@ -41,7 +41,7 @@ export default function Shortcuts(props: { onOpenShortcuts: () => void }) {
       openShortcuts: props.onOpenShortcuts,
     }))
     const bindings = registerKeybindings([
-      { id: 'help.shortcuts.open', command: 'help.shortcuts.open', description: 'Open keyboard shortcuts', category: 'Global', defaultChord: 'shift+?', when: 'typing-exempt' },
+      { id: 'help.shortcuts.open', command: 'help.shortcuts.open', description: 'Edit keyboard shortcuts', category: 'Global', defaultChord: 'shift+?', when: 'typing-exempt' },
       { id: 'github.files.find', command: 'github.files.find', description: 'Find file in this pull request', category: 'Pull requests', defaultChord: '/', when: 'typing-exempt', active: () => !!route() },
       { id: 'github.files.next', command: 'github.files.next', description: 'Next changed file', category: 'Pull requests', defaultChord: ']', when: 'typing-exempt', active: () => !!route() },
       { id: 'github.files.previous', command: 'github.files.previous', description: 'Previous changed file', category: 'Pull requests', defaultChord: '[', when: 'typing-exempt', active: () => !!route() },

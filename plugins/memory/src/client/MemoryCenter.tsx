@@ -43,9 +43,12 @@ export default function MemoryCenter() {
             <Text emphasis="muted">Durable knowledge and suggestions distilled from completed tasks.</Text>
           </Stack>
           <Show when={reviewSettings() && (!reviewSettings()!.backendId || !reviewSettings()!.targetId)}>
-            <Alert tone="warn" title="Configure memory review">
-              Closing a task will keep its evidence, but suggestions need a review model and target.
-              <Button size="sm" onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'findings-settings' })}>Open review settings</Button>
+            <Alert
+              tone="warn"
+              title="Configure memory review"
+              actions={<Button size="sm" onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'findings-settings' })}>Open review settings</Button>}
+            >
+              To get suggestions, choose a review model and where they go.
             </Alert>
           </Show>
           <FindingsBundleReview focusCandidateId={highlightedFinding()} scope={params.projectId ? { kind: 'project', projectId: params.projectId } : { kind: 'private' }} onChanged={() => void refetchMemories()} />

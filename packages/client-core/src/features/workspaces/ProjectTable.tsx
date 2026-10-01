@@ -4,12 +4,12 @@ import { resolveProjectColor } from '@acorn/protocol/projectColor.ts'
 import { canPickFolder } from '../../infra/platform'
 import { createWorkspace, patchProject } from './workspaceMutations'
 import { PROJECT_COLOR_OPTIONS } from './ProjectColorInput'
-import Icon from '../../kit/components/content/Icon'
 import { Text } from '../../kit/components/content/Text'
+import { formatPath } from '../../kit/lib/rendering/formatPath'
 import { IconButton } from '../../kit/components/inputs/IconButton'
 import { Badge, Button, Checkbox, Input, Select, Table, TableCell, TableHead, TableRow } from '../../kit/components/primitives'
 import { Toolbar } from '../../kit/components/layout/Toolbar'
-import './onboarding.css'
+import './projects.css'
 
 // Projects as a table, grouped under their workspace, with row selection and a bar for the changes
 // people make to several projects at once: move, hide, and colour (docs/workspaces-and-tasks.md).
@@ -59,6 +59,8 @@ export function ProjectTable(props: {
 
   return (
     <>
+      {/* The wrapper gives the rows their floor in projects.css. */}
+      <div class="ws-project-table">
       <Table size="sm">
         <TableRow head>
           <TableHead>
@@ -91,16 +93,19 @@ export function ProjectTable(props: {
                       />
                     </Show>
                   </TableCell>
+                  {/* The count is the group's, so it sits after its name in the header-count style
+                      rather than under the Folder heading. */}
                   <TableCell header>
-                    <Show when={group().workspaceId && props.openWorkspace} fallback={<Text emphasis="strong">{group().label}</Text>}>
-                      <Button variant="bare" size="sm" title={`Open ${group().label}`} onPress={() => props.openWorkspace?.(group().workspaceId!)}>
-                        <Text emphasis="strong">{group().label}</Text>
-                      </Button>
-                    </Show>
+                    <span class="ws-group-name">
+                      <Show when={group().workspaceId && props.openWorkspace} fallback={<Text emphasis="strong">{group().label}</Text>}>
+                        <Button variant="bare" size="sm" title={`Open ${group().label}`} onPress={() => props.openWorkspace?.(group().workspaceId!)}>
+                          <Text emphasis="strong">{group().label}</Text>
+                        </Button>
+                      </Show>
+                      <span class="ws-group-count">{group().projects.length || 'no'} project{group().projects.length === 1 ? '' : 's'}</span>
+                    </span>
                   </TableCell>
-                  <TableCell>
-                    <Text emphasis="muted">{group().projects.length || 'no'} project{group().projects.length === 1 ? '' : 's'}</Text>
-                  </TableCell>
+                  <TableCell />
                   <TableCell />
                   <TableCell />
                   <TableCell />
@@ -110,15 +115,17 @@ export function ProjectTable(props: {
                   rebuild the rows under the pointer and drop the focus on the row's checkbox. */}
               <Index each={group().projects}>
                 {(project) => (
-                  <TableRow>
+                  // The whole row opens the project. The row leaves a press on its checkbox, its folder
+                  // button, or its chevron to that control (Table.tsx § inCellControl).
+                  <TableRow onPress={() => props.openProject(project().id)}>
                     <TableCell>
                       <Checkbox ariaLabel={`Select ${project().name}`} checked={isSelected(project().id)} onChange={(on) => toggle([project().id], on)} />
                     </TableCell>
                     <TableCell header>
                       <span class="ws-project-name">
                         <span class="ws-project-dot" style={{ background: resolveProjectColor(project().color) ?? 'transparent' }} data-empty={project().color ? undefined : ''} aria-hidden="true" />
-                        <Button variant="bare" size="sm" onPress={() => props.openProject(project().id)}>{project().name}</Button>
-                        <Show when={project().hidden}><Badge>hidden</Badge></Show>
+                        <span>{project().name}</span>
+                        <Show when={project().hidden}><Badge size="xs">Hidden</Badge></Show>
                       </span>
                     </TableCell>
                     <TableCell>
@@ -133,17 +140,16 @@ export function ProjectTable(props: {
                           </span>
                         }
                       >
-                        {/* data-tip: the only way to read a path the column had to ellipsise. */}
-                        <span class="ws-row-path" data-tip={project().path ?? undefined}>{project().path}</span>
+                        {/* The last two folders tell projects apart. The tip holds the whole path. */}
+                        {(path) => <span class="ws-row-path" data-tip={path()}>{formatPath(path())}</span>}
                       </Show>
                     </TableCell>
                     <TableCell>
-                      {/* Marks, not words, each with a title so the meaning survives for a tooltip or a
-                          screen reader. */}
+                      {/* Words, not marks: a git mark read as "-o-", and its meaning lived only in a tip. */}
                       <span class="ws-row-facets">
-                        <Show when={project().path && project().vcs !== 'git'}><Icon name="folder" title="Plain folder" /></Show>
-                        <Show when={project().vcs === 'git'}><Icon name="git-commit-horizontal" title="Git repository" /></Show>
-                        <Show when={project().github}><Icon name="brand:github" title="GitHub repository" /></Show>
+                        <Show when={project().path && project().vcs !== 'git'}><Badge size="xs">Folder</Badge></Show>
+                        <Show when={project().vcs === 'git'}><Badge size="xs">Git</Badge></Show>
+                        <Show when={project().github}><Badge size="xs">GitHub</Badge></Show>
                       </span>
                     </TableCell>
                     <TableCell align="end">{props.taskCount(project().id)}</TableCell>
@@ -157,6 +163,7 @@ export function ProjectTable(props: {
           )}
         </Index>
       </Table>
+      </div>
 
       <Show when={chosen().length}>
         <BulkBar
@@ -246,14 +253,14 @@ function BulkBar(props: {
             <form class="ws-add-form" onSubmit={(event) => void moveToNew(event)}>
               <Input
                 label="New workspace name"
-                placeholder="Workspace name (e.g. Runn)"
+                placeholder="Workspace name"
                 value={naming() ?? ''}
                 ref={(el: HTMLInputElement) => queueMicrotask(() => el.focus())}
                 onInput={setNaming}
                 onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); setNaming(null) } }}
               />
               <Button submit disabled={busy() || !naming()?.trim()}>Create and move</Button>
-              <Button variant="bare" onPress={() => setNaming(null)}>Cancel</Button>
+              <Button variant="ghost" onPress={() => setNaming(null)}>Cancel</Button>
             </form>
           }
         >
@@ -284,11 +291,11 @@ function BulkBar(props: {
           <Select
             size="sm"
             width="auto"
-            label="Set colour"
+            label="Set rail colour"
             value=""
             disabled={busy()}
             options={[
-              { value: '', label: 'Set colour…', disabled: true },
+              { value: '', label: 'Set rail colour…', disabled: true },
               ...PROJECT_COLOR_OPTIONS,
               { value: 'none', label: 'No colour' },
             ]}

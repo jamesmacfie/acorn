@@ -3,7 +3,7 @@ import { createEffect, createSignal, onCleanup, Show, type JSX } from 'solid-js'
 import type { Renderable } from '../../tree/compat'
 import { isTyping } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm'
-import { flatten, Line, slot } from '../cells'
+import { flatten, Line, Rule, slot } from '../cells'
 import { boxBorder, litControl } from '../roles'
 import { trapKeys } from '../../keys/trap'
 import { bindKeys } from '../../keys/install'
@@ -86,12 +86,15 @@ function MenuList(props: { close: () => void; children: JSX.Element }) {
   )
 }
 
-/** A menu stop. A destructive item stays open while its confirmation is armed. */
+/** A menu stop. A destructive item stays open while its confirmation is armed. A choice item draws
+ *  `(•)` or `( )` for a radio and `[x]` or `[ ]` for a checkbox, and a checkbox leaves the menu open. */
 Menu.Item = (props: {
   context: { close: () => void }
   onSelect: () => void
   disabled?: boolean
   closeOnSelect?: boolean
+  kind?: 'radio' | 'checkbox'
+  checked?: boolean
   confirm?: string
   tone?: 'neutral' | 'danger'
   leading?: JSX.Element
@@ -106,13 +109,16 @@ Menu.Item = (props: {
       // Arming leaves the list open, or the prompt would close under the press that raised it.
       if (props.confirm && !armed.request('confirm')) return
       props.onSelect()
-      if (props.closeOnSelect !== false) props.context.close()
+      if (props.closeOnSelect ?? props.kind !== 'checkbox') props.context.close()
     },
     disabled: () => !!props.disabled,
   })
   return (
     <box flexDirection="row" gap={1} flexShrink={0} ref={control.ref}>
       <Line tone="accent">{control.focused() ? '›' : ' '}</Line>
+      <Show when={props.kind}>
+        <Line>{props.kind === 'checkbox' ? (props.checked ? '[x]' : '[ ]') : props.checked ? '(•)' : '( )'}</Line>
+      </Show>
       {slot(props.leading)}
       <Line {...litControl({
         focused: control.focused(),
@@ -127,3 +133,9 @@ Menu.Item = (props: {
     </box>
   )
 }
+
+/** A heading row inside a menu, in the group label's style. */
+Menu.Label = (props: { children: JSX.Element }) => <Line role="eyebrow">{flatten(props.children)}</Line>
+
+/** A rule between runs of items, such as above a destructive one. */
+Menu.Separator = () => <Rule />

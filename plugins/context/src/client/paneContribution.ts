@@ -9,7 +9,7 @@ const ContextBody = lazy(async () => ({ default: (await import('./ContextPane'))
 const ContextFooter = lazy(async () => ({ default: (await import('./ContextPane')).ContextFooter }))
 
 export const contextPaneContribution: PaneLayoutContribution<ContextModel> = {
-  id: 'context', label: 'Context', glyph: 'layout-grid', description: 'What an assembled send includes', order: 40,
+  id: 'context', label: 'Context', glyph: 'layout-grid', description: 'What the agent gets when you send', order: 40,
   defaultChord: 'meta+shift+x',
   layout: 'header-body-footer',
   // The inventory, the selection, the expanded rows and the sync state, held once per task by the host

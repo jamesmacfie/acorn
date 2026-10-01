@@ -15,7 +15,7 @@ export default function PaneSwitcher(props: PaneSwitcherProps) {
           active={pane.shown}
           markers={markersFor({ kind: 'pane', id: pane.id, taskId: props.task.id })}
           data-tip-key={pane.shortcut}
-          data-tip-sub={`${pane.description ?? pane.label} · ⌘-click to open beside`}
+          data-tip-sub={pane.description ? `${pane.description}. ⌘-click to open beside.` : '⌘-click to open beside.'}
           aria-pressed={pane.shown}
           onClick={(event) => event.metaKey || event.ctrlKey ? props.add(pane.id) : props.show(pane.id)}
         />

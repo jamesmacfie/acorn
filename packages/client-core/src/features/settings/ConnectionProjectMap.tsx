@@ -4,7 +4,7 @@ import type { Integration, IntegrationMapping, IntegrationProject, Project, Work
 import { connectionName } from '@acorn/protocol/integrations.ts'
 import { integrationMappingsKey, integrationMappingsOptions, integrationProjectsOptions, workspacesOptions } from '../../infra/queries'
 import { setIntegrationMappings } from '../workspaces/workspaceMutations'
-import { Alert, Button, EmptyState, Select } from '../../kit/components/primitives'
+import { Alert, Button, EmptyState, Select, Table, TableCell, TableHead, TableRow } from '../../kit/components/primitives'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { createSettingSave } from './settingSave'
 
@@ -96,7 +96,7 @@ export default function ConnectionProjectMap(props: {
           const status = Number((cause as Error).message.match(/(\d{3})$/)?.[1])
           throw new Error(status === 403
             ? 'That connection is no longer available. Sign in to it again on its page, then try again.'
-            : 'The node could not save that change. If it keeps failing, restart the app.')
+            : "Couldn't save that change. If it keeps happening, restart acorn.")
         }
         await queryClient.invalidateQueries({ queryKey: integrationMappingsKey(props.connection.id) })
         // The rail decides whether to draw this provider's source from the workspace-side read of the
@@ -122,18 +122,19 @@ export default function ConnectionProjectMap(props: {
       <SettingRow
         label={props.project || props.workspace ? connectionName(props.connection) : 'Followed projects'}
         description={props.project
-          ? `Its projects that show up for ${props.project.name}. A link that covers the whole workspace is changed on the workspace's page or the connection's.`
+          ? undefined
           : props.workspace
-            ? `Its projects that show up in ${props.workspace.name}. Pick All projects to follow one everywhere here, or one repository to follow it there alone.`
+            ? 'Pick All projects to show it across this workspace, or one project to show it only there.'
             : 'Pick a workspace to follow a project everywhere in it, or one repository to follow it there alone.'}
+        help={props.project ? "Projects followed by the whole workspace show here too. Change those on the workspace's page." : undefined}
         layout="stacked"
         savedAt={save.savedAt()}
         error={save.error()}
       >
         <Show when={projects.isError}>
           <Alert>
-            Could not list this connection's projects.
-            {props.connection.status === 'needs-auth' ? (props.manage ? ' It needs signing in again, on its own page.' : ' It needs signing in again, above.') : ''}
+            Couldn't load this service's projects.
+            {props.connection.status === 'needs-auth' ? (props.manage ? ' Sign in to it again on its page.' : ' Sign in to it again above.') : ''}
             <Button size="sm" disabled={projects.isFetching} onPress={() => void projects.refetch()}>
               {projects.isFetching ? 'Retrying…' : 'Retry'}
             </Button>
@@ -142,35 +143,47 @@ export default function ConnectionProjectMap(props: {
 
         <Show when={mappings.isError}>
           <Alert>
-            Could not read what this connection follows.
+            Couldn't load what this service follows.
             <Button size="sm" disabled={mappings.isFetching} onPress={() => void mappings.refetch()}>
               {mappings.isFetching ? 'Retrying…' : 'Retry'}
             </Button>
           </Alert>
         </Show>
 
-        <For each={rows()} fallback={<Show when={mappings.isSuccess}><EmptyState align="start">Nothing followed yet.</EmptyState></Show>}>
-          {(row) => (
-            <div class="integration-map-row">
-              <span class="integration-map-name">{labels().get(row.externalId) ?? row.externalId}</span>
-              <span class="muted">→</span>
-              <span class="integration-map-target">
-                {names().get(encodeTarget(row.workspaceId, row.projectId)) ?? row.workspaceId}
-              </span>
-              <Show when={!props.project || row.projectId}>
-                <Button
-                  variant="ghost"
-                  tone="danger"
-                  size="sm"
-                  disabled={locked()}
-                  onPress={() => void write(all().filter((other) => !sameMapping(other, row)))}
-                >
-                  Remove
-                </Button>
-              </Show>
-            </div>
-          )}
-        </For>
+        {/* A small table, the shape the page's other lists of records take (run targets). */}
+        <Show
+          when={rows().length}
+          fallback={<Show when={mappings.isSuccess}><EmptyState align="start" size="sm">Not following any projects.</EmptyState></Show>}
+        >
+          <Table size="sm">
+            <TableRow head>
+              <TableHead>Project</TableHead>
+              <TableHead>Shows up in</TableHead>
+              <TableHead align="end"><span class="sr-only">Remove</span></TableHead>
+            </TableRow>
+            <For each={rows()}>
+              {(row) => (
+                <TableRow>
+                  <TableCell header>{labels().get(row.externalId) ?? row.externalId}</TableCell>
+                  <TableCell>{names().get(encodeTarget(row.workspaceId, row.projectId)) ?? row.workspaceId}</TableCell>
+                  <TableCell align="end">
+                    <Show when={!props.project || row.projectId}>
+                      <Button
+                        variant="ghost"
+                        tone="danger"
+                        size="sm"
+                        disabled={locked()}
+                        onPress={() => void write(all().filter((other) => !sameMapping(other, row)))}
+                      >
+                        Remove
+                      </Button>
+                    </Show>
+                  </TableCell>
+                </TableRow>
+              )}
+            </For>
+          </Table>
+        </Show>
 
         <div class="integration-map-row">
           <Select
@@ -182,7 +195,7 @@ export default function ConnectionProjectMap(props: {
             <Select
               value={target()}
               disabled={busy() || !targets().length}
-              label="where it shows up"
+              label="Where it shows up"
               onChange={(value) => setTarget(value)} options={[{ value: '', label: 'Choose where…' }, ...targets().map((entry) => ({ value: entry.value, label: entry.label }))]} />
           </Show>
           <Button disabled={locked() || !externalId() || (!props.project && !target())} onPress={add}>Follow</Button>

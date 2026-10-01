@@ -270,7 +270,7 @@ The field-by-field reference is [plugin authoring](../plugin-authoring.md) § Th
 the only one; this section is what the **host** does with the file it reads.
 
 The host reads ten top-level keys. `id` names the package's route prefix, its directory under
-`<dataRoot>/plugins/`, and its SQLite file. `name` is display text. `version` is what the installer's
+`<dataRoot>/plugins/`, and its SQLite file. `name` is display text: it goes out as `label` on the roster row, and the client shows it wherever it names the plugin. `version` is what the installer's
 downgrade guard compares. `apiVersion` is the range checked at load, at install, and at client bundle
 resolution. `node`, `client`, and `migrations` are relative paths, each confined inside the package
 directory both lexically and through symlinks. `requires` orders init and refuses a package whose

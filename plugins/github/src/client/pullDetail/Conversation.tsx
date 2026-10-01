@@ -1,6 +1,6 @@
 import { createComputed, createEffect, createMemo, createSignal, For, onCleanup, Show, untrack, type Accessor, type JSX, type Setter } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
-import { formatRelativeTime } from '@acorn/plugin-api/client'
+import { formatChord, formatRelativeTime } from '@acorn/plugin-api/client'
 import {
   Badge, Button, Card, CodeBlock, Composer, CopyButton, Inline, Kbd, Stack, Text, Timeline, UserAvatar,
 } from '@acorn/plugin-api/ui'
@@ -340,7 +340,7 @@ function ComposerBox(props: {
       busy={props.busy}
       submitLabel={props.submitLabel}
       onSubmit={() => props.onSubmit()}
-      hint={<><Kbd size="xs">⌘↵</Kbd> to send</>}
+      hint={<><Kbd size="xs">{formatChord('meta+enter')}</Kbd> to send</>}
       secondary={props.secondary}
     />
   )

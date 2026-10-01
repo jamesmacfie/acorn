@@ -36,7 +36,7 @@ export const memoryCommands: readonly ContributedCommand[] = [
   {
     id: 'memory.learnings.review',
     title: 'Review learnings',
-    hint: 'prepare suggestions from this task’s findings',
+    hint: 'suggest what to remember from this task',
     keywords: ['memory', 'findings', 'prepare', 'learnings'],
     category: 'action',
     palette: true,

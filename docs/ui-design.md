@@ -70,6 +70,47 @@ Both heights include the bottom divider; the tab controls subtract its width so 
 end on the same line. The editor's file navigation and document strip, the host's `tabs` layout,
 and the terminal drawer use the pane level.
 
+Every chrome bar paints `--bg-subtle`: the rails, the pane switcher, the task footer, `Toolbar`,
+`Tabs`, `DocumentTabs`, a pane-level `SectionHeader`, and `.diff-toolbar`. So the headers across a
+split read as one row, whichever node draws each. The top bar is the one exception and keeps the
+page's `--bg`. It spans the window above every pane and belongs to none of them, so it reads as the
+frame rather than as one more pane header. A group label keeps the list's own colour, since it sits
+among the rows. Only a pane header and a group label stick to the top of their scroller. A `sub`
+heading and a `Fold` summary scroll with their content, because one that stuck covered the first
+line of the rows under it. `sticky` on the node asks for it anyway.
+
+Text in a list column starts on one edge, the pane pad: the header's label, a group label, a filter
+strip's box, a banner, and the first tab label. A `Row` adds its 3px selection marker on top. Where
+a split has a collapse control on its divider, the first bar on each side pads by half the control
+more on that side, so no header control runs under it.
+
+A button in chrome takes the small rung, `--control-h-sm`, whatever size its caller passed. That
+covers the actions of a `SectionHeader`, a `SettingsSection`, and an `Alert`, the actions beside a
+`Tabs` or `DocumentTabs` strip, and every button in a `Toolbar` bar. A bar that holds a field is a
+form row, so its buttons keep the field's height and **Send** lines up with the URL box beside it. A
+`bare` button has no box to size. When it is text standing in a row of actions, such as **Reset
+section** or a footer's **Cancel**, it takes the small rung's height anyway, so its target is not
+the 12px of its text. A row of buttons, in a footer or anywhere else, is `--gap-row` apart.
+
+A `Fold` or `SectionHeader` whose label is content, such as a path, a name, or a sentence, uses
+`level="sub"`. The default `group` level draws its label in the uppercase label treatment, which
+suits a word that names a group, such as "Tracked", and not a file path.
+
+`Text` draws at the working size, `--fs-sm`, whatever its emphasis, so a line of it in a page body
+matches the descriptions and hints around it. Two containers size their own content, the agent
+transcript and a description list's value, and `Text` inside them takes their size. In a `Table`, a
+column's label takes the uppercase label treatment. A row's own label, `TableCell header`, is the name
+of the thing on that row, so it reads as ordinary text at medium weight.
+
+`Heading level` is the role, not a size. A page title is 1, the title of a pane or of a selected
+item in a detail column is 2, including one inside a `Toolbar`, and a heading inside content is 3.
+So opening a Linear issue and then a Docker container keeps the title the same size.
+
+A top-level page, such as Home, Memory, or Agent Center, opens with `Heading level={1}`. Actions for
+the whole page go in an `Inline spread` beside it. The page's description goes behind a help mark on
+the title, or stays as one muted line under it when a person needs it to act. Settings draws its
+title by hand, as host chrome, at the same size and weight.
+
 ### Rail controls and status markers
 
 `RailTab` is presentation only. It takes a `label` (which becomes both the tooltip title and the
@@ -137,7 +178,7 @@ For the full contract, see [The closed UI kit](./ui-design/closed-kit.md#the-clo
 2. Any **other name** is a Lucide glyph from `lucide-static/icon-nodes.json`, drawn stroked and
    unfilled in the same box, node by node through `<Dynamic>` and never `innerHTML`.
 3. An **unmatched name renders as text** in a `span.glyph`. That fallback is load-bearing rather
-   than a nicety — the remaining inline literals (◆/◇ pin state, ⊘/◉ hidden) ride it, which is also
+   than a nicety — the remaining inline literals (⊘/◉ hidden) ride it, which is also
    why `--font-glyph` survives the brand marks leaving.
 
 `Icon` takes two more props, and both are things a call site could not say without a class. `tone`
@@ -288,7 +329,10 @@ the same resize behaviour, so a plugin never supplies its own grid or pointer ha
 A list column is flush and scrolls its own rows. A column holding a document instead says so with
 `scroll`, and then it scrolls as one region and takes the pane's inline padding, the same rule
 `single` and `header-body-footer` apply to their bodies. GitHub's browse is the case: its middle
-column is a pull request, not a picker.
+column is a pull request, not a picker. Its rows, headers, fold summaries, and bars take that padding
+back, the same way chrome does in a pane body, so row text and fold labels start on the heading's
+edge. A detail column holding a form or a document can pass `measure="page"`, which stops its content
+at `--page-measure`, the settings page width, from the column's start edge.
 
 **The list column is flat — no tint.** The four task panes each gave it `--bg-subtle` and the four
 rail/frame panes did not, so the split read differently depending on which rail you reached it from.
@@ -386,10 +430,49 @@ plugins through `@acorn/plugin-api/ui/host` beside `PaletteSurface`. The termina
 Nothing behind a drawer goes inert, there is no backdrop, and Escape does not dismiss it: a drawer is
 a second place to work rather than an interruption.
 
-The toast stack sits above `--term-drawer-h`, the terminal drawer's published height (set on
-`documentElement` by the terminal plugin, with a fallback for a window where that plugin is not
-mounted), so a toast never renders behind the drawer. The stack itself ignores pointer events so it
-never swallows a click on the app behind it, and each toast re-enables its own.
+The toast stack sits in the top right in every view, under the top bar and one pane header's height,
+and clear of the right pane rail. Every pane keeps its primary controls at the bottom right, such as
+the agent composer's **Send**, so a toast in the bottom corner always covered one of them. At the top
+it covers content, which a person can read past, and never the terminal drawer. The stack ignores
+pointer events so it never swallows a click on the app behind it, and each toast re-enables its own.
+A toast's dismiss is `IconButton icon="x"`.
+
+Every floating surface reads the same tokens: `--popover-bg`, `--surface-border`, and
+`--radius-popover`. A dialog lifts with `--elev-modal`, and a menu, picker, tip, toast, or mention list
+with `--elev-popover`, so a style pack can raise one without the other. The dialog backdrop reads
+`--scrim-filter`, which is how the Modern and Cute packs blur the page behind a dialog.
+
+A dialog's title looks like a detail pane's title: `--fs-lg` at `--heading-weight` in `--text`,
+sentence case, in a bar as tall as a pane header, with the chrome divider under it. `Modal` names the
+dialog by that title, so a screen reader announces it. It draws a close button, `IconButton icon="x"`,
+at the end of the title bar, unless `dismissOn` is empty, which is how a flow that must be finished,
+such as onboarding, says it cannot be left. `Modal.Actions` has the pane pad all round and the chrome
+divider above it, and the wizard's footer matches it.
+
+Every dialog has the same shape, so the button a person came to press is always in the same place:
+
+1. It is a `Modal` at one of its four widths: `sm` 420, `md` 560, `lg` 720, or `wide` 820. The
+   command palette is the one exception, because it is a search box with a list, not a form.
+2. The title is the only title. Nothing in the body repeats it.
+3. The footer is `Modal.Actions`, in this order: any extra or destructive secondary action, a
+   `Toolbar.Spacer`, **Cancel** as `ghost`, then one `solid` primary named for what it does. Say
+   **Close** instead of **Cancel** when there is nothing to cancel. The primary takes
+   `tone="danger"` when it destroys something.
+4. Every footer button is the default size, `md`.
+5. The footer holds no hint text. A line that helps the person decide goes in the body.
+
+A step-by-step flow and a form on a settings page follow their own rules (`docs/frontend.md`
+§ Forms and flows).
+
+A dialog moves focus inside when it opens, and gives it back to its opener when it closes. With no
+`autoFocus`, focus goes to the first control in `Modal.Body`. An `alertdialog` starts on its first
+footer button that is not `solid`, which is **Cancel**, so Enter does not confirm by accident. A dialog
+with neither takes focus itself. A child that focused something first, such as the wizard's step body,
+keeps it.
+
+A `Popover` that holds content rather than a list heads itself with `SectionHeader level="group"`,
+on the surface's own inset. There is no `Popover title` prop, because the notification bell has two
+headings and one prop would cover one of them.
 
 The command palette and the file finder share one surface, `PaletteSurface`, rather than the
 near-duplicate `.palette-*` and `.finder-*` rule sets that used to exist side by side.
@@ -412,7 +495,7 @@ coordination.
 
 ## Tooltips
 
-A tooltip is five data attributes, honoured on any element anywhere, not a `<Tooltip>` wrapper
+A tooltip is six data attributes, honoured on any element anywhere, not a `<Tooltip>` wrapper
 component:
 
 | Attribute | Meaning |
@@ -422,19 +505,40 @@ component:
 | `data-tip-key` | A keyboard chord, rendered as a key cap. |
 | `data-tip-at` | An event's epoch-millisecond time. The muted line becomes its relative age, calculated when the tip opens. |
 | `data-tip-legend` | A JSON array of status markers (icon name, `StatusDot` tone, colour tone, meaning). `RailTab` serialises this from its own markers; call sites never build it. |
+| `data-tip-kind` | `help` draws the text as an explanation rather than a label: body weight, a paragraph's line height, and up to `min(22rem, 90vw)` wide instead of 260. Only the help mark sets it. |
+
+Write a chord with `formatChord` (`kit/lib/rendering/formatChord.ts`, and `@acorn/plugin-api/client`
+for a plugin), never by hand. It reads the registry's `meta+shift+n` and the keymap's `shift+super+n`
+alike and writes the modifiers as ⌃⌥⇧⌘ in that order, then the key: ⇧⌘N, ⌘↩, ⇧?. The pane tips, the
+key caps, the find bar, and the cheat sheet all go through it.
 
 A wrapper component adds an element around every trigger, which changes layout; attributes work on
 plugin-contributed markup, need no per-site listener, and cost one delegated listener for the whole
 document. This outgrew the task rail long ago: it was `tooltip/RailTips.tsx`, used by four core
 surfaces and exactly one plugin, while about fifty other sites fell back to native `title=`, which
 is slow, unstyled, and invisible to keyboard users on some platforms. Native `title` stays
-acceptable only where the styled tip cannot reach, inside xterm's canvas, for instance.
+acceptable only where the styled tip cannot reach, inside xterm's canvas, for instance, or where it
+repeats a name the element cut short, as a tab, a grid cell, or a list row does. A row keeps it on
+purpose: the styled tip opens at once, and a tip on every row of a file tree would flash under a
+pointer moving down the list.
+
+So the kit nodes write `data-tip`, never `title`. A `title` prop on `Button`, `IconButton`, `Chip`,
+`Checkbox`, `Menu.Item`, a `Select` option, a `SegmentedControl` option, a `Tabs` tab, `Input`,
+`Textarea`, and `Icon` is drawn as the styled tip. `Button`'s `tip` wins over its `title`. An
+`IconButton` with neither shows its `label`, because a glyph says nothing on its own. `Badge` and
+`StatusDot` take a `tip` of their own. A tipped badge is a tab stop, as a tipped `Text` is, and a dot's
+tip is asked for rather than taken from its `label`, because a labelled dot inside a tipped rail tab
+would answer the pointer first and hide the tab's tip.
 
 The tip is a singleton, positioned `fixed` so it escapes a scrolling list that clips absolutely
-positioned children. Side is automatic: the right rail (`.pane-switcher`) flies left, everything
-else flies right, and the CSS offset anchors to whichever side the bubble is pinned to, with `right`
-rather than `left` plus a transform so the bubble keeps real layout width instead of squeezing to
-the edge. A legend entry mirrors one active rail status marker, placed or crowded out, so the tooltip
+positioned children. Side is automatic: the right rail (`.pane-switcher`) prefers the left and
+everything else prefers the right. Once the bubble is drawn, it is measured, and it flips to the other
+side when the preferred one would run past the window's edge and the other would not. Its middle then
+moves up or down until the whole bubble is at least `--space-4` inside the top and the bottom. The CSS
+offset anchors to whichever side the bubble is pinned to, with `right` rather than `left` plus a
+transform, so the bubble keeps real layout width instead of squeezing to the edge. The tip does not
+close on Escape, and a pointer cannot rest on it. Both need the keymap, because a tip open inside
+settings must not also swallow the Escape that closes settings. A legend entry mirrors one active rail status marker, placed or crowded out, so the tooltip
 both reports current state and teaches what each glyph on the rail means.
 
 A sandboxed plugin frame has its own document, so the shell's tooltip singleton cannot see elements
@@ -442,7 +546,40 @@ inside it and `data-tip` would otherwise be silently inert there. `kit/lib/contr
 delegated listener and bubble markup into a frame's document, the way frames already mount their
 own copy of the shared CSS. It stays framework-free and importless on purpose: it is reached from
 `@acorn/plugin-api/ui/sdk`, which bundles into a plugin's frame and must not drag a slice of the
-shell, or a second copy of Solid, across that boundary.
+shell, or a second copy of Solid, across that boundary. It flips and clamps the same way, and marks
+a help tip the same way.
+
+### The help mark
+
+`SettingRow`, `SettingsSection`, `SectionHeader`, `Section`, `Heading`, and `Field` take `help`, a
+string. With it, the node draws a small "?" right after its title, and the text opens as a help tip
+on hover, on focus, and on a tap. That is where an explanation goes when it is useful but not needed
+at a glance, so the page carries less text. The mark is `content/HelpMark.tsx`, internal to the kit
+and not exported, so a plugin passes `help` and never places a mark itself.
+
+- The mark is a real `<button>`: a tab stop that opens the tip on focus. A press focuses it, because
+  WebKit does not focus a button on click and a touch screen has no hover.
+- Its name is "About" plus the title, so a page of marks reads "About Stop idle agents after" rather
+  than "Help, help, help". Its description is the help text, so a screen reader gets the words
+  without the bubble.
+- It sits outside the element that names its host, so a row's or a section's name does not gain
+  "About".
+- It is `--icon-size` in an `--icon-box` square, which is one line of a 12px label, so a row with a
+  mark is no taller than one without. It is `--text-muted` at rest and `--text` on hover and focus.
+  The title and the mark share one `.ui-titled` box with a `--space-2` gap, whatever the host's own
+  gap is.
+- Order: the title, the mark, then a count, the changed dot, or the scope chip.
+
+Which text goes where:
+
+- `description`: only what the person needs to choose correctly right now. A consequence that cannot
+  be undone, a unit, a format. One line, about 70 characters.
+- `help`: how it works, when it applies, why it exists. One to three short sentences, under about
+  200 characters.
+- Neither: text that restates the label, or that describes how acorn is built rather than what the
+  person gets.
+
+On a `Field`, `hint` stays the place for what to type, and `help` holds the why.
 
 ## Drag-to-resize
 
@@ -565,6 +702,25 @@ height and carries no `.ui-menu-item`, so the roving focus walks straight past i
 cannot reach the one row in the menu that matters most. Changes' Discard and Force push were both
 that shape and are both items now.
 
+A destructive item is `tone="danger"`, sits last, and has a `Menu.Separator` above it. It either arms
+with `confirm="{Verb} {thing}?"` or opens a dialog, and then its label ends in "…", as **Archive
+session…** does. `ContextMenuItems` draws the separator itself, before the first danger row a
+registry returns, because a registered row has no group to put it in. A menu of actions on one thing
+gives every item a leading icon or none of them, so the labels start at one edge.
+
+A menu that holds a choice says which one is chosen. `Menu.Item` takes `kind="radio"` for one of a
+set and `kind="checkbox"` for an on-off setting, with `checked`. The item reports as
+`menuitemradio` or `menuitemcheckbox` with `aria-checked`, and draws a check mark before its label,
+or a blank as wide, so chosen and unchosen labels line up. A checkbox item leaves the menu open, so
+several settings can change in one visit. A menu is at least 10rem wide, so a short menu's labels do
+not touch its edges.
+
+Every armed label, on a `ConfirmButton` or a `Menu.Item`, is "{Verb} {thing}?": **Delete note?**,
+**Remove container?**, **Cancel run?**. A bare "?" or "Sure?" does not say what the second press
+does. An armed `ConfirmButton` keeps at least its resting width, so a shorter prompt cannot pull the
+bar in under the pointer, and an icon button grows to hold its words. The default, for a caller that
+names no prompt, is **Confirm?**.
+
 An `AnchorTarget` can be a point as well as an element; a point is a zero-size rect, so everything
 downstream of the positioning math already works unchanged, which is what lets `ContextMenu` reuse
 `MenuSurface` for a right-click instead of building a second menu. Visibility is the caller's state,
@@ -592,6 +748,12 @@ by live events. No surface may show a spinner with no deadline: past that deadli
 useful next action; a row served from cache uses `stale` or `offline` instead, because it does have
 data. Ages shown next to `stale`/`offline` read "never" rather than a fabricated `0` when the Node has
 not answered once this session.
+
+An empty page, pane, or detail column, such as a detail with nothing selected, draws the centred
+`EmptyState` with a title that says what is missing. A list's "no rows" line stands in for the rows,
+so it uses `align="start" size="sm"`. A start-aligned empty state in a detail column with no header
+lands its text on the header line, beside the collapse control, where it reads as a header that lost
+its bar.
 
 ## Accessibility and density
 
@@ -741,9 +903,9 @@ edge, and no real-WebKit run has accepted it.
 | Node | Focus | At 80×24 |
 | --- | --- | --- |
 | `Stack` | none | children on successive lines, `gap` as 0 or 1 blank lines. `grow` means the stack is the region rather than a run of content in one: it takes what is left of the box, so a scroller or a canvas inside it has a height to work against |
-| `Inline` | none | children on one line separated by a space; wraps to a `Stack` when too wide |
-| `Section` | conditional | label in grey uppercase, children below |
-| `Fold` | stop | `▸ label` or `▾ label`, children indented two cells by default; `contentIndent="none"` aligns child content with the header |
+| `Inline` | none | children on one line separated by a space; wraps to a `Stack` when too wide. `even` is ignored, because the desktop's equal columns have no use in a row of cells |
+| `Section` | conditional | label in grey uppercase, children below. `help` is a grey line under the label, because this host has no hover |
+| `Fold` | stop | `▸ label` or `▾ label`, children indented two cells by default; `contentIndent="none"` aligns child content with the header; a `leading` control sits between the mark and the label |
 | `Card` | conditional | a box-drawing frame that fits its pane; a toned card uses a coloured `▍` left edge for its full height while the other edges stay neutral. Compact density keeps that left edge without the frame |
 | `Timeline` | collection | cards in sequence, a grey rule between turns. `follow` makes it the scroller and holds it on the last turn until the reader scrolls away, which is what leaves a pane's header and composer pinned around it; without `follow` it is a plain column and whatever is around it scrolls. `place` and `onChange` are dropped, and `Timeline.Turn` ignores its `key`: the reader is not put back on the turn they left, because a viewport here knows its own offset and nothing about where each turn sits, so a redrawn list opens at the newest turn. `hidden` draws the same **Show earlier** button above the turns, `reveal` and `onTrim` are ignored, and a `near` child is told it is near at once. `Timeline.Turn` is a node of its own on both hosts |
 | `Tabs` | collection | `Tab  [Tab]  Tab` on one line, the selected one in brackets. Its text label carries the meaning; `icon` is omitted and `title` has nowhere to hover |
@@ -751,19 +913,19 @@ edge, and no real-WebKit run has accepted it.
 | `Modal` | trap | a centred box with its title; Escape dismisses, which `keys/keys.test.tsx` drives. `Modal.Body` and `Modal.Actions` answer to their flat spellings too, on both hosts |
 | `ModalBody` | none | the lines between the title rule and the actions line |
 | `ModalActions` | none | the buttons on one line, right-aligned inside the box |
-| `Menu` | trap | a vertical list in a box |
+| `Menu` | trap | a vertical list in a box. A choice item prints `(•)` or `( )` for a radio and `[x]` or `[ ]` for a checkbox before its label, and `Menu.Separator` is a rule |
 | `Popover` | none | reduced: the panel opens as a block under its anchor, not floating. Open, the anchor and its panel take a line of their own, because a row shares its width between its children and a panel laid out in a trigger's few cells reads as nothing |
 | `ListDetail` | none | reduced: two columns above 80 cells. Below it, the `list` form draws the detail alone and the `split` form stacks its two column children, because this node has no keys of its own to switch with and a column of 38 cells is a column nobody can read. `collapseKey` is ignored: a rail of marks reads only because the names it drops come back on hover, and this host has neither hover nor `tip`, so narrowing by region is the answer here |
 | `ListColumn` | none | reduced: the left column, or the whole width when the split has collapsed |
-| `DetailColumn` | none | the right column, or the whole width |
+| `DetailColumn` | none | the right column, or the whole width. `measure` is ignored, since the column is already no wider than a readable line |
 | `Sections` | collection | reduced: a strip of tabs over one panel — the header first, then each section, then `main` below 120 cells, where a diff in half the width is a diff wrapped at 45 columns. `h` and `l` walk the strip. A section's `meta` is not drawn: a strip has room for a label and a count |
 | `SplitHandle` | stop | absent: a terminal split moves by a key, not a grip |
 | `DocumentTabs` | collection | one line of tab labels with a `×` on the current one |
-| `SectionHeader` | none | a bold heading with actions on the next line, so a long action label cannot erase the heading |
+| `SectionHeader` | none | a bold heading with actions on the next line, so a long action label cannot erase the heading. `help` is a grey line between them, because this host has no hover |
 | `TabPanel` | none | the rows under the tab strip |
 | `ToolbarSpacer` | none | the padding that pushes what follows to the right edge |
-| `SettingsSection` | none | the label in bold, the description in grey under it, then its rows; the danger zone's label is in the danger colour instead of a frame. `actions` draw on the line under the label |
-| `SettingRow` | none | reduced: one line, the label then the control, and `stacked` puts the control on the next line. The description in grey under it, **Saved** in green or the error in red. `onReset` adds `•` to the label and a `Reset` button. A row with `from` draws `From <where>` and no control, so the value this machine holds is not shown. A row with `scope="device"` draws `(this device)` after its label |
+| `SettingsSection` | none | the label in bold, the description in grey under it, then `help` as a grey line, because this host has no hover, then its rows; the danger zone's label is in the danger colour instead of a frame. `actions` draw on the line under the label |
+| `SettingRow` | none | reduced: one line, the label then the control, and `stacked` puts the control on the next line. The description in grey under it, then `help` as a grey line, because this host has no hover, **Saved** in green or the error in red. `onReset` adds `•` to the label and a `Reset` button. A row with `from` draws `From <where>` and no control, so the value this machine holds is not shown. A row with `scope="device"` draws `(this device)` after its label |
 
 ### Showing
 
@@ -771,15 +933,15 @@ edge, and no real-WebKit run has accepted it.
 | --- | --- | --- |
 | `Text` | none | plain text; `mono` is a no-op, `muted` is the palette grey, `strong` is bold |
 | `Link` | stop | the text, underlined, pressable |
-| `Heading` | none | eyebrow in grey uppercase, heading in bold |
+| `Heading` | none | eyebrow in grey uppercase, heading in bold. `help` is a grey line under it, because this host has no hover |
 | `Rows` | collection | its items on successive lines; `virtual` is the window of rows that fit, and it follows the active row because there is no pointer to scroll with |
 | `Row` | item | one line: status glyph, title, meta right-aligned. `variant="stacked"` puts the second child on a second line, as it does on the DOM. `reveal` has no meaning, because there is no hover, so the trailing controls always show. `collapsed` is ignored for the same reason its column's `collapseKey` is: the full row draws, and no name is lost |
 | `TreeRow` | item | `Row` indented `depth` cells with `▸` or `▾` |
 | `RowActions` | none | the row's actions at the right end, always drawn with their control labels, never on hover |
-| `Badge` | none | `[text]` in the tone's colour |
+| `Badge` | none | `[text]` in the tone's colour. `tip` draws nothing, because this host has no hover |
 | `Chip` | conditional | `(text)`, with a trailing `×` when removable |
 | `ChipRow` | collection | chips on one line, wrapping |
-| `StatusDot` | none | `●` in colour, `○` for muted |
+| `StatusDot` | none | `●` in colour, `○` for muted. `tip` draws nothing, because this host has no hover |
 | `Facts` | none | two columns, labels grey; `grouping="rows"` is one pair per line; `wide` on an item is a desktop-only full-row tile |
 | `DescriptionList` | none | as `Facts`, one pair per line |
 | `Table` | none | reduced: box-drawn, truncating columns by the priority its heads declare |
@@ -818,13 +980,13 @@ edge, and no real-WebKit run has accepted it.
 | `Checkbox` | stop | `[x] label`; Space toggles |
 | `SegmentedControl` | collection | `( a \| [b] \| c )`, the selected one in brackets |
 | `ToggleButton` | stop | `[x] label` |
-| `Picker` | stop | a field that opens a `Menu` filtered by typing |
+| `Picker` | stop | a field that opens a `Menu` filtered by typing. It draws no remove control, so it ignores `removable` and `removeLabel`, which name a row's remove button and arm it on the first press in the window |
 | `PickerRow` | item | one line in that menu: label and grey hint; a leading icon is omitted |
 | `Composer` | stop | a boxed field with a `> ` prompt; commit submits |
 | `MentionTextarea` | stop | reduced: a `Textarea` with the mention menu below it; no inline highlight of the token |
 | `KeyValueEditor` | none | a two-column table with editable cells, each cell a stop |
 | `FindBar` | stop | `/ query  3/12` on one line |
-| `Field` | none | the label above its child |
+| `Field` | none | the label above its child, the hint under it, then `help` as a grey line, because this host has no hover |
 | `CopyButton` | stop | a labeled Copy control sends OSC 52 where the terminal takes it, and prints the value on its own line to copy by hand where it does not |
 | `ModelBackendPicker` | stop | two `Select`s over the backends a Generate control can spend: a stored key, or an installed agent CLI |
 

@@ -28,6 +28,8 @@ import type { ShellModel } from './model'
 // they change. Each query still filters locally (client-core/host/registries/commands/localSearch.ts).
 
 export function registerNavigationCommands(model: ShellModel): Disposable {
+  // A task's project by name, never its id, from the workspaces that list it.
+  const projectName = (id: string) => model.workspaces().flatMap((workspace) => workspace.projects).find((project) => project.id === id)?.name
   return registerCommands([
     goToGroup(),
     {
@@ -44,12 +46,12 @@ export function registerNavigationCommands(model: ShellModel): Disposable {
         .map((task): CommandSearchItem => ({
           id: task.id,
           title: task.title,
-          subtitle: task.branch ?? task.projectId,
+          subtitle: task.branch ?? projectName(task.projectId),
           taskId: task.id,
         })), { cache: false }),
       select: (item): CommandOutcome => {
         const task = model.allTasks().find((candidate) => candidate.id === item.id)
-        if (!task) throw new Error('that task is no longer here')
+        if (!task) throw new Error("That task isn't here any more.")
         activateTaskSignals(task)
         return COMMAND_CLOSED
       },
@@ -68,7 +70,7 @@ export function registerNavigationCommands(model: ShellModel): Disposable {
         .map((workspace): CommandSearchItem => ({
           id: workspace.id,
           title: workspace.name,
-          subtitle: `${workspace.projects.length} projects`,
+          subtitle: `${workspace.projects.length} project${workspace.projects.length === 1 ? '' : 's'}`,
           workspaceId: workspace.id,
         })), { cache: false }),
       select: (item): CommandOutcome => {

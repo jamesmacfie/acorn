@@ -52,6 +52,9 @@ polling cadence (the advertised interval, `slow_down`, `expires_in`) is stated o
    boot.
 
 The optional GitHub plugin reads `GITHUB_CLIENT_ID`, uses no client secret, and needs no callback URL.
+Without a client id the provider reports `connectable: false`, so Add connection and first-run setup
+leave GitHub out instead of offering a sign-in that cannot start. A connection stored earlier keeps
+working.
 `githubToken(c)` is the single credential read site for GitHub routes.
 
 Device flow wins over the redirect web flow for three reasons. The web flow needs a client secret to
@@ -369,8 +372,8 @@ plugin's share of it.
 
 | Command | Kind | Chord | In the palette |
 | --- | --- | --- | --- |
-| Go to GitHub in the left rail (`source.github.open`) | action | `⌘0` | Yes |
-| Open keyboard shortcuts (`help.shortcuts.open`) | action | `?` | No — the reference is a Settings page, and the palette already has a row that opens Settings |
+| Open GitHub (`source.github.open`) | action | `⌘0` | Yes |
+| Edit keyboard shortcuts (`help.shortcuts.open`) | action | `?` | No — the reference is a Settings page, and the palette already has a row that opens Settings |
 | Find file in this pull request (`github.files.find`) | `search` | `/` | Yes |
 | Next changed file (`github.files.next`) | action | `]` | No |
 | Previous changed file (`github.files.previous`) | action | `[` | No |

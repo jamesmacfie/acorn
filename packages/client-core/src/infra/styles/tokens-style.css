@@ -51,11 +51,12 @@
   --space-8: 16px; --space-9: 20px; --space-10: 24px; --space-11: 32px;
 
   --pane-pad: var(--space-7);
-  --pane-pad-y: var(--space-5);
   /* How wide a column of reading gets before the pane stops giving it more. A pane can be 3700px
      on a wide display, and a transcript line 480 characters long is a line nobody reads. A pack
      may raise or lower it; zeroing it is not a thing, so it carries a length rather than a switch. */
   --pane-measure: 1200px;
+  /* How wide a settings page or a form in a detail column gets: one measure for both. */
+  --page-measure: 720px;
   --gap-inline: var(--space-3);
   --gap-row: var(--space-4);
   --gap-stack: var(--space-5);
@@ -66,6 +67,9 @@
   --pad-chip: 0 var(--space-4);
   --pad-cell: var(--space-1) var(--space-3);
   --pad-surface: var(--pane-pad);
+  /* Nothing reads these two. They stay because a plugin's style pack is checked against this list, and
+     a pack written when they existed would fail to load without them. */
+  --pane-pad-y: var(--pane-pad);
   --pad-body: var(--pane-pad);
 
   /* ── Density ───────────────────────────────────────────────────────────────────────────────
@@ -100,6 +104,8 @@
   /* A third genre: a column that is a document rather than a picker. github's browse puts the pull
      request itself between the list and the diff, and it needs prose width. */
   --listdetail-w-wide: clamp(360px, 23vw, 430px);
+  /* The control column of a setting row and of a split field, one measure so the two line up. */
+  --setting-control-w: 18rem;
   --icon-size: 14px;
   --icon-box: 18px;
   --avatar-sm: 18px;
@@ -157,6 +163,8 @@
   --elev-row-hover: var(--shadow-0);
 
   --ring: inset 0 0 0 var(--bw) var(--accent);
+  /* A filled band round a settings section a search result landed on, out to its outline. */
+  --ring-highlight: 0 0 0 var(--space-3) var(--bg-selected);
   --focus-ring-w: 2px;
   --focus-ring-offset: 2px;
   --focus-ring-style: solid;

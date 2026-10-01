@@ -18,6 +18,7 @@ export const memoryPlugin = (): NodePlugin => {
   let routeCapability: { dispose(): void } | null = null
   return {
     name: 'memory',
+    label: 'Memory',
     required: true,
     emits: [
       { verb: 'memories-changed', description: 'The project or private memory library changed' },

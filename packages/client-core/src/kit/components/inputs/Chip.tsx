@@ -1,5 +1,6 @@
 import { children, Show, type JSX } from 'solid-js'
 import type { Size, Tone } from '../../tokens/tokens'
+import Icon from '../content/Icon'
 
 /* Chip: Badge's interactive sibling. See docs/ui-design.md § How the kit is built
    (Badge / Chip) for when to use which, and for `data-colored`.
@@ -31,7 +32,7 @@ export function Chip(props: {
     'data-dashed': props.dashed ? '' : undefined,
     'data-reveal': props.reveal ? '' : undefined,
     'data-colored': props.color ? '' : undefined,
-    title: props.title,
+    'data-tip': props.title,
     // A custom property is the only way to hand a runtime value to a stylesheet. Sanitised because
     // the colour comes off an API response: anything but a plain colour token is dropped.
     style: props.color && SAFE_COLOR.test(props.color) ? { '--chip-color': props.color } : undefined,
@@ -51,7 +52,9 @@ export function Chip(props: {
         <span {...attrs()}>
           {body}
           <Show when={props.onRemove}>
-            <button type="button" class="ui-chip-remove" aria-label="Remove" onClick={() => props.onRemove?.()}>✕</button>
+            {/* A mark inside the chip's own button, not an IconButton, whose square would make the chip
+                taller than the text it sits beside. */}
+            <button type="button" class="ui-chip-remove" aria-label="Remove" onClick={() => props.onRemove?.()}><Icon name="x" /></button>
           </Show>
         </span>
       }

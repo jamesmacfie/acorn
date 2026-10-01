@@ -4,6 +4,7 @@ import { taskBridge } from '../tasks/taskBridge'
 import { modelBackendsOptions } from '../../infra/queries'
 import type { BrowserRule, DbSchemaMode, PreviewMode, ProjectConfigPatch, ProjectConfigResponse, SetupTrigger } from '@acorn/protocol/api.ts'
 import { Button, Checkbox, Input, Select, Textarea } from '../../kit/components/primitives'
+import { IconButton } from '../../kit/components/inputs/IconButton'
 import { Text } from '../../kit/components/content/Text'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
@@ -66,8 +67,9 @@ export function BranchPrefixRow(props: { store: ProjectConfigStore }) {
   return (
     <ConfigText
       label="Task branch prefix"
-      description="Added before the branch a new task takes from its title: jamesmacfie/ gives jamesmacfie/fix-the-thing. A trailing - stays as the separator, otherwise / is added. Blank means no prefix."
-      placeholder="jamesmacfie/"
+      description="Added to the start of each new task's branch name."
+      help="For example, your-name/ gives your-name/fix-login. acorn adds a / unless you end it with -. Leave it blank for no prefix."
+      placeholder="your-name/"
       value={config(props.store)?.branchPrefix ?? ''}
       save={(value) => props.store.save({ branchPrefix: value })}
     />
@@ -84,24 +86,25 @@ export function SetupTab(props: { store: ProjectConfigStore }) {
     <>
       <SettingsSection id="worktree" label="Worktree">
         <ConfigText
-          label="Worktree setup script"
-          description="A shell command run once in a new task's git worktree, shown as the first terminal tab. Choose when it runs below."
-          lines={6}
+          label="Setup script"
+          description="Runs once in each new task's worktree, in its first terminal tab."
+          lines={4}
           placeholder="./scripts/setup-worktree.sh"
           value={config(props.store)?.setupScript ?? ''}
           save={(value) => props.store.save({ setupScript: value })}
         />
-        <SettingRow label="Run the script" error={triggerSave.error()}>
+        <SettingRow label="When to run it" error={triggerSave.error()}>
           <Select
-            label="Run the script"
+            label="When to run it"
             value={trigger()}
             onChange={(value) => void triggerSave.run(() => props.store.save({ setupScriptTrigger: value as SetupTrigger }))}
-            options={[{ value: 'terminal', label: 'When the terminal is first opened' }, { value: 'created', label: 'When the task is created' }, { value: 'off', label: 'Off, never run it' }]}
+            options={[{ value: 'terminal', label: 'When the terminal first opens' }, { value: 'created', label: 'When the task is created' }, { value: 'off', label: 'Never' }]}
           />
         </SettingRow>
         <ConfigText
-          label="Worktree teardown script"
-          description="Runs in the worktree just before it's removed on task close, such as docker compose down. A non-zero exit pauses the close."
+          label="Teardown script"
+          description="Runs in the worktree before acorn removes it when you close the task."
+          help="If the script fails, the task stays open so you can check what went wrong."
           lines={4}
           placeholder="docker compose -f dev.yml down"
           value={config(props.store)?.teardownScript ?? ''}
@@ -111,26 +114,28 @@ export function SetupTab(props: { store: ProjectConfigStore }) {
 
       <SettingsSection id="dev" label="Dev script">
         <ConfigText
-          label="Dev script"
-          description="A ▶ run button on a task's right rail that starts and stops the script in its own terminal. Blank means no run button. A repo's .acorn/config.toml or named run targets override it."
-          lines={3}
+          label="Command"
+          description="Adds a run button to each task that starts and stops this command."
+          help="It runs in its own terminal. Leave it blank for no run button. A run target named dev, or a dev entry in a config file, takes over from this."
+          lines={2}
           placeholder="pnpm dev"
           value={config(props.store)?.devScript ?? ''}
           repoValue={repoDev()?.command}
           save={(value) => props.store.save({ devScript: value })}
         />
         <ConfigText
-          label="Dev restart command"
-          description="Optional. How to restart the dev script in place, such as touch tmp/restart.txt. Agents call this through the run_restart tool. Blank means restart stops and starts the dev script again."
+          label="Restart command"
+          description="Leave blank to stop and start the command instead."
+          help="A command that restarts the dev server in place, such as touch tmp/restart.txt. Agents use it too."
           lines={2}
-          placeholder="(blank = stop + start)"
+          placeholder="touch tmp/restart.txt"
           value={config(props.store)?.devRestartScript ?? ''}
-          repoValue={repoDev() ? repoDev()?.restart ?? '(none, so restart stops and starts it)' : undefined}
+          repoValue={repoDev() ? repoDev()?.restart ?? 'Not set. Restart stops and starts it.' : undefined}
           save={(value) => props.store.save({ devRestartScript: value })}
         />
       </SettingsSection>
 
-      <SettingsSection id="run-targets" label="Run targets">
+      <SettingsSection id="run-targets" label="Run targets" help="Each run target is a button on the task that runs its command in the task's worktree.">
         <RunTargetsTable
           stored={config(props.store)?.runTargets ?? null}
           repoTargets={repo(props.store)?.runTargets ?? []}
@@ -153,7 +158,7 @@ export function PreviewTab(props: { store: ProjectConfigStore }) {
     const mode = modeLabels[repoMode() ?? previewMode()]
     return repoValue() ? `${mode}: ${repoValue()}` : mode
   }
-  const modeLabels: Record<PreviewMode | '', string> = { '': 'Dev-server port (default)', url: 'A fixed URL', port: 'localhost with a port', script: 'Script, its output is the URL' }
+  const modeLabels: Record<PreviewMode | '', string> = { '': 'Dev-server port (default)', url: 'A fixed URL', port: 'localhost with a port', script: 'A script that prints the URL' }
   const previewValue = (label: string) => ({
     value: config(props.store)?.previewValue ?? '',
     repoValue: repo(props.store)?.previewValue,
@@ -165,7 +170,7 @@ export function PreviewTab(props: { store: ProjectConfigStore }) {
       <SettingsSection id="preview-url" label="Browser preview">
         <SettingRow
           label="Browser preview URL"
-          description="How the browser-preview pane finds its URL for this repo's tasks."
+          help="Where the Browser pane opens for this project's tasks."
           layout={repoPreview() ? 'stacked' : 'inline'}
           from={repoPreview() ? REPO_CONFIG_FILE : undefined}
           error={previewModeSave.error()}
@@ -182,7 +187,7 @@ export function PreviewTab(props: { store: ProjectConfigStore }) {
             anything typed for the other one. The modes share the stored value. */}
         <Switch>
           <Match when={previewMode() === 'script'}>
-            <ConfigText {...previewValue('Preview script')} description="Runs in the task's worktree. Its output, trimmed, is loaded as the URL." lines={4} placeholder="./scripts/preview-url.sh" />
+            <ConfigText {...previewValue('Preview script')} description="Runs in the task's worktree. acorn opens what it prints." lines={2} placeholder="./scripts/preview-url.sh" />
           </Match>
           <Match when={previewMode() === 'url'}>
             <ConfigText {...previewValue('Preview URL')} placeholder="https://example.test" />
@@ -193,7 +198,12 @@ export function PreviewTab(props: { store: ProjectConfigStore }) {
         </Switch>
       </SettingsSection>
 
-      <SettingsSection id="page-rules" label="Page rules">
+      <SettingsSection
+        id="page-rules"
+        label="Page rules"
+        description="Fills in a field when a preview page loads, such as a dev login. Values are saved as plain text, so use dev passwords only."
+        help="The pattern matches part of the URL. * matches anything, and $ at the end matches the end, so */$ matches only the home page."
+      >
         <BrowserRulesEditor rules={config(props.store)?.browserRules ?? []} onSave={(rules) => props.store.save({ browserRules: rules })} />
       </SettingsSection>
     </>
@@ -213,12 +223,13 @@ export function DatabaseTab(props: { store: ProjectConfigStore }) {
   const schemaModeSave = createSettingSave()
   return (
     <>
-      <SettingsSection id="db-connection" label="Database">
+      <SettingsSection id="db-connection" label="Connection">
         <ConfigText
-          label="Database connection script"
-          description="Optional. A shell command run in a task's worktree that prints a Postgres connection URL for the Database pane. Blank means auto-detect from DATABASE_URL in the worktree .env or the environment. Use this for setups auto-detect can't read, such as bin/rails runner 'puts ActiveRecord::Base.connection_db_config.url'."
+          label="Connection URL command"
+          description="Leave blank to use DATABASE_URL from the worktree's .env or the environment."
+          help="For other setups, give a command that prints a Postgres connection URL. It runs in the task's worktree."
           lines={2}
-          placeholder="(blank = auto-detect)"
+          placeholder="./scripts/db-url.sh"
           value={config(props.store)?.dbUrlScript ?? ''}
           repoValue={repo(props.store)?.dbUrlScript}
           save={(value) => props.store.save({ dbUrlScript: value })}
@@ -228,15 +239,15 @@ export function DatabaseTab(props: { store: ProjectConfigStore }) {
       <Show when={hasModelBackend()}>
         <SettingsSection id="schema" label="Query generation">
           <SettingRow
-            label="SQL generation schema source"
-            description="Where the database schema in the AI query-generation prompt comes from."
+            label="Schema source"
+            help="What acorn sends the model as your database schema when it writes a query."
             error={schemaModeSave.error()}
           >
             <Select
-              label="SQL generation schema source"
+              label="Schema source"
               value={dbSchemaMode()}
               onChange={(value) => void schemaModeSave.run(() => props.store.save({ dbSchemaMode: value as DbSchemaMode | '' }))}
-              options={[{ value: '', label: 'Live database introspection (default)' }, { value: 'script', label: 'Script, its output is the schema' }, { value: 'file', label: 'File in the worktree' }]}
+              options={[{ value: '', label: 'Read the live database (default)' }, { value: 'script', label: 'A script that prints it' }, { value: 'file', label: 'A file in the worktree' }]}
             />
           </SettingRow>
           {/* A field per mode, for the same reason as the preview URL. */}
@@ -263,8 +274,9 @@ export function DatabaseTab(props: { store: ProjectConfigStore }) {
           </Switch>
           <ConfigText
             label="Schema notes"
-            description="Optional. Context for AI query generation that the schema can't express: what a jsonb column holds, what a status column's values mean, which of two similar tables is live. Sent with the schema on every generate."
-            lines={6}
+            description="Anything the schema doesn't say, such as what a status column's numbers mean."
+            help="acorn sends these notes with the schema each time it writes a query."
+            lines={4}
             placeholder={'orders.meta jsonb: { coupon: string, source: "web" | "app" }\norders.status: 0 pending, 1 paid, 2 refunded'}
             value={config(props.store)?.dbSchemaNotes ?? ''}
             save={(value) => props.store.save({ dbSchemaNotes: value })}
@@ -287,6 +299,7 @@ function RepoValue(props: { value: string }) {
 function ConfigText(props: {
   label: string
   description?: string
+  help?: string
   value: string
   save: (value: string) => Promise<unknown>
   /** What `.acorn/config.toml` sets instead, when it sets this. */
@@ -302,6 +315,7 @@ function ConfigText(props: {
     <SettingRow
       label={props.label}
       description={props.description}
+      help={props.help}
       layout={props.lines || fromRepo() ? 'stacked' : 'inline'}
       from={fromRepo() ? REPO_CONFIG_FILE : undefined}
       savedAt={field.savedAt()}
@@ -359,14 +373,9 @@ function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: Brows
     save()
   }
 
+  // The section is the editor's heading and says what it is for, so the rules sit straight in it.
   return (
-    <SettingRow
-      label="Page rules"
-      description="On page load in the preview browser, fill an input (CSS selector) with a value when the URL matches the pattern. The pattern is a substring, * is a wildcard, and a trailing $ anchors to the end, so */$ matches only the root. Use it to fill in a dev login. Values are stored as plain text in the local database: dev credentials only, never production secrets."
-      layout="stacked"
-      savedAt={saving.savedAt()}
-      error={saving.error()}
-    >
+    <>
       {/* Index, not For: keying by position stops an edit remounting the row and defocusing it. */}
       <Index each={rules()}>
         {(rule) => (
@@ -404,17 +413,12 @@ function BrowserRulesEditor(props: { rules: BrowserRule[]; onSave: (rules: Brows
               onInput={(value) => update(rule().id, (r) => ({ ...r, action: { ...r.action, value } }))}
               onChange={save}
             />
-            <Button title="Delete rule" onPress={() => remove(rule().id)}>
-              ×
-            </Button>
+            <IconButton icon="x" label="Delete rule" onPress={() => remove(rule().id)} />
           </div>
         )}
       </Index>
-      <div>
-        <Button onPress={add}>
-          Add rule
-        </Button>
-      </div>
-    </SettingRow>
+      <Show when={saving.error()}>{(message) => <Text tone="danger" wrap>{message()}</Text>}</Show>
+      <Button onPress={add}>Add rule</Button>
+    </>
   )
 }

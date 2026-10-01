@@ -8,12 +8,13 @@ import type { JSX } from 'solid-js'
 export function Table(props: {
   size?: 'sm' | 'md'
   stickyHead?: boolean
-  /** Sets the h-scroll floor. Without it a wide table forces the whole pane to scroll sideways. */
+  /** The narrowest the table draws. Below it the table scrolls sideways inside its column, as a table
+   *  wider than its column always does. */
   minWidth?: number
   children: JSX.Element
 }) {
   return (
-    <div class="ui-table-scroll" data-scroll={props.minWidth ? '' : undefined}>
+    <div class="ui-table-scroll">
       <table
         class="ui-table"
         data-size={props.size ?? 'md'}
@@ -57,7 +58,11 @@ export function TableRow(props: { head?: boolean; onPress?: () => void; children
     <tr
       role={props.onPress ? 'button' : undefined}
       tabindex={props.onPress ? 0 : undefined}
-      onClick={() => props.onPress?.()}
+      onClick={(event) => {
+        // A click on a cell's own control, such as a checkbox or a button, is that control's.
+        if (inCellControl(event.target, event.currentTarget)) return
+        props.onPress?.()
+      }}
       onKeyDown={(event) => {
         if (!props.onPress) return
         // A press inside a cell's own control is that control's, not the row's.
@@ -71,6 +76,14 @@ export function TableRow(props: { head?: boolean; onPress?: () => void; children
   // Read once: `head` says which half of the table a row belongs to, and no caller moves a row
   // between them.
   return props.head ? <thead>{row()}</thead> : row()
+}
+
+const CELL_CONTROL = 'button, a[href], input, select, textarea, label, [role="button"], [role="checkbox"], [role="switch"]'
+
+/** Whether a click landed inside a control of the row's own, not on the row. */
+function inCellControl(target: EventTarget | null, row: Element): boolean {
+  const control = target instanceof Element ? target.closest(CELL_CONTROL) : null
+  return !!control && control !== row && row.contains(control)
 }
 
 /** One cell. `header` makes it the row's own label rather than a value. */

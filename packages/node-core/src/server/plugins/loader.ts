@@ -72,6 +72,9 @@ export type InstalledPlugin = {
 // a discipline each composition root has to remember.
 export type InstalledPluginInfo = {
   id: string
+  // The manifest's `name`. It goes out on the roster row as `label`, not inside `installed`, so a
+  // rename never reads as a different running package (server/pluginHost/state.ts).
+  label: string
   // See InstalledPlugin above. Absent on the wire when there is nothing to report, so the common case
   // costs no bytes.
   unknown?: ManifestUnknown
@@ -151,6 +154,7 @@ function clientDigest(dir: string, relPath: string | undefined): { hash: string;
 
 export const installedPluginInfo = (entry: InstalledPlugin): InstalledPluginInfo => ({
   id: entry.manifest.id,
+  label: entry.manifest.name,
   version: entry.manifest.version,
   apiVersion: entry.manifest.apiVersion,
   permissions: entry.manifest.permissions,
@@ -175,7 +179,7 @@ export type ActivePluginSnapshot = {
 /** Retain the manifest and the exact client bytes as one boot or reload candidate. The reported
  * digest is computed from these retained bytes, never from a later disk scan. */
 export async function snapshotActivePlugin(entry: InstalledPlugin): Promise<ActivePluginSnapshot> {
-  const { id, hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...declaration } = installedPluginInfo(entry)
+  const { id, label: _label, hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...declaration } = installedPluginInfo(entry)
   const bundle = await readClientBundle([entry], id)
   return {
     id,

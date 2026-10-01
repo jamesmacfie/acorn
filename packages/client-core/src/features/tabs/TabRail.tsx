@@ -5,7 +5,6 @@ import { integrationsOptions, prefsOptions, projectsOptions, tasksKey, tasksOpti
 import { archiveTask, createTask, patchTask } from '../tasks/taskMutations'
 import { applyRailOrder, applySourceOrder, isPinned, moveTask, parseRailOrder, pinTask, unpinTask, type RailDropPosition, type RailOrder } from './railOrder'
 import { checksState } from '../../kit/lib/rendering/displayMeta'
-import { createDismissable } from '../../kit/lib/controls/dismissable'
 import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
 import { defaultSourceId } from '../../host/registries/sources/sources'
 import { schedulePanePrefetch } from '../../host/registries/panes/panes'
@@ -27,7 +26,8 @@ import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import { taskBridge } from '../tasks/taskBridge'
 import { defaultBranchForTask } from '../tasks/defaultBranch'
 import { registerCommands } from '../../host/registries/commands/commands'
-import { registerKeybindings } from '../../host/registries/commands/keybindings'
+import { keybindingRegistry, registerKeybindings, resolveKeybindings } from '../../host/registries/commands/keybindings'
+import { formatChord } from '../../kit/lib/rendering/formatChord'
 import { confirmTaskArchive } from '../tasks/confirmTaskArchive'
 import { saveJsonPref } from '../settings/savePref'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
@@ -40,9 +40,12 @@ import IconPicker, { randomIconName } from '../../kit/components/inputs/IconPick
 import { loadIconNodes } from '../../kit/tokens/iconNodes'
 import './tabrail.css'
 import { RailTab } from './RailTab'
-import { taskOriginAppearance } from '../tasks/origin'
-import { Alert, Button, Checkbox, Input, Select } from '../../kit/components/primitives'
+import { localTaskGlyph, taskOriginAppearance } from '../tasks/origin'
+import { Alert, Button, Checkbox, Field, Input, Select } from '../../kit/components/primitives'
+import { Inline } from '../../kit/components/layout/Inline'
+import { FieldProvider, NO_FIELD } from '../../kit/components/inputs/controlAttrs'
 import { Menu } from '../../kit/components/overlays/Menu'
+import { Modal } from '../../kit/components/overlays/Modal'
 import { workflowTaskHierarchy } from '../tasks/taskHierarchy'
 import { expandedWorkflowRoots, toggleWorkflowRoot } from '../tasks/taskTreeViewState'
 import { createRailDrag } from './createRailDrag'
@@ -144,6 +147,11 @@ export default function TabRail() {
     const scoped = inWs ? all.filter((task) => inWs.has(task.projectId) && !projects.data?.find((project) => project.id === task.projectId)?.hidden) : all
     return applyRailOrder(scoped, railOrder())
   }
+  // The New task button's key cap, read from the live binding so a rebound chord shows as rebound.
+  const newTaskChord = createMemo(() => {
+    const chord = resolveKeybindings(keybindingRegistry.entries(), prefs.data ?? {}).find((binding) => binding.id === 'task.create')?.chord
+    return chord ? formatChord(chord) : undefined
+  })
   const taskRows = createMemo(() => workflowTaskHierarchy(orderedTasks(), expandedWorkflowRoots(), activeTaskId()))
   const visibleTasks = () => taskRows().map((row) => row.task)
   const taskDepths = createMemo(() => new Map(taskRows().map((row) => [row.task.id, row.depth])))
@@ -285,8 +293,13 @@ export default function TabRail() {
     setDraft({ mode: 'rename', w })
   }
 
-  async function submitDraft(e: Event) {
-    e.preventDefault()
+  // Enter in a field and the footer button both land here, so it checks what the button's
+  // `disabled` checks.
+  const canSubmitDraft = () => !!text().trim()
+    && !(draft()?.mode === 'new' && selectedProject()?.vcs === 'git' && !noBranch() && !effectiveBranch())
+
+  async function submitDraft() {
+    if (!canSubmitDraft()) return
     setDraftErr('')
     const d = draft()
     const value = text().trim()
@@ -323,13 +336,13 @@ export default function TabRail() {
   // browser dev build.
   const [archiveErr, setArchiveErr] = createSignal('')
   const [draftErr, setDraftErr] = createSignal('')
-  let draftDialog!: HTMLDivElement
-  const draftDismiss = createDismissable({ onDismiss: () => setDraft(null), container: () => draftDialog })
+  // The title, not the project picker above it, is where a person starts typing.
+  let draftTitle: HTMLInputElement | undefined
 
   async function openArchive(w: Task) {
     setMenuId(null)
     setArchiveErr('')
-    const decision = await confirmTaskArchive(w.id)
+    const decision = await confirmTaskArchive(w)
     if (decision.confirmed) await archive(w, decision.checked)
   }
 
@@ -430,12 +443,12 @@ export default function TabRail() {
                   <RailTab
                     class="tabrail-task"
                     label={w.title}
-                    glyph={w.icon ?? originIcon(w.origin)}
+                    glyph={w.icon ?? (w.origin === 'local' ? localTaskGlyph(w.title) : originIcon(w.origin))}
                     active={!selectedSource() && w.id === activeTaskId()}
                     accent={accent()}
                     markers={markers()}
                     data-tip-sub={[
-                      w.branch ?? 'project folder',
+                      w.branch ?? 'Project folder',
                       taskOriginAppearance(w.origin).tooltip,
                     ].filter(Boolean).join(' · ')}
                     aria-haspopup="menu"
@@ -446,11 +459,9 @@ export default function TabRail() {
               >
                 {(menu) => (
                   <>
-                    <Menu.Label>{w.title}</Menu.Label>
-                    <Menu.Label>{w.branch ?? 'Project folder'}</Menu.Label>
-                    <Menu.Separator />
-                    {/* Both doors onto a task row draw from the same registry (docs/plugins.md
-                        § Context menus), so they cannot offer different things. */}
+                    {/* No heading rows: the tab's tip already names the task and its branch. Both
+                        doors onto a task row draw from the same registry (docs/plugins.md § Context
+                        menus), so they cannot offer different things. */}
                     <ContextMenuItems context={menu} location="task.row" target={rowTarget(w)} />
                   </>
                 )}
@@ -521,7 +532,6 @@ export default function TabRail() {
                 glyph={source.icon}
                 active={source.selected}
                 markers={[...source.markers]}
-                data-tip-sub="Browse"
                 aria-current={source.selected ? 'page' : undefined}
                 onClick={() => value().selectSource(source.id)}
               />
@@ -531,7 +541,7 @@ export default function TabRail() {
         <div class="tabrail-sep" />
         <NestedChromeSlot slotRef={value().slots.taskList} />
         <RailTab class="tabrail-bottom" label="New task" glyph="plus"
-          data-tip-sub="Start a task on a new branch" onClick={value().createTask} />
+          data-tip-key={newTaskChord()} onClick={value().createTask} />
       </nav>
     )
   }
@@ -554,61 +564,61 @@ export default function TabRail() {
       <Show when={archiveErr()}><Alert>{archiveErr()}</Alert></Show>
       <Show when={draft()}>
         {(d) => (
-          <div class="overlay-backdrop" onClick={draftDismiss.onBackdropClick}>
-            <div ref={draftDialog} class="overlay" role="dialog" aria-modal="true" onClick={draftDismiss.onContainerClick} onKeyDown={draftDismiss.onKeyDown}>
-              <div class="overlay-title">{d().mode === 'new' ? 'New task' : 'Rename task'}</div>
-              <div class="overlay-body">
-                <Show when={d().mode === 'new'}>
-                  <p class="muted">{selectedProject()?.vcs === 'git' && !noBranch() ? 'A local-first task on a new branch.' : 'Runs in the project folder.'}</p>
+          <Modal title={d().mode === 'new' ? 'New task' : 'Rename task'} autoFocus={() => draftTitle} onDismiss={() => setDraft(null)}>
+            <Modal.Body>
+              <Show when={draftErr()}><Alert>{draftErr()}</Alert></Show>
+              <Show when={d().mode === 'new'}>
+                <Field label="Project">
                   <Select value={newProject()} onChange={(value) => setNewProject(value)} options={[...newProjectOptions().map((project) => ({ value: project.id, label: project.name }))]} />
-                </Show>
-                <form class="integration-key-row" style={{ 'flex-direction': 'column', 'align-items': 'stretch', gap: '6px' }} onSubmit={submitDraft}>
-                  <Show when={draftErr()}><Alert>{draftErr()}</Alert></Show>
-                  <div style={{ display: 'flex', 'align-items': 'center', gap: '6px' }}>
+                </Field>
+              </Show>
+              <Field label="Title">
+                <Inline gap="inline">
+                  {/* Kept out of the field, which would otherwise name the icon button "Title". It
+                      has its own name, "Task icon". */}
+                  <FieldProvider value={NO_FIELD}>
                     <IconPicker value={iconDraft()} fallback={draftFallbackIcon()} onSelect={setIconDraft} />
+                  </FieldProvider>
+                  <Input
+                    ref={(el) => (draftTitle = el)}
+                    value={text()}
+                    onInput={(value) => setText(value)}
+                    onSubmit={() => void submitDraft()}
+                  />
+                </Inline>
+              </Field>
+              <Show when={d().mode === 'new' && selectedProject()?.vcs === 'git'}>
+                <Show when={!noBranch()}>
+                  <Field label="Branch">
                     <Input
-                      ref={(el) => queueMicrotask(() => el.focus())}
-                      placeholder={d().mode === 'new' ? 'Task title' : 'Task name'}
-                      value={text()}
-                      onInput={(value) => setText(value)}
+                      value={branchTouched() ? branchText() : effectiveBranch()}
+                      onInput={(value) => {
+                        setBranchTouched(true)
+                        setBranchText(value)
+                      }}
+                      onSubmit={() => void submitDraft()}
                     />
-                  </div>
-                  <Show when={d().mode === 'new' && selectedProject()?.vcs === 'git'}>
-                    <Show when={!noBranch()}>
-                      <Input
-                        placeholder="branch (from title)"
-                        title="Branch name — defaults to a slug of the title"
-                        value={branchTouched() ? branchText() : effectiveBranch()}
-                        onInput={(value) => {
-                          setBranchTouched(true)
-                          setBranchText(value)
-                        }}
-                        />
-                    </Show>
-                    <Checkbox
-                      size="sm"
-                      label="Use the project folder and its current branch"
-                      title="The task works in the project folder on whatever branch is checked out, with no worktree"
-                      checked={noBranch()}
-                      onChange={(checked) => setNoBranch(checked)}
-                    />
-                  </Show>
-                  <Show when={d().mode === 'new' && selectedProject()?.vcs === 'git' && !noBranch()}>
-                    <Checkbox
-                      size="sm"
-                      label="Skip setup script"
-                      title="Do not run this project's setup script for this task"
-                      checked={skipSetup()}
-                      onChange={setSkipSetup}
-                    />
-                  </Show>
-                  <Button submit disabled={!text().trim() || (d().mode === 'new' && selectedProject()?.vcs === 'git' && !noBranch() && !effectiveBranch())}>
-                    {d().mode === 'new' ? 'Create' : 'Save'}
-                  </Button>
-                </form>
-              </div>
-            </div>
-          </div>
+                  </Field>
+                </Show>
+                <Checkbox
+                  size="sm"
+                  label="Use the project folder and its current branch"
+                  hint="No new branch. The task uses whatever is checked out."
+                  checked={noBranch()}
+                  onChange={(checked) => setNoBranch(checked)}
+                />
+              </Show>
+              <Show when={d().mode === 'new' && selectedProject()?.vcs === 'git' && !noBranch()}>
+                <Checkbox size="sm" label="Skip setup script" checked={skipSetup()} onChange={setSkipSetup} />
+              </Show>
+            </Modal.Body>
+            <Modal.Actions>
+              <Button variant="ghost" onPress={() => setDraft(null)}>Cancel</Button>
+              <Button variant="solid" disabled={!canSubmitDraft()} onPress={() => void submitDraft()}>
+                {d().mode === 'new' ? 'Create task' : 'Rename'}
+              </Button>
+            </Modal.Actions>
+          </Modal>
         )}
       </Show>
     </div>

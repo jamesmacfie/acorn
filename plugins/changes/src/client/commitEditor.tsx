@@ -1,4 +1,4 @@
-import { Icon, IconButton, Menu, Textarea } from '@acorn/plugin-api/ui'
+import { IconButton, Menu, Textarea } from '@acorn/plugin-api/ui'
 import type { ChangesModel } from './changesModel'
 
 // The commit editor's shared parts: the field, the options menu, and the two strings that describe
@@ -71,14 +71,9 @@ export function CommitField(props: {
 
 /** Amend, sign-off, and skip git hooks.
  *
- *  No heading above the run and no rule between the items. `Menu.Label` and `Menu.Separator` are
- *  DOM-only halves of `Menu` and the terminal host's table has neither
- *  (apps/tui/src/kit/components.tsx), so a heading here would be a footer that draws on one of the
- *  two hosts. Each label says what it turns on instead, and the leading `○` or `◉` says whether it
- *  is on, which is the same mark the view menu uses for the same reason.
- *
- *  The menu stays open on a press, because these are three switches and a reader who wants two of
- *  them should not have to open it twice.
+ *  No heading above the run and no rule between the items. Each label says what it turns on, and
+ *  the check mark says whether it is on. They are checkbox items, so the menu stays open on a press:
+ *  these are three switches, and a reader who wants two of them should not have to open it twice.
  *
  *  The trigger is a chevron joined to the commit button, Zed's split button, which the footer draws
  *  by putting both in one joined `Toolbar.Group`. */
@@ -87,8 +82,8 @@ export function CommitOptionsMenu(props: { model: ChangesModel }) {
   const Toggle = (own: { menu: MenuContext; on: boolean; hint: string; onSelect: () => void; children: string }) => (
     <Menu.Item
       context={own.menu}
-      closeOnSelect={false}
-      leading={<Icon name={own.on ? 'circle-dot' : 'circle'} title={own.on ? 'On' : undefined} />}
+      kind="checkbox"
+      checked={own.on}
       title={own.hint}
       onSelect={own.onSelect}
     >

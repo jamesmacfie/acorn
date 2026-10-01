@@ -3,12 +3,15 @@ import { useQueryClient } from '@tanstack/solid-query'
 import { activeNodeId } from '../../../infra/node/activeNode'
 import { nodePlugins } from '../../../infra/node/nodePlugins'
 import { devicePlugins, distribution } from '../../../host/plugins/distribution'
+import { pluginLabel } from '../../../host/plugins/pluginLabel'
 import { Button, Checkbox } from '../../../kit/components/primitives'
 import { createRailVisibility, pluginSources } from '../../tabs/railVisibility'
 import { createSettingSave } from '../settingSave'
 import { openPluginPage, pluginOrigin, statusOf, type InstalledPlugin } from './installed'
 import { setDevicePluginEnabled, setNodePluginEnabled } from './pluginActions'
 import type { SettingsNavigate } from '../../../host/registries/shell/settings'
+// The strip draws on pages that never load the plugin list, so it brings its own rules.
+import './plugins.css'
 
 // The plugin strip: the host's handle on a plugin, drawn above every page a plugin contributes to
 // settings, whether the page is compiled, a remote tree or a frame (docs/frontend.md § The plugin strip).
@@ -37,6 +40,7 @@ export function PluginStrip(props: {
     const row = nodePlugins()?.plugins.find((candidate) => candidate.name === props.pluginId)
     return row ? { kind: 'node', id: props.pluginId, row } : undefined
   })
+  const name = () => pluginLabel(props.pluginId)
   const status = () => {
     const current = plugin()
     return current ? statusOf(distribution(), activeNodeId(), current, false) : undefined
@@ -79,12 +83,12 @@ export function PluginStrip(props: {
   }
 
   return (
-    <div class="settings-plugin-strip" role="region" aria-label={`${props.pluginId} plugin`}>
+    <div class="settings-plugin-strip" role="region" aria-label={`${name()} plugin`}>
       <div class="settings-plugin-strip-row">
         <span class="settings-plugin-strip-name">
-          <strong>{props.pluginId}</strong> plugin<Show when={plugin()}>{(current) => `, ${pluginOrigin(current())}`}</Show>
+          <strong>{name()}</strong> plugin<Show when={plugin()}>{(current) => `, ${pluginOrigin(current())}`}</Show>
         </span>
-        <Button variant="bare" size="sm" onPress={() => openPluginPage(props.navigate, props.pluginId, plugin()?.kind)}>Manage plugin</Button>
+        <Button variant="ghost" size="sm" onPress={() => openPluginPage(props.navigate, props.pluginId, plugin()?.kind)}>Manage plugin</Button>
         <span class="settings-plugin-strip-controls">
           <For each={rail()}>
             {(source) => (

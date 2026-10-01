@@ -18,6 +18,9 @@
   border-left: var(--control-border);
   box-shadow: var(--shadow-drawer-l);
 }
+/* The panel takes focus when it opens, as a place for Tab to start from. It is not a control, so it
+   draws no ring. */
+.integrations-panel:focus { outline: none; }
 .integrations-panel-head {
   display: flex;
   align-items: center;
@@ -110,12 +113,6 @@
 /* One connection's project map, on its page or from a workspace's or project's side. */
 .integration-map { display: flex; flex-direction: column; gap: var(--space-3); }
 .integration-map-row { display: flex; align-items: center; gap: var(--space-4); }
-/* The external project's own name is the row's subject, so it takes the space and the target follows
-   it. Both truncate rather than wrap: a Linear project name can be a sentence. */
-.integration-map-name { font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.integration-map-target { flex: 1; min-width: 0; color: var(--text-faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-/* Also the Nodes page's add buttons. */
-.integration-add-icon { font-size: var(--fs-lg); line-height: 1; transition: transform 0.18s ease; }
 .integration-add-hint { font-size: var(--fs-sm); margin: 0; }
 /* The rows of forms that stack their fields: the promote dialog, the rail's source draft, a project's
    database script. */

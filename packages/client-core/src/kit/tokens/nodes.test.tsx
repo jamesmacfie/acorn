@@ -49,6 +49,12 @@ describe('grouping nodes', () => {
     expect(host.querySelector('.ui-inline')!.hasAttribute('data-wrap')).toBe(true)
   })
 
+  it('Section forwards its help to the header, outside the group name', () => {
+    mount(() => <Section label="Definitions" help="A workflow is a list of steps."><span>row</span></Section>)
+    expect(host.querySelector('section')!.getAttribute('aria-label')).toBe('Definitions')
+    expect(host.querySelector<HTMLElement>('.section-header .ui-help')!.dataset.tip).toBe('A workflow is a list of steps.')
+  })
+
   it('Section names its group for a screen reader', () => {
     mount(() => <Section label="Needs you" count={2}><span>row</span></Section>)
     expect(host.querySelector('section')!.getAttribute('aria-label')).toBe('Needs you')
@@ -86,6 +92,15 @@ describe('showing nodes', () => {
     mount(() => <Heading level={1} eyebrow="RUNN-42">Fix the thing</Heading>)
     expect(host.querySelector('.ui-heading-eyebrow')!.textContent).toBe('RUNN-42')
     expect(host.querySelector('h1')!.textContent).toBe('Fix the thing')
+  })
+
+  it('Heading with help keeps its heading element and adds the mark beside it', () => {
+    mount(() => <Heading level={1} help="What agents learned from your finished tasks.">Memory</Heading>)
+    const title = host.querySelector('h1.ui-heading-title')!
+    expect(title.textContent).toBe('Memory')
+    const mark = host.querySelector<HTMLElement>('.ui-titled > .ui-help')!
+    expect(mark.getAttribute('aria-labelledby')!.split(' ')).toContain(title.id)
+    expect(title.contains(mark)).toBe(false)
   })
 
   it('Facts announces each pair', () => {

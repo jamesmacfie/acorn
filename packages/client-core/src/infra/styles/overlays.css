@@ -10,26 +10,37 @@
   justify-content: center;
   padding-top: 12vh;
   background: var(--scrim);
+  backdrop-filter: var(--scrim-filter);
 }
 .overlay {
   width: min(560px, 92vw);
   max-height: 70vh;
   display: flex;
   flex-direction: column;
-  background: var(--bg);
-  border: var(--control-border);
+  background: var(--popover-bg);
+  border: var(--surface-border);
   border-radius: var(--radius-popover);
-  box-shadow: var(--shadow-5);
+  box-shadow: var(--elev-modal);
   overflow: hidden;
 }
+/* A dialog's title reads like a detail pane's title, in a bar as tall as a pane header. Modal puts
+   its close button at the end of the bar. */
 .overlay-title {
-  font-size: var(--fs-sm);
-  text-transform: var(--label-transform);
-  letter-spacing: var(--label-tracking);
-  color: var(--text-muted);
-  padding: var(--pane-pad);
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  min-height: var(--pane-head-h);
+  padding: 0 var(--pane-pad);
+  font-size: var(--fs-lg);
+  font-weight: var(--heading-weight);
+  color: var(--text);
   border-bottom: var(--chrome-divider);
 }
+.overlay-title-text { flex: 1; min-width: 0; }
+/* The dialog takes focus only when it holds nothing focusable, as a place for Tab to start from. It
+   is not a control, so it draws no ring. */
+.overlay:focus { outline: none; }
 
 /* A loaded plugin's `overlay` frame surface (docs/plugins.md): the host draws the box and the
    dismiss affordance, the frame draws its contents. See docs/ui-design.md § Chrome and overlays
@@ -50,9 +61,10 @@
   min-height: 0;
   overflow-y: auto;
 }
-.overlay-body .muted { margin: 0; }
-.will-concerns { display: flex; flex-direction: column; gap: var(--space-4); margin: 0 0 var(--space-8); padding: 0; list-style: none; }
-.will-concerns li { display: grid; grid-template-columns: auto 1fr auto; gap: var(--space-4); align-items: baseline; }
+/* The body's gap spaces its paragraphs, so a paragraph's own margin would double it. */
+.overlay-body > p, .overlay-body .muted { margin: 0; }
+.will-concerns { display: flex; flex-direction: column; gap: var(--space-4); margin: 0; padding: 0; list-style: none; }
+.will-concerns li { display: grid; grid-template-columns: auto 1fr; gap: var(--space-4); align-items: baseline; }
 .will-concerns li[data-severity='danger'] { color: var(--del-marker); }
 .will-concern-details { grid-column: 2 / -1; display: flex; flex-direction: column; gap: var(--space-1); margin: var(--space-2) 0 0; padding: 0; list-style: none; font-size: var(--fs-sm); color: var(--text-muted); }
 .will-concern-details li { overflow-wrap: anywhere; }
@@ -79,14 +91,14 @@
 /* @mention autocomplete popup (MentionTextarea.tsx): fixed below the textarea. */
 .mention-popup {
   position: fixed;
-  z-index: var(--z-overlay);
+  z-index: var(--z-picker);
   list-style: none;
   margin: 0;
   padding: var(--space-2) 0;
-  background: var(--bg);
-  border: var(--control-border);
+  background: var(--popover-bg);
+  border: var(--surface-border);
   border-radius: var(--radius-popover);
-  box-shadow: var(--shadow-3);
+  box-shadow: var(--elev-popover);
   max-width: 220px;
   overflow: hidden;
 }
@@ -107,12 +119,12 @@
 .mention-at { color: var(--accent); font-weight: 600; }
 
 /* ── Toast ──────────────────────────────────────────────────────────────────────────────────
-   Bottom-right stack. See docs/ui-design.md § Chrome and overlays for why it is offset by
-   --term-drawer-h. */
+   Top right, under the top bar and a pane header's height, in every view. See docs/ui-design.md
+   § Chrome and overlays for why it left the bottom corner. */
 .ui-toast-host {
   position: fixed;
-  right: var(--space-8);
-  bottom: calc(var(--term-drawer-h, 0px) + var(--space-8));
+  top: calc(var(--topbar-h) + var(--pane-head-h) + var(--space-4));
+  right: calc(var(--tabrail-w) + var(--space-8));
   z-index: var(--z-toast);
   display: flex;
   flex-direction: column;
@@ -127,31 +139,20 @@
   align-items: center;
   gap: var(--space-4);
   max-width: min(420px, 80vw);
-  padding: var(--space-4) var(--space-5);
+  padding: var(--space-4) var(--space-4) var(--space-4) var(--space-5);
   font-size: var(--fs-sm);
   color: var(--text);
   background: var(--popover-bg);
   border: var(--surface-border);
-  border-radius: var(--radius-surface);
+  border-radius: var(--radius-popover);
   box-shadow: var(--elev-popover);
   animation: ui-toast-in var(--dur-short) var(--ease-out);
 }
-@keyframes ui-toast-in { from { opacity: 0; transform: translateY(var(--space-4)); } }
+@keyframes ui-toast-in { from { opacity: 0; transform: translateY(calc(-1 * var(--space-4))); } }
 @media (prefers-reduced-motion: reduce) { .ui-toast { animation: none; } }
 .ui-toast[data-tone='success'] { border-color: var(--success); }
 .ui-toast[data-tone='danger'] { border-color: var(--danger); }
 .ui-toast-message { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-.ui-toast-close {
-  flex: none;
-  padding: 0;
-  font: inherit;
-  font-size: var(--fs-2xs);
-  color: var(--text-faint);
-  background: none;
-  border: 0;
-  cursor: pointer;
-}
-.ui-toast-close:hover { color: var(--text); }
 
 /* ── Drawer ─────────────────────────────────────────────────────────────────────────────────
    The app's one drawer: a bottom dock between the two icon rails, above the task footer. Not a modal

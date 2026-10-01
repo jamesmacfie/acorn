@@ -52,7 +52,11 @@ export default function NotificationSettings() {
 
   return (
     <>
-      <SettingsSection id="channels" label="How acorn tells you">
+      <SettingsSection
+        id="channels"
+        label="How acorn tells you"
+        actions={<Button size="sm" tip="Sends one through every option that's on." onPress={sendTest}>Send a test</Button>}
+      >
         <SettingRow label="Play a sound" error={sound.error()}>
           <Checkbox switch ariaLabel="Play a sound" checked={settings().sound} onChange={(on) => save(sound, { sound: on })} />
         </SettingRow>
@@ -66,7 +70,7 @@ export default function NotificationSettings() {
         </Show>
       </SettingsSection>
 
-      <SettingsSection id="events" label="Notify me when" description="Turning an event off also keeps it out of the notification list.">
+      <SettingsSection id="events" label="Notify me when" help="Turning one off also hides it from the notification list.">
         <SettingRow label="An agent needs me" error={blocked.error()}>
           <Checkbox switch ariaLabel="An agent needs me" checked={settings().events.blocked} onChange={(on) => saveEvent(blocked, { blocked: on })} />
         </SettingRow>
@@ -75,12 +79,6 @@ export default function NotificationSettings() {
         </SettingRow>
         <SettingRow label="An agent fails" error={failed.error()}>
           <Checkbox switch ariaLabel="An agent fails" checked={settings().events.error} onChange={(on) => saveEvent(failed, { error: on })} />
-        </SettingRow>
-      </SettingsSection>
-
-      <SettingsSection id="test" label="Test">
-        <SettingRow label="Test notification" description="Uses every channel that is turned on above.">
-          <Button label="Send a test notification" onPress={sendTest} />
         </SettingRow>
       </SettingsSection>
     </>

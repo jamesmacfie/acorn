@@ -22,7 +22,6 @@
 
   /* ── Space: the point of this pack ─────────────────────────────────────────────────────── */
   --pane-pad: var(--space-10);
-  --pane-pad-y: var(--space-8);
   --gap-inline: var(--space-4);
   --gap-row: var(--space-6);
   --gap-stack: var(--space-8);

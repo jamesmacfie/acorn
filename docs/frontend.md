@@ -468,11 +468,15 @@ its workspace page, and a workspace's projects are rows under it while it is exp
 and projects below). The arrow keys
 move through the rail, Enter opens a page, and the rail's single Tab stop is the open page's row, so
 Tab moves into the page. A dot beside a row marks an attention row whose target is that settings page.
-A page's body is capped at 720 px unless it sets `fullWidth`. Below 900 px the rail is its own screen
-and a page opens over it with a back link.
+A page's body is capped at `--page-measure`, 720 px, unless it sets `fullWidth`. Below 900 px the rail is its own screen
+and a page opens over it with a back link. The page is a size container, so when it is narrower than
+32rem its inline rows stack, the control under the words, however wide the window is.
 
-The header draws a breadcrumb, the page name, and a scope chip: **This device**, **Node: <label>**,
-**Workspace: <name>**, or **Project: <name>**, with the node named too when there is more than one.
+The header keeps to the page's width. Above the title, a small path names only what the page sits
+under: its group, and on a project its workspace. The title line holds the page name, then a scope
+chip, then the close button (an `x` with **Esc** in its tip) at the end. The chip says **This device**,
+**Node: <label>**, **Workspace**, or **Project**, with the node named too when there is more than one.
+The title already names the workspace or project, so its chip names only the kind.
 A page that reads and writes the node in `context.scope.nodeId` sets `followsNodeSwitcher`, and its
 chip becomes the node switcher when the fleet has two nodes or more. The switcher is local to
 settings: it starts on the active node each time settings opens and never changes `activeNodeId`,
@@ -508,7 +512,9 @@ carried by a link.
 
 Results rank page names first, then section names, then row labels, then keywords, and within a
 rank a match at the start of the text before one at the start of a word before one anywhere. Each
-result reads **Page › Section**, names the row or keyword that matched, and carries a scope chip.
+result names the section it lands on, with its page as a faint step above it, then the row or
+keyword that matched. A section named like its page shows the name once. A plugin is found by its
+name and by its id.
 Enter opens the first result. A result with a section scrolls to it and marks it for three seconds
 with an outline and a fill, which are there at once when motion is reduced; only the fade moves. A
 deep link, `settings/<pageId>#<sectionId>`, and a palette section row land the same way. Reopening
@@ -527,8 +533,13 @@ its **Turns at once** and **Claude prices** sections.
 
 A page is `SettingsSection`s of `SettingRow`s, two kit nodes on `@acorn/plugin-api/ui` (docs/ui-design.md
 § Every node at 80 by 24). A row is the label and one line of description on the left and the
-control on the right, or under them at the full width when `layout="stacked"`. The row draws the save
-state its caller hands it:
+control on the right, or under them at the full width when `layout="stacked"`. The description is
+only what a person needs to choose right now: a consequence that cannot be undone, a unit, or a
+format. How the setting works or why it exists goes in `help`, behind a "?" after the label, on a row
+or a section (docs/ui-design.md § The help mark). Text that restates the label goes nowhere. The label
+names the row's one control, so clicking it flips a switch or focuses a field. Every inline row is at
+least one control high plus its padding, whatever its control. The row draws the save state its
+caller hands it on the label's line, so the control column holds only the control and never narrows:
 
 - A switch or a select saves when it changes. `createSettingSave()` holds the row's `error`, and the
   control's own state is the signal that the change landed.
@@ -559,7 +570,7 @@ state its caller hands it:
 A page that lists things, such as custom agents or MCP servers, opens one as a detail in the same pane,
 never in a modal. The detail calls `useSettingsDetail(title, back)`
 (`features/settings/settingsDetail.ts`), and the header does the rest: it shows the item as the title
-and the last breadcrumb, draws a back link to the page's list, and binds ⌘[ to it. Going back passes
+and makes the page's name in the path a link back to its list, with ⌘[ bound to it. Going back passes
 through `leave()`, so a form with unsaved changes asks first. A detail with steps of its own, such as
 Add connection's gallery and then one provider's form, passes a third argument, the label of where
 `back` goes, so the link names the step before rather than the list. The hook returns false when nothing is
@@ -571,6 +582,20 @@ The helpers are in `features/settings/settingSave.ts`, `features/settings/unsave
 instead of posting a background notice, so a row's error is said once, beside the row. A loaded
 plugin's tree keeps the same state in its own signals, because `savedAt` and `error` cross to a
 sandbox and a function does not.
+
+### Forms and flows
+
+A form or a flow takes its frame from where it starts. A flow that interrupts, such as first run or
+an agent asking to install a plugin, is a `Modal`, and its footer follows the dialog rule in
+docs/ui-design.md § Chrome and overlays. A flow started from a settings page stays on the page, such
+as Add connection or Add a node.
+
+- A form on a page ends in a left-aligned `Inline gap="row"` under its last field: the one `solid`
+  primary first, then **Cancel** as `ghost`. A page is wide, and a button pushed to the far edge is
+  hard to find from the field it belongs to.
+- A flow of three or more screens says where the person is, in a muted line above its form: "Step 2
+  of 3". A flow of two screens needs no count, because its title changes and the back link returns to
+  the first screen.
 
 ### Workspaces and projects
 
@@ -598,10 +623,11 @@ deleted from any page, because it is where a deleted workspace's projects land.
 The two pages are addressed by id: `settings/workspace/<workspaceId>` and
 `settings/project/<projectId>`, each taking `#<sectionId>`. The same key is the rail row, the
 remembered page, and the search result for that workspace's or project's name and sections. A section
-on a tab that is not showing lands by picking its tab first. A detail page has a back link above its
-breadcrumb, and ⌘[ follows it: a workspace goes back to Overview, and a project goes back to Overview
-when it was opened from there, otherwise to its workspace. The breadcrumb reads
-`Workspaces and projects › <workspace> › <project>`.
+on a tab that is not showing lands by picking its tab first. Each step of the path above the title is a
+link: the group opens Overview and, on a project, the workspace opens its page. ⌘[ goes back: a
+workspace to Overview, and a project to Overview when it was opened from there, otherwise to its
+workspace. The step ⌘[ follows shows the chord in its tip. On a project the path reads
+`Workspaces and projects › <workspace>`.
 
 A settings page registered with `scope: 'workspace'` or `scope: 'project'` has no rail row. It is a tab
 on every workspace's or project's page, after core's own tabs, and gets that workspace or project in

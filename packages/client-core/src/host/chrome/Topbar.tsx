@@ -21,20 +21,23 @@ export default function Topbar(own: { value?: unknown }) {
   return (
     <div class="topbar">
       <div class="topbar-side">
-        <IconButton icon="panel-left" label={props().railCollapsed ? 'Expand rail' : 'Collapse rail'}
+        <IconButton icon="panel-left" label={props().railCollapsed ? 'Show tasks' : 'Hide tasks'}
           onPress={props().collapseRail} />
         <Show when={props().workspaces.length}>
           <Picker
+            size="sm"
             label={props().workspace?.label ?? 'Select a workspace'}
             placeholder="Filter workspaces…" emptyText="No workspaces."
             results={workspaceResults}
-            rowLabel={(entry) => `${entry.label}${props().nodes.length > 1 ? ` · ${entry.nodeLabel}` : ''}${entry.projectCount ? ` (${entry.projectCount})` : ''}`}
+            rowLabel={(entry) => `${entry.label}${props().nodes.length > 1 ? ` · ${entry.nodeLabel}` : ''}`}
+            rowDescription={(entry) => entry.projectCount ? `${entry.projectCount} project${entry.projectCount === 1 ? '' : 's'}` : undefined}
             isActive={(entry) => entry.id === props().workspace?.id && entry.nodeId === props().node?.id}
             onSelect={(entry) => props().pickWorkspace(entry.id, entry.nodeId)}
           />
         </Show>
         <Show when={props().projectPickerVisible}>
           <Picker
+            size="sm"
             label={props().project?.label ?? 'Select a project'}
             ariaLabel="Project" placeholder="Filter projects…" emptyText="No projects."
             results={projectResults}
@@ -52,7 +55,7 @@ export default function Topbar(own: { value?: unknown }) {
               <>
                 <Show when={index() > 0}><span class="crumb-sep">/</span></Show>
                 <Show when={crumb.route} fallback={<span class="crumb crumb-num">{crumb.label}</span>}>
-                  {(route) => <Button variant="bare" onPress={() => props().navigate(route())}>{crumb.label}</Button>}
+                  {(route) => <Button variant="ghost" size="sm" onPress={() => props().navigate(route())}>{crumb.label}</Button>}
                 </Show>
               </>
             )}

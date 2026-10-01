@@ -21,33 +21,32 @@ const appearance: SearchDeclaration = {
   keywords: ['dark mode', 'light mode', 'colour', 'color', 'density', 'typography', 'font'],
   sections: [
     { id: 'style', label: 'Style', rows: ['Style'] },
-    { id: 'theme', label: 'Theme', rows: ['Follow system light and dark', 'Theme', 'Light theme', 'Dark theme'] },
+    { id: 'theme', label: 'Theme', rows: ["Match the system's light or dark mode", 'Theme', 'Light theme', 'Dark theme'] },
   ],
 }
 const notifications: SearchDeclaration = {
   keywords: ['sound', 'alert', 'badge', 'chime', 'dock', 'system notification'],
   sections: [
-    { id: 'channels', label: 'How acorn tells you', rows: ['Play a sound', 'Show a system notification', 'Show a count on the app icon'] },
+    { id: 'channels', label: 'How acorn tells you', rows: ['Play a sound', 'Show a system notification', 'Show a count on the app icon', 'Send a test'], keywords: ['test notification'] },
     { id: 'events', label: 'Notify me when', rows: ['An agent needs me', 'An agent finishes', 'An agent fails'] },
-    { id: 'test', label: 'Test', rows: ['Test notification'] },
   ],
 }
 const shortcuts: SearchDeclaration = {
   keywords: ['keybindings', 'hotkeys', 'keys', 'chord', 'rebind', 'unbind'],
   sections: [
     { id: 'global', label: 'Global', rows: ['Open settings', 'Toggle rail', 'Switch to the last workspace', 'Show keyboard shortcuts'] },
-    { id: 'panes', label: 'Panes', rows: ['Toggle focused pane or terminal maximize', 'Toggle terminal drawer'] },
+    { id: 'panes', label: 'Panes', rows: ['Maximize or restore the focused pane', 'Toggle terminal drawer'] },
     { id: 'tasks', label: 'Tasks', rows: ['New task'] },
   ],
 }
 const cli: SearchDeclaration = {
   keywords: ['PATH', 'shell', 'install', 'headless'],
   sections: [
-    { id: 'command', label: 'acorn command', rows: ['Command location'] },
+    { id: 'command', label: 'acorn command', rows: ['Location'] },
   ],
 }
 const workspaces: SearchDeclaration = {
-  keywords: ['add folder', 'import', 'clone', 'new workspace', 'move project', 'hide project', 'tab colour', 'color', 'select', 'bulk'],
+  keywords: ['add folder', 'import', 'clone', 'new workspace', 'move project', 'hide project', 'rail colour', 'tab colour', 'color', 'select', 'bulk'],
   sections: [
     { id: 'projects', label: 'Projects' },
   ],
@@ -56,7 +55,7 @@ const workspaces: SearchDeclaration = {
 const workspaceDetail: SearchDeclaration = {
   keywords: ['rename workspace', 'delete workspace'],
   sections: [
-    { id: 'general', label: 'Workspace', rows: ['Name'] },
+    { id: 'general', label: 'General', rows: ['Name'], keywords: ['workspace name'] },
     { id: 'projects', label: 'Projects' },
     { id: 'connections', label: 'Connections', keywords: ['services it follows', 'linear', 'follow', 'project map'] },
     { id: 'danger', label: 'Danger zone', rows: ['Delete workspace'] },
@@ -65,16 +64,16 @@ const workspaceDetail: SearchDeclaration = {
 const projectDetail: SearchDeclaration = {
   keywords: ['config.toml', 'rename project', 'change folder', 'build', 'worktree'],
   sections: [
-    { id: 'general', label: 'Project', rows: ['Name', 'Folder', 'Task tab colour', 'Workspace', 'Hidden', 'Task branch prefix'] },
+    { id: 'general', label: 'General', rows: ['Name', 'Folder', 'Rail colour', 'Workspace', 'Hidden', 'Task branch prefix'], keywords: ['project name', 'tab colour'] },
     { id: 'danger', label: 'Danger zone', rows: ['Delete project'] },
-    { id: 'worktree', label: 'Worktree', rows: ['Worktree setup script', 'Run the script', 'Worktree teardown script'] },
-    { id: 'dev', label: 'Dev script', rows: ['Dev script', 'Dev restart command'] },
-    { id: 'run-targets', label: 'Run targets', rows: ['Run targets'], keywords: ['run button', 'default target'] },
+    { id: 'worktree', label: 'Worktree', rows: ['Setup script', 'When to run it', 'Teardown script'], keywords: ['worktree setup script', 'worktree teardown script'] },
+    { id: 'dev', label: 'Dev script', rows: ['Command', 'Restart command'], keywords: ['dev restart command', 'run button'] },
+    { id: 'run-targets', label: 'Run targets', keywords: ['run button', 'default target'] },
     { id: 'preview-url', label: 'Browser preview', rows: ['Browser preview URL', 'Preview script', 'Preview URL', 'Preview port'] },
-    { id: 'page-rules', label: 'Page rules', rows: ['Page rules'], keywords: ['autofill login'] },
-    { id: 'db-connection', label: 'Database', rows: ['Database connection script'], keywords: ['database url', 'postgres'] },
-    { id: 'schema', label: 'Query generation', rows: ['SQL generation schema source', 'Schema script', 'Schema file', 'Schema notes'] },
-    { id: 'connections', label: 'Connections', keywords: ['services it follows', 'linear', 'follow', 'project map'] },
+    { id: 'page-rules', label: 'Page rules', keywords: ['autofill login'] },
+    { id: 'db-connection', label: 'Connection', rows: ['Connection URL command'], keywords: ['database', 'database url', 'postgres', 'DATABASE_URL'] },
+    { id: 'schema', label: 'Query generation', rows: ['Schema source', 'Schema script', 'Schema file', 'Schema notes'], keywords: ['sql generation'] },
+    { id: 'connections', label: 'Followed services', keywords: ['connections', 'services it follows', 'linear', 'follow', 'project map'] },
   ],
 }
 const agentTools: SearchDeclaration = {
@@ -119,14 +118,14 @@ const schedules: SearchDeclaration = {
 const runs: SearchDeclaration = {
   keywords: ['workflow runs', 'agent sessions', 'cost', 'spend', 'history'],
   sections: [
-    { id: 'runs', label: 'Runs' },
+    { id: 'runs', label: 'Recent runs' },
   ],
 }
 const nodes: SearchDeclaration = {
   keywords: ['pair', 'pairing code', 'fingerprint', 'unpair', 'revoke', 'reconnect', 'rename', 'device', 'control plane', 'remote', 'fleet'],
   sections: [
-    { id: 'paired', label: 'Paired nodes', keywords: ['unpair', 'revoke', 'reconnect', 'rename', 'detach'] },
-    { id: 'add', label: 'Add a node', rows: ['Node address', 'Pairing code', 'This device\'s name', 'Name for this node'], keywords: ['pair', 'fingerprint'] },
+    // Adding a node is the Paired nodes section's action, and its form opens there.
+    { id: 'paired', label: 'Paired nodes', rows: ['Node address', 'Pairing code', 'Name for this computer', 'Name for this node'], keywords: ['add a node', 'pair', 'fingerprint', 'unpair', 'revoke', 'reconnect', 'rename', 'detach'] },
     { id: 'provided', label: 'Nodes from a provider', rows: ['Name for the new node'], keywords: ['cloud', 'adopt', 'destroy', 'start', 'stop'] },
   ],
 }
@@ -134,22 +133,20 @@ const security: SearchDeclaration = {
   keywords: ['encryption', 'FileVault', 'backup', 'archive', 'restore'],
   sections: [
     { id: 'encryption', label: 'Disk encryption', rows: ['Full-disk encryption'] },
-    { id: 'backup', label: 'Backup', rows: ['Archive path'] },
+    { id: 'backup', label: 'Backup', rows: ['Save to'], keywords: ['archive path'] },
   ],
 }
 const audit: SearchDeclaration = {
   keywords: ['history', 'security log', 'pairing', 'revoked', 'credentials'],
   sections: [
-    { id: 'trail', label: 'Audit trail' },
+    { id: 'trail', label: 'Recent activity', keywords: ['audit trail'] },
   ],
 }
 const telemetry: SearchDeclaration = {
   keywords: ['analytics', 'tracking', 'privacy', 'logs', 'errors', 'sinks'],
   sections: [
-    { id: 'collection', label: 'Collection', rows: ['Collect timings, logs and errors on this node'] },
-    { id: 'collected', label: 'What this node has collected' },
-    { id: 'records', label: 'What a record can hold' },
-    { id: 'destination', label: 'Where it goes' },
+    { id: 'collection', label: 'Collection', rows: ['Collect timings, logs, and errors on this node'], keywords: ['where it goes'] },
+    { id: 'collected', label: 'What this node has collected', keywords: ['what a record can hold'] },
   ],
 }
 // The agents plugin's section (`agents`) is drawn through CORE_STORAGE_POINT and declared here, because
@@ -160,7 +157,7 @@ const storage: SearchDeclaration = {
     { id: 'agents', label: 'Agents', rows: ['Running agents', 'Idle', 'Memory', 'Attachments', 'Artifacts'], keywords: ['stop idle agents now'] },
     { id: 'process', label: 'Node process', rows: ['Memory'] },
     { id: 'disk', label: 'Disk', rows: ['Core database', 'Blob cache'], keywords: ['sqlite', 'write-ahead log'] },
-    { id: 'cache', label: 'Saved cache on this device', rows: ['Size', 'Entries'], keywords: ['clear cache'] },
+    { id: 'cache', label: 'Saved cache on this device', rows: ['Size', 'Entries'], keywords: ['clear cache', "clear this node's copy"] },
   ],
 }
 const plugins: SearchDeclaration = {
@@ -180,19 +177,19 @@ const railSurfaces: SearchDeclaration = {
 const deviceConfig: SearchDeclaration = {
   keywords: ['acorn.json', 'config file', 'edit by hand'],
   sections: [
-    { id: 'file', label: 'Device config file', rows: ['Location'] },
+    { id: 'file', label: 'Location', rows: ['File'] },
   ],
 }
 const clearCache: SearchDeclaration = {
   keywords: ['reload', 'reset', 'stale', 'refresh'],
   sections: [
-    { id: 'cache', label: 'Cache', rows: ['Cached answers'] },
+    { id: 'cache', label: 'This window', rows: ['Saved copies of what acorn loaded'] },
   ],
 }
 const extensionPoints: SearchDeclaration = {
   keywords: ['slots', 'contributions', 'unmatched', 'plugin author', 'debug'],
   sections: [
-    { id: 'points', label: 'Points on this node', rows: ['Which plugin draws this'] },
+    { id: 'points', label: 'Available points', rows: ['Which plugin draws this'] },
     { id: 'unmatched', label: 'Contributions that match nothing' },
   ],
 }
@@ -214,8 +211,8 @@ export const CORE_SETTINGS_PAGES = [
   // Workspaces and projects. Overview is the node's whole map; the workspace page and the project page
   // are each drawn once per workspace or project, under its own rail row, at
   // `settings/workspace/<id>` and `settings/project/<id>`.
-  { id: 'workspaces', ...workspaces, label: 'Overview', category: 'workspaces', scope: 'node', icon: 'layout-grid', order: 10, fullWidth: true },
-  { id: 'workspace.detail', ...workspaceDetail, label: 'Workspace', category: 'workspaces', scope: 'workspace', icon: 'folder', order: 20, fullWidth: true },
+  { id: 'workspaces', ...workspaces, label: 'Overview', category: 'workspaces', scope: 'node', icon: 'layout-grid', order: 10 },
+  { id: 'workspace.detail', ...workspaceDetail, label: 'Workspace', category: 'workspaces', scope: 'workspace', icon: 'folder', order: 20 },
   { id: 'project.detail', ...projectDetail, label: 'Project', category: 'workspaces', scope: 'project', icon: 'folder', order: 30 },
 
   // Agents. The agents plugin files its own pages here too; these two are core's. Tools and
@@ -232,8 +229,8 @@ export const CORE_SETTINGS_PAGES = [
   // Automation. A schedule is a promise one machine makes (docs/schedules.md), and a run happens on one
   // machine. Run history is core's rather than any plugin's, because the list is merged from every
   // plugin that declared a run source and no one of them owns it (@acorn/protocol/runs.ts).
-  { id: 'schedules', ...schedules, label: 'Schedules', category: 'automation', scope: 'node', icon: 'calendar-clock', order: 10, followsNodeSwitcher: true, fullWidth: true },
-  { id: 'runs', ...runs, label: 'Run history', category: 'automation', scope: 'node', icon: 'clock', order: 20, followsNodeSwitcher: true, fullWidth: true },
+  { id: 'schedules', ...schedules, label: 'Schedules', category: 'automation', scope: 'node', icon: 'calendar-clock', order: 10, followsNodeSwitcher: true },
+  { id: 'runs', ...runs, label: 'Run history', category: 'automation', scope: 'node', icon: 'clock', order: 20, followsNodeSwitcher: true },
 
   // Machines. Nodes is the device's fleet, so its scope is this device. Not `requires: 'desktop'`: the
   // page renders its own explanation in a browser, where there is no broker and so no fleet.
@@ -241,7 +238,7 @@ export const CORE_SETTINGS_PAGES = [
   // security.md § On-disk asks the app to surface the disk-encryption posture, and § Audit says the
   // trail is "owner-readable in Settings". Two pages, because they answer two questions.
   { id: 'security', ...security, label: 'Security and backup', category: 'machines', scope: 'node', icon: 'shield', order: 20, followsNodeSwitcher: true },
-  { id: 'audit', ...audit, label: 'Audit log', category: 'machines', scope: 'node', icon: 'scroll-text', order: 30, followsNodeSwitcher: true, fullWidth: true },
+  { id: 'audit', ...audit, label: 'Audit log', category: 'machines', scope: 'node', icon: 'scroll-text', order: 30, followsNodeSwitcher: true },
   // `telemetry.enabled` is a preference on the node rather than on this screen (docs/telemetry.md).
   { id: 'telemetry', ...telemetry, label: 'Telemetry', category: 'machines', scope: 'node', icon: 'activity', order: 40, followsNodeSwitcher: true },
   // Memory and disk are facts about one machine. Core's page, with a section each plugin that holds
@@ -260,7 +257,7 @@ export const CORE_SETTINGS_PAGES = [
   { id: 'device-config', ...deviceConfig, label: 'Device config file', category: 'advanced', scope: 'device', icon: 'file-cog', order: 10 },
   // The top bar menu's Clear cache, as a page someone can find by looking in settings.
   { id: 'clear-cache', ...clearCache, label: 'Clear cache', category: 'advanced', scope: 'device', icon: 'trash-2', order: 20 },
-  { id: 'extension-points', ...extensionPoints, label: 'Extension points', category: 'advanced', scope: 'device', icon: 'blocks', order: 30, fullWidth: true },
+  { id: 'extension-points', ...extensionPoints, label: 'Extension points', category: 'advanced', scope: 'device', icon: 'blocks', order: 30 },
 ] as const satisfies readonly CoreSettingsPage[]
 
 export type CoreSettingsPageId = (typeof CORE_SETTINGS_PAGES)[number]['id']

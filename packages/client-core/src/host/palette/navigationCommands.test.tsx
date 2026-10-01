@@ -125,7 +125,7 @@ describe('go to task', () => {
   it('says so rather than navigating when the task has gone since the list was drawn', async () => {
     const command = search('core.goto.task')
     expect(() => command.select({ id: 'vanished', title: 'Vanished' }, contextFor('node-a')))
-      .toThrow('no longer here')
+      .toThrow("isn't here any more")
     expect(navigated).toEqual([])
   })
 })

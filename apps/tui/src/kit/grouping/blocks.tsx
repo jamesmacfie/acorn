@@ -2,6 +2,7 @@
 import { createSignal, Show, type JSX } from 'solid-js'
 import type { Renderable } from '../../tree/compat'
 import type { Size, Space, Tone } from '@acorn/client-core/kit/tokens'
+import type { SectionProps } from '@acorn/client-core/kit/components/layout'
 import { isCompact, slotColor } from '../../appearance'
 import { Line, slot } from '../cells'
 import { borderCell, boxBorder, litControl, spaceCells, spaceLines } from '../roles'
@@ -23,7 +24,8 @@ export function Stack(props: { gap?: Space; grow?: boolean; children: JSX.Elemen
   )
 }
 
-export function Inline(props: { gap?: Space; wrap?: boolean; spread?: boolean; children: JSX.Element }) {
+// `even` is ignored: a row of cells already gives each child the width it needs.
+export function Inline(props: { gap?: Space; wrap?: boolean; spread?: boolean; even?: boolean; children: JSX.Element }) {
   return (
     <box
       flexDirection="row"
@@ -36,7 +38,7 @@ export function Inline(props: { gap?: Space; wrap?: boolean; spread?: boolean; c
   )
 }
 
-export function Section(props: { label: string; count?: number; actions?: JSX.Element; sticky?: boolean; children: JSX.Element }) {
+export function Section(props: SectionProps) {
   return (
     <box flexDirection="column" flexShrink={0} marginTop={spaceLines('section')}>
       <box flexDirection="row" gap={1}>
@@ -44,6 +46,7 @@ export function Section(props: { label: string; count?: number; actions?: JSX.El
         <Show when={props.count !== undefined}><Line role="muted">{String(props.count)}</Line></Show>
         {slot(props.actions)}
       </box>
+      <Show when={props.help}><Line role="muted" wrap>{props.help!}</Line></Show>
       {props.children}
     </box>
   )
@@ -55,6 +58,7 @@ export function Fold(props: {
   label: string
   count?: number
   meta?: JSX.Element
+  leading?: JSX.Element
   actions?: JSX.Element
   level?: 'pane' | 'group' | 'sub'
   contentIndent?: 'default' | 'none'
@@ -87,6 +91,7 @@ export function Fold(props: {
     >
       <box flexDirection="row" gap={1} flexShrink={0} ref={control.ref}>
         <Line {...litControl({ focused: control.focused() })}>{open() ? '▾' : '▸'}</Line>
+        {slot(props.leading)}
         <Line {...litControl({ focused: control.focused(), strong: true })}>{props.label}</Line>
         <Show when={props.count !== undefined}><Line role="muted">{String(props.count)}</Line></Show>
         {slot(props.meta)}

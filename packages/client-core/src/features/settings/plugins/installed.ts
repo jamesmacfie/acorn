@@ -2,6 +2,7 @@ import type { NodePluginRow } from '@acorn/protocol/api.ts'
 import type { DevicePluginEntry, PluginDistributionSnapshot } from '../../../host/plugins/distributionModel'
 import type { SettingsNavigate } from '../../../host/registries/shell/settings'
 import { createDetailRequest } from '../settingsDetail'
+import { pluginLabel } from '../../../host/plugins/pluginLabel'
 import { devicePluginStatus, nodePluginStatus, type PluginStatus } from '../../../host/plugins/pluginStatus'
 
 // The one list Settings > Plugins > Installed draws: the plugins the node in the header reports and the
@@ -16,16 +17,19 @@ export type InstalledPlugin =
 
 export type InstalledFilter = 'all' | 'needs-you' | 'device'
 
-/** Node plugins then device ones, each by id. The same id can be both, when a client-only plugin shares
+/** Node plugins then device ones, each by the name people read. The same id can be both, when a client-only plugin shares
  *  a name with one a node runs, so a plugin is addressed by kind and id together. */
 export function installedPlugins(rows: readonly NodePluginRow[], device: readonly DevicePluginEntry[]): InstalledPlugin[] {
   return [
-    ...[...rows].sort((a, b) => a.name.localeCompare(b.name)).map((row): InstalledPlugin => ({ kind: 'node', id: row.name, row })),
-    ...[...device].sort((a, b) => a.row.name.localeCompare(b.row.name)).map((entry): InstalledPlugin => ({ kind: 'device', id: entry.row.name, entry })),
+    ...[...rows].sort((a, b) => pluginLabel(a).localeCompare(pluginLabel(b))).map((row): InstalledPlugin => ({ kind: 'node', id: row.name, row })),
+    ...[...device].sort((a, b) => pluginLabel(a.row).localeCompare(pluginLabel(b.row))).map((entry): InstalledPlugin => ({ kind: 'device', id: entry.row.name, entry })),
   ]
 }
 
 export const pluginRow = (plugin: InstalledPlugin): NodePluginRow => (plugin.kind === 'node' ? plugin.row : plugin.entry.row)
+
+/** The plugin's name as people read it, or its id from a node that sends no name. */
+export const pluginName = (plugin: InstalledPlugin): string => pluginLabel(pluginRow(plugin))
 
 export function statusOf(snapshot: PluginDistributionSnapshot, nodeId: string | null, plugin: InstalledPlugin, devMode: boolean): PluginStatus {
   return plugin.kind === 'node' ? nodePluginStatus(snapshot, nodeId, plugin.row, devMode) : devicePluginStatus(snapshot, plugin.entry, devMode)

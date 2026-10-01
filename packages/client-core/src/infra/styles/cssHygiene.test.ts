@@ -43,6 +43,7 @@ describe('no phantom tokens', () => {
       '--row-field-w', '--row-owner-inset',
       '--kit-grid-col',
       '--tab-strip-h',
+      '--pane-actions-w',
     ])
 
     const phantom = [...new Set(sheets.flatMap((f) => [...referenced(f.text)]))]
@@ -81,9 +82,9 @@ describe('literal ratchets (these may only go down)', () => {
     expect(count(/z-index:(?!\s*(?:var\(|calc\())[^;]+;/g)).toBe(0)
   })
 
-  // Remaining: 8px/9px/9px micro-type and one 16px glyph button, all below or between ramp rungs.
+  // Zero since the rail's 8px and 9px micro-type moved to --fs-2xs.
   it('literal font-size', () => {
-    expect(count(/font-size:\s*\d/g)).toBeLessThanOrEqual(4)
+    expect(count(/font-size:\s*\d/g)).toBe(0)
   })
 
   // A third-party brand colour rides on its mark, in TypeScript or a plugin manifest, so nothing in

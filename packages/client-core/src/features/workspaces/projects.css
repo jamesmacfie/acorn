@@ -1,7 +1,7 @@
 .ws-row-controls { display: flex; align-items: center; gap: var(--space-2); }
 .ws-project-color {
-  width: 22px;
-  height: 22px;
+  width: var(--control-h-sm);
+  height: var(--control-h-sm);
   padding: 1px;
   border: var(--control-border);
   background: var(--bg);
@@ -10,18 +10,20 @@
 .ws-project-color::-webkit-color-swatch-wrapper { padding: 0; }
 .ws-project-color::-webkit-color-swatch { border: 0; }
 .ws-project-color:disabled { cursor: default; opacity: 0.5; }
-.ws-project-color-empty:not(:disabled) { opacity: 0.35; }
+/* No colour chosen: an empty dashed swatch at full strength, so it reads as "none" rather than as
+   disabled. The well still holds grey underneath, because a colour input always has a value. */
+.ws-project-color-empty { border-style: dashed; }
+.ws-project-color-empty::-webkit-color-swatch { opacity: 0; }
 
 /* ── The project table (ProjectTable.tsx) ─────────────────────────────────────────────────────── */
-.ws-row-facets {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  color: var(--text-muted);
-  font-size: var(--fs-md);
-}
-/* The path is reference, not a control, so it is capped and ellipsised rather than widening its
-   column; its tip holds the whole of it. */
+/* A small table's rows keep the small row height, so a row is a target the size of a list row. A
+   cell's height is its row's floor. */
+.ws-project-table :is(td, th[scope='row']) { height: var(--row-h-sm); }
+.ws-row-facets { display: flex; align-items: center; gap: var(--space-2); }
+.ws-group-name { display: flex; align-items: baseline; gap: var(--space-3); }
+.ws-group-count { color: var(--text-faint); font-weight: var(--fw-normal); font-variant-numeric: var(--tabular); }
+/* The path is reference, not a control, so it is capped rather than widening its column; its tip
+   holds the whole of it. */
 .ws-row-path {
   display: inline-block;
   max-width: 36ch;

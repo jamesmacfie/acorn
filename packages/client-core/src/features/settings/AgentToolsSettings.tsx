@@ -13,6 +13,7 @@ import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import { createSettingSave } from './settingSave'
 import { openPluginPage } from './plugins/installed'
+import { pluginLabel } from '../../host/plugins/pluginLabel'
 import type { SettingsNavigate } from '../../host/registries/shell/settings'
 
 // Settings → Agents → Tools and permissions (docs/agent-tools.md § Projections): the permission surface
@@ -33,7 +34,7 @@ type Grouping = 'owner' | 'tier'
 // Core's tools are acorn's own. A node from before the catalog named owners reports none, and its
 // tools are all core's then anyway.
 const ownerOf = (tool: AgentToolCatalogEntry) => tool.owner ?? 'core'
-const ownerLabel = (owner: string) => (owner === 'core' ? 'acorn' : owner)
+const ownerLabel = (owner: string) => (owner === 'core' ? 'acorn' : pluginLabel(owner))
 
 /** `navigate` is settings' own, for the links to each tool's plugin; drawn without it, there are none. */
 export default function AgentToolsSettings(props: { navigate?: SettingsNavigate } = {}) {
@@ -90,7 +91,7 @@ export default function AgentToolsSettings(props: { navigate?: SettingsNavigate 
       return TIERS.map((tier) => ({ key: tier.risk, label: `${tier.label} tools`, tools: toolsFor(tier.risk) }))
         .filter((group) => group.tools.length)
     }
-    const owners = [...new Set(tools.map(ownerOf))].sort((a, b) => (a === 'core' ? -1 : b === 'core' ? 1 : a.localeCompare(b)))
+    const owners = [...new Set(tools.map(ownerOf))].sort((a, b) => (a === 'core' ? -1 : b === 'core' ? 1 : ownerLabel(a).localeCompare(ownerLabel(b))))
     return owners.map((owner) => ({ key: owner, label: ownerLabel(owner), tools: tools.filter((tool) => ownerOf(tool) === owner) }))
   })
 
@@ -173,7 +174,7 @@ export default function AgentToolsSettings(props: { navigate?: SettingsNavigate 
                           when={grouping() === 'tier' && ownerOf(t) !== 'core' && props.navigate}
                           fallback={<Chip size="xs">{grouping() === 'owner' ? tierLabel(t.risk) : ownerLabel(ownerOf(t))}</Chip>}
                         >
-                          <Button variant="bare" size="sm" tip={`Manage the ${ownerOf(t)} plugin`} onPress={() => openPluginPage(props.navigate!, ownerOf(t), 'node')}>
+                          <Button variant="bare" size="sm" tip={`Manage the ${ownerLabel(ownerOf(t))} plugin`} onPress={() => openPluginPage(props.navigate!, ownerOf(t), 'node')}>
                             {ownerLabel(ownerOf(t))}
                           </Button>
                         </Show>

@@ -53,7 +53,7 @@ export const workflowsCommands: readonly ContributedCommand[] = [
     id: 'workflows.run',
     kind: 'search',
     title: 'Run a workflow',
-    hint: 'the workflows committed to this repository',
+    hint: 'workflows saved in this repository',
     keywords: ['workflow', 'start'],
     category: 'action',
     palette: true,
@@ -147,7 +147,7 @@ export const workflowsCommands: readonly ContributedCommand[] = [
     // project the reader is in.
     id: 'workflows.new',
     title: 'New workflow',
-    hint: 'a workflow of your own, saved on this node',
+    hint: 'a workflow saved on this computer',
     keywords: ['workflow', 'create'],
     category: 'action',
     palette: true,

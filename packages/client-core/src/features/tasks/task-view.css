@@ -32,7 +32,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-7);
-  padding: 4px var(--pane-pad);
+  padding: 0 var(--pane-pad);
   border-top: var(--chrome-divider);
   background: var(--bg-subtle);
   font-size: var(--fs-sm);
@@ -59,18 +59,6 @@
   align-items: center;
   justify-content: center;
 }
-.workspace-empty-term {
-  align-self: center;
-  font: inherit;
-  font-size: var(--fs-sm);
-  padding: var(--space-2) var(--space-6);
-  color: var(--text);
-  background: var(--bg);
-  border: var(--control-border);
-  border-radius: var(--radius);
-  cursor: pointer;
-}
-.workspace-empty-term:hover { background: var(--bg-hover); }
 
 /* Neither the editor pane nor the preview pane has a box rule of its own any more: the first roots
    itself in the kit's ListDetail and the second declares the `single` layout, and both of those
@@ -117,15 +105,12 @@
 .pane-switcher .tabrail-tab {
   font-family: var(--font-glyph);
   border-left: 0;
-  border-right: var(--tab-active-w) solid transparent;
+  border-right: var(--stripe-w) solid transparent;
 }
 .pane-switcher .tabrail-tab.active { border-right-color: var(--accent); }
-/* Close-task sits at the bottom of the rail, set off from the pane switches above it: same
+/* Archive task sits at the bottom of the rail, set off from the pane switches above it: same
    `.tabrail-bottom` modifier and the same square box as the left rail's "+". Its danger hover comes
    from RailTab's `tone`, not a class here. */
-
-/* Close-task confirmation modal bits (reuses the shared .overlay shell). */
-.close-actions { display: flex; justify-content: flex-end; gap: var(--space-5); }
 
 /* The Linear Source browse used to be here: the master/detail list, its triage filters, the
    priority-bar glyph, the label chip and the workspace project picker. Linear is a loaded package
@@ -150,7 +135,31 @@
    leaving it on the final task pane would stack it with the switcher's left divider. */
 .task-pane-row > .task-slot:last-child > .pane { border-right: 0; }
 /* SplitHandle owns the hit area, the hairline and the hover/focus tone (ui/split.ts + primitives.css). */
-.pane-slot-actions { position: absolute; top: 4px; right: 4px; z-index: calc(var(--z-resizer) + 1); display: flex; gap: var(--space-1); }
+/* Pin and close, centred on the pane header's line. They float over the pane's own chrome, so the
+   bar under them reserves their width below. */
+.pane-slot-actions {
+  position: absolute;
+  top: calc((var(--pane-head-h) - var(--control-h-xs)) / 2);
+  right: var(--space-2);
+  z-index: calc(var(--z-resizer) + 1);
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+/* What the actions take: two xs buttons, or those and the compact node chip while the node is
+   offline or stale. Reserved for both buttons even when close is hidden, so a header's controls do
+   not shift when a second pane opens. */
+.task-slot { --pane-actions-w: calc(2 * var(--control-h-xs) + var(--space-2)); }
+.task-slot:has(> .pane-slot-actions > .node-chip) { --pane-actions-w: calc(2 * var(--control-h-xs) + var(--space-10) + var(--space-4)); }
+/* The bar at the pane's top right is the one the actions sit over: the first bar of the last column
+   in a split pane (directly, or one wrapper down for a remote tree), or the header of a single-column
+   pane. A class chain with `:first-child`, because `:first-of-type` matches by element and every bar
+   is a div. */
+.task-slot:has(> .pane-slot-actions > .ui-btn) > :is(.layout-list-detail, .ui-listdetail) > :last-child > :is(.ui-toolbar, .diff-toolbar, .section-header[data-level='pane'], .ui-doctabs):first-child,
+.task-slot:has(> .pane-slot-actions > .ui-btn) > :is(.layout-list-detail, .ui-listdetail) > :last-child > :first-child > :is(.ui-toolbar, .section-header[data-level='pane']):first-child,
+.task-slot:has(> .pane-slot-actions > .ui-btn) > .layout-hbf > .layout-hbf-header {
+  padding-inline-end: calc(var(--pane-pad) + var(--pane-actions-w));
+}
 .contribution-failed { align-items: center; justify-content: center; gap: var(--space-4); }
 .contribution-unavailable { flex: 1; }
 

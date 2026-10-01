@@ -80,9 +80,13 @@ describe('props are sanitized before anything sees them', () => {
     expect(dropped).toHaveLength(136)
   })
 
-  it('makes a text run carry a string and nothing else', () => {
+  it('makes a text run carry a string, a finite number as its digits, and nothing else', () => {
     expect(sanitizeProps(TEXT_NODE, { value: 'hello', tone: 'ok' }).props).toEqual({ value: 'hello' })
-    expect(sanitizeProps(TEXT_NODE, { value: 12 }).props).toEqual({ value: '' })
+    // A bundle built before the remote root turned numbers into text still sends them as numbers.
+    expect(sanitizeProps(TEXT_NODE, { value: 12 }).props).toEqual({ value: '12' })
+    expect(sanitizeProps(TEXT_NODE, { value: Number.NaN }).props).toEqual({ value: '' })
+    expect(sanitizeProps(TEXT_NODE, { value: Number.POSITIVE_INFINITY }).props).toEqual({ value: '' })
+    expect(sanitizeProps(TEXT_NODE, { value: { toString: 'x' } }).props).toEqual({ value: '' })
   })
 })
 

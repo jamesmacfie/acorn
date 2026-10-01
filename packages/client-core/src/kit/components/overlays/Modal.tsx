@@ -1,7 +1,8 @@
-import { Show, type JSX } from 'solid-js'
+import { createUniqueId, onMount, Show, type JSX } from 'solid-js'
 import { Portal } from 'solid-js/web'
-import { restoreFocusOnCleanup } from '../../keys/trap'
+import { focusableIn, restoreFocusOnCleanup } from '../../keys/trap'
 import { createDismissable } from '../../lib/controls/dismissable'
+import { IconButton } from '../inputs/IconButton'
 
 // Modal chrome. Behaviour comes from createDismissable. See docs/ui-design.md § Chrome and
 // overlays for why that split keeps this component purely cosmetic, and why the overlay palettes
@@ -17,6 +18,26 @@ import { createDismissable } from '../../lib/controls/dismissable'
 // `overflow: auto` rather than one over the window. The ref-based focus trap and dismissal are
 // unaffected by the move, and a loaded plugin's overlay is inside an iframe, so it stays boxed
 // either way (host/frames/PluginRefPanel.tsx).
+//
+// Focus moves inside on open, so the next Tab stays in the dialog and a screen reader hears it. With
+// no `autoFocus`, it goes to the first control in the body. An `alertdialog` starts on its first
+// footer button that is not `solid`, which is the Cancel, so Enter never confirms by accident.
+// Without either, the dialog itself takes focus. Anything a child focused first, such as the wizard's
+// step body, is left alone.
+
+// Tab order within a part of the dialog, less anything a pointer or Tab cannot reach anyway.
+const reachable = (dialog: HTMLElement, part: string): HTMLElement[] => {
+  const root = dialog.querySelector<HTMLElement>(part)
+  return root ? focusableIn(root).filter((element) => element.tabIndex >= 0) : []
+}
+
+function firstFocus(dialog: HTMLElement, role: 'dialog' | 'alertdialog'): HTMLElement {
+  if (role === 'alertdialog') {
+    const safe = reachable(dialog, '.ui-modal-actions').find((button) => button.dataset.variant !== 'solid')
+    if (safe) return safe
+  }
+  return reachable(dialog, '.overlay-body')[0] ?? dialog
+}
 
 export function Modal(props: {
   /** `onDismiss` rather than `onClose` because dismissal is one of the kit's eleven events, and only
@@ -40,6 +61,7 @@ export function Modal(props: {
   children: JSX.Element
 }) {
   let dialog!: HTMLDivElement
+  const titleId = createUniqueId()
   const dismiss = createDismissable({
     onDismiss: () => props.onDismiss(),
     container: () => dialog,
@@ -48,7 +70,16 @@ export function Modal(props: {
 
   // Read before anything inside is focused, so the opener is still the active element.
   restoreFocusOnCleanup()
-  if (props.autoFocus) queueMicrotask(() => props.autoFocus?.()?.focus())
+  // After mount rather than straight away: a dialog under a Suspense boundary is built before it is
+  // in the document, and a focus call on a detached element does nothing.
+  onMount(() => queueMicrotask(() => {
+    const own = props.autoFocus?.()
+    if (own) return own.focus()
+    if (!dialog?.isConnected || dialog.contains(document.activeElement)) return
+    firstFocus(dialog, props.role ?? 'dialog').focus({ preventScroll: true })
+  }))
+  // An empty `dismissOn` means the dialog must be finished, not left, so it draws no close button.
+  const closable = () => (props.dismissOn ?? ['escape']).length > 0
 
   return (
     <Portal>
@@ -61,14 +92,22 @@ export function Modal(props: {
           data-layout={props.layout ?? 'stack'}
           role={props.role ?? 'dialog'}
           aria-modal="true"
-          aria-labelledby={props.labelledBy}
+          aria-labelledby={props.labelledBy ?? (props.title ? titleId : undefined)}
+          tabindex="-1"
           onClick={dismiss.onContainerClick}
           onKeyDown={(event) => {
             if (props.onKeyDown?.(event)) return
             dismiss.onKeyDown(event)
           }}
         >
-          <Show when={props.title}><div class="overlay-title">{props.title}</div></Show>
+          <Show when={props.title}>
+            <div class="overlay-title">
+              <span class="overlay-title-text" id={titleId}>{props.title}</span>
+              <Show when={closable()}>
+                <IconButton icon="x" label="Close" onPress={() => props.onDismiss()} />
+              </Show>
+            </div>
+          </Show>
           {props.children}
         </div>
       </div>

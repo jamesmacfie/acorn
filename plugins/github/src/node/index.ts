@@ -4,7 +4,7 @@ import { GITHUB_MIRROR } from '../contract/mirror'
 import { actions } from '../server/routes/checks/actions'
 import { githubDeviceAuth } from '../server/routes/deviceAuth'
 import { githubImport } from '../server/routes/repos/import'
-import { githubProvider } from '../server/provider'
+import { createGithubProvider } from '../server/provider'
 import { mentions } from '../server/routes/pulls/mentions'
 import { pins } from '../server/routes/pulls/pins'
 import { prActions } from '../server/routes/pulls/prActions'
@@ -33,6 +33,7 @@ import { pullRequestEditorLineMarkers } from '../server/editorLineMarkers'
 export const githubPlugin = (): NodePlugin => {
   return {
     name: 'github',
+    label: 'GitHub',
     required: false,
     // What other plugins may hear from this one
     // (docs/plugins/forward-compatibility.md § Hearing another plugin). workflows hears
@@ -71,7 +72,7 @@ export const githubPlugin = (): NodePlugin => {
       //
       // The device-flow router registers separately below because github's routes share a namespace
       // with twelve mirror routers whose registration order is load-bearing.
-      ctx.providers.integration(githubProvider)
+      ctx.providers.integration(createGithubProvider({ connectable: githubClientId() !== '' }))
       ctx.routes.fetch(createPullSourceHandler(), { prefix: '/data/pulls' })
       ctx.dataSources.register(pullSource)
 

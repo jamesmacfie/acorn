@@ -269,8 +269,8 @@ const acorn = {
     }),
   openConfigFile: () => invoke<void>('open_config_file'),
   cli: {
-    status: () => invoke<{ available: boolean; installed: boolean; location: string | null; message: string }>('cli_install_status'),
-    install: () => invoke<{ available: boolean; installed: boolean; location: string | null; message: string }>('cli_install'),
+    status: () => invoke<{ available: boolean; installed: boolean; outdated?: boolean; location: string | null; message: string }>('cli_install_status'),
+    install: () => invoke<{ available: boolean; installed: boolean; outdated?: boolean; location: string | null; message: string }>('cli_install'),
   },
 
   nodeFetch: async (nodeId: string, request: unknown) => {

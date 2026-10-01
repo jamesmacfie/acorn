@@ -35,7 +35,7 @@ export default function CopyButton(props: {
       type="button"
       class="copy-btn"
       data-always={props.always ? '' : undefined}
-      title={props.title ?? 'Copy'}
+      data-tip={props.title ?? 'Copy'}
       aria-label={props.title ?? 'Copy'}
       onClick={copy}
     >

@@ -79,6 +79,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
     })
   return {
     name: 'workflows',
+    label: 'Workflows',
     emits: [
       { verb: 'run-changed', description: 'A workflow run changed durable status' },
       { verb: 'gate-changed', description: 'A workflow approval gate started or settled' },

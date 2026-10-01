@@ -27,12 +27,14 @@ export function CommitModal(props: { model: ChangesModel; onDismiss: () => void 
             needs none — entering a dialog there lands on its first stop
             (docs/tui.md § Keys and focus). */}
         <CommitField model={model()} grow rows={12} onField={(element) => queueMicrotask(() => element.focus?.())} />
+        {/* Under the field rather than in the footer, which holds only buttons
+            (docs/ui-design.md § Chrome and overlays). */}
+        <Text emphasis="muted">{gitCommitLine(model())}</Text>
       </Modal.Body>
       <Modal.Actions>
-        <Text emphasis="muted">{gitCommitLine(model())}</Text>
-        <Button variant="bare" size="sm" onPress={props.onDismiss}>Cancel</Button>
+        <Button variant="ghost" onPress={props.onDismiss}>Cancel</Button>
         <Button
-          size="sm"
+          variant="solid"
           busy={model().committing()}
           disabled={!model().canCommit()}
           // Dismissed only once the draft is gone, which is what a commit that landed leaves

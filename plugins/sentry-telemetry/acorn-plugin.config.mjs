@@ -29,7 +29,7 @@
 //   net — the worker enforces these patterns for Sentry-hosted ingestion. A DSN names its own host,
 //     so `o<org>.ingest.<region>.sentry.io` is covered by one subdomain label under each pattern.
 export default {
-  name: 'Sentry (telemetry export)',
+  name: 'Sentry export',
   // The Sentry mark, as one SVG path's `d` in a 24 box. The host validates the grammar and registers
   // it as `brand:sentry-telemetry` under the id it stamps from this package's directory, so
   // `glyph: 'brand:sentry-telemetry'` in src/server/provider.ts resolves with no client code of ours

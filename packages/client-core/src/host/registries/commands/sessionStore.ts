@@ -93,7 +93,8 @@ export type SessionSearchState = {
   readonly results: readonly SessionSearchResult[]
   /** Per-node failures. A fleet query that lost one node keeps the other's rows and says so, which is
    *  the convention every other fan-out surface already follows (infra/node/fanout.ts). */
-  readonly errors: readonly { source: string; message: string }[]
+  /** `source` is the node's label in a fleet search, and null where there is one node to ask. */
+  readonly errors: readonly { source: string | null; message: string }[]
 }
 
 /** Where a setting frame is between "asking the owner what it is" and "here are the choices". */
@@ -400,13 +401,13 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
       // aborted controller means this answer was already given up on.
       if (mine !== generation || controllerForQuery.signal.aborted) return
       const results: SessionSearchResult[] = []
-      const errors: { source: string; message: string }[] = []
+      const errors: { source: string | null; message: string }[] = []
       for (const outcome of settled) {
         const label = outcome.target.label
         if ('error' in outcome) {
           // An abort is silent. It is this session cancelling its own work, and reporting it back to
           // the reader as a failure would put an error line under every keystroke.
-          if (!isAbort(outcome.error)) errors.push({ source: label ?? 'search', message: messageOf(outcome.error) })
+          if (!isAbort(outcome.error)) errors.push({ source: label ?? null, message: messageOf(outcome.error) })
           continue
         }
         for (const item of outcome.items) {

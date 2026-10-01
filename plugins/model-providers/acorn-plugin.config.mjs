@@ -17,7 +17,7 @@
 // `CoreServices.models.generateText`; see the header of plugins/model-providers/src/node/index.ts
 // for why a generic model endpoint is deliberately absent.
 export default {
-  name: 'Model Providers',
+  name: 'Model providers',
   // The plural feeder, and the reason it exists: one package, two brands, so a single `icon` could not
   // carry both. Keys become the suffix in `brand:model-providers/<key>`; the host stamps the prefix
   // from this package's directory, so these can no more claim another plugin's mark than `icon` could.

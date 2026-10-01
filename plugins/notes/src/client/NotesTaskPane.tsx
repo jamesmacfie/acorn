@@ -9,7 +9,7 @@ const NotesList = lazy(async () => ({ default: (await import('./NotesPane')).Not
 const NoteBody = lazy(async () => ({ default: (await import('./NotesPane')).NoteBody }))
 
 export const notesPaneContribution: PaneLayoutContribution<NotesModel> = {
-  id: 'notes', label: 'Notes', glyph: 'notepad-text', description: 'Workspace scratchpad', order: 30,
+  id: 'notes', label: 'Notes', glyph: 'notepad-text', description: 'Notes for this task and workspace', order: 30,
   defaultChord: 'meta+shift+d', requires: { plugin: 'notes' },
   layout: 'list-detail',
   // The selection, the note being edited and its autosave timer, held once per task by the host so

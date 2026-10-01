@@ -36,6 +36,10 @@ export type SessionAction = {
   label: string
   description?: string
   disabled?: boolean
+  /** A Lucide name, drawn before the label. */
+  icon?: string
+  /** `danger` for an action that removes something. The menu draws it last, below a rule. */
+  tone?: 'danger'
   run(): void
 }
 
@@ -317,11 +321,12 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
     if (!session) return []
     const hasTextPrompt = snapshot()?.turns[0]?.input.some((part) => part.type === 'text' && !!part.text.trim()) ?? false
     return [
-      { id: 'fork', label: 'Fork session', run: () => void fork() },
+      { id: 'fork', label: 'Fork session', icon: 'git-fork', run: () => void fork() },
       ...(snapshot()?.turns.some((turn) => turn.status === 'failed' || turn.status === 'interrupted')
         ? [{
             id: 'retry',
             label: 'Retry last turn with partial history',
+            icon: 'rotate-ccw',
             run: () => void retryLastTurn(),
           }]
         : []),
@@ -329,6 +334,7 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
         ? [{
             id: 'compact',
             label: 'Compact context',
+            icon: 'shrink',
             run: () => void action(() => managedAgentApi.compact(session.id)),
           }]
         : []),
@@ -336,6 +342,7 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
         ? [{
             id: 'terminal',
             label: 'Continue in terminal',
+            icon: 'square-terminal',
             description: session.providerSessionRef
               ? undefined
               : 'The provider has not supplied a resumable session reference.',
@@ -344,12 +351,14 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
           }]
         : []),
       ...(session.controller === 'terminal'
-        ? [{ id: 'managed', label: 'Return to managed mode', run: () => void resumeManaged() }]
+        ? [{ id: 'managed', label: 'Return to managed mode', icon: 'bot', run: () => void resumeManaged() }]
         : []),
       ...(session.controller === 'external' && session.kind === 'imported'
         ? [{
             id: 'verify',
-            label: 'Verify & resume provider session',
+            label: 'Reconnect session',
+            description: 'Check that the provider still has this session, then continue it in acorn.',
+            icon: 'refresh-cw',
             disabled: typeof session.config.importedProviderSessionRef !== 'string',
             run: () => void verifyImportedResume(),
           }]
@@ -357,14 +366,15 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
       {
         id: 'regenerate-title',
         label: 'Regenerate title',
+        icon: 'sparkles',
         description: hasTextPrompt ? undefined : 'Send a text prompt before regenerating the title.',
         disabled: !hasTextPrompt,
         run: () => void regenerateTitle(),
       },
-      { id: 'rename', label: 'Rename session', run: () => sessionAction(session, 'rename') },
-      { id: 'export-markdown', label: 'Export Markdown', run: () => void exportHistory('markdown') },
-      { id: 'export-json', label: 'Export lossless JSON', run: () => void exportHistory('json') },
-      { id: 'archive', label: 'Archive session…', run: () => sessionAction(session, 'archive') },
+      { id: 'rename', label: 'Rename session', icon: 'pencil', run: () => sessionAction(session, 'rename') },
+      { id: 'export-markdown', label: 'Export Markdown', icon: 'download', run: () => void exportHistory('markdown') },
+      { id: 'export-json', label: 'Export lossless JSON', icon: 'download', run: () => void exportHistory('json') },
+      { id: 'archive', label: 'Archive session…', icon: 'archive', tone: 'danger', run: () => sessionAction(session, 'archive') },
     ]
   })
 

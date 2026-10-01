@@ -84,8 +84,7 @@ export default {
     commands: [{
       id: 'inspect-evidence',
       kind: 'action',
-      title: 'Findings: inspect task evidence',
-      hint: 'raw observations and review provenance',
+      title: 'Show what acorn recorded for this task',
       keywords: ['findings', 'observations', 'evidence', 'diagnostics'],
       category: 'navigation',
       palette: true,

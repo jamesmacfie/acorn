@@ -354,7 +354,7 @@ export default function DashboardEditor(props: {
       </div>
     </Modal.Body>
     <Modal.Actions>
-      <Button variant="bare" onPress={props.onClose}>Close</Button>
+      <Button variant="ghost" onPress={props.onClose}>Close</Button>
       <Button variant="solid" tone="accent" onPress={() => void publish()}>Publish</Button>
     </Modal.Actions>
   </Modal>

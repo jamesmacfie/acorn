@@ -34,6 +34,7 @@ export function KeyValueEditor(props: {
   const blank = (): KVRow => ({ key: '', value: '', enabled: true })
   const padded = createMemo(() => [...props.rows, blank()])
   const withEnable = () => props.enableColumn !== false
+  const extraCols = () => props.columns?.length ?? 0
 
   const write = (index: number, patch: Partial<KVRow>) => {
     const next = [...props.rows]
@@ -47,7 +48,9 @@ export function KeyValueEditor(props: {
       class="ui-kvgrid"
       role="table"
       aria-label={props.ariaLabel}
-      style={{ '--kv-extra-cols': String(props.columns?.length ?? 0) }}
+      data-extra-cols={extraCols() ? '' : undefined}
+      data-no-enable={withEnable() ? undefined : ''}
+      style={extraCols() ? { '--kv-extra-cols': String(extraCols()) } : undefined}
     >
       <div class="ui-kvgrid-head" role="row">
         <Show when={withEnable()}><span /></Show>

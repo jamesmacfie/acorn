@@ -258,19 +258,19 @@ describe('the shell', () => {
     await screen.press('k', { ctrl: true })
     const open = await screen.frame()
     expect(open).toContain('Commands')
-    expect(open).toContain('tasks, workspaces, projects and nodes')
+    expect(open).toContain('tasks, workspaces, and projects')
 
     // The field owns the typing, and the list narrows to what matches.
     await screen.press('q')
     const filtered = await screen.frame()
     expect(filtered).toContain('Quit')
-    expect(filtered).not.toContain('tasks, workspaces, projects and nodes')
+    expect(filtered).not.toContain('tasks, workspaces, and projects')
 
     await screen.press('ESCAPE')
     const closed = await screen.frame()
     screen.done()
 
-    expect(closed).not.toContain('tasks, workspaces, projects and nodes')
+    expect(closed).not.toContain('tasks, workspaces, and projects')
     expect(closed).toContain('Reviews')
     // Back where they were, which is what the DOM palette's `prevFocus` does with an element.
     expect(caretRow(closed)).toBe(before)

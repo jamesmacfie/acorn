@@ -11,10 +11,12 @@ import { regionFocus } from '../keys/regions'
 // spend is the horizontal room a numbered indicator takes, so the indicator is `Step 2 of 5 · Repos`.
 //
 // The plugin owns which step it is on and what happens when someone advances; the host owns the
-// chrome, which is the part every wizard drew twice.
+// chrome, which is the part every wizard drew twice. The footer line holds every action: skip at the
+// start, Back and Next at the end, and the finish action in Next's place on the last step.
 export function Wizard(props: LayoutProps) {
   const steps = () => props.steps ?? []
   const at = () => steps().findIndex((step) => step.id === props.current)
+  const last = () => at() === steps().length - 1
 
   const step = (offset: number) => {
     const next = steps()[at() + offset]
@@ -32,10 +34,20 @@ export function Wizard(props: LayoutProps) {
         {props.regions.step?.()}
       </Panel>
       <box flexDirection="row" gap={1}>
+        <Show when={props.onSkip && !last()}>
+          <Button variant="ghost" onPress={() => props.onSkip?.()}>{props.skipLabel ?? 'Skip'}</Button>
+        </Show>
         <box flexGrow={1} />
-        <Show when={at() > 0}><Button variant="bare" onPress={() => step(-1)}>Back</Button></Show>
-        <Show when={at() >= 0 && at() < steps().length - 1}>
-          <Button tone="accent" disabled={props.canAdvance === false} onPress={() => step(1)}>Next</Button>
+        <Show when={at() > 0}><Button variant="ghost" onPress={() => step(-1)}>Back</Button></Show>
+        <Show when={at() >= 0 && !last()}>
+          <Button variant="solid" tone="accent" disabled={props.canAdvance === false} onPress={() => step(1)}>
+            {props.nextLabel ?? 'Next'}
+          </Button>
+        </Show>
+        <Show when={last() && props.onFinish}>
+          <Button variant="solid" tone="accent" disabled={props.canAdvance === false} onPress={() => props.onFinish?.()}>
+            {props.finishLabel ?? 'Finish'}
+          </Button>
         </Show>
       </box>
     </box>

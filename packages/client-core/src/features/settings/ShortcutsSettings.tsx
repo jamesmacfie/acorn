@@ -4,6 +4,7 @@ import type { PluginKeyClaimGrant } from '@acorn/protocol/api.ts'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { nodes } from '../../infra/node/fleet'
 import { installedByNode } from '../../host/plugins/distribution'
+import { pluginLabel } from '../../host/plugins/pluginLabel'
 import { keyClaimGrants } from '../../host/trust/permissions'
 import { prefsOptions } from '../../infra/queries'
 import { eventChord, formatChord } from '../tasks/paneShortcuts'
@@ -19,6 +20,8 @@ import { savePref } from './savePref'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { orphanedPluginOverrideIds, removeOverrideIds, visibleShortcutBindings } from './shortcutSettingsModel'
 import { Alert, Button } from '../../kit/components/primitives'
+import { IconButton } from '../../kit/components/inputs/IconButton'
+import { Text } from '../../kit/components/content/Text'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import { confirmAction } from '../../host/registries/shell/willPhase'
@@ -84,7 +87,7 @@ export default function ShortcutsSettings() {
       const key = pluginId ? `plugin:${pluginId}` : `core:${binding.category}`
       const group = map.get(key) ?? {
         key,
-        label: binding.category,
+        label: pluginId ? pluginLabel(pluginId) : binding.category,
         ...(pluginId ? { pluginId } : {}),
         disabled: binding.plugin?.state() === 'disabled',
         bindings: [],
@@ -97,7 +100,7 @@ export default function ShortcutsSettings() {
       const key = `plugin:${pluginId}`
       if (map.has(key)) continue
       const row = (installedByNode().get(activeNodeId() ?? '') ?? []).find((candidate) => candidate.name === pluginId)
-      map.set(key, { key, label: pluginId, pluginId, disabled: !row?.running, bindings: [], claims: pluginClaims })
+      map.set(key, { key, label: pluginLabel(pluginId), pluginId, disabled: !row?.running, bindings: [], claims: pluginClaims })
     }
     return [...map.values()]
   })
@@ -137,9 +140,9 @@ export default function ShortcutsSettings() {
   const removeOrphaned = async () => {
     const ids = orphaned()
     const confirmed = await confirmAction({
-      title: 'Remove shortcuts for removed plugins?',
+      title: 'Remove shortcuts for removed plugins',
       actionLabel: 'Remove',
-      goes: `Your custom shortcuts for ${ids.length} commands from plugins that are no longer installed. If you install one of them again, its shortcuts start from its defaults.`,
+      goes: `The ${ids.length} shortcuts you set for plugins that aren't installed. If you install one again, it starts with its own shortcuts.`,
       stays: 'Your shortcuts for acorn and for every installed plugin.',
       danger: true,
     })
@@ -148,18 +151,19 @@ export default function ShortcutsSettings() {
 
   return (
     <>
-      <p class="muted">Click a chord, then press its replacement. Conflicts never steal an existing binding.</p>
+      <Text emphasis="muted" wrap>To change a shortcut, click it and press the new keys.</Text>
       <For each={groups()}>
         {(group) => {
           const reset = saveFor(`group:${group.key}`)
           return (
             <SettingsSection
               id={sectionId(group)}
-              label={group.pluginId ? `${group.label} · ${nodeLabel()}` : group.label}
-              description={group.disabled ? 'Plugin disabled. Its shortcuts stay editable and apply when it is enabled.' : undefined}
+              // The node only matters when there is more than one to tell apart.
+              label={group.pluginId && nodes().length > 1 ? `${group.label} · ${nodeLabel()}` : group.label}
+              description={group.disabled ? 'This plugin is off. Changes here apply when you turn it on.' : undefined}
               actions={
-                <Show when={group.bindings.length}>
-                  <Button variant="bare" onPress={() => void reset.run(() => resetBindings(group.bindings))}>Reset section</Button>
+                <Show when={group.bindings.some(changed)}>
+                  <Button variant="ghost" size="sm" onPress={() => void reset.run(() => resetBindings(group.bindings))}>Reset section</Button>
                 </Show>
               }
             >
@@ -170,7 +174,7 @@ export default function ShortcutsSettings() {
                   return (
                     <SettingRow
                       label={binding.description}
-                      description={binding.conflict ? `Conflicts with ${binding.conflict}` : undefined}
+                      description={binding.conflict ? `Also used by ${binding.conflict}` : undefined}
                       savedAt={save.savedAt()}
                       error={refused()?.id === binding.id ? refused()!.message : save.error()}
                       onReset={changed(binding) ? () => void save.run(() => resetBindings([binding])) : undefined}
@@ -183,17 +187,21 @@ export default function ShortcutsSettings() {
                         classList={{ 'shortcut-conflict': !!binding.conflict }}
                         readonly
                         value={binding.chord ? formatChord(binding.chord) : 'Unbound'}
+                        // Sized to its chord, so a four-key chord is not clipped.
+                        size={Math.max(3, (binding.chord ? formatChord(binding.chord) : 'Unbound').length)}
                         onKeyDown={(event) => captureKey(binding, save, event)}
                         aria-label={`Shortcut for ${binding.description}`}
                       />
-                      <Button variant="bare" label={`Unbind ${binding.description}`} onPress={() => void save.run(() => saveOverride(binding, null))}>×</Button>
+                      <IconButton icon="x" label={`Unbind ${binding.description}`} onPress={() => void save.run(() => saveOverride(binding, null))} />
                     </SettingRow>
                   )
                 }}
               </For>
               <Show when={group.claims.length}>
-                <div class="shortcut-claims muted">
-                  <For each={group.claims}>{(claim) => <div>Handled by the {claim.label} surface: {claim.chords.map(formatChord).join(', ')}</div>}</For>
+                <div class="shortcut-claims">
+                  <For each={group.claims}>
+                    {(claim) => <Text emphasis="muted" wrap>{claim.label} uses these keys itself: {claim.chords.map(formatChord).join(', ')}</Text>}
+                  </For>
                 </div>
               </Show>
             </SettingsSection>
@@ -201,10 +209,10 @@ export default function ShortcutsSettings() {
         }}
       </For>
       <Show when={orphaned().length}>
-        <SettingsSection id="danger" label="Danger zone" tone="danger">
+        <SettingsSection id="danger" label="Removed plugins" tone="danger">
           <SettingRow
             label="Shortcuts for removed plugins"
-            description={`${orphaned().length} saved shortcuts belong to plugins that are no longer installed.`}
+            description={`${orphaned().length} shortcuts you set are for plugins that aren't installed anymore.`}
             error={cleanup.error()}
           >
             <Button tone="danger" onPress={() => void removeOrphaned()}>Remove</Button>

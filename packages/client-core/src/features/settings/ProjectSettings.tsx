@@ -13,7 +13,7 @@ import { confirmAction } from '../../host/registries/shell/willPhase'
 import { ContributionBoundary } from '../../kit/components/content/ContributionBoundary'
 import { PluginStrip } from './plugins/PluginStrip'
 import { Text } from '../../kit/components/content/Text'
-import { Button, Checkbox, Input, Select } from '../../kit/components/primitives'
+import { Button, Checkbox, EmptyState, Input, Select } from '../../kit/components/primitives'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import { Stack } from '../../kit/components/layout/Stack'
@@ -58,7 +58,12 @@ export default function ProjectSettings(props: { project: Project; context: Sett
   )
   // The config tabs wait for the first read, because the page-rules editor takes its list once.
   const loaded = (children: () => JSX.Element) => (
-    <Show when={store.response()} fallback={<Text emphasis="muted">{store.failed() ? 'Could not read this project\'s settings from the node.' : 'Reading this project\'s settings…'}</Text>}>
+    <Show
+      when={store.response()}
+      fallback={store.failed()
+        ? <Text tone="danger" wrap>Couldn't load this project's settings.</Text>
+        : <EmptyState busy align="start" size="sm">Loading…</EmptyState>}
+    >
       {children()}
     </Show>
   )
@@ -155,7 +160,7 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
 
   return (
     <>
-      <SettingsSection id="general" label="Project">
+      <SettingsSection id="general" label="General">
         <SettingRow label="Name" savedAt={name.savedAt()} error={name.error()}>
           <Input label="Name" maxLength={120} value={name.value()} onInput={name.input} onChange={(value) => void name.commit(value)} />
         </SettingRow>
@@ -172,7 +177,7 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
             </div>
           </Show>
         </SettingRow>
-        <SettingRow label="Task tab colour" description="The strip down the left of this project's tasks in the rail." error={colour.error()}>
+        <SettingRow label="Rail colour" help="The coloured strip beside this project's tasks in the rail." error={colour.error()}>
           <ProjectColorInput
             name={props.project.name}
             color={props.project.color}
@@ -189,7 +194,7 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
         </SettingRow>
         <SettingRow
           label="Hidden"
-          description="A hidden project's tasks are left out of the rail, and a new task cannot pick it."
+          description="Its tasks don't show in the rail, and new tasks can't use it."
           error={visibility.error()}
         >
           <Checkbox

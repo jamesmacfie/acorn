@@ -1,7 +1,8 @@
 import { createSignal, For, Show } from 'solid-js'
-import { createDismissable } from '../../../kit/lib/controls/dismissable'
 import { collectConcerns, type Concern, DETAILS_MAX, type WillEventMap } from './willPhaseModel'
 import { Button, Checkbox } from '../../../kit/components/primitives'
+import Icon from '../../../kit/components/content/Icon'
+import { Modal } from '../../../kit/components/overlays/Modal'
 import { createLogger } from '../../../infra/telemetry/logger'
 export { collectConcerns, registerWillHandler } from './willPhaseModel'
 export type { Concern, WillEventMap } from './willPhaseModel'
@@ -85,7 +86,6 @@ export function confirmAction(options: {
 }
 
 export function WillConfirmationHost() {
-  let dialog!: HTMLDivElement
   // Checkbox state per concern id, seeded from the concern's default on open.
   const [checks, setChecks] = createSignal<Record<string, boolean>>({})
   const finish = (confirmed: boolean) => {
@@ -108,61 +108,55 @@ export function WillConfirmationHost() {
     setChecks({})
     current.resolve({ confirmed, checked })
   }
-  const dismiss = createDismissable({ onDismiss: () => finish(false), container: () => dialog })
   const dangerous = (current: Prompt) => !!current.danger || current.concerns.some((concern) => concern.severity === 'danger')
+  // Focus starts on the action unless something would be lost, when it is Modal's own choice for an
+  // `alertdialog`: Cancel. The newest alert dialog is this one, because it is the last one mounted.
+  const action = (current: Prompt) => dangerous(current)
+    ? undefined
+    : [...document.querySelectorAll<HTMLElement>('[role="alertdialog"]')].at(-1)?.querySelector<HTMLElement>('.ui-modal-actions [data-variant="solid"]') ?? undefined
+  // Each concern names its own subject, because the dialog does not add the feature's name to it.
   return (
     <Show when={prompt()} keyed>
       {(current) => (
-        <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>
-          <div
-            ref={dialog}
-            class="overlay will-confirmation"
-            role="alertdialog"
-            aria-modal="true"
-            onClick={dismiss.onContainerClick}
-            onKeyDown={dismiss.onKeyDown}
-          >
-            <div class="overlay-title">{current.title}</div>
-            <div class="overlay-body">
-              <Show when={current.message}>{(message) => <p>{message()}</p>}</Show>
-              <Show when={current.stays}>{(stays) => <p class="muted">{stays()}</p>}</Show>
-              <Show when={current.concerns.length}>
-                <ul class="will-concerns">
-                  {current.concerns.map((concern) => (
-                    <li data-severity={concern.severity}>
-                      <span aria-hidden="true">{concern.severity === 'danger' ? '⛔' : '⚠'}</span>
-                      <span>{concern.message}</span>
-                      <span class="muted">— {concern.feature}</span>
-                      <Show when={concern.details?.length}>
-                        <ul class="will-concern-details">
-                          {/* Sliced here as well as on the node: a client-side producer answers with
-                              whatever it holds, and the cap is the dialog's rule, not the producer's. */}
-                          <For each={concern.details!.slice(0, DETAILS_MAX)}>{(detail) => <li>{detail}</li>}</For>
-                          <Show when={(concern.detailsMore ?? 0) + Math.max(0, concern.details!.length - DETAILS_MAX)}>
-                            {(more) => <li class="muted">+{more()} more</li>}
-                          </Show>
-                        </ul>
-                      </Show>
-                      <Show when={concern.checkbox}>
-                        {(checkbox) => (
-                          <Checkbox
-                            label={checkbox().label}
-                            checked={checks()[concern.id] ?? checkbox().checked}
-                            onChange={(checked) => setChecks((all) => ({ ...all, [concern.id]: checked }))}
-                          />
-                        )}
-                      </Show>
-                    </li>
-                  ))}
-                </ul>
-              </Show>
-              <div class="close-actions">
-                <Button autofocus={dangerous(current)} onPress={() => finish(false)}>Cancel</Button>
-                <Button autofocus={!dangerous(current)} tone={current.danger ? 'danger' : undefined} onPress={() => finish(true)}>{current.actionLabel}</Button>
-              </div>
-            </div>
-          </div>
-        </div>
+        <Modal title={current.title} size="sm" role="alertdialog" autoFocus={() => action(current)} onDismiss={() => finish(false)}>
+          <Modal.Body>
+            <Show when={current.message}>{(message) => <p>{message()}</p>}</Show>
+            <Show when={current.stays}>{(stays) => <p class="muted">{stays()}</p>}</Show>
+            <Show when={current.concerns.length}>
+              <ul class="will-concerns">
+                {current.concerns.map((concern) => (
+                  <li data-severity={concern.severity}>
+                    <Icon name={concern.severity === 'danger' ? 'octagon-alert' : 'triangle-alert'} tone={concern.severity} />
+                    <span>{concern.message}</span>
+                    <Show when={concern.details?.length}>
+                      <ul class="will-concern-details">
+                        {/* Sliced here as well as on the node: a client-side producer answers with
+                            whatever it holds, and the cap is the dialog's rule, not the producer's. */}
+                        <For each={concern.details!.slice(0, DETAILS_MAX)}>{(detail) => <li>{detail}</li>}</For>
+                        <Show when={(concern.detailsMore ?? 0) + Math.max(0, concern.details!.length - DETAILS_MAX)}>
+                          {(more) => <li class="muted">+{more()} more</li>}
+                        </Show>
+                      </ul>
+                    </Show>
+                    <Show when={concern.checkbox}>
+                      {(checkbox) => (
+                        <Checkbox
+                          label={checkbox().label}
+                          checked={checks()[concern.id] ?? checkbox().checked}
+                          onChange={(checked) => setChecks((all) => ({ ...all, [concern.id]: checked }))}
+                        />
+                      )}
+                    </Show>
+                  </li>
+                ))}
+              </ul>
+            </Show>
+          </Modal.Body>
+          <Modal.Actions>
+            <Button variant="ghost" onPress={() => finish(false)}>Cancel</Button>
+            <Button variant="solid" tone={dangerous(current) ? 'danger' : undefined} onPress={() => finish(true)}>{current.actionLabel}</Button>
+          </Modal.Actions>
+        </Modal>
       )}
     </Show>
   )

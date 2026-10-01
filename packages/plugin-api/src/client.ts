@@ -45,6 +45,8 @@ export { registerWsChannel } from '@acorn/client-core/infra/node'
 // The subscriber returns its disposal because a model root, rather than the plugin host's registration
 // pass, owns this listener's lifetime.
 export { onPluginFrame } from '@acorn/client-core/host/plugins'
+// Another plugin's name as a person reads it, for a line that says where something came from.
+export { pluginLabel } from '@acorn/client-core/host/plugins'
 
 // ── Contribution types ────────────────────────────────────────────────────────────────────────
 export { paneContribution } from '@acorn/client-core/host/registries/panes/panes.ts'
@@ -279,6 +281,8 @@ export { getHighlighter, tokenizeAnsiLines } from '@acorn/client-core/infra/high
 export { debounce } from '@acorn/client-core/kit/lib'
 export { persistDraft, readDraft, writeDraft } from '@acorn/client-core/kit/lib'
 export { formatRelativeTime } from '@acorn/client-core/kit/lib'
+// A shortcut as the app writes it everywhere: `meta+shift+n` reads ⇧⌘N.
+export { formatChord } from '@acorn/client-core/kit/lib'
 export { bytesOf, formatBytes, formatSize } from '@acorn/client-core/kit/lib'
 export { latestOnly } from '@acorn/client-core/kit/lib'
 export { onClosePaneWhen, onClosePaneWithin } from '@acorn/client-core/host/keys'

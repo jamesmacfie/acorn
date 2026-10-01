@@ -61,7 +61,7 @@ export const editorCommands: readonly ContributedCommand[] = [
     id: 'editor.files.open',
     kind: 'search',
     title: 'Go to file',
-    hint: 'open a file from this task’s worktree',
+    hint: 'open a file in this task',
     keywords: ['quick open', 'file'],
     category: 'navigation',
     palette: true,

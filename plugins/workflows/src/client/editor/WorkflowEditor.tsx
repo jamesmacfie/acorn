@@ -453,7 +453,9 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
             </Stack>
           </ModalBody>
           <ModalActions>
-            <Show when={!operation().landed.length}><Button variant="bare" disabled={store.busy()} onPress={() => void discardReview()}>Discard review</Button></Show>
+            <Show when={!operation().landed.length}><Button variant="ghost" disabled={store.busy()} onPress={() => void discardReview()}>Discard review</Button></Show>
+            <ToolbarSpacer />
+            <Button variant="ghost" onPress={() => setReview(undefined)}>Cancel</Button>
             <Button variant="solid" busy={store.busy()} onPress={() => void confirmPublication()}>{operation().state === 'prepared' ? 'Publish' : 'Resume publishing'}</Button>
           </ModalActions>
         </Modal>
@@ -469,7 +471,9 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
             </Stack>
           </ModalBody>
           <ModalActions>
-            <Show when={!operation().writes.some(write => write.landed)}><Button variant="bare" disabled={store.busy()} onPress={() => void discardReview()}>Discard review</Button></Show>
+            <Show when={!operation().writes.some(write => write.landed)}><Button variant="ghost" disabled={store.busy()} onPress={() => void discardReview()}>Discard review</Button></Show>
+            <ToolbarSpacer />
+            <Button variant="ghost" onPress={() => setReview(undefined)}>Cancel</Button>
             <Button variant="solid" busy={store.busy()} onPress={() => void confirmFiles()}>{operation().state === 'prepared' ? 'Write files' : 'Resume writing files'}</Button>
           </ModalActions>
         </Modal>

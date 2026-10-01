@@ -24,7 +24,6 @@
 
   /* ── Space ─────────────────────────────────────────────────────────────────────────────── */
   --pane-pad: var(--space-8);
-  --pane-pad-y: var(--space-6);
   --gap-inline: var(--space-4);
   --gap-row: var(--space-5);
   --gap-stack: var(--space-6);

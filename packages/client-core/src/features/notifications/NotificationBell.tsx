@@ -13,7 +13,7 @@ import { nodes } from '../../infra/node/fleet'
 import { noticeKindContribution } from '../../host/registries/rail/notices'
 import { projectPath } from '../../host/registries/commands/corePaths'
 import Icon from '../../kit/components/content/Icon'
-import { Alert, Button } from '../../kit/components/primitives'
+import { Alert, Button, EmptyState, SectionHeader } from '../../kit/components/primitives'
 import Popover from '../../kit/components/overlays/Popover'
 import './notifications.css'
 import { openRepoConfigTrust } from '../settings/trust/configTrust'
@@ -91,7 +91,7 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
       ariaLabel="Notifications"
       placement="bottom-end"
       trigger={({ open, toggle }) => (
-        <Button variant="bare" title="Notifications" label="Notifications" expanded={open()} onPress={toggle}>
+        <Button variant="ghost" size="sm" tip="Notifications" label="Notifications" expanded={open()} onPress={toggle}>
           <Icon name="bell" />
           <Show when={pill()}>
             {(count) => <span class="notify-count">{count()}</span>}
@@ -102,13 +102,11 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
       {({ close }) => (
         <div class="notify-inbox">
           <Show when={inbox().rows.length || inbox().unavailable.length}>
-            <div class="notify-head">
-              <span>Needs you</span>
-            </div>
+            <SectionHeader level="group">Needs you</SectionHeader>
             {/* Partial results are a banner, never a failed list (docs/architecture-overview.md § Fleet). */}
             <Show when={inbox().unavailable.length}>
               <For each={inbox().unavailable}>
-                {(entry) => <Alert tone="warn" variant="banner">{entry.label} unavailable</Alert>}
+                {(entry) => <Alert tone="warn" variant="banner">Couldn't reach {entry.label}</Alert>}
               </For>
             </Show>
             <ul class="notify-list">
@@ -140,26 +138,30 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
                           are two different questions, and a memory proposal is a nudge whatever it
                           is drawn with. */}
                       <span class="notify-glyph" classList={{ 'notify-warn': row.item.severity !== 'info' }}>
-                        <Icon name={row.item.glyph ?? (row.item.severity === 'info' ? 'info' : 'alert-triangle')} />
+                        <Icon name={row.item.glyph ?? (row.item.severity === 'info' ? 'info' : 'triangle-alert')} />
                       </span>
-                      <span class="notify-title">{row.item.title}</span>
+                      <span class="notify-line">
+                        <span class="notify-title">{row.item.title}</span>
+                        {/* The node badge only when there is more than one node — otherwise it is noise
+                            naming the only machine there is (docs/ui-design.md: first-run never mentions nodes). */}
+                        <Show when={multiNode()}><span class="notify-node muted">{row.node.label}</span></Show>
+                        <span class="notify-time muted">{relTime(row.item.at)}</span>
+                      </span>
                       <Show when={row.item.detail}><span class="notify-detail muted">{row.item.detail}</span></Show>
-                      {/* The node badge only when there is more than one node — otherwise it is noise
-                          naming the only machine there is (docs/ui-design.md: first-run never mentions nodes). */}
-                      <Show when={multiNode()}><span class="notify-node muted">{row.node.label}</span></Show>
-                      <span class="notify-time muted">{relTime(row.item.at)}</span>
                     </button>
                   </li>
                 )}
               </For>
             </ul>
           </Show>
-          <div class="notify-head">
-            <span>Notifications</span>
-            <Button variant="bare" onPress={clearAll}>Mark all read</Button>
-          </div>
+          <SectionHeader
+            level="group"
+            actions={<Show when={pill()}><Button variant="bare" onPress={clearAll}>Mark all read</Button></Show>}
+          >
+            Notifications
+          </SectionHeader>
           <ul class="notify-list">
-            <For each={noticesForActiveNode()} fallback={<li class="notify-empty muted">No notifications.</li>}>
+            <For each={noticesForActiveNode()} fallback={<li><EmptyState align="start" size="sm">No notifications.</EmptyState></li>}>
               {(n) => (
                 <li>
                   <button
@@ -174,9 +176,11 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
                     <span class="notify-glyph" classList={{ 'notify-warn': noticeKindContribution(n.kind)?.severity !== 'info' }}>
                       <Icon name={noticeKindContribution(n.kind)?.glyph ?? 'circle'} />
                     </span>
-                    <span class="notify-title">{n.title}</span>
+                    <span class="notify-line">
+                      <span class="notify-title">{n.title}</span>
+                      <span class="notify-time muted">{relTime(n.at)}</span>
+                    </span>
                     <Show when={n.detail}><span class="notify-detail muted">{n.detail}</span></Show>
-                    <span class="notify-time muted">{relTime(n.at)}</span>
                   </button>
                 </li>
               )}

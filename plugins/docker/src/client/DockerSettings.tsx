@@ -1,23 +1,22 @@
-// Settings → Docker: daemon availability readout + behaviour toggles + the [docker] config
-// reference (per-repo matcher overrides live in .acorn/config.toml, and each project's page shows its
-// own in a Docker tab, ./DockerProjectSettings.tsx). The sections match the
-// ones `./index.ts` declares for search.
+// Settings → Docker: whether the daemon answers, the behaviour toggles, and where the per-project
+// matcher is set. The [docker] example lives on each project's Docker tab, where those keys are read
+// (./DockerProjectSettings.tsx). The sections match the ones `./index.ts` declares for search.
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { createResource, Show } from 'solid-js'
+import { createResource } from 'solid-js'
 import { createSettingSave, prefsOptions } from '@acorn/plugin-api/client'
 import type { DockerInfo } from '../shared/model'
 import { fetchDockerInfo } from './dockerClient'
 import { defaultDockerPrefs, readDockerPrefs, saveDockerPref, type DockerPrefs } from './dockerPrefs'
-import { Checkbox, CodeBlock, SettingRow, SettingsSection, Text } from '@acorn/plugin-api/ui'
+import { Checkbox, SettingRow, SettingsSection } from '@acorn/plugin-api/ui'
 
 const infoText = (info: DockerInfo): string =>
   info.available
-    ? `Connected — engine ${info.version}, context ${info.context ?? 'default'}.`
-    : `Unavailable — ${info.detail}`
+    ? `Running, version ${info.version} (${info.context ?? 'default'})`
+    : `Docker isn't available: ${info.detail}`
 
 const SWITCHES: Array<{ key: keyof DockerPrefs; label: string; description?: string }> = [
-  { key: 'confirmDestructive', label: 'Ask twice before destructive actions', description: 'Remove, prune and compose down.' },
-  { key: 'showStopped', label: 'Show stopped containers in the Docker source' },
+  { key: 'confirmDestructive', label: 'Ask twice before destructive actions', description: 'Applies to remove, prune, and compose down.' },
+  { key: 'showStopped', label: 'Show stopped containers in the Docker list' },
 ]
 
 export default function DockerSettings() {
@@ -34,19 +33,14 @@ export default function DockerSettings() {
 
   return (
     <>
-      <SettingsSection id="daemon" label="Daemon">
-        <SettingRow label="Docker engine">
-          <Text emphasis="muted" wrap>
-            {/* By state rather than a read: a read would hold the whole page blank until the daemon
-                answers, and a failed one would take the page down with it. */}
-            <Show
-              when={info.state === 'ready' ? info() : undefined}
-              fallback={info.state === 'errored' ? 'Could not ask this node about its Docker daemon.' : 'Checking the daemon…'}
-            >
-              {(i) => infoText(i())}
-            </Show>
-          </Text>
-        </SettingRow>
+      <SettingsSection id="daemon" label="Status">
+        {/* The engine's state is the row's description, under its name, rather than text floating in
+            the control column. By state rather than a read: a read would hold the whole page blank
+            until the daemon answers, and a failed one would take the page down with it. */}
+        <SettingRow
+          label="Docker engine"
+          description={info.state === 'ready' ? infoText(info()) : info.state === 'errored' ? "Couldn't get Docker's status." : 'Checking Docker…'}
+        />
       </SettingsSection>
 
       <SettingsSection id="behaviour" label="Behaviour">
@@ -73,14 +67,9 @@ export default function DockerSettings() {
       <SettingsSection
         id="linking"
         label="Task linking"
-        description="Task↔container linking is automatic for compose stacks started in a task worktree. Stack commands (start/stop/dev servers) belong in [scripts.run.*] run targets, which get the trust gate and the run buttons on the task."
+        help="acorn links a task to the containers of a Compose stack started in its worktree. To start and stop a stack from the task, add it as a run target."
       >
-        <SettingRow label="Per-repo matcher" description="Set in .acorn/config.toml. Each project's settings page has a Docker tab showing what its checkout sets." layout="stacked">
-          <CodeBlock size="xs" copy>{`[docker]
-compose_project = "myproject"   # always link this compose project's containers
-match_labels = ["acorn.task"]   # label keys whose value equals the task's branch slug
-match_name = true               # allow the branch-slug-in-name fallback`}</CodeBlock>
-        </SettingRow>
+        <SettingRow label="Project rules" description="Set in each project's .acorn/config.toml. The project's Docker tab shows them." />
       </SettingsSection>
     </>
   )

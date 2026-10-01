@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { sourceRegistry } from '../../host/registries/sources/sources'
-import { taskOriginAppearance } from './origin'
+import { localTaskGlyph, taskOriginAppearance } from './origin'
 
 let dispose: (() => void) | undefined
 afterEach(() => {
@@ -28,5 +28,16 @@ describe('an origin a source declares but does not share an id with', () => {
     expect(taskOriginAppearance('tracker-item')).toEqual({ glyph: 'git-pull-request' })
     // And core's own origin never asks a source at all.
     expect(taskOriginAppearance('local')).toEqual({ glyph: 'circle-dot' })
+  })
+})
+
+describe('local task glyph', () => {
+  it('draws the first letter of the title, uppercased, so it never reads as an icon name', () => {
+    expect(localTaskGlyph('review changed files')).toBe('R')
+    expect(localTaskGlyph('x marks the spot')).toBe('X')
+  })
+
+  it('keeps the origin glyph for a title that does not start with a letter', () => {
+    expect(localTaskGlyph('2nd pass')).toBe('circle-dot')
   })
 })
