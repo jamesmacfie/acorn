@@ -47,6 +47,26 @@ The renderer talks to it over one loopback WebSocket, authenticated by a per-lau
 checked against the window's origin on upgrade. That socket is what Electron's preload and `ipcMain`
 pair used to be, and it carries the same vocabulary: `apps/desktop/src/shell/wire.ts` is the list.
 
+Each authenticated renderer socket owns a disposable UUID in `helper/rendererConnection.ts`. The
+renderer declares `node-interest` from authoritative selection, including its remembered initial
+selection and equivalent or cached switches. Only that Node's event payloads reach the socket;
+all-Node connection statuses still reach every renderer. Fleet reads, malformed requests, and cleanup
+addressed to a previous Node do not change interest. `null` is a fetch-only observer with no event
+lease. An old helper client that never declares interest retains wildcard forwarding. The renderer
+keeps its own Node filter as a second boundary.
+
+`node-fetch` request handles are namespaced by this socket UUID after validation. HTTP request and
+trace headers keep their original values. A renderer can abort only its own handles, and closing its
+socket aborts its pending reads without cancelling another renderer or a shared client query. Success,
+failure, and close release the registry. A late response is neither encoded nor sent after close.
+Caller cancellation remains status 499, deadlines remain `TimeoutError`, and transport failures retain
+their connection-health meaning. Pre-aborted client calls stop before body encoding or transport work.
+
+The helper's response codec uses a native Buffer view over the precise byte offset and length. Browser
+and renderer codecs remain Node-free. HTTP response assembly concatenates fragments once, then exposes
+a plain `Uint8Array` view of that allocation. Event JSON and Node-tagged bytes are encoded lazily for
+the first eligible open recipient and reused for other eligible sockets.
+
 The shell must not import plugin engines, database handles, or node source. Domain behaviour belongs
 in the node's own graph.
 
@@ -353,9 +373,11 @@ from its own script's response headers. `PLUGIN_WORKER_CSP` is
 WebSocket and `sendBeacon` all fail inside the worker, so the transferred `MessagePort` is the only way
 out of it. The document's `worker-src` names `'self' blob:` and never the plugin scheme.
 
-The renderer's half is `packages/client-core/src/host/tree/`: `workerHost.ts` owns one worker per
-bundle hash, shared by every tree that bundle draws and stopped a grace period after the last one
-unmounts; `TreeHost.tsx` validates and applies each batch and is the only thing that turns a handler id
+The renderer's half is `packages/client-core/src/host/tree/`: `workerHost.ts` shares one worker per
+bundle hash for capable SDKs, with per-slot bridge authority and a bounded idle grace pool. Legacy
+SDKs use equivalent immutable authority contexts and terminate on their last lease.
+[Mounted bridge ownership](./plugins/descriptors.md#mounted-bridge-ownership-and-sdk-compatibility)
+defines compatibility, admission, and idle bounds; `TreeHost.tsx` validates and applies each batch and is the only thing that turns a handler id
 into a function. A worker that misses two heartbeats is terminated and every tree it served is removed
 from the UI. The failure remains in the plugin diagnostics instead of replacing the contribution with
 an inline error.

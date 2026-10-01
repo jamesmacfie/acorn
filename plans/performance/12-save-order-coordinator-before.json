@@ -1,0 +1,12 @@
+{
+  "fixture": "actual save chord, two held transport writes with reverse completion",
+  "sends": [
+    "FIRST\nbaseline a.txt\n",
+    "SECOND\nFIRST\nbaseline a.txt\n"
+  ],
+  "disk": "FIRST\nbaseline a.txt\n",
+  "initialPending": 2,
+  "visible": "SECOND\nFIRST\nbaseline a.txt\n",
+  "dirty": true,
+  "expected": "Per-document write admission preserves the latest document on disk and waits for custody before discard."
+}

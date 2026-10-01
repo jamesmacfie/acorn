@@ -50,6 +50,12 @@ const writeState = (dataRoot: string, state: BundledPluginState): void => {
 
 const setEntry = (dataRoot: string, id: string, entry: BundledPluginStateEntry): void => {
   const state = readState(dataRoot)
+  const stored = state.plugins[id]
+  if (stored?.status === entry.status && stored.installedAt === entry.installedAt) {
+    if (stored.status !== 'installed' && entry.status !== 'installed') return
+    if (stored.status === 'installed' && entry.status === 'installed'
+      && stored.version === entry.version && stored.fingerprint === entry.fingerprint) return
+  }
   writeState(dataRoot, { ...state, plugins: { ...state.plugins, [id]: entry } })
 }
 

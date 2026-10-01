@@ -1,0 +1,45 @@
+[
+  {
+    "case": "obsolete-definition-save-ack",
+    "beforeAck": {
+      "definition": "Definition B",
+      "revision": 5,
+      "dirty": false
+    },
+    "afterAck": {
+      "definition": "Definition B",
+      "revision": 2,
+      "dirty": true
+    },
+    "writes": [
+      {
+        "nodeId": "node-A",
+        "path": "/v1/p/workflows/defs/A",
+        "def": {
+          "baseline": "acorn-1",
+          "formatVersion": 1,
+          "name": "Edited A",
+          "steps": []
+        },
+        "revision": 1
+      }
+    ]
+  },
+  {
+    "case": "outgoing-node-cleanup-save",
+    "originatingNode": "node-A",
+    "writes": [
+      {
+        "nodeId": "node-B",
+        "path": "/v1/p/workflows/defs/A",
+        "def": {
+          "baseline": "acorn-1",
+          "formatVersion": 1,
+          "name": "Unsent A",
+          "steps": []
+        },
+        "revision": 1
+      }
+    ]
+  }
+]

@@ -1,0 +1,96 @@
+{
+  "case": "markers",
+  "node": "v24.11.0",
+  "platform": "darwin",
+  "result": {
+    "files": 8,
+    "concurrent": {
+      "label": "eight-documents",
+      "wallMs": 92.48433299999999,
+      "nodeCpuMs": 92.133,
+      "commands": 48,
+      "commandKinds": {
+        "rev-parse": 16,
+        "check-ref-format": 8,
+        "merge-base": 8,
+        "diff": 16
+      },
+      "peakGit": 16,
+      "statCalls": 0,
+      "peakPendingLstat": 0,
+      "sampledHeapGrowthBytes": 0,
+      "value": [
+        [
+          {
+            "from": 2,
+            "to": 2
+          }
+        ],
+        [
+          {
+            "from": 2,
+            "to": 2
+          }
+        ],
+        [
+          {
+            "from": 2,
+            "to": 2
+          }
+        ],
+        [
+          {
+            "from": 2,
+            "to": 2
+          }
+        ],
+        [
+          {
+            "from": 2,
+            "to": 2
+          }
+        ],
+        [
+          {
+            "from": 2,
+            "to": 2
+          }
+        ],
+        [
+          {
+            "from": 2,
+            "to": 2
+          }
+        ],
+        [
+          {
+            "from": 2,
+            "to": 2
+          }
+        ]
+      ]
+    },
+    "immediateRepeat": {
+      "label": "repeat-one-document",
+      "wallMs": 41.61283300000002,
+      "nodeCpuMs": 11.756,
+      "commands": 6,
+      "commandKinds": {
+        "rev-parse": 2,
+        "check-ref-format": 1,
+        "merge-base": 1,
+        "diff": 2
+      },
+      "peakGit": 2,
+      "statCalls": 0,
+      "peakPendingLstat": 0,
+      "sampledHeapGrowthBytes": 0,
+      "value": [
+        {
+          "from": 2,
+          "to": 2
+        }
+      ]
+    }
+  }
+}

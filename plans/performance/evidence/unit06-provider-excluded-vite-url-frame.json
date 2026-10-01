@@ -1,0 +1,28 @@
+{
+  "benchmark": "PluginFrame native load lifecycle",
+  "solidIdentity": true,
+  "constructions": 40,
+  "cleanups": 40,
+  "loadCallbackHasSolidOwner": false,
+  "checkpoints": [
+    {
+      "opens": 1,
+      "closedPorts": 0,
+      "webviewDetaches": 0,
+      "zombiePushesForOneActionOneCoreEventOneAppearance": 3
+    },
+    {
+      "opens": 10,
+      "closedPorts": 0,
+      "webviewDetaches": 0,
+      "zombiePushesForOneActionOneCoreEventOneAppearance": 30
+    },
+    {
+      "opens": 40,
+      "closedPorts": 0,
+      "webviewDetaches": 0,
+      "zombiePushesForOneActionOneCoreEventOneAppearance": 120
+    }
+  ],
+  "cleanupWarnings": 40
+}

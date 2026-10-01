@@ -21,5 +21,8 @@ export default mergeConfig(base, defineConfig({
     environment: 'node',
     include: ['src/**/*.test.{ts,tsx}'],
     pool: 'forks',
+    // The repository runs six packages concurrently. Bound this package's cold shell transforms
+    // so their fixture startup does not exhaust the five-second test deadline under suite load.
+    maxWorkers: 2,
   },
 }))

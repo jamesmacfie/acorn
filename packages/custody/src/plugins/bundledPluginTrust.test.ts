@@ -1,12 +1,18 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { writePrivateAtomic } from '@acorn/node-core/server/storage'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/api.ts'
 import { PluginCache } from './pluginCache'
 import { PluginTrustStore } from './pluginTrustStore'
 import { BUNDLED_TRUST_OPT_OUT, trustBundledClientPlugins, trustsBundledClientPlugins } from './bundledPluginTrust'
+
+vi.mock('@acorn/node-core/server/storage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@acorn/node-core/server/storage')>()
+  return { ...actual, writePrivateAtomic: vi.fn(actual.writePrivateAtomic) }
+})
 
 const roots: string[] = []
 const temporary = (prefix: string): string => {
@@ -15,11 +21,98 @@ const temporary = (prefix: string): string => {
   return dir
 }
 
+const resourcePackage = (resources: string, id: string): string => {
+  const dir = join(resources, id)
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'client.js'), `export default '${id}'`)
+  writeFileSync(join(dir, 'acorn-plugin.json'), JSON.stringify({
+    id, name: id, version: '1', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR,
+    client: './client.js', permissions: { api: [], events: [], node: {} },
+  }))
+  return dir
+}
+
 afterEach(() => {
+  vi.mocked(writePrivateAtomic).mockClear()
   for (const root of roots.splice(0)) rmSync(root, { recursive: true, force: true })
 })
 
 describe('bundled plugin client trust', () => {
+  it('commits a fresh roster once per metadata store, and only trust when app provenance changes', () => {
+    const resources = temporary('acorn-bundled-trust-batch-')
+    const userData = temporary('acorn-bundled-trust-user-')
+    const ids = Array.from({ length: 7 }, (_, index) => `example-${index}`)
+    for (const id of ids) resourcePackage(resources, id)
+    const launch = (version: string) => trustBundledClientPlugins(resources, version,
+      new PluginCache(userData, { fetch: async () => { throw new Error('network must not be used') } }),
+      new PluginTrustStore(userData))
+
+    expect(launch('1')).toEqual(ids)
+    expect(writePrivateAtomic).toHaveBeenCalledTimes(2)
+    vi.mocked(writePrivateAtomic).mockClear()
+    expect(launch('1')).toEqual(ids)
+    expect(writePrivateAtomic).not.toHaveBeenCalled()
+    expect(launch('2')).toEqual(ids)
+    expect(writePrivateAtomic).toHaveBeenCalledTimes(1)
+    expect(new PluginTrustStore(userData).list().map((ack) => ack.nodeId)).toEqual(ids.map(() => 'bundled:acorn-2'))
+    expect(statSync(join(userData, 'acorn-1-plugin-cache/index.json')).mode & 0o777).toBe(0o600)
+    expect(statSync(join(userData, 'acorn-1-plugin-trust.json')).mode & 0o777).toBe(0o600)
+  })
+
+  it('keeps valid siblings and unrelated rejected decisions when a resource is missing or malformed', () => {
+    const resources = temporary('acorn-bundled-trust-partial-')
+    const userData = temporary('acorn-bundled-trust-user-')
+    resourcePackage(resources, 'first')
+    rmSync(join(resourcePackage(resources, 'missing'), 'client.js'))
+    const invalid = resourcePackage(resources, 'invalid')
+    const malformed = JSON.parse(readFileSync(join(invalid, 'acorn-plugin.json'), 'utf8'))
+    malformed.permissions.api = [123]
+    writeFileSync(join(invalid, 'acorn-plugin.json'), JSON.stringify(malformed))
+    resourcePackage(resources, 'last')
+    const cache = new PluginCache(userData, { fetch: async () => { throw new Error('network must not be used') } })
+    const trust = new PluginTrustStore(userData)
+    const firstHash = createHash('sha256').update("export default 'first'").digest('hex')
+    // Application-resource acceptance continues to replace a rejection about those exact bytes.
+    // A rejection about another bundle remains the owner's decision.
+    const rejected = {
+      pluginId: 'first', hash: firstHash, nodeId: 'node-a', version: '1',
+      permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
+      webviews: [], keyClaims: [], navigationDestinations: [], extensions: [], schedules: [], taskChecks: [],
+      harnesses: [], agentTools: [], contextSections: [], decision: 'rejected' as const, decidedAt: 100,
+    }
+    trust.record(rejected)
+    trust.record({ ...rejected, pluginId: 'unrelated', hash: 'a'.repeat(64) })
+    vi.mocked(writePrivateAtomic).mockClear()
+
+    expect(trustBundledClientPlugins(resources, '1', cache, trust)).toEqual(['first', 'last'])
+    expect(writePrivateAtomic).toHaveBeenCalledTimes(2)
+    const persisted = new PluginTrustStore(userData)
+    expect(persisted.decisionFor('first', firstHash)?.decision).toBe('accepted')
+    expect(persisted.decisionFor('unrelated', 'a'.repeat(64))?.decision).toBe('rejected')
+    expect(persisted.list()).toHaveLength(3)
+    expect(Object.keys(new PluginCache(userData, { fetch: async () => { throw new Error('network must not be used') } }).list())).toHaveLength(2)
+  })
+
+  it.each(['cache', 'trust'] as const)('retains retryable state when the %s commit fails', (failedStore) => {
+    const resources = temporary('acorn-bundled-trust-failure-')
+    const userData = temporary('acorn-bundled-trust-user-')
+    resourcePackage(resources, 'example')
+    const cache = new PluginCache(userData, { fetch: async () => { throw new Error('network must not be used') } })
+    const trust = new PluginTrustStore(userData)
+    const hash = createHash('sha256').update("export default 'example'").digest('hex')
+    if (failedStore === 'trust') {
+      vi.mocked(writePrivateAtomic).mockImplementationOnce(vi.mocked(writePrivateAtomic).getMockImplementation()!)
+    }
+    vi.mocked(writePrivateAtomic).mockImplementationOnce(() => { throw new Error('disk unavailable') })
+
+    expect(trustBundledClientPlugins(resources, '1', cache, trust)).toEqual([])
+    expect(trust.list()).toEqual([])
+    expect(new PluginTrustStore(userData).list()).toEqual([])
+    expect(cache.has(hash)).toBe(failedStore === 'trust')
+    expect(trustBundledClientPlugins(resources, '1', cache, trust)).toEqual(['example'])
+    expect(new PluginTrustStore(userData).decisionFor('example', hash)?.decision).toBe('accepted')
+  })
+
   it('caches and accepts the exact client bytes shipped in application resources', () => {
     const resources = temporary('acorn-bundled-trust-resources-')
     const userData = temporary('acorn-bundled-trust-user-')

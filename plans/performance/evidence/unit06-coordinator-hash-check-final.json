@@ -1,0 +1,7 @@
+{
+  "manifest": "plans/performance/evidence/unit06-final-source-manifest-v3.json",
+  "manifestSha256": "6d6b1cf23c94601d6157de901045a7d3bcbc8e241692842f45282a0e4f177b3f",
+  "checks": 92,
+  "failures": [],
+  "historicalDeltaNote": "Initial recursive check compared historical v1-to-v2 database bytes against v3 current bytes. Preserved excluded result. Current sources and all referenced immutable artifacts match; historical deltas are not current-source claims."
+}

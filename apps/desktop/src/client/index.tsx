@@ -1,14 +1,14 @@
 /* @refresh reload */
+import { PaneModelHost } from '@acorn/client-core/host/registries/panes/PaneModelHost.tsx'
 import { reportResponsiveness } from '@acorn/client-core/infra/platform'
 import { startResponsivenessMonitor } from '@acorn/client-core/infra/telemetry'
 import { render } from 'solid-js/web'
 import { applyNodePlugins } from './activate'
 import { createEffect, createRoot, Show } from 'solid-js'
-import { PersistQueryClientProvider } from '@tanstack/solid-query-persist-client'
+import { QueryCacheProvider } from '@acorn/client-core/infra/persistence/QueryCacheProvider.tsx'
 import { Route, Router } from '@solidjs/router'
 import App from './App'
 import '@acorn/client-core/infra/styles/styles.css'
-import { PERSISTED_SNAPSHOT_MAX_AGE_MS, shouldPersistQuery } from '@acorn/client-core/infra/persistence/queryPersistence.ts'
 import { activeCacheId, activeNodeId, nodeReady, selectActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 import { clientFor, nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
 import { wsOnReconnect } from '@acorn/client-core/infra/node/wsClient.ts'
@@ -149,32 +149,25 @@ render(
     // query started against node A cannot resolve into node B's cache (activeNode.ts's invariant).
     <Show when={activeCacheId()} keyed>
       {(nodeId) => {
-        const { client, persister, hydrated } = clientFor(nodeId)
+        const cache = clientFor(nodeId)
         return (
-          <PersistQueryClientProvider
-            client={client}
-            onSuccess={hydrated}
-            onError={hydrated}
-            persistOptions={{
-              persister,
-              maxAge: PERSISTED_SNAPSHOT_MAX_AGE_MS,
-              dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
-            }}
-          >
-            <Router root={App}>
-              <Route path="/" component={noop} />
-              <Route path="/t/:taskId" component={noop} />
-              <Route path="/settings/projects" component={noop} />
-              {sourceRouteContributions().map((route) => <Route path={route.path} component={noop} />)}
-              {/* A loaded plugin's project-scoped surfaces, whose patterns the host minted from the plugin
-                  id (client-core/host/registries/commands/corePaths.ts). Read here rather than folded into the line above
-                  because they belong to a surface rather than to a rail source, and they arrive later than
-                  compiled routes do. The distribution pass settles after the first paint, and this
-                  expression is inside the Router's `children` memo, so a route registered then is picked up
-                  rather than missed. */}
-              {projectSurfaceRoutes().map((route) => <Route path={route.path} component={noop} />)}
-            </Router>
-          </PersistQueryClientProvider>
+          <QueryCacheProvider cache={cache}>
+            <PaneModelHost nodeId={activeNodeId()}>
+              <Router root={App}>
+                <Route path="/" component={noop} />
+                <Route path="/t/:taskId" component={noop} />
+                <Route path="/settings/projects" component={noop} />
+                {sourceRouteContributions().map((route) => <Route path={route.path} component={noop} />)}
+                {/* A loaded plugin's project-scoped surfaces, whose patterns the host minted from the plugin
+                    id (client-core/host/registries/commands/corePaths.ts). Read here rather than folded into the line above
+                    because they belong to a surface rather than to a rail source, and they arrive later than
+                    compiled routes do. The distribution pass settles after the first paint, and this
+                    expression is inside the Router's `children` memo, so a route registered then is picked up
+                    rather than missed. */}
+                {projectSurfaceRoutes().map((route) => <Route path={route.path} component={noop} />)}
+              </Router>
+            </PaneModelHost>
+          </QueryCacheProvider>
         )
       }}
     </Show>

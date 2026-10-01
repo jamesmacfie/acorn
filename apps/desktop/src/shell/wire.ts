@@ -15,6 +15,7 @@ export type HelperMethod =
   | 'node-fetch'
   | 'node-abort'
   | 'node-send'
+  | 'node-interest'
   | 'fleet-list'
   | 'node-probe'
   | 'node-pair'
@@ -51,6 +52,7 @@ export type HelperPush =
   | { push: 'node-frame'; nodeId: string; frame: unknown }
   | { push: 'node-status'; status: unknown }
   | { push: 'node-replaced' }
+  | { push: 'node-transport-error'; nodeId: string; error: import('@acorn/protocol/broker.ts').NodeTransportError }
 
 export type HelperMessage = HelperReply | HelperPush
 

@@ -24,13 +24,13 @@ it('replaces full rows and removes them when the node returns an empty roster', 
   expect(sessions()).toEqual([])
 })
 
-it('clears rows after a failed refresh', async () => {
+it('retains authoritative rows after a failed refresh', async () => {
   setActiveNode('n1')
   const fetch = vi.fn().mockResolvedValueOnce(response([row('same')])).mockRejectedValueOnce(new Error('offline'))
   vi.stubGlobal('fetch', fetch)
   await refreshSessions()
   await expect(refreshSessions()).rejects.toThrow('offline')
-  expect(sessions()).toEqual([])
+  expect(sessions()).toEqual([row('same')])
 })
 
 it('drops a late response and a late created session from the previous node', async () => {

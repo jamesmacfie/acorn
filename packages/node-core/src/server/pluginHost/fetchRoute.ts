@@ -21,6 +21,7 @@ export async function servePluginFetch(
   const forwarded = new Request(url, {
     method: raw.method,
     headers: raw.headers,
+    signal: raw.signal,
     ...(raw.method === 'GET' || raw.method === 'HEAD' ? {} : { body: raw.body, duplex: 'half' }),
   } as RequestInit)
   return args.fetch(forwarded, pluginRequestContext(c, args.pluginId))

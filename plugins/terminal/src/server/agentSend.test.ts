@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { AgentSender, type SendableSession } from './agentSend'
 import { PASTE_BEGIN, PASTE_END, wrapBracketedPaste } from './terminalUtils'
 
@@ -96,4 +96,36 @@ describe('live PTY delivery (cat)', () => {
     expect(ring).toContain('line one')
     expect(ring).toContain('line two')
   }, 10_000)
+})
+
+it('cancels real submit timers on clear and releases completed timer ownership', () => {
+  vi.useFakeTimers()
+  try {
+    const session = fakeSession(false)
+    const sender = new AgentSender(() => session)
+    sender.send('a', 'one', 'now'); sender.send('a', 'two', 'now')
+    expect(vi.getTimerCount()).toBe(2)
+    sender.clear('a')
+    expect(vi.getTimerCount()).toBe(0)
+    vi.advanceTimersByTime(200)
+    expect(session.writes.filter(s => s === '\r')).toHaveLength(0)
+    sender.send('a', 'three', 'now')
+    vi.advanceTimersByTime(150)
+    expect(session.writes.at(-1)).toBe('\r')
+    expect((sender as unknown as { submits: Map<string, unknown> }).submits.size).toBe(0)
+  } finally { vi.useRealTimers() }
+})
+
+it('fences old callbacks even when a scheduler cannot cancel them or a session ID is reused', () => {
+  const callbacks: (() => void)[] = []
+  let session = fakeSession(false)
+  const original = session
+  const sender = new AgentSender(() => session, 150, callback => { callbacks.push(callback) })
+  sender.send('a', 'one', 'now')
+  session = fakeSession(false)
+  callbacks.shift()!()
+  expect(original.writes.filter(s => s === '\r')).toHaveLength(0)
+  sender.send('a', 'two', 'now'); sender.clear('a')
+  callbacks.shift()!()
+  expect(session.writes.filter(s => s === '\r')).toHaveLength(0)
 })

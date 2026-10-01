@@ -1,4 +1,9 @@
-import { createComponent, createSignal, lazy, type JSX } from 'solid-js'
+import { registrationSnapshot } from '../plugins/registrationSnapshot'
+import { createComponent, createSignal, lazy, onCleanup, type JSX } from 'solid-js'
+import { useQueryClient } from '@tanstack/solid-query'
+import { queryOwner } from '../../infra/node/queryOwnership'
+import { clientEvents, consumePaneIntent } from '../registries/commands/clientEvents'
+import { refreshTreeDocumentGrant } from '../tree/bridgeAuthority'
 import type { NodePluginRow, PluginFrameSurface } from '@acorn/protocol/api.ts'
 import type { DocumentHandle } from '../../features/editor/documentModel'
 import { isPluginKeyClaim } from '@acorn/protocol/keybindings.ts'
@@ -16,7 +21,7 @@ import { suppliedLayout } from '../layouts/table'
 import { suppliedRemoteTree } from '../tree/table'
 import { projectImporterRegistry } from '../registries/sources/projectImporters'
 import { projectSurfaceRegistry } from '../registries/panes/projectSurfaces'
-import { clearExclusiveSlotFailures, exclusiveSlotRegistry } from '../registries/extensionPoints/exclusiveSlots'
+import { clearExclusiveSlotFailures, exclusiveSlotFailed, exclusiveSlotRegistry } from '../registries/extensionPoints/exclusiveSlots'
 import { refPanelRegistry } from '../registries/panes/refPanels'
 import type { Disposable } from '../../kit/lib/registry'
 import { settingsRegistry } from '../registries/shell/settings'
@@ -97,6 +102,7 @@ const layoutComponent = async (name: PaneLayoutName) => suppliedLayout(name) ?? 
 type LayoutScope = { taskId?: string; projectId?: string; item?: string }
 
 const registered = new Map<string, Disposable[]>()
+const snapshots = new Map<string, string>()
 
 // `activeNodeId()` is the frame's node, and there's no other candidate: a task belongs to whichever node
 // the window is talking to, and a rail-scoped surface is looking at that node too. The frame never names
@@ -112,8 +118,12 @@ const registered = new Map<string, Disposable[]>()
 // `''` when there's no node at all is the browser-served `dev:node` mode, where the origin is the node
 // and apiClient's same-origin fallback is the right target.
 const frameNode = (): string => activeNodeId() ?? ''
+// Capture at component construction; delayed region builders keep their provider's origin.
+const mountedFrameNode = (): string => {
+  const owner = queryOwner(useQueryClient())
+  return owner === undefined ? frameNode() : owner ?? ''
+}
 
-/**
 /**
  * What one frame is, as the host decided it: the value no message can influence.
  *
@@ -141,7 +151,7 @@ export const frameBindingFor = (pluginId: string, surface: PluginFrameSurface, r
 
 // Registered per plugin and torn down as a unit: a re-run replaces a plugin's whole contribution set
 // rather than reconciling it, the way the client plugin host does (registries/plugin.ts).
-function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow, trusted: boolean): Disposable[] {
+function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow, trusted: boolean, onFailure: () => void): Disposable[] {
   const disposables: Disposable[] = []
   for (const surface of row.installed?.contributions.frames ?? []) {
     // A surface a future mobile shell would have to render unusably in a phone viewport
@@ -160,6 +170,7 @@ function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow, tr
     try {
       disposables.push(registerSurface(pluginId, hash, row, surface))
     } catch (error) {
+      onFailure()
       // A duplicate id is the expected failure, since contribution ids are un-namespaced by design and a
       // third-party plugin can collide with a first-party pane. One bad surface is skipped and the rest
       // of the plugin still works.
@@ -186,6 +197,7 @@ function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow, tr
         hash,
       }))
     } catch (error) {
+      onFailure()
       log.warn(`${pluginId} could not contribute extension '${entry.id}'`, error, { 'plugin.id': pluginId })
       recordSurfaceFailure(pluginId, entry.id, error)
     }
@@ -234,7 +246,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
           pluginId,
           surface,
           hash,
-          binding: frameBindingFor(pluginId, surface, row, { taskId: props.task.id, projectId: props.task.projectId }),
+          binding: frameBindingFor(pluginId, surface, row, { nodeId: mountedFrameNode(), taskId: props.task.id, projectId: props.task.projectId }),
         }),
       })
     case 'pane':
@@ -266,19 +278,33 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
           const layout = declared.layout
           const Draw = lazy(async () => ({ default: await layoutComponent(layout) }))
           return (scope: () => LayoutScope): JSX.Element => {
-            const binding = () => frameBindingFor(pluginId, surface, row, { taskId: scope().taskId, projectId: scope().projectId })
+            const nodeId = mountedFrameNode()
+            const initial = scope()
+            const intent = initial.item === undefined && initial.taskId
+              ? consumePaneIntent(initial.taskId, surface.id, 'plugin:select') : undefined
+            const openingItem = initial.item ?? (intent?.kind === 'plugin:select' ? intent.item : undefined)
+            const [selectedItem, setSelectedItem] = createSignal(openingItem)
+            const regionScope = (): LayoutScope => ({ ...scope(), item: scope().item ?? selectedItem() })
+            const unselect = clientEvents.on('presentation:pane-intent', (event) => {
+              if (event.taskId !== scope().taskId || event.paneId !== surface.id || event.intent.kind !== 'plugin:select') return
+              consumePaneIntent(event.taskId, event.paneId, 'plugin:select')
+              setSelectedItem(event.intent.item)
+            })
+            onCleanup(unselect)
+            const binding = () => frameBindingFor(pluginId, surface, row, { nodeId, taskId: scope().taskId, projectId: scope().projectId })
             // Held here rather than passed down, because the regions mount independently: an iframe
             // can connect its bridge before the editor has finished fetching its document. PluginFrame
             // reads through the accessor per call, so a frame that got there first still finds the
             // document when it arrives.
             const [document, setDocument] = createSignal<DocumentHandle | null>(null)
+            const documentGrant = Object.values(declared.regions).some((region) => region !== 'frame' && region.kind === 'document') ? document : undefined
             const regions: Record<string, () => JSX.Element> = {}
             for (const [name, region] of Object.entries(declared.regions)) {
               // Both of these run the plugin's own bytes, which is why `isHostOwnedSurface` excluded such
               // a pane from the trust bypass and why there is a `hash` to hand over. What differs is
               // where they run: an iframe with its own origin, or a worker with no DOM at all.
               if (region === 'frame') {
-                regions[name] = () => createComponent(PluginFrame, { binding: binding(), hash, document })
+                regions[name] = () => createComponent(PluginFrame, { binding: binding(), hash, document: documentGrant, get item() { return regionScope().item } })
                 continue
               }
               if (region.kind === 'remote') {
@@ -292,18 +318,21 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
                 // way: what makes the `document` verb answerable is standing beside a host editor, not
                 // which of the two runtimes the bundle happens to be in
                 // (docs/editor.md § Communication between regions).
-                regions[name] = () => createComponent(RemoteTree, { contribution, props: scope, scope, document })
+                regions[name] = () => createComponent(RemoteTree, { contribution, props: regionScope, scope: regionScope, document: documentGrant, openingItem })
                 continue
               }
               regions[name] = () => createComponent(DocumentSurface, {
                 pluginId,
                 surfaceId: surface.id,
-                nodeId: frameNode(),
+                nodeId,
                 region,
                 scope: scope(),
                 // The updater form, because a Solid setter given a bare value it can call would
                 // call it, and a document handle is a bag of methods.
-                onHandle: (next: DocumentHandle | null) => { setDocument(() => next) },
+                onHandle: (next: DocumentHandle | null) => {
+                  setDocument(() => next)
+                  refreshTreeDocumentGrant(document)
+                },
               })
             }
             return createComponent(Draw, {
@@ -435,7 +464,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         when: () => pluginEnabledOnNode(frameNode(), pluginId),
         // No task and no project in the binding: a core surface isn't inside anybody's task layout, and a
         // replacement that could ask for one would be replacing a different surface.
-        component: () => createComponent(PluginFrame, { binding: frameBindingFor(pluginId, surface, row), hash }),
+        component: () => createComponent(PluginFrame, { binding: frameBindingFor(pluginId, surface, row, { nodeId: mountedFrameNode() }), hash }),
       })
     }
     case 'refPanel': {
@@ -456,7 +485,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         // What goes in it is either the plugin's rectangle or a tree it emits: a panel body is a tree,
         // and a panel that declared a layout with a remote region says so.
         component: (props) => createComponent(PluginRefPanel, {
-          binding: frameBindingFor(pluginId, surface, row),
+          binding: frameBindingFor(pluginId, surface, row, { nodeId: mountedFrameNode() }),
           hash,
           ...(panelTree ? { tree: panelTree } : {}),
           get displayId() {
@@ -511,14 +540,17 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
           slot: 'overlay',
           order: surface.order,
           when: () => pluginEnabledOnNode(frameNode(), pluginId),
-          component: () => createComponent(PluginOverlay, {
+          component: () => {
+            const nodeId = mountedFrameNode()
+            return createComponent(PluginOverlay, {
             label: surface.label,
             hash,
             open,
             // An accessor, so the active task is read when the overlay opens: the task that was on screen
             // when the reader asked for the picker, not whichever one was selected when the slot mounted.
-            binding: () => frameBindingFor(pluginId, surface, row, activeTaskId() ? { taskId: activeTaskId()! } : {}),
-          }),
+            binding: () => frameBindingFor(pluginId, surface, row, { nodeId, ...(activeTaskId() ? { taskId: activeTaskId()! } : {}) }),
+            })
+          },
         }),
       ]
       return { dispose: () => [...disposables].reverse().forEach((disposable) => disposable.dispose()) }
@@ -536,7 +568,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         order: surface.order,
         component: () => settingsTree
           ? createComponent(RemoteTree, { contribution: settingsTree, props: () => ({}) })
-          : createComponent(PluginFrame, { binding: frameBindingFor(pluginId, surface, row), hash }),
+          : createComponent(PluginFrame, { binding: frameBindingFor(pluginId, surface, row, { nodeId: mountedFrameNode() }), hash }),
       })
     }
     case 'importer':
@@ -545,7 +577,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         label: surface.label,
         glyph: surface.glyph,
         component: (props) => createComponent(PluginFrame, {
-          binding: frameBindingFor(pluginId, surface, row),
+          binding: frameBindingFor(pluginId, surface, row, { nodeId: mountedFrameNode() }),
           hash,
           get onImported() {
             return props.onImported
@@ -559,7 +591,6 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
 }
 
 /**
-/**
  * Register every accepted plugin's declared surfaces. Idempotent: called after the distribution pass and
  * again when a trust decision lands, and each call replaces what the previous one contributed. Not called
  * on a node switch, and doesn't need to be, since nothing registered here holds a node id.
@@ -569,29 +600,27 @@ export function syncFrameContributions(): void {
   // per plugin id there's nothing to mount. The chrome pass has no such gate.
   if (!activeBundles()) return
 
-  for (const disposables of registered.values()) for (const disposable of disposables.reverse()) disposable.dispose()
-  registered.clear()
-  // This pass replaces every contribution, so it also replaces every reason one was missing.
-  clearSurfaceFailures()
-  // Including the exclusive-slot providers that threw. A sync is the one moment the bytes behind a
-  // provider can have changed, so it's the one moment a provider that fell back to core has earned
-  // another attempt (registries/exclusiveSlots.ts).
-  clearExclusiveSlotFailures()
-
-  // Driven by the roster rather than the bundle map, because not every surface needs a bundle: a document
-  // surface is host-drawn and executes nothing, so the loop has to reach a plugin with no client half.
-  //
-  // Trust binds to bytes, and ../contributions.ts decided which bytes: the resolved winner's, never a
-  // hash a roster row merely claims. An untrusted row is kept here rather than dropped the way the chrome
-  // pass drops it, because acceptance withholds only the code-bearing surfaces.
-  //
-  // A package with no client half is `trusted: false` for the same reason, and that's load-bearing: its
-  // webview surfaces would otherwise mount external web content with no prompt ever firing, because the
-  // trust queue only holds bundles.
-  for (const entry of eligiblePlugins()) {
+  const entries = eligiblePlugins()
+  const desired = new Map(entries.map((entry) => [entry.pluginId, registrationSnapshot(entry)]))
+  const retry = new Set(exclusiveSlotRegistry.entries().filter((provider) => exclusiveSlotFailed(provider.slot, provider.pluginId)).map((provider) => provider.pluginId))
+  // Retire every changed set before admission. Two plugins may exchange contribution ids in this
+  // pass, and a soon-to-be-retired provider must not cause an order-dependent collision.
+  for (const [pluginId, disposables] of registered) {
+    if (desired.has(pluginId) && desired.get(pluginId) === snapshots.get(pluginId) && !retry.has(pluginId)) continue
+    for (const disposable of [...disposables].reverse()) disposable.dispose()
+    registered.delete(pluginId)
+    snapshots.delete(pluginId)
+    clearSurfaceFailures(pluginId)
+    clearExclusiveSlotFailures(pluginId)
+  }
+  for (const entry of entries) {
+    const snapshot = desired.get(entry.pluginId)!
+    if (snapshots.get(entry.pluginId) === snapshot) continue
     reportUnknownDeclarations(entry.pluginId, entry.row)
-    const disposables = registerSurfaces(entry.pluginId, entry.hash, entry.row, entry.trusted)
-    if (disposables.length) registered.set(entry.pluginId, disposables)
+    let failed = false
+    const disposables = registerSurfaces(entry.pluginId, entry.hash, entry.row, entry.trusted, () => { failed = true })
+    registered.set(entry.pluginId, disposables)
+    if (!failed) snapshots.set(entry.pluginId, snapshot)
   }
 }
 
@@ -613,4 +642,5 @@ function reportUnknownDeclarations(pluginId: string, row: NodePluginRow): void {
 export function _resetFrameContributions(): void {
   for (const disposables of registered.values()) for (const disposable of disposables.reverse()) disposable.dispose()
   registered.clear()
+  snapshots.clear()
 }

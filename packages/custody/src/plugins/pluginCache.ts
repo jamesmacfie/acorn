@@ -50,6 +50,9 @@ const indexSchema = z.strictObject({ version: z.literal(1), entries: z.record(z.
 export type PutFailure = 'unreachable' | 'not-found' | 'too-large' | 'hash-mismatch'
 export type PutResult = { hash: string } | { error: PutFailure }
 
+type BundledClientBundle = { pluginId: string; version: string; read: () => Uint8Array }
+type BundledPutResult = { pluginId: string; hash: string } | { pluginId: string; error: unknown }
+
 // Just enough of NodeBroker to fetch. Narrow so the tests can exercise the hashing rules without a
 // TLS server.
 export type BundleFetcher = { fetch(nodeId: string, request: NodeFetchRequest): Promise<NodeFetchResponse> }
@@ -73,30 +76,42 @@ export class PluginCache {
   /** Cache client code read from this app's packaged resources. Unlike putFromNode there is no remote
    * hash claim to verify, so the content hash computed here is the identity main trusts. */
   putBundled(pluginId: string, version: string, bytes: Uint8Array): string {
-    if (bytes.byteLength > MAX_BUNDLE_BYTES) throw new Error(`Bundled plugin '${pluginId}' exceeds the client bundle limit.`)
-    const hash = createHash('sha256').update(bytes).digest('hex')
-    // Nothing to do when these exact bytes are already here, which is every launch between app
-    // updates. Writing anyway cost a bundle write plus an fsynced index rewrite per bundled plugin,
-    // in front of the window (docs/security.md § Third-party plugin bundles).
-    //
-    // The file is checked as well as the index row, because the two can disagree after a crash
-    // mid-write and `sweep` only repairs the other direction. A stat is not a write.
-    if (this.has(hash) && existsSync(join(this.dir, `${hash}.js`))) return hash
-    this.writeBundle(hash, bytes)
-    const now = Date.now()
-    const existing = this.entries()[hash]
-    this.writeIndex({
-      ...this.entries(),
-      [hash]: {
-        pluginId,
-        version,
-        bytes: bytes.byteLength,
-        nodeIds: existing?.nodeIds ?? [],
-        firstSeen: existing?.firstSeen ?? now,
-        lastSeen: now,
-      },
-    })
-    return hash
+    const result = this.putBundledBatch([{ pluginId, version, read: () => bytes }])[0]!
+    if ('error' in result) throw result.error
+    return result.hash
+  }
+
+  /** Cache application resources individually, then commit their successful index rows together.
+   * Suppliers keep only one bundle body in memory. A failed index commit publishes no new rows. */
+  putBundledBatch(bundles: Iterable<BundledClientBundle>): BundledPutResult[] {
+    const entries = { ...this.entries() }
+    const results: BundledPutResult[] = []
+    let changed = false
+    for (const bundle of bundles) {
+      const { pluginId, version } = bundle
+      try {
+        const bytes = bundle.read()
+        if (bytes.byteLength > MAX_BUNDLE_BYTES) throw new Error(`Bundled plugin '${pluginId}' exceeds the client bundle limit.`)
+        const hash = createHash('sha256').update(bytes).digest('hex')
+        const existing = entries[hash]
+        // Check the file as well as its row: a missing body must be repaired after a crash.
+        if (!existing || !existsSync(join(this.dir, `${hash}.js`))) {
+          const now = Date.now()
+          const entry = entrySchema.parse({
+            pluginId, version, bytes: bytes.byteLength,
+            nodeIds: existing?.nodeIds ?? [], firstSeen: existing?.firstSeen ?? now, lastSeen: now,
+          })
+          this.writeBundle(hash, bytes)
+          entries[hash] = entry
+          changed = true
+        }
+        results.push({ pluginId, hash })
+      } catch (error) {
+        results.push({ pluginId, error })
+      }
+    }
+    if (changed) this.writeIndex(entries)
+    return results
   }
 
   // Main-only. The `app-plugin://` handler is the caller, and this never reaches the renderer.
@@ -238,9 +253,9 @@ export class PluginCache {
   }
 
   private writeIndex(entries: Record<string, PluginCacheEntry>): void {
-    this.#entries = entries
     mkdirSync(this.dir, { recursive: true, mode: 0o700 })
     const path = join(this.dir, INDEX_FILE)
     writePrivateAtomic(path, `${JSON.stringify({ version: 1, entries } satisfies z.input<typeof indexSchema>, null, 2)}\n`)
+    this.#entries = entries
   }
 }

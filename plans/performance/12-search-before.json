@@ -1,0 +1,70 @@
+{
+  "owner": "plugins/editor/src/server/search.ts searchInFiles",
+  "fixture": "real bundled ripgrep on one disposable ASCII file",
+  "rows": [
+    {
+      "lines": 2000,
+      "fileBytes": 416000,
+      "value": {
+        "files": 1,
+        "hits": 2000,
+        "truncated": false,
+        "responseBytes": 504956
+      },
+      "nodeCpuMs": 13.628,
+      "wallMs": 215.280542,
+      "heapDeltaBytes": 1826856,
+      "spawned": [
+        {
+          "command": "rg",
+          "stdoutBytes": 786960,
+          "errorCode": null,
+          "pid": 76497
+        }
+      ]
+    },
+    {
+      "lines": 8000,
+      "fileBytes": 1664000,
+      "value": {
+        "files": 1,
+        "hits": 2000,
+        "truncated": true,
+        "responseBytes": 504955
+      },
+      "nodeCpuMs": 12.771,
+      "wallMs": 17.63133399999998,
+      "heapDeltaBytes": 4756960,
+      "spawned": [
+        {
+          "command": "rg",
+          "stdoutBytes": 3154156,
+          "errorCode": null,
+          "pid": 76512
+        }
+      ]
+    },
+    {
+      "lines": 100000,
+      "fileBytes": 20800000,
+      "value": {
+        "files": 0,
+        "hits": 0,
+        "truncated": false,
+        "responseBytes": 30
+      },
+      "nodeCpuMs": 65.463,
+      "wallMs": 90.97970799999996,
+      "heapDeltaBytes": 27369928,
+      "spawned": [
+        {
+          "command": "rg",
+          "stdoutBytes": 33554432,
+          "errorCode": "ERR_CHILD_PROCESS_STDIO_MAXBUFFER",
+          "pid": 76513
+        }
+      ]
+    }
+  ],
+  "expected": "Accepted search bounds production/parse work at the response cap and surfaces overflow/invalid query errors instead of claiming no matches."
+}

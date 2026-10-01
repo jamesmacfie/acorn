@@ -1,0 +1,29 @@
+{
+  "fixture": "actual setActiveNode, scope mapping, paneModel and Solid keyed Show; synthetic all-model eviction callback",
+  "comparisons": [
+    {
+      "mode": "plain",
+      "events": [
+        "shell-build:node-a",
+        "model-build:node-a",
+        "model-dispose:node-a",
+        "evict-all:active=node-b:dom=node-a",
+        "shell-build:node-b",
+        "model-build:node-b"
+      ],
+      "dom": "node-b"
+    },
+    {
+      "mode": "batched",
+      "events": [
+        "shell-build:node-a",
+        "model-build:node-a",
+        "model-dispose:node-a",
+        "evict-all:active=node-b:dom=node-a",
+        "shell-build:node-b",
+        "model-build:node-b"
+      ],
+      "dom": "node-b"
+    }
+  ]
+}

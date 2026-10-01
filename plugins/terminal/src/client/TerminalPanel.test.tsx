@@ -3,7 +3,7 @@ import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import type { ServerMsg, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
-import type { Task } from '@acorn/plugin-api/client'
+import { PrefKeys, savePref, type Task } from '@acorn/plugin-api/client'
 
 // What a terminal tab switch costs, in jsdom. This is the tier the drawer never had, and phase 6 of
 // the performance programme is the reason it needs one: the panel used to mount the active tab alone,
@@ -67,6 +67,10 @@ vi.mock('./theme', () => ({ baseTheme: () => ({}), monoFont: () => 'monospace', 
 
 const attaches: string[] = []
 let offline = false
+let loadProfiles: (() => Promise<unknown[]>) | undefined
+let loadRoster: (() => Promise<TerminalSession[]>) | undefined
+let createSession: (() => Promise<TerminalSession>) | undefined
+const created: string[] = []
 const detaches: string[] = []
 const attachSizes: ({ cols: number; rows: number } | undefined)[] = []
 const listeners = new Map<string, (m: ServerMsg) => void>()
@@ -74,10 +78,12 @@ const resizes: string[] = []
 vi.mock('./terminalClient', () => ({
   terminalApi: () => ({
     list: async () => {
+      if (loadRoster) return loadRoster()
       if (offline) throw new Error('node unreachable')
       return roster
     },
-    profiles: async () => [],
+    profiles: async () => loadProfiles ? loadProfiles() : [],
+    create: async () => { created.push('create'); return createSession ? createSession() : session(A, 'new') },
     resize: async (id: string, cols: number, rows: number) => {
       resizes.push(`${id} ${cols}x${rows}`)
       return true
@@ -140,6 +146,7 @@ let roster: TerminalSession[] = []
 const cleanups: (() => void)[] = []
 
 beforeEach(() => {
+  loadProfiles = undefined; loadRoster = undefined; createSession = undefined; created.length = 0; offline = false
   roster = [session(A, 'first'), session(B, 'second')]
   vi.stubGlobal('fetch', async (url: string) =>
     new Response(JSON.stringify(String(url).endsWith('/sessions') ? roster : {}), { status: 200, headers: { 'content-type': 'application/json' } }),
@@ -174,10 +181,11 @@ const settle = async (): Promise<void> => {
 //
 // `open` is the drawer's per-task open state, which the host's slot follows: false unmounts the whole
 // panel, the way a switch to a task without the drawer open does.
-const mount = (drawer: { task?: () => Task; open?: () => boolean } = {}): void => {
+const mount = (drawer: { task?: () => Task; open?: () => boolean; defaultProfile?: string } = {}): void => {
   const host = document.createElement('div')
   document.body.append(host)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
+  void savePref(client, PrefKeys.terminalRailDefault, drawer.defaultProfile ?? '')
   cleanups.push(
     render(
       () => (
@@ -373,7 +381,7 @@ describe('a terminal outlives the drawer that drew it', () => {
     setOpen(false)
     await settle()
 
-    // The drawer shows nothing after a failed read, but that is no evidence the session has gone.
+    // A failed read retains both the roster and every warm terminal.
     offline = true
     await refreshSessions().catch(() => {})
     offline = false
@@ -424,4 +432,54 @@ describe('the WebGL contexts stay bounded', () => {
     expect(StubWebgl.made).toHaveLength(3)
     expect(webglTerminalCount()).toBe(2)
   })
+})
+
+
+describe('deferred panel work stays with its view', () => {
+  it('settles a failed initial roster without auto-creating and permits a later valid mount', async () => {
+    roster = []
+    loadRoster = async () => { throw Error('roster offline') }
+    mount({ defaultProfile: 'shell' })
+    await settle()
+    expect(document.body.textContent).toContain('roster offline')
+    expect(document.body.textContent).not.toContain('Launching…')
+    expect(created).toEqual([])
+    for (const stop of cleanups.splice(0)) stop()
+    loadRoster = undefined
+    mount({ defaultProfile: 'shell' })
+    await settle()
+    expect(created).toEqual(['create'])
+  })
+
+  it('ignores a held profile rejection after disposal', async () => {
+    let reject!: (reason: Error) => void
+    loadProfiles = () => new Promise((_resolve, no) => { reject = no })
+    const [open, setOpen] = createSignal(true)
+    mount({ open, defaultProfile: 'shell' })
+    await settle()
+    setOpen(false)
+    reject(Error('late profile failure'))
+    await settle()
+    expect(document.body.textContent).not.toContain('late profile failure')
+    expect(created).toEqual([])
+  })
+})
+
+
+it('does not publish a held creation into a newer task after the task changes', async () => {
+  roster = [session(B, 'incoming', 't2')]
+  let finish!: (value: TerminalSession) => void
+  createSession = () => new Promise((resolve) => { finish = resolve })
+  const [current, setCurrent] = createSignal(task)
+  mount({ task: current, defaultProfile: 'shell' })
+  await settle()
+  expect(created).toEqual(['create'])
+  setCurrent({ id: 't2', title: 'second task' } as Task)
+  await settle()
+  const incomingBox = surfaces()[0]
+  finish(session(A, 'outgoing creation'))
+  await settle()
+  expect(tab(A)).toBeNull()
+  expect(tab(B)?.getAttribute('aria-selected')).toBe('true')
+  expect(surfaces()[0]).toBe(incomingBox)
 })

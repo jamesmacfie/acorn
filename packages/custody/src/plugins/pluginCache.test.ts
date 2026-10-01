@@ -1,10 +1,21 @@
 import { createHash } from 'node:crypto'
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 import { MAX_BUNDLE_BYTES, PluginCache } from './pluginCache'
+import { writePrivateAtomic } from '@acorn/node-core/server/storage'
+
+vi.mock('@acorn/node-core/server/storage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@acorn/node-core/server/storage')>()
+  return { ...actual, writePrivateAtomic: vi.fn(actual.writePrivateAtomic) }
+})
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>()
+  return { ...actual, renameSync: vi.fn(actual.renameSync) }
+})
 
 // Nothing to mock: the cache takes userDataDir as a parameter, the way fleetStore does, and touches
 // no shell API. That is what makes the hashing rules, the part that carries the security property,
@@ -34,6 +45,8 @@ beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'acorn-plugin-cache-'))
   served = { status: 200, body: BUNDLE }
   requests = []
+  vi.mocked(writePrivateAtomic).mockClear()
+  vi.mocked(renameSync).mockClear()
   vi.spyOn(console, 'warn').mockImplementation(() => {})
   vi.spyOn(console, 'error').mockImplementation(() => {})
 })
@@ -151,6 +164,66 @@ describe('caching the application own bundles', () => {
   // Nanoseconds, not milliseconds: two writes inside one millisecond would compare equal and the test
   // would pass for the wrong reason.
   const mtime = (path: string): bigint => statSync(path, { bigint: true }).mtimeNs
+
+  it('commits readable siblings together when another bundle cannot be read or exceeds its limit', () => {
+    const store = cache()
+    const results = store.putBundledBatch([
+      { pluginId: 'first', version: '1', read: () => new TextEncoder().encode('first') },
+      { pluginId: 'missing', version: '1', read: () => { throw new Error('missing resource') } },
+      { pluginId: 'large', version: '1', read: () => new Uint8Array(MAX_BUNDLE_BYTES + 1) },
+      { pluginId: 'last', version: '1', read: () => new TextEncoder().encode('last') },
+    ])
+
+    expect(results).toEqual([
+      { pluginId: 'first', hash: sha256('first') },
+      { pluginId: 'missing', error: expect.any(Error) },
+      { pluginId: 'large', error: expect.any(Error) },
+      { pluginId: 'last', hash: sha256('last') },
+    ])
+    expect(writePrivateAtomic).toHaveBeenCalledTimes(1)
+    expect(Object.keys(cache().list()).sort()).toEqual([sha256('first'), sha256('last')].sort())
+    expect(readFileSync(cache().path(sha256('first'))!, 'utf8')).toBe('first')
+  })
+
+  it('does not publish failed index writes and retries their unindexed bodies', () => {
+    const store = cache()
+    const bytes = new TextEncoder().encode(BUNDLE)
+    vi.mocked(writePrivateAtomic).mockImplementationOnce(() => { throw new Error('disk unavailable') })
+
+    expect(() => store.putBundled('sparkline', '1', bytes)).toThrow('disk unavailable')
+    expect(store.list()).toEqual({})
+    expect(cache().list()).toEqual({})
+    expect(store.putBundled('sparkline', '1', bytes)).toBe(sha256(BUNDLE))
+    expect(cache().has(sha256(BUNDLE))).toBe(true)
+  })
+
+  it('preserves the prior index when atomic replacement fails after writing and syncing its successor', () => {
+    const store = cache()
+    store.putBundled('sparkline', '1', new TextEncoder().encode(BUNDLE))
+    const path = join(cacheDir(), 'index.json')
+    const before = readFileSync(path, 'utf8')
+    const second = new TextEncoder().encode('second bundle')
+    vi.mocked(renameSync).mockImplementationOnce(vi.mocked(renameSync).getMockImplementation()!)
+    vi.mocked(renameSync).mockImplementationOnce(() => { throw new Error('replacement unavailable') })
+
+    expect(() => store.putBundled('second', '1', second)).toThrow('replacement unavailable')
+    expect(readFileSync(path, 'utf8')).toBe(before)
+    expect(store.list()).toEqual(cache().list())
+    expect(store.has(sha256('second bundle'))).toBe(false)
+    expect(store.putBundled('second', '1', second)).toBe(sha256('second bundle'))
+    expect(Object.keys(cache().list())).toHaveLength(2)
+  })
+
+  it('preserves remote provenance while repairing a missing bundled file', async () => {
+    const store = cache()
+    await store.putFromNode('node-a', 'sparkline', claim())
+    const before = store.list()[sha256(BUNDLE)]
+    rmSync(store.path(sha256(BUNDLE))!)
+    store.putBundledBatch([{ pluginId: 'sparkline', version: '2', read: () => new TextEncoder().encode(BUNDLE) }])
+
+    expect(cache().list()[sha256(BUNDLE)]).toMatchObject({ nodeIds: ['node-a'], firstSeen: before.firstSeen, version: '2' })
+    expect(readFileSync(cache().path(sha256(BUNDLE))!, 'utf8')).toBe(BUNDLE)
+  })
 
   it('writes once, and touches neither the bundle nor the index the second time', () => {
     const store = cache()

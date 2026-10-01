@@ -22,7 +22,7 @@ export default function HttpDetail(props: { model: HttpPanelModel }) {
     <>
       <Show
         when={model().selection().kind !== 'variables'}
-        fallback={<HttpVariables projectId={model().projectId} projectName={model().projectName} />}
+        fallback={<HttpVariables client={model().client} projectId={model().projectId} projectName={model().projectName} />}
       >
         <Toolbar ariaLabel="Request">
           <Select

@@ -133,6 +133,7 @@ const ackSchema = z.strictObject({
   dev: z.literal(true).optional(),
 })
 export type PluginAck = z.infer<typeof ackSchema>
+type PluginAckResult = { ack: PluginAck } | { ack: PluginAck; error: unknown }
 
 // The dev trust grant. See docs/security.md, "The dev grant", and docs/plugins.md, "Development
 // mode".
@@ -209,14 +210,33 @@ export class PluginTrustStore {
   // Upsert on (pluginId, hash). Re-deciding the same bundle replaces the row rather than appending,
   // so the file cannot grow a history of one plugin being toggled.
   record(ack: PluginAck): void {
-    const parsed = ackSchema.parse(ack)
-    const stored = this.decisionFor(parsed.pluginId, parsed.hash)
-    // Re-deciding the same bundle the same way writes nothing. Every launch re-records the five
-    // bundled plugins (bundledPluginTrust.ts), and each write is an fsync of the whole file in front
-    // of the window. `decidedAt` is excluded because it moves on every call by definition, and the
-    // stored answer to "when did the owner decide this" is the first time, not the last.
-    if (stored && isDeepStrictEqual({ ...stored, decidedAt: 0 }, { ...parsed, decidedAt: 0 })) return
-    this.write([...this.list().filter((existing) => !(existing.pluginId === parsed.pluginId && existing.hash === parsed.hash)), parsed], this.listDevGrants())
+    const result = this.recordBatch([ack])[0]!
+    if ('error' in result) throw result.error
+  }
+
+  /** Validate each disclosure independently and commit successful decisions once. Unchanged
+   * decisions retain their first timestamp. A failed commit leaves the remembered state intact. */
+  recordBatch(input: Iterable<PluginAck>): PluginAckResult[] {
+    let acks = this.list()
+    const results: PluginAckResult[] = []
+    let changed = false
+    for (const ack of input) {
+      try {
+        const parsed = ackSchema.parse(ack)
+        const stored = acks.find((existing) => existing.pluginId === parsed.pluginId && existing.hash === parsed.hash)
+        if (stored && isDeepStrictEqual({ ...stored, decidedAt: 0 }, { ...parsed, decidedAt: 0 })) {
+          results.push({ ack: stored })
+          continue
+        }
+        acks = [...acks.filter((existing) => !(existing.pluginId === parsed.pluginId && existing.hash === parsed.hash)), parsed]
+        changed = true
+        results.push({ ack: parsed })
+      } catch (error) {
+        results.push({ ack, error })
+      }
+    }
+    if (changed) this.write(acks, this.listDevGrants())
+    return results
   }
 
   /**
@@ -327,8 +347,6 @@ export class PluginTrustStore {
   }
 
   private write(acks: PluginAck[], devGrants: PluginDevGrant[]): void {
-    this.#acks = acks
-    this.#grants = devGrants
     const path = join(this.userDataDir, TRUST_FILE)
     mkdirSync(this.userDataDir, { recursive: true, mode: 0o700 })
     const file = { version: 1, acks, devGrants } satisfies { version: 1; acks: PluginAck[]; devGrants: PluginDevGrant[] }
@@ -337,5 +355,7 @@ export class PluginTrustStore {
     // for every plugin. The blob cache next door deliberately keeps the looser variant; see
     // pluginCache.ts § writeBundle.
     writePrivateAtomic(path, `${JSON.stringify(file, null, 2)}\n`)
+    this.#acks = acks
+    this.#grants = devGrants
   }
 }

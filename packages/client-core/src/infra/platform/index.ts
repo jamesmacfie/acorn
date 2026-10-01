@@ -7,9 +7,10 @@ import type {
   NodeProbeResult,
   NodeRecord,
   NodeStatus,
+  NodeTransportError,
 } from '@acorn/protocol/broker.ts'
 import type { NodePluginPermissions, PluginAgentToolGrant, PluginContextSectionGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
-import type { WsClientFrame } from '@acorn/protocol/ws.ts'
+import type { WsClientFrame, WsSendOptions } from '@acorn/protocol/ws.ts'
 
 // The platform seam: the renderer's one door to whatever is hosting it. See
 // docs/architecture-overview.md § Node API and client flow for the seam's shape, its nullable
@@ -25,7 +26,9 @@ import type { WsClientFrame } from '@acorn/protocol/ws.ts'
 export type NodeTransport = {
   fetch(nodeId: string, request: NodeFetchRequest): Promise<NodeFetchResponse>
   abort(requestId: string): void
-  send(nodeId: string, frame: WsClientFrame): void
+  send(nodeId: string, frame: WsClientFrame, options?: WsSendOptions): void
+  interest(nodeId: string | null): void
+  onError(cb: (nodeId: string, error: NodeTransportError) => void): () => void
   onFrame(cb: (nodeId: string, frame: unknown) => void): () => void
   // The one binary channel: terminal output, as an id-tagged frame the host forwards without reading
   // (@acorn/protocol/ws.ts § The one binary frame). The host peels its own node id; what arrives here
@@ -212,6 +215,8 @@ type AcornPreload = {
   nodeFetch?: NodeTransport['fetch']
   nodeAbort?: NodeTransport['abort']
   nodeSend?: NodeTransport['send']
+  nodeInterest?: NodeTransport['interest']
+  onNodeTransportError?: NodeTransport['onError']
   onNodeFrame?: NodeTransport['onFrame']
   onNodeBytes?: NodeTransport['onBytes']
   onNodeStatus?: NodeTransport['onStatus']
@@ -271,7 +276,9 @@ export const nodeTransport = (): NodeTransport | null => {
   return {
     fetch: nodeFetch,
     abort: (requestId) => acorn.nodeAbort?.(requestId),
-    send: (nodeId, frame) => acorn.nodeSend?.(nodeId, frame),
+    send: (nodeId, frame, options) => acorn.nodeSend?.(nodeId, frame, options),
+    interest: (nodeId) => acorn.nodeInterest?.(nodeId),
+    onError: (cb) => acorn.onNodeTransportError?.(cb) ?? (() => {}),
     onFrame: (cb) => acorn.onNodeFrame?.(cb) ?? (() => {}),
     onBytes: (cb) => acorn.onNodeBytes?.(cb) ?? (() => {}),
     onStatus: (cb) => acorn.onNodeStatus?.(cb) ?? (() => {}),

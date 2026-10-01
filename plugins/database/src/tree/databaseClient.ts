@@ -5,10 +5,9 @@
 // call is a message on the one MessagePort, and the host checks the path against this plugin's own
 // namespace before forwarding it (client-core/host/frames/scopes.ts).
 //
-// `connect()` is awaited per call rather than threaded through every component, because it resolves
-// once per frame and memoizes.
+// Capture the mounted region's API when constructing its client; calls retain that region's authority.
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
-import { connect } from '@acorn/plugin-api/ui/sdk'
+import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import {
   databaseActionRoute,
   databaseColumnsRoute,
@@ -32,60 +31,63 @@ import type {
   DbWriteResult,
 } from '../shared/database'
 
-const api = async () => (await connect()).api
+export function createDatabaseClient(captured: AcornBridge['api'] | (() => AcornBridge['api'])) {
+  const api = typeof captured === 'function' ? captured : () => captured
 
-export const connectDb = async (taskId: string): Promise<DbConnectResult> =>
-  (await api()).post(databaseActionRoute(taskId, 'connect'))
+  const connectDb = async (taskId: string): Promise<DbConnectResult> =>
+    api().post(databaseActionRoute(taskId, 'connect'))
 
-export const disconnectDb = async (taskId: string): Promise<{ ok: true }> =>
-  (await api()).post(databaseActionRoute(taskId, 'disconnect'))
+  const disconnectDb = async (taskId: string): Promise<{ ok: true }> =>
+    api().post(databaseActionRoute(taskId, 'disconnect'))
 
-export const listTables = async (taskId: string): Promise<DbTablesResult> =>
-  (await api()).get(databaseTablesRoute(taskId))
+  const listTables = async (taskId: string): Promise<DbTablesResult> =>
+    api().get(databaseTablesRoute(taskId))
 
-export const listColumns = async (taskId: string, schema: string, name: string): Promise<DbColumnsResult> =>
-  (await api()).get(databaseColumnsRoute(taskId, schema, name))
+  const listColumns = async (taskId: string, schema: string, name: string): Promise<DbColumnsResult> =>
+    api().get(databaseColumnsRoute(taskId, schema, name))
 
-export const listRows = async (taskId: string, schema: string, name: string, offset?: number): Promise<DbRowsResult> =>
-  (await api()).get(databaseRowsRoute(taskId, schema, name, offset))
+  const listRows = async (taskId: string, schema: string, name: string, offset?: number): Promise<DbRowsResult> =>
+    api().get(databaseRowsRoute(taskId, schema, name, offset))
 
-export const runQuery = async (taskId: string, sql: string): Promise<DbQueryResult> =>
-  (await api()).post(databaseActionRoute(taskId, 'query'), { sql })
+  const runQuery = async (taskId: string, sql: string): Promise<DbQueryResult> =>
+    api().post(databaseActionRoute(taskId, 'query'), { sql })
 
-export const updateCell = async (taskId: string, schema: string, name: string, column: string, value: DbCell, pk: DbPk): Promise<DbWriteResult> =>
-  (await api()).post(databaseActionRoute(taskId, 'update'), { schema, name, column, value, pk })
+  const updateCell = async (taskId: string, schema: string, name: string, column: string, value: DbCell, pk: DbPk): Promise<DbWriteResult> =>
+    api().post(databaseActionRoute(taskId, 'update'), { schema, name, column, value, pk })
 
-export const insertRow = async (taskId: string, schema: string, name: string, values: Record<string, DbCell>): Promise<DbWriteResult> =>
-  (await api()).post(databaseActionRoute(taskId, 'insert'), { schema, name, values })
+  const insertRow = async (taskId: string, schema: string, name: string, values: Record<string, DbCell>): Promise<DbWriteResult> =>
+    api().post(databaseActionRoute(taskId, 'insert'), { schema, name, values })
 
-export const deleteRow = async (taskId: string, schema: string, name: string, pk: DbPk): Promise<DbWriteResult> =>
-  (await api()).post(databaseActionRoute(taskId, 'delete'), { schema, name, pk })
+  const deleteRow = async (taskId: string, schema: string, name: string, pk: DbPk): Promise<DbWriteResult> =>
+    api().post(databaseActionRoute(taskId, 'delete'), { schema, name, pk })
 
-export const generateSql = async (
-  taskId: string,
-  body: { backendId: string; modelId?: string; prompt: string; queryIds?: string[] },
-): Promise<DbGenerateResult> => (await api()).post(databaseActionRoute(taskId, 'generate'), body)
+  const generateSql = async (
+    taskId: string,
+    body: { backendId: string; modelId?: string; prompt: string; queryIds?: string[] },
+  ): Promise<DbGenerateResult> => api().post(databaseActionRoute(taskId, 'generate'), body)
 
-// The stored scratch document, as the node holds it. Not `bridge.document.read()`, which answers with
-// what is in the editor right now: this is asked after the palette's `Generate SQL` wrote the row, so
-// the row is the question.
-export const readScratch = async (taskId: string): Promise<string> =>
-  (await (await api()).get<{ text?: string }>(databaseScratchRoute(taskId))).text ?? ''
+  // The stored scratch document, as the node holds it. Not `bridge.document.read()`, which answers with
+  // what is in the editor right now: this is asked after the palette's `Generate SQL` wrote the row, so
+  // the row is the question.
+  const readScratch = async (taskId: string): Promise<string> =>
+    (await api().get<{ text?: string }>(databaseScratchRoute(taskId))).text ?? ''
 
-export const listSavedQueries = async (taskId: string): Promise<DbSavedQuery[]> =>
-  (await api()).get(databaseQueriesRoute(taskId))
+  const listSavedQueries = async (taskId: string): Promise<DbSavedQuery[]> =>
+    api().get(databaseQueriesRoute(taskId))
 
-export const saveQuery = async (taskId: string, body: { name: string; notes: string; sql: string }): Promise<DbSavedQuery> =>
-  (await api()).post(databaseQueriesRoute(taskId), body)
+  const saveQuery = async (taskId: string, body: { name: string; notes: string; sql: string }): Promise<DbSavedQuery> =>
+    api().post(databaseQueriesRoute(taskId), body)
 
-export const deleteSavedQuery = async (taskId: string, queryId: string): Promise<void> => {
-  await (await api()).del(databaseQueryRoute(taskId, queryId))
+  const deleteSavedQuery = async (taskId: string, queryId: string): Promise<void> => {
+    await api().del(databaseQueryRoute(taskId, queryId))
+  }
+
+  // The Generate button's precondition, answered by this plugin's node half: the backends this owner can
+  // spend, which is every connected key plus every agent CLI installed on this machine. A frame cannot
+  // read core's integrations — there is no bridge scope for them, and minting one to serve a dropdown
+  // would hand every installed plugin the whole roster. This returns ids and labels. The key never
+  // leaves the node.
+  const listModelBackends = async (taskId: string): Promise<ModelBackend[]> =>
+    (await api().get<{ backends: ModelBackend[] }>(databaseModelBackendsRoute(taskId))).backends
+  return { connectDb, disconnectDb, listTables, listColumns, listRows, runQuery, updateCell, insertRow, deleteRow, generateSql, readScratch, listSavedQueries, saveQuery, deleteSavedQuery, listModelBackends }
 }
-
-// The Generate button's precondition, answered by this plugin's node half: the backends this owner can
-// spend, which is every connected key plus every agent CLI installed on this machine. A frame cannot
-// read core's integrations — there is no bridge scope for them, and minting one to serve a dropdown
-// would hand every installed plugin the whole roster. This returns ids and labels. The key never
-// leaves the node.
-export const listModelBackends = async (taskId: string): Promise<ModelBackend[]> =>
-  (await (await api()).get<{ backends: ModelBackend[] }>(databaseModelBackendsRoute(taskId))).backends

@@ -402,7 +402,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     // and providers, served through a database handle its dispose already closed.
     clearRegistrations(plugin.name)
     if (disabled.has(plugin.name) && !plugin.required) {
-      if (options.loaded?.has(plugin.name)) disposeUnstartedPlugin(plugin)
+      if (options.loaded?.has(plugin.name)) await disposeUnstartedPlugin(plugin)
       skipped.push(plugin.name)
       continue
     }
@@ -567,9 +567,13 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     // Loaded plugins only, and this map is the flag that says so. A plugin whose init was contained at
     // boot is still in it, which makes "write broken code, reload, fix it, reload again" work.
     if (!loadedBindings.has(name)) {
+      await disposeUnstartedPlugin(next.plugin)
       return { ok: false, error: `'${name}' is not a plugin this node loaded from disk, so it cannot be reloaded. Built-ins need a restart.` }
     }
-    if (disabled.has(name)) return { ok: false, error: `'${name}' is turned off on this node.` }
+    if (disabled.has(name)) {
+      await disposeUnstartedPlugin(next.plugin)
+      return { ok: false, error: `'${name}' is turned off on this node.` }
+    }
 
     // Everything the candidate registers is buffered rather than written to the registries the previous
     // instance is still in (server/pluginHost/context.ts § pending). Its database is the one thing it opens
@@ -628,6 +632,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       } catch {
         // Already closed by a dispose the failing init got far enough to arrange.
       }
+      revokePluginContext(candidateCtx)
       const message = error instanceof Error ? error.message : String(error)
       pluginLog(name).error(`reload init failed; the previous instance is still serving: ${describeError(error).message}`)
       markFailed(name, 'init', message)
@@ -664,12 +669,18 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       pluginLog(name).error(`reload could not register the new instance's contributions: ${describeError(error).message}`)
       clearRegistrations(name)
       for (const undo of candidateUndos.reverse()) undo()
+      try {
+        await next.plugin.dispose?.()
+      } catch {
+        // Preserve the registration error when candidate cleanup also fails.
+      }
       closeStorage(name)
       try {
         candidate.db?.close()
       } catch {
         // closeStorage already got it, once the candidate's handle had reached the map.
       }
+      revokePluginContext(candidateCtx)
       forget(name)
       markFailed(name, 'init', message)
       return { ok: false, error: message }
@@ -699,6 +710,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       } catch (error) {
         // Contained exactly as a ready failure at boot is, through the same rollback.
         await contain(next.plugin, 'ready', error)
+        revokePluginContext(candidateCtx)
         forget(name)
         markFailed(name, 'ready', error instanceof Error ? error.message : String(error))
         return { ok: false, error: error instanceof Error ? error.message : String(error) }

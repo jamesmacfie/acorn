@@ -9,6 +9,7 @@ import { runProviderResource } from '../integrations/resourceRuntime'
 import type { AppEnv, Principal } from '../middleware/auth'
 import { principalMayUseProviderCredential } from '../middleware/requireUser'
 import type { PluginProviderRuntime, PluginRequestContext } from './types'
+import { invocationOwned } from '../plugins/rpcOwnership'
 
 const assertProviderAccess = (principal: Principal): void => {
   if (!principalMayUseProviderCredential(principal)) {
@@ -92,7 +93,7 @@ export function buildPluginRequestContext(env: Env, principal: Principal, plugin
     },
   }
 
-  return { userId: principal.userId, principal, providers }
+  return invocationOwned({ userId: principal.userId, principal, providers })
 }
 
 export function pluginRequestContext(c: Context<AppEnv>, pluginId: string): PluginRequestContext {

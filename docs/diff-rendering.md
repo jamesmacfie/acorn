@@ -167,13 +167,16 @@ counts as stuck rather than slow. The slowest real document measured was about 1
 request of a session also pays for spawning the worker and instantiating the WASM engine, about 340ms
 end to end, so 10 seconds is a backstop rather than a budget.
 
-The worker tracks one of three states: `cold` (nothing tried), `live` (spawned and answering), or
-`dead` (unavailable, or it failed its first request). Once `dead`, every later call goes straight to
-the main-thread fallback instead of retrying, because both failure modes, no `Worker` in the
-environment and the policy not applying to the worker script, last for the life of the window. The
-fallback logs loudly. The failure it replaces was silent, because the WASM engine's rejection landed
-inside the highlighter's own promise and every surface rendered grey with no error a developer would
-see.
+Each window owns one lazy syntax worker. Concurrent callers share its import and construction wave.
+The request deadline covers that wave and execution. Import, construction, script, or message-send
+failure retires the captured generation and settles its requests through the JavaScript fallback.
+A per-document grammar failure uses that fallback without retiring a healthy worker. Messages and
+errors from a retired generation cannot affect a replacement.
+
+A 10-second deadline retires the blocked worker and returns exact plain source tokens for every
+waiting document. Later requests in that window remain plain. They do not replay the blocked regex
+work on the renderer. Tests can reset the owner; reset also settles its pending requests and clears
+their timers. Closing one pane keeps a healthy window worker available to other panes.
 
 Grammars load lazily. They total about 1.7 MB across the set, and a given diff touches two or three,
 so a TypeScript-only pull request does not pay for the C++ grammar (419 KB, the largest single one).
@@ -184,8 +187,9 @@ which would put the WASM engine back on the main thread.
 
 Paired delete/insert lines use a second worker for word-level diffs. Patch parsing and row assembly
 remain on the main thread, but the `diffWordsWithSpace` work for one file is sent as one batch so it
-cannot block scrolling. The worker has the same cold/live/dead shape and a main-thread fallback as
-highlighting, without sharing Shiki's wider worker policy or lifecycle.
+cannot block scrolling. Its independent request owner follows the same lifecycle rules without sharing Shiki's engine or
+wider worker policy. Ordinary worker unavailability retains the word-diff fallback. A deadline or
+reset omits word-level marks while keeping the complete source lines.
 
 **Hydration state is per file, and read per row.** The hydrator keeps each file's status —
 `idle`, `queued`, `loading`, `loaded`, `error` — in a Solid store keyed by path, and a load row reads
@@ -370,3 +374,29 @@ what the panel is for.
 files, and with `ahead` known it could warn about unpushed commits too. Archiving removes the worktree
 and not the branch, so those commits survive in the main checkout. A warning that says "your work is
 safe" is noise.
+
+
+## Retained row and fence work
+
+The canvas iterates the virtualizer's semantic keys. Overlapping keys retain their DOM owners;
+current row data, comment targets, indices, and offsets remain reactive. The key maps retain only
+the mounted window. A content refresh changes the affected file's gap revision and removes its
+expanded context. A source or file-set change advances the pane generation. Reads and tokenization
+check both generations before publishing, including when an identity changes away and returns.
+Unchanged files keep their expanded context and reading position.
+
+Markdown skips removed fences after its lazy import and before dispatch. Exact language and source
+share one in-flight HTML highlight through grammar loading and rendering. A removed block cannot
+cancel a surviving identical block. If every joining block leaves during grammar loading, the
+highlight renders no HTML. Settled work leaves the in-flight map on success or rejection. The
+completed cache keeps its 200-entry limit and does not retain fences over 16,384 UTF-16 code units.
+Large changing live fences still render their complete content; this lifecycle repair sets no
+additional content limit.
+
+
+A line submission captures its controller, original raw draft body, and originating invalidation
+callback before awaiting the mutation. Controllers can provide `acknowledge(originalBody)` to clear
+the exact acknowledged draft. DiffPane compares the captured draft namespace's stored text before
+cleanup and clears the visible slot only if its source, generation, key, and body still match.
+Edits made during submission and successor drafts survive. Controllers without that optional member
+keep the body-equality fallback. Failed submissions retain their drafts.

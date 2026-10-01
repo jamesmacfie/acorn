@@ -1,5 +1,6 @@
 import { syncChromeContributions } from '../chrome/chromeRegister'
 import { syncFrameContributions } from '../frames/register'
+import { batch } from 'solid-js'
 
 /**
 /**
@@ -12,6 +13,8 @@ import { syncFrameContributions } from '../frames/register'
  * one they depend on.
  */
 export function syncPluginContributions(): void {
-  syncFrameContributions()
-  syncChromeContributions()
+  batch(() => {
+    syncFrameContributions()
+    syncChromeContributions()
+  })
 }

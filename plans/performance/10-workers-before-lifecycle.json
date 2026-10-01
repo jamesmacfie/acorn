@@ -1,0 +1,15 @@
+[
+  {
+    "case": "reset-pending",
+    "afterReset": {
+      "syntaxSettled": false,
+      "wordsSettled": false,
+      "timers": 2
+    },
+    "afterTimeout": {
+      "syntaxSettled": true,
+      "wordsSettled": true,
+      "timers": 0
+    }
+  }
+]

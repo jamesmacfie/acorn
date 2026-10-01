@@ -1,12 +1,13 @@
+import { queryOwner } from '../../infra/node/queryOwnership'
 import { createEffect, createMemo, on, onCleanup } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { useQueryClient } from '@tanstack/solid-query'
 import type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
 import { TREE_LIMITS, batchBytes } from '@acorn/protocol/tree/messages.ts'
 import { answerOwnerInvoke, unknownHostOp, unsupportedOverlay, type OwnerActions } from './hostRequests'
-import { createFrameBridge, postSelect, postSurfaceAction, type FrameBinding } from '../frames/broker'
+import { postSelect, postSurfaceAction, type FrameBinding } from '../frames/broker'
 import { closePluginOverlayFrom, openPluginOverlayInvocation } from '../frames/overlays'
-import { createFrameServices } from '../frames/frameServices'
+import { createTreeBridgeFactory } from './bridgeFactory'
 import { eligiblePlugins, isTaskPane } from '../plugins/contributions'
 import { qualifiedContributionId } from '../plugins/contributionIds'
 import { activeNodeId } from '../../infra/node/activeNode'
@@ -14,7 +15,7 @@ import { createLogger } from '../../infra/telemetry/logger'
 import { clientEvents, consumePaneIntent } from '../registries/commands/clientEvents'
 import { TreeHost } from './TreeHost'
 import type { RemoteContribution } from './treeRegistry'
-import { acquireTreeWorker, type TreeHostResult } from './workerHost'
+import { acquireTreeWorker, treeAuthorityKey, treeModelAuthorityKey, treeDocumentGrant, type TreeHostResult } from './workerHost'
 
 // One tree from one plugin, drawn where the owner asked for it.
 //
@@ -51,13 +52,12 @@ export type RemoteTreeProps = {
   /**
    * The task or project this tree is inside, for a tree that is a pane rather than a slot.
    *
-   * An accessor, not a value, and read on every bridge call rather than captured at connect: one worker
-   * serves every tree its bundle draws and therefore holds one bridge, so a scope frozen at connect
-   * would be whichever tree happened to start the worker. Reading it live means `openPane` and the
-   * task-active gate answer for the task on screen, which is the only task a tree can be interacted
-   * with from.
+   * Task and project authority is captured with this mount's QueryClient origin. Item props remain
+   * reactive; a props update cannot lend the worker another mount's API or document grant.
    */
   scope?: () => TreeScope
+  /** The shared composed owner's immutable opening selection, for legacy context affinity. */
+  openingItem?: string
   /**
    * The sibling host editor's document, for a tree that is one region of a composed pane.
    *
@@ -72,6 +72,13 @@ export type RemoteTreeProps = {
 /** How long after a press a tree may still open its overlay. Long enough to cover the worker round
  *  trip the request makes, short enough that it cannot outlive the gesture a person made. */
 const GESTURE_WINDOW_MS = 1_000
+
+const treeRefusal = (contribution: RemoteContribution) => {
+  const log = createLogger('plugins', contribution.pluginId)
+  return (reason: string): void => log.warn(`${contribution.id}: ${reason}`, undefined, {
+    'plugin.id': contribution.pluginId, 'plugin.surface': contribution.id,
+  })
+}
 
 let slotSeq = 0
 
@@ -93,15 +100,12 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   const markGesture = (): void => { lastGestureAt = Date.now() }
 
   const contribution = componentProps.contribution
-  const log = createLogger('plugins', contribution.pluginId)
   const scope = (): TreeScope => componentProps.scope?.() ?? {}
-  const refuse = (reason: string): void => {
-    log.warn(`${contribution.id}: ${reason}`, undefined, {
-      'plugin.id': contribution.pluginId,
-      'plugin.surface': contribution.id,
-    })
-  }
+  const refuse = treeRefusal(contribution)
 
+  const registeredNode = queryOwner(qc)
+  const nodeId = registeredNode === undefined ? activeNodeId() : registeredNode
+  const boundScope = scope()
   const binding = (): FrameBinding => {
     // The roster row this device resolved, which is where the manifest's scopes and event channels
     // live. Read here rather than passed in, so the owner's surface cannot widen what a contributor
@@ -111,71 +115,53 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
       pluginId: contribution.pluginId,
       surface: contribution.id,
       target: 'remote',
-      nodeId: activeNodeId() ?? '',
-      api: owner?.installed.permissions.api ?? [],
-      events: owner?.installed.permissions.events ?? [],
+      nodeId: nodeId ?? '',
+      api: [...(owner?.installed.permissions.api ?? [])],
+      events: [...(owner?.installed.permissions.events ?? [])],
       // A tree is not a pane and cannot open one it did not declare, so this is the plugin's own
       // task-scoped panes and nothing else, exactly as it is for a frame.
       panes: (owner?.installed.contributions.frames ?? []).filter(isTaskPane).map((frame) => frame.id),
       claimsKeys: [],
       // Getters, for the reason `scope` above states at length: the binding outlives any one tree.
-      get taskId() {
-        return scope().taskId
-      },
-      get projectId() {
-        return scope().projectId
-      },
+      taskId: boundScope.taskId,
+      projectId: boundScope.projectId,
     }
   }
 
+  const bound = binding()
+  // The row that opened this pane, when a row did. Retained by `openPane` until the pane consumes
+  // it, so a tree mounting for the first time gets its selection in `context` rather than racing
+  // its own mount against an event that has already fired — the same split a frame region makes
+  // (../frames/PluginFrame.tsx). A routed item wins, because for a project-scoped surface it IS the
+  // current selection rather than a one-shot.
+  const opened = scope().item
+    ?? (bound.taskId ? consumePaneIntent(bound.taskId, contribution.id, 'plugin:select') : undefined)
+  const item = typeof opened === 'string' ? opened : opened?.kind === 'plugin:select' ? opened.item : undefined
+  const context: PluginFrameContext = {
+    surface: bound.surface,
+    target: 'remote',
+    nodeId: bound.nodeId,
+    ...(bound.taskId ? { taskId: bound.taskId } : {}),
+    ...(bound.projectId ? { projectId: bound.projectId } : {}),
+    ...(item ? { item } : {}),
+    theme: document.documentElement.dataset.theme ?? 'light',
+    style: document.documentElement.dataset.style ?? 'terminal',
+    claimsKeys: [],
+  }
+  const documentGrant = treeDocumentGrant(componentProps.document)
+  context.authority = treeModelAuthorityKey(contribution.hash, qc, bound, context, componentProps.document)
+  const legacyContext = componentProps.openingItem === undefined ? context : { ...context, item: componentProps.openingItem }
   const worker = acquireTreeWorker({
     pluginId: contribution.pluginId,
     hash: contribution.hash,
+    authority: treeAuthorityKey(contribution.hash, qc, bound, legacyContext, componentProps.document),
+    context: legacyContext,
+    hasFocus: () => container !== undefined && container.contains(document.activeElement),
     onRefused: refuse,
-    connect: (port) => {
-      const bound = binding()
-      // The row that opened this pane, when a row did. Retained by `openPane` until the pane consumes
-      // it, so a tree mounting for the first time gets its selection in `context` rather than racing
-      // its own mount against an event that has already fired — the same split a frame region makes
-      // (../frames/PluginFrame.tsx). A routed item wins, because for a project-scoped surface it IS the
-      // current selection rather than a one-shot.
-      const opened = scope().item
-        ?? (bound.taskId ? consumePaneIntent(bound.taskId, contribution.id) : undefined)
-      const item = typeof opened === 'string' ? opened : opened?.kind === 'plugin:select' ? opened.item : undefined
-      const context: PluginFrameContext = {
-        surface: bound.surface,
-        target: 'remote',
-        nodeId: bound.nodeId,
-        ...(bound.taskId ? { taskId: bound.taskId } : {}),
-        ...(bound.projectId ? { projectId: bound.projectId } : {}),
-        ...(item ? { item } : {}),
-        theme: document.documentElement.dataset.theme ?? 'light',
-        style: document.documentElement.dataset.style ?? 'terminal',
-        claimsKeys: [],
-      }
-      return createFrameBridge({
-        port,
-        binding: bound,
-        // The same fourteen effects a frame's bridge gets. A tree has no iframe to check focus
-        // against, so the gate is whether the shell's focus is inside the element this tree drew into,
-        // which is the same question one rung down.
-        services: createFrameServices(
-          {
-            binding: bound,
-            hash: contribution.hash,
-            // Present only where the host handed one down, which is a composed pane's other region.
-            ...(componentProps.document ? { document: componentProps.document } : {}),
-          },
-          {
-            qc,
-            frameHasFocus: () => container !== undefined && container.contains(document.activeElement),
-            navigate,
-          },
-        ),
-        context,
-        onMisbehaving: (reason) => refuse(`misbehaved on the bridge: ${reason}`),
-      })
-    },
+    connect: createTreeBridgeFactory(
+      { binding: bound, hash: contribution.hash, ...(documentGrant ? { document: documentGrant } : {}) },
+      { qc, navigate }, context, refuse,
+    ),
   })
 
   // ── What this tree may ask the host for (../frames/sdk.ts § TreeMount.host) ───────────────────────
@@ -265,12 +251,12 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   // A rail row picked while the pane is already open. `defer`, because the selection that opened the
   // pane crossed in the mount props and posting it again would restart a load already in flight.
   createEffect(on(() => scope().item, (next, previous) => {
-    const port = worker.bridgePort()
+    const port = worker.bridgePort(slot)
     if (!port || !next || next === previous) return
     postSelect(port, next)
   }, { defer: true }))
   const unselect = clientEvents.on('presentation:pane-intent', (event) => {
-    const port = worker.bridgePort()
+    const port = worker.bridgePort(slot)
     if (!port || event.taskId !== scope().taskId || event.paneId !== contribution.id) return
     if (event.intent.kind !== 'plugin:select') return
     // Consumed here so the retained copy does not reach a later remount as a stale selection.
@@ -280,7 +266,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   // A surface-scoped command the host resolved on this tree's behalf: the chord landed in the sibling
   // editor of a composed pane, or the row was picked in the palette.
   const unaction = clientEvents.on('plugin:surface-action', (event) => {
-    const port = worker.bridgePort()
+    const port = worker.bridgePort(slot)
     if (!port || event.pluginId !== contribution.pluginId || event.surface !== contribution.id) return
     postSurfaceAction(port, event.command)
   })

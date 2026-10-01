@@ -136,6 +136,11 @@ against a repo checkout can name one with `ACORN_BUNDLED_PLUGINS_DIR`, and then 
 as the desktop's does. Both call one `reconcileBundledPackages`, so the outcome and the boot summary
 cannot differ. A service-managed node sets no such variable.
 
+Reconciliation hashes the source and installed package on each pass. It leaves the ownership file
+untouched when the stored status, version, fingerprint, and installation time all match. A missing
+ownership row is still repaired after exact package placement. Owner overrides, uninstall tombstones,
+and development markers retain their reconciliation rules.
+
 Both roots report every ownership row at boot, whether or not they had a bundled copy to offer,
 because a package frozen by an owner-installed row is the failure that looks like a feature nobody
 built.

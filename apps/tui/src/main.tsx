@@ -52,8 +52,6 @@ const platform = installPlatform(opened, () => void quit())
 const { selectActiveNode, setActiveNode } = await import('@acorn/client-core/infra/node/activeNode.ts')
 const { clientFor, nodeState, setCacheStorage } = await import('@acorn/client-core/infra/node/fleet.ts')
 const { fileCacheStorage } = await import('./node/cache')
-const { persistQueryClient } = await import('@tanstack/query-persist-client-core')
-const { PERSISTED_SNAPSHOT_MAX_AGE_MS, shouldPersistQuery } = await import('@acorn/client-core/infra/persistence/queryPersistence.ts')
 const { markNodeRecovered, setNodeStarting } = await import('./chrome/nodeState')
 const { watchPluginChanges } = await import('@acorn/client-core/host/plugins/reload.ts')
 const { watchTaskChanges } = await import('@acorn/client-core/features/tasks/watchTaskChanges.ts')
@@ -92,18 +90,10 @@ await selectActiveNode()
 // the shell read a cache nothing persisted and nothing invalidated: every start was cold, and a task
 // created anywhere else never appeared. `clientFor` hands back both halves, so there is nothing to
 // build here beyond driving them.
-const { client, persister } = clientFor(opened.nodeId)
-// A tuple, not an object: `[unsubscribe, restorePromise]`. Nothing calls the unsubscribe — the
-// persister's lifetime is this process's.
-const [, restored] = persistQueryClient({
-  queryClient: client,
-  persister,
-  maxAge: PERSISTED_SNAPSHOT_MAX_AGE_MS,
-  dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
-})
-// Awaited, which is this host's `isRestoring`: the snapshot is one synchronous file read, and a shell
-// drawn a tick before it lands would draw an empty rail and then fill it.
-await restored
+const { client, persistence } = clientFor(opened.nodeId)
+const cacheLease = persistence.acquire()
+// Await the shared public restore before this host draws its first shell.
+await cacheLease.restored
 bootMark('cache restored')
 
 // The shell, and not one line earlier: a module that reaches the node must not be evaluated before
@@ -261,6 +251,8 @@ async function quit(code = 0): Promise<never> {
   for (const line of opened.held ?? []) write(`[node] ${line}`)
   for (const line of heldLines()) write(line)
   for (const warning of heldWarnings) write(warning)
+  cacheLease.release()
+  await persistence.flush().catch((error: unknown) => log.warn('could not flush query cache', error))
   await platform.dispose()
   process.exit(code)
 }

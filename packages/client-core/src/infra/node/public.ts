@@ -1,4 +1,5 @@
 export { postJson, readBytes, readJson, sendForm, writeJson } from './apiClient.ts'
+export { queryOwner } from './queryOwnership.ts'
 export {
   clientCapability, clientCapabilityId, provideClientCapability, requireClientCapability,
 } from './clientCapabilities.ts'

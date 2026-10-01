@@ -1,0 +1,19 @@
+{
+  "case": "retention",
+  "node": "v24.11.0",
+  "platform": "darwin",
+  "result": {
+    "syntheticGitOutput": true,
+    "paths": 24,
+    "readBytes": 16128000,
+    "ttlMs": 2000,
+    "baselineHeapBytes": 35634120,
+    "populatedHeapBytes": 51397224,
+    "expiredHeapBytes": 51372040,
+    "missingPaths": 24,
+    "missingHeapBytes": 51403160,
+    "clearedHeapBytes": 35266520,
+    "retainedPastTtlBytes": 15737920,
+    "reclaimedAfterInvalidateBytes": 16136640
+  }
+}

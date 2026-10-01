@@ -1,0 +1,18 @@
+{
+  "fixture": "actual AgentComposer, composerState, managedClient and API transport; non-keyed session prop change while hydration waits",
+  "paths": [
+    "/v1/p/agents/attachments/attachment-a"
+  ],
+  "before": {
+    "old": [],
+    "current": []
+  },
+  "after": {
+    "old": [],
+    "current": [
+      "attachment-a"
+    ],
+    "currentStorage": "[\"attachment-a\"]",
+    "currentDOMHasOldAttachment": true
+  }
+}

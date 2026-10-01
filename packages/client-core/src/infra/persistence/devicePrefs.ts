@@ -55,11 +55,9 @@ export function readDevicePrefs(): Record<string, string> {
   if (!store) return {}
   const out: Record<string, string> = {}
   try {
-    for (let index = 0; index < store.length; index++) {
-      const key = store.key(index)
-      if (!key?.startsWith(PREFIX) || !isDevicePref(key.slice(PREFIX.length))) continue
-      const value = store.getItem(key)
-      if (value !== null) out[key.slice(PREFIX.length)] = value
+    for (const key of DEVICE_KEYS) {
+      const value = store.getItem(`${PREFIX}${key}`)
+      if (value !== null) out[key] = value
     }
   } catch {
     return {}

@@ -5,7 +5,7 @@ import { trustBundledClientPlugins, trustsBundledClientPlugins } from './plugins
 import { recordCrash } from './supervision/crashBudget'
 import { deviceTokens, LOCAL_TOKEN_SCOPE, type TokenCipher } from './custody/deviceTokenStore'
 import { FleetStore, toNodeRecord } from './broker/fleetStore'
-import { NodeBroker } from './broker/nodeBroker'
+import { NodeBroker, type BrokerEvents } from './broker/nodeBroker'
 import { PluginCache } from './plugins/pluginCache'
 import { PluginTrustStore } from './plugins/pluginTrustStore'
 import { PreviewTunnels, type TunnelEvents } from './supervision/previewTunnel'
@@ -43,7 +43,10 @@ export type HelperOptions = {
   // currently attached.
   // `bytes` is the one binary channel: terminal output, id-tagged (@acorn/protocol/ws.ts § The one
   // binary frame).
-  push: { frame(nodeId: string, frame: unknown): void; bytes(nodeId: string, frame: Uint8Array): void; status(status: unknown): void }
+  push: BrokerEvents
+  // Hosts multiplexing renderer sockets request the advertised viewer codec. In-process hosts keep
+  // raw transport by default, including the terminal client.
+  viewerMultiplexing?: boolean
   // A preview tunnel opened or closed. Only a shell that cannot inject a request header needs these.
   // The Tauri shell seeds the listener's secret into the preview webview's cookie store instead. See
   // previewTunnel.ts.
@@ -116,7 +119,7 @@ export function createHelper(options: HelperOptions): Helper {
     },
   }, compileCacheRoot)
 
-  const broker = new NodeBroker({ frame: options.push.frame, bytes: options.push.bytes, status: options.push.status })
+  const broker = new NodeBroker(options.push, { viewerMultiplexing: options.viewerMultiplexing })
   const fleet = new FleetStore(userDataDir, tokens)
   // Preview tunnels re-resolve their node from the fleet store on every connection, so a new
   // endpoint, token, or certificate applies to new connections. Restart, adoption, and forget tear

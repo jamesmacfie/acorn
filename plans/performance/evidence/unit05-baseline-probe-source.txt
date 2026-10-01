@@ -1,0 +1,263 @@
+// Read-only investigation harness. Synthetic storage/transport only; application owners are imported.
+import { it, vi } from 'vitest'
+import { Show, createComponent, batch, createRenderEffect, onCleanup } from 'solid-js'
+import { render, createComponent as webComponent } from 'solid-js/web'
+import { QueryClient, QueryClientProvider, createQuery, useQueryClient } from '@tanstack/solid-query'
+import { writeFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
+import { activeCacheId, activeNodeId, setActiveNode } from '../../packages/client-core/src/infra/node/activeNode'
+import { paneModel, _resetPaneModels } from '../../packages/client-core/src/host/registries/panes/paneModels'
+import { clientEvents } from '../../packages/client-core/src/host/registries/commands/clientEvents'
+import { onScopeEvicted } from '../../packages/client-core/src/host/registries/shell/scopeEviction'
+import { activateScopedStateEviction } from '../../apps/desktop/src/client/scopedEviction'
+import { readJson } from '../../packages/client-core/src/infra/node/apiClient'
+import { initPtyChannel, wsAttach } from '../../plugins/terminal/src/client/wsChannel'
+import { _resetWsClient } from '../../packages/client-core/src/infra/node/wsClient'
+import TabRail from '../../packages/client-core/src/features/tabs/TabRail'
+import { tasksKey, projectsKey, workspacesKey, prefsKey, integrationsKey } from '../../packages/client-core/src/infra/queries'
+import { setActiveTaskId, setSelectedSource } from '../../packages/client-core/src/features/tasks/tasks'
+import { PrefKeys } from '../../packages/client-core/src/infra/persistence/prefKeys'
+import { savePref } from '../../packages/client-core/src/features/settings/savePref'
+import { refreshFleet } from '../../packages/client-core/src/infra/node/fleet'
+import { createNotesModel } from '../../plugins/notes/src/client/notesModel'
+import { writeDevicePref } from '../../packages/client-core/src/infra/persistence/devicePrefs'
+
+// The static route does not participate in these rail operations. As in TabRail's owning tests,
+// supply router context accessors without mounting another navigation composition.
+const instrumentation = vi.hoisted(() => ({ mounts: 0 }))
+vi.mock('@solidjs/router', () => ({ useNavigate: () => { instrumentation.mounts++; return () => {} }, useParams: () => ({}), A: (props: { children?: unknown }) => props.children }))
+
+const tag = process.env.ACORN_PERF_TAG ?? 'sample'
+const outputDir = dirname(fileURLToPath(import.meta.url))
+const record = (name: string, value: unknown) => writeFileSync(join(outputDir, `05-${name}-${tag}.json`), JSON.stringify(value, null, 2) + '\n')
+const tick = () => new Promise(resolve => setTimeout(resolve, 5))
+
+it('characterizes actual keyed provider swap and held pane ownership', async () => {
+  const requests: { nodeId: string; path: string }[] = []
+  Object.assign(window, { acorn: {
+    desktop: true,
+    nodeFetch: async (nodeId: string, request: { path: string }) => {
+      requests.push({ nodeId, path: request.path })
+      return { status: 200, headers: {}, body: new TextEncoder().encode(JSON.stringify({ node: nodeId })) }
+    },
+    onNodeStatus: () => () => {},
+  } })
+  _resetPaneModels()
+  const clients = new Map(['node-a', 'node-b', 'node-c'].map(id => [id, new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false, gcTime: Infinity } } })]))
+  const rows = new Map([['node-a', 'same-task'], ['node-b', 'same-task'], ['node-c', 'other-task']])
+  for (const [node, client] of clients) client.setQueryData(['audit-held', rows.get(node)], { node })
+  setActiveNode('node-a')
+  const events: string[] = []
+  const models: { builtUnder: string; captured: QueryClient; query: any }[] = []
+  const shellModels: { shellNode: string; builtUnder: string }[] = []
+  const host = document.createElement('div')
+  document.body.append(host)
+  const offScope = onScopeEvicted(e => events.push(`scope:${e.scope}:dom=${host.textContent}`))
+  const offEviction = activateScopedStateEviction()
+  const offEvent = clientEvents.on('runtime:node-switched', e => events.push(`event:${e.from}->${e.to}:dom=${host.textContent}`))
+  const Shell = (props: { node: string }) => {
+    events.push(`shell-build:${props.node}`)
+    onCleanup(() => events.push(`shell-dispose:${props.node}`))
+    const taskId = rows.get(props.node)!
+    const model = paneModel('audit-held', taskId, () => {
+      const builtUnder = props.node
+      const captured = useQueryClient()
+      events.push(`model-build:${builtUnder}`)
+      onCleanup(() => events.push(`model-dispose:${builtUnder}:active=${activeNodeId()}`))
+      const query = createQuery(() => ({ queryKey: ['audit-held', taskId], queryFn: () => readJson('/v1/core/audit-held') }))
+      const built = { builtUnder, captured, query }
+      models.push(built)
+      return built
+    })
+    shellModels.push({ shellNode: props.node, builtUnder: model.builtUnder })
+    createRenderEffect(() => events.push(`shell-draw:${props.node}:model=${model.builtUnder}`))
+    return <span>{props.node}:{model.builtUnder}</span>
+  }
+  const stop = render(() => <Show keyed when={activeCacheId()}>{node => <QueryClientProvider client={clients.get(node)!}><Shell node={node} /></QueryClientProvider>}</Show>, host)
+  await tick()
+  events.push('caller:before-node-b')
+  setActiveNode('node-b')
+  events.push('caller:after-node-b')
+  await tick()
+  const afterCollision = {
+    dom: host.textContent,
+    modelsBuilt: models.length,
+    shellModels: [...shellModels],
+    outgoingObservers: clients.get('node-a')!.getQueryCache().find({ queryKey: ['audit-held', 'same-task'] })!.getObserversCount(),
+    incomingObservers: clients.get('node-b')!.getQueryCache().find({ queryKey: ['audit-held', 'same-task'] })!.getObserversCount(),
+  }
+  await clients.get('node-a')!.invalidateQueries({ queryKey: ['audit-held', 'same-task'] })
+  await tick()
+  const afterOutgoingInvalidation = { requests: [...requests], outgoingData: clients.get('node-a')!.getQueryData(['audit-held', 'same-task']), dom: host.textContent }
+  events.push('caller:before-node-c')
+  setActiveNode('node-c')
+  events.push('caller:after-node-c')
+  await tick()
+  stop()
+  const afterShellDisposal = { modelsBuilt: models.length, disposedModels: events.filter(e => e.startsWith('model-dispose')), outgoingObservers: clients.get('node-c')!.getQueryCache().find({ queryKey: ['audit-held', 'other-task'] })!.getObserversCount() }
+  record('node-lifetime', { fixture: 'actual paneModel and keyed QueryClientProvider with synthetic compiled model, jsdom, no Persist hydration', afterCollision, afterOutgoingInvalidation, afterShellDisposal, events })
+  _resetPaneModels()
+  offEvent(); offEviction(); offScope()
+  for (const client of clients.values()) client.clear()
+  setActiveNode(null)
+  delete (window as any).acorn
+  host.remove()
+})
+
+it('records terminal channel frames across a Node switch and colliding session', () => {
+  const sent: { nodeId: string; frame: any }[] = []
+  Object.assign(window, { acorn: {
+    desktop: true, nodeFetch: () => Promise.reject(new Error('unused')),
+    nodeSend: (nodeId: string, frame: unknown) => sent.push({ nodeId, frame }),
+    onNodeStatus: () => () => {}, onNodeFrame: () => () => {}, onNodeBytes: () => () => {},
+  } })
+  _resetWsClient()
+  setActiveNode('node-a')
+  const offEviction = activateScopedStateEviction()
+  const stopChannel = initPtyChannel()
+  const sessionId = '11111111-2222-4333-8444-555555555555'
+  const offOld = wsAttach(sessionId, () => {})
+  setActiveNode('node-b')
+  offOld()
+  const afterSwitch = [...sent]
+  const offIncoming = wsAttach(sessionId, () => {})
+  offOld()
+  offIncoming()
+  record('terminal-switch', { fixture: 'actual channel, wsClient and scope mapping; transport records frames, no PTY', afterSwitch, allFrames: sent })
+  stopChannel(); offEviction(); _resetWsClient(); setActiveNode(null)
+  delete (window as any).acorn
+})
+
+it('counts rail parsing, project scans and task DOM identity through real TabRail', async () => {
+  Object.assign(window, { acorn: { desktop: true, onNodeStatus: () => () => {} } })
+  record('solid-runtime', { componentIdentity: createComponent === webComponent })
+  const checkpoints = []
+  for (const count of [6, 100, 300, 1000]) {
+    instrumentation.mounts = 0
+    localStorage.clear()
+    setSelectedSource(null)
+    setActiveTaskId('task-0')
+    const projectCount = count === 6 ? 2 : 20
+    let projectIdReads = 0
+    let parentReads = 0
+    const projects = Array.from({ length: projectCount }, (_, i) => ({
+      get id() { projectIdReads++; return `project-${i}` },
+      name: `Project ${i}`, workspaceId: 'workspace', hidden: false, vcs: 'none', path: '/tmp/synthetic',
+    }))
+    const tasks = Array.from({ length: count }, (_, i) => ({ id: `task-${i}`, projectId: `project-${i % projectCount}`, get parentId() { parentReads++; return null },
+      origin: 'local', title: `Task ${i}`, status: 'active', links: [], branch: null, icon: null, worktreePath: null }))
+    const order = JSON.stringify({ pinned: tasks.filter((_, i) => i % 10 === 0).map(t => t.id), order: tasks.map(t => t.id) })
+    writeDevicePref(PrefKeys.railOrder, order)
+    const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, gcTime: Infinity, retry: false } } })
+    client.setQueryData(tasksKey, tasks)
+    client.setQueryData(projectsKey, projects)
+    client.setQueryData(workspacesKey, [{ id: 'workspace', name: 'Workspace', projects: projects.map(p => ({ id: p.id })) }])
+    client.setQueryData(integrationsKey, { integrations: [] })
+    client.setQueryData(prefsKey, { [PrefKeys.railOrder]: order })
+    let orderParses = 0
+    const originalParse = JSON.parse
+    JSON.parse = function(value: string, ...rest: any[]) { if (value === order) orderParses++; return originalParse(value, ...rest) }
+    const host = document.createElement('div')
+    document.body.append(host)
+    const stop = render(() => <QueryClientProvider client={client}><TabRail /></QueryClientProvider>, host)
+    await tick()
+    const firstButton = host.querySelector('[data-task-id="task-0"] .tabrail-task')
+    const baseline = { orderParses, projectIdReads, parentReads, rows: host.querySelectorAll('[data-task-id]').length, componentCalls: instrumentation.mounts }
+    orderParses = 0; projectIdReads = 0; parentReads = 0
+    setActiveTaskId('task-1')
+    await tick()
+    const selection = { orderParses, projectIdReads, parentReads, rows: host.querySelectorAll('[data-task-id]').length, firstButtonRetained: firstButton === host.querySelector('[data-task-id="task-0"] .tabrail-task'), componentCalls: instrumentation.mounts }
+    const phases: Record<string, unknown> = {}
+    const measurePhase = async (name: string, action: () => void) => {
+      orderParses = 0
+      const cpu = process.cpuUsage()
+      const at = performance.now()
+      action()
+      await tick()
+      const used = process.cpuUsage(cpu)
+      phases[name] = { orderParses, processCpuMs: (used.user + used.system) / 1000, elapsedMs: performance.now() - at, componentCalls: instrumentation.mounts,
+        firstButtonRetained: firstButton === host.querySelector('[data-task-id="task-0"] .tabrail-task') }
+    }
+    await measurePhase('sameValue', () => void savePref(client, PrefKeys.railOrder, order))
+    await measurePhase('unrelatedPreference', () => void savePref(client, PrefKeys.theme, 'dark'))
+    const pinnedOrder = JSON.stringify({ pinned: ['task-1'], order: tasks.map(t => t.id) })
+    JSON.parse = function(value: string, ...rest: any[]) { if (value === order || value === pinnedOrder) orderParses++; return originalParse(value, ...rest) }
+    await measurePhase('pinChange', () => {
+      void savePref(client, PrefKeys.railOrder, pinnedOrder)
+    })
+    checkpoints.push({ tasks: count, projects: projectCount, baseline, selection, phases })
+    stop(); client.clear(); host.remove(); JSON.parse = originalParse
+  }
+  record('rail-host', { fixture: 'actual TabRail with real QueryClient, rows, markers and slots; static route accessor boundary; synthetic cached records; getter and JSON.parse counters', checkpoints })
+  setActiveTaskId(null); setSelectedSource(null)
+  delete (window as any).acorn
+})
+
+it('compares node eviction before provider construction with one batch', () => {
+  const comparisons = []
+  for (const mode of ['plain', 'batched']) {
+    _resetPaneModels()
+    setActiveNode('node-a')
+    const events: string[] = []
+    const host = document.createElement('div')
+    const offScope = onScopeEvicted(e => {
+      if (e.scope !== 'node-switched') return
+      events.push(`evict-all:active=${activeNodeId()}:dom=${host.textContent}`)
+      _resetPaneModels()
+    })
+    const offEviction = activateScopedStateEviction()
+    const Shell = (props: { node: string }) => {
+      events.push(`shell-build:${props.node}`)
+      const model = paneModel('audit-order', props.node + '-task', () => {
+        events.push(`model-build:${props.node}`)
+        onCleanup(() => events.push(`model-dispose:${props.node}`))
+        return { node: props.node }
+      })
+      return <span>{model.node}</span>
+    }
+    const stop = render(() => <Show keyed when={activeCacheId()}>{node => <Shell node={node} />}</Show>, host)
+    if (mode === 'batched') batch(() => setActiveNode('node-b'))
+    else setActiveNode('node-b')
+    comparisons.push({ mode, events: [...events], dom: host.textContent })
+    stop(); offEviction(); offScope(); _resetPaneModels(); host.remove()
+  }
+  setActiveNode(null)
+  record('switch-order', { fixture: 'actual setActiveNode, scope mapping, paneModel and Solid keyed Show; synthetic all-model eviction callback', comparisons })
+})
+
+
+it('records Notes origin and title timer retirement through the actual model', async () => {
+  const requests: { nodeId: string; path: string; method: string; body?: string }[] = []
+  const summary = { slug: 'scratchpad', title: 'Scratchpad', author: 'user', kind: 'scratch', included: true, originTaskId: 'same-task', updatedAt: 1 }
+  Object.assign(window, { acorn: {
+    desktop: true,
+    nodeFetch: async (nodeId: string, request: { path: string; method: string; body?: { kind: string; bytes: Uint8Array } }) => {
+      requests.push({ nodeId, path: request.path, method: request.method, ...(request.body ? { body: new TextDecoder().decode(request.body.bytes) } : {}) })
+      const answer = request.method !== 'GET' ? { ok: true } : request.path.endsWith('/notes') ? [summary] : { ...summary, body: 'server-body', createdAt: 1, originSessionId: null }
+      return { status: 200, headers: {}, body: new TextEncoder().encode(JSON.stringify(answer)) }
+    },
+    onNodeStatus: () => () => {},
+    fleetList: async () => ({ nodes: ['node-a', 'node-b'].map(nodeId => ({ nodeId, label: nodeId, endpoint: 'http://synthetic', local: false })), statuses: ['node-a', 'node-b'].map(nodeId => ({ nodeId, state: 'online' })) }),
+  } })
+  await refreshFleet()
+  setActiveNode('node-a')
+  const client = new QueryClient({ defaultOptions: { queries: { staleTime: Infinity, retry: false } } })
+  client.setQueryData(workspacesKey, [])
+  let model: ReturnType<typeof createNotesModel> | undefined
+  const Model = () => { model = createNotesModel('same-task', null); return <span>notes</span> }
+  const host = document.createElement('div')
+  const stop = render(() => <QueryClientProvider client={client}><Model /></QueryClientProvider>, host)
+  for (let turn = 0; turn < 100 && !model?.selected(); turn++) await tick()
+  model!.onBodyInput('pending-body-a')
+  model!.onTitleInput('pending-title-a')
+  const beforeRetirement = requests.filter(r => r.method !== 'GET').length
+  setActiveNode('node-b')
+  stop()
+  await tick()
+  const immediately = requests.filter(r => r.method !== 'GET')
+  await new Promise(resolve => setTimeout(resolve, 900))
+  record('notes-retirement', { fixture: 'actual Notes model and API, captured synthetic transport, QueryClient, jsdom; body/title edits then Node switch and model cleanup',
+    beforeRetirement, immediately, afterTitleDeadline: requests.filter(r => r.method !== 'GET') })
+  client.clear(); setActiveNode(null); delete (window as any).acorn
+})

@@ -1,0 +1,11 @@
+{
+  "fixture": "actual readFile catch branch; transport rejects unsupported/offline body",
+  "afterRead": {
+    "emptyEditableDocument": true,
+    "pooled": true,
+    "saved": true,
+    "visibleError": false
+  },
+  "writeText": "TYPED AFTER FAILED READ\n",
+  "expected": "Read failure is an error, never an empty successful editable file; retain a previous usable buffer and reject save until custody is known."
+}

@@ -1,4 +1,4 @@
-import { createEffect, createSignal, onCleanup, untrack } from 'solid-js'
+import { createEffect, createRoot, createSignal, getOwner, onCleanup, runWithOwner, untrack } from 'solid-js'
 import type { QueryClient } from '@tanstack/solid-query'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { pushBackgroundError } from '../../features/notifications/notifications'
@@ -12,6 +12,8 @@ import {
   type RestorePhase,
 } from './persistedState'
 import { createLogger } from '../telemetry/logger'
+import { activeNodeId } from '../node/activeNode'
+import { queryOwner } from '../node/queryOwnership'
 
 const log = createLogger('persisted-state')
 
@@ -31,11 +33,12 @@ const parseStored = <T>(slice: PersistedStateSlice<T>, scopeId: string, raw: unk
 export function restorePersistedSlices(
   slices: readonly PersistedStateSlice<unknown>[],
   prefs: Readonly<Record<string, string>>,
+  nodeId: string | null = activeNodeId(),
 ): void {
   for (const phase of PHASES) {
     for (const slice of slices.filter((candidate) => candidate.restore === phase && candidate.binding)) {
       for (const [key, raw] of Object.entries(prefs)) {
-        const scopeId = scopeIdFromStorageKey(slice, key)
+        const scopeId = scopeIdFromStorageKey(slice, key, nodeId)
         // A tombstone is a stored value that means "this scope is gone", written when the user
         // removed one. It is not a value to parse.
         if (scopeId === null || raw === PERSISTED_STATE_TOMBSTONE) continue
@@ -59,6 +62,9 @@ export type StartupRestoreOptions = {
 // Solid owns the reactive subscriptions, while this service owns their ordering and arming. No
 // descriptor can write until every phase has hydrated and boot:restored has been emitted.
 export function createStartupRestore(options: StartupRestoreOptions): { restored: () => boolean } {
+  const owner = getOwner()
+  const registered = queryOwner(options.queryClient)
+  const nodeId = registered === undefined ? untrack(activeNodeId) : registered
   const [restored, setRestored] = createSignal(false)
   const [armed, setArmed] = createSignal(false)
   const timers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -66,28 +72,46 @@ export function createStartupRestore(options: StartupRestoreOptions): { restored
   const lastStored = new Map<string, string>()
   const hydratedSlices = new Set<PersistedStateSlice<unknown>>()
   const previousScopes = new Map<PersistedStateSlice<unknown>, Set<string>>()
-  let activeSlices = new Set<PersistedStateSlice<unknown>>()
+  const activeSlices = new Map<PersistedStateSlice<unknown>, () => void>()
+  const inFlight = new Map<string, { raw: string }[]>()
+
+  const cancelQueued = (key: string) => {
+    const timer = timers.get(key)
+    if (timer !== undefined) clearTimeout(timer)
+    timers.delete(key)
+    queued.delete(key)
+  }
+  const flushKey = (key: string) => {
+    const pending = queued.get(key)
+    cancelQueued(key)
+    if (!pending) return
+    const attempts = inFlight.get(key) ?? []
+    attempts.push(pending)
+    inFlight.set(key, attempts)
+    void savePref(options.queryClient, key, pending.raw, { surfaceFailure: pending.slice.id !== 'core.notices' }).then((saved) => {
+      if (saved) lastStored.set(key, pending.raw)
+      attempts.splice(attempts.indexOf(pending), 1)
+      if (!attempts.length) inFlight.delete(key)
+    })
+  }
 
   const write = (slice: PersistedStateSlice<unknown>, scopeId: string, raw: string) => {
-    const key = storageKeyFor(slice, scopeId)
-    if (lastStored.get(key) === raw) return
+    const key = storageKeyFor(slice, scopeId, nodeId)
+    if (queued.get(key)?.raw === raw) return
+    const attempts = inFlight.get(key)
+    const projected = attempts?.length ? attempts[attempts.length - 1].raw : lastStored.get(key)
+    if (projected === raw) {
+      cancelQueued(key)
+      return
+    }
     if (slice.maxBytes != null && utf8Bytes(raw) > slice.maxBytes) {
       if (slice.id === 'core.notices') log.error(`${slice.id}: value exceeds ${slice.maxBytes} bytes`, undefined, { 'slice.id': slice.id })
       else pushBackgroundError('', `Could not save ${slice.id}`, `Persisted value exceeds ${slice.maxBytes} bytes.`)
       return
     }
+    cancelQueued(key)
     queued.set(key, { slice, raw })
-    const existing = timers.get(key)
-    if (existing) clearTimeout(existing)
-    timers.set(key, setTimeout(() => {
-      timers.delete(key)
-      const pending = queued.get(key)
-      queued.delete(key)
-      if (!pending) return
-      void savePref(options.queryClient, key, pending.raw, { surfaceFailure: pending.slice.id !== 'core.notices' }).then((saved) => {
-        if (saved) lastStored.set(key, pending.raw)
-      })
-    }, WRITE_THROTTLE_MS))
+    timers.set(key, setTimeout(() => flushKey(key), WRITE_THROTTLE_MS))
   }
 
   createEffect(() => {
@@ -96,7 +120,7 @@ export function createStartupRestore(options: StartupRestoreOptions): { restored
     performance.mark('acorn:restore:start')
     for (const [key, value] of Object.entries(prefs)) lastStored.set(key, value)
     const slices = untrack(options.slices)
-    restorePersistedSlices(slices, prefs)
+    restorePersistedSlices(slices, prefs, nodeId)
     for (const slice of slices) if (slice.binding) hydratedSlices.add(slice)
     performance.mark('acorn:restore:end')
     performance.measure('acorn:restore', 'acorn:restore:start', 'acorn:restore:end')
@@ -111,48 +135,54 @@ export function createStartupRestore(options: StartupRestoreOptions): { restored
     const slices = options.slices().filter((slice) => slice.binding)
     if (!armed()) return
     const currentSlices = new Set(slices)
-    for (const removed of activeSlices) {
+    for (const [removed, dispose] of activeSlices) {
       if (currentSlices.has(removed)) continue
+      dispose()
+      activeSlices.delete(removed)
       hydratedSlices.delete(removed)
       previousScopes.delete(removed)
     }
-    activeSlices = currentSlices
 
     const prefs = untrack(options.prefs) ?? {}
     const lateSlices = slices.filter((slice) => !hydratedSlices.has(slice))
     if (lateSlices.length) {
-      restorePersistedSlices(lateSlices, prefs)
+      untrack(() => restorePersistedSlices(lateSlices, prefs, nodeId))
       for (const slice of lateSlices) hydratedSlices.add(slice)
     }
 
     for (const slice of slices) {
-      const values = slice.binding!.values()
-      const currentScopes = new Set(Object.keys(values))
-      for (const [scopeId, value] of Object.entries(values)) {
-        let raw: string
-        try {
-          raw = stringifyPersistedValue(slice, value)
-        } catch (error) {
-          pushBackgroundError('', `Could not save ${slice.id}`, error instanceof Error ? error.message : String(error))
-          continue
-        }
-        write(slice, scopeId, raw)
-      }
-      for (const removedScope of previousScopes.get(slice) ?? []) {
-        if (currentScopes.has(removedScope)) continue
-        write(slice, removedScope, PERSISTED_STATE_TOMBSTONE)
-      }
-      previousScopes.set(slice, currentScopes)
+      if (activeSlices.has(slice)) continue
+      // Roots belong to startup, not the registry effect, so membership changes do not dispose and
+      // recreate unrelated subscriptions. The codec runs inside its own effect to track deep stores.
+      const dispose = runWithOwner(owner, () => createRoot((dispose) => {
+        createEffect(() => {
+          const values = slice.binding!.values()
+          const currentScopes = new Set(Object.keys(values))
+          for (const [scopeId, value] of Object.entries(values)) {
+            try {
+              write(slice, scopeId, stringifyPersistedValue(slice, value))
+            } catch (error) {
+              pushBackgroundError('', `Could not save ${slice.id}`, error instanceof Error ? error.message : String(error))
+            }
+          }
+          for (const removedScope of previousScopes.get(slice) ?? []) {
+            if (!currentScopes.has(removedScope)) write(slice, removedScope, PERSISTED_STATE_TOMBSTONE)
+          }
+          previousScopes.set(slice, currentScopes)
+        })
+        onCleanup(() => {
+          for (const [key, pending] of queued) if (pending.slice === slice) flushKey(key)
+        })
+        return dispose
+      }))!
+      activeSlices.set(slice, dispose)
     }
   })
 
   onCleanup(() => {
-    for (const timer of timers.values()) clearTimeout(timer)
-    timers.clear()
-    for (const [key, pending] of queued) {
-      void savePref(options.queryClient, key, pending.raw, { surfaceFailure: pending.slice.id !== 'core.notices' })
-    }
-    queued.clear()
+    for (const dispose of activeSlices.values()) dispose()
+    activeSlices.clear()
+    for (const key of queued.keys()) flushKey(key)
   })
   return { restored }
 }

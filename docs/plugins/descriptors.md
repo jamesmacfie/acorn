@@ -310,10 +310,9 @@ sandbox's own sequence and the host only quotes it back, exactly as the bridge's
 rung up. A payload or a reply body over 64 KiB is refused, eight may be outstanding per slot, and an
 owner has ten seconds to answer. The failure arm is a code and a sentence, never a host stack.
 
-The whole reason it rides here rather than the bridge is the slot. One worker holds one bridge, so a
-request that crossed the bridge could not say which of a bundle's mounted trees sent it; a request that
-crosses this channel is addressed by the port and the slot the host already trusts, and plugin code
-supplies no identifier at all.
+Owner requests use the tree channel because their authority is the mounted contribution's owner
+contract. The host validates the slot generation before admission and publication. A retired slot's
+held result cannot reach another slot that reused its id.
 
 **Every message is validated**, because the host is the only thing between a stranger's code and the
 shell's DOM:
@@ -328,7 +327,7 @@ shell's DOM:
   handler id, never a URL or a command id; navigation is `bridge.ui.openUrl`, held to the same rules
   as a frame's.
 - **Caps**, in `TREE_LIMITS`: 1 MiB and 4,000 mutations per batch, 5,000 live nodes and 64 levels of
-  depth per tree, 65,536 characters in one text node, 512 trees per worker. The byte cap is sized like
+  depth per tree, 65,536 characters in one text node, 512 live or reserved tree slots per bundle, across its authority contexts. The byte cap is sized like
   the state channel's 1 MiB per value: generous for anything honest, small enough that a bundle cannot
   use the renderer as a memory bomb. Past a cap the batch is dropped and recorded.
 - **Rate**: batches are coalesced per frame on the host side. A sandbox that floods is throttled, not
@@ -341,8 +340,60 @@ into a stranger's
 plugin; `messages.ts` holds the schemas the host parses with. The lists are duplicated from
 client-core's kit, which owns them, and a test over there fails the moment the two disagree.
 
-The sandbox itself — one Web Worker per bundle, what it has and what it does not, and what happens
+The sandbox itself, including shared modern workers and authority-affine legacy workers, what it has and what it does not, and what happens
 when it throws — is `docs/shell.md § The plugin worker`.
+
+### Mounted bridge ownership and SDK compatibility
+
+The additive `treeSlotBridge: 1` capability keeps the bridge and tree protocol versions unchanged.
+A capable SDK receives a bridge port on each initial `tree:mount`, and `TreeRender(bridge, mount)`
+receives that slot's bridge. Props updates reuse its port. Unmount removes subscriptions and pending
+requests, rejects held requests with `unmounted`, closes the port, and releases the remote root.
+Handler dispatch retains only callbacks referenced by nodes attached to that root.
+
+The bundle bootstrap has immutable initial metadata but no privileged API, state, document, or UI
+services. A capable SDK's global `connect()` reports `treeBridgeMode: 'bootstrap'`; use the bridge
+passed to `TreeRender` to construct services and models. Global context describes bootstrap metadata,
+not the authority of a subsequently mounted slot.
+
+| SDK and host | Bridge ownership |
+| --- | --- |
+| Capable SDK and capable host | One bundle worker, one privileged bridge per mounted slot. |
+| Legacy SDK and capable host | One worker per equivalent immutable authority context. |
+| Capable SDK and legacy host | Usable global bridge with `treeBridgeMode: 'legacy'` and a warning; the host's first-context limitations remain. |
+| Legacy SDK and legacy host | The host's global first-context behavior remains. |
+
+A legacy SDK cannot replace its module-global bridge. The host therefore shares only equivalent
+plugin/hash, QueryClient, Node, surface/target, task/project, effective permissions, structural document
+grant, and immutable opening item. Focus is the union of its live equivalent leases. Retiring the
+first lease removes that lease's focus closure; a surviving equivalent lease retains its context.
+The last lease terminates the worker immediately, with no idle legacy worker.
+
+Classification promotes the same detection worker on the legacy `connected` acknowledgement or its
+first bridge API request. Awaited top-level legacy API work executes once per admitted context.
+A retired detection authority is terminated before a replacement uses surviving metadata; it is never
+rebound to another document or Node. Modern workers retain warm modules for 30 seconds, with at most
+16 idle bundle workers. Historical capability hints are capped at 256 hashes. Eviction does not affect
+live workers, and a live exact legacy context takes precedence over a missing hint.
+
+The bundle budget admits at most 512 live or reserved slots. Modern slots share one worker. In the
+worst legacy case, 512 distinct contexts need 512 workers; this fallback preserves compatibility and
+provides no legacy memory gain. A detector occupies an admitted lease, rather than adding an
+unbounded extra pool. The terminal factory owns native termination settlement before constructing a
+same-hash replacement, while preserving live foreign contexts.
+
+A registered composed layout captures its QueryClient's Node before lazy regions mount. It consumes
+its opening `plugin:select` once and shares that immutable opening item across its regions; routed item
+props and subsequent selection events remain reactive. Only an actual document region grants document
+access. Delayed initial handle arrival preserves the grant; withdrawal or replacement advances its
+generation and permanently denies bridges admitted under the previous generation.
+
+These ownership guarantees cover API, cache, document, focus, and teardown. The renderer presentation
+bus still addresses pane intents by task/pane, and plugin frame channels follow the selected Node
+without a Node parameter on each subscription. They retain the selected-Node composition boundary.
+
+SDK bundles that embed the earlier remote-root implementation retain its callback bookkeeping until
+rebuilt. Host ownership repair cannot replace code embedded in accepted legacy bundle bytes.
 
 ## One shared eligibility and trust check
 
