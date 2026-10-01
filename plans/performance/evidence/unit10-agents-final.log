@@ -1,0 +1,9 @@
+$ vitest run
+
+ RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/agents
+
+
+ Test Files  142 passed (142)
+      Tests  1003 passed | 1 skipped (1004)
+   Start at  12:24:23
+   Duration  41.18s (transform 9.52s, setup 436ms, import 69.30s, tests 55.89s, environment 29.00s)

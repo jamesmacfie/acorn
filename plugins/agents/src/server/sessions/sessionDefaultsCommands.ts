@@ -1,3 +1,4 @@
+import { awaitWithSignal } from '../processes/startCancellation'
 import type { CoreServices } from '@acorn/plugin-api/node'
 import type { AgentConfigOption, AgentSession } from '../../contract/wire.ts'
 import { effectiveAgentDefaults, optionsWithDefaults, rememberAgentDefaults } from '../../shared/sessionDefaults'
@@ -20,46 +21,56 @@ type SessionDefaultsDependencies = {
 export class SessionDefaultsCommands {
   constructor(private readonly deps: SessionDefaultsDependencies) {}
 
-  async applySaved(sessionId: string, providerId: string): Promise<void> {
+  async applySaved(sessionId: string, providerId: string, signal?: AbortSignal): Promise<void> {
     const userId = this.deps.currentUserId()
     if (!userId) return
-    const stored = await readAgentSessionDefaults(this.deps.prefs, userId)
+    const stored = await this.read(() => readAgentSessionDefaults(this.deps.prefs, userId), signal)
     const wanted = effectiveAgentDefaults(stored, providerId)
     if (!Object.keys(wanted).length) return
-    const session = await this.deps.store.requireSession(sessionId)
+    const session = await this.read(() => this.deps.store.requireSession(sessionId), signal)
     const advertised = Array.isArray(session.config.configOptions)
       ? session.config.configOptions as AgentConfigOption[]
       : []
     const configOptions = optionsWithDefaults(advertised, wanted)
     if (configOptions === advertised) return
+    signal?.throwIfAborted()
     // Applying a saved value must not write the same value back as a new preference.
     await this.deps.patchSession(sessionId, { config: { ...session.config, configOptions } }, { remember: false })
       .catch(async (error) => {
+        signal?.throwIfAborted()
         await this.deps.recordWarning(sessionId,
           `Your saved defaults could not be applied to this session: ${error instanceof Error ? error.message : 'unknown error'}`)
       })
   }
 
-  async applyRequested(sessionId: string, wanted: Record<string, string>): Promise<void> {
+  async applyRequested(sessionId: string, wanted: Record<string, string>, signal?: AbortSignal): Promise<void> {
     if (!Object.keys(wanted).length) return
-    const session = await this.deps.store.requireSession(sessionId)
+    const session = await this.read(() => this.deps.store.requireSession(sessionId), signal)
     const advertised = Array.isArray(session.config.configOptions)
       ? session.config.configOptions as AgentConfigOption[]
       : []
     const configOptions = optionsWithDefaults(advertised, wanted)
     const dropped = Object.entries(wanted).filter(([id, value]) =>
       !configOptions.some((option) => option.id === id && option.currentValue === value))
+    signal?.throwIfAborted()
     if (dropped.length) {
       await this.deps.recordWarning(sessionId,
         `This provider does not offer ${dropped.map(([id, value]) => `${id} = ${value}`).join(', ')}, so the session kept its own setting.`)
     }
     if (configOptions === advertised) return
+    signal?.throwIfAborted()
     // A workflow file's choice belongs to this run, not to the owner's next session.
     await this.deps.patchSession(sessionId, { config: { ...session.config, configOptions } }, { remember: false })
       .catch(async (error) => {
+        signal?.throwIfAborted()
         await this.deps.recordWarning(sessionId,
           `The step's provider settings could not be applied: ${error instanceof Error ? error.message : 'unknown error'}`)
       })
+  }
+
+  private read<T>(query: () => Promise<T>, signal?: AbortSignal): Promise<T> {
+    signal?.throwIfAborted()
+    return signal ? awaitWithSignal(query(), signal) : query()
   }
 
   async remember(providerId: string, changed: ReadonlyArray<{ id: string; value: string }>): Promise<void> {

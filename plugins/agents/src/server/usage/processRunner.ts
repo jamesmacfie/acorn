@@ -1,3 +1,4 @@
+import { OwnedProcess } from '../processes/ownedProcess'
 import { accessSync, constants } from 'node:fs'
 import { createRequire } from 'node:module'
 import { delimiter, isAbsolute, join } from 'node:path'
@@ -16,7 +17,7 @@ export type PromptResponse = {
   response: string
 }
 
-export type PtyProcess = Pick<IPty, 'onData' | 'onExit' | 'write' | 'kill'>
+export type PtyProcess = Pick<IPty, 'onData' | 'onExit' | 'write' | 'kill'> & { pid?: number }
 
 // Grace period between the polite SIGHUP that node-pty's kill() sends and an unconditional SIGKILL.
 const KILL_ESCALATION_MS = 2_000
@@ -164,56 +165,51 @@ export function capturePty(options: PtyCaptureOptions): Promise<PtyCaptureResult
     let startupTimer: ReturnType<typeof setTimeout> | undefined
     const answered = new Set<number>()
 
+    let exitCode: number | null = null
+    let exitDisposable: { dispose(): void }
+    const owner = new OwnedProcess(process.pid, (done) => {
+      exitDisposable = process.onExit((event) => {
+        exitCode = event.exitCode
+        done()
+        finish(exitCode)
+      })
+    }, (signal) => process.kill(signal), killEscalationMs)
+
     const cleanup = () => {
       clearTimeout(timeoutTimer)
       if (idleTimer) clearTimeout(idleTimer)
       if (startupTimer) clearTimeout(startupTimer)
       dataDisposable.dispose()
-      exitDisposable.dispose()
-      if (escalation) clearTimeout(escalation)
     }
 
-    // Two-stage teardown. node-pty's kill() sends SIGHUP, which a CLI sitting on a prompt can ignore.
-    // One `claude /usage` probe survived as an orphan for four days, holding a deleted temp dir. So
-    // escalate to SIGKILL if the child has not reported exit shortly after the polite signal.
-    let exited = false
-    let escalation: ReturnType<typeof setTimeout> | undefined
-
-    const stop = () => {
+    const complete = async (code: number | null, error?: UsageProcessError) => {
+      if (settled) return
+      settled = true
+      cleanup()
       try {
-        process.kill()
-      } catch {
-        return // already gone
+        // forkpty creates a session and group led by the returned PID on Unix. Keep its exit
+        // observer through escalation, including when the parent exits before a group member.
+        await owner.stop(undefined, 'SIGHUP')
+        if (error) throw error
+        const output = await renderTerminalCapture(raw, { cols, rows, scrollback: options.scrollback }).catch((error: unknown) => {
+          throw new UsageProcessError('parse_failure', error instanceof Error ? error.message : 'Could not render terminal output.')
+        })
+        resolve({ output, exitCode: code })
+      } catch (failure) {
+        reject(failure instanceof UsageProcessError ? failure : new UsageProcessError(
+          'execution_failure', failure instanceof Error ? failure.message : 'Could not retire usage process.',
+        ))
+      } finally {
+        exitDisposable.dispose()
       }
-      escalation = setTimeout(() => {
-        if (exited) return
-        try {
-          process.kill('SIGKILL')
-        } catch {
-          // raced with a real exit, nothing to do
-        }
-      }, killEscalationMs)
-      escalation.unref?.()
     }
-
-    const fail = (error: UsageProcessError) => {
+    const fail = (error: UsageProcessError) => { void complete(null, error) }
+    const finish = (code: number | null) => { void complete(code) }
+    const write = (input: string) => {
       if (settled) return
-      settled = true
-      cleanup()
-      stop()
-      reject(error)
-    }
-
-    const finish = (exitCode: number | null) => {
-      if (settled) return
-      settled = true
-      cleanup()
-      stop()
-      void renderTerminalCapture(raw, { cols, rows, scrollback: options.scrollback }).then(
-        (output) => resolve({ output, exitCode }),
-        (error: unknown) =>
-          reject(new UsageProcessError('parse_failure', error instanceof Error ? error.message : 'Could not render terminal output.')),
-      )
+      try { process.write(input) } catch (error) {
+        fail(new UsageProcessError('execution_failure', error instanceof Error ? error.message : 'Usage process write failed.'))
+      }
     }
 
     const resetIdle = () => {
@@ -232,15 +228,10 @@ export function capturePty(options: PtyCaptureOptions): Promise<PtyCaptureResult
       for (const [index, response] of (options.promptResponses ?? []).entries()) {
         if (!answered.has(index) && matches(response.pattern, raw)) {
           answered.add(index)
-          process.write(response.response)
+          write(response.response)
         }
       }
-      if (hasMeaningfulOutput(chunk)) resetIdle()
-    })
-    const exitDisposable = process.onExit(({ exitCode }) => {
-      exited = true
-      if (escalation) clearTimeout(escalation)
-      finish(exitCode)
+      if (!settled && hasMeaningfulOutput(chunk)) resetIdle()
     })
     const timeoutTimer = setTimeout(
       () => fail(new UsageProcessError('timeout', `${options.command} did not finish within ${timeoutMs}ms.`)),
@@ -249,7 +240,7 @@ export function capturePty(options: PtyCaptureOptions): Promise<PtyCaptureResult
 
     if (options.startupInput) {
       startupTimer = setTimeout(() => {
-        if (!settled) process.write(options.startupInput!)
+        if (!settled) write(options.startupInput!)
       }, options.startupInputDelayMs ?? 250)
     }
   })

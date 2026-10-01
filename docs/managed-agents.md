@@ -1165,6 +1165,35 @@ Cancellation, timeout, provider disconnect, and restart are explicit states. A l
 lost without killing the provider process, and the client reattaches from the session sequence or
 terminal replay tail.
 
+Startup belongs to one session generation before its first task, workspace, or ledger read.
+Concurrent callers join the same wave. Stopping aborts pending dependency waits and driver startup,
+rejects callbacks from retired generations, and joins in-flight callbacks before storage closes.
+Explicit `createSession` still returns after provider readiness and saved settings have been applied.
+Manifest harnesses contribute executable data. Agents constructs their ACP driver locally, so the
+startup signal stays inside the compiled Agents runtime and never crosses plugin RPC.
+
+ACP and Codex initialization have a 60-second deadline. Their process owner exists at spawn, including
+when initialization rejects or never answers. Stop calls share one teardown. ACP session close and
+Codex thread unsubscribe get up to 1 second before signaling. The owner sends SIGTERM to pipe
+children or SIGHUP to usage PTYs, escalates after 2 seconds, and allows another 2 seconds for exit
+acknowledgement. Failed acknowledgement rejects teardown. Protocol closure and a sent kill signal do
+not count as process exit. JSON-RPC closure settles requests and clears their timers. ACP closure
+also drains parked permissions and forms.
+
+On macOS and Linux, pipe children launch in their own process group. The installed node-pty uses
+`forkpty`, which gives usage captures a session and process group led by the returned PID. Teardown
+signals only that owned group and waits for both parent exit and group disappearance, including
+when the parent exits before a group member. Read-only Codex usage and PTY captures acknowledge this
+retirement before returning a result or error. Output and terminal rendering retain their existing
+budgets. Durable Terminal tmux sessions keep their separate owner.
+
+Windows acknowledges direct-child exit but does not provide the Unix descendant guarantee. A native
+Windows job object is required for equivalent ownership. Descendants that deliberately leave a Unix
+process group are also outside this owner. A compiled native driver factory that ignores the start
+signal is joined until its start settles, and any late handle is stopped before teardown returns.
+Agents cannot promise a bounded stop for such a factory. Loaded manifest harnesses use the
+cancellable local ACP driver.
+
 A provider process runs until something stops it: the session is archived or deleted, its MCP servers
 change, it moves to a terminal, its task is archived, it sits idle past the owner's limit, or the node
 exits. Each one holds an agent CLI and its MCP servers, about 450 MB, and an idle Claude Code process

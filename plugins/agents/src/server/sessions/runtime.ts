@@ -125,16 +125,30 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     return reserved.session
   }
 
-  private async reserveSession(
+  private readonly reservations = new Set<Promise<{ session: AgentSession; created: boolean }>>()
+
+  private reserveSession(
     input: CreateAgentSessionInput,
     idempotencyKey?: string,
   ): Promise<{ session: AgentSession; created: boolean }> {
+    const reservation = Promise.resolve().then(() => this.reserveSessionWave(input, idempotencyKey))
+    this.reservations.add(reservation)
+    const settled = () => this.reservations.delete(reservation)
+    void reservation.then(settled, settled)
+    return reservation
+  }
+
+  private async reserveSessionWave(
+    input: CreateAgentSessionInput,
+    idempotencyKey?: string,
+  ): Promise<{ session: AgentSession; created: boolean }> {
+    this.shutdown.signal.throwIfAborted()
     assertBoundedJson('Agent session configuration', input.config, MAX_AGENT_CONFIG_BYTES)
     if (idempotencyKey) {
-      const existing = await this.store.operationResult<AgentSession>(idempotencyKey, 'session.create')
-      if (existing) return { session: await this.store.requireSession(existing.id), created: false }
+      const existing = await this.readWhileRunning(() => this.store.operationResult<AgentSession>(idempotencyKey, 'session.create'))
+      if (existing) return { session: await this.readWhileRunning(() => this.store.requireSession(existing.id)), created: false }
     }
-    const provider = await this.usableProvider((candidate) => candidate.id === input.providerId)
+    const provider = await this.readWhileRunning(() => this.usableProvider((candidate) => candidate.id === input.providerId))
     if (!provider) throw new Error(`Managed provider is not registered: ${input.providerId}`)
     if (!provider.installed) throw new Error(provider.diagnostics[0] ?? `${provider.label} is unavailable.`)
     if (provider.authenticated === false) {
@@ -143,11 +157,12 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     if (input.profileId !== provider.profileId) {
       throw new Error(`Provider '${provider.id}' requires profile '${provider.profileId}'.`)
     }
-    await this.core.tasks.requireRoot(input.taskId)
+    await this.readWhileRunning(() => this.core.tasks.requireRoot(input.taskId))
     // The servers switched on in Settings, decided here rather than taken from the caller: which
     // programs a session starts is the owner's setting, not something a request body can widen.
-    const withAgent = await this.withCustomAgent(input)
-    const mcpServers = await this.mcpServers.enabledNames()
+    const withAgent = await this.readWhileRunning(() => this.withCustomAgent(input))
+    const mcpServers = await this.readWhileRunning(() => this.mcpServers.enabledNames())
+    this.shutdown.signal.throwIfAborted()
     const session = await this.store.createSession({ ...withAgent, config: { ...withAgent.config, mcpServers } }, provider)
     if (idempotencyKey) await this.store.saveOperation(idempotencyKey, 'session.create', session, session.id)
     return { session, created: true }
@@ -209,10 +224,12 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
   private async initializeCreatedSession(session: AgentSession): Promise<AgentSession> {
     this.holdSessionReadiness(session.id)
     try {
-      await this.ensureSession(session)
+      const live = await this.ensureSession(session)
+      const signal = live.controller.signal
       // Workflow steps and sessions with an origin set their own options. Forks retain theirs.
       if (session.kind === 'interactive' && !session.parentSessionId && !session.origin) {
-        await this.sessionDefaults.applySaved(session.id, session.providerId).catch(async (error) => {
+        await this.sessionDefaults.applySaved(session.id, session.providerId, signal).catch(async (error) => {
+          signal.throwIfAborted()
           await this.record(session.id, null, {
             type: 'diagnostic',
             level: 'warning',
@@ -229,9 +246,10 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
         if (requested && typeof requested === 'object' && !Array.isArray(requested)) {
           const values = Object.fromEntries(Object.entries(requested).filter((entry): entry is [string, string] =>
             typeof entry[1] === 'string'))
-          await this.applyRequestedConfig(session.id, values)
+          await this.sessionDefaults.applyRequested(session.id, values, signal)
         }
       }
+      signal.throwIfAborted()
       await this.completeSessionReadiness(session.id)
       return this.store.requireSession(session.id)
     } catch (error) {
@@ -240,11 +258,16 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     }
   }
 
-  override async stop(): Promise<void> {
-    await this.titleGeneration.stop()
-    await super.stop()
-    // Provider starts can outlive HTTP requests. Join initialization before closing the database.
-    await Promise.allSettled(this.sessionInitializations.values())
+  private runtimeStop: Promise<void> | null = null
+
+  override stop(): Promise<void> {
+    if (this.runtimeStop) return this.runtimeStop
+    // Retire startup immediately, while title generation drains its own work.
+    const engine = super.stop()
+    return this.runtimeStop = (async () => {
+      await Promise.all([this.titleGeneration.stop(), engine])
+      await Promise.allSettled([...this.reservations, ...this.sessionInitializations.values()])
+    })()
   }
 
   /** Applies workflow-selected provider options after the provider advertises its choices. */

@@ -1,0 +1,106 @@
+$ pnpm run build:service && pnpm run build:cli && pnpm run build:bundled-plugins && pnpm run build:helper && pnpm run build:bridge && node scripts/stage.mjs
+$ pnpm --filter @acorn/node build
+$ vite build && node scripts/check-service-budget.mjs
+vite v8.0.16 building ssr environment for production...
+
+transforming...✓ 1179 modules transformed.
+rendering chunks...
+dist/THIRD-PARTY-NOTICES.txt              52.01 kB
+dist/chunks/pluginRpc-TX8UpHuv.js          0.09 kB
+dist/chunks/wrapper-D7JA5gQn.js            0.15 kB
+dist/chunks/coerce-CUEn3XOB.js             0.26 kB
+dist/chunks/diagnostics-YlfwPPuf.js        1.09 kB
+dist/chunks/rpcOwnership-DFC5W1r9.js       1.13 kB
+dist/chunks/api-CdvezTNy.js                1.28 kB
+dist/chunks/chunk-CNf5ZN-e.js              1.79 kB
+dist/chunks/workerStorage-Dr3WltzT.js      2.78 kB
+dist/plugin-worker.js                      8.25 kB
+dist/service.js                           13.75 kB
+dist/standalone.js                        17.24 kB
+dist/chunks/acpSession-BwyMdCmL.js        27.78 kB
+dist/chunks/pluginRpc-HeIweddc.js         28.63 kB
+dist/mcp.js                               29.70 kB
+dist/chunks/primary-keys-DJHsbEJ8.js      44.82 kB
+dist/chunks/pluginDbFiles-BOaAjxSo.js    106.07 kB
+dist/archive-worker.js                   111.67 kB
+dist/chunks/wrapper-Bc51xDd9.js          114.75 kB
+dist/chunks/mcpProbe-DUZaL_wl.js         114.80 kB
+dist/chunks/acp-_24Rwg0n.js              167.73 kB
+dist/chunks/schemas-BMgPacMg.js          195.89 kB
+dist/chunks/contextBlock-PhQ0fpuJ.js     281.02 kB
+dist/chunks/stdio-DnwXIELh.js            365.04 kB
+dist/chunks/crash-BBlXT9Iu.js          2,292.74 kB
+
+✓ built in 187ms
+[service-budget] dist/service.js and 11 chunk(s): 3054653B (ceiling 3062000B)
+[service-budget] resolved at run time: @vscode/ripgrep, node-pty; on first use: playwright-core
+$ pnpm --filter @acorn/cli build
+$ vite build && node scripts/check-graph.mjs
+vite v8.0.16 building ssr environment for production...
+
+transforming...✓ 339 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/archive-worker.js  111.67 kB │ gzip:  30.66 kB
+dist/cli.js             519.86 kB │ gzip: 113.63 kB
+
+[INEFFECTIVE_DYNAMIC_IMPORT] ../../node_modules/.pnpm/ws@8.21.0/node_modules/ws/wrapper.mjs is dynamically imported by ../../packages/node-core/src/server/transport/wsHub.ts but also statically imported by ../../packages/custody/src/broker/nodeBroker.ts, dynamic import will not move module into another chunk.
+
+✓ built in 56ms
+$ node scripts/build-bundled-plugins.mjs
+$ vite build && cp src/public.ts dist/sdk.d.ts && cp src/remote/public.ts dist/remote.d.ts
+vite v8.0.16 building client environment for production...
+
+transforming...✓ 22 modules transformed.
+rendering chunks...
+dist/remote.js                4.39 kB
+dist/remoteRoot-B3ZDpZa2.js   9.04 kB
+dist/sdk.js                  29.63 kB
+
+✓ built in 18ms
+$ vite build && cp src/public.ts dist/sdk.d.ts && cp src/remote/public.ts dist/remote.d.ts
+vite v8.0.16 building client environment for production...
+
+transforming...✓ 22 modules transformed.
+rendering chunks...
+dist/remote.js                4.39 kB
+dist/remoteRoot-B3ZDpZa2.js   9.04 kB
+dist/sdk.js                  29.63 kB
+
+✓ built in 17ms
+[build-plugin] agent-cost -> /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/dist/bundled-plugins/agent-cost
+[build-plugin] database -> /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/dist/bundled-plugins/database
+[build-plugin] findings -> /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/dist/bundled-plugins/findings
+[build-plugin] http -> /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/dist/bundled-plugins/http
+[build-plugin] linear -> /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/dist/bundled-plugins/linear
+[build-plugin] model-providers -> /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/dist/bundled-plugins/model-providers
+[build-plugin] rollbar -> /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/dist/bundled-plugins/rollbar
+[build-plugin] sentry-telemetry -> /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/dist/bundled-plugins/sentry-telemetry
+[bundled-plugins] 8 package(s) -> /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/dist/bundled-plugins
+$ vite build --config vite.helper.config.ts
+vite v8.0.16 building ssr environment for production...
+
+transforming...✓ 396 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/helper/helper-THIRD-PARTY-NOTICES.txt    3.66 kB │ gzip:   0.99 kB
+dist/helper/helper.js                       579.59 kB │ gzip: 136.66 kB
+
+[INEFFECTIVE_DYNAMIC_IMPORT] ../../node_modules/.pnpm/ws@8.21.0/node_modules/ws/wrapper.mjs is dynamically imported by ../../packages/node-core/src/server/transport/wsHub.ts but also statically imported by src/helper/helperServer.ts, ../../packages/custody/src/broker/nodeBroker.ts, ../../packages/custody/src/supervision/previewTunnel.ts, dynamic import will not move module into another chunk.
+
+✓ built in 61ms
+$ vite build --config vite.bridge.config.ts
+vite v8.0.16 building client environment for production...
+
+transforming...✓ 119 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/bridge/bridge.js  93.32 kB │ gzip: 27.65 kB
+
+✓ built in 33ms
+(node:75650) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/scripts/nodeRuntimePackages.ts is not specified and it doesn't parse as CommonJS.
+Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+To eliminate this warning, add "type": "module" to /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/package.json.
+(Use `node --trace-warnings ...` to show where the warning was created)
+[stage] 7 runtime entries, 111 hoisted packages -> dist/helper/node_modules
+[stage] node 24.21.0 (cache) -> binaries/node-aarch64-apple-darwin; service + 11 migration chain(s) -> dist/helper; 11 frame stylesheet(s) -> dist/bridge
