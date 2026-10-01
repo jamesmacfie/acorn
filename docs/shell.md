@@ -869,9 +869,12 @@ That process is the pinned Node in both a checkout and a bundle, so there is one
 standalone node is distributed separately as a tarball; it is not an npm package
 (`docs/node-distribution.md`).
 
-`.github/workflows/build-desktop.yml` builds macOS Apple silicon and Windows x64 on a push to main
-and on a `v*` tag, plus manual dispatches. Both jobs run the boot test and the Rust suite before the bundler pass so a broken boot path fails in seconds
-rather than minutes. A tag builds and keeps its artifacts; publishing them is refused while the build
+`.github/workflows/build-desktop.yml` builds macOS Apple silicon and Windows x64 for a `v*` tag or a
+manual dispatch of `.github/workflows/ci.yml`, after that workflow's Linux job passes for the same
+commit. Ordinary pushes to main run the unsigned desktop tests instead and produce no installer. Both
+jobs build the bundle inputs once, run the boot test and the Rust suite against them before the
+bundler pass so a broken boot path fails in seconds rather than minutes, and package that same
+output. Artifacts are kept for one day, the repository's retention limit. A tag builds and keeps its artifacts; publishing them is refused while the build
 is ad-hoc signed.
 
 ### Windows test installer
@@ -909,8 +912,8 @@ those remain manual acceptance checks using the uploaded installer.
 Both GitHub Actions workflows grant the repository token only `contents: read`, and checkout does
 not persist its credentials. The jobs install, test, build, and upload run artifacts; they do not
 push repository changes or publish releases. Pull requests run the unsigned suites in
-`.github/workflows/ci.yml`. The desktop bundle workflow runs on main pushes, `v*` tags, and manual
-dispatches.
+`.github/workflows/ci.yml`, which also runs them on main pushes. The desktop bundle workflow runs
+only when `ci.yml` calls it for a `v*` tag or a manual dispatch.
 
 The bundle job passes `TAURI_SIGNING_PRIVATE_KEY` only to its required-key check and distribution
 step, and passes `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` only to distribution. Setup, dependency

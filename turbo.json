@@ -6,9 +6,14 @@
   // The three plugins/ files are the same hazard one level down: each plugin's tsconfig, vitest and
   // drizzle config is a one-line re-export of them now, and they sit OUTSIDE every package directory,
   // so nothing in the default input set would hash them.
+  //
+  // The root manifest and the runtime pin are read by node-core's isolation test, which has no way
+  // to name a file above its package. Both change rarely enough that rerunning everything is cheap.
   "globalDependencies": [
     "tsconfig.base.json",
     "pnpm-workspace.yaml",
+    "package.json",
+    "node-runtime.json",
     "plugins/tsconfig.base.json",
     "plugins/vitest.shared.ts",
     "plugins/drizzle.shared.ts"
@@ -50,23 +55,68 @@
     // are not client-core's dependencies — the cycle is deliberately broken — so `topo` gives it none
     // of their hashes, and a new icon spelled in plugins/ would land on a cache hit with the check
     // never run. Hash what the census reads.
+    //
+    // A package-specific entry replaces the generic one rather than merging with it, so every entry
+    // below restates `dependsOn: ["topo"]` or loses its dependencies' hashes.
     "@acorn/client-core#lint": {
+      "dependsOn": ["topo"],
       "inputs": [
         "$TURBO_DEFAULT$",
         "../../{apps,packages,plugins}/*/src/**"
       ]
     },
-    // The boundary test reads every package off disk rather than importing them, so it has no
-    // dependency edges for `topo` to hash — once cached, nothing in the repo could invalidate it
-    // and it silently reported a stale pass. Hash the manifests and sources it actually inspects.
-    "@acorn/arch-tests#test": {
+    // The stylesheet hygiene suite reads plugin and desktop CSS (src/infra/styles/readStyleSheets.ts).
+    "@acorn/client-core#test": {
+      "dependsOn": ["topo"],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "../../{apps,packages,plugins,tools}/*/package.json",
-        "../../{apps,packages,plugins,tools}/*/src/**",
-        "../../{apps,packages,plugins,tools}/*/test/**",
-        "../../{apps,packages,plugins,tools}/*/scripts/**"
+        "../../plugins/*/src/**",
+        "../../apps/desktop/src/**"
       ]
+    },
+    // Fixtures, a sibling's manifest, a settings component and a published schema, all read by path.
+    "@acorn/node-core#test": {
+      "dependsOn": ["topo"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "../../apps/node/test/__fixtures__/**",
+        "../../apps/tui/package.json",
+        "../client-core/src/features/settings/plugins/PluginsSettings.tsx",
+        "../../docs/schemas/**"
+      ]
+    },
+    "@acorn/plugin-api#test": {
+      "dependsOn": ["topo"],
+      "inputs": ["$TURBO_DEFAULT$", "../../apps/node/test/__fixtures__/**"]
+    },
+    "create-acorn-plugin#test": {
+      "dependsOn": ["topo"],
+      "inputs": ["$TURBO_DEFAULT$", "../plugin-types/acorn-plugin.schema.json"]
+    },
+    // The loadable-plugin config suite walks plugins/ off disk, including plugins apps/node does
+    // not depend on.
+    "@acorn/node#test": {
+      "dependsOn": ["topo"],
+      "inputs": ["$TURBO_DEFAULT$", "../../plugins/*/src/**", "../../plugins/*/*.json"]
+    },
+    // CI sets ACORN_TUI_WIDE to add the wide layout cases. Strict env mode drops any variable a
+    // task does not declare, so without this the wide cases never ran and the two widths shared one
+    // cache entry.
+    "@acorn/tui#test": {
+      "dependsOn": ["topo"],
+      "env": ["ACORN_TUI_WIDE"]
+    },
+    // Never cached. The lifecycle suite spawns apps/node's standalone entry from source, so its
+    // inputs are apps/node and everything that imports, and apps/node is not a dependency of the CLI.
+    "@acorn/cli#test": {
+      "dependsOn": ["topo"],
+      "cache": false
+    },
+    // Never cached. The boundary suite reads every package off disk, and docPaths checks that every
+    // path cited in docs/, README.md and CLAUDE.md exists anywhere in the repo, so its true input set
+    // is the repository. The glob list this replaced missed docs/, so a doc edit served a stale pass.
+    "@acorn/arch-tests#test": {
+      "cache": false
     }
   }
 }

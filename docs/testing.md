@@ -406,9 +406,9 @@ guard, the highlighter worker's separate policy, the refusal to answer a node ro
 own HTML, the handshake and ready-line parsing, the data key's shape and file fallback, the plugin
 scheme's hash grammar and frame CSP, the webview URL policies and the key grammar that picks between
 them, the navigation-history bookkeeping, the capability file's webview scoping, and the three
-packaging properties in `tauri.conf.json`. The macOS pull request job in `.github/workflows/ci.yml`
-runs both halves. `.github/workflows/build-desktop.yml` runs them again before the bundler pass on
-`main` and tags, so a broken boot path fails before packaging.
+packaging properties in `tauri.conf.json`. The macOS job in `.github/workflows/ci.yml` runs both
+halves on pull requests and main pushes. `.github/workflows/build-desktop.yml` runs them before the
+bundler pass on tags and manual dispatches, so a broken boot path fails before packaging.
 
 What no headless run reaches is compositing: a child webview positioned over a window needs a window.
 That is what items 4 and 5 of the smoke checklist are for.
@@ -495,21 +495,27 @@ is still owed for both. Run it on the host used for release checks and keep both
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs `pnpm lint` and the non-desktop `pnpm test` suites on every pull
-request and on push to `main`. A separate macOS job runs `pnpm --filter @acorn/desktop test` on pull
-requests without signing secrets. `.github/workflows/build-desktop.yml` runs the same desktop tests
-before building the signed artifact on `main` and tags.
+request, push to `main`, `v*` tag, and manual dispatch. A separate macOS job runs
+`pnpm --filter @acorn/desktop test` on pull requests and `main` pushes without signing secrets. Tags
+and manual dispatches skip that job and, once the Linux job passes, call
+`.github/workflows/build-desktop.yml` to build the signed installers. That workflow builds the bundle
+inputs once, runs the desktop tests against them, and packages the same output.
 
 The non-desktop job runs on Linux. A macOS runner has no Docker for the container probes to find,
 and its `/var` is a symlink to `/private/var`, which causes one of the pre-existing failures below.
 
-`@acorn/desktop` is filtered out of the Linux test run. Its macOS pull request job installs Rust and
+`@acorn/desktop` is filtered out of the Linux test run. Its macOS job installs Rust and
 caches the pinned Node runtime; the package's `test` script stages the bundle inputs, builds the
 renderer, runs Vitest including the helper boot test, and runs `cargo test`. It does not require
 updater signing secrets or build a distributable.
 
-The workflows cache dependencies and the pinned Node runtime, but not Turborepo task outputs. CI
-runs suites that a local `pnpm test` might serve from Turborepo's cache. A green local run with 30 of
-31 tasks cached is not evidence about the one task you changed.
+The workflows cache dependencies and the pinned Node runtime. The Linux job also carries
+Turborepo's local cache between runs, so a lint or test task whose inputs did not change is replayed
+rather than rerun, locally and in CI. That makes `turbo.json` load-bearing: a test that reads a file
+outside its package must declare it as an input, or a change to that file serves a stale pass. The
+architecture suite and the CLI lifecycle suite read too much of the repository to list, so they are
+never cached. A green run with 30 of 31 tasks cached is not evidence about the one task you changed
+unless its inputs are declared.
 
 The startup budget checks live in `build` scripts because they assert properties of built output.
 `@acorn/desktop`'s `build` runs
@@ -519,7 +525,7 @@ the build over a byte ceiling or a denylisted chunk name; [frontend.md](./fronte
 enforce. The TUI build also checks that Node can resolve every external import in its emitted modules,
 including lazy chunks, through `apps/tui/scripts/check-runtime-imports.mjs`.
 
-The desktop pull request job builds the renderer through its `test` script, but does not run the
+The macOS desktop job builds the renderer through its `test` script, but does not run the
 renderer budget check; `build-desktop.yml` applies that check to the real build output. The terminal
 client's build check runs when somebody builds that package. Each has a fixture suite that drives the
 same script against a directory it writes itself — `apps/desktop/test/scripts/` and
