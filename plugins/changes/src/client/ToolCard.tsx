@@ -1,8 +1,10 @@
-import { createSignal, For, Show, type Component } from 'solid-js'
+import { createSignal, For, lazy, Show, type Component } from 'solid-js'
 import { dispatchLayout } from '@acorn/plugin-api/client'
 import { agentToolTone } from '@acorn/plugin-agents/contract/toolTone.ts'
 import type { AgentToolCardProps } from '@acorn/protocol/extensionPoints.ts'
 import { Badge, Button, CodeBlock, Fold, Inline, Stack, StatusDot } from '@acorn/plugin-api/ui'
+
+const RecordedDiffs = lazy(() => import('./RecordedDiffs'))
 
 // The file-tool card in an agent transcript, written entirely in the kit
 // (docs/ui-design.md § The closed kit). Nothing here spells a class, a tag or a pixel, which is the whole
@@ -19,6 +21,11 @@ export const ChangesToolCard: Component<AgentToolCardProps> = (props) => {
   // the next event, since the transcript rebuilds its rows on every snapshot.
   const [open, setOpen] = createSignal(props.defaultOpen)
   const status = () => props.tool.status ?? 'running'
+  const label = () => (props.tool.paths ?? []).reduce(
+    (title, path) => title.replaceAll(path, path.split(/[/\\]/).slice(-2).join('/')),
+    props.tool.title || 'Tool',
+  )
+  const openChanges = () => dispatchLayout(props.taskId, { type: 'show', pane: 'changes' })
   // Badge has no `muted`, which is what a pending call's dot is. `neutral` is the same meaning in
   // the tone set a Badge does have.
   const badgeTone = () => {
@@ -27,7 +34,7 @@ export const ChangesToolCard: Component<AgentToolCardProps> = (props) => {
   }
   return (
     <Fold
-      label={props.tool.title || 'Tool'}
+      label={label()}
       open={open()}
       onOpenChange={setOpen}
       meta={
@@ -45,11 +52,14 @@ export const ChangesToolCard: Component<AgentToolCardProps> = (props) => {
       <Stack gap="row">
         <Show when={props.tool.input}>{(input) => <CodeBlock copy maxHeight="block">{input()}</CodeBlock>}</Show>
         <Show when={props.tool.output}>{(output) => <CodeBlock copy maxHeight="block">{output()}</CodeBlock>}</Show>
-        <For each={props.tool.paths ?? []}>
+        <Show when={props.fileChanges?.length}>
+          <RecordedDiffs changes={props.fileChanges ?? []} onOpenChanges={openChanges} />
+        </Show>
+        <For each={(props.tool.paths ?? []).filter((path) => !props.fileChanges?.some((change) => change.path === path))}>
           {(path) => (
             <Button
               variant="bare"
-              onPress={() => dispatchLayout(props.taskId, { type: 'show', pane: 'changes' })}
+              onPress={openChanges}
             >
               {path}
             </Button>

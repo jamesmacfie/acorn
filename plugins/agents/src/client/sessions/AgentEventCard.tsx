@@ -230,7 +230,7 @@ export default function AgentEventCard(props: {
       <Show when={event().type === 'tool'}>
         {(_shown) => {
           const tool = () => (event() as Extract<ReturnType<typeof event>, { type: 'tool' }>).tool
-          return <AgentToolCallCard tool={tool()} taskId={props.taskId} createdAt={props.item.createdAt} />
+          return <AgentToolCallCard tool={tool()} fileChanges={props.item.fileChanges} taskId={props.taskId} createdAt={props.item.createdAt} />
         }}
       </Show>
       <Show when={event().type === 'subagent'}>
