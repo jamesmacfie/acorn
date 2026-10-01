@@ -1,0 +1,24 @@
+Side project > side-project · 1 task                                           ●
+┌─Menu─────────────────┐
+│› Docker              │  Select a container.
+│  Workflows           │
+│  Agents              │
+│  Memory              │
+│                      │
+└──────────────────────┘
+┌─Browse───────────────┐
+│Nothing to list here. │
+│                      │
+│                      │
+│                      │
+│                      │
+│                      │
+└──────────────────────┘
+┌─Tasks────────────────┐
+│  Check workspace sw  │
+│                      │
+│                      │
+│                      │
+│                      │
+└──────────────────────┘
+j/k move · enter open · esc back · ctrl+k commands · ? help · w switch worksp…

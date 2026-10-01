@@ -1,0 +1,17 @@
+{
+  "sessions": [
+    {
+      "surface": "native",
+      "status": "stopped",
+      "launcherPid": 63009,
+      "alive": false
+    },
+    {
+      "surface": "tui",
+      "status": "stopped",
+      "launcherPid": 10423,
+      "alive": false
+    }
+  ],
+  "remainingChildren": []
+}

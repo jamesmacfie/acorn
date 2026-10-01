@@ -13,7 +13,7 @@ vi.mock('./sessions/managedSelection', () => ({
   openManagedSession: mocks.openManagedSession,
   requestComposerFocus: mocks.requestComposerFocus,
 }))
-vi.mock('./sessions/managedStore', () => ({ managedAgentStore: { startSession: mocks.startSession } }))
+vi.mock('./sessions/managedStore', () => ({ managedAgentStore: { captureRead: () => ({ nodeId: null, check: () => {}, current: () => true }), startSession: mocks.startSession } }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...await importOriginal<Record<string, unknown>>(),
   setSelectedSource: mocks.setSelectedSource,
