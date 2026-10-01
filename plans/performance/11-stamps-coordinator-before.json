@@ -1,0 +1,75 @@
+{
+  "case": "stamps",
+  "node": "v24.11.0",
+  "platform": "darwin",
+  "result": {
+    "files": 3000,
+    "cold": {
+      "label": "cold-one-reader",
+      "wallMs": 62.44870900000001,
+      "nodeCpuMs": 63.252,
+      "commands": 4,
+      "commandKinds": {
+        "status": 1,
+        "rev-parse": 1,
+        "diff": 2
+      },
+      "peakGit": 3,
+      "statCalls": 3003,
+      "peakPendingLstat": 3000,
+      "sampledHeapGrowthBytes": 13540504,
+      "value": [
+        {
+          "entries": 3000,
+          "responseBytes": 487497
+        }
+      ]
+    },
+    "warm": {
+      "label": "warm-one-reader",
+      "wallMs": 14.532666999999947,
+      "nodeCpuMs": 49.973,
+      "commands": 0,
+      "commandKinds": {},
+      "peakGit": 0,
+      "statCalls": 3003,
+      "peakPendingLstat": 3001,
+      "sampledHeapGrowthBytes": 12426032,
+      "value": [
+        {
+          "entries": 3000,
+          "responseBytes": 487497
+        }
+      ]
+    },
+    "overlapping": {
+      "label": "warm-four-readers",
+      "wallMs": 80.58516699999996,
+      "nodeCpuMs": 305.911,
+      "commands": 0,
+      "commandKinds": {},
+      "peakGit": 0,
+      "statCalls": 12012,
+      "peakPendingLstat": 12004,
+      "sampledHeapGrowthBytes": 33387648,
+      "value": [
+        {
+          "entries": 3000,
+          "responseBytes": 487497
+        },
+        {
+          "entries": 3000,
+          "responseBytes": 487497
+        },
+        {
+          "entries": 3000,
+          "responseBytes": 487497
+        },
+        {
+          "entries": 3000,
+          "responseBytes": 487497
+        }
+      ]
+    }
+  }
+}

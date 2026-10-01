@@ -1,0 +1,21 @@
+Coordinator replay against unchanged baseline source, September 30, 2026.
+
+rtk proxy env ACORN_PERF_TAG=coordinator-before pnpm exec vitest run --config plans/performance/14-probe.config.ts
+3 files / 4 cases passed in 3.04 seconds. Includes actual authoring API -> broker fixture delivery.
+
+rtk proxy node --expose-gc --import tsx plans/performance/14-node-probe.mjs memory coordinator-before
+Five unchanged reads: 1,500 file reads, 3,000 INSERTs, 10 DELETEs, 547.973 CPU ms.
+Four overlapping reads: 1,200 file reads, 2,400 INSERTs, 8 DELETEs, 433.804 CPU ms.
+Both index and FTS have 300 rows; duplicate FTS rows were not reproduced.
+
+rtk proxy node --expose-gc --import tsx plans/performance/14-node-probe.mjs workflow coordinator-before
+Task navigation: 1,010 selected rows, 33,292,920 string bytes, 102.569 CPU ms.
+One hundred list rows: 3,296,500 string bytes, 28.229 CPU ms.
+
+rtk proxy node --expose-gc --import tsx plans/performance/14-node-probe.mjs processing coordinator-before
+Fifty-row all page: 2,401 selected rows, 22,329,492 string bytes, 56.399 CPU ms.
+Fifty-row failed page: same payload, 38.985 CPU ms.
+Both retain exact global category counts and ordered page identities.
+
+Detailed JSON artifacts use the coordinator-before tag. These are synthetic SQLite and jsdom
+owner probes, not visible native latency or full-day workload evidence. Source remains unchanged.

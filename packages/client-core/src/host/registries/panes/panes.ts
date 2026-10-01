@@ -5,7 +5,7 @@ import type { Region } from '../../layouts'
 import { suppliedLayout } from '../../layouts/table'
 import type { Task } from '../../../infra/queries'
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
-import { markPaneDrawn, paneDrawn, paneModel } from './paneModels'
+import { markPaneDrawn, paneDrawn, paneModel, paneModelScope } from './paneModels'
 import { recordSample, startSpan, type SpanHandle } from '../../../infra/telemetry/emitter'
 import { Registry, type Disposable } from '../../../kit/lib/state/registry'
 import { createLogger } from '../../../infra/telemetry/logger'
@@ -167,15 +167,16 @@ function drawLayout(entry: PaneLayoutContribution<any>, owner?: string): PaneCon
   return {
     ...entry,
     component: (props) => {
+      const scope = paneModelScope()
       const regions: Record<string, Region> = {}
       // A getter, so the model is looked up when a region renders rather than when the pane is built,
       // and a pane that switches task hands its regions the new task's model without remounting them.
       const model = () => (entry.model ? paneModel(entry.id, props.task.id, () => {
         const taskId = props.task.id
-        return entry.model!(props.task, { shown: createMemo(() => paneDrawn(entry.id, taskId)) })
-      }, owner ?? 'core') : undefined)
+        return entry.model!(props.task, { shown: createMemo(() => paneDrawn(entry.id, taskId, scope)) })
+      }, owner ?? 'core', scope) : undefined)
       // For as long as this pane draws this task, which is what the model's `shown` reads.
-      createRenderEffect(() => onCleanup(markPaneDrawn(entry.id, props.task.id)))
+      createRenderEffect(() => onCleanup(markPaneDrawn(entry.id, props.task.id, scope)))
       for (const [name, Region] of Object.entries(entry.regions)) {
         // Under a `Suspense` of its own, because a region is a `lazy()` component and a pending one
         // renders as an empty string, which draws the region's rectangle empty until the module

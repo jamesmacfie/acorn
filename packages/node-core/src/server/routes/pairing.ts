@@ -61,6 +61,7 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
       const info: NodeInfo = {
         baseline: ACORN_BASELINE,
         protocolVersion: NODE_PROTOCOL_VERSION,
+        eventTransport: { viewers: 1 },
         // The certificate a client pins against (docs/api-reference.md § Pairing). Reading it over the
         // connection being authenticated proves nothing. It is the value the owner compares against
         // the code shown on the node.

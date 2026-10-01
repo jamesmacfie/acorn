@@ -1,0 +1,121 @@
+{
+  "elements": [
+    {
+      "disabled": false,
+      "name": "Default▾",
+      "ref": "e1",
+      "role": "button"
+    },
+    {
+      "disabled": false,
+      "name": "acorn-performance-fixture",
+      "ref": "e2",
+      "role": "button"
+    },
+    {
+      "disabled": false,
+      "name": "Notifications",
+      "ref": "e3",
+      "role": "button"
+    },
+    {
+      "disabled": false,
+      "name": "App menu",
+      "ref": "e4",
+      "role": "button"
+    },
+    {
+      "disabled": false,
+      "name": "Home",
+      "ref": "e5",
+      "role": "button"
+    },
+    {
+      "disabled": false,
+      "name": "Docker",
+      "ref": "e6",
+      "role": "button"
+    },
+    {
+      "disabled": false,
+      "name": "API",
+      "ref": "e7",
+      "role": "button"
+    },
+    {
+      "disabled": false,
+      "name": "Workflows",
+      "ref": "e8",
+      "role": "button"
+    },
+    {
+      "disabled": false,
+      "name": "Agents",
+      "ref": "e9",
+      "role": "button"
+    },
+    {
+      "disabled": false,
+      "name": "Memory",
+      "ref": "e10",
+      "role": "button"
+    },
+    {
+      "disabled": false,
+      "name": "Archive",
+      "ref": "e11",
+      "role": "button"
+    },
+    {
+      "disabled": false,
+      "name": "New task",
+      "ref": "e12",
+      "role": "button"
+    },
+    {
+      "disabled": false,
+      "name": "Refresh API",
+      "ref": "e13",
+      "role": "button"
+    },
+    {
+      "disabled": false,
+      "name": "API filter",
+      "ref": "e14",
+      "role": "toolbar"
+    },
+    {
+      "disabled": false,
+      "name": "Filter API by title",
+      "ref": "e15",
+      "role": "textbox"
+    },
+    {
+      "disabled": false,
+      "name": "Resize list",
+      "ref": "e16",
+      "role": "separator"
+    },
+    {
+      "disabled": false,
+      "name": "Collapse list",
+      "ref": "e17",
+      "role": "button"
+    },
+    {
+      "disabled": false,
+      "name": "Resize API requests list",
+      "ref": "e18",
+      "role": "separator"
+    },
+    {
+      "disabled": false,
+      "name": "Collapse API requests list",
+      "ref": "e19",
+      "role": "button"
+    }
+  ],
+  "text": "Default\n▾\nacorn-performance-fixture\n▾\nAPI\n0\n\nNo saved requests in this project yet. Open the API pane in a task to make one.",
+  "title": "acorn",
+  "url": "app://acorn/p/ef459ea3-175e-4dee-83cf-098cef39b333"
+}

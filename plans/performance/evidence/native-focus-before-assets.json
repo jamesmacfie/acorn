@@ -1,0 +1,29 @@
+{
+  "source": "Previously staged original f8e4b59c JavaScript resources; no staging since initial baseline. Rust rebuild changes only test bundle identity/capability configuration.",
+  "components": [
+    {
+      "component": "client",
+      "files": 334,
+      "bytes": 7537589,
+      "sha256": "8902f3d7273a808982f7f204ea87c209d553923f40ae1cde77f431aa8fd7036e"
+    },
+    {
+      "component": "bridge",
+      "files": 2,
+      "bytes": 231620,
+      "sha256": "b801f92218fd0b3fc431c251a6106bfdd7f9d12c9e4acb4f7adbad48f7c2e1ba"
+    },
+    {
+      "component": "helper",
+      "files": 56,
+      "bytes": 4427490,
+      "sha256": "b6e9600932759cfe08477101a26419b7d372c82a856646ac5f58b539f7a59652"
+    },
+    {
+      "component": "bundled-plugins",
+      "files": 39,
+      "bytes": 3804650,
+      "sha256": "d75a29226637b11d589d4cd25412477b8eab9e98a68679ccb5ed5728aabbc92f"
+    }
+  ]
+}

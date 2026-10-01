@@ -1,0 +1,173 @@
+{
+  "fixture": "actual TabRail with real QueryClient, rows, markers and slots; static route accessor boundary; synthetic cached records; getter and JSON.parse counters",
+  "checkpoints": [
+    {
+      "tasks": 6,
+      "projects": 2,
+      "baseline": {
+        "orderParses": 13,
+        "projectIdReads": 20,
+        "parentReads": 19,
+        "rows": 6,
+        "componentCalls": 1
+      },
+      "selection": {
+        "orderParses": 1,
+        "projectIdReads": 18,
+        "parentReads": 19,
+        "rows": 6,
+        "firstButtonRetained": true,
+        "componentCalls": 1
+      },
+      "phases": {
+        "sameValue": {
+          "orderParses": 1,
+          "processCpuMs": 25.336,
+          "elapsedMs": 12.743541999999707,
+          "componentCalls": 2,
+          "firstButtonRetained": true
+        },
+        "unrelatedPreference": {
+          "orderParses": 0,
+          "processCpuMs": 6.687,
+          "elapsedMs": 5.771083000000544,
+          "componentCalls": 2,
+          "firstButtonRetained": true
+        },
+        "pinChange": {
+          "orderParses": 0,
+          "processCpuMs": 0.751,
+          "elapsedMs": 5.369957999999315,
+          "componentCalls": 2,
+          "firstButtonRetained": true
+        }
+      }
+    },
+    {
+      "tasks": 100,
+      "projects": 20,
+      "baseline": {
+        "orderParses": 201,
+        "projectIdReads": 2120,
+        "parentReads": 301,
+        "rows": 100,
+        "componentCalls": 1
+      },
+      "selection": {
+        "orderParses": 1,
+        "projectIdReads": 2100,
+        "parentReads": 301,
+        "rows": 100,
+        "firstButtonRetained": true,
+        "componentCalls": 1
+      },
+      "phases": {
+        "sameValue": {
+          "orderParses": 1,
+          "processCpuMs": 3.998,
+          "elapsedMs": 5.536957999999686,
+          "componentCalls": 2,
+          "firstButtonRetained": true
+        },
+        "unrelatedPreference": {
+          "orderParses": 0,
+          "processCpuMs": 0.294,
+          "elapsedMs": 6.255416999999397,
+          "componentCalls": 2,
+          "firstButtonRetained": true
+        },
+        "pinChange": {
+          "orderParses": 0,
+          "processCpuMs": 0.328,
+          "elapsedMs": 5.676334000000679,
+          "componentCalls": 2,
+          "firstButtonRetained": true
+        }
+      }
+    },
+    {
+      "tasks": 300,
+      "projects": 20,
+      "baseline": {
+        "orderParses": 601,
+        "projectIdReads": 6320,
+        "parentReads": 901,
+        "rows": 300,
+        "componentCalls": 1
+      },
+      "selection": {
+        "orderParses": 1,
+        "projectIdReads": 6300,
+        "parentReads": 901,
+        "rows": 300,
+        "firstButtonRetained": true,
+        "componentCalls": 1
+      },
+      "phases": {
+        "sameValue": {
+          "orderParses": 1,
+          "processCpuMs": 5.019,
+          "elapsedMs": 5.452291999999943,
+          "componentCalls": 2,
+          "firstButtonRetained": true
+        },
+        "unrelatedPreference": {
+          "orderParses": 0,
+          "processCpuMs": 0.307,
+          "elapsedMs": 5.229542000000038,
+          "componentCalls": 2,
+          "firstButtonRetained": true
+        },
+        "pinChange": {
+          "orderParses": 0,
+          "processCpuMs": 0.516,
+          "elapsedMs": 6.525583000000552,
+          "componentCalls": 2,
+          "firstButtonRetained": true
+        }
+      }
+    },
+    {
+      "tasks": 1000,
+      "projects": 20,
+      "baseline": {
+        "orderParses": 2001,
+        "projectIdReads": 21020,
+        "parentReads": 3001,
+        "rows": 1000,
+        "componentCalls": 1
+      },
+      "selection": {
+        "orderParses": 1,
+        "projectIdReads": 21000,
+        "parentReads": 3001,
+        "rows": 1000,
+        "firstButtonRetained": true,
+        "componentCalls": 1
+      },
+      "phases": {
+        "sameValue": {
+          "orderParses": 1,
+          "processCpuMs": 12.677,
+          "elapsedMs": 10.44287499999973,
+          "componentCalls": 2,
+          "firstButtonRetained": true
+        },
+        "unrelatedPreference": {
+          "orderParses": 0,
+          "processCpuMs": 0.165,
+          "elapsedMs": 5.514208000000508,
+          "componentCalls": 2,
+          "firstButtonRetained": true
+        },
+        "pinChange": {
+          "orderParses": 0,
+          "processCpuMs": 0.263,
+          "elapsedMs": 6.415417000000161,
+          "componentCalls": 2,
+          "firstButtonRetained": true
+        }
+      }
+    }
+  ]
+}

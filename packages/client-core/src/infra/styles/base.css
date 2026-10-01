@@ -96,3 +96,8 @@ svg.glyph,
   white-space: nowrap;
   border: 0;
 }
+
+/* AppKit composition: branches with page rectangles are clipped by the host presentation seam.
+   Floating portals remain in this same document above the live page. */
+body.native-page-composition { background: transparent; }
+body.native-page-composition > #root { background: var(--bg); }

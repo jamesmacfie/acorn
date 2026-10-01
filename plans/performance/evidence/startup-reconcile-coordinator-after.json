@@ -1,0 +1,131 @@
+{
+  "source": "/Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/dist/bundled-plugins",
+  "seed": {
+    "installed": [
+      "agent-cost",
+      "database",
+      "findings",
+      "http",
+      "linear",
+      "model-providers",
+      "rollbar",
+      "sentry-telemetry"
+    ],
+    "updated": [],
+    "preserved": [],
+    "removed": [],
+    "failures": []
+  },
+  "results": [
+    {
+      "ms": 13.65,
+      "writes": 0,
+      "fsyncs": 0,
+      "reads": 102,
+      "readBytes": 7666257,
+      "fsyncMs": 0,
+      "installed": 0,
+      "updated": 0,
+      "failed": 0
+    },
+    {
+      "ms": 12.92,
+      "writes": 0,
+      "fsyncs": 0,
+      "reads": 102,
+      "readBytes": 7666257,
+      "fsyncMs": 0,
+      "installed": 0,
+      "updated": 0,
+      "failed": 0
+    },
+    {
+      "ms": 14.8,
+      "writes": 0,
+      "fsyncs": 0,
+      "reads": 102,
+      "readBytes": 7666257,
+      "fsyncMs": 0,
+      "installed": 0,
+      "updated": 0,
+      "failed": 0
+    },
+    {
+      "ms": 15.89,
+      "writes": 0,
+      "fsyncs": 0,
+      "reads": 102,
+      "readBytes": 7666257,
+      "fsyncMs": 0,
+      "installed": 0,
+      "updated": 0,
+      "failed": 0
+    },
+    {
+      "ms": 12.3,
+      "writes": 0,
+      "fsyncs": 0,
+      "reads": 102,
+      "readBytes": 7666257,
+      "fsyncMs": 0,
+      "installed": 0,
+      "updated": 0,
+      "failed": 0
+    },
+    {
+      "ms": 10.51,
+      "writes": 0,
+      "fsyncs": 0,
+      "reads": 102,
+      "readBytes": 7666257,
+      "fsyncMs": 0,
+      "installed": 0,
+      "updated": 0,
+      "failed": 0
+    },
+    {
+      "ms": 10.14,
+      "writes": 0,
+      "fsyncs": 0,
+      "reads": 102,
+      "readBytes": 7666257,
+      "fsyncMs": 0,
+      "installed": 0,
+      "updated": 0,
+      "failed": 0
+    },
+    {
+      "ms": 11,
+      "writes": 0,
+      "fsyncs": 0,
+      "reads": 102,
+      "readBytes": 7666257,
+      "fsyncMs": 0,
+      "installed": 0,
+      "updated": 0,
+      "failed": 0
+    },
+    {
+      "ms": 11.97,
+      "writes": 0,
+      "fsyncs": 0,
+      "reads": 102,
+      "readBytes": 7666257,
+      "fsyncMs": 0,
+      "installed": 0,
+      "updated": 0,
+      "failed": 0
+    },
+    {
+      "ms": 10.91,
+      "writes": 0,
+      "fsyncs": 0,
+      "reads": 102,
+      "readBytes": 7666257,
+      "fsyncMs": 0,
+      "installed": 0,
+      "updated": 0,
+      "failed": 0
+    }
+  ]
+}

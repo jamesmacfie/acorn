@@ -372,6 +372,18 @@ that wants one names that layout instead of nesting this node.
 
 ## Chrome and overlays
 
+Host floating UI uses body-level portals so it can draw above native pages through
+[the native overlay layer](./native-overlays.md). The kit retains its CSS stacking, anchoring,
+component props, and action ownership. It imports no native commands. Custom host floating markup
+must use a body portal and an inventoried class or `data-host-overlay` attribute. UI inside a
+plugin iframe remains confined to that frame.
+
+Modal focus containment includes anchored menus and pickers whose openers belong to the dialog.
+Escape dismisses the top anchored interaction once. While a modal covers a native page, the host
+isolates background DOM and the shell removes the page from native accessibility navigation.
+Passive tooltips retain pointer pass-through. Native page presses send dismissal notification to
+the host; AppKit delivers the original event to the page without synthesizing a second page click.
+
 A loaded plugin's `overlay` frame surface (`docs/plugins.md`) gets an explicit height from the host,
 not a `max-height`: the iframe inside sizes to 100% of its container, so a container sized by its own
 content would size to nothing. The same reasoning applies to a `refPanel` frame's iframe inside its

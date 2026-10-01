@@ -16,6 +16,8 @@ import { TEXT_NODE, isKitEvent } from '@acorn/protocol/tree/nodes.ts'
 type Attached = {
   push(op: TreeMutation): void
   handlerFor(fn: (payload: unknown) => void): number
+  retainHandler(fn: (payload: unknown) => void): void
+  releaseHandler(fn: (payload: unknown) => void): void
   /** The slot's own root node. Identity, not a type name: a plugin can create a node called `#root`
    *  and it must not become one. */
   isRoot(node: RemoteNode): boolean
@@ -145,15 +147,27 @@ const serialize = (root: Attached, node: RemoteNode): TreeNode => {
 }
 
 const attach = (node: RemoteNode, root: Attached | null): void => {
+  const previous = rootOf.get(node)
+  if (previous === root) return
+  for (const [name, value] of Object.entries(node.props)) {
+    if (!isKitEvent(name) || typeof value !== 'function') continue
+    previous?.releaseHandler(value as (payload: unknown) => void)
+    root?.retainHandler(value as (payload: unknown) => void)
+  }
   if (root) rootOf.set(node, root)
   else rootOf.delete(node)
   for (const child of node.children) attach(child, root)
 }
 
 export function setProperty(node: RemoteNode, name: string, value: unknown): void {
+  const previous = node.props[name]
   node.props[name] = value
   const root = rootOf.get(node)
   if (!root) return
+  if (isKitEvent(name) && previous !== value) {
+    if (typeof previous === 'function') root.releaseHandler(previous as (payload: unknown) => void)
+    if (typeof value === 'function') root.retainHandler(value as (payload: unknown) => void)
+  }
   const wire = wireValue(root, name, value)
   // `undefined` is a prop the sandbox unset. It crosses as null, because JSON drops the other one.
   root.push({ op: 'patch', id: node.id, props: { [name]: wire === undefined ? null : wire } })
@@ -169,17 +183,21 @@ export function insertNode(parent: RemoteNode, node: RemoteNode, anchor?: Remote
   const from = node.parent
   if (from) from.children.splice(from.children.indexOf(node), 1)
   parent.children.splice(index, 0, node)
-  const wasAttached = rootOf.has(node)
+  const previousRoot = rootOf.get(node)
   node.parent = parent
   const root = rootOf.get(parent)
-  if (wasAttached) {
+  if (previousRoot && previousRoot === root) {
     // Already on screen: the host moves the node it has rather than being sent a second copy of it.
     root?.push({ op: 'move', id: node.id, parent: wireParent(root, parent), index })
     return
   }
+  if (previousRoot) {
+    previousRoot.push({ op: 'remove', id: node.id })
+    attach(node, null)
+  }
   if (!root) return
-  const payload = serialize(root, node)
   attach(node, root)
+  const payload = serialize(root, node)
   root.push({ op: 'insert', parent: wireParent(root, parent), index, node: payload })
 }
 
@@ -206,6 +224,7 @@ export function createRemoteRoot(emit: (ops: TreeMutation[]) => void): RemoteRoo
   let handlerSeq = 0
   const handlers = new Map<number, (payload: unknown) => void>()
   const handlerIds = new WeakMap<object, number>()
+  const references = new Map<number, number>()
   let pending: TreeMutation[] = []
   let scheduled = false
   let disposed = false
@@ -235,13 +254,26 @@ export function createRemoteRoot(emit: (ops: TreeMutation[]) => void): RemoteRoo
     handlerFor: (fn) => {
       const existing = handlerIds.get(fn)
       if (existing !== undefined) {
-        handlers.set(existing, fn)
         return existing
       }
       const id = ++handlerSeq
       handlerIds.set(fn, id)
-      handlers.set(id, fn)
       return id
+    },
+    retainHandler: (fn) => {
+      const id = state.handlerFor(fn)
+      references.set(id, (references.get(id) ?? 0) + 1)
+      handlers.set(id, fn)
+    },
+    releaseHandler: (fn) => {
+      const id = handlerIds.get(fn)
+      if (id === undefined) return
+      const count = references.get(id) ?? 0
+      if (count > 1) references.set(id, count - 1)
+      else {
+        references.delete(id)
+        handlers.delete(id)
+      }
     },
   }
 
@@ -254,6 +286,7 @@ export function createRemoteRoot(emit: (ops: TreeMutation[]) => void): RemoteRoo
       disposed = true
       pending = []
       handlers.clear()
+      references.clear()
       attach(node, null)
     },
   }

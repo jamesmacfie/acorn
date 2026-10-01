@@ -1,0 +1,42 @@
+{
+  "fixture": "actual FileTree and Rows, synthetic listings, jsdom; no visible UI timing claims",
+  "observations": [
+    {
+      "files": 200,
+      "initial": {
+        "listingReads": 1,
+        "treeItems": 201,
+        "elements": 805,
+        "nodeCpuMs": 62.42,
+        "jsdomWallMs": 67.06729099999995
+      },
+      "expanded": {
+        "treeItems": 202,
+        "firstRowRetained": true
+      },
+      "returned": {
+        "listingReads": 2,
+        "newRootFileVisible": false
+      }
+    },
+    {
+      "files": 2000,
+      "initial": {
+        "listingReads": 1,
+        "treeItems": 2001,
+        "elements": 8005,
+        "nodeCpuMs": 476.362,
+        "jsdomWallMs": 248.51070800000002
+      },
+      "expanded": {
+        "treeItems": 2002,
+        "firstRowRetained": true
+      },
+      "returned": {
+        "listingReads": 2,
+        "newRootFileVisible": false
+      }
+    }
+  ],
+  "expected": "Wide directory row DOM remains bounded by viewport; normal worktree invalidation revalidates affected mounted tree listings while retaining expansion/selection."
+}

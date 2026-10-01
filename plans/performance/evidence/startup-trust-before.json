@@ -1,0 +1,52 @@
+[
+  {
+    "version": "1",
+    "ms": 88.1,
+    "writes": 21,
+    "fsyncs": 14,
+    "fsyncMs": 61.5,
+    "reads": 15,
+    "readBytes": 774480,
+    "accepted": 7
+  },
+  {
+    "version": "1",
+    "ms": 4.32,
+    "writes": 0,
+    "fsyncs": 0,
+    "fsyncMs": 0,
+    "reads": 15,
+    "readBytes": 774480,
+    "accepted": 7
+  },
+  {
+    "version": "1",
+    "ms": 2.77,
+    "writes": 0,
+    "fsyncs": 0,
+    "fsyncMs": 0,
+    "reads": 15,
+    "readBytes": 774480,
+    "accepted": 7
+  },
+  {
+    "version": "2",
+    "ms": 35.75,
+    "writes": 7,
+    "fsyncs": 7,
+    "fsyncMs": 30.91,
+    "reads": 15,
+    "readBytes": 774480,
+    "accepted": 7
+  },
+  {
+    "version": "2",
+    "ms": 2.72,
+    "writes": 0,
+    "fsyncs": 0,
+    "fsyncMs": 0,
+    "reads": 15,
+    "readBytes": 774480,
+    "accepted": 7
+  }
+]

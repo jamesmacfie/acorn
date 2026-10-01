@@ -22,6 +22,15 @@ port.postMessage(
       // A second route that has nothing to do with the first. It must answer while `slow` is still
       // waiting.
       quick: async () => 'quick',
+      request: async (request: Request, context?: { providers: { withConnections(id: string, visit: () => Promise<unknown>): Promise<unknown> } }) => {
+        if (new URL(request.url).pathname === '/nested') {
+          await context!.providers.withConnections('fixture', () => new Promise((resolve) => {
+            if (request.signal.aborted) resolve(request.signal.reason)
+            else request.signal.addEventListener('abort', () => resolve(request.signal.reason), { once: true })
+          }))
+        }
+        return Response.json({ aborted: request.signal.aborted, name: request.signal.reason?.name, message: request.signal.reason?.message })
+      },
     },
     'plugin',
   ),

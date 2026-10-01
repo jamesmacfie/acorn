@@ -1,0 +1,9 @@
+{
+  "scheduled": 1,
+  "afterClear": 1,
+  "afterDeadline": 0,
+  "writes": [
+    "\u001b[200~synthetic\u001b[201~",
+    "\r"
+  ]
+}

@@ -334,7 +334,7 @@ function resolveRequires(
 function dropPlugin(loaded: LoadedPlugin[], installed: InstalledPlugin[], id: string): void {
   const loadedAt = loaded.findIndex((entry) => entry.manifest.id === id)
   if (loadedAt >= 0) {
-    disposeUnstartedPlugin(loaded[loadedAt].plugin)
+    void disposeUnstartedPlugin(loaded[loadedAt].plugin)
     loaded.splice(loadedAt, 1)
   }
   const installedAt = installed.findIndex((entry) => entry.manifest.id === id)

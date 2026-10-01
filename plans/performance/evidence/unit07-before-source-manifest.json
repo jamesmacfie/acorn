@@ -1,0 +1,34 @@
+[
+  {
+    "path": "plugins/terminal/src/server/terminalUtils.ts",
+    "sha256": "4943fe448f2434103639f905d339fe82a31487364dcc867134d8dbe1d612b99a"
+  },
+  {
+    "path": "plugins/terminal/src/server/terminalDisplay.ts",
+    "sha256": "599187c60d4efa0b5aadfda6bd2536e0218299e84b16dd70f255aa0a4e2d2919"
+  },
+  {
+    "path": "plugins/terminal/src/server/runtime.ts",
+    "sha256": "1f275e4ce1f93475aeaaad661297e41b45198c2ce8fa9588f055777ecc4dad91"
+  },
+  {
+    "path": "plugins/terminal/src/server/terminal.ts",
+    "sha256": "cddf0b6ddba0bed9fea48f977d70b6ddc0aeb61bb18bdd9dcbfdc4f2763089a2"
+  },
+  {
+    "path": "plugins/terminal/src/server/runChannel.ts",
+    "sha256": "8aa1cd43f87409063eb4bb545e2b7f71ed031d0cf61624504110c46f816649d9"
+  },
+  {
+    "path": "plans/performance/04-node-probe.mjs",
+    "sha256": "fe2d85042e25ab12955acb093946ac3db35cb31066cdec5d8f526786edaa9be8"
+  },
+  {
+    "path": "plans/performance/04-engine-probe.test.ts",
+    "sha256": "139dd05e80bfcbff5a396230e9fe5ee05dd3e057978bb0752680192cb62c1d92"
+  },
+  {
+    "path": "plans/performance/04-probe.config.ts",
+    "sha256": "869ff2a65bb987c97c61d965a6134337f10388a99ed3b6adb13dd13f82457a61"
+  }
+]

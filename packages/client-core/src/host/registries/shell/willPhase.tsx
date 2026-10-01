@@ -1,3 +1,4 @@
+import { Portal } from 'solid-js/web'
 import { createSignal, For, Show } from 'solid-js'
 import { createDismissable } from '../../../kit/lib/controls/dismissable'
 import { collectConcerns, type Concern, DETAILS_MAX, type WillEventMap } from './willPhaseModel'
@@ -111,6 +112,7 @@ export function WillConfirmationHost() {
   const dismiss = createDismissable({ onDismiss: () => finish(false), container: () => dialog })
   const dangerous = (current: Prompt) => !!current.danger || current.concerns.some((concern) => concern.severity === 'danger')
   return (
+    <Portal>
     <Show when={prompt()} keyed>
       {(current) => (
         <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>
@@ -165,5 +167,6 @@ export function WillConfirmationHost() {
         </div>
       )}
     </Show>
+    </Portal>
   )
 }

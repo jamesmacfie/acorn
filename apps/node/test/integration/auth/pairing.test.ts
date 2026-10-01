@@ -76,14 +76,14 @@ const pairDevice = async (name = 'laptop'): Promise<PairResult> => {
 }
 
 describe('GET /v1/node', () => {
-  it('exposes only baseline, protocol version, and fingerprint when unauthenticated', async () => {
+  it('exposes baseline, protocol, fingerprint, and transport capability when unauthenticated', async () => {
     const res = await send('/v1/node')
     expect(res.status).toBe(200)
     const info = (await res.json()) as NodeInfo
     // Key-exact, not a subset match: the point of this route is what it does not say to anything
     // that can reach the port.
-    expect(Object.keys(info).sort()).toEqual(['baseline', 'fingerprint', 'protocolVersion'])
-    expect(info).toEqual({ baseline: ACORN_BASELINE, protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: FINGERPRINT })
+    expect(Object.keys(info).sort()).toEqual(['baseline', 'eventTransport', 'fingerprint', 'protocolVersion'])
+    expect(info).toEqual({ baseline: ACORN_BASELINE, protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: FINGERPRINT, eventTransport: { viewers: 1 } })
   })
 
   it('adds the node identity once authenticated, and nothing else', async () => {
@@ -92,7 +92,7 @@ describe('GET /v1/node', () => {
     // `toEqual`, not `toMatchObject`, and that is the assertion: this response must stay readable by
     // every client forever (docs/api-reference.md § Versioning), so the bar for a field on it is a
     // consumer. `appVersion` used to ride along here with no reader anywhere and was dropped.
-    expect(info).toEqual({ baseline: ACORN_BASELINE, protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: FINGERPRINT, nodeId: NODE_ID })
+    expect(info).toEqual({ baseline: ACORN_BASELINE, protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: FINGERPRINT, nodeId: NODE_ID, eventTransport: { viewers: 1 } })
   })
 })
 

@@ -1,0 +1,23 @@
+{
+  "fixture": "Actual wrapLines with a single ASCII word at 80 cells; complete contents retained",
+  "cases": [
+    {
+      "length": 10000,
+      "lines": 125,
+      "wallMs": 0.8107920000002196,
+      "cpuMs": 0.889
+    },
+    {
+      "length": 100000,
+      "lines": 1250,
+      "wallMs": 43.72987499999999,
+      "cpuMs": 43.772
+    },
+    {
+      "length": 1000000,
+      "lines": 12500,
+      "wallMs": 4213.876292,
+      "cpuMs": 4219.225
+    }
+  ]
+}

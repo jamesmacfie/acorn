@@ -40,6 +40,20 @@ export type WsServerFrame = WsFrame
 // of an invalidation channel with no replay.
 export type WsServerWireFrame = WsServerFrame & { seq: number }
 
+// Optional transport ownership, advertised by GET /v1/node and requested at upgrade. Payloads remain
+// channel-owned. Non-opted-in peers continue using raw frames and the original binary layout.
+export const WS_VIEWERS_HEADER = 'x-acorn-viewers'
+export const WS_MAX_VIEWERS = 128
+export const wsViewerIdSchema = z.string().uuid()
+export const wsViewerFrameSchema = z.strictObject({ channel: z.literal('ws:viewer'), viewerId: wsViewerIdSchema, frame: wsFrameSchema })
+export const wsViewerCloseSchema = z.strictObject({ channel: z.literal('ws:viewer-close'), viewerId: wsViewerIdSchema })
+
+// A channel owner declares disposable subscription state outside its opaque payload. Commands carry
+// no hint and form FIFO barriers. Custody never identifies a subscription by parsing plugin frames.
+export const wsSubscriptionIntentSchema = z.strictObject({ key: z.string().min(1).max(512), state: z.enum(['attached', 'detached']) })
+export type WsSubscriptionIntent = z.infer<typeof wsSubscriptionIntentSchema>
+export type WsSendOptions = { intent?: WsSubscriptionIntent; cleanup?: boolean }
+
 // ── The one binary frame ──────────────────────────────────────────────────────────────────────────
 //
 // Everything above is JSON. Terminal output is not, because it is the one channel measured in frames
@@ -51,9 +65,9 @@ export type WsServerWireFrame = WsServerFrame & { seq: number }
 // refuses anything else so a caller falls back to its JSON frame instead of writing a frame nobody
 // can read.
 //
-// It nests once. The node tags the session id; the desktop helper tags the node id around what the
-// node sent and forwards the inside untouched, so the format is written down once and the broker in
-// the middle never looks in.
+// The node tags the session id. On an opted-in events socket it adds the logical viewer id around
+// that frame; the broker removes that routing layer. The helper then tags the node id around the
+// unchanged session frame. Legacy Node peers always retain the original session-id layout.
 //
 // A binary frame carries no `seq` and consumes none. The sequence is the invalidation channel's
 // gap detector (`WsServerWireFrame` above), and terminal output has never been part of it.

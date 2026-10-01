@@ -1,0 +1,13 @@
+{
+  "eventTriggers": 30,
+  "initialTriggers": 1,
+  "beforeRelease": {
+    "calls": 31,
+    "active": 31,
+    "peak": 31
+  },
+  "afterRelease": {
+    "active": 0
+  },
+  "expected": "One active run per schedule; intervening refresh edges mark a pending follow-up, which stops after disposal and respects document visibility."
+}

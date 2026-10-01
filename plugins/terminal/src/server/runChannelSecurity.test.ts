@@ -34,7 +34,7 @@ describe('run-channel snapshot trust integration', () => {
       const startSession = vi.fn(async () => 'session')
       service = createRuntimeService(core, {
         startSession, isRunning: () => false, onExit: () => () => {},
-        exitCode: () => undefined, killSession: vi.fn(),
+        exitCode: () => undefined, killSession: vi.fn(), retireSession: vi.fn(),
       })
       await expect(service[operation]('task', 'dev')).rejects.toMatchObject({ code: 'needs-trust' })
       expect(startSession).not.toHaveBeenCalled()

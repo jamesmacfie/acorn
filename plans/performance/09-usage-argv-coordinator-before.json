@@ -1,0 +1,14 @@
+{
+  "calls": [
+    {
+      "command": "claude",
+      "args": [
+        "/usage",
+        "--allowed-tools",
+        ""
+      ],
+      "promptResponses": 5
+    }
+  ],
+  "providerExecuted": false
+}

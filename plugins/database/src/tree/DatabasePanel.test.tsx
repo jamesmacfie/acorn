@@ -26,7 +26,7 @@ const runQuery = vi.fn()
 const readScratch = vi.fn(async () => 'SELECT generated;')
 let saved: () => Promise<DbSavedQuery[]> = async () => queries
 
-vi.mock('./databaseClient', () => ({ databaseClient: () => ({
+vi.mock('./databaseClient', () => ({ createDatabaseClient: () => ({
   connectDb: async () => ({ ok: true, database: 'dev' }),
   disconnectDb: async () => ({ ok: true }),
   listTables: async () => ({ tables: [] }),

@@ -1,0 +1,38 @@
+{
+  "runtime": "v24.11.0",
+  "owner": "actual HTTP model/decode, synthetic API",
+  "records": [
+    {
+      "name": "late-response",
+      "currentDraftUrl": "https://b.invalid/",
+      "responseUrl": "https://a.invalid/",
+      "expected": "A response must remain bound to its sending draft/selection rather than attach to a newly selected request."
+    },
+    {
+      "name": "subject-node-key",
+      "reusedModelAcrossNodes": true,
+      "secondUrl": "https://a.invalid/",
+      "note": "Module-level characterization only; actual warmed worker reuse belongs to area16."
+    },
+    {
+      "name": "decode-body",
+      "bytes": 1048576,
+      "elapsedMs": 46.65616699999998,
+      "cpuMs": 47.696,
+      "decodedBytes": 1048576,
+      "textCharacters": 1048576,
+      "heapDeltaBytes": 37246456,
+      "note": "Node/V8 and jsdom atob, not native WebKit. Heap is sampled transient allocation, not a leak."
+    },
+    {
+      "name": "decode-body",
+      "bytes": 5242880,
+      "elapsedMs": 236.05441699999994,
+      "cpuMs": 237.241,
+      "decodedBytes": 5242880,
+      "textCharacters": 5242880,
+      "heapDeltaBytes": 134936176,
+      "note": "Node/V8 and jsdom atob, not native WebKit. Heap is sampled transient allocation, not a leak."
+    }
+  ]
+}

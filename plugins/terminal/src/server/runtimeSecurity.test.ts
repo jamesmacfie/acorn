@@ -20,6 +20,7 @@ function fixture() {
     isRunning: () => true,
     exitCode: () => undefined,
     killSession: vi.fn(),
+    retireSession: vi.fn(),
   }
   return {
     deps, startSession, runScript, authorizeRepoConfig,

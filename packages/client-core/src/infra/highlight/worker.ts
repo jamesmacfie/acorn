@@ -7,6 +7,7 @@ import { getHighlighter } from './shiki'
 import { langFor } from './langs'
 import type { HighlightLines, HighlightRequest, HighlightResponse } from './messages'
 import { createLogger } from '../telemetry/logger'
+import { createDocumentWorker } from './documentWorker'
 import { registerPageFact } from '../telemetry/pageFacts'
 
 const log = createLogger('highlight')
@@ -16,74 +17,18 @@ export type TokenizeDocument = (path: string, code: string) => Promise<Highlight
 
 const plain = (code: string): HighlightLines => code.split('\n').map((line) => [{ content: line, light: '', dark: '' }])
 
-// docs/diff-rendering.md § Syntax highlighting covers why this is generous: a backstop, not a
-// budget.
-const TOKENIZE_TIMEOUT_MS = 10_000
-
-type Pending = { resolve: (lines: HighlightLines) => void }
-
-// See docs/diff-rendering.md § Syntax highlighting for the cold/live/dead state machine.
-let state: 'cold' | 'live' | 'dead' = 'cold'
-let worker: Worker | null = null
-let nextId = 1
-const pending = new Map<number, Pending>()
-registerPageFact('ui.page.workers.highlight', () => (worker ? 1 : 0))
-
-const failAll = () => {
-  for (const [, p] of pending) p.resolve([])
-  pending.clear()
-}
-
-const kill = (why: string) => {
-  if (state !== 'dead') {
-    // Logs loudly: see docs/diff-rendering.md § Syntax highlighting for the silent failure this
-    // replaces.
-    log.error(`worker unavailable, falling back to the main thread: ${why}`)
-  }
-  state = 'dead'
-  worker?.terminate()
-  worker = null
-  failAll()
-}
-
-async function spawn(): Promise<Worker | null> {
-  if (state === 'dead') return null
-  if (worker) return worker
-  // No Worker at all: a node-environment test, which is all of them (docs § vitest runs in node).
-  if (typeof Worker === 'undefined') {
-    state = 'dead'
-    return null
-  }
-  try {
-    // Dynamic, not static: a top-level `?worker` import makes this module unloadable in the node test
-    // environment, and this module sits under the diff model that several plugin tests do load.
-    const { default: HighlightWorker } = await import('./highlighter.worker?worker')
-    const spawned = new HighlightWorker()
-    spawned.onmessage = (event: MessageEvent<HighlightResponse>) => {
-      const message = event.data
-      const entry = pending.get(message.id)
-      if (!entry) return
-      pending.delete(message.id)
-      if (message.queueMs !== undefined) recordDuration('core', 'highlight.queue.wait', message.queueMs)
-      if (message.executionMs !== undefined) recordDuration('core', 'highlight.worker.execute', message.executionMs)
-      recordSample('core', 'highlight.result', 1, '1', { outcome: message.ok ? 'worker' : 'grammar-error' })
-      if (message.ok) {
-        state = 'live'
-        entry.resolve(message.lines)
-        return
-      }
-      // A per-document failure (bad grammar, rejected pattern) is not a dead worker: resolve this
-      // one empty and let the caller fall back for that document only.
-      entry.resolve([])
-    }
-    spawned.onerror = () => kill('worker script failed to load or run')
-    worker = spawned
-    return spawned
-  } catch (error) {
-    kill(String((error as Error)?.message ?? error))
-    return null
-  }
-}
+const owner = createDocumentWorker<HighlightRequest, HighlightResponse, HighlightLines>({
+  load: () => import('./highlighter.worker?worker'),
+  response: (message) => {
+    if (message.queueMs !== undefined) recordDuration('core', 'highlight.queue.wait', message.queueMs)
+    if (message.executionMs !== undefined) recordDuration('core', 'highlight.worker.execute', message.executionMs)
+    recordSample('core', 'highlight.result', 1, '1', { outcome: message.ok ? 'worker' : 'grammar-error' })
+    return message.ok ? { kind: 'value', value: message.lines } : { kind: 'fallback' }
+  },
+  unavailable: (reason) => log.error(`worker unavailable, falling back to the main thread: ${reason}`),
+  timeout: () => recordSample('core', 'highlight.timeout', 1),
+  pending: (count) => recordSample('core', 'highlight.pending', count),
+})
 
 /**
  * Tokenize on the main thread. The fallback, not the path: it uses the JavaScript regex engine (the
@@ -126,43 +71,23 @@ export async function highlightDocument(path: string, code: string): Promise<Hig
     const lines = await measure('core', 'highlight.main_thread', () => onMainThread(path, code))
     return { lines, timedOut: reason === 'timeout' }
   }
-  const w = await spawn()
-  if (!w) return fallback('unavailable')
-  const id = nextId++
-  const request: HighlightRequest = { id, lang, code, ...(telemetryEnabled() ? { sentAt: performance.timeOrigin + performance.now() } : {}) }
-  let timedOut = false
-  recordSample('core', 'highlight.pending', pending.size + 1)
-  const lines = await new Promise<HighlightLines>((resolve) => {
-    // A TextMate grammar is a regex program, and a regex program can backtrack catastrophically. The
-    // worker cannot block the UI, but a request that never comes back would leave a diff file showing
-    // its loading row forever, so give up on it and let the caller render plain text instead.
-    const timer = setTimeout(() => {
-      pending.delete(id)
-      timedOut = true
-      recordSample('core', 'highlight.timeout', 1)
-      resolve([])
-    }, TOKENIZE_TIMEOUT_MS)
-    pending.set(id, {
-      resolve: (result) => {
-        clearTimeout(timer)
-        resolve(result)
-      },
-    })
-    w.postMessage(request)
-  })
-  // Empty means the worker could not do it (see onmessage). Fall back for this document.
-  if (lines.length === 0 && code.length > 0) return fallback(timedOut ? 'timeout' : 'empty-result')
+  const result = await owner.request((id) => ({
+    id, lang, code, ...(telemetryEnabled() ? { sentAt: performance.timeOrigin + performance.now() } : {}),
+  }))
+  if (result.kind === 'degraded') {
+    recordSample('core', 'highlight.fallback', 1, '1', { reason: 'retired' })
+    return { lines: plain(code), timedOut: true }
+  }
+  if (result.kind === 'fallback') return fallback('unavailable')
+  const lines = result.value
+  if (lines.length === 0 && code.length > 0) return fallback('empty-result')
   recordSample('core', 'highlight.lines', lines.length)
   return { lines, timedOut: false }
 }
 
-/** Never rejects. A highlighter that degrades beats one that takes its surface down. */
-export const tokenizeDocument: TokenizeDocument = async (path, code) => (await highlightDocument(path, code)).lines
+/** Tests only: settle and retire this generation before trying a fresh worker. */
+export const resetHighlightWorker = owner.reset
 
-/** Tests only: forget the worker so the next call re-evaluates the environment. */
-export const resetHighlightWorker = () => {
-  worker?.terminate()
-  worker = null
-  state = 'cold'
-  pending.clear()
-}
+registerPageFact('ui.page.workers.highlight', owner.workerCount)
+
+export const tokenizeDocument: TokenizeDocument = async (path, code) => (await highlightDocument(path, code)).lines

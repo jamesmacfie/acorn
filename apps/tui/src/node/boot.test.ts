@@ -3,11 +3,11 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { QueryClient } from '@tanstack/solid-query'
-import { persistQueryClient, persistQueryClientRestore } from '@tanstack/query-persist-client-core'
+import { persistQueryClientRestore } from '@tanstack/query-persist-client-core'
 import { lockedBy } from '@acorn/node-core/server/storage'
 import { LOCAL_TOKEN_SCOPE } from '@acorn/custody/custody/deviceTokenStore.ts'
 import { cacheKeyFor, clientFor, setCacheStorage } from '@acorn/client-core/infra/node/fleet.ts'
-import { PERSISTED_SNAPSHOT_MAX_AGE_MS, shouldPersistQuery } from '@acorn/client-core/infra/persistence/queryPersistence.ts'
+import { PERSISTED_SNAPSHOT_MAX_AGE_MS } from '@acorn/client-core/infra/persistence/queryPersistence.ts'
 import { tasksKey, type Task } from '@acorn/protocol/api.ts'
 import { custody, openNode, type OpenedNode } from './open'
 import { fileCacheStorage } from './cache'
@@ -132,37 +132,35 @@ describe('acorn against a node it started', () => {
   it('writes one cache file named by the partition key, and reads the rows back out of it', async () => {
     const cacheDir = join(root, 'config', 'cache')
     setCacheStorage(fileCacheStorage(cacheDir))
-    const { client, persister } = clientFor(opened.nodeId)
-    const [, restored] = persistQueryClient({
-      queryClient: client,
-      persister,
-      maxAge: PERSISTED_SNAPSHOT_MAX_AGE_MS,
-      dehydrateOptions: { shouldDehydrateQuery: shouldPersistQuery },
-    })
-    await restored
+    const { client, persister, persistence } = clientFor(opened.nodeId)
+    const lease = persistence.acquire()
+    await lease.restored
+    try {
 
-    const rows: Task[] = [{
-      id: 'task-persisted', title: 'from the cache', projectId: 'project-1', branch: 'from-the-cache',
-      origin: 'local', icon: null, status: 'active', links: [], parentId: null, sort: 0,
-      github: null, worktreePath: null, pullNumber: null,
-    }]
-    client.setQueryData(tasksKey, rows)
-    // Waited on by content rather than by existence. The persister writes on every cache event and
-    // throttles to one write every five seconds, so the first file on disk may be the empty snapshot
-    // it took while restoring.
-    const written = join(cacheDir, `${encodeURIComponent(cacheKeyFor(opened.nodeId))}.json`)
-    await waitFor(() => existsSync(written) && readFileSync(written, 'utf8').includes('task-persisted'), 'the rows to be persisted')
+      const rows: Task[] = [{
+        id: 'task-persisted', title: 'from the cache', projectId: 'project-1', branch: 'from-the-cache',
+        origin: 'local', icon: null, status: 'active', links: [], parentId: null, sort: 0,
+        github: null, worktreePath: null, pullNumber: null,
+      }]
+      client.setQueryData(tasksKey, rows)
+      // Wait for the production capture clock to write the final rows, not only a filename.
+      const written = join(cacheDir, `${encodeURIComponent(cacheKeyFor(opened.nodeId))}.json`)
+      await waitFor(() => existsSync(written) && readFileSync(written, 'utf8').includes('task-persisted'), 'the rows to be persisted')
 
-    // One file, named by the partition key with the colon encoded. Node A's snapshot must never be
-    // able to rehydrate into node B, and the name is what makes that structural.
-    expect(readdirSync(cacheDir)).toEqual([`${encodeURIComponent(cacheKeyFor(opened.nodeId))}.json`])
+      // One file, named by the partition key with the colon encoded. Node A's snapshot must never be
+      // able to rehydrate into node B, and the name is what makes that structural.
+      expect(readdirSync(cacheDir)).toEqual([`${encodeURIComponent(cacheKeyFor(opened.nodeId))}.json`])
 
-    // …and a fresh client restores from that file with no node involved, which is what the next
-    // `acorn` does before it has heard from one. Not the same client: this asserts the file, not the
-    // memory it was dehydrated from.
-    const cold = new QueryClient()
-    await persistQueryClientRestore({ queryClient: cold, persister, maxAge: PERSISTED_SNAPSHOT_MAX_AGE_MS })
-    expect(cold.getQueryData(tasksKey)).toEqual(rows)
+      // …and a fresh client restores from that file with no node involved, which is what the next
+      // `acorn` does before it has heard from one. Not the same client: this asserts the file, not the
+      // memory it was dehydrated from.
+      const cold = new QueryClient()
+      await persistQueryClientRestore({ queryClient: cold, persister, maxAge: PERSISTED_SNAPSHOT_MAX_AGE_MS })
+      expect(cold.getQueryData(tasksKey)).toEqual(rows)
+    } finally {
+      lease.release()
+      await persistence.flush()
+    }
   }, 30_000)
 
   it('drains the node it started and releases the lock', async () => {

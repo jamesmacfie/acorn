@@ -1,0 +1,73 @@
+{
+  "fixture": "Actual desktop RemoteTree + workerHost + createFrameBridge + frameServices; Worker/MessageChannel transport and API seam faked, no native timings",
+  "snapshots": [
+    {
+      "phase": "both mounted, B has no document grant",
+      "read": {
+        "id": 1,
+        "ok": true,
+        "status": 200,
+        "body": {
+          "text": "document-a"
+        }
+      },
+      "state": {
+        "id": 2,
+        "ok": true,
+        "status": 200,
+        "body": "cache-a"
+      }
+    },
+    {
+      "phase": "B mounted API",
+      "requestNode": "node-a"
+    },
+    {
+      "phase": "first slot retired",
+      "bridgeClosed": false,
+      "read": {
+        "id": 4,
+        "ok": true,
+        "status": 200,
+        "body": {
+          "text": "document-a"
+        }
+      }
+    },
+    {
+      "phase": "B focused",
+      "navigation": {
+        "id": 5,
+        "ok": false,
+        "error": {
+          "code": "plugin_scope_denied",
+          "message": "openUrl works from a click or key handler: the frame must be focused",
+          "requestId": "",
+          "retryable": false
+        }
+      }
+    },
+    {
+      "phase": "after 100 warm remounts",
+      "read": {
+        "id": 7,
+        "ok": true,
+        "status": 200,
+        "body": {
+          "text": "written-after-a-retired"
+        }
+      },
+      "spawned": 1,
+      "ports": 4,
+      "terminated": 0
+    }
+  ],
+  "docs": {
+    "a": "written-after-a-retired",
+    "b": "document-b"
+  },
+  "final": {
+    "terminated": 1,
+    "closedPorts": 2
+  }
+}

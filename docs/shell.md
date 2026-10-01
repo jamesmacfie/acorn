@@ -47,6 +47,26 @@ The renderer talks to it over one loopback WebSocket, authenticated by a per-lau
 checked against the window's origin on upgrade. That socket is what Electron's preload and `ipcMain`
 pair used to be, and it carries the same vocabulary: `apps/desktop/src/shell/wire.ts` is the list.
 
+Each authenticated renderer socket owns a disposable UUID in `helper/rendererConnection.ts`. The
+renderer declares `node-interest` from authoritative selection, including its remembered initial
+selection and equivalent or cached switches. Only that Node's event payloads reach the socket;
+all-Node connection statuses still reach every renderer. Fleet reads, malformed requests, and cleanup
+addressed to a previous Node do not change interest. `null` is a fetch-only observer with no event
+lease. An old helper client that never declares interest retains wildcard forwarding. The renderer
+keeps its own Node filter as a second boundary.
+
+`node-fetch` request handles are namespaced by this socket UUID after validation. HTTP request and
+trace headers keep their original values. A renderer can abort only its own handles, and closing its
+socket aborts its pending reads without cancelling another renderer or a shared client query. Success,
+failure, and close release the registry. A late response is neither encoded nor sent after close.
+Caller cancellation remains status 499, deadlines remain `TimeoutError`, and transport failures retain
+their connection-health meaning. Pre-aborted client calls stop before body encoding or transport work.
+
+The helper's response codec uses a native Buffer view over the precise byte offset and length. Browser
+and renderer codecs remain Node-free. HTTP response assembly concatenates fragments once, then exposes
+a plain `Uint8Array` view of that allocation. Event JSON and Node-tagged bytes are encoded lazily for
+the first eligible open recipient and reused for other eligible sockets.
+
 The shell must not import plugin engines, database handles, or node source. Domain behaviour belongs
 in the node's own graph.
 
@@ -401,13 +421,15 @@ On Windows, Wry maps custom schemes to HTTP origins (`app://acorn` to `http://ap
 origins. A 64-character hash host has not been verified in WebView2; if that engine rejects the
 mapped hostname, the tree fails closed and cannot fall back to renderer-origin execution.
 
-The renderer's half is `packages/client-core/src/host/tree/`: `workerHost.ts` owns one worker per
-accepted `(pluginId, hash)`, shared by that identity's trees and stopped a grace period after the last
-unmount. Each mounted tree has a distinct slot and scoped bridge port, including its own focus,
-document, and selection context. `TreeHost.tsx` validates and applies each batch and is the only thing
-that turns a handler id into a function. A worker that misses two heartbeats is terminated and every
-tree it served is removed from the UI. The failure remains in the plugin diagnostics instead of
-replacing the contribution with an inline error.
+The renderer's half is `packages/client-core/src/host/tree/`: `workerHost.ts` shares one modern worker
+per accepted `(pluginId, hash)`, with a distinct bridge port, focus, document, and selection context
+for every mounted slot. Modern workers have a bounded idle grace pool. Legacy SDKs use one immutable
+slot-affine worker per mounted tree and terminate with its final lease.
+[Mounted bridge ownership](./plugins/descriptors.md#mounted-bridge-ownership-and-sdk-compatibility)
+defines compatibility, admission, and idle bounds. `TreeHost.tsx` validates and applies each batch and
+is the only thing that turns a handler id into a function. A worker that misses two heartbeats is
+terminated and every tree it served is removed from the UI. The failure remains in plugin diagnostics
+instead of replacing the contribution with an inline error.
 
 ### The renderer bridge
 
@@ -671,7 +693,9 @@ navigation state separate. The prefix and key shape are validated because they s
 A child webview under `Window::add_child` composites over the main one and takes logical bounds from
 the renderer's pane geometry. It does not inherit DOM overflow clipping, so the renderer intersects
 the host element with the viewport and every clipping ancestor before it sends those bounds. The
-child hides when no visible area remains or an overlay covers the pane. `incognito(true)` gives it
+child hides when no visible area remains. On macOS, the main renderer composites above the page
+through [the native overlay layer](./native-overlays.md). Other platforms and a disabled or failed
+layer use shared rectangle-overlap suppression. `incognito(true)` gives it
 its own ephemeral data store. Local-node preview is one kept-alive webview per task, restricted to
 HTTP and HTTPS URLs with no credentials, with an external chrome layer the renderer draws. Remote-node
 preview is unavailable: the native webview has no network-level policy for page subrequests, so a
@@ -869,9 +893,12 @@ That process is the pinned Node in both a checkout and a bundle, so there is one
 standalone node is distributed separately as a tarball; it is not an npm package
 (`docs/node-distribution.md`).
 
-`.github/workflows/build-desktop.yml` builds macOS Apple silicon and Windows x64 on a push to main
-and on a `v*` tag, plus manual dispatches. Both jobs run the boot test and the Rust suite before the bundler pass so a broken boot path fails in seconds
-rather than minutes. A tag builds and keeps its artifacts; publishing them is refused while the build
+`.github/workflows/build-desktop.yml` builds macOS Apple silicon and Windows x64 for a `v*` tag or a
+manual dispatch of `.github/workflows/ci.yml`, after that workflow's Linux job passes for the same
+commit. Ordinary pushes to main run the unsigned desktop tests instead and produce no installer. Both
+jobs build the bundle inputs once, run the boot test and the Rust suite against them before the
+bundler pass so a broken boot path fails in seconds rather than minutes, and package that same
+output. Artifacts are kept for one day, the repository's retention limit. A tag builds and keeps its artifacts; publishing them is refused while the build
 is ad-hoc signed.
 
 ### Windows test installer
@@ -909,8 +936,8 @@ those remain manual acceptance checks using the uploaded installer.
 Both GitHub Actions workflows grant the repository token only `contents: read`, and checkout does
 not persist its credentials. The jobs install, test, build, and upload run artifacts; they do not
 push repository changes or publish releases. Pull requests run the unsigned suites in
-`.github/workflows/ci.yml`. The desktop bundle workflow runs on main pushes, `v*` tags, and manual
-dispatches.
+`.github/workflows/ci.yml`, which also runs them on main pushes. The desktop bundle workflow runs
+only when `ci.yml` calls it for a `v*` tag or a manual dispatch.
 
 The bundle job passes `TAURI_SIGNING_PRIVATE_KEY` only to its required-key check and distribution
 step, and passes `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` only to distribution. Setup, dependency

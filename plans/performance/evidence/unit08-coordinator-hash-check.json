@@ -1,0 +1,368 @@
+{
+  "source": "plans/performance/evidence/unit08-final-source-manifest.json",
+  "manifestSha256": "b4ba05f4369daa844a82e15a7ba31afc18a39cab48933cb1e6e624d97aa940f0",
+  "entries": 60,
+  "allMatch": true,
+  "rows": [
+    {
+      "path": "packages/client-core/src/infra/highlight/documentWorker.ts",
+      "expected": "866d19c390b3fdefa96f3a8373a582b8fb23558cc71986889eb25d21067f7c7b",
+      "actual": "866d19c390b3fdefa96f3a8373a582b8fb23558cc71986889eb25d21067f7c7b",
+      "match": true
+    },
+    {
+      "path": "packages/client-core/src/infra/highlight/worker.ts",
+      "expected": "46ee620f3bbf7df36fede90fa6f9c5ea4cb3579d0d306285ce0e6d95e6e2dce5",
+      "actual": "46ee620f3bbf7df36fede90fa6f9c5ea4cb3579d0d306285ce0e6d95e6e2dce5",
+      "match": true
+    },
+    {
+      "path": "packages/client-core/src/infra/highlight/wordDiffWorker.ts",
+      "expected": "fa23c5e1a394fd322cde725e18cedf92c382441e41f16c40f244f2ba2f111b7d",
+      "actual": "fa23c5e1a394fd322cde725e18cedf92c382441e41f16c40f244f2ba2f111b7d",
+      "match": true
+    },
+    {
+      "path": "packages/client-core/src/infra/highlight/shiki.ts",
+      "expected": "461b0e83303d6c7193fa88a2971ee07c1105c0804e948701f5125f06312480f7",
+      "actual": "461b0e83303d6c7193fa88a2971ee07c1105c0804e948701f5125f06312480f7",
+      "match": true
+    },
+    {
+      "path": "packages/client-core/src/features/diff/DiffCanvas.tsx",
+      "expected": "f1c9b8a508e61f40514007c48697b2e3a07a30640c622ff573cde5db5e4ff810",
+      "actual": "f1c9b8a508e61f40514007c48697b2e3a07a30640c622ff573cde5db5e4ff810",
+      "match": true
+    },
+    {
+      "path": "packages/client-core/src/features/diff/DiffPane.tsx",
+      "expected": "f5797a8fb73b8ab5bd78e768709115cb8f2c8e5dda444eedfd387d98bde9fde6",
+      "actual": "f5797a8fb73b8ab5bd78e768709115cb8f2c8e5dda444eedfd387d98bde9fde6",
+      "match": true
+    },
+    {
+      "path": "packages/client-core/src/kit/diff/DiffRows.tsx",
+      "expected": "e9af890eca4134db365ebbf66e9d6ba8cf27626fcaceb61557b6e19e4fcccf2b",
+      "actual": "e9af890eca4134db365ebbf66e9d6ba8cf27626fcaceb61557b6e19e4fcccf2b",
+      "match": true
+    },
+    {
+      "path": "packages/client-core/src/kit/components/content/Markdown.tsx",
+      "expected": "5a3af18aa7e21ebe2315c989595a74652d4e7cbeac56dfb4cd065f154b213b0d",
+      "actual": "5a3af18aa7e21ebe2315c989595a74652d4e7cbeac56dfb4cd065f154b213b0d",
+      "match": true
+    },
+    {
+      "path": "packages/client-core/src/kit/keys/collectionIntents.ts",
+      "expected": "808cf0e703f6a02e67ce88eb416c92f3646e51c768b131ad4d7526ec5cf2c789",
+      "actual": "808cf0e703f6a02e67ce88eb416c92f3646e51c768b131ad4d7526ec5cf2c789",
+      "match": true
+    },
+    {
+      "path": "packages/client-core/src/features/diff/DiffCanvas.test.tsx",
+      "expected": "9194dfc5e573d6529dc1749b932f3853ba11924a2927e292defe31f9105c7856",
+      "actual": "9194dfc5e573d6529dc1749b932f3853ba11924a2927e292defe31f9105c7856",
+      "match": true
+    },
+    {
+      "path": "packages/client-core/src/features/diff/GapLifetime.test.tsx",
+      "expected": "176cc68961377f8ac6ae36b70b5551136256405ed12f5e97cbaeaaa82e3a3812",
+      "actual": "176cc68961377f8ac6ae36b70b5551136256405ed12f5e97cbaeaaa82e3a3812",
+      "match": true
+    },
+    {
+      "path": "packages/client-core/src/infra/highlight/documentWorker.test.ts",
+      "expected": "b5217bda4c08943eedd6f61044275481cb69c93fe4db56a1352b8407acd037a1",
+      "actual": "b5217bda4c08943eedd6f61044275481cb69c93fe4db56a1352b8407acd037a1",
+      "match": true
+    },
+    {
+      "path": "packages/client-core/src/infra/highlight/documentWorkerClients.test.tsx",
+      "expected": "18ab4ffd114d62f43ccbbe979a5bf1ecd433e3aa79dc3b9d6057d5392f669c91",
+      "actual": "18ab4ffd114d62f43ccbbe979a5bf1ecd433e3aa79dc3b9d6057d5392f669c91",
+      "match": true
+    },
+    {
+      "path": "packages/client-core/src/infra/highlight/htmlLifetime.test.ts",
+      "expected": "ad1c474f26d234c9886b8bf17a93bdd34180dbf9742746912ec87b7e4f853bca",
+      "actual": "ad1c474f26d234c9886b8bf17a93bdd34180dbf9742746912ec87b7e4f853bca",
+      "match": true
+    },
+    {
+      "path": "packages/client-core/src/kit/components/content/MarkdownLifetime.test.tsx",
+      "expected": "94791c2211ca68fda8968531e1daad968cfadcdb0e8887a1a9e52e30dc611dc2",
+      "actual": "94791c2211ca68fda8968531e1daad968cfadcdb0e8887a1a9e52e30dc611dc2",
+      "match": true
+    },
+    {
+      "path": "packages/client-core/src/kit/diff/lineSubmission.test.tsx",
+      "expected": "948226847ccd07fc88fbfcf30df0c28cf42e9a9e9665cff3eadd80495878b4e8",
+      "actual": "948226847ccd07fc88fbfcf30df0c28cf42e9a9e9665cff3eadd80495878b4e8",
+      "match": true
+    },
+    {
+      "path": "packages/client-core/src/kit/keys/collectionIntents.test.ts",
+      "expected": "f5eda3dae1ceb2d4a9922d400784941e3be8b8749a1b09ed05ba5102852be321",
+      "actual": "f5eda3dae1ceb2d4a9922d400784941e3be8b8749a1b09ed05ba5102852be321",
+      "match": true
+    },
+    {
+      "path": "plans/performance/unit08-probe.config.ts",
+      "expected": "9febc44c3510ba52445b40bdfb6a496af7f29062f5c572277a204bc014d56317",
+      "actual": "9febc44c3510ba52445b40bdfb6a496af7f29062f5c572277a204bc014d56317",
+      "match": true
+    },
+    {
+      "path": "plans/performance/unit08-ordinary-before.config.ts",
+      "expected": "088e8267223bd8a2e7824b1563c3b46a1c894ecf927ad16997d504c9f506080b",
+      "actual": "088e8267223bd8a2e7824b1563c3b46a1c894ecf927ad16997d504c9f506080b",
+      "match": true
+    },
+    {
+      "path": "plans/performance/10-worker-probe.test.tsx",
+      "expected": "a240dcb75b850bb8f71ef2a35009aa523b65237ad06d2653cfb7a142ffd1452c",
+      "actual": "a240dcb75b850bb8f71ef2a35009aa523b65237ad06d2653cfb7a142ffd1452c",
+      "match": true
+    },
+    {
+      "path": "plans/performance/10-canvas-probe.test.tsx",
+      "expected": "6db929227a667d5b8bfd96bb27efd234bacb8a1d55eea21fa5bc11131541983d",
+      "actual": "6db929227a667d5b8bfd96bb27efd234bacb8a1d55eea21fa5bc11131541983d",
+      "match": true
+    },
+    {
+      "path": "plans/performance/10-markdown-probe.test.tsx",
+      "expected": "21dc7eba409ef3ed198b72b0d6668ba9dc09981fd902381c7bef8fd3146750ec",
+      "actual": "21dc7eba409ef3ed198b72b0d6668ba9dc09981fd902381c7bef8fd3146750ec",
+      "match": true
+    },
+    {
+      "path": "plans/performance/10-gap-probe.test.tsx",
+      "expected": "b804646ab873dcf1fb1ee8d8fc7e99c4bd75bf32e93262d5626943504420a224",
+      "actual": "b804646ab873dcf1fb1ee8d8fc7e99c4bd75bf32e93262d5626943504420a224",
+      "match": true
+    },
+    {
+      "path": "plans/performance/10-runtime-probe.test.tsx",
+      "expected": "de3c7bc396f81c0b7fcc200b3a24ce650746c5cb8d99e4b57a1fb818b73001ed",
+      "actual": "de3c7bc396f81c0b7fcc200b3a24ce650746c5cb8d99e4b57a1fb818b73001ed",
+      "match": true
+    },
+    {
+      "path": "plans/performance/15-collection-probe.test.ts",
+      "expected": "d9e4ead88e3aeee35b4fc2e01315c4fe4022a16ab71a9204fc4cfa645546a15a",
+      "actual": "d9e4ead88e3aeee35b4fc2e01315c4fe4022a16ab71a9204fc4cfa645546a15a",
+      "match": true
+    },
+    {
+      "path": "plans/performance/15-probe.config.mts",
+      "expected": "41fc454e0403e5ebcb6cc1d267b1f67b80a4722c474e4caf5eb7868b6d80b3a1",
+      "actual": "41fc454e0403e5ebcb6cc1d267b1f67b80a4722c474e4caf5eb7868b6d80b3a1",
+      "match": true
+    },
+    {
+      "path": "docs/diff-rendering.md",
+      "expected": "4fe6798613e5d95b61104e2af827628077c48f76bdd38fd7da60ea6f8ed76694",
+      "actual": "4fe6798613e5d95b61104e2af827628077c48f76bdd38fd7da60ea6f8ed76694",
+      "match": true
+    },
+    {
+      "path": "plans/performance/implementation-08-diff-highlight.md",
+      "expected": "df8f14f202ae1157d13299a918dbbcea14f6d5f6749949e432dc6ad412e652c9",
+      "actual": "df8f14f202ae1157d13299a918dbbcea14f6d5f6749949e432dc6ad412e652c9",
+      "match": true
+    },
+    {
+      "path": "plans/performance/10-canvas-unit08-after-final.json",
+      "expected": "dd6385b496ce8259985e35ea4cdecd11a837f3b0cada1900c30367edf013cf6a",
+      "actual": "dd6385b496ce8259985e35ea4cdecd11a837f3b0cada1900c30367edf013cf6a",
+      "match": true
+    },
+    {
+      "path": "plans/performance/10-canvas-unit08-before.json",
+      "expected": "71ff4c1bc0e3e8fa9711a5a48ca76dc0bbbdaf71d532d65a901725bf0ef4384e",
+      "actual": "71ff4c1bc0e3e8fa9711a5a48ca76dc0bbbdaf71d532d65a901725bf0ef4384e",
+      "match": true
+    },
+    {
+      "path": "plans/performance/10-gaps-unit08-after-final.json",
+      "expected": "e190b0e1099b53d6375933a0c8bdcf363f8d411a97ac4697db7ad2956009ed5f",
+      "actual": "e190b0e1099b53d6375933a0c8bdcf363f8d411a97ac4697db7ad2956009ed5f",
+      "match": true
+    },
+    {
+      "path": "plans/performance/10-gaps-unit08-before.json",
+      "expected": "a24e69df3ebe8abd082720bd3b8f0f5f76a4c9da496ee71ddc2b27bcb68b2837",
+      "actual": "a24e69df3ebe8abd082720bd3b8f0f5f76a4c9da496ee71ddc2b27bcb68b2837",
+      "match": true
+    },
+    {
+      "path": "plans/performance/10-markdown-unit08-after-final.json",
+      "expected": "6de31b9fa4ed6b3fd0fce0ecb3772b5cbb39fdbdf4961113bdf9f0f793bed3b0",
+      "actual": "6de31b9fa4ed6b3fd0fce0ecb3772b5cbb39fdbdf4961113bdf9f0f793bed3b0",
+      "match": true
+    },
+    {
+      "path": "plans/performance/10-markdown-unit08-before.json",
+      "expected": "3e9a49a3c36648b507b010d35330246d24ced01719f0596223c8701772333f24",
+      "actual": "3e9a49a3c36648b507b010d35330246d24ced01719f0596223c8701772333f24",
+      "match": true
+    },
+    {
+      "path": "plans/performance/10-workers-unit08-after-final.json",
+      "expected": "123908b22ebf40a46ddb2a04eb0c90c04e5dd6274603599a2c7eb135797795e1",
+      "actual": "123908b22ebf40a46ddb2a04eb0c90c04e5dd6274603599a2c7eb135797795e1",
+      "match": true
+    },
+    {
+      "path": "plans/performance/10-workers-unit08-before.json",
+      "expected": "e522d72b3cca68d1215a0e6540e2f5e6439630a9ea3d0be2e18ff9fba7b9e3ae",
+      "actual": "e522d72b3cca68d1215a0e6540e2f5e6439630a9ea3d0be2e18ff9fba7b9e3ae",
+      "match": true
+    },
+    {
+      "path": "plans/performance/10-workers-unit08-ordinary-before.json",
+      "expected": "e64db14d95a19465250b274b2c2245b8e135ad6855462841dea543722fc0034d",
+      "actual": "e64db14d95a19465250b274b2c2245b8e135ad6855462841dea543722fc0034d",
+      "match": true
+    },
+    {
+      "path": "plans/performance/15-collection-unit08-after-final.json",
+      "expected": "7f8ed8762660172b0f67d4e1ff3ff9e9245fce0d5bb40b53cae60a7d50cb34e7",
+      "actual": "7f8ed8762660172b0f67d4e1ff3ff9e9245fce0d5bb40b53cae60a7d50cb34e7",
+      "match": true
+    },
+    {
+      "path": "plans/performance/15-collection-unit08-before.json",
+      "expected": "a3e09fa6e31a7c49a1db01796e0ec5ad11c4910b8645c7125a60ba18f1a6f522",
+      "actual": "a3e09fa6e31a7c49a1db01796e0ec5ad11c4910b8645c7125a60ba18f1a6f522",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-acknowledgement-source-delta.json",
+      "expected": "2da263e05464d0a0b158224f45100dc10398d637152c28789c2d7d305a537305",
+      "actual": "2da263e05464d0a0b158224f45100dc10398d637152c28789c2d7d305a537305",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-audit-probe-config.ts",
+      "expected": "8b1eb39f69d1fa15f6f561396adb5daaf63bba808a474e3aed74842ec4711e0b",
+      "actual": "8b1eb39f69d1fa15f6f561396adb5daaf63bba808a474e3aed74842ec4711e0b",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-before-canvas-probe.test.tsx",
+      "expected": "38878f4800f012129a00581ea4714391063835d269ff2fa25df2ef11125bd939",
+      "actual": "38878f4800f012129a00581ea4714391063835d269ff2fa25df2ef11125bd939",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-before-gap-probe.test.tsx",
+      "expected": "b7af4fc432f70fa20ade7c091560597069128b363060ed3e902deac819bd1734",
+      "actual": "b7af4fc432f70fa20ade7c091560597069128b363060ed3e902deac819bd1734",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-before-markdown-probe.test.tsx",
+      "expected": "df06cb401e224144723f477daf69efec02e7e7e2d2433f76920e9b86ade139e3",
+      "actual": "df06cb401e224144723f477daf69efec02e7e7e2d2433f76920e9b86ade139e3",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-before-reference-manifest-v2.json",
+      "expected": "08b118f6b04b815ca224b3e14af937ba23da9df4affa9b2392599979cda4344c",
+      "actual": "08b118f6b04b815ca224b3e14af937ba23da9df4affa9b2392599979cda4344c",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-before-source-manifest.json",
+      "expected": "5d2f3f6180bc2a72999f867fc554dc70bbeacb72ad9ce79d20134d24cc77a4d9",
+      "actual": "5d2f3f6180bc2a72999f867fc554dc70bbeacb72ad9ce79d20134d24cc77a4d9",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-before-worker-probe.test.tsx",
+      "expected": "9300558e9c19909fc15258407d3198cf0d11a22a0c9c88d94437a5757d0f99f7",
+      "actual": "9300558e9c19909fc15258407d3198cf0d11a22a0c9c88d94437a5757d0f99f7",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-measured-DiffPane-source.tsx",
+      "expected": "88b016ccab3ff9aca3880e2c703c9020a272ac4719805bcadf7caec3e60f70fd",
+      "actual": "88b016ccab3ff9aca3880e2c703c9020a272ac4719805bcadf7caec3e60f70fd",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-measured-DiffRows-source.tsx",
+      "expected": "88a12294941c34e00a83c02e9c434f23435a8a380fa4e4dd8a9ef2a1cba8f79f",
+      "actual": "88a12294941c34e00a83c02e9c434f23435a8a380fa4e4dd8a9ef2a1cba8f79f",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-provider-unit08-after-final.json",
+      "expected": "d15dc3602f67ad0777a445dc602986b40445e6d91def9d78d1843f836171d6bd",
+      "actual": "d15dc3602f67ad0777a445dc602986b40445e6d91def9d78d1843f836171d6bd",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-verification-architecture.log",
+      "expected": "d1f3567e5f4a27037413f9043641ebf17c45abb068587792502f1c7b409887c5",
+      "actual": "d1f3567e5f4a27037413f9043641ebf17c45abb068587792502f1c7b409887c5",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-verification-collection.log",
+      "expected": "7e244e4530efb439ed684824d0d0d7e3b661cad166886a48952b1483066fc34b",
+      "actual": "7e244e4530efb439ed684824d0d0d7e3b661cad166886a48952b1483066fc34b",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-verification-focused.log",
+      "expected": "79f81d59632996828fd297f364e73a93e46162d3171ebe97fa8f708c5f5502c6",
+      "actual": "79f81d59632996828fd297f364e73a93e46162d3171ebe97fa8f708c5f5502c6",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-verification-lint.log",
+      "expected": "07790319af8c0c5f2e2f45cbe35dea38755e4ce56eed69b12e7a60ad7555e94d",
+      "actual": "07790319af8c0c5f2e2f45cbe35dea38755e4ce56eed69b12e7a60ad7555e94d",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-verification-ordinary-before.log",
+      "expected": "5996e0b8d7ae8732834fe0bed735de424b6c5ddc5515bb7175c66d20ca06bab0",
+      "actual": "5996e0b8d7ae8732834fe0bed735de424b6c5ddc5515bb7175c66d20ca06bab0",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-verification-probes.log",
+      "expected": "74a05bef431d2ec51a5ee82b23b6bff0faf69d21d0524e1214b56646baa667d9",
+      "actual": "74a05bef431d2ec51a5ee82b23b6bff0faf69d21d0524e1214b56646baa667d9",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-verification-submit.log",
+      "expected": "6ffc02e4ec2c158e4c4e53b78400505c339ac01f1937427f1561e4d5da6fcc52",
+      "actual": "6ffc02e4ec2c158e4c4e53b78400505c339ac01f1937427f1561e4d5da6fcc52",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-verification-tui-diff.log",
+      "expected": "89e41159776e92631b131567b50a6563dbb5e9ad8f5ab750e63a549c6b83f011",
+      "actual": "89e41159776e92631b131567b50a6563dbb5e9ad8f5ab750e63a549c6b83f011",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-verification-tui.log",
+      "expected": "3f65fec33c1b6cd5e5226ef2508894ab67e1f2802b3b34c9f5a898c2460d8f46",
+      "actual": "3f65fec33c1b6cd5e5226ef2508894ab67e1f2802b3b34c9f5a898c2460d8f46",
+      "match": true
+    },
+    {
+      "path": "plans/performance/evidence/unit08-verification-types.log",
+      "expected": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "actual": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "match": true
+    }
+  ]
+}

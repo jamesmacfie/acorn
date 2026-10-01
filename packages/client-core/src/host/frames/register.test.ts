@@ -23,7 +23,7 @@ const { uiSlotRegistry } = await import('../registries/extensionPoints/slots')
 const { _resetPluginDistribution, _seedPluginDistribution } = await import('../plugins/distribution')
 const { surfaceFailures } = await import('../plugins/surfaceFailures')
 const { openPluginOverlay, closePluginOverlay } = await import('./overlays')
-const { exclusiveSlotOffers, exclusiveSlotRegistry, registerCoreExclusiveSlot, resolveExclusiveSlot } = await import('../registries/extensionPoints/exclusiveSlots')
+const { exclusiveSlotOffers, exclusiveSlotRegistry, registerCoreExclusiveSlot, resolveExclusiveSlot, noteExclusiveSlotFailure, exclusiveSlotFailed } = await import('../registries/extensionPoints/exclusiveSlots')
 const { _resetFrameContributions, frameBindingFor, syncFrameContributions } = await import('./register')
 
 // The frame host pass (docs/plugins.md § Frame contribution kind).
@@ -485,5 +485,61 @@ describe('frameBindingFor', () => {
     setActiveNode(null)
     // The browser-served `dev:node` mode, where the origin is the node.
     expect(frameBindingFor('board', declared.frames![0]!, board).nodeId).toBe('')
+  })
+})
+
+
+describe('unchanged declaration reconciliation', () => {
+  it('retains healthy contribution identity across equivalent roster and install metadata updates', () => {
+    const original = row('board', ALL_TARGETS)
+    seedTrusted(original)
+    syncFrameContributions()
+    const pane = paneRegistry.entries()[0]
+    const next = structuredClone(original)
+    Object.assign(next.installed!, { installedAt: 42, source: 'another-location', bundled: false })
+    next.installed!.client!.bytes = 999
+    seedTrusted(next)
+    syncFrameContributions()
+    expect(paneRegistry.entries()[0]).toBe(pane)
+    next.installed!.contributions.frames![0].label = 'Changed'
+    seedTrusted(next)
+    syncFrameContributions()
+    expect(paneRegistry.entries()[0]).not.toBe(pane)
+  })
+
+  it('retires all changed declarations before exchanged ids are registered', () => {
+    seedTrusted(row('first', { frames: [surface({ target: 'pane', id: 'one' })] }), row('second', { frames: [surface({ target: 'pane', id: 'two' })] }))
+    syncFrameContributions()
+    seedTrusted(row('first', { frames: [surface({ target: 'pane', id: 'two' })] }), row('second', { frames: [surface({ target: 'pane', id: 'one' })] }))
+    syncFrameContributions()
+    expect(ids().panes.sort()).toEqual(['one', 'two'])
+    expect(surfaceFailures().filter((failure) => failure.pluginId === 'first' || failure.pluginId === 'second')).toEqual([])
+  })
+
+  it('retries a collision after its former provider is removed without another roster change', () => {
+    const external = paneRegistry.register({ id: 'shared', label: 'External', glyph: 'puzzle', order: 0, component: () => null })
+    const second = row('second', { frames: [surface({ target: 'pane', id: 'shared' })] })
+    seedTrusted(second)
+    syncFrameContributions()
+    expect(surfaceFailures().some((failure) => failure.pluginId === 'second')).toBe(true)
+    external.dispose()
+    syncFrameContributions()
+    expect(ids().panes).toEqual(['shared'])
+    expect(surfaceFailures().filter((failure) => failure.pluginId === 'second')).toEqual([])
+  })
+
+  it('retries a rendered exclusive failure without replacing an unrelated healthy pane', () => {
+    const healthy = row('healthy', { frames: [surface({ target: 'pane', id: 'healthy' })] })
+    const provider = row('provider', { frames: [surface({ target: 'coreSlot', id: 'replacement', coreSlot: 'rail.taskList' })] })
+    seedTrusted(healthy, provider)
+    syncFrameContributions()
+    const pane = paneRegistry.entries()[0]
+    const offer = exclusiveSlotRegistry.entries()[0]
+    for (let attempt = 0; attempt < 3; attempt++) noteExclusiveSlotFailure('rail.taskList', 'provider')
+    expect(exclusiveSlotFailed('rail.taskList', 'provider')).toBe(true)
+    syncFrameContributions()
+    expect(exclusiveSlotFailed('rail.taskList', 'provider')).toBe(false)
+    expect(exclusiveSlotRegistry.entries()[0]).not.toBe(offer)
+    expect(paneRegistry.entries()[0]).toBe(pane)
   })
 })

@@ -126,6 +126,7 @@ acorn-plugin-sdk: member AcornBridge.telemetry.event
 acorn-plugin-sdk: member AcornBridge.telemetry.gauge
 acorn-plugin-sdk: member AcornBridge.telemetry.measure
 acorn-plugin-sdk: member AcornBridge.telemetry.startSpan
+acorn-plugin-sdk: member AcornBridge.treeBridgeMode
 acorn-plugin-sdk: member AcornBridge.ui
 acorn-plugin-sdk: member AcornBridge.ui.close
 acorn-plugin-sdk: member AcornBridge.ui.copy
@@ -148,6 +149,7 @@ acorn-plugin-sdk: member AcornBridgeError.retryable
 acorn-plugin-sdk: member PluginByteResponse.bytes
 acorn-plugin-sdk: member PluginByteResponse.filename
 acorn-plugin-sdk: member PluginByteResponse.type
+acorn-plugin-sdk: member PluginFrameContext.authority
 acorn-plugin-sdk: member PluginFrameContext.claimsKeys
 acorn-plugin-sdk: member PluginFrameContext.input
 acorn-plugin-sdk: member PluginFrameContext.item

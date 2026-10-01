@@ -383,6 +383,13 @@ contained failure at boot. The route answers **200 with `state: 'failed'`** for 
 request did nothing wrong and nothing was lost. Only on success does the host clear the previous
 registrations, run its `dispose`, close its database, revoke its context and replay the buffer.
 
+The host owns every candidate handed to reload. An unknown or disabled owner closes the unstarted
+realm. Initialization, registration replay, and ready failures dispose the initialized candidate,
+close its worker storage, terminate its realm, and revoke its registration context. Cleanup preserves
+the reported failure if the candidate's disposal also throws. Repeated disposal of an isolated
+candidate joins the same cleanup operation. An initialization failure leaves the preceding instance
+serving; a replay or ready failure follows the contained failure contract after commit begins.
+
 Four properties, all deliberate:
 
 - **A revoked context throws.** After a swap, anything reached through the previous instance's `ctx` —
