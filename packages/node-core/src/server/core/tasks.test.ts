@@ -219,6 +219,30 @@ describe('adoptPullNumbers project matching', () => {
 
   afterEach(() => t.cleanup())
 
+  it.each([
+    { pullNumber: 99 },
+    { branch: 'different' },
+    { status: 'archived' as const },
+  ])('preserves a task changed between adoption lookup and write: %j', async (patch) => {
+    await t.db.insert(schema.workspaces).values({ id: 'workspace', name: 'Workspace', isDefault: true, sort: 0, createdAt: 1, updatedAt: 1 })
+    await t.db.insert(schema.projects).values({
+      id: 'project', name: 'widget', workspaceId: 'workspace', sort: 0, hidden: false,
+      githubOwner: 'acme', githubName: 'widget', createdAt: 1, updatedAt: 1,
+    })
+    await t.db.insert(schema.tasks).values({
+      id: 'task', title: 'Task', origin: 'local', projectId: 'project', branch: 'feature',
+      status: 'active', sort: 0, createdAt: 1, updatedAt: 1,
+    })
+    const batch = t.db.batch.bind(t.db)
+    vi.spyOn(t.db, 'batch').mockImplementationOnce(async (statements) => {
+      await t.db.update(schema.tasks).set(patch).where(eq(schema.tasks.id, 'task'))
+      return batch(statements)
+    })
+    expect(await createTaskService(t.db).adoptPullNumbers('acme', 'widget', new Map([['feature', 42]]))).toBe(0)
+    const [task] = await t.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'task'))
+    expect(task).toMatchObject({ ...patch, pullNumber: 'pullNumber' in patch ? patch.pullNumber : null })
+  })
+
   it('adopts the same PR number across every matching project clone', async () => {
     const now = Date.now()
     await t.db.insert(schema.workspaces).values({ id: 'workspace-github', name: 'GitHub', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
