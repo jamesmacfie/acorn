@@ -49,7 +49,7 @@ to change, and is deferred (see [deferred.md](../deferred.md)).
 
 The plan's overrules: rows 709 and 712 use "No agent is running for this task."; rows 710 and 711 say
 "send" throughout. `ContextPane.tsx:126`'s "⚠" is [08-24](./08-24-smaller-defects.md) item d.
-`:155` ("Assembling…") is done by [08-15](../b08a-changes-and-diff/08-15-changes-states.md).
+`:155` ("Assembling…") is done by 08-15 (shipped in B08a).
 
 ## What earlier batches give you
 

@@ -42,8 +42,8 @@ makes the toast deliberate), so the toast stays (plan decision 14; see [deferred
 
 Held: `notesModel.ts:183`'s "Note saved" toast waits with the toast decision. `NotesPane.tsx:61`'s
 delete is already **Delete note?** (K1a). `:142` is done by
-[08-15](../b08a-changes-and-diff/08-15-changes-states.md). The include box's tip is
-[08-11](../b08a-changes-and-diff/08-11-checkboxes.md)'s.
+08-15 (shipped in B08a). The include box's tip is
+08-11 (shipped in B08a)'s.
 
 ## Risk and checks
 

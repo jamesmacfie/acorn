@@ -1,8 +1,8 @@
 # UI consistency: the rest of the pass
 
-**Status:** in progress. Fourteen of twenty-one batches shipped: eleven on branch `ui-inconsistency`,
-and B06, B07a, and B07b on branch `more-ui`, merged to main. Six area batches and the final sweep
-remain. Written 2026-10-01.
+**Status:** in progress. Fifteen of twenty-one batches shipped: eleven on branch `ui-inconsistency`,
+B06, B07a, and B07b on branch `more-ui`, merged to main, and B08a on `more-ui`, committed and not yet merged. Five area
+batches and the final sweep remain. Written 2026-10-01.
 Line numbers in these files are from 2026-10-01 and may have moved.
 
 This programme is a UX and UI consistency pass over the acorn desktop app. The worry behind it was that
@@ -144,25 +144,20 @@ a status word, and an age. Publish lists by name, schedule's timezone is a filte
 authoring has a footer with **Send**, and `GenerateModal.tsx` is gone. Record history folds its
 provenance, and the bell drops "Workflow '…'". See [deferred.md](./deferred.md) § B07b.
 
+**B08a, Changes and the diff.** The Changes list header is **Changes** with its count, then
+**View options**, **Refresh**, and a ghost **Stage all**. Unsent review notes get a banner at the top of
+the list, "{n} notes not sent", with **Send to agent**, and the send's result lands in it. A row's
+stage box is its last control and lines up with its group's, and Notes' include box moved to the end
+with delete in the row menu. The branch bar shows the branch alone, "Not published", and counts with a
+tip in words. The commit footer fits one line. Clean and non-Git states are centred in the detail, and
+a filter with no match draws a centred state with **Clear filter**. The composer has a ghost
+**Cancel** first and a solid **Comment**, the note badge reads **Not sent** or **Sent**, and a note
+starts at its code in both views. The file header's status is an xs badge with a styled tip, and code
+lines carry no native tooltip. See [deferred.md](./deferred.md) § B08a.
+
 ## What remains, in order
 
-Run the batches in this order. Each depends on the kit batches; B08b depends on B08a, and B10b on B10a.
-
-### B08a. Task panes: Changes and the diff
-
-- [08-1. The Changes list header hides its own summary and runs under the collapse control](./b08a-changes-and-diff/08-1-changes-list-header.md)
-- [08-9. What a diff line draws under itself starts at the wrong inset](./b08a-changes-and-diff/08-9-notes-under-a-diff-line.md)
-- [08-11. Checkboxes mean three things in three places](./b08a-changes-and-diff/08-11-checkboxes.md)
-- [08-13. The branch bar cuts the branch name and keeps the project name](./b08a-changes-and-diff/08-13-branch-bar.md)
-- [08-14. "No files match." sits in the diff's corner](./b08a-changes-and-diff/08-14-file-filter-empty-state.md)
-- [08-15. Empty, loading, and error states in the Changes pane take several shapes](./b08a-changes-and-diff/08-15-changes-states.md)
-- [08-16. The line composer's buttons and the note badge](./b08a-changes-and-diff/08-16-line-composer.md)
-- [08-17. The diff file header: a plain status letter and a tiny fold control](./b08a-changes-and-diff/08-17-diff-file-header.md)
-- [08-18. Every code line in Changes carries a native tooltip](./b08a-changes-and-diff/08-18-native-tooltips-on-code-lines.md)
-
-Everything here is CSS, attributes, copy, or a button variant. Do not change row heights,
-`DIFF_LINE_HEIGHT`, the measure scheduler, or the height estimates in the diff model. Use the task
-**Review changed files**.
+Run the batches in this order. Each depends on the kit batches; B10b depends on B10a.
 
 ### B08b. Task panes: Notes, Context, Findings, Memory, and Editor
 

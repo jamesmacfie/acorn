@@ -13,7 +13,7 @@ heading).
 
 ## Already done
 
-- a. **Stage all** becomes ghost sm in [08-1](../b08a-changes-and-diff/08-1-changes-list-header.md);
+- a. **Stage all** becomes ghost sm in 08-1 (shipped in B08a);
   the Notes **Show in Context** link in [08-12](./08-12-notes.md).
 - e. K4b moved the commit dialog's hint into the body and fixed its footer.
 - f. The Findings list header is [08-7](./08-7-one-pane-frame.md).

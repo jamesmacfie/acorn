@@ -41,7 +41,7 @@ action fails, but do not press **Merge** against a real repository.
 
 The plan's overrules: the `reauth` sentence drops "in Settings", because the alert has a button; `sso`
 gets its own sentence; a default covers the codes the table misses. The kit's own fallback for a failed
-save is "Couldn't save. Try again." (B08a, [08-16](../b08a-changes-and-diff/08-16-line-composer.md));
+save is "Couldn't save. Try again." (B08a, 08-16 (shipped in B08a));
 GitHub's wrappers say what failed instead.
 
 ## Risk and checks

@@ -32,7 +32,7 @@ own item.
   picker, in place of the decide step's verdict editor. New feature. The condition editor's "name the If
   and Otherwise destinations below" line waits for it.
 - **08-14 (part).** The diff's file filter also narrows the Changes file list. New feature. The empty
-  state ships in [08-14](./b08a-changes-and-diff/08-14-file-filter-empty-state.md).
+  state shipped in B08a.
 - **08-22 (part).** **Open** and **Delete** for a memory. Needs new memory routes, and opening a file
   outside the worktree.
 - **08-24c (part).** The file in view marked in the Changes list while the diff scrolls. New feature
@@ -74,8 +74,7 @@ own item.
   note on row 879), and the command timeout keeps milliseconds and says so (row 889).
 - **07-13 (part).** Elapsed time from a step's first event. Needs a `startedAt` on the step row.
 - **08-1 (part).** A `DiffSource.toolbar` member, so **Send notes** sits in the diff toolbar beside
-  the notes. Plugin API. The `Alert` banner fallback ships in
-  [08-1](./b08a-changes-and-diff/08-1-changes-list-header.md).
+  the notes. Plugin API. The `Alert` banner fallback shipped in B08a.
 - **08-16 (part).** Composer labels per diff source ("Note for the agent…", **Add note**, "Add a
   note"). A `DiffSource.compose` member.
 - **08-8 (part).** **Add memory** in the Context section's actions. Changes the cross-plugin
@@ -404,6 +403,42 @@ dialog on `Modal`.
 - **Not checked live:** a For each run's record history, child run cards and lineage, an agent step,
   the files export dialog, and an approved gate. The fixture has none of them. Each was read from code,
   and the relationships, record history, and node detail have tests.
+
+### B08a
+
+- **08-1, Send's label.** The banner says "{n} notes not sent", so its button reads **Send to agent**
+  rather than repeating the count. Both fit on one line at the 300-pixel default. The banner draws the
+  last result too, and a result with nothing left to send has a dismiss button. `agentIdle` and the
+  model's `totals` had no reader once the header changed, so both went, with `model.ts § totals` and its
+  test.
+- **08-1, non-Git.** The header shows "Changes" with no count, and the list draws nothing; the detail
+  owns the one "Not a Git project" state, so the fact is not said twice side by side.
+- **08-11, measured.** The group box and the row box both sit at x 322 in the window, where they were
+  322 and 292. In Notes, the scratchpad and a note both start at x 65. Notes' delete is a `RowActions`
+  **Delete** that arms to **Delete note?**. Its tip no longer names the note.
+- **08-13, the generate button.** It stays a `ConfirmButton`, so it keeps its **Replace?** arm, and
+  takes `iconOnly` and ghost: 26 by 26. The kit already lets an armed icon-only button grow to its
+  prompt, so the old "no `iconOnly`" note was stale. At 26 the footer needed 246 pixels in 244: an `sm`
+  action row in a list footer took the pane-edge pad on top of the footer's own. `shell.css` drops that
+  second pad, so the row starts on the message field's edge (62) and fits one line. Only Changes has an
+  action row in a list footer.
+- **08-13, the picker's tip.** `ModelPickerPopover` takes an optional `tipSub`, on both hosts; the
+  terminal accepts and ignores it.
+- **08-15, the clean check.** The model gains `loaded`, true after the first status read, so a loading
+  task does not flash "No changes". `ChangesDiff` draws the centred "No changes" / "Everything is
+  committed." itself rather than through `DiffPane`, whose fallback GitHub shares; that fallback is the
+  centred "No changes", or a centred busy "Loading…".
+- **08-15, Context's send copy.** "No running agent session." in Context stays for B08b's 08-8, which
+  owns those rows.
+- **08-17.** `fileStatusMeta` labels are sentence case ("Modified"). Nothing else read them. The
+  collapse control keeps its text glyph in a 20 square. The header measured 36 high before and after.
+- **08-18.** The **Ask agent** tip's second line shows only in unified view, because `lineAction` runs
+  only there. `docs/diff-rendering.md` says what `lineAction.title` is for.
+- **08-9, measured.** A note's badge starts at x 122 in unified and 78 in split, matching the code;
+  before, 102 in both. Row positions in a scrolled diff matched the before shot.
+- **Not checked live:** a clean tree, a folder that is not Git, a failed segment, a sent note, and
+  Context loading. The fixture has none of them. Each was read from code, and the Changes list has a
+  test for the empty tree and the notes banner.
 
 ## Notes for later sessions
 

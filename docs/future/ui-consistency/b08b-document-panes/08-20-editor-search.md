@@ -37,7 +37,7 @@ In `plugins/editor/src/client/search/SearchPanel.tsx:65-125`:
 | `SearchPanel.tsx:62` | results truncated | Rewrite | Showing the first results. Narrow your search to see more. |
 
 The `:62` wording is the plan's overrule: the client does not know the cap, so it cannot say "the first
-{n}". `:86` is done by [08-15](../b08a-changes-and-diff/08-15-changes-states.md).
+{n}". `:86` is done by 08-15 (shipped in B08a).
 
 ## Risk and checks
 
