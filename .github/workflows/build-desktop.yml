@@ -2,11 +2,19 @@ name: Build the desktop app
 
 # The desktop artifact. There are no GitHub OAuth secrets here on purpose: the client id is a
 # node-side plugin read now, from the environment or the data root's .env file.
+#
+# Called by ci.yml for `v*` tags and manual dispatches, after the Linux suite passes for the same
+# commit. Ordinary pushes get the unsigned desktop suite there instead of an installer.
+#
+# Both secrets are optional here so a missing key reaches the check step below, which says how to
+# create one, rather than failing the call with a bare "secret required" error.
 on:
-  push:
-    branches: [main]
-    tags: ['v*']
-  workflow_dispatch:
+  workflow_call:
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: false
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        required: false
 
 permissions:
   contents: read
@@ -66,9 +74,10 @@ jobs:
           key: node-runtime-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node-runtime.json') }}
 
       # The node service, the bundled plugins, the helper, the bridge, the migration chains and the
-      # pinned runtime. Everything the bundler is about to copy has to exist before it runs.
-      - name: Stage the bundle inputs
-        run: pnpm --filter @acorn/desktop run stage
+      # pinned runtime, then the renderer and its startup budget checks. Built once: the tests below
+      # run against this output and the bundler packages it unchanged.
+      - name: Build the bundle inputs
+        run: pnpm --filter @acorn/desktop run build
 
       - name: Test plugin database preparation
         run: pnpm --filter @acorn/node-core test src/server/plugins/pluginDbFiles.test.ts
@@ -77,7 +86,7 @@ jobs:
       # cannot load its world" (docs/testing.md § The desktop boot test), and it runs before the
       # slow bundler pass so a broken boot path fails in seconds rather than minutes.
       - name: Test the shell and the helper
-        run: pnpm --filter @acorn/desktop test
+        run: pnpm --filter @acorn/desktop run test:built
 
       - name: Build and verify the bundle
         # The public half is baked into tauri.conf.json; updater artifacts require this key.
@@ -85,13 +94,16 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-        run: pnpm --filter @acorn/desktop run dist
+        run: pnpm --filter @acorn/desktop run dist --prebuilt
 
       - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5
         with:
           name: ${{ matrix.artifact }}
           path: ${{ matrix.artifacts }}
           if-no-files-found: error
+          # The repository caps retention at one day. Saying so here keeps a later change to that
+          # setting from quietly restoring the 90-day default for every installer.
+          retention-days: 1
 
   # Gate 1 of docs/shell.md § Signing gates and the updater. A tag builds and keeps its
   # artifacts through the job above; publishing them as a release is refused while the build is
