@@ -44,7 +44,7 @@ const modes = {
     },
     context: { injectionEnabled: 'async', assemble: 'async' },
     models: { generateText: 'async', available: 'async' },
-    data: { connect: 'async', disconnect: 'async', query: 'async', catalog: 'async', schema: 'async' },
+    data: { configured: 'async', connect: 'async', disconnect: 'async', query: 'async', catalog: 'async', schema: 'async' },
     prefs: { read: 'async', write: 'async' },
     identity: { active: 'sync' },
     projects: {

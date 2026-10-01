@@ -12,6 +12,8 @@ import { commandRegistry } from '../registries/commands/commands'
 import { pluginProjectRoutePrefix } from '../registries/commands/corePaths'
 import { keybindingRegistry } from '../registries/commands/keybindings'
 import { paneRegistry } from '../registries/panes/panes'
+import { clientScheduleRegistry } from '../registries/shell/schedules'
+import { ownsRoute } from '../chrome/chromeData'
 import { suppliedExtendedPane } from '../chrome/extendedPane'
 import { suppliedLayout } from '../layouts/table'
 import { suppliedRemoteTree } from '../tree/table'
@@ -38,6 +40,7 @@ import { clearSurfaceFailures, recordSurfaceFailure } from '../plugins/surfaceFa
 import type { FrameBinding } from './broker'
 import { isHostOwnedSurface, paneLayoutFor, remoteRegionEntry } from './layouts'
 import { closePluginOverlay, pluginOverlayOpen } from './overlays'
+import { paneAvailability } from './paneAvailability'
 import { suppliedDocumentSurface } from './documentSurface'
 import { createLogger } from '../../infra/telemetry/logger'
 
@@ -391,7 +394,15 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         if (surface.providerId && surface.providerId !== pluginId) {
           throw new Error(`declared provider '${surface.providerId}' is not '${pluginId}'`)
         }
-        return own(paneRegistry, {
+        // The plugin's own answer to "can this task show the pane" (./paneAvailability.ts). Confined
+        // again for the reason the layout routes above are.
+        if (surface.availability !== undefined && !ownsRoute(pluginId, surface.availability)) {
+          throw new Error(`availability route '${surface.availability}' is not under '${pluginId}'`)
+        }
+        const availability = surface.availability
+          ? paneAvailability(`plugin.${pluginId}.${surface.id}.availability`, surface.availability)
+          : null
+        const pane = own(paneRegistry, {
           id: surface.id,
           label: surface.label,
           glyph: surface.glyph,
@@ -401,7 +412,8 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
           // The per-node gate. A plugin installed on node A contributes nothing to a task on node B, so
           // the switcher never offers a pane whose routes aren't there (distribution.ts).
           when: (task) => pluginEnabledOnNode(frameNode(), pluginId)
-            && (!surface.providerId || task.links.some((link) => link.providerId === surface.providerId)),
+            && (!surface.providerId || task.links.some((link) => link.providerId === surface.providerId))
+            && (!availability || availability.available(task.id)),
           component: (props) => {
             // The pane's regions. The wrapper below is separate from them because a footer strip and an
             // aside column belong to the pane rather than to whatever fills it.
@@ -421,6 +433,10 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
             })
           },
         })
+        // After the pane, so a duplicate pane id that throws above leaves no schedule running.
+        if (!availability) return pane
+        const schedule = clientScheduleRegistry.register(availability.schedule, pluginId)
+        return { dispose: () => { schedule.dispose(); pane.dispose() } }
       }
     case 'coreSlot': {
       // The exclusive slot: an offer to draw one of core's own surfaces (registries/exclusiveSlots.ts).

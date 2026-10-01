@@ -96,6 +96,10 @@ export const frameSurface = z.object({
   // Absent is deliberately false: archived tasks have no worktree, and mounting an ordinary pane
   // may otherwise start work that the owner did not restore.
   readsArchived: z.boolean().optional(),
+  // Task `pane` only. A GET route that answers `{ [taskId]: boolean }` for the node's active tasks, so
+  // the host can hide the pane on a task it has nothing to draw for. A task the answer leaves out is
+  // hidden too. See docs/panes.md § Contributions.
+  availability: pluginRoute.optional(),
   // Lets a mobile shell skip a desktop-shaped pane instead of rendering it unusably.
   formFactor: z.array(z.enum(['desktop', 'mobile'])).min(1).max(2).default(['desktop']),
   // `refPanel` and task-scoped `pane`. The client adapter checks it against the plugin id: a surface
@@ -185,6 +189,9 @@ export const frameSurface = z.object({
   }
   if (surface.readsArchived && (surface.target !== 'pane' || surface.scope !== 'task')) {
     ctx.addIssue({ code: 'custom', path: ['readsArchived'], message: 'readsArchived is only valid on a task pane' })
+  }
+  if (surface.availability && (surface.target !== 'pane' || surface.scope !== 'task')) {
+    ctx.addIssue({ code: 'custom', path: ['availability'], message: 'availability is only valid on a task pane' })
   }
   // These host-driven surfaces carry changing data and verbs. A rectangle cannot receive that
   // contract, so only a remote tree may offer them; the original task-list slot remains compatible

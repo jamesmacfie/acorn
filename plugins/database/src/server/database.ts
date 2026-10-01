@@ -19,6 +19,7 @@ import type {
 } from '../shared/database'
 
 export type DatabaseBridge = {
+  configured(taskId: string): Promise<boolean>
   connect(taskId: string): Promise<DbConnectResult>
   disconnect(taskId: string): Promise<{ ok: true }>
   tables(taskId: string): Promise<DbTablesResult>
@@ -71,6 +72,7 @@ export function databaseBridge(
   const liveCatalog = (taskId: string) => core.data.catalog(taskId)
 
   return {
+    configured: (taskId) => core.data.configured(taskId),
     connect: async (taskId) => {
       try {
         const result = await core.data.connect(taskId)
