@@ -64,6 +64,7 @@ export type CoreProjectService = {
   update(id: string, patch: ProjectUpdateRefInput): Promise<ProjectRef | null>
   /** The project's build, dev and database scripts: commands acorn executes, behind their own grant. */
   config(id: string): Promise<ProjectConfigResponse | null>
-  assertConfigTrusted(taskId: string): Promise<void>
+  /** An expected hash binds execution to the selected configuration snapshot; drift is refused. */
+  assertConfigTrusted(taskId: string, expectedHash?: string): Promise<void>
   setup(id: string): Promise<{ script: string | null; trigger: SetupTrigger }>
 }

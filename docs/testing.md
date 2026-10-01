@@ -24,6 +24,9 @@ time. Set `ACORN_TEST_CONCURRENCY` to change it. CI sets it to one. Each package
 starts a worker per core, and six packages at once on a four-core runner made tests 10 to 15 times
 slower than they run locally.
 
+The TUI suite also limits its internal test forks to two. Package concurrency alone does not bound
+Vitest workers; cold shell transforms across many forks can exceed fixture deadlines under load.
+
 The desktop package's `test` stages the bundle inputs first, including a build of the plugin SDK for
 bundled plugin imports. It then runs its Vitest suites and the Rust unit tests, so the boot test
 exercises fresh artifacts.
@@ -382,18 +385,23 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
 ## The desktop boot test
 
 `apps/desktop/test/boot.test.ts` is the shell's loadability check: it catches "the shell
-cannot load its world". It runs the staged helper under the bundled Node against a fresh data root,
-which spawns the real `service.js` over the service protocol, then asks the helper the first two
+cannot load its world". It runs the staged helper under the bundled Node against a fresh data root
+with host executables removed from PATH, so first-run certificate creation cannot depend on OpenSSL.
+The helper spawns the real `service.js` over the service protocol. The test asks it the first two
 questions the renderer asks: which nodes are there, and can a `/v1` request reach one. A 200 from
 `/v1/node` means the pinned TLS connection came up and the device token authenticated, so one
 assertion covers the custody stack end to end. Two more check the gate: a socket without the secret
 is refused, and a plain HTTP request gets 426.
 
 It also prints how long the node took to start, from the helper's ready line to its `service.start`
-mark, and fails over 1,500 ms. That span is spawning the node, evaluating the service bundle, and
-the node's boot to a bound listener, about 270 ms on an M2 Pro. The bound is loose on purpose, since
-timing on a shared CI runner is noisy. It catches a change that adds seconds, and the printed number
-is the one to compare between builds.
+mark, and fails at 10,000 ms on Windows or 1,500 ms on other hosts. That span is spawning the node,
+evaluating the service bundle, and the node's boot to a bound listener. It measured about 270 ms on
+an M2 Pro and 2,705-5,126 ms on Windows CI on 2026-10-01. The bounds leave room for shared-runner
+variation while catching startup regressions. The desktop test command runs the boot test in a
+separate Vitest invocation after the unit suites, so their Git, database, and transformation work
+does not compete with the measured startup. `pnpm --filter @acorn/desktop test:boot` runs that
+invocation against staged files; Windows installer verification uses it against installed resources.
+Compare the printed number between builds on the same host.
 
 The Rust unit tests in `apps/desktop/src-tauri/src/` cover what a headless run cannot reach through
 the helper: the renderer CSP and the dev-only widening a packaged build must not carry, the traversal
@@ -401,9 +409,9 @@ guard, the highlighter worker's separate policy, the refusal to answer a node ro
 own HTML, the handshake and ready-line parsing, the data key's shape and file fallback, the plugin
 scheme's hash grammar and frame CSP, the webview URL policies and the key grammar that picks between
 them, the navigation-history bookkeeping, the capability file's webview scoping, and the three
-packaging properties in `tauri.conf.json`. The macOS pull request job in `.github/workflows/ci.yml`
-runs both halves. `.github/workflows/build-desktop.yml` runs them again before the bundler pass on
-`main` and tags, so a broken boot path fails before packaging.
+packaging properties in `tauri.conf.json`. The macOS job in `.github/workflows/ci.yml` runs both
+halves on pull requests and main pushes. `.github/workflows/build-desktop.yml` runs them before the
+bundler pass on tags and manual dispatches, so a broken boot path fails before packaging.
 
 What no headless run reaches is compositing: a child webview positioned over a window needs a window.
 That is what items 4 and 5 of the smoke checklist are for.
@@ -490,21 +498,27 @@ is still owed for both. Run it on the host used for release checks and keep both
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs `pnpm lint` and the non-desktop `pnpm test` suites on every pull
-request and on push to `main`. A separate macOS job runs `pnpm --filter @acorn/desktop test` on pull
-requests without signing secrets. `.github/workflows/build-desktop.yml` runs the same desktop tests
-before building the signed artifact on `main` and tags.
+request, push to `main`, `v*` tag, and manual dispatch. A separate macOS job runs
+`pnpm --filter @acorn/desktop test` on pull requests and `main` pushes without signing secrets. Tags
+and manual dispatches skip that job and, once the Linux job passes, call
+`.github/workflows/build-desktop.yml` to build the signed installers. That workflow builds the bundle
+inputs once, runs the desktop tests against them, and packages the same output.
 
 The non-desktop job runs on Linux. A macOS runner has no Docker for the container probes to find,
 and its `/var` is a symlink to `/private/var`, which causes one of the pre-existing failures below.
 
-`@acorn/desktop` is filtered out of the Linux test run. Its macOS pull request job installs Rust and
+`@acorn/desktop` is filtered out of the Linux test run. Its macOS job installs Rust and
 caches the pinned Node runtime; the package's `test` script stages the bundle inputs, builds the
 renderer, runs Vitest including the helper boot test, and runs `cargo test`. It does not require
 updater signing secrets or build a distributable.
 
-The workflows cache dependencies and the pinned Node runtime, but not Turborepo task outputs. CI
-runs suites that a local `pnpm test` might serve from Turborepo's cache. A green local run with 30 of
-31 tasks cached is not evidence about the one task you changed.
+The workflows cache dependencies and the pinned Node runtime. The Linux job also carries
+Turborepo's local cache between runs, so a lint or test task whose inputs did not change is replayed
+rather than rerun, locally and in CI. That makes `turbo.json` load-bearing: a test that reads a file
+outside its package must declare it as an input, or a change to that file serves a stale pass. The
+architecture suite and the CLI lifecycle suite read too much of the repository to list, so they are
+never cached. A green run with 30 of 31 tasks cached is not evidence about the one task you changed
+unless its inputs are declared.
 
 The startup budget checks live in `build` scripts because they assert properties of built output.
 `@acorn/desktop`'s `build` runs
@@ -514,7 +528,7 @@ the build over a byte ceiling or a denylisted chunk name; [frontend.md](./fronte
 enforce. The TUI build also checks that Node can resolve every external import in its emitted modules,
 including lazy chunks, through `apps/tui/scripts/check-runtime-imports.mjs`.
 
-The desktop pull request job builds the renderer through its `test` script, but does not run the
+The macOS desktop job builds the renderer through its `test` script, but does not run the
 renderer budget check; `build-desktop.yml` applies that check to the real build output. The terminal
 client's build check runs when somebody builds that package. Each has a fixture suite that drives the
 same script against a directory it writes itself — `apps/desktop/test/scripts/` and
@@ -1104,6 +1118,31 @@ when the annotation or rail contracts change.
      confirm that its switch and opener disappear, then re-enable it and confirm that the saved choice
      returns.
 148. In `acorn`, confirm that the hidden source is still listed in the terminal's source menu.
+
+Checks 149–154 cover Computer Use app-access approval ([managed-agents.md](./managed-agents.md)
+§ App-access approval). Run them on macOS with Computer Use installed, against a `dev:agent` session
+whose app has no saved grant. Record the codex-cli, Computer Use, macOS, and Acorn versions with the
+result.
+
+149. From a managed Codex session, ask the agent to read the test app's state through Computer Use,
+     addressing the path that `pnpm dev:agent:ui -- target` reports. Confirm that the card names
+     **Acorn Agent Test (com.acorn.desktop.agent-test)** and offers **Allow for this session**,
+     **Always allow**, and **Decline**. Reach **Always allow** with the keyboard alone. Save the
+     sanitized request `_meta` beside `plugins/agents/src/server/drivers/__fixtures__/codexComputerUseApproval.json`
+     and correct the fixture where the two differ.
+150. After **Always allow** in check 149, start a new managed session and ask again: no card appears.
+     Quit Acorn and Codex, start them again, and ask again: no card. Stop the session, start one with a
+     different name, and ask again: no card, because every session shares the identifier.
+151. In a fresh session, choose **Allow for this session**. Ask again in the same session: no card.
+     Ask in a new session: the card appears.
+152. Revoke the grant in the ChatGPT app's Computer Use settings. Ask again: the card appears, and the
+     old session's history still reads as it did. Note whether an action already running finished.
+153. With the installed Acorn and two `dev:agent` sessions open, have each session's agent address its
+     own `target` path. Confirm that each acts only on its own window, that `target` lists the other
+     session under `sharedWith`, and that a native menu in one window is reachable while the other
+     receives no input.
+154. Stop a session, then run `target` and `stop` against its name: both refuse. Start it again and
+     confirm that `target` reports the new process.
 
 Checks 96–99 passed on 2026-09-27 with an isolated `dev:agent` data root and a loaded fixture plugin.
 The Tauri window refreshed only that plugin after its push, cleared marks across disable, enable,

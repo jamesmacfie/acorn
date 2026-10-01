@@ -17,10 +17,22 @@ The Node resolves a task's connection URL from trusted repository configuration,
 executable repository configuration and requires the exact config-trust acknowledgement. The
 connection URL is never sent to the renderer or stored in plugin rows.
 
+The pane is offered only on a task that has one of those sources. `CoreServices.data.configured`
+checks whether a connection script is set, the worktree `.env` names `DATABASE_URL`, or the Node's
+environment does. It runs no script and opens no socket, so it says there is a database to try, not
+that it is up. The plugin's `/available` route answers it for every active task, and the manifest
+names that route as the pane's `availability` (docs/panes.md § Contributions). A task-scoped caller
+gets `403`, because the answer lists every task.
+
 Pools are task-scoped and owned by `CoreServices.data`. Core resolves the URL, opens the `pg` socket,
 normalizes cells, enforces timeouts and row caps, and closes the task pools the plugin opened when the
 plugin is disposed. The loaded plugin receives no URL, driver, socket, project-config grant,
 `DATABASE_URL` environment grant, or process broker.
+
+HTTP routes compare task IDs in CLI bodies, palette queries, and context requests with the verified
+principal carried by the host. A task credential can address only its signed task. Missing or foreign
+query scope returns `404 not_found` before task lookup, saved-query reads, SQL, or auto-connect.
+Device and service credentials retain access to any task; an absent task returns the same `404`.
 
 The plugin declares `secrets: false`, and that is not an oversight: because the URL is resolved per
 connect and never persisted, there is no credential at rest for the host secret service to hold.

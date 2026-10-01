@@ -80,7 +80,8 @@ says it happened.
 Attributes are the only place a fact about one record goes. Keys are dotted and lowercase, at most
 64 characters. A string value is cut at 512, a record keeps at most 32 attributes, and a log body is
 cut at 2,000 characters. The collector truncates rather than dropping, and counts truncations as
-`telemetry.truncated`, so a chatty seam is visible instead of quietly losing its tail.
+`telemetry.truncated`, so a chatty seam is visible instead of quietly losing its tail. Attribute keys
+and string values pass through the same pattern scrubber. Keys and values use one-line formatting.
 
 Two keys are reserved and stamped by the host. An emitter that sets one is ignored, not refused,
 because a plugin should not be able to fail its own route by mislabelling a span.
@@ -378,6 +379,18 @@ the data-root path, which is what "open the data folder" means in a terminal.
 `createLogger('schedules').warn('github:refresh timed out')` prints `[schedules] github:refresh
 timed out`, which is what the hand-written prefix printed before. Attributes render as `key=value`
 on the end of the line, so a line stays one line and stays greppable.
+
+The Node logger scrubs its tag, message, attribute keys, and string values before writing stderr or
+emitting a telemetry record, including when collection is off. Tags keep at most 512 characters,
+messages keep 2,000, and attributes use the collector's field and count limits. Stderr shows at most
+200 characters per string attribute and 4,000 UTF-8 bytes for the complete line, without splitting a
+multibyte character. Tabs and line breaks become spaces. The performance printer also scrubs its
+text and metric names before stderr. The collector applies attribute hygiene to direct emitters and
+posted records, then stamps the host-owned `owner` and `runtime` attributes.
+
+Pattern redaction recognizes known credential shapes and collapses the configured home and data
+roots. It cannot recognize every credential or make arbitrary private content safe to log. A boundary
+that knows a credential's value must withhold that content or apply exact redaction there.
 
 Everything goes to stderr, `info` and `debug` included, because stdout is a wire in the standalone
 entry and in the desktop helper. `console.error` and `console.warn` rather than

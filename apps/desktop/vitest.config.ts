@@ -2,12 +2,14 @@ import solid from 'vite-plugin-solid'
 import { defineConfig } from 'vitest/config'
 
 const gitEnv = {
-  GIT_CONFIG_GLOBAL: '/dev/null',
-  GIT_CONFIG_SYSTEM: '/dev/null',
+  GIT_CONFIG_GLOBAL: process.platform === 'win32' ? 'NUL' : '/dev/null',
+  GIT_CONFIG_SYSTEM: process.platform === 'win32' ? 'NUL' : '/dev/null',
 }
 
 export default defineConfig({
   test: {
+    // Leave CPU for the real helper/Node boot while the other suites transform the client graph.
+    maxWorkers: 4,
     projects: [
       {
         test: {

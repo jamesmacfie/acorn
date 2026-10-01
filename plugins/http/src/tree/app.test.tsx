@@ -6,7 +6,7 @@ import { solidTree } from '@acorn/plugin-api/ui/tree'
 import { HttpDetailApp, HttpListApp, type HttpPaneProps } from './app'
 import { _resetHttpPanelModel } from './panelModel'
 
-vi.mock('./httpClient', () => ({ httpClient: () => ({
+vi.mock('./httpClient', () => ({ createHttpClient: () => ({
   createRequest: vi.fn(),
   deleteRequest: vi.fn(),
   listRequests: async () => [],

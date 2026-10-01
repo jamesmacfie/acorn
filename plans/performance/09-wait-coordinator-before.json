@@ -1,0 +1,31 @@
+{
+  "cursor": {
+    "tiedRows": 20,
+    "limit": 5,
+    "firstRows": 5,
+    "nextCursor": "1000",
+    "secondRows": 0
+  },
+  "runs": [
+    {
+      "priorTurns": 0,
+      "frames": 101,
+      "reads": 105,
+      "mappedTurns": 0,
+      "mappedEvents": 5153,
+      "wallMs": 101.27937500000007,
+      "cpuMs": 148.619,
+      "resultBytes": 23471
+    },
+    {
+      "priorTurns": 1000,
+      "frames": 101,
+      "reads": 105,
+      "mappedTurns": 104000,
+      "mappedEvents": 5153,
+      "wallMs": 400.96462500000007,
+      "cpuMs": 528.169,
+      "resultBytes": 1345140
+    }
+  ]
+}

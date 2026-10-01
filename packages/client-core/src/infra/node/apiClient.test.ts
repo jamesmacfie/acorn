@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { NodeConnectionState, NodeRecord } from '@acorn/protocol/broker.ts'
 import { parseTraceparent } from '@acorn/protocol/telemetry.ts'
 import { apiRouteAttr, ApiError, readJson, writeJson } from './apiClient'
@@ -48,10 +48,40 @@ const ready = async (state: NodeConnectionState) => {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks()
   _resetFleet()
   setActiveNode(null)
   _resetClientTelemetry()
   delete (globalThis as { window?: unknown }).window
+})
+
+describe('request cancellation and encoding', () => {
+  it('rejects a pre-aborted broker call before body encoding or transport work', async () => {
+    await ready('online')
+    const encode = vi.spyOn(TextEncoder.prototype, 'encode')
+    const controller = new AbortController()
+    controller.abort()
+    await expect(writeJson('/v1/core/workspaces', { method: 'POST', body: '{}', signal: controller.signal })).rejects.toMatchObject({ name: 'AbortError' })
+    expect(attempted).toEqual([])
+    expect(encode).not.toHaveBeenCalled()
+  })
+
+  it('encodes a string body once and forwards an in-flight abort', async () => {
+    await ready('online')
+    const encode = vi.spyOn(TextEncoder.prototype, 'encode')
+    const controller = new AbortController()
+    const abort = vi.fn()
+    window.acorn!.nodeAbort = abort
+    window.acorn!.nodeFetch = (_id, request) => new Promise((_resolve, reject) => {
+      expect(request.body?.kind).toBe('bytes')
+      abort.mockImplementation((requestId: string) => { expect(requestId).toBe(request.requestId); reject(Object.assign(new Error('cancelled'), { name: 'AbortError' })) })
+    })
+    const request = writeJson('/v1/core/workspaces', { method: 'POST', body: '{}', signal: controller.signal })
+    controller.abort()
+    await expect(request).rejects.toMatchObject({ name: 'AbortError' })
+    expect(encode).toHaveBeenCalledTimes(1)
+    expect(abort).toHaveBeenCalledTimes(1)
+  })
 })
 
 describe('mutations against an unreachable node', () => {

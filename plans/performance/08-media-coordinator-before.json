@@ -1,0 +1,11 @@
+{
+  "fixture": "eight actual AgentAttachmentCard mounts for one 1MiB synthetic image; real FileReader/dataUrl/Markdown; fake Node byte transport; jsdom does not decode image pixels or issue img fetches; load elapsed includes waits and is not renderer CPU/visible latency",
+  "observed": {
+    "metadataReads": 8,
+    "contentReads": 8,
+    "contentBytesRequested": 8388608,
+    "sourceAttributeCharacters": 11185008,
+    "elements": 48,
+    "loadElapsedMs": 503.8767079999998
+  }
+}

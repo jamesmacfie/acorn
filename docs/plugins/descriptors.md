@@ -295,6 +295,12 @@ which means a batch costs its own ops rather than the tree it is applied to — 
 5,000-node cap is 71 ms rather than the 1.1 seconds the earlier scan-every-node walk took
 (measured 2026-09-03).
 
+After simulating all operations, the host walks the final projected tree once to check every node's
+depth, including descendants of moved subtrees. Unknown nodes and cycles refuse the whole batch.
+Ancestor checks stop at the depth cap. A batch may temporarily deepen descendants before moving or
+removing them again, because rendering sees only its validated final state. Subtree deletion uses an
+iterative walk, so cleanup does not recurse through a temporary deep tree.
+
 **Twelve events, host to sandbox**: `onPress`, `onChange` (the committed value), `onSubmit`,
 `onSelect`, `onActivate`, `onToggle`, `onOpenChange`, `onExpand`, `onDismiss`, `onPick`, `onRemove`,
 `onConfirm`.
@@ -322,6 +328,8 @@ identifier. Other SDK calls use a separate bridge port and context for each moun
 sharing one worker do not share document, scope, focus, or gesture authority. Selection and surface
 actions target a slot; appearance updates reach every live slot. An older SDK without the per-tree
 bridge handshake may mount only one tree in a worker.
+The host validates the slot generation before admission and publication. A retired slot's held
+result cannot reach another slot that reused its id.
 
 **Every message is validated**, because the host is the only thing between a stranger's code and the
 shell's DOM:
@@ -337,13 +345,19 @@ shell's DOM:
   explicit HTTPS URL in an `href` prop; the kit validates every rendered anchor again. Programmatic
   navigation uses `bridge.ui.openUrl` under the same focus and URL policy as a frame.
 - **Caps**, in `TREE_LIMITS`: 1 MiB and 4,000 mutations per batch, 5,000 live nodes and 64 levels of
-  depth per tree, 65,536 characters in one text node, 512 trees per worker. The byte cap is sized like
+  depth per tree, 65,536 characters in one text node, 512 live or reserved tree slots per bundle, across its authority contexts. The byte cap is sized like
   the state channel's 1 MiB per value: generous for anything honest, small enough that a bundle cannot
   use the renderer as a memory bomb. The host checks message depth and size before recursive parsing
   and measures batch bytes itself instead of trusting the sandbox's `bytes` field. Past a cap the batch
   is dropped and recorded.
-- **Rate**: batches are coalesced per frame on the host side. A sandbox that floods is throttled, not
-  trusted.
+- **Pending updates**: the host checks the combined queue before appending each incoming batch.
+  The queue has the same 4,000-mutation and 1 MiB limits, measured as UTF-8 JSON bytes. Overflow clears
+  the whole queue, cancels its scheduled flush, records one refusal, and fails that mounted tree.
+  Later updates to that mount are ignored. Remount the tree to establish a fresh state agreement.
+  Disposal also clears the queue, and callbacks already in delivery cannot apply updates afterward.
+- **Scheduling**: batches coalesce per animation frame on the desktop and per timer turn in the
+  terminal. A hidden desktop window flushes on a zero-delay timer. A visible window also has a
+  100 ms timer fallback if its animation frame stalls.
 
 The version travels in the handshake (`TREE_PROTOCOL_VERSION`), and a mismatch leaves the contribution
 empty rather than crashing the host. `packages/protocol/src/tree/nodes.ts` carries the node names, the
@@ -352,8 +366,62 @@ into a stranger's
 plugin; `messages.ts` holds the schemas the host parses with. The lists are duplicated from
 client-core's kit, which owns them, and a test over there fails the moment the two disagree.
 
-The sandbox itself — one Web Worker per accepted `(pluginId, hash)`, what it has and what it does not, and what happens
-when it throws — is `docs/shell.md § The plugin worker`.
+The sandbox includes one shared modern worker per accepted `(pluginId, hash)` and separate
+slot-affine legacy workers. Its environment, refusals, and failure behavior are described in
+`docs/shell.md § The plugin worker`.
+
+### Mounted bridge ownership and SDK compatibility
+
+The additive `treeSlotBridge: 1` and scoped-bridge handshakes keep the bridge and tree protocol
+versions unchanged. A capable SDK receives a bridge port on each initial `tree:mount`, and
+`TreeRender(bridge, mount)`
+receives that slot's bridge. Props updates reuse its port. Unmount removes subscriptions and pending
+requests, rejects held requests with `unmounted`, closes the port, and releases the remote root.
+Handler dispatch retains only callbacks referenced by nodes attached to that root.
+
+The bundle bootstrap has immutable initial metadata but no privileged API, state, document, or UI
+services. A capable SDK's global `connect()` reports `treeBridgeMode: 'bootstrap'`; use the bridge
+passed to `TreeRender` to construct services and models. Global context describes bootstrap metadata,
+not the authority of a subsequently mounted slot.
+
+| SDK and host | Bridge ownership |
+| --- | --- |
+| Capable SDK and capable host | One bundle worker, one privileged bridge per mounted slot. |
+| Legacy SDK and capable host | One immutable, slot-affine worker per mounted tree. |
+| Capable SDK and legacy host | Usable global bridge with `treeBridgeMode: 'legacy'` and a warning; the host's first-context limitations remain. |
+| Legacy SDK and legacy host | The host's global first-context behavior remains. |
+
+A legacy SDK cannot replace its module-global bridge or prove which equivalent tree produced an
+API request or trusted gesture. Each legacy worker therefore mounts one tree under immutable
+plugin/hash, QueryClient, Node, surface/target, task/project, permissions, document grant, and opening
+item authority. Equivalent concurrent trees use separate workers; their focus and gesture contexts
+never combine. The last lease terminates its worker immediately, with no idle legacy worker.
+
+Classification promotes the same detection worker on the legacy `connected` acknowledgement or its
+first bridge API request. Awaited top-level legacy API work executes once per admitted slot-affine worker.
+A retired detection authority is terminated before a replacement uses surviving metadata; it is never
+rebound to another document or Node. Modern workers retain warm modules for 30 seconds, with at most
+16 idle bundle workers. Historical capability hints are capped at 256 plugin/hash identities. Eviction does not affect
+live workers, and a live exact identity takes precedence over a missing hint.
+
+Each plugin/hash identity admits at most 512 live or reserved slots. Modern slots share one worker. Up to
+512 legacy trees need 512 workers, including equivalent contexts. This stricter per-tree authority
+policy preserves compatibility at additional process cost and provides no legacy memory gain. A detector occupies an admitted lease, rather than adding an
+unbounded extra pool. The terminal factory owns native termination settlement before constructing a
+same-hash replacement, while preserving live foreign contexts.
+
+A registered composed layout captures its QueryClient's Node before lazy regions mount. It consumes
+its opening `plugin:select` once and shares that immutable opening item across its regions; routed item
+props and subsequent selection events remain reactive. Only an actual document region grants document
+access. Delayed initial handle arrival preserves the grant; withdrawal or replacement advances its
+generation and permanently denies bridges admitted under the previous generation.
+
+These ownership guarantees cover API, cache, document, focus, and teardown. The renderer presentation
+bus still addresses pane intents by task/pane, and plugin frame channels follow the selected Node
+without a Node parameter on each subscription. They retain the selected-Node composition boundary.
+
+SDK bundles that embed the earlier remote-root implementation retain its callback bookkeeping until
+rebuilt. Host ownership repair cannot replace code embedded in accepted legacy bundle bytes.
 
 ## One shared eligibility and trust check
 

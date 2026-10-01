@@ -1,13 +1,14 @@
-import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync } from 'node:fs'
+import { execFileSync, spawnSync } from 'node:child_process'
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync, chmodSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createBackup, suggestBackupPath } from './backup'
 import { openDb } from '../bindings'
 import { PLUGIN_DB_DIR } from '../plugins/storage'
 import { openSqlite } from './sqlite'
 import { schema } from '../db'
+import * as processBroker from '../core/proc'
 
 // The backup, against a real data root and unpacked with the real `tar` (docs/data-layer.md §
 // Backup and import).
@@ -76,6 +77,7 @@ beforeEach(async () => {
 })
 
 afterEach(() => {
+  vi.restoreAllMocks()
   rmSync(root, { recursive: true, force: true })
   rmSync(out, { recursive: true, force: true })
 })
@@ -162,6 +164,45 @@ describe('createBackup', () => {
     // The scrub runs on the copy. Getting this backwards would blank the owner's live credentials
     // as a side effect of taking a backup, which is the worst failure this file could have.
     expect(readFileSync(join(root, 'core.sqlite')).equals(before)).toBe(true)
+  })
+
+  it.each([[0o022, false], [0o022, true], [0o000, false], [0o000, true]] as const)('writes privately under umask %s, replacing %s', async (mask, replace) => {
+    // The child owns its umask; no global change can race another test or production operation.
+    const archive = join(out, 'backup.tar.gz')
+    if (replace) { writeFileSync(archive, 'old archive'); chmodSync(archive, 0o644) }
+    const loader = import.meta.resolve('tsx/esm')
+    const module = new URL('./backup.ts', import.meta.url).href
+    const result = spawnSync(process.execPath, ['--import', loader, '--input-type=module', '-e', `
+      import { createBackup } from ${JSON.stringify(module)};
+      process.umask(${mask});
+      await createBackup(${JSON.stringify(root)}, ${JSON.stringify(archive)});
+    `], { timeout: 10000, maxBuffer: 4096 })
+    expect(result.error).toBeUndefined()
+    expect(result.status, result.stderr.toString()).toBe(0)
+    if (process.platform !== 'win32') expect(statSync(archive).mode & 0o777).toBe(0o600)
+    expect(readdirSync(out)).toEqual(['backup.tar.gz'])
+    const dir = unpack(archive)
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  it.each([false, true])('precreates private output and preserves old archive on failure or deadline %s', async (timedOut) => {
+    const archive = join(out, 'backup.tar.gz')
+    writeFileSync(archive, 'previous backup')
+    const before = readFileSync(join(root, 'core.sqlite'))
+    vi.spyOn(processBroker, 'runProcess').mockImplementation(async (spec) => {
+      const partial = spec.args![1]!
+      if (process.platform !== 'win32') {
+        expect(statSync(partial).mode & 0o777).toBe(0o600)
+        expect(statSync(join(partial, '..')).mode & 0o777).toBe(0o700)
+      }
+      expect(readFileSync(archive, 'utf8')).toBe('previous backup')
+      writeFileSync(partial, 'partial output')
+      return { code: timedOut ? 0 : 1, signal: null, stdout: '', stderr: 'fixture failure', timedOut, aborted: false, truncated: false, spawnError: null }
+    })
+    await expect(createBackup(root, archive)).rejects.toThrow(timedOut ? /interrupted/ : /fixture failure/)
+    expect(readFileSync(archive, 'utf8')).toBe('previous backup')
+    expect(readFileSync(join(root, 'core.sqlite')).equals(before)).toBe(true)
+    expect(readdirSync(out)).toEqual(['backup.tar.gz'])
   })
 
   it('refuses a relative destination', async () => {

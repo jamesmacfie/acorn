@@ -65,3 +65,7 @@ export { selectPaneTab } from '@acorn/client-core/host/layouts/state.ts'
 // Another plugin's rectangle, beside or below this one's pane (the `rectangle` kind). The iframe twin
 // of `Slot`, for the surfaces that own pixels.
 export { InlineSlot } from '@acorn/client-core/host/frames'
+
+// The compiled composer control around its owner's model choices. Its `above` and `children` props
+// carry JSX, so it composes kit nodes in the host rather than adding a remote-tree node.
+export { default as ModelPickerPopover } from '@acorn/client-core/features/settings/models/ModelPickerPopover.tsx'

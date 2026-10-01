@@ -90,7 +90,7 @@ export default function PluginFrame(props: PluginFrameProps) {
   const selected = (): string | undefined => {
     const taskId = props.binding.taskId
     if (!taskId) return undefined
-    const intent = consumePaneIntent(taskId, props.binding.surface)
+    const intent = consumePaneIntent(taskId, props.binding.surface, 'plugin:select')
     return intent?.kind === 'plugin:select' ? intent.item : undefined
   }
 
@@ -116,8 +116,17 @@ export default function PluginFrame(props: PluginFrameProps) {
   // rather than inside `onLoad` so the effect below can have a normal reactive lifetime: `onLoad` runs from
   // an iframe load event, which is outside the component's reactive owner.
   let port: MessagePort | null = null
-  let disconnect: (() => void) | null = null
-  let removeLoadListener: (() => void) | null = null
+  let retireLoad: (() => void) | null = null
+  let detachLoad: (() => void) | null = null
+  const retireFrame = (): void => {
+    detachLoad?.()
+    detachLoad = null
+    const retire = retireLoad
+    retireLoad = null
+    port = null
+    retire?.()
+  }
+  onCleanup(() => { retireFrame(); frameEl = undefined })
 
   // Every routed selection after the one the frame connected with. `defer` skips the initial value:
   // that one already crossed in `context`, and posting it again would tell the frame to
@@ -133,101 +142,133 @@ export default function PluginFrame(props: PluginFrameProps) {
   const onLoad = (frame: HTMLIFrameElement) => {
     const target = frame.contentWindow
     if (!target) return
+    retireFrame()
     const channel = new MessageChannel()
-    // How long this plugin's UI took to say anything, owned by the plugin. It ends on the first
-    // message, so what it measures is the whole of "the reader clicked and something appeared":
-    // fetching the bundle out of the cache, evaluating it, and the SDK's first call back.
-    const boot = startSpan(props.binding.pluginId, {
-      name: 'frame.boot',
-      attrs: { seam: 'frame.boot', 'plugin.surface': props.binding.surface, 'plugin.target': props.binding.target },
-    })
-    // Armed before the port is transferred and cleared by the frame's first message. A controller-only
-    // frame is exempt: it has no rectangle for a placeholder to occupy, and replacing its iframe would
-    // remove the very thing the host is driving.
-    const deadline = props.controllerOnly
-      ? null
-      : setTimeout(() => {
-        log.warn(`${props.binding.pluginId} surface '${props.binding.surface}' never connected its frame`)
-        // An error record and not only a span, because this is the failure a person reports as
-        // "the pane is blank" and there is nothing else in the app that names the plugin.
-        boot.end('error', { 'error.name': 'FrameNeverConnected' })
-        emitError(props.binding.pluginId, {
-          name: 'FrameNeverConnected',
-          message: `surface '${props.binding.surface}' did not connect within ${HANDSHAKE_DEADLINE_MS}ms`,
-          handled: true,
-          attrs: { seam: 'frame.boot', 'plugin.surface': props.binding.surface },
-        })
-        setSilent(true)
-        disconnect?.()
-      }, HANDSHAKE_DEADLINE_MS)
-    const bridge = createFrameBridge({
-      port: channel.port1,
-      binding: props.binding,
-      services: services(),
-      context: context(),
-      onMisbehaving: (reason) => {
-        log.warn(`${props.binding.pluginId} misbehaved on the bridge: ${reason}`)
-        setMisbehaving(reason)
-        disconnect?.()
-      },
-      onConnected: () => {
-        boot.end()
-        if (deadline !== null) clearTimeout(deadline)
-      },
-    })
-    // Targeted, not '*': the sandbox keeps the frame's own origin through allow-same-origin (see the
-    // block at the top of this file for why that is safe here), so naming it ensures the port can only
-    // land in the hash-addressed document we built this frame for.
-    target.postMessage({ acornBridge: PLUGIN_BRIDGE_VERSION }, pluginFrameOrigin(props.hash), [channel.port2])
+    let bridgeOwnsPort = false
+    const cleanup: (() => void)[] = [() => { if (!bridgeOwnsPort) channel.port1.close() }, () => channel.port2.close()]
+    let retired = false
+    const retireThisLoad = () => {
+      if (retired) return
+      retired = true
+      for (const dispose of cleanup.reverse()) {
+        try { dispose() } catch (error) { log.warn('frame cleanup failed', error) }
+      }
+    }
+    retireLoad = retireThisLoad
+    const retireIfCurrent = (): void => {
+      if (retireLoad === retireThisLoad) retireFrame()
+      else retireThisLoad()
+    }
+    try {
+      // How long this plugin's UI took to say anything, owned by the plugin. It ends on the first
+      // message, so what it measures is the whole of "the reader clicked and something appeared":
+      // fetching the bundle out of the cache, evaluating it, and the SDK's first call back.
+      const boot = startSpan(props.binding.pluginId, {
+        name: 'frame.boot',
+        attrs: { seam: 'frame.boot', 'plugin.surface': props.binding.surface, 'plugin.target': props.binding.target },
+      })
+      cleanup.push(() => boot.end('error', { 'error.name': 'FrameTornDown' }))
+      // Armed before the port is transferred and cleared by the frame's first message. A controller-only
+      // frame is exempt: it has no rectangle for a placeholder to occupy, and replacing its iframe would
+      // remove the very thing the host is driving.
+      const deadline = props.controllerOnly
+        ? null
+        : setTimeout(() => {
+          log.warn(`${props.binding.pluginId} surface '${props.binding.surface}' never connected its frame`)
+          // An error record and not only a span, because this is the failure a person reports as
+          // "the pane is blank" and there is nothing else in the app that names the plugin.
+          boot.end('error', { 'error.name': 'FrameNeverConnected' })
+          emitError(props.binding.pluginId, {
+            name: 'FrameNeverConnected',
+            message: `surface '${props.binding.surface}' did not connect within ${HANDSHAKE_DEADLINE_MS}ms`,
+            handled: true,
+            attrs: { seam: 'frame.boot', 'plugin.surface': props.binding.surface },
+          })
+          if (retireLoad !== retireThisLoad) return
+          retireIfCurrent()
+          setSilent(true)
+        }, HANDSHAKE_DEADLINE_MS)
+      if (deadline !== null) cleanup.push(() => clearTimeout(deadline))
+      const bridge = createFrameBridge({
+        port: channel.port1,
+        binding: props.binding,
+        services: services(),
+        context: context(),
+        onMisbehaving: (reason) => {
+          log.warn(`${props.binding.pluginId} misbehaved on the bridge: ${reason}`)
+          if (retireLoad !== retireThisLoad) return
+          retireIfCurrent()
+          setMisbehaving(reason)
+        },
+        onConnected: () => {
+          boot.end()
+          if (deadline !== null) clearTimeout(deadline)
+        },
+      })
+      bridgeOwnsPort = true
+      cleanup.push(() => bridge.dispose())
+      // Targeted, not '*': the sandbox keeps the frame's own origin through allow-same-origin (see the
+      // block at the top of this file for why that is safe here), so naming it ensures the port can only
+      // land in the hash-addressed document we built this frame for.
+      target.postMessage({ acornBridge: PLUGIN_BRIDGE_VERSION }, pluginFrameOrigin(props.hash), [channel.port2])
 
-    port = channel.port1
-    const push = () => postAppearance(channel.port1, { ...currentAxes(), tokens: currentTokens() })
-    push()
-    const unwatch = watchAppearance(push)
-    // Every selection after the one that opened the pane. The intent is emitted as well as retained, so
-    // an already-mounted frame is reached without being remounted and losing what it had drawn.
-    const unselect = clientEvents.on('presentation:pane-intent', (event) => {
-      if (event.taskId !== props.binding.taskId || event.paneId !== props.binding.surface) return
-      if (event.intent.kind !== 'plugin:select') return
-      // Consumed here so the retained copy does not reach a later remount as a stale selection.
-      consumePaneIntent(event.taskId, event.paneId)
-      postSelect(channel.port1, event.intent.item)
-    })
-    // Surface-scoped commands the host resolved for this frame: the chord was pressed in the sibling
-    // editor, or the row was picked in the palette. Addressed by plugin and surface, because a task can
-    // have two composed panes open and each one's chord belongs to its own frame.
-    const unaction = clientEvents.on('plugin:surface-action', (event) => {
-      if (event.pluginId !== props.binding.pluginId || event.surface !== props.binding.surface) return
-      postSurfaceAction(channel.port1, event.command)
-    })
-    const unwebview = props.webview?.subscribe((eventChannel, payload) => {
-      postBridgeEvent(channel.port1, eventChannel, payload)
-    })
-    let disconnected = false
-    disconnect = () => {
-      if (disconnected) return
-      disconnected = true
-      port = null
-      frameEl = undefined
-      removeLoadListener?.()
-      removeLoadListener = null
-      // Idempotent: a frame that already connected ended this on its first message. A frame torn
-      // down mid-handshake is the case worth recording, and it did not boot.
-      boot.end('error', { 'error.name': 'FrameTornDown' })
-      if (deadline !== null) clearTimeout(deadline)
-      unwebview?.()
-      unaction()
-      unselect()
-      unwatch()
-      bridge.dispose()
+      port = channel.port1
+      const push = () => postAppearance(channel.port1, { ...currentAxes(), tokens: currentTokens() })
+      push()
+      const unwatch = watchAppearance(push)
+      cleanup.push(unwatch)
+      // Every selection after the one that opened the pane. The intent is emitted as well as retained, so
+      // an already-mounted frame is reached without being remounted and losing what it had drawn.
+      const unselect = clientEvents.on('presentation:pane-intent', (event) => {
+        if (event.taskId !== props.binding.taskId || event.paneId !== props.binding.surface) return
+        if (event.intent.kind !== 'plugin:select') return
+        // Consumed here so the retained copy does not reach a later remount as a stale selection.
+        consumePaneIntent(event.taskId, event.paneId, 'plugin:select')
+        postSelect(channel.port1, event.intent.item)
+      })
+      cleanup.push(unselect)
+      // Surface-scoped commands the host resolved for this frame: the chord was pressed in the sibling
+      // editor, or the row was picked in the palette. Addressed by plugin and surface, because a task can
+      // have two composed panes open and each one's chord belongs to its own frame.
+      const unaction = clientEvents.on('plugin:surface-action', (event) => {
+        if (event.pluginId !== props.binding.pluginId || event.surface !== props.binding.surface) return
+        postSurfaceAction(channel.port1, event.command)
+      })
+      cleanup.push(unaction)
+      const unwebview = props.webview?.subscribe((eventChannel, payload) => {
+        postBridgeEvent(channel.port1, eventChannel, payload)
+      })
+      if (unwebview) cleanup.push(unwebview)
+    } catch (error) {
+      retireIfCurrent()
+      const reason = error instanceof Error ? error.message : String(error)
+      log.warn(`${props.binding.pluginId} frame setup failed`, error)
+      setMisbehaving(reason)
     }
   }
 
+  const FrameBody = () => {
+    onCleanup(() => { retireFrame(); frameEl = undefined })
+    return <iframe
+        // The bundle hash is the origin, so a plugin update is a new origin and a new frame. There is
+        // nothing cached under the old one to reason about.
+        src={`${pluginFrameOrigin(props.hash)}/index.html`}
+        title={props.binding.surface}
+        sandbox="allow-scripts allow-same-origin"
+        aria-hidden={props.controllerOnly ? 'true' : undefined}
+        style={props.controllerOnly
+          ? { border: '0', width: '1px', height: '1px', position: 'absolute', opacity: '0', 'pointer-events': 'none' }
+          : { border: '0', width: '100%', height: '100%', display: 'block' }}
+        ref={(frame) => {
+          frameEl = frame
+          const load = () => onLoad(frame)
+          frame.addEventListener('load', load, { once: true })
+          detachLoad = () => frame.removeEventListener('load', load)
+        }}
+      />
+  }
+
   // Register cleanup while this component owns a Solid root. The load event has no reactive owner.
-  onCleanup(() => {
-    disconnect?.()
-    removeLoadListener?.()
-  })
 
   return (
     <Show
@@ -244,26 +285,7 @@ export default function PluginFrame(props: PluginFrameProps) {
         </section>
       }
     >
-      <iframe
-        // The bundle hash is the origin, so a plugin update is a new origin and a new frame. There is
-        // nothing cached under the old one to reason about.
-        src={`${pluginFrameOrigin(props.hash)}/index.html`}
-        title={props.binding.surface}
-        sandbox="allow-scripts allow-same-origin"
-        aria-hidden={props.controllerOnly ? 'true' : undefined}
-        style={props.controllerOnly
-          ? { border: '0', width: '1px', height: '1px', position: 'absolute', opacity: '0', 'pointer-events': 'none' }
-          : { border: '0', width: '100%', height: '100%', display: 'block' }}
-        ref={(frame) => {
-          frameEl = frame
-          const load = () => {
-            removeLoadListener = null
-            onLoad(frame)
-          }
-          frame.addEventListener('load', load, { once: true })
-          removeLoadListener = () => frame.removeEventListener('load', load)
-        }}
-      />
+      <FrameBody />
     </Show>
   )
 }

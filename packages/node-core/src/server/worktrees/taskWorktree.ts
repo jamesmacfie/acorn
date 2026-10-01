@@ -12,6 +12,7 @@ import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import { loadRepoConfig, type LayoutRecipe, type RunTarget } from '../runConfig'
 import { getProject, type ProjectRow } from '../projects'
 import { getProjectConfig } from '../projectConfig'
+import { readRepoConfigSnapshot, type RepoConfigSnapshot } from '../repoConfigSnapshot'
 import { copyWorktreeFiles, ensureWorktree, staleWorktreeReason, worktreeBranch, worktreePorcelain } from './worktrees'
 import { isTaskArchiving } from './archiveGate'
 import { broadcastHeadChanged, broadcastTasksChanged } from '../notify'
@@ -378,7 +379,7 @@ export async function repoFor(db: AppDatabase, taskId: string): Promise<string> 
 export async function taskRunConfig(
   db: AppDatabase,
   taskId: string,
-): Promise<{ targets: RunTarget[]; cwd: string; errors: { source: string; message: string }[]; layouts: LayoutRecipe[]; repoTargetIds: string[] } | { error: string }> {
+): Promise<{ targets: RunTarget[]; cwd: string; errors: { source: string; message: string }[]; layouts: LayoutRecipe[]; repoTargetIds: string[]; repoConfigHash: string | null } | { error: string }> {
   const t = await loadTask(db, taskId)
   if (!t) return { error: 'Task not found.' }
   const project = await projectForTask(db, t)
@@ -390,13 +391,21 @@ export async function taskRunConfig(
   } catch (e) {
     return { error: e instanceof Error ? e.message : 'No usable worktree for this task.' }
   }
-  const config = project ? (await getProjectConfig(db, project.id))?.config : null
+  // Hash and parse the same captured bytes. A separate file read could select a command that
+  // differs from the snapshot later checked by the trust gate.
+  let snapshot: RepoConfigSnapshot | null
+  try {
+    snapshot = readRepoConfigSnapshot(cwd, project)
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : 'Repository configuration could not be read safely.' }
+  }
+  const repoText = snapshot?.files.find((file) => file.path === '.acorn/config.toml')?.content ?? null
   const cfg = loadRepoConfig(cwd, homedir(), {
-    devScript: config?.devScript,
-    devRestartScript: config?.devRestartScript,
-    runTargetsJson: config?.runTargets,
-  })
-  return { targets: cfg.runTargets, cwd, errors: cfg.errors, layouts: cfg.layouts, repoTargetIds: cfg.repoTargetIds }
+    devScript: project?.devScript,
+    devRestartScript: project?.devRestartScript,
+    runTargetsJson: project?.runTargets,
+  }, repoText)
+  return { targets: cfg.runTargets, cwd, errors: cfg.errors, layouts: cfg.layouts, repoTargetIds: cfg.repoTargetIds, repoConfigHash: snapshot?.hash ?? null }
 }
 
 function slugifyProjectName(name: string): string {

@@ -84,7 +84,6 @@ export { rowHeightSm } from '@acorn/client-core/kit/lib'
 // it is presentation only, a protocol type in and two selects out, and a plugin whose own route calls
 // `core.models.generateText` needs to offer the picker from a frame.
 export { default as ModelBackendPicker } from '@acorn/client-core/features/settings/models/ModelBackendPicker.tsx'
-export { default as ModelPickerPopover } from '@acorn/client-core/features/settings/models/ModelPickerPopover.tsx'
 export { defaultModelIdFor } from '@acorn/client-core/features/settings'
 
 // ── Diff rows ─────────────────────────────────────────────────────────────────────────────────

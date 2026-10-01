@@ -424,7 +424,11 @@ The terminal drawer is a task surface and is available when the desktop terminal
 
 Overlays are shell-owned: command palette, settings, onboarding, notices, confirmations, and secret
 entry are not rendered by arbitrary pane content. The shell positions native preview views over a
-renderer pane host and hides them while overlays cover them.
+renderer pane host. `observeNativePage` owns shared page geometry, native overlay presentation, and
+the overlap fallback for both preview and loaded-plugin pages. The optional `rendererLayer.update`
+platform group sends geometry and input policy to the shell. The live Solid tree retains content,
+callbacks, drafts, and query ownership; no second renderer or cache receives them. For the shell
+contract and platform matrix, see [Native overlays](./native-overlays.md).
 
 Focus is shell state too. `client-core/host/keys/focusRegions.ts` holds which region of which pane the keyboard
 is in and what each region last had focused, and it is the one place `focusedPane` is written and the
@@ -749,8 +753,10 @@ Both clients have a build check over what they load before they draw, and both f
 over a byte ceiling, and on a **chunk name**.
 
 - **The renderer.** `apps/desktop/scripts/check-renderer-budget.mjs`, run from `@acorn/desktop`'s
-  `build`, sums every script and stylesheet a cold window loads: 861,000 B for scripts, 200,000 B
-  for styles. The script ceiling is the 2026-09-29 measurement, 819,628 B, plus about 5%. A change
+  `build`, sums every script and stylesheet a cold window loads: 906,000 B for scripts, 200,000 B
+  for styles. The script ceiling is the 2026-10-01 measurement, 862,188 B, plus about 5%. This includes
+  the security changes to frame request ownership and tree validation, which run before plugin
+  content is drawn. The previous ceiling used the 2026-09-29 measurement of 819,628 B. A change
   that needs more raises it in the same commit, with the reason in the commit message. It reads the graph from Vite's manifest, which `vite.config.ts` moves out of the shipped
   client folder to `dist/renderer-manifest.json`. The startup set is the static closure of the entry
   chunk plus the modules in the script's `STARTUP_IMPORTS` list, and every script and stylesheet
@@ -878,3 +884,29 @@ The kit calls a host-installed callback in `kit/lib/telemetry/workTelemetry.ts`;
 The desktop installs responsiveness monitoring in the renderer entrypoint, not the separately bundled
 preload bridge, so it observes the same consent and interaction state as the application.
 [Telemetry](telemetry.md#diagnosing-an-unresponsive-view) owns the vocabulary and diagnostic workflow.
+
+
+### Node shell navigation lifetime
+
+The desktop's keyed QueryCacheProvider contains PaneModelHost before the Router. The query provider
+owns persistence independently; PaneModelHost leases the selected Node generation for detached pane
+models. `setActiveNode` declares transport interest even for an equivalent selection, then batches a
+changed signal, device memory, and `runtime:node-switched`. Event listeners see the new Node before
+incoming reactive construction while the outgoing DOM still exists. Scope eviction carries `from`
+and `to`; owners retire the captured outgoing generation rather than reading an ambient cleanup
+scope. Individual region/pane removal preserves its model. Provider destruction retires observers
+and drawn marks. The explicit host wrapper is available for the TUI composition programme.
+
+TabRail memoizes the scalar stored `railOrder` value, parses it once per changed value, and shares a
+pin membership Set. Selection, same-value preference writes, and unrelated preferences reuse that
+projection. Row identity, reactive contributed markers, and the persisted representation remain the
+rail's existing contracts.
+
+## Preview pane lifetime
+
+The preview pane mounts its toolbar and observers for the selected task. The desktop shell retains
+its browser document when that pane unmounts. The bridge registers a native state listener before
+`ensure` requests a replay, so the toolbar resumes the browsing URL and history controls without a
+fresh navigation. Visibility changes hide or show the retained native page independently of home
+reconciliation. Pending URL reads preserve the record; resolution and capacity failures offer a retry.
+See [Host-owned webviews](./shell.md#host-owned-webviews) for ownership, policy, and recovery limits.

@@ -1,5 +1,10 @@
 # A host-owned document surface
 
+Editor file access uses core's canonical task-root guard for reads and writes. Writes refuse dangling
+links before opening the file, so a missing outside target cannot be created through a link in the
+worktree. Ordinary new files beneath real in-root directories and safe internal aliases remain valid.
+For the path replacement limit, see [security controls](./security.md#process-path-and-configuration-controls).
+
 ## Image previews in the editor pane
 
 The editor plugin keeps one tab model for worktree files. In graphical mode, opening a PNG, JPEG,

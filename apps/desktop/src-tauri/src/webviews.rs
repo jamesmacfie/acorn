@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
+use crate::webview_target::Target;
+
 use serde::{Deserialize, Serialize};
 use tauri::webview::{Cookie, NewWindowResponse, PageLoadEvent, WebviewBuilder};
 use tauri::{AppHandle, Emitter, LogicalPosition, LogicalSize, Manager, Runtime, Url, Webview, WebviewUrl};
@@ -116,6 +118,7 @@ struct Record<R: Runtime> {
     nav: Arc<Mutex<Nav>>,
     policy: LivePolicy,
     invalidated: bool,
+    home: Target,
 }
 
 /// The shell's webview state. `tunnels` is written from the helper's stdout signals, never from the
@@ -149,6 +152,7 @@ impl<R: Runtime> Webviews<R> {
         let _operation = self.operations.lock().unwrap();
         let records: Vec<_> = self.records.lock().unwrap().drain().map(|(_, record)| record).collect();
         for record in records {
+            record.policy.replace(Policy::Denied);
             let _ = record.webview.close();
         }
     }
@@ -255,23 +259,23 @@ fn policy_for(key: &str, hosts: Option<Vec<String>>) -> Option<Policy> {
     Some(Policy::Plugin(hosts))
 }
 
-/// Create the surface if it is not there, or re-point one at a new home URL. Returns false for an
-/// unrecognised key, a URL the policy refuses, or a window that is gone. One boolean covers all
-/// three, because the caller hides the affordance either way.
+/// Reconcile the configured home without resetting browsing state. Policy, capacity, creation,
+/// and navigation failures return false so the caller can offer an explicit retry.
 #[tauri::command]
 pub fn webview_ensure<R: Runtime>(app: AppHandle<R>, key: String, url: String, hosts: Option<Vec<String>>) -> bool {
     let state = app.state::<Webviews<R>>();
     let _operation = state.operations.lock().unwrap();
     let Some(policy) = policy_for(&key, hosts) else {
         // An empty or invalid replacement grant must retire an older view with this key.
-        retire_record(&state, &key, Policy::Denied);
+        retire_record(&state, &key);
         return false;
     };
     if !policy.allows(&url) {
-        retire_record(&state, &key, Policy::Denied);
+        retire_record(&state, &key);
         return false;
     }
 
+    let Ok(home) = Url::parse(&url) else { return false };
     {
         let mut records = state.records.lock().unwrap();
         if let Some(record) = records.get_mut(&key) {
@@ -279,13 +283,21 @@ pub fn webview_ensure<R: Runtime>(app: AppHandle<R>, key: String, url: String, h
             // view cancels a navigation approved just before the swap and clears old page state.
             let changed = record.policy.replace(policy.clone());
             if !changed && !record.invalidated {
-                let current = record.nav.lock().unwrap().url();
-                return current == url || Url::parse(&url).is_ok_and(|parsed| record.webview.navigate(parsed).is_ok());
+                // Browsing location is independent of the configured home, including redirects.
+                let ready = record.home.reconcile(home, |target| {
+                    seed_tunnel_cookie(&app, &record.webview, target.as_str());
+                    record.webview.navigate(target.clone()).is_ok()
+                });
+                if ready {
+                    emit_state(&app, &key, &record.nav.lock().unwrap());
+                }
+                return ready;
             }
+            record.policy.replace(Policy::Denied);
             record.invalidated = true;
         }
     }
-    if !retire_record(&state, &key, policy.clone()) {
+    if !retire_record(&state, &key) {
         return false;
     }
     if state.records.lock().unwrap().len() >= MAX_WEBVIEWS {
@@ -294,17 +306,18 @@ pub fn webview_ensure<R: Runtime>(app: AppHandle<R>, key: String, url: String, h
     }
 
     let Some(record) = create(&app, &key, &url, policy) else { return false };
+    emit_state(&app, &key, &record.nav.lock().unwrap());
     state.records.lock().unwrap().insert(key, record);
     true
 }
 
 /// The caller holds `operations`, so no second ensure can create the same native label before the
 /// old view closes. The map lock is released before `hide`, `close`, or the fallback navigation.
-fn retire_record<R: Runtime>(state: &Webviews<R>, key: &str, policy: Policy) -> bool {
+fn retire_record<R: Runtime>(state: &Webviews<R>, key: &str) -> bool {
     let old = {
         let mut records = state.records.lock().unwrap();
         if let Some(record) = records.get_mut(key) {
-            record.policy.replace(policy);
+            record.policy.replace(Policy::Denied);
             record.invalidated = true;
         }
         records.remove(key)
@@ -339,6 +352,7 @@ fn create<R: Runtime>(app: &AppHandle<R>, key: &str, home: &str, policy: Policy)
     let load_nav = nav.clone();
     let load_app = app.clone();
     let load_key = key.to_string();
+    let load_policy = live_policy.clone();
 
     let builder = WebviewBuilder::<R>::new(webview_label(key), WebviewUrl::External(Url::parse("about:blank").ok()?))
         // Ephemeral and per surface: a second incognito webview on the same origin sees neither the
@@ -376,7 +390,7 @@ fn create<R: Runtime>(app: &AppHandle<R>, key: &str, home: &str, policy: Policy)
             true
         })
         .on_page_load(move |_webview, payload| {
-            if payload.url().as_str() == "about:blank" {
+            if payload.url().as_str() == "about:blank" || !load_policy.allows(payload.url().as_str()) {
                 return;
             }
             let mut nav = load_nav.lock().unwrap();
@@ -397,12 +411,12 @@ fn create<R: Runtime>(app: &AppHandle<R>, key: &str, home: &str, policy: Policy)
     // the store is write-only from here. The helper checks that the cookie arrived.
     seed_tunnel_cookie(app, &webview, home);
 
-    if let Err(error) = webview.navigate(home_url) {
+    if let Err(error) = webview.navigate(home_url.clone()) {
         eprintln!("[webview] could not navigate {key}: {error}");
         let _ = webview.close();
         return None;
     }
-    Some(Record { webview, nav, policy: live_policy, invalidated: false })
+    Some(Record { webview, nav, policy: live_policy, invalidated: false, home: Target::applied(home_url) })
 }
 
 /// Tauri labels have their own grammar and must be unique per app, and the seam's keys carry colons.
@@ -427,14 +441,25 @@ fn seed_tunnel_cookie<R: Runtime>(app: &AppHandle<R>, webview: &Webview<R>, url:
 }
 
 #[tauri::command]
-pub fn webview_bounds<R: Runtime>(app: AppHandle<R>, key: String, rect: Rect) {
+pub fn webview_bounds<R: Runtime>(app: AppHandle<R>, key: String, rect: Rect, viewport: Option<crate::overlays::Viewport>) {
     if ![rect.x, rect.y, rect.width, rect.height].iter().all(|value| value.is_finite()) {
         return;
     }
+    let mut sx = 1.0;
+    let mut sy = 1.0;
+    if let Some(viewport) = viewport {
+        if !viewport.valid() { return; }
+        if let Some(window) = app.get_window("main") {
+            if let (Ok(size), Ok(scale)) = (window.inner_size(), window.scale_factor()) {
+                sx = size.width as f64 / scale / viewport.width;
+                sy = size.height as f64 / scale / viewport.height;
+            }
+        }
+    }
     with_record::<R, _>(&app, &key, |record| {
         let _ = record.webview.set_bounds(tauri::Rect {
-            position: LogicalPosition::new(rect.x, rect.y).into(),
-            size: LogicalSize::new(rect.width.max(0.0), rect.height.max(0.0)).into(),
+            position: LogicalPosition::new(rect.x * sx, rect.y * sy).into(),
+            size: LogicalSize::new(rect.width.max(0.0) * sx, rect.height.max(0.0) * sy).into(),
         });
     });
 }
@@ -457,6 +482,7 @@ pub fn webview_show<R: Runtime>(app: AppHandle<R>, key: String, exclusive: bool)
     if let Some(record) = records.get(&key) {
         if !record.invalidated {
             let _ = record.webview.show();
+            crate::overlays::raise(&app);
         }
     }
 }
@@ -468,16 +494,12 @@ pub fn webview_hide<R: Runtime>(app: AppHandle<R>, key: String) {
     });
 }
 
-/// The preview seam's `hide()` takes no key, so every surface in the family goes away. The caller
-/// means "no preview is on screen".
-#[tauri::command]
-pub fn webview_hide_family<R: Runtime>(app: AppHandle<R>, prefix: String) {
-    let Some(prefix) = family(&prefix) else { return };
+/// A renderer reload invalidates DOM owners without retiring their kept-alive page instances.
+pub fn hide_pages_on_reload<R: Runtime>(app: &AppHandle<R>) {
     let state = app.state::<Webviews<R>>();
-    for (key, record) in state.records.lock().unwrap().iter() {
-        if key.starts_with(prefix) {
-            let _ = record.webview.hide();
-        }
+    let records = state.records.lock().unwrap();
+    for record in records.values() {
+        let _ = record.webview.hide();
     }
 }
 
@@ -536,6 +558,7 @@ pub fn webview_command<R: Runtime>(app: AppHandle<R>, key: String, action: Strin
                 webview.open_devtools();
                 if let Some(bounds) = bounds {
                     let _ = webview.set_bounds(bounds);
+                    crate::overlays::raise(&app);
                 }
             }
             true
@@ -548,7 +571,19 @@ pub fn webview_command<R: Runtime>(app: AppHandle<R>, key: String, action: Strin
 pub fn webview_evict<R: Runtime>(app: AppHandle<R>, key: String) {
     let state = app.state::<Webviews<R>>();
     let _operation = state.operations.lock().unwrap();
-    retire_record(&state, &key, Policy::Denied);
+    retire_record(&state, &key);
+}
+
+/// Retire even previews whose renderer tracking was lost during a main-page reload.
+#[tauri::command]
+pub fn webview_evict_previews<R: Runtime>(app: AppHandle<R>) {
+    let state = app.state::<Webviews<R>>();
+    let _operation = state.operations.lock().unwrap();
+    let keys: Vec<_> = state.records.lock().unwrap().keys()
+        .filter(|key| key.starts_with(PREVIEW_PREFIX)).cloned().collect();
+    for key in keys {
+        retire_record(&state, &key);
+    }
 }
 
 fn family(key: &str) -> Option<&'static str> {

@@ -56,7 +56,7 @@ export type { CustomAgentRegistry, ManifestCustomAgent } from '@acorn/node-core/
 
 // ── Route toolkit ─────────────────────────────────────────────────────────────────────────────
 export type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
-export { isTaskConfined, mayActOnTask, ownerId, requireDevice, requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+export { isTaskConfined, mayActOnTask, ownerId, principalMayActOnTask, requireDevice, requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 export { onServerError, respondError } from '@acorn/node-core/server/respond.ts'
 // The portable carrier a loaded plugin uses to run its own Hono router through
 // `ctx.routes.fetch` (docs/plugins.md § Loaded plugins).

@@ -283,7 +283,6 @@ describe('architecture boundaries', () => {
       'packages/node-core/src/server/headless.ts', // one-shot agent run, streams stdout as it goes
       'packages/node-core/src/server/mcpRegister.ts', // registers the MCP server with a CLI
       'packages/node-core/src/server/profiles.ts', // probes whether an agent CLI is installed
-      'packages/node-core/src/server/transport/tls.ts', // openssl, at first boot only
       'packages/node-core/src/server/core/loginShellPath.ts', // the login-shell PATH probe, once at boot
       'packages/node-core/src/server/transport/listener.ts', // lsof and ps, only when the wanted port is taken
       // The supervised node's own child.
@@ -618,7 +617,7 @@ describe('architecture boundaries', () => {
       // (settings/models/ModelPickerPopover.tsx), merged in from main the same day. One more for
       // Storage and memory (settings/StorageSettings.tsx), a lazy chunk the desktop registers like the
       // others, merged in from perf the same day.
-      '@acorn/client-core': 162,
+      '@acorn/client-core': 164, // PaneModelHost and QueryCacheProvider are renderer composition seams.
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 10,
@@ -772,6 +771,8 @@ describe('architecture boundaries', () => {
       ['packages/client-core/src/host/chrome/chromeData.ts', "'context' the agent input part"],
       ['packages/node-core/src/server/plugins/coreFacets.ts', "'context' the core facet name"],
       ['packages/node-core/src/server/plugins/nodePluginWorker.ts', "'context' the RPC path and 'http' the Node builtin"],
+      ['packages/protocol/src/plugin/nodeBuiltins.ts', "'http' the Node builtin family"],
+      ['packages/node-core/src/server/plugins/storagePolicy.ts', "'memory' the SQLite temp_store value"],
       // `database` the layer a workflow definition was found in: a row in acorn's own store rather
       // than a file somebody committed. Nothing to do with the database plugin.
       // Where a task's terminals live is a node question, asked of the roster
@@ -792,7 +793,6 @@ describe('architecture boundaries', () => {
       ['packages/client-core/src/kit/components/content/Rectangle.tsx', "'editor' the rectangle kind"],
       ['packages/client-core/src/host/trust/permissions.ts', "'database' a Lucide icon name"],
       ['packages/client-core/src/kit/components/inputs/IconPicker.tsx', "'database' and 'terminal', Lucide icon names"],
-      ['packages/node-core/src/server/repoConfigTrust.ts', "'workflows' the .acorn directory name"],
       ['packages/protocol/src/integrations/mcp.ts', "'http' the MCP transport"],
       ['packages/protocol/src/chrome/settingsPages.ts', "'agents' the settings rail group"],
       // Moved from apps/desktop so the terminal lists the same pages. Search words name the services a

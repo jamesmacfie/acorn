@@ -66,4 +66,19 @@ describe('a Select inside a Popover', () => {
     document.body.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true }))
     expect(document.querySelector('.ui-popover')).toBe(null)
   })
+  it('dismisses a nested list with Escape before its parent popover', () => {
+    dispose = render(() => (
+      <Popover trigger={({ toggle }) => <button type="button" onClick={toggle}>open</button>}>
+        <Select title="Model" value="a" options={[{ value: 'a', label: 'A' }]} />
+      </Popover>
+    ), host)
+    press(host.querySelector('button')!)
+    press(document.querySelector('.ui-popover')!.querySelector('button.ui-select')!)
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    expect(document.querySelector('.ui-select-list')).toBe(null)
+    expect(document.querySelector('.ui-popover')).toBeTruthy()
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    expect(document.querySelector('.ui-popover')).toBe(null)
+  })
+
 })

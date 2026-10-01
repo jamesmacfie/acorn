@@ -1,3 +1,8 @@
+import { createComponent } from 'solid-js'
+import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
+import { registerQueryOwner } from '../../infra/node/queryOwnership'
+import { treeDocumentGrant } from '../tree/bridgeAuthority'
+import { openPane, consumePaneIntent } from '../registries/commands/clientEvents'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PLUGIN_API_MAJOR, type NodePluginRow } from '@acorn/protocol/api.ts'
@@ -17,19 +22,24 @@ import type { DocumentSurfaceProps } from './documentSurface'
 // into `context.item` (./PluginFrame.tsx) and a tree never did, so a command that opened a closed pane
 // arrived with no selection at all.
 
-const remoteProps: { document?: unknown; scope?: () => unknown }[] = []
+const remoteProps: { document?: unknown; scope?: () => unknown; openingItem?: string }[] = []
+const editorOrigins: string[] = []
 let documentHandle: ((handle: DocumentHandle | null) => void) | null = null
 
 vi.mock('../../infra/node/hostCapabilities', () => ({ hasHostCapability: () => true }))
 vi.mock('../tree/RemoteTree', () => ({
   // The worker path is not what this file is about, and mounting one in jsdom would need a Worker.
-  RemoteTree: (props: { document?: unknown; scope?: () => unknown }) => {
+  RemoteTree: (props: { document?: unknown; scope?: () => unknown; openingItem?: string }) => {
     remoteProps.push(props)
     return <span>worker-tree</span>
   },
 }))
 vi.mock('../../features/editor/DocumentSurface', () => ({
-  default: () => <span>wrong host</span>,
+  default: (props: { nodeId: string; onHandle?: (handle: DocumentHandle | null) => void }) => {
+    editorOrigins.push(props.nodeId)
+    documentHandle = props.onHandle ?? null
+    return <span>editor</span>
+  },
 }))
 const { paneRegistry } = await import('../registries/panes/panes')
 const { _resetPluginDistribution, _seedPluginDistribution } = await import('../plugins/distribution')
@@ -73,8 +83,10 @@ const row = (): NodePluginRow => ({
 describe('a composed pane’s remote region', () => {
   beforeEach(() => {
     remoteProps.length = 0
+    editorOrigins.length = 0
     documentHandle = null
     setDocumentSurface((props: DocumentSurfaceProps) => {
+      editorOrigins.push(props.nodeId)
       documentHandle = props.onHandle ?? null
       return <span>editor</span>
     })
@@ -94,20 +106,66 @@ describe('a composed pane’s remote region', () => {
 
   it('is handed the sibling editor’s document, the same accessor a frame region gets', async () => {
     const pane = paneRegistry.entries().find((entry) => entry.id === 'database')!
-    const dispose = render(() => pane.component({
-      task: { id: 'task-1', projectId: 'p-1', links: [] },
-    } as never), document.createElement('div'))
+    const qc = new QueryClient()
+    registerQueryOwner(qc, 'origin-a')
+    const dispose = render(() => createComponent(QueryClientProvider, {
+      client: qc,
+      get children() { return pane.component({ task: { id: 'task-1', projectId: 'p-1', links: [] } } as never) },
+    }), document.createElement('div'))
+    setActiveNode('ambient-b')
 
     // The layout and both region components are lazy, so the regions arrive a microtask later.
     await vi.waitFor(() => expect(remoteProps).toHaveLength(1))
     const accessor = remoteProps[0].document as (() => DocumentHandle | null) | undefined
     expect(typeof accessor).toBe('function')
+    expect(editorOrigins).toEqual(['origin-a'])
+    const firstGrant = treeDocumentGrant(accessor)!
     // Null until the editor beside it has loaded, which is the whole reason it is an accessor: the two
     // regions mount independently and either may be first.
     expect(accessor?.()).toBeNull()
     const handle = { read: () => 'select 1', write: () => {}, flush: async () => {} }
     documentHandle?.(handle)
     expect(accessor?.()).toBe(handle)
+    expect(firstGrant()).toBe(handle)
+    documentHandle?.(null)
+    documentHandle?.(handle)
+    expect(firstGrant).toThrow('retired')
+    expect(treeDocumentGrant(accessor)!()).toBe(handle)
     dispose()
+    qc.clear()
+  })
+
+  it('captures an opening plugin selection once for both list/detail regions and preserves live selection', async () => {
+    _resetFrameContributions()
+    const declaration = row()
+    const surface = declaration.installed!.contributions.frames![0]
+    Object.assign(surface, { layout: 'list-detail', regions: { list: { kind: 'remote', entry: 'list' }, detail: { kind: 'remote', entry: 'detail' } } })
+    _seedPluginDistribution([['node-a', [declaration]]], [`database ${HASH}`])
+    syncFrameContributions()
+    openPane('task-1', 'database', { kind: 'plugin:select', item: 'request-9' })
+    const pane = paneRegistry.entries().find((entry) => entry.id === 'database')!
+    const qc = new QueryClient()
+    registerQueryOwner(qc, null)
+    const dispose = render(() => createComponent(QueryClientProvider, {
+      client: qc,
+      get children() { return pane.component({ task: { id: 'task-1', projectId: 'p-1', links: [] } } as never) },
+    }), document.createElement('div'))
+    await vi.waitFor(() => expect(remoteProps).toHaveLength(2))
+    for (const region of remoteProps) {
+      expect(region.openingItem).toBe('request-9')
+      expect(region.scope?.()).toMatchObject({ item: 'request-9' })
+      expect(region.document).toBeUndefined()
+    }
+    expect(consumePaneIntent('task-1', 'database')).toBeUndefined()
+    openPane('task-1', 'database', { kind: 'plugin:select', item: 'request-10' })
+    for (const region of remoteProps) {
+      expect(region.scope?.()).toMatchObject({ item: 'request-10' })
+      expect(region.openingItem).toBe('request-9')
+    }
+    openPane('task-1', 'other-pane', { kind: 'editor:search' })
+    expect(consumePaneIntent('task-1', 'other-pane', 'plugin:select')).toBeUndefined()
+    expect(consumePaneIntent('task-1', 'other-pane')).toEqual({ kind: 'editor:search' })
+    dispose()
+    qc.clear()
   })
 })

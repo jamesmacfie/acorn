@@ -6,7 +6,7 @@ import {
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { DbCell, DbColumn, DbResultSet, DbSavedQuery, DbTable } from '../shared/database'
 import { SCRATCH_SELECT_ID } from '../shared/database'
-import { databaseClient } from './databaseClient'
+import { createDatabaseClient } from './databaseClient'
 import { quoteIdentifier, savedQueryLabel } from './databaseModel'
 import GenerateSqlModal from './GenerateSqlModal'
 import SaveQueryModal from './SaveQueryModal'
@@ -30,11 +30,8 @@ import SaveQueryModal from './SaveQueryModal'
 type Selected = { schema: string; name: string } | null
 
 export default function DatabasePanel(props: { bridge: AcornBridge; taskId: string }) {
-  const client = databaseClient(props.bridge)
-  const {
-    connectDb, deleteRow, deleteSavedQuery, disconnectDb, insertRow, listColumns, listModelBackends,
-    listRows, listSavedQueries, listTables, readScratch, runQuery, updateCell,
-  } = client
+  const client = createDatabaseClient(props.bridge.api)
+  const { connectDb, deleteRow, deleteSavedQuery, disconnectDb, insertRow, listColumns, listModelBackends, listRows, listSavedQueries, listTables, readScratch, runQuery, updateCell } = client
   const [status, setStatus] = createSignal<'connecting' | 'connected' | 'error'>('connecting')
   const [dbName, setDbName] = createSignal('')
   const [error, setError] = createSignal('')

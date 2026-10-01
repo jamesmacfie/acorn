@@ -79,11 +79,21 @@ export function readDevicePrefs(): Record<string, string> {
   if (!store) return {}
   const out: Record<string, string> = {}
   try {
-    for (let index = 0; index < store.length; index++) {
-      const key = store.key(index)
-      if (!key?.startsWith(PREFIX) || !isDevicePref(key.slice(PREFIX.length))) continue
-      const value = store.getItem(key)
-      if (value !== null) out[key.slice(PREFIX.length)] = value
+    for (const key of DEVICE_KEYS) {
+      const value = store.getItem(`${PREFIX}${key}`)
+      if (value !== null) out[key] = value
+    }
+    // Installed device plugins own open-ended preference names. Only those installations need a
+    // storage scan; the fixed host keys above never enumerate unrelated drafts.
+    if (devicePluginIds.size > 0) {
+      for (let index = 0; index < store.length; index++) {
+        const storedKey = store.key(index)
+        if (!storedKey?.startsWith(`${PREFIX}plugin:`)) continue
+        const key = storedKey.slice(PREFIX.length)
+        if (!isDevicePref(key)) continue
+        const value = store.getItem(storedKey)
+        if (value !== null) out[key] = value
+      }
     }
   } catch {
     return {}

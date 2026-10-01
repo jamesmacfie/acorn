@@ -88,6 +88,9 @@ export type FrameServices = {
   copy(text: string): void
   openPane(paneId: string): void
   openTarget?(target: { kind: string; resourceId: string; subresourceId?: string }): void
+  // Find a task in the reader's task list and hand back the move to it, or nothing when the list does
+  // not have it. Two steps so the broker can reply between them (see the `openTask` case).
+  openTask(taskId: string): (() => void) | undefined
   // Resolve an https URL somewhere: in-app if a content-link recogniser claims it, the owner's browser
   // otherwise. Returns nothing on purpose; see the `openUrl` case below for why the frame is told neither
   // the outcome nor when it happened.
@@ -138,7 +141,7 @@ const MEASURED_KINDS: ReadonlySet<string> = new Set([
 // focus check alone is a raised bar rather than a wall: a visible frame's own script can pull focus to
 // itself. If that is ever abused the upgrade is real user-activation plumbing through the sandbox, not a
 // longer window here.
-const OPEN_URL_MIN_GAP_MS = 1000
+const NAVIGATION_MIN_GAP_MS = 1000
 
 export type FrameBridge = { dispose(): void; setContext?(context: PluginFrameContext): void }
 
@@ -196,11 +199,15 @@ export function createFrameBridge(input: {
   let spoke = false
 
   const inFlight = new Map<number, AbortController>()
+  // Cancellation releases reply ownership, but native effects and APIs ignoring abort can still be
+  // running. Keep their budget until settlement while this bridge remains alive.
+  const activeWork = new Set<AbortController>()
   const detachers: (() => void)[] = []
   const subscribed = new Set<string>()
   let windowStart = Date.now()
   let windowCount = 0
-  let lastOpenUrlAt = 0
+  // Shared by `openUrl` and `openTask`: both move the reader, so they share one budget.
+  let lastNavigationAt = 0
   let alive = true
 
   const post = (message: PluginBridgeMessage): void => {
@@ -216,9 +223,12 @@ export function createFrameBridge(input: {
   }
 
   function teardown(): void {
-    for (const controller of inFlight.values()) controller.abort()
+    for (const controller of activeWork) controller.abort()
+    activeWork.clear()
     inFlight.clear()
-    for (const detach of detachers.splice(0)) detach()
+    for (const detach of detachers.splice(0)) {
+      try { detach() } catch { /* One failed subscriber cannot retain the port and other owners. */ }
+    }
     subscribed.clear()
     port.onmessage = null
     port.close()
@@ -234,7 +244,7 @@ export function createFrameBridge(input: {
       windowCount = 0
     }
     if (++windowCount > MAX_PER_WINDOW) return `more than ${MAX_PER_WINDOW} bridge messages in ${WINDOW_MS / 1000}s`
-    if (inFlight.size >= MAX_IN_FLIGHT) return `more than ${MAX_IN_FLIGHT} requests in flight`
+    if (activeWork.size >= MAX_IN_FLIGHT) return `more than ${MAX_IN_FLIGHT} requests in flight`
     return null
   }
 
@@ -248,48 +258,60 @@ export function createFrameBridge(input: {
     })
   }
 
-  const handleApi = async (id: number, data: Record<string, unknown>): Promise<void> => {
+  // A request owns its id until it settles or is cancelled. Its work occupies the quota until
+  // settlement, even after it loses reply ownership.
+  const runRequest = (id: number, run: (controller: AbortController, reply: typeof post) => Promise<void>): void => {
+    const controller = new AbortController()
+    inFlight.set(id, controller)
+    activeWork.add(controller)
+    const reply: typeof post = (message) => {
+      if (inFlight.get(id) === controller) post(message)
+    }
+    void run(controller, reply)
+      .catch((error: unknown) => reply(failed(id, 'internal', error instanceof Error ? error.message : String(error))))
+      .finally(() => {
+        activeWork.delete(controller)
+        if (inFlight.get(id) === controller) inFlight.delete(id)
+      })
+  }
+
+  const handleApi = async (id: number, data: Record<string, unknown>, controller: AbortController, reply: typeof post): Promise<void> => {
     const { method, path, body } = data as { method?: unknown; path?: unknown; body?: unknown }
     if (typeof path !== 'string' || !isApiMethod(method)) {
-      post(failed(id, 'bad_request', 'an api request needs a method and a path'))
+      reply(failed(id, 'bad_request', 'an api request needs a method and a path'))
       return
     }
     const decision = allowApi(binding, method, path)
     if (!decision.allowed) {
       // Never reaches services.fetch. The e2e suite asserts exactly this by spying at the broker: a denied
       // path must not produce a request, not merely a discarded response.
-      post(denied(id, decision.reason))
+      reply(denied(id, decision.reason))
       return
     }
-    const controller = new AbortController()
-    inFlight.set(id, controller)
     try {
       const result = await services.fetch(method, decision.path, body, controller.signal)
-      if (!inFlight.has(id)) return // cancelled while in flight; the frame stopped caring
-      if (result.ok) post({ id, ok: true, status: result.status, body: result.body })
+      if (result.ok) reply({ id, ok: true, status: result.status, body: result.body })
       else {
-        post({
+        reply({
           id,
           ok: false,
           error: result.error ?? { code: 'internal', message: `${method} failed with ${result.status}`, requestId: '', retryable: result.status >= 500 },
         })
       }
     } catch (error) {
-      if (inFlight.has(id)) post(failed(id, 'internal', error instanceof Error ? error.message : String(error)))
-    } finally {
-      inFlight.delete(id)
+      reply(failed(id, 'internal', error instanceof Error ? error.message : String(error)))
     }
   }
 
   // The same call as `handleApi`, for a route whose body is bytes (docs/plugins.md § Binary bridge
   // calls). The two share one thing and it is the important one: `allowApi` decides before either looks
   // at a body, so the byte path cannot be used to reach a path the JSON path would refuse.
-  const handleApiBytes = async (id: number, data: Record<string, unknown>): Promise<void> => {
+  const handleApiBytes = async (id: number, data: Record<string, unknown>, controller: AbortController, reply: typeof post): Promise<void> => {
     const { method, path, bytes, type, filename } = data as {
       method?: unknown; path?: unknown; bytes?: unknown; type?: unknown; filename?: unknown
     }
     if (typeof path !== 'string' || (method !== 'GET' && method !== 'POST')) {
-      post(failed(id, 'bad_request', 'a byte request needs GET or POST and a path'))
+      reply(failed(id, 'bad_request', 'a byte request needs GET or POST and a path'))
       return
     }
     const decision = allowApi(binding, method, path)
@@ -297,27 +319,27 @@ export function createFrameBridge(input: {
       // Same guarantee as the JSON path, and the same test pins it: a denied path must never produce a
       // request. Checked here, before the body is read, so a 12 MiB POST at another plugin's namespace
       // is refused without being looked at.
-      post(denied(id, decision.reason))
+      reply(denied(id, decision.reason))
       return
     }
     let body: { bytes: Uint8Array; type: string; filename?: string } | undefined
     if (method === 'POST') {
       if (!(bytes instanceof Uint8Array)) {
-        post(failed(id, 'bad_request', 'a byte POST needs a Uint8Array body'))
+        reply(failed(id, 'bad_request', 'a byte POST needs a Uint8Array body'))
         return
       }
       if (bytes.byteLength > MAX_PLUGIN_BYTES) {
-        post(failed(id, 'bad_request', `binary bridge calls are capped at ${MAX_PLUGIN_BYTES} bytes`))
+        reply(failed(id, 'bad_request', `binary bridge calls are capped at ${MAX_PLUGIN_BYTES} bytes`))
         return
       }
       // Advisory metadata, bounded here so a frame cannot use a header as a side channel. What the
       // bytes actually are is decided by whatever receives them.
       if (type !== undefined && (typeof type !== 'string' || type.length > 128)) {
-        post(failed(id, 'bad_request', 'a byte body’s type must be a short media type'))
+        reply(failed(id, 'bad_request', 'a byte body’s type must be a short media type'))
         return
       }
       if (filename !== undefined && (typeof filename !== 'string' || filename.length > 500)) {
-        post(failed(id, 'bad_request', 'a byte body’s filename must be a short name'))
+        reply(failed(id, 'bad_request', 'a byte body’s filename must be a short name'))
         return
       }
       body = {
@@ -326,13 +348,10 @@ export function createFrameBridge(input: {
         ...(typeof filename === 'string' && filename ? { filename } : {}),
       }
     }
-    const controller = new AbortController()
-    inFlight.set(id, controller)
     try {
       const result = await services.fetchBytes(method, decision.path, body, controller.signal)
-      if (!inFlight.has(id)) return // cancelled while in flight; the frame stopped caring
       if (!result.ok) {
-        post({
+        reply({
           id,
           ok: false,
           error: result.error ?? { code: 'internal', message: `${method} failed with ${result.status}`, requestId: '', retryable: result.status >= 500 },
@@ -340,14 +359,12 @@ export function createFrameBridge(input: {
         return
       }
       if (result.bytes.byteLength > MAX_PLUGIN_BYTES) {
-        post(failed(id, 'too_large', `binary bridge calls are capped at ${MAX_PLUGIN_BYTES} bytes`))
+        reply(failed(id, 'too_large', `binary bridge calls are capped at ${MAX_PLUGIN_BYTES} bytes`))
         return
       }
-      post({ id, ok: true, status: result.status, body: { bytes: result.bytes, type: result.type, filename: result.filename } })
+      reply({ id, ok: true, status: result.status, body: { bytes: result.bytes, type: result.type, filename: result.filename } })
     } catch (error) {
-      if (inFlight.has(id)) post(failed(id, 'internal', error instanceof Error ? error.message : String(error)))
-    } finally {
-      inFlight.delete(id)
+      reply(failed(id, 'internal', error instanceof Error ? error.message : String(error)))
     }
   }
 
@@ -379,27 +396,27 @@ export function createFrameBridge(input: {
     post({ id, ok: true, status: 200, body: null })
   }
 
-  const handleState = async (id: number, kind: string, data: Record<string, unknown>): Promise<void> => {
+  const handleState = async (id: number, kind: string, data: Record<string, unknown>, reply: typeof post): Promise<void> => {
     const key = data.key
     if (typeof key !== 'string' || !key) {
-      post(failed(id, 'bad_request', 'a state operation needs a key'))
+      reply(failed(id, 'bad_request', 'a state operation needs a key'))
       return
     }
     const scoped = pluginStateKey(binding.pluginId, key)
     if (kind === 'state.get') {
-      post({ id, ok: true, status: 200, body: services.stateGet(scoped) ?? null })
+      reply({ id, ok: true, status: 200, body: services.stateGet(scoped) ?? null })
       return
     }
     const serialized = JSON.stringify(data.value ?? null)
     if (utf8Bytes(serialized) > MAX_PLUGIN_STATE_BYTES) {
-      post(failed(id, 'bad_request', `state values are capped at ${MAX_PLUGIN_STATE_BYTES} bytes`))
+      reply(failed(id, 'bad_request', `state values are capped at ${MAX_PLUGIN_STATE_BYTES} bytes`))
       return
     }
     try {
       await services.stateSet(scoped, data.value ?? null)
-      post({ id, ok: true, status: 200, body: null })
+      reply({ id, ok: true, status: 200, body: null })
     } catch (error) {
-      post(failed(id, 'internal', error instanceof Error ? error.message : String(error)))
+      reply(failed(id, 'internal', error instanceof Error ? error.message : String(error)))
     }
   }
 
@@ -441,6 +458,33 @@ export function createFrameBridge(input: {
         services.openTarget?.({ kind: destination.targetKind, resourceId, ...(subresourceId === undefined ? {} : { subresourceId }) })
         return void post({ id, ok: true, status: 200, body: null })
       }
+      case 'openTask': {
+        const taskId = data.taskId
+        if (typeof taskId !== 'string' || !taskId || taskId.length > 300) {
+          return void post(failed(id, 'bad_request', 'openTask needs a task id'))
+        }
+        // Knowing which tasks exist is a read, so the verb rides the read scope rather than adding a
+        // grant of its own.
+        if (!binding.api.includes('core.tasks:read')) {
+          return void post(denied(id, 'openTask needs the core.tasks:read scope'))
+        }
+        // The same person's-act rule as `openUrl` below, and the same budget.
+        if (!services.frameHasFocus()) {
+          return void post(denied(id, 'openTask works from a click or key handler: the frame must be focused'))
+        }
+        const now = Date.now()
+        if (now - lastNavigationAt < NAVIGATION_MIN_GAP_MS) {
+          return void post(denied(id, 'openTask is limited to one navigation per second'))
+        }
+        lastNavigationAt = now
+        // Look up, reply, then move. The move can unmount the surface that asked, a rail source's tree
+        // most of all, and a reply posted after that is dropped (see `openUrl` below).
+        const go = services.openTask(taskId)
+        if (!go) return void post(failed(id, 'not_found', 'that task is not in the task list'))
+        post({ id, ok: true, status: 200, body: null })
+        go()
+        return
+      }
       case 'openUrl': {
         const url = data.url
         // The boundary. A URL from a frame is untrusted input on its way to the navigation layer, so the
@@ -452,16 +496,16 @@ export function createFrameBridge(input: {
         }
         // A navigation must be a person's act. A click or keypress inside the frame's document gives the
         // iframe focus, so honouring the verb only while the frame holds it means background code cannot
-        // move the reader, which the SDK's `openLinkOnClick` satisfies for free. See OPEN_URL_MIN_GAP_MS
+        // move the reader, which the SDK's `openLinkOnClick` satisfies for free. See NAVIGATION_MIN_GAP_MS
         // above for why the throttle backs the focus check up.
         if (!services.frameHasFocus()) {
           return void post(denied(id, 'openUrl works from a click or key handler: the frame must be focused'))
         }
         const now = Date.now()
-        if (now - lastOpenUrlAt < OPEN_URL_MIN_GAP_MS) {
+        if (now - lastNavigationAt < NAVIGATION_MIN_GAP_MS) {
           return void post(denied(id, 'openUrl is limited to one navigation per second'))
         }
-        lastOpenUrlAt = now
+        lastNavigationAt = now
         // The reply goes out before the effect, the opposite of every other verb here. The ladder can
         // replace the reference panel this very frame is rendering inside, which is the whole point of the
         // refPanel presentation, and doing so disposes this bridge from inside the call, so a reply posted
@@ -515,49 +559,49 @@ export function createFrameBridge(input: {
   // Three operations, and the interesting thing about them is what is not here: no cursor, no selection,
   // no decorations, no "open this other document". Each of those is either the host's state or an
   // LSP-shaped route, and the growth rule sends new asks to the second rather than to this list.
-  const handleDocument = async (id: number, data: Record<string, unknown>): Promise<void> => {
+  const handleDocument = async (id: number, data: Record<string, unknown>, reply: typeof post): Promise<void> => {
     const doc = services.document
     if (!doc) {
-      post(denied(id, 'document operations need a pane whose layout declares a document region'))
+      reply(denied(id, 'document operations need a pane whose layout declares a document region'))
       return
     }
     const op = data.op
     try {
       switch (op) {
         case 'read':
-          post({ id, ok: true, status: 200, body: { text: doc.read() } })
+          reply({ id, ok: true, status: 200, body: { text: doc.read() } })
           return
         case 'write': {
           const text = data.text
           if (typeof text !== 'string') {
-            post(failed(id, 'bad_request', 'a document write needs text'))
+            reply(failed(id, 'bad_request', 'a document write needs text'))
             return
           }
           // The same ceiling the read path enforces, applied in the other direction: a frame must not be
           // able to push a document into the editor that the editor would then refuse to load back.
           if (utf8Bytes(text) > MAX_DOCUMENT_BYTES) {
-            post(failed(id, 'bad_request', `documents are capped at ${MAX_DOCUMENT_BYTES} bytes`))
+            reply(failed(id, 'bad_request', `documents are capped at ${MAX_DOCUMENT_BYTES} bytes`))
             return
           }
           doc.write(text)
-          post({ id, ok: true, status: 200, body: null })
+          reply({ id, ok: true, status: 200, body: null })
           return
         }
         case 'flush':
           await doc.flush()
-          post({ id, ok: true, status: 200, body: null })
+          reply({ id, ok: true, status: 200, body: null })
           return
         default:
-          post(failed(id, 'bad_request', `unknown document op ${String(op)}`))
+          reply(failed(id, 'bad_request', `unknown document op ${String(op)}`))
       }
     } catch (error) {
-      post(failed(id, 'internal', error instanceof Error ? error.message : String(error)))
+      reply(failed(id, 'internal', error instanceof Error ? error.message : String(error)))
     }
   }
 
-  const handleWebview = async (id: number, data: Record<string, unknown>): Promise<void> => {
+  const handleWebview = async (id: number, data: Record<string, unknown>, reply: typeof post): Promise<void> => {
     if (binding.target !== 'webview') {
-      post(denied(id, 'webview operations are only valid from a webview surface'))
+      reply(denied(id, 'webview operations are only valid from a webview surface'))
       return
     }
     const op = data.op
@@ -565,25 +609,25 @@ export function createFrameBridge(input: {
       if (op === 'navigate') {
         const url = data.url
         if (typeof url !== 'string' || !isAllowedWebviewUrl(url, binding.hosts ?? [])) {
-          post(denied(id, 'navigate must stay inside this surface’s declared hosts'))
+          reply(denied(id, 'navigate must stay inside this surface’s declared hosts'))
           return
         }
         if (!services.webviewNavigate || !(await services.webviewNavigate(url))) {
-          post(failed(id, 'unavailable', 'the host webview is not available'))
+          reply(failed(id, 'unavailable', 'the host webview is not available'))
           return
         }
       } else if (op === 'back' || op === 'forward' || op === 'reload') {
         if (!services.webviewCommand || !(await services.webviewCommand(op))) {
-          post(failed(id, 'unavailable', 'the host webview is not available'))
+          reply(failed(id, 'unavailable', 'the host webview is not available'))
           return
         }
       } else {
-        post(failed(id, 'bad_request', `unknown webview op ${String(op)}`))
+        reply(failed(id, 'bad_request', `unknown webview op ${String(op)}`))
         return
       }
-      post({ id, ok: true, status: 200, body: null })
+      reply({ id, ok: true, status: 200, body: null })
     } catch (error) {
-      post(failed(id, 'internal', error instanceof Error ? error.message : String(error)))
+      reply(failed(id, 'internal', error instanceof Error ? error.message : String(error)))
     }
   }
 
@@ -604,8 +648,11 @@ export function createFrameBridge(input: {
       reportOverBudget(budget)
       return kill(budget)
     }
+    const shape = requestShape(data)
+    // A reply to a duplicate would also settle the original SDK promise. Close the bridge instead,
+    // including when mount authority changed while the original call was in flight.
+    if (shape && shape.kind !== 'cancel' && inFlight.has(shape.id)) return kill('duplicate live bridge request id')
     if (input.authorize && !input.authorize()) {
-      const shape = requestShape(data)
       if (shape) post(denied(shape.id, 'this bridge is not bound to a mounted tree'))
       return
     }
@@ -641,31 +688,30 @@ export function createFrameBridge(input: {
     if (data.kind === 'telemetry') {
       return measured(() => recordFrameTelemetry(binding.pluginId, data.record))
     }
-    const shape = requestShape(data)
     if (!shape) return
     return measured(() => {
       switch (shape.kind) {
         case 'api':
-          void handleApi(shape.id, data)
+          runRequest(shape.id, (controller, reply) => handleApi(shape.id, data, controller, reply))
           return
         case 'api.bytes':
-          void handleApiBytes(shape.id, data)
+          runRequest(shape.id, (controller, reply) => handleApiBytes(shape.id, data, controller, reply))
           return
         case 'subscribe':
           handleSubscribe(shape.id, data)
           return
         case 'state.get':
         case 'state.set':
-          void handleState(shape.id, shape.kind, data)
+          runRequest(shape.id, (_controller, reply) => handleState(shape.id, shape.kind, data, reply))
           return
         case 'ui':
           handleUi(shape.id, data)
           return
         case 'document':
-          void handleDocument(shape.id, data)
+          runRequest(shape.id, (_controller, reply) => handleDocument(shape.id, data, reply))
           return
         case 'webview':
-          void handleWebview(shape.id, data)
+          runRequest(shape.id, (_controller, reply) => handleWebview(shape.id, data, reply))
           return
         case 'cancel': {
           const target = data.target

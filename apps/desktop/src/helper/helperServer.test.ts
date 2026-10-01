@@ -52,6 +52,10 @@ const stubHelper = (): Stub => {
       }),
       upsert: (record: unknown) => void upserted.push(record),
       statuses: () => [],
+      abort: () => {},
+      send: () => {},
+      closeViewer: () => {},
+      openViewer: () => true,
     },
     fleet: {
       list: () => remembered.map((entry) => entry.node),
@@ -145,6 +149,67 @@ describe('node-adopt checks the vouched fingerprint against the certificate', ()
   })
 })
 
+it('refuses a multibyte secret safely and then accepts the valid secret and origin', async () => {
+  const { helper } = stubHelper()
+  const server = await startHelperServer(helper, { secret: 'a'.repeat(64), appOrigin: 'http://acorn.localhost' })
+  servers.push(server)
+  const refused = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${encodeURIComponent('é'.repeat(64))}`)
+  await new Promise<void>((resolve) => { refused.on('error', () => {}); refused.once('close', () => resolve()) })
+  const foreign = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${server.secret}`, { origin: 'http://foreign.invalid' })
+  await new Promise<void>((resolve) => { foreign.on('error', () => {}); foreign.once('close', () => resolve()) })
+  const valid = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${server.secret}`, { origin: 'http://acorn.localhost' })
+  await new Promise<void>((resolve, reject) => { valid.once('open', resolve); valid.on('error', reject) })
+  valid.close()
+})
+
+it('closes an oversized request with 1009 before dispatch, then shuts down promptly', async () => {
+  const { helper } = stubHelper()
+  const write = vi.spyOn(helper.config, 'write')
+  const server = await startHelperServer(helper, { secret: 'a'.repeat(64), appOrigin: 'http://acorn.localhost', maxRequestBytes: 64 })
+  servers.push(server)
+  const ws = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${server.secret}`)
+  ws.on('error', () => {})
+  await new Promise<void>((resolve) => ws.once('open', resolve))
+  const closed = new Promise<number>((resolve) => ws.once('close', (code) => resolve(code)))
+  ws.send(JSON.stringify({ id: 1, method: 'config-write', params: { value: 'x'.repeat(65) } }))
+  expect(await closed).toBe(1009)
+  expect(write).not.toHaveBeenCalled()
+})
+
+it('does not apply the incoming carrier limit to a larger helper reply', async () => {
+  const { helper } = stubHelper()
+  vi.spyOn(helper.config, 'read').mockReturnValue({ config: { testValue: 'x'.repeat(1000) } } as ReturnType<Helper['config']['read']>)
+  const server = await startHelperServer(helper, { secret: 'a'.repeat(64), appOrigin: 'http://acorn.localhost', maxRequestBytes: 64 })
+  servers.push(server)
+  const ws = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${server.secret}`)
+  ws.on('error', () => {})
+  await new Promise<void>((resolve) => ws.once('open', resolve))
+  const replied = new Promise<string>((resolve) => ws.once('message', (data) => resolve(String(data))))
+  ws.send(JSON.stringify({ id: 1, method: 'config-read' }))
+  expect((await replied).length).toBeGreaterThan(1000)
+  ws.close()
+})
+
+it('terminates an oversized peer still waiting in its closing handshake during helper disposal', async () => {
+  const { helper } = stubHelper()
+  const server = await startHelperServer(helper, { secret: 'a'.repeat(64), appOrigin: 'http://acorn.localhost', maxRequestBytes: 64 })
+  servers.push(server)
+  const ws = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${server.secret}`)
+  ws.on('error', () => {})
+  await new Promise<void>((resolve) => ws.once('open', resolve))
+  const closing = vi.spyOn(WebSocket.prototype, 'close')
+  try {
+    ws.pause()
+    ws.send('x'.repeat(65))
+    await vi.waitFor(() => expect(closing.mock.calls.some(([code]) => code === 1009)).toBe(true))
+    await server.close()
+  } finally {
+    closing.mockRestore()
+    ws.resume()
+    ws.terminate()
+  }
+}, 2_000)
+
 
 // The helper forwards the active node's frames and nobody else's.
 //
@@ -152,7 +217,7 @@ describe('node-adopt checks the vouched fingerprint against the certificate', ()
 // renderer drops whatever is not the active node on arrival
 // (@acorn/client-core/infra/node/wsClient.ts). So an N-node fleet paid two process boundaries, a
 // stringify and a parse per frame to deliver frames that were then thrown away.
-// Nobody has to tell the helper which node is active: every request the renderer makes names one.
+// Interest is declared by selection, independently of reads and cleanup writes.
 describe('the helper forwards only the active node', () => {
   const connect = async () => {
     const { helper } = stubHelper()
@@ -188,8 +253,7 @@ describe('the helper forwards only the active node', () => {
   it('drops a frame from a node the renderer is not addressing, and keeps every node\'s status', async () => {
     const { socket, settled, server } = await connect()
     try {
-      // Addressing node-a is what makes it the active one. `node-send` and `node-fetch` both count.
-      socket.send(JSON.stringify({ id: 1, method: 'node-send', params: { nodeId: 'node-a', frame: { channel: 'term:attach', id: 's1' } } }))
+      socket.send(JSON.stringify({ id: 1, method: 'node-interest', params: { nodeId: 'node-a' } }))
       await settled()
 
       server.push({ push: 'node-frame', nodeId: 'node-a', frame: { channel: 'tasks:changed' } })
@@ -215,13 +279,13 @@ describe('the helper forwards only the active node', () => {
     }
   })
 
-  // A node switch changes the fact with the renderer's first request to the new node.
+  // A cached Node switch changes interest without any API read.
   it('follows the renderer to a new node', async () => {
     const { socket, settled, server } = await connect()
     try {
-      socket.send(JSON.stringify({ id: 1, method: 'node-send', params: { nodeId: 'node-a', frame: { channel: 'term:attach', id: 's1' } } }))
+      socket.send(JSON.stringify({ id: 1, method: 'node-interest', params: { nodeId: 'node-a' } }))
       await settled()
-      socket.send(JSON.stringify({ id: 2, method: 'node-send', params: { nodeId: 'node-b', frame: { channel: 'term:attach', id: 's2' } } }))
+      socket.send(JSON.stringify({ id: 2, method: 'node-interest', params: { nodeId: 'node-b' } }))
       await settled()
 
       server.push({ push: 'node-frame', nodeId: 'node-a', frame: { channel: 'tasks:changed' } })

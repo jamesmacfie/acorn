@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
 import { writePrivateAtomic } from '@acorn/node-core/server/storage'
 import { join } from 'node:path'
 import { z } from 'zod'
@@ -7,11 +7,10 @@ import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { corePluginBundleByHashRoute, corePluginBundleRoute } from '@acorn/protocol/api.ts'
 import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
-import { withPluginPackage } from '@acorn/node-core/server/plugins'
+import { withPluginPackage, readPluginFile, MAX_PLUGIN_MANIFEST_BYTES, PluginPackageFileError } from '@acorn/node-core/server/plugins'
 import { hasNodeHalf, bundleSourceSchema } from '@acorn/protocol/plugin/bundles.ts'
 import type { PluginInstallSource } from '@acorn/protocol/api.ts'
 import { describePluginSource } from '@acorn/protocol/plugin/source.ts'
-import { resolveInRoot } from '@acorn/node-core/server/core/fs.ts'
 import { installSchema } from './pluginRequests'
 import { NodeResponseTooLargeError } from '../broker/nodeRequest'
 
@@ -61,6 +60,9 @@ const indexSchema = z.strictObject({ version: z.literal(1), entries: z.record(z.
 export type PutFailure = 'unreachable' | 'not-found' | 'too-large' | 'hash-mismatch' | 'has-node-half' | 'invalid-manifest' | 'plugin-id-mismatch'
 export type PutResult = { hash: string } | { error: PutFailure }
 
+type BundledClientBundle = { pluginId: string; version: string; read: () => Uint8Array }
+type BundledPutResult = { pluginId: string; hash: string } | { pluginId: string; error: unknown }
+
 // Just enough of NodeBroker to fetch. Narrow so the tests can exercise the hashing rules without a
 // TLS server.
 export type BundleFetcher = { fetch(nodeId: string, request: NodeFetchRequest, limits?: { maxResponseBytes?: number }): Promise<NodeFetchResponse> }
@@ -84,30 +86,42 @@ export class PluginCache {
   /** Cache client code read from this app's packaged resources. Unlike putFromNode there is no remote
    * hash claim to verify, so the content hash computed here is the identity main trusts. */
   putBundled(pluginId: string, version: string, bytes: Uint8Array): string {
-    if (bytes.byteLength > MAX_BUNDLE_BYTES) throw new Error(`Bundled plugin '${pluginId}' exceeds the client bundle limit.`)
-    const hash = createHash('sha256').update(bytes).digest('hex')
-    // Nothing to do when these exact bytes are already here, which is every launch between app
-    // updates. Writing anyway cost a bundle write plus an fsynced index rewrite per bundled plugin,
-    // in front of the window (docs/security.md § Third-party plugin bundles).
-    //
-    // The file is checked as well as the index row, because the two can disagree after a crash
-    // mid-write and `sweep` only repairs the other direction. A stat is not a write.
-    if (this.has(hash) && existsSync(join(this.dir, `${hash}.js`))) return hash
-    this.writeBundle(hash, bytes)
-    const now = Date.now()
-    const existing = this.entries()[hash]
-    this.writeIndex({
-      ...this.entries(),
-      [hash]: {
-        pluginId,
-        version,
-        bytes: bytes.byteLength,
-        nodeIds: existing?.nodeIds ?? [],
-        firstSeen: existing?.firstSeen ?? now,
-        lastSeen: now,
-      },
-    })
-    return hash
+    const result = this.putBundledBatch([{ pluginId, version, read: () => bytes }])[0]!
+    if ('error' in result) throw result.error
+    return result.hash
+  }
+
+  /** Cache application resources individually, then commit their successful index rows together.
+   * Suppliers keep only one bundle body in memory. A failed index commit publishes no new rows. */
+  putBundledBatch(bundles: Iterable<BundledClientBundle>): BundledPutResult[] {
+    const entries = { ...this.entries() }
+    const results: BundledPutResult[] = []
+    let changed = false
+    for (const bundle of bundles) {
+      const { pluginId, version } = bundle
+      try {
+        const bytes = bundle.read()
+        if (bytes.byteLength > MAX_BUNDLE_BYTES) throw new Error(`Bundled plugin '${pluginId}' exceeds the client bundle limit.`)
+        const hash = createHash('sha256').update(bytes).digest('hex')
+        const existing = entries[hash]
+        // Check the file as well as its row: a missing body must be repaired after a crash.
+        if (!existing || !existsSync(join(this.dir, `${hash}.js`))) {
+          const now = Date.now()
+          const entry = entrySchema.parse({
+            pluginId, version, bytes: bytes.byteLength,
+            nodeIds: existing?.nodeIds ?? [], firstSeen: existing?.firstSeen ?? now, lastSeen: now,
+          })
+          this.writeBundle(hash, bytes)
+          entries[hash] = entry
+          changed = true
+        }
+        results.push({ pluginId, hash })
+      } catch (error) {
+        results.push({ pluginId, error })
+      }
+    }
+    if (changed) this.writeIndex(entries)
+    return results
   }
 
   // Main-only. The `app-plugin://` handler is the caller, and this never reaches the renderer.
@@ -184,14 +198,11 @@ export class PluginCache {
   async putFromSource(source: PluginInstallSource, expectedPluginId?: string): Promise<{ hash: string; pluginId: string; version: string } | { error: PutFailure }> {
     try {
       return await withPluginPackage(this.userDataDir, source, (root, manifest) => {
-        const rawManifest: unknown = JSON.parse(readFileSync(join(root, 'acorn-plugin.json'), 'utf8'))
+        const rawManifest: unknown = JSON.parse(readPluginFile(root, 'acorn-plugin.json', MAX_PLUGIN_MANIFEST_BYTES).toString('utf8'))
         if (expectedPluginId && manifest.id !== expectedPluginId) return { error: 'plugin-id-mismatch' as const }
         if (hasNodeHalf(rawManifest)) return { error: 'has-node-half' as const }
         if (!manifest.client) return { error: 'invalid-manifest' as const }
-        const path = resolveInRoot(root, manifest.client)
-        if (!path) return { error: 'invalid-manifest' as const }
-        if (statSync(path).size > MAX_BUNDLE_BYTES) return { error: 'too-large' as const }
-        const bytes = readFileSync(path)
+        const bytes = readPluginFile(root, manifest.client, MAX_BUNDLE_BYTES)
         const hash = createHash('sha256').update(bytes).digest('hex')
         this.writeBundle(hash, bytes)
         const now = Date.now()
@@ -212,6 +223,7 @@ export class PluginCache {
         return { hash, pluginId: manifest.id, version: manifest.version }
       })
     } catch (error) {
+      if (error instanceof PluginPackageFileError && error.kind === 'too-large') return { error: 'too-large' }
       log.warn(`device plugin install failed: ${describeError(error).message}`)
       throw error
     }
@@ -316,9 +328,9 @@ export class PluginCache {
   }
 
   private writeIndex(entries: Record<string, PluginCacheEntry>): void {
-    this.#entries = entries
     mkdirSync(this.dir, { recursive: true, mode: 0o700 })
     const path = join(this.dir, INDEX_FILE)
     writePrivateAtomic(path, `${JSON.stringify({ version: 1, entries } satisfies z.input<typeof indexSchema>, null, 2)}\n`)
+    this.#entries = entries
   }
 }

@@ -1,0 +1,72 @@
+{
+  "production": [
+    {
+      "path": "plugins/terminal/src/server/terminalUtils.ts",
+      "sha256": "248de44222bf7930c0d79c9d1521cb9ee0e1a69c14b128e95b999676731438d9"
+    },
+    {
+      "path": "plugins/terminal/src/server/terminalDisplay.ts",
+      "sha256": "599187c60d4efa0b5aadfda6bd2536e0218299e84b16dd70f255aa0a4e2d2919"
+    },
+    {
+      "path": "plugins/terminal/src/server/runtime.ts",
+      "sha256": "d4dd3d1e1a19fba371453bbd13983d00cddf04a03cb79687f507d6a9772596b7"
+    },
+    {
+      "path": "plugins/terminal/src/server/terminal.ts",
+      "sha256": "631445714e3be152bc3452e8c8d52a42dce9716a1125dce69eac1671f4472375"
+    },
+    {
+      "path": "plugins/terminal/src/server/runChannel.ts",
+      "sha256": "da1d83fa6b3e103f75db45bd48ce1a3b8bc3f95ce969d8e90c47b6c6df579d96"
+    },
+    {
+      "path": "docs/terminal.md",
+      "sha256": "a072e60fb4ad1ad6dd0b29c64746cafe4e69ee8cb43f1e1d17800bbadde103d6"
+    }
+  ],
+  "tests": [
+    {
+      "path": "plugins/terminal/src/server/terminalUtils.test.ts",
+      "sha256": "f54ea426face93168699fa53a18d600c4b1be8de31b4b8143957953edae397d7"
+    },
+    {
+      "path": "plugins/terminal/src/server/runtime.test.ts",
+      "sha256": "d6d2c6d58acaf7ef6c90d382a90f2eaaf36d5a813f06825436269bbbf940dcc9"
+    },
+    {
+      "path": "plugins/terminal/src/server/runtimeLifecycle.test.ts",
+      "sha256": "de54cb7a41d8c9fec790c3e0af55fbdbcfe2140f457d4ac4f17bc056f4877949"
+    },
+    {
+      "path": "plugins/terminal/src/server/terminalLifetime.test.ts",
+      "sha256": "349cda8e164874288d5b0dc8d5d8141c19f91dfec5727a3608500af01c440da8"
+    },
+    {
+      "path": "plugins/terminal/src/server/terminalProcessLifetime.test.ts",
+      "sha256": "051375d5f7627b9dc3081fa3622dbc1dc919bda6b02296aa898e50792ff0a590"
+    },
+    {
+      "path": "plugins/terminal/src/client/sessionRemoval.test.tsx",
+      "sha256": "6a257e99f56fc7f5f6a645f7b443e1d195d275a3a87af5720a924d9bc621b686"
+    }
+  ],
+  "probes": [
+    {
+      "path": "plans/performance/unit07-ring-probe.mjs",
+      "sha256": "d92442d0241fc984eb4508cf1245609afbf92c3b0070fcdf02bcd631b846f065"
+    },
+    {
+      "path": "plans/performance/04-node-probe.mjs",
+      "sha256": "fe2d85042e25ab12955acb093946ac3db35cb31066cdec5d8f526786edaa9be8"
+    },
+    {
+      "path": "plans/performance/04-engine-probe.test.ts",
+      "sha256": "139dd05e80bfcbff5a396230e9fe5ee05dd3e057978bb0752680192cb62c1d92"
+    },
+    {
+      "path": "plans/performance/04-probe.config.ts",
+      "sha256": "869ff2a65bb987c97c61d965a6134337f10388a99ed3b6adb13dd13f82457a61"
+    }
+  ]
+}

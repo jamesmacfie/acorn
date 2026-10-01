@@ -16,18 +16,45 @@ export type SendableSession = {
 
 export type SendResult = { ok: true; queued: boolean } | { ok: false; reason: string }
 
+type ScheduledSubmit = { active: boolean; cancel?: () => void }
+
 export class AgentSender {
   private pending = new Map<string, string[]>() // sessionId → sanitized blocks awaiting the idle edge
+
+  private submits = new Map<string, Set<ScheduledSubmit>>()
 
   constructor(
     private getSession: (id: string) => SendableSession | null,
     private submitDelayMs = 150,
-    private schedule: (fn: () => void, ms: number) => void = (fn, ms) => setTimeout(fn, ms),
+    private schedule: (fn: () => void, ms: number) => (() => void) | void = (fn, ms) => {
+      const timer = setTimeout(fn, ms)
+      return () => clearTimeout(timer)
+    },
   ) {}
 
-  private deliver(s: SendableSession, block: string, submit: boolean) {
+  private deliver(sessionId: string, s: SendableSession, block: string, submit: boolean) {
     s.write(block)
-    if (submit) this.schedule(() => s.running() && s.write('\r'), this.submitDelayMs)
+    if (!submit) return
+    const group = this.submits.get(sessionId) ?? new Set<ScheduledSubmit>()
+    this.submits.set(sessionId, group)
+    const operation: ScheduledSubmit = { active: true }
+    group.add(operation)
+    const finish = () => {
+      group.delete(operation)
+      if (!group.size && this.submits.get(sessionId) === group) this.submits.delete(sessionId)
+    }
+    try {
+      operation.cancel = this.schedule(() => {
+        if (!operation.active) return
+        operation.active = false
+        finish()
+        if (this.getSession(sessionId) === s && s.running()) s.write('\r')
+      }, this.submitDelayMs) || undefined
+    } catch (error) {
+      operation.active = false
+      finish()
+      throw error
+    }
   }
 
   send(sessionId: string, text: string, submit: SendSubmit): SendResult {
@@ -35,11 +62,11 @@ export class AgentSender {
     if (!s || !s.running()) return { ok: false, reason: 'Session is not running.' }
     const block = wrapBracketedPaste(text)
     if (submit === 'draft') {
-      this.deliver(s, block, false)
+      this.deliver(sessionId, s, block, false)
       return { ok: true, queued: false }
     }
     if (submit === 'now' || s.idle()) {
-      this.deliver(s, block, true)
+      this.deliver(sessionId, s, block, true)
       return { ok: true, queued: false }
     }
     const queue = this.pending.get(sessionId) ?? []
@@ -55,12 +82,21 @@ export class AgentSender {
     this.pending.delete(sessionId)
     const s = this.getSession(sessionId)
     if (!s || !s.running()) return
-    for (const block of queue) this.deliver(s, block, true)
+    for (const block of queue) this.deliver(sessionId, s, block, true)
   }
 
   // Session exited. Its queue can never fire.
   clear(sessionId: string): void {
     this.pending.delete(sessionId)
+    const group = this.submits.get(sessionId)
+    this.submits.delete(sessionId)
+    let failure: unknown
+    for (const operation of group ?? []) {
+      operation.active = false
+      try { operation.cancel?.() } catch (error) { failure ??= error }
+    }
+    group?.clear()
+    if (failure) throw failure
   }
 
   queuedCount(sessionId: string): number {

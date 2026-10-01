@@ -15,6 +15,7 @@ import type { NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 vi.mock('idb-keyval', () => ({ get: vi.fn(), set: vi.fn(), del: vi.fn(async () => {}) }))
 
 const store = new Map<string, string>([['acorn.last-node', 'node-remembered']])
+let interests: (string | null)[] = []
 ;(globalThis as { localStorage?: unknown }).localStorage = {
   get length() { return store.size },
   key: (index: number) => [...store.keys()][index] ?? null,
@@ -40,11 +41,13 @@ const stubBridge = (nodes: NodeRecord[], statuses: NodeStatus[] = []): void => {
       nodeFetch: () => Promise.reject(new Error('this suite makes no requests')),
       fleetList: async () => ({ nodes, statuses }),
       onNodeStatus: () => () => {},
+      nodeInterest: (nodeId: string | null) => interests.push(nodeId),
     },
   })
 }
 
 afterEach(() => {
+  interests = []
   _resetFleet()
   vi.unstubAllGlobals()
 })
@@ -60,6 +63,7 @@ describe('the remembered node', () => {
     // …and the fleet, when it answers, produces the same partition rather than a second one.
     stubBridge([record('node-remembered')])
     await selectActiveNode()
+    expect(interests).toEqual(['node-remembered', 'node-remembered'])
     expect(activeCacheId()).toBe('node-remembered')
     expect(clientFor(activeCacheId())).toBe(guessed)
     expect(cacheKeyFor(activeCacheId())).toBe('acorn-cache:acorn-1:node-remembered')
@@ -80,6 +84,15 @@ describe('the remembered node', () => {
     await selectActiveNode()
     expect(activeNodeId()).toBeNull()
     expect(store.has('acorn.last-node')).toBe(false)
+  })
+})
+
+describe('authoritative event interest', () => {
+  it('declares equivalent selection and a cached switch without a fetch', () => {
+    stubBridge([record('node-a'), record('node-b')])
+    setActiveNode('node-a'); interests = []
+    setActiveNode('node-a'); setActiveNode('node-b')
+    expect(interests).toEqual(['node-a', 'node-b'])
   })
 })
 

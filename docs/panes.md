@@ -28,6 +28,9 @@ narrow column is unusable.
 
 `preview` is gated by `when` too: a task with no run-target URL and no project preview setting has
 nothing to draw, so it gets no button ([shell.md](./shell.md) § Host-owned webviews has the check).
+`database` is gated the same way through its manifest's `availability` route: a task with no
+connection script and no `DATABASE_URL` in its worktree `.env` or the Node's environment gets no
+button ([database.md](./database.md) § Connection resolution).
 
 The loaded Findings pane is deliberately absent from this list. Its manifest sets
 `showInSwitcher: false`, so the pane remains a valid persisted layout target and can be opened by
@@ -225,8 +228,8 @@ The draft lives on the pane's model, above every region
 there: a shortcut that comes and goes with a column is not a shortcut.
 
 The host holds that shared thing. A compiled pane declares a `model` beside its regions, and the host
-builds it once per task inside its own reactive root, hands it to every region, and disposes it when
-the task is evicted (`client-core/src/host/registries/panes/paneModels.ts`):
+keeps one current task model per pane inside a detached reactive root, shares it across regions, and
+disposes it when that task is replaced or evicted, or its Node shell retires (`client-core/src/host/registries/panes/paneModels.ts`):
 
 ```ts
 ctx.panes.register({
@@ -247,8 +250,12 @@ the admission rule's own test. A pane whose regions share nothing omits `model` 
 handed `undefined`.
 
 The model outlives the pane that asked for it. The host keeps one per pane, and a model stays until a
-different task asks for that pane or the task is evicted, so after the reader moves on its effects
-keep running with nobody looking. The host therefore calls `model(task, pane)`, and `pane.shown()` is
+different task asks for that pane, the task is evicted, or the owning Node shell/provider is destroyed.
+Closing a pane or unmounting a region keeps the model. The shell mounts the explicit `PaneModelHost`
+component inside its selected QueryClient provider. Its captured Node generation qualifies model
+reuse and drawn marks; outgoing scope eviction retires observers before an incoming shell builds.
+Late cleanup from an earlier generation cannot release a replacement model or its drawn marks. A
+failed builder disposes its partially constructed root before a retry. The host therefore calls `model(task, pane)`, and `pane.shown()` is
 true only while a mounted pane is drawing that task. It is false on another task, behind a rail source
 such as Home, and while the same task shows a different pane. An effect that polls, or marks something
 as seen, reads it first. The agent pane marks sessions read and acknowledges finished turns only while
@@ -414,6 +421,20 @@ A compiled pane sets `readsArchived: true` on its pane contribution. A loaded pl
 optional field on a task-scoped `frames` entry whose `target` is `pane`. It is invalid on a
 project-scoped pane or any other frame target. Leaving it out keeps the pane out of archived previews,
 which also preserves the behaviour of manifests written before the field existed.
+
+A compiled pane hides itself on a task with nothing to draw by giving its contribution a `when`. A
+loaded plugin can't ship a function to the host, so its task-scoped `frames` entry names an
+`availability` route instead, one of its own under `/v1/p/<id>/`. A GET answers
+`{ [taskId]: boolean }` for every active task on the Node, and the pane appears only on a task the
+answer marks `true`. The host reads it once per Node and keeps it in memory
+(`client-core/host/frames/paneAvailability.ts`), because `when` is asked on every draw of the pane
+strip. It reads again on a project change, a task it hasn't seen, a Node switch, a reconnect, window
+focus, and every two minutes. Until the first answer arrives the pane is hidden. A failed read keeps
+the last answer, so one dropped request doesn't flicker the button. A `404` means a package built
+before the route existed, and the pane then shows on every task, as it did before. The route lists
+every active task, so it should refuse a task-scoped caller. Answer "is this set up", not "is it
+running": an answer that turns false while a dev server restarts closes a pane the reader is looking
+at.
 
 A loaded plugin declares the same two keys on a `frames` entry, and it has to: `layout` is required on
 a `pane`, a `refPanel` and a `settings` surface. Omitting it used to mean "the whole surface is my

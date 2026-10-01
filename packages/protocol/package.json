@@ -44,6 +44,7 @@
     "./node.ts": "./src/device/node.ts",
     "./nodeEvents.ts": "./src/transport/nodeEvents.ts",
     "./nodeProviders.ts": "./src/device/nodeProviders.ts",
+    "./nodeRuntime.ts": "./src/runtime/nodeRuntime.ts",
     "./notes.ts": "./src/projects/notes.ts",
     "./notices.ts": "./src/chrome/notices.ts",
     "./paneLayouts.ts": "./src/chrome/paneLayouts.ts",
@@ -56,6 +57,7 @@
     "./plugin/declaration.ts": "./src/plugin/declaration.ts",
     "./plugin/grants.ts": "./src/plugin/grants.ts",
     "./plugin/ids.ts": "./src/plugin/ids.ts",
+    "./plugin/nodeBuiltins.ts": "./src/plugin/nodeBuiltins.ts",
     "./plugin/runtimeContributions.ts": "./src/plugin/runtimeContributions.ts",
     "./plugin/source.ts": "./src/plugin/source.ts",
     "./plugin/state.ts": "./src/plugin/state.ts",
@@ -89,8 +91,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@vitest/coverage-v8": "4.1.9",
+    "@vitest/coverage-v8": "4.1.11",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.11"
   }
 }

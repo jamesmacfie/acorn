@@ -272,11 +272,21 @@ child process per plugin with the two ports over an IPC channel. Measured on Nod
 applies the permission model to the thread: the worker is denied a read the parent is allowed. So there
 is no child process, and the TUI process itself runs with no permission flags at all.
 
-**Node's permission model does not cover the network**, which is the one thing the DOM worker's CSP
-gave away free. `apps/tui/src/plugins/pluginWorker.js` runs before a stranger's module scope, installs
-a `module.registerHooks` resolver refusing fourteen builtins, and deletes five globals. `module` is on
-that list so a bundle cannot register a hook of its own and undo this one, and `worker_threads` so it
-cannot start a thread that inherited none of it.
+**Client workers receive an empty environment.** `env: {}` is supplied at worker creation, before
+bundle evaluation. Accepting client bytes grants no access to the workstation's exported variables,
+including environment grants a plugin declares for its separate Node half.
+
+**Node 22 and 24's permission model does not cover the network.** The trusted factory applies the
+shared builtin family policy in `packages/protocol/src/plugin/nodeBuiltins.ts` with sockets and exec
+disabled, then passes the permitted public builtin names to the standalone bootstrap. Before bundle
+evaluation, `apps/tui/src/plugins/pluginWorker.js` enforces that set through `module.registerHooks`
+for imports and CommonJS require, wraps `process.getBuiltinModule` with the same check, and deletes
+five network globals. Builtin subpaths receive their family's policy; unknown, internal, network and
+privileged families are refused. `module` is unavailable, so a bundle cannot register its own hook
+or construct another require function. `worker_threads` is unavailable too. Harmless builtins remain
+usable, and filesystem access still needs the two exact Node permission grants above. The bootstrap
+needs no additional readable policy file or bundle chunk. Node 26 adds its independent network
+permission check; the client builtin policy applies on every supported branch.
 
 The batch rules are shared rather than copied. `client-core/host/tree/treeState.ts` holds the store,
 the pre-flight check, `apply()`, the prop sanitiser and the coalescer with no JSX in them, and each

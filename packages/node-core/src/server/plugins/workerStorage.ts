@@ -7,6 +7,8 @@ import { entityKind } from 'drizzle-orm/entity'
 import { BaseSQLiteDatabase } from 'drizzle-orm/sqlite-core/db'
 import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core/dialect'
 import { assertPluginMigrationHistory } from './migrations.ts'
+import { installPluginStoragePolicy } from './storagePolicy.ts'
+import { validatePluginDbFiles } from './pluginDbFiles.ts'
 
 type Statement = {
   run(...params: unknown[]): { changes: number | bigint; lastInsertRowid: number | bigint }
@@ -44,7 +46,14 @@ const wrapStatement = (statement: StatementSync): Statement => {
 }
 
 const openClient = (path: string): Client => {
+  validatePluginDbFiles(path)
   const sqlite = new DatabaseSync(path, { enableForeignKeyConstraints: false })
+  try {
+    installPluginStoragePolicy(sqlite)
+  } catch (error) {
+    sqlite.close()
+    throw error
+  }
   let depth = 0
   const transaction = <A extends unknown[], R>(fn: (...args: A) => R) => {
     const run = (begin: string) => (...args: A): R => {

@@ -1,0 +1,36 @@
+{
+  "runtime": "v24.11.0",
+  "driver": "mocked pg, actual core owner",
+  "records": [
+    {
+      "name": "concurrent-cold-queries",
+      "requests": 20,
+      "poolsCreated": 20,
+      "poolsAliveAfterDisconnect": 19
+    },
+    {
+      "name": "disconnect-during-connect",
+      "poolsCreated": 1,
+      "aliveAfterConnectFinishes": 1
+    },
+    {
+      "name": "concurrent-catalogs",
+      "readers": 8,
+      "tables": 100,
+      "schemaStatements": 1608,
+      "elapsedMs": 1.9325000000000045,
+      "note": "Fake pg does not enforce max:4; concurrency and elapsed are not live Postgres timing."
+    },
+    {
+      "name": "row-cap",
+      "driverRows": 250000,
+      "returnedRows": 200,
+      "normalizedCells": 250000,
+      "truncated": true,
+      "elapsedMs": 38.313834000000014,
+      "cpuMs": 58.082,
+      "heapDeltaBytes": 26299440,
+      "note": "Driver result allocation is outside timed section; heap delta is sampled allocation, not a retained leak."
+    }
+  ]
+}

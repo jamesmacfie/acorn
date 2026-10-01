@@ -11,6 +11,9 @@ export type SourceEntry = { id: SourceId; glyph: string; label: string }
 export type SourceScope = {
   providers?: readonly PublicIntegrationProvider[]
   linked?: readonly WorkspaceExternalProject[]
+  /** Whether the active workspace has a project that is a git repository. Undefined until the
+   *  projects have loaded, and then no source is hidden for it, for the reason `linked` gives. */
+  gitProject?: boolean
 }
 
 export function availableSources(integrations: Integration[] | undefined, scope?: SourceScope): SourceEntry[] {
@@ -34,12 +37,13 @@ export function availableSources(integrations: Integration[] | undefined, scope?
   }
   return sourceRegistry
     .entries()
-    // Four independent gates, all AND-ed: `requires` asks the platform question, `providerId` asks "is
+    // Five independent gates, all AND-ed: `requires` asks the platform question, `providerId` asks "is
     // the integration behind this connected?", the mapping asks "does this workspace follow anything of
-    // its?", and `when` asks anything else the contribution needs (Fleet home: more than one node
-    // paired).
+    // its?", `requiresGitProject` asks whether it holds a git repository, and `when` asks anything
+    // else the contribution needs (Fleet home: more than one node paired).
     .filter((source) => hasHostCapability(source.requires)
       && (!source.providerId || (has(source.providerId, source.requiresProvider) && linked(source.providerId)))
+      && (!source.requiresGitProject || scope?.gitProject !== false)
       && (source.when?.() ?? true))
     // `id` breaks a tie, so two sources declaring the same order still produce a stable rail
     // rather than one that depends on registration after all, the same tiebreak the slot hosts

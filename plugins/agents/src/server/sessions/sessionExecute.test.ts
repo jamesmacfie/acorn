@@ -207,6 +207,9 @@ describe('agents.sessionExecute config options', () => {
 
     const patched = await runtime.patchSession(session.id, { config: { toolCeiling: { maxRisk: 'execute' } } })
     expect(patched.config.toolCeiling).toEqual(tools)
+    expect(patched.config).toMatchObject({ workflowRunId: 'run-1', workflowStepId: 'step-1' })
+    const fork = await runtime.fork(session.id)
+    expect(fork.config).toMatchObject({ workflowRunId: 'run-1', workflowStepId: 'step-1', toolCeiling: tools })
   })
 
   it('drops a value the provider does not offer and says so in the transcript', async () => {

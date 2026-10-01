@@ -160,6 +160,20 @@ export const managedAgents = new Hono<AppEnv>()
     maxSize: 12 * 1024 * 1024,
     onError: (c) => respondError(c, 413, 'request_too_large'),
   }))
+  // Renderer execution controls require owner authority, independently of session ownership.
+  // Register before the ownership resolvers so denied callers cannot reach any runtime operation.
+  // Agent execution uses the guarded delegation/workflow capabilities, never these HTTP controls.
+  .on('GET', ['/providers', '/sessions/:sessionId/mcp'], requireDevice)
+  .on('PUT', ['/sessions/:sessionId/mcp'], requireDevice)
+  .on('POST', [
+    '/sessions', '/transcript-imports', '/sessions/:sessionId/turns',
+    '/sessions/:sessionId/implement-plan', '/sessions/:sessionId/requests/:requestId/resolve',
+    '/sessions/:sessionId/fork', '/sessions/:sessionId/compact',
+    '/sessions/:sessionId/regenerate-title', '/sessions/:sessionId/handoff-terminal',
+    '/sessions/:sessionId/resume-managed', '/sessions/:sessionId/verify-imported-resume',
+  ], requireDevice)
+  .on('PATCH', ['/sessions/:sessionId', '/sessions/:sessionId/turns/:turnId'], requireDevice)
+  .on('DELETE', ['/sessions/:sessionId'], requireDevice)
   // One mount per id kind. Hono's trailing `/*` matches zero segments, so `/sessions/:sessionId/*`
   // already covers `/sessions/:sessionId` itself.
   //
@@ -171,13 +185,15 @@ export const managedAgents = new Hono<AppEnv>()
   .use('/attachments/:attachmentId/*', owns('attachmentId', (b, id) => b.taskIdForAttachment(id)))
   .use('/artifacts/:artifactId/*', owns('artifactId', (b, id) => b.taskIdForArtifact(id)))
   // This plugin's contribution to core's merged run list (@acorn/protocol/runs.ts). Read by the node
-  // with no client and no request in sight, so it takes no params and answers node-wide; core filters
-  // the merged answer for a confined caller, which is why there is no `confineFilter` here.
+  // with service authority, so it takes no params and answers node-wide. Task callers use core's
+  // filtered merged run list and cannot read this unfiltered source directly.
   //
   // A session is a run: it starts, takes time, spends money, and ends. Cost is not on the row —
   // it lives per turn inside `usage_json`, and parsing every turn's JSON to draw a list is the wrong
   // trade. The field is optional in the run shape for exactly this case.
-  .get('/runs', (c) => viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.runs()))
+  .get('/runs', (c) => isTaskConfined(c)
+    ? respondError(c, 403, 'forbidden')
+    : viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.runs()))
   .get('/providers', (c) =>
     viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.providers(c.req.query('force') === 'true')))
   // Settings > Storage and memory (docs/managed-agents.md § Operations and failure). Device only: the

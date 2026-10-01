@@ -3,6 +3,7 @@ import { createServer, type Server, type Socket } from 'node:net'
 import { WebSocket } from 'ws'
 import { pinnedTlsOptions } from '../broker/nodeBroker'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
+import { MAX_TUNNEL_MESSAGE_BYTES } from '@acorn/protocol/ws.ts'
 
 const log = createLogger('tunnel')
 
@@ -49,6 +50,7 @@ type Entry = {
   server: Server
   port: number
   sockets: Set<Socket>
+  websockets: Set<WebSocket>
   idle: ReturnType<typeof setTimeout> | null
   // Per listener, not per connection: docs/shell.md § Host-owned webviews.
   secret: string
@@ -95,6 +97,7 @@ export class PreviewTunnels {
   constructor(
     private readonly resolve: (nodeId: string) => TunnelNode | null,
     private readonly events?: TunnelEvents,
+    private readonly options: { maxMessageBytes?: number } = {},
   ) {}
 
   async open(target: TunnelKey): Promise<number> {
@@ -125,6 +128,7 @@ export class PreviewTunnels {
         entry.idle = null
       }
       sockets.add(socket)
+      socket.on('error', () => socket.destroy())
       socket.on('close', () => {
         sockets.delete(socket)
         this.armIdle(id)
@@ -153,7 +157,7 @@ export class PreviewTunnels {
       log.warn(`listener for ${id} failed: ${describeError(error).message}`, { 'tunnel.id': id })
       this.closeEntry(id)
     })
-    this.entries.set(id, { server, port, sockets, idle: null, secret })
+    this.entries.set(id, { server, port, sockets, websockets: new Set(), idle: null, secret })
     this.events?.opened(port, secret)
     this.armIdle(id)
     return port
@@ -190,6 +194,7 @@ export class PreviewTunnels {
     }
     const timer = setTimeout(() => refuse('no request head within the deadline'), HEAD_TIMEOUT_MS)
     timer.unref?.()
+    socket.once('close', () => clearTimeout(timer))
     const onData = (chunk: Buffer): void => {
       buffered = Buffer.concat([buffered, chunk])
       // Byte-level comparison: docs/shell.md § Host-owned webviews.
@@ -198,6 +203,7 @@ export class PreviewTunnels {
         if (buffered.length > MAX_HEAD_BYTES) refuse('request head exceeded its ceiling')
         return
       }
+      if (end + 4 > MAX_HEAD_BYTES) { refuse('request head exceeded its ceiling'); return }
       if (!headCarriesSecret(buffered.subarray(0, end).toString('latin1'), secret)) {
         refuse('connection did not present this tunnel\'s secret')
         return
@@ -206,7 +212,7 @@ export class PreviewTunnels {
       socket.off('data', onData)
       // Passes everything read so far, not just the head. A POST's body can arrive in the same
       // packet, and dropping it would corrupt the request just authorized.
-      onAuthorized(buffered)
+      try { onAuthorized(buffered) } catch { refuse('could not open the node pipe') }
     }
     socket.on('data', onData)
   }
@@ -233,6 +239,7 @@ export class PreviewTunnels {
     this.events?.closed(entry.port)
     if (entry.idle) clearTimeout(entry.idle)
     for (const socket of entry.sockets) socket.destroy()
+    for (const ws of entry.websockets) ws.terminate()
     entry.server.close()
   }
 
@@ -249,12 +256,16 @@ export class PreviewTunnels {
     url.searchParams.set('task', target.taskId)
     url.searchParams.set('port', String(target.port))
     const ws = new WebSocket(url, {
+      maxPayload: Math.min(this.options.maxMessageBytes ?? MAX_TUNNEL_MESSAGE_BYTES, MAX_TUNNEL_MESSAGE_BYTES),
       headers: { authorization: `Bearer ${node.token}` },
       // The same pinning helper the broker's HTTPS agent uses, so there is one definition of "is
       // this the node we paired with".
       ...pinnedTlsOptions(node.fingerprint, node.certPem),
     })
     ws.binaryType = 'nodebuffer'
+    const entry = this.entries.get(id)
+    entry?.websockets.add(ws)
+    ws.once('close', () => entry?.websockets.delete(ws))
 
     // Paused immediately. The socket is accepted before the WebSocket handshake finishes, so the
     // first bytes of the request would otherwise be dropped, and pausing pushes backpressure onto the
@@ -263,25 +274,45 @@ export class PreviewTunnels {
     // them.
     socket.pause()
 
+    let closed = false
     const closeBoth = (): void => {
+      if (closed) return
+      closed = true
       socket.destroy()
-      if (ws.readyState === ws.OPEN || ws.readyState === ws.CONNECTING) ws.close()
+      if (ws.readyState === ws.OPEN) ws.close()
+      else if (ws.readyState === ws.CONNECTING) ws.terminate()
+    }
+
+    // Serialize each slice before releasing TCP backpressure. The authorized head may include a
+    // POST body from the same read, so it follows the same splitting rule as all later chunks.
+    const send = (chunk: Buffer): void => {
+      const maxBytes = Math.min(this.options.maxMessageBytes ?? MAX_TUNNEL_MESSAGE_BYTES, MAX_TUNNEL_MESSAGE_BYTES)
+      let offset = 0
+      const next = (): void => {
+        if (closed || ws.readyState !== ws.OPEN) return closeBoth()
+        if (offset === chunk.length) { socket.resume(); return }
+        const end = Math.min(offset + maxBytes, chunk.length)
+        const part = chunk.subarray(offset, end)
+        offset = end
+        try { ws.send(part, (error) => { if (error) closeBoth(); else next() }) } catch { closeBoth() }
+      }
+      next()
     }
 
     ws.on('open', () => {
       // Resumed only after head is sent, so the request the browser already sent reaches the dev
       // server before anything that follows it on the same connection.
-      ws.send(head, () => socket.resume())
+      send(head)
     })
     ws.on('message', (data: Buffer) => {
-      if (!socket.write(data)) ws.pause()
+      try { if (!socket.write(data)) ws.pause() } catch { closeBoth() }
     })
-    socket.on('drain', () => ws.resume())
+    socket.on('drain', () => { if (!closed) ws.resume() })
     socket.on('data', (chunk: Buffer) => {
       // Backpressure by callback, matching the node side. Stop reading from the browser until the
       // frame reaches the socket, so a slow link cannot grow an unbounded queue in main.
       socket.pause()
-      ws.send(chunk, () => socket.resume())
+      send(chunk)
     })
     ws.on('close', closeBoth)
     ws.on('error', (error) => {

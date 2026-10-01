@@ -28,6 +28,7 @@ const services = (): FrameServices => ({
   toast: vi.fn(),
   copy: vi.fn(),
   openPane: vi.fn(),
+  openTask: vi.fn(),
   openUrl: vi.fn(),
   frameHasFocus: vi.fn(() => true),
   importerDone: vi.fn(),

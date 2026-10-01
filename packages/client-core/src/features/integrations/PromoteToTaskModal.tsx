@@ -1,3 +1,4 @@
+import { Portal } from 'solid-js/web'
 import { createResource, createSignal, onMount, Show, type JSX } from 'solid-js'
 import { useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
@@ -168,6 +169,7 @@ export function PromoteToTaskModal(props: {
   const formStyle = { 'flex-direction': 'column', 'align-items': 'stretch', gap: '6px' } as const
 
   return (
+    <Portal>
     <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>
       <div ref={dialog} class="overlay" role="dialog" aria-modal="true" onClick={dismiss.onContainerClick} onKeyDown={dismiss.onKeyDown}>
         <div class="overlay-title">{props.headerLabel}</div>
@@ -240,5 +242,6 @@ export function PromoteToTaskModal(props: {
         </div>
       </div>
     </div>
+    </Portal>
   )
 }

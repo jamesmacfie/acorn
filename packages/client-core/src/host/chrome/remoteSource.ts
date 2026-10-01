@@ -18,6 +18,9 @@ export function remoteSourcePanel(pluginId: string, hash: string, descriptor: Pl
     regions: {
       list: () => createComponent(SourceRegion, { contribution: list, sourceId: descriptor.id, region: 'list' }),
       detail: () => createComponent(SourceRegion, { contribution: detail, sourceId: descriptor.id, region: 'detail' }),
+      // A tree is a run of kit nodes, so it gets the padding and scroller a pane body gets. A tree that
+      // draws its own split loses the padding again through the column's `:has(.ui-listdetail)` rule.
+      scroll: true,
     },
   }
 }

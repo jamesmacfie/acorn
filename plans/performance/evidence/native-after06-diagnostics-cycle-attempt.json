@@ -1,0 +1,19 @@
+{
+  "excludedCycleAttempt": "First return remained blank at 2s checkpoint; no five-cycle success artifact. Inspect actual focus separately.",
+  "state": {
+    "focused": false,
+    "records": [],
+    "trees": [
+      {
+        "children": 0,
+        "text": ""
+      },
+      {
+        "children": 0,
+        "text": ""
+      }
+    ],
+    "urlValue": null,
+    "visibility": "hidden"
+  }
+}

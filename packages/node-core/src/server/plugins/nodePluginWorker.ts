@@ -1,11 +1,12 @@
 // Bootstrap for one loaded plugin's Node half. This is a separate Vite entry in production and a
 // directly executed TypeScript module in tests. Trusted runtime modules load first; the resolver hook
 // is installed before the package's entrypoint is evaluated.
-import { builtinModules, createRequire, registerHooks } from 'node:module'
+import { builtinModules, createRequire, registerHooks, syncBuiltinESMExports } from 'node:module'
 import { realpathSync } from 'node:fs'
 import { sep } from 'node:path'
 import { workerData, type MessagePort } from 'node:worker_threads'
 import { fileURLToPath, pathToFileURL } from 'node:url'
+import { pluginBuiltinAllowed } from '@acorn/protocol/plugin/nodeBuiltins.ts'
 import { pluginFunctionMode } from './functionMode.ts'
 import { networkHostAllowed } from './networkHosts.ts'
 import { PluginRpcEndpoint, rpcError } from './pluginRpc.ts'
@@ -29,18 +30,13 @@ const options = workerData as WorkerOptions
 const openWorkerPluginDb = options.migrationsFolder
   ? (await import('./workerStorage.ts')).openWorkerPluginDb
   : null
-const denied = new Set([
-  'cluster', 'module', 'vm', 'inspector', 'repl', 'sqlite', 'worker_threads',
-  // Raw sockets cannot enforce a manifest host list. Networked plugins use the wrapped fetch below;
-  // protocols such as Postgres need the separate, explicitly broad sockets grant.
-  ...(options.allowSockets ? [] : ['net', 'http', 'https', 'http2', 'tls', 'dgram', 'dns', 'quic']),
-])
-if (!options.allowExec) denied.add('child_process')
+const builtinGrants = { sockets: options.allowSockets, exec: options.allowExec }
+const builtinAllowed = (specifier: string) => pluginBuiltinAllowed(specifier, builtinGrants)
 
 // Rolldown uses createRequire when an otherwise self-contained ESM bundle contains a CommonJS
 // dependency. The package builder rewrites only that generated import to this permission-aware
 // require. Exposing the function is safe: direct and generated callers both pass through the same
-// builtin deny list, and non-builtin packages cannot escape the package's bundled dependency graph.
+// builtin family policy, and non-builtin packages cannot escape the package's bundled dependency graph.
 const safeRequireSymbol = Symbol.for('acorn.plugin.safe-require.v1')
 const nativeRequire = createRequire(import.meta.url)
 const builtins = new Set(builtinModules.map(name => name.replace(/^node:/, '')))
@@ -52,22 +48,33 @@ Object.defineProperty(globalThis, safeRequireSymbol, {
     if (!builtins.has(name)) {
       throw new Error(`acorn: loaded plugin '${options.plugin}' may not require non-builtin '${specifier}'`)
     }
-    if (denied.has(name)) {
+    if (!builtinAllowed(specifier)) {
       throw new Error(`acorn: loaded plugin '${options.plugin}' may not require '${specifier}'`)
     }
     return nativeRequire(specifier)
   },
 })
 
+// Module ownership survives a package edit or removal while the old realm is still serving during
+// reload. A failed fresh realpath of the parent must never promote its later imports to trusted.
+const pluginModuleUrls = new Set([pathToFileURL(options.entrypoint).href])
 registerHooks({
   resolve(specifier, context, next) {
-    if (denied.has(specifier.replace(/^node:/, ''))) {
+    if ((specifier.startsWith('node:') || builtins.has(specifier)) && !builtinAllowed(specifier)) {
       throw new Error(`acorn: loaded plugin '${options.plugin}' may not import '${specifier}'`)
     }
     const resolved = next(specifier, context)
-    if (context.parentURL?.startsWith('file:') && isPluginFile(context.parentURL)
-      && typeof resolved.url === 'string' && resolved.url.startsWith('file:') && !isPluginFile(resolved.url)) {
-      throw new Error(`acorn: loaded plugin '${options.plugin}' may not import files outside its package`)
+    if (context.parentURL && (pluginModuleUrls.has(context.parentURL) ||
+      (context.parentURL.startsWith('file:') && isPluginFile(context.parentURL)))) {
+      if (resolved.url.startsWith('node:')) {
+        if (!builtinAllowed(resolved.url)) throw new Error(`acorn: loaded plugin '${options.plugin}' may not import '${specifier}'`)
+      } else if (!resolved.url.startsWith('file:')) {
+        throw new Error(`acorn: loaded plugin '${options.plugin}' dependencies must be package files or approved builtins`)
+      } else if (!isPluginFile(resolved.url)) {
+        throw new Error(`acorn: loaded plugin '${options.plugin}' may not import files outside its package`)
+      } else {
+        pluginModuleUrls.add(resolved.url)
+      }
     }
     return resolved
   },
@@ -83,14 +90,17 @@ function isPluginFile(url: string): boolean {
   }
 }
 
-// This API bypasses ESM resolution hooks, so it receives the same builtin deny list.
+// This API bypasses ESM resolution hooks, so it receives the same builtin family policy.
 const getBuiltinModule = process.getBuiltinModule.bind(process)
 process.getBuiltinModule = ((specifier: string) => {
-  if (denied.has(specifier.replace(/^node:/, ''))) {
+  if (!builtinAllowed(specifier)) {
     throw new Error(`acorn: loaded plugin '${options.plugin}' may not load builtin '${specifier}'`)
   }
   return getBuiltinModule(specifier)
 }) as typeof process.getBuiltinModule
+// Trusted bootstrap dependencies may already have loaded node:process. Synchronize its cached
+// named exports before plugin evaluation so every import order receives the guarded accessor.
+syncBuiltinESMExports()
 
 const nativeFetch = globalThis.fetch.bind(globalThis)
 if (options.allowNetwork) {

@@ -1,0 +1,15 @@
+{
+  "focused": true,
+  "records": [],
+  "trees": [
+    {
+      "children": 4,
+      "text": "acorn-performance-fixture+ RequestNo saved requests for this project yet. Variables"
+    },
+    {
+      "children": 4,
+      "text": "GETPOSTPUTPATCHDELETEHEADOPTIONSGET▾SendNew requestCopy as curlSave…ParamsBodyHeadersAuthVarsnonejsontextform-urlencodednone▾This request has no body.No response yet — press Send."
+    }
+  ],
+  "visibility": "visible"
+}

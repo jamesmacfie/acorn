@@ -19,8 +19,8 @@ export const dockerPlugin = (): NodePlugin => {
     ctx.taskChecks.register({
       id: 'containers',
       check: (task) => dockerArchiveConcern(bridge, task),
-      // `compose down` reconstructs the project from labels, so it works whether or not the worktree
-      // is still there. The archive runs it before removal.
+      // Cleanup rechecks daemon working-directory metadata against the host-stored task root,
+      // then stops/removes only those container IDs. The archive runs it before worktree removal.
       apply: async (task) => void await bridge.taskTeardown(task.id),
     })
     ctx.routes.register(docker, { prefix: '', note: 'local docker daemon' })

@@ -47,6 +47,26 @@ The renderer talks to it over one loopback WebSocket, authenticated by a per-lau
 checked against the window's origin on upgrade. That socket is what Electron's preload and `ipcMain`
 pair used to be, and it carries the same vocabulary: `apps/desktop/src/shell/wire.ts` is the list.
 
+Each authenticated renderer socket owns a disposable UUID in `helper/rendererConnection.ts`. The
+renderer declares `node-interest` from authoritative selection, including its remembered initial
+selection and equivalent or cached switches. Only that Node's event payloads reach the socket;
+all-Node connection statuses still reach every renderer. Fleet reads, malformed requests, and cleanup
+addressed to a previous Node do not change interest. `null` is a fetch-only observer with no event
+lease. An old helper client that never declares interest retains wildcard forwarding. The renderer
+keeps its own Node filter as a second boundary.
+
+`node-fetch` request handles are namespaced by this socket UUID after validation. HTTP request and
+trace headers keep their original values. A renderer can abort only its own handles, and closing its
+socket aborts its pending reads without cancelling another renderer or a shared client query. Success,
+failure, and close release the registry. A late response is neither encoded nor sent after close.
+Caller cancellation remains status 499, deadlines remain `TimeoutError`, and transport failures retain
+their connection-health meaning. Pre-aborted client calls stop before body encoding or transport work.
+
+The helper's response codec uses a native Buffer view over the precise byte offset and length. Browser
+and renderer codecs remain Node-free. HTTP response assembly concatenates fragments once, then exposes
+a plain `Uint8Array` view of that allocation. Event JSON and Node-tagged bytes are encoded lazily for
+the first eligible open recipient and reused for other eligible sockets.
+
 The shell must not import plugin engines, database handles, or node source. Domain behaviour belongs
 in the node's own graph.
 
@@ -401,13 +421,15 @@ On Windows, Wry maps custom schemes to HTTP origins (`app://acorn` to `http://ap
 origins. A 64-character hash host has not been verified in WebView2; if that engine rejects the
 mapped hostname, the tree fails closed and cannot fall back to renderer-origin execution.
 
-The renderer's half is `packages/client-core/src/host/tree/`: `workerHost.ts` owns one worker per
-accepted `(pluginId, hash)`, shared by that identity's trees and stopped a grace period after the last
-unmount. Each mounted tree has a distinct slot and scoped bridge port, including its own focus,
-document, and selection context. `TreeHost.tsx` validates and applies each batch and is the only thing
-that turns a handler id into a function. A worker that misses two heartbeats is terminated and every
-tree it served is removed from the UI. The failure remains in the plugin diagnostics instead of
-replacing the contribution with an inline error.
+The renderer's half is `packages/client-core/src/host/tree/`: `workerHost.ts` shares one modern worker
+per accepted `(pluginId, hash)`, with a distinct bridge port, focus, document, and selection context
+for every mounted slot. Modern workers have a bounded idle grace pool. Legacy SDKs use one immutable
+slot-affine worker per mounted tree and terminate with its final lease.
+[Mounted bridge ownership](./plugins/descriptors.md#mounted-bridge-ownership-and-sdk-compatibility)
+defines compatibility, admission, and idle bounds. `TreeHost.tsx` validates and applies each batch and
+is the only thing that turns a handler id into a function. A worker that misses two heartbeats is
+terminated and every tree it served is removed from the UI. The failure remains in plugin diagnostics
+instead of replacing the contribution with an inline error.
 
 ### The renderer bridge
 
@@ -432,9 +454,15 @@ sets `binaryType = 'arraybuffer'`, peels the node id, and hands the rest to
 that reads the session id and the one place the bytes become text. So a busy build's output crosses two
 process boundaries with two copies and no parse, where it used to be JSON-escaped once per attached
 socket on the node and stringified again here. Request and response bodies stay base64 in the JSON
-messages: nothing else on this wire is measured in frames per second, and the largest body measured,
-the agent snapshot's first page at about 2 MB on 2026-09-03, is an order of magnitude under the
-ceiling `apps/desktop/src/shell/wire.ts` names.
+messages. The helper accepts at most 16 MiB per incoming serialized request before JSON parsing,
+including base64 and envelope bytes. This accommodates an 8 MiB binary body with encoding overhead.
+An oversized request closes with WebSocket code 1009 before dispatch.
+
+This request limit does not restrict outgoing replies. Custody bounds an HTTP response body to
+64 MiB before the helper encodes it, which can produce about 85.4 MiB of base64 plus its envelope.
+The renderer uses the browser WebSocket API, which offers no native receive-message ceiling.
+The Node broker owns the HTTP response bound and the 8 MiB Node-event receive bound. Peer errors and
+late replies are contained by the helper, and closing it terminates its live sockets and watchdogs.
 
 The file dialogs are the folder picker, `pick_files`, and `save_file`. The last two carry bytes, not
 paths: the renderer sends a byte array to save and receives one per file it picked, base64 in both
@@ -665,7 +693,9 @@ navigation state separate. The prefix and key shape are validated because they s
 A child webview under `Window::add_child` composites over the main one and takes logical bounds from
 the renderer's pane geometry. It does not inherit DOM overflow clipping, so the renderer intersects
 the host element with the viewport and every clipping ancestor before it sends those bounds. The
-child hides when no visible area remains or an overlay covers the pane. `incognito(true)` gives it
+child hides when no visible area remains. On macOS, the main renderer composites above the page
+through [the native overlay layer](./native-overlays.md). Other platforms and a disabled or failed
+layer use shared rectangle-overlap suppression. `incognito(true)` gives it
 its own ephemeral data store. Local-node preview is one kept-alive webview per task, restricted to
 HTTP and HTTPS URLs with no credentials, with an external chrome layer the renderer draws. Remote-node
 preview is unavailable: the native webview has no network-level policy for page subrequests, so a
@@ -687,6 +717,55 @@ discards a page or history entry on a now-revoked host. An empty or invalid repl
 old view. A failed replacement is reported to the pane.
 If native close fails, the shell hides and tries to blank the invalidated view, refuses further
 show/load/command calls for it, and retries close on the next `ensure`.
+
+`ensure` reconciles a normalized configured home independently of the page's browsing location.
+Rust uses Tauri's URL parser, preserving paths, ports, queries, and fragments. Equal homes and equal
+policies reuse the native document, even after a redirect or address entry. A changed home navigates
+once after native navigation accepts it. Failed navigation leaves the applied home unchanged, so a
+return or **Retry preview** can try again. **Home**, **Reload**, address entry, and history traversal
+remain explicit browser operations.
+
+The bridge registers its state listener before invoking `ensure`. Every successful reconciliation
+replays the retained URL, loading state, and shell history cursor to the mounted toolbar. It does not
+substitute the configured home for the browsing location. Operations are ordered per native key.
+Eviction advances that key's generation immediately, suppresses queued work, and orders retirement
+before any replacement. Retired native callbacks read a denied policy and stop reporting page loads.
+
+Pane cleanup removes observers and hides only its task's view. Overlay visibility changes do not call
+`ensure`. Pending configuration reads and authoritative absent URLs hide without evicting. A resolution
+error or native refusal offers **Retry preview**. A Node switch retires the shell's preview family,
+including records that outlived a renderer reload. A family generation rejects stale commands, and
+replacement owners wait for native retirement before using any task-only key.
+Only the positively identified local Node may create previews.
+Task archive, owner removal, window close, and shutdown release the corresponding resources. Loaded
+plugin pages keep their intentional unmount eviction and policy replacement behavior.
+
+### Background scheduling and document loss
+
+Acorn leaves browser background throttling at its default. Hidden pages retain their state while the
+engine retains their document, and their timers and network activity can continue at a reduced rate.
+There is no inactivity timer or automatic eviction. The shared 32-view limit remains in force.
+Retiring an incognito page discards its document and ephemeral storage.
+
+The pinned desktop stack is Tauri 2.11.5, tauri-runtime-wry 2.11.4, and wry 0.55.1. Tauri's builder
+exposes page-load events but no content-process termination callback. wry exposes a termination handler
+on macOS and iOS, but Tauri does not forward it. Acorn cannot reliably distinguish an engine unload
+from a page-requested reload or hot update through this interface. It performs no inferred automatic
+recovery and displays no invented recovery notice. **Reload** and **Home** provide explicit recovery.
+Neither an engine crash nor application restart preserves form values or complete browser history.
+The shell's history cursor tracks navigation callbacks, rather than a native back-forward list.
+
+| Platform | Scheduling | Observable process loss and recovery |
+| --- | --- | --- |
+| macOS | Default WebKit scheduling; measured in the preview acceptance record | No termination callback through Tauri; explicit Reload or Home |
+| Windows | Default WebView2 scheduling; not measured in this delivery | No portable Tauri termination callback; explicit Reload or Home |
+| Linux | Default WebKitGTK scheduling; not measured in this delivery | No portable Tauri termination callback; explicit Reload or Home |
+
+For measurements, navigation traces, and remaining graphical checks, see
+[Preview retention acceptance](./testing/preview-retention.md). The automation-only
+`webview_diagnostics` command reports web-content process IDs and physical footprints on macOS.
+It contains no page contents or URLs, adds no production telemetry, and reports no measurements on
+other platforms. Process IDs must be deduplicated before totaling shared memory.
 
 Normal development and packaged webviews expose no automation server. The explicit
 `agent-automation` build is the exception: its main Acorn webview has a loopback-only WebDriver server
@@ -759,9 +838,12 @@ The node receives no window handle, no webview handle, and no shell object of an
 
 `apps/node` emits `service.js`, `mcp.js`, `standalone.js`, and shared chunks. Third-party
 packages are bundled into them, and into the helper, except the native addons and run-time-loaded
-packages that `apps/node/externals.ts` lists. Node resolves those from `apps/desktop`'s
-`node_modules`. Loading packages as separate files was most of the node's and the helper's startup
-before that. `apps/node/scripts/check-service-budget.mjs` runs after the node build, fails it when
+packages that `apps/node/externals.ts` lists. Staging materializes their installed dependency graphs under
+`dist/helper/node_modules` without pnpm directory links, so the installed helper and service resolve
+them from application resources. Shared dependencies are hoisted to that directory to keep NSIS
+input paths within Windows' legacy path limit; conflicting versions remain nested beside their
+consumers. The shared runtime package list belongs to `scripts/nodeRuntimePackages.ts`.
+Loading packages as separate files was most of the node's and the helper's startup before that. `apps/node/scripts/check-service-budget.mjs` runs after the node build, fails it when
 `service.js` and the chunks it imports statically pass a byte ceiling, and prints what is left for
 Node to resolve. Both builds write the licence text of every package they bundled beside their
 output, as `THIRD-PARTY-NOTICES.txt` and `helper-THIRD-PARTY-NOTICES.txt`, so it ships in the
@@ -811,10 +893,95 @@ That process is the pinned Node in both a checkout and a bundle, so there is one
 standalone node is distributed separately as a tarball; it is not an npm package
 (`docs/node-distribution.md`).
 
-`.github/workflows/build-desktop.yml` runs the same commands on a push to main and on a `v*` tag,
-plus the boot test and the Rust suite before the bundler pass so a broken boot path fails in seconds
-rather than minutes. A tag builds and keeps its artifacts; publishing them is refused while the build
+`.github/workflows/build-desktop.yml` builds macOS Apple silicon and Windows x64 for a `v*` tag or a
+manual dispatch of `.github/workflows/ci.yml`, after that workflow's Linux job passes for the same
+commit. Ordinary pushes to main run the unsigned desktop tests instead and produce no installer. Both
+jobs build the bundle inputs once, run the boot test and the Rust suite against them before the
+bundler pass so a broken boot path fails in seconds rather than minutes, and package that same
+output. Artifacts are kept for one day, the repository's retention limit. A tag builds and keeps its artifacts; publishing them is refused while the build
 is ad-hoc signed.
+
+### Windows test installer
+
+The Windows matrix entry uploads `acorn-windows-x64`, containing an NSIS setup executable and its
+updater signature. The macOS job uploads `acorn-dmg`. Both artifacts belong to the Actions run;
+the workflow does not publish GitHub Releases. Windows Authenticode signing is not configured.
+
+The platform override in `apps/desktop/src-tauri/tauri.windows.conf.json` selects NSIS, a Windows
+icon, installation for the current user, and the WebView2 bootstrapper. The installer downloads
+WebView2 if it is absent, so installation can require internet access. The runtime staging script
+fetches the pinned Windows `node.exe` directly and checks its published SHA-256 before caching it.
+The installed runtime lives beside `acorn-desktop.exe`; the helper, service, CLI, plugins, and renderer live
+under the installation directory. The helper's origin gate expects `http://app.localhost` on
+Windows, matching Wry's mapping of the app scheme.
+
+The Windows target needs Git on PATH for repository operations. The bundled service generates the
+local Node's TLS certificate in-process on first boot and reuses its persisted identity on later
+boots. It does not require an OpenSSL executable. Acorn bundles Node and its runtime packages, so
+the target does not need Node, pnpm, Rust, or a compiler installed. For the Node's
+other host requirements and Windows file permission limits, see [Node distribution](./node-distribution.md).
+
+Windows distribution verification installs the generated setup executable into a temporary directory,
+compares the installed resources with staging, checks the installed Node version and digest, and runs
+the helper boot test against that installation. The test uses a fresh data root outside the checkout
+with host executables removed from PATH and verifies an authenticated broker request to the local
+Node. It also checks the WebSocket secret and origin gates. It uninstalls the temporary application
+after verification. Run Windows distribution
+builds on a disposable build host: NSIS also writes application shortcuts and uninstall metadata.
+This check does not drive the WebView2 window or prove connectivity between different machines;
+those remain manual acceptance checks using the uploaded installer.
+
+### CI permissions and signing credentials
+
+Both GitHub Actions workflows grant the repository token only `contents: read`, and checkout does
+not persist its credentials. The jobs install, test, build, and upload run artifacts; they do not
+push repository changes or publish releases. Pull requests run the unsigned suites in
+`.github/workflows/ci.yml`, which also runs them on main pushes. The desktop bundle workflow runs
+only when `ci.yml` calls it for a `v*` tag or a manual dispatch.
+
+The bundle job passes `TAURI_SIGNING_PRIVATE_KEY` only to its required-key check and distribution
+step, and passes `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` only to distribution. Setup, dependency
+installation, staging, tests, and artifact upload do not receive these signing variables. The
+distribution command runs repository build commands before signing, so those commands share the
+signing environment and must be trusted. Step scope reduces direct credential exposure; it does
+not isolate signing from a compromised build or earlier step.
+
+Action references use full commit hashes with version comments. To update one, verify the release
+commit in the action's upstream repository, review the change, and update the hash and comment
+together. The Rust toolchain action also sets `toolchain: stable` explicitly because pinning the
+action's code does not select or pin the compiler. For the underlying practices, see
+[GitHub's secure use reference](https://docs.github.com/en/actions/reference/security/secure-use).
+
+### Rust dependency security
+
+`apps/desktop/src-tauri/Cargo.lock` pins the shell's Rust dependency graph. The rustls dependency
+through `ureq` is 0.23.45, which fixes
+[RUSTSEC-2026-0285](https://rustsec.org/advisories/RUSTSEC-2026-0285.html). Acorn calls `ureq` in
+`app_scheme.rs` to proxy renderer content and in `dev_server.rs` to probe the development entry
+module. Both use the `ACORN_DEV_SERVER` origin read by `lib.rs`; the development launchers set a
+local HTTP origin. The packaged launch uses files unless that environment variable is supplied.
+The Node helper owns paired Node HTTPS connections, separately from this Rust client. The dependency
+finding does not establish exposure of those connections or a completed attacker handshake.
+
+The 2026-10-01 RustSec review reports zero vulnerabilities and seven informational warnings. One is
+[RUSTSEC-2024-0429](https://rustsec.org/advisories/RUSTSEC-2024-0429.html), an unsound string-array
+iterator in glib 0.18.5. This version enters through the Linux GTK 0.18 stack; the macOS and Windows
+target graphs do not include it. Acorn and the 26 reverse dependency source roots reviewed contain
+no calls to `VariantStrIter` or `array_iter_str` outside glib's own implementation, documentation,
+and tests. This source review does not prove runtime unreachability. Calling the affected iterator
+on a Linux build remains a crash risk. The published fix requires glib 0.20 or later, outside the
+GTK stack's 0.18 dependency constraint, and the registry has no patched 0.18 release. A maintained
+backport or coordinated GTK/Tauri migration needs Linux build and runtime validation.
+
+The other warnings identify unmaintained dependencies: `proc-macro-error` 1.0.4 through the Linux
+GTK/glib build macros, and five UNIC 0.9 crates through `urlpattern` 0.3 and `tauri-utils` 2.9.3.
+The UNIC crates are `unic-char-property`, `unic-char-range`, `unic-common`, `unic-ucd-ident`, and
+`unic-ucd-version`. Tauri uses URL patterns for remote capability contexts; Acorn's capability file
+grants only the local main webview. These advisories provide no patched releases. A
+[`tauri-utils` 2.10 migration](https://github.com/tauri-apps/tauri/releases/tag/tauri-utils-v2.10.0)
+changes the URL pattern dependency and raises its minimum Rust version to 1.90, beyond the desktop
+manifest's declared 1.82. Review that toolchain and framework migration
+separately. Keep these warnings visible in dependency audits until their upstream paths change.
 
 ### Signing gates and the updater
 

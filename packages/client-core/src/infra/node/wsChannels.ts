@@ -10,7 +10,7 @@
 // A duplicate prefix throws rather than replacing, like Registry: silently overwriting would make
 // client-plugin registration order observable, and a dropped stream looks like a backend problem for a
 // day.
-import type { WsClientFrame, WsServerFrame } from '@acorn/protocol/ws.ts'
+import type { WsClientFrame, WsServerFrame, WsSubscriptionIntent } from '@acorn/protocol/ws.ts'
 
 export type WsChannelHandler = (frame: WsServerFrame) => void
 
@@ -18,15 +18,16 @@ export type WsChannelHandler = (frame: WsServerFrame) => void
 // changes as panes mount and unmount.
 export type WsReattach = () => WsClientFrame[]
 
-type Registration = { handler: WsChannelHandler; reattach?: WsReattach }
+export type WsSubscriptionPolicy = (frame: WsClientFrame) => WsSubscriptionIntent | undefined
+type Registration = { handler: WsChannelHandler; reattach?: WsReattach; subscription?: WsSubscriptionPolicy }
 
 const channels = new Map<string, Registration>()
 
 export type Disposable = { dispose(): void }
 
-export function registerWsChannel(prefix: string, handler: WsChannelHandler, reattach?: WsReattach): Disposable {
+export function registerWsChannel(prefix: string, handler: WsChannelHandler, reattach?: WsReattach, subscription?: WsSubscriptionPolicy): Disposable {
   if (channels.has(prefix)) throw new Error(`ws channel already registered: ${prefix}`)
-  const registration: Registration = { handler, reattach }
+  const registration: Registration = { handler, reattach, subscription }
   channels.set(prefix, registration)
   let disposed = false
   return {
@@ -51,6 +52,8 @@ export function routeWsFrame(frame: WsServerFrame): void {
 export function wsReattachFrames(): WsClientFrame[] {
   return [...channels.values()].flatMap((registration) => registration.reattach?.() ?? [])
 }
+
+export const wsSubscriptionIntent = (frame: WsClientFrame): WsSubscriptionIntent | undefined => channels.get(frame.channel.split(':', 1)[0])?.subscription?.(frame)
 
 // Which prefixes are claimed. Exported for the test that pins the set after client plugins boot: a
 // mismatched prefix is a silent drop rather than a dead branch, so it wants an assertion.

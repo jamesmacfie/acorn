@@ -69,6 +69,13 @@ an exhausted attempt budget, a wrong code, or a malformed body. A caller cannot 
 hit, so there is no oracle for "right code, wrong something". The attempt counter increments before
 the code comparison runs, so racing concurrent guesses cannot dodge the budget.
 
+The route accepts at most 4 KiB of raw request bytes. It checks `Content-Length` and counts streamed
+bytes before JSON parsing. An oversized request returns `413 payload_too_large` and spends no code
+attempt. Ordinary malformed requests retain `401 pairing_failed`. A separate per-Node ceiling admits
+20 requests per minute, including malformed and oversized requests, then returns `429 rate_limited`.
+Custody's first-contact probe has an absolute eight-second deadline across connection, headers, and
+body, and a 16 KiB response ceiling. Pairing uses the pinned connection with an eight-second deadline.
+
 `POST /v1/pair` returns the device's bearer token once, in that response, and the node stores only
 its hash from then on. The node's unauthenticated probe response carries the TLS certificate
 fingerprint for the new client to compare against the node's own screen. Sending the fingerprint over
@@ -86,12 +93,17 @@ pair result also carries `baseline: "acorn-1"`. A client rejects a missing or di
 before pairing or opening a WebSocket, even when the numeric protocol is 1.
 
 The protocol number has one meaning. `NODE_PROTOCOL_VERSION` (`packages/protocol/src/device/node.ts`) is the
-protocol major. There is no minor, no capability negotiation,
-and no feature handshake. Each side refuses a major it does not speak. The pairing probe refuses
+protocol major. There is no minor or separate feature handshake. Each side refuses a major it does not speak. The pairing probe refuses
 before pairing, and the broker re-probes `GET /v1/node` on every connect, producing the
 `incompatible` connection state and the `protocol_mismatch` error code. Checking only at pairing is
 not enough, because a paired node upgrades by restarting, which drops the socket, so the reconnect is
 where a new major shows up.
+
+An optional `eventTransport: { viewers: 1 }` in that same tolerant `GET /v1/node` response advertises
+logical event viewers. A host that explicitly enables viewer multiplexing adds `x-acorn-viewers: 1`
+to its authenticated `/v1/events` upgrade only after that advertisement. No extra startup request is
+needed. Absence, a malformed optional advertisement, an unknown feature version, or an unsuccessful probe retains the existing legacy
+event transport. This advertisement does not change the protocol major or invalidate a paired Node.
 
 **Within a major, changes are additive only.** New routes, new optional response fields, and new
 WebSocket channels are all safe. Renaming a field, removing one, or changing what one means is the
@@ -641,11 +653,63 @@ marks the Node stale and refetches. Durable agent and workflow history is read f
 PTY output, Docker logs/stats/exec, workflow notices, agent streams, and preview tunnels use the
 same authenticated socket with feature-specific frames and bounded backpressure/replay semantics.
 
+### Logical event viewers
+
+Legacy upgrades retain raw JSON channel frames and the terminal binary layout of 36 ASCII session
+UUID bytes followed by payload bytes. `NodeBroker` uses this transport by default, including the TUI.
+The desktop helper explicitly opts in when the Node advertises viewer version 1.
+
+On an opted-in socket, the transport carries these additional frames:
+
+| Direction | Shape | Meaning |
+| --- | --- | --- |
+| Client → Node | `{ channel: 'ws:viewer', viewerId, frame }` | Deliver the opaque channel-owned `frame` to this viewer. |
+| Client → Node | `{ channel: 'ws:viewer-close', viewerId }` | Retire this viewer's subscriptions and channel resources. |
+| Node → client | `{ channel: 'ws:viewer', viewerId, frame, seq }` | Target a JSON response to this viewer. |
+| Node → client | `{ channel: 'ws:viewer-error', viewerId, code, message, seq }` | Explicit admission refusal, including under invalidation shedding. |
+| Node → client | 36 ASCII viewer UUID bytes + unchanged terminal binary frame | Target terminal bytes to this viewer. |
+
+Generic invalidations remain raw JSON broadcasts. JSON sequence numbers belong to the physical
+authenticated socket, including targeted replies and admission errors. The broker checks every
+sequence before filtering by viewer; binary output consumes no sequence number. A default send on an
+opted-in broker uses a stable broker-owned viewer UUID and omits that identity from default callbacks.
+
+Viewer IDs are opaque transport identities. They carry no authority: internal scope and device
+authorization remain on the physical connection. At most 128 live viewers, including the default
+viewer, can own resources on one connection. Overflow produces a targeted `viewer_limit` error.
+Viewer removal, Node removal, and connection disposal clear their ownership maps.
+
+The helper declares the selected Node with a generic nested `ws:viewer-open` lease. Selecting another
+Node closes the old lease; returning from cached UI state opens a fresh one. Fleet HTTP reads never
+open leases. On a legacy Node, only one viewer can hold the events lease; another receives
+`viewers_unsupported` through the client's transport-error seam and the first remains usable. Raw
+legacy output is routed to that lease's owner. Closing its lease reconnects the physical events socket
+to retire resources the old Node cannot close logically. This fallback affects shared socket status
+and custody event subscribers; the HTTP agent and independent reads remain usable.
+
+Channel owners may supply typed desired-subscription hints (`key`, `attached` or `detached`) alongside
+their opaque frames. Custody compacts each viewer/key between command barriers, retains live attached
+state for reconnect, and sends the latest first-segment intent before requesting a fresh restore.
+Input, actions, and unknown channel frames preserve FIFO between live owners; they are not compacted.
+A renderer's online reattach is idempotent after this automatic replay. Disposing a viewer ends its
+queued command ownership and removes its desired state; delivery across disposal is not guaranteed.
+Cleanup targeting a captured Node cannot create a retired viewer or change active event interest.
+
+Node and custody each enforce an 8 MiB incoming event-message ceiling before parsing or dispatch.
+Oversized messages close with WebSocket code 1009. The open channel envelope remains plugin-owned;
+the transport contains synchronous and asynchronous owner-handler failures within the connection.
+
 The preview tunnel (`/v1/tunnel`, `packages/node-core/src/server/transport/tunnel.ts`) is a separate upgrade on
 the same listener, resolved from `?task=<uuid>&port=<n>` and gated by the same device and
 internal-token authorization as `/v1/events`. It forwards raw bytes to `127.0.0.1` on the named port
 only, never to a resolved hostname. Only declared ports are tunnellable, and there is no general
 SOCKS proxy to whatever else listens on the node's loopback.
+
+Both tunnel receivers enforce 64 KiB per message. Both senders split arbitrary TCP reads, including
+the custody listener's authorized request head and any body bytes read beside it, into ordered slices.
+Each sender waits for a slice's write callback before sending the next and resumes TCP reads after
+the complete chunk. Total HTTP streams can exceed the message ceiling without dropped or reordered
+bytes. Oversized incoming messages close with code 1009 and close the corresponding TCP pipe.
 
 A port counts as declared when the task's run bridge names it as a run target's URL, or when the
 project's `previewMode` is `'port'` or `'url'`. `previewMode: 'script'` is not a source, because its

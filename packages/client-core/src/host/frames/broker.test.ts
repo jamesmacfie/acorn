@@ -37,6 +37,7 @@ const services = (over: Partial<FrameServices> = {}): FrameServices => ({
   copy: vi.fn(),
   openPane: vi.fn(),
   openTarget: vi.fn(),
+  openTask: vi.fn(() => vi.fn()),
   openUrl: vi.fn(),
   frameHasFocus: vi.fn(() => true),
   importerDone: vi.fn(),
@@ -458,6 +459,58 @@ describe('ui verbs', () => {
     await h.settled(2)
     expect(svc.openUrl).toHaveBeenCalledWith('https://linear.app/acme/issue/ENG-42')
     expect(svc.copy).not.toHaveBeenCalled()
+  })
+
+  it('replies to openTask before it moves the reader, because the move can unmount the asker', async () => {
+    // Leaving a rail source for a task disposes the source's trees, and a reply posted after that is
+    // dropped, which would leave the plugin's promise pending for good. Node's MessageChannel drops a
+    // queued message on close too, so the order is read off the host's own port rather than the far end.
+    const order: string[] = []
+    const channel = new MessageChannel()
+    const port = channel.port1
+    const postMessage = port.postMessage.bind(port)
+    port.postMessage = (message: { id?: number }) => {
+      if (message.id === 60) order.push('reply')
+      postMessage(message)
+    }
+    const svc = services({ openTask: vi.fn(() => () => void order.push('move')) })
+    const bridge = createFrameBridge({ port: port as unknown as MessagePort, binding: BINDING, services: svc, context: CONTEXT, onMisbehaving: () => {} })
+    channel.port2.postMessage({ id: 60, kind: 'ui', op: 'openTask', taskId: 'task-9' })
+    for (let tick = 0; tick < 200 && order.length < 2; tick++) await new Promise((r) => setTimeout(r, 1))
+    bridge.dispose()
+    channel.port2.close()
+    expect(svc.openTask).toHaveBeenCalledWith('task-9')
+    expect(order).toEqual(['reply', 'move'])
+  })
+
+  it('answers not_found for a task the list does not have', async () => {
+    const h = withBridge({}, services({ openTask: vi.fn(() => undefined) }))
+    h.send({ id: 61, kind: 'ui', op: 'openTask', taskId: 'task-missing' })
+    await h.settled(2)
+    expect(replyTo(h, 61)).toMatchObject({ ok: false, error: { code: 'not_found' } })
+  })
+
+  it('refuses openTask without the task read scope, without focus, or inside the navigation gap', async () => {
+    const unscoped = withBridge({ api: [] })
+    unscoped.send({ id: 62, kind: 'ui', op: 'openTask', taskId: 'task-9' })
+    await unscoped.settled(2)
+    expect(replyTo(unscoped, 62)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    expect(unscoped.svc.openTask).not.toHaveBeenCalled()
+    unscoped.dispose()
+
+    const unfocused = withBridge({}, services({ frameHasFocus: vi.fn(() => false) }))
+    unfocused.send({ id: 63, kind: 'ui', op: 'openTask', taskId: 'task-9' })
+    await unfocused.settled(2)
+    expect(replyTo(unfocused, 63)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    unfocused.dispose()
+
+    // One budget with openUrl: both move the reader.
+    const h = withBridge()
+    h.send({ id: 64, kind: 'ui', op: 'openUrl', url: 'https://github.com/runn/acorn/pull/1' })
+    h.send({ id: 65, kind: 'ui', op: 'openTask', taskId: 'task-9' })
+    await h.settled(3)
+    expect(replyTo(h, 65)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    expect(h.svc.openTask).not.toHaveBeenCalled()
   })
 
   it('rejects a verb outside the closed set', async () => {

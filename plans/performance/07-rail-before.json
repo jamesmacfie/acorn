@@ -1,0 +1,352 @@
+{
+  "environment": {
+    "node": "v24.11.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "commit": "f8e4b59c",
+    "synthetic": true
+  },
+  "hierarchy": [
+    {
+      "shape": "flat",
+      "tasks": 6,
+      "visible": 6,
+      "parentReads": 19,
+      "duration": {
+        "elapsedMedianMs": 0.005833400000000211,
+        "cpuMedianMs": 0.0223,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "failure": null
+    },
+    {
+      "shape": "flat",
+      "tasks": 100,
+      "visible": 100,
+      "parentReads": 301,
+      "duration": {
+        "elapsedMedianMs": 0.036974999999998204,
+        "cpuMedianMs": 0.0792,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "failure": null
+    },
+    {
+      "shape": "flat",
+      "tasks": 300,
+      "visible": 300,
+      "parentReads": 901,
+      "duration": {
+        "elapsedMedianMs": 0.08243339999999932,
+        "cpuMedianMs": 0.1544,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "failure": null
+    },
+    {
+      "shape": "flat",
+      "tasks": 1000,
+      "visible": 1000,
+      "parentReads": 3001,
+      "duration": {
+        "elapsedMedianMs": 0.23667080000000168,
+        "cpuMedianMs": 0.23620000000000002,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "failure": null
+    },
+    {
+      "shape": "broad",
+      "tasks": 6,
+      "visible": 2,
+      "parentReads": 61,
+      "duration": {
+        "elapsedMedianMs": 0.00817079999999919,
+        "cpuMedianMs": 0.0082,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "failure": null
+    },
+    {
+      "shape": "broad",
+      "tasks": 100,
+      "visible": 2,
+      "parentReads": 1095,
+      "duration": {
+        "elapsedMedianMs": 0.07425000000000068,
+        "cpuMedianMs": 0.08020000000000001,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "failure": null
+    },
+    {
+      "shape": "broad",
+      "tasks": 300,
+      "visible": 2,
+      "parentReads": 3295,
+      "duration": {
+        "elapsedMedianMs": 0.25090000000000146,
+        "cpuMedianMs": 0.45919999999999994,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "failure": null
+    },
+    {
+      "shape": "broad",
+      "tasks": 1000,
+      "visible": 2,
+      "parentReads": 10995,
+      "duration": {
+        "elapsedMedianMs": 1.3737541000000022,
+        "cpuMedianMs": 1.3946999999999998,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "failure": null
+    },
+    {
+      "shape": "balanced",
+      "tasks": 6,
+      "visible": 3,
+      "parentReads": 65,
+      "duration": {
+        "elapsedMedianMs": 0.005187499999999545,
+        "cpuMedianMs": 0.0053,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "failure": null
+    },
+    {
+      "shape": "balanced",
+      "tasks": 100,
+      "visible": 5,
+      "parentReads": 1479,
+      "duration": {
+        "elapsedMedianMs": 0.07619589999999903,
+        "cpuMedianMs": 0.0763,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "failure": null
+    },
+    {
+      "shape": "balanced",
+      "tasks": 300,
+      "visible": 5,
+      "parentReads": 4879,
+      "duration": {
+        "elapsedMedianMs": 0.23180420000000482,
+        "cpuMedianMs": 0.2319,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "failure": null
+    },
+    {
+      "shape": "balanced",
+      "tasks": 1000,
+      "visible": 6,
+      "parentReads": 18099,
+      "duration": {
+        "elapsedMedianMs": 0.8662916999999993,
+        "cpuMedianMs": 0.8703,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "failure": null
+    },
+    {
+      "shape": "chain",
+      "tasks": 6,
+      "visible": 6,
+      "parentReads": 89,
+      "duration": {
+        "elapsedMedianMs": 0.004675000000003138,
+        "cpuMedianMs": 0.0047,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "failure": null
+    },
+    {
+      "shape": "chain",
+      "tasks": 100,
+      "visible": 100,
+      "parentReads": 10993,
+      "duration": {
+        "elapsedMedianMs": 0.46598749999999994,
+        "cpuMedianMs": 0.466,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "failure": null
+    },
+    {
+      "shape": "chain",
+      "tasks": 300,
+      "visible": 300,
+      "parentReads": 92993,
+      "duration": {
+        "elapsedMedianMs": 3.8184958000000053,
+        "cpuMedianMs": 3.8177,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "failure": null
+    },
+    {
+      "shape": "chain",
+      "tasks": 1000,
+      "visible": 1000,
+      "parentReads": 1009993,
+      "duration": {
+        "elapsedMedianMs": 41.99473750000002,
+        "cpuMedianMs": 42.154399999999995,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "failure": null
+    },
+    {
+      "shape": "chain",
+      "tasks": 2000,
+      "visible": 2000,
+      "parentReads": 4019993,
+      "duration": {
+        "elapsedMedianMs": 180.39699999999993,
+        "cpuMedianMs": 180.976,
+        "rounds": 7,
+        "callsPerRound": 1
+      },
+      "failure": null
+    }
+  ],
+  "rail": [
+    {
+      "tasks": 6,
+      "orderCharacters": 85,
+      "parsesPerMountRowPass": 12,
+      "repeatedOwnerCalls": {
+        "elapsedMedianMs": 0.008866699999998673,
+        "cpuMedianMs": 0.0128,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "onceParsedComparator": {
+        "elapsedMedianMs": 0.0010541000000557688,
+        "cpuMedianMs": 0.0010999999999999998,
+        "rounds": 7,
+        "callsPerRound": 10
+      }
+    },
+    {
+      "tasks": 100,
+      "orderCharacters": 1111,
+      "parsesPerMountRowPass": 200,
+      "repeatedOwnerCalls": {
+        "elapsedMedianMs": 0.860162500000024,
+        "cpuMedianMs": 0.8813000000000001,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "onceParsedComparator": {
+        "elapsedMedianMs": 0.009445799999957672,
+        "cpuMedianMs": 0.0095,
+        "rounds": 7,
+        "callsPerRound": 10
+      }
+    },
+    {
+      "tasks": 300,
+      "orderCharacters": 3531,
+      "parsesPerMountRowPass": 600,
+      "repeatedOwnerCalls": {
+        "elapsedMedianMs": 7.219983400000001,
+        "cpuMedianMs": 7.216500000000001,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "onceParsedComparator": {
+        "elapsedMedianMs": 0.04357499999996435,
+        "cpuMedianMs": 0.0437,
+        "rounds": 7,
+        "callsPerRound": 10
+      }
+    },
+    {
+      "tasks": 1000,
+      "orderCharacters": 12001,
+      "parsesPerMountRowPass": 2000,
+      "repeatedOwnerCalls": {
+        "elapsedMedianMs": 95.20860399999992,
+        "cpuMedianMs": 95.2115,
+        "rounds": 7,
+        "callsPerRound": 2
+      },
+      "onceParsedComparator": {
+        "elapsedMedianMs": 0.475945799999954,
+        "cpuMedianMs": 0.4753,
+        "rounds": 7,
+        "callsPerRound": 10
+      }
+    }
+  ],
+  "railProjection": [
+    {
+      "tasks": 6,
+      "projects": 2,
+      "projectIdComparisonsPerProjection": 9,
+      "duration": {
+        "elapsedMedianMs": 0.004887499999949796,
+        "cpuMedianMs": 0.005,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "provenance": "exact TabRail orderedTasks/taskRows expressions over synthetic plain data; no DOM"
+    },
+    {
+      "tasks": 100,
+      "projects": 20,
+      "projectIdComparisonsPerProjection": 1050,
+      "duration": {
+        "elapsedMedianMs": 0.052075000000058935,
+        "cpuMedianMs": 0.052700000000000004,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "provenance": "exact TabRail orderedTasks/taskRows expressions over synthetic plain data; no DOM"
+    },
+    {
+      "tasks": 300,
+      "projects": 20,
+      "projectIdComparisonsPerProjection": 3150,
+      "duration": {
+        "elapsedMedianMs": 0.134691599999951,
+        "cpuMedianMs": 0.1347,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "provenance": "exact TabRail orderedTasks/taskRows expressions over synthetic plain data; no DOM"
+    },
+    {
+      "tasks": 1000,
+      "projects": 20,
+      "projectIdComparisonsPerProjection": 10500,
+      "duration": {
+        "elapsedMedianMs": 0.4395709000000352,
+        "cpuMedianMs": 0.48529999999999995,
+        "rounds": 7,
+        "callsPerRound": 10
+      },
+      "provenance": "exact TabRail orderedTasks/taskRows expressions over synthetic plain data; no DOM"
+    }
+  ]
+}

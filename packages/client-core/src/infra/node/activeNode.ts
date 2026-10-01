@@ -1,5 +1,5 @@
-import { createSignal } from 'solid-js'
-import { fleetBridge } from '../platform'
+import { batch, createSignal } from 'solid-js'
+import { fleetBridge, nodeTransport } from '../platform'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { readLocal, writeLocal } from '../../kit/lib/state/deviceStorage'
 import { homeNode, nodeIsStarting, nodes, ORIGIN_NODE_ID, refreshFleet } from './fleet'
@@ -23,18 +23,21 @@ const [activeNodeId, setActiveNodeIdSignal] = createSignal<string | null>(readLo
 export { activeNodeId }
 
 export function setActiveNode(nodeId: string | null): void {
+  nodeTransport()?.interest(nodeId)
   const previous = activeNodeId()
   if (previous === nodeId) return
-  setActiveNodeIdSignal(nodeId)
-  // Before the event below, so a listener that reads the device's answer back gets this one.
-  writeLocal(LAST_NODE_KEY, nodeId ?? '')
-  // Announced, not performed here: which module signals hold node-scoped state is a composition question
-  // (apps/desktop's scopedEviction.ts owns the list), and client-core must not import a plugin's store to
-  // clear it.
-  //
-  // Emitted after the signal so a listener reads the new node, but before the QueryClient provider
-  // remounts: the provider is keyed on `activeCacheId()`, and Solid flushes that on the next tick.
-  clientEvents.emit('runtime:node-switched', { from: previous, to: nodeId })
+  batch(() => {
+    setActiveNodeIdSignal(nodeId)
+    // Before the event below, so a listener that reads the device's answer back gets this one.
+    writeLocal(LAST_NODE_KEY, nodeId ?? '')
+    // Announced, not performed here: which module signals hold node-scoped state is a composition question
+    // (apps/desktop's scopedEviction.ts owns the list), and client-core must not import a plugin's store to
+    // clear it.
+    //
+    // Emitted after the signal so a listener reads the new node, but before the QueryClient provider
+    // remounts: the batch holds reactive construction until every outgoing owner has retired.
+    clientEvents.emit('runtime:node-switched', { from: previous, to: nodeId })
+  })
 }
 
 // Which cache partition the mounted provider uses (node/fleet.ts). Not the same as `activeNodeId`:
@@ -81,6 +84,7 @@ export const nodeGateHolds = (): boolean => !nodeReady()
 // during the round trip; called again when the fleet gains its first node, and by the recovery
 // screen's Retry, which is what makes `starting` a state the user can observe.
 export async function selectActiveNode(): Promise<void> {
+  nodeTransport()?.interest(activeNodeId())
   const bridge = fleetBridge()
   // No broker at all: the renderer is being served by a node directly (`dev:node` in a browser), so the
   // origin already is the node and apiClient's same-origin fallback covers it. Gating the shell on a

@@ -324,9 +324,71 @@ describe('send — transport outcomes', () => {
   let fx: Fixture | null = null
 
   afterEach(() => {
+    vi.restoreAllMocks()
     vi.unstubAllGlobals()
     fx?.cleanup()
     fx = null
+  })
+
+  it.each([
+    { url: 'not a URL {{TOKEN}}/{{TOKEN}}', message: 'Not a valid URL.' },
+    { url: '{{TOKEN}}:opaque', message: 'Only http and https URLs are supported.' },
+    { headers: [{ name: 'X-Token', value: '{{TOKEN}}\n{{TOKEN}}', enabled: true }], message: 'Request headers are invalid.' },
+    { headers: [{ name: '{{TOKEN}} invalid', value: 'value', enabled: true }], message: 'Request headers are invalid.' },
+  ])('returns safe preparation errors before fetch: $message', async ({ message, ...patch }) => {
+    fx = fixture()
+    const secret = 'SyntheticPrivateValue'
+    await fx.db.insert(httpVariables).values({ id: 'private', userId: USER, projectId: 'project-widget', name: 'TOKEN', kind: 'secret', value: await protectHttpValue(secret, SECRETS), encrypted: true, enabled: true, createdAt: 1, updatedAt: 1 })
+    const fetcher = vi.fn()
+    vi.stubGlobal('fetch', fetcher)
+    const attempt = send(fx.db, fx.core, USER, 'project-widget', input(patch))
+    await expect(attempt).rejects.toBeInstanceOf(SendError)
+    await expect(attempt).rejects.toThrow(message)
+    const error = await attempt.catch((error: Error) => error)
+    expect(JSON.stringify(error, ['message', 'stack', 'cause'])).not.toContain(secret)
+    expect(fetcher).not.toHaveBeenCalled()
+  })
+
+  it('redacts URLSearchParams encodings and simulated transport diagnostics while sending the real value', async () => {
+    fx = fixture()
+    const secret = "synthetic private value!~"
+    const encoded = new URLSearchParams({ value: secret }).toString().slice(6)
+    await fx.db.insert(httpVariables).values({ id: 'private', userId: USER, projectId: 'project-widget', name: 'TOKEN', kind: 'secret', value: await protectHttpValue(secret, SECRETS), encrypted: true, enabled: true, createdAt: 1, updatedAt: 1 })
+    const fetcher = vi.fn().mockRejectedValue(Object.assign(new Error(`failure ${secret} ${encodeURIComponent(secret)} ${encoded}`), { code: encoded }))
+    vi.stubGlobal('fetch', fetcher)
+    const result = await send(fx.db, fx.core, USER, 'project-widget', input({ url: 'https://api.test/?token={{TOKEN}}' }))
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain(encodeURIComponent(secret))
+    expect(result.ok).toBe(false)
+    for (const form of [secret, encodeURIComponent(secret), encoded]) expect(JSON.stringify(result)).not.toContain(form)
+  })
+
+  it('redacts lowercase URL hosts and header names compiled from private variables', async () => {
+    fx = fixture()
+    const secret = 'SyntheticPrivateValue'
+    await fx.db.insert(httpVariables).values({ id: 'private', userId: USER, projectId: 'project-widget', name: 'TOKEN', kind: 'secret', value: await protectHttpValue(secret, SECRETS), encrypted: true, enabled: true, createdAt: 1, updatedAt: 1 })
+    const fetcher = vi.fn().mockResolvedValue(new Response('ok'))
+    vi.stubGlobal('fetch', fetcher)
+    const result = await send(fx.db, fx.core, USER, 'project-widget', input({ url: 'https://{{TOKEN}}.test/', headers: [{ name: 'X-{{TOKEN}}', value: 'normal', enabled: true }] }))
+    expect(String(fetcher.mock.calls[0]?.[0])).toContain(secret.toLowerCase())
+    expect(JSON.stringify(result)).not.toContain(secret.toLowerCase())
+  })
+
+  it.each(['exit', 'spawn', 'throw'])('withholds private command diagnostics on %s failures', async (mode) => {
+    fx = fixture()
+    await fx.coreDb.insert(schema.workspaces).values({ id: 'workspace', name: 'Fixture', isDefault: true, sort: 0, createdAt: 0, updatedAt: 0 })
+    await fx.coreDb.insert(schema.projects).values({ id: 'project-widget', name: 'Fixture', path: tmpdir(), workspaceId: 'workspace', sort: 0, hidden: false, vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null, createdAt: 0, updatedAt: 0 })
+    const privateDiagnostic = 'SyntheticPrivateCommandDiagnostic'
+    await fx.db.insert(httpVariables).values({ id: 'command', userId: USER, projectId: 'project-widget', name: 'TOKEN', kind: 'command', value: await protectHttpValue('synthetic-command', SECRETS), encrypted: true, enabled: true, createdAt: 1, updatedAt: 1 })
+    const process = vi.spyOn(fx.core.proc, 'runProcess')
+    if (mode === 'throw') process.mockRejectedValue(new Error(privateDiagnostic))
+    else process.mockResolvedValue({ code: 1, signal: null, stdout: '', stderr: privateDiagnostic, timedOut: false, aborted: false, truncated: false, spawnError: mode === 'spawn' ? privateDiagnostic : null })
+    const fetcher = vi.fn()
+    vi.stubGlobal('fetch', fetcher)
+    const error = await send(fx.db, fx.core, USER, 'project-widget', input({ url: 'https://api.test/?token={{TOKEN}}' })).catch((error: Error) => error)
+    expect(error).toBeInstanceOf(SendError)
+    expect((error as Error).message).toContain('Variable "TOKEN": command')
+    expect(JSON.stringify(error, ['message', 'stack', 'cause'])).not.toContain(privateDiagnostic)
+    expect(fetcher).not.toHaveBeenCalled()
   })
 
   it('keeps the system error behind Node’s generic fetch failure', async () => {

@@ -14,6 +14,7 @@ import { visibleConversationItems } from './conversationItems'
 import { asPlainText } from './copyFormats'
 import AgentRequestCard from './AgentRequestCard'
 import { askedQuestions } from './requestAnswers'
+import { appApprovalOf, approvalSentNote, approvalTarget, sentOptionId } from './appApproval'
 import AgentArtifactCard from './AgentArtifactCard'
 import AgentAttachmentCard from './AgentAttachmentCard'
 import { senderLabel } from './turnSender'
@@ -418,6 +419,18 @@ export default function AgentEventCard(props: {
             <Card pad="sm">
               <Stack gap="row">
                 <Heading level={3} eyebrow={asked().kind}>{asked().title}</Heading>
+                {/* Which app the answer was about, by the identifier it is keyed on, and for a saved
+                    grant who holds it. An older row has no approval and reads as it always did. */}
+                <Show when={appApprovalOf(asked().approval)}>
+                  {(approval) => (
+                    <Stack gap="row">
+                      <Text emphasis="muted" wrap>{`App: ${approvalTarget(approval())}`}</Text>
+                      <Show when={approvalSentNote(approval(), sentOptionId(props.request))}>
+                        {(note) => <Text emphasis="muted" wrap>{note()}</Text>}
+                      </Show>
+                    </Stack>
+                  )}
+                </Show>
                 <Show when={askedQuestions(asked(), props.request).length} fallback={
                   <Text emphasis="muted">No answer</Text>
                 }>

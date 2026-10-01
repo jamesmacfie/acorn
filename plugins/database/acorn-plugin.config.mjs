@@ -88,6 +88,9 @@ export default {
       // implied by this plugin's place in the compiled pane list; a move is not a reason to renumber
       // panes under everyone who has this one open.
       order: 70,
+      // Hidden on a task with no database source: no connection script, and no DATABASE_URL in the
+      // worktree `.env` or the node's environment. There would be nothing to connect to.
+      availability: '/v1/p/database/available',
       // The composed pane. The host draws the SQL editor and the drag handle; this plugin's frame draws
       // the button bar, the table sidebar, the result grid and its two modals below.
       //

@@ -1,3 +1,4 @@
+import { Portal } from 'solid-js/web'
 // The desktop's own chrome, and why it is here rather than in client-core: it is the arrangement, not
 // the parts. Routing and the overlay slots are what this composition root decides. The topbar and rail
 // are exclusive slots it fills with core's provider or a device plugin's (docs/frontend.md).
@@ -577,7 +578,7 @@ export default function App() {
           Before this, the only place in the app that could open one was github's PR conversation. */}
       <RefPanelHost />
       <Show when={settingsRequest()}>
-        {(request) => <SettingsView request={request()} onClose={() => setSettingsRequest(null)} />}
+        {(request) => <Portal><SettingsView request={request()} onClose={() => setSettingsRequest(null)} /></Portal>}
       </Show>
       {/* After settings, so a confirmation a settings page asks for paints above the layer that asked. */}
       <WillConfirmationHost />
@@ -589,10 +590,10 @@ export default function App() {
       <SlotHost slot="overlay" context={slotContext()} />
     </div>
     </div>
-    <Tips />
+    <Portal><Tips /></Portal>
     {/* One transient-feedback stack for the whole app, frames included. The bridge's ui.toast
         lands here too. */}
-    <ToastHost />
+    <Portal><ToastHost /></Portal>
     </div>
     </Show>
   )

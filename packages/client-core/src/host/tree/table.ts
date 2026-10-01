@@ -15,6 +15,7 @@ import type { RemoteContribution } from './treeRegistry'
 export type RemoteTreeComponent = Component<{
   contribution: RemoteContribution
   props: () => unknown
+  openingItem?: string
   scope?: () => { taskId?: string; projectId?: string; item?: string }
   /** The sibling host editor's document, for a tree that is one region of a composed pane. An accessor
    *  because the two regions mount independently; its absence is the whole permission check, exactly as

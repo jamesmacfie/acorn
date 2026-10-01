@@ -1,0 +1,14 @@
+{
+  "runtime": "v24.11.0",
+  "owner": "actual DockerService with real ChildProcess spawn ENOENT; no daemon",
+  "attemptedStreams": 32,
+  "beforeCap": {
+    "errors": 32,
+    "closes": 32,
+    "exits": 0,
+    "ends": 0,
+    "trackedFailedChildren": 32
+  },
+  "endsAfter33rdAttach": 1,
+  "trackedAfter33rdAttach": 32
+}

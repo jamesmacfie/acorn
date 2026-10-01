@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, truncateSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, truncateSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
@@ -162,6 +162,18 @@ describe('editor routes over a real worktree', () => {
 
   it('404s a read when the task has no mapped worktree', async () => {
     expect((await authed().fetch(req('/api/tasks/task2/editor/read?path=a.ts'), {} as Env)).status).toBe(404)
+  })
+
+  it('refuses a dangling link before writing, but allows an ordinary new file', async () => {
+    const outsideTarget = join(outside, 'never-created.txt')
+    symlinkSync(outsideTarget, join(work, 'dangling.txt'))
+    const app = authed()
+    const refused = await app.fetch(req('/api/tasks/task1/editor/file', 'PUT', { path: 'dangling.txt', content: 'synthetic content' }), {} as Env)
+    expect(await refused.json()).toMatchObject({ ok: false })
+    expect(existsSync(outsideTarget)).toBe(false)
+    const written = await app.fetch(req('/api/tasks/task1/editor/file', 'PUT', { path: 'sub/new.txt', content: 'ordinary content' }), {} as Env)
+    expect(await written.json()).toEqual({ ok: true })
+    expect(readFileSync(join(work, 'sub/new.txt'), 'utf8')).toBe('ordinary content')
   })
 
   it('400s a malformed write body; 401s without a principal', async () => {
