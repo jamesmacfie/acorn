@@ -1,3 +1,4 @@
+import { Portal } from 'solid-js/web'
 import { createEffect, createSignal, For, Show } from 'solid-js'
 import { diffLines } from 'diff'
 import { readJson, writeJson } from '../../../infra/node/apiClient'
@@ -51,6 +52,7 @@ export default function ConfigTrustDialog() {
   const dismiss = createDismissable({ onDismiss: closeRepoConfigTrust, container: () => dialog })
 
   return (
+    <Portal>
     <Show when={configTrustRequest()}>
       <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>
         <section
@@ -99,5 +101,6 @@ export default function ConfigTrustDialog() {
         </section>
       </div>
     </Show>
+    </Portal>
   )
 }

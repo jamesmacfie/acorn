@@ -14,6 +14,8 @@ import {
   pluginWebviews,
   previewViews,
   recoveryActions,
+  rendererLayer,
+  type RendererLayer,
   type DesktopExtras,
   type CliInstaller,
   type FileDialogs,
@@ -94,6 +96,7 @@ const GROUPS = {
     resolve: recoveryActions,
     members: members<RecoveryActions>()(['openDataFolder', 'quit']),
   },
+  rendererLayer: { resolve: rendererLayer, members: members<RendererLayer>()(['update']) },
   preview: {
     resolve: previewViews,
     members: members<PreviewViews>()(['ensure', 'setBounds', 'show', 'hide', 'load', 'command', 'evict', 'onEvent']),

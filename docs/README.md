@@ -40,6 +40,7 @@ orientation map over the whole plugin system and it is much shorter than the ref
 | [frontend.md](./frontend.md) | Renderer composition, the package layout, and how the shell is put together. |
 | [ui-design.md](./ui-design.md) | The closed component kit, the appearance axes, and the design tokens. |
 | [panes.md](./panes.md) | The layout model and the pane vocabulary. |
+| [native-overlays.md](./native-overlays.md) | Native composition, input routing, presentation authority, supported platforms, and degraded behavior. |
 | [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) | The palette, the keymap, focus, and typing. |
 | [diff-rendering.md](./diff-rendering.md) | The diff document and its segments, row geometry, the resident segment cache, find, and what large-surface rendering refuses. |
 | [editor.md](./editor.md) | The host-owned document surface: why the host draws the editor and what it lends. |
@@ -94,6 +95,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing.md](./testing.md) | Test commands, coverage scope, test layers, and the alpha release pass. |
 | [testing/manual-checks.md](./testing/manual-checks.md) | Index of numbered, feature-specific manual acceptance checks. |
 | [testing/desktop-and-plugins.md](./testing/desktop-and-plugins.md) | Packaged shell, plugin installation, host webviews, and loaded plugin lifecycle checks. |
+| [testing/native-overlays.md](./testing/native-overlays.md) | Native overlay acceptance scenarios, test evidence, performance targets, and outstanding graphical checks. |
 | [testing/terminal-and-palette.md](./testing/terminal-and-palette.md) | Terminal keyboard and shared command palette checks. |
 | [testing/changes-and-large-surfaces.md](./testing/changes-and-large-surfaces.md) | Changes pane, large diff, transcript, and task restoration checks. |
 | [testing/workflows.md](./testing/workflows.md) | Workflow authoring, execution, child runs, schedules, and data-source checks. |
@@ -119,8 +121,6 @@ Start with the plugin map, then follow the authoring guide or API reference.
   projections, and acceptance gates for a standalone terminal client.
 - [Plugin list search proposal](./future/pluginsearch.md) — search beyond the loaded Linear,
   Rollbar, and GitHub list rows while keeping project and state scope.
-- [Native overlay layer requirements](./future/native-overlay-layer.md) — desktop overlays above
-  live preview and plugin webviews, with native composition, input routing, and acceptance gates.
 - `schemas/` — generated, versioned JSON Schemas that are pinned by a test and immutable by rule.
   Today that is `docs/schemas/enrollment-v1.json`.
 

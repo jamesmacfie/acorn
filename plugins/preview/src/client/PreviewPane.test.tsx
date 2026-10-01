@@ -17,6 +17,10 @@ const views = vi.hoisted(() => ({
 vi.mock('@acorn/plugin-api/client', () => ({
   elementRectKey: () => '0:0:300:200',
   previewViews: () => views,
+  observeNativePage: (_element: HTMLElement, update: (rect: { x: number; y: number; width: number; height: number }, covered: boolean) => void) => {
+    update({ x: 0, y: 0, width: 300, height: 200 }, false)
+    return () => {}
+  },
   visibleElementRect: () => ({ x: 0, y: 0, width: 300, height: 200 }),
 }))
 

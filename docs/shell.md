@@ -671,7 +671,9 @@ navigation state separate. The prefix and key shape are validated because they s
 A child webview under `Window::add_child` composites over the main one and takes logical bounds from
 the renderer's pane geometry. It does not inherit DOM overflow clipping, so the renderer intersects
 the host element with the viewport and every clipping ancestor before it sends those bounds. The
-child hides when no visible area remains or an overlay covers the pane. `incognito(true)` gives it
+child hides when no visible area remains. On macOS, the main renderer composites above the page
+through [the native overlay layer](./native-overlays.md). Other platforms and a disabled or failed
+layer use shared rectangle-overlap suppression. `incognito(true)` gives it
 its own ephemeral data store. Local-node preview is one kept-alive webview per task, restricted to
 HTTP and HTTPS URLs with no credentials, with an external chrome layer the renderer draws. Remote-node
 preview is unavailable: the native webview has no network-level policy for page subrequests, so a
