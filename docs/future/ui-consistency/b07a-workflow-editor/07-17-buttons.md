@@ -1,6 +1,6 @@
 # 07-17. Text buttons 11 pixels high, a typed "+", and a code action row on the edge
 
-**Status:** not started. Batch B07a. Written 2026-10-01. Line numbers are from 2026-10-01 and may
+**Status:** done 2026-10-02 on `more-ui`. Batch B07a. Written 2026-10-01. Line numbers are from 2026-10-01 and may
 have moved.
 
 Workflows has eight bare text buttons about 11 pixels high: **Delete** in the outline header,

@@ -1,6 +1,6 @@
 # 07-2. The workflow editor's header is a 26-pixel row with no bar
 
-**Status:** not started. Batch B07a. Written 2026-10-01. Line numbers are from 2026-10-01 and may
+**Status:** done 2026-10-02 on `more-ui`. Batch B07a. Written 2026-10-01. Line numbers are from 2026-10-01 and may
 have moved.
 
 The editor's header is `Toolbar variant="actions" size="sm"`, the form-footer variant: no fill, no

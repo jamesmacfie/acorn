@@ -8,6 +8,7 @@ import {
   Badge,
   Button,
   DetailColumn,
+  Heading,
   Icon,
   IconButton,
   Inline,
@@ -45,7 +46,8 @@ import {
   toJson,
   type DraftSelection,
 } from './draft'
-import { createDraftStore, defRefKey, SOURCE_GLYPH } from './draftStore'
+import { createDraftStore, defRefKey, SOURCE_GLYPH, type SaveState } from './draftStore'
+import { RevealFieldErrors } from './FieldControl'
 import FileConflicts from './FileConflicts'
 import GraphView from './GraphView'
 import JsonTab from './JsonTab'
@@ -104,6 +106,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       const ref = store.ref()
       if (ref) forgetNodeInLayout(defRefKey(ref), name)
     },
+    move: (name: string, direction: -1 | 1) => apply(current => moveNode(current, name, direction)),
     addForEach: (sourceId: string) => apply(current => addForEach(current, sourceId)),
     createChild: (stepId: string, itemSchema: DataSchema) => { void createChild(stepId, itemSchema) },
   }
@@ -135,7 +138,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       navigate(`${workflowsSurfacePath(props.projectId, defRefKey({ source: 'database', id: row.id }))}?returnTo=${encodeURIComponent(returnTo)}&returnStep=${encodeURIComponent(stepId)}`)
     } catch (error) {
       if (childId) await workflowApi.deleteDef(childId).catch(() => undefined)
-      store.setMessage(error instanceof Error ? error.message : 'The child workflow could not be created.')
+      store.setMessage(error instanceof Error ? error.message : "Couldn't create the child workflow.")
     }
   }
 
@@ -151,16 +154,19 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
   // emptied rather than after the validate debounce (./draft.ts § missingRequiredFields).
   const describeFor = (kind: string) =>
     store.catalog()?.kinds.find((entry) => entry.id === kind)?.describe ?? BUILTIN_STEP_DESCRIPTIONS[kind]
+  // Both ask the same required-field question, so the node's answer for a field this side already
+  // named is dropped. They differ only in the field label's case.
   const missing = createMemo(() => missingRequiredFields(draft().def, describeFor))
-  const problems = () => [...missing(), ...store.problems()]
+  const problems = () => {
+    const named = new Set(missing().map((problem) => problem.toLowerCase()))
+    return [...missing(), ...store.problems().filter((problem) => !named.has(problem.toLowerCase()))]
+  }
+  // A required field stays quiet until it is touched, or until Publish or Run asks whether the
+  // workflow is ready (./FieldControl.tsx § RevealFieldErrors).
+  const [revealErrors, setRevealErrors] = createSignal(false)
   const runnableDefinition = () => store.ref()?.source === 'database' ? store.publishedDef() : draft().def
   const missingRunKind = () => runnableDefinition()?.steps.find((step) => unavailableCatalogKind(step.kind ?? 'agent', store.catalog()))
   const missingDraftKind = () => draft().def.steps.find((step) => unavailableCatalogKind(step.kind ?? 'agent', store.catalog()))
-  const counts = createMemo(() => {
-    const def = draft().def
-    const roots = def.steps.filter((step, index) => (step.after ? step.after.length === 0 : index === 0)).length
-    return { nodes: def.steps.length, roots }
-  })
 
   // A draft saves whether or not it validates, the way the store takes one (docs/workflows.md
   // § Database definitions). Greying Save out while a workflow is half-built is how you lose it on
@@ -194,13 +200,13 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       ? { value: proposed, conflicts: [] }
       : mergeWorkflow(base, proposed, current)
     if (merged.conflicts.length) {
-      return `The draft changed while AI was working. Review these conflicts first: ${merged.conflicts.map(conflict => conflict.path).join(', ')}.`
+      return `You changed the workflow while AI was working. Sort out these steps first: ${[...new Set(merged.conflicts.map(conflict => conflictSubject(conflict.path, current)))].join(', ')}.`
     }
     const checked = await workflowApi.validateDef(merged.value, props.projectId)
-    if (checked.problems.length) return `The reconciled proposal is no longer valid: ${checked.problems.join(' ')}`
+    if (checked.problems.length) return `AI's changes no longer fit your workflow: ${checked.problems.join(' ')}`
     const refused = store.applyText(toJson(merged.value))
     if (refused) return refused
-    toast('AI proposal applied. Undo restores the previous draft.')
+    toast("AI's changes applied. Undo puts your version back.")
     return undefined
   }
 
@@ -277,14 +283,13 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
     const operation = store.publication()
     if (operation?.state !== 'complete') return
     setReview(undefined)
-    const landed = operation.landed.find(write => write.kind === 'workflow' && write.id === store.ref()?.id)
-    toast(landed ? `Published revision ${landed.revision}.` : 'Published.')
+    toast('Published.')
   }
   const confirmFiles = async (): Promise<void> => {
     await store.publishFiles()
     if (store.fileOperation()?.state !== 'complete') return
     setReview(undefined)
-    if (store.ref()?.source === 'database') toast('Exported. The files are not committed yet.')
+    if (store.ref()?.source === 'database') toast("Exported. The files aren't committed.")
   }
   const discardReview = async (): Promise<void> => {
     await (review() === 'files' ? store.discardFiles() : store.discardPublication())
@@ -303,22 +308,25 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
   // though the draft autosaves, because a reader who wants it written now should not have to wait.
   // The rest are rare and go in the overflow menu.
   const header = (
-    <Toolbar variant="actions" size="sm">
-      <Link onPress={() => navigate(projectPath(props.projectId))}>← Workflows</Link>
+    <Toolbar ariaLabel="Workflow">
       <Show when={typeof searchParams.returnTo === 'string' && searchParams.returnTo.startsWith('/p/')}>
-        <Link onPress={() => {
+        <Button size="xs" variant="ghost" onPress={() => {
           const path = typeof searchParams.returnTo === 'string' ? searchParams.returnTo : ''
           const step = typeof searchParams.returnStep === 'string' ? searchParams.returnStep : ''
           navigate(`${path}?step=${encodeURIComponent(step)}`)
-        }}>← Parent workflow</Link>
+        }}><Icon name="arrow-left" /> Parent workflow</Button>
       </Show>
-      <Text emphasis="strong">{draft().def.name}</Text>
+      <Heading level={2}>{draft().def.name}</Heading>
       <Show when={sourceGlyph()}>{(glyph) => <Icon name={glyph().icon} title={glyph().title} />}</Show>
-      <Show when={!store.readOnly()}><Badge tone={store.dirty() ? 'warn' : undefined}>{store.saveState()}</Badge></Show>
+      <Show when={!store.readOnly()}>
+        <Badge tone={SAVE_BADGE[store.saveState()].tone} tip={SAVE_BADGE[store.saveState()].tip}>{SAVE_BADGE[store.saveState()].word}</Badge>
+      </Show>
       {/* Where a run starts from. This badge replaced a warning strip that sat over every new draft
           saying the same thing; an unpublished draft is a normal state, not a problem. */}
       <Show when={isDatabase() && !store.loading()}>
-        <Badge>{store.publishedRevision() ? `Published r${store.publishedRevision()}` : 'Not published'}</Badge>
+        <Badge tip={store.publishedRevision() ? `Version ${store.publishedRevision()}. Runs and schedules use this version.` : undefined}>
+          {store.publishedRevision() ? 'Published' : 'Not published'}
+        </Badge>
       </Show>
       <ToolbarSpacer />
       <Show when={canGenerate()}>
@@ -330,10 +338,10 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       <IconButton icon="redo-2" label="Redo" disabled={!store.canRedo()} onPress={store.redo} />
       <Show
         when={!store.readOnly()}
-        fallback={<Button size="sm" busy={store.busy()} onPress={() => void copyToDatabase()}>Copy to database</Button>}
+        fallback={<Button size="sm" busy={store.busy()} onPress={() => void copyToDatabase()}>Make an editable copy</Button>}
       >
         <Button size="sm" disabled={!canSave()} busy={store.busy()} onPress={() => void save()}>Save</Button>
-        <Button size="sm" opens="dialog" disabled={store.busy() || store.conflicts().length > 0} onPress={() => void openPublication()}>Publish…</Button>
+        <Button size="sm" opens="dialog" disabled={store.busy() || store.conflicts().length > 0} onPress={() => { setRevealErrors(true); void openPublication() }}>Publish…</Button>
       </Show>
       <Button
         size="sm"
@@ -341,7 +349,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
         opens="dialog"
         disabled={runDisabled()}
         tip={isDatabase() && !store.publishedRevision() ? 'Publish this workflow before running it.' : undefined}
-        onPress={run}
+        onPress={() => { setRevealErrors(true); run() }}
       >
         Run…
       </Button>
@@ -353,13 +361,17 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
             <IconButton icon="ellipsis" label="More actions" opens="menu" expanded={open()} onPress={toggle} />
           )}
         >
+          {/* A disabled item takes no hover, so a tip would never show. The reason rides in the label. */}
           {(menu) => (
             <>
-              <Menu.Item context={menu} disabled={!store.publishedRevision()} onSelect={schedule}>Schedule…</Menu.Item>
-              <Menu.Item context={menu} disabled={store.busy() || !store.publishedRevision()} onSelect={() => void openExport()}>
-                Export to repository…
+              <Menu.Item context={menu} disabled={!store.publishedRevision()} onSelect={schedule}>
+                {store.publishedRevision() ? 'Schedule…' : 'Schedule… (publish first)'}
               </Menu.Item>
-              <Menu.Item context={menu} tone="danger" confirm="Delete this workflow?" disabled={store.busy()} onSelect={() => void remove()}>
+              <Menu.Item context={menu} disabled={store.busy() || !store.publishedRevision()} onSelect={() => void openExport()}>
+                {store.publishedRevision() ? 'Export to repository…' : 'Export to repository… (publish first)'}
+              </Menu.Item>
+              <Menu.Separator />
+              <Menu.Item context={menu} tone="danger" confirm="Delete workflow?" disabled={store.busy()} onSelect={() => void remove()}>
                 Delete
               </Menu.Item>
             </>
@@ -379,29 +391,28 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
     />
   )
 
+  // One problem and a count, so the bar stays one line. The problem is a link that selects its step.
   const footer = (
     <Toolbar size="sm">
       <Show
-        when={problems().length}
-        fallback={<Text emphasis="muted">{`Valid · ${counts().nodes} nodes · ${counts().roots} roots`}</Text>}
+        when={problems()[0]}
+        fallback={<Text emphasis="muted">{`${draft().def.steps.length} ${draft().def.steps.length === 1 ? 'step' : 'steps'}, no problems`}</Text>}
       >
-        <Inline gap="inline" wrap>
-          <For each={problems().slice(0, 3)}>
-            {(problem) => (
-              <Link
-                onPress={() => {
-                  const named = draft().def.steps.find((step) => problem.includes(`'${step.name}'`))
-                  if (named) store.select((current) => selectRow(current, { kind: 'node', name: named.name }))
-                }}
-              >
-                {problem}
-              </Link>
-            )}
-          </For>
-          <Show when={problems().length > 3}>
-            <Text emphasis="muted">{`and ${problems().length - 3} more`}</Text>
-          </Show>
-        </Inline>
+        {(problem) => (
+          <Inline gap="inline">
+            <Link
+              onPress={() => {
+                const named = draft().def.steps.find((step) => problem().includes(`'${step.name}'`))
+                if (named) store.select((current) => selectRow(current, { kind: 'node', name: named.name }))
+              }}
+            >
+              {problem()}
+            </Link>
+            <Show when={problems().length > 1}>
+              <Text emphasis="muted">{`and ${problems().length - 1} more`}</Text>
+            </Show>
+          </Inline>
+        )}
       </Show>
     </Toolbar>
   )
@@ -412,31 +423,32 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
     // scroll. Without it the stack was as tall as whatever the inspector held, so the node list ran
     // off the bottom of the window with nothing to scroll, and the graph and the JSON box got
     // whatever height the list's rows happened to give them.
+    <RevealFieldErrors.Provider value={revealErrors}>
     <Stack gap="none" grow>
       {header}
       {tabs}
       <Show when={store.message()}>{(message) => <Alert tone="warn">{message()}</Alert>}</Show>
       <Show when={isDatabase() && missingDraftKind()}>
-        {(step) => <Alert tone="warn" title="Run unavailable">{unavailableStepKindMessage(step().kind ?? 'agent')}</Alert>}
+        {(step) => <Alert tone="warn" title="Can't run this workflow">{unavailableStepKindMessage(step().kind ?? 'agent')}</Alert>}
       </Show>
       <Show when={store.loadError()}><Alert tone="danger">{String(store.loadError())}</Alert></Show>
       <FileConflicts store={store} />
       <For each={store.conflicts()}>{conflict => <Alert tone="warn" title={`Conflict: ${conflict.path}`}>
         <Stack gap="row">
-          <Text wrap>{`Your change: ${JSON.stringify(conflict.local)}`}</Text>
-          <Text wrap>{`Changed elsewhere: ${JSON.stringify(conflict.external)}`}</Text>
+          <Text wrap>{`Your change: ${asText(conflict.local)}`}</Text>
+          <Text wrap>{`Changed elsewhere: ${asText(conflict.external)}`}</Text>
           <Inline gap="inline">
-            <Button onPress={() => store.resolveConflict(conflict.path, 'local')}>Keep your change</Button>
-            <Button onPress={() => store.resolveConflict(conflict.path, 'external')}>Keep external change</Button>
+            <Button onPress={() => store.resolveConflict(conflict.path, 'local')}>Keep mine</Button>
+            <Button onPress={() => store.resolveConflict(conflict.path, 'external')}>Keep theirs</Button>
           </Inline>
         </Stack>
       </Alert>}</For>
       {/* A review prepared earlier, or one dismissed without deciding. It stays on the node until it is
           published or discarded, so the reader is told it is there rather than finding it by accident. */}
       <Show when={!review() && (pendingPublication() || pendingFiles())}>
-        <Alert title="A review is waiting">
+        <Alert title="Publishing isn't finished">
           <Inline gap="inline" wrap>
-            <Text>{pendingPublication() ? 'This workflow has a publication that was not finished.' : 'An export to the repository was not finished.'}</Text>
+            <Text>{pendingPublication() ? 'Review it to finish or discard it.' : 'Review the export to finish or discard it.'}</Text>
             <Button size="sm" opens="dialog" onPress={() => setReview(pendingPublication() ? 'publication' : 'files')}>Review</Button>
           </Inline>
         </Alert>
@@ -502,9 +514,9 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       <Show when={store.readOnly()}>
         <Show
           when={store.unreadable()}
-          fallback={<Alert>This one is a committed file. Copy it to the database to change it.</Alert>}
+          fallback={<Alert>This workflow is a file in the repository. To change it here, make an editable copy.</Alert>}
         >
-          <Alert tone="danger">This address does not name a workflow. Go back and pick one from the list.</Alert>
+          <Alert tone="danger">This workflow doesn't exist. Choose one from the list.</Alert>
         </Show>
       </Show>
       <Show
@@ -522,12 +534,10 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
                 readOnly={store.readOnly()}
                 onSelect={(selection: DraftSelection) => store.select((current) => selectRow(current, selection))}
                 onAdd={(kind) => apply((current) => kind === 'ai-list' ? addAiList(current) : addNode(current, kind))}
-                onRemove={actions.remove}
-                onMove={(name, direction) => apply(current => moveNode(current, name, direction))}
               />
             )}</Show>
           </ListColumn>
-          <DetailColumn scroll={tab() === 'nodes'}>
+          <DetailColumn scroll={tab() === 'nodes'} measure={tab() === 'nodes' ? 'page' : undefined}>
             <Show
               when={tab() === 'graph'}
               fallback={(
@@ -560,5 +570,25 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       </Show>
       {footer}
     </Stack>
+    </RevealFieldErrors.Provider>
   )
+}
+
+const SAVE_BADGE: Record<SaveState, { word: string; tone?: 'warn' | 'danger'; tip?: string }> = {
+  saved: { word: 'Saved' },
+  saving: { word: 'Saving…' },
+  unsaved: { word: 'Not saved', tone: 'danger', tip: "acorn couldn't reach the node. Your changes are kept on this computer." },
+  conflict: { word: 'Resolve save conflict', tone: 'warn' },
+}
+
+/** A conflicting value as a person reads it: text as itself, anything else as its JSON. */
+const asText = (value: unknown): string =>
+  value === undefined ? 'Not set' : typeof value === 'string' ? value : JSON.stringify(value)
+
+/** The step a merge conflict sits in, by name, or the definition field it touches. Merge paths name
+ *  a step as `/steps/@{id}` (../../shared/workflowMerge.ts). */
+const conflictSubject = (path: string, def: { steps: readonly { id?: string; name: string }[] }): string => {
+  const id = /^\/steps\/@([^/]+)/.exec(path)?.[1]
+  if (id) return def.steps.find((step) => step.id === id)?.name ?? id
+  return path.split('/').filter(Boolean)[0] ?? 'the workflow'
 }

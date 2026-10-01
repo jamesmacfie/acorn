@@ -23,17 +23,22 @@ export function edges(def: WorkflowDef): Map<string, readonly string[]> {
   return new Map(def.steps.map((step, index) => [stepIdentity(step), effectiveAfter(def, index)]))
 }
 
-/** One row of the list column: the graph in reading order, indented by rank.
+/** One row of the list column: the graph in reading order.
  *
  *  Roots come first in declaration order and every other node lands after the last of its
  *  predecessors, which is what puts a chain under the step that starts it rather than at the bottom.
- *  A node waiting on more than one step carries `parents` so the row can say so. */
+ *  A node waiting on more than one step carries `parents` so the row can say so.
+ *
+ *  Only a fork indents: a branch target, or a step that waits on more than one. A straight chain
+ *  stays flush under its first step, because indenting every link by rank turned a ten-step chain
+ *  into a staircase that spent a third of the column on margin. */
 export type GraphRow = { name: string; depth: number; parents: readonly string[] }
 
 const MAX_DEPTH = 4
 
 export function graphOrder(def: WorkflowDef): GraphRow[] {
   const graph = edges(def)
+  const branchTargets = new Set(def.steps.flatMap((step) => Object.values(step.branches ?? {})))
   const declared = new Map(def.steps.map((step, index) => [stepIdentity(step), index]))
   const waiting = new Set(def.steps.map((step) => stepIdentity(step)))
   const placedAt = new Map<string, number>()
@@ -42,7 +47,10 @@ export function graphOrder(def: WorkflowDef): GraphRow[] {
 
   const row = (name: string): GraphRow => {
     const parents = (graph.get(name) ?? []).filter((parent) => declared.has(parent))
-    const depth = parents.length ? Math.min(MAX_DEPTH, 1 + Math.max(...parents.map((parent) => rank.get(parent) ?? 0))) : 0
+    const forks = parents.length > 1 || branchTargets.has(name)
+    const depth = parents.length
+      ? Math.min(MAX_DEPTH, (forks ? 1 : 0) + Math.max(...parents.map((parent) => rank.get(parent) ?? 0)))
+      : 0
     rank.set(name, depth)
     placedAt.set(name, rows.length)
     waiting.delete(name)

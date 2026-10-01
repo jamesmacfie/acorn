@@ -1,11 +1,9 @@
-import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
+import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { activeTaskId, tasksOptions } from '@acorn/plugin-api/client'
 import { Button, Field, Modal, ModalActions, ModalBody, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import TypedValueField from './TypedValueField'
-import type { WorkflowDef } from '../../shared/workflowContracts'
-import { workflowApi } from '../workflowsClient'
 import { startWorkflow } from '../startWorkflow'
 import { closeWorkflowStart, startRequest, type StartRequest } from './startRequest'
 
@@ -26,7 +24,6 @@ export default function StartDialogHost() {
 }
 
 function StartDialog(props: { request: StartRequest }) {
-  const [definition] = createResource(() => props.request.defId, async id => (await workflowApi.def(id, props.request.projectId)).def as WorkflowDef)
   const inputs = () => props.request.inputs ?? []
   const [values, setValues] = createSignal<Record<string, DataValue>>({
     ...Object.fromEntries(inputs().filter((input) => input.default !== undefined).map((input) => [input.name, input.default!])),
@@ -65,13 +62,9 @@ function StartDialog(props: { request: StartRequest }) {
       <ModalBody>
         <Stack gap="row">
           <Show when={error()}>{(message) => <Text tone="danger" wrap>{message()}</Text>}</Show>
-          <Show when={definition()}>{(saved) => (
-            <Text emphasis="muted" wrap>Up to {saved().maxDescendants ?? 100} descendant tasks, four child levels, and {saved().maxConcurrency ?? 4} concurrent agents. Nested work shares these limits.</Text>
-          )}</Show>
           <Show when={!props.request.taskId}>
             <Field label="Task" hint="The run happens in this task's checkout." group>
               <Select
-                size="sm"
                 label="Task"
                 value={taskId()}
                 options={[{ value: '', label: 'Choose a task…' }, ...choices()]}
@@ -84,6 +77,7 @@ function StartDialog(props: { request: StartRequest }) {
                 <TypedValueField
                   label={input.required ? `${input.label ?? input.name} *` : input.label ?? input.name}
                   schema={input.schema}
+                  hint={input.description}
                   value={values()[input.name]}
                   required={input.required}
                   onValidity={(valid) => setInvalid(current => ({ ...current, [input.name]: !valid }))}

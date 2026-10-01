@@ -1,6 +1,6 @@
 # 07-5. The graph: tiny targets, text that shrinks past reading, and ids for names
 
-**Status:** not started. Batch B07a. Written 2026-10-01. Line numbers are from 2026-10-01 and may
+**Status:** done 2026-10-02 on `more-ui`. Batch B07a. Written 2026-10-01. Line numbers are from 2026-10-01 and may
 have moved.
 
 On the editor's **Graph** tab, a card's port and each edge's remove control are 14 by 14, under the

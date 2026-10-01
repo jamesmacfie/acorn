@@ -1,6 +1,6 @@
 # 07-8. The inspector says the same thing three or four times
 
-**Status:** not started. Batch B07a. Written 2026-10-01. Line numbers are from 2026-10-01 and may
+**Status:** done 2026-10-02 on `more-ui`. Batch B07a. Written 2026-10-01. Line numbers are from 2026-10-01 and may
 have moved.
 
 For a new **Run a command** step, "Run one shell command in the task's checkout and hand its output
