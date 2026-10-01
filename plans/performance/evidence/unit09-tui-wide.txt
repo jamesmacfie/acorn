@@ -1,0 +1,40 @@
+Default > repo · 2 tasks                                                            ● Task to open: Review changed files
+┌─Menu───────────────────────────┐Docker 0                        │
+│› Docker                        │Refresh                            Select a container.
+│  Workflows                     │✕ connect ECONNREFUSED
+│  Agents                        │  127.0.0.1:51864
+│  Memory                        │[Containers]  Images  Volumes
+│                                │Networks
+└────────────────────────────────┘Filter name / image / project
+┌─Browse─────────────────────────┐
+│Nothing to list here.           │  loading…
+│                                │
+│                                │
+│                                │
+│                                │
+│                                │
+│                                │
+│                                │
+│                                │
+│                                │
+│                                │
+│                                │
+│                                │
+│                                │
+│                                │
+│                                │
+│                                │
+│                                │
+│                                │
+│                                │
+│                                │
+│                                │
+└────────────────────────────────┘
+┌─Tasks──────────────────────────┐
+│  Review changed files          │
+│  Plan follow-up work           │
+│                                │
+│                                │
+│                                │
+└────────────────────────────────┘
+j/k move · enter open · esc back · ctrl+k commands · ? help · w switch workspace · p switch project · ; last workspac…

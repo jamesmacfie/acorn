@@ -1,0 +1,27 @@
+URL: app://acorn/p/1c0c8a9a-6a5b-45fe-9852-1483fdddc892
+Title: acorn
+
+Text:
+Default
+▾
+repo
+L
+Home
+Add panel
+
+Elements:
+- button "Hide tasks" [ref=e1]
+- button "Default▾" [ref=e2]
+- button "Notifications" [ref=e3]
+- button "App menu" [ref=e4]
+- button "Home" [ref=e5]
+- button "Docker" [ref=e6]
+- button "API" [ref=e7]
+- button "Workflows" [ref=e8]
+- button "Agents" [ref=e9]
+- button "Memory" [ref=e10]
+- button "Archive" [ref=e11]
+- button "Large surfaces (small)" [ref=e12]
+- button "New task" [ref=e13]
+- heading "Home" [ref=e14]
+- button "Add panel" [ref=e15]

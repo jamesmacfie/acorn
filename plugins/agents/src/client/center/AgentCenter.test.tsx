@@ -6,7 +6,7 @@ vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: [] }) }))
 vi.mock('../sessions/managedClient', () => ({ managedAgentApi: {
   providers: async () => [], sessions: async () => ({ sessions: [] }), search: async () => [],
 } }))
-vi.mock('../sessions/managedStore', () => ({ managedAgentStore: {
+vi.mock('../sessions/managedStore', () => ({ managedAgentStore: { captureRead: () => ({ nodeId: null, check: () => {}, current: () => true }),
   sessions: () => [], upsertSessions: () => {}, activate: () => () => {},
 } }))
 vi.mock('@acorn/plugin-api/client', async (original) => ({
