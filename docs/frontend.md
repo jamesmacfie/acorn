@@ -424,7 +424,11 @@ The terminal drawer is a task surface and is available when the desktop terminal
 
 Overlays are shell-owned: command palette, settings, onboarding, notices, confirmations, and secret
 entry are not rendered by arbitrary pane content. The shell positions native preview views over a
-renderer pane host and hides them while overlays cover them.
+renderer pane host. `observeNativePage` owns shared page geometry, native overlay presentation, and
+the overlap fallback for both preview and loaded-plugin pages. The optional `rendererLayer.update`
+platform group sends geometry and input policy to the shell. The live Solid tree retains content,
+callbacks, drafts, and query ownership; no second renderer or cache receives them. For the shell
+contract and platform matrix, see [Native overlays](./native-overlays.md).
 
 Focus is shell state too. `client-core/host/keys/focusRegions.ts` holds which region of which pane the keyboard
 is in and what each region last had focused, and it is the one place `focusedPane` is written and the

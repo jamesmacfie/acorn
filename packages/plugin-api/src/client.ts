@@ -198,7 +198,7 @@ export { formatFileReference, sendReferenceToAgent, setManagedAgentReferenceHand
 export { canPickFolder, pickFiles, pickFolder, previewViews, saveFile } from '@acorn/client-core/infra/platform'
 // Native child webviews do not inherit DOM overflow clipping. Compiled surfaces that position one
 // use the host's shared visible box rather than duplicating the clipping walk.
-export { elementRectKey, visibleElementRect } from '@acorn/client-core/infra/platform'
+export { elementRectKey, visibleElementRect, observeNativePage } from '@acorn/client-core/infra/platform'
 export type { VisibleElementRect } from '@acorn/client-core/infra/platform'
 export type { PickedFile, PreviewState, PreviewViews, SaveRequest } from '@acorn/client-core/infra/platform'
 

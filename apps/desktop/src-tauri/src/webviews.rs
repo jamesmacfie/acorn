@@ -427,14 +427,25 @@ fn seed_tunnel_cookie<R: Runtime>(app: &AppHandle<R>, webview: &Webview<R>, url:
 }
 
 #[tauri::command]
-pub fn webview_bounds<R: Runtime>(app: AppHandle<R>, key: String, rect: Rect) {
+pub fn webview_bounds<R: Runtime>(app: AppHandle<R>, key: String, rect: Rect, viewport: Option<crate::overlays::Viewport>) {
     if ![rect.x, rect.y, rect.width, rect.height].iter().all(|value| value.is_finite()) {
         return;
     }
+    let mut sx = 1.0;
+    let mut sy = 1.0;
+    if let Some(viewport) = viewport {
+        if !viewport.valid() { return; }
+        if let Some(window) = app.get_window("main") {
+            if let (Ok(size), Ok(scale)) = (window.inner_size(), window.scale_factor()) {
+                sx = size.width as f64 / scale / viewport.width;
+                sy = size.height as f64 / scale / viewport.height;
+            }
+        }
+    }
     with_record::<R, _>(&app, &key, |record| {
         let _ = record.webview.set_bounds(tauri::Rect {
-            position: LogicalPosition::new(rect.x, rect.y).into(),
-            size: LogicalSize::new(rect.width.max(0.0), rect.height.max(0.0)).into(),
+            position: LogicalPosition::new(rect.x * sx, rect.y * sy).into(),
+            size: LogicalSize::new(rect.width.max(0.0) * sx, rect.height.max(0.0) * sy).into(),
         });
     });
 }
@@ -457,6 +468,7 @@ pub fn webview_show<R: Runtime>(app: AppHandle<R>, key: String, exclusive: bool)
     if let Some(record) = records.get(&key) {
         if !record.invalidated {
             let _ = record.webview.show();
+            crate::overlays::raise(&app);
         }
     }
 }
@@ -536,6 +548,7 @@ pub fn webview_command<R: Runtime>(app: AppHandle<R>, key: String, action: Strin
                 webview.open_devtools();
                 if let Some(bounds) = bounds {
                     let _ = webview.set_bounds(bounds);
+                    crate::overlays::raise(&app);
                 }
             }
             true

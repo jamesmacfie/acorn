@@ -1,3 +1,4 @@
+import type { OverlayPresentation } from '@acorn/client-core/infra/platform'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { decodeIdFrame } from '@acorn/protocol/ws.ts'
@@ -217,12 +218,12 @@ const onEvent = <T>(name: string, handler: (payload: T) => void): (() => void) =
 type WebviewState = { key: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
 type WebviewBlocked = { key: string; url: string; host: string }
 
+const overlayEpoch = invoke<number | null>('overlay_begin').catch(() => null)
 const previewKey = (taskId: string): string => `preview:${taskId}`
 
-// Rect fields cross as-is: the renderer measures its pane in CSS pixels and Rust positions the child
-// webview in logical ones, which are the same unit on both sides of the boundary.
+// CSS viewport dimensions let the shell convert zoomed CSS pixels into native logical points.
 const setBounds = (key: string, rect: { x: number; y: number; width: number; height: number }): void =>
-  void invoke('webview_bounds', { key, rect })
+  void invoke('webview_bounds', { key, rect, viewport: { width: window.innerWidth, height: window.innerHeight } })
 
 // One listener per group rather than one per surface: a Tauri event listener is a round trip to
 // register, and the renderer already fans these out by key.
@@ -359,6 +360,10 @@ const acorn = {
 
   // The browser preview pane. `show` is exclusive because one task's preview is on screen at a time,
   // and `hide` names no task because what the caller means is "no preview right now".
+  rendererLayer: ((globalThis as { __ACORN_PLATFORM__?: string; __ACORN_NATIVE_OVERLAYS__?: boolean }).__ACORN_PLATFORM__ ?? 'darwin') === 'darwin'
+    && (globalThis as { __ACORN_NATIVE_OVERLAYS__?: boolean }).__ACORN_NATIVE_OVERLAYS__ !== false ? {
+    update: (presentation: OverlayPresentation) => overlayEpoch.then((epoch) => epoch === null ? false : invoke<boolean>('overlay_update', { epoch, presentation })),
+  } : undefined,
   preview: {
     ensure: (taskId: string, url: string) => invoke<boolean>('webview_ensure', { key: previewKey(taskId), url }),
     setBounds: (taskId: string, rect: { x: number; y: number; width: number; height: number }) => setBounds(previewKey(taskId), rect),
@@ -401,12 +406,14 @@ const acorn = {
 // this cannot read leaves the strip on its last one, which beats painting it black.
 function followThemeBackground(): void {
   const paint = () => {
-    const channels = getComputedStyle(document.body).backgroundColor.match(/[\d.]+/g)
+    const probe = document.createElement('span')
+    probe.style.color = 'var(--bg)'
+    document.body.append(probe)
+    const channels = getComputedStyle(probe).color.match(/[\d.]+/g)
+    probe.remove()
     if (!channels || channels.length < 3) return
     const [red, green, blue, alpha] = channels.map(Number)
-    // A transparent body means the stylesheet has not arrived, which is what `dev` looks like: Vite
-    // injects the CSS with the module graph rather than as a render-blocking link. Painting black and
-    // waiting for the next theme change is worse than leaving the strip where it is.
+    // Leave the initial window color until appearance tokens resolve to a visible color.
     if (alpha === 0) return
     void invoke('set_window_background', { red, green, blue })
   }
