@@ -32,6 +32,7 @@ import GateFormEditor from './GateFormEditor'
 import WorkflowDispatchForm from './WorkflowDispatchForm'
 import StepConfigurationFields from './StepConfigurationFields'
 import StepPreview from './StepPreview'
+import TimeBudgetField from './TimeBudgetField'
 import {
   canConnect,
   effectiveAfter,
@@ -220,6 +221,16 @@ export default function NodeInspector(props: {
                 onStep={(patch) => props.actions.setStep(stepIdentity(current()), patch)}
               />
             </Show>
+
+            <TimeBudgetField label="Step timeout in minutes"
+              hint={def().budget?.maxWallTimeMs !== undefined
+                ? 'Leave empty to use the workflow timeout. The run stops when its remaining time runs out.'
+                : runsAgent()
+                  ? 'Leave empty for the 10-minute agent turn default. A custom timeout covers the whole step, including agent loops.'
+                  : 'Limits active step execution, including child workflows. Leave empty for no workflow step limit.'}
+              budget={current().budget} maxWallTimeMs={def().budget?.maxWallTimeMs}
+              disabled={props.readOnly}
+              onChange={(budget) => props.actions.setStep(stepIdentity(current()), { budget })} />
 
             <StepConfigurationFields
               step={current()}

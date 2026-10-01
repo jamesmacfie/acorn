@@ -93,7 +93,7 @@ describe('a contributed kind draws its own form', () => {
   it('renders one control per field, of the type the description named', () => {
     mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'run', kind: 'terminal:command', after: [] }] }, [kind], 'run')
     expect(labels('textarea')).toContain('Command')
-    const number = host.querySelector('input[type="number"]')
+    const number = host.querySelector('input[aria-label="Timeout"]')
     expect(number?.getAttribute('aria-label')).toBe('Timeout')
     expect(number?.getAttribute('min')).toBe('1000')
     expect(host.querySelector('input[type="checkbox"]')).toBeTruthy()
@@ -151,6 +151,17 @@ describe('a kind that runs an agent', () => {
     pluginId: null,
     describe: { label: 'Ask an agent', description: 'Ask an agent.', icon: 'bot', output: { description: 'Agent answer.' }, runsAgent: true, fields: [{ id: 'prompt', label: 'Prompt', type: 'prompt' }] },
   }
+
+  it('edits a custom step timeout without changing the other budget limits', () => {
+    mount({ baseline: 'acorn-1', formatVersion: 1, name: 'w', steps: [{
+      name: 'ask', prompt: 'Investigate.', budget: { maxWallTimeMs: 1_800_000, maxTurns: 2 },
+    }] }, [kind], 'ask')
+    const input = host.querySelector<HTMLInputElement>('input[aria-label="Step timeout in minutes"]')!
+    expect(input.value).toBe('30')
+    input.value = '45'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(noActions.setStep).toHaveBeenLastCalledWith('ask', { budget: { maxWallTimeMs: 2_700_000, maxTurns: 2 } })
+  })
 
   it('draws the harness, every option that harness advertises, and where it runs', () => {
     mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'ask', after: [], profileId: 'claude-code' }] }, [kind], 'ask')
