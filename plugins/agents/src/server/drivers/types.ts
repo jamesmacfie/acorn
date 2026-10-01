@@ -38,6 +38,8 @@ export type AgentDriverMcpServer =
   | { transport: 'http'; name: string; url: string; headers: Record<string, string> }
 
 export type AgentDriverStartOptions = {
+  /** Local compiled-runtime cancellation. This signal never crosses plugin RPC. */
+  signal?: AbortSignal
   session: AgentSession
   cwd: string
   env: Record<string, string>

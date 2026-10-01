@@ -1,0 +1,11 @@
+{
+  "plugins/agents/src/server/drivers/jsonRpcProcess.ts": "cc8af23e106867cc6527a54aac40404e96d51afa8a6ff867ffdf93fc00b22137",
+  "plugins/agents/src/server/drivers/acpDriver.ts": "9703b6bcb152ccb6c1bc51890ecf19b92033e6749a6cf27802baff0605010919",
+  "plugins/agents/src/server/drivers/codexDriver.ts": "fb0cdc04d972e89d1450af83607fb7bc02daf9fdb48a4fcdda78a05a676fddfa",
+  "plugins/agents/src/server/sessions/runtimeEngine.ts": "d008a405aaa497ec73aa34c4c7cbf030aa75a9e5d70d425ab54a8ea36e73f9d1",
+  "plugins/agents/src/server/usage/processRunner.ts": "240a98ac5f7dd70f1b7e8434c8041320e77c411d4fdbeaf9793b818b77319832",
+  "plugins/agents/src/server/usage/codexUsage.ts": "6deba7f27de20254f21caf6ff11989ecd9938a3adcd2e2232a35f819b55d17c4",
+  "plans/performance/09-process-probe.test.ts": "ffb7b4f33f303fec201e8361c700f4603418fc0fcc626410e8e4cde80e6462ab",
+  "plans/performance/09-owned-child.mjs": "0d11407242e59cb9acfbc644f0f7f9cc994f22a3ee8db04a3f1f95e69584d1aa",
+  "plans/performance/09-probe.config.ts": "7bc424f8b57141b6c01e5cf35d93e7063de311e0ec17932e4ce362d8d4367497"
+}

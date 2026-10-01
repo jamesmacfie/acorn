@@ -1,6 +1,6 @@
 import { SecretService } from '@acorn/plugin-api/testkit'
 import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import * as schema from '../node/schema'
 import { AgentMcpServerStore } from './mcpServerStore'
 
@@ -14,7 +14,7 @@ describe('the MCP servers acorn hands to sessions', () => {
     testDb = makeTestPluginDb('agents')
     store = new AgentMcpServerStore(testDb.db, SECRETS)
   })
-  afterEach(() => testDb.cleanup())
+  afterEach(() => { vi.restoreAllMocks(); testDb.cleanup() })
 
   const linear = {
     transport: 'stdio' as const,
@@ -69,5 +69,20 @@ describe('the MCP servers acorn hands to sessions', () => {
     const resolved = await otherKey.resolve(['linear', 'docs', 'gone'], 'test')
     expect(resolved.servers).toEqual([{ transport: 'http', name: 'docs', url: 'https://docs.example/mcp', headers: {} }])
     expect(resolved.unavailable).toEqual(['linear'])
+  })
+
+  it('does not read another server after cancellation during a secret reveal', async () => {
+    await store.save('linear', linear)
+    await store.save('docs', { transport: 'http', url: 'https://docs.example/mcp', values: [], enabled: true })
+    let finish!: (value: string) => void
+    const reveal = vi.spyOn(SECRETS, 'reveal').mockReturnValue(new Promise((resolve) => { finish = resolve }))
+    const controller = new AbortController()
+    const cancelled = new Error('cancel MCP startup')
+    const resolving = store.resolve(['linear', 'docs'], 'test', controller.signal).catch((error: unknown) => error)
+    await vi.waitFor(() => expect(reveal).toHaveBeenCalledOnce())
+    controller.abort(cancelled)
+    testDb.cleanup()
+    finish('synthetic secret')
+    expect(await resolving).toBe(cancelled)
   })
 })

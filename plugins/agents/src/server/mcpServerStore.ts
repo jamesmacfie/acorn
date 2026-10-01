@@ -143,26 +143,32 @@ export class AgentMcpServerStore {
   async resolve(
     names: readonly string[],
     purpose: string,
+    signal?: AbortSignal,
   ): Promise<{ servers: AgentDriverMcpServer[]; secrets: string[]; unavailable: string[] }> {
     const servers: AgentDriverMcpServer[] = []
     const secrets: string[] = []
     const unavailable: string[] = []
     for (const name of names) {
+      signal?.throwIfAborted()
       const row = await this.#row(name)
+      signal?.throwIfAborted()
       const config = row && storedConfig(row)
       if (!config) continue
       const values: Record<string, string> = {}
       const revealed: string[] = []
       try {
         for (const pair of config.values) {
+          signal?.throwIfAborted()
           if (pair.secret && pair.sealed) {
             values[pair.name] = await this.#secrets.reveal(pair.sealed, purpose)
+            signal?.throwIfAborted()
             revealed.push(values[pair.name]!)
           } else {
             values[pair.name] = pair.value ?? ''
           }
         }
       } catch {
+        signal?.throwIfAborted()
         unavailable.push(name)
         continue
       }
