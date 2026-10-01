@@ -1,5 +1,6 @@
 import { Field, Fold, Input, Select, Stack, Textarea } from '@acorn/plugin-api/ui'
 import type { WorkflowBudget, WorkflowDef } from '../../shared/workflowContracts'
+import TimeBudgetField from './TimeBudgetField'
 
 export default function DefinitionInspector(props: {
   def: WorkflowDef
@@ -68,10 +69,10 @@ export default function DefinitionInspector(props: {
             <Input size="sm" type="number" width="narrow" label="Cost ceiling" disabled={props.disabled}
               value={budget().maxCostUsd ?? ''} onInput={(value) => setBudget('maxCostUsd', value)} />
           </Field>
-          <Field label="Wall clock, in milliseconds" group>
-            <Input size="sm" type="number" width="narrow" label="Wall clock" disabled={props.disabled}
-              value={budget().maxWallTimeMs ?? ''} onInput={(value) => setBudget('maxWallTimeMs', value)} />
-          </Field>
+          <TimeBudgetField label="Workflow timeout in minutes"
+            hint="Limits the whole run, including child workflows. Leave empty for no run limit. Without a time budget, agent turns default to 10 minutes."
+            budget={props.def.budget} disabled={props.disabled}
+            onChange={(budget) => props.onChange({ budget })} />
           <Field label="Turns" group>
             <Input size="sm" type="number" width="narrow" label="Turns" disabled={props.disabled}
               value={budget().maxTurns ?? ''} onInput={(value) => setBudget('maxTurns', value)} />
