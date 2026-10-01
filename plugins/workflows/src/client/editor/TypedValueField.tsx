@@ -6,6 +6,9 @@ import type { DataValue } from '@acorn/protocol/dataValues.ts'
 /** Text schemas use plain text; every other schema uses JSON without inferred conversion. */
 export default function TypedValueField(props: {
   label: string
+  /** What to type, under the box. The JSON reminder joins it for a non-text schema. */
+  hint?: string
+  size?: 'sm' | 'md'
   schema?: DataSchema
   value?: DataValue
   disabled?: boolean
@@ -31,7 +34,8 @@ export default function TypedValueField(props: {
       props.onValidity?.(false)
     }
   }
-  return <Field label={props.label} error={error()} hint={textSchema() ? undefined : 'Enter a JSON value.'} group>
-    <Input size="sm" label={props.label} disabled={props.disabled} value={text()} invalid={!!error()} onInput={update} />
+  const hint = () => [props.hint, textSchema() ? undefined : 'Enter a JSON value.'].filter(Boolean).join(' ') || undefined
+  return <Field label={props.label} error={error()} hint={hint()} group>
+    <Input size={props.size ?? 'md'} label={props.label} disabled={props.disabled} value={text()} invalid={!!error()} onInput={update} />
   </Field>
 }

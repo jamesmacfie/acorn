@@ -1,20 +1,36 @@
 import { stepIdentity } from '../../shared/workflowIdentity'
 import { createMemo, For, Show } from 'solid-js'
-import { Badge, Button, ConfirmButton, Icon, Menu, Row, Rows, SectionHeader, Stack, Text } from '@acorn/plugin-api/ui'
+import { pluginLabel } from '@acorn/plugin-api/client'
+import { Badge, Button, Icon, Menu, Row, Rows, SectionHeader, Stack, Text } from '@acorn/plugin-api/ui'
 import type { WorkflowCatalog } from '../../shared/workflowContracts'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
-import { DEFINITION_ROW, effectiveAfter, graphOrder, INPUTS_ROW, type DraftSelection, type WorkflowDraft } from './draft'
-import { branchLabel, dependencyLabels, referenceLabels, stepSummary } from './outlineModel'
+import { DEFINITION_ROW, graphOrder, INPUTS_ROW, type DraftSelection, type WorkflowDraft } from './draft'
+import { branchLabel, stepSummary } from './outlineModel'
 
 // The list column: the definition, its inputs, and the graph in reading order.
 //
 // One list, not two, because the inspector's subject is whatever is selected here and the definition's
-// own fields need a row to be selected from. The graph rows are indented by rank and a node waiting on
-// more than one step says how many. This list stays beside the graph view rather than being replaced
-// by it: it is the one place the definition's own rows can be selected from (./GraphView.tsx).
+// own fields need a row to be selected from. A row indents only where the graph forks
+// (./graphOrder.ts), and a node waiting on more than one step says how many. This list stays beside
+// the graph view rather than being replaced by it: it is the one place the definition's own rows can
+// be selected from (./GraphView.tsx). Moving and deleting the selected step live in the inspector's
+// header, beside the step they act on.
 
 const kindIcon = (kind: string, catalog: WorkflowCatalog | undefined): string | undefined =>
   catalog?.kinds.find((entry) => entry.id === kind)?.describe?.icon ?? BUILTIN_STEP_DESCRIPTIONS[kind]?.icon
+
+/** The built-in kinds, by what they are for. A kind not named here falls into Flow. Plugin kinds get a
+ *  group each, under the plugin's name. */
+const BUILTIN_GROUPS: readonly { label: string; kinds: readonly string[] }[] = [
+  { label: 'Ask AI', kinds: ['agent', 'decide', 'ci-loop', 'ai-list'] },
+  { label: 'Records', kinds: ['find-records', 'get-record-details', 'workflow-map'] },
+  { label: 'Flow', kinds: ['if', 'gate-human', 'gate-policy', 'workflow'] },
+]
+
+/** Not a catalog kind: two steps the editor adds together (./aiListDraft.ts). */
+const AI_LIST = { id: 'ai-list', label: 'Ask AI for a list, then run each', icon: 'sparkles', description: undefined as string | undefined }
+
+type AddItem = { id: string; label: string; icon: string; description?: string }
 
 export default function NodeList(props: {
   draft: WorkflowDraft
@@ -22,8 +38,6 @@ export default function NodeList(props: {
   readOnly?: boolean
   onSelect: (selection: DraftSelection) => void
   onAdd: (kind: string) => void
-  onRemove: (name: string) => void
-  onMove: (name: string, direction: -1 | 1) => void
 }) {
   const def = () => props.draft.def
   const order = createMemo(() => graphOrder(def()))
@@ -35,17 +49,15 @@ export default function NodeList(props: {
   }
 
   const items = createMemo(() => [
-    { key: DEFINITION_ROW, label: def().name || 'Definition', summary: '', icon: '', dependencies: '' },
-    { key: INPUTS_ROW, label: 'Inputs', summary: '', icon: '', dependencies: '' },
+    { key: DEFINITION_ROW, label: def().name || 'Definition', summary: '', icon: '' },
+    { key: INPUTS_ROW, label: 'Inputs', summary: '', icon: '' },
     ...order().map((row) => {
       const step = def().steps.find(candidate => stepIdentity(candidate) === row.name)!
-      const dependencies = dependencyLabels(step, def())
       return {
         key: `node:${row.name}`,
         label: step.name ?? row.name,
         summary: stepSummary(step, def(), props.catalog),
         icon: kindIcon(step.kind ?? 'agent', props.catalog) ?? '',
-        dependencies: dependencies.length ? `After ${dependencies.join(', ')}` : 'Starts the run',
       }
     }),
   ])
@@ -59,75 +71,74 @@ export default function NodeList(props: {
     props.onSelect({ kind: 'node', name: key.slice('node:'.length) })
   }
 
-  const selectedNode = () => (props.draft.selection.kind === 'node' ? props.draft.selection.name : undefined)
-  const selectedHasEdges = () => {
-    const name = selectedNode()
-    if (!name) return false
-    const index = def().steps.findIndex((step) => stepIdentity(step) === name)
-    return effectiveAfter(def(), index).length > 0
-      || def().steps.some((_step, at) => effectiveAfter(def(), at).includes(name))
-  }
-  const selectedReferences = () => selectedNode() ? referenceLabels(selectedNode()!, def()) : []
-  const selectedIndex = () => def().steps.findIndex(step => stepIdentity(step) === selectedNode())
-
-  // Built-in kinds first, then each plugin's, which is the order somebody reaches for them in.
-  const grouped = createMemo(() => [...(props.catalog?.kinds ?? [])].sort((a, b) =>
-    (a.pluginId ?? '').localeCompare(b.pluginId ?? '') || a.id.localeCompare(b.id)))
+  // Grouped by what a step is for, then one group per plugin, each sorted by label: the list used to
+  // run in plugin-then-id order, which read as no order at all.
+  const groups = createMemo(() => {
+    const kinds = props.catalog?.kinds ?? []
+    const item = (kind: (typeof kinds)[number]): AddItem => ({
+      id: kind.id,
+      label: kind.describe?.label ?? kind.id,
+      icon: kind.describe?.icon ?? 'puzzle',
+      description: kind.describe?.description,
+    })
+    const byLabel = (a: AddItem, b: AddItem) => a.label.localeCompare(b.label)
+    const builtins = kinds.filter((kind) => !kind.pluginId)
+    const named = new Set(BUILTIN_GROUPS.flatMap((group) => group.kinds))
+    const builtinGroups = BUILTIN_GROUPS.map((group) => ({
+      label: group.label,
+      items: [
+        ...builtins.filter((kind) => group.kinds.includes(kind.id)).map(item),
+        ...(group.kinds.includes(AI_LIST.id) ? [AI_LIST] : []),
+        ...(group.label === 'Flow' ? builtins.filter((kind) => !named.has(kind.id)).map(item) : []),
+      ].sort(byLabel),
+    }))
+    const plugins = [...new Set(kinds.flatMap((kind) => (kind.pluginId ? [kind.pluginId] : [])))]
+      .map((pluginId) => ({
+        label: pluginLabel(pluginId),
+        items: kinds.filter((kind) => kind.pluginId === pluginId).map(item).sort(byLabel),
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+    return [...builtinGroups, ...plugins].filter((group) => group.items.length)
+  })
 
   return (
     <>
       <SectionHeader
         actions={(
           <Show when={!props.readOnly}>
-            <Button size="sm" variant="bare" iconOnly label="Move up" title="Move selected step up" disabled={selectedIndex() <= 0}
-              onPress={() => selectedNode() && props.onMove(selectedNode()!, -1)}><Icon name="arrow-up" /></Button>
-            <Button size="sm" variant="bare" iconOnly label="Move down" title="Move selected step down" disabled={selectedIndex() < 0 || selectedIndex() >= def().steps.length - 1}
-              onPress={() => selectedNode() && props.onMove(selectedNode()!, 1)}><Icon name="arrow-down" /></Button>
             <Menu
               ariaLabel="Add a step"
               trigger={(state) => (
-                <Button size="sm" opens="menu" expanded={state.open()} onPress={state.toggle}>+ Add</Button>
+                <Button size="sm" opens="menu" expanded={state.open()} onPress={state.toggle}><Icon name="plus" /> Add step</Button>
               )}
             >
-              {/* Built-in kinds first, then one run per plugin. The owner rides in each row's title
-                  rather than in a heading: the kit's menu has no heading node on both hosts. */}
               {(menu) => (
-                <>
-                <Menu.Item context={menu} onSelect={() => props.onAdd('ai-list')}>
-                  Plan with AI, then For each
-                </Menu.Item>
-                <For each={grouped()}>
-                  {(kind) => (
-                    <Menu.Item
-                      context={menu}
-                      title={kind.describe?.description ?? (kind.pluginId ? `From ${kind.pluginId}` : undefined)}
-                      leading={<Show when={kind.describe?.icon}>{(name) => <Icon name={name()} />}</Show>}
-                      onSelect={() => props.onAdd(kind.id)}
-                    >
-                      {kind.describe?.label ?? kind.id}
-                    </Menu.Item>
+                <For each={groups()}>
+                  {(group, index) => (
+                    <>
+                      <Show when={index() > 0}><Menu.Separator /></Show>
+                      <Menu.Label>{group.label}</Menu.Label>
+                      <For each={group.items}>
+                        {(kind) => (
+                          <Menu.Item
+                            context={menu}
+                            title={kind.description}
+                            leading={<Icon name={kind.icon} />}
+                            onSelect={() => props.onAdd(kind.id)}
+                          >
+                            {kind.label}
+                          </Menu.Item>
+                        )}
+                      </For>
+                    </>
                   )}
                 </For>
-                </>
               )}
             </Menu>
-            <ConfirmButton
-              size="sm"
-              variant="bare"
-              disabled={!selectedNode()}
-              skipConfirm={!selectedHasEdges() && !selectedReferences().length}
-              confirmLabel={selectedReferences().length ? `Remove ${selectedReferences().length} references?` : 'Delete step?'}
-              onConfirm={() => {
-                const name = selectedNode()
-                if (name) props.onRemove(name)
-              }}
-            >
-              Delete
-            </ConfirmButton>
           </Show>
         )}
       >
-        Outline
+        Steps
       </SectionHeader>
       <Rows
         tree
@@ -165,8 +176,8 @@ export default function NodeList(props: {
                 onPress={() => select(item.key)}
                 depth={row().depth + 1}
                 density="compact"
-                variant="tree"
-                title={row().parents.length > 1 ? `Waits on ${row().parents.join(', ')}` : undefined}
+                variant="stacked"
+                title={row().parents.length > 1 ? `Waits on ${row().parents.map((parent) => stepFor(parent)?.name ?? parent).join(', ')}` : undefined}
                 leading={<Show when={item.icon}>{(name) => <Icon name={name()} />}</Show>}
                 meta={(
                   <>
@@ -179,8 +190,7 @@ export default function NodeList(props: {
               >
                 <Stack gap="none">
                   <Text>{stepFor(row().name)?.name ?? row().name}</Text>
-                  <Text emphasis="muted" wrap>{item.summary}</Text>
-                  <Text emphasis="muted" wrap>{item.dependencies}</Text>
+                  <Text emphasis="muted">{item.summary}</Text>
                 </Stack>
               </Row>
             )}
@@ -191,12 +201,7 @@ export default function NodeList(props: {
           telling that the thing it is missing is a step. */}
       <Show when={!def().steps.length && !props.readOnly}>
         <Row density="compact">
-          <Text emphasis="muted" wrap>No steps yet. Add the first one above.</Text>
-        </Row>
-      </Show>
-      <Show when={selectedReferences().length}>
-        <Row density="compact" variant="stacked">
-          <Text emphasis="muted" wrap>{`Deleting this step affects ${selectedReferences().join(', ')}.`}</Text>
+          <Text emphasis="muted" wrap>No steps yet. Add one to start.</Text>
         </Row>
       </Show>
     </>

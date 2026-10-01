@@ -1,5 +1,5 @@
 import { createSignal, Index, Show } from 'solid-js'
-import { Button, Field, Inline, Input, Select, Stack, Text } from '@acorn/plugin-api/ui'
+import { Button, Field, Icon, Inline, Input, Select, Stack, Text } from '@acorn/plugin-api/ui'
 
 // A `decide` step's branches: a verdict, and the step it takes (docs/workflows.md § Execution model).
 //
@@ -32,7 +32,7 @@ export default function BranchesField(props: {
   return (
     <Field
       label="Branches"
-      hint="One verdict per branch. Every target has to wait on this step. `default` is taken when nothing else matches."
+      help="Each answer the agent gives leads to a step. A branch called default catches anything else."
       group
     >
       <Stack gap="row">
@@ -43,7 +43,6 @@ export default function BranchesField(props: {
             <Inline gap="inline">
               <Text>{row()[0]}</Text>
               <Select
-                size="sm"
                 label={`Step for ${row()[0]}`}
                 disabled={props.disabled}
                 value={row()[1]}
@@ -51,7 +50,7 @@ export default function BranchesField(props: {
                 onChange={(next) => set(row()[0], next)}
               />
               <Show when={!props.disabled}>
-                <Button size="sm" variant="bare" onPress={() => remove(row()[0])}>Remove</Button>
+                <Button size="sm" variant="ghost" onPress={() => remove(row()[0])}>Remove</Button>
               </Show>
             </Inline>
           )}
@@ -59,20 +58,19 @@ export default function BranchesField(props: {
         <Show when={!props.disabled}>
           <Inline gap="inline">
             <Input
-              size="sm"
               width="narrow"
-              label="New verdict"
+              label="New answer"
               assist={false}
-              placeholder="verdict"
+              placeholder="Answer"
               value={verdict()}
               onInput={setVerdict}
               onSubmit={add}
             />
-            <Button size="sm" onPress={add} disabled={!verdict().trim()}>Add branch</Button>
+            <Button size="sm" onPress={add} disabled={!verdict().trim()}><Icon name="plus" /> Add branch</Button>
           </Inline>
         </Show>
         <Show when={!props.targets.length}>
-          <Text emphasis="muted" wrap>Nothing waits on this step yet, so there is nowhere for a branch to go.</Text>
+          <Text emphasis="muted" wrap>Add a step after this one to give a branch somewhere to go.</Text>
         </Show>
       </Stack>
     </Field>

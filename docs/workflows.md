@@ -341,7 +341,8 @@ is a record.
 
 The node list is the editor's list. Both call `graphOrder` in
 `plugins/workflows/src/client/editor/graphOrder.ts`, over the definition the run froze when it started, so
-the indentation in the run cannot disagree with the indentation in the editor. A node that waits on
+the indentation in the run cannot disagree with the indentation in the editor. Only a fork indents:
+a branch target, or a node that waits on more than one step. A node that waits on
 more than one step carries the same `⇐ n` mark. A dispatched child is a row under the step that
 spawned it.
 

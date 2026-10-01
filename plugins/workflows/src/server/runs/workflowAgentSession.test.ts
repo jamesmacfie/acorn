@@ -30,6 +30,41 @@ const v2 = (def: Omit<WorkflowDef, 'formatVersion'>): WorkflowDef => ({
   steps: def.steps.map((step, index) => ({ id: step.id ?? step.name ?? `step-${index + 1}`, ...step })),
 })
 
+describe('custom workflow timeouts', () => {
+  it.each([
+    { runTimeout: undefined, stepTimeout: undefined, expected: undefined },
+    { runTimeout: 3_600_000, stepTimeout: undefined, expected: 3_600_000 },
+    { runTimeout: undefined, stepTimeout: 1_800_000, expected: 1_800_000 },
+    { runTimeout: 3_600_000, stepTimeout: 1_800_000, expected: 1_800_000 },
+  ])('passes the effective timeout to agent execution: $expected', async ({ runTimeout, stepTimeout, expected }) => {
+    const testDb = makeTestPluginDb('workflows')
+    const profile = agentProfileRegistry.register({
+      id: DEFAULT_PROFILE_ID, label: 'Claude Code', kind: 'agent', command: 'claude',
+      backendPreference: 'tmux', transport: 'pty',
+    })
+    const runStep = vi.fn<RunnerDeps['runStep']>().mockResolvedValue(ok)
+    try {
+      const runner = new WorkflowRunner(testDb.db, {
+        runStep,
+        writeHandoff: async () => {}, assembleContext: async () => '',
+        evaluatePolicy: async () => ({ pass: true }), failingChecks: async () => '', notify: () => {},
+      }, noExtensions)
+      const runId = await runner.start('task-1', v2({
+        baseline: 'acorn-1', name: 'Timed work',
+        budget: runTimeout === undefined ? undefined : { maxWallTimeMs: runTimeout },
+        steps: [{ name: 'work', prompt: 'Do the work.',
+          budget: stepTimeout === undefined ? undefined : { maxWallTimeMs: stepTimeout } }],
+      }))
+      await vi.waitFor(async () => expect((await runner.run(runId))?.status).toBe('done'))
+      expect(runStep).toHaveBeenCalledOnce()
+      expect(runStep.mock.calls[0][2].timeoutMs).toBe(expected)
+    } finally {
+      profile()
+      testDb.cleanup()
+    }
+  })
+})
+
 describe('which harness a step runs on', () => {
   it('resolves the workflow default before the step is run', async () => {
     const testDb = makeTestPluginDb('workflows')

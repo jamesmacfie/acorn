@@ -18,7 +18,7 @@ Run them on the desktop and in `acorn` in a terminal.
     **Save**, reload the surface, and the same nodes come back.
 49. From the same definition, press **Save to repo** on a task with a checkout. The file appears at
     `.acorn/workflows/<slug>.toml` in that worktree. Open it from the rail: it draws the same nodes
-    read-only, with **Copy to database** where Save was. Start a run from it and the repo trust prompt
+    read-only, with **Make an editable copy** where Save was. Start a run from it and the repo trust prompt
     appears, because the snapshot now covers the file.
 50. Press **Run** in the editor. The dialog asks for the declared input and for a task, refuses to
     confirm until the required one is filled, and starts the run. Then run the same definition from

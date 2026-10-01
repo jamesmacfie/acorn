@@ -1,0 +1,280 @@
+{
+  "fixture": "actual wsClient/agent channel -> managedStore -> AgentTranscript -> AgentEventCard -> Markdown/Timeline; jsdom + Solid development browser build; wrapped original telemetry/parser only counts and brackets actual production owner functions; 25 synthetic frames synchronously delivered, no visible latency",
+  "checkpoints": [
+    {
+      "cards": 40,
+      "tailCharacters": 80,
+      "initial": {
+        "synchronousWallMs": 76.82574999999997,
+        "processCPUms": 106.192,
+        "elements": 683,
+        "turns": 40,
+        "markdownBlocks": 41,
+        "parseCalls": 40,
+        "parseCharacters": 2732,
+        "parseMs": 1.91058300000077,
+        "ownerMs": {
+          "agents.transcript.project": {
+            "calls": 1,
+            "ms": 0.3670830000000933
+          },
+          "agents.transcript.visible": {
+            "calls": 1,
+            "ms": 0.03600000000005821
+          }
+        }
+      },
+      "steady": {
+        "synchronousWall": {
+          "totalMs": 15.910377000002882,
+          "medianMs": 0.4060829999998532,
+          "p95Ms": 1.3910000000005311
+        },
+        "processCPUms": 36.134,
+        "parseCalls": 25,
+        "parseCharacters": 3950,
+        "parseMs": 0.44658199999867065,
+        "ownerMs": {
+          "agents.transcript.project": {
+            "calls": 25,
+            "ms": 0.17137600000023667
+          },
+          "agents.transcript.visible": {
+            "calls": 25,
+            "ms": 0.07837600000038947
+          }
+        },
+        "mutations": {
+          "added": 25,
+          "removed": 25,
+          "attributes": 0,
+          "characterData": 0
+        },
+        "firstRowRetained": true,
+        "firstParagraphRetained": true,
+        "elements": 683,
+        "rawEvents": 65
+      }
+    },
+    {
+      "cards": 400,
+      "tailCharacters": 80,
+      "initial": {
+        "synchronousWallMs": 160.4511250000005,
+        "processCPUms": 338.789,
+        "elements": 3405,
+        "turns": 200,
+        "markdownBlocks": 201,
+        "parseCalls": 200,
+        "parseCharacters": 13612,
+        "parseMs": 1.572542999995676,
+        "ownerMs": {
+          "agents.transcript.project": {
+            "calls": 1,
+            "ms": 0.19954199999938282
+          },
+          "agents.transcript.visible": {
+            "calls": 1,
+            "ms": 0.027082999999947788
+          }
+        }
+      },
+      "steady": {
+        "synchronousWall": {
+          "totalMs": 8.953083999997943,
+          "medianMs": 0.3242499999996653,
+          "p95Ms": 0.45262500000080763
+        },
+        "processCPUms": 20.92,
+        "parseCalls": 25,
+        "parseCharacters": 3950,
+        "parseMs": 0.2698289999989356,
+        "ownerMs": {
+          "agents.transcript.project": {
+            "calls": 25,
+            "ms": 0.1473329999971611
+          },
+          "agents.transcript.visible": {
+            "calls": 25,
+            "ms": 0.4201649999995425
+          }
+        },
+        "mutations": {
+          "added": 25,
+          "removed": 25,
+          "attributes": 0,
+          "characterData": 0
+        },
+        "firstRowRetained": true,
+        "firstParagraphRetained": true,
+        "elements": 3405,
+        "rawEvents": 425
+      }
+    },
+    {
+      "cards": 2000,
+      "tailCharacters": 80,
+      "initial": {
+        "synchronousWallMs": 116.38833300000078,
+        "processCPUms": 199.2,
+        "elements": 3405,
+        "turns": 200,
+        "markdownBlocks": 201,
+        "parseCalls": 200,
+        "parseCharacters": 13612,
+        "parseMs": 1.026919000009002,
+        "ownerMs": {
+          "agents.transcript.project": {
+            "calls": 1,
+            "ms": 0.7081660000003467
+          },
+          "agents.transcript.visible": {
+            "calls": 1,
+            "ms": 0.1296250000004875
+          }
+        }
+      },
+      "steady": {
+        "synchronousWall": {
+          "totalMs": 13.354874999997264,
+          "medianMs": 0.4639999999999418,
+          "p95Ms": 0.8624589999999444
+        },
+        "processCPUms": 24.28,
+        "parseCalls": 25,
+        "parseCharacters": 3950,
+        "parseMs": 0.3291290000006484,
+        "ownerMs": {
+          "agents.transcript.project": {
+            "calls": 25,
+            "ms": 0.25674500000241096
+          },
+          "agents.transcript.visible": {
+            "calls": 25,
+            "ms": 1.029209999998784
+          }
+        },
+        "mutations": {
+          "added": 25,
+          "removed": 25,
+          "attributes": 0,
+          "characterData": 0
+        },
+        "firstRowRetained": true,
+        "firstParagraphRetained": true,
+        "elements": 3405,
+        "rawEvents": 2025
+      }
+    },
+    {
+      "cards": 400,
+      "tailCharacters": 20000,
+      "initial": {
+        "synchronousWallMs": 127.609958,
+        "processCPUms": 236.104,
+        "elements": 4284,
+        "turns": 200,
+        "markdownBlocks": 494,
+        "parseCalls": 200,
+        "parseCharacters": 33532,
+        "parseMs": 1.6707110000106695,
+        "ownerMs": {
+          "agents.transcript.project": {
+            "calls": 1,
+            "ms": 0.06999999999970896
+          },
+          "agents.transcript.visible": {
+            "calls": 1,
+            "ms": 0.021459000000504602
+          }
+        }
+      },
+      "steady": {
+        "synchronousWall": {
+          "totalMs": 33.02758100000301,
+          "medianMs": 1.226875000000291,
+          "p95Ms": 1.9107080000003407
+        },
+        "processCPUms": 42.572,
+        "parseCalls": 25,
+        "parseCharacters": 501950,
+        "parseMs": 20.30033099999946,
+        "ownerMs": {
+          "agents.transcript.project": {
+            "calls": 25,
+            "ms": 0.09870699999737553
+          },
+          "agents.transcript.visible": {
+            "calls": 25,
+            "ms": 0.1940389999999752
+          }
+        },
+        "mutations": {
+          "added": 25,
+          "removed": 25,
+          "attributes": 0,
+          "characterData": 0
+        },
+        "firstRowRetained": true,
+        "firstParagraphRetained": true,
+        "elements": 4284,
+        "rawEvents": 425
+      }
+    },
+    {
+      "cards": 400,
+      "tailCharacters": 200000,
+      "initial": {
+        "synchronousWallMs": 427.2674589999997,
+        "processCPUms": 566.09,
+        "elements": 12225,
+        "turns": 200,
+        "markdownBlocks": 3141,
+        "parseCalls": 200,
+        "parseCharacters": 213532,
+        "parseMs": 8.726955000001908,
+        "ownerMs": {
+          "agents.transcript.project": {
+            "calls": 1,
+            "ms": 0.04691599999932805
+          },
+          "agents.transcript.visible": {
+            "calls": 1,
+            "ms": 0.01937499999985448
+          }
+        }
+      },
+      "steady": {
+        "synchronousWall": {
+          "totalMs": 239.3280850000001,
+          "medianMs": 9.25866700000006,
+          "p95Ms": 10.886207999999897
+        },
+        "processCPUms": 270.671,
+        "parseCalls": 25,
+        "parseCharacters": 5001950,
+        "parseMs": 182.683082999999,
+        "ownerMs": {
+          "agents.transcript.project": {
+            "calls": 25,
+            "ms": 0.20007999999961612
+          },
+          "agents.transcript.visible": {
+            "calls": 25,
+            "ms": 0.23795999999856576
+          }
+        },
+        "mutations": {
+          "added": 25,
+          "removed": 25,
+          "attributes": 0,
+          "characterData": 0
+        },
+        "firstRowRetained": true,
+        "firstParagraphRetained": true,
+        "elements": 12225,
+        "rawEvents": 425
+      }
+    }
+  ]
+}

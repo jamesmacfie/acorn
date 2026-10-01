@@ -116,9 +116,11 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
 
   const releaseSocket = managedAgentStore.activate()
   onCleanup(releaseSocket)
+  const rosterOwner = managedAgentStore.captureRead()
   const sessionsLoaded = managedAgentStore.loadTask(task.id)
   void sessionsLoaded
     .then((sessions) => {
+      rosterOwner.check()
       if (!selectedManagedSession(task.id) && sessions[0]) selectManagedSession(task.id, sessions[0].id)
     })
     .catch((caught) => setError(caught instanceof Error ? caught.message : 'Unable to load agent sessions.'))
@@ -184,10 +186,12 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
 
   async function createSession({ provider: descriptor, agent }: NewSessionChoice) {
     if (!descriptor.installed || creating()) return
+    const owner = managedAgentStore.captureRead()
     setCreating(true)
     setError('')
     try {
       const session = await managedAgentStore.startSession(task.id, descriptor, agent?.id)
+      owner.check()
       selectManagedSession(task.id, session.id)
       requestComposerFocus(session.id)
       await managedAgentStore.loadSnapshot(session.id)

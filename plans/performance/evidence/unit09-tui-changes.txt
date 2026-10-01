@@ -1,0 +1,24 @@
+Default > repo · 2 tasks                            ● Task: Review changed files
+┌─Menu─────────────────┐› Agent  [Changes]  Notes  Context  Editor
+│  Docker              │┌─List─────────────────────────────────────────────────┐
+│  Workflows           ││22 uncommitted +2706 −2488 View options               │
+│  Agents              ││Refresh changes      Stage all [Send 20 notes → agent]│
+│  Memory              ││▾ Tracked 21 [ ]                                     █│
+│                      ││  [M] image-0007.binassets/pkg-07/    [ ]  Send to ag█│
+└──────────────────────┘│  [M] module-0000.tssrc/pkg-00/   +134 −9 [ ]  Send t█│
+┌─Browse───────────────┐│  [M] module-0001.tssrc/pkg-01/   +71 −6 [ ]  Send to█│
+│Choose a source.      ││  [M] module-0002.tssrc/pkg-02/   +35 −2 [ ]  Send to││
+│                      ││  [M] module-0003.tssrc/pkg-03/   +97 −6 [ ]  Send to││
+│                      ││  [M] module-0004.tssrc/pkg-04/   +139 −8 [ ]  Send t││
+│                      ││  [M] module-0005.tssrc/pkg-05/   +91 −6 [ ]  Send to││
+│                      ││  [M] module-0006.tssrc/pkg-06/   +111 −6 [ ]  Send t││
+│                      ││  [M] module-0008.tssrc/pkg-08/   +57 −4 [ ]  Send to││
+└──────────────────────┘│repo / main Copy  no upstream [Publish] Remote actions│
+┌─Tasks────────────────┐│┌────────────────────────────────────────────────────┐│
+│  Review changed fil  │││Commit message                                      ││
+│  Plan follow-up wor  │││                                                    ││
+│                      │││                                                    ││
+│                      ││└────────────────────────────────────────────────────┘│
+│                      ││Expand the message    [Commit tracked][Commit options]│
+└──────────────────────┘└──────────────────────────────────────────────────────┘
+j/k move · esc back · h/l column · ctrl+k commands · ? help · w switch worksp…

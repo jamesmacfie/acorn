@@ -976,7 +976,9 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   background: var(--card-bg);
   border: var(--surface-border);
   border-radius: var(--radius-surface);
-  padding: var(--pad-surface);
+  /* A rung, not --pad-surface: the card is a fixed 200 by 92 in JS (graphLayout.ts), and Cozy's
+     24 clips the third line. */
+  padding: var(--space-7);
   cursor: pointer;
 }
 .ui-graph-card:hover { border-color: var(--accent); }
@@ -994,8 +996,8 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-graph-port {
   position: absolute;
   inset: 0 auto auto 0;
-  width: 14px;
-  height: 14px;
+  width: var(--control-h-xs);
+  height: var(--control-h-xs);
   padding: 0;
   border: var(--control-border);
   border-radius: var(--radius-circle);
@@ -1005,11 +1007,11 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-graph-cut {
   position: absolute;
   inset: 0 auto auto 0;
-  width: 14px;
-  height: 14px;
+  display: grid;
+  place-items: center;
+  width: var(--control-h-xs);
+  height: var(--control-h-xs);
   padding: 0;
-  line-height: 1;
-  font-size: var(--fs-2xs);
   color: var(--text-muted);
   border: var(--control-border);
   border-radius: var(--radius-circle);
@@ -1348,6 +1350,11 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 /* A form or a document in a detail column stops at a settings page's width and starts on the column's
    start edge, where the column's own header starts. Its chrome still spans the column. */
 .ui-listdetail-detail[data-measure='page'] > :not(.ui-toolbar, .ui-tabs, .section-header) { width: 100%; max-width: var(--page-measure); }
+/* A bar that heads a scrolling detail column is its header: it sits on the column's top edge rather
+   than a scroll pad below it, and what follows starts a section gap under it. */
+.ui-listdetail-detail[data-scroll] > .ui-toolbar:not([data-variant='actions'], [data-size='sm']):first-child {
+  margin-block: calc(-1 * var(--space-5)) var(--gap-section);
+}
 
 /* See docs/ui-design.md § Two-column panes for ListDetail's narrow-width behaviour. */
 

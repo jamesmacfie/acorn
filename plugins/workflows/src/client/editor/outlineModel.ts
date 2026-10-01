@@ -1,4 +1,5 @@
 import type { DataBinding, DataPredicate } from '@acorn/protocol/dataBindings.ts'
+import { pluginLabel } from '@acorn/plugin-api/client'
 import type { WorkflowCatalog, WorkflowDef, WorkflowStepDef } from '../../shared/workflowContracts'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 import { stepIdentity } from '../../shared/workflowIdentity'
@@ -37,18 +38,20 @@ function conditionLabel(condition: DataPredicate | undefined, def: WorkflowDef):
   return `${bindingLabel(condition.left, def)} ${operator}${condition.right ? ` ${bindingLabel(condition.right, def)}` : ''}.`
 }
 
+/** The outline row's second line. A summary only where it says something about this one step (what
+ *  an If tests, what a For each reads, what a Find records asks for); otherwise the kind's label,
+ *  because the kind's description already sits behind the inspector heading's help mark. */
 export function stepSummary(step: WorkflowStepDef, def: WorkflowDef, catalog: WorkflowCatalog | undefined): string {
   const kind = kindOf(step)
   if (unavailableCatalogKind(kind, catalog)) {
     const pluginId = stepKindPluginId(kind)
-    return pluginId ? `Plugin '${pluginId}' does not provide this step on this node.` : `Step kind '${kind}' is unavailable on this node.`
+    return pluginId ? `The ${pluginLabel(pluginId)} plugin isn't on this computer.` : "This kind of step isn't on this computer."
   }
   if (kind === 'find-records') {
     const query = step.query
     if (!query) return 'Choose records to find.'
     if (query.kind === 'saved') return 'Find records with a saved query.'
-    const source = query.content.query.source
-    return `Find records from ${source.pluginId} · ${source.sourceId}.`
+    return `Find ${pluginLabel(query.content.query.source.pluginId)} records.`
   }
   if (kind === 'workflow-map') {
     const source = def.steps.find(candidate => stepIdentity(candidate) === step.items?.step)?.name ?? 'chosen records'
@@ -56,14 +59,8 @@ export function stepSummary(step: WorkflowStepDef, def: WorkflowDef, catalog: Wo
   }
   if (kind === 'workflow') return `Run ${targetName(step, catalog)}.`
   if (kind === 'if') return `If ${conditionLabel(step.condition, def)}`
-  if (kind === 'decide') return 'Ask AI to choose a branch.'
-  if (kind === 'get-record-details') return 'Fetch details for the selected record.'
-  if (kind === 'agent' && step.schema && typeof step.schema === 'object') {
-    const fields = Object.keys((step.schema as { properties?: object }).properties ?? {})
-    return fields.length ? `Ask an agent to return ${fields.join(', ')}.` : 'Ask an agent for structured output.'
-  }
   const described = catalog?.kinds.find(entry => entry.id === kind)?.describe ?? BUILTIN_STEP_DESCRIPTIONS[kind]
-  return described?.description ?? `Run ${described?.label ?? kind}.`
+  return described?.label ?? kind
 }
 
 export function dependencyLabels(step: WorkflowStepDef, def: WorkflowDef): string[] {
@@ -82,9 +79,9 @@ export function branchLabel(step: WorkflowStepDef, def: WorkflowDef): string | u
   return undefined
 }
 
-/** Human-readable references shown before a destructive delete. The mutation rules decide what is
- *  detached; this list exists so a binding or branch never disappears as a surprise. */
-export function referenceLabels(id: string, def: WorkflowDef): string[] {
+/** The steps a delete would change, by name, shown before it happens. The mutation rules decide what
+ *  is detached; this list exists so a binding or branch never disappears as a surprise. */
+export function referencingSteps(id: string, def: WorkflowDef): string[] {
   const references: string[] = []
   const visitsBinding = (binding: unknown): boolean => {
     if (!binding || typeof binding !== 'object') return false
@@ -96,12 +93,11 @@ export function referenceLabels(id: string, def: WorkflowDef): string[] {
       && (binding as { step?: string }).step === id
   }
   for (const [index, step] of def.steps.entries()) {
-    const label = step.name
-    if (effectiveAfter(def, index).includes(id)) references.push(`${label} dependency`)
-    if (step.items?.step === id) references.push(`${label} records`)
-    if (Object.values(step.childWorkflow?.inputs ?? {}).some(visitsBinding)) references.push(`${label} child input`)
-    if (Object.values(step.title?.bindings ?? {}).some(visitsBinding)) references.push(`${label} title`)
-    if (Object.values(step.branches ?? {}).includes(id)) references.push(`${label} branch`)
+    if (effectiveAfter(def, index).includes(id)
+      || step.items?.step === id
+      || Object.values(step.childWorkflow?.inputs ?? {}).some(visitsBinding)
+      || Object.values(step.title?.bindings ?? {}).some(visitsBinding)
+      || Object.values(step.branches ?? {}).includes(id)) references.push(step.name)
   }
   return [...new Set(references)]
 }
