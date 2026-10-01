@@ -291,11 +291,10 @@ describe('architecture boundaries', () => {
       'apps/cli/src/supervision/lifecycle.ts', // explicit background Node lifecycle commands
       // Long-lived engines. Each owns its children's lifetime, and the broker has no model for that.
       'plugins/terminal/src/server/terminal.ts', // PTYs
-      'plugins/agents/src/server/drivers/jsonRpcProcess.ts', // ACP driver, one process per session
-      'plugins/agents/src/server/drivers/acpDriver.ts', // the generic ACP driver, one process per session
+      'plugins/agents/src/server/drivers/jsonRpcProcess.ts', // child stream types for JSON-RPC
+      'plugins/agents/src/server/processes/ownedProcess.ts', // duplex provider and read-only usage groups
       'plugins/agents/src/server/drivers/codexDriver.ts',
       'plugins/agents/src/server/drivers/authProbe.ts',
-      'plugins/agents/src/server/usage/codexUsage.ts',
       'plugins/docker/src/server/cli.ts',
       'plugins/docker/src/server/dockerService.ts', // `docker logs -f` / `stats` streams
       'plugins/editor/src/server/search.ts', // ripgrep, streamed
