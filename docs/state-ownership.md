@@ -142,6 +142,7 @@ Use the persistence scope that owns the state:
 | Workspace/task selection | Node + workspace/task |
 | Draft editor/comment text, and a commit message in the Changes pane | client + current task |
 | Provider data and task mutations | owning Node |
+| Computer Use app-access grants ([managed-agents.md](./managed-agents.md) § App-access approval) | the Computer Use integration on the Node's computer; the Node keeps only the decision |
 
 Module-level signals or maps that reference a task or workspace must either include the Node ID or be
 cleared on a node switch. A state owner registers its OWN evictor beside the signal it clears, through
@@ -326,6 +327,46 @@ There is no optimistic assumption that an invalidated cache reflects a completed
 The shell restores fleet and Node scope before task scope. Switching Nodes remounts Node-scoped
 client state so effects and query clients cannot retain the previous Node's assumptions.
 
+
+Preference writes capture their QueryClient's registered Node before asynchronous ordering or
+cleanup. Custom clients capture the active Node at the call; a captured missing target cannot follow
+a later selection. Confirmation, ordering, and optimistic rollback are per QueryClient and key.
+Device keys are read directly from the declared finite set, and device storage is written before
+query-cache observers are notified.
+
+Startup restore captures the same QueryClient identity for scoped-key generation and hydration
+filtering. It hydrates workspace, view, and pane phases before arming writes. Registry membership
+owns one independently disposable effect per bound slice. Each effect tracks codec reads, including
+deep mutable Solid stores; a change in one slice does not serialize unrelated slices. Equivalent
+queued values retain their first deadline, and a reversion cancels stale queued work. In-flight
+reversions remain queued until their exact saved value is durable. Late plugins hydrate before
+writing, disablement preserves stored data, removed scopes write tombstones, and disposal flushes
+pending writes to their captured Node.
+
 Disabling a plugin removes its client contributions at activation and stops its Node routes/services
 on the next Node initialization. Its data file remains in the Node root until the owner explicitly
 deletes it.
+
+
+### Notes recovery and compiled pane ownership
+
+Notes body/title recovery is feature-owned device state keyed by Node, complete scope address, and
+slug. It remains until the exact local edit is acknowledged or the document is explicitly deleted;
+no arbitrary size/count cap drops dirty text. The 250 ms device batch and forced flush points are
+specified in [notes-and-memory.md](./notes-and-memory.md). Notes does not implement the server
+compare-and-swap contract used by saved queries. Its selection memory is Node + task, session-only.
+
+Compiled pane models and their drawn marks carry a captured Node shell generation. One current task
+model per pane is shared across regions, survives pane removal, and retires with task replacement,
+task eviction, Node switch, or host/provider destruction. A late outgoing lease release cannot retire
+a returning equal-ID generation. This lifetime is independent of persisted query cache ownership.
+
+## Retained preview documents
+
+The Node owns preview configuration. The desktop shell owns each retained local preview's normalized
+configured home, browsing location, loading state, and navigation cursor. These facts are transient
+and stay outside the Node database and client query cache. Pane unmount hides the page and removes
+renderer observers. Refetching configuration reconciles the home without reloading an equal target.
+Node switches retire all previews so task IDs cannot cross Node ownership. Archive and shell shutdown
+also release native resources. Browser process loss and application exit can discard unsaved page
+state. For the lifecycle and recovery limits, see [Host-owned webviews](./shell.md#host-owned-webviews).

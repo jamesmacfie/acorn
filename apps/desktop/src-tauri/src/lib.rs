@@ -12,6 +12,10 @@ mod notifications;
 mod plugin_scheme;
 mod reset_stage;
 mod webviews;
+mod webview_target;
+#[cfg(feature = "agent-automation")]
+mod webview_diagnostics;
+mod overlays;
 
 #[cfg(all(feature = "agent-automation", not(debug_assertions)))]
 compile_error!(
@@ -151,14 +155,21 @@ pub fn run() {
             cli_install::cli_install,
             reset_stage::reset_export,
             reset_stage::reset_complete,
+            #[cfg(feature = "agent-automation")]
+            webview_diagnostics::webview_diagnostics,
+            #[cfg(feature = "agent-automation")]
+            webview_diagnostics::webview_trial_delay,
+            overlays::overlay_debug_focus,
+            overlays::overlay_begin,
+            overlays::overlay_update,
             webviews::webview_ensure,
             webviews::webview_bounds,
             webviews::webview_show,
             webviews::webview_hide,
-            webviews::webview_hide_family,
             webviews::webview_load,
             webviews::webview_command,
             webviews::webview_evict,
+            webviews::webview_evict_previews,
         ])
         .menu(menu::build)
         .on_menu_event(|app, event| menu::on_menu_event(app.app_handle(), event.id().as_ref()))
@@ -322,7 +333,7 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
                 env_files: env_files(app, &data_dir, packaged)?,
                 version: app.package_info().version.to_string(),
                 is_packaged: packaged,
-                app_origin: APP_ORIGIN.to_string(),
+                app_origin: renderer_origin(cfg!(windows) || cfg!(target_os = "android")).to_string(),
             },
         },
         move |signal| match signal {
@@ -376,14 +387,16 @@ fn env_files(app: &tauri::AppHandle, data_dir: &Path, packaged: bool) -> Result<
 /// `Contents/MacOS`, which `resource_dir()` does not name. Getting it wrong is invisible until
 /// somebody installs the app, which is what `scripts/verify-bundle.mjs` catches.
 pub(crate) fn bundled_node() -> PathBuf {
-    std::env::current_exe().ok().and_then(|exe| exe.parent().map(|dir| dir.join("node"))).unwrap_or_else(|| PathBuf::from("node"))
+    let name = if cfg!(windows) { "node.exe" } else { "node" };
+    std::env::current_exe().ok().and_then(|exe| exe.parent().map(|dir| dir.join(name))).unwrap_or_else(|| PathBuf::from(name))
 }
 
 /// The bundled runtime in a dev build, named the way `bundle.externalBin` names it, so dev and
 /// packaged disagree about the path and nothing else.
 pub(crate) fn bundled_node_for_host() -> PathBuf {
     let triple = std::env::var("ACORN_TARGET_TRIPLE").unwrap_or_else(|_| format!("{}-{}", std::env::consts::ARCH, host_suffix()));
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries").join(format!("node-{triple}"))
+    let extension = if triple.contains("-windows-") { ".exe" } else { "" };
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries").join(format!("node-{triple}{extension}"))
 }
 
 fn host_suffix() -> &'static str {
@@ -403,13 +416,13 @@ fn open_window(app: &tauri::AppHandle) -> tauri::Result<()> {
     // lights. `commands::set_window_background` is the other half, because only the page knows the
     // colour. See docs/shell.md, "The renderer bridge".
     #[cfg(target_os = "macos")]
-    let builder = builder.title_bar_style(tauri::TitleBarStyle::Transparent);
+    let builder = builder.title_bar_style(tauri::TitleBarStyle::Transparent).transparent(true);
     builder
         .title("acorn")
         .inner_size(1440.0, 900.0)
         // The colour until the page reports its own, one paint later: the default theme's `--bg`
         // (client-core styles/tokens-theme.css). Wrong for any other theme, and only for that paint.
-        .background_color(tauri::webview::Color(0x12, 0x12, 0x12, 0xff))
+        .background_color(tauri::webview::Color(0x12, 0x12, 0x12, if cfg!(target_os = "macos") { 0 } else { 0xff }))
         // This is the preload. It runs before any page script, so the host global is installed before
         // the shell mounts and the platform string the seam reads synchronously is already there. A
         // `<script>` tag in the HTML could only approximate both.
@@ -445,6 +458,10 @@ fn is_renderer_url(url: &tauri::Url) -> bool {
     is_renderer_url_for(url, cfg!(windows) || cfg!(target_os = "android"))
 }
 
+fn renderer_origin(mapped_schemes: bool) -> &'static str {
+    if mapped_schemes { "http://app.localhost" } else { APP_ORIGIN }
+}
+
 fn is_renderer_url_for(url: &tauri::Url, mapped_schemes: bool) -> bool {
     let original = url.scheme() == APP_SCHEME && url.host_str() == Some("acorn");
     let mapped = mapped_schemes && matches!(url.scheme(), "http" | "https") && url.host_str() == Some("app.localhost");
@@ -474,7 +491,7 @@ fn bridge_script(app: &tauri::AppHandle) -> String {
         eprintln!("[shell] could not read the renderer bridge at {}: {error}", path.display());
         String::new()
     });
-    format!("globalThis.__ACORN_PLATFORM__ = {:?};\n{bridge}", tauri_platform())
+    format!("globalThis.__ACORN_PLATFORM__ = {:?}; globalThis.__ACORN_NATIVE_OVERLAYS__ = {};\n{bridge}", tauri_platform(), std::env::var("ACORN_NATIVE_OVERLAYS").as_deref() != Ok("0"))
 }
 
 fn tauri_platform() -> &'static str {
@@ -525,12 +542,22 @@ fn show_recovery(app: &tauri::AppHandle, reason: Option<&str>) {
 mod tests {
     use super::*;
 
-    /// The origin the window loads and the origin the helper checks on the WebSocket upgrade are one
-    /// constant, not two spellings.
+    /// Wry maps the app scheme to HTTP on Windows. The helper must check the browser's origin.
     #[test]
     fn the_window_url_is_the_origin_the_helper_checks() {
         assert!(format!("{APP_ORIGIN}/").starts_with(APP_ORIGIN));
         assert_eq!(APP_ORIGIN, "app://acorn");
+        assert_eq!(renderer_origin(false), APP_ORIGIN);
+        assert_eq!(renderer_origin(true), "http://app.localhost");
+        assert!(is_renderer_url_for(&renderer_origin(true).parse().unwrap(), true));
+    }
+
+    #[test]
+    fn the_runtime_paths_use_the_host_executable_extension() {
+        let name = if cfg!(windows) { "node.exe" } else { "node" };
+        assert_eq!(bundled_node().file_name().unwrap(), name);
+        let staged = bundled_node_for_host();
+        assert_eq!(staged.extension().is_some_and(|ext| ext == "exe"), cfg!(windows));
     }
 
     #[test]

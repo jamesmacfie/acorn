@@ -1,8 +1,8 @@
 import { Agent as HttpAgent } from 'node:http'
 import { Agent as HttpsAgent } from 'node:https'
 import { WebSocket } from 'ws'
-import { nodeRequest, NodeResponseTooLargeError } from './nodeRequest'
-import { WS_PATH, type WsClientFrame } from '@acorn/protocol/ws.ts'
+import { nodeRequest } from './nodeRequest'
+import { MAX_NODE_WS_MESSAGE_BYTES, decodeIdFrame, WS_PATH, WS_VIEWERS_HEADER, wsViewerIdSchema, type WsClientFrame, type WsSendOptions } from '@acorn/protocol/ws.ts'
 import { NODE_PROTOCOL_VERSION, nodeInfoSchema } from '@acorn/protocol/node.ts'
 import {
   type NodeConnectionState,
@@ -10,8 +10,11 @@ import {
   type NodeFetchResponse,
   type NodeRecord,
   type NodeStatus,
+  type NodeTransportError,
 } from '@acorn/protocol/broker.ts'
-import { emitEvent, measure, telemetryEnabled } from '@acorn/node-core/server/telemetry'
+import { EventViewers } from './eventViewers'
+import { BrokerFetch } from './brokerFetch'
+import { emitEvent, telemetryEnabled } from '@acorn/node-core/server/telemetry'
 import { createLogger } from '@acorn/node-core/server/telemetry'
 
 // What the broker reports, and it is health rather than traffic (docs/shell.md § What the helper
@@ -34,7 +37,6 @@ const BACKOFF_MS = [1_000, 2_000, 4_000, 8_000, 16_000, 30_000]
 const JITTER = 0.2
 // A WS that has been down this long while HTTP still works is `degraded`, not `offline`.
 const DEGRADED_AFTER_MS = 5_000
-const DEFAULT_TIMEOUT_MS = 30_000
 const PING_INTERVAL_MS = 15_000
 // Two intervals of silence, not one. A single missed pong on a congested link is not evidence, and
 // being wrong costs a working socket and a refetch of everything on it.
@@ -45,7 +47,7 @@ const PROTOCOL_PROBE_TIMEOUT_MS = 5_000
 const PROTOCOL_PROBE_MAX_BYTES = 16 * 1024
 // ws enforces this while assembling (including inflated messages), before toString/JSON.parse or
 // the helper IPC boundary can make another copy. A malicious node must not pick the allocation size.
-export const MAX_NODE_WS_MESSAGE_BYTES = 8 * 1024 * 1024
+export { MAX_NODE_WS_MESSAGE_BYTES } from '@acorn/protocol/ws.ts'
 const MAX_NODE_HTTP_SOCKETS = 4
 
 // A node plus the material only main may hold: the bearer, and the certificate to pin against.
@@ -53,11 +55,12 @@ export type BrokerNode = NodeRecord & { token: string; certPem?: string }
 
 export type BrokerEvents = {
   // A server→client frame arrived. Forwarded verbatim; the broker does not interpret channels.
-  frame(nodeId: string, frame: unknown): void
+  frame(nodeId: string, frame: unknown, viewerId?: string): void
   // The one binary frame: terminal output, as an id-tagged payload (@acorn/protocol/ws.ts § The one
   // binary frame). Forwarded byte for byte — this broker does not read the id inside and does not
   // count the frame against `seq`, because a binary frame takes no sequence number.
-  bytes(nodeId: string, frame: Uint8Array): void
+  bytes(nodeId: string, frame: Uint8Array, viewerId?: string): void
+  transportError?(nodeId: string, error: NodeTransportError, viewerId?: string): void
   status(status: NodeStatus): void
 }
 
@@ -67,7 +70,7 @@ type Connection = {
   ws: WebSocket | null
   // Frames the renderer sent before the socket was open. Kept here as well as in the renderer's own
   // outbox, because a reconnect happens inside main and the renderer never learns of it.
-  outbox: string[]
+  viewers: EventViewers
   state: NodeConnectionState
   error: NodeStatus['error']
   attempt: number
@@ -87,16 +90,18 @@ type Connection = {
 
 export class NodeBroker {
   private readonly connections = new Map<string, Connection>()
-  private readonly inFlight = new Map<string, AbortController>()
+  private readonly requests = new BrokerFetch()
   private readonly pingIntervalMs: number
+  private readonly viewerMultiplexing: boolean
 
   // The heartbeat cadence is injectable so the interval runs for real in tests and the assertion is
   // that the socket died, not that a timer was scheduled.
   constructor(
     private readonly events: BrokerEvents,
-    options: { pingIntervalMs?: number } = {},
+    options: { pingIntervalMs?: number; viewerMultiplexing?: boolean } = {},
   ) {
     this.pingIntervalMs = options.pingIntervalMs ?? PING_INTERVAL_MS
+    this.viewerMultiplexing = options.viewerMultiplexing ?? false
   }
 
   // Add or replace a node. Replacing tears the old connection down first, so a re-pair with a new
@@ -110,7 +115,7 @@ export class NodeBroker {
       node,
       agent,
       ws: null,
-      outbox: [],
+      viewers: new EventViewers((viewerId, error) => this.events.transportError?.(node.nodeId, error, viewerId)),
       state: 'offline',
       error: undefined,
       attempt: 0,
@@ -160,6 +165,7 @@ export class NodeBroker {
   // the raw field is read anyway, because a client that refuses to learn a version from a partly
   // parsed response cannot explain itself.
   private async probeProtocol(connection: Connection): Promise<boolean | null> {
+    connection.viewers.setTransport(false)
     try {
       const response = await nodeRequest({
         url: new URL('/v1/node', connection.node.endpoint),
@@ -174,7 +180,10 @@ export class NodeBroker {
       if (response.status !== 200) return null
       const payload: unknown = JSON.parse(new TextDecoder().decode(response.body))
       const parsed = nodeInfoSchema.safeParse(payload)
-      if (parsed.success) return parsed.data.protocolVersion === NODE_PROTOCOL_VERSION
+      if (parsed.success) {
+        connection.viewers.setTransport(this.viewerMultiplexing && parsed.data.eventTransport?.viewers === 1)
+        return parsed.data.protocolVersion === NODE_PROTOCOL_VERSION
+      }
       const claimed = (payload as { protocolVersion?: unknown } | null)?.protocolVersion
       // A parseable Acorn claim without the baseline is a definite incompatibility, not an offline node.
       return typeof claimed === 'number' ? false : null
@@ -191,6 +200,7 @@ export class NodeBroker {
     this.stopHeartbeat(connection)
     connection.ws?.terminate()
     connection.agent.destroy()
+    connection.viewers.clear()
     this.connections.delete(nodeId)
   }
 
@@ -205,8 +215,7 @@ export class NodeBroker {
 
   dispose(): void {
     for (const nodeId of [...this.connections.keys()]) this.remove(nodeId)
-    for (const controller of this.inFlight.values()) controller.abort()
-    this.inFlight.clear()
+    this.requests.dispose()
   }
 
   // --- HTTP ---
@@ -225,76 +234,42 @@ export class NodeBroker {
       throw new Error('Node request path must stay on the paired node.')
     }
 
-    const controller = new AbortController()
-    this.inFlight.set(request.requestId, controller)
-    // Which side aborted is the difference between "the node is gone" and "we changed our mind". The
-    // timer's abort is evidence about the node. `abort(requestId)` from the renderer is not.
-    let timedOut = false
-    const timeout = setTimeout(() => {
-      timedOut = true
-      controller.abort()
-    }, request.timeoutMs ?? DEFAULT_TIMEOUT_MS)
-    try {
-      const response = await measure('core', 'broker.request', () => nodeRequest({
-        // The origin was checked before this request, including protocol-relative paths and
-        // backslashes. The endpoint and its bearer stay paired.
-        url: target,
-        method: request.method ?? 'GET',
-        headers: {
-          ...request.headers,
-          // Attached here, never by the renderer. That is the point of the broker.
-          authorization: `Bearer ${connection.node.token}`,
-        },
-        body: request.body,
-        agent: connection.agent,
-        signal: controller.signal,
-        maxResponseBytes: limits.maxResponseBytes,
-      }), { 'node.id': nodeId, method: request.method ?? 'GET' })
-      this.noteHttpResult(connection, response)
-      return response
-    } catch (error) {
-      // Neither abort is evidence about the node, so neither one changes its state.
-      //
-      // A cancellation the renderer asked for says nothing at all. Marking it `offline` here was a
-      // live bug: a query aborted on unmount flipped a healthy node to `offline`, and apiClient then
-      // failed every mutation with "This node is offline" until the next successful read cleared it.
-      //
-      // Our own timeout is a fact about one route, not about the transport. A provider route waits
-      // on a third party, and a loaded plugin's route waits on a worker thread, so either can pass
-      // this deadline while the socket is open and every other route on the node answers normally.
-      // Marking the node `offline` for it took the whole app down over one slow plugin panel.
-      // Liveness is the heartbeat's job: missed pings terminate the socket, and `downState` then
-      // picks `offline` or `degraded` with the HTTP evidence folded in.
-      if (isAbort(error)) {
-        if (!timedOut) throw error
-        // Renamed so the two aborts stay distinguishable one layer up. `helperServer.ts` answers the
-        // renderer's own cancellation with a 499 and must not swallow this one. "The operation was
-        // aborted" also tells someone whose node stopped answering nothing.
-        throw Object.assign(new Error(`The node did not answer within ${request.timeoutMs ?? DEFAULT_TIMEOUT_MS}ms`), { name: 'TimeoutError' })
-      }
-      // A route returning too much data is a response failure, not evidence that its node is down.
-      if (error instanceof NodeResponseTooLargeError) throw error
-      // Everything left is the transport itself: connection refused, socket hang-up, pin mismatch.
-      this.noteHttpFailure(connection, error)
-      throw error
-    } finally {
-      clearTimeout(timeout)
-      this.inFlight.delete(request.requestId)
-    }
+    return this.requests.fetch(nodeId, request, connection, {
+      result: (response) => this.noteHttpResult(connection, response),
+      failure: (error) => this.noteHttpFailure(connection, error),
+    }, limits)
   }
 
-  abort(requestId: string): void {
-    this.inFlight.get(requestId)?.abort()
-  }
+  abort(requestId: string): void { this.requests.abort(requestId) }
 
   // --- WebSocket ---
 
-  send(nodeId: string, frame: WsClientFrame): void {
+  send(nodeId: string, frame: WsClientFrame, options: WsSendOptions & { viewerId?: string } = {}): boolean {
+    const connection = this.connections.get(nodeId)
+    if (!connection) return false
+    const viewerId = options.viewerId ?? connection.viewers.defaultId
+    if (!wsViewerIdSchema.safeParse(viewerId).success) throw new Error('Invalid event viewer ID.')
+    const entry = connection.viewers.track(viewerId, frame, options.intent, options.cleanup)
+    if (!entry) return false
+    if (connection.ws?.readyState === WebSocket.OPEN) {
+      const payload = connection.viewers.wire(entry)
+      if (payload) connection.ws.send(payload)
+    } else connection.viewers.outbox.push(entry)
+    return true
+  }
+
+  openViewer(nodeId: string, viewerId: string): boolean {
+    return this.send(nodeId, { channel: 'ws:viewer-open' }, { viewerId, intent: { key: 'ws:viewer', state: 'attached' } })
+  }
+
+  closeViewer(nodeId: string, viewerId?: string): void {
     const connection = this.connections.get(nodeId)
     if (!connection) return
-    const payload = JSON.stringify(frame)
-    if (connection.ws?.readyState === WebSocket.OPEN) connection.ws.send(payload)
-    else connection.outbox.push(payload)
+    const id = viewerId ?? connection.viewers.defaultId
+    const resetLegacy = connection.viewers.retire(id)
+    if (connection.ws?.readyState !== WebSocket.OPEN) return
+    if (connection.viewers.multiplexed) connection.ws.send(JSON.stringify({ channel: 'ws:viewer-close', viewerId: id }))
+    else if (resetLegacy) connection.ws.terminate()
   }
 
   private openSocket(connection: Connection): void {
@@ -304,7 +279,7 @@ export class NodeBroker {
     // The bearer rides the upgrade request's headers, which a browser cannot set. One reason the
     // socket belongs to main rather than the renderer.
     const ws = new WebSocket(url, {
-      headers: { authorization: `Bearer ${connection.node.token}` },
+      headers: { authorization: `Bearer ${connection.node.token}`, ...(connection.viewers.multiplexed ? { [WS_VIEWERS_HEADER]: '1' } : {}) },
       agent: connection.agent,
       maxPayload: MAX_NODE_WS_MESSAGE_BYTES,
       perMessageDeflate: false,
@@ -312,10 +287,14 @@ export class NodeBroker {
     connection.ws = ws
 
     ws.on('open', () => {
+      if (connection.closed || connection.ws !== ws) return
       connection.attempt = 0
       connection.wsDownSince = null
       connection.seq = 0
-      for (const payload of connection.outbox.splice(0)) ws.send(payload)
+      for (const entry of connection.viewers.outbox.drain()) {
+        const payload = connection.viewers.wire(entry)
+        if (payload) ws.send(payload)
+      }
       this.setState(connection, 'online')
       this.startHeartbeat(connection, ws)
     })
@@ -324,6 +303,7 @@ export class NodeBroker {
       connection.lastSeenAt = Date.now()
     })
     ws.on('message', (data, isBinary) => {
+      if (connection.closed || connection.ws !== ws) return
       if (isBinary) return this.receiveBytes(connection, data)
       this.receive(connection, data.toString())
     })
@@ -339,6 +319,7 @@ export class NodeBroker {
     })
     ws.on('error', (error) => this.noteSocketError(connection, error))
     ws.on('close', () => {
+      if (connection.ws !== ws) return
       this.stopHeartbeat(connection)
       if (connection.wsDownSince === null) connection.wsDownSince = Date.now()
       this.scheduleReconnect(connection)
@@ -387,7 +368,10 @@ export class NodeBroker {
   private receiveBytes(connection: Connection, data: unknown): void {
     connection.lastSeenAt = Date.now()
     const frame = Array.isArray(data) ? Buffer.concat(data as Buffer[]) : (data as Buffer)
-    this.events.bytes(connection.node.nodeId, frame)
+    if (!connection.viewers.multiplexed) return this.events.bytes(connection.node.nodeId, frame, connection.viewers.legacyRecipient())
+    const tagged = decodeIdFrame(frame)
+    if (!tagged || !wsViewerIdSchema.safeParse(tagged.id).success) return
+    this.events.bytes(connection.node.nodeId, tagged.payload, connection.viewers.externalId(tagged.id))
   }
 
   private receive(connection: Connection, raw: string): void {
@@ -397,6 +381,7 @@ export class NodeBroker {
     } catch {
       return // a frame we cannot parse is a frame we cannot act on
     }
+    if (!frame || typeof frame !== 'object') return
     connection.lastSeenAt = Date.now()
     const seq = (frame as { seq?: unknown }).seq
     // `ws:shed` is the node saying "you were behind, so I dropped some invalidation frames". Shed
@@ -420,12 +405,22 @@ export class NodeBroker {
       }
       connection.seq = seq
     }
-    this.events.frame(connection.node.nodeId, frame)
+    const routed = frame as { channel?: unknown; viewerId?: unknown; frame?: unknown }
+    if (connection.viewers.multiplexed && routed.channel === 'ws:viewer' && typeof routed.viewerId === 'string') {
+      if (!wsViewerIdSchema.safeParse(routed.viewerId).success) return
+      this.events.frame(connection.node.nodeId, routed.frame, connection.viewers.externalId(routed.viewerId))
+    } else if (connection.viewers.multiplexed && routed.channel === 'ws:viewer-error') {
+      const error = frame as { viewerId?: unknown; code?: unknown; message?: unknown }
+      if (typeof error.viewerId === 'string' && wsViewerIdSchema.safeParse(error.viewerId).success && (error.code === 'viewer_limit' || error.code === 'viewers_unsupported') && typeof error.message === 'string') {
+        this.events.transportError?.(connection.node.nodeId, { code: error.code, message: error.message }, connection.viewers.externalId(error.viewerId))
+      }
+    } else this.events.frame(connection.node.nodeId, frame, connection.viewers.multiplexed ? undefined : connection.viewers.legacyRecipient())
   }
 
   private scheduleReconnect(connection: Connection): void {
     if (connection.closed || connection.reconnectTimer) return
     connection.ws = null
+    connection.viewers.reconnect()
     this.setState(connection, this.downState(connection), connection.error)
     const base = BACKOFF_MS[Math.min(connection.attempt, BACKOFF_MS.length - 1)]
     // Jitter so several nodes coming back from a laptop sleep do not reconnect in lockstep.
@@ -564,9 +559,6 @@ const errorCodeOf = (response: NodeFetchResponse): string | null => {
     return null
   }
 }
-
-// nodeRequest.ts raises the DOM-shaped `AbortError`; `ws`/undici-style aborts carry the same name.
-const isAbort = (error: unknown): boolean => (error as { name?: unknown } | null)?.name === 'AbortError'
 
 const isPinMismatch = (error: unknown): boolean => {
   for (let e: unknown = error; e; e = (e as { cause?: unknown }).cause) {

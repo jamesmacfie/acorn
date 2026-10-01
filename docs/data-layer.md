@@ -357,6 +357,14 @@ reset in [local development](./local-development.md) before starting a Node with
 The reset preserves a private recovery copy and never removes repositories or worktrees.
 
 Native SQLite access is centralized, and both plugin tiers reach it through `ctx.storage.open()`.
+Loaded storage connections install a native authorization policy before executing migration history
+or plugin SQL. It refuses cross-file attachment and export, limits PRAGMAs and virtual table modules,
+and keeps temporary SQL storage in memory. The connection wrapper exposes no policy setter. The
+loader's host fallback applies the same policy and refuses arbitrary backup destinations. A runtime
+without SQLite authorization support refuses loaded storage rather than opening an unconfined
+connection; the bundled Node 24 runtime supports it. See
+[Node plugin storage security](./security/node-plugin-security.md#storage) for the boundary and
+compatibility contract.
 The filename is bound to the plugin id. A loaded plugin opens that handle inside its isolated worker,
 whose filesystem grant names only that database, WAL, and SHM paths; a built-in opens it in the host.
 Only the source of the chain differs: a loaded plugin's manifest names a directory confined to its
@@ -379,7 +387,15 @@ and `pluginMigrationsChain` only validates that a Drizzle chain exists there.
 The host opens a built-in's file lazily on first use. For a loaded plugin with migrations, the loader
 privately prepares the three exact SQLite paths before starting the worker so it can grant files
 without granting the shared `plugins/` directory; the worker still opens the database lazily on first
-use. Each tier holds one handle and closes it immediately after that plugin's `dispose()`, so a plugin's
+use. Preparation refuses a linked `plugins/` directory and checks that each state file is regular
+before opening it. POSIX hosts also use no-follow and nonblocking flags. Preparation checks the
+opened descriptor and, on POSIX hosts, sets its private mode through that descriptor. Windows
+preparation retains the directory and regular-file checks but relies on the data root's access
+control list for privacy; POSIX mode bits do not restrict Windows access.
+Worker and host native opens check existing database, WAL, and SHM files before handing their paths
+to SQLite; absent sidecars remain valid. Exact grants include both lexical and canonical spellings
+for data-root aliases. These checks do not remove the path replacement race before SQLite opens.
+Each tier holds one handle and closes it immediately after that plugin's `dispose()`, so a plugin's
 dispose is about the resources the plugin itself owns and a plugin whose only resource was the database
 needs no dispose at all. Both tiers use `CoreServices` for core-owned operations. `apps/node/test/integration/plugins/httpLoaded.test.ts` covers what
 happens when a loaded plugin's chain grows between versions, where the update applies at the next
@@ -411,6 +427,13 @@ operation into a fresh, initialized data root. Before copying archive members, r
 `pnpm backup:verify <backup.tar.gz> <target-root>`. It reads the archive manifest without extracting
 files and refuses a missing or different `acorn-1` baseline on either the backup or target root.
 The archive itself carries `baseline: "acorn-1"` beside its format version.
+
+Archive output is precreated at mode `0600` inside a private `0700` sibling directory on the
+chosen destination's filesystem. The archive is renamed over the chosen destination only after
+successful completion, so replacement also repairs a permissive prior archive. A failed or
+interrupted archive preserves the prior backup and removes partial output. No global umask is
+changed. These are POSIX permissions; Windows operators must restrict the destination directory
+with an NTFS ACL.
 
 The archive holds `core.sqlite` and every `plugins/*.sqlite`: the workspace and task model, repo
 configuration, agent transcripts, notes, memories, and the HTTP client's saved requests. Secrets are

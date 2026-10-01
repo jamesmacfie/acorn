@@ -1,0 +1,22 @@
+{
+  "source": "Cumulative units01\u201304 after explicit QueryCacheProvider component export; measured owner logic unchanged.",
+  "root": "/Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance",
+  "hashes": {
+    "packages/client-core/src/infra/node/fleet.ts": "79b1c3790d1ac314c38506f817dbb989c95753d930fdcf2b805868eccedcd2f6",
+    "packages/client-core/src/infra/node/queryOwnership.ts": "810130c5b46ad54dbe148f358b87b2071c2394c7ef6acc5a718df3aee22f83ae",
+    "packages/client-core/src/infra/node/apiClient.ts": "ad8ef6ea7bf97c04592ed5763054dc40da1d31584a4e570a220a84723b6336f9",
+    "packages/client-core/src/infra/persistence/queryPersistence.ts": "ed63f9c250120b544f2857cc28b82b0acd0c4d18a6d84328306e48f8f58a0112",
+    "packages/client-core/src/infra/persistence/queryCacheLifecycle.ts": "9c7bba1685bce7cb6bae5012be7ccb46e8bf4da47eccd36cd5ae076e74810723",
+    "packages/client-core/src/infra/persistence/QueryCacheProvider.tsx": "cbc9433d1cbd149f962f0bef75d87839c26b2ad53534bccf42466c38e2d71b52",
+    "packages/client-core/src/infra/persistence/public.ts": "6b5a30b33ddc11089524a157c337c18599a40555e26237ef1d3e781f987572b2",
+    "packages/client-core/src/infra/persistence/startupRestore.ts": "739f34098e49e879759354d347c35514fb54bf4fa5f142708d35e1b04212d162",
+    "packages/client-core/src/infra/persistence/persistedState.ts": "feeca1c53babd38a5eff6762b735ef088776c12472d40f567a392dab7a42f45c",
+    "packages/client-core/src/infra/persistence/devicePrefs.ts": "9f96bc3d695ac7402a1869f853ba624c53b1f01f50ae4c27280323e5a49c1995",
+    "packages/client-core/src/features/settings/savePref.ts": "cbca7345020d5b00f7f783897ddcf1fe05b1ecbfae8327061cec7d5f9e809c1b",
+    "apps/desktop/src/client/index.tsx": "c216059860642a39977a4304b50bda2cd35e200c0d61356f9aeadb5ec4c05650",
+    "apps/tui/src/main.tsx": "724b2d573508a5687790e8b8436487897d6a6fc9c3ab53821e164524fe92f9ed",
+    "apps/tui/src/node/cache.ts": "6d6c167d5953d59579b0306c2a0fc7eec0037d1cd91e7c591b70d6b90537f685",
+    "packages/client-core/package.json": "c2f92acd2c17d5e90ea7770389a5aacbbddcd41cbf9f1fd947cb102bfa01d5ae",
+    "pnpm-lock.yaml": "17ef452021bd503ff19a9cb97f1f1f2cf8586a06e8d6e387aefb8b0fa69eee57"
+  }
+}

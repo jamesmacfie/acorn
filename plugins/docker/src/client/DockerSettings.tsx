@@ -67,7 +67,7 @@ export default function DockerSettings() {
       <SettingsSection
         id="linking"
         label="Task linking"
-        help="acorn links a task to the containers of a Compose stack started in its worktree. To start and stop a stack from the task, add it as a run target."
+        help="acorn lists a task's containers, and cleans them up, from the Compose stack started in its worktree. Project rules only suggest a stack in the task summary. To start and stop a stack from the task, add it as a run target."
       >
         <SettingRow label="Project rules" description="Set in each project's .acorn/config.toml. The project's Docker tab shows them." />
       </SettingsSection>

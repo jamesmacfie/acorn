@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { ApiError } from '@acorn/protocol/api.ts'
 import { createApp } from '../index'
 import type { Env } from '../bindings'
+import { principalMayActOnTask } from './requireUser'
 
 // One representative path per mounted /v1 router. requireUser is a global `/v1/*` gate, so an
 // unauthenticated request to any of these must 401 with the ApiError envelope, before routing, before
@@ -35,6 +36,23 @@ const PROTECTED_PATHS: [string, string][] = [
   ['GET', '/v1/p/github/repos/o/r/actions/runs/1/jobs'],
   ['GET', '/v1/p/github/repos/o/r/mentions'],
 ]
+
+describe('principal task authority without a Hono context', () => {
+  it('denies absent principals and missing task claims, and compares exact task IDs', () => {
+    expect(principalMayActOnTask(null, 'task-a')).toBe(false)
+    expect(principalMayActOnTask(undefined, 'task-a')).toBe(false)
+    expect(principalMayActOnTask({ kind: 'internal', userId: 'owner', scope: 'task' }, 'task-a')).toBe(false)
+    const principal = { kind: 'internal' as const, userId: 'owner', scope: 'task' as const, taskId: 'task-a' }
+    expect(principalMayActOnTask(principal, 'task-a')).toBe(true)
+    expect(principalMayActOnTask(principal, 'task-a-suffix')).toBe(false)
+    expect(principalMayActOnTask(principal, 'task-b')).toBe(false)
+  })
+
+  it('preserves unconfined device and service authority', () => {
+    expect(principalMayActOnTask({ kind: 'device', userId: 'owner' }, 'task-b')).toBe(true)
+    expect(principalMayActOnTask({ kind: 'internal', userId: 'owner', scope: 'service' }, 'task-b')).toBe(true)
+  })
+})
 
 describe('requireUser gate over the protected router table', () => {
   it.each(PROTECTED_PATHS)('%s %s → 401 unauthenticated when logged out', async (method, path) => {

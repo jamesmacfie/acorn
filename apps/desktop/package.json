@@ -11,7 +11,7 @@
     "dev:agent:smoke": "node scripts/agent/session.mjs --smoke",
     "dev:agent:ui": "node scripts/agent/ui.mjs",
     "build": "pnpm run stage && pnpm run build:renderer && pnpm run check:renderer-budget && pnpm run check:runtime-syntax",
-    "dist": "pnpm run build && CI=true tauri build --config '{\"build\":{\"beforeBuildCommand\":\"\"}}' && pnpm run verify:bundle",
+    "dist": "node scripts/dist.mjs",
     "stage": "pnpm run build:service && pnpm run build:cli && pnpm run build:bundled-plugins && pnpm run build:helper && pnpm run build:bridge && node scripts/stage.mjs",
     "build:service": "pnpm --filter @acorn/node build",
     "build:cli": "pnpm --filter @acorn/cli build",
@@ -23,11 +23,14 @@
     "check:runtime-syntax": "node scripts/check-runtime-syntax.mjs",
     "verify:bundle": "node scripts/verify-bundle.mjs",
     "lint": "tsc --noEmit",
-    "test": "pnpm run stage && pnpm run build:renderer && vitest run && cargo test --manifest-path src-tauri/Cargo.toml",
+    "test": "pnpm run stage && pnpm run build:renderer && pnpm run test:built",
+    "test:built": "vitest run --exclude test/boot.test.ts && pnpm run test:boot && cargo test --manifest-path src-tauri/Cargo.toml",
+    "test:boot": "vitest run --project shell test/boot.test.ts",
     "tauri": "tauri"
   },
   "//dev:no-watch": "`tauri dev` rebuilds and relaunches the app whenever a file under src-tauri changes, which takes the window away from whoever is using it. This is the same dev run with the watcher off: the app keeps running while the Rust changes, and you pick the new binary up by restarting with `dev`. The renderer's own hot reload is Vite's and is unaffected either way.",
   "//build": "The renderer is built here rather than by `beforeBuildCommand` so the startup-budget check runs against the bytes that get bundled and the bundler pass does not repeat a build that already happened; the inline config empties the hook for that one invocation. CI=true is what makes the DMG's Finder-cosmetics AppleScript get skipped — it needs Automation permission a build machine does not have, so the runner skips it either way and this keeps a local DMG the same shape as the shipped one.",
+  "//test:built": "The test suite without the staging and renderer build in front of it. The bundle workflow runs `build` once, then this, then `dist --prebuilt`, so the bytes it packages are the bytes it tested.",
   "//dependencies": "The node's runtime dependencies. Most are bundled into the staged service.js and the helper; the few apps/node/externals.ts keeps external, plus @xterm/headless and @xterm/addon-serialize, are resolved from this package's node_modules at run time, so they are declared here rather than in apps/node. scripts/pack-node.mjs reads the standalone node's versions from here too.",
   "dependencies": {
     "@agentclientprotocol/claude-agent-acp": "^0.54.1",
@@ -54,12 +57,13 @@
     "idb-keyval": "^6.2.5",
     "jose": "^6.2.3",
     "lucide-static": "^1.27.0",
+    "node-forge": "1.4.0",
     "node-pty": "^1.0.0",
     "openai": "^6.48.0",
     "pg": "^8.22.0",
     "playwright-core": "^1.61.1",
     "shiki": "^4.2.0",
-    "smol-toml": "^1.7.0",
+    "smol-toml": "^1.7.1",
     "solid-js": "catalog:",
     "ws": "^8.21.0",
     "zod": "catalog:"
@@ -92,6 +96,6 @@
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
     "vite-plugin-solid": "^2.11.12",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.11"
   }
 }

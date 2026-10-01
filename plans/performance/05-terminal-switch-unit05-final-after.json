@@ -1,0 +1,91 @@
+{
+  "fixture": "actual channel, wsClient and scope mapping; transport records frames, no PTY",
+  "afterSwitch": [
+    {
+      "nodeId": "node-a",
+      "frame": {
+        "channel": "term:attach",
+        "id": "11111111-2222-4333-8444-555555555555"
+      },
+      "options": {
+        "cleanup": false,
+        "intent": {
+          "key": "term:11111111-2222-4333-8444-555555555555",
+          "state": "attached"
+        }
+      }
+    },
+    {
+      "nodeId": "node-a",
+      "frame": {
+        "channel": "term:detach",
+        "id": "11111111-2222-4333-8444-555555555555"
+      },
+      "options": {
+        "cleanup": true,
+        "intent": {
+          "key": "term:11111111-2222-4333-8444-555555555555",
+          "state": "detached"
+        }
+      }
+    }
+  ],
+  "allFrames": [
+    {
+      "nodeId": "node-a",
+      "frame": {
+        "channel": "term:attach",
+        "id": "11111111-2222-4333-8444-555555555555"
+      },
+      "options": {
+        "cleanup": false,
+        "intent": {
+          "key": "term:11111111-2222-4333-8444-555555555555",
+          "state": "attached"
+        }
+      }
+    },
+    {
+      "nodeId": "node-a",
+      "frame": {
+        "channel": "term:detach",
+        "id": "11111111-2222-4333-8444-555555555555"
+      },
+      "options": {
+        "cleanup": true,
+        "intent": {
+          "key": "term:11111111-2222-4333-8444-555555555555",
+          "state": "detached"
+        }
+      }
+    },
+    {
+      "nodeId": "node-b",
+      "frame": {
+        "channel": "term:attach",
+        "id": "11111111-2222-4333-8444-555555555555"
+      },
+      "options": {
+        "cleanup": false,
+        "intent": {
+          "key": "term:11111111-2222-4333-8444-555555555555",
+          "state": "attached"
+        }
+      }
+    },
+    {
+      "nodeId": "node-b",
+      "frame": {
+        "channel": "term:detach",
+        "id": "11111111-2222-4333-8444-555555555555"
+      },
+      "options": {
+        "cleanup": true,
+        "intent": {
+          "key": "term:11111111-2222-4333-8444-555555555555",
+          "state": "detached"
+        }
+      }
+    }
+  ]
+}

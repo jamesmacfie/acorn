@@ -23,6 +23,8 @@ export type DataSchemaResult = {
   notes?: string
 }
 export type CoreDataService = {
+  /** Whether the task has any database source to try. Runs no script and connects to nothing. */
+  configured(taskId: string): Promise<boolean>
   connect(taskId: string): Promise<{ database: string }>
   disconnect(taskId: string): Promise<void>
   query(taskId: string, sql: string, options?: DataQueryOptions): Promise<DataQueryResult>

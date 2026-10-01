@@ -65,6 +65,8 @@ export const nodeInfoSchema = z.object({
   protocolVersion: z.number().int().positive(),
   fingerprint: z.string().min(1),
   nodeId: z.string().optional(),
+  // Additive opt-in, rather than a protocol major change. Absence means the raw event transport.
+  eventTransport: z.object({ viewers: z.number().int().positive().optional() }).optional().catch(undefined),
   // Present only on a CLI-owned background process and only to an authenticated caller. This
   // instance nonce lets lifecycle commands reject a stale PID/record after the root is reopened.
   serviceInstanceId: z.string().uuid().optional(),

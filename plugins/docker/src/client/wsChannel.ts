@@ -94,6 +94,11 @@ registerWsChannel(
     const [kind, id] = splitStreamKey(key)
     return { channel: `docker:${kind}:attach`, id }
   }),
+  (frame) => {
+    if (typeof frame.id !== 'string') return
+    if (frame.channel === 'docker:logs:attach' || frame.channel === 'docker:logs:detach') return { key: `docker:logs:${frame.id}`, state: frame.channel.endsWith(':attach') ? 'attached' : 'detached' }
+    if (frame.channel === 'docker:stats:attach' || frame.channel === 'docker:stats:detach') return { key: `docker:stats:${frame.id}`, state: frame.channel.endsWith(':attach') ? 'attached' : 'detached' }
+  },
 )
 
 // Test seam: these maps are module singletons, and core's _resetWsClient does not know about them.

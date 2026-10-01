@@ -106,4 +106,21 @@ describe('GitHub project importer', () => {
     expect(response.status).toBe(200)
     expect(await response.json()).toEqual({ results: [{ repoId: 999, owner: '', name: '', action: 'map', ok: false, error: 'Repository is not available in the GitHub mirror.' }] })
   })
+
+  it.each([
+    { kind: 'internal' as const, userId: 'james', scope: 'task' as const, taskId: 'task1' },
+    { kind: 'internal' as const, userId: 'james', scope: 'service' as const },
+  ])('refuses $scope import authority before body parsing, mirror reads, or mutations', async (caller) => {
+    const select = vi.spyOn(plugin.db, 'select')
+    const denied = new Hono<AppEnv>().use('/api/*', ...testGate(caller)).route('/api', githubImport(plugin.db, { projects: { create, update, byGithub }, git: { gitOrThrow } } as never))
+    for (const body of ['{malformed', JSON.stringify({ repositories: [{ repoId: 101, action: 'map', path: '/checkouts/map-me' }, { repoId: 102, action: 'clone', parentDir: '/checkouts' }] })]) {
+      const request = new Request('http://acorn.test/api/import', { method: 'POST', headers: { 'content-type': 'application/json' }, body })
+      const response = await denied.fetch(request, env())
+      expect(response.status).toBe(403)
+      expect((await response.json()).error.code).toBe('interactive_user_required')
+      expect(request.bodyUsed).toBe(false)
+    }
+    expect(select).not.toHaveBeenCalled()
+    for (const call of [create, update, byGithub, gitOrThrow]) expect(call).not.toHaveBeenCalled()
+  })
 })

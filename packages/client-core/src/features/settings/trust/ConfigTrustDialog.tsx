@@ -1,3 +1,4 @@
+import { Portal } from 'solid-js/web'
 import { createEffect, createSignal, For, Show } from 'solid-js'
 import { diffLines } from 'diff'
 import { readJson, writeJson } from '../../../infra/node/apiClient'
@@ -51,6 +52,7 @@ export default function ConfigTrustDialog() {
   // One primary: the button says **Trust and run** when a run is waiting on the answer, and
   // **Trust configuration** when the person opened the review from a notice.
   return (
+    <Portal>
     <Show when={configTrustRequest()}>
       <Modal title="Review project configuration" size="lg" role="alertdialog" onDismiss={closeRepoConfigTrust}>
         <Modal.Body>
@@ -88,5 +90,6 @@ export default function ConfigTrustDialog() {
         </Modal.Actions>
       </Modal>
     </Show>
+    </Portal>
   )
 }

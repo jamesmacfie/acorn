@@ -18,6 +18,9 @@ beforeAll(() => {
   // The two shapes that matter: a symlinked file and a symlinked directory pointing out of the root.
   symlinkSync(join(outside, 'secret.txt'), join(root, 'leak.txt'))
   symlinkSync(outside, join(root, 'escape'))
+  symlinkSync(join(outside, 'not-created.txt'), join(root, 'dangling.txt'))
+  symlinkSync(join(outside, 'not-created-dir'), join(root, 'dangling-dir'))
+  symlinkSync(join(root, 'src'), join(root, 'alias'))
 })
 afterAll(() => rmSync(base, { recursive: true, force: true }))
 
@@ -29,12 +32,27 @@ describe('resolveInRoot', () => {
 
   it('accepts a path that does not exist yet, so a new-file write works', () => {
     expect(resolveInRoot(root, 'src/brand-new.ts')).toBe(join(root, 'src', 'brand-new.ts'))
+    expect(resolveInRoot(root, 'new/directory/file.ts')).toBe(join(root, 'new/directory/file.ts'))
+    expect(resolveInRoot(root, 'alias/brand-new.ts')).toBe(join(root, 'alias/brand-new.ts'))
+  })
+
+  it('rejects dangling leaf and intermediate links rather than accepting their parent', () => {
+    expect(resolveInRoot(root, 'dangling.txt')).toBeNull()
+    expect(resolveInRoot(root, 'dangling-dir/file.txt')).toBeNull()
+  })
+
+  it('accepts a root alias and safe internal links without changing the caller path', () => {
+    const aliasRoot = join(base, 'root-alias')
+    symlinkSync(root, aliasRoot)
+    expect(resolveInRoot(aliasRoot, 'alias/app.ts')).toBe(join(aliasRoot, 'alias/app.ts'))
+    expect(resolveInRoot(root + '/', 'src/app.ts')).toBe(join(root, 'src/app.ts'))
   })
 
   it('rejects lexical traversal and absolute paths', () => {
     expect(resolveInRoot(root, '../outside/secret.txt')).toBeNull()
     expect(resolveInRoot(root, 'src/../../outside/secret.txt')).toBeNull()
     expect(resolveInRoot(root, outside)).toBeNull()
+    expect(resolveInRoot(root, join(root, 'src/app.ts'))).toBeNull()
   })
 
   it('rejects a path THROUGH a symlinked directory that leaves the root', () => {

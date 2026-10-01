@@ -304,6 +304,13 @@ it fails for any reason a selection can break, not only for the one it was writt
   anybody has answered yet and what they said both live on the row and keep changing long after the
   event is written. An answer to a question the harness marked secret reads as "Answer hidden", since
   the thread is durable and searchable in a way a prompt answered and gone was not.
+- An app-access approval names its app by the name a person reads and the identifier the grant is
+  keyed on, and says what each scope means before any button (`client/sessions/appApproval.ts`). The
+  buttons are the stored options, so **Always allow** appears only when the provider offered it. Once
+  answered, the record keeps the app and identifier. After **Always allow** it also says that the
+  provider saves the grant and where to revoke it, because a sent answer is not proof of a saved grant
+  ([managed-agents.md § App-access approval](../managed-agents.md#app-access-approval)). The desktop
+  and the terminal draw the same card.
 - **Chats only keeps the requests.** The toggle above the composer drops the tool calls, the reasoning
   and the notes, and a question the agent asked with the answer sitting on it is the same conversation
   as a message. During planning it is most of the conversation, so leaving it out gave a reader a

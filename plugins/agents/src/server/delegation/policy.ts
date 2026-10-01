@@ -32,4 +32,4 @@ export const delegatedToolCeiling = (
 }
 
 export const sessionMayDelegate = (session: AgentSession): boolean =>
-  !Object.prototype.hasOwnProperty.call(session.config, 'workflowRunId')
+  session.kind !== 'workflow' && !Object.prototype.hasOwnProperty.call(session.config, 'workflowRunId')

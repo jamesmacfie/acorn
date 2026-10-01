@@ -162,6 +162,36 @@ confinement, surface reachability — and reads the file. Loaded plugins join th
 array and the same host passes as the compiled-in ones, so `ready`, capability late-binding and
 disposal are identical, and order is no more load-bearing for them than for a built-in.
 
+### Package input limits
+
+Node installation and device custody share the package reader and archive process. Downloads stop
+at 32 MiB of compressed bytes. A disposable process preflights the private staged archive with
+`tar` 7.5.22, then extracts the same bytes with that library. The process has a 128 MiB V8 heap
+ceiling and a 120-second deadline, followed by a 250 ms termination grace. Cleanup waits for process
+close. Archive code is a separate build entry and does not enter the client's startup graph.
+
+The preflight limits decompressed tar bytes and total declared file bytes to 128 MiB, each file to
+32 MiB, paths to 4,096 bytes and 32 components, and each metadata record to 64 KiB. It admits at
+most 10,000 effective filesystem members and interpreted non-empty metadata records, including
+repeated paths. The decompressed byte ceiling also bounds physical headers that the parser does not
+emit, such as empty metadata and trailing padding. PAX and GNU long-path metadata use the library's
+effective header interpretation. Nested compression, sparse declarations, special files, invalid paths, and members
+that descend through archive links are refused. Ordinary directories, files, and package-local
+symbolic or hard aliases remain supported. Validation also refuses broken links or aliases outside
+the identified package root. Extracted permissions retain owner executable bits and deny group and
+other access.
+
+Local development folders remain linked and mutable. Validation and review bound directory walks
+to 10,000 entries and 32 levels; package files are limited to 32 MiB each and 128 MiB in total.
+Fingerprinting collects only a bounded directory before sorting and streams file bytes. Manifests
+are limited to 256 KiB, Node entrypoints to 32 MiB, and client bundles to 8 MiB. Node discovery,
+hashing, bundle serving, and device custody open canonical package-confined regular files, inspect
+the descriptor before reading, and cap actual bytes if a file grows. POSIX nonblocking and
+no-follow flags refuse FIFOs and final-component link replacement. Windows lacks those flags; its
+canonical and descriptor checks remain, and directory custody depends on the operator's ACL.
+These checks do not provide an atomic snapshot of a mutable development folder or eliminate
+intermediate-directory replacement races by another process running as the owner.
+
 Three things differ, and all three follow from the code not being ours:
 
 - **They get there through the installer.** `POST /v1/core/plugins/install` (owner/device principal,
@@ -360,6 +390,13 @@ database, and the failure lands as `state: 'failed'` with its `reason` on the ro
 contained failure at boot. The route answers **200 with `state: 'failed'`** for that, not an error — the
 request did nothing wrong and nothing was lost. Only on success does the host clear the previous
 registrations, run its `dispose`, close its database, revoke its context and replay the buffer.
+
+The host owns every candidate handed to reload. An unknown or disabled owner closes the unstarted
+realm. Initialization, registration replay, and ready failures dispose the initialized candidate,
+close its worker storage, terminate its realm, and revoke its registration context. Cleanup preserves
+the reported failure if the candidate's disposal also throws. Repeated disposal of an isolated
+candidate joins the same cleanup operation. An initialization failure leaves the preceding instance
+serving; a replay or ready failure follows the contained failure contract after commit begins.
 
 Four properties, all deliberate:
 

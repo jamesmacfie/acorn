@@ -1,0 +1,19 @@
+{
+  "session": "perf-focus-after06",
+  "before": {
+    "focused": false,
+    "visibility": "hidden"
+  },
+  "commands": {
+    "identifier": "com.acorn.performance.automation",
+    "nativeFocused": false,
+    "nativeVisible": true,
+    "ok": true
+  },
+  "after": {
+    "domNodes": 265,
+    "focused": false,
+    "visibility": "hidden",
+    "xterms": 0
+  }
+}

@@ -21,7 +21,19 @@ const GAP = 4
 // of its rows reads as a press outside the popover: the popover closes, the row goes with it, and the
 // click never lands on anything. Whatever opened after me is drawn on top of me, so a press in it is
 // not a press outside.
-const openSurfaces: Array<() => HTMLElement | undefined> = []
+type OpenSurface = { surface: () => HTMLElement | undefined; anchor: () => AnchorTarget | undefined }
+const openSurfaces: OpenSurface[] = []
+
+/** Portals opened by controls within a modal remain part of that modal's focus interaction. */
+export function anchoredSurfacesWithin(root: HTMLElement): HTMLElement[] {
+  const owned = [root]
+  for (const entry of openSurfaces) {
+    const anchor = elementOf(entry.anchor())
+    const surface = entry.surface()
+    if (anchor && surface && owned.some((parent) => parent.contains(anchor))) owned.push(surface)
+  }
+  return owned.slice(1)
+}
 
 /** Whether focus is inside an open anchored surface: a menu, a select's list, a popover. That surface
  *  answers the Escape, and it hears it on `window`, after any document listener has already had it.
@@ -29,7 +41,7 @@ const openSurfaces: Array<() => HTMLElement | undefined> = []
  *  not what the person pressing Escape is looking at. */
 export const focusInAnchoredSurface = (): boolean => {
   const focused = typeof document === 'undefined' ? null : document.activeElement
-  return !!focused && openSurfaces.some((surface) => surface()?.contains(focused))
+  return !!focused && openSurfaces.some((surface) => surface.surface()?.contains(focused))
 }
 
 /** Pure collision pass for every anchored surface. Element anchors may flip to the opposite side;
@@ -170,7 +182,7 @@ export function createAnchoredPopover(opts: {
   const toggle = () => (open() ? close() : show())
 
   // This surface's place in the open order, for as long as it is open.
-  const entry = () => surface
+  const entry = { surface: () => surface, anchor: opts.anchor }
   // A controlled owner can flip `open` without calling show() (the task rail opens its row menu
   // from onRowClick), and only show() measures. Measure on every open, whichever door it came
   // through. Runs after render, so the mounted surface is already registered.
@@ -191,11 +203,11 @@ export function createAnchoredPopover(opts: {
     // the right answer for a context menu: the row it was opened over is not part of the menu.
     if (elementOf(opts.anchor())?.contains(target) || surface?.contains(target)) return
     const at = openSurfaces.indexOf(entry)
-    if (at >= 0 && openSurfaces.slice(at + 1).some((later) => later()?.contains(target))) return
+    if (at >= 0 && openSurfaces.slice(at + 1).some((later) => later.surface()?.contains(target))) return
     close()
   }
   const onKey = (event: KeyboardEvent) => {
-    if (event.key === 'Escape' && open()) {
+    if (event.key === 'Escape' && open() && !event.defaultPrevented && openSurfaces.at(-1) === entry) {
       event.preventDefault()
       close()
     }

@@ -1,0 +1,10 @@
+{
+  "ownerSha256": "e2733901d6591f17f25c4ca04988f6fbf334364b93dbf966a0e40b905abec88f",
+  "scheduled": 1,
+  "afterClear": 1,
+  "afterDeadline": 0,
+  "writes": [
+    "\u001b[200~synthetic\u001b[201~",
+    "\r"
+  ]
+}

@@ -33,7 +33,8 @@ export type ProjectService = {
   create(input: ProjectCreateRefInput): Promise<ProjectRef>
   update(id: string, patch: ProjectUpdateRefInput): Promise<ProjectRef | null>
   config(id: string): Promise<ProjectConfigResponse | null>
-  assertConfigTrusted(taskId: string): Promise<void>
+  /** An expected hash binds execution to the selected configuration snapshot; drift is refused. */
+  assertConfigTrusted(taskId: string, expectedHash?: string): Promise<void>
   setup(id: string): Promise<{ script: string | null; trigger: SetupTrigger }>
 }
 
@@ -87,7 +88,7 @@ export function createProjectService(db: AppDatabase): CompiledProjectService {
     create: (input) => createProjectRef(db, input),
     update: (id, patch) => updateProjectRef(db, id, patch),
     config: (id) => getProjectConfig(db, id),
-    assertConfigTrusted: (taskId) => assertRepoConfigTrusted(db, taskId),
+    assertConfigTrusted: (taskId, expectedHash) => assertRepoConfigTrusted(db, taskId, expectedHash),
     assertProjectConfigTrusted: (projectId) => assertProjectRepoConfigTrusted(db, projectId),
     setup: (id) => projectSetup(db, id),
   }

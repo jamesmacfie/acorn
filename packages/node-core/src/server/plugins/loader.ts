@@ -9,10 +9,9 @@
 // only way a package reaches `<dataRoot>/plugins` now is through the installer, an
 // owner-authenticated route, and the device asks again before it runs the client half.
 import { createHash } from 'node:crypto'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
+import { readdirSync, statSync } from 'node:fs'
 import { basename, join } from 'node:path'
-import { confineExistingFile, resolveInRoot } from '../core/fs'
+import { resolveInRoot } from '../core/fs'
 import { describeSource, pluginInstallRoot, readLockfile, sweepDebris } from './installer'
 import { contributesNodeData, PLUGIN_API_MAJOR, readPluginManifestResult, speaksApiVersion, type ManifestUnknown, type PluginManifest } from './manifest'
 import { PluginMigrationsError, pluginMigrationsChain } from './migrations'
@@ -24,13 +23,15 @@ import type { NodePlugin, PluginStorage } from '../pluginHost/types'
 import { createLogger } from '../telemetry/logger'
 import type { PluginRuntimeIdentity } from '@acorn/protocol/api.ts'
 
+import { MAX_CLIENT_BUNDLE_BYTES, MAX_PLUGIN_FILE_BYTES, readPluginFile, streamPluginFile, visitPluginFile } from './packageFiles'
+
 const log = createLogger('plugins')
 
 // A client bundle is one ESM file that has to travel a broker request and land in a device's cache
 // (docs/plugins.md). The ceiling is here rather than only in the
 // device's cache because a node should not read a gigabyte into memory to answer a GET, and it is
 // generous enough that no honest bundle meets it.
-export const MAX_CLIENT_BUNDLE_BYTES = 8 * 1024 * 1024
+export { MAX_CLIENT_BUNDLE_BYTES } from './packageFiles'
 
 export type LoadedPlugin = {
   manifest: PluginManifest
@@ -135,18 +136,18 @@ const digestCache = new Map<string, { key: string; value: { hash: string; bytes:
 // never sees a bundle to cache.
 function clientDigest(dir: string, relPath: string | undefined): { hash: string; bytes: number } | null {
   if (!relPath) return null
-  const abs = resolveInRoot(dir, relPath)
-  if (!abs) return null
   try {
-    const stats = statSync(abs)
-    const key = `${stats.mtimeMs}:${stats.size}:${stats.ino}`
-    const cached = digestCache.get(abs)
-    if (cached?.key === key) return cached.value
-    const bytes = readFileSync(abs)
-    if (bytes.byteLength > MAX_CLIENT_BUNDLE_BYTES) return null
-    const value = { hash: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.byteLength }
-    digestCache.set(abs, { key, value })
-    return value
+    return visitPluginFile(dir, relPath, MAX_CLIENT_BUNDLE_BYTES, (fd, stats) => {
+      const key = `${stats.mtimeMs}:${stats.ctimeMs}:${stats.size}:${stats.ino}:${stats.dev}`
+      const cacheKey = `${dir}:${relPath}`
+      const cached = digestCache.get(cacheKey)
+      if (cached?.key === key) return cached.value
+      const hash = createHash('sha256')
+      const bytes = streamPluginFile(fd, stats.size, MAX_CLIENT_BUNDLE_BYTES, (chunk) => hash.update(chunk))
+      const value = { hash: hash.digest('hex'), bytes }
+      digestCache.set(cacheKey, { key, value })
+      return value
+    })
   } catch {
     return null
   }
@@ -201,11 +202,8 @@ export async function readClientBundle(
 ): Promise<{ bytes: Uint8Array<ArrayBuffer>; hash: string } | null> {
   const entry = installed.find((candidate) => candidate.manifest.id === id)
   if (!entry?.manifest.client) return null
-  const confined = await confineExistingFile(entry.dir, entry.manifest.client)
-  if (!confined.ok) return null
   try {
-    const bytes = await readFile(confined.path)
-    if (bytes.byteLength > MAX_CLIENT_BUNDLE_BYTES) return null
+    const bytes = readPluginFile(entry.dir, entry.manifest.client, MAX_CLIENT_BUNDLE_BYTES)
     // Uint8Array.from rather than a view over the Buffer: Node's Buffers sit in a shared pool, and
     // the response body must not alias memory the next read can reuse.
     return { bytes: Uint8Array.from(bytes), hash: createHash('sha256').update(bytes).digest('hex') }
@@ -340,7 +338,7 @@ function resolveRequires(
 function dropPlugin(loaded: LoadedPlugin[], installed: InstalledPlugin[], id: string): void {
   const loadedAt = loaded.findIndex((entry) => entry.manifest.id === id)
   if (loadedAt >= 0) {
-    disposeUnstartedPlugin(loaded[loadedAt].plugin)
+    void disposeUnstartedPlugin(loaded[loadedAt].plugin)
     loaded.splice(loadedAt, 1)
   }
   const installedAt = installed.findIndex((entry) => entry.manifest.id === id)
@@ -441,6 +439,9 @@ async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: Rea
 
   let plugin: NodePlugin
   try {
+    // Validate the opened entry before asking the module loader to read the path. Development
+    // packages remain mutable; this is a bounded preflight, not an atomic module graph snapshot.
+    visitPluginFile(dir, manifest.node, MAX_PLUGIN_FILE_BYTES, () => undefined)
     plugin = await isolateNodePlugin({
       entrypoint,
       pluginDir: dir,
@@ -460,7 +461,7 @@ async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: Rea
       if (!migrationsFolder) {
         throw new PluginMigrationsError(`Plugin '${manifest.id}' opened storage but declares no migrations.`)
       }
-      return openPluginDb(dataRoot, manifest.id, { migrationsFolder })
+      return openPluginDb(dataRoot, manifest.id, { migrationsFolder, loaded: true })
     },
   }
   // Installed only now. A package whose node half declared itself and then failed to import is

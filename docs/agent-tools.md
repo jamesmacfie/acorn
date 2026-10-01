@@ -447,6 +447,12 @@ drives an installed Chrome. The browser itself is in no bundle, and the tools re
 unavailable on a machine without one. The plugin is compiled rather than loaded because
 `playwright-core` carries native bits a hash-addressed loaded bundle cannot.
 
+The Node retains at most eight task contexts and closes the oldest before opening a replacement.
+Concurrent requests for one task share its pending allocation. Release cancels pending creation;
+shutdown waits for late allocations to close. A failed context close retains its capacity until cleanup
+succeeds or the browser disconnects. Console messages and page errors share a recent-output budget:
+200 entries, 8 KiB of UTF-8 per entry, and 256 KiB in total. Oversized entries show a truncation marker.
+
 Rich results are audit-ready by construction. A screenshot is a row in the plugin's own table, keyed
 to the task and capped per task, and the tool result is a URL handle rather than inline base64, so it
 outlives the transcript. An audit trail of tool usage belongs at the registry dispatch seam, where
@@ -454,7 +460,9 @@ every call already passes, not inside this plugin.
 
 The insert and newest-20 retention sweep complete before
 `plugin:browser:captures-changed { taskId }` is published. `browser.captures` then lists ordered
-metadata for that task; pixels stay behind the authenticated capture route. The older
+metadata for that task; pixels stay behind the authenticated capture route. Task credentials can read
+only their own task's capture bytes; device and service credentials can read any task's captures.
+Foreign and unknown capture IDs both return an empty 404 response. The older
 `capture-created` frame remains for one compatibility period, but new consumers use the collection
 event so a missed frame or retention deletion self-heals on re-read.
 

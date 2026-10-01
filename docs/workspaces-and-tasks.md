@@ -163,6 +163,11 @@ worktree failure remain distinct errors. On macOS, the Node retries Git with the
 Line Tools binary when Apple's selected Xcode Git refuses a command solely because its license has
 not been accepted.
 
+If another worktree or the project checkout already has the task's branch checked out, Git refuses
+creation. Acorn reports the occupied branch and path from Git's worktree roster. Release that branch
+in the reported checkout, then reopen the task to retry creation. Acorn leaves the other checkout
+and its uncommitted files untouched. Setup runs only after creation succeeds.
+
 A new task branch starts from the branch checked out in the mapped project folder. Acorn runs
 `git worktree add -b` from that folder without an explicit start point, so Git uses the folder's
 current `HEAD`. Remote-tracking refs such as `origin/main` do not take precedence over local commits.
@@ -181,7 +186,9 @@ A project's `.acorn/config.toml`, committed or personal, may list `copy` paths: 
 usually gitignored (`.env.local` and similar), copied into a freshly created worktree so it works
 without a setup script. Missing sources warn rather than fail worktree creation, existing targets
 are never overwritten, and a repo's list wins over a personal one outright rather than merging with
-it.
+it. Both source and destination use the canonical task-root path guard: links outside either root
+and dangling links are rejected with a warning. Sources must be regular files; safe aliases inside
+the roots remain supported. Existing destination entries, including links, are never replaced.
 
 ### Worktree status reads
 

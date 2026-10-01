@@ -2,6 +2,7 @@ import { createSignal, For, Show } from 'solid-js'
 import type { AgentRequest } from '../../contract/wire.ts'
 import { Alert, Button, Card, Checkbox, Field, Heading, Inline, Input, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import { managedAgentApi } from './managedClient'
+import { appApprovalOf, approvalScopeNote, approvalTarget } from './appApproval'
 
 // A question the harness is blocked on: a permission, a choice, a form. Drawn in the transcript at the
 // point the agent asked, by the card for its own `request` event (./AgentEventCard.tsx), so that
@@ -45,6 +46,7 @@ export default function AgentRequestCard(props: {
       options?: Array<{ id: string; label: string }>
     }>
     : []
+  const approval = () => appApprovalOf(payload().approval)
 
   async function resolve(resolution: unknown) {
     if (busy() || props.request.status !== 'pending') return
@@ -70,6 +72,15 @@ export default function AgentRequestCard(props: {
           <Text emphasis="muted" wrap>Response sent; waiting for the provider to acknowledge it…</Text>
         </Show>
         <Show when={props.request.detail}>{(detail) => <Text emphasis="muted" wrap>{detail()}</Text>}</Show>
+        <Show when={approval()}>
+          {(shown) => (
+            <Stack gap="row">
+              <Text wrap>{`App: ${approvalTarget(shown())}`}</Text>
+              <Text emphasis="muted" wrap>{approvalScopeNote(shown())}</Text>
+              <Show when={shown().warning}>{(warning) => <Alert tone="warn">{warning()}</Alert>}</Show>
+            </Stack>
+          )}
+        </Show>
         <For each={questions()}>
           {(question) => (
             <Field label={`${question.header ? `${question.header}: ` : ''}${question.prompt}`}>

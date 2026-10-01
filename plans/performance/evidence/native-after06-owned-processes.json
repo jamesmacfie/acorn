@@ -1,0 +1,27 @@
+{
+  "session": "perf-focus-after06",
+  "launcherPid": 82681,
+  "appPid": 83266,
+  "ownedProcesses": [
+    {
+      "pid": 83266,
+      "ppid": 82681,
+      "exe": "/Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/src-tauri/target/debug/bundle/macos/Acorn Performance Automation.app/Contents/MacOS/acorn-desktop"
+    },
+    {
+      "pid": 83281,
+      "ppid": 83266,
+      "exe": "/Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/src-tauri/binaries/node-aarch64-apple-darwin"
+    },
+    {
+      "pid": 83296,
+      "ppid": 83281,
+      "exe": "/Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/src-tauri/binaries/node-aarch64-apple-darwin"
+    },
+    {
+      "pid": 83390,
+      "ppid": 83296,
+      "exe": "docker"
+    }
+  ]
+}

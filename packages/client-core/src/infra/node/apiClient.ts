@@ -50,8 +50,9 @@ type SendOptions = {
   headers?: Record<string, string>
   body?: ApiBody
   signal?: AbortSignal
-  // Explicit target, for fleet fan-out and for tests. Defaults to the active node.
-  nodeId?: string
+  // Undefined selects the active Node; null captures no target. A broker rejects null, while a
+  // browser without a broker keeps its serving-origin behavior.
+  nodeId?: string | null
   // For a route that waits on something slow, such as a model call. The broker kills a request at 30s,
   // which is less than one model call is allowed to take, so a caller that knows it is slow has to say
   // so. Unset keeps the broker's default.
@@ -141,8 +142,9 @@ async function deliver(
   requestId: string,
   headers: Record<string, string>,
 ): Promise<ApiResponse> {
+  if (options.signal?.aborted) throw Object.assign(new Error('The operation was aborted'), { name: 'AbortError' })
   const transport = nodeTransport()
-  const nodeId = options.nodeId ?? activeNodeId()
+  const nodeId = options.nodeId === undefined ? activeNodeId() : options.nodeId
 
   if (!transport || !nodeId) {
     // A host that HAS a broker but no node picked yet. That used to be unreachable, because the window
@@ -187,12 +189,13 @@ async function deliver(
   const onAbort = () => transport.abort(requestId)
   options.signal?.addEventListener('abort', onAbort, { once: true })
   try {
+    const body = asNodeBody(options.body)
     const res = await transport.fetch(nodeId, {
       requestId,
       path,
       method,
       headers,
-      ...(asNodeBody(options.body) ? { body: asNodeBody(options.body)! } : {}),
+      ...(body ? { body } : {}),
       ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
       ...(options.maxResponseBytes === undefined ? {} : { maxResponseBytes: options.maxResponseBytes }),
     })
@@ -256,7 +259,7 @@ const raise = (res: ApiResponse, fallback: string): never => {
   })
 }
 
-type ReadOptions = { signal?: AbortSignal; nodeId?: string; owner?: string }
+type ReadOptions = { signal?: AbortSignal; nodeId?: string | null; owner?: string }
 
 // A cast, not a parse. Within a protocol major every change is additive, so a read tolerates fields it
 // does not know about (docs/api-reference.md § Versioning).
@@ -343,7 +346,7 @@ export type WriteInit = {
   headers?: Record<string, string>
   body?: ApiBody
   signal?: AbortSignal
-  nodeId?: string
+  nodeId?: string | null
   timeoutMs?: number
   // Both as on `SendOptions` above: who the request is for, and the poster's own opt-out.
   owner?: string

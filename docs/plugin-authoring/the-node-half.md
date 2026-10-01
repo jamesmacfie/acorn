@@ -49,6 +49,12 @@ would see. `ctx.storage`, `ctx.core`, `ctx.schedules`, `ctx.dataSources`,
 `ctx.capabilities` and `ctx.events.send`/`status`/`on` are all present, shaped by the
 manifest.
 
+For compiled channel handlers, `onFrame`'s opaque connection token identifies one event viewer's
+resource lifetime. Key subscriptions and interactive resources by that token, and release them in
+`onDisconnect`; one physical socket can contain several viewers. The token exposes no credentials or
+claims. Core applies the physical parent's authorization before dispatch, while the channel owner
+continues to own its payload validation, producer sharing, and targeted joining replay.
+
 Agent tools and context sections are still available to a loaded package, but only as manifest
 descriptors: `contributions.agentTools` and `contributions.contextSections`. They do not become live
 registries in `ctx`. The host turns each descriptor into the same normalized registration compiled
@@ -489,7 +495,7 @@ messages by hand:
 | `api.getBytes` / `api.postBytes` | The same call for a route whose body is bytes, on its own wire kind `api.bytes`. GET and POST, capped at 12 MiB each way, with an advisory `type` and `filename`. Reach for it instead of base64 whenever you are moving a file: the JSON verbs stringify everything, which costs a third more on the wire and a decode at each end. The path decision is identical, and another plugin's namespace is refused before the body is read. |
 | `events.on` | Subscribe to a channel the manifest declared: one of the shell's four, or your own `plugin:<your-id>:<verb>`. The payload is whatever your node half put on the frame beside `channel`. |
 | `state.get` / `state.set` | Durable storage keyed `(pluginId, key)` by the host, capped at 1 MiB per value. The same `plugin:<id>:*` namespace your node half's `prefs` facet is projected into — this is the supported node-half↔frame state channel. Distinct from the frame's own `localStorage`, which works but is keyed by bundle hash and so rotates with every update. |
-| `ui.toast` / `ui.copy` / `ui.openPane` / `ui.openDestination` / `ui.openUrl` / `ui.done` / `ui.close` | The closed effect set. `openDestination` maps a surface-local manifest declaration to one host target kind; the plugin supplies only resource IDs of at most 300 characters. `openUrl` is `https` only, honoured only while the frame holds focus and at most once per second, and you learn nothing back. `done` is importer-only; `close` is importers and overlays. An overlay a remote tree opened as its companion may pass `close` a JSON result under 64 KiB, which is what resolves that tree's `openOverlay` call; an importer supplying one is refused. |
+| `ui.toast` / `ui.copy` / `ui.openPane` / `ui.openDestination` / `ui.openTask` / `ui.openUrl` / `ui.done` / `ui.close` | The closed effect set. `openDestination` maps a surface-local manifest declaration to one host target kind; the plugin supplies only resource IDs of at most 300 characters. `openTask` goes to a task in the reader's task list. It needs the `core.tasks:read` scope, follows the same focus rule and shares the same one-per-second budget as `openUrl`, and rejects with `not_found` when the list does not have the task. `openUrl` is `https` only, honoured only while the frame holds focus and at most once per second, and you learn nothing back. `done` is importer-only; `close` is importers and overlays. An overlay a remote tree opened as its companion may pass `close` a JSON result under 64 KiB, which is what resolves that tree's `openOverlay` call; an importer supplying one is refused. |
 | `document.read` / `write` / `flush` | Only from a pane whose layout puts a document region beside your region. Nothing about the *editor* crosses — no cursor, no selection, no decorations. |
 | `webview.*` | `navigate`, `back`, `forward`, `reload`, plus navigation and blocked events. Controller-only: you cannot read the page or type into it. |
 | `keys.claim` | Narrow the manifest's declared chord set at runtime. It can never widen it. |

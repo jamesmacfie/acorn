@@ -29,7 +29,7 @@ const CHANNEL_PART = /^[a-z][a-z0-9-]{0,63}$/
 /** The inverse, and the ownership check both ends run. `null` for anything that is not one of ours:
  *  another prefix, a missing or malformed half, or a verb containing the delimiter. */
 export function parsePluginChannel(channel: string): { pluginId: string; verb: string } | null {
-  const parts = channel.split(':')
+  const parts = channel.split(':', 4)
   if (parts.length !== 3) return null
   const [prefix, pluginId, verb] = parts
   if (prefix !== PLUGIN_CHANNEL_PREFIX) return null

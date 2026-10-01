@@ -38,6 +38,17 @@ sends with `fetch` under its own bounded time and response-size limits (`plugins
 A request times out after 30 seconds and a response body over 5 MB is capped while streaming, so a
 large or endless response cannot be buffered whole before the cap applies.
 
+URL, scheme, and header validation failures name the invalid field without quoting resolved content.
+They remain `SendError` preparation failures, which the route returns as 422 and the workflow handler
+persists as a failed step. Command-variable failures report their status, deadline, or output limit,
+and withhold raw command stderr, spawn diagnostics, and thrown command messages.
+
+For request URLs, request timelines, and transport diagnostics, the executor redacts resolved secret
+variables and command outputs in raw, URI-component, form URL-encoded, and lowercase forms. These
+cover common transport encodings and ASCII case normalization; they do not cover arbitrary
+derived encodings. Complete HTTP response bodies and response headers remain deliberate response
+data and can contain values returned by the chosen endpoint.
+
 Variables resolve in one pass, lowest precedence first: task builtins, then project variables, then
 per-request overrides. Only the names a request actually references get resolved, because a command
 variable's value comes from running its shell command, and an override present at send time replaces
@@ -163,3 +174,19 @@ its resolved value never exists at capture time.
 Legacy `http-draft:*` keys from releases that persisted unsaved drafts in `localStorage` are swept by
 the shell at renderer activation (`client-core/infra/persistence/legacyStorage.ts`), not by the plugin. A
 frame's storage area is its own and could never have reached them.
+
+## Shared model and region leases
+
+Equivalent immutable model/grant affinity shares selection, drafts, saved lists, and send results
+between list and detail. The opening item is not part of this model identity. Equal project/task ids
+on different Nodes, QueryClients, or structural document grants do not join models.
+
+Each region has its own action and client view. Save, delete, send, and clipboard work captures the
+invoking region's bridge before awaiting. Retiring another region does not cancel that work. A retired
+origin cannot publish a held result. Shared idempotent list reads can retry through a surviving
+equivalent lease if their admitted lease retires, at most once per available bridge; mutations are not
+replayed. The first bridge is reserved before resource construction, with rollback on construction
+failure. The latest inactive model keeps its warm draft without retaining bridges or subscriptions.
+
+Ordered draft save, error recovery, and concurrent mutation reconciliation remain separate concerns;
+the lease model does not add a persisted draft recovery contract.

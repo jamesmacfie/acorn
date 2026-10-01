@@ -26,6 +26,9 @@ The application does not defend a Node host against root/other-user access or a 
 account, nor does it sandbox first-party plugin code. A client still treats a paired Node as an
 untrusted source of replies, events, content, and plugin offers until an owner authorizes code.
 
+The shell's Rust dependency patch and remaining upstream advisory warnings are recorded in
+[Rust dependency security](./shell.md#rust-dependency-security).
+
 ## Transport and auth
 
 - Nodes bind to `127.0.0.1` over TLS 1.3 and reject unexpected `Host` values.
@@ -53,6 +56,15 @@ untrusted source of replies, events, content, and plugin offers until an owner a
   scope on the Node, then calls only the owner's `/cli/<name>` plugin route. The CLI never sends its
   bearer token as command input; the worker receives its existing permission-filtered context.
 - `/v1/events` authenticates the upgrade and rechecks device activity for long-lived streams.
+  The Node enforces the broker's 8 MiB message ceiling before JSON parsing. Claimed upgrade sockets
+  own peer errors before asynchronous authentication; lookup, upgrade, and owner-handler failures
+  remain within that connection. Disposal closes pending upgrades as well as connected sockets.
+  Failed device-activity lookups close the affected authenticated sockets. Disconnect cleanup attempts
+  every owner's hook independently, including hooks that return rejected promises.
+- Raw preview tunnels enforce 64 KiB per WebSocket message at both Node and custody receivers.
+  Both senders split TCP chunks in order and wait for each write before resuming TCP reads.
+  The helper's request limit and browser receive boundary are documented in
+  [the shell contract](./shell.md#the-shell-process).
 - Revoking a device (`DELETE /v1/core/devices/:id`) closes that device's live sockets immediately and
   fails its in-flight requests. A device can revoke its own row; that is the same effect as unpairing
   itself.
@@ -149,6 +161,11 @@ arbitrary command execution as the owner, from inside another task's context. Th
 once, before a frame reaches any channel handler or the `term:` dispatch, and it fails closed on an
 unknown stream id rather than allowing it, since failing open would make the check bypassable by
 racing session creation.
+
+Logical viewer dispatch reads these claims from its physical authenticated parent on every frame.
+The opaque viewer token passed to a compiled channel handler is a resource-lifetime key, never a
+replacement connection or a credential. Nesting a viewer envelope cannot widen a task-scoped token's
+terminal access or grant it a plugin channel.
 
 A task-confined connection also receives none of `wsBroadcast`'s frames. No broadcast channel is
 task-addressed: `workflow:step:event` carries another task's raw agent stream (assistant text and tool
@@ -259,6 +276,10 @@ child-process environment. Every call to `reveal()` sits outside the scrub-on-th
   through. `resolveInRoot` stayed the one implementation everywhere except the Docker plugin's
   container-label matcher, which compares paths reported by the daemon inside a container namespace;
   resolving those against this host's filesystem would be wrong, not merely redundant.
+  It distinguishes an absent entry from a dangling symlink with `lstat`, and refuses an
+  unresolvable link rather than approving its parent. New paths beneath real in-root directories
+  and aliases that resolve inside the root remain valid. Editor writes, Changes disk reads and
+  unstaged diffs, and both endpoints of worktree file copies use this policy.
 - Short-lived task work goes through the process broker, which uses explicit working directories,
   environment allowlists, process-group termination, bounded output, and production timeouts.
 - Long-lived engines own their own children, under the same environment hygiene. The broker's model is
@@ -275,9 +296,12 @@ child-process environment. Every call to `reveal()` sits outside the scrub-on-th
   acknowledged before execution; a changed snapshot fails closed with `needs-trust`/`config-changed`.
 - A workflow definition stored as a `workflow_defs` row is executable configuration with no committed
   bytes, so it is owner-typed instead of hashed. Every route under `/v1/p/workflows/defs` is
-  device-only, and a start by id refuses a row to a task-confined caller while still allowing a
-  committed file, which the snapshot does cover. Save to repo turns the row into a file and hands it
-  back to the snapshot: the write is a slug of the definition name, confined to `.acorn/workflows/`
+  device-only. Root workflow starts over HTTP also require a device principal, for file and database
+  definitions alike. They reject task and service credentials before reading the body: repository
+  trust does not authorize a caller to reset its tool ceiling or workflow tree accounting. Trusted
+  schedules and frozen child dispatch enter through their admission capabilities. Save to repo turns
+  the row into a file and hands it back to the snapshot: the write is a slug of the definition name,
+  confined to `.acorn/workflows/`
   by `resolveInRoot`, and the next start from that file asks for the acknowledgement
   ([workflows.md](./workflows.md) § Database definitions).
 - A gate answer is device-only. `POST /v1/p/workflows/workflows/runs/:runId/gate` refuses a
@@ -293,8 +317,11 @@ child-process environment. Every call to `reveal()` sits outside the scrub-on-th
   authority. The resolved graph and effective limits are persisted so restart recovery cannot gain
   authority from an edited definition. Cancellation closes admission before it stops descendants,
   which prevents a late child creation from escaping the tree-wide cancel.
-- Docker matching configuration is declarative; Docker and run-target execution remains subject to
-  the appropriate trust gate.
+- Docker task listings and teardown use host-stored worktree roots and daemon working-directory
+  metadata; declarative matcher hints affect only the device summary. Cleanup targets full container
+  IDs, never a project-wide name. Global Docker HTTP actions require owner device authority.
+  WebSocket Docker channels permit device and service principals while denying task-confined sockets.
+  Repository run-target execution uses the configuration trust gate. See [Docker](./docker.md).
 - External URLs opened through the OS pass a scheme allowlist. Preview navigation is limited to
   HTTP(S) URLs without userinfo.
 
@@ -323,6 +350,19 @@ Widening the snapshot changes the hash, so a project that already has script col
 one re-acknowledgement the next time something gated runs. That is the correct answer rather than a
 migration: the owner is being shown a snapshot that now covers more than the one they approved.
 
+Run-target resolution captures the executable snapshot before parsing the repository config and
+returns its hash through `core.tasks.runConfig`. Terminal supplies that expected hash to
+`core.projects.assertConfigTrusted` for repository-authored starts and restarts. The gate rejects
+identity drift even when the configuration on disk has reverted to acknowledged bytes. It does not
+reread a different config file to select the command. Running instances retain their admitted URL
+and stop commands, so default URL discovery does not execute repository edits without admission.
+Snapshots accept regular files within the repository root, including internal symlink aliases.
+Nonblocking descriptor opens reject special files before reading. Each file and the project settings
+entry are capped at 1 MiB, the formatted snapshot at 8 MiB, and the snapshot at 256 entries. Workflow
+directory scans stop after 1,024 entries, including non-TOML entries. Unsafe or oversized input fails
+closed with a configuration error. These static path checks do not eliminate concurrent path
+replacement between checks and use.
+
 Which paths ask. The three call sites that assert trust are the ones where the *checkout* authored what
 runs: a run target whose winning layer was the repo's config file, a `db_url_script` from the same
 place, and a workflow defined in the repo. The setup and teardown scripts run from the project row
@@ -335,10 +375,10 @@ and reported as unread rather than merged: they were merged over the project row
 nothing consumed the result, so a repo could declare a setup script and watch it do nothing. They are
 not wired instead of dropped because wiring them would make a committed file run a command on worktree
 creation and on archive, and neither path asks this gate first — that is a new execution surface, not a
-fix. The `[docker]` table is still read without the gate; the comment on
-`plugins/docker/src/server/dockerConfig.ts` now names the two invariants that make that safe, which are
-that exec is ref-addressed rather than matcher-addressed and that the WebSocket hub refuses docker
-channels to a task-confined socket. If either changes, that table needs the gate.
+fix. The `[docker]` table is still read without the gate. Its bounded, confined repository read
+contributes device-summary hints only. Task listing and archive/manual cleanup derive association
+independently of those hints. Exec remains explicitly ref-addressed and the WebSocket hub refuses
+Docker channels to a task-confined socket. Widening any of those seams needs a new authority review.
 
 **A known limit.** `resolveInRoot` is check-then-use: nothing re-validates between the containment
 check and the open, so an agent that can write in its own worktree can swap a path component for a
@@ -456,14 +496,23 @@ is the only file in that package permitted to name either class.
 **Storing a bundle is idempotent, and the application's own bundles go through the same door.** The
 shell caches and acknowledges the bundles in its own resource directory at every launch, because that
 grant covers bytes the build produced and nothing else writes there. Doing it at every launch does not
-mean writing at every launch. `putBundled` hashes the bytes, and when the cache already holds that
-hash and the file is on disk it returns and touches nothing. The index is rewritten only when a row is
-added, the boot sweep rewrites it only when it evicted something, and the trust store compares the
-stored acknowledgement field by field, ignoring `decidedAt`, and writes only on a difference. So five
-bundled plugins cost five bundle writes and ten fsynced rewrites on the launch after an app update, and
-zero on every launch after that. The two disagreement cases still self-heal: a row whose file is gone
-is rewritten because the file is checked as well as the row, and a file with no row is deleted by the
-sweep.
+mean writing at every launch. The bundled pass hashes one client body at a time. When the cache
+already holds that hash and the file is on disk, it touches neither the body nor its index row. It
+places missing bodies before committing the successful cache rows in one atomic, fsynced index
+write. It then validates each trust disclosure and commits the successful decisions in one atomic,
+fsynced trust write. A malformed or unreadable sibling does not discard the successful packages.
+The trust store compares the acknowledgement field by field, ignoring `decidedAt`, and keeps the
+first timestamp for an unchanged decision. A fresh roster requires at most two metadata commits.
+An application-version-only provenance change requires at most one. An unchanged pass writes
+nothing. The boot sweep rewrites its index only when it evicts something.
+
+The cache and trust files commit separately, in that order. A failed metadata commit leaves that
+store's remembered rows unchanged, and the bundled pass reports no successful acknowledgements.
+The following launch retries. A cache commit followed by a failed trust commit leaves reusable
+cached bytes without granting trust to them. A row whose file is gone is repaired because the file
+is checked as well as the row, and a file with no row is deleted by the sweep. Remote bundles and
+owner decisions retain their individual validation and commit paths. The
+`ACORN_PROMPT_BUNDLED_PLUGIN_TRUST=1` opt-out still skips bundled cache and trust initialization.
 
 Skipping a write is not skipping a decision. The hash is still computed from the bytes on every
 launch, so a bundle whose contents changed produces a hash the cache does not hold and takes the full
@@ -503,7 +552,10 @@ The threats this closes, and the ones it does not:
   its own pixels, a Web Worker created by a host-owned relay at the same isolated plugin origin for
   one that draws a tree (`docs/shell.md § The plugin worker`), and — in
   the terminal, where there is no iframe and no CSP — a `node:worker_threads` thread under
-  `--permission`. No path asks a second question, and none can start without an accepted hash.
+  `--permission` and an empty environment. Its builtin policy refuses network and privileged modules
+  through imports, CommonJS require and the synchronous process accessor before bundle evaluation.
+  See [the terminal sandbox contract](./tui/chrome-and-plugins.md#the-sandbox). No path asks a second
+  question, and none can start without an accepted hash.
 - **A Node lying in its listing** about hash, version or permissions — the hash is recomputed from the
   bytes. The permissions shown are the manifest as the Node's own loader read it; a Node that lies
   there also controls the bytes, so the containment rather than the disclosure is what bounds it.
@@ -732,7 +784,10 @@ read and the value it writes. The tools expose no arbitrary JavaScript evaluatio
 
 Screenshots are rows in the plugin's own database, keyed to the task, served back only through
 `/v1/p/browser/captures/:id` behind the same auth as every other node route. The newest twenty per
-task are kept.
+task are kept. The route checks the capture's recorded task against the authenticated principal:
+task credentials can read only their own captures; device and service credentials retain access
+across tasks. Foreign and unknown IDs return the same empty 404 response. Browser context allocation
+and page diagnostics also have resource budgets; see [Browser tools](./agent-tools.md#browser-tools).
 
 ## Untrusted provider data
 
@@ -768,7 +823,9 @@ with restrictive permissions. A Node lock prevents two processes from opening on
 report disk-encryption status on macOS and surfaces the warning when it cannot verify full-disk
 encryption.
 
-Backups snapshot core and plugin SQLite files through SQLite's online-backup API. Device rows and
+Backups snapshot core and plugin SQLite files through SQLite's online-backup API. Output is private
+from creation and atomically replaces a prior backup after success; see
+[data-layer.md § Backup and import](./data-layer.md#backup-and-import). Device rows and
 credential material are scrubbed, while blobs and worktrees are excluded because they are recoverable
 and can dominate archive size. Restore is a documented manual operation into a fresh data root.
 

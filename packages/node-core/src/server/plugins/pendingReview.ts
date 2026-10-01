@@ -2,10 +2,11 @@
 // beside the package, rather than in the agent's in-memory request queue, so a crash or restart
 // cannot turn a downloaded package into executable Node code.
 import { createHash, randomUUID } from 'node:crypto'
-import { closeSync, existsSync, linkSync, lstatSync, openSync, readFileSync, readSync, readdirSync, readlinkSync, realpathSync, rmSync, statSync } from 'node:fs'
+import { existsSync, linkSync, lstatSync, readFileSync, readdirSync, readlinkSync, realpathSync, rmSync, statSync } from 'node:fs'
 import { join, relative, resolve, sep } from 'node:path'
 import { writePrivateAtomic } from '../storage/dataRoot'
 import { PLUGIN_DB_DIR } from './storage'
+import { MAX_PLUGIN_FILE_BYTES, MAX_PLUGIN_PACKAGE_BYTES, MAX_PLUGIN_PACKAGE_DEPTH, MAX_PLUGIN_PACKAGE_ENTRIES, pluginDirectoryEntries, streamPluginFile, visitPluginFile } from './packageFiles'
 
 export type PendingPluginReview = {
   reviewId: string
@@ -51,11 +52,11 @@ export function pluginReviewFingerprint(dir: string): string {
   const hash = createHash('sha256')
   const realRoot = realpathSync(dir)
   const visited = new Set<string>()
-  const chunk = Buffer.allocUnsafe(64 * 1024)
   let files = 0
   let bytes = 0
-  const walk = (path: string): void => {
-    if (++files > 100_000) throw new Error('Plugin review exceeds 100,000 package entries.')
+  const walk = (path: string, depth: number): void => {
+    if (depth > MAX_PLUGIN_PACKAGE_DEPTH) throw new Error('Plugin review exceeds the package depth limit.')
+    if (++files > MAX_PLUGIN_PACKAGE_ENTRIES) throw new Error('Plugin review exceeds the package entry limit.')
     const real = realpathSync(path)
     if (real !== realRoot && !real.startsWith(realRoot + sep)) throw new Error(`Review path '${relative(dir, path)}' escapes the plugin package.`)
     const stat = lstatSync(path)
@@ -68,26 +69,16 @@ export function pluginReviewFingerprint(dir: string): string {
       if (visited.has(real)) return
       visited.add(real)
       hash.update(`dir\0${rel}\0`)
-      for (const name of readdirSync(path).sort()) walk(join(path, name))
+      for (const entry of pluginDirectoryEntries(path, MAX_PLUGIN_PACKAGE_ENTRIES - files).sort((a, b) => a.name < b.name ? -1 : a.name > b.name ? 1 : 0)) walk(join(path, entry.name), depth + 1)
       return
     }
     if (!statSync(path).isFile()) throw new Error(`Unsupported review entry '${rel}'.`)
-    const size = statSync(path).size
-    bytes += size
-    if (bytes > 512 * 1024 * 1024) throw new Error('Plugin review exceeds 512 MiB of package files.')
-    hash.update(`file\0${rel}\0${size}\0`)
-    const fd = openSync(path, 'r')
-    try {
-      for (;;) {
-        const size = readSync(fd, chunk, 0, chunk.length, null)
-        if (!size) break
-        hash.update(chunk.subarray(0, size))
-      }
-    } finally {
-      closeSync(fd)
-    }
+    visitPluginFile(dir, path, Math.min(MAX_PLUGIN_FILE_BYTES, MAX_PLUGIN_PACKAGE_BYTES - bytes), (fd, stats) => {
+      hash.update(`file\0${rel}\0${stats.size}\0`)
+      bytes += streamPluginFile(fd, stats.size, Math.min(MAX_PLUGIN_FILE_BYTES, MAX_PLUGIN_PACKAGE_BYTES - bytes), (chunk) => hash.update(chunk))
+    })
   }
-  walk(dir)
+  walk(dir, 0)
   return hash.digest('hex')
 }
 

@@ -264,7 +264,12 @@ export class AgentSessionRepository {
           status: 'pending',
           title: event.title,
           detail: event.detail ?? null,
-          payloadJson: JSON.stringify({ options: event.options ?? [], questions: event.questions ?? [] }),
+          // Additive: a row written before `approval` existed reads as the plain consent it was.
+          payloadJson: JSON.stringify({
+            options: event.options ?? [],
+            questions: event.questions ?? [],
+            ...(event.approval ? { approval: event.approval } : {}),
+          }),
           createdAt: timestamp,
         })
         .onConflictDoNothing()

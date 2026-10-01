@@ -93,6 +93,13 @@ export function registerKnowledgeChannel(db: PluginDatabase, core: KnowledgeCore
   // The client's memory surface, exposed as the KnowledgeBridge behind the HTTP routes.
   // guard() keeps the `| { error }` contract the client unions on.
   const route: KnowledgeBridge = {
+    taskMemoryScope: async (taskId) => {
+      const task = await core.tasks.load(taskId)
+      if (!task) return null
+      if (!task.projectId) return { projectId: null }
+      const project = await core.projects.byId(task.projectId)
+      return project ? { projectId: project.id } : null
+    },
     memoryList: (projectId) =>
       guard(async () => {
         await reconciled()

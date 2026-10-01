@@ -2,6 +2,7 @@ import { children, Show, type JSX } from 'solid-js'
 import { safeContentHref } from '@acorn/protocol/externalUrl.ts'
 import type { ItemProps } from '../../keys/collection'
 import { isExternal } from '../content/isExternal'
+import Icon from '../content/Icon'
 
 /** Did this click land on a control inside the row rather than on the row itself? A row action's
  *  menu button must not also open the row, and no kit node hands a plugin an event to stop, so the
@@ -106,6 +107,9 @@ export function Row(props: {
    *  from a token read off the document root (../../lib/layout/metrics.ts), so a taller collapsed row is a
    *  height the virtualizer has not accounted for. */
   collapsed?: JSX.Element
+  /** `collapsed` as a Lucide name, for a caller that can only send data. A remote tree's props are
+   *  JSON, so an `Icon` element cannot cross the wire; a name can. `collapsed` wins when both are set. */
+  collapsedIcon?: string
   title?: string
   /** The app's tooltip for the row at full width (docs/ui-design.md § Tooltips). A collapsed row's
    *  tip stays its name. `tipAt` adds a relative age under whichever tip is showing. A row with a tip
@@ -119,7 +123,7 @@ export function Row(props: {
   // Given a rail form, draw it. The caller owns both the column's collapse and its rows, so it
   // passes the slot or leaves it off; there is no second boolean that could disagree with the width
   // the column is actually at.
-  const collapsed = () => props.collapsed !== undefined
+  const collapsed = () => props.collapsed !== undefined || props.collapsedIcon !== undefined
   const tipText = () => collapsed() ? (props.title ?? props.label) : props.tip
   const body = (
     <Show
@@ -130,7 +134,7 @@ export function Row(props: {
         </RowParts>
       )}
     >
-      <span class="ui-row-collapsed">{props.collapsed}</span>
+      <span class="ui-row-collapsed">{props.collapsed ?? <Icon name={props.collapsedIcon!} />}</span>
     </Show>
   )
   if (safeHref) {

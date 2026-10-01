@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { DEV_BUILD_MARKER, reconcileBundledPlugins } from './bundled'
-import { markPluginUserManaged, readBundledPluginState } from './bundledState'
+import { bundledPluginStatePath, markPluginUserManaged, readBundledPluginState } from './bundledState'
 import { installPlugin, pluginDir, uninstallPlugin } from './installer'
 import { PLUGIN_API_MAJOR } from './manifest'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
@@ -42,6 +42,37 @@ describe('bundled plugin reconciliation', () => {
     expect(reconcileBundledPlugins(root, resources)).toMatchObject({ installed: ['rollbar'], failures: [] })
     expect(readFileSync(join(pluginDir(root, 'rollbar'), 'dist/node.js'), 'utf8')).toContain('1.0.0')
     expect(readBundledPluginState(root, 'rollbar')).toMatchObject({ status: 'installed', version: '1.0.0' })
+  })
+
+  it('repairs missing ownership state after exact package placement', () => {
+    packageAt(resources, '1.0.0')
+    reconcileBundledPlugins(root, resources)
+    rmSync(bundledPluginStatePath(root))
+
+    expect(reconcileBundledPlugins(root, resources)).toMatchObject({ installed: [], updated: [], failures: [] })
+    expect(readBundledPluginState(root, 'rollbar')).toMatchObject({ status: 'installed', version: '1.0.0' })
+  })
+
+  it('repairs a missing installed package while preserving its original installation time', () => {
+    packageAt(resources, '1.0.0')
+    reconcileBundledPlugins(root, resources)
+    const before = readBundledPluginState(root, 'rollbar')
+    rmSync(pluginDir(root, 'rollbar'), { recursive: true })
+
+    expect(reconcileBundledPlugins(root, resources)).toMatchObject({ installed: ['rollbar'], failures: [] })
+    expect(readBundledPluginState(root, 'rollbar')).toEqual(before)
+    expect(readFileSync(join(pluginDir(root, 'rollbar'), 'dist/node.js'), 'utf8')).toContain('1.0.0')
+  })
+
+  it('preserves a changed installed target rather than trusting its recorded fingerprint', () => {
+    packageAt(resources, '1.0.0')
+    reconcileBundledPlugins(root, resources)
+    writeFileSync(join(pluginDir(root, 'rollbar'), 'dist/node.js'), 'owner changes')
+    packageAt(resources, '2.0.0')
+
+    expect(reconcileBundledPlugins(root, resources)).toMatchObject({ preserved: ['rollbar'], failures: [] })
+    expect(readFileSync(join(pluginDir(root, 'rollbar'), 'dist/node.js'), 'utf8')).toBe('owner changes')
+    expect(readBundledPluginState(root, 'rollbar')).toMatchObject({ status: 'user' })
   })
 
   it('updates only the app-owned package while preserving an old profile\'s Rollbar records', async () => {

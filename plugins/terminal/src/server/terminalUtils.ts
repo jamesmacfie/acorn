@@ -5,62 +5,62 @@
 
 export const RING_CAP = 256 * 1024 // bytes of recent raw output kept for prompt detection / transcript-tail analysis
 
-/**
- * Recent raw output, kept as the chunks it arrived in.
- *
- * It used to be one string, rebuilt as `ring = trimRing(ring + data)` on every chunk the
- * pseudo-terminal produced. That copies up to 256 KB per chunk to serve readers that ask for the last
- * four or ten kilobytes of it. Now a chunk is pushed,
- * the oldest are dropped once the budget is spent, and a reader concatenates only the tail it asked
- * for.
- *
- * Bytes, not characters. node-pty hands over decoded strings, so each chunk is encoded once on the way
- * in, and `tail` joins the buffers before decoding — a multi-byte character split across two chunks
- * still reads back whole, which is the one thing a per-chunk decode would get wrong. The only place a
- * character can still be cut is the head, where the budget bites, and the string version cut it in
- * exactly the same place.
- */
+const RING_BLOCK_BYTES = 4 * 1024
+const RING_BLOCKS = RING_CAP / RING_BLOCK_BYTES
+
+/** Recent raw bytes in lazy fixed-size blocks. Reads join before decoding UTF-8. */
 export class OutputRing {
-  private readonly chunks: Buffer[] = []
+  private readonly blocks: (Buffer | undefined)[] = Array.from({ length: RING_BLOCKS })
+  private cursor = 0
   private total = 0
 
-  /** How many bytes are kept. At most RING_CAP. */
   get bytes(): number {
     return this.total
   }
 
   push(data: string): void {
     if (!data) return
-    const chunk = Buffer.from(data, 'utf8')
-    this.chunks.push(chunk)
-    this.total += chunk.length
-    while (this.total > RING_CAP) {
-      const head = this.chunks[0]
-      const over = this.total - RING_CAP
-      if (head.length <= over) {
-        this.chunks.shift()
-        this.total -= head.length
-      } else {
-        // Trim the head chunk rather than dropping it whole, so the ring holds exactly its budget and
-        // a reader asking for the whole thing sees the same bytes the string version kept.
-        this.chunks[0] = head.subarray(over)
-        this.total -= over
-      }
+    const encoded = Buffer.from(data, 'utf8')
+    // An aligned ordinary block already owns exactly its storage. Adopt it without a second
+    // allocation or copy. Pooled or oversized backing storage still takes the bounded copy path.
+    if (this.cursor % RING_BLOCK_BYTES === 0 && encoded.length === RING_BLOCK_BYTES &&
+        encoded.byteOffset === 0 && encoded.buffer.byteLength === RING_BLOCK_BYTES) {
+      this.blocks[this.cursor / RING_BLOCK_BYTES] = encoded
+      this.cursor = (this.cursor + RING_BLOCK_BYTES) % RING_CAP
+      this.total = Math.min(RING_CAP, this.total + RING_BLOCK_BYTES)
+      return
     }
+    // A large callback contributes only its suffix. Copy into our blocks so that a small retained
+    // tail cannot hold the oversized input's backing allocation.
+    let offset = Math.max(0, encoded.length - RING_CAP)
+    while (offset < encoded.length) {
+      const index = Math.floor(this.cursor / RING_BLOCK_BYTES)
+      const within = this.cursor % RING_BLOCK_BYTES
+      const block = this.blocks[index] ?? (this.blocks[index] = Buffer.allocUnsafeSlow(RING_BLOCK_BYTES))
+      const count = Math.min(RING_BLOCK_BYTES - within, encoded.length - offset)
+      encoded.copy(block, within, offset, offset + count)
+      offset += count
+      this.cursor = (this.cursor + count) % RING_CAP
+    }
+    this.total = Math.min(RING_CAP, this.total + encoded.length)
   }
 
-  /** The last `bytes` bytes, decoded. Defaults to everything kept. */
+  /** The last bytes, decoded once, including replacement characters at a cut UTF-8 head. */
   tail(bytes: number = RING_CAP): string {
     if (bytes <= 0 || this.total === 0) return ''
-    let want = Math.min(bytes, this.total)
-    const parts: Buffer[] = []
-    for (let i = this.chunks.length - 1; i >= 0 && want > 0; i -= 1) {
-      const chunk = this.chunks[i]
-      parts.push(chunk.length <= want ? chunk : chunk.subarray(chunk.length - want))
-      want -= Math.min(chunk.length, want)
+    const count = Math.min(Math.floor(bytes), this.total)
+    const joined = Buffer.allocUnsafe(count)
+    let position = (this.cursor - count + RING_CAP) % RING_CAP
+    let copied = 0
+    while (copied < count) {
+      const index = Math.floor(position / RING_BLOCK_BYTES)
+      const within = position % RING_BLOCK_BYTES
+      const length = Math.min(RING_BLOCK_BYTES - within, count - copied)
+      this.blocks[index]!.copy(joined, copied, within, within + length)
+      copied += length
+      position = (position + length) % RING_CAP
     }
-    parts.reverse()
-    return Buffer.concat(parts).toString('utf8')
+    return joined.toString('utf8')
   }
 }
 

@@ -76,21 +76,6 @@ const startBody = z
   // One or the other, never both and never neither.
   .refine((body) => !!body.def !== !!body.defId)
 
-// A `defId` that names a file rather than a row. A row is owner-typed configuration that skips the
-// repo trust snapshot, so a task-confined caller may start a file and not a row.
-const FILE_DEF_ID = /^(repo|user):/
-const referencesDatabaseChild = (def: unknown): boolean => {
-  if (!def || typeof def !== 'object') return false
-  const steps = (def as { steps?: unknown }).steps
-  if (!Array.isArray(steps)) return false
-  return steps.some((step) => {
-    if (!step || typeof step !== 'object') return false
-    const child = (step as { childWorkflow?: unknown }).childWorkflow
-    if (!child || typeof child !== 'object') return false
-    const ref = (child as { ref?: unknown }).ref
-    return !!ref && typeof ref === 'object' && (ref as { source?: unknown }).source === 'database'
-  })
-}
 // `values` answers a gate's form, so it comes only with an approval. Which names and types are legal
 // is the runner's answer, because only the frozen definition knows the fields.
 const gateBody = z.object({
@@ -140,17 +125,16 @@ export const workflow = new Hono<AppEnv>()
   .get('/workflows/task-navigation', requireDevice, (c) => viaBridge(c, WORKFLOW_ROUTE,
     b => b.taskNavigation?.() ?? Promise.resolve({ groups: [] })))
   .get('/tasks/:id/workflows', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.defs(c.req.param('id'), !isTaskConfined(c))))
-  .post('/tasks/:id/workflows', async (c) => {
+  // A root start creates fresh authority and tree accounting. Repository trust does not authorize
+  // an agent to escape its signed ceiling or existing workflow tree. Trusted schedules and child
+  // dispatch use their own admission capabilities, not this renderer HTTP control.
+  .post('/tasks/:id/workflows', requireDevice, async (c) => {
     const parsed = startBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    const { def, defId, inputs } = parsed.data
+    const { defId, inputs } = parsed.data
     if (defId) {
-      if (isTaskConfined(c) && !FILE_DEF_ID.test(defId)) return respondError(c, 403, 'forbidden')
-      return viaBridge(c, WORKFLOW_ROUTE, (b) => b.startById(c.req.param('id'), defId, inputs, !isTaskConfined(c)))
+      return viaBridge(c, WORKFLOW_ROUTE, (b) => b.startById(c.req.param('id'), defId, inputs, true))
     }
-    // A database definition is owner-authored configuration without a repository trust snapshot.
-    // The same device-only rule applies when an inline parent refers to one as a child.
-    if (isTaskConfined(c) && referencesDatabaseChild(def)) return respondError(c, 403, 'forbidden')
     return respondError(c, 400, 'published_definition_required', ['Publish this workflow and start it by its definition ID.'])
   })
   .get('/tasks/:id/workflows/runs', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.runs(c.req.param('id'))))

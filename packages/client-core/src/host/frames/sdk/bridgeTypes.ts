@@ -62,6 +62,8 @@ export type PluginByteResponse = { bytes: Uint8Array; type: string; filename: st
 // Named for what it is rather than for the app: `Acorn` on @acorn/plugin-api/ui is the shell component,
 // and two things called Acorn in one plugin's imports is a trap.
 export type AcornBridge = {
+  /** Per-mount authority, legacy host fallback, or authority-free module bootstrap. */
+  readonly treeBridgeMode?: 'mount' | 'legacy' | 'bootstrap'
   /** What this frame was opened to look at. A snapshot, not reactive: a frame is recreated when its
    * subject changes. */
   readonly context: PluginFrameContext
@@ -81,6 +83,11 @@ export type AcornBridge = {
     openPane(paneId: string): Promise<void>
     /** Open a manifest-declared cooperative destination owned by another plugin. */
     openDestination(destinationId: string, resourceId: string, subresourceId?: string): Promise<void>
+    /**
+     * Go to a task on this node. Needs the `core.tasks:read` scope, and works only from a click or
+     * key handler, the same as `openUrl`. Rejects when the task is not in the reader's task list.
+     */
+    openTask(taskId: string): Promise<void>
     /**
      * Hand an `https` URL to the host. It resolves in-app when something recognises it, such as another
      * provider's reference panel or a task pane, and opens the owner's browser otherwise. Anything but

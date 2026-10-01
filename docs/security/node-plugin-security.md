@@ -7,6 +7,14 @@ Part of [security.md](../security.md).
 The section above is about bundles a Node distributes to a device. This one is about the isolated
 worker realm that runs a loaded plugin's node half.
 
+Before resolving plugin files, preparing storage, or creating a worker, the host enforces the
+shared Node runtime policy in `packages/protocol/src/runtime/nodeRuntime.ts`. Supported releases
+are 22.23.2 or later in branch 22, 24.18.1 or later in branch 24, and 26.5.1 or later in branch 26.
+Other branches and prereleases are refused. These floors include the
+[July 29, 2026 permission model security fixes](https://nodejs.org/en/blog/vulnerability/july-2026-security-releases).
+The terminal client applies the same policy to loaded client workers. The desktop bundles
+Node 24.21.0, downloaded over HTTPS and checked against its release archive checksum.
+
 The manifest's `permissions.node` block is now an enforced ceiling. The host serializes only the
 already owner-bound, permission-shaped context; functions cross as RPC references, so the worker
 never receives a core database, registry, or service implementation. Node starts the realm with its
@@ -22,6 +30,24 @@ where they run, but cannot verify what plugin-authored code intends to do.
 This is a resource boundary, not an OS security claim. Node describes its permission model as a
 seat belt rather than a sandbox for hostile code, and a worker is not crash isolation. Rung 3 remains
 the answer for a deployment that needs an operating-system adversarial boundary.
+
+Incoming plugin and provider fetch requests carry the verified `PluginRequestContext`, with
+`Authorization`, `x-acorn-internal`, cookies, and proxy authorization removed before the Request
+crosses into a loaded worker. Ordinary headers, body, query, and mount-relative path are retained.
+This applies at the incoming fetch adapter; a plugin's own outbound provider Request can still carry
+the provider credential it was authorized to use.
+
+The worker's ESM resolver, scoped CommonJS require, and `process.getBuiltinModule` use the same
+public builtin family policy, `@acorn/protocol/plugin/nodeBuiltins.ts`. Internal and unknown families
+are refused; socket families and child processes require their respective explicit grants. Plugin
+dependencies must resolve to approved builtins or real files inside the package. Non-file dependency
+schemes are refused. Module ownership is retained after a package file is removed, so an old realm
+serving during reload cannot lose its plugin classification on a later dynamic import.
+
+Source development verification on Node 24.21.0 found harmless sibling dependency source and
+metadata readable through workspace symlinks despite individual-package launch grants. Import
+provenance remains enforced. The grants and tests do not establish complete native filesystem
+confinement; deployments needing that guarantee require an operating-system boundary.
 
 ### The broadcast namespace
 
@@ -148,6 +174,11 @@ that declaration. Every other loaded notice falls back to the plugin's own sourc
 local ID, target kind, and optional notice kind form the update-diff key. Adding or retargeting one
 therefore requires a new decision.
 
+**Going to a task rides the task read scope.** `ui.openTask` moves the reader to any task in their
+task list, so a surface needs `core.tasks:read`, the scope that already lets it list those tasks. It
+holds to the same person's-act rule as `openUrl`: the surface must have focus, and the two verbs share
+one navigation per second.
+
 **Four things rung 0 refuses permanently**, and each will be asked for again in words that sound
 reasonable:
 
@@ -250,9 +281,38 @@ an already owner-bound, manifest-shaped `ctx` over that port; registrations, fet
 handlers, capabilities, and the few synchronous public calls all retain their published signatures
 through structured-clone RPC.
 
+RPC exports have explicit owners. Lifecycle contexts, route registrations, subscriptions, disposal
+handles, and capability results belong to the realm. Repeated exports reuse a function's identity
+within its call mode and ownership scope, including bound class methods. Replacing a capability
+resolves the replacement implementation on the next lookup.
+
+A fetch invocation owns its request context and derived provider services. Published provider,
+secret, and telemetry visitor operations lend their callback only until that operation finishes.
+Generic visitor results keep their published lifetime, including returned functions. The transport
+retires local exports and receiver proxy caches when their owner finishes, fails, or cancels. An
+entered nested call can drain after retirement, but a further authority call is refused. A late
+nested result cannot revive a retired request scope. These rules do not infer ownership from method
+names on arbitrary capabilities.
+
+Returned telemetry spans own a separate scope until `end`, so a span can outlive the call that
+started it. Ending a span retires that scope; repeated `end` calls are local no-ops. Request signals
+carry pre-abort state and live cancellation through mount forwarding, worker execution, and body
+encoding. Cancellation stops the host from waiting for an uncooperative handler, releases transport
+listeners and references, and suppresses its late reply. It does not terminate plugin-authored work
+that ignores the signal. Endpoint shutdown settles calls that are still encoding bodies and cancels
+their readers without awaiting an authored stream's cancellation hook.
+
+Fetch bodies remain fully buffered across this seam. Body readers retain byte-stream validation,
+and no additional asynchronous body limit is introduced. Async calls remain concurrent, synchronous
+calls retain nested message draining and their five-second ceiling, and completed synchronous reply
+buffers return to the 4 MiB pool.
+
 The launch grant is intentionally narrow:
 
 - the worker may read the installed plugin package and the trusted bootstrap/runtime dependencies;
+- source workers grant both resolved dependency paths and their package lookup aliases, including
+  the protocol package used by the builtin policy. The grants name individual trusted packages,
+  not the containing `node_modules` directory; plugin imports still stay inside their own package;
 - a plugin with migrations may read and write only its pre-created database, WAL, and SHM paths;
 - the worker environment starts from the process broker's credential-free base. Explicit `env`
   names add individual values; `files` resolves individual absolute paths from named values and
@@ -339,11 +399,13 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
 
 ### Tokens, routes, and agents
 
-- **Plugin routes vs task-scoped tokens.** Decide explicitly, default no: task-scoped internal
-  tokens (agents, PTY children, the MCP child) cannot reach `/v1/p/<third-party>/*`. Otherwise a
-  prompt-injected agent can drive a malicious plugin's routes with the task's authority. Opt-in
-  per route via explicit metadata when a plugin genuinely serves task-scoped consumers, surfaced
-  in the permission prompt.
+- **Plugin routes and task-scoped tokens.** The host passes the verified principal to compiled
+  routers and portable fetch handlers. Task-shaped HTTP mounts enforce the signed task ID;
+  handlers outside those mounts must check resource scope from that principal before doing work.
+  Database CLI and context handlers enforce supplied task IDs, and Memory resolves the caller's
+  project before index reads. Device-only administration remains separately gated. There is no
+  blanket task-token denial or route opt-in metadata gate. A default-deny policy with per-route
+  opt-in metadata and permission-prompt disclosure is planned, not an implemented control.
 - **Agent tools are a prompt-injection surface.** A plugin-contributed tool is callable by an
   LLM reading hostile content. The existing risk-metadata and per-owner tool-permission
   machinery (docs/agent-tools.md) applies, with a stricter default for third-party tools:
@@ -394,11 +456,20 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
 
 ### Storage
 
-- **Migrations** run in the Node at boot against the plugin's own file only
-  (`packages/node-core/src/server/plugins/migrations.ts`). SQL is data, not code, but verify the
-  plugin database factory (`server/plugins/storage.ts`) keeps `load_extension` unavailable
-  (the default `server/storage/sqlite.ts` pins) and never grants `ATTACH` reach into other files — an attached
-  database is a cross-plugin read the boundary rules exist to prevent.
+- **State-file preparation** refuses links and special files at the database, WAL, and SHM names
+  before native SQLite opens them. Host creation and chmod use descriptors checked as regular files,
+  with no-follow and nonblocking flags on POSIX hosts. The shared `plugins/` directory cannot be a
+  link. Supported data-root aliases and missing sidecars remain valid. This is static preflight, so path replacement between
+  that check and SQLite's native open remains a limit.
+- **Migrations and SQL** use a native SQLite authorizer installed before migration history,
+  migrations, or exposed statements in both the worker adapter and the loader's host fallback.
+  `ATTACH`, `DETACH`, file export through `VACUUM INTO`, filesystem PRAGMAs, and extension/file
+  functions are refused. PRAGMAs and virtual table modules have explicit allowlists; temporary SQL
+  storage stays in memory. The native connection is private, so plugin code cannot remove its policy.
+  The fallback also refuses arbitrary native backup destinations. Ordinary owning schema changes,
+  nested transactions, and WAL remain available. Loaded storage fails closed with a clear error when
+  the runtime lacks `DatabaseSync.setAuthorizer` (including the supported floor Node 22.23.2); use the
+  bundled Node 24 runtime for loaded storage plugins. Core and compiled plugin SQL policy is unchanged.
 - **Backups.** Backup snapshots scrub core credentials and device rows
   (docs/architecture-overview.md), but a plugin that stashes tokens in its own SQLite defeats
   the scrub — its file is snapshotted verbatim. The credential broker makes core secret storage
@@ -478,7 +549,7 @@ These are the rules that made rung 2 possible and now keep later API work from p
 | Network egress | `fetch` only to declared hostnames; raw network modules refused | realm allowlist today; OS sandbox for an adversarial boundary | Rung 2 enforced, rung 3 hardened |
 | Webview hosts | Loads remote content the plugin chooses | Manifest host allowlist enforced across redirects; no CDP; isolated ephemeral partition | Webview phases 1/2 |
 | Agent sessions | Tool contributions | Third-party tools default disabled/ask | Phase 1/5 |
-| Fleet devices | Routes + broadcasts | Task-token opt-in default-no; content-free broadcasts | Phase 1/3 |
+| Fleet devices | Routes + broadcasts | Verified principal; task-shaped mount and handler resource guards; device-only administration; content-free broadcasts. Task-token route opt-in remains planned | Shipped guards; planned opt-in |
 | Backups | Plugin-stored secrets survive scrub | Broker + "no secrets in plugin tables" rule; scope by `projectId`, never mirror the project row | Rung 1 |
 | Project config scripts (`setup_script`, `dev_script`, …) | Available only through `core.projects.config()` when granted; config writes remain unmapped | Separate `projects:config` read grant; project config trust acknowledgement | Rung 2 (node half); phase 3 (frames) |
 | Project folder paths | Available through `core.projects.checkouts()` only when granted | split `projects:read`/`:write`; name the disclosure in the trust prompt | Rung 2 |

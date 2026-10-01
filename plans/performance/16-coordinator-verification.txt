@@ -1,0 +1,21 @@
+Coordinator replay against unchanged baseline source, October 1, 2026.
+
+ACORN_PERF_TAG=coordinator-before, all commands prefixed rtk proxy:
+pnpm exec vitest run --config plans/performance/16-renderer-probe.config.ts
+1 file / 2 cases passed in 1.16 seconds.
+pnpm exec vitest run --config plans/performance/16-tui-probe.config.mts
+1 file / 1 case passed in 1.05 seconds.
+pnpm exec vitest run --config plans/performance/16-node-probe.config.ts
+2 files / 2 cases passed in 471 ms.
+node --import tsx plans/performance/16-shared-viewers-probe.mts
+Completed, actual loopback sockets and synthetic Docker child cleaned up.
+node --expose-gc --import tsx plans/performance/16-telemetry-probe.mts
+Completed, distinct coordinator-before outputs preserved.
+
+Viewer replay confirms B receives zero terminal-ready frames when joining after A's restore;
+A detach leaves zero sinks/producers although B remains; final renderer disconnect leaves one
+sink and one Docker reader until broker disposal. Three Docker frames arrive upstream during
+the 50 ms zero-renderer interval. Final broker cleanup leaves zero sinks and both readers stopped.
+
+These are synthetic owner/socket/worker and jsdom/cell fixtures, not native visible latency or
+full-day active-use evidence. Application source remains unchanged at the end of investigation.

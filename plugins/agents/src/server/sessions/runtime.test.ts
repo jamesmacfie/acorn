@@ -9,7 +9,7 @@ import { agentProfileRegistry } from '@acorn/plugin-api/node'
 import { memoryIdentityStore } from '@acorn/plugin-api/testkit'
 import { createCoreServices, type CoreServices } from '@acorn/plugin-api/testkit'
 import { makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
-import type { AgentNormalizedEvent, AgentProviderDescriptor } from '../../contract/wire.ts'
+import type { AgentAppApproval, AgentNormalizedEvent, AgentProviderDescriptor } from '../../contract/wire.ts'
 import type {
   AgentDriver,
   AgentDriverSession,
@@ -96,6 +96,8 @@ class RequestDriver implements AgentDriver {
   readonly profileId = 'request-test'
   resolutions = 0
 
+  constructor(private readonly approval?: AgentAppApproval) {}
+
   async probe(): Promise<AgentProviderDescriptor> {
     return descriptor(this.providerId)
   }
@@ -103,6 +105,7 @@ class RequestDriver implements AgentDriver {
   async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
     const providerSessionRef = options.session.providerSessionRef ?? randomUUID()
     let ready = true
+    const approval = this.approval
     await options.onEvent({ type: 'session_metadata', providerSessionRef })
     await options.onEvent({ type: 'session_state', state: 'ready' })
     return {
@@ -118,6 +121,7 @@ class RequestDriver implements AgentDriver {
           kind: 'permission',
           title: 'Run the test command?',
           options: [{ id: 'allow-once', label: 'Allow once', kind: 'allow_once' }],
+          ...(approval ? { approval } : {}),
         })
         return { providerTurnRef: 'provider-turn-1' }
       },
@@ -1575,6 +1579,51 @@ describe('managed agent runtime conformance', () => {
     expect((await runtime.store.request(session.id, 'permission-1'))?.status).toBe('resolved')
   })
 
+  // The answer is checked against the request the node stored, not against the client's buttons.
+  it('refuses a choice the request never offered and leaves the request open', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    const approval: AgentAppApproval = {
+      connector: 'Computer Use',
+      app: { id: 'com.acorn.desktop.agent-test', name: 'Acorn Agent Test' },
+      scopes: ['session'],
+    }
+    const driver = new RequestDriver(approval)
+    registry.registerNative(driver.providerId, () => driver)
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+    const session = await runtime.createSession({
+      taskId: seed.taskId,
+      providerId: driver.providerId,
+      profileId: driver.profileId,
+      kind: 'interactive',
+      config: {},
+    })
+    await runtime.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Ask first.' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
+    })
+    await runtime.wait(session.id, 0, 'attention', 2_000)
+    expect((await runtime.store.request(session.id, 'permission-1'))?.payload.approval).toEqual(approval)
+
+    await expect(runtime.resolveRequest(session.id, 'permission-1', { optionId: 'acceptAlways' }, randomUUID()))
+      .rejects.toThrow('That choice was not offered for this request.')
+    expect(driver.resolutions).toBe(0)
+    expect((await runtime.store.request(session.id, 'permission-1'))?.status).toBe('pending')
+
+    await runtime.resolveRequest(session.id, 'permission-1', { optionId: 'allow-once' }, randomUUID())
+    expect(driver.resolutions).toBe(1)
+  })
+
   it('retries only a driver-classified transient turn with no accepted response', async () => {
     const seed = await seedTask(testDb, dataDir)
     const registry = new AgentDriverRegistry()
@@ -2106,6 +2155,11 @@ describe('managed agent runtime conformance', () => {
     await runtime.patchSession(session.id, { config: { ...(await runtime.store.requireSession(session.id)).config,
       configOptions: (session.config.configOptions as Array<{ id: string }>).map((option) =>
         option.id === 'reasoning' ? { ...option, currentValue: 'medium' } : option) } })
+    const replaced = await runtime.patchSession(session.id, { config: {
+      configOptions: (await runtime.store.requireSession(session.id)).config.configOptions,
+      customAgent: { id: 'forged', instructions: 'Changed instructions.' },
+    } })
+    expect(replaced.config.customAgent).toEqual(session.config.customAgent)
     const fork = await runtime.fork(session.id)
     expect(fork.config.customAgent).toMatchObject({ id: agent.id, instructions: 'Review for correctness only.' })
     expect((fork.config.configOptions as Array<{ id: string; currentValue: string }>)

@@ -1,6 +1,7 @@
 import { AGENT_TOOL_PASSTHROUGH, brokerEnv, createLogger } from '@acorn/plugin-api/node'
 import { sessionCustomAgent } from '../../shared/customAgents'
 import { execFile } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { basename, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import type {
@@ -199,8 +200,12 @@ export class CodexAgentDriver implements AgentDriver {
         rpc.respondError(request.id, -32601, `Acorn does not implement server request ${request.method}.`)
         return
       }
-      pendingRequests.set(event.requestId, request)
-      void options.onEvent(event)
+      // Our own id, not Codex's. Codex numbers its requests from 0 in every app-server process, and a
+      // session starts a new process when it resumes, so its number can repeat one this session
+      // already answered. The store keys a request on session and id, and would keep the old row.
+      const requestId = randomUUID()
+      pendingRequests.set(requestId, request)
+      void options.onEvent({ ...event, requestId })
     }
 
     rpc = new JsonRpcProcess({
@@ -420,8 +425,10 @@ export class CodexAgentDriver implements AgentDriver {
       async resolveRequest(providerRequestId, resolution) {
         const request = pendingRequests.get(providerRequestId)
         if (!request) throw new Error('Codex request is no longer pending.')
+        // Built first: an answer the request never offered throws here, before anything is sent.
+        const response = codexServerRequestResponse(request, resolution)
         pendingRequests.delete(providerRequestId)
-        rpc.respond(request.id, codexServerRequestResponse(request, resolution))
+        rpc.respond(request.id, response)
       },
       async setConfig(optionId, value) {
         configOptions = configOptions.map((option) => option.id === optionId ? { ...option, currentValue: value } : option)

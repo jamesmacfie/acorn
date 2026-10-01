@@ -1,0 +1,38 @@
+{
+  "reconstructedFrom": {
+    "cli": "codex-cli 0.159.2",
+    "integration": "Codex Computer Use 26.915.1001093, @oai/sky 0.7.5",
+    "source": "@oai/sky dist/project/cua/sky_js/src/targets/mac/computer-use-policy.js, withComputerUsePolicy",
+    "os": "macOS 27.0"
+  },
+  "notes": [
+    "Synthetic: built field for field from the integration's own request construction, not captured off the wire. A live capture is owed (docs/testing.md, check 149).",
+    "The app is the bundle identifier; the name a person reads is only in tool_params_display.",
+    "persist is ['session', 'always'] when the integration's policy allows persistent approval, else ['session'].",
+    "The integration reads the answer's _meta.persist, and its own telemetry counts an accept without it as a session grant. node_repl keeps session grants per thread under CODEX_HOME/computer-use/sessions and always grants in its ComputerUseAppApprovals.json.",
+    "A later request the integration already holds a grant for is answered by the integration itself, with content.source 'computer-use-persisted-state', and never reaches Acorn."
+  ],
+  "request": {
+    "id": 31,
+    "method": "mcpServer/elicitation/request",
+    "params": {
+      "threadId": "thread-1",
+      "turnId": "turn-1",
+      "serverName": "cua_repl",
+      "mode": "openai/form",
+      "message": "Allow Computer Use to use \"Acorn Agent Test\"?",
+      "requestedSchema": { "type": "object", "properties": {} },
+      "_meta": {
+        "codex_approval_kind": "mcp_tool_call",
+        "connector_id": "computer-use",
+        "connector_name": "Computer Use",
+        "persist": ["session", "always"],
+        "riskLevel": "low",
+        "tool_call_id": "call-1",
+        "tool_name": "get_app_state",
+        "tool_params": { "app": "com.acorn.desktop.agent-test" },
+        "tool_params_display": [{ "name": "app", "display_name": "App", "value": "Acorn Agent Test" }]
+      }
+    }
+  }
+}

@@ -1,3 +1,4 @@
+import { Portal } from 'solid-js/web'
 import { children, createEffect, createSignal, Index, onCleanup, Show, type JSX } from 'solid-js'
 import { Button, Input } from '../../kit/components/primitives'
 import type { PaletteView } from './overlay'
@@ -104,6 +105,7 @@ export function PaletteSurface<T>(props: {
   const footer = children(() => props.footer)
 
   return (
+    <Portal>
     <Show when={props.palette.open()}>
       <div class="overlay-backdrop" onClick={props.palette.close}>
         <div
@@ -179,5 +181,6 @@ export function PaletteSurface<T>(props: {
         </div>
       </div>
     </Show>
+    </Portal>
   )
 }

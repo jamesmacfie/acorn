@@ -1,0 +1,48 @@
+{
+  "fixture": "Actual TUI workerFactory, Node Worker, permission bootstrap and workerHost. Synthetic bundle emits 256KiB and honors stdout drain; no output bytes printed to host screen.",
+  "beforeDrain": {
+    "messages": [
+      {
+        "started": true,
+        "stdout": 0
+      },
+      {
+        "paused": true,
+        "stdout": 65536
+      }
+    ],
+    "finished": false,
+    "stdoutReadableLength": 65536,
+    "stderrReadableLength": 0
+  },
+  "afterDrain": {
+    "finished": true,
+    "discardedBytes": 262144,
+    "messages": [
+      {
+        "started": true,
+        "stdout": 0
+      },
+      {
+        "paused": true,
+        "stdout": 65536
+      },
+      {
+        "paused": true,
+        "stdout": 131072
+      },
+      {
+        "paused": true,
+        "stdout": 196608
+      },
+      {
+        "paused": true,
+        "stdout": 262144
+      },
+      {
+        "finished": true,
+        "stdout": 262144
+      }
+    ]
+  }
+}

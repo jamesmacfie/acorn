@@ -1,3 +1,4 @@
+import { Portal } from 'solid-js/web'
 import { Show } from 'solid-js'
 import PluginFrame from './PluginFrame'
 import type { FrameBinding } from './broker'
@@ -28,6 +29,7 @@ export type PluginOverlayProps = {
 export default function PluginOverlay(props: PluginOverlayProps) {
   const invocation = () => (props.open() ? pluginOverlayInvocation() : null)
   return (
+    <Portal>
     <Show when={invocation()} keyed>
       {/* Keyed on the invocation, so opening the same overlay a second time builds a second iframe with
           only the second input. A reused document would let an editor inherit the previous canvas, and
@@ -51,5 +53,6 @@ export default function PluginOverlay(props: PluginOverlayProps) {
         </div>
       )}
     </Show>
+    </Portal>
   )
 }

@@ -9,11 +9,12 @@
 // invalidation and workflow notices; Terminal registers the PTY `term:` payload handler.
 import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, TaskChangedEvent, WorkspaceChangedEvent, WorkspaceProjectsChangedEvent, WorktreeStatusChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { NoticeFrame } from '@acorn/protocol/notices.ts'
-import { type WsClientFrame, type WsServerFrame } from '@acorn/protocol/ws.ts'
+import { type WsClientFrame, type WsServerFrame, type WsSendOptions } from '@acorn/protocol/ws.ts'
 import { nodeTransport } from '../platform'
 import { measure } from '../telemetry/emitter'
 import { activeNodeId } from './activeNode'
-import { registerWsChannel, routeWsFrame, wsReattachFrames } from './wsChannels'
+import { registerWsChannel, routeWsFrame, wsReattachFrames, wsSubscriptionIntent } from './wsChannels'
+import { toast } from '../../features/notifications/toast'
 
 // `term:status` carries the id of the plugin whose chrome moved, or nothing when core itself pinged and
 // every plugin's descriptors are suspect (node-core/server/notify.ts).
@@ -76,16 +77,21 @@ const everOnline = new Set<string>()
 
 // The one send door. A channel owner needs it to attach and detach its own streams, and it is the only
 // part of the socket a plugin can reach.
-export function wsSend(frame: WsClientFrame): void {
-  rawSend(frame)
+export function wsSend(frame: WsClientFrame, options?: WsSendOptions): void {
+  rawSend(frame, activeNodeId(), options)
 }
 
-function rawSend(frame: WsClientFrame): void {
-  const nodeId = activeNodeId()
+/** Sends cleanup to its captured Node without changing the renderer's event interest. */
+export function wsSendToNode(nodeId: string, frame: WsClientFrame, options?: WsSendOptions): void {
+  rawSend(frame, nodeId, options)
+}
+
+function rawSend(frame: WsClientFrame, nodeId = activeNodeId(), options?: WsSendOptions): void {
   if (!nodeId) return
   connect()
   // No local queue: main holds one, so a frame sent before its socket is open is still delivered.
-  nodeTransport()?.send(nodeId, frame)
+  const intent = options?.intent ?? wsSubscriptionIntent(frame)
+  nodeTransport()?.send(nodeId, frame, intent || options ? { ...options, ...(intent ? { intent } : {}) } : undefined)
 }
 
 // Subscribe to the broker's push channels. Idempotent and never torn down, because this module is a
@@ -95,6 +101,8 @@ function connect(): void {
   const transport = nodeTransport()
   if (!transport) return
   bridged = true
+  transport.interest(activeNodeId())
+  transport.onError((_nodeId, error) => toast(error.message, { tone: 'danger' }))
 
   // The nodeId is a filter, not decoration. Main opens a socket to every paired node and pushes every
   // frame here. Without the filter, node B's output for a colliding stream id feeds node A's reader
@@ -116,6 +124,7 @@ function connect(): void {
   })
   transport.onStatus((status) => {
     if (status.state !== 'online') return
+    if (status.nodeId === activeNodeId()) transport.interest(status.nodeId)
     if (!everOnline.has(status.nodeId)) {
       everOnline.add(status.nodeId)
       return

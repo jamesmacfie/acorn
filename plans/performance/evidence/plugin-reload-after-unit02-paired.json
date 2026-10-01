@@ -1,0 +1,41 @@
+{
+  "sourceRoot": "/Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance",
+  "counts": [
+    {
+      "phase": "baseline",
+      "workers": 1
+    },
+    {
+      "phase": "rejected reload 1",
+      "outcome": {
+        "ok": false,
+        "error": "Capability already provided: candidate.test"
+      },
+      "workers": 1
+    },
+    {
+      "phase": "rejected reload 2",
+      "outcome": {
+        "ok": false,
+        "error": "Capability already provided: candidate.test"
+      },
+      "workers": 1
+    },
+    {
+      "phase": "rejected reload 3",
+      "outcome": {
+        "ok": false,
+        "error": "Capability already provided: candidate.test"
+      },
+      "workers": 1
+    },
+    {
+      "phase": "host disposed",
+      "workers": 1
+    },
+    {
+      "phase": "manual candidate dispose",
+      "workers": 1
+    }
+  ]
+}

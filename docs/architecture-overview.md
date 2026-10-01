@@ -384,6 +384,11 @@ table beside another plugin's. See [the dashboards doc](./dashboards.md). Each p
 all-or-nothing rather than sanitising field by field, because a half-accepted answer renders as
 complete and is not. Adding to this list means naming the same argument: untrusted wire, host-drawn.
 
+Runtime dependency security floors live in the root `package.json` overrides. The standalone packer
+carries them into npm's manifest; `tools/arch/dependencySecurity.test.ts` checks that pnpm's runtime
+overrides agree. See [dependency security policy](./node-distribution.md#dependency-security-policy)
+for direct dependency references and the standalone install's reproducibility limits.
+
 ## Product model
 
 ```text
@@ -431,6 +436,13 @@ tiers are permanent, and the line between them is what a contribution needs. Any
 data plus async messages can be sandboxed, while PTY stream ownership and components the shell renders
 inside its own tree at a place it has not opened as an extension point need the shared realm and stay
 first-party.
+Client tree module lifetime is separate from mounted authority. Capable SDKs share a bundle worker
+while every mounted slot owns its bridge, pending requests, and document grant. A legacy SDK uses
+one immutable slot-affine worker per mounted tree and terminates with its final lease. The host captures QueryClient
+origin before lazy region construction, and structural document handle changes revoke prior grant
+generations. [Mounted bridge ownership](./plugins/descriptors.md#mounted-bridge-ownership-and-sdk-compatibility)
+defines capability negotiation, compatibility, resource bounds, and the selected-Node event boundary.
+
 A device can also hold a client-only loaded plugin. Its bundle has device provenance, wins over a Node
 offer of the same plugin ID, and uses the same client sandbox and trust gate. The device installer
 rejects any Node entry or Node-dependent contribution.

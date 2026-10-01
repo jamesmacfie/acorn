@@ -30,8 +30,8 @@ export function fileCacheStorage(dir: string = join(configDir(), 'cache')): Cach
     },
     // Written beside the target and renamed over it, so a reader never sees a half-written snapshot
     // and a crash mid-write leaves the previous one readable. `rename` within a directory is atomic
-    // on every filesystem this runs on. The persister throttles to one call every five seconds, so
-    // the temp name needs no per-write suffix: a second write for the same key cannot overlap.
+    // on every filesystem this runs on. The partition lifecycle serializes writes
+    // and drains them before retirement, so the fixed sibling temp file has one owner at a time.
     setItem: async (key, value) => {
       await mkdir(dir, { recursive: true, mode: 0o700 })
       const target = pathFor(key)

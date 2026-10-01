@@ -50,6 +50,12 @@ lints and runs on, `apps/tui/package.json` declares that same range in its `engi
 needs no flag: the painter is this package's own TypeScript and Yoga arrives as WebAssembly, so
 drawing reaches no native library at all.
 
+The supported branches are Node 22 at 22.23.2 or later, Node 24 at 24.18.1 or later, and Node 26 at
+26.5.1 or later. Other branches are unsupported. The bundled runtime is 24.21.0. Before looking up
+a loaded client bundle or creating its worker, the terminal checks the shared policy in
+`packages/protocol/src/runtime/nodeRuntime.ts`. An unsupported runtime refuses loaded plugin
+execution with an upgrade message, even if package installation ignored the `engines` warning.
+
 So the whole suite draws on the Node the repo already has, with no skips and no second runtime to
 bundle ([testing.md](./testing.md) § Test layers, [future/bundle.md](./future/bundle.md)).
 
@@ -107,6 +113,12 @@ desktop. The first `acorn` against one asks for a pairing code. For a desktop-su
 standalone node, run `kill -USR1 <pid>` and read the code from its launching terminal. The TUI then
 runs the ordinary pairing exchange against loopback. A loopback mint route would remove the step and
 does not exist.
+
+The initial selected partition acquires the shared query-cache lifecycle after installing file
+storage. Restore finishes before the shell draws, and quit releases the lease and drains its pending
+snapshot. File writes are asynchronous atomic replacements serialized by that lifecycle; retirement
+deletes through the same captured file adapter. [Caching](./caching.md#renderer-query-cache) owns
+capture timing, lease release, same-ID replacement barriers, and failed-deletion recovery.
 
 ### Remote nodes
 
@@ -704,3 +716,21 @@ module and the signing gate. What that step still owes is written there.
 - [future/bundle.md](./future/bundle.md) — packaging `acorn` and the node together.
 - [future/remote.md](./future/remote.md) — the browser surfaces, which share this host's reasoning
   about auth and custody and none of its constraints.
+
+## Client worker lifetime
+
+The terminal factory gives each sandbox owned stdout/stderr pipes and drains them without retaining
+output or writing it onto the cell screen. Worker construction, transferred hello ports, and native
+termination settlement belong to the factory. A hash retirement barrier delays replacement creation
+until retired native threads exit. Canceling a deferred construction removes its callback and closes
+its untransferred ports; it does not spawn a worker.
+
+The bootstrap retains one initial hello across asynchronous module import. It releases that ownership
+when the bridge or tree actually adopts the ports, restores temporary observation hooks, and closes
+unclaimed ports on import rejection or the 10-second handshake deadline. Arbitrary message listeners
+cannot consume the sole retained hello. General worker traffic is not queued. The shared host keeps
+only the latest pre-ready props per admitted slot and reports failed startup after its 20-second
+construction deadline.
+
+For capability negotiation, modern warm modules, immutable legacy contexts, and the 512-slot bundle
+budget, see [Mounted bridge ownership and SDK compatibility](./plugins/descriptors.md#mounted-bridge-ownership-and-sdk-compatibility).

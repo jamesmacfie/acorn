@@ -203,6 +203,7 @@ client: nodeReady
 client: nodeState
 client: nodes
 client: observeAttention
+client: observeNativePage
 client: onClosePaneWhen
 client: onClosePaneWithin
 client: onPluginFrame
@@ -238,6 +239,7 @@ client: projectsKey
 client: projectsOptions
 client: pushManagedAgentNotice
 client: queryContentSchema
+client: queryOwner
 client: queryReferenceSchema
 client: queryScopeSchema
 client: railDotProps
@@ -316,6 +318,7 @@ client: wsOnStatus
 client: wsOnWorkflowStepChanged
 client: wsOnWorkflowStepEvent
 client: wsSend
+client: wsSendToNode
 node: AGENTS_CUSTOM_AGENT_REGISTRY
 node: AGENTS_HARNESS_REGISTRY
 node: AGENT_TOOL_PASSTHROUGH
@@ -537,6 +540,7 @@ node: parseVersionedDataValue
 node: pastedContent
 node: patchBlobKey
 node: portableCarrier
+node: principalMayActOnTask
 node: profileAvailable
 node: providerCredential
 node: providerError
@@ -593,6 +597,7 @@ testkit/client: paneRegistry
 testkit/client: parseInAppTarget
 testkit/client: provideClientCapability
 testkit/client: refPanelRegistry
+testkit/client: refreshFleet
 testkit/client: setActiveNode
 testkit/client: setProjectsLookup
 testkit/ws-client: _resetWsClient
@@ -717,6 +722,7 @@ ui/host: AnnotationMarks
 ui/host: Concern
 ui/host: Drawer
 ui/host: InlineSlot
+ui/host: ModelPickerPopover
 ui/host: PaletteSurface
 ui/host: PromoteTaskAction
 ui/host: PromoteToTaskModal
@@ -927,7 +933,6 @@ ui: Modal
 ui: ModalActions
 ui: ModalBody
 ui: ModelBackendPicker
-ui: ModelPickerPopover
 ui: NonCodeRow
 ui: Only
 ui: Picker

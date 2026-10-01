@@ -1,3 +1,4 @@
+import { Portal } from 'solid-js/web'
 import { createResource, createSignal, For, Show } from 'solid-js'
 import { corePluginsRoute, type NodePluginState, type PluginApprovalRequest } from '@acorn/protocol/api.ts'
 import { readJson } from '../../infra/node/apiClient'
@@ -190,6 +191,7 @@ export default function PluginApprovalDialog() {
   // the first footer button that does nothing irreversible: **Deny** or **Remove plugin**, never the
   // download or the switch-on.
   return (
+    <Portal>
     <Show when={request()}>
       {(current) => (
         <Modal
@@ -278,5 +280,6 @@ export default function PluginApprovalDialog() {
         </Modal>
       )}
     </Show>
+    </Portal>
   )
 }

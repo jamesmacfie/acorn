@@ -1,0 +1,10 @@
+{
+  "fixture": "actual DocumentHandle.flush; two flush calls, first write held",
+  "beforeAck": {
+    "secondSettled": true,
+    "acknowledged": false,
+    "writes": 1
+  },
+  "targetNode": "node-a",
+  "expected": "Both flush promises remain pending until the current snapshot has been acknowledged."
+}

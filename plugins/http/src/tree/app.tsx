@@ -1,10 +1,10 @@
+import { createHttpClient } from './httpClient'
 import { createResource, createSignal, Match, Show, Switch, type JSX } from 'solid-js'
 import { EmptyState, Heading, Select, SettingRow, SettingsSection, Stack, Text } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import { projectRoute, projectsRoute, type Project, type ProjectsResponse } from '@acorn/protocol/api.ts'
 import HttpDetail from './HttpDetail'
 import HttpList from './HttpList'
-import { httpClient } from './httpClient'
 import HttpVariables from './HttpVariables'
 import { httpPanelModel } from './panelModel'
 
@@ -85,7 +85,7 @@ export function HttpDetailApp(props: HttpPaneProps & { bridge: AcornBridge }) {
 // The variables settings surface. A picker rather than an inferred project: variables belong to a
 // project and a settings page is workspace-shaped at most.
 export function HttpSettingsApp(props: { bridge: AcornBridge }) {
-  const client = httpClient(props.bridge)
+  const client = createHttpClient(props.bridge.api)
   const [projects] = createResource(() => props.bridge.api.get<ProjectsResponse>(projectsRoute))
   const [selected, setSelected] = createSignal('')
   const visible = () => (projects()?.projects ?? []).filter((candidate) => !candidate.hidden)

@@ -1,5 +1,6 @@
 import type { Browser, BrowserContext, CDPSession, Page } from 'playwright-core'
 import { buildAxTree, isAllowedBrowserUrl, renderAxTree, resolveRef, type AxSnapshot } from './axTree'
+import { BrowserDiagnostics } from './diagnostics'
 
 // One Playwright browser for the node, one incognito context and page per task, and a CDP session on
 // each page for the accessibility tree. See docs/agent-tools.md § Browser tools.
@@ -10,8 +11,6 @@ import { buildAxTree, isAllowedBrowserUrl, renderAxTree, resolveRef, type AxSnap
 //
 // The bundle ships no browser: bundles are hash-addressed and a Chromium is 150 MB per platform. This
 // drives an installed Chrome, and says so when there is not one.
-
-const CONSOLE_CAP = 200
 
 // How many task browsing contexts stay alive. Each carries its own cookies and storage, and a
 // long-running node works through a lot of tasks.
@@ -37,40 +36,55 @@ export type Capture = { id: string; mime: string; bytes: Buffer; taskId: string 
 /// this file never learns what a database is. See docs/agent-tools.md § Browser tools.
 export type CaptureStore = { put(capture: Omit<Capture, 'id'>): Promise<{ id: string }> }
 
-type Session = { context: BrowserContext; page: Page; cdp: CDPSession; console: string[]; snapshot: AxSnapshot | null }
+type Session = { context: BrowserContext; page: Page; cdp: CDPSession; console: BrowserDiagnostics; snapshot: AxSnapshot | null; closing: boolean }
+type Allocation = { cancelled: boolean; promise: Promise<Session> }
 
 export class BrowserPool {
   #browser: Browser | null = null
   #sessions = new Map<string, Session>()
   #launching: Promise<Browser> | null = null
+  #allocations = new Map<string, Allocation>()
+  #pendingCleanup = new Map<BrowserContext, Browser>()
+  #allocationQueue: Promise<void> = Promise.resolve()
+  #disposed = false
+  #disposing: Promise<void> | null = null
 
   constructor(private readonly captures: CaptureStore) {}
 
   /// Launch once, lazily, and share. Nothing happens at plugin init, because an idle node should not
   /// pay for a browser process.
   async #launch(): Promise<Browser> {
+    if (this.#disposed) throw new Error('Browser pool is disposed.')
     if (this.#browser?.isConnected()) return this.#browser
     this.#launching ??= (async () => {
       const { chromium } = await import('playwright-core')
       let last: unknown
       for (const channel of CHANNELS) {
+        if (this.#disposed) throw new Error('Browser pool is disposed.')
         try {
           return await chromium.launch({ channel })
         } catch (error) {
           last = error
         }
       }
+      if (this.#disposed) throw new Error('Browser pool is disposed.')
       try {
         return await chromium.launch()
       } catch {
         throw new Error(`${NO_BROWSER} (${last instanceof Error ? last.message : String(last)})`)
       }
     })()
-      .then((browser) => {
+      .then(async (browser) => {
+        if (this.#disposed) {
+          await browser.close().catch(() => {})
+          throw new Error('Browser pool is disposed.')
+        }
+        this.#sessions.clear()
         this.#browser = browser
         // The owner closed it by hand, or it crashed. The next call launches a new one rather than
         // handing back a dead handle.
         browser.once('disconnected', () => {
+          if (this.#browser !== browser) return
           this.#browser = null
           this.#sessions.clear()
         })
@@ -84,23 +98,74 @@ export class BrowserPool {
 
   /// One context per task, so one task's cookies, storage, and logins never reach another's.
   async #session(taskId: string): Promise<Session> {
+    if (this.#disposed) throw new Error('Browser pool is disposed.')
     const existing = this.#sessions.get(taskId)
-    if (existing && !existing.page.isClosed()) return existing
+    if (existing && !existing.closing && this.#browser?.isConnected() && !existing.page.isClosed()) return existing
+    const pending = this.#allocations.get(taskId)
+    if (pending) return pending.promise
+    const allocation: Allocation = { cancelled: false, promise: null! }
+    allocation.promise = this.#queue(() => this.#allocate(taskId, allocation)).finally(() => {
+      if (this.#allocations.get(taskId) === allocation) this.#allocations.delete(taskId)
+    })
+    this.#allocations.set(taskId, allocation)
+    return allocation.promise
+  }
+
+  // Allocation and release share the resource queue, so a context stays counted until close has
+  // settled. Independent operations on live task pages still run concurrently.
+  #queue<T>(action: () => Promise<T>): Promise<T> {
+    const work = this.#allocationQueue.then(action)
+    this.#allocationQueue = work.then(() => {}, () => {})
+    return work
+  }
+
+  async #allocate(taskId: string, allocation: Allocation): Promise<Session> {
+    const check = () => {
+      if (this.#disposed || allocation.cancelled) throw new Error('Browser session creation was cancelled.')
+    }
+    check()
     const browser = await this.#launch()
+    check()
+    // A partial allocation whose close failed still consumes capacity. Retry cleanup before opening
+    // anything else; a disconnected browser has already destroyed its contexts.
+    for (const [context, owner] of this.#pendingCleanup) {
+      if (owner.isConnected()) await context.close()
+      this.#pendingCleanup.delete(context)
+      check()
+    }
+    // A closed page still owns a context until it is explicitly released.
+    await this.#closeSession(taskId)
+    check()
     // Insertion order is the eviction order, which a Map already gives.
     for (const oldest of [...this.#sessions.keys()].slice(0, Math.max(0, this.#sessions.size - MAX_SESSIONS + 1))) {
-      await this.release(oldest)
+      await this.#closeSession(oldest)
+      check()
     }
-    const context = await browser.newContext()
-    const page = await context.newPage()
-    const session: Session = { context, page, cdp: await context.newCDPSession(page), console: [], snapshot: null }
-    page.on('console', (message) => {
-      session.console.push(`[${message.type()}] ${message.text()}`)
-      if (session.console.length > CONSOLE_CAP) session.console.splice(0, session.console.length - CONSOLE_CAP)
-    })
-    page.on('pageerror', (error) => session.console.push(`[error] ${error.message}`))
-    this.#sessions.set(taskId, session)
-    return session
+    let context: BrowserContext | null = null
+    try {
+      check()
+      context = await browser.newContext()
+      check()
+      const page = await context.newPage()
+      check()
+      const cdp = await context.newCDPSession(page)
+      check()
+      if (this.#browser !== browser || !browser.isConnected()) throw new Error('Browser disconnected during session creation.')
+      const session: Session = { context, page, cdp, console: new BrowserDiagnostics(), snapshot: null, closing: false }
+      page.on('console', (message) => session.console.append(message.type(), message.text()))
+      page.on('pageerror', (error) => session.console.append('error', error.message))
+      this.#sessions.set(taskId, session)
+      return session
+    } catch (error) {
+      if (context) {
+        try {
+          await context.close()
+        } catch {
+          if (browser.isConnected()) this.#pendingCleanup.set(context, browser)
+        }
+      }
+      throw error
+    }
   }
 
   async navigate(taskId: string, url: string): Promise<Outcome> {
@@ -165,22 +230,58 @@ export class BrowserPool {
 
   async console(taskId: string): Promise<{ lines: string[] }> {
     const session = this.#sessions.get(taskId)
-    return { lines: session ? [...session.console] : [] }
+    return { lines: session?.console.lines() ?? [] }
   }
 
   /// Drop one task's browsing. The context takes its cookies and storage with it.
   async release(taskId: string): Promise<void> {
+    const allocation = this.#allocations.get(taskId)
+    if (allocation) {
+      allocation.cancelled = true
+      this.#allocations.delete(taskId)
+    }
+    const session = this.#sessions.get(taskId)
+    if (session) session.closing = true
+    // Capture identity before queuing: a later request for the same task owns its own lifetime.
+    if (session) await this.#queue(async () => {
+      if (this.#sessions.get(taskId) === session) await this.#closeSession(taskId)
+    })
+    await allocation?.promise.catch(() => {})
+  }
+
+  async #closeSession(taskId: string): Promise<void> {
     const session = this.#sessions.get(taskId)
     if (!session) return
     this.#sessions.delete(taskId)
-    await session.context.close().catch(() => {})
+    const browser = this.#browser
+    try {
+      await session.context.close()
+    } catch (error) {
+      // A failed close on a live browser must not free capacity. Retry it before any replacement;
+      // never reuse a session that the owner has already released.
+      if (!this.#disposed && browser === this.#browser && browser?.isConnected()) {
+        session.closing = true
+        this.#sessions.set(taskId, session)
+        throw error
+      }
+    }
   }
 
   async dispose(): Promise<void> {
-    this.#sessions.clear()
-    const browser = this.#browser
-    this.#browser = null
-    await browser?.close().catch(() => {})
+    if (this.#disposing) return this.#disposing
+    this.#disposed = true
+    for (const allocation of this.#allocations.values()) allocation.cancelled = true
+    this.#disposing = (async () => {
+      const browser = this.#browser
+      this.#browser = null
+      await Promise.allSettled([...this.#sessions.keys()].map((taskId) => this.#closeSession(taskId)))
+      await browser?.close().catch(() => {})
+      // Includes a pending launch: a late browser closes itself before it can be published.
+      await this.#allocationQueue
+      await Promise.allSettled([...this.#pendingCleanup.keys()].map((context) => context.close()))
+      this.#pendingCleanup.clear()
+    })()
+    return this.#disposing
   }
 
   async #attempt(taskId: string, action: (session: Session) => Promise<void>): Promise<Outcome> {

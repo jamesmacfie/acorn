@@ -1,0 +1,59 @@
+{
+  "fixture": "Actual shared collectionIntents; synthetic stable list, disabled getter counts full enabled scans; near-tail next/page/type-ahead",
+  "cases": [
+    {
+      "count": 100,
+      "next": {
+        "disabledReads": 10100,
+        "cpuMs": 0.834,
+        "wallMs": 0.5930830000000071
+      },
+      "page": {
+        "disabledReads": 10200,
+        "cpuMs": 1.277,
+        "wallMs": 0.45787500000000136
+      },
+      "type": {
+        "disabledReads": 9100,
+        "cpuMs": 0.494,
+        "wallMs": 0.380874999999989
+      }
+    },
+    {
+      "count": 1000,
+      "next": {
+        "disabledReads": 1001000,
+        "cpuMs": 31.637,
+        "wallMs": 29.758834000000007
+      },
+      "page": {
+        "disabledReads": 1002000,
+        "cpuMs": 27.876,
+        "wallMs": 27.771833
+      },
+      "type": {
+        "disabledReads": 991000,
+        "cpuMs": 27.529,
+        "wallMs": 27.35733400000001
+      }
+    },
+    {
+      "count": 5000,
+      "next": {
+        "disabledReads": 25005000,
+        "cpuMs": 709.091,
+        "wallMs": 706.867458
+      },
+      "page": {
+        "disabledReads": 25010000,
+        "cpuMs": 599.443,
+        "wallMs": 594.4256670000001
+      },
+      "type": {
+        "disabledReads": 24955000,
+        "cpuMs": 462.065,
+        "wallMs": 452.160292
+      }
+    }
+  ]
+}

@@ -24,38 +24,40 @@ import {
 // HttpSendInput instead, whose executionTaskId comes from the panel context.
 export type RequestPayload = Omit<HttpRequest, 'id' | 'projectId' | 'createdAt' | 'updatedAt'>
 
-export type HttpClient = ReturnType<typeof httpClient>
+export function createHttpClient(captured: AcornBridge['api'] | (() => AcornBridge['api'])) {
+  const api = typeof captured === 'function' ? captured : () => captured
 
-export const httpClient = ({ api }: AcornBridge) => ({
-  listRequests: (projectId: string, taskId?: string): Promise<HttpRequest[]> =>
-    api.get(`${httpRequestsRoute(projectId)}${taskId ? `?taskId=${encodeURIComponent(taskId)}` : ''}`),
+  const listRequests = async (projectId: string, taskId?: string): Promise<HttpRequest[]> =>
+    api().get(`${httpRequestsRoute(projectId)}${taskId ? `?taskId=${encodeURIComponent(taskId)}` : ''}`)
 
-  createRequest: (projectId: string, body: RequestPayload): Promise<HttpRequest> =>
-    api.post(httpRequestsRoute(projectId), body),
+  const createRequest = async (projectId: string, body: RequestPayload): Promise<HttpRequest> =>
+    api().post(httpRequestsRoute(projectId), body)
 
-  updateRequest: (projectId: string, id: string, body: RequestPayload): Promise<HttpRequest> =>
-    api.put(httpRequestRoute(projectId, id), body),
+  const updateRequest = async (projectId: string, id: string, body: RequestPayload): Promise<HttpRequest> =>
+    api().put(httpRequestRoute(projectId, id), body)
 
-  deleteRequest: async (projectId: string, id: string): Promise<void> => {
-    await api.del(httpRequestRoute(projectId, id))
-  },
+  const deleteRequest = async (projectId: string, id: string): Promise<void> => {
+    await api().del(httpRequestRoute(projectId, id))
+  }
 
-  listVariables: (projectId: string): Promise<HttpVariable[]> =>
-    api.get(httpVariablesRoute(projectId)),
+  const listVariables = async (projectId: string): Promise<HttpVariable[]> =>
+    api().get(httpVariablesRoute(projectId))
 
-  createVariable: (projectId: string, body: Omit<HttpVariable, 'id' | 'updatedAt'>): Promise<HttpVariable> =>
-    api.post(httpVariablesRoute(projectId), body),
+  const createVariable = async (projectId: string, body: Omit<HttpVariable, 'id' | 'updatedAt'>): Promise<HttpVariable> =>
+    api().post(httpVariablesRoute(projectId), body)
 
-  updateVariable: (projectId: string, id: string, body: Omit<HttpVariable, 'id' | 'updatedAt'>): Promise<HttpVariable> =>
-    api.put(httpVariableRoute(projectId, id), body),
+  const updateVariable = async (projectId: string, id: string, body: Omit<HttpVariable, 'id' | 'updatedAt'>): Promise<HttpVariable> =>
+    api().put(httpVariableRoute(projectId, id), body)
 
-  deleteVariable: async (projectId: string, id: string): Promise<void> => {
-    await api.del(httpVariableRoute(projectId, id))
-  },
+  const deleteVariable = async (projectId: string, id: string): Promise<void> => {
+    await api().del(httpVariableRoute(projectId, id))
+  }
 
-  sendRequest: (projectId: string, body: HttpSendInput): Promise<SendResult> =>
-    api.post(httpSendRoute(projectId), body),
-})
+  const sendRequest = async (projectId: string, body: HttpSendInput): Promise<SendResult> =>
+    api().post(httpSendRoute(projectId), body)
+
+  return { listRequests, createRequest, updateRequest, deleteRequest, listVariables, createVariable, updateVariable, deleteVariable, sendRequest }
+}
 
 // The response body arrives base64'd so binary survives the JSON hop. Decode as UTF-8 for display;
 // callers that know it's binary use the byte array.
@@ -63,3 +65,5 @@ export function decodeBody(bodyBase64: string): { text: string; bytes: Uint8Arra
   const bytes = Uint8Array.from(atob(bodyBase64), (ch) => ch.charCodeAt(0))
   return { text: new TextDecoder().decode(bytes), bytes }
 }
+
+export type HttpClient = ReturnType<typeof createHttpClient>

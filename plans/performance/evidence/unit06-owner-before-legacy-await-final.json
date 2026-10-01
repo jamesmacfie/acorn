@@ -1,0 +1,121 @@
+{
+  "fixture": "Actual desktop RemoteTree, QueryClientProvider, SDK bytes, permission-scoped TUI worker factory, FrameBridge and frameServices. API only is an origin recorder; no native timing.",
+  "before": true,
+  "sdk": "legacy",
+  "listeningBarrier": true,
+  "solidIdentity": true,
+  "constructions": 2,
+  "cleanups": 2,
+  "equivalent": false,
+  "bothDocuments": false,
+  "heldOperation": false,
+  "warmCount": 0,
+  "heldId": 0,
+  "retiredApi": null,
+  "revokedDocument": null,
+  "secondNavigation": {
+    "ok": false,
+    "code": "plugin_scope_denied",
+    "message": "AcornBridgeError: openUrl works from a click or key handler: the frame must be focused"
+  },
+  "first": {
+    "worker": 0,
+    "phase": "mounted",
+    "label": "a",
+    "context": {
+      "surface": "audit.panel",
+      "target": "remote",
+      "nodeId": "node-a",
+      "taskId": "same-task",
+      "projectId": "same-project",
+      "theme": "light",
+      "style": "terminal",
+      "claimsKeys": []
+    },
+    "api": {
+      "ok": true,
+      "body": {
+        "nodeId": "node-a"
+      }
+    },
+    "state": {
+      "ok": true,
+      "body": "cache-a"
+    },
+    "document": {
+      "ok": true,
+      "body": "document-a"
+    }
+  },
+  "second": {
+    "worker": 0,
+    "phase": "mounted",
+    "label": "b",
+    "context": {
+      "surface": "audit.panel",
+      "target": "remote",
+      "nodeId": "node-a",
+      "taskId": "same-task",
+      "projectId": "same-project",
+      "theme": "light",
+      "style": "terminal",
+      "claimsKeys": []
+    },
+    "api": {
+      "ok": true,
+      "body": {
+        "nodeId": "node-a"
+      }
+    },
+    "state": {
+      "ok": true,
+      "body": "cache-a"
+    },
+    "document": {
+      "ok": true,
+      "body": "document-a"
+    }
+  },
+  "secondApi": {
+    "ok": true,
+    "body": {
+      "nodeId": "node-a"
+    }
+  },
+  "secondDocument": {
+    "ok": true,
+    "body": "document-a"
+  },
+  "writesAfterFirstRetired": {
+    "ok": true
+  },
+  "docs": {
+    "a": "foreign-write",
+    "b": "document-b"
+  },
+  "afterRetireWorkers": [
+    1
+  ],
+  "workers": 1,
+  "topLevelCalls": [
+    "node-a"
+  ],
+  "calls": [
+    {
+      "path": "/v1/p/audit/top-level",
+      "nodeId": "node-a"
+    },
+    {
+      "path": "/v1/p/audit/read",
+      "nodeId": "node-a"
+    },
+    {
+      "path": "/v1/p/audit/read",
+      "nodeId": "node-a"
+    },
+    {
+      "path": "/v1/p/audit/read-api",
+      "nodeId": "node-a"
+    }
+  ]
+}

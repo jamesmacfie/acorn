@@ -1,17 +1,23 @@
 name: Lint and test
 
-# The Linux suite and the unsigned desktop suite gate pull requests. The signed desktop bundle
-# remains in build-desktop.yml on main and tags.
+# The Linux suite gates every run. The unsigned macOS desktop suite runs on pull requests and main
+# pushes. Installers are built only for `v*` tags and manual dispatches, through build-desktop.yml,
+# and only after the Linux suite passes for the same commit.
 on:
   pull_request:
   push:
     branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
-# A second push to the same branch makes the first run's answer worthless.
+permissions:
+  contents: read
+
+# A second push to the same branch makes the first run's answer worthless. The event is in the group
+# so a main push does not cancel a manual installer build of main. Tag builds are never cancelled.
 concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: ${{ !startsWith(github.ref, 'refs/tags/') }}
 
 jobs:
   check:
@@ -20,15 +26,27 @@ jobs:
     # http test compares paths against (docs/testing.md § Known pre-existing failures).
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           # The major from node-runtime.json. node:sqlite sets the floor, so an older major does not
           # boot the service at all.
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+
+      # Turborepo's local cache, carried between runs: restored from the newest entry for this branch
+      # or main, saved under this commit. turbo.json decides what a hit may skip, so a task that reads
+      # files it does not declare must be fixed there, not here.
+      - name: Cache Turborepo task results
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: .turbo/cache
+          key: turbo-${{ runner.os }}-${{ github.sha }}
+          restore-keys: turbo-${{ runner.os }}-
 
       # oxlint, then `tsc --noEmit` in every package. Two halves in one script: an oxlint failure
       # means tsc never ran, so read which half went red before trusting the types.
@@ -38,36 +56,46 @@ jobs:
       # bounds Turborepo's concurrency, and without the bound the suites that spawn processes or mint
       # certificates time out under the load while passing in isolation (CLAUDE.md).
       #
-      # The desktop suite needs macOS and Rust, so the separate job below runs it on pull requests.
-      # build-desktop.yml runs it again before packaging on main and tags.
+      # The desktop suite needs macOS and Rust, so the separate jobs below run it.
       - run: pnpm test --filter='!@acorn/desktop'
         env:
-          # Exercise both sides of the TUI's 80-cell layout breakpoint on pull requests.
+          # Exercise both sides of the TUI's 80-cell layout breakpoint. turbo.json declares it as an
+          # input of the TUI suite, so the two widths do not share a cache entry.
           ACORN_TUI_WIDE: '1'
           # The runner has four cores, and each package's Vitest already starts a worker per core. Six
           # packages at once timed out tests that finish in under a second locally, and two still
           # broke the timing-sensitive diff layout tests in a four-core Linux container.
           ACORN_TEST_CONCURRENCY: '1'
 
+      # Turborepo never evicts, and the restored cache is saved again whole, so drop entries older
+      # than a week. A result still being hit is rebuilt once and cached again.
+      - name: Prune old Turborepo results
+        run: find .turbo/cache -type f -mtime +7 -delete 2>/dev/null || true
+
   desktop:
-    if: github.event_name == 'pull_request'
+    # A packaging run tests the desktop inside build-desktop.yml, against the bytes it bundles.
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && !startsWith(github.ref, 'refs/tags/'))
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@b906affcce14559ad1aafd4ab0e942779e9f58b1 # v4
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
         with:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
 
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
+      - uses: dtolnay/rust-toolchain@6bed0761d98439e5a578e2877258200ad565ba87 # stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         with:
           workspaces: apps/desktop/src-tauri
 
       - name: Cache the pinned Node runtime
-        uses: actions/cache@v4
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cache/acorn/node-runtime
           key: node-runtime-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('node-runtime.json') }}
@@ -76,3 +104,12 @@ jobs:
       # helper boot test), and runs the Rust unit tests. It does not sign or publish an artifact.
       - name: Test the desktop
         run: pnpm --filter @acorn/desktop test
+
+  # Installers wait for the Linux suite, so a red commit never spends the macOS and Windows minutes.
+  package:
+    needs: check
+    if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+    uses: ./.github/workflows/build-desktop.yml
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}

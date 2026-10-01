@@ -33,8 +33,9 @@ export function recordSurfaceFailure(pluginId: string, surface: string, error: u
 
 /** Called at the top of a registration pass, which replaces a plugin's whole contribution set: a surface
  * that registers cleanly this time must not keep reporting the last pass's failure. */
-export function clearSurfaceFailures(): void {
-  failures.clear()
+export function clearSurfaceFailures(pluginId?: string): void {
+  if (pluginId === undefined) failures.clear()
+  else for (const [key, failure] of failures) if (failure.pluginId === pluginId) failures.delete(key)
 }
 
 export const surfaceFailures = (): readonly SurfaceFailure[] => [...failures.values()]

@@ -73,7 +73,10 @@ for that Node and shows the code beside its pinned identity words. **Close pairi
 early. A standalone Node prints its code in its launching terminal and reopens the window on
 `SIGUSR1`.
 
-Pairing failures use one `401 pairing_failed` response with no distinguishing details. The bundled
+Ordinary pairing failures use one `401 pairing_failed` response with no distinguishing details.
+The route's 4 KiB body ceiling returns `413 payload_too_large`; its 20-per-minute Node ceiling returns
+`429 rate_limited`. Oversized bodies never consume the code window or issue a token. The
+[API reference](./api-reference.md#pairing) owns the byte and deadline contracts. The bundled
 local Node is a special case: the helper spawned it, so the service handshake can return a device token
 without a user-entered code. The token is still stored and authenticated as a normal device token.
 
@@ -97,9 +100,26 @@ these scopes:
 
 Task tokens are checked at task route mounts, stream upgrades, and task-owned operations. They cannot
 pair devices, administer devices or plugins, read the HTTP client's encrypted request material, or
-use the renderer-facing agent-tool projection. The session claim authorizes session-required tools
-such as managed-agent orchestration. The Node reads it from the verified token, never from
+use the renderer-facing agent-tool projection or managed-agent execution and human approval controls.
+Managed-agent HTTP execution controls also reject service credentials; trusted workflow and delegation
+execution uses guarded capabilities directly. Task credentials can read and cancel their task's
+managed sessions, but cannot read the direct node-wide Agents run source. The session claim authorizes
+session-required tools such as managed-agent orchestration. The Node reads it from the verified token, never from
 `x-acorn-session-id`.
+
+HTTP root workflow starts require a device principal for repository, user, and database definitions.
+Both task and service credentials are refused before body parsing. Task credentials retain their
+own workflow file listings, run reads, cancellation, and kill operations. Trusted schedules and
+child workflows start through admission capabilities that preserve their approved authority and
+workflow lineage.
+
+Plugin routes outside task-shaped mounts enforce their own resource scope. Database CLI, palette,
+and context routes compare supplied task IDs with the portable verified principal before core or
+database work. Memory list and search resolve the signed task's project before reading project memory;
+omitted project scope remains private-only. GitHub project import requires a device, including for
+service callers, because it administers core projects and checkout paths. For the route contracts, see
+[Database plugin](./database.md), [Notes and memory](./notes-and-memory.md), and
+[GitHub integration](./github-integration.md).
 
 A workflow or delegated managed session persists its effective tool ceiling, and the runtime includes
 that value when it mints the token. The agent-tool route enforces only the signed ceiling;

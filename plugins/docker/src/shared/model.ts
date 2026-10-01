@@ -92,9 +92,8 @@ export type DockerScope = 'containers' | 'images' | 'volumes' | 'networks'
 const REF_RE = /^[A-Za-z0-9][A-Za-z0-9_.:/-]{0,255}$/
 export const isDockerRef = (ref: string): boolean => REF_RE.test(ref)
 
-// Task↔container linkage (docs/workspaces-and-tasks.md): computed main-side by matching compose
-// working_dir labels (and slug fallbacks) against task worktrees. One entry per active task with
-// at least one matched container.
+// Device-only task summary: working_dir associations plus display-only hints when metadata is
+// absent. Task listings / cleanup use only working_dir association (docs/docker.md).
 export type DockerTaskSummary = {
   taskId: string
   running: number
@@ -103,7 +102,7 @@ export type DockerTaskSummary = {
 }
 
 // The `[docker]` matcher keys (server/dockerConfig.ts) as one project sees them: what its checkout's
-// `.acorn/config.toml` sets, what `~/.acorn/config.toml` sets, and what a task on it is matched with.
+// `.acorn/config.toml` sets, what `~/.acorn/config.toml` sets, and the effective device-summary hints.
 // A key is present in `repo` and `home` only when that file sets it.
 export type DockerMatcherKeys = { composeProject: string | null; matchLabels: string[]; matchName: boolean }
 export type DockerProjectMatcher = {

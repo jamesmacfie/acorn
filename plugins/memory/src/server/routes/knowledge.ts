@@ -1,10 +1,11 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { z } from 'zod'
-import { type AppEnv, requireDevice, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
+import { type AppEnv, BridgeError, requireDevice, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 
 // Memory's route surface. Notes owns its own routes.
 
 export type KnowledgeBridge = {
+  taskMemoryScope(taskId: string): Promise<{ projectId: string | null } | null>
   memoryList(projectId?: string): Promise<unknown>
   memorySearch(query: string, projectId?: string, type?: string): Promise<unknown>
   memoryAdd(taskId: string, p: { scope: 'project' | 'private'; name: string; description: string; type: string; body: string }): Promise<unknown>
@@ -19,12 +20,37 @@ export const setKnowledgeBridge = (bridge: KnowledgeBridge | null): void => setR
 const addBody = z.object({ scope: z.enum(['project', 'private']), name: z.string(), description: z.string(), type: z.string(), body: z.string() })
 const approveFindingBody = z.strictObject({ revision: z.number().int().min(1), payloadHash: z.string().min(1), idempotencyKey: z.string().min(1).max(300) })
 
+// A project query must stay inside the signed task's project. Omitted scope reads only the shared
+// private library, but still requires an existing task. Resolve before reconciliation or index reads.
+async function mayReadMemory(c: Context<AppEnv>, bridge: KnowledgeBridge, projectId: string | undefined): Promise<boolean> {
+  const principal = c.get('principal')
+  if (!principal) return false
+  if (principal.kind === 'device' || principal.scope === 'service') return true
+  if (!principal.taskId) return false
+  try {
+    const scope = await bridge.taskMemoryScope(principal.taskId)
+    return !!scope && (projectId === undefined || projectId === scope.projectId)
+  } catch {
+    // Missing state and failed scope resolution return the same denial without internal detail.
+  }
+  return false
+}
+
+async function readMemory(c: Context<AppEnv>, read: (bridge: KnowledgeBridge, projectId: string | undefined) => Promise<unknown>): Promise<Response> {
+  const projectId = c.req.query('projectId') ?? undefined
+  if (!c.get('principal')) return respondError(c, 401, 'unauthenticated')
+  return viaBridge(c, KNOWLEDGE, async (bridge) => {
+    if (!await mayReadMemory(c, bridge, projectId)) throw new BridgeError(404, 'not_found')
+    return read(bridge, projectId)
+  })
+}
+
 export const knowledge = new Hono<AppEnv>()
-  .get('/memory', (c) => viaBridge(c, KNOWLEDGE, (b) => b.memoryList(c.req.query('projectId') ?? undefined)))
+  .get('/memory', (c) => readMemory(c, (b, projectId) => b.memoryList(projectId)))
   .get('/memory/search', (c) => {
     const q = c.req.query('q')
     if (!q) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, KNOWLEDGE, (b) => b.memorySearch(q, c.req.query('projectId') ?? undefined, c.req.query('type') ?? undefined))
+    return readMemory(c, (b, projectId) => b.memorySearch(q, projectId, c.req.query('type') ?? undefined))
   })
   .post('/memory/findings/:id/approve', requireDevice, async (c) => {
     const parsed = approveFindingBody.safeParse(await c.req.json().catch(() => null))

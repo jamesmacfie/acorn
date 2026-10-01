@@ -31,11 +31,11 @@ const MAX_PAIR_RESPONSE_BYTES = 64 * 1024
 //     then broken.
 //
 // No token is sent and nothing is remembered, so an unverified request here grants nothing.
-export async function probeNode(endpoint: string): Promise<NodeProbeResult & { certPem: string }> {
+export async function probeNode(endpoint: string, options: { timeoutMs?: number } = {}): Promise<NodeProbeResult & { certPem: string }> {
   const url = new URL('/v1/node', endpoint)
   if (url.protocol !== 'https:') throw new Error('A node endpoint must be https — the pin is the identity.')
 
-  const { body, certPem, fingerprint } = await unverifiedGet(url)
+  const { body, certPem, fingerprint } = await unverifiedGet(url, Math.min(options.timeoutMs ?? PROBE_TIMEOUT_MS, PROBE_TIMEOUT_MS))
   const payload: unknown = JSON.parse(body)
   const parsedInfo = nodeInfoSchema.safeParse(payload)
   if (!parsedInfo.success) {
@@ -104,26 +104,41 @@ export async function pairWithNode(
 // A single GET with the certificate captured off the socket. Written out rather than routed through
 // nodeRequest because it needs the peer certificate, which only the raw request exposes, and because
 // `rejectUnauthorized: false` appears once in this codebase, here, next to the reason.
-function unverifiedGet(url: URL): Promise<{ body: string; certPem: string; fingerprint: string }> {
+function unverifiedGet(url: URL, timeoutMs: number): Promise<{ body: string; certPem: string; fingerprint: string }> {
   return new Promise((resolve, reject) => {
-    const req = httpsRequest(url, { method: 'GET', rejectUnauthorized: false, timeout: PROBE_TIMEOUT_MS }, (res) => {
+    let settled = false
+    const finish = (error: unknown, result?: { body: string; certPem: string; fingerprint: string }): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(deadline)
+      if (result) resolve(result)
+      else reject(error)
+    }
+    const req = httpsRequest(url, { method: 'GET', rejectUnauthorized: false }, (res) => {
+      if (settled) { res.destroy(); return }
       const socket = res.socket as import('node:tls').TLSSocket
       const cert = socket.getPeerCertificate()
       if (!cert?.raw) {
         res.destroy()
-        return reject(new Error('The node presented no certificate.'))
+        return finish(new Error('The node presented no certificate.'))
       }
       void readBoundedResponse(res, MAX_NODE_PROBE_BYTES).then((body) => {
-        if (res.statusCode !== 200) return reject(new Error(`${url.origin} answered ${res.statusCode} at /v1/node.`))
-        resolve({
+        if (res.statusCode !== 200) return finish(new Error(`${url.origin} answered ${res.statusCode} at /v1/node.`))
+        finish(null, {
           body: body.toString('utf8'),
           certPem: toPem(cert.raw),
           fingerprint: normalizeFingerprint(cert.fingerprint256),
         })
-      }, reject)
+      }, (error: unknown) => finish(error))
     })
-    req.on('timeout', () => req.destroy(new Error(`${url.origin} did not respond.`)))
-    req.on('error', reject)
+    // One deadline across connect, TLS, headers and body. Activity cannot extend it.
+    const deadline = setTimeout(() => {
+      const error = new Error(`${url.origin} did not respond within the probe deadline.`)
+      finish(error)
+      req.destroy(error)
+    }, timeoutMs)
+    deadline.unref()
+    req.on('error', (error) => finish(error))
     req.end()
   })
 }

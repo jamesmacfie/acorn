@@ -1,3 +1,4 @@
+import { Portal } from 'solid-js/web'
 import { createSignal, For, Show } from 'solid-js'
 import { collectConcerns, type Concern, DETAILS_MAX, type WillEventMap } from './willPhaseModel'
 import { Button, Checkbox } from '../../../kit/components/primitives'
@@ -116,6 +117,7 @@ export function WillConfirmationHost() {
     : [...document.querySelectorAll<HTMLElement>('[role="alertdialog"]')].at(-1)?.querySelector<HTMLElement>('.ui-modal-actions [data-variant="solid"]') ?? undefined
   // Each concern names its own subject, because the dialog does not add the feature's name to it.
   return (
+    <Portal>
     <Show when={prompt()} keyed>
       {(current) => (
         <Modal title={current.title} size="sm" role="alertdialog" autoFocus={() => action(current)} onDismiss={() => finish(false)}>
@@ -159,5 +161,6 @@ export function WillConfirmationHost() {
         </Modal>
       )}
     </Show>
+    </Portal>
   )
 }

@@ -14,6 +14,8 @@ import {
   pluginWebviews,
   previewViews,
   recoveryActions,
+  rendererLayer,
+  type RendererLayer,
   type DesktopExtras,
   type CliInstaller,
   type FileDialogs,
@@ -51,7 +53,7 @@ const GROUPS = {
   },
   transport: {
     resolve: nodeTransport,
-    members: members<NodeTransport>()(['fetch', 'abort', 'send', 'onFrame', 'onBytes', 'onStatus']),
+    members: members<NodeTransport>()(['fetch', 'abort', 'send', 'interest', 'onError', 'onFrame', 'onBytes', 'onStatus']),
   },
   fleet: {
     resolve: fleetBridge,
@@ -94,9 +96,10 @@ const GROUPS = {
     resolve: recoveryActions,
     members: members<RecoveryActions>()(['openDataFolder', 'quit']),
   },
+  rendererLayer: { resolve: rendererLayer, members: members<RendererLayer>()(['update']) },
   preview: {
     resolve: previewViews,
-    members: members<PreviewViews>()(['ensure', 'setBounds', 'show', 'hide', 'load', 'command', 'evict', 'onEvent']),
+    members: members<PreviewViews>()(['ensure', 'setBounds', 'show', 'hide', 'load', 'command', 'evict', 'evictAll', 'onEvent']),
   },
   webviews: {
     resolve: pluginWebviews,

@@ -19,3 +19,6 @@ check you run. For the short release pass, use [the smoke checklist](../testing.
 Some checks need connected providers or native dialogs. The dated results and unverified cases
 remain beside their scenarios. A worktree run can use `pnpm dev:agent` for isolated data and ports;
 packaged shell and native checks still need the release artifact on a graphical host.
+
+[Native overlay checks](./native-overlays.md) cover composition and input across the main renderer
+and native page webviews. Their A1–A16 identifiers preserve the feature's acceptance requirements.

@@ -1,3 +1,4 @@
+import type { VisibleElementRect } from './webviewGeometry'
 import type { ResponsivenessPulse } from '../telemetry/responsiveness'
 import type {
   NodeAdoptRequest,
@@ -7,9 +8,10 @@ import type {
   NodeProbeResult,
   NodeRecord,
   NodeStatus,
+  NodeTransportError,
 } from '@acorn/protocol/broker.ts'
 import type { NodePluginPermissions, PluginAgentToolGrant, PluginContextSectionGrant, PluginCustomAgentGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
-import type { WsClientFrame } from '@acorn/protocol/ws.ts'
+import type { WsClientFrame, WsSendOptions } from '@acorn/protocol/ws.ts'
 import type { DeviceConfig } from '@acorn/protocol/deviceConfig.ts'
 
 // The platform seam: the renderer's one door to whatever is hosting it. See
@@ -26,7 +28,9 @@ import type { DeviceConfig } from '@acorn/protocol/deviceConfig.ts'
 export type NodeTransport = {
   fetch(nodeId: string, request: NodeFetchRequest): Promise<NodeFetchResponse>
   abort(requestId: string): void
-  send(nodeId: string, frame: WsClientFrame): void
+  send(nodeId: string, frame: WsClientFrame, options?: WsSendOptions): void
+  interest(nodeId: string | null): void
+  onError(cb: (nodeId: string, error: NodeTransportError) => void): () => void
   onFrame(cb: (nodeId: string, frame: unknown) => void): () => void
   // The one binary channel: terminal output, as an id-tagged frame the host forwards without reading
   // (@acorn/protocol/ws.ts § The one binary frame). The host peels its own node id; what arrives here
@@ -150,16 +154,18 @@ export type Notify = {
 // that is not mounted behind the gate.
 export type RecoveryActions = { openDataFolder(): void; quit(): void }
 
-// Browser-preview surface: a host-owned WebContentsView per task, positioned over the pane's rect.
+// The shell retains one preview per local task. Node switches retire every preview. Ensure replays
+// browsing state after observer registration and reconciles configured home independently of it.
 export type PreviewState = { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
 export type PreviewViews = {
   ensure(taskId: string, url: string): Promise<boolean>
   setBounds(taskId: string, rect: { x: number; y: number; width: number; height: number }): void
   show(taskId: string): void
-  hide(): void
+  hide(taskId: string): void
   load(taskId: string, url: string): void
   command(taskId: string, action: 'back' | 'forward' | 'reload' | 'stop' | 'devtools'): void
   evict(taskId: string): void
+  evictAll(): void
   onEvent(cb: (state: PreviewState) => void): () => void
 }
 
@@ -240,6 +246,7 @@ export type PluginDeviceInstallResult = { hash: string; pluginId: string; versio
 // The preload object, shaped as the groups above rather than as a flat bag, so the adapters below are
 // projections instead of translations. Everything is optional: an older preload, or none at all.
 type AcornPreload = {
+  rendererLayer?: RendererLayer
   desktop?: boolean
   platform?: string
   onClosePane?: DesktopExtras['onClosePane']
@@ -251,6 +258,8 @@ type AcornPreload = {
   nodeFetch?: NodeTransport['fetch']
   nodeAbort?: NodeTransport['abort']
   nodeSend?: NodeTransport['send']
+  nodeInterest?: NodeTransport['interest']
+  onNodeTransportError?: NodeTransport['onError']
   onNodeFrame?: NodeTransport['onFrame']
   onNodeBytes?: NodeTransport['onBytes']
   onNodeStatus?: NodeTransport['onStatus']
@@ -311,7 +320,9 @@ export const nodeTransport = (): NodeTransport | null => {
   return {
     fetch: nodeFetch,
     abort: (requestId) => acorn.nodeAbort?.(requestId),
-    send: (nodeId, frame) => acorn.nodeSend?.(nodeId, frame),
+    send: (nodeId, frame, options) => acorn.nodeSend?.(nodeId, frame, options),
+    interest: (nodeId) => acorn.nodeInterest?.(nodeId),
+    onError: (cb) => acorn.onNodeTransportError?.(cb) ?? (() => {}),
     onFrame: (cb) => acorn.onNodeFrame?.(cb) ?? (() => {}),
     onBytes: (cb) => acorn.onNodeBytes?.(cb) ?? (() => {}),
     onStatus: (cb) => acorn.onNodeStatus?.(cb) ?? (() => {}),
@@ -475,3 +486,13 @@ export const setBadge = (count: number | null): void => acornGlobal()?.notify?.s
 // Whether this host can change fleet membership rather than only read it (`fleetBridge`). Settings →
 // Nodes hides itself rather than offering buttons that cannot work.
 export const canPairNodes = (): boolean => !!acornGlobal()?.nodeProbe
+
+// Transient native composition. The owning DOM remains the only renderer and action authority.
+export type OverlayPresentation = {
+  generation: number
+  viewport?: { width: number; height: number }
+  pages: Array<{ bounds: VisibleElementRect; blockers: number[] }>
+  surfaces: Array<{ id: number; role: 'tooltip' | 'popover' | 'menu' | 'modal' | 'toast' | 'drawer' | 'custom'; bounds: VisibleElementRect; radius: number[]; interactive: boolean; modal: boolean }>
+}
+export type RendererLayer = { update(presentation: OverlayPresentation): Promise<boolean> }
+export const rendererLayer = (): RendererLayer | null => acornGlobal()?.rendererLayer ?? null

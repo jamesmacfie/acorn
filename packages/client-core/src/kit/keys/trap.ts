@@ -7,6 +7,7 @@
 // (docs/command-palette-and-shortcuts.md § Focus and typing: focus returns to the
 // opener on dismiss).
 
+import { anchoredSurfacesWithin } from '../lib/controls/anchor'
 import { onCleanup } from 'solid-js'
 
 const FOCUSABLE = 'button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex]:not([tabindex="-1"])'
@@ -20,15 +21,21 @@ export const focusableIn = (root: HTMLElement): HTMLElement[] =>
 /** Cycle Tab within `root`. Does nothing for any other key. */
 export function trapTab(event: KeyboardEvent, root: HTMLElement): void {
   if (event.key !== 'Tab') return
-  const focusable = focusableIn(root)
-  if (!focusable.length) return
+  const roots = [root, ...anchoredSurfacesWithin(root)]
+  const focusable = roots.flatMap(focusableIn)
+  if (!focusable.length) {
+    event.preventDefault()
+    if (!root.hasAttribute('tabindex')) root.tabIndex = -1
+    root.focus()
+    return
+  }
   const first = focusable[0]
   const last = focusable[focusable.length - 1]
   const active = document.activeElement
-  if (event.shiftKey && active === first) {
+  if (event.shiftKey && (active === first || !roots.some((surface) => surface.contains(active)))) {
     event.preventDefault()
     last.focus()
-  } else if (!event.shiftKey && active === last) {
+  } else if (!event.shiftKey && (active === last || !roots.some((surface) => surface.contains(active)))) {
     event.preventDefault()
     first.focus()
   }

@@ -1,3 +1,4 @@
+import { Portal } from 'solid-js/web'
 import { createMemo, createSignal, createUniqueId, For, Show } from 'solid-js'
 import { nodes } from '../../infra/node/fleet'
 import Icon from '../../kit/components/content/Icon'
@@ -89,6 +90,7 @@ export default function PluginTrustDialog() {
   })
 
   return (
+    <Portal>
     <Show when={request()}>
       {(current) => (
         <div class="overlay-backdrop">
@@ -209,6 +211,7 @@ export default function PluginTrustDialog() {
         </div>
       )}
     </Show>
+    </Portal>
   )
 }
 

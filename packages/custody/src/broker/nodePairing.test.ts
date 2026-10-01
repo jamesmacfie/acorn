@@ -55,3 +55,23 @@ it('limits the pinned pairing response while its chunks arrive', async () => {
     baseline: ACORN_BASELINE,
   }, { code: 'unused', deviceName: 'test' })).rejects.toBeInstanceOf(NodeResponseTooLargeError)
 })
+
+it('ends an active drip at the absolute deadline and closes its TLS socket', async () => {
+  let closed!: () => void
+  const peerClosed = new Promise<void>((resolve) => { closed = resolve })
+  const endpoint = await start((_req, res) => {
+    res.writeHead(200)
+    res.write('{')
+    const drip = setInterval(() => res.write(' '), 10)
+    res.once('close', () => { clearInterval(drip); closed() })
+  })
+  const started = performance.now()
+  await expect(probeNode(endpoint, { timeoutMs: 80 })).rejects.toThrow('probe deadline')
+  expect(performance.now() - started).toBeLessThan(1000)
+  await peerClosed
+})
+
+it('retains certificate comparison on a successful bounded probe', async () => {
+  const endpoint = await start((_req, res) => res.end(JSON.stringify({ baseline: ACORN_BASELINE, protocolVersion: 1, fingerprint: cert.fingerprint })))
+  await expect(probeNode(endpoint)).resolves.toMatchObject({ endpoint, fingerprint: cert.fingerprint, compatible: true, certPem: cert.certPem })
+})
