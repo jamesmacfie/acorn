@@ -19,6 +19,7 @@ import { createDatabaseFetch } from './database'
 const principal = (userId: string, kind: Principal['kind'] = 'device'): Principal => ({ kind, userId })
 
 const fake = (over: Partial<DatabaseBridge> = {}): DatabaseBridge => ({
+  configured: async () => true,
   connect: async () => ({ ok: true, database: 'dev' }),
   disconnect: async () => ({ ok: true }),
   tables: async () => ({ tables: [] }),
@@ -180,6 +181,23 @@ describe('portable database task authorization', () => {
     }
     expect(coreRead).not.toHaveBeenCalled()
     expect(savedRead).not.toHaveBeenCalled()
+  })
+})
+
+describe('pane availability', () => {
+  it('answers which active tasks have a database source, and refuses a task-scoped caller', async () => {
+    const f = fixture()
+    try {
+      await seed(f)
+      const bridge = fake({ configured: async (taskId) => taskId === 'task1' })
+      const response = await f.call('/available', undefined, bridge)
+      expect(response.status).toBe(200)
+      expect(await response.json()).toEqual({ task1: true, other: false })
+      const agent: Principal = { kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1' }
+      expect((await f.call('/available', undefined, bridge, agent)).status).toBe(403)
+    } finally {
+      f.cleanup()
+    }
   })
 })
 

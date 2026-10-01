@@ -38,6 +38,8 @@ export type DataSchemaResult = {
 }
 
 export type DataSourceService = {
+  /** Whether the task has a database source at all (see hasTaskDataSource). Connects to nothing. */
+  configured(taskId: string): Promise<boolean>
   connect(taskId: string): Promise<{ database: string }>
   disconnect(taskId: string): Promise<void>
   query(taskId: string, sql: string, options?: DataQueryOptions): Promise<DataQueryResult>
@@ -132,15 +134,36 @@ async function readEnvUrl(envPath: string): Promise<string | null> {
   return null
 }
 
-/** Resolve a task's transient database URL without storing or returning it to a plugin. */
-export async function resolveTaskDataUrl(core: DataCore, taskId: string): Promise<string | null> {
+// Where a task's database URL could come from, read without running anything. `null` for no task.
+async function taskDataSources(core: DataCore, taskId: string) {
   const task = await core.tasks.load(taskId)
   if (!task) return null
   const root = await core.tasks.root(taskId)
   const project = task.projectId ? await core.projects.byId(task.projectId) : null
   const config = task.projectId ? await core.projects.config(task.projectId) : null
   const repo = loadRepoConfig(root ?? project?.path ?? null, homedir(), { dbUrlScript: config?.config.dbUrlScript })
-  const script = repo.dbUrlScript?.trim()
+  return { root, repo, script: repo.dbUrlScript?.trim() }
+}
+
+/**
+ * Does this task have any database source: a connection script, a worktree `.env` DATABASE_URL, or
+ * the node's own? It runs no script, so it cannot say whether the database is up, only whether there
+ * is one to try.
+ */
+export async function hasTaskDataSource(core: DataCore, taskId: string): Promise<boolean> {
+  const sources = await taskDataSources(core, taskId)
+  if (!sources) return false
+  const { root, script } = sources
+  if (script && root) return true
+  if (root && await readEnvUrl(join(root, '.env'))) return true
+  return !!process.env.DATABASE_URL?.trim()
+}
+
+/** Resolve a task's transient database URL without storing or returning it to a plugin. */
+export async function resolveTaskDataUrl(core: DataCore, taskId: string): Promise<string | null> {
+  const sources = await taskDataSources(core, taskId)
+  if (!sources) return null
+  const { root, repo, script } = sources
   if (script && root) {
     // Keep this outside the catch: refusing untrusted executable repo configuration must not quietly
     // fall through to another credential source.
@@ -255,6 +278,7 @@ export function createDataSourceService(core: DataCore): DataSourceService {
   }
 
   return {
+    configured: (taskId) => hasTaskDataSource(core, taskId),
     connect: async (taskId) => ({ database: (await connect(taskId, true)).database }),
     disconnect: async (taskId) => {
       catalogs.delete(taskId)
@@ -341,6 +365,7 @@ export function createDataSourceService(core: DataCore): DataSourceService {
 /** Apply the loaded-plugin permission boundary without exposing a second service implementation. */
 export function dataSourceFor(service: DataSourceService, canWrite: boolean): DataSourceService {
   return {
+    configured: (taskId) => service.configured(taskId),
     connect: (taskId) => service.connect(taskId),
     disconnect: (taskId) => service.disconnect(taskId),
     catalog: (taskId) => service.catalog(taskId),

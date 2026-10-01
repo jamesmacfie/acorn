@@ -11,7 +11,7 @@ import { createProjectService } from './projectRefs'
 import * as coreProc from './proc'
 import { createTaskService } from './tasks'
 import { RepoConfigTrustError } from '../repoConfigTrust'
-import { dataReadOnlyRefusal, resolveTaskDataUrl } from './data'
+import { dataReadOnlyRefusal, hasTaskDataSource, resolveTaskDataUrl } from './data'
 
 describe('dataReadOnlyRefusal', () => {
   it('accepts reads and refuses multiple-statement and CTE writes', () => {
@@ -62,6 +62,22 @@ describe('resolveTaskDataUrl: repo-authored url_script trust gate', () => {
     writeCommittedUrlScript()
     await expect(resolveTaskDataUrl(core, 'task1')).rejects.toBeInstanceOf(RepoConfigTrustError)
     expect(existsSync(marker)).toBe(false)
+  })
+
+  it('reports a source from the script or the worktree .env without running the script', async () => {
+    const nodeUrl = process.env.DATABASE_URL
+    delete process.env.DATABASE_URL
+    try {
+      await expect(hasTaskDataSource(core, 'task1')).resolves.toBe(false)
+      writeFileSync(join(repo, '.env'), 'DATABASE_URL=postgres://from-dotenv/db\n')
+      await expect(hasTaskDataSource(core, 'task1')).resolves.toBe(true)
+      rmSync(join(repo, '.env'))
+      writeCommittedUrlScript()
+      await expect(hasTaskDataSource(core, 'task1')).resolves.toBe(true)
+      expect(existsSync(marker)).toBe(false)
+    } finally {
+      if (nodeUrl !== undefined) process.env.DATABASE_URL = nodeUrl
+    }
   })
 
   it('fails closed rather than falling through to the .env fallback', async () => {

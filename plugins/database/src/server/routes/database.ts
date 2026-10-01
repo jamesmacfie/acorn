@@ -152,6 +152,14 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
         return respondError(c, 400, 'bad_request', [error instanceof Error ? error.message : 'Query refused.'])
       }
     })
+    // The manifest's `availability` route: the pane is hidden on a task with no database source.
+    // It lists every active task on the node, so a task-scoped caller may not read it.
+    .get('/available', async (c) => {
+      const { principal } = requestContext(c)
+      if (principal.kind !== 'device' && principal.scope !== 'service') return respondError(c, 403, 'forbidden')
+      const tasks = await core.tasks.active()
+      return c.json(Object.fromEntries(await Promise.all(tasks.map(async (t) => [t.id, await bridge.configured(t.id)] as const))))
+    })
     .post('/tasks/:taskId/connect', async (c) => c.json(await bridge.connect(id(c))))
     .post('/tasks/:taskId/disconnect', async (c) => c.json(await bridge.disconnect(id(c))))
     .get('/tasks/:taskId/tables', async (c) => c.json(await bridge.tables(id(c))))

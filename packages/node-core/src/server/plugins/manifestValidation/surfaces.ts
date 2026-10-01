@@ -50,6 +50,7 @@ export function validateFrames(refs: ManifestReferences): void {
         })
       }
     }
+    if (frame.availability) route(frame.availability, [...at, 'availability'])
     if (frame.target !== 'webview') {
       if (frame.url !== undefined || frame.urlSource !== undefined || frame.hosts !== undefined) {
         ctx.addIssue({ code: 'custom', path: at, message: 'url, urlSource and hosts are only valid on a webview surface' })

@@ -57,17 +57,6 @@ jobs:
         with:
           workspaces: apps/desktop/src-tauri
 
-      # The Node needs OpenSSL on first boot. Git for Windows includes it, but its usr/bin is
-      # outside the runner's PATH. End-user prerequisites are documented in docs/shell.md.
-      - name: Add OpenSSL to the Windows build PATH
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: |
-          $gitRoot = Split-Path (Split-Path (Get-Command git.exe).Source -Parent) -Parent
-          $opensslDirectory = Join-Path $gitRoot 'usr/bin'
-          if (!(Test-Path (Join-Path $opensslDirectory 'openssl.exe'))) { throw 'Git for Windows OpenSSL was not found.' }
-          $opensslDirectory >> $env:GITHUB_PATH
-
       # One download per pin per runner image, which is worth a cache entry of its own because the
       # rust-cache key has nothing to do with it.
       - name: Cache the pinned Node runtime

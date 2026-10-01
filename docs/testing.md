@@ -382,8 +382,9 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
 ## The desktop boot test
 
 `apps/desktop/test/boot.test.ts` is the shell's loadability check: it catches "the shell
-cannot load its world". It runs the staged helper under the bundled Node against a fresh data root,
-which spawns the real `service.js` over the service protocol, then asks the helper the first two
+cannot load its world". It runs the staged helper under the bundled Node against a fresh data root
+with host executables removed from PATH, so first-run certificate creation cannot depend on OpenSSL.
+The helper spawns the real `service.js` over the service protocol. The test asks it the first two
 questions the renderer asks: which nodes are there, and can a `/v1` request reach one. A 200 from
 `/v1/node` means the pinned TLS connection came up and the device token authenticated, so one
 assertion covers the custody stack end to end. Two more check the gate: a socket without the secret

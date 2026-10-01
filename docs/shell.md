@@ -888,17 +888,18 @@ The installed runtime lives beside `acorn-desktop.exe`; the helper, service, CLI
 under the installation directory. The helper's origin gate expects `http://app.localhost` on
 Windows, matching Wry's mapping of the app scheme.
 
-The Windows target needs Git and OpenSSL on PATH. Acorn invokes OpenSSL to generate the local Node's
-certificate on first boot. Git for Windows includes OpenSSL under its `usr/bin` directory; add that
-directory to PATH and restart Acorn. CI adds it before boot verification. Acorn bundles Node and its
-runtime packages, so the target does not need Node, pnpm, Rust, or a compiler installed. For the Node's
+The Windows target needs Git on PATH for repository operations. The bundled service generates the
+local Node's TLS certificate in-process on first boot and reuses its persisted identity on later
+boots. It does not require an OpenSSL executable. Acorn bundles Node and its runtime packages, so
+the target does not need Node, pnpm, Rust, or a compiler installed. For the Node's
 other host requirements and Windows file permission limits, see [Node distribution](./node-distribution.md).
 
 Windows distribution verification installs the generated setup executable into a temporary directory,
 compares the installed resources with staging, checks the installed Node version and digest, and runs
 the helper boot test against that installation. The test uses a fresh data root outside the checkout
-and verifies an authenticated broker request to the local Node. It also checks the WebSocket secret
-and origin gates. It uninstalls the temporary application after verification. Run Windows distribution
+with host executables removed from PATH and verifies an authenticated broker request to the local
+Node. It also checks the WebSocket secret and origin gates. It uninstalls the temporary application
+after verification. Run Windows distribution
 builds on a disposable build host: NSIS also writes application shortcuts and uninstall metadata.
 This check does not drive the WebView2 window or prove connectivity between different machines;
 those remain manual acceptance checks using the uploaded installer.

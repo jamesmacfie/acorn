@@ -260,6 +260,7 @@ acorn-plugin-types: member ConfineResult.reason
 acorn-plugin-types: member CoreContextService.assemble
 acorn-plugin-types: member CoreContextService.injectionEnabled
 acorn-plugin-types: member CoreDataService.catalog
+acorn-plugin-types: member CoreDataService.configured
 acorn-plugin-types: member CoreDataService.connect
 acorn-plugin-types: member CoreDataService.disconnect
 acorn-plugin-types: member CoreDataService.query
