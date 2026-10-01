@@ -15,7 +15,7 @@ import type {
 import { managedAgentApi } from './managedClient'
 import { mergeManagedSnapshot, newestManagedSession } from './managedSnapshot'
 import { mergeAgentUsage, openUsageLine } from '../../shared/usageFold'
-import { clearComposerDraft, clearComposerDrafts } from '../composer/composerState'
+import { clearComposerDraft } from '../composer/composerState'
 import { clearReadingPlaces } from './readingPlaceStore'
 
 // This plugin's client half has no `ctx.log`: a client context is contribution points and nothing
@@ -31,6 +31,19 @@ const [snapshots, setSnapshots] = createSignal<Record<string, AgentSessionSnapsh
 // only when that task's rows change, so rows for other tasks don't run at all. A slice is made on
 // first read and kept, because a reader may still hold it. There is one per task anyone asked about.
 const taskSlices = new Map<string, Signal<readonly AgentSession[]>>()
+let generation = 0
+
+/** Captures the authority of a read, including clears while staying on the same Node. */
+function captureRead(sessionId?: string) {
+  const nodeId = activeNodeId()
+  const started = generation
+  const current = () => started === generation && nodeId === activeNodeId()
+    && (!sessionId || !deletedSessionIds.has(sessionId))
+  return { nodeId, current, check() {
+    if (!current()) throw new Error('This managed agent read no longer owns the active store.')
+  } }
+}
+
 let subscribers = 0
 let disposeSocket: (() => void) | null = null
 const snapshotRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>()
@@ -204,7 +217,7 @@ function replaceDelegations(
   pageSessions: readonly AgentSession[],
   incoming: readonly AgentSessionDelegation[],
 ): void {
-  const sessionIds = new Set(pageSessions.map((session) => session.id))
+  const sessionIds = new Set(pageSessions.filter((session) => !deletedSessionIds.has(session.id)).map((session) => session.id))
   setDelegations((current) => {
     const next = Object.fromEntries(Object.entries(current).filter(([sessionId]) => !sessionIds.has(sessionId)))
     for (const delegation of incoming) {
@@ -270,11 +283,12 @@ const pageReach = (events: AgentEventRecord[]): number =>
 // the node folds a page's tool and usage updates onto the card each one opened, so the rows after that
 // record may already be inside an earlier one (`foldedThroughSeq`). `from` is where the snapshot read
 // started, which is where the walk starts when that read came back with no events.
-async function pageToEnd(sessionId: string, snapshot: AgentSessionSnapshot, from: number): Promise<AgentEventRecord[]> {
+async function pageToEnd(sessionId: string, snapshot: AgentSessionSnapshot, from: number, owner: ReturnType<typeof captureRead>): Promise<AgentEventRecord[]> {
   const events = [...snapshot.events]
   let cursor = Math.max(from, pageReach(events))
   while (cursor < snapshot.session.lastEventSeq) {
-    const page = await managedAgentApi.events(sessionId, cursor)
+    const page = await managedAgentApi.events(sessionId, cursor, 2_000, owner)
+    owner.check()
     if (!page.events.length) break
     events.push(...page.events)
     cursor = pageReach(page.events)
@@ -423,8 +437,10 @@ function scheduleSnapshotRefresh(sessionId: string): void {
 function refreshDelegationsForTask(taskId: string): Promise<void> {
   const held = delegationLoads.get(taskId)
   if (held) return held
-  const run = managedAgentApi.sessions({ taskId, archived: false })
+  const owner = captureRead()
+  const run = managedAgentApi.sessions({ taskId, archived: false }, owner)
     .then((page) => {
+      owner.check()
       upsertSessions(page.sessions)
       replaceDelegations(page.sessions, page.delegations)
     })
@@ -486,6 +502,7 @@ export const managedAgentStore = {
     provider: { id: string; profileId: string },
     customAgentId?: string,
   ): Promise<AgentSession> {
+    const owner = captureRead()
     const session = await managedAgentApi.createSession({
       taskId,
       providerId: provider.id,
@@ -493,7 +510,8 @@ export const managedAgentStore = {
       kind: 'interactive',
       ...(customAgentId ? { customAgentId } : {}),
       config: {},
-    })
+    }, undefined, owner)
+    owner.check()
     upsertSession(session)
     return session
   },
@@ -504,6 +522,7 @@ export const managedAgentStore = {
     requestedConfigOptions: Record<string, string>,
     idempotencyKey: string,
   ): Promise<AgentSession> {
+    const owner = captureRead()
     const session = await managedAgentApi.createSession({
       taskId,
       providerId: provider.id,
@@ -512,7 +531,8 @@ export const managedAgentStore = {
       origin,
       title: `Ask about ${origin.path}:${origin.line}`,
       config: { requestedConfigOptions },
-    }, idempotencyKey)
+    }, idempotencyKey, owner)
+    owner.check()
     upsertSession(session)
     return session
   },
@@ -543,11 +563,13 @@ export const managedAgentStore = {
     if (cached) return held.run
     // An async body rather than a `.then` chain on the call, so a caller that hands this store a
     // broken API gets a rejection like any other failure instead of a synchronous throw.
+    const owner = captureRead()
     const run: Promise<AgentSession[]> = (async () => {
-      const page = await managedAgentApi.sessions({ taskId, archived: false })
+      const page = await managedAgentApi.sessions({ taskId, archived: false }, owner)
+      owner.check()
       upsertSessions(page.sessions)
       replaceDelegations(page.sessions, page.delegations)
-      return page.sessions
+      return page.sessions.filter((session) => !deletedSessionIds.has(session.id))
     })().catch((error: unknown) => {
       // A failed read is never remembered: the next caller has to be able to try again.
       if (taskLoads.get(taskId)?.run === run) taskLoads.delete(taskId)
@@ -557,16 +579,20 @@ export const managedAgentStore = {
     return run
   },
   async loadAttention(): Promise<AgentSession[]> {
-    const page = await managedAgentApi.sessions({ attention: true, archived: false })
+    const owner = captureRead()
+    const page = await managedAgentApi.sessions({ attention: true, archived: false }, owner)
+    owner.check()
     upsertSessions(page.sessions)
     replaceDelegations(page.sessions, page.delegations)
-    return page.sessions
+    return page.sessions.filter((session) => !deletedSessionIds.has(session.id))
   },
   async loadAll(archived = false): Promise<AgentSession[]> {
-    const page = await managedAgentApi.sessions({ archived })
+    const owner = captureRead()
+    const page = await managedAgentApi.sessions({ archived }, owner)
+    owner.check()
     upsertSessions(page.sessions)
     replaceDelegations(page.sessions, page.delegations)
-    return page.sessions
+    return page.sessions.filter((session) => !deletedSessionIds.has(session.id))
   },
   /**
    * Read a session from the node and merge it into the store.
@@ -585,16 +611,19 @@ export const managedAgentStore = {
     const held = snapshots()[sessionId] ? completeThrough.get(sessionId) ?? 0 : 0
     agentTelemetry.observe('agents.snapshot.load', 1, '1', { cache: inflight ? 'inflight' : held ? 'resume' : 'miss' })
     if (inflight) return inflight
+    const owner = captureRead(sessionId)
     const run: Promise<AgentSessionSnapshot> = (async () => {
       const read = async (from: number) => {
-        const incoming = await managedAgentApi.snapshot(sessionId, from)
-        if (deletedSessionIds.has(sessionId)) throw new Error('This managed agent session was deleted.')
-        return { from, snapshot: { ...incoming, events: await pageToEnd(sessionId, incoming, from) } }
+        const incoming = await managedAgentApi.snapshot(sessionId, from, 2_000, owner)
+        owner.check()
+        return { from, snapshot: { ...incoming, events: await pageToEnd(sessionId, incoming, from, owner) } }
       }
       let fetched = await read(held)
+      owner.check()
       // A read that started part-way along is only half a snapshot. If the store dropped the rows
       // below it while the read was out (a node switch clears it), read the whole session instead.
       if (fetched.from && !snapshots()[sessionId]) fetched = await read(0)
+      owner.check()
       const full = fetched.snapshot
       // Complete through wherever the walk ended. The row's own `lastEventSeq` counts too: the walk
       // stops early on an empty page when rows were pruned below the counter, and those never come.
@@ -622,7 +651,7 @@ export const managedAgentStore = {
       // the entry now, and clearing it would leave a third caller refetching what is already in flight.
       if (snapshotLoads.get(sessionId) === run) snapshotLoads.delete(sessionId)
       // Here rather than at the merge, which is still inside this read and so cannot count it.
-      trimSnapshots()
+      if (owner.current()) trimSnapshots()
     })
     snapshotLoads.set(sessionId, run)
     return run
@@ -635,11 +664,13 @@ export const managedAgentStore = {
    * drop the transcript from under it. Holding reads nothing: `loadSnapshot` still does that.
    */
   hold(sessionId: string): () => void {
+    const started = generation
     holds.set(sessionId, (holds.get(sessionId) ?? 0) + 1)
     let released = false
     return () => {
       if (released) return
       released = true
+      if (started !== generation) return
       const count = (holds.get(sessionId) ?? 1) - 1
       if (count > 0) return void holds.set(sessionId, count)
       holds.delete(sessionId)
@@ -660,7 +691,10 @@ export const managedAgentStore = {
   // `deletedSessionIds` goes too: suppressing an upsert is a judgement about one node's ids, and
   // keeping it would silently swallow the new node's first events for any id that collided. The
   // attention gate clears itself on the same event (client-core deliver.ts).
+  captureRead,
   clear(): void {
+    generation++
+    holds.clear()
     setRoster(() => [])
     setDelegations({})
     setSnapshots({})
@@ -668,14 +702,13 @@ export const managedAgentStore = {
     seenEventIds.clear()
     usageLines.clear()
     completeThrough.clear()
-    recent.clear() // not `holds`: those belong to mounted surfaces, and each releases its own
+    recent.clear()
     eventSeqs.clear()
     taskLoads.clear() // another node's tasks, and the window would serve its answers for this one
     delegationLoads.clear()
     // An in-flight read of the old node's session. It resolves after this and merges into an empty
     // store, so the entry has to go with the rest or the next reader shares a stale request.
     snapshotLoads.clear()
-    clearComposerDrafts() // another node's sessions, so another node's attachment ids
     for (const timer of snapshotRefreshTimers.values()) clearTimeout(timer)
     snapshotRefreshTimers.clear()
   },
