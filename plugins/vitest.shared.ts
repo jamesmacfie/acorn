@@ -40,6 +40,10 @@ export default defineConfig({
     // found" from being an exit code when a plugin has neither kind, and the per-project flag is what
     // stops it when a plugin has one kind and not the other.
     passWithNoTests: true,
+    // Keeps each compiled module on disk between runs, in node_modules/.experimental-vitest-cache at
+    // the repo root, keyed on the file's path, its content and the config. Every package config sets
+    // it, because each package is its own Vitest process. See docs/testing.md.
+    experimental: { fsModuleCache: true },
     projects: [
       {
         test: { ...common, name: 'logic', environment: 'node', include: ['src/**/*.test.ts'] },

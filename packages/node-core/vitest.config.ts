@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
+    experimental: { fsModuleCache: true },
     environment: 'node',
     include: ['src/**/*.test.ts'],
     // Real git is invoked by worktree/status tests; a developer's ~/.gitconfig must not leak in.
