@@ -1,0 +1,41 @@
+{
+  "fixture": "actual WS channel -> managedStore; 8000 synthetic 1KiB append updates for one tool; no DOM, no real network; process.cpuUsage brackets dispatch+store, serialized logical bytes are not retained heap",
+  "samples": [
+    {
+      "updates": 2000,
+      "batchSynchronousWallMs": 31.74004199999945,
+      "processCPUms": 12.953,
+      "averagePerAppendWallMs": 0.015870020999999724,
+      "rawJsonBytes": 2512680,
+      "foldedRows": 1,
+      "foldedJsonBytes": 2048250
+    },
+    {
+      "updates": 4000,
+      "batchSynchronousWallMs": 92.52716700000019,
+      "processCPUms": 5.593,
+      "averagePerAppendWallMs": 0.046263583500000094,
+      "rawJsonBytes": 5028680,
+      "foldedRows": 1,
+      "foldedJsonBytes": 4096250
+    },
+    {
+      "updates": 6000,
+      "batchSynchronousWallMs": 29.85975000000144,
+      "processCPUms": 9.815,
+      "averagePerAppendWallMs": 0.01492987500000072,
+      "rawJsonBytes": 7544680,
+      "foldedRows": 1,
+      "foldedJsonBytes": 6144250
+    },
+    {
+      "updates": 8000,
+      "batchSynchronousWallMs": 6.260834000000614,
+      "processCPUms": 6.485,
+      "averagePerAppendWallMs": 0.003130417000000307,
+      "rawJsonBytes": 10060680,
+      "foldedRows": 1,
+      "foldedJsonBytes": 8192250
+    }
+  ]
+}

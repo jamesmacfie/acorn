@@ -1,0 +1,13 @@
+{
+  "commit": "22cf99cf76af1aac4e65584ccde138880e3709b8",
+  "sources": {
+    "packages/client-core/src/infra/node/apiClient.ts": "1c7982088069b9ad110e9b8ad456c87a36b25a4b1490c26ce89f1f6a99ee832b",
+    "plugins/agents/src/client/sessions/managedStore.ts": "bc5ee07b8aefa07d9bd12257f80e9bd4eab776d6fa3adec292221cef118513c7",
+    "plugins/agents/src/client/sessions/managedDrafts.ts": "cec4a537e5f875ab211a247b2015cae6b7200666e546184590a96441f5c9f5a4",
+    "plugins/agents/src/client/composer/composerState.ts": "dc8199c31a1448df9de0b36c63384964349d14c56f6b1dd0677772b1508e06f1",
+    "plugins/agents/src/client/composer/AgentComposer.tsx": "6a8a919f3f377dce59d7205f7ef4a0ecc0c7617e14e625db778796f509aa4b73",
+    "plugins/agents/src/client/sessions/managedClient.ts": "0ab975cdf43292a4ddf0829dc165988a03befe3cf720c20d26703b6528d15d5e",
+    "plugins/agents/src/client/sessions/AgentAttachmentCard.tsx": "32f050030082eec8a94dc9631141927a2cce4366d17ed1c907bbb8257c55c051",
+    "plugins/agents/src/client/sessions/AgentArtifactCard.tsx": "cd0f84ab037527ecaace607c45a5c9ebcb3a6d46552f18f6ada864edb5237c8d"
+  }
+}

@@ -1,0 +1,24 @@
+Default > repo · 2 tasks                                                       ●
+┌─Workspace────────────────────────────────────────────────────────────────────┐
+│ › Default                                                                    │
+│   Side project                                                               │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+j/k move · enter open · esc back · ctrl+k commands · ctrl+b rail · ctrl+p go …

@@ -48,7 +48,9 @@ export async function startSessionFromPalette(
   provider: { id: string; profileId: string },
   customAgentId?: string,
 ): Promise<void> {
+  const owner = managedAgentStore.captureRead()
   const session = await managedAgentStore.startSession(taskId, provider, customAgentId)
+  owner.check()
   openManagedSession(taskId, session.id)
   requestComposerFocus(session.id)
 }

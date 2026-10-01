@@ -1,16 +1,15 @@
-import { createEffect, createMemo, createSignal, For, on, Show, type JSX } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, on, onCleanup, Show, type JSX } from 'solid-js'
 import type { AgentAttachment, AgentConfigOption, AgentInputPart, AgentSession } from '../../contract/wire.ts'
 import { agentContextBudget, type AgentContextContribution, type AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import { AGENT_COMPOSER_ACTIONS_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { managedAgentApi } from '../sessions/managedClient'
-import { agentContextContributions, clearLocal, formatChord, pickFiles, readLocal, writeLocal } from '@acorn/plugin-api/client'
+import { activeNodeId, agentContextContributions, formatChord, pickFiles } from '@acorn/plugin-api/client'
 import {
   Alert, Button, Chip, ChipRow, CodeBlock, Field, Icon, IconButton, Inline, Kbd, MentionTextarea, Only, Picker,
   Popover, SectionHeader, Select, Stack, Text, Toolbar, type MentionSegment, type MentionSource,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { consumeComposerFocus } from '../sessions/managedSelection'
-import { hydrateManagedDraft, managedDraft, setManagedDraft } from '../sessions/managedDrafts'
 import { composerDraftState, hydrateComposerDraft } from './composerState'
 import { sameAgentConfigOptions } from '../settings/agentConfigOptions'
 import { agentComposerDisabledMessage } from './agentComposerState'
@@ -36,10 +35,6 @@ const ATTACHMENT_EXTENSIONS = [
   'py', 'rb', 'go', 'rs', 'java', 'c', 'h', 'cpp', 'hpp', 'swift', 'sh', 'sql', 'diff', 'patch',
   'jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf',
 ]
-
-const draftKey = (sessionId: string): string => `acorn.agent-draft.${sessionId}`
-const attachmentDraftKey = (sessionId: string): string => `acorn.agent-attachments.${sessionId}`
-const contextDraftKey = (sessionId: string): string => `acorn.agent-context.${sessionId}`
 
 type InsertChoice = {
   id: string
@@ -86,28 +81,25 @@ export default function AgentComposer(props: {
   // disabled for the duration: the editor overlay normally covers the composer, but a turn must not be
   // able to enqueue an id that is being replaced, and correctness here cannot depend on what is on
   // top — or on which pane the reader happens to be looking at.
-  const shared = createMemo(() => composerDraftState(props.session.id))
+  const shared = createMemo(() => composerDraftState(props.session.id, activeNodeId()))
+  const capture = () => {
+    const state = shared()
+    const session = props.session
+    return { state, session, nodeId: state.nodeId,
+      visible: () => state.valid() && shared() === state }
+  }
+  createEffect(() => onCleanup(shared().hold()))
   const attachments = () => shared().attachments()
-  const setAttachments = (next: AgentAttachment[] | ((current: AgentAttachment[]) => AgentAttachment[])) =>
-    shared().setAttachments(next)
   const contexts = () => shared().contexts()
   const setContexts = (next: AgentContextSnapshot[] | ((current: AgentContextSnapshot[]) => AgentContextSnapshot[])) =>
     shared().setContexts(next)
   const error = () => shared().error()
-  const setError = (next: string) => shared().setError(next)
   const sending = () => shared().sending()
-  const setSending = (next: boolean) => shared().setSending(next)
   const uploading = () => shared().uploading()
-  const setUploading = (next: boolean) => shared().setUploading(next)
   const replacing = () => shared().replacing()
-  const setReplacing = (next: string) => shared().setReplacing(next)
-  // These four stay this composer's own. `capturingContext` and `contextPickerId` are one modal's
-  // state and the modal is per mount; `expanded` is session-only, like the terminal drawer's own
-  // maximise, because a composer that stayed tall across a relaunch would hide the transcript of a
-  // session nobody had started typing into yet; and `dismissedAutomaticPayload` pairs with the
-  // automatic-context effect below, which only ever runs on an `interactive` session and so is never
-  // the one drawn twice — the run pane can only mount a `workflow` session.
-  const [capturingContext, setCapturingContext] = createSignal('')
+  // Picker visibility, height, and automatic-context dismissal belong to this surface. The guard
+  // over context capture belongs to the shared draft, so another surface cannot send midway through it.
+  const capturingContext = () => shared().capturing()
   const [contextPickerId, setContextPickerId] = createSignal('')
   const [dismissedAutomaticPayload, setDismissedAutomaticPayload] = createSignal<string>()
   const [expanded, setExpanded] = createSignal(false)
@@ -179,147 +171,114 @@ export default function AgentComposer(props: {
 
   // Two halves, because they have two owners. This composer's view state resets on every mount that
   // sees a new session; the session's own draft is read back once, however many composers asked, since
-  // the read fetches an attachment per stored id and may patch the session to clear a consumed fork
-  // context. Folded into one effect, the second mount would stop resetting its own view state.
-  createEffect(on(composerSessionId, (sessionId) => {
+  // the read fetches attachment metadata. A second mount still resets its own view state.
+  createEffect(on(shared, (state) => {
+    const owner = capture()
     setExpanded(false)
     setContextPickerId('')
     setDismissedAutomaticPayload(undefined)
-    hydrateComposerDraft(sessionId, () => {
-      hydrateManagedDraft(sessionId, readLocal(draftKey(sessionId)) ?? '')
-      setError('')
-      let ids: string[] = []
-      try {
-        const value = JSON.parse(readLocal(attachmentDraftKey(sessionId)) ?? '[]') as unknown
-        if (Array.isArray(value)) ids = value.filter((item): item is string => typeof item === 'string')
-      } catch {
-        ids = []
+    hydrateComposerDraft(state.sessionId, async () => {
+      const revision = state.revisions()[1]
+      const fork = owner.session.config.pendingForkContext
+      if (fork && typeof fork === 'object' && (fork as { type?: unknown }).type === 'context') {
+        state.preserveForkHydration()
+        if (!state.contexts().length) state.setContexts([fork as AgentContextSnapshot])
       }
-      try {
-        const stored = JSON.parse(readLocal(contextDraftKey(sessionId)) ?? '[]') as unknown
-        const restored = Array.isArray(stored)
-          ? stored.filter((item): item is AgentContextSnapshot =>
-              typeof item === 'object' && item != null && (item as { type?: unknown }).type === 'context')
-          : []
-        const forkContext = props.session.config.pendingForkContext
-        setContexts(restored.length
-          ? restored
-          : forkContext && typeof forkContext === 'object'
-            && (forkContext as { type?: unknown }).type === 'context'
-            ? [forkContext as AgentContextSnapshot]
-            : [])
-      } catch {
-        setContexts([])
-        if (props.session.config.pendingForkContext) {
-          const { pendingForkContext: _sent, ...config } = props.session.config
-          void managedAgentApi.patch(props.session.id, { config })
-            .then(props.onSessionUpdated)
-            .catch(() => undefined)
-        }
+      if (state.attachmentIds().length === state.attachments().length
+        && state.attachmentIds().every((id, index) => state.attachments()[index]?.id === id)) return
+      const items = await Promise.all(state.attachmentIds().map((id) =>
+        managedAgentApi.attachment(id, owner)))
+      if (state.valid() && state.revisions()[1] === revision) {
+        state.setAttachments(items.filter((item): item is AgentAttachment => item != null))
       }
-      return Promise.all(ids.map((id) => managedAgentApi.attachment(id).catch(() => null)))
-        .then((items) => setAttachments(items.filter((item): item is AgentAttachment => item != null)))
-    })
+    }, state)
   }))
 
-  let automaticCaptureVersion = 0
-  createEffect(on(automaticContextKey, () => {
-    const sessionId = props.session.id
-    if (props.session.kind !== 'interactive') return
-    void refreshAutomaticContext().catch((caught) => {
-      if (props.session.id !== sessionId) return
-      setError(caught instanceof Error ? caught.message : 'Unable to attach task context.')
+  createEffect(on(() => [shared(), automaticContextKey()], () => {
+    const owner = capture()
+    if (owner.session.kind !== 'interactive') return
+    void refreshAutomaticContext(owner).catch((caught) => {
+      owner.state.setError(caught instanceof Error ? caught.message : 'Unable to attach task context.')
     })
   }))
-  const draft = () => managedDraft(props.session.id)
+  const draft = () => shared().text()
   const setDraft = (value: string | ((current: string) => string)) => {
-    const next = typeof value === 'function' ? value(draft()) : value
-    setManagedDraft(props.session.id, next)
+    shared().setText(typeof value === 'function' ? value(draft()) : value)
   }
-  createEffect(() => writeLocal(draftKey(props.session.id), draft()))
-  createEffect(() => writeLocal(
-    attachmentDraftKey(props.session.id),
-    JSON.stringify(attachments().map((attachment) => attachment.id)),
-  ))
-  createEffect(() => {
-    try {
-      writeLocal(contextDraftKey(props.session.id), JSON.stringify(contexts()))
-    } catch {
-      // A captured context can exceed localStorage. The immutable copy still persists with the turn;
-      // this only means the unsent draft cannot survive a reload.
-    }
-  })
 
   const effectivePolicy = (): Record<string, unknown> =>
     Object.fromEntries(configOptions().flatMap((option) =>
       option.currentValue == null ? [] : [[option.id === 'reasoning' ? 'effort' : option.id, option.currentValue]]))
 
-  async function refreshAutomaticContext(): Promise<AgentContextSnapshot[]> {
-    if (props.session.kind !== 'interactive') return contexts()
-    // A manually selected task-context snapshot is authoritative for this draft. Do not add a
-    // second automatic copy on send or when the Context pane revision changes underneath it.
-    if (contexts().some((context) => context.source === 'context.task')) return contexts()
-    const contribution = agentContextContributions()
-      .find((item) => item.id === TASK_CONTEXT_CONTRIBUTION_ID)
-    if (!contribution) return contexts()
-    const sessionId = props.session.id
-    const captureVersion = ++automaticCaptureVersion
-    const captured = (await contribution.capture({ taskId: props.session.taskId }))[0]
-    if (!captured || props.session.id !== sessionId || captureVersion !== automaticCaptureVersion) return contexts()
-    const automatic = automaticTaskContextFor(captured, props.previousAutomaticContext)
-    const next = contexts().filter((context) => context.source !== AUTOMATIC_TASK_CONTEXT_SOURCE)
-    if (automatic && automaticTaskContextPayload(automatic) !== dismissedAutomaticPayload()) next.push(automatic)
-    setContexts(next)
-    return next
+  async function refreshAutomaticContext(owner = capture()): Promise<AgentContextSnapshot[]> {
+    const { state, session } = owner
+    const key = automaticContextKey()
+    if (state.automaticCapture?.key === key) return state.automaticCapture.run
+    const run = (async () => {
+      const before = state.contexts()
+      if (state.capturing()) return before
+      if (session.kind !== 'interactive' || before.some((context) => context.source === 'context.task')) return before
+      const contribution = agentContextContributions().find((item) => item.id === TASK_CONTEXT_CONTRIBUTION_ID)
+      if (!contribution) return before
+      const revision = state.revisions()[2]
+      const captureVersion = state.captureRevision()
+      const previous = props.previousAutomaticContext
+      const dismissed = dismissedAutomaticPayload()
+      const captured = (await contribution.capture({ taskId: session.taskId }))[0]
+      if (!captured || activeNodeId() !== owner.nodeId || !state.captureCurrent(captureVersion)
+        || state.revisions()[2] !== revision) return before
+      const automatic = automaticTaskContextFor(captured, previous)
+      const next = before.filter((context) => context.source !== AUTOMATIC_TASK_CONTEXT_SOURCE)
+      if (automatic && automaticTaskContextPayload(automatic) !== dismissed) next.push(automatic)
+      state.setContexts(next)
+      return next
+    })().finally(() => { if (state.automaticCapture?.run === run) state.automaticCapture = undefined })
+    state.automaticCapture = { key, run }
+    return run
   }
 
   const nothingToSend = () => !draft().trim() && !attachments().length && !contexts().length
 
   async function send() {
-    const text = draft().trim()
-    // Exactly `/mcp`. `/mcp:server:prompt` is how Claude Code runs a server's prompt, and it goes on to
-    // the agent like any other command.
+    const owner = capture()
+    const { state, session } = owner
+    const text = state.text().trim()
     if (props.onMcp && /^\/mcp$/.test(text)) {
       props.onMcp()
-      setDraft('')
-      clearLocal(draftKey(props.session.id))
+      state.setText('')
       return
     }
-    // `replacing()` for the reason its declaration gives: a turn must not enqueue an attachment id that
-    // is halfway through being swapped for another.
-    if (nothingToSend() || sending() || replacing() || props.disabled || props.submitDisabled) return
-    setSending(true)
-    setError('')
+    if (nothingToSend() || !shared().hydrated() || sending() || uploading() || capturingContext() || replacing() || props.disabled || props.submitDisabled) return
+    const revisions = [...state.revisions()]
+    const submittedAttachments = state.attachments()
+    const paths = files.paths()
+    const policy = effectivePolicy()
+    state.setSending(true)
+    state.setError('')
     try {
-      const turnContexts = await refreshAutomaticContext()
+      const turnContexts = await refreshAutomaticContext(owner)
+      if (!state.valid()) return
+      // Context refreshed by this send is acknowledged only if no concurrent edit replaced it.
+      if (state.contexts() === turnContexts) revisions[2] = state.revisions()[2]
       if (agentContextBudget(turnContexts).overLimit) {
-        setError('Remove some context before sending; Acorn snapshots are limited to 512 KiB per turn.')
+        state.setError('Remove some context before sending; Acorn snapshots are limited to 512 KiB per turn.')
         return
       }
       const input: AgentInputPart[] = [
         ...(text ? [{ type: 'text' as const, text }] : []),
-        ...parseFileMentions(text, files.paths()),
-        ...attachments().map((attachment): AgentInputPart => attachment.mediaType.startsWith('image/')
+        ...parseFileMentions(text, paths),
+        ...submittedAttachments.map((attachment): AgentInputPart => attachment.mediaType.startsWith('image/')
           ? { type: 'image', attachmentId: attachment.id, alt: attachment.filename }
           : { type: 'attachment', attachmentId: attachment.id }),
         ...turnContexts,
       ]
-      await managedAgentApi.enqueue(props.session.id, {
-        input,
-        source: 'interactive',
-        effectivePolicy: effectivePolicy(),
-      })
-      setDraft('')
-      setAttachments([])
-      setContexts([])
-      clearLocal(draftKey(props.session.id))
-      clearLocal(attachmentDraftKey(props.session.id))
-      clearLocal(contextDraftKey(props.session.id))
-      props.onSent()
+      await managedAgentApi.enqueue(session.id, { input, source: 'interactive', effectivePolicy: policy }, undefined, owner)
+      state.acknowledge(revisions, submittedAttachments, turnContexts)
+      if (owner.visible()) props.onSent()
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to queue this turn.')
+      state.setError(caught instanceof Error ? caught.message : 'Unable to queue this turn.')
     } finally {
-      setSending(false)
+      state.setSending(false)
     }
   }
 
@@ -328,23 +287,26 @@ export default function AgentComposer(props: {
   // threw away typed text on it would lose work nothing can get back.
   async function stop() {
     if (!canStopAgent(props.session)) return
-    setError('')
+    const owner = capture()
+    owner.state.setError('')
     try {
-      await managedAgentApi.cancel(props.session.id)
+      await managedAgentApi.cancel(owner.session.id)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to stop this agent.')
+      owner.state.setError(caught instanceof Error ? caught.message : 'Unable to stop this agent.')
     }
   }
 
   async function updateOption(option: AgentConfigOption, value: string) {
+    const owner = capture()
     const nextOptions = configOptions().map((item) =>
       item.id === option.id ? { ...item, currentValue: value } : item)
     try {
-      props.onSessionUpdated(await managedAgentApi.patch(props.session.id, {
-        config: { ...props.session.config, configOptions: nextOptions },
-      }))
+      const updated = await managedAgentApi.patch(owner.session.id, {
+        config: { ...owner.session.config, configOptions: nextOptions },
+      }, owner)
+      if (owner.visible()) props.onSessionUpdated(updated)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to update agent configuration.')
+      owner.state.setError(caught instanceof Error ? caught.message : 'Unable to update agent configuration.')
     }
   }
 
@@ -356,37 +318,49 @@ export default function AgentComposer(props: {
   // the drop and paste path already hands `addFiles` through the kit's `onFiles`, and the upload
   // reads its bytes back out, so the two paths meet here rather than one layer down.
   async function attach() {
-    const picked = await pickFiles({ accept: ATTACHMENT_EXTENSIONS })
-    await addFiles(picked.map((file) => new File([file.bytes as BlobPart], file.name, { type: file.type })))
+    const owner = capture()
+    if (owner.state.uploading()) return
+    owner.state.setUploading(true)
+    try {
+      const picked = await pickFiles({ accept: ATTACHMENT_EXTENSIONS })
+      await addFiles(picked.map((file) => new File([file.bytes as BlobPart], file.name, { type: file.type })), owner, true)
+    } catch (caught) {
+      owner.state.setError(caught instanceof Error ? caught.message : 'Unable to upload attachment.')
+    } finally { owner.state.setUploading(false) }
   }
 
-  async function addFiles(files: File[]) {
-    if (!files.length || uploading()) return
-    if (attachments().length + files.length > 8) {
-      setError('A turn can include at most eight attachments.')
-      return
-    }
-    const aggregate = attachments().reduce((total, item) => total + item.byteSize, 0)
-      + files.reduce((total, file) => total + file.size, 0)
-    if (aggregate > 25 * 1024 * 1024) {
-      setError('Turn attachments are limited to 25 MiB in total.')
-      return
-    }
-    setUploading(true)
-    setError('')
+  async function addFiles(files: File[], owner = capture(), picking = false) {
+    const { state, session } = owner
+    if (!state.valid() || !files.length || (!picking && state.uploading())) return
+    state.setUploading(true)
+    state.setError('')
     try {
-      const uploaded = await Promise.all(files.map((file) => managedAgentApi.uploadAttachment(props.session.taskId, file)))
-      setAttachments((current) => [...current, ...uploaded.filter((item) => !current.some((existing) => existing.id === item.id))])
+      await state.hydration
+      if (!state.hydrated() || !state.valid()) return
+      if (state.attachments().length + files.length > 8) {
+        state.setError('A turn can include at most eight attachments.')
+        return
+      }
+      const aggregate = state.attachments().reduce((total, item) => total + item.byteSize, 0)
+        + files.reduce((total, file) => total + file.size, 0)
+      if (aggregate > 25 * 1024 * 1024) {
+        state.setError('Turn attachments are limited to 25 MiB in total.')
+        return
+      }
+      // Preserve each successful upload even when a sibling file fails.
+      const uploaded = await Promise.allSettled(files.map((file) => managedAgentApi.uploadAttachment(session.taskId, file, owner)))
+      state.setAttachments((current) => [...current, ...uploaded.flatMap(result =>
+        result.status === 'fulfilled' && !current.some(item => item.id === result.value.id) ? [result.value] : [])])
+      if (uploaded.some(result => result.status === 'rejected')) state.setError('Unable to upload attachment.')
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to upload attachment.')
-    } finally {
-      setUploading(false)
-    }
+      state.setError(caught instanceof Error ? caught.message : 'Unable to upload attachment.')
+    } finally { state.setUploading(false) }
   }
 
   function removeAttachment(attachment: AgentAttachment) {
-    setAttachments((current) => current.filter((item) => item.id !== attachment.id))
-    void managedAgentApi.removeAttachment(attachment.id).catch(() => undefined)
+    const owner = capture()
+    owner.state.setAttachments((current) => current.filter((item) => item.id !== attachment.id))
+    void managedAgentApi.removeAttachment(attachment.id, owner).catch(() => undefined)
   }
 
   /**
@@ -415,18 +389,21 @@ export default function AgentComposer(props: {
     if (!attachments().some((item) => item.id === expected.id)) {
       throw new Error('That attachment is no longer in this draft.')
     }
-    setReplacing(expected.id)
+    const owner = capture()
+    const { state, session } = owner
+    state.setReplacing(expected.id)
     try {
-      const replacement = await managedAgentApi.attachment(replacementAttachmentId)
+      const replacement = await managedAgentApi.attachment(replacementAttachmentId, owner)
+      if (!state.valid()) return
       // The draft is re-read here rather than captured before the await: fetching the metadata gave the
       // reader time to remove something. Every rule about whether the swap is allowed lives in the pure
       // decision (./replaceAttachment.ts), where the cases that would lose an attachment are testable.
       const decision = decideReplacement({
-        current: attachments(),
+        current: state.attachments(),
         expectedId: expected.id,
         claimedExpectedId: expectedAttachmentId,
         replacement,
-        taskId: props.session.taskId,
+        taskId: session.taskId,
       })
       if (decision.kind === 'noop') return
       if (decision.kind === 'refuse') {
@@ -434,19 +411,17 @@ export default function AgentComposer(props: {
         // the sweep would get it eventually; asking now keeps a rejected edit from leaving content
         // behind. The decision never refuses when the candidate IS the source, so this cannot delete
         // the reader's own attachment.
-        void managedAgentApi.removeAttachment(replacement.id).catch(() => undefined)
+        void managedAgentApi.removeAttachment(replacement.id, owner).catch(() => undefined)
         throw new Error(decision.reason)
       }
-      setAttachments(decision.next)
-      // Written by hand rather than left to the effect above, which runs after this function returns.
-      // The point of the ordering is that the durable draft names the replacement before the source is
-      // deleted, and an effect one tick later is not that.
-      writeLocal(attachmentDraftKey(props.session.id), JSON.stringify(decision.next.map((item) => item.id)))
+      // The shared owner writes the replacement before source cleanup. A failed durable write keeps
+      // both blobs, so the stored draft still resolves after a reload.
+      if (!state.setAttachments(decision.next)) return
       // Best effort, deliberately. The swap is already durable; a failure here leaves an unreferenced
       // row that the store's own 24-hour sweep collects.
-      void managedAgentApi.removeAttachment(expected.id).catch(() => undefined)
+      void managedAgentApi.removeAttachment(expected.id, owner).catch(() => undefined)
     } finally {
-      setReplacing('')
+      state.setReplacing('')
     }
   }
 
@@ -471,21 +446,21 @@ export default function AgentComposer(props: {
 
   async function captureContext(contributionId: string, optionIds: readonly string[]) {
     const contribution = agentContextContributions().find((item) => item.id === contributionId)
-    if (!contribution || capturingContext()) return
-    setCapturingContext(contributionId)
-    setError('')
+    const owner = capture()
+    const { state, session } = owner
+    if (!contribution || state.capturing()) return
+    const revision = state.revisions()[2]
+    const operation = state.captureRevision()
+    state.setCapturing(contributionId)
+    state.setError('')
     try {
-      const captured = await contribution.capture({ taskId: props.session.taskId }, optionIds)
-      setContexts((current) => [
-        ...current.filter((item) => !contextBelongsTo(item, contribution)),
-        ...captured,
-      ])
-      setContextPickerId('')
+      const captured = await contribution.capture({ taskId: session.taskId }, optionIds)
+      if (!state.captureCurrent(operation) || activeNodeId() !== owner.nodeId || state.revisions()[2] !== revision) return
+      state.setContexts((current) => [...current.filter((item) => !contextBelongsTo(item, contribution)), ...captured])
+      if (owner.visible()) setContextPickerId('')
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'Unable to capture Acorn context.')
-    } finally {
-      setCapturingContext('')
-    }
+      state.setError(caught instanceof Error ? caught.message : 'Unable to capture Acorn context.')
+    } finally { state.setCapturing('') }
   }
 
   // Read when the field first takes focus, so the list is there by the time somebody types `@`. A
@@ -768,7 +743,7 @@ export default function AgentComposer(props: {
           size="sm"
           busy={sending()}
           title={props.submitDisabled ? 'Wait for the agent to finish connecting.' : undefined}
-          disabled={nothingToSend() || !!replacing() || contextBudget().overLimit || props.disabled || props.submitDisabled}
+          disabled={nothingToSend() || !shared().hydrated() || uploading() || !!capturingContext() || !!replacing() || contextBudget().overLimit || props.disabled || props.submitDisabled}
           onPress={() => void send()}
         >
           Send

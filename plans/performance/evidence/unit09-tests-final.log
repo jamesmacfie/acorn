@@ -1,0 +1,1348 @@
+$ node scripts/rebuild-node-abi.mjs && VITEST_MAX_WORKERS=${VITEST_MAX_WORKERS:-3} turbo run test --continue --concurrency=${ACORN_TEST_CONCURRENCY:-6} --env-mode=loose
+• turbo 2.9.18
+
+   • Packages in scope: @acorn/arch-tests, @acorn/cli, @acorn/client-core, @acorn/custody, @acorn/dashboards-core, @acorn/desktop, @acorn/diff-document, @acorn/node, @acorn/node-core, @acorn/plugin-agent-cost, @acorn/plugin-agents, @acorn/plugin-api, @acorn/plugin-browser, @acorn/plugin-changes, @acorn/plugin-context, @acorn/plugin-database, @acorn/plugin-docker, @acorn/plugin-editor, @acorn/plugin-findings, @acorn/plugin-github, @acorn/plugin-http, @acorn/plugin-linear, @acorn/plugin-memory, @acorn/plugin-model-providers, @acorn/plugin-nodes-file, @acorn/plugin-notes, @acorn/plugin-onboarding, @acorn/plugin-preview, @acorn/plugin-rollbar, @acorn/plugin-sentry-telemetry, @acorn/plugin-terminal, @acorn/plugin-workflows, @acorn/protocol, @acorn/tui, acorn-plugin-sdk, acorn-plugin-types, create-acorn-plugin
+   • Running test in 37 packages
+   • Remote caching disabled, using shared worktree cache
+
+@acorn/arch-tests:test: cache bypass, force executing 57f66e5dde1c8588
+@acorn/node-core:test: cache miss, executing a3e2d6a5cfedf3ad
+@acorn/client-core:test: cache miss, executing c633be389ba954f3
+@acorn/protocol:test: cache hit, replaying logs 34fe64ddcf397447
+@acorn/dashboards-core:test: cache hit, replaying logs 494a13082df2c641
+@acorn/protocol:test: $ vitest run
+@acorn/protocol:test:
+@acorn/protocol:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-test-audit/packages/protocol
+@acorn/protocol:test:
+@acorn/protocol:test:
+@acorn/protocol:test:  Test Files  35 passed (35)
+@acorn/protocol:test:       Tests  275 passed (275)
+@acorn/protocol:test:    Start at  22:39:53
+@acorn/protocol:test:    Duration  3.98s (transform 3.00s, setup 0ms, import 5.37s, tests 426ms, environment 2ms)
+@acorn/protocol:test:
+@acorn/dashboards-core:test: $ vitest run
+@acorn/dashboards-core:test:
+@acorn/dashboards-core:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-test-audit/packages/dashboards-core
+@acorn/dashboards-core:test:
+@acorn/dashboards-core:test:
+@acorn/dashboards-core:test:  Test Files  10 passed (10)
+@acorn/dashboards-core:test:       Tests  206 passed (206)
+@acorn/dashboards-core:test:    Start at  22:39:56
+@acorn/dashboards-core:test:    Duration  1.36s (transform 1.24s, setup 0ms, import 1.81s, tests 227ms, environment 1ms)
+@acorn/dashboards-core:test:
+@acorn/diff-document:test: cache hit, replaying logs 7573201b5b992d29
+@acorn/diff-document:test: $ vitest run
+@acorn/diff-document:test:
+@acorn/diff-document:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-test-audit/packages/diff-document
+@acorn/diff-document:test:
+@acorn/diff-document:test:
+@acorn/diff-document:test:  Test Files  2 passed (2)
+@acorn/diff-document:test:       Tests  18 passed (18)
+@acorn/diff-document:test:    Start at  22:39:53
+@acorn/diff-document:test:    Duration  1.50s (transform 291ms, setup 0ms, import 446ms, tests 992ms, environment 0ms)
+@acorn/diff-document:test:
+create-acorn-plugin:test: cache miss, executing ba28651ce844aedd
+@acorn/custody:test: cache miss, executing 3c28fb35edeca2d3
+acorn-plugin-types:test: cache miss, executing b0fda7c3ef110060
+@acorn/arch-tests:test: $ vitest run
+acorn-plugin-types:test: $ vitest run
+@acorn/node-core:test: $ vitest run
+@acorn/client-core:test: $ vitest run
+@acorn/custody:test: $ vitest run
+create-acorn-plugin:test: $ vitest run
+@acorn/custody:test:
+@acorn/custody:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/packages/custody
+@acorn/custody:test:
+acorn-plugin-types:test:
+acorn-plugin-types:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/packages/plugin-types
+acorn-plugin-types:test:
+@acorn/node-core:test:
+@acorn/node-core:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/packages/node-core
+@acorn/node-core:test:
+@acorn/arch-tests:test:
+@acorn/arch-tests:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/tools/arch
+@acorn/arch-tests:test:
+create-acorn-plugin:test:
+create-acorn-plugin:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/packages/create-acorn-plugin
+create-acorn-plugin:test:
+@acorn/client-core:test:
+@acorn/client-core:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/packages/client-core
+@acorn/client-core:test:
+acorn-plugin-types:test:
+acorn-plugin-types:test:  Test Files  3 passed (3)
+acorn-plugin-types:test:       Tests  5 passed (5)
+acorn-plugin-types:test:    Start at  10:43:07
+acorn-plugin-types:test:    Duration  1.76s (transform 1.10s, setup 0ms, import 2.58s, tests 70ms, environment 0ms)
+acorn-plugin-types:test:
+@acorn/plugin-api:test: cache miss, executing ad6c50295bab8691
+@acorn/custody:test: ...+......+++++++++++++++++++++++++++++++++++++++*.+.....+...............+...+...+....+............+.........+.....+......+.+.....+.......+...+..+...+.............+.........+++++++++++++++++++++++++++++++++++++++*.+.+.....+...+.+...+..+.+............++++++
+@acorn/custody:test: .........+...+..+....+..+...+++++++++++++++++++++++++++++++++++++++*.......+......+++++++++++++++++++++++++++++++++++++++*.+........+......+..........+.....+...+.+..+........................+.........+.+......+..+...+.......+........+...+..........+..+...+....+......+..+....+.....+...+...+............+.+......+...+..+.+..+............+...............+...+......+.......+...............+.....+....+........+.............+...+..............+.......+.........+.....+....+..+.+.....+.......+...+.....+...+....+.................+......+...+....+...+........+....+..+.+..+.......+.....+...+......+.........+............+.........+....+.....+...+....+.....+....+..+....+...+.....+.......+.........+...........+...............+.+........+....+...........+..........+...........+......+...............+..........+...+.....+................+.....+.+........+.+...+........+...+.........+.......+...+..+...++++++
+@acorn/custody:test: -----
+@acorn/plugin-api:test: $ vitest run
+@acorn/plugin-api:test:
+@acorn/plugin-api:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/packages/plugin-api
+@acorn/plugin-api:test:
+@acorn/plugin-api:test: (node:18968) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-api:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/node-core:test: (node:18873) ExperimentalWarning: The flag --allow-net is under experimental phase.
+@acorn/node-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/node-core:test: (node:18873) ExperimentalWarning: The flag --allow-net is under experimental phase.
+@acorn/node-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-api:test: (node:18970) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-api:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/arch-tests:test:
+@acorn/arch-tests:test:  Test Files  8 passed (8)
+@acorn/arch-tests:test:       Tests  74 passed (74)
+@acorn/arch-tests:test:    Start at  10:43:07
+@acorn/arch-tests:test:    Duration  6.08s (transform 858ms, setup 0ms, import 2.74s, tests 6.53s, environment 1ms)
+@acorn/arch-tests:test:
+@acorn/cli:test: cache bypass, force executing 5dd0af593015d45e
+@acorn/cli:test: $ vitest run
+@acorn/cli:test:
+@acorn/cli:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/cli
+@acorn/cli:test:
+@acorn/plugin-api:test:
+@acorn/plugin-api:test:  Test Files  3 passed (3)
+@acorn/plugin-api:test:       Tests  14 passed (14)
+@acorn/plugin-api:test:    Start at  10:43:10
+@acorn/plugin-api:test:    Duration  5.36s (transform 6.12s, setup 0ms, import 3.42s, tests 5.08s, environment 0ms)
+@acorn/plugin-api:test:
+@acorn/plugin-editor:test: cache miss, executing 0c71c99442351ca0
+@acorn/custody:test: tar: Could not pack extended attributes: Operation not supported
+@acorn/plugin-editor:test: $ vitest run
+@acorn/plugin-editor:test:
+@acorn/plugin-editor:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/editor
+@acorn/plugin-editor:test:
+@acorn/custody:test:
+@acorn/custody:test:  Test Files  15 passed (15)
+@acorn/custody:test:       Tests  167 passed (167)
+@acorn/custody:test:    Start at  10:43:07
+@acorn/custody:test:    Duration  10.70s (transform 3.25s, setup 0ms, import 7.34s, tests 19.57s, environment 1ms)
+@acorn/custody:test:
+@acorn/plugin-sentry-telemetry:test: cache miss, executing e857335971ffe55d
+@acorn/plugin-sentry-telemetry:test: $ vitest run
+@acorn/plugin-sentry-telemetry:test:
+@acorn/plugin-sentry-telemetry:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/sentry-telemetry
+@acorn/plugin-sentry-telemetry:test:
+create-acorn-plugin:test:
+create-acorn-plugin:test:  Test Files  2 passed (2)
+create-acorn-plugin:test:       Tests  18 passed (18)
+create-acorn-plugin:test:    Start at  10:43:07
+create-acorn-plugin:test:    Duration  16.67s (transform 1.34s, setup 0ms, import 1.99s, tests 15.23s, environment 0ms)
+create-acorn-plugin:test:
+@acorn/plugin-notes:test: cache miss, executing 32d591f9ed8fa015
+@acorn/plugin-notes:test: $ vitest run
+@acorn/plugin-notes:test:
+@acorn/plugin-notes:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/notes
+@acorn/plugin-notes:test:
+@acorn/plugin-sentry-telemetry:test:
+@acorn/plugin-sentry-telemetry:test:  Test Files  10 passed (10)
+@acorn/plugin-sentry-telemetry:test:       Tests  112 passed (112)
+@acorn/plugin-sentry-telemetry:test:    Start at  10:43:19
+@acorn/plugin-sentry-telemetry:test:    Duration  6.43s (transform 9.59s, setup 24ms, import 14.75s, tests 342ms, environment 842ms)
+@acorn/plugin-sentry-telemetry:test:
+@acorn/plugin-context:test: cache miss, executing 7b77f5d20bb2e848
+@acorn/plugin-context:test: $ vitest run
+@acorn/plugin-editor:test: (node:28706) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-editor:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-context:test:
+@acorn/plugin-context:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/context
+@acorn/plugin-context:test:
+@acorn/plugin-editor:test: (node:28745) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-editor:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-editor:test: (node:28753) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-editor:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-context:test: (node:28749) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-context:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-context:test: (node:28750) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-context:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-context:test: (node:28751) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-context:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-editor:test: (node:29041) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-editor:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-editor:test:
+@acorn/plugin-editor:test:  Test Files  12 passed (12)
+@acorn/plugin-editor:test:       Tests  58 passed (58)
+@acorn/plugin-editor:test:    Start at  10:43:16
+@acorn/plugin-editor:test:    Duration  15.77s (transform 24.80s, setup 98ms, import 33.22s, tests 5.23s, environment 1.72s)
+@acorn/plugin-editor:test:
+@acorn/plugin-onboarding:test: cache miss, executing 86c1f7a63b7a461b
+@acorn/plugin-notes:test: (node:29398) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-notes:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-notes:test: (node:29674) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-notes:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-onboarding:test: $ vitest run
+@acorn/plugin-context:test:
+@acorn/plugin-context:test:  Test Files  4 passed (4)
+@acorn/plugin-context:test:       Tests  14 passed (14)
+@acorn/plugin-context:test:    Start at  10:43:29
+@acorn/plugin-context:test:    Duration  3.74s (transform 7.41s, setup 0ms, import 9.46s, tests 32ms, environment 0ms)
+@acorn/plugin-context:test:
+@acorn/plugin-model-providers:test: cache miss, executing e0488933d8c3ea27
+@acorn/plugin-model-providers:test: $ vitest run
+@acorn/plugin-onboarding:test:
+@acorn/plugin-onboarding:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/onboarding
+@acorn/plugin-onboarding:test:
+@acorn/cli:test:
+@acorn/cli:test:  Test Files  8 passed (8)
+@acorn/cli:test:       Tests  41 passed (41)
+@acorn/cli:test:    Start at  10:43:14
+@acorn/cli:test:    Duration  20.47s (transform 6.88s, setup 0ms, import 9.43s, tests 16.23s, environment 0ms)
+@acorn/cli:test:
+@acorn/plugin-browser:test: cache miss, executing d982e77eecf3e888
+@acorn/plugin-model-providers:test:
+@acorn/plugin-model-providers:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/model-providers
+@acorn/plugin-model-providers:test:
+@acorn/plugin-browser:test: $ vitest run
+@acorn/plugin-onboarding:test: (node:30575) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-onboarding:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-notes:test: (node:30582) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-notes:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-browser:test:
+@acorn/plugin-browser:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/browser
+@acorn/plugin-browser:test:
+@acorn/plugin-notes:test: (node:30676) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-notes:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-notes:test:
+@acorn/plugin-notes:test:  Test Files  9 passed (9)
+@acorn/plugin-notes:test:       Tests  42 passed (42)
+@acorn/plugin-notes:test:    Start at  10:43:25
+@acorn/plugin-notes:test:    Duration  13.77s (transform 24.92s, setup 79ms, import 31.21s, tests 325ms, environment 1.69s)
+@acorn/plugin-notes:test:
+@acorn/plugin-linear:test: cache miss, executing 69fed1362196d982
+@acorn/plugin-model-providers:test:
+@acorn/plugin-model-providers:test:  Test Files  1 passed (1)
+@acorn/plugin-model-providers:test:       Tests  14 passed (14)
+@acorn/plugin-model-providers:test:    Start at  10:43:35
+@acorn/plugin-model-providers:test:    Duration  4.93s (transform 3.22s, setup 0ms, import 4.48s, tests 161ms, environment 0ms)
+@acorn/plugin-model-providers:test:
+@acorn/plugin-rollbar:test: cache miss, executing 4f3dfb39c92af427
+@acorn/plugin-linear:test: $ vitest run
+@acorn/plugin-rollbar:test: $ vitest run
+@acorn/plugin-linear:test:
+@acorn/plugin-linear:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/linear
+@acorn/plugin-linear:test:
+@acorn/plugin-rollbar:test:
+@acorn/plugin-rollbar:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/rollbar
+@acorn/plugin-rollbar:test:
+@acorn/plugin-browser:test:
+@acorn/plugin-browser:test:  Test Files  5 passed | 1 skipped (6)
+@acorn/plugin-browser:test:       Tests  31 passed | 1 skipped (32)
+@acorn/plugin-browser:test:    Start at  10:43:36
+@acorn/plugin-browser:test:    Duration  5.00s (transform 5.95s, setup 0ms, import 9.20s, tests 288ms, environment 0ms)
+@acorn/plugin-browser:test:
+@acorn/plugin-nodes-file:test: cache miss, executing 9543a7870dc8f69c
+@acorn/plugin-nodes-file:test: $ vitest run
+@acorn/plugin-nodes-file:test:
+@acorn/plugin-nodes-file:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/nodes-file
+@acorn/plugin-nodes-file:test:
+@acorn/plugin-nodes-file:test:
+@acorn/plugin-nodes-file:test:  Test Files  1 passed (1)
+@acorn/plugin-nodes-file:test:       Tests  5 passed (5)
+@acorn/plugin-nodes-file:test:    Start at  10:43:45
+@acorn/plugin-nodes-file:test:    Duration  460ms (transform 111ms, setup 0ms, import 201ms, tests 11ms, environment 0ms)
+@acorn/plugin-nodes-file:test:
+acorn-plugin-sdk:test: cache miss, executing 74cdc72fb51f2f13
+@acorn/plugin-onboarding:test:
+@acorn/plugin-onboarding:test:  Test Files  4 passed (4)
+@acorn/plugin-onboarding:test:       Tests  16 passed (16)
+@acorn/plugin-onboarding:test:    Start at  10:43:34
+@acorn/plugin-onboarding:test:    Duration  12.79s (transform 22.87s, setup 82ms, import 29.45s, tests 67ms, environment 1.62s)
+@acorn/plugin-onboarding:test:
+acorn-plugin-sdk:test: $ vitest run
+@acorn/plugin-terminal:test: cache miss, executing b7c65f7a8c6da668
+@acorn/plugin-terminal:test: $ vitest run
+acorn-plugin-sdk:test:
+acorn-plugin-sdk:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/packages/plugin-sdk
+acorn-plugin-sdk:test:
+acorn-plugin-sdk:test:
+acorn-plugin-sdk:test:  Test Files  1 passed (1)
+acorn-plugin-sdk:test:       Tests  2 passed (2)
+acorn-plugin-sdk:test:    Start at  10:43:47
+acorn-plugin-sdk:test:    Duration  482ms (transform 129ms, setup 0ms, import 179ms, tests 2ms, environment 0ms)
+acorn-plugin-sdk:test:
+@acorn/plugin-agent-cost:test: cache miss, executing b9724a597571abfd
+@acorn/plugin-linear:test:
+@acorn/plugin-linear:test:  Test Files  8 passed (8)
+@acorn/plugin-linear:test:       Tests  52 passed (52)
+@acorn/plugin-linear:test:    Start at  10:43:41
+@acorn/plugin-linear:test:    Duration  7.14s (transform 15.18s, setup 0ms, import 19.00s, tests 105ms, environment 0ms)
+@acorn/plugin-linear:test:
+@acorn/plugin-terminal:test:
+@acorn/plugin-terminal:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/terminal
+@acorn/plugin-terminal:test:
+@acorn/plugin-preview:test: cache miss, executing 395bac4f5c39c715
+@acorn/plugin-agent-cost:test: $ vitest run
+@acorn/plugin-preview:test: $ vitest run
+@acorn/plugin-agent-cost:test:
+@acorn/plugin-agent-cost:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/agent-cost
+@acorn/plugin-agent-cost:test:
+@acorn/plugin-preview:test:
+@acorn/plugin-preview:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/preview
+@acorn/plugin-preview:test:
+@acorn/plugin-agent-cost:test: (node:31541) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-agent-cost:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-rollbar:test:
+@acorn/plugin-rollbar:test:  Test Files  10 passed (10)
+@acorn/plugin-rollbar:test:       Tests  60 passed (60)
+@acorn/plugin-rollbar:test:    Start at  10:43:41
+@acorn/plugin-rollbar:test:    Duration  9.64s (transform 11.66s, setup 119ms, import 21.31s, tests 156ms, environment 3.66s)
+@acorn/plugin-rollbar:test:
+@acorn/plugin-docker:test: cache miss, executing 2ea9c41ba62da0f5
+@acorn/plugin-docker:test: $ vitest run
+@acorn/plugin-agent-cost:test:
+@acorn/plugin-agent-cost:test:  Test Files  3 passed (3)
+@acorn/plugin-agent-cost:test:       Tests  8 passed (8)
+@acorn/plugin-agent-cost:test:    Start at  10:43:49
+@acorn/plugin-agent-cost:test:    Duration  2.10s (transform 1.54s, setup 0ms, import 1.99s, tests 14ms, environment 0ms)
+@acorn/plugin-agent-cost:test:
+@acorn/plugin-agents:test: cache miss, executing e1f0a4ad1ff857ff
+@acorn/plugin-agents:test: $ vitest run
+@acorn/plugin-docker:test:
+@acorn/plugin-docker:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/docker
+@acorn/plugin-docker:test:
+@acorn/plugin-docker:test: (node:31704) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-docker:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-agents:test:
+@acorn/plugin-agents:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/agents
+@acorn/plugin-agents:test:
+@acorn/plugin-preview:test:
+@acorn/plugin-preview:test:  Test Files  5 passed (5)
+@acorn/plugin-preview:test:       Tests  18 passed (18)
+@acorn/plugin-preview:test:    Start at  10:43:50
+@acorn/plugin-preview:test:    Duration  10.04s (transform 9.02s, setup 140ms, import 9.65s, tests 1.12s, environment 1.44s)
+@acorn/plugin-preview:test:
+@acorn/plugin-github:test: cache miss, executing 363e5cd236ca7e9a
+@acorn/plugin-github:test: $ vitest run
+@acorn/plugin-github:test:
+@acorn/plugin-github:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/github
+@acorn/plugin-github:test:
+@acorn/plugin-docker:test: (node:32098) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-docker:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-docker:test: (node:32136) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-docker:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-docker:test:
+@acorn/plugin-docker:test:  Test Files  13 passed (13)
+@acorn/plugin-docker:test:       Tests  89 passed (89)
+@acorn/plugin-docker:test:    Start at  10:43:52
+@acorn/plugin-docker:test:    Duration  13.84s (transform 26.04s, setup 46ms, import 26.54s, tests 6.83s, environment 1.57s)
+@acorn/plugin-docker:test:
+@acorn/plugin-changes:test: cache miss, executing 40311b969296d4b8
+@acorn/plugin-changes:test: $ vitest run
+@acorn/plugin-terminal:test: (node:32183) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-terminal:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-changes:test:
+@acorn/plugin-changes:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/changes
+@acorn/plugin-changes:test:
+@acorn/plugin-terminal:test: (node:32275) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-terminal:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-terminal:test: (node:32851) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-terminal:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-terminal:test: (node:32946) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-terminal:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-terminal:test: (node:32963) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-terminal:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-terminal:test:
+@acorn/plugin-terminal:test:  Test Files  28 passed (28)
+@acorn/plugin-terminal:test:       Tests  189 passed (189)
+@acorn/plugin-terminal:test:    Start at  10:43:48
+@acorn/plugin-terminal:test:    Duration  27.69s (transform 33.05s, setup 360ms, import 53.54s, tests 4.66s, environment 7.60s)
+@acorn/plugin-terminal:test:
+@acorn/plugin-workflows:test: cache miss, executing 79255370eed1869d
+@acorn/plugin-workflows:test: $ vitest run
+@acorn/plugin-workflows:test:
+@acorn/plugin-workflows:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/workflows
+@acorn/plugin-workflows:test:
+@acorn/node-core:test:
+@acorn/node-core:test:  Test Files  139 passed (139)
+@acorn/node-core:test:       Tests  1415 passed (1415)
+@acorn/node-core:test:    Start at  10:43:07
+@acorn/node-core:test:    Duration  73.12s (transform 7.17s, setup 0ms, import 104.72s, tests 68.45s, environment 12ms)
+@acorn/node-core:test:
+@acorn/plugin-database:test: cache miss, executing 2fd044387781804d
+@acorn/plugin-database:test: $ vitest run
+@acorn/plugin-database:test:
+@acorn/plugin-database:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/database
+@acorn/plugin-database:test:
+@acorn/plugin-github:test: (node:34440) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-github:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-github:test: (node:36206) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-github:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-agents:test: (node:38140) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-agents:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-changes:test: (node:38168) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-changes:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-github:test: (node:38371) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-github:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:38465) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-github:test: (node:39374) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-github:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-github:test: (node:39547) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-github:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-database:test:
+@acorn/plugin-database:test:  Test Files  9 passed (9)
+@acorn/plugin-database:test:       Tests  90 passed (90)
+@acorn/plugin-database:test:    Start at  10:44:22
+@acorn/plugin-database:test:    Duration  7.35s (transform 9.14s, setup 65ms, import 12.12s, tests 1.18s, environment 2.15s)
+@acorn/plugin-database:test:
+@acorn/plugin-http:test: cache miss, executing 6ef0b700dce46b48
+@acorn/plugin-github:test: (node:40468) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-github:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-http:test: $ vitest run
+@acorn/plugin-github:test: (node:40902) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-github:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-http:test:
+@acorn/plugin-http:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/http
+@acorn/plugin-http:test:
+@acorn/plugin-github:test:
+@acorn/plugin-github:test:  Test Files  38 passed (38)
+@acorn/plugin-github:test:       Tests  211 passed (211)
+@acorn/plugin-github:test:    Start at  10:44:02
+@acorn/plugin-github:test:    Duration  31.70s (transform 32.16s, setup 154ms, import 71.88s, tests 3.91s, environment 4.73s)
+@acorn/plugin-github:test:
+@acorn/client-core:test: (node:43696) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-findings:test: cache miss, executing 5c7d2b503e2e0c27
+@acorn/client-core:test: (node:44256) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-findings:test: $ vitest run
+@acorn/client-core:test: (node:44761) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:45009) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:45308) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-findings:test:
+@acorn/plugin-findings:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/findings
+@acorn/plugin-findings:test:
+@acorn/client-core:test: (node:46188) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:46587) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:46625) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:47082) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:47432) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:47784) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:47800) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:48215) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:48740) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:48802) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:48885) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-changes:test:
+@acorn/plugin-changes:test:  Test Files  14 passed (14)
+@acorn/plugin-changes:test:       Tests  237 passed (237)
+@acorn/plugin-changes:test:    Start at  10:44:09
+@acorn/plugin-changes:test:    Duration  32.51s (transform 28.46s, setup 198ms, import 41.18s, tests 28.52s, environment 5.15s)
+@acorn/plugin-changes:test:
+@acorn/plugin-memory:test: cache miss, executing c0e252f5920ad04c
+@acorn/plugin-http:test:
+@acorn/plugin-http:test:  Test Files  11 passed (11)
+@acorn/plugin-http:test:       Tests  128 passed (128)
+@acorn/plugin-http:test:    Start at  10:44:32
+@acorn/plugin-http:test:    Duration  9.67s (transform 10.72s, setup 92ms, import 16.75s, tests 3.78s, environment 2.56s)
+@acorn/plugin-http:test:
+@acorn/client-core:test: (node:49567) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/node:test: cache miss, executing 986544a6685ba3f0
+@acorn/plugin-memory:test: $ vitest run
+@acorn/client-core:test: (node:49635) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:49657) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/node:test: $ vitest run
+@acorn/client-core:test: (node:49687) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-memory:test:
+@acorn/plugin-memory:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/memory
+@acorn/plugin-memory:test:
+@acorn/client-core:test: (node:49728) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/node:test:
+@acorn/node:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/node
+@acorn/node:test:
+@acorn/client-core:test: (node:49745) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:49744) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:49807) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-findings:test:
+@acorn/plugin-findings:test:  Test Files  10 passed (10)
+@acorn/plugin-findings:test:       Tests  47 passed (47)
+@acorn/plugin-findings:test:    Start at  10:44:35
+@acorn/plugin-findings:test:    Duration  11.39s (transform 11.54s, setup 20ms, import 26.66s, tests 1.86s, environment 1.76s)
+@acorn/plugin-findings:test:
+@acorn/client-core:test: (node:49810) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: cache miss, executing ff1af2b88613a201
+@acorn/client-core:test: (node:49819) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: $ vitest run
+@acorn/client-core:test: (node:49876) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:49883) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:49922) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:49923) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test:
+@acorn/tui:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/tui
+@acorn/tui:test:
+@acorn/client-core:test: (node:49942) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:49951) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:49956) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:49960) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/node:test: (node:49747) [PERM0002] SecurityWarning: The flag --allow-child-process must be used with extreme caution. It could invalidate the permission model.
+@acorn/node:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:49969) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:49958) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/node:test: (node:49747) ExperimentalWarning: The flag --allow-net is under experimental phase.
+@acorn/node:test: (node:49747) [PERM0002] SecurityWarning: The flag --allow-child-process must be used with extreme caution. It could invalidate the permission model.
+@acorn/node:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:49953) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/node:test: (node:49747) ExperimentalWarning: The flag --allow-net is under experimental phase.
+@acorn/node:test: (node:49747) [PERM0002] SecurityWarning: The flag --allow-child-process must be used with extreme caution. It could invalidate the permission model.
+@acorn/node:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:50320) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:49954) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:50373) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/node:test: (node:49747) ExperimentalWarning: The flag --allow-net is under experimental phase.
+@acorn/node:test: (node:49747) [PERM0002] SecurityWarning: The flag --allow-child-process must be used with extreme caution. It could invalidate the permission model.
+@acorn/node:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:50565) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:50605) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-agents:test: (node:50623) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-agents:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/node:test: (node:49747) ExperimentalWarning: The flag --allow-net is under experimental phase.
+@acorn/client-core:test: (node:50628) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-memory:test: (node:50620) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-memory:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:50634) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:50910) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:50921) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/node:test: (node:49747) [PERM0002] SecurityWarning: The flag --allow-child-process must be used with extreme caution. It could invalidate the permission model.
+@acorn/node:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/node:test: (node:49747) ExperimentalWarning: The flag --allow-net is under experimental phase.
+@acorn/node:test: (node:49747) [PERM0002] SecurityWarning: The flag --allow-child-process must be used with extreme caution. It could invalidate the permission model.
+@acorn/node:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:51335) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/node:test: (node:49747) ExperimentalWarning: The flag --allow-net is under experimental phase.
+@acorn/plugin-agents:test: (node:51393) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-agents:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:51389) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:51403) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:51423) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-memory:test:
+@acorn/plugin-memory:test:  Test Files  8 passed (8)
+@acorn/plugin-memory:test:       Tests  46 passed (46)
+@acorn/plugin-memory:test:    Start at  10:44:44
+@acorn/plugin-memory:test:    Duration  18.04s (transform 30.36s, setup 55ms, import 47.27s, tests 529ms, environment 1.34s)
+@acorn/plugin-memory:test:
+@acorn/desktop:test: cache miss, executing fb59479b5eb1318e
+@acorn/client-core:test: (node:51491) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-agents:test: (node:51495) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-agents:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/desktop:test: $ pnpm run stage && pnpm run build:renderer && pnpm run test:built
+@acorn/plugin-agents:test: (node:51508) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-agents:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/desktop:test: $ pnpm run build:service && pnpm run build:cli && pnpm run build:bundled-plugins && pnpm run build:helper && pnpm run build:bridge && node scripts/stage.mjs
+@acorn/plugin-agents:test: (node:51644) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-agents:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:51646) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:51668) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/desktop:test: $ pnpm --filter @acorn/node build
+@acorn/client-core:test: (node:51726) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:51799) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:51797) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/desktop:test: $ vite build && node scripts/check-service-budget.mjs
+@acorn/plugin-agents:test: (node:51801) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-agents:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:51802) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/desktop:test: vite v8.0.16 building ssr environment for production...
+@acorn/desktop:test:
+@acorn/desktop:test: transforming...✓ 1176 modules transformed.
+@acorn/desktop:test: rendering chunks...
+@acorn/desktop:test: dist/THIRD-PARTY-NOTICES.txt              52.01 kB
+@acorn/desktop:test: dist/chunks/pluginRpc-TX8UpHuv.js          0.09 kB
+@acorn/desktop:test: dist/chunks/wrapper-D7JA5gQn.js            0.15 kB
+@acorn/desktop:test: dist/chunks/rpcOwnership-DFC5W1r9.js       1.13 kB
+@acorn/desktop:test: dist/chunks/api-CdvezTNy.js                1.28 kB
+@acorn/desktop:test: dist/chunks/diagnostics-DSubQu8s.js        1.35 kB
+@acorn/desktop:test: dist/chunks/chunk-CNf5ZN-e.js              1.79 kB
+@acorn/desktop:test: dist/chunks/workerStorage-DWO7Wmnd.js      2.74 kB
+@acorn/desktop:test: dist/plugin-worker.js                      8.25 kB
+@acorn/desktop:test: dist/service.js                           13.69 kB
+@acorn/desktop:test: dist/standalone.js                        17.18 kB
+@acorn/desktop:test: dist/chunks/pluginRpc-HeIweddc.js         28.63 kB
+@acorn/desktop:test: dist/mcp.js                               29.70 kB
+@acorn/desktop:test: dist/archive-worker.js                   111.67 kB
+@acorn/desktop:test: dist/chunks/wrapper-Bc51xDd9.js          114.75 kB
+@acorn/desktop:test: dist/chunks/mcpProbe-XKHnWtra.js         114.76 kB
+@acorn/desktop:test: dist/chunks/pluginDbFiles-CRub7vxp.js    149.70 kB
+@acorn/desktop:test: dist/chunks/acp-_24Rwg0n.js              167.73 kB
+@acorn/desktop:test: dist/chunks/schemas-BMgPacMg.js          195.89 kB
+@acorn/desktop:test: dist/chunks/stdio-DnwXIELh.js            365.04 kB
+@acorn/desktop:test: dist/chunks/crash-D4cDmkzY.js          2,579.56 kB
+@acorn/desktop:test:
+@acorn/desktop:test: ✓ built in 626ms
+@acorn/desktop:test: [service-budget] dist/service.js and 8 chunk(s): 3059187B (ceiling 3062000B)
+@acorn/desktop:test: [service-budget] resolved at run time: @vscode/ripgrep, node-pty; on first use: playwright-core
+@acorn/client-core:test: (node:51886) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/desktop:test: $ pnpm --filter @acorn/cli build
+@acorn/client-core:test: (node:51899) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-agents:test: (node:51907) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-agents:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test: (node:51938) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/client-core:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/client-core:test:
+@acorn/client-core:test:  Test Files  294 passed (294)
+@acorn/client-core:test:       Tests  2246 passed (2246)
+@acorn/client-core:test:    Start at  10:43:08
+@acorn/client-core:test:    Duration  121.34s (transform 22.26s, setup 3.36s, import 73.13s, tests 53.95s, environment 123.52s)
+@acorn/client-core:test:
+@acorn/desktop:test: $ vite build && node scripts/check-graph.mjs
+@acorn/desktop:test: vite v8.0.16 building ssr environment for production...
+@acorn/desktop:test:
+@acorn/desktop:test: transforming...✓ 339 modules transformed.
+@acorn/desktop:test: rendering chunks...
+@acorn/desktop:test: computing gzip size...
+@acorn/desktop:test: dist/archive-worker.js  111.67 kB │ gzip:  30.66 kB
+@acorn/desktop:test: dist/cli.js             519.86 kB │ gzip: 113.63 kB
+@acorn/desktop:test:
+@acorn/desktop:test: [INEFFECTIVE_DYNAMIC_IMPORT] ../../node_modules/.pnpm/ws@8.21.0/node_modules/ws/wrapper.mjs is dynamically imported by ../../packages/node-core/src/server/transport/wsHub.ts but also statically imported by ../../packages/custody/src/broker/nodeBroker.ts, dynamic import will not move module into another chunk.
+@acorn/desktop:test:
+@acorn/desktop:test: ✓ built in 218ms
+@acorn/desktop:test: $ node scripts/build-bundled-plugins.mjs
+@acorn/plugin-workflows:test: (node:52122) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-workflows:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/desktop:test: $ vite build && cp src/public.ts dist/sdk.d.ts && cp src/remote/public.ts dist/remote.d.ts
+@acorn/desktop:test: vite v8.0.16 building client environment for production...
+@acorn/desktop:test:
+@acorn/desktop:test: transforming...✓ 22 modules transformed.
+@acorn/desktop:test: rendering chunks...
+@acorn/desktop:test: dist/remote.js                4.39 kB
+@acorn/desktop:test: dist/remoteRoot-B3ZDpZa2.js   9.04 kB
+@acorn/desktop:test: dist/sdk.js                  29.63 kB
+@acorn/desktop:test:
+@acorn/desktop:test: ✓ built in 60ms
+@acorn/plugin-agents:test: (node:52844) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-agents:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/desktop:test: $ vite build && cp src/public.ts dist/sdk.d.ts && cp src/remote/public.ts dist/remote.d.ts
+@acorn/plugin-agents:test:
+@acorn/plugin-agents:test:  Test Files  139 passed (139)
+@acorn/plugin-agents:test:       Tests  971 passed | 1 skipped (972)
+@acorn/plugin-agents:test:    Start at  10:43:54
+@acorn/plugin-agents:test:    Duration  83.87s (transform 20.79s, setup 672ms, import 130.27s, tests 31.94s, environment 36.64s)
+@acorn/plugin-agents:test:
+@acorn/desktop:test: vite v8.0.16 building client environment for production...
+@acorn/desktop:test:
+@acorn/desktop:test: transforming...✓ 22 modules transformed.
+@acorn/desktop:test: rendering chunks...
+@acorn/desktop:test: dist/remote.js                4.39 kB
+@acorn/desktop:test: dist/remoteRoot-B3ZDpZa2.js   9.04 kB
+@acorn/desktop:test: dist/sdk.js                  29.63 kB
+@acorn/desktop:test:
+@acorn/desktop:test: ✓ built in 113ms
+@acorn/desktop:test: [build-plugin] agent-cost -> /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/dist/bundled-plugins/agent-cost
+@acorn/plugin-workflows:test: (node:53167) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-workflows:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/node:test: (node:52214) ExperimentalWarning: The flag --allow-net is under experimental phase.
+@acorn/node:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-workflows:test: (node:53153) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/plugin-workflows:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/node:test: (node:52214) ExperimentalWarning: The flag --allow-net is under experimental phase.
+@acorn/node:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/node:test: (node:52214) ExperimentalWarning: The flag --allow-net is under experimental phase.
+@acorn/node:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/node:test: (node:52214) ExperimentalWarning: The flag --allow-net is under experimental phase.
+@acorn/node:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/plugin-workflows:test:
+@acorn/plugin-workflows:test:  Test Files  63 passed (63)
+@acorn/plugin-workflows:test:       Tests  514 passed (514)
+@acorn/plugin-workflows:test:    Start at  10:44:18
+@acorn/plugin-workflows:test:    Duration  62.50s (transform 34.35s, setup 342ms, import 111.12s, tests 40.80s, environment 9.65s)
+@acorn/plugin-workflows:test:
+@acorn/desktop:test: [build-plugin] database -> /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/dist/bundled-plugins/database
+@acorn/node:test: (node:52759) ExperimentalWarning: The flag --allow-net is under experimental phase.
+@acorn/node:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/desktop:test: [build-plugin] findings -> /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/dist/bundled-plugins/findings
+@acorn/desktop:test: [build-plugin] http -> /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/dist/bundled-plugins/http
+@acorn/desktop:test: [build-plugin] linear -> /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/dist/bundled-plugins/linear
+@acorn/tui:test: (node:53785) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/desktop:test: [build-plugin] model-providers -> /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/dist/bundled-plugins/model-providers
+@acorn/node:test: (node:53810) ExperimentalWarning: The flag --allow-net is under experimental phase.
+@acorn/node:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/desktop:test: [build-plugin] rollbar -> /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/dist/bundled-plugins/rollbar
+@acorn/desktop:test: [build-plugin] sentry-telemetry -> /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/dist/bundled-plugins/sentry-telemetry
+@acorn/desktop:test: [bundled-plugins] 8 package(s) -> /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop/dist/bundled-plugins
+@acorn/desktop:test: $ vite build --config vite.helper.config.ts
+@acorn/desktop:test: vite v8.0.16 building ssr environment for production...
+@acorn/desktop:test:
+@acorn/desktop:test: transforming...✓ 396 modules transformed.
+@acorn/desktop:test: rendering chunks...
+@acorn/desktop:test: computing gzip size...
+@acorn/desktop:test: dist/helper/helper-THIRD-PARTY-NOTICES.txt    3.66 kB │ gzip:   0.99 kB
+@acorn/desktop:test: dist/helper/helper.js                       579.59 kB │ gzip: 136.66 kB
+@acorn/desktop:test:
+@acorn/desktop:test: [INEFFECTIVE_DYNAMIC_IMPORT] ../../node_modules/.pnpm/ws@8.21.0/node_modules/ws/wrapper.mjs is dynamically imported by ../../packages/node-core/src/server/transport/wsHub.ts but also statically imported by src/helper/helperServer.ts, ../../packages/custody/src/broker/nodeBroker.ts, ../../packages/custody/src/supervision/previewTunnel.ts, dynamic import will not move module into another chunk.
+@acorn/desktop:test:
+@acorn/desktop:test: ✓ built in 98ms
+@acorn/desktop:test: $ vite build --config vite.bridge.config.ts
+@acorn/desktop:test: vite v8.0.16 building client environment for production...
+@acorn/desktop:test:
+@acorn/desktop:test: transforming...✓ 119 modules transformed.
+@acorn/desktop:test: rendering chunks...
+@acorn/desktop:test: computing gzip size...
+@acorn/desktop:test: dist/bridge/bridge.js  93.32 kB │ gzip: 27.65 kB
+@acorn/desktop:test:
+@acorn/desktop:test: ✓ built in 75ms
+@acorn/desktop:test: (node:54368) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/scripts/nodeRuntimePackages.ts is not specified and it doesn't parse as CommonJS.
+@acorn/desktop:test: Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
+@acorn/desktop:test: To eliminate this warning, add "type": "module" to /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/package.json.
+@acorn/desktop:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/desktop:test: [stage] 7 runtime entries, 111 hoisted packages -> dist/helper/node_modules
+@acorn/desktop:test: [stage] node 24.21.0 (cache) -> binaries/node-aarch64-apple-darwin; service + 11 migration chain(s) -> dist/helper; 11 frame stylesheet(s) -> dist/bridge
+@acorn/desktop:test: $ vite build
+@acorn/desktop:test: vite v8.0.16 building client environment for production...
+@acorn/node:test:
+@acorn/node:test:  Test Files  40 passed (40)
+@acorn/node:test:       Tests  280 passed (280)
+@acorn/node:test:    Start at  10:44:45
+@acorn/node:test:    Duration  55.68s (transform 14.73s, setup 0ms, import 51.24s, tests 101.90s, environment 3ms)
+@acorn/node:test:
+@acorn/desktop:test:
+@acorn/desktop:test: transforming...✓ 1371 modules transformed.
+@acorn/desktop:test: rendering chunks...
+@acorn/desktop:test: computing gzip size...
+@acorn/desktop:test: dist/client/assets/cpp-Vecd3u6l.js                             0.05 kB
+@acorn/desktop:test: dist/client/assets/xml-BlVvVLke.js                             0.05 kB
+@acorn/desktop:test: dist/client/assets/html-CEES10Qm.js                            0.06 kB
+@acorn/desktop:test: dist/client/assets/xml-Bvlx11yh.js                             5.38 kB
+@acorn/desktop:test: dist/client/assets/worker-wordDiff.worker-MsP_IO05.js          8.63 kB
+@acorn/desktop:test: dist/client/index.html                                         9.25 kB │ gzip:   1.85 kB
+@acorn/desktop:test: dist/client/assets/scss-CLKKmMvk.js                           27.21 kB
+@acorn/desktop:test: dist/client/assets/nunito-var-CjueodBP.woff2                  39.15 kB
+@acorn/desktop:test: dist/client/assets/inter-var-8kRkwJBP.woff2                   48.43 kB
+@acorn/desktop:test: dist/client/assets/html-FFOZEiuQ.js                           57.24 kB
+@acorn/desktop:test: dist/client/assets/ruby-oyA8u5VL.js                           88.10 kB
+@acorn/desktop:test: dist/client/assets/literata-var-D8O2rLBL.woff2               110.29 kB
+@acorn/desktop:test: dist/client/assets/worker-highlighter.worker-CcI2tOi8.js     112.96 kB
+@acorn/desktop:test: dist/client/.vite/manifest.json                              140.63 kB │ gzip:  16.47 kB
+@acorn/desktop:test: dist/client/assets/wasm-S0UXjx1m.js                          622.32 kB
+@acorn/desktop:test: dist/client/assets/cpp-ZYh_74ri.js                           637.57 kB
+@acorn/desktop:test: dist/client/assets/Home-ZyDas05-.css                           0.12 kB │ gzip:   0.11 kB
+@acorn/desktop:test: dist/client/assets/ArchivePage-DopVg6tf.css                    0.32 kB │ gzip:   0.18 kB
+@acorn/desktop:test: dist/client/assets/annotationKey-vrvLA9Sd.css                  0.58 kB │ gzip:   0.28 kB
+@acorn/desktop:test: dist/client/assets/ConfigTrustDialog-DTOQu-I0.css              0.60 kB │ gzip:   0.29 kB
+@acorn/desktop:test: dist/client/assets/ChromeExtendedPane-CgiC7Cs7.css             0.82 kB │ gzip:   0.30 kB
+@acorn/desktop:test: dist/client/assets/navigationCommands-CVc8euIS.css             1.00 kB │ gzip:   0.43 kB
+@acorn/desktop:test: dist/client/assets/plugins-zjKuk9Y8.css                        1.11 kB │ gzip:   0.41 kB
+@acorn/desktop:test: dist/client/assets/NotificationBell-CRwkbU4B.css               1.37 kB │ gzip:   0.58 kB
+@acorn/desktop:test: dist/client/assets/ProjectColorInput-B-_ItcZi.css              1.39 kB │ gzip:   0.54 kB
+@acorn/desktop:test: dist/client/assets/plugin-trust-DZIIBV39.css                   2.52 kB │ gzip:   0.77 kB
+@acorn/desktop:test: dist/client/assets/xterm-kHJ-D0s7.css                          2.85 kB │ gzip:   0.77 kB
+@acorn/desktop:test: dist/client/assets/settings-CBe5Seg0.css                       6.13 kB │ gzip:   1.57 kB
+@acorn/desktop:test: dist/client/assets/PanelGrid-lY9MnRMW.css                     11.00 kB │ gzip:   2.41 kB
+@acorn/desktop:test: dist/client/assets/index-jyN--v-N.css                        114.74 kB │ gzip:  20.97 kB
+@acorn/desktop:test: dist/client/assets/public-CTqSM9Tt.js                          0.02 kB │ gzip:   0.04 kB
+@acorn/desktop:test: dist/client/assets/baseline-DmN1j9tD.js                        0.03 kB │ gzip:   0.05 kB
+@acorn/desktop:test: dist/client/assets/public-BaZRjXqo.js                          0.03 kB │ gzip:   0.05 kB
+@acorn/desktop:test: dist/client/assets/taskLookup-B452qbqe.js                      0.05 kB │ gzip:   0.06 kB
+@acorn/desktop:test: dist/client/assets/c-DWGmR78Y.js                               0.05 kB │ gzip:   0.07 kB
+@acorn/desktop:test: dist/client/assets/table-BcALgrRG.js                           0.05 kB │ gzip:   0.07 kB
+@acorn/desktop:test: dist/client/assets/cpp-CNAAXZl-.js                             0.05 kB │ gzip:   0.07 kB
+@acorn/desktop:test: dist/client/assets/css-CdtkT07m.js                             0.05 kB │ gzip:   0.07 kB
+@acorn/desktop:test: dist/client/assets/jsx-hEbJ82HF.js                             0.05 kB │ gzip:   0.07 kB
+@acorn/desktop:test: dist/client/assets/sql-0Qcw9ht3.js                             0.05 kB │ gzip:   0.07 kB
+@acorn/desktop:test: dist/client/assets/tsx-5f3ulCja.js                             0.05 kB │ gzip:   0.07 kB
+@acorn/desktop:test: dist/client/assets/xml-CoDIzWF0.js                             0.05 kB │ gzip:   0.07 kB
+@acorn/desktop:test: dist/client/assets/html-DDNsd9lV.js                            0.06 kB │ gzip:   0.07 kB
+@acorn/desktop:test: dist/client/assets/java-DxlWrXwe.js                            0.06 kB │ gzip:   0.07 kB
+@acorn/desktop:test: dist/client/assets/yaml-CxbubiML.js                            0.06 kB │ gzip:   0.07 kB
+@acorn/desktop:test: dist/client/assets/xterm-nAkeU_n8.js                           0.06 kB │ gzip:   0.07 kB
+@acorn/desktop:test: dist/client/assets/public-oQlp3pdv.js                          0.06 kB │ gzip:   0.07 kB
+@acorn/desktop:test: dist/client/assets/javascript-Yelw-5ZN.js                      0.06 kB │ gzip:   0.08 kB
+@acorn/desktop:test: dist/client/assets/typescript-Utq2Cl8c.js                      0.06 kB │ gzip:   0.08 kB
+@acorn/desktop:test: dist/client/assets/shellscript-BiGZg9Om.js                     0.06 kB │ gzip:   0.08 kB
+@acorn/desktop:test: dist/client/assets/workTelemetry-mEACpLik.js                   0.07 kB │ gzip:   0.08 kB
+@acorn/desktop:test: dist/client/assets/public-B__Sh4Bd.js                          0.09 kB │ gzip:   0.09 kB
+@acorn/desktop:test: dist/client/assets/public-CUqQ__Qg.js                          0.10 kB │ gzip:   0.10 kB
+@acorn/desktop:test: dist/client/assets/wordDiff.worker-CqrA5wC9.js                 0.12 kB │ gzip:   0.13 kB
+@acorn/desktop:test: dist/client/assets/highlighter.worker-CyKLlQHK.js              0.13 kB │ gzip:   0.13 kB
+@acorn/desktop:test: dist/client/assets/preferences-CuWnjkkh.js                     0.13 kB │ gzip:   0.13 kB
+@acorn/desktop:test: dist/client/assets/configTrust-Ch9JsIrK.js                     0.13 kB │ gzip:   0.13 kB
+@acorn/desktop:test: dist/client/assets/api-CtuF8A-m.js                             0.14 kB │ gzip:   0.12 kB
+@acorn/desktop:test: dist/client/assets/model-BF06PvJD.js                           0.15 kB │ gzip:   0.13 kB
+@acorn/desktop:test: dist/client/assets/styles-BydB1h18.js                          0.15 kB │ gzip:   0.13 kB
+@acorn/desktop:test: dist/client/assets/Only-DE0dkXIO.js                            0.16 kB │ gzip:   0.14 kB
+@acorn/desktop:test: dist/client/assets/public-BYWS9Lwe.js                          0.16 kB │ gzip:   0.13 kB
+@acorn/desktop:test: dist/client/assets/badge-xyTuBFa5.js                           0.16 kB │ gzip:   0.15 kB
+@acorn/desktop:test: dist/client/assets/rowTargets-u_lV6G4K.js                      0.18 kB │ gzip:   0.14 kB
+@acorn/desktop:test: dist/client/assets/ToggleButton-5hXwRclk.js                    0.22 kB │ gzip:   0.18 kB
+@acorn/desktop:test: dist/client/assets/unsavedChanges-DfcIpTxh.js                  0.23 kB │ gzip:   0.19 kB
+@acorn/desktop:test: dist/client/assets/projectImporters-C0-2Suer.js                0.25 kB │ gzip:   0.20 kB
+@acorn/desktop:test: dist/client/assets/corePaths-CP9UEDQe.js                       0.26 kB │ gzip:   0.19 kB
+@acorn/desktop:test: dist/client/assets/attention-Bf_CwVEw.js                       0.26 kB │ gzip:   0.20 kB
+@acorn/desktop:test: dist/client/assets/refResolvers-CL5Vy2CC.js                    0.27 kB │ gzip:   0.19 kB
+@acorn/desktop:test: dist/client/assets/scrollAuthor-DOOfDSk5.js                    0.27 kB │ gzip:   0.21 kB
+@acorn/desktop:test: dist/client/assets/surfaceFailures-CwTysE11.js                 0.28 kB │ gzip:   0.22 kB
+@acorn/desktop:test: dist/client/assets/deviceStorage-C0wkyZL-.js                   0.28 kB │ gzip:   0.18 kB
+@acorn/desktop:test: dist/client/assets/confirm-CKv8pNkb.js                         0.28 kB │ gzip:   0.22 kB
+@acorn/desktop:test: dist/client/assets/metrics-DKWN_gfV.js                         0.29 kB │ gzip:   0.22 kB
+@acorn/desktop:test: dist/client/assets/ProviderGlyph-D1N8yKuD.js                   0.30 kB │ gzip:   0.22 kB
+@acorn/desktop:test: dist/client/assets/collapseState-BInIAB6M.js                   0.32 kB │ gzip:   0.25 kB
+@acorn/desktop:test: dist/client/assets/formatPath-BRVbtuNX.js                      0.33 kB │ gzip:   0.26 kB
+@acorn/desktop:test: dist/client/assets/activeWorkspaceId-BdQh9PNc.js               0.34 kB │ gzip:   0.24 kB
+@acorn/desktop:test: dist/client/assets/modelProviders-CvNDgJ9d.js                  0.37 kB │ gzip:   0.23 kB
+@acorn/desktop:test: dist/client/assets/refResolvers-DybJ1bxk.js                    0.39 kB │ gzip:   0.31 kB
+@acorn/desktop:test: dist/client/assets/projectSurfaces-rQeX_tpC.js                 0.39 kB │ gzip:   0.27 kB
+@acorn/desktop:test: dist/client/assets/lastWorkspace-C54cxByt.js                   0.39 kB │ gzip:   0.27 kB
+@acorn/desktop:test: dist/client/assets/Facts-DVM_GT89.js                           0.41 kB │ gzip:   0.25 kB
+@acorn/desktop:test: dist/client/assets/ChipRow-BcaO7Gp9.js                         0.42 kB │ gzip:   0.29 kB
+@acorn/desktop:test: dist/client/assets/IconButton-bMytevxQ.js                      0.42 kB │ gzip:   0.28 kB
+@acorn/desktop:test: dist/client/assets/pluginLabel-BUqHQ7BW.js                     0.44 kB │ gzip:   0.29 kB
+@acorn/desktop:test: dist/client/assets/settingsDetail-DRwhlxQd.js                  0.44 kB │ gzip:   0.29 kB
+@acorn/desktop:test: dist/client/assets/activate-CiZBFbtn.js                        0.45 kB │ gzip:   0.29 kB
+@acorn/desktop:test: dist/client/assets/wsChannels-B-4gXQem.js                      0.45 kB │ gzip:   0.31 kB
+@acorn/desktop:test: dist/client/assets/dashboardViews-C2R_P153.js                  0.47 kB │ gzip:   0.30 kB
+@acorn/desktop:test: dist/client/assets/RowActions-DO64OTgN.js                      0.48 kB │ gzip:   0.31 kB
+@acorn/desktop:test: dist/client/assets/DockerFooterBadge-CHi4fCSx.js               0.48 kB │ gzip:   0.32 kB
+@acorn/desktop:test: dist/client/assets/EditorTerminal-D7_xiJwn.js                  0.49 kB │ gzip:   0.34 kB
+@acorn/desktop:test: dist/client/assets/Spinner-B-vpddh_.js                         0.50 kB │ gzip:   0.36 kB
+@acorn/desktop:test: dist/client/assets/registry-D7Gz27eF.js                        0.50 kB │ gzip:   0.32 kB
+@acorn/desktop:test: dist/client/assets/freshness-Bjo0I4N7.js                       0.53 kB │ gzip:   0.32 kB
+@acorn/desktop:test: dist/client/assets/overlays-C1psJAC7.js                        0.54 kB │ gzip:   0.33 kB
+@acorn/desktop:test: dist/client/assets/contextMenus-Bkx61gGR.js                    0.57 kB │ gzip:   0.38 kB
+@acorn/desktop:test: dist/client/assets/telemetrySetting-2GVkNH7D.js                0.57 kB │ gzip:   0.38 kB
+@acorn/desktop:test: dist/client/assets/appearance-CO0NCYpX.js                      0.58 kB │ gzip:   0.38 kB
+@acorn/desktop:test: dist/client/assets/completeness-CaAOEKEW.js                    0.58 kB │ gzip:   0.33 kB
+@acorn/desktop:test: dist/client/assets/changedFiles-Pt6XXsPx.js                    0.58 kB │ gzip:   0.39 kB
+@acorn/desktop:test: dist/client/assets/AddedTally-D_kSpw6T.js                      0.59 kB │ gzip:   0.32 kB
+@acorn/desktop:test: dist/client/assets/settings-BGUajvjh.js                        0.61 kB │ gzip:   0.39 kB
+@acorn/desktop:test: dist/client/assets/externalUrl-Bf4t7rsz.js                     0.62 kB │ gzip:   0.28 kB
+@acorn/desktop:test: dist/client/assets/public-Cp3J6bEI.js                          0.63 kB │ gzip:   0.40 kB
+@acorn/desktop:test: dist/client/assets/DescriptionList-BYehs2Zd.js                 0.64 kB │ gzip:   0.35 kB
+@acorn/desktop:test: dist/client/assets/hostCapabilities-BV7BHgop.js                0.65 kB │ gzip:   0.40 kB
+@acorn/desktop:test: dist/client/assets/RuntimeStateIcon-DEE5CfV6.js                0.66 kB │ gzip:   0.35 kB
+@acorn/desktop:test: dist/client/assets/properties-C357ku5U.js                      0.66 kB │ gzip:   0.34 kB
+@acorn/desktop:test: dist/client/assets/ClearCacheSettings-B2cUEwFC.js              0.67 kB │ gzip:   0.40 kB
+@acorn/desktop:test: dist/client/assets/appearancePrefs-PGHLJvOp.js                 0.67 kB │ gzip:   0.35 kB
+@acorn/desktop:test: dist/client/assets/Log-BEB5KbD8.js                             0.67 kB │ gzip:   0.41 kB
+@acorn/desktop:test: dist/client/assets/Toolbar-KRgO_nCP.js                         0.68 kB │ gzip:   0.38 kB
+@acorn/desktop:test: dist/client/assets/tabScroll-BoBB0QVf.js                       0.68 kB │ gzip:   0.43 kB
+@acorn/desktop:test: dist/client/assets/chunk-QTnfLwEv.js                           0.69 kB │ gzip:   0.42 kB
+@acorn/desktop:test: dist/client/assets/UserAvatar-CZAfzmYV.js                      0.71 kB │ gzip:   0.43 kB
+@acorn/desktop:test: dist/client/assets/HelpMark-R6Gv70n3.js                        0.72 kB │ gzip:   0.43 kB
+@acorn/desktop:test: dist/client/assets/generatePick-bGRu8uA1.js                    0.72 kB │ gzip:   0.41 kB
+@acorn/desktop:test: dist/client/assets/languageIds-_C3PbRTm.js                     0.74 kB │ gzip:   0.35 kB
+@acorn/desktop:test: dist/client/assets/controlAttrs-Bd7u97Ic.js                    0.74 kB │ gzip:   0.45 kB
+@acorn/desktop:test: dist/client/assets/settingSave-BHbc_BuO.js                     0.74 kB │ gzip:   0.44 kB
+@acorn/desktop:test: dist/client/assets/concurrencyClient-ClfWMOUD.js               0.77 kB │ gzip:   0.49 kB
+@acorn/desktop:test: dist/client/assets/subagentDisplay-CJnJnD8Z.js                 0.77 kB │ gzip:   0.43 kB
+@acorn/desktop:test: dist/client/assets/taskBridge-D_-TVkP_.js                      0.78 kB │ gzip:   0.44 kB
+@acorn/desktop:test: dist/client/assets/pageFacts-_BirNNsw.js                       0.79 kB │ gzip:   0.48 kB
+@acorn/desktop:test: dist/client/assets/schedules-BWlW37Mq.js                       0.80 kB │ gzip:   0.49 kB
+@acorn/desktop:test: dist/client/assets/Heading-Djax_SXo.js                         0.80 kB │ gzip:   0.43 kB
+@acorn/desktop:test: dist/client/assets/fleetActions-lU-Eon09.js                    0.81 kB │ gzip:   0.43 kB
+@acorn/desktop:test: dist/client/assets/trap-DRdiLK0E.js                            0.82 kB │ gzip:   0.47 kB
+@acorn/desktop:test: dist/client/assets/annotationKey-Chr2ahbP.js                   0.83 kB │ gzip:   0.47 kB
+@acorn/desktop:test: dist/client/assets/Link-DpngjOHl.js                            0.83 kB │ gzip:   0.47 kB
+@acorn/desktop:test: dist/client/assets/SegmentedControl-D0cv-UcZ.js                0.83 kB │ gzip:   0.47 kB
+@acorn/desktop:test: dist/client/assets/agentContext-C46Ezfa6.js                    0.84 kB │ gzip:   0.44 kB
+@acorn/desktop:test: dist/client/assets/attentionInbox-B-x_okJ4.js                  0.85 kB │ gzip:   0.50 kB
+@acorn/desktop:test: dist/client/assets/pluginChannel-DpHkmBr3.js                   0.87 kB │ gzip:   0.51 kB
+@acorn/desktop:test: dist/client/assets/segmentCaches-C-FJEmfb.js                   0.88 kB │ gzip:   0.46 kB
+@acorn/desktop:test: dist/client/assets/DeviceConfigSettings-D9TU32w8.js            0.94 kB │ gzip:   0.53 kB
+@acorn/desktop:test: dist/client/assets/approval-CjzmrwuQ.js                        0.94 kB │ gzip:   0.51 kB
+@acorn/desktop:test: dist/client/assets/Popover-C2ugIaB9.js                         0.94 kB │ gzip:   0.53 kB
+@acorn/desktop:test: dist/client/assets/homeTab-C4t16d6p.js                         0.95 kB │ gzip:   0.61 kB
+@acorn/desktop:test: dist/client/assets/ChromeBadge-DA8jJlF4.js                     0.97 kB │ gzip:   0.51 kB
+@acorn/desktop:test: dist/client/assets/Card-BTqYdWox.js                            0.97 kB │ gzip:   0.54 kB
+@acorn/desktop:test: dist/client/assets/PluginOverlay-Dcma_hj7.js                   0.98 kB │ gzip:   0.55 kB
+@acorn/desktop:test: dist/client/assets/ModelPickerPopover-z7eRNDkV.js              0.98 kB │ gzip:   0.48 kB
+@acorn/desktop:test: dist/client/assets/agentConfigOptions-DU_sOpIP.js              0.98 kB │ gzip:   0.42 kB
+@acorn/desktop:test: dist/client/assets/dismissable-CPossk6c.js                     0.99 kB │ gzip:   0.54 kB
+@acorn/desktop:test: dist/client/assets/EmptyState-BIZ_SkfK.js                      1.06 kB │ gzip:   0.45 kB
+@acorn/desktop:test: dist/client/assets/Rectangle-9iW3IXrm.js                       1.06 kB │ gzip:   0.60 kB
+@acorn/desktop:test: dist/client/assets/arbitration-Cg8G5YHh.js                     1.09 kB │ gzip:   0.60 kB
+@acorn/desktop:test: dist/client/assets/TreeRow-iQAIq0LG.js                         1.10 kB │ gzip:   0.54 kB
+@acorn/desktop:test: dist/client/assets/agentSessions-mHw4OmgH.js                   1.11 kB │ gzip:   0.61 kB
+@acorn/desktop:test: dist/client/assets/exclusiveSlots-WbYFcwGG.js                  1.12 kB │ gzip:   0.67 kB
+@acorn/desktop:test: dist/client/assets/ProjectColorInput-BmREltXU.js               1.13 kB │ gzip:   0.63 kB
+@acorn/desktop:test: dist/client/assets/uiStyles-B-LRnNXR.js                        1.13 kB │ gzip:   0.52 kB
+@acorn/desktop:test: dist/client/assets/toml-LvoKBwCs.js                            1.19 kB │ gzip:   0.53 kB
+@acorn/desktop:test: dist/client/assets/preload-helper-zJ_50EbN.js                  1.19 kB │ gzip:   0.68 kB
+@acorn/desktop:test: dist/client/assets/Chip-CQ6iKAIo.js                            1.19 kB │ gzip:   0.59 kB
+@acorn/desktop:test: dist/client/assets/mutations-BuWgXUqM.js                       1.20 kB │ gzip:   0.52 kB
+@acorn/desktop:test: dist/client/assets/SettingsSection-CbQ4F3O_.js                 1.20 kB │ gzip:   0.52 kB
+@acorn/desktop:test: dist/client/assets/extensionPoints-sNWwepNo.js                 1.22 kB │ gzip:   0.66 kB
+@acorn/desktop:test: dist/client/assets/WorkspacePalette-DXG75xc8.js                1.26 kB │ gzip:   0.67 kB
+@acorn/desktop:test: dist/client/assets/ImagePreview-B5yWmwpf.js                    1.26 kB │ gzip:   0.74 kB
+@acorn/desktop:test: dist/client/assets/Textarea-D4hN-c88.js                        1.29 kB │ gzip:   0.64 kB
+@acorn/desktop:test: dist/client/assets/nodePlugins-COHDC2DS.js                     1.30 kB │ gzip:   0.68 kB
+@acorn/desktop:test: dist/client/assets/notifications-CX84f5K-.js                   1.30 kB │ gzip:   0.63 kB
+@acorn/desktop:test: dist/client/assets/ModelBackendPicker-h1clvVI4.js              1.32 kB │ gzip:   0.64 kB
+@acorn/desktop:test: dist/client/assets/plugins-CqeIlUdv.js                         1.32 kB │ gzip:   0.70 kB
+@acorn/desktop:test: dist/client/assets/nodeSecurity-VYdr0MJH.js                    1.39 kB │ gzip:   0.80 kB
+@acorn/desktop:test: dist/client/assets/commands-DGABF_FK.js                        1.39 kB │ gzip:   0.75 kB
+@acorn/desktop:test: dist/client/assets/contract-CLihRaZt.js                        1.41 kB │ gzip:   0.65 kB
+@acorn/desktop:test: dist/client/assets/runDisplay-DFpsiMWy.js                      1.41 kB │ gzip:   0.66 kB
+@acorn/desktop:test: dist/client/assets/installed-CwUsRdiv.js                       1.43 kB │ gzip:   0.74 kB
+@acorn/desktop:test: dist/client/assets/Slot-CNn6EUQK.js                            1.44 kB │ gzip:   0.73 kB
+@acorn/desktop:test: dist/client/assets/addon-fit-CX9Yc_tg.js                       1.47 kB │ gzip:   0.64 kB
+@acorn/desktop:test: dist/client/assets/surfaceHealth-CkAD1vDy.js                   1.49 kB │ gzip:   0.82 kB
+@acorn/desktop:test: dist/client/assets/public-CoNdpU3J.js                          1.50 kB │ gzip:   0.69 kB
+@acorn/desktop:test: dist/client/assets/ServicesSettings-XxdaMNZf.js                1.51 kB │ gzip:   0.72 kB
+@acorn/desktop:test: dist/client/assets/ini-B5eOa1yu.js                             1.51 kB │ gzip:   0.49 kB
+@acorn/desktop:test: dist/client/assets/TerminalSettings-C7EHPlGT.js                1.55 kB │ gzip:   0.73 kB
+@acorn/desktop:test: dist/client/assets/mcpServers-CwDOGLQw.js                      1.56 kB │ gzip:   0.81 kB
+@acorn/desktop:test: dist/client/assets/attachPty-oC3V3dRY.js                       1.58 kB │ gzip:   0.84 kB
+@acorn/desktop:test: dist/client/assets/Button-fODPjIU_.js                          1.61 kB │ gzip:   0.77 kB
+@acorn/desktop:test: dist/client/assets/settingsSearch-CmNS6Lcy.js                  1.61 kB │ gzip:   0.75 kB
+@acorn/desktop:test: dist/client/assets/PluginRefPanel-C6HHxSYt.js                  1.63 kB │ gzip:   0.82 kB
+@acorn/desktop:test: dist/client/assets/RefPanelTaskLink-1LVv_FU6.js                1.64 kB │ gzip:   0.86 kB
+@acorn/desktop:test: dist/client/assets/ProjectConnections-CfsLZ_Rf.js              1.65 kB │ gzip:   0.75 kB
+@acorn/desktop:test: dist/client/assets/FindBar-Bn3M0ZUq.js                         1.70 kB │ gzip:   0.78 kB
+@acorn/desktop:test: dist/client/assets/ComparePreview-_8DRkps5.js                  1.72 kB │ gzip:   0.88 kB
+@acorn/desktop:test: dist/client/assets/DockerTaskPane-BCM9gqFR.js                  1.72 kB │ gzip:   0.87 kB
+@acorn/desktop:test: dist/client/assets/gateForm-Dy78GFWp.js                        1.73 kB │ gzip:   0.86 kB
+@acorn/desktop:test: dist/client/assets/connections-CN3ol3Mu.js                     1.76 kB │ gzip:   0.90 kB
+@acorn/desktop:test: dist/client/assets/queries-C-0xlt1l.js                         1.80 kB │ gzip:   0.69 kB
+@acorn/desktop:test: dist/client/assets/keymapHost-DGXr3K2b.js                      1.84 kB │ gzip:   0.98 kB
+@acorn/desktop:test: dist/client/assets/DockerSettings-DDKp3lL1.js                  1.87 kB │ gzip:   0.94 kB
+@acorn/desktop:test: dist/client/assets/AppearanceSettings-BP2VoYIz.js              1.92 kB │ gzip:   0.71 kB
+@acorn/desktop:test: dist/client/assets/CliSettings-CzqXMunj.js                     1.95 kB │ gzip:   0.91 kB
+@acorn/desktop:test: dist/client/assets/Tabs-C17blik4.js                            1.95 kB │ gzip:   0.93 kB
+@acorn/desktop:test: dist/client/assets/contributions-CKnvJHFM.js                   1.98 kB │ gzip:   0.98 kB
+@acorn/desktop:test: dist/client/assets/dist-Bi-dLedG.js                            1.99 kB │ gzip:   1.26 kB
+@acorn/desktop:test: dist/client/assets/public-B_6Bny9T.js                          2.15 kB │ gzip:   0.85 kB
+@acorn/desktop:test: dist/client/assets/WorkflowsSettings-CtBnL9wH.js               2.15 kB │ gzip:   1.03 kB
+@acorn/desktop:test: dist/client/assets/DockerProjectSettings-XHjSCwkw.js           2.16 kB │ gzip:   0.97 kB
+@acorn/desktop:test: dist/client/assets/keybindings-y_Mw3oDq.js                     2.16 kB │ gzip:   1.07 kB
+@acorn/desktop:test: dist/client/assets/Wizard-BQZi9joB.js                          2.20 kB │ gzip:   0.99 kB
+@acorn/desktop:test: dist/client/assets/settings-DpJ0sPNl.js                        2.24 kB │ gzip:   1.06 kB
+@acorn/desktop:test: dist/client/assets/fanout-CZMkziPX.js                          2.26 kB │ gzip:   1.14 kB
+@acorn/desktop:test: dist/client/assets/AgentStorageSection-DB8Vt6zY.js             2.27 kB │ gzip:   1.09 kB
+@acorn/desktop:test: dist/client/assets/SecuritySettings-DExarCSn.js                2.37 kB │ gzip:   1.24 kB
+@acorn/desktop:test: dist/client/assets/channels-CVt-_TWY.js                        2.40 kB │ gzip:   0.74 kB
+@acorn/desktop:test: dist/client/assets/shell-Du5Qg9im.js                           2.44 kB │ gzip:   1.20 kB
+@acorn/desktop:test: dist/client/assets/NotificationSettings-C9G-80N7.js            2.49 kB │ gzip:   0.95 kB
+@acorn/desktop:test: dist/client/assets/deviceFlow-BER7ks7h.js                      2.51 kB │ gzip:   1.17 kB
+@acorn/desktop:test: dist/client/assets/DocumentTabs-BhAcP6FB.js                    2.52 kB │ gzip:   1.09 kB
+@acorn/desktop:test: dist/client/assets/MemorySection-Dy4oMo4m.js                   2.52 kB │ gzip:   1.09 kB
+@acorn/desktop:test: dist/client/assets/PullDetail-CLn63OHH.js                      2.52 kB │ gzip:   1.11 kB
+@acorn/desktop:test: dist/client/assets/pluginStatus-D7ZQdnsz.js                    2.53 kB │ gzip:   1.00 kB
+@acorn/desktop:test: dist/client/assets/ConfigTrustDialog-oYx0jXUq.js               2.63 kB │ gzip:   1.23 kB
+@acorn/desktop:test: dist/client/assets/anchor-B8Nyd72I.js                          2.72 kB │ gzip:   1.24 kB
+@acorn/desktop:test: dist/client/assets/SettingRow-CHouIMKT.js                      2.74 kB │ gzip:   1.12 kB
+@acorn/desktop:test: dist/client/assets/PluginStrip-CamgplNm.js                     2.79 kB │ gzip:   1.26 kB
+@acorn/desktop:test: dist/client/assets/deliver-GACqDpqS.js                         2.80 kB │ gzip:   1.32 kB
+@acorn/desktop:test: dist/client/assets/json-qhed-kSA.js                            2.81 kB │ gzip:   0.77 kB
+@acorn/desktop:test: dist/client/assets/public-DzG5uSUA.js                          2.88 kB │ gzip:   1.32 kB
+@acorn/desktop:test: dist/client/assets/MemoryCenter-CbKn0Woz.js                    2.93 kB │ gzip:   1.31 kB
+@acorn/desktop:test: dist/client/assets/langs-fNcph087.js                           2.94 kB │ gzip:   1.10 kB
+@acorn/desktop:test: dist/client/assets/StartFromItemHost-BWxzk8cP.js               2.99 kB │ gzip:   1.44 kB
+@acorn/desktop:test: dist/client/assets/GithubConnect-rLyAygnn.js                   2.99 kB │ gzip:   1.23 kB
+@acorn/desktop:test: dist/client/assets/devicePrefs-CW0notC4.js                     3.00 kB │ gzip:   1.35 kB
+@acorn/desktop:test: dist/client/assets/StorageSettings-D56tCZzb.js                 3.02 kB │ gzip:   1.36 kB
+@acorn/desktop:test: dist/client/assets/platform-BRj9tb1G.js                        3.16 kB │ gzip:   1.34 kB
+@acorn/desktop:test: dist/client/assets/RunsSettings-KikevVgC.js                    3.19 kB │ gzip:   1.45 kB
+@acorn/desktop:test: dist/client/assets/AuditLogSettings-DfsumUt6.js                3.27 kB │ gzip:   1.50 kB
+@acorn/desktop:test: dist/client/assets/PullRefPanel-Ta0hSH0R.js                    3.28 kB │ gzip:   1.49 kB
+@acorn/desktop:test: dist/client/assets/FleetHome-KxfeRFM7.js                       3.28 kB │ gzip:   1.40 kB
+@acorn/desktop:test: dist/client/assets/ExtensionPointsDev-BFZTzlzs.js              3.35 kB │ gzip:   1.48 kB
+@acorn/desktop:test: dist/client/assets/AiModelsSettings-CJfLIcAG.js                3.39 kB │ gzip:   1.38 kB
+@acorn/desktop:test: dist/client/assets/worker-Bj91Ye9t.js                          3.39 kB │ gzip:   1.53 kB
+@acorn/desktop:test: dist/client/assets/workflowsClient-BcPZ1AZ8.js                 3.44 kB │ gzip:   1.35 kB
+@acorn/desktop:test: dist/client/assets/RailSurfacesSettings-ChYu-YwN.js            3.45 kB │ gzip:   1.59 kB
+@acorn/desktop:test: dist/client/assets/AiSetup-pIw4l9tY.js                         3.46 kB │ gzip:   1.37 kB
+@acorn/desktop:test: dist/client/assets/TelemetrySettings-Cak2rsO8.js               3.49 kB │ gzip:   1.48 kB
+@acorn/desktop:test: dist/client/assets/contentLinks-DQBAm12Q.js                    3.56 kB │ gzip:   1.71 kB
+@acorn/desktop:test: dist/client/assets/WorkspaceProjectAssignments-CzJlO3al.js     3.57 kB │ gzip:   1.64 kB
+@acorn/desktop:test: dist/client/assets/wsClient-Dnnve99Z.js                        3.60 kB │ gzip:   1.58 kB
+@acorn/desktop:test: dist/client/assets/savePref-u9eBrtr-.js                        3.72 kB │ gzip:   1.68 kB
+@acorn/desktop:test: dist/client/assets/managedClient-DSOUIHzK.js                   3.77 kB │ gzip:   1.52 kB
+@acorn/desktop:test: dist/client/assets/ChromeExtendedPane-DTKELegx.js              3.79 kB │ gzip:   1.46 kB
+@acorn/desktop:test: dist/client/assets/GithubImporter-BR5llWb8.js                  3.91 kB │ gzip:   1.69 kB
+@acorn/desktop:test: dist/client/assets/Shortcuts-BELeesEs.js                       3.97 kB │ gzip:   1.56 kB
+@acorn/desktop:test: dist/client/assets/collection-BIEpFDH5.js                      4.07 kB │ gzip:   1.77 kB
+@acorn/desktop:test: dist/client/assets/PluginWebview-DRtLqWez.js                   4.08 kB │ gzip:   1.87 kB
+@acorn/desktop:test: dist/client/assets/Row-BkTeykT8.js                             4.13 kB │ gzip:   1.30 kB
+@acorn/desktop:test: dist/client/assets/CommandPalette-DQQYeWtA.js                  4.16 kB │ gzip:   1.94 kB
+@acorn/desktop:test: dist/client/assets/McpSettings-CxcmyOYz.js                     4.17 kB │ gzip:   1.85 kB
+@acorn/desktop:test: dist/client/assets/NotificationBell-Du5S9hSE.js                4.43 kB │ gzip:   1.76 kB
+@acorn/desktop:test: dist/client/assets/support-D_Y9jocu.js                         4.57 kB │ gzip:   1.41 kB
+@acorn/desktop:test: dist/client/assets/draft-CcplWsBH.js                           4.62 kB │ gzip:   1.97 kB
+@acorn/desktop:test: dist/client/assets/PreviewTaskPane-mehAgqFK.js                 4.69 kB │ gzip:   2.03 kB
+@acorn/desktop:test: dist/client/assets/CreatePullForm-CC-nU42k.js                  4.71 kB │ gzip:   2.08 kB
+@acorn/desktop:test: dist/client/assets/Home-CaxWKuG8.js                            4.84 kB │ gzip:   2.14 kB
+@acorn/desktop:test: dist/client/assets/WorkspaceSettings-CvzjtPEe.js               4.88 kB │ gzip:   1.92 kB
+@acorn/desktop:test: dist/client/assets/MentionTextarea-qfh_SUPE.js                 4.95 kB │ gzip:   2.20 kB
+@acorn/desktop:test: dist/client/assets/DocumentSurface-CI30X9Nf.js                 5.01 kB │ gzip:   2.50 kB
+@acorn/desktop:test: dist/client/assets/localSearch-9DqVeKpd.js                     5.02 kB │ gzip:   1.90 kB
+@acorn/desktop:test: dist/client/assets/RunPane-DQVsXrxT.js                         5.04 kB │ gzip:   1.83 kB
+@acorn/desktop:test: dist/client/assets/ruby-DsYpTuWg.js                            5.10 kB │ gzip:   2.15 kB
+@acorn/desktop:test: dist/client/assets/OnboardingOverlay-Dw3hswgR.js               5.13 kB │ gzip:   2.45 kB
+@acorn/desktop:test: dist/client/assets/StyleGallery-DtMNStiv.js                    5.25 kB │ gzip:   1.93 kB
+@acorn/desktop:test: dist/client/assets/ConnectionProjectMap-BCizzOTE.js            5.27 kB │ gzip:   2.01 kB
+@acorn/desktop:test: dist/client/assets/AgentToolsSettings-CdgsVksl.js              5.33 kB │ gzip:   2.30 kB
+@acorn/desktop:test: dist/client/assets/xml-WY0zc4PG.js                             5.38 kB │ gzip:   1.20 kB
+@acorn/desktop:test: dist/client/assets/ShortcutsSettings-DLYV87eJ.js               5.43 kB │ gzip:   2.43 kB
+@acorn/desktop:test: dist/client/assets/store-DEZn0OAk.js                           5.48 kB │ gzip:   2.17 kB
+@acorn/desktop:test: dist/client/assets/NotesPane-DCnWqWRj.js                       5.48 kB │ gzip:   1.96 kB
+@acorn/desktop:test: dist/client/assets/stepFields-T0QTYh5H.js                      5.58 kB │ gzip:   1.99 kB
+@acorn/desktop:test: dist/client/assets/PluginApprovalDialog-BH93_bqV.js            5.58 kB │ gzip:   2.22 kB
+@acorn/desktop:test: dist/client/assets/ContextPane-DsSTFB9r.js                     5.58 kB │ gzip:   1.93 kB
+@acorn/desktop:test: dist/client/assets/remoteSourceRegion-B_DGytkC.js              5.65 kB │ gzip:   2.70 kB
+@acorn/desktop:test: dist/client/assets/layouts-CGUdu_6U.js                         5.83 kB │ gzip:   2.26 kB
+@acorn/desktop:test: dist/client/assets/PromoteToTaskModal-CzZEGiJ6.js              5.91 kB │ gzip:   2.32 kB
+@acorn/desktop:test: dist/client/assets/Markdown-Bapiu8Mt.js                        6.26 kB │ gzip:   2.96 kB
+@acorn/desktop:test: dist/client/assets/toml-CcmNWLt0.js                            6.41 kB │ gzip:   1.28 kB
+@acorn/desktop:test: dist/client/assets/ArchivePage-BhW-EcDi.js                     6.61 kB │ gzip:   2.61 kB
+@acorn/desktop:test: dist/client/assets/nativePages-Cn3IsS73.js                     6.71 kB │ gzip:   2.73 kB
+@acorn/desktop:test: dist/client/assets/InlineDiffCard-TtT6TQk7.js                  6.91 kB │ gzip:   2.76 kB
+@acorn/desktop:test: dist/client/assets/ChromeSourcePanel-C4V_XT6K.js               6.92 kB │ gzip:   2.55 kB
+@acorn/desktop:test: dist/client/assets/PluginFrame-CCbOs0_m.js                     7.19 kB │ gzip:   3.12 kB
+@acorn/desktop:test: dist/client/assets/ProjectTable-D92h8e2r.js                    7.33 kB │ gzip:   2.56 kB
+@acorn/desktop:test: dist/client/assets/Timeline-D40OCvm3.js                        7.41 kB │ gzip:   3.37 kB
+@acorn/desktop:test: dist/client/assets/pricingClient-BFgqkVC6.js                   7.41 kB │ gzip:   2.59 kB
+@acorn/desktop:test: dist/client/assets/Graph-BI8QlQeW.js                           7.43 kB │ gzip:   3.09 kB
+@acorn/desktop:test: dist/client/assets/persist-BTsPHolo.js                         7.48 kB │ gzip:   2.92 kB
+@acorn/desktop:test: dist/client/assets/AgentSessionDefaultsSettings-D2VPKNZY.js    7.77 kB │ gzip:   2.73 kB
+@acorn/desktop:test: dist/client/assets/navigationCommands-BoVd0G1F.js              7.82 kB │ gzip:   3.08 kB
+@acorn/desktop:test: dist/client/assets/panes-DqvhYB_n.js                           7.83 kB │ gzip:   3.73 kB
+@acorn/desktop:test: dist/client/assets/chromeData-BqD8NX0v.js                      7.89 kB │ gzip:   2.92 kB
+@acorn/desktop:test: dist/client/assets/libesm-BPa4NziU.js                          8.25 kB │ gzip:   3.04 kB
+@acorn/desktop:test: dist/client/assets/CustomAgentsSettings-Tv4mEfhn.js            8.29 kB │ gzip:   3.09 kB
+@acorn/desktop:test: dist/client/assets/AgentCenter-Dx-f4IXR.js                     8.72 kB │ gzip:   3.27 kB
+@acorn/desktop:test: dist/client/assets/ContainerDetail-BAHEmASl.js                 9.18 kB │ gzip:   3.57 kB
+@acorn/desktop:test: dist/client/assets/AgentTaskSidebar-DzB-c_hF.js                9.22 kB │ gzip:   2.86 kB
+@acorn/desktop:test: dist/client/assets/PluginTrustDialog-DiGiDOKX.js               9.23 kB │ gzip:   3.39 kB
+@acorn/desktop:test: dist/client/assets/permissions-CNCOVCE9.js                     9.80 kB │ gzip:   3.60 kB
+@acorn/desktop:test: dist/client/assets/PrPane-Cgm58G6H.js                         10.05 kB │ gzip:   3.91 kB
+@acorn/desktop:test: dist/client/assets/AgentMcpServersSettings-OxVrljAS.js        10.06 kB │ gzip:   3.67 kB
+@acorn/desktop:test: dist/client/assets/SchedulesSettings-C0mQ-UPu.js              10.15 kB │ gzip:   3.59 kB
+@acorn/desktop:test: dist/client/assets/draftStore-Bsa5_ggw.js                     10.15 kB │ gzip:   4.08 kB
+@acorn/desktop:test: dist/client/assets/yaml-DijMHRDA.js                           10.49 kB │ gzip:   2.26 kB
+@acorn/desktop:test: dist/client/assets/AgentLimitsSettings-wRdWTYsC.js            10.86 kB │ gzip:   3.48 kB
+@acorn/desktop:test: dist/client/assets/public-4Gq8FDXy.js                         10.88 kB │ gzip:   3.78 kB
+@acorn/desktop:test: dist/client/assets/sessionStore-0fDSUWgf.js                   10.97 kB │ gzip:   4.19 kB
+@acorn/desktop:test: dist/client/assets/github-light-EUqPIrTm.js                   11.18 kB │ gzip:   2.49 kB
+@acorn/desktop:test: dist/client/assets/github-dark-C-LZuMrd.js                    11.40 kB │ gzip:   2.53 kB
+@acorn/desktop:test: dist/client/assets/dist-H0dDKqnj.js                           11.55 kB │ gzip:   5.17 kB
+@acorn/desktop:test: dist/client/assets/DockerBrowse-BRs76Hfz.js                   11.65 kB │ gzip:   3.57 kB
+@acorn/desktop:test: dist/client/assets/ConnectionsPage-BHdWdoox.js                12.44 kB │ gzip:   4.06 kB
+@acorn/desktop:test: dist/client/assets/AgentPane-IzknB3nK.js                      13.63 kB │ gzip:   4.76 kB
+@acorn/desktop:test: dist/client/assets/dist-CSEOOA9M.js                           13.73 kB │ gzip:   5.93 kB
+@acorn/desktop:test: dist/client/assets/OnboardingWizard-Nxn8tQVp.js               13.77 kB │ gzip:   5.23 kB
+@acorn/desktop:test: dist/client/assets/SettingsView-CQsyFxZ3.js                   14.33 kB │ gzip:   5.54 kB
+@acorn/desktop:test: dist/client/assets/dist-Cpk7S10R.js                           14.34 kB │ gzip:   5.77 kB
+@acorn/desktop:test: dist/client/assets/rust-Cfkwpbl8.js                           15.06 kB │ gzip:   2.71 kB
+@acorn/desktop:test: dist/client/assets/FindingsBundleReview-N278iMbL.js           15.37 kB │ gzip:   4.46 kB
+@acorn/desktop:test: dist/client/assets/GithubBrowse-BZRXV6AS.js                   16.34 kB │ gzip:   6.54 kB
+@acorn/desktop:test: dist/client/assets/ChangesPane-CgGlH9nU.js                    17.32 kB │ gzip:   5.29 kB
+@acorn/desktop:test: dist/client/assets/DiffRows-BMEvgNs_.js                       18.93 kB │ gzip:   6.27 kB
+@acorn/desktop:test: dist/client/assets/NodesSettings-BppM-wdg.js                  20.31 kB │ gzip:   7.07 kB
+@acorn/desktop:test: dist/client/assets/EditorPane-JKt058f-.js                     20.40 kB │ gzip:   8.44 kB
+@acorn/desktop:test: dist/client/assets/apiClient-DmHgBs9L.js                      21.25 kB │ gzip:   8.26 kB
+@acorn/desktop:test: dist/client/assets/ProjectSettings-DBjlAJSA.js                22.07 kB │ gzip:   7.00 kB
+@acorn/desktop:test: dist/client/assets/sql-CP0rg-5b.js                            23.41 kB │ gzip:   7.45 kB
+@acorn/desktop:test: dist/client/assets/WorkflowsBrowse-DuA3DwzI.js                23.45 kB │ gzip:   7.59 kB
+@acorn/desktop:test: dist/client/assets/RemoteTree-kU-sPLPn.js                     23.87 kB │ gzip:   8.44 kB
+@acorn/desktop:test: dist/client/assets/PluginsSettings-BDUABfSw.js                24.11 kB │ gzip:   7.70 kB
+@acorn/desktop:test: dist/client/assets/Icon-o5eHUo1N.js                           24.33 kB │ gzip:   7.29 kB
+@acorn/desktop:test: dist/client/assets/Rows-DyM9ACk8.js                           26.45 kB │ gzip:   8.08 kB
+@acorn/desktop:test: dist/client/assets/dist-DeooXfW9.js                           26.46 kB │ gzip:   8.68 kB
+@acorn/desktop:test: dist/client/assets/dist-D1P2lYPf.js                           26.83 kB │ gzip:  12.70 kB
+@acorn/desktop:test: dist/client/assets/java-BtIQNnN0.js                           27.20 kB │ gzip:   4.25 kB
+@acorn/desktop:test: dist/client/assets/scss-DHtrkMkT.js                           27.20 kB │ gzip:   4.18 kB
+@acorn/desktop:test: dist/client/assets/dist-BJUTN3ST.js                           28.36 kB │ gzip:  11.51 kB
+@acorn/desktop:test: dist/client/assets/web-6-NtIblv.js                            28.86 kB │ gzip:  11.14 kB
+@acorn/desktop:test: dist/client/assets/dist-eAWARNr5.js                           30.73 kB │ gzip:  12.74 kB
+@acorn/desktop:test: dist/client/assets/prSections-CCDMPBwA.js                     30.96 kB │ gzip:   9.73 kB
+@acorn/desktop:test: dist/client/assets/NodeDetail-BOIdoLzL.js                     31.03 kB │ gzip:   8.13 kB
+@acorn/desktop:test: dist/client/assets/AgentEventCard-DYMyLXX6.js                 31.92 kB │ gzip:   9.61 kB
+@acorn/desktop:test: dist/client/assets/SourceQueryEditor-CB9Bqo0_.js              37.31 kB │ gzip:  11.60 kB
+@acorn/desktop:test: dist/client/assets/dist-CS9_-PUo.js                           39.72 kB │ gzip:  11.80 kB
+@acorn/desktop:test: dist/client/assets/AgentConversation-BAzodO5O.js              40.69 kB │ gzip:  13.22 kB
+@acorn/desktop:test: dist/client/assets/dist-CS70WoCz.js                           40.71 kB │ gzip:  16.94 kB
+@acorn/desktop:test: dist/client/assets/shellscript-CqHdAlCp.js                    41.46 kB │ gzip:   6.07 kB
+@acorn/desktop:test: dist/client/assets/dist-CreDIddp.js                           43.89 kB │ gzip:  15.14 kB
+@acorn/desktop:test: dist/client/assets/dist-g9_qYQbp.js                           44.58 kB │ gzip:  19.33 kB
+@acorn/desktop:test: dist/client/assets/DiffPane-C-aOU1Ju.js                       45.56 kB │ gzip:  16.64 kB
+@acorn/desktop:test: dist/client/assets/go-rLFTqkRN.js                             46.81 kB │ gzip:   5.14 kB
+@acorn/desktop:test: dist/client/assets/css-LbU1hoFO.js                            49.02 kB │ gzip:  11.90 kB
+@acorn/desktop:test: dist/client/assets/html-BcACZWSP.js                           57.24 kB │ gzip:  11.74 kB
+@acorn/desktop:test: dist/client/assets/PanelGrid-DBRFm_4U.js                      57.41 kB │ gzip:  18.84 kB
+@acorn/desktop:test: dist/client/assets/markdown-BYOwaDjH.js                       59.32 kB │ gzip:   5.66 kB
+@acorn/desktop:test: dist/client/assets/python-gzcpVVnB.js                         69.94 kB │ gzip:   9.09 kB
+@acorn/desktop:test: dist/client/assets/dist-C98JyTPb.js                           70.78 kB │ gzip:  26.09 kB
+@acorn/desktop:test: dist/client/assets/WorkflowEditor-BhtDc4lB.js                 72.06 kB │ gzip:  19.27 kB
+@acorn/desktop:test: dist/client/assets/c-SSSlmE39.js                              72.10 kB │ gzip:  10.49 kB
+@acorn/desktop:test: dist/client/assets/install-DYj7GkU1.js                        82.53 kB │ gzip:  24.61 kB
+@acorn/desktop:test: dist/client/assets/dist-DaPy8QHp.js                           84.62 kB │ gzip:  33.75 kB
+@acorn/desktop:test: dist/client/assets/emitter-BWUYWJ8n.js                        84.93 kB │ gzip:  23.82 kB
+@acorn/desktop:test: dist/client/assets/ruby-BhrksQMt.js                           88.07 kB │ gzip:  11.90 kB
+@acorn/desktop:test: dist/client/assets/distribution-L7Sym5b9.js                   93.60 kB │ gzip:  30.51 kB
+@acorn/desktop:test: dist/client/assets/viewState-CfqBoa6K.js                      96.24 kB │ gzip:  31.48 kB
+@acorn/desktop:test: dist/client/assets/less-DVTAwKKz.js                           97.62 kB │ gzip:  14.84 kB
+@acorn/desktop:test: dist/client/assets/dist-HiDESoBo.js                          103.89 kB │ gzip:  34.75 kB
+@acorn/desktop:test: dist/client/assets/TerminalPanel-04jwk_AJ.js                 110.62 kB │ gzip:  29.52 kB
+@acorn/desktop:test: dist/client/assets/shiki-BAO2WipY.js                         162.79 kB │ gzip:  53.82 kB
+@acorn/desktop:test: dist/client/assets/javascript-BzbQS41l.js                    174.81 kB │ gzip:  16.62 kB
+@acorn/desktop:test: dist/client/assets/tsx-BOvsFOI6.js                           175.52 kB │ gzip:  16.61 kB
+@acorn/desktop:test: dist/client/assets/jsx-D3KKoC5L.js                           177.77 kB │ gzip:  16.70 kB
+@acorn/desktop:test: dist/client/assets/typescript-j_1H8WHN.js                    181.06 kB │ gzip:  16.23 kB
+@acorn/desktop:test: dist/client/assets/xterm-CKrD01wN.js                         287.23 kB │ gzip:  67.82 kB
+@acorn/desktop:test: dist/client/assets/dist-DMAftjod.js                          313.34 kB │ gzip: 101.58 kB
+@acorn/desktop:test: dist/client/assets/index-DnK7k4T_.js                         358.75 kB │ gzip: 121.05 kB
+@acorn/desktop:test: dist/client/assets/icon-nodes-B_Udu2aO.js                    368.66 kB │ gzip:  80.34 kB
+@acorn/desktop:test: dist/client/assets/cpp-BGdv8dzs.js                           637.54 kB │ gzip:  50.48 kB
+@acorn/desktop:test:
+@acorn/desktop:test: ✓ built in 3.22s
+@acorn/desktop:test: [plugin builtin:vite-reporter]
+@acorn/desktop:test: (!) Some chunks are larger than 500 kB after minification. Consider:
+@acorn/desktop:test: - Using dynamic import() to code-split the application
+@acorn/desktop:test: - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
+@acorn/desktop:test: - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+@acorn/desktop:test: $ vitest run --exclude test/boot.test.ts && pnpm run test:boot && cargo test --manifest-path src-tauri/Cargo.toml
+@acorn/desktop:test:
+@acorn/desktop:test:  RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop
+@acorn/desktop:test:
+@acorn/desktop:test:  ❯ |shell| src/helper/rendererConnection.test.ts (6 tests | 6 failed) 15ms
+@acorn/desktop:test:      × filters explicit interest per socket through fleet reads, cleanup sends, malformed calls, and cached switches 8ms
+@acorn/desktop:test:      × isolates equal request IDs and aborts only a disconnected renderer 1ms
+@acorn/desktop:test:      × keeps legacy wildcard interest but a modern fetch-only observer receives statuses without opening a lease 1ms
+@acorn/desktop:test:      × encodes only once for eligible recipients and does no payload work for inactive or missing viewers 1ms
+@acorn/desktop:test:      × targets transport refusals to the requesting renderer while retaining sibling status delivery 1ms
+@acorn/desktop:test:      × does not access a late response body after close and clears completed request ownership 1ms
+@acorn/desktop:test: (node:55387) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/desktop:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/desktop:test: (node:55392) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/desktop:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/desktop:test: (node:55396) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/desktop:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/desktop:test: (node:55430) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/desktop:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/desktop:test: (node:55432) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/desktop:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/desktop:test:
+@acorn/desktop:test: ⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+@acorn/desktop:test:
+@acorn/desktop:test:  FAIL  |shell| src/helper/rendererConnection.test.ts > renderer socket ownership > filters explicit interest per socket through fleet reads, cleanup sends, malformed calls, and cached switches
+@acorn/desktop:test: TypeError: Cannot read properties of undefined (reading 'watch')
+@acorn/desktop:test:  ❯ startHelperServer src/helper/helperServer.ts:118:41
+@acorn/desktop:test:     116|     }
+@acorn/desktop:test:     117|   }
+@acorn/desktop:test:     118|   const stopConfigWatch = helper.config.watch((state) => push({ push: …
+@acorn/desktop:test:        |                                         ^
+@acorn/desktop:test:     119|
+@acorn/desktop:test:     120|   // The same filter as `push` above, and the same reason: an N-node f…
+@acorn/desktop:test:  ❯ fixture src/helper/rendererConnection.test.ts:36:24
+@acorn/desktop:test:  ❯ src/helper/rendererConnection.test.ts:63:21
+@acorn/desktop:test:
+@acorn/desktop:test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+@acorn/desktop:test:
+@acorn/desktop:test:  FAIL  |shell| src/helper/rendererConnection.test.ts > renderer socket ownership > isolates equal request IDs and aborts only a disconnected renderer
+@acorn/desktop:test: TypeError: Cannot read properties of undefined (reading 'watch')
+@acorn/desktop:test:  ❯ startHelperServer src/helper/helperServer.ts:118:41
+@acorn/desktop:test:     116|     }
+@acorn/desktop:test:     117|   }
+@acorn/desktop:test:     118|   const stopConfigWatch = helper.config.watch((state) => push({ push: …
+@acorn/desktop:test:        |                                         ^
+@acorn/desktop:test:     119|
+@acorn/desktop:test:     120|   // The same filter as `push` above, and the same reason: an N-node f…
+@acorn/desktop:test:  ❯ fixture src/helper/rendererConnection.test.ts:36:24
+@acorn/desktop:test:  ❯ src/helper/rendererConnection.test.ts:92:21
+@acorn/desktop:test:
+@acorn/desktop:test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+@acorn/desktop:test:
+@acorn/desktop:test:  FAIL  |shell| src/helper/rendererConnection.test.ts > renderer socket ownership > keeps legacy wildcard interest but a modern fetch-only observer receives statuses without opening a lease
+@acorn/desktop:test: TypeError: Cannot read properties of undefined (reading 'watch')
+@acorn/desktop:test:  ❯ startHelperServer src/helper/helperServer.ts:118:41
+@acorn/desktop:test:     116|     }
+@acorn/desktop:test:     117|   }
+@acorn/desktop:test:     118|   const stopConfigWatch = helper.config.watch((state) => push({ push: …
+@acorn/desktop:test:        |                                         ^
+@acorn/desktop:test:     119|
+@acorn/desktop:test:     120|   // The same filter as `push` above, and the same reason: an N-node f…
+@acorn/desktop:test:  ❯ fixture src/helper/rendererConnection.test.ts:36:24
+@acorn/desktop:test:  ❯ src/helper/rendererConnection.test.ts:111:21
+@acorn/desktop:test:
+@acorn/desktop:test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+@acorn/desktop:test:
+@acorn/desktop:test:  FAIL  |shell| src/helper/rendererConnection.test.ts > renderer socket ownership > encodes only once for eligible recipients and does no payload work for inactive or missing viewers
+@acorn/desktop:test: TypeError: Cannot read properties of undefined (reading 'watch')
+@acorn/desktop:test:  ❯ startHelperServer src/helper/helperServer.ts:118:41
+@acorn/desktop:test:     116|     }
+@acorn/desktop:test:     117|   }
+@acorn/desktop:test:     118|   const stopConfigWatch = helper.config.watch((state) => push({ push: …
+@acorn/desktop:test:        |                                         ^
+@acorn/desktop:test:     119|
+@acorn/desktop:test:     120|   // The same filter as `push` above, and the same reason: an N-node f…
+@acorn/desktop:test:  ❯ fixture src/helper/rendererConnection.test.ts:36:24
+@acorn/desktop:test:  ❯ src/helper/rendererConnection.test.ts:127:21
+@acorn/desktop:test:
+@acorn/desktop:test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+@acorn/desktop:test:
+@acorn/desktop:test:  FAIL  |shell| src/helper/rendererConnection.test.ts > renderer socket ownership > targets transport refusals to the requesting renderer while retaining sibling status delivery
+@acorn/desktop:test: TypeError: Cannot read properties of undefined (reading 'watch')
+@acorn/desktop:test:  ❯ startHelperServer src/helper/helperServer.ts:118:41
+@acorn/desktop:test:     116|     }
+@acorn/desktop:test:     117|   }
+@acorn/desktop:test:     118|   const stopConfigWatch = helper.config.watch((state) => push({ push: …
+@acorn/desktop:test:        |                                         ^
+@acorn/desktop:test:     119|
+@acorn/desktop:test:     120|   // The same filter as `push` above, and the same reason: an N-node f…
+@acorn/desktop:test:  ❯ fixture src/helper/rendererConnection.test.ts:36:24
+@acorn/desktop:test:  ❯ src/helper/rendererConnection.test.ts:148:21
+@acorn/desktop:test:
+@acorn/desktop:test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+@acorn/desktop:test:
+@acorn/desktop:test:  FAIL  |shell| src/helper/rendererConnection.test.ts > renderer socket ownership > does not access a late response body after close and clears completed request ownership
+@acorn/desktop:test: TypeError: Cannot read properties of undefined (reading 'watch')
+@acorn/desktop:test:  ❯ startHelperServer src/helper/helperServer.ts:118:41
+@acorn/desktop:test:     116|     }
+@acorn/desktop:test:     117|   }
+@acorn/desktop:test:     118|   const stopConfigWatch = helper.config.watch((state) => push({ push: …
+@acorn/desktop:test:        |                                         ^
+@acorn/desktop:test:     119|
+@acorn/desktop:test:     120|   // The same filter as `push` above, and the same reason: an N-node f…
+@acorn/desktop:test:  ❯ fixture src/helper/rendererConnection.test.ts:36:24
+@acorn/desktop:test:  ❯ src/helper/rendererConnection.test.ts:162:21
+@acorn/desktop:test:
+@acorn/desktop:test: ⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+@acorn/desktop:test:
+@acorn/desktop:test:
+@acorn/desktop:test:  Test Files  1 failed | 25 passed (26)
+@acorn/desktop:test:       Tests  6 failed | 149 passed (155)
+@acorn/desktop:test:    Start at  10:45:44
+@acorn/desktop:test:    Duration  15.78s (transform 16.24s, setup 55ms, import 17.00s, tests 22.82s, environment 3ms)
+@acorn/desktop:test:
+@acorn/desktop:test:  ELIFECYCLE  Command failed with exit code 1.
+@acorn/desktop:test:  ELIFECYCLE  Test failed. See above for more details.
+@acorn/desktop#test:  WARNING  command finished with error, but continuing...
+@acorn/tui:test: (node:56352) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:56634) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:56805) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:56868) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:57459) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:57525) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:57532) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:57533) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:57544) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:57906) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58154) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58155) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58166) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58167) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58174) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58175) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58195) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58196) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58198) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58199) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58212) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58213) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58215) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58221) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58257) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58261) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58597) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58866) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58867) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58871) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58902) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58906) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58909) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test: (node:58913) ExperimentalWarning: localStorage is not available because --localstorage-file was not provided.
+@acorn/tui:test: (Use `node --trace-warnings ...` to show where the warning was created)
+@acorn/tui:test:
+@acorn/tui:test:  Test Files  65 passed (65)
+@acorn/tui:test:       Tests  661 passed | 2 skipped (663)
+@acorn/tui:test:    Start at  10:44:48
+@acorn/tui:test:    Duration  135.44s (transform 48.78s, setup 0ms, import 21.22s, tests 234.27s, environment 5ms)
+@acorn/tui:test:
+ ERROR  @acorn/desktop#test: command (/Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop) /Users/jamesmacfie/Library/pnpm/bin/pnpm run test exited (1)
+
+ Tasks:    36 successful, 37 total
+Cached:    3 cached, 37 total
+  Time:    3m58.533s
+Failed:    @acorn/desktop#test
+
+ ERROR  run failed: command  exited (1)
+ ELIFECYCLE  Test failed. See above for more details.
