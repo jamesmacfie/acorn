@@ -28,6 +28,9 @@ narrow column is unusable.
 
 `preview` is gated by `when` too: a task with no run-target URL and no project preview setting has
 nothing to draw, so it gets no button ([shell.md](./shell.md) § Host-owned webviews has the check).
+`database` is gated the same way through its manifest's `availability` route: a task with no
+connection script and no `DATABASE_URL` in its worktree `.env` or the Node's environment gets no
+button ([database.md](./database.md) § Connection resolution).
 
 The loaded Findings pane is deliberately absent from this list. Its manifest sets
 `showInSwitcher: false`, so the pane remains a valid persisted layout target and can be opened by
@@ -394,6 +397,20 @@ A compiled pane sets `readsArchived: true` on its pane contribution. A loaded pl
 optional field on a task-scoped `frames` entry whose `target` is `pane`. It is invalid on a
 project-scoped pane or any other frame target. Leaving it out keeps the pane out of archived previews,
 which also preserves the behaviour of manifests written before the field existed.
+
+A compiled pane hides itself on a task with nothing to draw by giving its contribution a `when`. A
+loaded plugin can't ship a function to the host, so its task-scoped `frames` entry names an
+`availability` route instead, one of its own under `/v1/p/<id>/`. A GET answers
+`{ [taskId]: boolean }` for every active task on the Node, and the pane appears only on a task the
+answer marks `true`. The host reads it once per Node and keeps it in memory
+(`client-core/host/frames/paneAvailability.ts`), because `when` is asked on every draw of the pane
+strip. It reads again on a project change, a task it hasn't seen, a Node switch, a reconnect, window
+focus, and every two minutes. Until the first answer arrives the pane is hidden. A failed read keeps
+the last answer, so one dropped request doesn't flicker the button. A `404` means a package built
+before the route existed, and the pane then shows on every task, as it did before. The route lists
+every active task, so it should refuse a task-scoped caller. Answer "is this set up", not "is it
+running": an answer that turns false while a dev server restarts closes a pane the reader is looking
+at.
 
 A loaded plugin declares the same two keys on a `frames` entry, and it has to: `layout` is required on
 a `pane`, a `refPanel` and a `settings` surface. Omitting it used to mean "the whole surface is my

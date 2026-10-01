@@ -283,7 +283,6 @@ describe('architecture boundaries', () => {
       'packages/node-core/src/server/headless.ts', // one-shot agent run, streams stdout as it goes
       'packages/node-core/src/server/mcpRegister.ts', // registers the MCP server with a CLI
       'packages/node-core/src/server/profiles.ts', // probes whether an agent CLI is installed
-      'packages/node-core/src/server/transport/tls.ts', // openssl, at first boot only
       'packages/node-core/src/server/core/loginShellPath.ts', // the login-shell PATH probe, once at boot
       'packages/node-core/src/server/transport/listener.ts', // lsof and ps, only when the wanted port is taken
       // The supervised node's own child.
