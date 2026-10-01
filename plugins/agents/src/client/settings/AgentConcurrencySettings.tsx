@@ -51,11 +51,11 @@ export default function AgentConcurrencySettings() {
       <SettingsSection
         id="limits"
         label="Turns at once"
-        description="How many agent turns this Node runs at once. A session always runs one turn at a time, so these ceilings only decide how many sessions can be working together. Turns over a ceiling wait in the queue and start as soon as there is room."
+        help="How many agents can work at the same time on this node. Extra work waits in line and starts when there's room."
       >
         <SettingRow
           label="Turns at once per provider"
-          description="Counted against one agent CLI across every task and workspace, so a single provider account never runs more turns than this."
+          description="For each agent CLI, such as Claude Code, across all tasks."
           savedAt={provider.savedAt()}
           error={provider.error()}
           onReset={reset('provider', provider)}
@@ -74,7 +74,7 @@ export default function AgentConcurrencySettings() {
         </SettingRow>
         <SettingRow
           label="Turns at once per workspace"
-          description="Counted across all providers in one workspace, so one workspace cannot take the machine."
+          description="For each workspace, across all agent CLIs."
           savedAt={workspace.savedAt()}
           error={workspace.error()}
           onReset={reset('workspace', workspace)}

@@ -16,7 +16,7 @@ vi.mock('@tanstack/solid-query', () => ({
 vi.mock('../../infra/queries', () => ({ prefsOptions: () => ({ queryKey: ['prefs'] }) }))
 vi.mock('../../infra/node/apiClient', () => ({ readJson: vi.fn() }))
 
-import AgentToolsSettings from './AgentToolsSettings'
+import AgentToolsSettings, { splitToolDescription } from './AgentToolsSettings'
 
 let host: HTMLElement
 let dispose: (() => void) | undefined
@@ -32,7 +32,7 @@ afterEach(() => {
 
 const headings = () => [...host.querySelectorAll('[data-settings-section="tools"] .ui-section-header-label')].map((label) => label.textContent)
 const chipOf = (tool: string) =>
-  [...host.querySelectorAll('.ui-setting-row')].find((row) => row.querySelector('.ui-setting-label')?.textContent === tool)?.querySelector('.ui-chip')?.textContent
+  [...host.querySelectorAll('.ui-setting-row')].find((row) => row.querySelector('.ui-setting-label')?.textContent === tool)?.querySelector('.ui-badge')?.textContent
 
 describe('Tools and permissions', () => {
   it('groups tools by owner, acorn first, and by tier on request', () => {
@@ -43,5 +43,13 @@ describe('Tools and permissions', () => {
     byTier.click()
     expect(headings()).toEqual(['Read tools', 'Write tools', 'Execute tools'])
     expect(chipOf('findings_record')).toBe('findings')
+  })
+})
+
+describe('splitToolDescription', () => {
+  it('ends the summary at a period before a capital, and nowhere else', () => {
+    expect(splitToolDescription("A run target's status: { running, url?, exitCode? }. Poll it.")).toEqual({ summary: "A run target's status: { running, url?, exitCode? }.", rest: 'Poll it.' })
+    expect(splitToolDescription('Read one note.')).toEqual({ summary: 'Read one note.', rest: '' })
+    expect(splitToolDescription('Uses e.g. notes. Then more.')).toEqual({ summary: 'Uses e.g. notes.', rest: 'Then more.' })
   })
 })

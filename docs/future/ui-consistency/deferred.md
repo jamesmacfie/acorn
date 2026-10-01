@@ -53,7 +53,7 @@ own item.
   04-5, 04-8, 04-14, 05-20, 06-1, 06-6, and 06-14. Listed here because the plan listed it.
 - **06-1 (part).** A person-facing `title` and `summary` for each agent tool. New fields on the tool
   contribution and the catalog. B06 ships the first-sentence mitigation
-  ([06-1](./b06-integrations/06-1-tool-descriptions-for-the-model.md)).
+  (06-1).
 - **06-16.** An unsaved-changes guard for remote-tree settings pages, and a default project passed from
   the host. A new tree-to-host bridge call (`ctx.settings.unsaved(dirty)`). It also holds area 06's copy
   rows 779 to 781 for the API requests settings heading and its help.
@@ -165,7 +165,7 @@ These need someone to choose. Each blocks only its own item.
   around line 132), and the `replace` picker must move to Rail and surfaces first. B04 did the layout.
 - **06-18a (part). Keep the Workflows settings page only for parse problems, or remove it.** It repeats
   the rail source and is empty with no task open. Its two copy rows can land either way
-  ([06-18](./b06-integrations/06-18-smaller-defects.md)).
+  (06-18).
 - **06-18h (part) and the vocabulary rule. One word for the computer.** Today the app says "This
   device", "this computer", "this machine", "this Mac", and "this node". The interim rule: say "this
   computer" in static copy about the machine the window runs on, keep **This device** for
@@ -248,8 +248,8 @@ dialog on `Modal`.
 - **Kept on the id, on purpose:** the trust prompt, the approval dialog, the review, the two "waiting
   for your review" and "waiting for approval" bell rows, and the audit log. A loaded plugin chooses its
   own name, and only the id is unique on the node.
-- **Sentry's connection provider label** stayed "Sentry (telemetry export)". It is
-  [06-18](./b06-integrations/06-18-smaller-defects.md) item i.
+- **Sentry's connection provider label** stayed "Sentry (telemetry export)". B06 renamed it to
+  "Sentry export" (06-18 item i).
 - **Search by id** went missing when search indexed names only. B04 fixed it with `keywords`.
 
 ### B01
@@ -297,6 +297,36 @@ dialog on `Modal`.
   are "acorn links a task to the Compose containers started in its worktree. These settings change which
   containers count." as help, and a **Where to change these** row naming the project's
   `.acorn/config.toml` without the absolute path. Apply them with any Docker settings work.
+
+### B06
+
+- **06-17, skipped: the icon picker on the custom agent form.** `IconPicker` is not on the plugin UI
+  surface, and the closed-kit tests hold the plugin barrel, the support matrix, the remote-tree node
+  set, and the terminal's table to one list. Exposing it is a new kit node in about a dozen places,
+  including the published SDK, which plan decision 20 rules out. The field stays a typed Lucide name
+  with a shorter hint. Do it with a kit change that also gives the terminal a text form.
+- **06-1, model-facing first sentences that stay:** `plugin_authoring` ("THIS node"), `agent_spawn`
+  (`prompt`), `browser_navigate` (`run_status`), `browser_snapshot`, `browser_click`, `browser_fill`
+  ("snapshot ref"), `memory_write` ("PROPOSE"), and `run_status` (a type). The real fix is the
+  deferred person-facing `summary` on the tool.
+- **06-3 changed from the plan.** AI models' Agent CLIs read the core model backends route, and
+  Harnesses reads the agents plugin's provider descriptors, so the two cannot share one descriptor
+  without a new seam. Both now say **Installed** or **Not installed** as a badge. Plugin rows map the
+  status sentence to one badge word in `installed.ts` (`statusWord`) and keep the sentence in the
+  description only when the word leaves something out.
+- **06-5 changed from the plan.** Install a plugin keeps its setting rows, because **Install on** needs
+  a help mark beside a select. Its buttons sit 8 below the package field, the same as the gap between
+  that row's two controls. Add connection and Replace key share `CredentialFields`.
+- **06-6:** the Overview tab opens with a **Status** section holding **Enabled** and the status alert,
+  so the help-mark rule (decision 11) still has a section title.
+- **06-8:** an MCP config server's command is cut to its last two folders per path, with the full
+  command and its environment behind the row's help mark.
+- **06-12:** the connection map's row label "Followed projects" became **Projects**, because a setting
+  row needs a label.
+- **Not checked live:** a connection's own page, Replace key, the device-code panel, a failed rail
+  surface, a replacement offer, acorn.json plugin offers, a populated MCP servers list, and the API
+  pane's Variables view in a task. The fixture has none of them. Each was read from code, and the
+  connection page has a jsdom test.
 
 ## Notes for later sessions
 

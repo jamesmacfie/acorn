@@ -139,13 +139,13 @@ describe('a tree becomes the host’s own components', () => {
     h.apply([{ op: 'insert', parent: null, index: 0, node: node('picker', 'ModelBackendPicker', {
       backends, backendId: 'harness:claude-code', modelId: '', onChange: { $handler: 7 },
     }) }])
-    expect(await settled(() => !!host.querySelector('button[data-tip="Generate with"]'))).toBe(true)
+    expect(await settled(() => !!host.querySelector('button[aria-label="Generate with"]'))).toBe(true)
 
     h.apply([{ op: 'patch', id: 'picker', props: { backendId: 'harness:codex', modelId: 'gpt-one' } }])
     await frame()
 
-    expect(host.querySelector('button[data-tip="Generate with"]')?.textContent).toContain('Codex')
-    expect(host.querySelector('button[data-tip="Model"]')?.textContent).toContain('GPT One')
+    expect(host.querySelector('button[aria-label="Generate with"]')?.textContent).toContain('Codex')
+    expect(host.querySelector('button[aria-label="Model"]')?.textContent).toContain('GPT One')
   })
 
   it('moves the element it has rather than building a new one', async () => {

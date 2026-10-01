@@ -2,8 +2,8 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createSignal, For, Index, Show } from 'solid-js'
 import { createSettingSave, useSettingsDetail, useUnsavedChanges } from '@acorn/plugin-api/client'
 import {
-  Alert, Button, Checkbox, Field, IconButton, Inline, Input, Link,
-  SegmentedControl, SettingRow, SettingsSection, Stack, Text, Textarea, Toolbar,
+  Alert, Button, Checkbox, EmptyState, Field, Icon, IconButton, Inline, Input,
+  SegmentedControl, SettingRow, SettingsSection, Stack, Text, Textarea,
 } from '@acorn/plugin-api/ui'
 import { confirmAction } from '@acorn/plugin-api/ui/host'
 import {
@@ -143,19 +143,19 @@ export default function AgentMcpServersSettings(props: { context?: PageContext }
             <SettingsSection
               id="servers"
               label="Servers"
-              description="Servers you add here go to every agent session acorn runs, in Claude Code, Codex, and any other harness, and they go with a session when you continue it in a terminal. A server that is on for new sessions starts in each session you open from now on. Settings never changes a session that is already open: to change its list, type /mcp in its composer."
-              actions={<Button onPress={() => openForm(blankAgentMcpServerDraft())}>Add server</Button>}
+              description="acorn adds these servers to every agent session."
+              help="They go to Claude Code, Codex, and any other harness, including a session you continue in a terminal. A change applies to new sessions. To change an open session, type /mcp in its message box."
+              actions={
+                <>
+                  <Show when={props.context}>
+                    {(context) => <Button variant="ghost" onPress={() => context().navigate('mcp')}>MCP config files</Button>}
+                  </Show>
+                  <Button onPress={() => openForm(blankAgentMcpServerDraft())}><Icon name="plus" /> Add server</Button>
+                </>
+              }
             >
-              <Show when={props.context}>
-                {(context) => (
-                  <Text emphasis="muted" wrap>
-                    Servers set up in a CLI's own config keep loading as well, and acorn cannot switch them off.{' '}
-                    <Link onPress={() => context().navigate('mcp')}>MCP config files</Link> lists them.
-                  </Text>
-                )}
-              </Show>
               <Show when={!current().length && servers.isSuccess}>
-                <Text emphasis="muted">No servers yet.</Text>
+                <EmptyState align="start" size="sm">No servers.</EmptyState>
               </Show>
               {/* By name, because a toggle or a refetch hands back new server objects, and a row drawn
                   again would drop the focus on its switch. */}
@@ -190,30 +190,26 @@ function ServerRow(props: {
   const enabled = createSettingSave()
   const server = () => props.server
   return (
-    <SettingRow
-      label={server().name}
-      description={server().transport === 'stdio' ? 'Command (stdio)' : 'URL (HTTP)'}
-      layout="stacked"
-      error={enabled.error()}
-    >
-      <Stack gap="inline">
-        <Text emphasis="mono">
-          {server().transport === 'stdio' ? [server().command, ...server().args].join(' ') : server().url}
-        </Text>
-        <Checkbox
-          switch
-          size="sm"
-          label="On for new sessions"
-          checked={server().enabled}
-          onChange={(checked) => enabled.run(() => props.onToggle(checked))}
-        />
-        <TestLine state={props.test} />
-        <Toolbar variant="actions" size="sm">
-          <Button size="sm" onPress={props.onEdit}>Edit</Button>
-          <Button size="sm" busy={props.test?.testing} onPress={props.onTest}>Test</Button>
-        </Toolbar>
-      </Stack>
-    </SettingRow>
+    <>
+      <SettingRow
+        label={server().name}
+        description={server().transport === 'stdio' ? [server().command, ...server().args].join(' ') : server().url ?? undefined}
+        error={enabled.error()}
+      >
+        <Inline>
+          <Checkbox
+            switch
+            size="sm"
+            label="On for new sessions"
+            checked={server().enabled}
+            onChange={(checked) => enabled.run(() => props.onToggle(checked))}
+          />
+          <Button size="sm" variant="ghost" label={`Edit ${server().name}`} onPress={props.onEdit}>Edit</Button>
+          <Button size="sm" variant="ghost" label={`Test ${server().name}`} busy={props.test?.testing} onPress={props.onTest}>Test</Button>
+        </Inline>
+      </SettingRow>
+      <TestLine state={props.test} />
+    </>
   )
 }
 
@@ -265,7 +261,7 @@ function ServerEditor(props: {
     void confirmAction({
       title: 'Discard unsaved changes',
       actionLabel: 'Discard changes',
-      goes: 'The changes to this server that are not saved yet.',
+      goes: 'Your unsaved changes to this server.',
       stays: props.draft.existing ? 'The server as it was last saved.' : undefined,
       danger: true,
     }).then((discard) => { if (discard) props.onCancel() })
@@ -296,14 +292,14 @@ function ServerEditor(props: {
               </Field>
             }
           >
-            <Field label="Command" hint="Found on the PATH agents run with, or give a full path.">
+            <Field label="Command" hint="A program on your PATH, or its full path.">
               <Input value={props.draft.command} placeholder="npx" onInput={(command) => props.onEdit({ command })} />
             </Field>
             <Field label="Arguments" hint="One per line.">
               <Textarea mono rows={3} value={props.draft.args} placeholder={'-y\n@example/mcp-server'} onInput={(args) => props.onEdit({ args })} />
             </Field>
           </Show>
-          <Field label={valuesLabel()} group hint="Mark a value secret to store it encrypted. acorn never shows it again, and a stored secret left empty keeps its value.">
+          <Field label={valuesLabel()} group hint="Secret values are stored encrypted and never shown again. Leave a saved secret empty to keep it.">
             <Stack gap="inline">
               <Index each={props.draft.values}>
                 {(pair, index) => (
@@ -331,10 +327,10 @@ function ServerEditor(props: {
           </Field>
           <Checkbox switch label="On for new sessions" checked={props.draft.enabled} onChange={(enabled) => props.onEdit({ enabled })} />
           <Show when={props.error}><Alert>{props.error}</Alert></Show>
-          <Toolbar variant="actions">
+          <Inline gap="row">
             <Button tone="accent" variant="solid" busy={props.saving} onPress={props.onSave}>Save</Button>
             <Button variant="ghost" onPress={props.onCancel}>Cancel</Button>
-          </Toolbar>
+          </Inline>
         </Stack>
       </SettingsSection>
       <Show when={props.draft.existing}>

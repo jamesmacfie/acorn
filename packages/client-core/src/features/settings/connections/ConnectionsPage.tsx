@@ -91,6 +91,7 @@ export function ConnectionsPage(props: {
         listedOn={props.page === SERVICES_PAGE ? (provider) => (isModelProvider(provider) ? 'Listed on AI models' : undefined) : undefined}
         openConnection={openConnection}
         listLabel={props.label}
+        title={props.page === SERVICES_PAGE ? 'Add connection' : 'Add an API key'}
         onClose={() => setOpen(undefined)}
       />
     </Show>

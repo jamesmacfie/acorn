@@ -2,7 +2,7 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createMemo, createResource, createSignal, For, Show, type Accessor } from 'solid-js'
 import { pluginLabel, useSettingsDetail, useUnsavedChanges } from '@acorn/plugin-api/client'
 import {
-  Alert, Button, Chip, Field, Inline, Input, Select, SettingRow, SettingsSection, Stack, Text, Textarea, Toolbar,
+  Alert, Badge, Button, EmptyState, Field, Icon, Inline, Input, Select, SettingRow, SettingsSection, Stack, Text, Textarea,
 } from '@acorn/plugin-api/ui'
 import { confirmAction } from '@acorn/plugin-api/ui/host'
 import type { AgentProviderDescriptor } from '../../contract/wire.ts'
@@ -24,8 +24,8 @@ import { customAgentsOptions, deleteCustomAgent, saveCustomAgent } from './custo
 const SYSTEM_PROMPT_HARNESSES: ReadonlySet<string> = new Set(['claude', 'codex'])
 
 const TOOL_ACCESS = [
-  { value: '', label: 'Every tool the session may use' },
-  { value: 'write', label: 'Read and change, no running things' },
+  { value: '', label: 'All allowed tools' },
+  { value: 'write', label: "Read and write, but don't run anything" },
   { value: 'read', label: 'Read only' },
 ]
 
@@ -74,7 +74,7 @@ export default function CustomAgentsSettings() {
       <Inline>
         <ProviderGlyph glyph={agent.glyph ?? providerFor(agent.providerId)?.glyph} label={agent.name} />
         <Show when={agent.source.kind === 'plugin' ? agent.source.pluginId : undefined}>
-          {(pluginId) => <Chip size="xs">From {pluginLabel(pluginId())}</Chip>}
+          {(pluginId) => <Badge size="xs">From {pluginLabel(pluginId())}</Badge>}
         </Show>
         <Show when={agent.source.kind === 'user'}>
           <Button size="sm" variant="ghost" onPress={() => open(agent.id, inputOf(agent))}>Edit</Button>
@@ -97,15 +97,15 @@ export default function CustomAgentsSettings() {
           <>
             <SettingsSection
               id="agents"
-              label="Custom agents"
-              description="A custom agent is a harness with the settings, instructions, and tool access a session should start on. Each one appears under New in the Agent pane and in the command palette. Editing an agent changes the sessions you start from it later, not the ones already running."
+              label="Your agents"
+              help="A custom agent starts a session with the harness, settings, instructions, and tool access you choose. It shows under New in the Agent pane and in the command palette. Changes apply to sessions you start later."
               actions={
                 <Button onPress={create} disabled={!providers()?.some((provider) => provider.installed)}>
-                  New agent
+                  <Icon name="plus" /> New agent
                 </Button>
               }
             >
-              <For each={own()} fallback={<Show when={agents.isSuccess}><Text emphasis="muted">No custom agents yet.</Text></Show>}>{row}</For>
+              <For each={own()} fallback={<Show when={agents.isSuccess}><EmptyState align="start" size="sm">No custom agents.</EmptyState></Show>}>{row}</For>
             </SettingsSection>
             <Show when={fromPlugins().length}>
               <SettingsSection
@@ -172,7 +172,7 @@ function AgentEditor(props: {
     void confirmAction({
       title: 'Discard unsaved changes',
       actionLabel: 'Discard changes',
-      goes: 'The changes to this agent that are not saved yet.',
+      goes: 'Your unsaved changes to this agent.',
       stays: props.editing().id ? 'The agent as it was last saved.' : undefined,
       danger: true,
     }).then((discard) => { if (discard) props.onClose() })
@@ -222,7 +222,7 @@ function AgentEditor(props: {
         <Inline><Button variant="bare" size="sm" onPress={back}>‹ Custom agents</Button></Inline>
       </Show>
       <SettingsSection id="agent" label="Agent">
-        <Stack gap="row">
+        <Stack gap="stack">
           <Field label="Name">
             <Input
               value={draft().name}
@@ -235,13 +235,13 @@ function AgentEditor(props: {
           <Field label="Description" hint="Shown under the name in New. Leave it empty to show the harness and its settings.">
             <Input value={draft().description ?? ''} maxLength={500} onInput={(description) => update({ description: description || undefined })} />
           </Field>
-          <Field label="Icon" hint="A Lucide icon name, such as bug. Leave it empty to use the harness's mark.">
+          {/* A typed name: the kit's icon picker is not on the plugin surface (deferred, B06 06-17). */}
+          <Field label="Icon" hint="A Lucide icon name, such as bug. Leave it empty to use the harness's icon.">
             <Input value={draft().glyph ?? ''} maxLength={200} onInput={(glyph) => update({ glyph: glyph.trim() || undefined })} />
           </Field>
-          <Field label="Harness" layout="split">
+          <Field label="Harness">
             <Select
               label="Harness"
-              size="sm"
               value={draft().providerId}
               options={props.providers
                 .filter((candidate) => candidate.installed || candidate.id === draft().providerId)
@@ -260,10 +260,9 @@ function AgentEditor(props: {
           >
             <For each={props.advertised[draft().providerId]}>
               {(option) => (
-                <Field label={option.label} layout="split">
+                <Field label={option.label}>
                   <Select
                     label={option.label}
-                    size="sm"
                     value={draft().options[option.id] ?? ''}
                     options={[
                       { value: '', label: 'Your usual default' },
@@ -275,10 +274,9 @@ function AgentEditor(props: {
               )}
             </For>
           </Show>
-          <Field label="Acorn tools" hint="The most this agent may do with Acorn's own tools. It never widens what Tools and permissions allows." layout="split">
+          <Field label="acorn tools" hint="The most this agent can do with acorn's tools. Tools and permissions still applies.">
             <Select
-              label="Acorn tools"
-              size="sm"
+              label="acorn tools"
               value={draft().maxToolRisk ?? ''}
               options={TOOL_ACCESS}
               onChange={(value) => update({ maxToolRisk: (value || undefined) as CustomAgentInput['maxToolRisk'] })}
@@ -288,7 +286,7 @@ function AgentEditor(props: {
             label="Instructions"
             hint={SYSTEM_PROMPT_HARNESSES.has(draft().providerId)
               ? `Added to ${provider()?.label ?? 'the agent'}'s system prompt for every session started from this agent.`
-              : 'This harness has no system prompt Acorn can add to, so these go in front of the first message instead. A compaction can drop them.'}
+              : "This harness can't take extra instructions, so acorn adds them before your first message. The agent can lose them when it shortens a long conversation."}
           >
             <Textarea
               value={draft().instructions ?? ''}
@@ -299,10 +297,10 @@ function AgentEditor(props: {
             />
           </Field>
           <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
-          <Toolbar variant="actions">
+          <Inline gap="row">
             <Button tone="accent" variant="solid" busy={saving()} onPress={() => void save()}>Save</Button>
             <Button variant="ghost" onPress={props.onClose}>Cancel</Button>
-          </Toolbar>
+          </Inline>
         </Stack>
       </SettingsSection>
       <Show when={props.editing().id}>

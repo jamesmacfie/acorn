@@ -152,14 +152,6 @@
 .run-target-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: var(--space-4); }
 .run-target-form > :not(.ui-field) { grid-column: 1 / -1; }
 
-/* MCP inspector (docs/mcp.md). */
-.mcp-server { display: flex; align-items: baseline; gap: var(--space-5); padding: 3px 0 3px var(--space-6); font-size: var(--fs-sm); flex-wrap: wrap; }
-.mcp-server-name { font-family: var(--font-mono); color: var(--text); }
-.mcp-server-status { color: var(--add-marker); }
-.mcp-server-status.mcp-disabled { color: var(--text-faint); }
-.mcp-server-status.mcp-invalid { color: var(--del-marker); }
-.mcp-server-cmd { max-width: 40ch; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--font-mono); }
-.mcp-server-env { font-family: var(--font-mono); }
 .shortcut-conflict { border-color: var(--del-marker); }
 .shortcut-claims { display: flex; flex-direction: column; gap: var(--space-1); }
 

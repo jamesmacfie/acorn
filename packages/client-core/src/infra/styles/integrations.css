@@ -86,15 +86,15 @@
    the mark alone and no rule here names it. */
 .integration-logo {
   flex: none;
-  width: 30px;
-  height: 30px;
+  width: var(--control-h);
+  height: var(--control-h);
   display: grid;
   place-items: center;
   border-radius: var(--radius-lg);
   background: var(--brand, var(--bg-hover));
   color: var(--brand-on, var(--text));
 }
-.integration-logo svg { width: 18px; height: 18px; display: block; }
+.integration-logo svg { width: var(--icon-box); height: var(--icon-box); display: block; }
 .integration-logo-mono { font-weight: 700; font-size: var(--fs-md); line-height: 1; font-family: var(--font-glyph); }
 
 /* The Add connection gallery: a card per provider, as many to a row as fit. */
@@ -103,10 +103,13 @@
   grid-template-columns: repeat(auto-fill, minmax(12rem, 1fr));
   gap: var(--space-4);
 }
-.connection-card { display: flex; align-items: flex-start; gap: var(--space-5); text-align: left; }
+/* A card is a button, and a button centres what it holds, so a card whose title wraps would start its
+   text higher than its neighbours. Every title starts at the card's top instead. */
+.connection-gallery > .ui-card { display: flex; flex-direction: column; justify-content: flex-start; }
+.connection-card { display: flex; align-self: stretch; align-items: flex-start; gap: var(--space-5); text-align: left; }
 .connection-card-text { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
 .connection-card-title { font-weight: 600; color: var(--text); }
-.connection-card-sub { font-size: var(--fs-sm); color: var(--text-faint); }
+.connection-card-sub { font-size: var(--fs-sm); color: var(--text-muted); }
 .connection-card-state { font-size: var(--fs-sm); color: var(--text-muted); }
 .connection-card-state[data-full] { color: var(--state-ok); }
 

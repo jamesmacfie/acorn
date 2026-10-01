@@ -38,6 +38,26 @@ export function statusOf(snapshot: PluginDistributionSnapshot, nodeId: string | 
 export const matchesFilter = (filter: InstalledFilter, plugin: InstalledPlugin, status: PluginStatus): boolean =>
   filter === 'all' || (filter === 'device' ? plugin.kind === 'device' : status.needsYou)
 
+/** The status in one word, for a list row's badge. The sentence in `status.text` says more when the
+ *  word is not enough (`statusDetail`). */
+export function statusWord(status: PluginStatus): string {
+  if (status.tone === 'ok') return 'Active'
+  if (status.tone === 'accent') return 'In development'
+  if (status.line === 'failed' || status.tone === 'danger') return 'Failed'
+  if (status.line === 'waiting' || status.needsYou) return 'Needs you'
+  if (status.line === 'disabled') return 'Off'
+  if (status.line === 'offline') return 'Offline'
+  return status.text.startsWith('Not installed') ? 'Not installed' : 'Unknown'
+}
+
+/** The status sentence when the badge's word leaves something out, or nothing. */
+export const statusDetail = (status: PluginStatus): string | undefined =>
+  status.text === statusWord(status) ? undefined : status.text
+
+/** The badge's tone. A status dot's grey is a badge's plain one. */
+export const statusBadgeTone = (status: PluginStatus): 'ok' | 'warn' | 'danger' | 'accent' | 'neutral' =>
+  status.tone === 'muted' ? 'neutral' : status.tone
+
 /** Where a plugin came from, in the words of the strip and the list: "built in", "from GitHub". */
 export function pluginOrigin(plugin: InstalledPlugin): string {
   if (plugin.kind === 'device') return `on this device, from ${sourceKind(plugin.entry.sourceLabel)}`

@@ -41,7 +41,7 @@ export default function ModelBackendPicker(props: {
     <>
       <Show when={props.backends.length > 1}>
         <Select
-          title="Generate with"
+          label="Generate with"
           value={current()?.id ?? ''}
           onChange={(value) => {
             // The model resets with the backend. A model id belongs to one backend, so carrying the
@@ -53,12 +53,12 @@ export default function ModelBackendPicker(props: {
       </Show>
       <Show when={modelOptions().length}>
         <Select
-          title="Model"
+          label="Model"
           value={props.modelId}
           onChange={(value) => props.onChange({ backendId: current()?.id ?? '', modelId: value })} options={modelOptions()} />
       </Show>
       <Show when={current()?.catalogUnavailable}>
-        <Text tone="muted">Could not refresh this CLI's model list. Saved choices are kept.</Text>
+        <Text tone="muted">Couldn't refresh this CLI's models. Your choice is kept.</Text>
       </Show>
     </>
   )

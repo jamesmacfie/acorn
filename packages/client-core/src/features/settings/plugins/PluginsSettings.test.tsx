@@ -5,7 +5,7 @@ import type { NodePluginRow } from '@acorn/protocol/api.ts'
 import type { DevicePluginEntry } from '../../../host/plugins/distributionModel'
 
 // Installed lists the node's plugins and this device's side by side, filters them down to what needs the
-// person or what this device holds, and opens one plugin's page with its four tabs and its danger zone.
+// person or what this device holds, and opens one plugin's page with its three tabs and its danger zone.
 const permissions = { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } }
 const installed = (version: string) => ({ version, apiVersion: '1', permissions, contributions: { frames: [] }, client: null, source: 'github:someone/beta' })
 const ROWS: NodePluginRow[] = [
@@ -66,11 +66,11 @@ describe('Installed', () => {
     expect(listed()).toEqual(['alpha', 'beta', 'gamma'])
   })
 
-  it('opens a plugin\'s page with its four tabs, its review, and both ways to uninstall', async () => {
+  it('opens a plugin\'s page with its three tabs, its review, and both ways to uninstall', async () => {
     await vi.waitFor(() => expect(listed()).toContain('beta'))
     openPluginPage((_target, opened) => opened?.(), 'beta', 'node')
     await vi.waitFor(() => expect(host.querySelector('[role="tablist"]')).not.toBeNull())
-    expect([...host.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent)).toEqual(['Overview', 'Settings', 'Permissions', 'Versions'])
+    expect([...host.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent)).toEqual(['Overview', 'Permissions', 'Versions'])
     expect(host.textContent).toContain('Approve this package')
     const danger = host.querySelector('[data-settings-section="danger"]')!
     expect([...danger.querySelectorAll('button')].map((button) => button.textContent)).toEqual(['Keep its data', 'Delete its data'])

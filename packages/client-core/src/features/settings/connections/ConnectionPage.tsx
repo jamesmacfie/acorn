@@ -1,4 +1,4 @@
-import { createSignal, For, Show } from 'solid-js'
+import { createSignal, Show } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
 import type { Integration } from '@acorn/protocol/api.ts'
 import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
@@ -18,6 +18,7 @@ import { useSettingsDetail } from '../settingsDetail'
 import { createSettingSave, createTextSetting } from '../settingSave'
 import { useUnsavedChanges } from '../unsavedChanges'
 import { connectionStatusText } from './connections'
+import { CredentialFields } from './CredentialFields'
 
 // One connection's page, a detail of Services or AI models (docs/integrations.md § Settings). What is
 // wrong with it comes first, with the button that fixes it, then its name and switch, where its projects
@@ -46,6 +47,7 @@ export function ConnectionPage(props: ConnectionPageProps) {
 
   const manageable = () => props.provider?.connection.disconnectable === true
   const deviceFlow = () => props.provider?.connection.kind === 'device-flow'
+  const providerLabel = () => props.provider?.label ?? props.connection.providerId
 
   const run = async (work: () => Promise<void>) => {
     setError('')
@@ -97,7 +99,7 @@ export function ConnectionPage(props: ConnectionPageProps) {
       await testIntegration(props.connection.id)
     } catch (failure) {
       const code = failure instanceof ApiError ? failure.code : undefined
-      throw new Error(code ? `The test did not pass. (${code})` : 'The test did not pass.')
+      throw new Error(code ? `The test failed. Error code: ${code}.` : 'The test failed.')
     } finally {
       await refresh()
     }
@@ -109,7 +111,7 @@ export function ConnectionPage(props: ConnectionPageProps) {
     const confirmed = await confirmAction({
       title: `Disconnect ${connectionName(props.connection)}`,
       actionLabel: 'Disconnect',
-      goes: 'acorn deletes its stored credentials, its project links, the issues it cached, and the links from tasks to those issues.',
+      goes: `acorn deletes the ${deviceFlow() ? 'saved credentials' : 'saved key'}, the projects it follows, the issues it saved, and the links from tasks to those issues.`,
       stays: 'Your tasks and worktrees stay, and so does the account at the provider.',
       danger: true,
     })
@@ -152,27 +154,14 @@ export function ConnectionPage(props: ConnectionPageProps) {
       <Show when={error()}><Alert>{error()}</Alert></Show>
 
       <Show when={replacing()}>
-        <SettingsSection id="credential" label={props.provider ? `New ${props.provider.label} credentials` : 'New credentials'} description="acorn checks them with the provider before it keeps them.">
-          <For each={form.fields()}>
-            {(field) => (
-              <SettingRow label={field.label} description={field.hint} layout="stacked">
-                <Input
-                  label={field.label}
-                  type={field.type}
-                  assist={false}
-                  placeholder={field.placeholder}
-                  value={form.value(field.id)}
-                  onInput={(value) => form.setValue(field.id, value)}
-                  onSubmit={() => void form.submit()}
-                />
-              </SettingRow>
-            )}
-          </For>
-          <Show when={form.error()}><Alert>{form.error()}</Alert></Show>
-          <Inline>
-            <Button onPress={() => void form.submit()} disabled={form.busy() || !form.complete()}>{form.busy() ? 'Saving…' : 'Save'}</Button>
-            <Button variant="ghost" onPress={cancelReplacing} disabled={form.busy()}>Cancel</Button>
-          </Inline>
+        <SettingsSection id="credential" label="Replace key" description={`acorn checks with ${providerLabel()} before it saves the new key.`}>
+          <CredentialFields form={form}>
+            <Show when={form.error()}><Alert>{form.error()}</Alert></Show>
+            <Inline gap="row">
+              <Button variant="solid" tone="accent" busy={form.busy()} onPress={() => void form.submit()} disabled={!form.complete()}>Save</Button>
+              <Button variant="ghost" onPress={cancelReplacing} disabled={form.busy()}>Cancel</Button>
+            </Inline>
+          </CredentialFields>
         </SettingsSection>
       </Show>
 
@@ -193,10 +182,8 @@ export function ConnectionPage(props: ConnectionPageProps) {
             />
           </SettingRow>
           <SettingRow
-            label="Credentials"
-            description={props.connection.status === 'connected'
-              ? 'Connected. Test asks the provider whether they still work.'
-              : 'Test asks the provider whether they still work.'}
+            label={deviceFlow() ? 'Credentials' : 'Key'}
+            description={`Test checks that ${providerLabel()} still accepts it.`}
           >
             <Inline>
               <Button size="sm" variant="ghost" disabled={busy()} onPress={() => void test()}>Test</Button>
@@ -205,7 +192,7 @@ export function ConnectionPage(props: ConnectionPageProps) {
               </Show>
             </Inline>
           </SettingRow>
-          <SettingRow label="On" description="Turning it off pauses it. Its project links stay." error={enabled.error()}>
+          <SettingRow label="Enabled" description="Turn it off to pause updates. It keeps the projects it follows." error={enabled.error()}>
             <Checkbox switch ariaLabel={`Turn ${connectionName(props.connection)} on`} checked={props.connection.status !== 'disabled'} disabled={busy()} onChange={setEnabled} />
           </SettingRow>
         </Show>
@@ -221,7 +208,7 @@ export function ConnectionPage(props: ConnectionPageProps) {
 
       <Show when={manageable()}>
         <SettingsSection id="danger" label="Danger zone" tone="danger">
-          <SettingRow label="Disconnect" description="Deletes its stored credentials and its project links.">
+          <SettingRow label="Disconnect" description={`Deletes the ${deviceFlow() ? 'saved credentials' : 'saved key'} and the projects it follows. You can connect it again later.`}>
             <Button tone="danger" disabled={busy()} onPress={() => void disconnect()}>Disconnect…</Button>
           </SettingRow>
         </SettingsSection>

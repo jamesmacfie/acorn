@@ -1,7 +1,7 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createMemo, createResource, For, Show } from 'solid-js'
 import { createSettingSave, prefsOptions } from '@acorn/plugin-api/client'
-import { Alert, Checkbox, Inline, Link, Select, SettingRow, SettingsSection, Text } from '@acorn/plugin-api/ui'
+import { Alert, Badge, Checkbox, Inline, Link, Select, SettingRow, SettingsSection, Text } from '@acorn/plugin-api/ui'
 import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 import {
   AGENT_ARCHIVED_HISTORY_CHOICES,
@@ -25,11 +25,12 @@ import {
 } from '../sessions/toolFoldPrefs'
 import { saveStartupContextInjection, startupContextInjection } from './startupContext'
 
-/** What the harness row says about the CLI on this machine. */
-const harnessState = (provider: AgentProviderDescriptor): string => {
-  if (!provider.installed) return provider.diagnostics[0] ?? 'Not installed on this machine.'
-  const installed = provider.executableVersion ? `Installed, ${provider.executableVersion}.` : 'Installed.'
-  return provider.authenticated === false ? `${installed} Not signed in.` : installed
+/** The line under a harness's name: its version and sign-in, or why it is missing. The row's badge says
+ *  whether it is installed. */
+const harnessState = (provider: AgentProviderDescriptor): string | undefined => {
+  if (!provider.installed) return provider.diagnostics[0]
+  const parts = [provider.executableVersion ? `Version ${provider.executableVersion}.` : '', provider.authenticated === false ? 'Not signed in.' : '']
+  return parts.filter(Boolean).join(' ') || undefined
 }
 
 // Settings -> Agents -> Harnesses and defaults: the harnesses this node can run, and what a new session
@@ -115,7 +116,10 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
         <For each={providers() ?? []} fallback={<Text emphasis="muted">{providers.loading ? 'Loading harnesses…' : 'No harnesses on this node.'}</Text>}>
           {(provider) => (
             <SettingRow label={provider.label} description={harnessState(provider)}>
-              <ProviderGlyph glyph={provider.glyph} label={provider.label} />
+              <Inline>
+                <ProviderGlyph glyph={provider.glyph} label={provider.label} />
+                <Badge tone={provider.installed ? 'ok' : 'neutral'}>{provider.installed ? 'Installed' : 'Not installed'}</Badge>
+              </Inline>
             </SettingRow>
           )}
         </For>

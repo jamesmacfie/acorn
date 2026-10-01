@@ -49,7 +49,7 @@ export function createSentryTelemetryProvider(options: {
   const fetchImpl = options.fetch ?? fetch
   return publicConnectionProvider<SentryValidated>({
     id: PROVIDER_ID,
-    label: 'Sentry (telemetry export)',
+    label: 'Sentry export',
     // This plugin's own mark, registered by the host from `icon` in acorn-plugin.config.mjs. The
     // issue-reading `sentry` integration will carry the same one, which is deliberate: two
     // providers, two credentials, two reasons to install (docs/integrations.md § Sentry).
@@ -69,7 +69,7 @@ export function createSentryTelemetryProvider(options: {
           label: 'DSN',
           type: 'password',
           placeholder: 'https://…@o0.ingest.sentry.io/0',
-          hint: 'Sentry → Settings → Projects → your project → Client Keys. The DSN stays encrypted on this machine.',
+          hint: 'Sentry → Settings → Projects → your project → Client Keys. acorn stores it encrypted.',
           required: true,
         },
         {
@@ -77,7 +77,7 @@ export function createSentryTelemetryProvider(options: {
           label: 'Environment',
           type: 'text',
           placeholder: 'development',
-          hint: 'Tags everything this node sends. Sentry defaults it to production when it is blank.',
+          hint: 'Added to everything acorn sends. Leave it blank to use production.',
           required: false,
         },
         {
@@ -85,7 +85,7 @@ export function createSentryTelemetryProvider(options: {
           label: 'Release',
           type: 'text',
           placeholder: 'acorn@1.0.0',
-          hint: 'Optional. No source maps are uploaded, so this only groups what you send.',
+          hint: 'Optional. Groups what you send by version.',
           required: false,
         },
       ],

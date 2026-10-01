@@ -3,7 +3,8 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { connectionName } from '@acorn/protocol/integrations.ts'
 import { modelBackendsOptions, prefsOptions } from '../../../infra/queries'
 import type { SettingsPageContext } from '../../../host/registries/shell/settings'
-import { Button, EmptyState, StatusDot } from '../../../kit/components/primitives'
+import { Badge, Button, EmptyState } from '../../../kit/components/primitives'
+import Icon from '../../../kit/components/content/Icon'
 import { Text } from '../../../kit/components/content/Text'
 import { SettingRow } from '../../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../../kit/components/layout/SettingsSection'
@@ -49,13 +50,14 @@ export default function AiModelsSettings(props: { context: SettingsPageContext }
           <SettingsSection
             id="generate"
             label="Generating text"
-            description="Commit messages, SQL, and workflows are written with whichever of these you pick. A key is spent from the node. An installed agent signs in on its own, and acorn never passes it a key."
+            help="acorn writes commit messages, SQL, and workflow drafts with the model you pick. An API key is billed to that key. An agent CLI uses its own sign-in."
           >
-            <SettingRow label="Generate with" scope="device" error={save.error()}>
+            {/* Stacked when there are two selects, which do not fit the control column side by side. */}
+            <SettingRow label="Generate with" scope="device" layout={backends().length > 1 ? 'stacked' : 'inline'} error={save.error()}>
               {/* The one place the default is changed outside a dialog. The picker hides its backend
                   select when there is a single choice: there is no choice to make, and the model select
                   beside it still is one. */}
-              <Show when={backends().length} fallback={<Text emphasis="muted">{status.isError ? 'Could not ask this node what it can generate with.' : status.isPending ? 'Reading what this node can generate with…' : 'Nothing to generate with. Add a key, or install an agent CLI.'}</Text>}>
+              <Show when={backends().length} fallback={<Text emphasis="muted">{status.isError ? "Couldn't ask this node what it can generate with." : status.isPending ? 'Reading what this node can generate with…' : 'Nothing to generate with. Add a key, or install an agent CLI.'}</Text>}>
                 <ModelBackendPicker
                   backends={backends()}
                   backendId={pick()?.backendId ?? ''}
@@ -66,32 +68,32 @@ export default function AiModelsSettings(props: { context: SettingsPageContext }
             </SettingRow>
           </SettingsSection>
 
-          <SettingsSection id="keys" label="API keys" actions={<Button size="sm" onPress={list.openAdd}>Add a key</Button>}>
+          <SettingsSection id="keys" label="API keys" actions={<Button size="sm" onPress={list.openAdd}><Icon name="plus" /> Add a key</Button>}>
             <For
               each={list.connections()}
-              fallback={<Show when={!list.failed()}><EmptyState align="start">{list.pending() ? 'Reading keys…' : 'No key on this node. Add one to generate with a provider such as Anthropic or OpenAI.'}</EmptyState></Show>}
+              fallback={<Show when={!list.failed()}><EmptyState align="start" size="sm" busy={list.pending()}>{list.pending() ? 'Reading keys…' : 'No API keys. Add one from Anthropic or OpenAI.'}</EmptyState></Show>}
             >
               {(connection) => (
                 <SettingRow
                   label={connectionName(connection)}
                   description={connectionRowText(connection, list.providerOf(connection))}
                 >
-                  <StatusDot tone={connectionTone(connection)} label={connectionStatusLabel(connection)} />
+                  <Badge tone={connectionTone(connection)}>{connectionStatusLabel(connection)}</Badge>
                   <Button size="sm" variant="ghost" label={`Manage ${connectionName(connection)}`} onPress={() => list.openConnection(connection)}>Manage</Button>
                 </SettingRow>
               )}
             </For>
           </SettingsSection>
 
-          <SettingsSection id="clis" label="Agent CLIs" description="Agent programs on this machine that can write a one-off answer. Each signs in on its own.">
-            <Show when={harnesses().length || missing().length} fallback={<EmptyState align="start">{status.isError ? 'Could not ask this node which agent CLIs it has.' : status.isPending ? 'Looking for agent CLIs…' : 'No agent CLI offers one-off answers here.'}</EmptyState>}>
+          <SettingsSection id="clis" label="Agent CLIs" help="Command-line agents on this computer, such as Claude Code. Each one uses its own sign-in.">
+            <Show when={harnesses().length || missing().length} fallback={<EmptyState align="start" size="sm" busy={status.isPending}>{status.isError ? "Couldn't ask this node which agent CLIs it has." : status.isPending ? 'Looking for agent CLIs…' : 'No agent CLIs found on this computer.'}</EmptyState>}>
               {/* `Index` rather than `For`: the route refetches on a short stale time, so every row would
                   be a new object each time. */}
               <Index each={harnesses()}>
-                {(harness) => <SettingRow label={harness().label} description="Installed on this machine."><StatusDot tone="ok" label="Installed" /></SettingRow>}
+                {(harness) => <SettingRow label={harness().label}><Badge tone="ok">Installed</Badge></SettingRow>}
               </Index>
               <Index each={missing()}>
-                {(harness) => <SettingRow label={harness().label} description="Not found on this machine."><StatusDot tone="muted" label="Not found" /></SettingRow>}
+                {(harness) => <SettingRow label={harness().label}><Badge>Not installed</Badge></SettingRow>}
               </Index>
             </Show>
           </SettingsSection>

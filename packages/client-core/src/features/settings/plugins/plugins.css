@@ -24,23 +24,8 @@
 .settings-plugin-strip-status[data-tone='warn'] { color: var(--warn); }
 .settings-plugin-strip-status[data-tone='danger'] { color: var(--danger); }
 
-/* Plugins acorn.json asks for (./ConfigPluginOffers.tsx): name, source, install. */
-.plugin-list {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr) max-content;
-  column-gap: var(--space-5);
-  row-gap: var(--space-2);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}
-.plugin-row { display: grid; grid-column: 1 / -1; grid-template-columns: subgrid; align-items: center; }
-.plugin-name { font-family: var(--font-mono); font-size: var(--fs-sm); }
-.plugin-source { font-family: var(--font-mono); font-size: var(--fs-xs); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
 /* The events a plugin announces, on its Overview tab. */
 .plugin-emits { display: grid; gap: var(--space-1); margin: 0; padding-inline-start: var(--space-5); font-size: var(--fs-xs); }
 .plugin-emits li { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-2); }
 .plugin-emits li span { color: var(--text-muted); }
 
-.plugin-failed { font-size: var(--fs-xs); color: var(--danger); }

@@ -56,9 +56,9 @@ export function FindingsSettings(props: { bridge: AcornBridge }) {
       <SettingsSection
         id="review"
         label="Automatic review"
-        description="Findings quietly records bounded evidence at completion boundaries. Recording does not run a model. Closing a task queues the review in the background, and a preparation failure never changes task or workflow success."
+        help="When you archive a task, acorn keeps a short record of it. A model runs only when it prepares suggestions, in the background. If that fails, your task and workflow results don't change."
       >
-        <Show when={backends().length && targets().length} fallback={<Alert tone="warn">A model backend and review target are needed to prepare suggestions. Findings will still be recorded.</Alert>}>
+        <Show when={backends().length && targets().length} fallback={<Alert tone="warn">To get suggestions, choose a review model and where they go. acorn still keeps a record of each archived task.</Alert>}>
           <SettingRow label="Prepare suggestions when I archive a task" error={errorOn('archive')}>
             <Checkbox switch ariaLabel="Prepare suggestions when I archive a task" checked={!!settings().backendId && targetIds().includes(settings().targetId ?? '')} onChange={setArchiveReview} />
           </SettingRow>
@@ -66,7 +66,7 @@ export function FindingsSettings(props: { bridge: AcornBridge }) {
             <SettingRow label="Review target" error={errorOn('target')}>
               <Select label="Review target" value={settings().targetId ?? ''} options={targets().map((target) => ({ value: target.id, label: target.label }))} onChange={(targetId: string) => void save('target', { targetId })} />
             </SettingRow>
-            <SettingRow label="Model" description={`Using ${chosen()?.label ?? 'the selected backend'}.`} layout="stacked" error={errorOn('model')}>
+            <SettingRow label="Model" layout="stacked" error={errorOn('model')}>
               <ModelBackendPicker
                 backends={backends()}
                 backendId={settings().backendId ?? ''}
@@ -81,8 +81,8 @@ export function FindingsSettings(props: { bridge: AcornBridge }) {
         </Show>
       </SettingsSection>
       <SettingsSection id="notifications" label="Notifications">
-        <SettingRow label="Notify me when a prepared review bundle is ready" error={errorOn('notify')}>
-          <Checkbox switch ariaLabel="Notify me when a prepared review bundle is ready" checked={settings().notifyWhenReady} onChange={(notifyWhenReady: boolean) => void save('notify', { notifyWhenReady })} />
+        <SettingRow label="Notify me when suggestions are ready" error={errorOn('notify')}>
+          <Checkbox switch ariaLabel="Notify me when suggestions are ready" checked={settings().notifyWhenReady} onChange={(notifyWhenReady: boolean) => void save('notify', { notifyWhenReady })} />
         </SettingRow>
       </SettingsSection>
     </>

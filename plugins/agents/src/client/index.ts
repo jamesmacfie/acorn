@@ -126,7 +126,7 @@ export const agentsClientPlugin: ClientPlugin = {
     ctx.settingsPages.register({
       id: 'custom-agents', label: 'Custom agents', category: 'agents', scope: 'node', icon: 'bot', order: 20, requires: { plugin: 'agents' },
       keywords: ['instructions', 'system prompt', 'harness', 'preset'],
-      sections: [{ id: 'agents', label: 'Custom agents' }],
+      sections: [{ id: 'agents', label: 'Your agents' }],
       component: CustomAgentsSettings,
     })
     // Beside core's MCP config files page, which lists the servers each CLI loads by itself.
@@ -152,8 +152,8 @@ export const agentsClientPlugin: ClientPlugin = {
       keywords: ['concurrency', 'parallel', 'queue', 'limit', 'turns', 'cost', 'pricing', 'price', 'tokens', 'usd', 'estimate', 'cache'],
       sections: [
         { id: 'limits', label: 'Turns at once', rows: ['Turns at once per provider', 'Turns at once per workspace'] },
-        { id: 'claude', label: 'Claude prices', rows: ['Built-in models', 'Exact model ids'], keywords: ['anthropic'] },
-        { id: 'codex', label: 'Codex prices', rows: ['Built-in models', 'Exact model ids'], keywords: ['openai'] },
+        { id: 'claude', label: 'Claude prices', rows: ['Built-in models', 'Other models'], keywords: ['anthropic'] },
+        { id: 'codex', label: 'Codex prices', rows: ['Built-in models', 'Other models'], keywords: ['openai'] },
       ],
       component: AgentLimitsSettings,
     })

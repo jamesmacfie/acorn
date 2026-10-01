@@ -148,7 +148,7 @@ export default function AgentPricingSettings() {
       </Show>
 
       <Show when={unpricedModels().length}>
-        <SettingsSection id="unpriced" label="Unpriced models" description="Models seen in recent Claude usage that have no price. Add one to give it an exact price under Claude prices.">
+        <SettingsSection id="unpriced" label="Unpriced models" description="Claude models you used recently that have no price. Add a price so acorn can estimate their cost.">
           <SettingRow label="Seen recently" layout="stacked">
             <Inline wrap>
               <For each={unpricedModels()}>
@@ -172,7 +172,7 @@ export default function AgentPricingSettings() {
                 <SettingsSection
                   id={provider.id}
                   label={`${provider.label} prices`}
-                  description="Estimated USD API prices per million tokens. They change Acorn's estimates only. They do not change what a provider bills or how a subscription applies usage."
+                  help="acorn uses these for cost estimates, in US dollars per million tokens. They don't change what you're billed."
                 >
                   <SettingRow label="Built-in models" layout="stacked" savedAt={table.builtIn.savedAt()} error={table.builtIn.error()}>
                     <Table size="sm" minWidth={620}>
@@ -190,8 +190,10 @@ export default function AgentPricingSettings() {
                           return (
                             <TableRow>
                               <TableCell header>
-                                <Text>{name()}</Text>
-                                <Text emphasis="mono">{definition()?.models}</Text>
+                                <Stack gap="none">
+                                  <Text>{name()}</Text>
+                                  <Text emphasis="mono" tone="muted">{definition()?.models}</Text>
+                                </Stack>
                               </TableCell>
                               <For each={PRICE_FIELDS}>
                                 {(field) => (
@@ -214,9 +216,12 @@ export default function AgentPricingSettings() {
                                 )}
                               </For>
                               <TableCell>
+                                {/* Only on a changed row, like a setting row's own Reset. */}
+                                <Show when={row().overridden}>
                                 <Button
-                                  variant="bare"
-                                  disabled={!row().overridden}
+                                  variant="ghost"
+                                  size="xs"
+                                  label={`Reset ${name()}`}
                                   onPress={() => {
                                     const catalogId = row().catalogId
                                     void table.builtIn.run(() => write((draft) => {
@@ -227,6 +232,7 @@ export default function AgentPricingSettings() {
                                 >
                                   Reset
                                 </Button>
+                                </Show>
                               </TableCell>
                             </TableRow>
                           )
@@ -236,8 +242,8 @@ export default function AgentPricingSettings() {
                   </SettingRow>
 
                   <SettingRow
-                    label="Exact model ids"
-                    description="For a model that is not in the built-in list. An exact entry takes priority over a built-in price."
+                    label="Other models"
+                    description="For a model that isn't listed above. Its price overrides a built-in one."
                     layout="stacked"
                     savedAt={table.exact.savedAt()}
                     error={table.exact.error()}
@@ -245,11 +251,11 @@ export default function AgentPricingSettings() {
                     <Stack gap="row">
                       <Show
                         when={current()[provider.id].customModels.length || pending()[provider.id].length}
-                        fallback={<Text emphasis="muted">No exact model prices.</Text>}
+                        fallback={<Text emphasis="muted">No other models.</Text>}
                       >
                         <Table size="sm" minWidth={620}>
                           <TableRow head>
-                            <TableHead priority="high">Exact model id</TableHead>
+                            <TableHead priority="high">Model id</TableHead>
                             <For each={PRICE_FIELDS}>{(field) => <TableHead>{field.label}</TableHead>}</For>
                             <TableHead priority="low" />
                           </TableRow>
@@ -294,7 +300,8 @@ export default function AgentPricingSettings() {
                                       </For>
                                       <TableCell>
                                         <Button
-                                          variant="bare"
+                                          variant="ghost"
+                                          size="xs"
                                           onPress={() => {
                                             const model = row().model
                                             void table.exact.run(() => write((draft) => {
@@ -346,7 +353,7 @@ export default function AgentPricingSettings() {
                                   )}
                                 </For>
                                 <TableCell>
-                                  <Button variant="bare" onPress={() => dropPending(provider.id, row().id)}>Remove</Button>
+                                  <Button variant="ghost" size="xs" onPress={() => dropPending(provider.id, row().id)}>Remove</Button>
                                 </TableCell>
                               </TableRow>
                             )}
