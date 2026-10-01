@@ -94,6 +94,7 @@ export type PluginByteResponse = { bytes: Uint8Array; type: string; filename: st
 export type AcornBridge = {
   /** What this frame was opened to look at. A snapshot, not reactive: a frame is recreated when its
    * subject changes. */
+  readonly treeBridgeMode?: 'mount' | 'legacy' | 'bootstrap'
   readonly context: PluginFrameContext
   readonly api: AcornBridgeApi
   events: {
@@ -216,7 +217,7 @@ export type AcornBridge = {
   onSurfaceAction(listener: (command: string) => void): () => void
 }
 
-type Pending = { resolve(value: unknown): void; reject(error: unknown): void }
+type Pending = { resolve(value: unknown): void; reject(error: unknown): void; cleanup?(): void }
 
 const isHello = (data: unknown): boolean =>
   !!data && typeof data === 'object' && (data as { acornBridge?: unknown }).acornBridge === PLUGIN_BRIDGE_VERSION
@@ -264,14 +265,15 @@ function handshake(): Promise<AcornBridge> {
       // transfers one, so this is undefined there and `mountTree` refuses, which is the honest answer
       // for a bundle asking a rectangle to draw a tree.
       acceptTreePort(event.ports?.[1] ?? null)
-      resolve(attach(port))
+      const perMount = (event.data as { treeSlotBridge?: number }).treeSlotBridge === 1
+      resolve(attach(port, { mode: event.ports?.[1] ? (perMount ? 'bootstrap' : 'legacy') : undefined }))
     }
     target.addEventListener('message', onWindowMessage)
   })
 }
 
-function attach(port: MessagePort): Promise<AcornBridge> {
-  return new Promise<AcornBridge>((ready) => {
+function attach(port: MessagePort, options: { mode?: AcornBridge['treeBridgeMode']; onDispose?(dispose: () => void): void } = {}): Promise<AcornBridge> {
+  return new Promise<AcornBridge>((ready, rejectReady) => {
     const pending = new Map<number, Pending>()
     const listeners = new Map<string, Set<(payload: unknown) => void>>()
     const appearanceListeners = new Set<(appearance: { theme: string; style: string }) => void>()
@@ -279,6 +281,7 @@ function attach(port: MessagePort): Promise<AcornBridge> {
     const actionListeners = new Set<(command: string) => void>()
     const subscribing = new Map<string, Promise<unknown>>()
     let seq = 0
+    let disposed = false
     let context: PluginFrameContext | null = null
     let claimed = new Set<string>()
 
@@ -309,6 +312,7 @@ function attach(port: MessagePort): Promise<AcornBridge> {
       const waiter = pending.get(reply.id)
       if (!waiter) return
       pending.delete(reply.id)
+      waiter.cleanup?.()
       if (reply.ok) waiter.resolve(reply.body)
       else waiter.reject(new AcornBridgeError(reply.error))
     }
@@ -321,13 +325,15 @@ function attach(port: MessagePort): Promise<AcornBridge> {
         case 'ready':
           context = message.context
           claimed = new Set((message.context.claimsKeys ?? []).filter(isPluginKeyClaim))
-          keyTarget.addEventListener?.('keydown', onKeyDown, { capture: true })
-          detachKeyForwarding = () => keyTarget.removeEventListener?.('keydown', onKeyDown, { capture: true })
+          if (!options.mode) {
+            keyTarget.addEventListener?.('keydown', onKeyDown, { capture: true })
+            detachKeyForwarding = () => keyTarget.removeEventListener?.('keydown', onKeyDown, { capture: true })
+          }
           // The ack, before the plugin's own code gets the bridge: reaching this line proves the bundle
           // evaluated and called connect(), which is what the host's handshake deadline asks about. A
           // frame that dies at module scope never gets here, and the host draws a labelled placeholder
           // instead of a blank rectangle.
-          port.postMessage({ kind: 'connected' })
+          port.postMessage({ kind: 'connected', ...(options.mode === 'bootstrap' ? { treeSlotBridge: 1 } : {}) })
           ready(api)
           return
         case 'event':
@@ -346,25 +352,45 @@ function attach(port: MessagePort): Promise<AcornBridge> {
           return
       }
     }
-    port.start?.()
+
+    const retiredError = () => new AcornBridgeError({ code: 'unmounted', message: 'this tree bridge was retired', retryable: false, requestId: '' })
+    const dispose = (): void => {
+      if (disposed) return
+      disposed = true
+      const error = retiredError()
+      rejectReady(error)
+      for (const waiter of pending.values()) { try { waiter.cleanup?.() } catch { /* retire every waiter */ }; waiter.reject(error) }
+      pending.clear()
+      listeners.clear()
+      appearanceListeners.clear()
+      selectListeners.clear()
+      actionListeners.clear()
+      subscribing.clear()
+      try { keyTarget.removeEventListener?.('keydown', onKeyDown, { capture: true }) } catch { /* still close the port */ }
+      port.onmessage = null
+      try { port.close() } catch { /* ownership is already retired */ }
+    }
+    options.onDispose?.(dispose)
 
     const request = <T>(message: Record<string, unknown>, signal?: AbortSignal): Promise<T> => {
+      if (disposed) return Promise.reject(retiredError())
+      if (signal?.aborted) return Promise.reject(signal.reason ?? new Error('aborted'))
       const id = ++seq
       return new Promise<T>((resolve, reject) => {
-        pending.set(id, { resolve: resolve as (value: unknown) => void, reject })
-        port.postMessage({ ...message, id })
-        if (!signal) return
-        if (signal.aborted) return void abort(id, reject, signal)
-        signal.addEventListener('abort', () => abort(id, reject, signal), { once: true })
+        const abort = (): void => {
+          const waiter = pending.get(id)
+          if (!waiter) return
+          pending.delete(id)
+          waiter.cleanup?.()
+          try { port.postMessage({ id: ++seq, kind: 'cancel', target: id }) } catch { /* local abort still settles */ }
+          reject(signal?.reason ?? new Error('aborted'))
+        }
+        const cleanup = () => signal?.removeEventListener('abort', abort)
+        pending.set(id, { resolve: resolve as (value: unknown) => void, reject, cleanup })
+        signal?.addEventListener('abort', abort, { once: true })
+        try { port.postMessage({ ...message, id }) }
+        catch (error) { pending.delete(id); cleanup(); reject(error) }
       })
-    }
-
-    // An abort tells the host to stop caring and rejects locally. There's no un-sending an HTTP request,
-    // and pretending otherwise would be a lie a caller could act on.
-    const abort = (id: number, reject: (error: unknown) => void, signal: AbortSignal): void => {
-      if (!pending.delete(id)) return
-      port.postMessage({ id: ++seq, kind: 'cancel', target: id })
-      reject(signal.reason ?? new Error('aborted'))
     }
 
     const call = <T>(method: string, path: string, body?: unknown, options?: { signal?: AbortSignal }): Promise<T> =>
@@ -373,6 +399,7 @@ function attach(port: MessagePort): Promise<AcornBridge> {
     // No id, no reply, no throw. `postMessage` can still fail on a closed port, and a plugin that
     // measured itself into a crash would be the one bug telemetry is not allowed to have.
     const emit = (record: PluginBridgeTelemetryRecord): void => {
+      if (disposed) return
       try {
         port.postMessage({ kind: 'telemetry', record })
       } catch {
@@ -404,6 +431,7 @@ function attach(port: MessagePort): Promise<AcornBridge> {
     }
 
     const onEvent = (channel: string, listener: (payload: unknown) => void): (() => void) => {
+      if (disposed) return () => {}
       const set = listeners.get(channel) ?? new Set()
       set.add(listener)
       listeners.set(channel, set)
@@ -423,6 +451,7 @@ function attach(port: MessagePort): Promise<AcornBridge> {
     }
 
     const api: AcornBridge = {
+      ...(options.mode ? { treeBridgeMode: options.mode } : {}),
       get context() {
         if (!context) throw new Error('acorn: context is only available after connect() resolves')
         return context
@@ -506,6 +535,7 @@ function attach(port: MessagePort): Promise<AcornBridge> {
       },
       keys: {
         claim(chords) {
+          if (disposed) return
           const declared = new Set((context?.claimsKeys ?? []).filter(isPluginKeyClaim))
           const next = new Set<string>()
           for (const chord of chords) {
@@ -519,18 +549,22 @@ function attach(port: MessagePort): Promise<AcornBridge> {
         },
       },
       onAppearance(listener) {
+        if (disposed) return () => {}
         appearanceListeners.add(listener)
         return () => appearanceListeners.delete(listener)
       },
       onSelect(listener) {
+        if (disposed) return () => {}
         selectListeners.add(listener)
         return () => void selectListeners.delete(listener)
       },
       onSurfaceAction(listener) {
+        if (disposed) return () => {}
         actionListeners.add(listener)
         return () => void actionListeners.delete(listener)
       },
     }
+    try { port.start?.() } catch (error) { rejectReady(error); dispose() }
   })
 }
 
@@ -650,11 +684,8 @@ export type TreeMount = {
   /**
    * The two things a tree may ask the host for, as opposed to describe to it.
    *
-   * On the mount rather than on the bridge, and that is the whole design. One worker serves every tree
-   * its bundle draws and holds one bridge, so a composer showing four image attachments has four trees
-   * and one port: a request sent over the bridge could not say which of the four sent it, and the host
-   * would have to guess from focus. These two ride the tree channel instead, where the slot is part of
-   * the address the host already trusts.
+   * These requests use the tree channel and the host-validated slot generation. Their authority is
+   * the owning extension point's declared action contract, separate from a slot's API bridge.
    *
    * Both reject with an `AcornBridgeError` carrying a code. Neither takes a plugin, point or slot id;
    * there is nothing here to forge.
@@ -716,6 +747,7 @@ export function mountTree(renderers: Record<string, TreeRender>): void {
     // `connect()` resolving means the hello has landed, so the answer is already known either way.
     // A surface with no tree channel is a rectangle, and saying so is more use than hanging.
     if (!helloSeen || !treePort) throw new Error('acorn: mountTree needs a tree channel, and this surface has none')
+    if (bridge.treeBridgeMode === 'legacy') console.warn('[acorn] this host uses the legacy shared tree bridge; update acorn for mounted authority isolation')
     runTreeChannel(treePort, bridge, renderers)
   }).catch((error: unknown) => {
     console.error('[acorn] mountTree failed:', error)
@@ -729,6 +761,7 @@ type MountedSlot = {
   dispose: (() => void)[]
   /** Host requests this slot is waiting on, by request id (`TreeMount.host`). */
   pending: Map<number, Pending>
+  bridgeDispose: (() => void) | null
 }
 
 function runTreeChannel(port: MessagePort, bridge: AcornBridge, renderers: Record<string, TreeRender>): void {
@@ -748,6 +781,8 @@ function runTreeChannel(port: MessagePort, bridge: AcornBridge, renderers: Recor
       waiter.reject(new AcornBridgeError({ code: 'unmounted', message: 'the host unmounted this tree', retryable: false, requestId: '' }))
     }
     slot.pending.clear()
+    try { slot.bridgeDispose?.() } catch (error) { console.error('[acorn] tree bridge teardown threw:', error) }
+    slot.bridgeDispose = null
     for (const dispose of slot.dispose) {
       try { dispose() } catch (error) { console.error('[acorn] tree teardown threw:', error) }
     }
@@ -766,15 +801,17 @@ function runTreeChannel(port: MessagePort, bridge: AcornBridge, renderers: Recor
       port.postMessage({ kind: 'tree:host-request', slot: slotId, id, op, name, ...(payload === undefined ? {} : { payload }) })
     })
 
-  const mount = (id: string, entry: string, props: unknown): void => {
+  const mount = (id: string, entry: string, props: unknown, bridgePort?: MessagePort): void => {
     const existing = slots.get(id)
     if (existing) {
+      bridgePort?.close()
       existing.props = props
       for (const listener of existing.onProps) listener(props)
       return
     }
     const render = renderers[entry]
     if (!render) {
+      bridgePort?.close()
       port.postMessage({ kind: 'tree:failed', slot: id, message: `no renderer named '${entry}'` })
       return
     }
@@ -801,24 +838,35 @@ function runTreeChannel(port: MessagePort, bridge: AcornBridge, renderers: Recor
       onProps: [],
       dispose: [],
       pending: new Map(),
+      bridgeDispose: null,
     }
     slots.set(id, slot)
-    try {
-      render(bridge, {
-        entry,
-        root: slot.root,
-        props: () => slot.props,
-        onProps: (listener) => slot.onProps.push(listener),
-        onUnmount: (dispose) => slot.dispose.push(dispose),
-        host: {
-          invoke: <TResult,>(action: string, payload?: unknown) => ask<TResult>(id, 'owner.invoke', action, payload),
-          openOverlay: <TResult,>(overlayId: string, input?: unknown) => ask<TResult | null>(id, 'overlay.open', overlayId, input),
-        },
-      })
-    } catch (error: unknown) {
-      drop(id)
-      port.postMessage({ kind: 'tree:failed', slot: id, message: error instanceof Error ? error.message : String(error) })
+    const draw = (mountedBridge: AcornBridge): void => {
+      if (slots.get(id) !== slot) return
+      try {
+        render(mountedBridge, {
+          entry,
+          root: slot.root,
+          props: () => slot.props,
+          onProps: (listener) => slot.onProps.push(listener),
+          onUnmount: (dispose) => slot.dispose.push(dispose),
+          host: {
+            invoke: <TResult,>(action: string, payload?: unknown) => ask<TResult>(id, 'owner.invoke', action, payload),
+            openOverlay: <TResult,>(overlayId: string, input?: unknown) => ask<TResult | null>(id, 'overlay.open', overlayId, input),
+          },
+        })
+      } catch (error: unknown) {
+        drop(id)
+        port.postMessage({ kind: 'tree:failed', slot: id, message: error instanceof Error ? error.message : String(error) })
+      }
     }
+    if (bridgePort) {
+      void attach(bridgePort, { mode: 'mount', onDispose: (dispose) => { slot.bridgeDispose = dispose } }).then(draw).catch((error: unknown) => {
+        if (slots.get(id) !== slot) return
+        drop(id)
+        port.postMessage({ kind: 'tree:failed', slot: id, message: error instanceof Error ? error.message : String(error) })
+      })
+    } else draw(bridge)
   }
 
   port.onmessage = (event: MessageEvent) => {
@@ -826,7 +874,7 @@ function runTreeChannel(port: MessagePort, bridge: AcornBridge, renderers: Recor
     if (!message || typeof message !== 'object') return
     switch (message.kind) {
       case 'tree:mount':
-        if (typeof message.slot === 'string' && typeof message.entry === 'string') mount(message.slot, message.entry, message.props)
+        if (typeof message.slot === 'string' && typeof message.entry === 'string') mount(message.slot, message.entry, message.props, event.ports?.[0])
         return
       case 'tree:unmount':
         if (typeof message.slot === 'string') drop(message.slot)

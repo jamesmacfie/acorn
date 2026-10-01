@@ -109,7 +109,7 @@ export function DiffPane(props: {
   const selectedPath = createMemo(() => source().selectedPath())
   const mentionsList = () => source().mentions?.() ?? []
   const canComment = () => source().canComment()
-  const invalidate = () => source().invalidate()
+  const invalidate = createMemo(() => { const origin = source(); return () => origin.invalidate() })
   let lastTarget = ''
 
   const viewMode = (): ViewMode => (prefs.data?.[PrefKeys.diffView] === 'split' ? 'split' : 'unified')
@@ -134,6 +134,12 @@ export function DiffPane(props: {
   onCleanup(parsedPublisher.dispose)
   // Context lines revealed by clicking a gap, keyed by that gap's stable identity. Reset when the
   // file set changes.
+  const expandedPaths = new Map<string, string>()
+  let gapEpoch = 0
+  let composerEpoch = 0
+  const gapFileRevisions = new Map<string, number>()
+  let gapOwnerLive = true
+  onCleanup(() => { gapOwnerLive = false; expandedPaths.clear() })
   const [expanded, setExpanded] = createSignal<Map<string, CodeRow[]>>(new Map())
   const [lineComposer, setLineComposer] = createSignal<{ key: string; body: string } | null>(null)
   // Collapsed diff files (header row stays, body rows are dropped from the row model). Remembered
@@ -188,11 +194,23 @@ export function DiffPane(props: {
       return { file, diff: [{ kind: 'load', file, status: 'loading' }] }
     }))
 
+  createEffect(on(() => [props.source, JSON.stringify(props.source.scope)] as const, () => {
+    gapEpoch++
+    composerEpoch++
+    setLineComposer(null)
+    expandedPaths.clear()
+    setExpanded(new Map())
+  }))
+
   // A different set of files: nothing about the old view survives.
   createEffect(on(filesSignature, (signature, previous) => {
+    gapEpoch++
+    composerEpoch++
+    gapFileRevisions.clear()
     lastTarget = ''
     parsedPublisher.reset()
     setParsedByPath(reconcile({}))
+    expandedPaths.clear()
     setExpanded(new Map())
     // Restore the scope's collapsed files if they were saved against this same file set; a changed
     // signature means a different diff, and a collapse decision about the old one does not carry over.
@@ -221,10 +239,19 @@ export function DiffPane(props: {
     heldKeys = keys && { files: filesSignature(), keys }
     if (keys && held?.files === filesSignature()) {
       const moved = list.filter((file) => keys.get(file.path) !== held.keys.get(file.path)).map((file) => file.path)
+      const changed = new Set(moved)
+      for (const path of changed) gapFileRevisions.set(path, (gapFileRevisions.get(path) ?? 0) + 1)
+      if (changed.size) {
+        setExpanded((previous) => new Map([...previous].filter(([id]) => !changed.has(expandedPaths.get(id) ?? ''))))
+        for (const [id, path] of expandedPaths) if (changed.has(path)) expandedPaths.delete(id)
+      }
       recordSample('core', 'diff.hydrator.refresh', moved.length)
       hydrator.refresh(list, moved)
       return
     }
+    gapEpoch++
+    expandedPaths.clear()
+    setExpanded(new Map())
     parsedPublisher.reset()
     recordSample('core', 'diff.hydrator.reset', 1)
     recordSample('core', 'diff.files', files().length)
@@ -263,19 +290,34 @@ export function DiffPane(props: {
   // Fetch the file's head body once, slice the gap's hidden lines, and splice them into the row
   // stream by recording them in `expanded`. A source with no fileText renders the gap inert.
   const handleExpand = async (gap: GapRow) => {
-    const fileText = source().fileText
+    const origin = source()
+    const epoch = gapEpoch
+    const revision = gapFileRevisions.get(gap.path) ?? 0
+    const fileSet = filesSignature()
+    const version = origin.contentKey?.(gap.path) ?? contentSignature()
+    const scope = JSON.stringify(origin.scope)
+    const current = () => gapOwnerLive && gapEpoch === epoch && (gapFileRevisions.get(gap.path) ?? 0) === revision
+      && source() === origin && JSON.stringify(source().scope) === scope
+      && filesSignature() === fileSet
+      && (origin.contentKey?.(gap.path) ?? contentSignature()) === version
+      && files().some((file) => file.path === gap.path && file.sha === gap.sha)
+    const fileText = origin.fileText
     if (gap.sha == null || !fileText) return
     try {
-      const lines = await expandGapAsync(gap, await fileText({ path: gap.path, sha: gap.sha }), tokenizeDocument)
+      const body = await fileText({ path: gap.path, sha: gap.sha })
+      if (!current()) return
+      const lines = await expandGapAsync(gap, body, tokenizeDocument)
+      if (!current()) return
       // The one full copy left in this file, and it stays: `buildRenderableRows` takes a `Map` and is
       // published on the plugin API (@acorn/plugin-api/ui/diff), and this write happens once per gap a
       // reader clicks open rather than once per file in the diff.
+      expandedPaths.set(gapId(gap), gap.path)
       setExpanded((prev) => new Map(prev).set(gapId(gap), lines))
     } catch (error) {
       // The gap goes back to being a gap. A read can fail for reasons the row cannot fix (the file
       // moved out from under a working-tree diff), and a rejection here would otherwise escape the
       // row's click handler entirely.
-      log.error('gap expansion failed', error)
+      if (current()) log.error('gap expansion failed', error)
     }
   }
 
@@ -507,23 +549,38 @@ export function DiffPane(props: {
   // composer is single-slot (one open line at a time), so this seeds body from the draft when it
   // opens and writes back on edit; submitting sets body to '' which removes the key.
   const lineDraftKey = (key: string) => `line-comment:${source().draftPrefix}:${key}`
-  const composerFor = (key: string): LineComposerController => ({
-    isOpen: () => lineComposer()?.key === key,
-    body: () => {
-      const current = lineComposer()
-      return current?.key === key ? current.body : ''
-    },
-    setOpen: (open) => {
-      setLineComposer((current) => {
-        if (open) return { key, body: current?.key === key ? current.body : readDraft(lineDraftKey(key)) }
-        return current?.key === key ? null : current
-      })
-    },
-    setBody: (body) => {
-      writeDraft(lineDraftKey(key), body)
-      setLineComposer({ key, body })
-    },
-  })
+  const composerFor = (key: string): LineComposerController => {
+    const draftKey = lineDraftKey(key)
+    const origin = props.source
+    const epoch = composerEpoch
+    const ownsVisibleSlot = () => gapOwnerLive && props.source === origin && composerEpoch === epoch
+    return {
+      isOpen: () => ownsVisibleSlot() && lineComposer()?.key === key,
+      body: () => {
+        const current = lineComposer()
+        return ownsVisibleSlot() && current?.key === key ? current.body : ''
+      },
+      setOpen: (open) => {
+        if (!ownsVisibleSlot()) return
+        setLineComposer((current) => {
+          if (open) return { key, body: current?.key === key ? current.body : readDraft(draftKey) }
+          return current?.key === key ? null : current
+        })
+      },
+      setBody: (body) => {
+        writeDraft(draftKey, body)
+        if (!ownsVisibleSlot()) return
+        setLineComposer((current) => current?.key === key ? { key, body } : current)
+      },
+      acknowledge: (originalBody) => {
+        // Compare the captured namespace even when another line or source owns the visible slot.
+        if (readDraft(draftKey) !== originalBody) return
+        writeDraft(draftKey, '')
+        if (!ownsVisibleSlot()) return
+        setLineComposer((current) => current?.key === key && current.body === originalBody ? null : current)
+      },
+    }
+  }
 
   const splitComposer = (r: CodeRow | null, side: CommentSide) => {
     const lineNo = side === 'LEFT' ? r?.oldNo : r?.newNo
@@ -553,7 +610,7 @@ export function DiffPane(props: {
         shouldMeasureRow={shouldMeasureRow}
         shouldMeasureBand={shouldMeasureBand}
         hasLineExtra={(row) => source().hasLineExtra?.(row) ?? false}
-        onMutated={invalidate}
+        onMutated={invalidate()}
         resolveThread={(threadId, resolved) => source().resolveThread?.(threadId, resolved) ?? rejectUnsupported()}
         replyReview={(databaseId, body) => source().reply?.(databaseId, body) ?? rejectUnsupported()}
         expandGap={handleExpand}
@@ -568,7 +625,7 @@ export function DiffPane(props: {
         composerFor={composerFor}
         splitComposer={splitComposer}
         canComment={canComment}
-        invalidate={invalidate}
+        invalidate={invalidate()}
         findHighlight={findController.findHighlight}
         lineExtra={source().lineExtra}
         lineAction={source().lineAction}

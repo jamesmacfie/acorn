@@ -1,0 +1,94 @@
+{
+  "environment": {
+    "node": "v24.11.0",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "ring": [
+    {
+      "chunkBytes": 4096,
+      "retainedBytes": 262144,
+      "retainedChunks": null,
+      "heapDelta": 25128,
+      "arrayBuffersDelta": 262160,
+      "fillMs": 0.4757080000000258,
+      "fillCpuMs": 2.313,
+      "overflowChunks": 8,
+      "overflowMs": 0.04620799999997871,
+      "overflowCpuMs": 0.046,
+      "tailValid": true
+    },
+    {
+      "chunkBytes": 8,
+      "retainedBytes": 262144,
+      "retainedChunks": null,
+      "heapDelta": 68128,
+      "arrayBuffersDelta": 0,
+      "fillMs": 7.153374999999983,
+      "fillCpuMs": 16.594,
+      "overflowChunks": 4096,
+      "overflowMs": 0.5504579999999919,
+      "overflowCpuMs": 2.392,
+      "tailValid": true
+    },
+    {
+      "chunkBytes": 1,
+      "retainedBytes": 262144,
+      "retainedChunks": null,
+      "heapDelta": -260496,
+      "arrayBuffersDelta": 0,
+      "fillMs": 26.68712500000001,
+      "fillCpuMs": 30.266,
+      "overflowChunks": 8192,
+      "overflowMs": 0.9947090000000003,
+      "overflowCpuMs": 2.92,
+      "tailValid": true
+    }
+  ],
+  "overlappingStart": {
+    "calls": 8,
+    "spawned": 1,
+    "returnedSessions": [
+      "s1",
+      "s1",
+      "s1",
+      "s1",
+      "s1",
+      "s1",
+      "s1",
+      "s1"
+    ],
+    "killed": [
+      "s1"
+    ],
+    "surviving": [],
+    "trackedInstances": 0
+  },
+  "runTargetRetention": {
+    "completedDistinctTasks": 1000,
+    "trackedInstances": 0,
+    "retainedExitCodes": 1000,
+    "exitListenerCount": 1,
+    "afterDispose": {
+      "exitCodes": 0,
+      "exitListeners": 0
+    }
+  },
+  "attachRebuild": {
+    "replayBytes": 262144,
+    "snapshotBytes": 16633,
+    "elapsedMs": 23.67783399999996,
+    "cpuMs": 45.179
+  },
+  "attachPending": {
+    "pendingFrames": 1000,
+    "pendingBytes": 4096000,
+    "emulating": true,
+    "deliveredBeforeSnapshot": 1,
+    "afterSnapshot": {
+      "emulating": false,
+      "delivered": 1002,
+      "screenDisposals": 1
+    }
+  }
+}

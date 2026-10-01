@@ -1,9 +1,20 @@
-import { existsSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
 import { PluginTrustStore, type PluginAck } from './pluginTrustStore'
+import { writePrivateAtomic } from '@acorn/node-core/server/storage'
+
+vi.mock('@acorn/node-core/server/storage', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@acorn/node-core/server/storage')>()
+  return { ...actual, writePrivateAtomic: vi.fn(actual.writePrivateAtomic) }
+})
+
+vi.mock('node:fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:fs')>()
+  return { ...actual, renameSync: vi.fn(actual.renameSync) }
+})
 
 const NONE: NodePluginPermissions = { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } }
 const HASH_A = 'a'.repeat(64)
@@ -33,6 +44,8 @@ const ack = (over: Partial<PluginAck> = {}): PluginAck => ({
 
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'acorn-plugin-trust-'))
+  vi.mocked(writePrivateAtomic).mockClear()
+  vi.mocked(renameSync).mockClear()
   vi.spyOn(console, 'warn').mockImplementation(() => {})
 })
 
@@ -42,6 +55,61 @@ afterEach(() => {
 })
 
 describe('acknowledging a bundle', () => {
+  it('commits valid disclosures together without changing an unrelated rejection or development grant', () => {
+    const trust = store()
+    const rejected = ack({ pluginId: 'refused', hash: HASH_B, decision: 'rejected' })
+    trust.record(rejected)
+    trust.grantDev({ pluginId: 'workbench', nodeId: 'node-a', grantedAt: 100 })
+    vi.mocked(writePrivateAtomic).mockClear()
+    const first = ack({ permissions: { ...NONE, api: ['core.tasks:read'] } })
+    const last = ack({ pluginId: 'other', hash: 'c'.repeat(64) })
+
+    const results = trust.recordBatch([first, ack({ hash: 'invalid' }), last])
+
+    expect(results).toEqual([{ ack: first }, { ack: expect.anything(), error: expect.any(Error) }, { ack: last }])
+    expect(writePrivateAtomic).toHaveBeenCalledTimes(1)
+    const persisted = store()
+    expect(persisted.decisionFor('sparkline', HASH_A)?.permissions.api).toEqual(['core.tasks:read'])
+    expect(persisted.decisionFor('refused', HASH_B)).toEqual(rejected)
+    expect(persisted.decisionFor('other', 'c'.repeat(64))).toEqual(last)
+    expect(persisted.listDevGrants()).toEqual([{ pluginId: 'workbench', nodeId: 'node-a', grantedAt: 100 }])
+
+    vi.mocked(writePrivateAtomic).mockClear()
+    trust.recordBatch([ack({ ...first, decidedAt: first.decidedAt + 1 }), last])
+    expect(writePrivateAtomic).not.toHaveBeenCalled()
+    expect(store().decisionFor('sparkline', HASH_A)?.decidedAt).toBe(first.decidedAt)
+  })
+
+  it('leaves remembered and durable decisions intact after a failed batch commit', () => {
+    const trust = store()
+    trust.record(ack({ decision: 'rejected' }))
+    vi.mocked(writePrivateAtomic).mockImplementationOnce(() => { throw new Error('disk unavailable') })
+
+    expect(() => trust.recordBatch([ack(), ack({ hash: HASH_B })])).toThrow('disk unavailable')
+    expect(trust.decisionFor('sparkline', HASH_A)?.decision).toBe('rejected')
+    expect(trust.decisionFor('sparkline', HASH_B)).toBeUndefined()
+    expect(store().list()).toEqual(trust.list())
+    trust.recordBatch([ack(), ack({ hash: HASH_B })])
+    expect(store().list()).toHaveLength(2)
+    expect(store().decisionFor('sparkline', HASH_A)?.decision).toBe('accepted')
+  })
+
+  it('keeps the prior trust file when atomic replacement fails after its successor is synced', () => {
+    const trust = store()
+    trust.record(ack({ decision: 'rejected' }))
+    const path = join(dir, 'acorn-1-plugin-trust.json')
+    const before = readFileSync(path, 'utf8')
+    vi.mocked(renameSync).mockImplementationOnce(() => { throw new Error('replacement unavailable') })
+
+    expect(() => trust.recordBatch([ack(), ack({ hash: HASH_B })])).toThrow('replacement unavailable')
+    expect(readFileSync(path, 'utf8')).toBe(before)
+    expect(trust.list()).toEqual(store().list())
+    expect(trust.decisionFor('sparkline', HASH_A)?.decision).toBe('rejected')
+    trust.recordBatch([ack(), ack({ hash: HASH_B })])
+    expect(store().list()).toHaveLength(2)
+    expect(store().decisionFor('sparkline', HASH_A)?.decision).toBe('accepted')
+  })
+
   it('has no decision on first sight, which is the prompt condition', () => {
     expect(store().decisionFor('sparkline', HASH_A)).toBeUndefined()
   })

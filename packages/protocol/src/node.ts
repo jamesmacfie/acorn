@@ -65,6 +65,8 @@ export const nodeInfoSchema = z.object({
   protocolVersion: z.number().int().positive(),
   fingerprint: z.string().min(1),
   nodeId: z.string().optional(),
+  // Additive opt-in, rather than a protocol major change. Absence means the raw event transport.
+  eventTransport: z.object({ viewers: z.number().int().positive().optional() }).optional().catch(undefined),
 })
 
 export type NodeInfo = z.infer<typeof nodeInfoSchema>

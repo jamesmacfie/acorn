@@ -1,0 +1,147 @@
+{
+  "scans": [
+    {
+      "sessions": 100,
+      "runs": [
+        {
+          "wallMs": 13.057042000000138,
+          "cpuMs": 19.024,
+          "statements": 101,
+          "heads": 0
+        },
+        {
+          "wallMs": 16.61658299999999,
+          "cpuMs": 34.504,
+          "statements": 101,
+          "heads": 0
+        },
+        {
+          "wallMs": 11.084542000000056,
+          "cpuMs": 13.634,
+          "statements": 101,
+          "heads": 0
+        }
+      ]
+    },
+    {
+      "sessions": 1000,
+      "runs": [
+        {
+          "wallMs": 99.46316700000011,
+          "cpuMs": 152.532,
+          "statements": 1001,
+          "heads": 0
+        },
+        {
+          "wallMs": 88.30958399999986,
+          "cpuMs": 89.229,
+          "statements": 1001,
+          "heads": 0
+        },
+        {
+          "wallMs": 84.211458,
+          "cpuMs": 93.65,
+          "statements": 1001,
+          "heads": 0
+        }
+      ]
+    },
+    {
+      "sessions": 5000,
+      "runs": [
+        {
+          "wallMs": 401.0617500000001,
+          "cpuMs": 416.442,
+          "statements": 5001,
+          "heads": 0
+        },
+        {
+          "wallMs": 392.00583299999994,
+          "cpuMs": 438.165,
+          "statements": 5001,
+          "heads": 0
+        },
+        {
+          "wallMs": 388.6523750000001,
+          "cpuMs": 396.393,
+          "statements": 5001,
+          "heads": 0
+        }
+      ]
+    }
+  ],
+  "launch": {
+    "wallMs": 15.95049999999992,
+    "cpuMs": 19.053
+  },
+  "initial": {
+    "live": 20,
+    "active": 2,
+    "reconnectTimers": 0,
+    "quietTimers": 0,
+    "launches": 20,
+    "stops": 0,
+    "sends": [
+      "s0",
+      "s1"
+    ],
+    "cancels": 0,
+    "probes": 0
+  },
+  "raised": {
+    "live": 20,
+    "active": 4,
+    "reconnectTimers": 0,
+    "quietTimers": 0,
+    "sends": [
+      "s0",
+      "s1",
+      "s2",
+      "s3"
+    ]
+  },
+  "blockedCancellation": {
+    "live": 20,
+    "active": 4,
+    "reconnectTimers": 0,
+    "quietTimers": 0,
+    "launches": 20,
+    "stops": 0
+  },
+  "lowered": {
+    "live": 20,
+    "active": 4,
+    "reconnectTimers": 0,
+    "quietTimers": 0,
+    "sends": [
+      "s0",
+      "s1",
+      "s2",
+      "s3"
+    ]
+  },
+  "providers": {
+    "concurrentRequests": 20,
+    "probes": 20,
+    "wallMs": 11.862500000000182,
+    "cpuMs": 15.465
+  },
+  "beforeStop": {
+    "live": 20,
+    "active": 4,
+    "reconnectTimers": 1,
+    "quietTimers": 0
+  },
+  "stop": {
+    "wallMs": 0.21258299999999508,
+    "cpuMs": 0.281
+  },
+  "afterStop": {
+    "live": 0,
+    "active": 0,
+    "reconnectTimers": 0,
+    "quietTimers": 0,
+    "stops": 19,
+    "callbacks": 1
+  }
+}

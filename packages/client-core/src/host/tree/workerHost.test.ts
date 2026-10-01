@@ -37,7 +37,7 @@ const stubWorker = (): Worker => ({
 const bridge = (): FrameBridge => ({ dispose: () => {} })
 
 const acquire = (refused: string[] = []) =>
-  acquireTreeWorker({ pluginId: 'stranger', hash: HASH, connect: () => bridge(), onRefused: (reason) => refused.push(reason) })
+  acquireTreeWorker({ pluginId: 'stranger', hash: HASH, authority: 'equivalent-test-context', connect: () => bridge(), onRefused: (reason) => refused.push(reason) })
 
 const start = (): void => {
   sandbox = { worker: null as unknown as Worker, port: null as unknown as MessagePort, terminated: false, seen: [] }

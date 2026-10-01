@@ -53,6 +53,7 @@ describe('RuntimeService over real processes', () => {
     },
     exitCode: (id) => children.get(id)?.exitCode,
     killSession: (id) => children.get(id)?.kill(),
+    retireSession: (id) => children.get(id)?.kill(),
     runScript: async (_taskId, script, cwd) => {
       try {
         const { stdout } = await execP('/bin/sh', ['-c', script], { cwd, timeout: 10_000 })

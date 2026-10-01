@@ -1,3 +1,4 @@
+import { createHttpClient } from './httpClient'
 import { createResource, createSignal, Match, Show, Switch, type JSX } from 'solid-js'
 import { EmptyState, Heading, Select, Stack, Text } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
@@ -84,6 +85,7 @@ export function HttpDetailApp(props: HttpPaneProps & { bridge: AcornBridge }) {
 // The variables settings surface. A picker rather than an inferred project: variables belong to a
 // project and the settings modal is workspace-shaped.
 export function HttpSettingsApp(props: { bridge: AcornBridge }) {
+  const client = createHttpClient(props.bridge.api)
   const [projects] = createResource(() => props.bridge.api.get<ProjectsResponse>(projectsRoute))
   const [selected, setSelected] = createSignal('')
   const visible = () => (projects()?.projects ?? []).filter((candidate) => !candidate.hidden)
@@ -101,7 +103,7 @@ export function HttpSettingsApp(props: { bridge: AcornBridge }) {
         options={[{ value: '', label: 'Choose a project…' }, ...visible().map((candidate) => ({ value: candidate.id, label: candidate.name }))]}
       />
       <Show when={chosen()}>
-        {(candidate) => <HttpVariables projectId={candidate().id} projectName={nameOf(candidate())} />}
+        {(candidate) => <HttpVariables client={client} projectId={candidate().id} projectName={nameOf(candidate())} />}
       </Show>
     </Stack>
   )

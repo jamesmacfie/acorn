@@ -216,7 +216,9 @@ export function createFrameBridge(input: {
   function teardown(): void {
     for (const controller of inFlight.values()) controller.abort()
     inFlight.clear()
-    for (const detach of detachers.splice(0)) detach()
+    for (const detach of detachers.splice(0)) {
+      try { detach() } catch { /* One failed subscriber cannot retain the port and other owners. */ }
+    }
     subscribed.clear()
     port.onmessage = null
     port.close()

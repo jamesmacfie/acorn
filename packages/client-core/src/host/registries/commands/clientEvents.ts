@@ -127,9 +127,10 @@ export function openPane(taskId: string, paneId: string, intent?: PaneIntent, mo
   if (intent) clientEvents.emit('presentation:pane-intent', { taskId, paneId, intent })
 }
 
-export function consumePaneIntent(taskId: string, paneId: string): PaneIntent | undefined {
+export function consumePaneIntent(taskId: string, paneId: string, kind?: PaneIntent['kind']): PaneIntent | undefined {
   const key = paneIntentKey(taskId, paneId)
   const intent = pendingPaneIntents.get(key)
+  if (kind && intent?.kind !== kind) return undefined
   pendingPaneIntents.delete(key)
   return intent
 }

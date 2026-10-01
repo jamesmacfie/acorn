@@ -49,6 +49,12 @@ would see. `ctx.storage`, `ctx.core`, `ctx.schedules`, `ctx.dataSources`,
 `ctx.capabilities` and `ctx.events.send`/`status`/`on` are all present, shaped by the
 manifest.
 
+For compiled channel handlers, `onFrame`'s opaque connection token identifies one event viewer's
+resource lifetime. Key subscriptions and interactive resources by that token, and release them in
+`onDisconnect`; one physical socket can contain several viewers. The token exposes no credentials or
+claims. Core applies the physical parent's authorization before dispatch, while the channel owner
+continues to own its payload validation, producer sharing, and targeted joining replay.
+
 Agent tools and context sections are still available to a loaded package, but only as manifest
 descriptors: `contributions.agentTools` and `contributions.contextSections`. They do not become live
 registries in `ctx`. The host turns each descriptor into the same normalized registration compiled

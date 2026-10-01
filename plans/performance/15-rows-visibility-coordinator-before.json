@@ -1,0 +1,22 @@
+{
+  "fixture": "Actual Rows2000 at80x24, retained parent visible=false then true as Shell overlays do",
+  "initial": {
+    "created": 2000,
+    "disposed": 1976,
+    "retainedRows": 24
+  },
+  "hiddenState": {
+    "created": 3976,
+    "disposed": 1976,
+    "retainedRows": 2000,
+    "nodes": 22005,
+    "yoga": 12004,
+    "cpuMs": 214.859,
+    "wallMs": 144.26195800000005
+  },
+  "visibleAgain": {
+    "created": 3976,
+    "disposed": 3952,
+    "retainedRows": 24
+  }
+}

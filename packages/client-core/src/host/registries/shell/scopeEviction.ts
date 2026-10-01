@@ -20,7 +20,7 @@ export type ScopeEviction =
   // the new node within a tick, so clearing costs nothing and keying by node would buy nothing.
   // Durable per-task and per-workspace memory (editor scroll, the active terminal tab, the workspace
   // view) does not clear here: it is keyed by node instead, so switching back restores it.
-  | { scope: 'node-switched' }
+  | { scope: 'node-switched'; from?: string | null; to?: string | null }
 
 type Listener = (eviction: ScopeEviction) => void
 

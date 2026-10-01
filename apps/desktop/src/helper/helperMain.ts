@@ -113,12 +113,14 @@ async function boot(handshake: Handshake): Promise<{ helper: Helper; server: Hel
     },
     userDataDir: handshake.userDataDir,
     tokenCipher,
+    viewerMultiplexing: true,
     // Looked up rather than captured, because the listener does not exist yet and there may be no
     // renderer attached when a frame arrives.
     push: {
-      frame: (nodeId, frame) => server?.push({ push: 'node-frame', nodeId, frame }),
-      bytes: (nodeId, frame) => server?.pushBytes(nodeId, frame),
+      frame: (nodeId, frame, viewerId) => server?.push({ push: 'node-frame', nodeId, frame }, viewerId),
+      bytes: (nodeId, frame, viewerId) => server?.pushBytes(nodeId, frame, viewerId),
       status: (status) => server?.push({ push: 'node-status', status }),
+      transportError: (nodeId, error, viewerId) => server?.push({ push: 'node-transport-error', nodeId, error }, viewerId),
     },
     // The renderer is told and reloads itself. The node it was talking to has a new endpoint,
     // certificate, and token.

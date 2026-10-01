@@ -73,6 +73,19 @@ output and operation time, reports each teardown failure, and does not claim a m
 succeeded when one part failed. Events and log/stat streams use `/v1/events` with reconnect/refetch
 behavior.
 
+The Docker channel owns one continuous producer per stream kind and container reference. Log and
+stats viewers share that producer across physical and logical connections; detach or disconnect
+removes only that viewer, and the final subscriber stops it. Interactive exec PTYs remain independent
+per opaque viewer token and authenticated principal.
+
+The first log producer keeps `docker logs --tail 300`. A joining viewer receives only its targeted
+display replay: the latest 512 × 1024 UTF-16 code units, preserving the client's existing chunk-text
+and tail semantics, including split surrogate chunks. Replay storage uses bounded blocks and is joined
+only for a new viewer. Stats replay contains the latest valid sample. A join never resets existing
+subscribers or starts another CLI reader. Producer end reaches every surviving subscriber once and
+retires its sharing entry; construction failure unwinds the new entry. The client keeps its established
+desired subscription on `docker:stream-end`, so reconnect can retry a still-open surface.
+
 Compose files and commands that execute developer code pass the repository configuration trust gate.
 The declarative matcher does not, by itself, execute anything.
 

@@ -85,7 +85,9 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
     platform: process.platform,
     nodeFetch: (nodeId: string, request: Parameters<NodeBroker['fetch']>[1]) => broker.fetch(nodeId, request),
     nodeAbort: (requestId: string) => broker.abort(requestId),
-    nodeSend: (nodeId: string, frame: Parameters<NodeBroker['send']>[1]) => broker.send(nodeId, frame),
+    nodeSend: (nodeId: string, frame: Parameters<NodeBroker['send']>[1], options?: Parameters<NodeBroker['send']>[2]) => broker.send(nodeId, frame, options),
+    nodeInterest: (_nodeId: string | null) => {},
+    onNodeTransportError: (_cb: unknown) => () => {},
     onNodeFrame: (cb: (nodeId: string, frame: unknown) => void) => subscribe(frameHandlers, cb),
     onNodeBytes: (cb: (nodeId: string, frame: Uint8Array) => void) => subscribe(byteHandlers, cb),
     onNodeStatus: (cb: (status: NodeStatus) => void) => {

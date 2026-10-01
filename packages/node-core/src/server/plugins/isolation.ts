@@ -58,12 +58,13 @@ const runtimeReadRoots = (bootstrap: string): string[] => {
   ]
 }
 
-const unstarted = new WeakMap<NodePlugin, () => void>()
+const unstarted = new WeakMap<NodePlugin, () => Promise<void>>()
 
 /** Terminate a realm the dependency resolver rejected before the host acquired it. */
-export function disposeUnstartedPlugin(plugin: NodePlugin): void {
-  unstarted.get(plugin)?.()
+export function disposeUnstartedPlugin(plugin: NodePlugin): Promise<void> | undefined {
+  const dispose = unstarted.get(plugin)
   unstarted.delete(plugin)
+  return dispose?.()
 }
 
 export async function isolateNodePlugin(options: {
@@ -179,11 +180,14 @@ export async function isolateNodePlugin(options: {
 
   const lifecycle = endpoint.decode(handshake.descriptor, 'plugin') as Lifecycle
   let closed = false
-  const close = () => {
-    if (closed) return
+  let closing: Promise<void> | undefined
+  const close = (): Promise<void> => {
+    if (closing) return closing
+    if (closed) return Promise.resolve()
     closed = true
     endpoint.close(new Error(`Plugin '${options.plugin}' worker stopped.`))
-    void worker.terminate()
+    closing = worker.terminate().then(() => {})
+    return closing
   }
   worker.on('error', (error) => {
     if (!closed) endpoint.close(error instanceof Error ? error : new Error(String(error)))
@@ -193,17 +197,23 @@ export async function isolateNodePlugin(options: {
     if (!closed) endpoint.close(new Error(`Plugin '${options.plugin}' worker exited with code ${code}.`))
     closed = true
   })
+  let disposing: Promise<void> | undefined
   const plugin: NodePlugin & Record<string, unknown> = {
     ...handshake.metadata,
     name: options.plugin,
     init: (ctx) => lifecycle.init(loadedContext(ctx)),
     ...(lifecycle.ready ? { ready: (ctx: NodePluginContext) => lifecycle.ready!(loadedContext(ctx)) } : {}),
-    dispose: async () => {
-      try {
-        await lifecycle.dispose()
-      } finally {
-        close()
-      }
+    dispose: () => {
+      disposing ??= (async () => {
+        if (closed) return close()
+        try {
+          await lifecycle.dispose()
+        } finally {
+          unstarted.delete(plugin)
+          await close()
+        }
+      })()
+      return disposing
     },
   }
   unstarted.set(plugin, close)

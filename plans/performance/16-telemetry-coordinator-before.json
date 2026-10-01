@@ -1,0 +1,100 @@
+{
+  "fixture": "Actual Node/client emitters, queue and RPC endpoints in one isolate; isolated synthetic sinks/posters; no Sentry network. CPU measured operations, not app latency.",
+  "node": "v24.11.0",
+  "nodeOff": {
+    "wallMs": 2.042125000000027,
+    "cpuMs": 4.958
+  },
+  "nodeOn": {
+    "wallMs": 38.72887499999999,
+    "cpuMs": 44.603
+  },
+  "nodeFlush": {
+    "wallMs": 2.824041999999963,
+    "cpuMs": 3.11
+  },
+  "nodeHistogram": {
+    "kind": "metric",
+    "at": 1790797059692,
+    "name": "bounded-seam",
+    "type": "histogram",
+    "value": {
+      "count": 100000,
+      "sum": 19.37429700001352,
+      "min": 0.000125,
+      "max": 0.332625,
+      "p50": 0.000208,
+      "p95": 0.00025
+    },
+    "unit": "ms",
+    "attrs": {
+      "seam": "bounded-seam",
+      "owner": "audit",
+      "runtime": "node"
+    }
+  },
+  "nodeDynamicSeries": 1000,
+  "clientOff": {
+    "wallMs": 2.0417090000000258,
+    "cpuMs": 3.608
+  },
+  "clientOn": {
+    "wallMs": 45.53562499999998,
+    "cpuMs": 52.901
+  },
+  "clientHistogram": {
+    "kind": "metric",
+    "at": 1790797059745,
+    "name": "bounded-seam",
+    "type": "histogram",
+    "value": {
+      "count": 100000,
+      "sum": 25.007405000000745,
+      "min": 0.00016599999997879422,
+      "max": 0.16641600000002654,
+      "p50": 0.0002499999999940883,
+      "p95": 0.0003330000000119071
+    },
+    "unit": "ms",
+    "attrs": {
+      "seam": "bounded-seam",
+      "owner": "audit",
+      "runtime": "tui"
+    }
+  },
+  "clientDynamicSeriesExported": 1000,
+  "fullQueuePush100k": {
+    "wallMs": 104.29274999999996,
+    "cpuMs": 106.333
+  },
+  "queue": {
+    "retained": 1000,
+    "dropped": 99000
+  },
+  "rpcTelemetryApi": {
+    "collecting": false,
+    "samples": [
+      {
+        "calls": 1000,
+        "hostFunctionEncodes": 1006,
+        "peerFunctionEncodes": 1000,
+        "heapBytes": 18127264
+      },
+      {
+        "calls": 5000,
+        "hostFunctionEncodes": 5006,
+        "peerFunctionEncodes": 5000,
+        "heapBytes": 23161352
+      },
+      {
+        "calls": 10000,
+        "hostFunctionEncodes": 10006,
+        "peerFunctionEncodes": 10000,
+        "heapBytes": 29320328
+      }
+    ],
+    "heapAfterClose": 16989976,
+    "repeatedSameVisitorFunction": true
+  },
+  "checksum": 400000
+}

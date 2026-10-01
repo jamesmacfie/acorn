@@ -1,0 +1,270 @@
+{
+  "sourceRoot": "/Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance",
+  "mode": "after",
+  "node": "v24.11.0",
+  "provenance": [
+    {
+      "path": "apps/desktop/src/helper/helperServer.ts",
+      "sha256": "0da0fd72ed16757636eb7bbe6d1b3e4df1ad64f55f97309ef4b82828ce8a218a"
+    },
+    {
+      "path": "packages/custody/src/broker/nodeBroker.ts",
+      "sha256": "5a947e1dfd4249fa5cd709779f011ac071bcf25776c229eb13e6ee3e25aea6e0"
+    },
+    {
+      "path": "packages/custody/src/broker/nodeRequest.ts",
+      "sha256": "7d9ed8b48221586e5a3263675a583140faeabd1cb900cc88fee01ef64e133cb6"
+    },
+    {
+      "path": "packages/node-core/src/server/transport/wsHub.ts",
+      "sha256": "b36e497caeecc6679a58574a195a639b5ecd78e9a6f81dc0965fd2703ef1b12e"
+    },
+    {
+      "path": "plugins/docker/src/server/wsChannel.ts",
+      "sha256": "125c9a836907b5acc8390a20421491070522755749f3ecca272a1171381ac016"
+    },
+    {
+      "path": "plugins/terminal/src/server/terminalDisplay.ts",
+      "sha256": "599187c60d4efa0b5aadfda6bd2536e0218299e84b16dd70f255aa0a4e2d2919"
+    },
+    {
+      "path": "plugins/terminal/src/client/wsChannel.ts",
+      "sha256": "88c3fd5e9b26def1f4ac8c796a7f2b146061576cdf3a5671d0a6e439737152ac"
+    },
+    {
+      "path": "plugins/terminal/src/client/terminalClient.ts",
+      "sha256": "303c728e093fb6d71351fc9646c2feeb9677fc59782c7eb871db1c54e4828b5d"
+    },
+    {
+      "path": "packages/protocol/src/ws.ts",
+      "sha256": "3dfa871271ba5b496a262bd6ac0007a029eda466e65942bd523bc93c813de37f"
+    },
+    {
+      "path": "packages/protocol/src/node.ts",
+      "sha256": "f5e2125d442d4808bc597a08775ca8938ede8abcb06a6415b17f5abe0c82abed"
+    },
+    {
+      "path": "apps/desktop/src/helper/bodyCodec.ts",
+      "sha256": "d56faefd46aa1475ab83c17468fbfd8de3059cbb8218cf6d8dd09be1e559d73c"
+    },
+    {
+      "path": "apps/desktop/src/helper/rendererConnection.ts",
+      "sha256": "70f686f89bf0e2ad8b3ba7d544db262b9f055f06150bfcddf2b0e85c3aaf9744"
+    },
+    {
+      "path": "packages/custody/src/broker/eventViewers.ts",
+      "sha256": "cc698fb33e4c56d451039577ec33f42b796f9b8bb31b11f6ddd56e9ba231eaa1"
+    },
+    {
+      "path": "packages/custody/src/broker/subscriptionOutbox.ts",
+      "sha256": "0ad47de683c14332c44d273c48cdc20f357331fc2e6caf45ca82c63039880453"
+    },
+    {
+      "path": "packages/custody/src/broker/brokerFetch.ts",
+      "sha256": "60e36a4a2245e5abb2e625d81f3275403392e25d3eed0dad7031291d7b6c2ad5"
+    },
+    {
+      "path": "packages/node-core/src/server/transport/wsViewers.ts",
+      "sha256": "11ae0ff4ac44e6466936db86dc72636fa13d10a9aaeade173eddaae6a5fc1a80"
+    },
+    {
+      "path": "packages/node-core/src/server/transport/wsViewerDispatch.ts",
+      "sha256": "bf06bbf39add89b1638f8700d40ec6ca00d851e3d12f52bd85b11a29f082f8f6"
+    },
+    {
+      "path": "plugins/docker/src/server/sharedStreams.ts",
+      "sha256": "b77ae1137ba261eb61fbb3f3e94093fee591879c0594b7a4df3f3f88f4a6d669"
+    },
+    {
+      "path": "plugins/docker/src/server/logReplay.ts",
+      "sha256": "809e885d042da2f19237c749cd2cc45810ded688eb276780afa3a8d2302cdac6"
+    }
+  ],
+  "fixture": "Two separate authenticated wsHub Node child processes, real isolated node-pty cat and production xterm headless serialization, actual helper and broker, disposable Docker executable. No private state, real Docker daemon, Tauri, or visible latency measurement.",
+  "adaptations": [
+    "Explicit interest, advertised opt-in and typed intent; assert corrected independent viewer outcomes."
+  ],
+  "joined": {
+    "node": {
+      "id": 2,
+      "attaches": 2,
+      "detaches": 0,
+      "sinks": 2,
+      "snapshots": 2,
+      "producers": 1,
+      "stops": 0,
+      "physicalSockets": 1,
+      "size": {
+        "cols": 100,
+        "rows": 30
+      },
+      "pids": [
+        12371,
+        12411,
+        12586
+      ]
+    },
+    "aReady": 1,
+    "bReady": 1,
+    "aResetDelta": 0
+  },
+  "surviving": {
+    "node": {
+      "id": 4,
+      "attaches": 2,
+      "detaches": 1,
+      "sinks": 1,
+      "snapshots": 2,
+      "producers": 1,
+      "stops": 0,
+      "physicalSockets": 1,
+      "size": {
+        "cols": 100,
+        "rows": 30
+      },
+      "pids": [
+        12371,
+        12411,
+        12586
+      ]
+    },
+    "bAdditionalTerminalFrames": 16
+  },
+  "inactive": {
+    "downstreamFrames": 0,
+    "downstreamBytes": 0,
+    "elapsedMs": 68.89291700000012,
+    "parentProcessCpuMs": 3.471
+  },
+  "reconnect": {
+    "readyDelta": 1,
+    "latestSize": {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "cols": 144,
+      "rows": 44
+    },
+    "before": {
+      "id": 6,
+      "attaches": 2,
+      "detaches": 1,
+      "sinks": 1,
+      "snapshots": 2,
+      "producers": 1,
+      "stops": 0,
+      "physicalSockets": 1,
+      "size": {
+        "cols": 144,
+        "rows": 44
+      },
+      "pids": [
+        12371,
+        12411,
+        12586
+      ]
+    },
+    "after": {
+      "id": 8,
+      "attaches": 3,
+      "detaches": 2,
+      "sinks": 1,
+      "snapshots": 3,
+      "producers": 2,
+      "stops": 1,
+      "physicalSockets": 2,
+      "size": {
+        "cols": 144,
+        "rows": 44
+      },
+      "pids": [
+        12371,
+        12411,
+        12642
+      ]
+    }
+  },
+  "retired": {
+    "id": 9,
+    "attaches": 3,
+    "detaches": 3,
+    "sinks": 0,
+    "snapshots": 3,
+    "producers": 2,
+    "stops": 2,
+    "physicalSockets": 2,
+    "size": {
+      "cols": 144,
+      "rows": 44
+    },
+    "pids": [
+      12371,
+      12411
+    ]
+  },
+  "upstream": {
+    "json": 148,
+    "binary": 19,
+    "binaryBytes": 66367
+  },
+  "bodies": [
+    {
+      "bytes": 65536,
+      "base64Chars": 87384,
+      "medianMs": 0.0559160000002521,
+      "medianProcessCpuMs": 0.062
+    },
+    {
+      "bytes": 2097152,
+      "base64Chars": 2796204,
+      "medianMs": 0.6342920000006416,
+      "medianProcessCpuMs": 0.577
+    },
+    {
+      "bytes": 8388608,
+      "base64Chars": 11184812,
+      "medianMs": 1.310124999999971,
+      "medianProcessCpuMs": 1.332
+    }
+  ],
+  "responseAssembly": {
+    "bytes": 8388608,
+    "fragmentedWrites": 128,
+    "retainedResponses": 7,
+    "retainedBytes": 58720256,
+    "medianMs": 12.824209000000337,
+    "medianProcessCpuMs": 22.407,
+    "bodySizedAssemblyAllocationsPerResponse": 1,
+    "allocationCountEvidence": "Production owner source; timing includes HTTP, not an allocation profiler."
+  },
+  "limitations": [
+    "Terminal engine adapter mirrors production attach/resize/display flow; uses actual PTY/emulator, not full plugin registration/database.",
+    "Base64 timing calls the selected production encoder; response timing includes loopback HTTP.",
+    "No heap-profiler or visible UI timing; structural allocation counts are labeled separately.",
+    "Opted-in binary adds a 36-byte viewer header per upstream targeted frame; helper preserves its existing 36-byte Node header. Dimension changes add one idempotent attach control frame."
+  ],
+  "cleanup": [
+    {
+      "pid": 12371,
+      "alive": false
+    },
+    {
+      "pid": 12413,
+      "alive": false
+    },
+    {
+      "pid": 12411,
+      "alive": false
+    },
+    {
+      "pid": 12564,
+      "alive": false
+    },
+    {
+      "pid": 12586,
+      "alive": false
+    },
+    {
+      "pid": 12642,
+      "alive": false
+    }
+  ]
+}

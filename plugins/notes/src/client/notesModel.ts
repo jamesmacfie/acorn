@@ -1,6 +1,9 @@
 import { createEffect, createResource, createSignal, onCleanup, onMount } from 'solid-js'
-import { createQuery } from '@tanstack/solid-query'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
+  activeNodeId,
+  queryOwner,
+  readJson,
   clientEvents,
   consumePaneIntent,
   debounce,
@@ -9,6 +12,8 @@ import {
   workspaceForProject,
   workspacesOptions,
 } from '@acorn/plugin-api/client'
+import { workspacesRoute, type Workspace } from '@acorn/protocol/api.ts'
+import { noteDraft, type NoteDraft } from './noteDrafts'
 import { createArmedConfirm } from '@acorn/plugin-api/ui'
 import { SCRATCHPAD_SLUG } from '@acorn/protocol/notes.ts'
 import { notesApi, type NoteLocation, type NoteScope, type NoteSummary } from './notesClient'
@@ -30,9 +35,20 @@ export type Selected = { scope: NoteScope; slug: string; virtual?: boolean }
 export type NotesModel = ReturnType<typeof createNotesModel>
 
 export function createNotesModel(taskId: string, projectId: string | null) {
-  const api = notesApi()
+  const owner = queryOwner(useQueryClient())
+  const nodeId = owner === undefined ? activeNodeId() : owner
+  const api = notesApi(nodeId)
+  let disposed = false
+  let selectionRevision = 0
+  let document: { location: NoteLocation; slug: string; draft: NoteDraft; release(): void; virtual?: boolean } | null = null
+  const adoptDocument = (next: { location: NoteLocation; slug: string; draft: NoteDraft; virtual?: boolean }) => {
+    const release = next.draft.retain()
+    document?.release()
+    document = { ...next, release }
+  }
+  const live = () => !disposed && activeNodeId() === nodeId
   let titleField: HTMLInputElement | undefined
-  const workspaces = createQuery(() => workspacesOptions(nodeReady()))
+  const workspaces = createQuery(() => ({ ...workspacesOptions(nodeReady()), queryFn: ({ signal }) => readJson<Workspace[]>(workspacesRoute, { nodeId, signal }) }))
   const workspace = () => workspaceForProject(workspaces.data, projectId ?? undefined)
   const wsId = () => workspace()?.id ?? null
   const locationFor = (scope: NoteScope): NoteLocation | null =>
@@ -100,10 +116,18 @@ export function createNotesModel(taskId: string, projectId: string | null) {
   const selectedIncluded = () => selectedSummary()?.included ?? true
 
   // Autosave: debounce while typing, flush on blur and before we switch away. save() reads
-  // selected()+body() at fire time, so flush before mutating selected on a note switch.
+  // Each save captures the selected document owner. Flush again after held reads before replacing it.
   const scheduleSave = debounce(() => void save(), 1500)
   const scheduleTitle = debounce(() => void saveTitle(), 800)
-  onCleanup(() => scheduleSave.flush())
+  onCleanup(() => {
+    scheduleSave.flush()
+    scheduleTitle.flush()
+    document?.draft.flushRecovery()
+    document?.release()
+    disposed = true
+    selectionRevision++
+    titleField = undefined
+  })
 
   // Land the pane: retained notes:open intent wins, then the remembered note, else the scratchpad.
   createEffect(() => {
@@ -111,7 +135,7 @@ export function createNotesModel(taskId: string, projectId: string | null) {
     setLanded(true)
     const intent = consumePaneIntent(taskId, 'notes')
     if (intent && intent.kind === 'notes:open' && (intent.scope !== 'workspace' || wsId())) return void open(intent.scope, intent.slug)
-    const remembered = notesSelectionFor(taskId)
+    const remembered = notesSelectionFor(taskId, nodeId)
     if (remembered) return void open(remembered.scope, remembered.slug)
     landScratchpad()
   })
@@ -126,122 +150,172 @@ export function createNotesModel(taskId: string, projectId: string | null) {
     onCleanup(off)
   })
 
+  function flush() {
+    scheduleSave.flush()
+    scheduleTitle.flush()
+    document?.draft.flushRecovery()
+  }
+
   function landScratchpad() {
+    flush()
+    selectionRevision++
     setPreview(false)
     const existing = scratchpad()
     if (existing) return void open('task', existing.slug)
+    const location: NoteLocation = { scope: 'task', taskId }
+    const draft = noteDraft(nodeId, location, SCRATCHPAD_SLUG)
+    adoptDocument({ location, slug: SCRATCHPAD_SLUG, draft, virtual: true })
     setSelected({ scope: 'task', slug: SCRATCHPAD_SLUG, virtual: true })
-    setNoteTitle('Scratchpad')
-    setBody('')
+    setNoteTitle(draft.title ?? 'Scratchpad')
+    setBody(draft.body ?? '')
+    setActionError(draft.error)
   }
 
-  // First keystroke in a virtual scratchpad creates the file (single-flight). Adopt an existing
-  // scratchpad slug if the list already has one; adopt a deduped slug if create renamed it.
+  // Creation belongs to the virtual document, even if the view retires before it answers. Transfer
+  // its recovery edits and save them on that Node; only the still-current view may adopt the slug.
   function ensureScratchpad(): Promise<void> {
     if (scratchCreate) return scratchCreate
+    const original = document
+    if (!original?.virtual) return Promise.resolve()
+    const ticket = selectionRevision
     scratchCreate = (async () => {
-      const existing = scratchpad()
-      if (existing) {
-        setSelected({ scope: 'task', slug: existing.slug })
-        rememberNotesSelection(taskId, { scope: 'task', slug: existing.slug })
-        return
-      }
-      const res = await api.create({ scope: 'task', taskId }, 'Scratchpad', 'scratch')
-      if ('error' in res) {
-        setActionError(res.error)
+      try {
+        const existing = scratchpad()
+        const result = existing ? { slug: existing.slug } : await api.create(original.location, 'Scratchpad', 'scratch')
+        if ('error' in result) throw new Error(result.error)
+        const draft = noteDraft(nodeId, original.location, result.slug)
+        if (original.draft.body !== undefined) draft.edit('body', original.draft.body)
+        if (original.draft.title !== undefined) draft.edit('title', original.draft.title)
+        draft.flushRecovery()
+        if (draft !== original.draft) original.draft.discard()
+        if (live() && ticket === selectionRevision) {
+          adoptDocument({ location: original.location, slug: result.slug, draft })
+          setSelected({ scope: 'task', slug: result.slug })
+          rememberNotesSelection(taskId, { scope: 'task', slug: result.slug }, nodeId)
+          void refetchTask()
+        }
+        const error = await draft.save(api)
+        if (live() && ticket === selectionRevision) setActionError(error)
+      } catch (error) {
+        original.draft.fail(error instanceof Error ? error.message : String(error))
+        if (live() && ticket === selectionRevision) setActionError(error instanceof Error ? error.message : String(error))
         scratchCreate = null
-        return
       }
-      setSelected({ scope: 'task', slug: res.slug })
-      rememberNotesSelection(taskId, { scope: 'task', slug: res.slug })
-      await refetchTask()
     })()
     return scratchCreate
   }
 
   async function open(scope: NoteScope, slug: string) {
     const location = locationFor(scope)
-    if (!api || !location) return
-    scheduleSave.flush() // persist the note we're leaving before loading the next
-    const res = await api.read(location, slug)
-    if ('error' in res) return setActionError(res.error)
-    setActionError('')
-    setPreview(false)
-    setSelected({ scope, slug })
-    setBody(res.body)
-    setNoteTitle(res.title)
-    setSaving(false)
-    rememberNotesSelection(taskId, { scope, slug })
+    if (!live() || !location) return
+    flush()
+    const ticket = ++selectionRevision
+    try {
+      const result = await api.read(location, slug)
+      if (!live() || ticket !== selectionRevision) return
+      if ('error' in result) return setActionError(result.error)
+      flush() // Edits made while this read was held still belong to the outgoing document.
+      const draft = noteDraft(nodeId, location, slug)
+      adoptDocument({ location, slug, draft })
+      setActionError(draft.error)
+      setPreview(false)
+      setSelected({ scope, slug })
+      setBody(draft.body ?? result.body)
+      setNoteTitle(draft.title ?? result.title)
+      setSaving(false)
+      rememberNotesSelection(taskId, { scope, slug }, nodeId)
+    } catch (error) {
+      if (live() && ticket === selectionRevision) setActionError(error instanceof Error ? error.message : String(error))
+    }
   }
 
-  async function save() {
-    const sel = selected()
-    const location = sel && locationFor(sel.scope)
-    if (!api || !sel || sel.virtual || !location) return
-    setSaving(true)
-    const res = await api.write(location, sel.slug, body())
+  async function save(notify = true) {
+    const target = document
+    if (!target) return
+    if (target.virtual) return ensureScratchpad()
+    const ticket = selectionRevision
+    if (live()) setSaving(true)
+    const error = await target.draft.save(api)
+    if (!live() || ticket !== selectionRevision) return
     setSaving(false)
-    if ('error' in res) return setActionError(res.error)
-    setActionError('')
-    toast('Note saved', { tone: 'success' })
+    setActionError(error)
+    if (notify && !error && !target.draft.dirty) toast('Note saved', { tone: 'success' })
   }
 
   async function saveTitle() {
-    const sel = selected()
-    const location = sel && locationFor(sel.scope)
-    if (!api || !sel || sel.virtual || !location || !noteTitle().trim()) return
-    const res = await api.setTitle(location, sel.slug, noteTitle().trim())
-    if ('error' in res) return setActionError(res.error)
-    setActionError('')
-    await refetchScope(sel.scope)
+    const ticket = selectionRevision
+    const scope = selected()?.scope
+    await save(false)
+    if (live() && ticket === selectionRevision && scope) await refetchScope(scope)
   }
 
   async function createIn(scope: NoteScope): Promise<boolean> {
     const location = locationFor(scope)
-    if (!api || !location) return false
-    const res = await api.create(location, 'Untitled')
-    if ('error' in res) {
-      setActionError(res.error)
+    if (!live() || !location) return false
+    flush()
+    const ticket = ++selectionRevision
+    try {
+      const result = await api.create(location, 'Untitled')
+      if (!live() || ticket !== selectionRevision) return false
+      if ('error' in result) { setActionError(result.error); return false }
+      await refetchScope(scope)
+      if (!live() || ticket !== selectionRevision) return false
+      const opening = selectionRevision + 1
+      await open(scope, result.slug)
+      return live() && selectionRevision === opening && selected()?.scope === scope && selected()?.slug === result.slug
+    } catch (error) {
+      if (live() && ticket === selectionRevision) setActionError(error instanceof Error ? error.message : String(error))
       return false
     }
-    setActionError('')
-    await refetchScope(scope)
-    await open(scope, res.slug)
-    return true
   }
 
   async function toggleIncluded(scope: NoteScope, slug: string, included: boolean) {
     const location = locationFor(scope)
-    if (!api || !location) return
-    const res = await api.setIncluded(location, slug, included)
-    if ('error' in res) return setActionError(res.error)
-    setActionError('')
-    await refetchScope(scope)
+    if (!live() || !location) return
+    const ticket = selectionRevision
+    try {
+      const result = await (document?.slug === slug && selected()?.scope === scope ? document.draft : noteDraft(nodeId, location, slug)).run(() => api.setIncluded(location, slug, included))
+      if (!live() || ticket !== selectionRevision) return
+      if ('error' in result) return setActionError(result.error)
+      setActionError('')
+      await refetchScope(scope)
+    } catch (error) {
+      if (live() && ticket === selectionRevision) setActionError(error instanceof Error ? error.message : String(error))
+    }
   }
 
   async function remove(scope: NoteScope, slug: string) {
     const location = locationFor(scope)
-    if (!api || !location) return
-    if (!deleteArmed.request(`${scope}:${slug}`)) return
-    setActionError('')
-    if (isActive(scope, slug)) {
-      scheduleSave.cancel()
-      landScratchpad()
+    if (!live() || !location || !deleteArmed.request(`${scope}:${slug}`)) return
+    flush()
+    const ticket = ++selectionRevision
+    const draft = document?.slug === slug && selected()?.scope === scope ? document.draft : noteDraft(nodeId, location, slug)
+    try {
+      const result = await draft.run(() => api.remove(location, slug))
+      if ('error' in result) throw new Error(result.error)
+      draft.discard()
+      if (!live() || ticket !== selectionRevision) return
+      setActionError('')
+      await refetchScope(scope)
+      if (live() && ticket === selectionRevision && isActive(scope, slug)) landScratchpad()
+    } catch (error) {
+      if (live() && ticket === selectionRevision) setActionError(error instanceof Error ? error.message : String(error))
     }
-    const result = await api.remove(location, slug)
-    if ('error' in result) return setActionError(result.error)
-    await refetchScope(scope)
   }
 
   function onBodyInput(value: string) {
+    if (!live()) return
     setBody(value)
-    if (selected()?.virtual) void ensureScratchpad().then(() => scheduleSave())
+    document?.draft.edit('body', value)
+    if (document?.virtual) void ensureScratchpad()
     else scheduleSave()
   }
 
   function onTitleInput(value: string) {
+    if (!live()) return
     setNoteTitle(value)
-    if (selected()?.virtual) void ensureScratchpad().then(() => scheduleTitle())
+    document?.draft.edit('title', value)
+    if (document?.virtual) void ensureScratchpad()
     else scheduleTitle()
   }
 
@@ -251,7 +325,10 @@ export function createNotesModel(taskId: string, projectId: string | null) {
     // different regions the host mounts independently: the "+" that creates a note is in the list and
     // the field it wants focused is in the detail.
     titleRef: (element: HTMLInputElement) => { titleField = element },
-    requestTitleFocus: () => queueMicrotask(() => { titleField?.focus(); titleField?.select() }),
+    requestTitleFocus: () => {
+      const ticket = selectionRevision
+      queueMicrotask(() => { if (live() && ticket === selectionRevision) { titleField?.focus(); titleField?.select() } })
+    },
     api,
     workspace,
     locationFor,

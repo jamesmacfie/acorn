@@ -19,6 +19,9 @@ rather than `turbo run test` directly: the bound is what keeps the suite honest.
 spawn a real subprocess, mint a certificate, or run git, and turning the bound off oversubscribes the
 machine badly enough that they time out while passing in isolation.
 
+The TUI suite also limits its internal test forks to two. Package concurrency alone does not bound
+Vitest workers; cold shell transforms across many forks can exceed fixture deadlines under load.
+
 The desktop package's `test` stages the bundle inputs first, then runs its Vitest suites and the Rust
 unit tests, so the boot test always exercises fresh artifacts.
 

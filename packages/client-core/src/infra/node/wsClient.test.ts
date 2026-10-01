@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import type { NodeStatus } from '@acorn/protocol/broker.ts'
+import type { NodeStatus, NodeTransportError } from '@acorn/protocol/broker.ts'
+import { activeToasts, dismissToast } from '../../features/notifications/toast'
 import { setActiveNode } from './activeNode'
 import { registerWsChannel } from './wsChannels'
 
@@ -14,6 +15,7 @@ type Bridge = {
   // session.
   emitBytes(frame: Uint8Array, nodeId?: string): void
   emitStatus(state: NodeStatus['state'], nodeId?: string): void
+  emitError(error: NodeTransportError, nodeId?: string): void
 }
 
 function installBridge(): Bridge {
@@ -21,6 +23,7 @@ function installBridge(): Bridge {
   const frameHandlers: ((nodeId: string, frame: unknown) => void)[] = []
   const byteHandlers: ((nodeId: string, frame: Uint8Array) => void)[] = []
   const statusHandlers: ((status: NodeStatus) => void)[] = []
+  const errorHandlers: ((nodeId: string, error: NodeTransportError) => void)[] = []
   // `nodeFetch` is what makes the host's transport exist as far as platform/index.ts is concerned:
   // it is the "there is a broker" discriminator, so a fake that pushes frames has to answer
   // requests too, even if this suite never sends one.
@@ -40,6 +43,7 @@ function installBridge(): Bridge {
       statusHandlers.push(cb)
       return () => {}
     },
+    onNodeTransportError: (cb: (nodeId: string, error: NodeTransportError) => void) => { errorHandlers.push(cb); return () => {} },
   }
   ;(globalThis as { window?: unknown }).window = { acorn }
   return {
@@ -49,6 +53,7 @@ function installBridge(): Bridge {
     emitFrame: (frame, nodeId = 'n1') => frameHandlers.forEach((cb) => cb(nodeId, frame)),
     emitBytes: (frame, nodeId = 'n1') => byteHandlers.forEach((cb) => cb(nodeId, frame)),
     emitStatus: (state, nodeId = 'n1') => statusHandlers.forEach((cb) => cb({ nodeId, state })),
+    emitError: (error, nodeId = 'n1') => errorHandlers.forEach((cb) => cb(nodeId, error)),
   }
 }
 
@@ -63,6 +68,7 @@ beforeEach(async () => {
 })
 
 afterEach(() => {
+  for (const entry of activeToasts()) dismissToast(entry.id)
   client._resetWsClient()
   setActiveNode(null)
   delete (globalThis as { window?: unknown }).window
@@ -71,6 +77,13 @@ afterEach(() => {
 const framesSent = () => bridge.sent.map((s) => s.frame)
 
 describe('wsClient', () => {
+  it('shows a generic transport refusal to the user without changing sibling Node status', () => {
+    client.wsConnect()
+    bridge.emitError({ code: 'viewers_unsupported', message: 'Upgrade this Node for another window.' })
+    expect(activeToasts()).toEqual([expect.objectContaining({ message: 'Upgrade this Node for another window.', tone: 'danger' })])
+    bridge.emitStatus('online', 'n2')
+    expect(activeToasts()).toHaveLength(1)
+  })
   it('fans status, notice, step and agent frames to their subscribers', () => {
     const statuses: number[] = []
     const notices: string[] = []

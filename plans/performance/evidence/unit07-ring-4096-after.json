@@ -1,0 +1,14 @@
+{
+  "ownerSha256": "248de44222bf7930c0d79c9d1521cb9ee0e1a69c14b128e95b999676731438d9",
+  "node": "v24.11.0",
+  "size": 4096,
+  "bytes": 262144,
+  "tailExact": true,
+  "fillWallMs": 0.52049999999997,
+  "fillCpuMs": 2.064,
+  "overflowChunks": 8,
+  "overflowWallMs": 0.05120900000002848,
+  "overflowCpuMs": 0.051,
+  "heapDelta": 30296,
+  "arrayBuffersDelta": 262160
+}

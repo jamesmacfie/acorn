@@ -222,6 +222,7 @@ client: projectsKey
 client: projectsOptions
 client: pushManagedAgentNotice
 client: queryContentSchema
+client: queryOwner
 client: queryReferenceSchema
 client: queryScopeSchema
 client: railDotProps
@@ -296,6 +297,7 @@ client: wsOnStatus
 client: wsOnWorkflowStepChanged
 client: wsOnWorkflowStepEvent
 client: wsSend
+client: wsSendToNode
 node: AGENTS_HARNESS_REGISTRY
 node: AGENT_TOOL_PASSTHROUGH
 node: AgentProfileContribution
@@ -567,6 +569,7 @@ testkit/client: paneRegistry
 testkit/client: parseInAppTarget
 testkit/client: provideClientCapability
 testkit/client: refPanelRegistry
+testkit/client: refreshFleet
 testkit/client: setActiveNode
 testkit/client: setProjectsLookup
 testkit/ws-client: _resetWsClient

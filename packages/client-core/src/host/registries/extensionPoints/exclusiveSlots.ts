@@ -42,7 +42,10 @@ export const exclusiveSlotFailed = (slot: CoreExclusiveSlot, pluginId: string): 
 
 /** Cleared by the contribution sync, which is the one moment the bytes behind a provider can have
  *  changed. Also the test seam. */
-export const clearExclusiveSlotFailures = (): void => failed.clear()
+export const clearExclusiveSlotFailures = (pluginId?: string): void => {
+  if (pluginId === undefined) failed.clear()
+  else for (const key of failed) if (key.endsWith(`:${pluginId}`)) failed.delete(key)
+}
 
 /** Every plugin offering to replace this surface, for the settings picker. These are offers, so
  *  nothing here is on screen unless the user said so. */

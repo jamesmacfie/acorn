@@ -1,0 +1,24 @@
+{
+  "afterCreate": 0,
+  "afterRemoveAndExit": 0,
+  "removedListeners": {
+    "data": 1,
+    "exit": 1
+  },
+  "afterDispose": {
+    "dataListeners": 1,
+    "exitListeners": 1,
+    "kills": 0,
+    "timers": 0
+  },
+  "lateOutput": {
+    "queuedTimers": 1,
+    "afterFlushTimers": 0
+  },
+  "reboot": {
+    "newRosterCount": 1,
+    "oldListeners": 1,
+    "oldOutputQueuedTimer": 1,
+    "statusesFromOldOutput": 0
+  }
+}

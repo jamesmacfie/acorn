@@ -1,6 +1,8 @@
 import type { QueryClient } from '@tanstack/solid-query'
 import { prefsKey, prefsRoute } from '@acorn/protocol/api.ts'
 import { writeJson } from '../../infra/node/apiClient'
+import { activeNodeId } from '../../infra/node/activeNode'
+import { queryOwner } from '../../infra/node/queryOwnership'
 import { pushBackgroundError } from '../notifications/notifications'
 import { isDevicePref, writeDevicePref } from '../../infra/persistence/devicePrefs'
 import { persistedStateRegistry, utf8Bytes } from '../../infra/persistence/persistedState'
@@ -12,9 +14,10 @@ const log = createLogger('prefs')
 // after the device migration all describes one node's resources: a task's pane layout, its open files,
 // a repo's PR filters, what the agent running there may do. State follows the resource it describes
 // (docs/state.md § Scope rules), so there's no home node to pick.
-export const setPref = async (key: string, value: string) =>
+export const setPref = async (key: string, value: string, nodeId: string | null = activeNodeId()) =>
   writeJson<{ key: string; value: string }>(prefsRoute, {
     method: 'PUT',
+    nodeId,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ key, value }),
   }, (res) => `prefs ${res.status}`)
@@ -25,7 +28,7 @@ type PrefWriteState = {
   hadConfirmedValue: boolean
   latestAttempt: number
 }
-const writes = new Map<string, PrefWriteState>()
+const writes = new WeakMap<QueryClient, Map<string, PrefWriteState>>()
 
 // The query cache is the one client-side writer: update it optimistically so every reactive reader
 // moves together, serialize server writes per key, and roll back only if this attempt is still the
@@ -58,10 +61,14 @@ export async function savePref(
     return true
   }
 
+  const registered = queryOwner(qc)
+  const nodeId = registered === undefined ? activeNodeId() : registered
+  const partitionWrites = writes.get(qc) ?? new Map<string, PrefWriteState>()
+  writes.set(qc, partitionWrites)
   const previous = qc.getQueryData<Record<string, string>>(prefsKey)
   qc.setQueryData<Record<string, string>>(prefsKey, (old) => ({ ...old, [key]: value }))
 
-  const state = writes.get(key) ?? {
+  const state = partitionWrites.get(key) ?? {
     tail: Promise.resolve(),
     confirmed: previous?.[key],
     hadConfirmedValue: !!previous && key in previous,
@@ -69,12 +76,12 @@ export async function savePref(
   }
   const attempt = ++state.latestAttempt
   const request = state.tail.catch(() => {}).then(async () => {
-    await setPref(key, value)
+    await setPref(key, value, nodeId)
     state.confirmed = value
     state.hadConfirmedValue = true
   })
   state.tail = request
-  writes.set(key, state)
+  partitionWrites.set(key, state)
   try {
     await request
     return true
@@ -94,7 +101,7 @@ export async function savePref(
     else pushBackgroundError('', `Could not save ${key}`, error instanceof Error ? error.message : String(error))
     return false
   } finally {
-    if (writes.get(key)?.tail === request) writes.delete(key)
+    if (partitionWrites.get(key)?.tail === request) partitionWrites.delete(key)
   }
 }
 

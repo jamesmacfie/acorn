@@ -22,6 +22,7 @@ export type NodeRequestOptions = {
 
 export function nodeRequest(options: NodeRequestOptions): Promise<NodeFetchResponse> {
   const { url, agent, signal } = options
+  if (signal.aborted) return Promise.reject(abortError())
   const encoded = encodeBody(options.body)
   const send = url.protocol === 'https:' ? httpsRequest : httpRequest
 
@@ -58,7 +59,8 @@ export function nodeRequest(options: NodeRequestOptions): Promise<NodeFetchRespo
             // joining rather than dropping keeps it honest.
             headers[key] = Array.isArray(value) ? value.join(', ') : value
           }
-          resolve({ status: res.statusCode ?? 0, headers, body: new Uint8Array(Buffer.concat(chunks)) })
+          const joined = Buffer.concat(chunks)
+          resolve({ status: res.statusCode ?? 0, headers, body: new Uint8Array(joined.buffer, joined.byteOffset, joined.byteLength) })
         })
         res.on('error', reject)
       },

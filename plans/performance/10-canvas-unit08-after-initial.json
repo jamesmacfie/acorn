@@ -1,0 +1,11 @@
+{
+  "case": "one-row-window-shift",
+  "before": 200,
+  "after": 200,
+  "overlap": 199,
+  "preserved": 199,
+  "oldSelectedRowConnected": true,
+  "selectionInsideOldRow": true,
+  "elapsedMs": 4.2864999999999895,
+  "cpuMs": 11.213
+}

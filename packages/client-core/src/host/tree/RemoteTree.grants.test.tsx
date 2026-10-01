@@ -18,7 +18,8 @@ vi.mock('@tanstack/solid-query', () => ({ useQueryClient: () => ({}) }))
 vi.mock('./TreeHost', () => ({ TreeHost: () => <button type="button">tree</button> }))
 vi.mock('../frames/frameServices', () => ({ createFrameServices: () => ({}) }))
 vi.mock('../frames/broker', () => ({ createFrameBridge: () => ({}), postSelect: vi.fn(), postSurfaceAction: vi.fn() }))
-vi.mock('./workerHost', () => ({
+vi.mock('./workerHost', async (original) => ({
+  ...await original<typeof import('./workerHost')>(),
   acquireTreeWorker: () => ({
     transport: () => ({}),
     mount: () => {},

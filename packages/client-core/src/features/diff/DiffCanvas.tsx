@@ -1,11 +1,11 @@
-import { For, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createMemo, For, onCleanup, onMount, Show } from 'solid-js'
 import type { Accessor, JSX } from 'solid-js'
 import { DiffLine, NonCodeRow, SplitCell, type LineComposerController, type ThreadCollapseController } from '../../kit/diff/DiffRows'
 import type { FindHighlight } from '../../kit/diff/find'
 import { isCodeRow, type CodeRow, type DiffThread, type GapRow, type LoadDiffStatus, type Row, type SplitBand, type ViewMode } from '../../kit/diff/diffModel'
 import { createSplitScrollSync } from '../../kit/diff/splitScrollSync'
 
-type VirtualItem = { index: number; start: number; end: number }
+type VirtualItem = { key?: string | number | bigint; index: number; start: number; end: number }
 type DiffVirtualizer = {
   getTotalSize: () => number
   getVirtualItems: () => VirtualItem[]
@@ -51,14 +51,14 @@ export function DiffCanvas(props: {
   lineAction?: { title: string; run: (row: CodeRow, event: MouseEvent) => void }
   openLine?: (row: CodeRow) => void
 }) {
-  const virtualRows = () => props.virt.getVirtualItems().flatMap((vi) => {
-    const row = props.rows()[vi.index]
-    return row ? [{ vi, row }] : []
-  })
-  const virtualBands = () => props.splitVirt.getVirtualItems().flatMap((vi) => {
-    const band = props.bands()[vi.index]
-    return band ? [{ vi, band }] : []
-  })
+  // Maps contain only the mounted window. Primitive virtualizer keys preserve overlapping owners;
+  // each owner's accessors read this window's fresh geometry and model.
+  const virtualRows = createMemo(() => new Map(props.virt.getVirtualItems()
+    .filter((vi) => props.rows()[vi.index])
+    .map((vi) => [vi.key ?? vi.index, vi])))
+  const virtualBands = createMemo(() => new Map(props.splitVirt.getVirtualItems()
+    .filter((vi) => props.bands()[vi.index])
+    .map((vi) => [vi.key ?? vi.index, vi])))
 
   const splitScroll = createSplitScrollSync()
   onCleanup(splitScroll.dispose)
@@ -70,38 +70,46 @@ export function DiffCanvas(props: {
             block to stay put when the wide unified canvas scrolls sideways. */}
         <div class="diff-rows" style={{ height: `${props.virt.getTotalSize()}px`, '--diff-cols': props.maxCols() }}>
           {props.stickyHead()}
-          <For each={virtualRows()}>
-            {({ vi, row }) => {
+          <For each={[...virtualRows().keys()]}>
+            {(key) => {
+              const initial = virtualRows().get(key)!
+              const vi = createMemo<VirtualItem>((previous) => virtualRows().get(key) ?? previous, initial)
+              const row = createMemo<Row>((previous) => {
+                const item = virtualRows().get(key)
+                return item ? props.rows()[item.index] ?? previous : previous
+              }, props.rows()[initial.index])
+              const codeRow = () => { const value = row(); return isCodeRow(value) ? value : null }
               let rowEl: HTMLDivElement | undefined
               const measureRow = () => {
                 if (rowEl) props.scheduleElementMeasure('unified', rowEl)
               }
+              createEffect(() => { if (props.shouldMeasureRow(row())) measureRow() })
               return (
                 <div
                   class="diff-row"
                   classList={{
-                    'diff-hunk': row.kind === 'hunk',
-                    'diff-add': row.kind === 'insert',
-                    'diff-del': row.kind === 'delete',
-                    'diff-file-row': row.kind === 'file',
-                    'diff-thread-row': row.kind === 'thread' || row.kind === 'nodiff' || row.kind === 'load',
+                    'diff-hunk': row().kind === 'hunk',
+                    'diff-add': row().kind === 'insert',
+                    'diff-del': row().kind === 'delete',
+                    'diff-file-row': row().kind === 'file',
+                    'diff-thread-row': row().kind === 'thread' || row().kind === 'nodiff' || row().kind === 'load',
                   }}
-                  data-index={vi.index}
-                  title={props.lineAction && isCodeRow(row) ? props.lineAction.title : undefined}
-                  onClick={props.lineAction && isCodeRow(row)
-                    ? ((e) => props.lineAction!.run(row, e))
+                  data-index={vi().index}
+                  title={props.lineAction && isCodeRow(row()) ? props.lineAction.title : undefined}
+                  onClick={props.lineAction && isCodeRow(row())
+                    ? ((e) => { const current = codeRow(); if (current) props.lineAction!.run(current, e) })
                     : undefined}
                   ref={(el) => {
                     rowEl = el
-                    if (props.shouldMeasureRow(row)) props.scheduleElementMeasure('unified', el)
+                    if (props.shouldMeasureRow(row())) props.scheduleElementMeasure('unified', el)
                   }}
-                  style={{ transform: `translateY(${vi.start}px)` }}
+                  style={{ transform: `translateY(${vi().start}px)` }}
                 >
                   <Show
-                    when={isCodeRow(row) ? row : null}
+                    when={codeRow()}
                     fallback={
                       <NonCodeRow
-                        row={row as Exclude<Row, CodeRow>}
+                        row={row() as Exclude<Row, CodeRow>}
                         onMutated={props.invalidate}
                         resolveThread={(threadId, resolved) => props.resolveThread(threadId, resolved)}
                         reply={(databaseId, body) => props.replyReview(databaseId, body)}
@@ -117,15 +125,15 @@ export function DiffCanvas(props: {
                     }
                   >
                     {(code) => {
-                      const comment = props.lineComment(code())
+                      const comment = () => props.lineComment(code())
                       return (
                         <>
                           <DiffLine
                             r={code()}
-                            canAdd={comment.canAdd}
-                            addComment={(body) => props.addComment(body, code(), comment.side, comment.lineNo)}
+                            canAdd={comment().canAdd}
+                            addComment={(body) => props.addComment(body, code(), comment().side, comment().lineNo)}
                             onMutated={props.invalidate}
-                            composer={comment.canAdd ? props.composerFor(comment.key) : undefined}
+                            composer={comment().canAdd ? props.composerFor(comment().key) : undefined}
                             mentions={props.mentions()}
                             highlight={props.findHighlight(code())}
                             openLine={props.openLine}
@@ -155,8 +163,14 @@ export function DiffCanvas(props: {
           ref={(el) => splitScroll.attach(el)}
         >
           {props.stickyHead()}
-          <For each={virtualBands()}>
-            {({ vi, band }) => {
+          <For each={[...virtualBands().keys()]}>
+            {(key) => {
+              const initial = virtualBands().get(key)!
+              const vi = createMemo<VirtualItem>((previous) => virtualBands().get(key) ?? previous, initial)
+              const band = createMemo<SplitBand>((previous) => {
+                const item = virtualBands().get(key)
+                return item ? props.bands()[item.index] ?? previous : previous
+              }, props.bands()[initial.index])
               let bandEl: HTMLDivElement | undefined
               const measureBand = () => {
                 if (bandEl) props.scheduleElementMeasure('split', bandEl)
@@ -166,19 +180,20 @@ export function DiffCanvas(props: {
               onMount(() => {
                 if (bandEl) splitScroll.adopt(bandEl)
               })
-              const fullRow = () => (band as Extract<SplitBand, { kind: 'full' }>).row
+              const fullRow = () => (band() as Extract<SplitBand, { kind: 'full' }>).row
+              createEffect(() => { if (props.shouldMeasureBand(band())) measureBand() })
               return (
                 <div
                   class="diff-split-band"
-                  data-index={vi.index}
+                  data-index={vi().index}
                   ref={(el) => {
                     bandEl = el
-                    if (props.shouldMeasureBand(band)) props.scheduleElementMeasure('split', el)
+                    if (props.shouldMeasureBand(band())) props.scheduleElementMeasure('split', el)
                   }}
-                  style={{ transform: `translateY(${vi.start}px)` }}
+                  style={{ transform: `translateY(${vi().start}px)` }}
                 >
                   <Show
-                    when={band.kind === 'pair' ? (band as Extract<SplitBand, { kind: 'pair' }>) : null}
+                    when={band().kind === 'pair' ? (band() as Extract<SplitBand, { kind: 'pair' }>) : null}
                     fallback={
                       <div
                         class="diff-split-full"

@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PrefKeys } from './prefKeys'
 import { isDevicePref, mergePrefs, readDevicePrefs, writeDevicePref } from './devicePrefs'
 
@@ -70,6 +70,27 @@ describe('the storage round trip', () => {
     expect(readDevicePrefs()).toEqual({})
     expect(mergePrefs({ [layoutKey]: '{"panes":["new"]}' })).toEqual({ [layoutKey]: '{"panes":["new"]}' })
     expect(store.get(`acorn-pref:${layoutKey}`)).toBe('{"panes":["old"]}')
+  })
+
+  it('reads declared keys without enumerating thousands of unrelated drafts', () => {
+    for (let index = 0; index < 5_000; index++) store.set(`draft:${index}`, 'private')
+    store.set('acorn-pref:acorn-1:theme', 'dark')
+    const enumerate = vi.spyOn(localStorage, 'key')
+    const read = vi.spyOn(localStorage, 'getItem')
+    expect(readDevicePrefs()).toEqual({ theme: 'dark' })
+    expect(enumerate).not.toHaveBeenCalled()
+    expect(read.mock.calls.length).toBeGreaterThan(0)
+    expect(read.mock.calls.length).toBeLessThan(50)
+    expect(store.size).toBe(5_001)
+  })
+
+  it('returns an empty view if a declared-key read throws after a partial read', () => {
+    let calls = 0
+    vi.spyOn(localStorage, 'getItem').mockImplementation(() => {
+      if (++calls === 2) throw new Error('blocked')
+      return 'partial'
+    })
+    expect(readDevicePrefs()).toEqual({})
   })
 
   it('returns an empty view when localStorage is unavailable', () => {

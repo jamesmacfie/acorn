@@ -1,0 +1,135 @@
+{
+  "root": "/tmp/acorn-perf-original-f8e4b59c",
+  "hashes": {
+    "packages/client-core/src/infra/node/fleet.ts": "18ab88f4ed8961dc525af10d2e07c9e360eafdaf9b8e71d2e45c5b4e445dd3b8",
+    "packages/client-core/src/infra/node/queryOwnership.ts": null,
+    "packages/client-core/src/infra/node/apiClient.ts": "62954216f9665fc0a443cc9351a3bc0cfcc618ee067f72c18983e7de6884f8ee",
+    "packages/client-core/src/infra/persistence/queryPersistence.ts": "ed63f9c250120b544f2857cc28b82b0acd0c4d18a6d84328306e48f8f58a0112",
+    "packages/client-core/src/infra/persistence/queryCacheLifecycle.ts": null,
+    "packages/client-core/src/infra/persistence/QueryCacheProvider.tsx": null,
+    "packages/client-core/src/infra/persistence/startupRestore.ts": "4c6383bf4fd652573c99175c7c418c51e0a30d179734d8c8bda7a1f9e0c4a2ad",
+    "packages/client-core/src/infra/persistence/persistedState.ts": "ed6b603d88a2979d53ad0481804b33ca08bcc9704c3d03c7915369a75cf67b7d",
+    "packages/client-core/src/infra/persistence/devicePrefs.ts": "4ef1f631d2d9c9a35ab591b742d26076a880e07bd996f7fedcfc9ac7b6a15222",
+    "packages/client-core/src/features/settings/savePref.ts": "7daa4f918f14516929cadf8d3839e5af0f63a7473699b854e39d18693fc3c014",
+    "apps/desktop/src/client/index.tsx": "2af2f96fb20f5d30db682c531bc3acc1d888683c61ace2688fe9bc09a3148ee9",
+    "apps/tui/src/main.tsx": "861ceb0b280c574df858bc28dff3b1448bf02ec472109189e4353b782cd99a38",
+    "apps/tui/src/node/cache.ts": "1843ba70ee0129a2a769e1f3624d7d733e29f48e032433bb321d7b3d6ad40d6f"
+  },
+  "environment": {
+    "node": "v24.11.0",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "traversal": [
+    {
+      "size": 100,
+      "sameDataUpdates": 30,
+      "sameDataScans": 30,
+      "sameDataVisits": 3000,
+      "sameDataWallMs": 3.056124999999952,
+      "sameDataCpuMs": 4.343,
+      "fetchScans": 2,
+      "invalidationTurnScansIncludingFindAll": 101,
+      "invalidationTurnVisitsIncludingFindAll": 10100,
+      "invalidationWallMs": 6.619250000000022,
+      "invalidationCpuMs": 3.645,
+      "totalScansIncludingFindAll": 133,
+      "totalVisitsIncludingFindAll": 13300,
+      "wholeWindowCpuMs": 16.319,
+      "wholeWindowWallMs": 5212.591,
+      "writes": [
+        {
+          "key": "acorn-cache:acorn-1:synthetic-100",
+          "bytes": 262022,
+          "queryCount": 100
+        },
+        {
+          "key": "acorn-cache:acorn-1:synthetic-100",
+          "bytes": 261923,
+          "queryCount": 100
+        }
+      ],
+      "serializedBytes": 261923,
+      "serializeWallMs": 0.5757499999999709,
+      "serializeCpuMs": 0.593,
+      "deserializeWallMs": 0.27358300000014424,
+      "deserializeCpuMs": 0.392
+    },
+    {
+      "size": 1000,
+      "sameDataUpdates": 30,
+      "sameDataScans": 30,
+      "sameDataVisits": 30000,
+      "sameDataWallMs": 18.66649999999936,
+      "sameDataCpuMs": 23.088,
+      "fetchScans": 2,
+      "invalidationTurnScansIncludingFindAll": 1001,
+      "invalidationTurnVisitsIncludingFindAll": 1001000,
+      "invalidationWallMs": 341.4599169999992,
+      "invalidationCpuMs": 545.886,
+      "totalScansIncludingFindAll": 1033,
+      "totalVisitsIncludingFindAll": 1033000,
+      "wholeWindowCpuMs": 618.158,
+      "wholeWindowWallMs": 5566.177041,
+      "writes": [
+        {
+          "key": "acorn-cache:acorn-1:synthetic-1000",
+          "bytes": 2625422,
+          "queryCount": 1000
+        },
+        {
+          "key": "acorn-cache:acorn-1:synthetic-1000",
+          "bytes": 2624423,
+          "queryCount": 1000
+        }
+      ],
+      "serializedBytes": 2624423,
+      "serializeWallMs": 10.922082999999475,
+      "serializeCpuMs": 7.81,
+      "deserializeWallMs": 6.69879199999923,
+      "deserializeCpuMs": 6.105
+    },
+    {
+      "size": 3000,
+      "sameDataUpdates": 30,
+      "sameDataScans": 30,
+      "sameDataVisits": 90000,
+      "sameDataWallMs": 100.65270800000144,
+      "sameDataCpuMs": 96.044,
+      "fetchScans": 2,
+      "invalidationTurnScansIncludingFindAll": 3001,
+      "invalidationTurnVisitsIncludingFindAll": 9003000,
+      "invalidationWallMs": 1802.4629589999986,
+      "invalidationCpuMs": 1641.385,
+      "totalScansIncludingFindAll": 3033,
+      "totalVisitsIncludingFindAll": 9099000,
+      "wholeWindowCpuMs": 1791.524,
+      "wholeWindowWallMs": 7122.515292,
+      "writes": [
+        {
+          "key": "acorn-cache:acorn-1:synthetic-3000",
+          "bytes": 7889422,
+          "queryCount": 3000
+        },
+        {
+          "key": "acorn-cache:acorn-1:synthetic-3000",
+          "bytes": 7886423,
+          "queryCount": 3000
+        }
+      ],
+      "serializedBytes": 7886423,
+      "serializeWallMs": 15.70104100000026,
+      "serializeCpuMs": 11.189,
+      "deserializeWallMs": 16.5413750000007,
+      "deserializeCpuMs": 11.161
+    }
+  ],
+  "memory": {
+    "uniqueTextBytes": 16777216,
+    "queries": 128,
+    "gcTime": 86400000,
+    "persistedQueries": 0,
+    "retainedHeapBytes": 16822248,
+    "heapAfterClearBytes": 142904
+  }
+}

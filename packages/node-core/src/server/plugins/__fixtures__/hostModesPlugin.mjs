@@ -45,6 +45,9 @@ export default {
     const measured = ctx.telemetry.measure('probe', () => 42)
     immediate(measured, 'telemetry.measure')
     if (measured !== 42) throw new Error('telemetry.measure lost callback return value')
+    const callable = ctx.telemetry.measure('callable', () => () => 43)
+    immediate(callable, 'telemetry.measure callable result')
+    if (await callable() !== 43) throw new Error('telemetry.measure retired its returned callable')
     try {
       ctx.telemetry.measure('async', async () => 42)
       throw new Error('async measure unexpectedly succeeded')

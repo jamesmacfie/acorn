@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { activeNodeId, clientEvents, consumeTerminalFocusIntent, isTerminalMax, onClosePaneWithin, PrefKeys, prefsOptions, registerCommands, savePref, type Task, termFontSize } from '@acorn/plugin-api/client'
+import { activeNodeId, queryOwner, clientEvents, consumeTerminalFocusIntent, isTerminalMax, onClosePaneWithin, PrefKeys, prefsOptions, registerCommands, savePref, type Task, termFontSize } from '@acorn/plugin-api/client'
 import { activeTerminal, addSession, refreshSessions, rememberActiveTerminal, sessions } from './sessionStore'
 import { terminalApi } from './terminalClient'
 import TerminalSurface from './TerminalSurface'
@@ -18,9 +18,16 @@ const PROFILES_STALE_MS = 5 * 60_000
 // active project folder/worktree from the task id on a durable tmux backend. Sessions are scoped to
 // the active task, not the URL; switching tasks swaps the visible terminals.
 export default function TerminalPanel(props: { onClose: () => void; task: Task | null }) {
-  const api = terminalApi()
   const queryClient = useQueryClient()
+  const owner = queryOwner(queryClient)
+  const nodeId = owner === undefined ? activeNodeId() : owner
+  const api = terminalApi(nodeId)
+  let disposed = false
+  onCleanup(() => { disposed = true })
   const ws = () => props.task
+  const taskId = createMemo(() => ws()?.id)
+  const view = createMemo(() => ({ taskId: taskId() }))
+  const live = (captured = view()) => !disposed && activeNodeId() === nodeId && view() === captured
   const prefs = createQuery(() => prefsOptions(true))
 
   const [profiles, setProfiles] = createSignal<TerminalProfile[]>([])
@@ -66,7 +73,13 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     if (id && a && visibleSessions().some((s) => s.id === a)) rememberActiveTerminal(id, a)
   })
 
+  createEffect(() => {
+    view()
+    setBusy(false); setLaunching(false); setPendingTitle(null); setError(null)
+  })
+
   onMount(async () => {
+    const captured = view()
     const def = prefs.data?.[PrefKeys.terminalRailDefault]
     const willAutoLaunch = !!def && def !== 'empty' && !!ws()
     if (willAutoLaunch) setLaunching(true)
@@ -74,17 +87,18 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     // about 18 ms of its loop, and the drawer remounts on every return to a task that has it open. The
     // list changes when a harness lands on PATH, which nothing reports, so a short stale time is the
     // refresh.
-    setProfiles(await queryClient.fetchQuery({ queryKey: ['terminal', 'profiles'], queryFn: () => api.profiles(), staleTime: PROFILES_STALE_MS }))
-    // The shared store (init'd in App) owns the onStatus subscription; just ensure we're populated.
-    await refreshSessions()
-    if (willAutoLaunch && visibleSessions().length === 0) {
-      try {
-        await startProfile(def as string)
-      } finally {
-        setLaunching(false)
-      }
-    } else {
-      setLaunching(false)
+    try {
+      const loaded = await queryClient.fetchQuery({ queryKey: ['terminal', 'profiles'], queryFn: () => api.profiles(), staleTime: PROFILES_STALE_MS })
+      if (!live(captured)) return
+      setProfiles(loaded)
+      // A failed roster is not fresh enough to decide whether to auto-launch another session.
+      await refreshSessions()
+      if (!live(captured)) return
+      if (willAutoLaunch && visibleSessions().length === 0) await startProfile(def as string)
+    } catch (failure) {
+      if (live(captured)) setError(failure instanceof Error ? failure.message : 'Failed to load terminals.')
+    } finally {
+      if (live(captured)) setLaunching(false)
     }
   })
 
@@ -98,8 +112,10 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     if (s) void closeTab(s)
   })
 
-  const focusActiveSurface = () =>
-    requestAnimationFrame(() => drawerRef?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus())
+  const focusActiveSurface = () => {
+    const captured = view()
+    requestAnimationFrame(() => { if (live(captured)) drawerRef?.querySelector<HTMLTextAreaElement>('.xterm-helper-textarea')?.focus() })
+  }
 
   const applyTerminalFocus = (sessionId: string) => {
     if (!visibleSessions().some((session) => session.id === sessionId)) return
@@ -203,21 +219,21 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   // Spawn into the active task. `checkout` is the base repo path; the node derives the
   // task's lazy worktree from it and cwds the session there (docs/workspaces-and-tasks.md).
   async function spawn(profileId: string) {
-    const taskId = ws()?.id
+    const captured = view()
+    const taskId = captured.taskId
     if (!taskId) return
     const title = titleFor(profileId, ws())
     setBusy(true)
     setPendingTitle(title)
     try {
-      const createdNode = activeNodeId() ?? ''
+      const createdNode = nodeId ?? ''
       const s = await api.create({ taskId, profileId, title })
       addSession(s, createdNode) // create returns the session — no list round trip before the tab renders
-      setActiveId(s.id)
+      if (live(captured)) setActiveId(s.id)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to start the session.')
+      if (live(captured)) setError(e instanceof Error ? e.message : 'Failed to start the session.')
     } finally {
-      setPendingTitle(null)
-      setBusy(false)
+      if (live(captured)) { setPendingTitle(null); setBusy(false) }
     }
   }
 
@@ -234,9 +250,15 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
   // One click closes the tab: remove() kills a running session first, then drops it.
   // Closing the last tab closes the whole drawer.
   async function closeTab(s: TerminalSession) {
-    await api.remove(s.id)
-    await refreshSessions()
-    if (visibleSessions().length === 0) props.onClose()
+    const captured = view()
+    try {
+      await api.remove(s.id)
+      if (!live(captured)) return
+      await refreshSessions()
+      if (live(captured) && visibleSessions().length === 0) props.onClose()
+    } catch (failure) {
+      if (live(captured)) setError(failure instanceof Error ? failure.message : 'Failed to close the terminal.')
+    }
   }
 
   return (
@@ -351,7 +373,12 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
               sessionId={id}
               fontSize={surfaceFontSize()}
               hidden={id !== activeId()}
-              onExit={() => void refreshSessions()}
+              onExit={() => {
+                const captured = view()
+                if (live(captured)) void refreshSessions().catch((failure) => {
+                  if (live(captured)) setError(failure instanceof Error ? failure.message : 'Failed to refresh terminals.')
+                })
+              }}
             />
           )}
         </For>

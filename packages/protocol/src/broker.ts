@@ -62,6 +62,13 @@ export const nodeStatusSchema = z.strictObject({
 })
 export type NodeStatus = z.infer<typeof nodeStatusSchema>
 
+// Viewer admission is a transport operation failure, not Node health. The requesting viewer alone
+// receives this error; another viewer's streams and all fleet statuses remain available.
+export type NodeTransportError = {
+  code: 'viewers_unsupported' | 'viewer_limit'
+  message: string
+}
+
 // A node the client knows about. Membership is client-side state
 // (docs/architecture-overview.md § Client state and fleet behavior), so this is main's record, not
 // something a node reports about itself.

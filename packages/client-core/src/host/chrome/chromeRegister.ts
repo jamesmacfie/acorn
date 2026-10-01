@@ -1,3 +1,4 @@
+import { registrationSnapshot } from '../plugins/registrationSnapshot'
 import { createComponent, lazy } from 'solid-js'
 import type { NodePluginRow, PluginChromeAction, PluginCommandSelectAction, PluginSourceEmptyState } from '@acorn/protocol/api.ts'
 import { isPluginShortcutChord, qualifiedPluginCommandId } from '@acorn/protocol/keybindings.ts'
@@ -64,6 +65,8 @@ const ChromeSourceDetail = lazy(async () => ({ default: (await import('./ChromeS
 const ChromeBadge = lazy(() => import('./ChromeBadge'))
 
 const registered = new Map<string, Disposable[]>()
+const snapshots = new Map<string, string>()
+const refreshByPlugin = new Map<string, number[]>()
 
 // The node the rail and the task footer are looking at. There's no other candidate: a task belongs to
 // whichever node the window is talking to.
@@ -111,7 +114,7 @@ export const usableEmptyState = (
   // button would be the worse trade.
   empty?.action && !contextFreeActionUsable(pluginId, surfaces, empty.action) ? { message: empty.message } : empty
 
-function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[]): Disposable[] {
+function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[], onFailure: () => void): Disposable[] {
   const installed = row.installed!
   const contributions = installed.contributions
   const disposables: Disposable[] = []
@@ -126,6 +129,7 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
     try {
       disposables.push(register())
     } catch (error) {
+      onFailure()
       // A duplicate id is the expected failure: contribution ids are un-namespaced by design, so a
       // third-party descriptor can collide with a first-party source or slot.
       log.warn(`${pluginId} could not contribute ${what} '${id}'`, error, { 'plugin.id': pluginId })
@@ -450,20 +454,29 @@ function registerChrome(pluginId: string, row: NodePluginRow, refreshes: number[
  * again when a trust decision lands, and each call replaces what the previous one contributed.
  */
 export function syncChromeContributions(): void {
-  disposeAll()
-  const refreshes: number[] = []
-  // Gated on `hasWithheldCode`, not `!trusted` (docs/plugins.md § One shared eligibility and trust
-  // check): a descriptor-only package, as model-providers ships, has no bytes to accept and must still
-  // contribute, so a rail row that opens a pane which will never mount is worse than no rail row.
-  for (const entry of eligiblePlugins()) {
-    if (hasWithheldCode(entry)) continue
-    registered.set(entry.pluginId, registerChrome(entry.pluginId, entry.row, refreshes))
+  const entries = eligiblePlugins().filter((entry) => !hasWithheldCode(entry))
+  const desired = new Map(entries.map((entry) => [entry.pluginId, registrationSnapshot(entry)]))
+  let changed = false
+  for (const [pluginId, disposables] of registered) {
+    if (desired.has(pluginId) && desired.get(pluginId) === snapshots.get(pluginId)) continue
+    for (const disposable of [...disposables].reverse()) disposable.dispose()
+    registered.delete(pluginId)
+    snapshots.delete(pluginId)
+    refreshByPlugin.delete(pluginId)
+    changed = true
   }
-  // One timer at the smallest declared interval rather than one per descriptor. The polling fallback is
-  // for data that changes with no node-side trigger; the primary path is still the status ping.
-  //
-  // Not a `pollerContribution`: `startClientSchedules()` snapshots the registry once at app mount, and
-  // this pass runs after the distribution round trip, so a poller registered here would never start.
+  for (const entry of entries) {
+    const snapshot = desired.get(entry.pluginId)!
+    if (snapshots.get(entry.pluginId) === snapshot) continue
+    const refreshes: number[] = []
+    let failed = false
+    registered.set(entry.pluginId, registerChrome(entry.pluginId, entry.row, refreshes, () => { failed = true }))
+    refreshByPlugin.set(entry.pluginId, refreshes)
+    if (!failed) snapshots.set(entry.pluginId, snapshot)
+    changed = true
+  }
+  if (!changed) return
+  const refreshes = [...refreshByPlugin.values()].flat()
   if (registered.size) watchChrome(refreshes.length ? Math.min(...refreshes) : undefined)
   else unwatchChrome()
 }
@@ -471,6 +484,8 @@ export function syncChromeContributions(): void {
 function disposeAll(): void {
   for (const disposables of registered.values()) for (const disposable of disposables.reverse()) disposable.dispose()
   registered.clear()
+  snapshots.clear()
+  refreshByPlugin.clear()
 }
 
 /** Test seam, mirroring _resetFrameContributions: the registries are module-level, so a suite that

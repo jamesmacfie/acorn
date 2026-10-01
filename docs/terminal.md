@@ -31,6 +31,18 @@ and waiting for it. The field is optional in both directions. A frame without it
 session's last size, and a Node that predates it ignores it. The drawer surface covers the second case
 by comparing the size in `ready` with its own and posting a resize when they differ.
 
+An opted-in logical viewer owns its own sink. A viewer joining after another has restored receives a
+fresh targeted canonical restore without resetting the first; detaching or closing it leaves its
+siblings live. The physical socket's final viewer releases its stream holds and resources. Legacy
+clients keep their existing single-viewer attachment behavior; see
+[logical event viewers](./api-reference.md#logical-event-viewers) for the compatibility fallback.
+
+Terminal owns the desired `term:<sessionId>` subscription hint. A live dimension change updates its
+saved size through one idempotent attach control frame before the existing HTTP resize. Equal sizes
+send nothing, and a retired or foreign-Node local subscription cannot reopen through resize. Both
+broker replay and renderer online reattach therefore use the latest dimensions, with one fresh
+snapshot after reconnect and none for the live size-intent update.
+
 The Node batches PTY output before it goes over the wire: buffered bytes flush as one `output` frame
 roughly every 16 milliseconds (about one frame at 60 frames per second) instead of one frame per PTY
 chunk, so a busy TUI does not send a frame for every keystroke echo.
@@ -40,6 +52,27 @@ Output stays behind `terminal.reviewInput.v1`: at most 256 snapshots of 16 KiB a
 60 seconds. A removed, expired, evicted, or pre-restart snapshot reads as unavailable. Task archive
 uses a separate awaited hook. Terminal gathers bounded PTY output and Git diff before teardown, then
 runs `terminal:archive-review` with task and session identities; Findings formats the observation.
+
+The session engine publishes each successful creation and removal at its roster boundary. Setup,
+run targets, teardown, and capability callers share that boundary. A task drop or reconciliation
+publishes once for its changed batch. If durable deletion fails after the memory roster changes,
+clients still receive the roster event and the caller receives the deletion failure. Unknown removal
+changes nothing.
+
+A session owns its PTY data and exit listeners, output timer, delayed agent-submit timers, and teardown waiters. Retirement
+releases each resource even if another disposer fails. Node shutdown closes its tmux attachment
+child, preserving the detached tmux session and its metadata for reconciliation. It terminates an
+ephemeral PTY child. Explicit kill or removal still destroys the tmux session. Delayed creation and
+reconciliation stay bound to the boot's core services and database; they cannot publish into another
+boot. A session awaiting its durable insert remains hidden from rosters and attachment lookup. Failed
+fresh tmux admission rolls back only its UUID session after the captured database confirms no row.
+If that check cannot establish absence, the engine preserves the tmux session and logs the
+unconfirmed admission. A successful insert followed by engine retirement retains durable work.
+
+Teardown resolves on exit, removal, engine disposal, or its deadline. Removal and disposal return a
+null exit code. At its deadline, teardown stops its process and keeps an exited history row with a
+null exit code and its full bounded output tail. Its listeners and deadline are released without
+waiting for another exit event.
 
 ## The screen, and who pays for it
 
@@ -65,15 +98,13 @@ matters, the answer is a bigger ring for that class, not a parser running for ev
 What an attach pays instead is a rebuild of 15 to 25 ms from a full ring. The desktop pays it once per
 tab and again after a reconnect, since its tabs stay attached.
 
-**The ring is a list of chunks, not a string.** 256 KB of recent raw output, kept as the buffers it
-arrived in with a running byte count, dropping from the head once the budget is spent. It used to be
-one string rebuilt as `ring = trim(ring + chunk)` on every chunk the pseudo-terminal produced, which
-copies the whole buffer per chunk to serve readers that want the last four or ten kilobytes of it. A
-reader concatenates only the tail it asks for, and `tail` joins the buffers before decoding, so a
-character split by a chunk boundary still reads back whole. Two things read it besides the attach
-rebuild: the blocked-prompt scan over the last 4,000 bytes and the transcript tail over the last
-10,000. Both are heuristics over recent output, and both now count in bytes where they used to count
-in UTF-16 code units.
+The raw ring retains exactly the last 256 KiB of UTF-8 bytes in at most 64 lazily allocated 4 KiB
+blocks. Tiny PTY callbacks share those blocks, and head movement uses a byte cursor rather than
+shifting an array of callbacks. An oversized callback copies its suffix into the owned blocks, so a
+small tail cannot retain its larger input allocation. A reader joins the requested bytes before one
+UTF-8 decode. A byte limit can cut the first character and produce the same replacement character
+as a decoded byte suffix. Attach restoration, blocked-prompt detection, and transcript analysis keep
+their byte limits.
 
 **Output crosses the wire as bytes.** `term:out` is the one channel on the authenticated socket that is
 not JSON. A frame is a fixed-width session id and then the pseudo-terminal's bytes verbatim
@@ -83,6 +114,10 @@ that does not fit the field falls back to the JSON frame, so a stream owner with
 scheme still works. A binary frame carries no `seq` and consumes none, because sequence numbers belong
 to the invalidation channel and output has never been part of it. `ready`, `exit` and `error` carry a
 session object rather than bytes and stay JSON.
+
+On an opted-in socket the hub wraps that unchanged binary frame with a 36-byte viewer UUID. It encodes
+the inner session frame once per payload; routing adds the viewer header per recipient. The broker
+removes the viewer header before the helper adds its existing Node UUID header for the renderer.
 
 The client-core socket owns node filtering and WebSocket envelope dispatch. Terminal registers the
 `term:out` and binary PTY handlers, validates JSON payloads, and owns attach, detach, and input for
@@ -166,6 +201,7 @@ first one in a congested window with a `ws:shed` marker that takes the sequence 
 would have had. Later sheds in the same window consume no sequence number, because one "you are
 behind" is the whole message. The broker forwards the marker instead of resetting the socket, and the
 renderer answers it the way it answers a reconnect: mark what is on screen stale and let it refetch.
+Viewer admission errors are critical replies and bypass this invalidation shedding path.
 
 ## Process broker
 
@@ -184,6 +220,14 @@ runs in `RuntimeService.start`, after the repo-config trust gate and before the 
 the vetoing plugin's id in front of it. Observe and veto only, and no transform: the design sketched
 one over the target's environment, and a hook payload is scalars and arrays of scalars, so an
 environment map is not expressible in the declared vocabulary (`docs/plugins.md` § Hooks).
+
+Run-target operations are serialized per task and target before configuration, trust, hooks, or spawn
+awaits. Adjacent Start callers join one process admission. Stop and Restart preserve their position
+in the queue; unrelated keys remain concurrent. A fallback Restart starts an absent target, but an
+explicit stop-script failure prevents replacement. Discovered URLs are checked against the same live
+instance after their script completes, so a stopped or replaced instance cannot return its prior URL. Settled and failed operations release their queue
+identity. A disposed service cannot execute queued work or publish a delayed start, and an immediate
+process exit cannot become a running instance.
 
 ## Workflow steps
 
@@ -271,6 +315,23 @@ killed from anywhere, its task archived, or the node switched. Output that arriv
 on another task keeps being parsed into it, so it is current when they come back, and coming back
 draws it where it was, with no new xterm, no `term:attach`, and no screen for the node to rebuild. A
 roster read that fails keeps every terminal; only a roster the node answered with lets one go.
+
+A Node switch batches authoritative selection, remembered-device state, and the eviction event.
+Listeners read the incoming Node while the outgoing DOM is still drawn; the outgoing channel and
+session consumers retire before the incoming shell/prime effect constructs them. Channel slots are
+qualified by Node and session, and held xterms bind HTTP, input, attach, resize, and cleanup to that
+origin. Captured `wsSendToNode` cleanup cannot reacquire the helper's retired viewer. Idempotent old
+cleanup cannot detach an equal-ID replacement or a newly borrowing surface. Returning to that Node
+builds a fresh local subscription even if the physical socket stayed online.
+
+Same-Node hidden tabs and parked task terminals remain live and keep the same xterm, complete parsed
+scrollback, and alternate-screen state. They are not detached on visibility changes. Four recently
+shown terminals retain WebGL contexts. A failed roster read retains both rows and attention, as well
+as held terminals; only an authoritative successful roster removes sessions. Deferred panel profile,
+create, close, and focus callbacks carry the view generation and originating Node. An outgoing
+creation can remain on that Node's durable roster but cannot select or focus another view. Failed
+initial profile/roster reads report to the current view, settle its loading state, and do not infer
+that an empty roster should auto-launch another session.
 
 Terminals are the exception to the rule that a pane's view does not outlive its task
 ([panes.md](./panes.md) § Layout model), for three reasons. A terminal is a running program the reader

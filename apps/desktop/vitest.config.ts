@@ -8,6 +8,8 @@ const gitEnv = {
 
 export default defineConfig({
   test: {
+    // Leave CPU for the real helper/Node boot while the other suites transform the client graph.
+    maxWorkers: 4,
     projects: [
       {
         test: {

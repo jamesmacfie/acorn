@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createCollectionIntents, PAGE } from './collectionIntents'
+import { createCollectionIntents, createTypeAhead, PAGE } from './collectionIntents'
 import { _resetCollectionState } from './collectionState'
 
 // The rules about a list, with no host under them.
@@ -127,5 +127,31 @@ describe('a page key stops at the end of the list', () => {
     expect(keys.active()).toBe(`row-${PAGE}`)
     expect(keys.handle('pagePrev')).toBe(true)
     expect(keys.active()).toBe('row-0')
+  })
+})
+
+
+describe('operation snapshots stay linear and read mutable disabled state', () => {
+  it('scans enabled items once through movement, page, and type-ahead entrypoints', () => {
+    let reads = 0
+    const items = Array.from({ length: 5_000 }, (_, at) => ({ key: `row-${at}`, label: `row-${at}`,
+      get disabled() { reads++; return false } }))
+    const keys = createCollectionIntents({ id: () => 'linear', items: () => items, land: () => {}, onItem: () => true })
+    keys.goTo('row-4998')
+    for (const operation of [() => keys.move(1), () => keys.handle('prev'), () => keys.handle('pagePrev'), () => createTypeAhead(keys)('r')]) {
+      reads = 0; operation(); expect(reads).toBe(items.length)
+    }
+  })
+  it('observes in-place disabled changes, controlled selection, unlabeled current rows, and nested focus', () => {
+    const items = [{ key: 'a', label: 'Alpha', disabled: false }, { key: 'b', disabled: false }, { key: 'c', label: 'Charlie', disabled: false }]
+    let selected = 'b', onItem = false
+    const pick = vi.fn((key: string) => { selected = key })
+    const keys = createCollectionIntents({ id: () => 'mutable', items: () => items, selected: () => selected,
+      onSelect: pick, land: () => {}, onItem: () => onItem })
+    expect(keys.active()).toBe('b'); expect(createTypeAhead(keys)('a')).toBe(true); expect(keys.active()).toBe('a')
+    items[0].disabled = true; expect(keys.active()).toBe('b')
+    expect(keys.handle('activate')).toBe(false); expect(pick).not.toHaveBeenCalled()
+    onItem = true; expect(keys.handle('activate')).toBe(true); expect(pick).toHaveBeenCalledWith('b')
+    expect(keys.handle('prev')).toBe(true); expect(keys.active()).toBe('c')
   })
 })

@@ -92,6 +92,12 @@ desktop. So the first `acorn` against one prints that node's pid and the `kill -
 reopens its pairing window, and then runs the ordinary pairing exchange against loopback. A loopback
 mint route would remove the step and does not exist.
 
+The initial selected partition acquires the shared query-cache lifecycle after installing file
+storage. Restore finishes before the shell draws, and quit releases the lease and drains its pending
+snapshot. File writes are asynchronous atomic replacements serialized by that lifecycle; retirement
+deletes through the same captured file adapter. [Caching](./caching.md#renderer-query-cache) owns
+capture timing, lease release, same-ID replacement barriers, and failed-deletion recovery.
+
 ### Remote nodes
 
 `acorn --node https://host:4317` runs the desktop's three steps in a terminal
@@ -615,3 +621,21 @@ module and the signing gate. What that step still owes is written there.
 - [future/bundle.md](./future/bundle.md) — packaging `acorn` and the node together.
 - [future/remote.md](./future/remote.md) — the browser surfaces, which share this host's reasoning
   about auth and custody and none of its constraints.
+
+## Client worker lifetime
+
+The terminal factory gives each sandbox owned stdout/stderr pipes and drains them without retaining
+output or writing it onto the cell screen. Worker construction, transferred hello ports, and native
+termination settlement belong to the factory. A hash retirement barrier delays replacement creation
+until retired native threads exit. Canceling a deferred construction removes its callback and closes
+its untransferred ports; it does not spawn a worker.
+
+The bootstrap retains one initial hello across asynchronous module import. It releases that ownership
+when the bridge or tree actually adopts the ports, restores temporary observation hooks, and closes
+unclaimed ports on import rejection or the 10-second handshake deadline. Arbitrary message listeners
+cannot consume the sole retained hello. General worker traffic is not queued. The shared host keeps
+only the latest pre-ready props per admitted slot and reports failed startup after its 20-second
+construction deadline.
+
+For capability negotiation, modern warm modules, immutable legacy contexts, and the 512-slot bundle
+budget, see [Mounted bridge ownership and SDK compatibility](./plugins/descriptors.md#mounted-bridge-ownership-and-sdk-compatibility).

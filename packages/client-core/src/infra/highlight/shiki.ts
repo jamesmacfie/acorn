@@ -43,6 +43,8 @@ export async function getHighlighter(lang?: string): Promise<HighlighterCore> {
 const HTML_CACHE_ENTRIES = 200
 const HTML_CACHE_MAX_BYTES = 16 * 1024
 const htmlCache = new Map<string, string>()
+type HtmlFlight = { live: Set<() => boolean>; promise: Promise<string> }
+const htmlFlights = new Map<string, HtmlFlight>()
 
 /**
  * Highlight one whole fence to html, dual-themed, loading its grammar first. It can reject — a grammar
@@ -54,27 +56,43 @@ const htmlCache = new Map<string, string>()
  * --shiki-dark no stylesheet here reads, so under a dark theme every fence drew github-light on a
  * white background.
  */
-export async function highlightToHtml(code: string, lang: string): Promise<string> {
+export function highlightToHtml(code: string, lang: string, isLive: () => boolean = () => true): Promise<string> {
   const key = `${lang}\u0000${code}`
   const hit = htmlCache.get(key)
   recordSample('core', 'highlight.html.cache', 1, '1', { cache: hit === undefined ? 'miss' : 'hit' })
-  if (hit !== undefined) return hit
-  recordSample('core', 'highlight.html.characters', code.length)
-  const hl = await getHighlighter(lang)
-  const html = measure('core', 'highlight.html.render', () => hl.codeToHtml(code, {
-    lang,
-    themes: { l: 'github-light', r: 'github-dark' },
-    defaultColor: false,
-    cssVariablePrefix: '--',
-  }))
-  if (code.length > HTML_CACHE_MAX_BYTES) return html
-  // First in, first out. A Map iterates in insertion order, so the oldest key is the first one.
-  if (htmlCache.size >= HTML_CACHE_ENTRIES) {
-    const oldest = htmlCache.keys().next()
-    if (!oldest.done) htmlCache.delete(oldest.value)
+  if (hit !== undefined) return Promise.resolve(hit)
+  const joining = htmlFlights.get(key)
+  if (joining) {
+    joining.live.add(isLive)
+    return joining.promise
   }
-  htmlCache.set(key, html)
-  return html
+  const live = new Set([isLive])
+  const flight: HtmlFlight = { live, promise: Promise.resolve('') }
+  flight.promise = (async () => {
+    const hl = await getHighlighter(lang)
+    // Grammar admission is shared. A leaving block cannot cancel another block's highlight.
+    if (![...live].some((consumer) => consumer())) return ''
+    recordSample('core', 'highlight.html.characters', code.length)
+    const html = measure('core', 'highlight.html.render', () => hl.codeToHtml(code, {
+      lang,
+      themes: { l: 'github-light', r: 'github-dark' },
+      defaultColor: false,
+      cssVariablePrefix: '--',
+    }))
+    if (code.length <= HTML_CACHE_MAX_BYTES) {
+      if (htmlCache.size >= HTML_CACHE_ENTRIES) {
+        const oldest = htmlCache.keys().next()
+        if (!oldest.done) htmlCache.delete(oldest.value)
+      }
+      htmlCache.set(key, html)
+    }
+    return html
+  })().finally(() => {
+    if (htmlFlights.get(key) === flight) htmlFlights.delete(key)
+    live.clear()
+  })
+  htmlFlights.set(key, flight)
+  return flight.promise
 }
 
 /** Tests only: forget what has been highlighted so a spy can count calls from a known state. */

@@ -1,0 +1,19 @@
+{
+  "packages/client-core/src/host/registries/panes/paneModels.ts": "73f83afe04a5934743e5b69bd2b456d95d4a40706b767aefcef0bd6f1b9aa660",
+  "packages/client-core/src/host/registries/panes/panes.ts": "d9b870efb7bda5313dbfcbad883f26709f76a3c311601948900a10185fd20c39",
+  "packages/client-core/src/infra/node/activeNode.ts": "3329d5e3cd3a3308fdc4387319693bf02e6f44c94eb8c34674ccffc7572955d9",
+  "packages/client-core/src/infra/node/apiClient.ts": "ad8ef6ea7bf97c04592ed5763054dc40da1d31584a4e570a220a84723b6336f9",
+  "packages/client-core/src/infra/node/queryOwnership.ts": "810130c5b46ad54dbe148f358b87b2071c2394c7ef6acc5a718df3aee22f83ae",
+  "apps/desktop/src/client/index.tsx": "c216059860642a39977a4304b50bda2cd35e200c0d61356f9aeadb5ec4c05650",
+  "apps/desktop/src/client/scopedEviction.ts": "3bf5201aec9d6bae93281ba0211ced57afd059f28e8cef8d9b3f9c9b401b2474",
+  "plugins/notes/src/client/notesModel.ts": "3d0532954ebf74c39594dcbf99eeca21ca7c84e94fc4db1ae2cff05d5355302a",
+  "plugins/notes/src/client/notesClient.ts": "51f006383be2fa46a883397b86b5ce21835296469f1d3997feeeb2de607fc366",
+  "plugins/notes/src/client/notesPaneState.ts": "00fd630995979f5b65ee8b18d73bd1552c3034f7ff199fe3949bfc1162f00b51",
+  "plugins/terminal/src/client/liveXterm.ts": "ddf6d1456b7b8b53cf69c350352fceecea3b42d761af7a7ac6f139535a558429",
+  "plugins/terminal/src/client/terminalClient.ts": "303c728e093fb6d71351fc9646c2feeb9677fc59782c7eb871db1c54e4828b5d",
+  "plugins/terminal/src/client/wsChannel.ts": "88c3fd5e9b26def1f4ac8c796a7f2b146061576cdf3a5671d0a6e439737152ac",
+  "plugins/terminal/src/client/sessionStore.ts": "18917c46ecc2036e6a09c3fad3292e97b53e565542db9c49333f8629332eabf7",
+  "plugins/terminal/src/client/TerminalPanel.tsx": "2a725a0f8d8ccb3fe1844aa3a77dfa5cb41d76c6ef00c8031a4476d2d93d7491",
+  "plugins/terminal/src/client/TerminalSurface.tsx": "4c19a4b71bede66eed8f0c2e0ad4d0fb003ac2055c054f95ccf1af19c3927af0",
+  "packages/client-core/src/features/tabs/TabRail.tsx": "9df61b8e7332f80948abf6ae7eb4cb9aaeded0b676bc6796f10adc4b60c78cc4"
+}

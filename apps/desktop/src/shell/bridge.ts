@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { decodeIdFrame } from '@acorn/protocol/ws.ts'
+import { decodeIdFrame, type WsSendOptions } from '@acorn/protocol/ws.ts'
+import type { NodeTransportError } from '@acorn/protocol/broker.ts'
 import { apiRouteNamespace } from '@acorn/protocol/telemetry.ts'
 import {
   decodeBytes,
@@ -62,6 +63,9 @@ const pending = new Map<number, Pending>()
 const frameListeners = new Set<(nodeId: string, frame: unknown) => void>()
 const byteListeners = new Set<(nodeId: string, frame: Uint8Array) => void>()
 const statusListeners = new Set<(status: unknown) => void>()
+const transportErrorListeners = new Set<(nodeId: string, error: NodeTransportError) => void>()
+const pendingTransportErrors = new Map<string, NodeTransportError>()
+let eventInterest: string | null | undefined
 let nextId = 1
 let socket: Promise<WebSocket> | null = null
 let liveSocket: WebSocket | null = null
@@ -76,7 +80,12 @@ const connect = (): Promise<WebSocket> => {
         // The secret rides in the query string because a browser cannot set headers on a WebSocket
         // handshake. It is the gate; the helper checks the Origin too, but only as a second lock.
         const ws = new WebSocket(`ws://127.0.0.1:${port}/helper?secret=${encodeURIComponent(secret)}`)
-        ws.onopen = () => { liveSocket = ws; resolve(ws) }
+        ws.onopen = () => {
+          liveSocket = ws
+          // Reopening the helper socket creates a fresh viewer. Declare interest before queued calls.
+          if (eventInterest !== undefined) ws.send(JSON.stringify({ id: nextId++, method: 'node-interest', params: { nodeId: eventInterest } }))
+          resolve(ws)
+        }
         ws.onerror = () => reject(new Error('acorn could not reach its desktop helper.'))
         ws.onclose = () => {
           // Every in-flight call is answered rather than left hanging: a query that never settles
@@ -114,6 +123,10 @@ const receive = (message: HelperMessage, receipt?: ReplyReceipt): void => {
   if (isPush(message)) {
     if (message.push === 'node-frame') for (const cb of frameListeners) cb(message.nodeId, message.frame)
     else if (message.push === 'node-status') for (const cb of statusListeners) cb(message.status)
+    else if (message.push === 'node-transport-error') {
+      if (!transportErrorListeners.size) pendingTransportErrors.set(message.nodeId, message.error)
+      else for (const cb of transportErrorListeners) cb(message.nodeId, message.error)
+    }
     // The node this renderer was talking to has been replaced by a restart or crash recovery. Its
     // endpoint, certificate and token are all new, so everything in memory is about a process that is
     // gone. Electron reloads the window from main; here the page reloads itself.
@@ -277,7 +290,14 @@ const acorn = {
     return { status: response.status, headers: response.headers, body: decoded }
   },
   nodeAbort: (requestId: string) => tell('node-abort', { requestId }),
-  nodeSend: (nodeId: string, frame: unknown) => tell('node-send', { nodeId, frame }),
+  nodeSend: (nodeId: string, frame: unknown, options?: WsSendOptions) => tell('node-send', { nodeId, frame, ...(options?.intent ? { intent: options.intent } : {}), ...(options?.cleanup === undefined ? {} : { cleanup: options.cleanup }) }),
+  nodeInterest: (nodeId: string | null) => { eventInterest = nodeId; tell('node-interest', { nodeId }) },
+  onNodeTransportError: (cb: (nodeId: string, error: NodeTransportError) => void) => {
+    const off = subscribe(transportErrorListeners, cb)
+    for (const [nodeId, error] of pendingTransportErrors) cb(nodeId, error)
+    pendingTransportErrors.clear()
+    return off
+  },
   onNodeFrame: (cb: (nodeId: string, frame: unknown) => void) => subscribe(frameListeners, cb),
   onNodeBytes: (cb: (nodeId: string, frame: Uint8Array) => void) => subscribe(byteListeners, cb),
   onNodeStatus: (cb: (status: unknown) => void) => subscribe(statusListeners, cb),

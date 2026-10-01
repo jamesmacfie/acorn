@@ -1,0 +1,71 @@
+{
+  "fixture": "Actual universal Rows/Row at 80x24; synthetic stable objects; first layout unknown height",
+  "cases": [
+    {
+      "count": 200,
+      "initial": {
+        "created": 200,
+        "disposed": 176,
+        "retainedRows": 24,
+        "nodes": 316,
+        "yoga": 172,
+        "wallMs": 40.530917000000045,
+        "cpuMs": 79.426
+      },
+      "scroll": {
+        "created": 3,
+        "disposed": 3,
+        "cpuMs": 4.93
+      },
+      "afterDispose": {
+        "created": 203,
+        "disposed": 203,
+        "retainedRows": 0
+      }
+    },
+    {
+      "count": 2000,
+      "initial": {
+        "created": 2000,
+        "disposed": 1976,
+        "retainedRows": 24,
+        "nodes": 316,
+        "yoga": 172,
+        "wallMs": 285.4846249999998,
+        "cpuMs": 450.3
+      },
+      "scroll": {
+        "created": 3,
+        "disposed": 3,
+        "cpuMs": 3.838
+      },
+      "afterDispose": {
+        "created": 2003,
+        "disposed": 2003,
+        "retainedRows": 0
+      }
+    },
+    {
+      "count": 10000,
+      "initial": {
+        "created": 10000,
+        "disposed": 9976,
+        "retainedRows": 24,
+        "nodes": 316,
+        "yoga": 172,
+        "wallMs": 1923.635833,
+        "cpuMs": 2528.684
+      },
+      "scroll": {
+        "created": 3,
+        "disposed": 3,
+        "cpuMs": 8.748
+      },
+      "afterDispose": {
+        "created": 10003,
+        "disposed": 10003,
+        "retainedRows": 0
+      }
+    }
+  ]
+}

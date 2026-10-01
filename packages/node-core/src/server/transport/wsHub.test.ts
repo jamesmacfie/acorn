@@ -4,7 +4,7 @@ import type { AddressInfo } from 'node:net'
 import { WebSocket } from 'ws'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import type { DeviceService } from '../auth/deviceTokens'
-import { decodeIdFrame, WS_BINARY_ID_BYTES, WS_PATH, type WsServerWireFrame } from '@acorn/protocol/ws.ts'
+import { decodeIdFrame, WS_BINARY_ID_BYTES, WS_PATH, WS_VIEWERS_HEADER, WS_MAX_VIEWERS, type WsServerWireFrame } from '@acorn/protocol/ws.ts'
 import { _resetWsHub, attachWsHub, disposeWsHub, registerWsChannelHandler, setStreamHandlers, wsBroadcast, type StreamSink } from './wsHub'
 type TestStreamMsg = Parameters<StreamSink>[0]
 
@@ -132,6 +132,88 @@ const waitFor = async (predicate: () => boolean, label: string, timeoutMs = 5_00
     await new Promise((r) => setTimeout(r, 5))
   }
 }
+
+describe('opted-in event viewers', () => {
+  const A = 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa'
+  const B = 'bbbbbbbb-bbbb-4bbb-bbbb-bbbbbbbbbbbb'
+  const wrap = (viewerId: string, frame: object) => JSON.stringify({ channel: 'ws:viewer', viewerId, frame })
+
+  it('targets each fresh terminal restore and retires one viewer without stopping its sibling', async () => {
+    const live = new Set<StreamSink>()
+    const sizes: unknown[] = []
+    setStreamHandlers({
+      input: () => {}, streamTaskId: () => 'task-a',
+      attach: (_id, sink, size) => {
+        live.add(sink); sizes.push(size)
+        sink({ type: 'ready', session: {}, replayed: true })
+        sink({ type: 'output', data: 'canonical\u0000海' })
+      },
+      detach: (_id, sink) => { live.delete(sink) },
+    })
+    const ws = await open({ ...authHeaders(), [WS_VIEWERS_HEADER]: '1' })
+    const json = frames(ws), binary = binaries(ws)
+    ws.send(wrap(A, { channel: 'term:attach', id: SESSION, cols: 81, rows: 25 }))
+    await waitFor(() => binary.length === 1, 'A restore')
+    ws.send(wrap(B, { channel: 'term:attach', id: SESSION, cols: 92, rows: 30 }))
+    await waitFor(() => binary.length === 2, 'B restore')
+    expect(live.size).toBe(2)
+    expect(sizes).toEqual([{ cols: 81, rows: 25 }, { cols: 92, rows: 30 }])
+    expect(json.map((frame) => frame.viewerId)).toEqual([A, B])
+    expect(json.map((frame) => frame.seq)).toEqual([1, 2])
+    expect(binary.map((frame) => decodeIdFrame(frame)?.id)).toEqual([A, B])
+    for (const frame of binary) expect(decodeText(Buffer.from(decodeIdFrame(frame)!.payload))).toEqual({ id: SESSION, text: 'canonical\u0000海' })
+    ws.send(wrap(A, { channel: 'term:detach', id: SESSION }))
+    await waitFor(() => live.size === 1, 'A detach')
+    for (const sink of live) sink({ type: 'output', data: 'B continues' })
+    await waitFor(() => binary.length === 3, 'B live output')
+    expect(decodeIdFrame(binary[2])?.id).toBe(B)
+    ws.send(JSON.stringify({ channel: 'ws:viewer-close', viewerId: A }))
+    ws.send(JSON.stringify({ channel: 'ws:viewer-close', viewerId: B }))
+    await waitFor(() => live.size === 0, 'final viewer cleanup')
+    ws.close()
+  })
+
+  it('uses parent task claims for nested input and refuses unrelated terminal and plugin authority', async () => {
+    const inputs: string[] = [], attached: string[] = [], plugin: unknown[] = []
+    setStreamHandlers({ input: (id) => { inputs.push(id) }, attach: (id) => { attached.push(id) }, detach: () => {}, streamTaskId: (id) => id === SESSION ? 'task-a' : 'task-b' })
+    registerWsChannelHandler('probe', { onFrame: (frame) => plugin.push(frame), onDisconnect: () => {} })
+    const credential = mintInternalToken(INTERNAL, { scope: 'task', taskId: 'task-a' })
+    const ws = await open({ host, 'x-acorn-internal': credential, [WS_VIEWERS_HEADER]: '1' })
+    ws.send(wrap(A, { channel: 'term:attach', id: SESSION }))
+    ws.send(wrap(A, { channel: 'term:input', id: SESSION, data: 'allowed' }))
+    ws.send(wrap(B, { channel: 'term:attach', id: OTHER_SESSION }))
+    ws.send(wrap(B, { channel: 'term:input', id: OTHER_SESSION, data: 'refused' }))
+    ws.send(wrap(B, { channel: 'probe:action' }))
+    ws.send(wrap(A, { channel: 'term:input', id: SESSION, data: 'barrier' }))
+    await waitFor(() => inputs.length === 2, 'task frames processed')
+    expect(attached).toEqual([SESSION]); expect(inputs).toEqual([SESSION, SESSION]); expect(plugin).toEqual([])
+    const broadcasts = frames(ws)
+    wsBroadcast({ channel: 'probe:changed' })
+    ws.ping()
+    await new Promise<void>((resolve) => ws.once('pong', resolve))
+    expect(broadcasts).toEqual([])
+    ws.close()
+  })
+
+  it('refuses malformed nesting and viewer overflow explicitly, then admits a freed slot', async () => {
+    let calls = 0
+    registerWsChannelHandler('probe', { onFrame: (_frame, send) => { calls += 1; send({ channel: 'probe:ok' }) }, onDisconnect: () => {} })
+    const ws = await open({ ...authHeaders(), [WS_VIEWERS_HEADER]: '1' })
+    const json = frames(ws)
+    ws.send(wrap('invalid', { channel: 'probe:action' }))
+    ws.send(wrap(A, { channel: 42 }))
+    ws.send(JSON.stringify({ channel: 'probe:action' }))
+    const ids = Array.from({ length: WS_MAX_VIEWERS + 1 }, (_, index) => `00000000-0000-4000-8000-${String(index).padStart(12, '0')}`)
+    for (const id of ids) ws.send(wrap(id, { channel: 'probe:action' }))
+    await waitFor(() => json.some((frame) => frame.channel === 'ws:viewer-error'), 'explicit cap error')
+    expect(calls).toBe(WS_MAX_VIEWERS)
+    expect(json.at(-1)).toMatchObject({ channel: 'ws:viewer-error', viewerId: ids.at(-1), code: 'viewer_limit' })
+    ws.send(JSON.stringify({ channel: 'ws:viewer-close', viewerId: ids[0] }))
+    ws.send(wrap(ids.at(-1)!, { channel: 'probe:action' }))
+    await waitFor(() => calls === WS_MAX_VIEWERS + 1, 'freed viewer slot')
+    ws.close()
+  })
+})
 
 describe('wsHub auth', () => {
   it('rejects a socket with no token at all', async () => {
@@ -617,8 +699,8 @@ describe('wsHub backpressure', () => {
   let tiny: Server
   let tinyHost: string
 
-  const openTiny = (): Promise<WebSocket> => {
-    const ws = new WebSocket(`ws://${tinyHost}${WS_PATH}`, { headers: { host: tinyHost, authorization: `Bearer ${DEVICE_TOKEN}` } })
+  const openTiny = (viewers = false): Promise<WebSocket> => {
+    const ws = new WebSocket(`ws://${tinyHost}${WS_PATH}`, { headers: { host: tinyHost, authorization: `Bearer ${DEVICE_TOKEN}`, ...(viewers ? { [WS_VIEWERS_HEADER]: '1' } : {}) } })
     return new Promise((resolve, reject) => {
       ws.on('open', () => resolve(ws))
       ws.on('error', reject)
@@ -733,6 +815,24 @@ describe('wsHub backpressure', () => {
     expect(got.filter((f) => f.channel === 'ws:shed')).toHaveLength(1)
     expect(got.map((f) => f.seq)).toEqual(got.map((_f, i) => i + 1))
     expect(got.map((f) => f.channel)).toEqual(['term:out', 'ws:shed'])
+    ws.close()
+  })
+
+  it('delivers capacity refusal under congestion without shedding it or skipping physical sequence', async () => {
+    const ws = await openTiny(true)
+    const got = frames(ws)
+    for (let i = 0; i < WS_MAX_VIEWERS; i++) ws.send(JSON.stringify({ channel: 'ws:viewer', viewerId: `00000000-0000-4000-8000-${String(i).padStart(12, '0')}`, frame: { channel: 'ws:viewer-open' } }))
+    await new Promise<void>((resolve) => { ws.once('pong', resolve); ws.ping() })
+    ws.pause()
+    wsBroadcast({ channel: 'term:out', id: 'congested', msg: { type: 'output', data: 'x'.repeat(4_000_000) } as never })
+    wsBroadcast({ channel: 'tasks:changed' })
+    ws.send(JSON.stringify({ channel: 'ws:viewer', viewerId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa', frame: { channel: 'term:attach', id: OTHER_SESSION } }))
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    ws.resume()
+    await waitFor(() => got.some((frame) => frame.channel === 'ws:viewer-error'), 'the capacity refusal')
+    expect(got.filter((frame) => frame.channel === 'ws:viewer-error')).toEqual([expect.objectContaining({ viewerId: 'aaaaaaaa-aaaa-4aaa-aaaa-aaaaaaaaaaaa', code: 'viewer_limit' })])
+    expect(got.map((frame) => frame.seq)).toEqual(got.map((_frame, i) => i + 1))
+    expect(got.some((frame) => frame.channel === 'ws:shed')).toBe(true)
     ws.close()
   })
 })

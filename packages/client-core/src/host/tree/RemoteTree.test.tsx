@@ -29,7 +29,8 @@ vi.mock('../frames/broker', () => ({
   postSelect: vi.fn(),
   postSurfaceAction: vi.fn(),
 }))
-vi.mock('./workerHost', () => ({
+vi.mock('./workerHost', async (original) => ({
+  ...await original<typeof import('./workerHost')>(),
   acquireTreeWorker: (options: { connect: (port: MessagePort) => unknown }) => {
     connects.push(options.connect)
     return {

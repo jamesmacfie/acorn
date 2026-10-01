@@ -7,6 +7,7 @@ export type { ClientPlugin } from '@acorn/client-core/host/registries/extensionP
 
 // ── Data toolkit: transport, queries, events ──────────────────────────────────────────────────
 export { postJson, readBytes, readJson, sendForm, writeJson } from '@acorn/client-core/infra/node'
+export { queryOwner } from '@acorn/client-core/infra/node'
 // `modelBackendsOptions` is everything a Generate control can spend, keys and installed agent CLIs
 // alike. On this barrel because the first-run wizard draws the list on its own step, and the node
 // probes PATH per read, so no plugin can assemble it from the integrations query.
@@ -38,7 +39,7 @@ export { openTarget } from '@acorn/client-core/features/notifications'
 export type { PaneIntent } from '@acorn/client-core/host/registries/commands'
 // prune candidate: the raw socket. Plugins should be reaching for registerWsChannel (below) or a
 // ctx-provided subscription rather than attaching to the shared client themselves.
-export { registerWsBinaryHandler, wsConnect, wsOnNotice, wsOnReconnect, wsOnStatus, wsOnWorkflowStepChanged, wsOnWorkflowStepEvent, wsSend } from '@acorn/client-core/infra/node/wsClient.ts'
+export { registerWsBinaryHandler, wsConnect, wsOnNotice, wsOnReconnect, wsOnStatus, wsOnWorkflowStepChanged, wsOnWorkflowStepEvent, wsSend, wsSendToNode } from '@acorn/client-core/infra/node/wsClient.ts'
 export type { WorkflowNotice } from '@acorn/client-core/infra/node/wsClient.ts'
 export { registerWsChannel } from '@acorn/client-core/infra/node'
 // A compiled plugin hearing the same `plugin:<id>:<verb>` broadcasts its loaded frames can declare.

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { fileCacheStorage } from './cache'
+import { _resetFleet, cacheKeyFor, clientFor, dropNode, setCacheStorage } from '@acorn/client-core/infra/node/fleet.ts'
 
 // The query cache's file store (./cache.ts): where a persisted partition lands, and what a reader sees
 // while one is being written. The persister calls this while the renderer owns the terminal, so a
@@ -56,6 +57,40 @@ describe('fileCacheStorage', () => {
 
   it('reads a missing partition as a cold start rather than an error', async () => {
     expect(await fileCacheStorage(dir).getItem(KEY)).toBeUndefined()
+  })
+
+  it('restores, switches, and retires real file partitions through the shared lifecycle', async () => {
+    _resetFleet()
+    const storage = fileCacheStorage(dir)
+    setCacheStorage(storage)
+    const cache = clientFor('tui-disposable')
+    const lease = cache.persistence.acquire()
+    await lease.restored
+    cache.client.setQueryData(['tasks'], [{ id: 'offline-task' }])
+    await cache.persistence.flush()
+    lease.release()
+    await Promise.resolve()
+    cache.client.clear()
+    const remount = cache.persistence.acquire()
+    await remount.restored
+    expect(cache.client.getQueryData(['tasks'])).toEqual([{ id: 'offline-task' }])
+    cache.client.setQueryData(['tasks'], [{ id: 'final-task' }])
+    remount.release()
+    await Promise.resolve()
+    await cache.persistence.flush()
+    expect(await storage.getItem(cacheKeyFor('tui-disposable'))).toContain('final-task')
+    await dropNode('tui-disposable')
+    expect(await storage.getItem(cacheKeyFor('tui-disposable'))).toBeUndefined()
+    expect(existsSync(join(dir, `${encodeURIComponent(cacheKeyFor('tui-disposable'))}.json.tmp`))).toBe(false)
+    const replacement = clientFor('tui-disposable')
+    const next = replacement.persistence.acquire(); await next.restored
+    expect(replacement.client.getQueryData(['tasks'])).toBeUndefined()
+    replacement.client.setQueryData(['tasks'], [{ id: 'new-owner' }])
+    await replacement.persistence.flush()
+    expect(await storage.getItem(cacheKeyFor('tui-disposable'))).toContain('new-owner')
+    next.release()
+    await dropNode('tui-disposable')
+    _resetFleet()
   })
 
   it('removes a partition, and removing one that is not there is not an error', async () => {

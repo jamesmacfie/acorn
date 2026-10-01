@@ -250,6 +250,32 @@ an already owner-bound, manifest-shaped `ctx` over that port; registrations, fet
 handlers, capabilities, and the few synchronous public calls all retain their published signatures
 through structured-clone RPC.
 
+RPC exports have explicit owners. Lifecycle contexts, route registrations, subscriptions, disposal
+handles, and capability results belong to the realm. Repeated exports reuse a function's identity
+within its call mode and ownership scope, including bound class methods. Replacing a capability
+resolves the replacement implementation on the next lookup.
+
+A fetch invocation owns its request context and derived provider services. Published provider,
+secret, and telemetry visitor operations lend their callback only until that operation finishes.
+Generic visitor results keep their published lifetime, including returned functions. The transport
+retires local exports and receiver proxy caches when their owner finishes, fails, or cancels. An
+entered nested call can drain after retirement, but a further authority call is refused. A late
+nested result cannot revive a retired request scope. These rules do not infer ownership from method
+names on arbitrary capabilities.
+
+Returned telemetry spans own a separate scope until `end`, so a span can outlive the call that
+started it. Ending a span retires that scope; repeated `end` calls are local no-ops. Request signals
+carry pre-abort state and live cancellation through mount forwarding, worker execution, and body
+encoding. Cancellation stops the host from waiting for an uncooperative handler, releases transport
+listeners and references, and suppresses its late reply. It does not terminate plugin-authored work
+that ignores the signal. Endpoint shutdown settles calls that are still encoding bodies and cancels
+their readers without awaiting an authored stream's cancellation hook.
+
+Fetch bodies remain fully buffered across this seam. Body readers retain byte-stream validation,
+and no additional asynchronous body limit is introduced. Async calls remain concurrent, synchronous
+calls retain nested message draining and their five-second ceiling, and completed synchronous reply
+buffers return to the 4 MiB pool.
+
 The launch grant is intentionally narrow:
 
 - the worker may read the installed plugin package and the trusted bootstrap/runtime dependencies;

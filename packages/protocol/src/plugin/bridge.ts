@@ -30,6 +30,9 @@ export type PluginBridgeHello = { acornBridge: typeof PLUGIN_BRIDGE_VERSION }
 // it most have no task at all. An importer runs before any project exists, and a project-scoped pane
 // opens from the rail.
 export type PluginFrameContext = {
+  /** Opaque host-owned equivalent model/grant affinity; excludes the opening item. It is not a credential. */
+  authority?: string
+
   // The contribution id this frame is rendering, as declared in the manifest.
   surface: string
   // `coreSlot` is a rectangle drawn where one of acorn's own surfaces normally is, and the frame is
@@ -225,7 +228,7 @@ export type PluginBridgeTelemetry = { kind: 'telemetry'; record: PluginBridgeTel
 // No id and no reply. It is not a request, so the broker's request parser drops it and only the
 // arrival matters, which also means any other message from the frame is just as good an ack, and the
 // host treats it as one.
-export type PluginBridgeConnected = { kind: 'connected' }
+export type PluginBridgeConnected = { kind: 'connected'; treeSlotBridge?: 1 }
 
 export type PluginBridgeRequest =
   | PluginBridgeApiRequest
