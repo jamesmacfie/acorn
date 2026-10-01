@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@acorn/plugin-agents": "workspace:*",
+    "@acorn/diff-document": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
     "@acorn/plugin-editor": "workspace:*",
     "@acorn/protocol": "workspace:*",
@@ -34,6 +35,6 @@
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
     "vite-plugin-solid": "^2.11.12",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.11"
   }
 }

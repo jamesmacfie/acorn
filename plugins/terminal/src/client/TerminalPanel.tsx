@@ -270,6 +270,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
           the tabs and the `actions` slot the +, ^C and ✕ ride in, so this drawer's header is the
           same element at the same height as the editor's file tab bar. */}
       <DocumentTabs
+        level="pane"
         idPrefix="terminal"
         ariaLabel="Terminal sessions"
         active={activeId() ?? ''}

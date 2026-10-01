@@ -7,7 +7,7 @@ import type { Task } from '../../../infra/queries'
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 import { markPaneDrawn, paneDrawn, paneModel, paneModelScope } from './paneModels'
 import { recordSample, startSpan, type SpanHandle } from '../../../infra/telemetry/emitter'
-import { Registry, type Disposable } from '../../../kit/lib/registry'
+import { Registry, type Disposable } from '../../../kit/lib/state/registry'
 import { createLogger } from '../../../infra/telemetry/logger'
 
 const log = createLogger('pane')
@@ -89,7 +89,7 @@ export type PaneLayoutContribution<M = undefined> = PaneCommon & {
   hidden?: (task: Task) => readonly string[]
   /**
    * `list-detail` only: offer the control that narrows the list column to the width of the icon
-   * rails (kit/lib/collapseState.ts).
+   * rails (kit/lib/layout/collapseState.ts).
    *
    * Opt in rather than automatic, because collapsing is a bargain the pane has to keep. The column
    * narrows to 48px and every row in it has to come back as one mark, which the pane arranges by

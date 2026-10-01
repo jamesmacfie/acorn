@@ -36,6 +36,7 @@ const VISIBLE_EVENT_TYPES = new Set<AgentNormalizedEvent['type']>([
   'tool',
   'subagent',
   'plan',
+  'plan_proposal',
   'request',
   'file_change',
   'terminal',
@@ -88,6 +89,7 @@ export const isChatItem = (item: AgentConversationItem): boolean =>
   item.event.type === 'user_message'
   || item.event.type === 'assistant_message'
   || item.event.type === 'request'
+  || item.event.type === 'plan_proposal'
 
 /** The card for one subagent, so a caller can render that subagent's run on its own. */
 export const findSubagentItem = (
@@ -203,6 +205,11 @@ function openFold(): Fold {
   // titled with the raw tool id because a mid-call update carries no title either. A tool call belongs
   // to whoever opened it, and every later update folds there wherever it arrives from.
   const toolCards = new Map<string, { stream: Stream; at: number }>()
+  // A file change folds the same way, by the edit it belongs to and the file. Both harnesses report an
+  // edit more than once as it firms up: Claude sends an excerpt when the call starts and the real hunks
+  // once it has run, Codex streams patch updates before the item completes, and Codex's whole-turn diff
+  // arrives again every time the turn's diff grows. The reader wants the last word on each, once.
+  const fileChangeCards = new Map<string, { stream: Stream; at: number }>()
   // What changed since the last `settle`. Positions past `settled` are new, so they need no entry.
   let settled = 0
   const changed = new Set<number>()
@@ -242,9 +249,11 @@ function openFold(): Fold {
   }
 
   // Tools, usage, subagents, and plans report evolving state rather than separate moments, so each is
-  // folded into the card it started rather than appended. The event ledger still stores a row per
-  // provider update, which is what replay and any later timing question read. A plan is a complete
-  // snapshot and folds only within its own turn; a later turn's plan is a separate piece of work.
+  // folded into the card it started rather than appended. The ledger stores a row per update for
+  // usage, subagents and plans. A tool call or a file change it stores as the opening row and one row
+  // with the latest state, which folds here to the same card (../../server/sessions/ledgerFold.ts). A
+  // plan is a complete snapshot and folds only within its own turn; a later turn's plan is a separate
+  // piece of work.
   //
   // A tool call is keyed by turn and tool id, so a command reads as one panel whose status and output
   // change in place. Plans are keyed by turn. Usage is keyed by turn, with one allowance: a turn's last
@@ -259,6 +268,10 @@ function openFold(): Fold {
     stream: Stream,
   ): { stream: Stream; at: number } | undefined => {
     if (record.event.type === 'tool') return toolCards.get(toolCardKey(record.turnId, record.event.tool.id))
+    if (record.event.type === 'file_change') {
+      const key = fileChangeKey(record)
+      return key === undefined ? undefined : fileChangeCards.get(key)
+    }
     if (record.event.type === 'subagent') {
       const at = subagentCardAt.get(record.event.subagent.id)
       return at === undefined ? undefined : { stream: top, at }
@@ -290,6 +303,8 @@ function openFold(): Fold {
     if (record.event.type === 'tool') {
       toolCards.set(toolCardKey(record.turnId, record.event.tool.id), { stream, at: stream.items.length })
     }
+    const changeKey = fileChangeKey(record)
+    if (changeKey !== undefined) fileChangeCards.set(changeKey, { stream, at: stream.items.length })
     if (record.event.type === 'usage') {
       stream.usageCardAt = stream.items.length
       closedSinceUsage = []
@@ -362,6 +377,12 @@ function openFold(): Fold {
 
   return { add, replaceLastUsage, settle }
 }
+
+// Scoped by turn like a tool card's key, because a harness's item ids need only be unique within one.
+const fileChangeKey = (record: AgentEventRecord): string | undefined =>
+  record.event.type === 'file_change' && record.event.changeId !== undefined
+    ? toolCardKey(record.turnId, `${record.event.changeId}\n${record.event.path ?? ''}`)
+    : undefined
 
 const bySeq = (events: AgentEventRecord[]): AgentEventRecord[] => [...events].sort((a, b) => a.seq - b.seq)
 

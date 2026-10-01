@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { createLogger, describeError } from '@acorn/plugin-api/node'
+import { createLogger, describeError, pastedContent } from '@acorn/plugin-api/node'
 import type { AgentInputPart, AgentTurn } from '../../contract/wire.ts'
 import type { ManagedAgentRuntime } from '../sessions/runtime'
+import type { AgentDelegationStore } from './store'
 import { assistantResult, parseStructuredResult, promptWithResultContract } from '../sessions/resultContract'
 
 const log = createLogger('agents:delegation', 'agents')
@@ -13,6 +14,7 @@ const MAX_REPORT_TEXT = 8 * 1024
 const MAX_REPORTS_PER_OWNER = 100
 
 export const reportKey = (childTurnId: string): string => `delegation-report:${childTurnId}`
+export const requestReportKey = (requestId: string): string => `delegation-request:${requestId}`
 
 export const turnResultSchema = (turn: AgentTurn): object | undefined => {
   const value = turn.effectivePolicy.resultSchema ?? turn.effectivePolicy.schema
@@ -77,7 +79,48 @@ export function delegatedTurn(
 
 /** Queues one turn on the owner when a turn it gave a child settles (docs/managed-agents.md § Managed delegation). */
 export class DelegationReports {
-  constructor(private readonly runtime: ManagedAgentRuntime) {}
+  constructor(
+    private readonly runtime: ManagedAgentRuntime,
+    private readonly delegations: AgentDelegationStore,
+  ) {}
+
+  /** A pending request is a pause, not a settled turn. The request row is read after commit. */
+  async deliverRequest(sessionId: string, providerRequestId: string): Promise<void> {
+    const store = this.runtime.store
+    const request = await store.request(sessionId, providerRequestId)
+    if (!request || request.status !== 'pending' || !request.turnId
+      || !['permission', 'question', 'elicitation'].includes(request.kind)) return
+    const turn = await store.turn(request.turnId)
+    const ownerId = turn?.effectivePolicy.reportTo
+    if (!turn || turn.sessionId !== sessionId || turn.source !== 'delegation' || typeof ownerId !== 'string') return
+    const [owner, child] = await Promise.all([store.getSession(ownerId), store.getSession(sessionId)])
+    if (!owner || !child || owner.archivedAt || owner.runtimeState === 'failed'
+      || !await this.delegations.ownedChild(owner.taskId, ownerId, sessionId)) return
+    const key = requestReportKey(request.id)
+    if (await store.turnForIdempotency(ownerId, key)) return
+    if (await store.countTurns(ownerId, 'delegation_report') >= MAX_REPORTS_PER_OWNER) {
+      log.warn(`not reporting request ${request.id}: session ${ownerId} already holds ${MAX_REPORTS_PER_OWNER} reports`)
+      return
+    }
+    const need = request.kind === 'permission' ? 'permission' : request.kind === 'question' ? 'an answer' : 'elicitation input'
+    const detail = [request.title, request.detail].filter(Boolean).join(' — ').slice(0, 500)
+    await this.runtime.enqueueTurn(ownerId, {
+      input: [
+        { type: 'text', text: `${child.title} is blocked and needs ${need}.\n\nRequest:\n${pastedContent(detail)}\n\nOpen or inspect child session ${child.id} to see the request. A human must resolve it in the child session; you cannot approve or answer it from this report.` },
+        context('delegation_report', child.title,
+          `Blocked request from delegated session ${child.id}, turn ${turn.id}, request ${request.id}.`,
+          child.id, `Delegated session ${child.id}, request ${request.id}`),
+      ],
+      source: 'delegation_report',
+      effectivePolicy: { reportFrom: { sessionId: child.id, turnId: turn.id } },
+      idempotencyKey: key,
+    })
+  }
+
+  deliverRequestSafely(sessionId: string, providerRequestId: string): void {
+    void this.deliverRequest(sessionId, providerRequestId).catch((error: unknown) =>
+      log.warn(`report for request ${providerRequestId} failed: ${describeError(error).message}`))
+  }
 
   async deliver(childTurnId: string): Promise<void> {
     const store = this.runtime.store
@@ -97,11 +140,13 @@ export class DelegationReports {
     const text = assistantResult(await store.eventsForTurn(turn.id))
     const schema = turnResultSchema(turn)
     const structured = schema && text ? parseStructuredResult(text, schema) : null
+    // The child's message is marked as text the owner did not write. A child that read a hostile page
+    // can repeat what it read, and unmarked, that would reach the owner as its own user's request.
     const body = [
       `${child.title} finished the turn you gave it. Answer it with agent_prompt on session ${child.id}, or read its full output with agent_read.`,
-      `Outcome: ${turn.status}`,
+      `Outcome: ${turn.stopReason === 'refusal' ? 'refused. The model declined the request, so asking again in the same words will not help.' : turn.status}`,
       ...(turn.error ? [`Error: ${turn.error.message}`] : []),
-      ...(text ? ['Final message:', text.length > MAX_REPORT_TEXT ? `…${text.slice(-MAX_REPORT_TEXT)}` : text] : ['The turn ended with no message.']),
+      ...(text ? ['Final message:', pastedContent(text.length > MAX_REPORT_TEXT ? `…${text.slice(-MAX_REPORT_TEXT)}` : text)] : ['The turn ended with no message.']),
       ...(structured != null ? ['Structured result:', '```json', JSON.stringify(structured, null, 2), '```'] : []),
     ].join('\n\n')
     await this.runtime.enqueueTurn(ownerId, {

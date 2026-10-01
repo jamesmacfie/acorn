@@ -1,10 +1,11 @@
-// Local-changes review backing: working-tree status, per-file patch and blob reads, plus stage,
+// Local-changes review backing: working-tree status, the diff document and blob reads, plus stage,
 // commit, discard, and the four remote verbs over the task's worktree. The LocalGitBridge behind the HTTP routes in
 // ./routes/localGit.ts. The taskId is the capability, and relative paths are validated inside
 // localDiff.ts. Pure Node, so it works in dev:node too. Wired in ../node/index.ts.
 import { BridgeError, type CoreServices, type PluginHookRegistry } from '@acorn/plugin-api/node'
 import type { LocalGitBridge } from './routes/localGit'
-import { abortOperation, branchOf, commitDiffText, commitStaged, discardAll, discardFile, fetchRemote, gitOperation, headCommit, localDiff, localNewSideText, localStatus, pullRemote, pushBranch, stageAll, stageFiles, unstageAll, unstageFiles } from './localDiff'
+import { abortOperation, branchOf, commitDiffText, commitStaged, discardAll, discardFile, fetchRemote, gitOperation, headCommit, localNewSideText, localStatus, pullRemote, pushBranch, stageAll, stageFiles, unstageAll, unstageFiles } from './localDiff'
+import { localDocument, localSearch, localSegments } from './localDocument'
 import { buildCommitPrompt, cleanCommitMessage, COMMIT_MESSAGE_SYSTEM, commitDiffScope, commitFiles, splitByBudget, splitPatch } from './commitMessage'
 import { COMMIT_MESSAGE_MAX_OUTPUT_TOKENS, emptyLocalStatus } from '../shared/api'
 
@@ -56,6 +57,11 @@ export function localGitBridge(
   // A mutation resolves the root, runs the git action, then announces so dirty markers move. Dropping
   // the coalesced `git status` for the path is `run`'s job in ./localDiff.ts, next to the write itself,
   // so an action reached from anywhere (the agent tools, a test) gets it too.
+  const rootOf = async (taskId: string) => {
+    const root = await core.tasks.root(taskId)
+    if (!root) throw new BridgeError(404, 'not_found', 'No worktree yet.')
+    return root
+  }
   const withRoot = async (taskId: string, fn: (root: string) => Promise<{ ok: boolean; reason?: string }>) => {
     const root = await core.tasks.root(taskId)
     if (!root) return { ok: false, reason: 'No worktree yet.' }
@@ -69,19 +75,12 @@ export function localGitBridge(
       if (!root) return emptyLocalStatus()
       return localStatus(root).catch(() => emptyLocalStatus())
     },
-    diff: async (taskId, path, scope) => {
-      const root = await core.tasks.root(taskId)
-      if (!root) return { error: 'No worktree yet.' }
-      try {
-        // Whole-file context: the pane shows the entire file with changes highlighted, so no expand
-        // affordances are needed. 1e6 lines caps any real file.
-        // git's default -U3, so the pane shows hunks with expandable gaps between them rather than
-        // every line of every file (docs/diff-rendering.md).
-        return await localDiff(root, path, scope === 'staged' ? 'staged' : 'unstaged')
-      } catch (e) {
-        return { error: e instanceof Error ? e.message : 'diff failed' }
-      }
-    },
+    // The diff as a document, then its segments and search pages (./localDocument.ts). git's default
+    // -U3, so the pane shows hunks with expandable gaps between them rather than every line of every
+    // file (docs/diff-rendering.md).
+    document: async (taskId, request) => ({ files: await localDocument(await rootOf(taskId), request.scope, request.files) }),
+    segments: async (taskId, request) => localSegments(await rootOf(taskId), request.scope, request.requests),
+    search: async (taskId, { scope, files, ...request }) => localSearch(await rootOf(taskId), scope, files, request),
     newSide: async (taskId, path, scope) => {
       const root = await core.tasks.root(taskId)
       if (!root) return { error: 'No worktree yet.' }

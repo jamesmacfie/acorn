@@ -6,6 +6,7 @@ import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import TypedValueField from './TypedValueField'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 import { workflowApi } from '../workflowsClient'
+import { startWorkflow } from '../startWorkflow'
 import { closeWorkflowStart, startRequest, type StartRequest } from './startRequest'
 
 // "Run this workflow": one box per declared input, and a task to run it on.
@@ -49,7 +50,7 @@ function StartDialog(props: { request: StartRequest }) {
     setBusy(true)
     setError(undefined)
     const filled = Object.fromEntries(Object.entries(values()).filter(([, value]) => value !== ''))
-    const answer = await workflowApi.start(taskId(), { defId: props.request.defId }, Object.keys(filled).length ? filled : undefined)
+    const answer = await startWorkflow(taskId(), { defId: props.request.defId }, Object.keys(filled).length ? filled : undefined)
     setBusy(false)
     if (answer.error) {
       setError(answer.error)

@@ -2,26 +2,10 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
-import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
-
-// The plugin API is a contract: this test pins the exported names of every entrypoint against a
-// committed list, so a surface change is always something someone decided rather than something
-// that slipped in. See docs/plugins.md § The plugin API for the snapshot, the regeneration command,
-// and why adding a name still needs to weigh the same question as taking on a new dependency.
-//
-// Removing a name is a major bump. See docs/plugins.md § The plugin API for why PLUGIN_API_MAJOR is
-// compared by exact string match at three places, and for why regeneration refuses to drop a name
-// silently.
-//
-// Out of scope for this test: `@deprecated` markers, a removal schedule, a compatible-change commit
-// trailer. See docs/plugins.md § What is published, and what acorn promises about it for why there
-// is no deprecation program.
-//
-// Names, not a rolled-up .d.ts: every package here is consumed as source, since `noEmit` is set
-// globally and nothing in the repo emits declarations (the same reasoning applies to the published
-// surface, docs/plugins.md § What is published, and what acorn promises about it). What the snapshot
-// cannot catch is an upstream type changing shape underneath a stable name; `tsc --noEmit` across
-// the seventeen plugins that consume this package already catches that, loudly.
+// This private workspace facade is consumed as source by compiled plugins. Pin its exported names so
+// a barrel edit is visible in review. Its snapshot has no loaded-plugin API major: removing a
+// compiled-only export does not change the published SDK, declarations, or manifest contract. See
+// docs/plugins/package-shape.md § The plugin API for the two compatibility boundaries.
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 
@@ -38,6 +22,7 @@ const ENTRYPOINTS = {
   'ui/diff': 'ui/diff.ts',
   'ui/editor': 'ui/editor.ts',
   'ui/host': 'ui/host.ts',
+  'ui/model-provider-failure': 'ui/model-provider-failure.ts',
   // The kit's vocabulary as data. Its own entrypoint so a node-environment consumer can read the
   // role enums without loading a component.
   'ui/tokens': 'ui/tokens.ts',
@@ -67,18 +52,15 @@ function exportedNames(source: string): string[] {
   return names
 }
 
-// The snapshot's first line, e.g. `# plugin API major: 2`. It is in the snapshot rather than beside it
-// so that one file answers both questions a reader has: what the surface is, and which major it is.
-const MAJOR_LINE = /^# plugin API major: (.+)$/
+const SNAPSHOT_HEADER = '# private workspace facade'
 
-function readSnapshot(path: string): { major: string; names: string[] } {
+function readSnapshot(path: string): string[] {
   const lines = readFileSync(path, 'utf8').trim().split('\n')
-  const major = MAJOR_LINE.exec(lines[0])?.[1]
-  if (!major) throw new Error(`${path} must start with "# plugin API major: <n>"`)
-  return { major, names: lines.slice(1) }
+  if (lines[0] !== SNAPSHOT_HEADER) throw new Error(`${path} must start with "${SNAPSHOT_HEADER}"`)
+  return lines.slice(1)
 }
 
-it('the plugin API surface matches its snapshot', () => {
+it('the private plugin facade matches its snapshot', () => {
   const actual = Object.entries(ENTRYPOINTS)
     .flatMap(([entry, file]) => exportedNames(readFileSync(join(HERE, file), 'utf8')).map((name) => `${entry}: ${name}`))
     .sort()
@@ -93,45 +75,10 @@ it('the plugin API surface matches its snapshot', () => {
   expect(new Set(actual).size).toBe(actual.length) // no entrypoint exports the same name twice
 
   const snapshotPath = join(HERE, 'surface.snapshot.txt')
-  const committed = readSnapshot(snapshotPath)
 
   if (process.env.UPDATE_SURFACE) {
-    // The gate, and the only place it can live: after regeneration there is nothing left to compare a
-    // removal against, so the refusal has to happen instead of the write.
-    const gone = committed.names.filter((name) => !actual.includes(name))
-    // The recoverable-reset programme moves compiled helpers to their owners before ticket 10
-    // assigns the fresh API-1 identity. No other API-13 removal is accepted here.
-    const legacyMoves = new Set([
-      'client: agentToolTone',
-      'client: fromManagedSession',
-      'ui/host: PromoteWorkflowStep',
-      'client: activeTerminal',
-      'client: addSession',
-      'client: fromTerminalSession',
-      'client: refreshSessions',
-      'client: rememberActiveTerminal',
-      'client: requestTerminalFocus',
-      'client: sessions',
-      'client: wsAttach',
-      'client: wsWrite',
-    ])
-    const unapprovedGone = gone.filter((name) => !legacyMoves.has(name))
-    if (unapprovedGone.length && committed.major === PLUGIN_API_MAJOR) {
-      throw new Error(
-        `Regenerating this snapshot would remove ${unapprovedGone.length} name(s) from the plugin API while `
-          + `PLUGIN_API_MAJOR is still '${PLUGIN_API_MAJOR}'. Every plugin package pins that major by exact `
-          + `string match, so a shrunken surface under an unchanged number is a break nothing announces.\n\n`
-          + `Either put the name(s) back, or bump PLUGIN_API_MAJOR in packages/protocol/src/pluginApiVersion.ts `
-          + `and rebuild the loaded packages (docs/plugins.md § The plugin API).\n\n`
-          + unapprovedGone.map((name) => `  - ${name}`).join('\n'),
-      )
-    }
-    writeFileSync(snapshotPath, [`# plugin API major: ${PLUGIN_API_MAJOR}`, ...actual].join('\n') + '\n')
+    writeFileSync(snapshotPath, [SNAPSHOT_HEADER, ...actual].join('\n') + '\n')
   }
 
-  // Both halves of the pair, so neither can drift alone: the names, and the major they were pinned under.
-  // Bumping the major without regenerating fails here too, which is what stops a bump from being a way to
-  // launder a removal that never got written down.
-  expect(actual).toEqual(readSnapshot(snapshotPath).names)
-  expect(readSnapshot(snapshotPath).major).toBe(PLUGIN_API_MAJOR)
+  expect(actual).toEqual(readSnapshot(snapshotPath))
 })

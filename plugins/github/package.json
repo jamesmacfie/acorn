@@ -16,6 +16,8 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@acorn/plugin-agents": "workspace:*",
+    "@acorn/diff-document": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
     "@acorn/plugin-editor": "workspace:*",
     "@acorn/protocol": "workspace:*",
@@ -23,7 +25,6 @@
     "@tanstack/solid-query": "^5.101.0",
     "@tanstack/solid-virtual": "^3.13.37",
     "drizzle-orm": "catalog:",
-    "gitdiff-parser": "^0.3.1",
     "hono": "catalog:",
     "solid-js": "catalog:",
     "zod": "catalog:"
@@ -36,6 +37,6 @@
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
     "vite-plugin-solid": "^2.11.12",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.11"
   }
 }

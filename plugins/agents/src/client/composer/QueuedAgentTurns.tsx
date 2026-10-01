@@ -4,10 +4,14 @@ import type { AgentRuntimeState, AgentTurn } from '../../contract/wire.ts'
 import { Button, Card, IconButton, Inline, Section, Stack, Text, Textarea } from '@acorn/plugin-api/ui'
 import { clientEvents } from '@acorn/plugin-api/client'
 import { agentConcurrencyOptions } from '../settings/concurrencyClient'
+import AgentAttachmentCard from '../sessions/AgentAttachmentCard'
 import { managedAgentApi } from '../sessions/managedClient'
 
 const promptText = (turn: AgentTurn): string =>
   (turn.continuationInput ?? turn.input).find((part) => part.type === 'text')?.text ?? ''
+
+const attachments = (turn: AgentTurn) =>
+  turn.input.filter((part) => part.type === 'attachment' || part.type === 'image')
 
 // Follow-ups typed while the session was busy, in the order they will be sent. Editable and
 // reorderable until the dispatcher takes one (docs/managed-agents.md § The turn queue).
@@ -79,7 +83,7 @@ export default function QueuedAgentTurns(props: {
               <Button
                 variant="bare"
                 size="sm"
-                onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'agent-concurrency' })}
+                onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'agent-limits#limits' })}
               >
                 Change
               </Button>
@@ -92,12 +96,21 @@ export default function QueuedAgentTurns(props: {
                   <Show
                     when={editing() === turn.id}
                     fallback={
-                      <Text wrap>
-                        {promptText(turn) || `${turn.input.length} attached input item${turn.input.length === 1 ? '' : 's'}`}
-                      </Text>
+                      <Show when={promptText(turn) || !attachments(turn).length}>
+                        <Text wrap>
+                          {promptText(turn) || `${turn.input.length} attached input item${turn.input.length === 1 ? '' : 's'}`}
+                        </Text>
+                      </Show>
                     }
                   >
                     <Textarea value={text()} onInput={(value) => setText(value)} rows={2} size="sm" />
+                  </Show>
+                  <Show when={attachments(turn).length}>
+                    <Inline wrap>
+                      <For each={attachments(turn)}>
+                        {(part) => <AgentAttachmentCard attachmentId={part.attachmentId} />}
+                      </For>
+                    </Inline>
                   </Show>
                   <Inline>
                     <Show

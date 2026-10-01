@@ -1,18 +1,32 @@
-/* Reusable tab strip (core/client/ui/Tabs.tsx). Generalized from the Rollbar item panel. */
-/* Wraps rather than overflowing. A tab holds an 88px floor so a word label is readable, and github's
-   pull strip puts four or more `#20982` tabs in a navigator column narrower than their sum: without
-   this the tabs past the edge were drawn outside the strip with nothing to scroll them back. */
-.ui-tabs {
+/* One horizontal scroll rule for content, document and dashboard tab lists. Their controls differ,
+   but tab widths and the chosen tab stay intact in a narrow pane. */
+.ui-tab-scroll {
+  flex: 1;
   display: flex;
-  flex-wrap: wrap;
   align-items: stretch;
-  min-height: var(--tab-h);
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.ui-tab-scroll > * { flex-shrink: 0; }
+
+/* Reusable content-tab strip (kit/components/layout/Tabs.tsx). */
+.ui-tabs {
+  --tab-strip-h: var(--tab-h);
+  display: flex;
+  align-items: stretch;
+  min-width: 0;
+  max-width: 100%;
+  min-height: var(--tab-strip-h);
   padding: 0 var(--pane-pad);
   border-bottom: var(--chrome-divider);
   background: var(--bg-subtle);
 }
+.ui-tabs[data-level='pane'] { --tab-strip-h: var(--pane-head-h); }
 .ui-tab {
   position: relative;
+  /* The strip's divider is inside its height, so the tab fills only the content box. */
+  min-height: calc(var(--tab-strip-h) - var(--chrome-divider-w));
   /* A row, so a tab can carry a mark before its label without the svg sitting on the text baseline. */
   display: inline-flex;
   align-items: center;
@@ -47,7 +61,7 @@
   .ui-tab { transition: none; }
 }
 
-/* Trailing controls beside the strip. Two consumers were overriding `.ui-tabs` to bolt these on. */
-.ui-tabs-actions { margin-left: auto; display: flex; align-items: center; gap: var(--space-2); }
+/* The selected tab can scroll while its actions stay in view. */
+.ui-tabs-actions { flex: none; display: flex; align-items: center; gap: var(--space-2); padding-left: var(--space-2); }
 .ui-tab-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
 .ui-tab-panel[hidden] { display: none; }

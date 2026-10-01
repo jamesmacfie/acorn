@@ -1,7 +1,7 @@
 import { createMemo, createSignal, Show } from 'solid-js'
 import { formatRelativeTime, readLocal, type Task, writeLocal } from '@acorn/plugin-api/client'
 import {
-  Badge, Button, ConfirmButton, EmptyState, Icon, Row, Rows, SectionHeader, SegmentedControl, Stack,
+  Badge, Button, ConfirmButton, EmptyState, Icon, Inline, Row, Rows, SectionHeader, SegmentedControl, Stack,
   Text,
 } from '@acorn/plugin-api/ui'
 import { RunGraph } from './RunGraph'
@@ -46,7 +46,8 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
   }
 
   return (
-    <Stack gap="none">
+    // Grown only for the graph: its canvas fills whatever height it is given and has none of its own.
+    <Stack gap="none" grow={nodeView() === 'graph'}>
       <Show when={model.runs().length} fallback={<EmptyState size="sm" align="start">No runs on this task.</EmptyState>}>
         <Rows
           id={`workflows:runs:${props.task.id}`}
@@ -125,11 +126,14 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
                       />
                     )}
                     meta={(
-                      <>
+                      <Inline gap="inline">
                         <Show when={node().parents.length > 1}>
                           <Badge size="xs">{`⇐ ${node().parents.length}`}</Badge>
                         </Show>
-                        <Text emphasis="muted">{node().step?.status ?? 'pending'}</Text>
+                        {/* The leading check already says done; every other status keeps its word. */}
+                        <Show when={node().step?.status !== 'done'}>
+                          <Text emphasis="muted">{node().step?.status ?? 'pending'}</Text>
+                        </Show>
                         <Show when={node().step?.children.length}>
                           {(count) => (
                             <Text emphasis="muted">
@@ -138,7 +142,7 @@ export function RunPaneList(props: { task: Task; model: RunPaneModel }) {
                           )}
                         </Show>
                         <Text emphasis="muted">{stepElapsed(node().step, model.now())}</Text>
-                      </>
+                      </Inline>
                     )}
                     onPress={() => selectNode(item.key)}
                   >

@@ -49,7 +49,10 @@ tauri-plugin-notification = "2"
 libc = "0.2"
 
 [target.'cfg(target_os = "macos")'.dependencies]
-# One function, for one problem: lending a dev build an installed acorn's identity so its banners
-# are not labelled Terminal (src/commands.rs). tauri-plugin-notification already pulls this crate in
-# under notify-rust, so naming it here compiles nothing new.
+# Native banner responses and dev-build identity (src/notifications.rs). The crate is also
+# pulled in by tauri-plugin-notification through notify-rust.
 mac-notification-sys = "0.6"
+# One private selector, for one number: the pid of the renderer's web content process, so its memory
+# can be read from outside it (src/footprint.rs). Tauri already builds this crate, so naming it here
+# compiles nothing new.
+objc2 = "0.6"

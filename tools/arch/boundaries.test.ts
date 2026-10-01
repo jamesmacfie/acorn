@@ -283,12 +283,12 @@ describe('architecture boundaries', () => {
       'packages/node-core/src/server/headless.ts', // one-shot agent run, streams stdout as it goes
       'packages/node-core/src/server/mcpRegister.ts', // registers the MCP server with a CLI
       'packages/node-core/src/server/profiles.ts', // probes whether an agent CLI is installed
-      'packages/node-core/src/server/transport/tls.ts', // openssl, at first boot only
       'packages/node-core/src/server/core/loginShellPath.ts', // the login-shell PATH probe, once at boot
       'packages/node-core/src/server/transport/listener.ts', // lsof and ps, only when the wanted port is taken
       // The supervised node's own child.
       'packages/custody/src/supervision/serviceHost.ts',
       'apps/tui/src/node/supervise.ts', // `acorn` supervising the node it started, when it started one
+      'apps/cli/src/supervision/lifecycle.ts', // explicit background Node lifecycle commands
       // Long-lived engines. Each owns its children's lifetime, and the broker has no model for that.
       'plugins/terminal/src/server/terminal.ts', // PTYs
       'plugins/agents/src/server/drivers/jsonRpcProcess.ts', // ACP driver, one process per session
@@ -322,17 +322,18 @@ describe('architecture boundaries', () => {
     const CALLS_CONSOLE = /\bconsole\s*\.\s*(?:log|warn|error|info|debug)\s*\(/
     const callsConsole = (source: string): boolean =>
       CALLS_CONSOLE.test(source.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, ''))
-    // Baseline, not an allowlist: entries may only be removed. Six files, all deliberate.
+    // Baseline, not an allowlist: entries may only be removed. The SDK modules run in a plugin's
+    // own frame or worker, where its console is the one an author has open.
     const CONSOLE_BASELINE = [
       // IS the logger.
       'packages/client-core/src/infra/telemetry/logger.ts',
-      // Runs inside the plugin's own iframe, not in the shell. It is bundled into every plugin by
-      // scripts/build-plugin.mjs, it has no API client and no telemetry emitter to reach, and its
-      // console is the one a plugin author opens on their own frame.
-      'packages/client-core/src/host/frames/sdk.ts',
-      // `kit/` may import `kit/` and the highlighter and nothing else, which is the design-system
-      // contract the rule above this one holds. One line, in the diff hydrator.
-      'packages/client-core/src/kit/diff/hydration.ts',
+      // These modules run inside a plugin's frame or worker. The bundle has no host logger, and its
+      // console is the one a plugin author opens while debugging.
+      'packages/client-core/src/host/frames/sdk/bridgePort.ts',
+      'packages/client-core/src/host/frames/sdk/bridgeTelemetry.ts',
+      'packages/client-core/src/host/frames/sdk/connection.ts',
+      'packages/client-core/src/host/frames/sdk/frameMount.ts',
+      'packages/client-core/src/host/frames/sdk/treeChannel.ts',
       // The terminal client's three deliberate ones. Its stderr is the screen, so none of these is
       // a log line (docs/tui.md § What the terminal client reports).
       //
@@ -453,6 +454,27 @@ describe('architecture boundaries', () => {
     expect(offences.sort()).toEqual([])
   })
 
+  it('a tree reaches the host through the bridge it was mounted with, never connect()', () => {
+    // In a tree worker, `connect()` resolves to the bundle's shared port, and the host refuses every
+    // request on it from a bundle whose SDK hands each tree its own bridge (host/tree/workerHost.ts).
+    // The database and API panes both shipped that way and showed "this bridge is not bound to a
+    // mounted tree" on open. Their tests mocked the client module, so only a static rule sees it.
+    const offences: string[] = []
+    let scanned = 0
+    for (const plugin of readdirSync(join(ROOT, 'plugins'))) {
+      const dir = join(ROOT, 'plugins', plugin, 'src/tree')
+      if (!existsSync(dir)) continue
+      for (const file of walk(dir)) {
+        if (!/\.tsx?$/.test(file) || isTestCode(file)) continue
+        scanned++
+        const code = readFileSync(file, 'utf8')
+        if (/import\s*\{[^}]*\bconnect\b[^}]*\}\s*from '@acorn\/plugin-api\/ui\/sdk'/.test(code)) offences.push(rel(file))
+      }
+    }
+    expect(scanned).toBeGreaterThan(10) // anti-vacuity: the walker found the tree directories
+    expect(offences.sort()).toEqual([])
+  })
+
   it('a compiled plugin pane writes no DOM either', () => {
     // Same rule, other tier. A compiled pane runs in the shell's process and could reach for a `<form>`
     // or a `class` and have it work today, which is how seven files of raw DOM accumulated behind a
@@ -464,7 +486,14 @@ describe('architecture boundaries', () => {
     // two download anchors, the github ref links, the editor pane's Monaco root and the preview pane's
     // — and the before-terminal-ui programme emptied it phase by phase, which is why this rule could
     // land in its endgame shape. An exception costs a line here and a comment saying why it survived.
-    const CLIENT_DOM_BASELINE: string[] = []
+    //
+    // The editor's image preview is the one exception. The kit has no image node, so it draws an
+    // `<img>` with inline sizing, and a terminal client sees nothing there. An `Image` kit node with a
+    // text projection on the terminal would empty this again.
+    const CLIENT_DOM_BASELINE: string[] = [
+      'plugins/editor/src/client/ImagePreview.tsx: a class, a style or an innerHTML',
+      'plugins/editor/src/client/ImagePreview.tsx: a raw element',
+    ]
     // Walked rather than listed, so a new plugin is covered on the commit that creates it.
     const offences: string[] = []
     let scanned = 0
@@ -487,9 +516,13 @@ describe('architecture boundaries', () => {
       // Core-owned CSS for a core-owned component the plugin renders.
       '@acorn/client-core/features/workspaces/onboarding.css',
     ])
+    // `@acorn/diff-document` beside protocol: a runtime-neutral contract with no host state in it,
+    // which a provider's node builds diff documents with and its client hands the viewer
+    // (docs/diff-rendering.md § The document).
+    const SHARED = new Set(['@acorn/plugin-api', '@acorn/protocol', '@acorn/diff-document'])
     const offenders = crossPackage
       .filter((e) => e.fromPkg.kind === 'plugin' && !isTestCode(e.fromFile))
-      .filter((e) => e.target.pkg!.name !== '@acorn/plugin-api' && e.target.pkg!.name !== '@acorn/protocol')
+      .filter((e) => !SHARED.has(e.target.pkg!.name))
       .filter((e) => !isContract(e.target.pkg, e.target.file))
       .filter((e) => !ALLOWED_CSS.has(e.spec))
       .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
@@ -510,7 +543,10 @@ describe('architecture boundaries', () => {
     // Keeps a production file from importing test scaffolding, which is how a tmp-dir SQLite factory
     // ends up shipped. Any package's testkit/, not just node-core's: the rule immediately found the
     // same shape in plugins/github.
-    const offenders = EDGES.filter((e) => !isTestCode(e.fromFile))
+    // One exception: the agent-automation seeder, which writes fixtures into a throwaway data root
+    // before the window starts and is test scaffolding by purpose (docs/testing.md § Large-surface
+    // fixture). It never ships: apps/desktop/scripts/ is build and dev tooling.
+    const offenders = EDGES.filter((e) => !isTestCode(e.fromFile) && rel(e.fromFile) !== 'apps/desktop/scripts/agent/seed.ts')
       .filter((e) => e.target.file?.includes('/src/testkit/') || e.target.file?.endsWith('/src/testkit.ts'))
       .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
     expect([...new Set(offenders)].sort()).toEqual([])
@@ -570,10 +606,22 @@ describe('architecture boundaries', () => {
   it('libraries publish only enumerated, existing source entrypoints', () => {
     const limits: Record<string, number> = {
       '@acorn/protocol': 80,
-      '@acorn/client-core': 150,
+      // Model-provider error guidance needs a pure path for logic tests and remote trees. Importing
+      // the kit/lib barrel here would pull renderer-only modules into those consumers. Three more on
+      // 2026-09-29 for the settings pages split out of Security, Appearance and Plugins, each its own
+      // lazy chunk behind its own rail row. One more for `kit/lib/savedSignal`, the Saved timer both
+      // hosts' SettingRow share, which the terminal kit cannot take from the renderer-only barrel.
+      // One more for a project's own settings page, a lazy chunk the desktop registers like the others.
+      // One more for Rail and surfaces, split off the plugin list on 2026-09-30. One more when Integrations
+      // split into Services and AI models the same day. One more for the shared model picker popover
+      // (settings/models/ModelPickerPopover.tsx), merged in from main the same day. One more for
+      // Storage and memory (settings/StorageSettings.tsx), a lazy chunk the desktop registers like the
+      // others, merged in from perf the same day.
+      '@acorn/client-core': 164, // PaneModelHost and QueryCacheProvider are renderer composition seams.
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 10,
+      '@acorn/diff-document': 2,
     }
     const problems: string[] = []
     for (const [name, limit] of Object.entries(limits)) {
@@ -595,6 +643,9 @@ describe('architecture boundaries', () => {
         }
       }
     }
+    const protocolExports = packageExports.get('@acorn/protocol')!
+    expect(protocolExports['./plugin/contract.ts']).toBe('./src/plugin/contract.ts')
+    expect(Object.keys(protocolExports).filter((path) => path.startsWith('./plugin/manifest/'))).toEqual([])
     expect(problems.sort()).toEqual([])
   })
 
@@ -620,7 +671,7 @@ describe('architecture boundaries', () => {
     // Anti-vacuity: the suite's own guard counts packages and edges, not protocol's files, so a walk
     // that returned nothing would satisfy the assertion below.
     expect(files.length).toBeGreaterThan(15)
-    const offenders = files.filter((f) => readFileSync(f, 'utf8').includes('/v1/p/')).map((f) => relative(proto.src, f))
+    const offenders = files.filter((f) => !isTestCode(f) && readFileSync(f, 'utf8').includes('/v1/p/')).map((f) => relative(proto.src, f))
     expect([...new Set(offenders)].sort()).toEqual([])
   })
 
@@ -672,7 +723,8 @@ describe('architecture boundaries', () => {
     const pluginNames = PACKAGES.filter((p) => p.kind === 'plugin').map((p) => p.name.replace('@acorn/plugin-', ''))
     const proto = byName.get('@acorn/protocol')!
     const named = walk(proto.src)
-      .map((f) => relative(proto.src, f))
+      // Source ownership folders do not change whether a module names a plugin.
+      .map((f) => basename(f))
       .filter((f) => !f.endsWith('.test.ts'))
       .filter((f) => !NAME_COLLISIONS.includes(f))
       // Matched on the file name, not the contents: a comment can't create a dependency, and scanning
@@ -693,32 +745,34 @@ describe('architecture boundaries', () => {
     //
     // Ten roster ids are also core's own words. Where that is the whole reason, the entry says so.
     const NAMES_A_PLUGIN_OK = new Map([
-      ['packages/protocol/src/dataSources.ts', 'preview is a query mode, not the preview plugin'],
-      ['packages/plugin-types/src/public.ts', 'preview is a published query mode, not the preview plugin'],
+      ['packages/protocol/src/data/dataSources.ts', 'preview is a query mode, not the preview plugin'],
+      ['packages/plugin-types/src/contracts/data.ts', 'preview is a published query mode, not the preview plugin'],
+      ['packages/plugin-types/src/contracts/coreProjects.ts', "'terminal' is a project setup-script trigger"],
       ['packages/node-core/src/server/dataSources/runtime.ts', 'preview is a query mode, not the preview plugin'],
       ['packages/client-core/src/features/dataSources/SourceQueryEditor.tsx', 'preview is a data-query mode, not the preview plugin'],
       // `terminal` the UI style pack, which is a shape-and-density choice with no plugin behind it.
       ['packages/client-core/src/features/settings/StyleGallery.tsx', "the 'terminal' UI style"],
       ['packages/client-core/src/features/settings/uiStyles.ts', "the 'terminal' UI style"],
-      ['packages/client-core/src/infra/persistence/appStartup.ts', "the 'terminal' UI style"],
       ['packages/client-core/src/host/frames/PluginFrame.tsx', "the 'terminal' UI style, passed to a frame"],
       ['packages/client-core/src/host/tree/RemoteTree.tsx', "the 'terminal' UI style, passed to a tree"],
       // `terminal` the moment a setup script runs, and `terminal` the command palette category.
-      ['packages/client-core/src/features/settings/WorkspaceProjectSettings.tsx', "the 'terminal' setup-script trigger"],
+      ['packages/client-core/src/features/settings/ProjectConfigTabs.tsx', "the 'terminal' setup-script trigger"],
       ['packages/node-core/src/server/routes/projects/projects.ts', "the 'terminal' setup-script trigger"],
       ['packages/node-core/src/server/worktrees/taskWorktree.ts', "the 'terminal' setup-script trigger"],
-      ['packages/protocol/src/api.ts', "the 'terminal' setup-script trigger"],
+      ['packages/protocol/src/transport/api/projects.ts', "the 'terminal' setup-script trigger"],
       ['packages/client-core/src/host/registries/commands/commands.ts', "the 'terminal' command category"],
       // `terminal` the channel prefix of core's own `terminal:sessions-changed` event, which is a noun
       // and not the roster id. Any plugin that starts a session emits it and the shell hears it
       // (@acorn/protocol/nodeEvents.ts).
-      ['packages/protocol/src/plugin/contract.ts', "the 'terminal' command category"],
+      ['packages/protocol/src/plugin/manifest/commandDescriptors.ts', "the 'terminal' command category"],
       // `terminal` an agent controller and a driver kind; `context` an agent input part.
-      ['packages/protocol/src/agentContext.ts', "'context' the agent input part"],
+      ['packages/protocol/src/agents/agentContext.ts', "'context' the agent input part"],
       ['packages/client-core/src/features/agent/contextSnapshot.ts', "'context' the agent input part"],
       ['packages/client-core/src/host/chrome/chromeData.ts', "'context' the agent input part"],
-      ['packages/node-core/src/server/plugins/permissions.ts', "'context' the permission name"],
+      ['packages/node-core/src/server/plugins/coreFacets.ts', "'context' the core facet name"],
       ['packages/node-core/src/server/plugins/nodePluginWorker.ts', "'context' the RPC path and 'http' the Node builtin"],
+      ['packages/protocol/src/plugin/nodeBuiltins.ts', "'http' the Node builtin family"],
+      ['packages/node-core/src/server/plugins/storagePolicy.ts', "'memory' the SQLite temp_store value"],
       // `database` the layer a workflow definition was found in: a row in acorn's own store rather
       // than a file somebody committed. Nothing to do with the database plugin.
       // Where a task's terminals live is a node question, asked of the roster
@@ -729,18 +783,21 @@ describe('architecture boundaries', () => {
       ['packages/client-core/src/features/tabs/TabRail.tsx', 'the host-capability probe'],
       // `github` the website an installable plugin comes from, which is a different thing wearing the
       // same word, and `github` the brand mark every glyph named `brand:github` resolves through.
-      ['packages/client-core/src/features/settings/PluginsSettings.tsx', "'github' the install source kind"],
+      ['packages/client-core/src/features/settings/plugins/InstallPlugin.tsx', "'github' the install source kind"],
       ['packages/client-core/src/host/trust/approval.ts', "'github' the install source kind"],
       ['packages/node-core/src/server/agentTools/pluginRequests.ts', "'github' the install source kind"],
-      ['packages/node-core/src/server/plugins/installer.ts', "'github' the install source kind"],
+      ['packages/protocol/src/plugin/source.ts', "'github' the shared install source kind"],
       ['packages/client-core/src/kit/tokens/brandMarks.ts', "'github' the brand mark"],
       // The rest, each a plain collision with a word core already had.
       ['packages/client-core/src/features/editor/DocumentSurface.tsx', "'editor' the rectangle kind"],
       ['packages/client-core/src/kit/components/content/Rectangle.tsx', "'editor' the rectangle kind"],
       ['packages/client-core/src/host/trust/permissions.ts', "'database' a Lucide icon name"],
       ['packages/client-core/src/kit/components/inputs/IconPicker.tsx', "'database' and 'terminal', Lucide icon names"],
-      ['packages/node-core/src/server/repoConfigTrust.ts', "'workflows' the .acorn directory name"],
-      ['packages/protocol/src/mcp.ts', "'http' the MCP transport"],
+      ['packages/protocol/src/integrations/mcp.ts', "'http' the MCP transport"],
+      ['packages/protocol/src/chrome/settingsPages.ts', "'agents' the settings rail group"],
+      // Moved from apps/desktop so the terminal lists the same pages. Search words name the services a
+      // Services page lists, which is text a person types, not a branch on a plugin.
+      ['packages/client-core/src/features/settings/corePages.ts', "'agents' the settings rail group, and service names as search words"],
     ])
 
     // A `//` outside a string starts a comment. Prose is allowed to name a plugin, and most of the
@@ -956,11 +1013,12 @@ describe('architecture boundaries', () => {
     expect([...new Set(crossed)].sort()).toEqual([])
   })
 
-  it('plugin-api is a facade: re-exports only, and only of the three core packages', () => {
-    // The moment the facade grows behaviour of its own it becomes a fourth core package with its own
-    // bugs.
+  it('plugin-api is a facade: re-exports only, and only of the core packages', () => {
+    // The moment the facade grows behaviour of its own it becomes another core package with its own
+    // bugs. `@acorn/diff-document` is on the list because `ui/diff` publishes the document types the
+    // viewer's port is written in (docs/diff-rendering.md § The document).
     const api = PACKAGES.find((p) => p.name === '@acorn/plugin-api')!
-    const CORE = new Set(['@acorn/node-core', '@acorn/client-core', '@acorn/protocol', '@acorn/plugin-api'])
+    const CORE = new Set(['@acorn/node-core', '@acorn/client-core', '@acorn/protocol', '@acorn/plugin-api', '@acorn/diff-document'])
     const foreign = EDGES.filter((e) => e.fromPkg.name === api.name && e.target.pkg && !CORE.has(e.target.pkg.name))
       .map((e) => `${rel(e.fromFile)}: ${e.spec}`)
     // Re-exports only: no plain imports, and no declarations. `export … from` is the whole file.
@@ -992,13 +1050,14 @@ describe('architecture boundaries', () => {
   it('client-core kit/ is pure presentation: props in, DOM out', () => {
     // kit/ is what @acorn/plugin-api/ui re-exports, so its import edges are the design-system contract.
     //
-    // An allowlist of destinations, not a denylist of data modules, because a denylist silently stops
-    // covering the next directory someone adds. kit/ may import kit/ and infra/highlight/ (the shiki
-    // highlighter the diff model colours through), and nothing else.
+    // An allowlist of destinations within client-core, not a denylist of data modules, because a
+    // denylist silently stops covering the next directory someone adds. kit/ may import kit/ and
+    // infra/highlight/ (the shiki highlighter the diff model colours through). Other packages have
+    // their own import rules.
     //
-    // Type-only imports pass: kit/components/WorkspacePicker.tsx imports the `FleetWorkspace` type, a
-    // shape it renders rather than a store it reads. Known and deliberate: kit/diff/DiffRows.tsx reaches
-    // kit/lib/draftState, which touches localStorage, because the draft belongs to the comment box.
+    // Type-only imports count too. A type owned by a feature still makes the kit depend on that
+    // feature. kit/diff/DiffRows.tsx reaches kit/lib/state/draftState, which touches localStorage,
+    // because the draft belongs to the comment box.
     //
     const UI_MAY_IMPORT = (file: string): boolean => {
       const p = rel(file)
@@ -1006,38 +1065,28 @@ describe('architecture boundaries', () => {
       const inner = p.slice('packages/client-core/src/'.length)
       return inner.startsWith('kit/') || inner.startsWith('infra/highlight/')
     }
-    // `[^'"]*?` for the clause, because a preceding import's specifier contains the quotes that bound
-    // the statement.
-    const CLAUSE_IMPORT_RE = /\bimport\s+(?!type\b)([^'"]*?)\s+from\s*['"]([^'"\n]+)['"]/g
-    const BARE_IMPORT_RE = /\bimport\s*['"]([^'"\n]+)['"]/g
     const uiDir = join(ROOT, 'packages/client-core/src/kit')
-    const offenders: string[] = []
-    let scanned = 0
-    for (const file of walk(uiDir).filter((f) => !isTestCode(f))) {
-      scanned++
-      const text = readFileSync(file, 'utf8')
-      const specs: string[] = []
-      for (const re of [CLAUSE_IMPORT_RE, BARE_IMPORT_RE]) {
-        re.lastIndex = 0
-        let m: RegExpExecArray | null
-        while ((m = re.exec(text))) {
-          if (re === CLAUSE_IMPORT_RE) {
-            // A named clause whose every entry is `type X` is type-only in substance.
-            const named = m[1].trim().match(/^\{([\s\S]*)\}$/)
-            if (named && named[1].split(',').every((part) => !part.trim() || /^type\s/.test(part.trim()))) continue
-            specs.push(m[2])
-          } else specs.push(m[1])
-        }
-      }
-      for (const spec of specs) {
-        const target = resolveSpec(file, spec)
-        if (!target.file) continue // external, or @acorn/protocol resolved elsewhere, both fine
-        if (target.pkg && target.pkg.name !== '@acorn/client-core') continue // protocol and friends
-        if (!UI_MAY_IMPORT(target.file)) offenders.push(`${rel(file)}: ${spec}`)
-      }
-    }
+    const kitImportOffenders = (fromFile: string, specs: readonly string[]): string[] => specs.flatMap((spec) => {
+      const target = resolveSpec(fromFile, spec)
+      if (!target.file || target.pkg?.name !== '@acorn/client-core' || UI_MAY_IMPORT(target.file)) return []
+      return [`${rel(fromFile)}: ${spec}`]
+    })
+    const scanned = walk(uiDir).filter((file) => !isTestCode(file)).length
+    const offenders = EDGES
+      .filter((edge) => edge.fromFile.startsWith(uiDir + '/') && !isTestCode(edge.fromFile))
+      .flatMap((edge) => kitImportOffenders(edge.fromFile, [edge.spec]))
     // Anti-vacuity: the walker must actually be finding the design system.
     expect(scanned).toBeGreaterThan(15)
+    const syntheticFile = join(uiDir, 'components/overlays/tips.tsx')
+    const forbiddenSpec = '../../../features/tabs/railMarkers'
+    for (const statement of [
+      `import type { RailMarkerDot } from '${forbiddenSpec}'`,
+      `import { type RailMarkerDot } from '${forbiddenSpec}'`,
+      `export type { RailMarkerDot } from '${forbiddenSpec}'`,
+    ]) {
+      const specs = Array.from(statement.matchAll(IMPORT_RE), (match) => match[2])
+      expect(kitImportOffenders(syntheticFile, specs)).toEqual([`${rel(syntheticFile)}: ${forbiddenSpec}`])
+    }
     expect([...new Set(offenders)].sort()).toEqual([])
   })
 
@@ -1184,8 +1233,8 @@ describe('architecture boundaries', () => {
     // draws them. A frame or a remote tree targeting the palette would put one palette per plugin
     // inside the one surface that owns global focus, the reserved keys and every loading and error
     // state — and it would have no terminal half at all.
-    const contract = readFileSync(join(ROOT, 'packages/protocol/src/plugin/contract.ts'), 'utf8')
-    const targets = /target: z\.enum\(\[([^\]]*)\]\)/.exec(contract)
+    const surfaces = readFileSync(join(ROOT, 'packages/protocol/src/plugin/manifest/surfaces.ts'), 'utf8')
+    const targets = /target: z\.enum\(\[([^\]]*)\]\)/.exec(surfaces)
     expect(targets).not.toBeNull()
     expect(targets![1]).not.toMatch(/palette/)
 
@@ -1200,7 +1249,7 @@ describe('architecture boundaries', () => {
     // result that could name a verb, a route or a URL would make a changing server response more
     // powerful than the manifest somebody reviewed, so the row carries display facts and identity and
     // the manifest's search command owns the one static action.
-    const commands = readFileSync(join(ROOT, 'packages/protocol/src/commands.ts'), 'utf8')
+    const commands = readFileSync(join(ROOT, 'packages/protocol/src/chrome/commands.ts'), 'utf8')
     const item = /export const commandSearchItemSchema = z\.object\(\{([\s\S]*?)\n\}\)/.exec(commands)
     expect(item).not.toBeNull()
     const fields = [...item![1].matchAll(/^\s{2}([a-zA-Z]+):/gm)].map((m) => m[1])
@@ -1244,18 +1293,18 @@ describe('architecture boundaries', () => {
   })
 
   it('the plugin SDK carries no dependency into a stranger\'s bundle', () => {
-    // `@acorn/plugin-api/ui/sdk` is the only runtime code a third-party client bundle imports, and a
-    // foreign bundler bundles whatever it reaches. So its value-import closure has to stay inside the
-    // repo and inside modules that import nothing themselves.
+    // A third-party client bundle imports `@acorn/plugin-api/ui/sdk`. Its bundler follows value
+    // imports through these framework-free SDK modules and the protocol leaves they use. Keep external
+    // runtime dependencies out of that closure.
     //
     // The failure this catches happened on the first day of the tree path: `mountTree` wanted a
     // protocol constant and took it from the module beside the Zod schemas, which put the whole of Zod
     // into every plugin's bundle and grew the published file sixfold. The vite config says so in a
     // comment; a comment is not a check.
     //
-    // Value imports only. A `import type` is erased, which is what lets the SDK name protocol types
-    // freely.
-    const CLAUSE = /\bimport\s+(?!type\b)([^'"]*?)\s+from\s*['"]([^'"\n]+)['"]/g
+    // Value imports and re-exports. An `import type` or `export type` is erased, which lets the SDK
+    // name protocol types freely. The public sdk.ts entry re-exports private implementation modules.
+    const CLAUSE = /\b(?:import|export)\s+(?!type\b)([^'"]*?)\s+from\s*['"]([^'"\n]+)['"]/g
     const BARE = /\bimport\s*['"]([^'"\n]+)['"]/g
     const valueSpecs = (text: string): string[] => {
       const out: string[] = []

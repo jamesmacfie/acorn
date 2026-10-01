@@ -68,6 +68,26 @@ afterEach(() => {
 })
 
 describe('portable provider routes', () => {
+  it('keeps host credentials out of the provider request while preserving verified identity', async () => {
+    register(PROVIDER, OWNER)
+    integrationProviderRegistry.registerRoute({ providerId: PROVIDER, prefix: '', fetch: async (request, context) => Response.json({
+      headers: Object.fromEntries(request.headers), principal: context.principal, body: await request.text(),
+    }) })
+    const principal: Principal = { kind: 'device', userId: USER, deviceId: 'synthetic-device' }
+    const response = await app(principal).fetch(new Request(`http://acorn.test/v1/p/${PROVIDER}/echo`, {
+      method: 'POST', body: 'synthetic provider body', headers: {
+        Authorization: 'Bearer synthetic-owner-token', 'X-Acorn-Internal': 'synthetic-service-token',
+        Cookie: 'synthetic=secret', 'Proxy-Authorization': 'synthetic-proxy', 'X-Application': 'retained',
+      },
+    }), {} as Env)
+    expect(response.status).toBe(200)
+    const seen = await response.json() as { headers: Record<string, string>; principal: Principal; body: string }
+    expect(seen.principal).toEqual(principal)
+    expect(seen.body).toBe('synthetic provider body')
+    expect(seen.headers['x-application']).toBe('retained')
+    for (const name of ['authorization', 'x-acorn-internal', 'cookie', 'proxy-authorization']) expect(seen.headers).not.toHaveProperty(name)
+  })
+
   it('mounts a fetch handler and preserves the provider-credential gate', async () => {
     register(PROVIDER, OWNER)
     integrationProviderRegistry.registerRoute({

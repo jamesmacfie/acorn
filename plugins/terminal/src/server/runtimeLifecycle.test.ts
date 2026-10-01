@@ -12,7 +12,7 @@ function fixture(overrides: Partial<RuntimeDeps> = {}) {
   const changes: boolean[] = []
   let created = 0
   const deps: RuntimeDeps = {
-    loadTargets: vi.fn(async () => ({ targets: [{ id: 'dev', command: 'fixture' }], cwd: '/tmp/fixture', repoTargetIds: ['dev'] })),
+    loadTargets: vi.fn(async () => ({ targets: [{ id: 'dev', command: 'fixture' }], cwd: '/tmp/fixture', repoTargetIds: ['dev'], repoConfigHash: 'approved-fixture' })),
     authorizeRepoConfig: vi.fn(async () => {}),
     startSession: vi.fn(async () => { const id = `s${++created}`; live.add(id); return id }),
     isRunning: id => live.has(id), exitCode: () => 0,
@@ -28,7 +28,7 @@ function fixture(overrides: Partial<RuntimeDeps> = {}) {
 
 it('joins adjacent starts before config, orders stop and later start, and keeps other keys concurrent', async () => {
   const held = deferred<Awaited<ReturnType<RuntimeDeps['loadTargets']>>>()
-  const f = fixture({ loadTargets: vi.fn(task => task === 'held' ? held.promise : Promise.resolve({ targets: [{ id: 'dev', command: 'fixture' }], cwd: '/tmp', repoTargetIds: [] })) })
+  const f = fixture({ loadTargets: vi.fn(task => task === 'held' ? held.promise : Promise.resolve({ targets: [{ id: 'dev', command: 'fixture' }], cwd: '/tmp', repoTargetIds: [], repoConfigHash: null })) })
   const start = f.svc.start('held', 'dev')
   const joined = f.svc.start('held', 'dev')
   expect(joined).toBe(start)
@@ -36,7 +36,7 @@ it('joins adjacent starts before config, orders stop and later start, and keeps 
   const later = f.svc.start('held', 'dev')
   expect(later).not.toBe(start)
   expect((await f.svc.start('other', 'dev')).ok).toBe(true)
-  held.resolve({ targets: [{ id: 'dev', command: 'fixture' }], cwd: '/tmp', repoTargetIds: ['dev'] })
+  held.resolve({ targets: [{ id: 'dev', command: 'fixture' }], cwd: '/tmp', repoTargetIds: ['dev'], repoConfigHash: 'approved-fixture' })
   const [a, b, stopped, c] = await Promise.all([start, joined, stop, later])
   expect(a.sessionId).toBe(b.sessionId)
   expect(stopped.ok).toBe(true)
@@ -63,7 +63,7 @@ it('releases vetoes, thrown authorization, and spawn failures so retry can start
 })
 
 it('does not restart after an explicit stop failure and permits an absent cold start', async () => {
-  const f = fixture({ loadTargets: async () => ({ targets: [{ id: 'dev', command: 'fixture', stop: 'stop' }], cwd: '/tmp', repoTargetIds: [] }), runScript: async () => ({ ok: false, reason: 'stop failed' }) })
+  const f = fixture({ loadTargets: async () => ({ targets: [{ id: 'dev', command: 'fixture', stop: 'stop' }], cwd: '/tmp', repoTargetIds: [], repoConfigHash: null }), runScript: async () => ({ ok: false, reason: 'stop failed' }) })
   await f.svc.start('t', 'dev')
   expect(await f.svc.restart('t', 'dev')).toEqual({ ok: false, reason: 'stop failed' })
   expect(f.deps.startSession).toHaveBeenCalledTimes(1)
@@ -75,7 +75,7 @@ it('does not restart after an explicit stop failure and permits an absent cold s
 it.each(['config', 'trust', 'hook', 'spawn'] as const)('retires disposal during held %s and skips queued work', async phase => {
   const hold = deferred<void>()
   const f = fixture()
-  if (phase === 'config') f.deps.loadTargets = async () => { await hold.promise; return { targets: [{ id: 'dev', command: 'fixture' }], cwd: '/tmp', repoTargetIds: ['dev'] } }
+  if (phase === 'config') f.deps.loadTargets = async () => { await hold.promise; return { targets: [{ id: 'dev', command: 'fixture' }], cwd: '/tmp', repoTargetIds: ['dev'], repoConfigHash: 'approved-fixture' } }
   if (phase === 'trust') f.deps.authorizeRepoConfig = async () => { await hold.promise }
   if (phase === 'hook') f.deps.hooks = { run: async (_id, payload) => { await hold.promise; return { ok: true, payload } } }
   if (phase === 'spawn') f.deps.startSession = vi.fn(async () => { await hold.promise; f.live.add('late'); return 'late' })
@@ -125,7 +125,7 @@ it('retains an instance when killing its still-live process throws, so retry can
 
 it.each(['stop', 'restart', 'dispose'] as const)('does not publish an old discovered URL after %s', async action => {
   const hold = deferred<{ ok: boolean; output: string }>()
-  const f = fixture({ loadTargets: async () => ({ targets: [{ id: 'dev', command: 'fixture', urlCommand: 'discover' }], cwd: '/tmp', repoTargetIds: [] }), runScript: () => hold.promise })
+  const f = fixture({ loadTargets: async () => ({ targets: [{ id: 'dev', command: 'fixture', urlCommand: 'discover' }], cwd: '/tmp', repoTargetIds: [], repoConfigHash: null }), runScript: () => hold.promise })
   await f.svc.start('t', 'dev')
   const status = f.svc.status('t', 'dev'), url = f.svc.defaultUrl('t')
   for (let i = 0; i < 8; i++) await Promise.resolve()

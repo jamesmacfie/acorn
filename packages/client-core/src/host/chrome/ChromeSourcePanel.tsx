@@ -10,7 +10,7 @@ import { createFleetQuery } from '../../infra/node/fanout'
 import { FRESHNESS_LABELS } from '../../infra/node/freshness'
 import { Alert, Badge, Button, EmptyState, Input, Row, SectionHeader, Toolbar } from '../../kit/components/primitives'
 import { Inline } from '../../kit/components/layout/Inline'
-import { sidebarCollapsed } from '../../kit/lib/collapseState'
+import { sidebarCollapsed } from '../../kit/lib/layout/collapseState'
 import { IconButton } from '../../kit/components/inputs/IconButton'
 import Icon from '../../kit/components/content/Icon'
 import { RowActions } from '../../kit/components/layout/RowActions'
@@ -102,7 +102,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
     ({ projectId }) => chromeKey(props.pluginId, props.descriptor.id, projectId),
     (node, { projectId }, signal) => readRailItems(
       props.pluginId,
-      scopedSourceItemsPath(props.descriptor.items, projectId),
+      scopedSourceItemsPath(props.descriptor.items!, projectId),
       node,
       signal,
     ),

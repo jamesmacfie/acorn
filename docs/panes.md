@@ -26,6 +26,12 @@ the button, because most tasks never will ([workflows.md](./workflows.md) § The
 the same 640px floor `agents` does, because an agent node draws the same composer and a composer in a
 narrow column is unusable.
 
+`preview` is gated by `when` too: a task with no run-target URL and no project preview setting has
+nothing to draw, so it gets no button ([shell.md](./shell.md) § Host-owned webviews has the check).
+`database` is gated the same way through its manifest's `availability` route: a task with no
+connection script and no `DATABASE_URL` in its worktree `.env` or the Node's environment gets no
+button ([database.md](./database.md) § Connection resolution).
+
 The loaded Findings pane is deliberately absent from this list. Its manifest sets
 `showInSwitcher: false`, so the pane remains a valid persisted layout target and can be opened by
 **Findings: inspect task evidence**, but raw review inputs do not occupy the everyday task switcher.
@@ -63,6 +69,14 @@ The layout reducer owns show/add, close/unpin, pin, move, resize, equalize, maxi
 replacement. Pinned panes survive a switcher selection; a normal selection focuses the target. Closing
 the last unpinned pane falls back to the PR pane when one is available.
 
+The pane switcher is the `pane.switcher` exclusive slot. Core registers the default provider; a
+selected client plugin may replace its rendering. The host passes available panes, labels, icons,
+visibility, pinning, shortcuts, task identity, and maximized state through
+`@acorn/protocol/paneSwitcher.ts`. The provider invokes host verbs for show, add, close, pin,
+maximize, and equalize. The provider owns no layout row or keyboard listener. A missing, disabled,
+untrusted, incompatible, or failed provider falls back to core. Three rendering failures disable
+that provider for the session until plugin state is synchronized again.
+
 Widths are clamped to pane minimums and normalized on load. Unknown IDs become placeholders so a
 disabled plugin or a stale layout cannot crash the task view. Maximize/focus is session UI state and
 does not rewrite the durable row.
@@ -70,7 +84,7 @@ does not rewrite the durable row.
 **Inside a pane** the host owns the arrangement. A pane names one of the layouts below and supplies a
 component per region; it never draws the split, the divider, or the drag handle itself. The names and
 each layout's region set are in
-[@acorn/protocol/paneLayouts.ts](../packages/protocol/src/paneLayouts.ts).
+[@acorn/protocol/paneLayouts.ts](../packages/protocol/src/chrome/paneLayouts.ts).
 
 **Which components draw them is the host package's,** the same way `KIT_COMPONENTS` is: the desktop's
 are in `client-core/src/host/layouts` and the terminal's are in `apps/tui/src/layouts`, and a host
@@ -277,7 +291,8 @@ named by the pane contribution, so a surface that wants a different arrangement 
 regions everywhere has to be a layout — except a browse source's detail region is not a pane and cannot
 name one. So the shape is a kit node instead, and both call sites reach it: the desktop draws a header
 over a column of folds beside the main region, and the terminal draws a strip of tabs over one panel
-([ui-design.md § The closed kit](./ui-design.md)).
+([ui-design.md § The closed kit](./ui-design.md)). When there is a main region, the desktop's shared
+`ListDetail` control closes the section column to its edge while keeping the content mounted.
 
 The node takes its two columns two ways, and both matter. A caller with an element to spare passes the
 left one as `list`; a caller that cannot — a remote tree, whose props are JSON on a message port —
@@ -367,7 +382,7 @@ ctx.panes.register({
 `hidden` drops a region outright. `collapsible`, on a `list-detail` pane, is the other answer to the
 same question: the column survives and narrows to the width of the icon rails, with each row coming
 back as one mark. Opt in, because that second half is the pane's to arrange — it reads the same
-signal (`kit/lib/collapseState.ts`) and passes each `Row` a `collapsed` slot — and a pane that
+signal (`kit/lib/layout/collapseState.ts`) and passes each `Row` a `collapsed` slot — and a pane that
 collapses without doing it gets full-width rows clipped mid-word. A pane drawn from a remote tree
 cannot keep the bargain: its rows are built in a plugin worker with no way to read a host signal, so
 it leaves the flag off and keeps a column that resizes and does not collapse. See
@@ -386,6 +401,20 @@ A compiled pane sets `readsArchived: true` on its pane contribution. A loaded pl
 optional field on a task-scoped `frames` entry whose `target` is `pane`. It is invalid on a
 project-scoped pane or any other frame target. Leaving it out keeps the pane out of archived previews,
 which also preserves the behaviour of manifests written before the field existed.
+
+A compiled pane hides itself on a task with nothing to draw by giving its contribution a `when`. A
+loaded plugin can't ship a function to the host, so its task-scoped `frames` entry names an
+`availability` route instead, one of its own under `/v1/p/<id>/`. A GET answers
+`{ [taskId]: boolean }` for every active task on the Node, and the pane appears only on a task the
+answer marks `true`. The host reads it once per Node and keeps it in memory
+(`client-core/host/frames/paneAvailability.ts`), because `when` is asked on every draw of the pane
+strip. It reads again on a project change, a task it hasn't seen, a Node switch, a reconnect, window
+focus, and every two minutes. Until the first answer arrives the pane is hidden. A failed read keeps
+the last answer, so one dropped request doesn't flicker the button. A `404` means a package built
+before the route existed, and the pane then shows on every task, as it did before. The route lists
+every active task, so it should refuse a task-scoped caller. Answer "is this set up", not "is it
+running": an answer that turns false while a dev server restarts closes a pane the reader is looking
+at.
 
 A loaded plugin declares the same two keys on a `frames` entry, and it has to: `layout` is required on
 a `pane`, a `refPanel` and a `settings` surface. Omitting it used to mean "the whole surface is my
@@ -468,7 +497,9 @@ file in the editor, so a separate rail pane made one mental model ("find somethi
 open it") into a cross-pane hop. `⌘⇧F` and the "Find in files…" palette row open the editor pane with
 the search panel focused, through an `editor:search` pane intent. Keep that entry point, or searching
 starts with "open the editor first". Tree and search stay mounted together, so flipping between them
-keeps a query, its results, and the tree's open folders.
+keeps a query, its results, and the tree's open folders. The shared sidebar collapses to an empty
+rail, with its panels kept mounted. Search and "Reveal active file" commands expand it so the requested
+panel is visible.
 
 ## Data and actions
 

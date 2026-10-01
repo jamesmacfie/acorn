@@ -2,12 +2,15 @@ import { existsSync, realpathSync } from 'node:fs'
 import { Worker as NodeWorker } from 'node:worker_threads'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { builtinModules } from 'node:module'
 import { _setWorkerFactory } from '@acorn/client-core/host/tree/workerHost.ts'
+import { assertSupportedNodeRuntime } from '@acorn/protocol/nodeRuntime.ts'
+import { pluginBuiltinAllowed } from '@acorn/protocol/plugin/nodeBuiltins.ts'
 import { bundlePath } from './custody'
 import { createLogger } from '@acorn/client-core/infra/telemetry'
 
-// Modern loaded SDK bundles share one `node:worker_threads` worker per hash. Legacy bundles use
-// immutable authority contexts; each worker runs under `--permission` with read access to two files
+// Modern loaded SDK bundles share one `node:worker_threads` worker per plugin/hash. Legacy bundles use
+// one immutable mounted slot per worker; each worker runs under `--permission` with read access to two files
 // (docs/tui.md). Same-hash retirement owns the native exit before a replacement thread is built.
 //
 // `workerHost.ts` above this is shared with the desktop whole — the handshake, the slot bookkeeping,
@@ -49,6 +52,9 @@ const pending = new Map<string, Set<() => void>>()
 const log = createLogger('plugins')
 
 function spawn(url: string): WorkerLike {
+  assertSupportedNodeRuntime(process.versions.node)
+  // The host addresses a bundle by hash and never by path, on every host (docs/security.md §
+  // Third-party plugin bundles). Here the path is looked up from the hash rather than passed in.
   const hash = url.slice(url.lastIndexOf('/') + 1).replace(/\.js$/, '')
   const claimed = bundlePath(hash)
   if (!claimed) throw new Error(`no cached bundle for ${hash.slice(0, 12)}`)
@@ -116,7 +122,8 @@ function spawn(url: string): WorkerLike {
   const construct = (): void => {
     if (terminated) return
     worker = new NodeWorker(bootstrap, {
-      workerData: { bundle },
+      workerData: { bundle, builtins: builtinModules.filter((name) => pluginBuiltinAllowed(name, { sockets: false, exec: false })).map((name) => name.replace(/^node:/, '')) },
+      env: {},
       execArgv: ['--permission', `--allow-fs-read=${bootstrap}`, `--allow-fs-read=${bundle}`],
       stdout: true,
       stderr: true,

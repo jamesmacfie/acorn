@@ -31,9 +31,9 @@ describe('GitHub mirror retention repair', () => {
       { userId: USER, repoId: 999, number: 3, state: 'open', title: 'orphan repo', fetchedAt: 1 },
     ])
     await testDb.db.insert(comments).values([
-      { userId: USER, repoId: 1, number: 1, id: 'valid', body: 'keep' },
-      { userId: USER, repoId: 1, number: 2, id: 'orphan-pr', body: 'remove' },
-      { userId: USER, repoId: 999, number: 3, id: 'orphan-repo', body: 'remove' },
+      { userId: USER, repoId: 1, number: 1, id: 'valid', body: 'keep', position: 0 },
+      { userId: USER, repoId: 1, number: 2, id: 'orphan-pr', body: 'remove', position: 0 },
+      { userId: USER, repoId: 999, number: 3, id: 'orphan-repo', body: 'remove', position: 0 },
     ])
     await testDb.db.insert(checks).values({
       userId: USER,
@@ -41,6 +41,7 @@ describe('GitHub mirror retention repair', () => {
       number: 2,
       name: 'orphan-check',
       status: 'failure',
+      position: 0,
     })
 
     expect(await pruneOrphanedGithubMirror(testDb.db)).toEqual({ removedPulls: 2 })
@@ -64,6 +65,8 @@ describe('GitHub mirror retention repair', () => {
       repoId: 99,
       number: 4,
       path: 'private.ts',
+      position: 0,
+      patchState: 'unavailable',
     })
     await testDb.db.insert(reviews).values({
       userId: USER,
@@ -71,6 +74,7 @@ describe('GitHub mirror retention repair', () => {
       number: 4,
       id: 'review',
       body: 'private review',
+      position: 0,
     })
 
     const statements = deleteRepoMirrorStatements(testDb.db, USER, [99])

@@ -33,6 +33,7 @@ export type AgentUsageServiceOptions = {
 
 export type AgentUsageService = {
   read(options: { userId: string; force?: boolean }): Promise<AgentUsageSnapshot>
+  refreshProvider(options: { userId: string; providerId: string }): Promise<AgentUsageSnapshot | null>
   /** Freshly confirm that every depleted quota for one harness has a known future reset, then return
    *  the latest of those resets. `null` means the runtime cannot schedule safely. */
   depletedUntil(options: { userId: string; providerId: string }): Promise<number | null>
@@ -73,11 +74,12 @@ export function createAgentUsageService(options: AgentUsageServiceOptions): Agen
   const lastSuccess = new Map<AgentUsageProviderId, AgentProviderUsage>()
   let activeKey: string | null = null
   let cached: { key: string; snapshot: AgentUsageSnapshot } | null = null
-  let inFlight: { key: string; promise: Promise<AgentUsageSnapshot> } | null = null
+  let inFlight: { key: string; providerId: string | null; promise: Promise<AgentUsageSnapshot> } | null = null
 
   const refresh = async (
     pricing: AgentPricingPreferences,
     key: string,
+    providerId: string | null = null,
   ): Promise<AgentUsageSnapshot> => {
     if (activeKey !== key) {
       lastSuccess.clear()
@@ -85,17 +87,29 @@ export function createAgentUsageService(options: AgentUsageServiceOptions): Agen
     }
     await mkdir(options.probeDir, { recursive: true })
     const entries = collectors.entries()
-    const settled = await Promise.allSettled(entries.map((entry) => entry.collect(pricing)))
-    const providers = settled.map((result, index) => {
-      const entry = entries[index]
+    const previous = cached?.key === key ? new Map(cached.snapshot.providers.map((item) => [item.provider, item])) : null
+    // A cold cache or a changed registry needs one complete snapshot before individual rows can be
+    // replaced. Otherwise a manual refresh could silently hide a newly registered harness.
+    const partial = providerId !== null && previous?.has(providerId)
+      && entries.every((entry) => previous.has(entry.provider))
+    const selected = partial ? entries.filter((entry) => entry.provider === providerId) : entries
+    const settled = await Promise.allSettled(selected.map((entry) => entry.collect(pricing)))
+    const updated = new Map(selected.map((entry, index) => {
+      const result = settled[index]
       if (result.status === 'fulfilled') {
         const usage = named(entry, result.value)
         lastSuccess.set(entry.provider, usage)
-        return usage
+        return [entry.provider, usage] as const
       }
-      return failedProvider(entry, result.reason, lastSuccess.get(entry.provider))
+      return [entry.provider, failedProvider(entry, result.reason, lastSuccess.get(entry.provider))] as const
+    }))
+    const providers = entries.flatMap((entry) => {
+      const item = updated.get(entry.provider) ?? previous?.get(entry.provider)
+      return item ? [item] : []
     })
-    const snapshot = { providers, refreshedAt: now() }
+    // The TTL belongs to the complete probe. Refreshing Claude must not postpone the next Codex
+    // check, even though the returned snapshot contains the newer Claude row.
+    const snapshot = { providers, refreshedAt: partial ? cached!.snapshot.refreshedAt : now() }
     cached = { key, snapshot }
     options.onRefreshed?.()
     return snapshot
@@ -105,7 +119,7 @@ export function createAgentUsageService(options: AgentUsageServiceOptions): Agen
     const pricing = await pricingForUser(userId)
     const key = `${userId}\u0000${agentPricingFingerprint(pricing)}`
     if (inFlight) {
-      if (inFlight.key === key) return inFlight.promise
+      if (inFlight.key === key && (!force || inFlight.providerId === null)) return inFlight.promise
       await inFlight.promise
       return read({ userId, force })
     }
@@ -119,7 +133,25 @@ export function createAgentUsageService(options: AgentUsageServiceOptions): Agen
     const promise = refresh(pricing, key).finally(() => {
       if (inFlight?.promise === promise) inFlight = null
     })
-    inFlight = { key, promise }
+    inFlight = { key, providerId: null, promise }
+    return promise
+  }
+
+  const refreshProvider: AgentUsageService['refreshProvider'] = async ({ userId, providerId }) => {
+    if (!collectors.get(providerId)) return null
+    const pricing = await pricingForUser(userId)
+    const key = `${userId}\u0000${agentPricingFingerprint(pricing)}`
+    if (inFlight) {
+      if (inFlight.key === key && (inFlight.providerId === null || inFlight.providerId === providerId)) {
+        return inFlight.promise
+      }
+      await inFlight.promise
+      return refreshProvider({ userId, providerId })
+    }
+    const promise = refresh(pricing, key, providerId).finally(() => {
+      if (inFlight?.promise === promise) inFlight = null
+    })
+    inFlight = { key, providerId, promise }
     return promise
   }
 
@@ -140,5 +172,5 @@ export function createAgentUsageService(options: AgentUsageServiceOptions): Agen
     return Number.isFinite(resetAt) && resetAt > now() ? resetAt : null
   }
 
-  return { read, depletedUntil }
+  return { read, refreshProvider, depletedUntil }
 }

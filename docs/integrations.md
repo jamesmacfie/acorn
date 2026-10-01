@@ -11,9 +11,9 @@ plugin that implements a provider contributes descriptors, validation, routes, a
 
 ## Connection lifecycle
 
-Settings → Integrations lists provider descriptors and connection state. A connection can be created,
-replaced, tested, disabled, enabled, or deleted. Secret fields are write-only, so the client receives
-presence, health, scopes, and account metadata instead of plaintext.
+Settings lists connections under **Connections**, on two pages (§ Settings below). A connection can be
+created, replaced, tested, disabled, enabled, or deleted. Secret fields are write-only, so the client
+receives presence, health, scopes, and account metadata instead of plaintext.
 
 Provider routes are projected under `/v1/p/<provider>/...` and are protected from task-scoped internal
 callers by the provider-access gate. The generic administration routes are under
@@ -42,6 +42,45 @@ resource call on. The ownership check runs at the ask, and the store it returns 
 provider. Every query it makes carries the provider, and a freshness-marker key outside the
 provider's own `provider:<id>:` namespace is refused, so a plugin can never read or write another
 provider's rows through it.
+
+### Settings
+
+The Connections group has two pages, and each connection is listed on exactly one of them, chosen by
+its provider's `kind` (`features/settings/connections/connections.ts`):
+
+- **Services**, page id `integrations`, lists every connection whose provider is not a
+  `model-provider`: GitHub, Linear, Rollbar, the Sentry exporter, and any provider a plugin adds. It
+  keeps the old page id because plugins and notices open it by that id.
+- **AI models**, page id `ai-models`, lists the model-provider keys beside the agent CLIs this machine
+  has, and holds **Generate with**. That pick belongs to this device, not the node, so its row carries
+  its own **This device** chip (§ Model providers).
+
+A connection whose status is `needs-auth` is listed first with an amber dot. Core's attention source
+`core.connectionsNeedAuth` (`features/settings/connections/connectionAttention.ts`) raises a bell row
+for it, targeted at the page that lists it, and that row is what puts the dot beside the page in the
+settings rail. The client refetches the row when the node announces `connection:changed`.
+
+**Manage** opens one connection's page in the same pane, with the settings header's back link. The
+page leads with what is wrong and the button that fixes it: **Replace key** for a provider with typed
+fields, **Turn on** for a connection that is off, **Test** for one that did not answer. A device-flow
+provider such as GitHub has no key to replace, and the node refuses a second connection to a provider
+at its `maxConnections`, so its fix is to disconnect and connect again, and the page says so. Under
+that sit **Name**, **Credentials** (Test and Replace key), an **On** switch, **Where it shows up** for
+a provider that lists projects (§ The map itself), and **Disconnect** in the danger zone, which names
+the cascade before it runs. Replace key is a form with Save and Cancel, and typed fields count as
+unsaved changes.
+
+**Add connection** opens a gallery built from the public descriptors: one card per `connectable`
+provider, saying what it asks for in the labels its fields declare, or "Sign in with a code" for a
+device flow. A provider at its `maxConnections` stays in the gallery marked as connected, and its card
+opens the connection. AI models' **Add a key** shows only the model providers. Picking a card shows its
+fields as a form with Save and Cancel, or the device code, on the same page. The fields, the write, and
+the device-flow pacing are `features/integrations/credentialForm.ts` and `deviceFlow.ts`, which
+first-run onboarding shares.
+
+Search finds a connection by name and opens its page. A workspace's page and a project's
+**Connections** tab draw the project map from their own side, and each connection there links to its
+page.
 
 ### Naming a connection
 
@@ -163,9 +202,11 @@ project in the workspace follows it; name one and only that project's rails do. 
 how the table spells "the whole workspace", because SQLite does not enforce a primary key across a
 nullable column and this key is what stops a link being stored twice.
 
-It is edited from the connection, in Settings → Integrations, not from a workspace at a time: one
-Linear or Rollbar connection usually serves every workspace on the machine, so its whole map reads
-better in one place. `GET` and `PUT /v1/core/integrations/:id/mappings` carry it. The write replaces
+It is edited from the connection, on its page under Settings > Services: one Linear or Rollbar
+connection usually serves every workspace on the machine, so its whole map reads better in one place.
+A workspace's page and a project's Connections tab draw the same map from their side
+(`features/settings/ProjectConnections.tsx`). They list only the links that reach them and add links
+that point only there, and every write still replaces the connection's whole map. `GET` and `PUT /v1/core/integrations/:id/mappings` carry it. The write replaces
 every row that connection owns, across all workspaces, which is what keeps a sibling connection's
 rows out of it without anyone having to merge. `PUT /v1/core/workspaces/:id/external-projects` is the
 same table from the other side, still there for a plugin replacing its own provider's slice.
@@ -274,6 +315,10 @@ the rail draws the item beside the list at `/p/:projectId/x/rollbar/items/:item`
 involved; the task pane is the linked-items view. Payloads are normalized through a strict privacy
 allowlist before persistence or rendering. List, detail, occurrence history, and occurrence detail
 have independent freshness.
+
+Refreshing an open Rollbar item keeps its detail and selected tab visible while the provider answers.
+If the refresh fails, the pane shows the failure above the last loaded detail so the reader can retry
+without losing their place.
 
 The source row spends its narrow width on severity, identity, frequency and the error itself: a
 semantic error/warning/info icon, one fixed-width `#id` field, the numeric occurrence badge, and an
@@ -387,7 +432,7 @@ makes disconnecting stop the export inside one five-second window instead of at 
 
 A **backend** is one thing a Generate control can spend: a model-provider connection this owner has
 stored a key for, or an agent CLI installed on this machine. `ModelBackend` in
-`packages/protocol/src/modelProviders.ts` is the one read model over both, and it is deliberately
+`packages/protocol/src/integrations/modelProviders.ts` is the one read model over both, and it is deliberately
 flat: an id, a kind of `connection` or `harness`, a label, an optional glyph, a model catalog that may
 be empty, a default model id that may be `''`, and a flag for a failed CLI catalog read. A connection's
 auth kind, scopes, account and timestamps do not cross it, because no consumer reads them and a harness
@@ -450,7 +495,7 @@ Claude's catalog is the profile's stable CLI aliases. A harness with an empty se
 **`generateText` dispatches on the prefix.** A `connection:` id goes to `generateTextForConnection`
 in `server/modelProviders/runtime.ts`. A `harness:` id goes to `generateTextForHarness` in
 `server/modelProviders/harnessRuntime.ts`. Both return the same result, whose `backendId` says which
-was spent, and both run behind the same `validateInput` first: a 60-second ceiling, 100,000 system
+was spent, and both run behind the same `validateInput` first: a three-minute ceiling, 100,000 system
 characters, 1,000,000 prompt characters, and 128,000 output tokens. `maxOutputTokens` is validated
 and then ignored for a harness, because neither `claude` nor `codex` has a flag for it, and a bound
 the caller states and the backend cannot honour is still worth refusing when it is absurd.
@@ -485,8 +530,8 @@ including Aider, is unavailable for this path and keeps the deterministic prompt
 which is every profile with a one-shot mode whose command is not on this machine. The refusal above
 is of a generic generate endpoint, an unbudgeted proxy to whatever a caller asked for. This is the
 ids-and-labels projection `/v1/core/integrations` already serves for connections, and its consumers
-are core's own surfaces: the onboarding wizard's step, the Settings section that lists the backends
-and holds the shared default, and the project-settings gate on the AI-SQL schema editor that used to
+are core's own surfaces: the onboarding wizard's step, Settings > AI models, which lists the agent
+CLIs and holds the shared default, and the project-settings gate on the AI-SQL schema editor that used to
 count connections client-side. Nothing but the wizard reads `missing`. A plugin frame keeps the proxy
 route its own plugin serves, because `/v1/core/*` has no bridge scope and minting one would hand
 every installed plugin the whole roster to serve one dropdown.

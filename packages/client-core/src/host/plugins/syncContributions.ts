@@ -3,7 +3,6 @@ import { syncFrameContributions } from '../frames/register'
 import { batch } from 'solid-js'
 
 /**
-/**
  * Both registration passes, in order. They must always run as a pair, since the frames pass draws the
  * rectangles and the chrome pass registers the commands and rail rows that open them, and that pairing
  * used to exist only as a comment beside two call sites.

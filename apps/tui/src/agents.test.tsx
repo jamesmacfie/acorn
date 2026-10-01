@@ -1,6 +1,8 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { describe, expect, it } from 'vitest'
-import { recordedRequests } from './fixture'
+import { tasksKey } from '@acorn/protocol/api.ts'
+import { dispatchLayout } from '@acorn/client-core/features/tasks/tasks.ts'
+import { recordedRequests, TASK } from './fixture'
 import { focusedRenderable } from './keys/regions'
 import { renderFixture } from './harness'
 import { enterDetail, openFirstSession, stopSaying } from './agentsDriving'
@@ -20,6 +22,55 @@ import { enterDetail, openFirstSession, stopSaying } from './agentsDriving'
 const posts = () => recordedRequests().filter((request) => request.method === 'POST').map((request) => request.path)
 
 describe('running an agent from a terminal', () => {
+  it('can activate the completed Codex plan without treating a planning answer as implementation', async () => {
+    process.env.ACORN_FIXTURE_CODEX_PLAN = '1'
+    const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
+    try {
+      await screen.until('Implement plan')
+      let found = false
+      for (let step = 0; step < 12 && !found; step += 1) {
+        found = (await screen.caret()).text.includes('Find why the old passwor')
+        if (!found) await screen.press('TAB')
+      }
+      expect(found, await screen.frame()).toBe(true)
+      await screen.press('RETURN')
+      await enterDetail(screen)
+      const frame = await screen.until('Implement plan')
+      expect(frame).toContain('Update the API')
+      expect(posts()).toEqual([])
+      await stopSaying(screen, 'Implement plan')
+      await screen.press('RETURN')
+      expect(posts()).toEqual(['/v1/p/agents/sessions/session-1/implement-plan'])
+    } finally {
+      screen.done()
+      delete process.env.ACORN_FIXTURE_CODEX_PLAN
+    }
+  }, 180_000)
+
+  it('shows the sessions for the newly opened task', async () => {
+    const other = { ...TASK, id: 'task-2', title: 'other-task', branch: 'other-task', sort: 1 }
+    const screen = await renderFixture({
+      pane: 'agents', width: 120, height: 40,
+      cache: (client) => client.setQueryData(tasksKey, [TASK, other]),
+    })
+    try {
+      expect(await screen.until('Find why the old password still works')).toContain('Agents 1')
+      dispatchLayout(other.id, { type: 'show', pane: 'agents' })
+      await screen.press('ARROW_DOWN')
+      expect((await screen.caret()).text).toContain('other-task')
+      const preview = await screen.frame()
+      expect(preview.split('\n')[0]).toContain('Task to open: other-task')
+      expect(preview).toContain('Find why the old password still works')
+      await screen.press('RETURN')
+      const opened = await screen.until('Agents 0')
+      expect(opened.split('\n')[0]).toContain('Task: other-task')
+      expect(opened).toContain('Agents 0')
+      expect(opened).not.toContain('Find why the old password still works')
+    } finally {
+      screen.done()
+    }
+  }, 180_000)
+
   it('opens a run and sends a turn to it', async () => {
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     try {
@@ -98,7 +149,7 @@ describe('running an agent from a terminal', () => {
   // is a `Menu` with a filter field over provider rows — and inside the header's `Toolbar` its panel
   // used to be laid out in the few cells the trigger was given, so `Claude Code` and `Available`
   // collided into `ClaAv` and a reader could not tell what they were choosing
-  // (../kit/grouping.tsx § ToolbarPanel).
+  // (../kit/grouping/blocks.tsx § Toolbar).
   it('starts a new run from the header, and the provider row is readable', async () => {
     const screen = await renderFixture({ pane: 'agents', width: 120, height: 40 })
     try {
@@ -108,7 +159,7 @@ describe('running an agent from a terminal', () => {
       await screen.press('RETURN')
 
       const open = await screen.frame()
-      expect(open).toContain('Filter providers…')
+      expect(open).toContain('Filter agents…')
       expect(open).toContain('Claude Code')
 
       await stopSaying(screen, 'Claude Code')
@@ -126,10 +177,8 @@ describe('running an agent from a terminal', () => {
     try {
       await openFirstSession(screen)
       await enterDetail(screen)
-      // `[…]`, not the words: an `IconButton` paints its mark on this host (../kit/asking.tsx), and
-      // the brackets are the `outline` variant's, which is what tells the pane's own overflow menu
-      // from the bare `…` on a response card further up the column.
-      await stopSaying(screen, '[…]')
+      // The visible label identifies the action without relying on a Lucide substitute.
+      await stopSaying(screen, '[Session actions]')
       await screen.press('RETURN')
       // `until`, not `frame`: the rows are built from the provider list, which is a resource the pane
       // is still fetching when the menu opens.

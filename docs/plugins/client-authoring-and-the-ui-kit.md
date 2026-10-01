@@ -28,6 +28,12 @@ A tree needs none of this, and that is the point: the host draws the nodes, so t
 style pack and density are already applied and there is nothing to bridge. What follows is the frame
 path only.
 
+One worker may run several trees from the same accepted plugin bundle. The host gives each mount a
+separate bridge context and port: scope, selected item, document access, focus and gesture authority
+belong to that tree. The SDK routes selection and surface actions to the named mount; a tree cannot
+claim another mount's authority by naming its slot. Bundles built against the older single-bridge
+handshake remain usable with one mounted tree per worker.
+
 The shell owns the frame document and links `/ui.css`, a stylesheet assembled at build time from
 the same presentation-only primitive, tabs, picker, modal, copy, diff, and style-pack CSS the shell
 uses. The appearance bridge applies the complete theme, style and invariant token projection to the
@@ -265,7 +271,7 @@ The frame SDK begins with that declared set and `acorn.keys.claim([...])` may na
 It cannot add undeclared keys. `meta+k`, `meta+,`, `meta+1`–`meta+9`, and `escape` are never claimable.
 All other keydowns are forwarded to the shell's one dispatcher, so global and plugin-surface shortcuts
 continue to work while the iframe has focus. Claims are disclosed in the device trust prompt and in
-Settings → Shortcuts.
+Settings → Keyboard shortcuts.
 
 `urlSource` replaces `url` when the start URL is dynamic and must be inside the plugin's own
 `/v1/p/<id>/` namespace; it answers `{ "url": "..." }` and receives task/project ids as query
@@ -367,7 +373,7 @@ There is no callback anywhere in that shape, and that is the design rather than 
 action a concern offers is a route declared once — on the context or in the manifest — where the node
 can confine it to the plugin's own namespace and re-confine it on every dispatch. An action arriving
 inside a response body is an action nothing checked; the same rule
-[extensionPoints.ts](../../packages/protocol/src/extensionPoints.ts) states for why an extension item
+[extensionPoints.ts](../../packages/protocol/src/chrome/extensionPoints.ts) states for why an extension item
 carries no per-item verb.
 
 **What the host binds and a plugin cannot state:** the plugin id on every concern, the qualified id
@@ -482,7 +488,7 @@ silent nothing every unmatched contribution is, and re-enabling redelivers.
 
 **A harness package with no node half still gets a plugin row.** This is the one place the loader
 produces a plugin from a manifest alone (`server/plugins/loader.ts`): a no-op `init`, no storage, and
-everything else a plugin row carries — a line in Settings → Plugins, an owner who can disable it, and
+everything else a plugin row carries — a row in **Settings > Plugins > Installed**, an owner who can disable it, and
 registrations that roll back with the rest. Delivering such a package beside the host instead would
 mean reimplementing all of that. A manifest-only package may not take a built-in's id, because there
 is nothing in it to run in that built-in's place.

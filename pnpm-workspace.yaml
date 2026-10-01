@@ -12,12 +12,25 @@ allowBuilds:
 # instanceof checks. Both are near-impossible to diagnose from the symptom, so pin them here.
 catalog:
   drizzle-orm: "^0.45.2"
-  hono: "^4.12.32"
+  hono: "^4.13.5"
   solid-js: "^1.9.13"
   zod: "^4.4.3"
 overrides:
+  # Runtime entries match package.json overrides, which npm uses for the standalone distribution.
   "@hono/node-server": ">=2.0.11"
   dompurify: ">=3.4.12"
-  fast-uri: ">=3.1.4"
+  fast-uri: "4.1.5"
+  hono: "4.13.5"
+  ip-address: "10.7.1"
+  qs: "6.16.0"
+  # Compatible patched versions for build/test tooling; unaffected release lines keep their versions.
+  "postcss@>=8 <8.5.23": "8.5.23"
+  "nanoid@>=3 <3.3.18": "3.3.18"
+  "browserslist@>=4 <4.28.7": "4.28.7"
+  "baseline-browser-mapping@>=2 <2.11.0": "2.11.0"
+  "undici@>=8 <8.10.2": "8.10.2"
+  # Drizzle Kit still includes the deprecated loader. Only its core-utils copy is remapped;
+  # the 0.18 line has no patch for GHSA-67mh-4wv8-2f99. Config/schema loading is smoke tested.
+  "@esbuild-kit/core-utils>esbuild": "0.25.12"
 patchedDependencies:
   solid-js@1.9.13: patches/solid-js@1.9.13.patch

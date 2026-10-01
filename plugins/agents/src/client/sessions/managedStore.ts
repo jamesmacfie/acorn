@@ -478,16 +478,41 @@ export const managedAgentStore = {
    *
    * Two surfaces open a session now — the pane's New picker and the palette's "New agent session" —
    * and neither may be the one that knows what a create looks like. The provider is named by its two
-   * ids rather than by its descriptor, because the palette only carries a picked row.
+   * ids rather than by its descriptor, because the palette only carries a picked row. A custom agent
+   * is named by id alone: the node reads it and applies what it keeps.
    */
-  async startSession(taskId: string, provider: { id: string; profileId: string }): Promise<AgentSession> {
+  async startSession(
+    taskId: string,
+    provider: { id: string; profileId: string },
+    customAgentId?: string,
+  ): Promise<AgentSession> {
     const session = await managedAgentApi.createSession({
       taskId,
       providerId: provider.id,
       profileId: provider.profileId,
       kind: 'interactive',
+      ...(customAgentId ? { customAgentId } : {}),
       config: {},
     })
+    upsertSession(session)
+    return session
+  },
+  async startInlineSession(
+    taskId: string,
+    provider: { id: string; profileId: string },
+    origin: import('../../contract/inlineDiff.ts').InlineDiffOrigin,
+    requestedConfigOptions: Record<string, string>,
+    idempotencyKey: string,
+  ): Promise<AgentSession> {
+    const session = await managedAgentApi.createSession({
+      taskId,
+      providerId: provider.id,
+      profileId: provider.profileId,
+      kind: 'interactive',
+      origin,
+      title: `Ask about ${origin.path}:${origin.line}`,
+      config: { requestedConfigOptions },
+    }, idempotencyKey)
     upsertSession(session)
     return session
   },
@@ -547,10 +572,11 @@ export const managedAgentStore = {
    * Read a session from the node and merge it into the store.
    *
    * A session the store already holds is read on from where its events are whole
-   * (`completeThrough`), not from the start. The ledger only appends, so every row below that mark
-   * is one the store has already, and reading them again was the whole cost of switching back to a
-   * task: 2.9 MB for a 4,000-event session, 11.7 MB and about four seconds of paging for a 16,000-event
-   * one. The turns, the requests and the row still come back whole, because they change in ways no
+   * (`completeThrough`), not from the start. The ledger appends, and when it drops a tool call's
+   * superseded row the call's new state lands past every mark (server/sessions/ledgerFold.ts). So
+   * every row below the mark is one the store has already, and reading them again was the whole cost
+   * of switching back to a task: 2.9 MB for a 4,000-event session, 11.7 MB and about four seconds of
+   * paging for a 16,000-event one. The turns, the requests and the row still come back whole, because they change in ways no
    * frame reports: a turn queued from another window, a request expired by a stop. So this answers
    * what a full read would, for the size of the turns and requests plus whatever the socket missed.
    */

@@ -8,6 +8,7 @@ type Outputs = {
   send(frame: WsServerFrame, viewerId?: string | null): void
   stream(viewer: EventViewer, id: string, message: Parameters<StreamSink>[0]): void
   release(id: string): void
+  invoke(action: () => unknown): void
 }
 
 export const isTaskConfinedWs = (parent: { internal?: InternalClaims }): boolean => !!parent.internal && parent.internal.scope !== 'service'
@@ -16,16 +17,16 @@ export const isTaskConfinedWs = (parent: { internal?: InternalClaims }): boolean
 export function createWsViewerDispatch(parent: Parent, streams: () => StreamHandlers | null, channels: ReadonlyMap<string, WsChannelHandler>, output: Outputs) {
   const retire = (owner: EventViewer) => {
     for (const [id, sink] of owner.sinks) {
-      streams()?.detach(id, sink)
       owner.sinks.delete(id)
+      output.invoke(() => streams()?.detach(id, sink))
       if (!parent.viewers.hasStream(id)) output.release(id)
     }
-    for (const handler of channels.values()) handler.onDisconnect(owner)
+    for (const handler of channels.values()) output.invoke(() => handler.onDisconnect(owner))
   }
 
   return {
     close: () => parent.viewers.clear(retire),
-    receive(raw: string): void {
+    receive(raw: string): unknown {
       let parsed: unknown
       try { parsed = JSON.parse(raw) } catch { return }
       const envelope = wsFrameSchema.safeParse(parsed)
@@ -58,24 +59,24 @@ export function createWsViewerDispatch(parent: Parent, streams: () => StreamHand
         // The viewer carries no claims. Read the physical parent's claims on every dispatch.
         if (isTaskConfinedWs(parent) && (!parent.internal?.taskId || handlers.streamTaskId(id) !== parent.internal.taskId)) return
         if (frame.channel === 'term:input') {
-          if (typeof data === 'string') handlers.input(id, data)
+          if (typeof data === 'string') return handlers.input(id, data)
         } else if (frame.channel === 'term:attach') {
           if (owner.sinks.has(id)) return
           const sink: StreamSink = (message) => output.stream(owner, id, message)
           owner.sinks.set(id, sink)
-          handlers.attach(id, sink, typeof cols === 'number' && typeof rows === 'number' ? { cols, rows } : undefined)
+          return handlers.attach(id, sink, typeof cols === 'number' && typeof rows === 'number' ? { cols, rows } : undefined)
         } else if (frame.channel === 'term:detach') {
           const sink = owner.sinks.get(id)
           if (sink) {
-            handlers.detach(id, sink)
             owner.sinks.delete(id)
             if (!parent.viewers.hasStream(id)) output.release(id)
+            return handlers.detach(id, sink)
           }
         }
         return
       }
       if (isTaskConfinedWs(parent)) return
-      channels.get(frame.channel.split(':', 1)[0])?.onFrame(frame, (reply) => { if (owner.active) output.send(reply, owner.id) }, owner)
+      return channels.get(frame.channel.split(':', 1)[0])?.onFrame(frame, (reply) => { if (owner.active) output.send(reply, owner.id) }, owner)
     },
   }
 }

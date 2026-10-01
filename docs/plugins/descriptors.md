@@ -2,6 +2,11 @@
 
 [Back to plugins](../plugins.md)
 
+The public manifest schema is `@acorn/protocol/plugin/contract.ts`. Its private `manifest/` modules
+group surface, chrome, command, extension, display, and Node runtime descriptors. The Node's
+`packages/node-core/src/server/plugins/manifest.ts` applies rules that need the plugin id or compare sibling contributions.
+Clients use the wire types from `contract.ts` and recheck values received in roster rows.
+
 ## Descriptors
 
 A rail source, a badge in the task footer or the topbar, commands and keybindings, attention items,
@@ -19,7 +24,7 @@ partial-failure reporting. A source may declare `projectScoped`, which says its 
 the shell's project: the host then appends `?project=` to that route, keys the cache by it, and
 offers the topbar project picker while the source is on screen. It is opt in, so a manifest written
 before the field and a plugin that never thought about projects both get one shared list instead of
-an identical one refetched per project (docs/frontend.md § the router is registry-driven). A source may also declare an `emptyState` — one bounded message and at most
+an identical one refetched per project (docs/frontend.md § the router is registry-driven). A source may declare `showInRailByDefault: false` to start with no desktop rail icon. It is a default, not a gate: the source still registers, the palette offers **Open <label>** for it, and the user's **Show in left rail** switch under Settings > Plugins overrides it (docs/frontend.md § Registries and plugins). A source may also declare an `emptyState` — one bounded message and at most
 one context-free action — shown when its route answered with *no items*, in place of the host's fixed
 "Nothing here yet.". Not when the fetch failed: an unreachable node already has its own banner, and
 telling someone "nothing is assigned to you" because a request timed out is a claim the host has no
@@ -290,10 +295,17 @@ which means a batch costs its own ops rather than the tree it is applied to — 
 5,000-node cap is 71 ms rather than the 1.1 seconds the earlier scan-every-node walk took
 (measured 2026-09-03).
 
-**Eleven events, host to sandbox**: `onPress`, `onChange` (the committed value), `onSubmit`,
-`onSelect`, `onActivate`, `onToggle`, `onOpenChange`, `onExpand`, `onDismiss`, `onPick`, `onRemove`.
+After simulating all operations, the host walks the final projected tree once to check every node's
+depth, including descendants of moved subtrees. Unknown nodes and cycles refuse the whole batch.
+Ancestor checks stop at the depth cap. A batch may temporarily deepen descendants before moving or
+removing them again, because rendering sees only its validated final state. Subtree deletion uses an
+iterative walk, so cleanup does not recurse through a temporary deep tree.
+
+**Twelve events, host to sandbox**: `onPress`, `onChange` (the committed value), `onSubmit`,
+`onSelect`, `onActivate`, `onToggle`, `onOpenChange`, `onExpand`, `onDismiss`, `onPick`, `onRemove`,
+`onConfirm`.
 Never a key and never a pointer event, because a terminal host has neither and has to be able to map
-its own keys onto these eleven names. A prop whose name is in the list carries a handler id; a prop
+its own keys onto these twelve names. A prop whose name is in the list carries a handler id; a prop
 whose name starts with `on` and is not in the list is dropped.
 
 **Lifecycle** is `tree:mount(slot, entry, props)` and `tree:unmount(slot)` from host to sandbox, with
@@ -310,43 +322,59 @@ sandbox's own sequence and the host only quotes it back, exactly as the bridge's
 rung up. A payload or a reply body over 64 KiB is refused, eight may be outstanding per slot, and an
 owner has ten seconds to answer. The failure arm is a code and a sentence, never a host stack.
 
-Owner requests use the tree channel because their authority is the mounted contribution's owner
-contract. The host validates the slot generation before admission and publication. A retired slot's
-held result cannot reach another slot that reused its id.
+This request rides the tree channel because its slot is the host's authority for the extension point.
+The host binds the request to the channel and slot that mounted it; plugin code supplies no authority
+identifier. Other SDK calls use a separate bridge port and context for each mounted tree, so two trees
+sharing one worker do not share document, scope, focus, or gesture authority. Selection and surface
+actions target a slot; appearance updates reach every live slot. An older SDK without the per-tree
+bridge handshake may mount only one tree in a worker.
+The host validates the slot generation before admission and publication. A retired slot's held
+result cannot reach another slot that reused its id.
 
 **Every message is validated**, because the host is the only thing between a stranger's code and the
 shell's DOM:
 
 - `type` has to be a node this build knows and can draw on this host. Anything else is omitted, so an
   optional contribution cannot replace its owner's UI with an error.
-- A prop value is a handler id or plain JSON, depth-bounded. `class`, `className`, `style` and
-  `classList` are refused outright, a role prop carrying a raw colour is refused, and a function can
-  never cross because a function is not JSON. A failing prop is dropped, the node still renders, and
-  the row says which prop.
-- Text is set as text. `Markdown` goes through the shell's own markdown policy. A `Button` carries a
-  handler id, never a URL or a command id; navigation is `bridge.ui.openUrl`, held to the same rules
-  as a frame's.
+- A prop value is a handler id or plain JSON, bounded to 16 levels, 10,000 values and 1 MiB of
+  characters. `class`, `className`, `style`, `classList` and nested host handles such as `item` and
+  `drag` are refused outright. A role prop carrying a raw colour is refused, and a function cannot
+  cross because it is not JSON. A failing prop is dropped, the node still renders, and the row says
+  which prop.
+- Text is set as text. `Markdown` goes through the shell's own markdown policy. A tree may put only an
+  explicit HTTPS URL in an `href` prop; the kit validates every rendered anchor again. Programmatic
+  navigation uses `bridge.ui.openUrl` under the same focus and URL policy as a frame.
 - **Caps**, in `TREE_LIMITS`: 1 MiB and 4,000 mutations per batch, 5,000 live nodes and 64 levels of
   depth per tree, 65,536 characters in one text node, 512 live or reserved tree slots per bundle, across its authority contexts. The byte cap is sized like
   the state channel's 1 MiB per value: generous for anything honest, small enough that a bundle cannot
-  use the renderer as a memory bomb. Past a cap the batch is dropped and recorded.
-- **Rate**: batches are coalesced per frame on the host side. A sandbox that floods is throttled, not
-  trusted.
+  use the renderer as a memory bomb. The host checks message depth and size before recursive parsing
+  and measures batch bytes itself instead of trusting the sandbox's `bytes` field. Past a cap the batch
+  is dropped and recorded.
+- **Pending updates**: the host checks the combined queue before appending each incoming batch.
+  The queue has the same 4,000-mutation and 1 MiB limits, measured as UTF-8 JSON bytes. Overflow clears
+  the whole queue, cancels its scheduled flush, records one refusal, and fails that mounted tree.
+  Later updates to that mount are ignored. Remount the tree to establish a fresh state agreement.
+  Disposal also clears the queue, and callbacks already in delivery cannot apply updates afterward.
+- **Scheduling**: batches coalesce per animation frame on the desktop and per timer turn in the
+  terminal. A hidden desktop window flushes on a zero-delay timer. A visible window also has a
+  100 ms timer fallback if its animation frame stalls.
 
 The version travels in the handshake (`TREE_PROTOCOL_VERSION`), and a mismatch leaves the contribution
 empty rather than crashing the host. `packages/protocol/src/tree/nodes.ts` carries the node names, the
-eleven events and the role enums as plain constants with no Zod on them, because that file is bundled
+twelve events and the role enums as plain constants with no Zod on them, because that file is bundled
 into a stranger's
 plugin; `messages.ts` holds the schemas the host parses with. The lists are duplicated from
 client-core's kit, which owns them, and a test over there fails the moment the two disagree.
 
-The sandbox itself, including shared modern workers and authority-affine legacy workers, what it has and what it does not, and what happens
-when it throws — is `docs/shell.md § The plugin worker`.
+The sandbox includes one shared modern worker per accepted `(pluginId, hash)` and separate
+slot-affine legacy workers. Its environment, refusals, and failure behavior are described in
+`docs/shell.md § The plugin worker`.
 
 ### Mounted bridge ownership and SDK compatibility
 
-The additive `treeSlotBridge: 1` capability keeps the bridge and tree protocol versions unchanged.
-A capable SDK receives a bridge port on each initial `tree:mount`, and `TreeRender(bridge, mount)`
+The additive `treeSlotBridge: 1` and scoped-bridge handshakes keep the bridge and tree protocol
+versions unchanged. A capable SDK receives a bridge port on each initial `tree:mount`, and
+`TreeRender(bridge, mount)`
 receives that slot's bridge. Props updates reuse its port. Unmount removes subscriptions and pending
 requests, rejects held requests with `unmounted`, closes the port, and releases the remote root.
 Handler dispatch retains only callbacks referenced by nodes attached to that root.
@@ -359,26 +387,26 @@ not the authority of a subsequently mounted slot.
 | SDK and host | Bridge ownership |
 | --- | --- |
 | Capable SDK and capable host | One bundle worker, one privileged bridge per mounted slot. |
-| Legacy SDK and capable host | One worker per equivalent immutable authority context. |
+| Legacy SDK and capable host | One immutable, slot-affine worker per mounted tree. |
 | Capable SDK and legacy host | Usable global bridge with `treeBridgeMode: 'legacy'` and a warning; the host's first-context limitations remain. |
 | Legacy SDK and legacy host | The host's global first-context behavior remains. |
 
-A legacy SDK cannot replace its module-global bridge. The host therefore shares only equivalent
-plugin/hash, QueryClient, Node, surface/target, task/project, effective permissions, structural document
-grant, and immutable opening item. Focus is the union of its live equivalent leases. Retiring the
-first lease removes that lease's focus closure; a surviving equivalent lease retains its context.
-The last lease terminates the worker immediately, with no idle legacy worker.
+A legacy SDK cannot replace its module-global bridge or prove which equivalent tree produced an
+API request or trusted gesture. Each legacy worker therefore mounts one tree under immutable
+plugin/hash, QueryClient, Node, surface/target, task/project, permissions, document grant, and opening
+item authority. Equivalent concurrent trees use separate workers; their focus and gesture contexts
+never combine. The last lease terminates its worker immediately, with no idle legacy worker.
 
 Classification promotes the same detection worker on the legacy `connected` acknowledgement or its
-first bridge API request. Awaited top-level legacy API work executes once per admitted context.
+first bridge API request. Awaited top-level legacy API work executes once per admitted slot-affine worker.
 A retired detection authority is terminated before a replacement uses surviving metadata; it is never
 rebound to another document or Node. Modern workers retain warm modules for 30 seconds, with at most
-16 idle bundle workers. Historical capability hints are capped at 256 hashes. Eviction does not affect
-live workers, and a live exact legacy context takes precedence over a missing hint.
+16 idle bundle workers. Historical capability hints are capped at 256 plugin/hash identities. Eviction does not affect
+live workers, and a live exact identity takes precedence over a missing hint.
 
-The bundle budget admits at most 512 live or reserved slots. Modern slots share one worker. In the
-worst legacy case, 512 distinct contexts need 512 workers; this fallback preserves compatibility and
-provides no legacy memory gain. A detector occupies an admitted lease, rather than adding an
+Each plugin/hash identity admits at most 512 live or reserved slots. Modern slots share one worker. Up to
+512 legacy trees need 512 workers, including equivalent contexts. This stricter per-tree authority
+policy preserves compatibility at additional process cost and provides no legacy memory gain. A detector occupies an admitted lease, rather than adding an
 unbounded extra pool. The terminal factory owns native termination settlement before constructing a
 same-hash replacement, while preserving live foreign contexts.
 
@@ -406,16 +434,14 @@ updates only one of them, and `tsc` stays quiet because each copy is locally con
 `packages/client-core/src/host/plugins/contributions.ts` now owns that shared half; the passes keep their
 own job, rendering a sandboxed iframe versus registering a command.
 
-`eligiblePlugins()` returns one row per plugin id, and each row's `hash` and `trusted` come from the
-same place: the bundle that **won fleet resolution**, not the first one a roster happened to list. In a
-mixed-version fleet, node A might offer v1 while node B's v2 wins; taking the manifest from one row and
-the hash from another would register contributions declared by bytes nobody accepted. A package with no
-client half anywhere in the fleet never enters resolution, so it falls back to the first row seen; such
-a package contributes only descriptors and host-drawn surfaces, whose behaviour does not depend on which
-node described them. `trusted` is true only when the device has accepted the exact bytes that won
-resolution, never the row's own claimed hash: a candidate dropped at resolution can still carry a
-`client.hash` in its roster row, and honoring that would let an acceptance recorded against an older,
-runnable build clear a bundle this device has already decided not to run.
+`eligiblePlugins()` reads the active Node's observation and pairs its running declaration with that
+Node's selected hash. An installed update on the same Node, or a newer version on a different Node,
+does not change those registrations. `trusted` is true only when custody has cached and accepted the
+exact client bytes matching the active runtime. A declaration with no client half can still contribute
+host-drawn descriptors. Command and keybinding metadata may remain visible for an inactive plugin so
+saved bindings are explainable, but invocation checks current availability. A stale or unreachable
+observation supplies no live contribution. The snapshot and its per-Node availability selector own
+the reasons a loaded contribution is withheld.
 
 Frames and chrome ask different-strength questions of the same row. Frames gate code-bearing surfaces
 on `trusted` outright. Chrome asks the weaker `hasWithheldCode`: does this package carry code the device

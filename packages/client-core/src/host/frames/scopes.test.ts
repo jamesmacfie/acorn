@@ -73,12 +73,16 @@ describe('the route table covers every core route', () => {
     // The blunt sweep: whatever the table says, no scope may reach any of these paths with anything.
     const forbidden = [
       api.coreSecurityRoute,
+      api.coreStorageRoute,
       api.coreAuditRoute,
       api.coreBackupRoute,
+      api.corePairStartRoute,
+      api.corePairRoute,
       api.coreDevicesRoute,
       api.coreDeviceRoute(ID),
       api.corePluginsRoute,
       api.corePluginBundleRoute(ID),
+      api.corePluginBundleByHashRoute(ID, 'a'.repeat(64)),
       api.corePluginInstallRoute,
       api.corePluginUpdateRoute(ID),
       api.corePluginReloadRoute(ID),
@@ -97,8 +101,8 @@ describe('the route table covers every core route', () => {
       api.repoConfigTrustRoute(ID),
       api.taskPreviewUrlRoute(ID),
       api.taskOnCreatedRoute(ID),
-      api.taskMcpRoute(ID),
-      api.taskMcpStarterRoute(ID),
+      api.projectMcpRoute(ID),
+      api.projectMcpStarterRoute(ID),
       api.projectRunTargetsRoute(ID),
       api.workspaceBootstrapRoute,
       api.integrationsRoute,
@@ -181,9 +185,10 @@ describe('scope checking', () => {
     expect(allowApi(board, 'DELETE', api.taskLinksRoute(ID)).allowed).toBe(false)
   })
 
-  it('does not let a read on the task collection leak the task’s MCP or preview credentials', () => {
-    // The reason the table names paths instead of globbing `/v1/core/tasks*`.
-    expect(allowApi(board, 'GET', api.taskMcpStarterRoute(ID)).allowed).toBe(false)
+  it('does not let a read on the task or project collection leak MCP config or preview credentials', () => {
+    // The reason the table names paths instead of globbing `/v1/core/tasks*` or `/v1/core/projects*`.
+    const projectReader = { pluginId: 'board', api: ['core.projects:read'] }
+    expect(allowApi(projectReader, 'GET', api.projectMcpRoute(ID)).allowed).toBe(false)
     expect(allowApi(board, 'GET', api.taskPreviewUrlRoute(ID)).allowed).toBe(false)
   })
 
@@ -198,6 +203,11 @@ describe('plugin namespaces', () => {
   it('always allows the plugin’s own routes, with no scope declared', () => {
     expect(allowApi(board, 'GET', '/v1/p/board/cards').allowed).toBe(true)
     expect(allowApi(board, 'POST', '/v1/p/board').allowed).toBe(true)
+  })
+
+  it('preserves query strings and encoded opaque ids on an allowed route', () => {
+    const path = '/v1/p/board/cards/a%20b%25?q=%2e%2e'
+    expect(allowApi(board, 'GET', path)).toEqual({ allowed: true, path })
   })
 
   it('denies another plugin’s namespace', () => {
@@ -221,6 +231,30 @@ describe('malformed paths', () => {
 
   it('rejects traversal', () => {
     expect(allowApi(board, 'GET', '/v1/core/tasks/../security').allowed).toBe(false)
+  })
+
+  it('rejects paths whose route changes when custody constructs its URL', () => {
+    const preview = '/v1/core/tasks/task-1/preview-url'
+    for (const path of [
+      `/v1/p/board/%2e%2e/%2e%2e/core/tasks/task-1/preview-url`,
+      `/v1/p/board/.%2e/.%2e/core/tasks/task-1/preview-url`,
+      `/v1/p/board/../../core/tasks/task-1/preview-url`,
+      `/v1/p/board\\..\\..\\core\\tasks\\task-1\\preview-url`,
+    ]) {
+      expect(new URL(path, 'https://node.invalid').pathname).toBe(preview)
+      expect(allowApi(board, 'POST', path).allowed).toBe(false)
+    }
+  })
+
+  it('rejects encoded separators, nested traversal and URL fragments', () => {
+    for (const path of [
+      '/v1/p/board/cards/a%2fb',
+      '/v1/p/board/cards/a%5cb',
+      '/v1/p/board/%252e%252e/%252e%252e/core/tasks/task-1/preview-url',
+      '/v1/p/board/cards#fragment',
+    ]) {
+      expect(allowApi(board, 'GET', path).allowed).toBe(false)
+    }
   })
 
   it('rejects a method it does not know', () => {

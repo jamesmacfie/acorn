@@ -2,7 +2,7 @@ import { createResource, createSignal, Show } from 'solid-js'
 import { saveFile } from '@acorn/plugin-api/client'
 import { Button, Card, Icon, Markdown, Modal, Stack, Text } from '@acorn/plugin-api/ui'
 import { managedAgentApi } from './managedClient'
-import { dataUrl, imageAlt, isInlineImageType } from './inlineImage'
+import { dataUrl, imageAlt, isInlineImageType, MAX_INLINE_IMAGE_BYTES } from './inlineImage'
 
 // One attachment the reader sent, as the thing itself rather than as its id.
 //
@@ -34,8 +34,8 @@ export default function AgentAttachmentCard(props: { attachmentId: string }) {
   const [loaded] = createResource(() => props.attachmentId, async (attachmentId) => {
     const attachment = await managedAgentApi.attachment(attachmentId).catch(() => null)
     if (!attachment) return null
-    if (!isInlineImageType(attachment.mediaType)) return { attachment, source: null }
-    const content = await managedAgentApi.attachmentContent(attachmentId).catch(() => null)
+    if (!isInlineImageType(attachment.mediaType) || attachment.byteSize > MAX_INLINE_IMAGE_BYTES) return { attachment, source: null }
+    const content = await managedAgentApi.attachmentPreview(attachmentId).catch(() => null)
     return { attachment, source: content ? await dataUrl(content.bytes, content.type) : null }
   })
 

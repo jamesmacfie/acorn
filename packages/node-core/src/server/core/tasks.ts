@@ -1,19 +1,19 @@
 // The task read seam (CoreServices.tasks). Plugins hold task ids and ask core to resolve them here,
 // so database handles stay private to their owning layer.
-import { and, eq, isNull, max, or, sql } from 'drizzle-orm'
+import { and, eq, isNull, lt, max, or, sql } from 'drizzle-orm'
 import { randomUUID } from 'node:crypto'
 import { dedupeBranch, slugifyBranch } from '@acorn/protocol/branch.ts'
 import type { LayoutRecipe, RunTarget } from '../runConfig'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import { broadcastTasksChanged, broadcastWorktreeStatusChanged } from '../notify'
-import { loadTask, projectForTask, resolveTaskCwd, TASK_REF_COLUMNS, taskRoot, taskRunConfig, toTaskRef, workspaceIdFor, type TaskRef } from '../worktrees/taskWorktree'
+import { loadTask, projectForTask, requireTaskRoot, resolveTaskCwd, TASK_REF_COLUMNS, taskRoot, taskRunConfig, toTaskRef, workspaceIdFor, type TaskRef } from '../worktrees/taskWorktree'
 import { getProject, normalizeGithubPart } from '../projects'
 
 // What `taskRunConfig` answers: the merged run-target config plus the cwd to run it in. Named,
 // because it is a CoreServices return value rather than an internal helper's.
 export type TaskRunConfig =
-  | { targets: RunTarget[]; cwd: string; errors: { source: string; message: string }[]; layouts: LayoutRecipe[]; repoTargetIds: string[] }
+  | { targets: RunTarget[]; cwd: string; errors: { source: string; message: string }[]; layouts: LayoutRecipe[]; repoTargetIds: string[]; repoConfigHash: string | null }
   | { error: string }
 
 // The three columns a `task_links` row is read for outside core: which provider, through which
@@ -54,6 +54,9 @@ export type TaskService = {
   // The task's worktree root, resolving through the project checkout and creating the worktree
   // lazily if needed. null when no checkout is mapped, the task is archiving, or it is not active.
   root(taskId: string): Promise<string | null>
+  // A root for execution. Missing mappings and worktree failures throw distinct errors instead of
+  // collapsing to null, which is reserved for read-only panes that can show an empty state.
+  requireRoot(taskId: string): Promise<string>
   // The cwd a task's commands run in, creating the worktree on first use
   // (docs/workspaces-and-tasks.md § Worktrees and setup). Takes the row rather than the id, because
   // the one caller already loaded it and re-reading would be a second query across a database
@@ -114,6 +117,12 @@ export type TaskService = {
 export type CompiledTaskService = TaskService & {
   /** Replay-safe root creation for internal orchestrators such as approved workflow schedules. */
   createRoot(projectId: string, seed: RootTaskSeed, intendedTaskId: string): Promise<string>
+  // Every task archived before `before`, a millisecond timestamp. plugins/agents reads it to remove the
+  // agent history of tasks archived longer than the owner keeps it (docs/data-layer.md § Retention).
+  // Only tasks still archived: a restore clears `archivedAt`, so a restored task is never in the list.
+  // First-party only, because deleting on a task's archive date is a retention policy and no loaded
+  // plugin has one. plugins/permissions.ts § scopeCore strips it from the loaded tier's facet.
+  archivedBefore(before: number): Promise<string[]>
 }
 
 export function createTaskService(db: AppDatabase): CompiledTaskService {
@@ -152,6 +161,13 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
       }
       return intendedTaskId
     },
+    archivedBefore: async (before) => {
+      const rows = await db
+        .select({ id: schema.tasks.id })
+        .from(schema.tasks)
+        .where(and(eq(schema.tasks.status, 'archived'), lt(schema.tasks.archivedAt, before)))
+      return rows.map((row) => row.id)
+    },
     adoptPullNumbers: async (repoOwner, repoName, branchToPull) => {
       if (!branchToPull.size) return 0
       const candidates = await db
@@ -188,6 +204,7 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
       return row && toTaskRef(row)
     },
     root: (taskId) => taskRoot(db, taskId),
+    requireRoot: (taskId) => requireTaskRoot(db, taskId),
     resolveCwd: (task, baseCheckout) => resolveTaskCwd(db, task, baseCheckout),
     runConfig: (taskId) => taskRunConfig(db, taskId),
     active: () => db.select(TASK_REF_COLUMNS).from(schema.tasks).where(eq(schema.tasks.status, 'active')),

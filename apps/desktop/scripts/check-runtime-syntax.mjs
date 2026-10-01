@@ -4,11 +4,12 @@ import { extname, join, resolve } from 'node:path'
 
 // The generated host-side bundles, parsed by the runtime that will load them: the desktop helper,
 // which runs under the bundled Node, and the bridge the shell injects into the webview.
-const roots = ['dist/helper', 'dist/bridge'].map((dir) => resolve(import.meta.dirname, '..', dir))
+const roots = ['dist/helper', 'dist/bridge', 'dist/cli'].map((dir) => resolve(import.meta.dirname, '..', dir))
 
 async function javascriptFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true })
   const nested = await Promise.all(entries.map(async (entry) => {
+    if (entry.name === 'node_modules') return []
     const path = join(directory, entry.name)
     return entry.isDirectory() ? javascriptFiles(path) : [path]
   }))

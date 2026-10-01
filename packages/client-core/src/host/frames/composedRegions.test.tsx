@@ -7,6 +7,7 @@ import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PLUGIN_API_MAJOR, type NodePluginRow } from '@acorn/protocol/api.ts'
 import type { DocumentHandle } from '../../features/editor/documentModel'
+import type { DocumentSurfaceProps } from './documentSurface'
 
 // What a composed pane hands each of its regions.
 //
@@ -40,11 +41,11 @@ vi.mock('../../features/editor/DocumentSurface', () => ({
     return <span>editor</span>
   },
 }))
-
 const { paneRegistry } = await import('../registries/panes/panes')
 const { _resetPluginDistribution, _seedPluginDistribution } = await import('../plugins/distribution')
 const { setActiveNode } = await import('../../infra/node/activeNode')
 const { syncFrameContributions, _resetFrameContributions } = await import('./register')
+const { setDocumentSurface, _resetDocumentSurface } = await import('./documentSurface')
 
 const HASH = 'a'.repeat(64)
 
@@ -84,6 +85,11 @@ describe('a composed pane’s remote region', () => {
     remoteProps.length = 0
     editorOrigins.length = 0
     documentHandle = null
+    setDocumentSurface((props: DocumentSurfaceProps) => {
+      editorOrigins.push(props.nodeId)
+      documentHandle = props.onHandle ?? null
+      return <span>editor</span>
+    })
     setActiveNode('node-a')
     // The trust gate is the frame pass's, not the chrome pass's: a pane mounts bytes, so the device
     // has to have accepted this exact hash before anything registers.
@@ -92,6 +98,7 @@ describe('a composed pane’s remote region', () => {
   })
 
   afterEach(() => {
+    _resetDocumentSurface()
     _resetFrameContributions()
     _resetPluginDistribution()
     setActiveNode(null)

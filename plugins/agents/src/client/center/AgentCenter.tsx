@@ -14,7 +14,7 @@ import { openManagedSession, selectManagedSession } from '../sessions/managedSel
 import { workflowRunOf } from './workflowRun'
 import type { AgentSession } from '../../contract/wire.ts'
 import {
-  Alert, Card, Chip, DetailColumn, EmptyState, Facts, Heading, Icon, Inline, Input, ListDetail, Row,
+  Alert, Card, Chip, DetailColumn, EmptyState, Heading, Icon, Inline, Input, ListDetail, Row,
   Rows, SegmentedControl, Select, Stack, StatusDot, Text,
 } from '@acorn/plugin-api/ui'
 import RuntimeStateIcon from '../sessions/RuntimeStateIcon'
@@ -216,21 +216,26 @@ export default function AgentCenter() {
     <ListDetail>
       <DetailColumn scroll>
         <Stack gap="section">
-          <Inline wrap>
+          <Inline wrap gap="section">
             <Heading level={1} eyebrow={fleetScope() ? 'Fleet' : 'Workspace'}>Agent Center</Heading>
-            <Facts
-              items={[
-                { label: 'active', value: String(sourceSessions().filter((session) => isActiveAgent(session)).length) },
-                { label: 'need you', value: String(sourceSessions().filter((session) => needsAttention(session)).length) },
-                { label: 'sessions', value: String(sourceSessions().length) },
-              ]}
-            />
+            <Inline wrap gap="section">
+              <Stack gap="none">
+                <Text emphasis="eyebrow">active</Text>
+                <Text>{sourceSessions().filter((session) => isActiveAgent(session)).length}</Text>
+              </Stack>
+              <Stack gap="none">
+                <Text emphasis="eyebrow">need you</Text>
+                <Text>{sourceSessions().filter((session) => needsAttention(session)).length}</Text>
+              </Stack>
+              <Stack gap="none">
+                <Text emphasis="eyebrow">sessions</Text>
+                <Text>{sourceSessions().length}</Text>
+              </Stack>
+            </Inline>
           </Inline>
-          <Text emphasis="muted" wrap>
-            {fleetScope()
-              ? 'Managed sessions across every paired node. Remote rows refresh on load rather than live.'
-              : 'Managed Claude Code and Codex sessions across this workspace’s tasks and worktrees.'}
-          </Text>
+          <Show when={fleetScope()}>
+            <Text emphasis="muted" wrap>Managed sessions across every paired node. Remote rows refresh on load rather than live.</Text>
+          </Show>
 
           <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
 
@@ -242,16 +247,13 @@ export default function AgentCenter() {
           <Inline wrap>
             <For each={providers() ?? []}>
               {(provider) => (
-                <Card pad="sm">
+                <Card pad="sm" fit>
                   <Inline>
                     <StatusDot
                       tone={providerTone(provider.installed ? provider.authenticated === false ? 'error' : 'ok' : 'missing')}
                       label={provider.installed ? provider.authenticated === false ? 'Authentication required' : 'Available' : 'Not installed'}
                     />
-                    <Stack gap="none">
-                      <Text emphasis="strong">{provider.label}</Text>
-                      <Text emphasis="muted">{provider.executableVersion ?? provider.driverVersion}</Text>
-                    </Stack>
+                    <Text emphasis="strong">{provider.label}</Text>
                   </Inline>
                 </Card>
               )}
@@ -283,7 +285,6 @@ export default function AgentCenter() {
             <Show when={nodes().length > 1}>
               <SegmentedControl
                 ariaLabel="Scope"
-                size="sm"
                 value={scope()}
                 onChange={setScope}
                 options={[
@@ -294,7 +295,6 @@ export default function AgentCenter() {
             </Show>
             <SegmentedControl
               ariaLabel="Session state"
-              size="sm"
               value={stateFilter()}
               onChange={setStateFilter}
               options={(fleetScope()

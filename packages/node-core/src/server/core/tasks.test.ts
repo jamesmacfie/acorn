@@ -182,6 +182,33 @@ describe('createRoot replay identity', () => {
   })
 })
 
+describe('archivedBefore', () => {
+  let t: TestDb
+
+  beforeEach(async () => {
+    t = makeTestDb()
+  })
+  afterEach(() => t.cleanup())
+
+  it('names only tasks still archived, and only those archived before the cutoff', async () => {
+    const day = 86_400_000
+    const task = (id: string, status: string, archivedAt: number | null, sort: number) => ({
+      id, title: id, projectId: 'project', branch: id, worktreePath: null, pullNumber: null, status, parentId: null,
+      sort, origin: 'local', icon: null, createdAt: now, updatedAt: now, archivedAt,
+    })
+    await t.db.insert(schema.tasks).values([
+      task('old', 'archived', now - 100 * day, 0),
+      task('recent', 'archived', now - 10 * day, 1),
+      task('active', 'active', null, 2),
+      // A cancelled child keeps no archive date, and cancelling is not archiving.
+      task('cancelled', 'cancelled', null, 3),
+    ])
+    const tasks = createTaskService(t.db)
+    expect(await tasks.archivedBefore(now - 30 * day)).toEqual(['old'])
+    expect((await tasks.archivedBefore(now)).sort()).toEqual(['old', 'recent'])
+  })
+})
+
 describe('adoptPullNumbers project matching', () => {
   let t: TestDb
 

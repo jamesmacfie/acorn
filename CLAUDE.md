@@ -31,3 +31,13 @@ subject and `pnpm dev:agent:smoke` to verify the automation path itself. This dr
 renderer, not native menus and dialogs or host-owned child webviews; use native computer-use control
 or the release checklist for those surfaces. See [docs/local-development.md](./docs/local-development.md)
 for the full workflow.
+
+When a change affects the terminal UI, run it in the isolated PTY driver. Start
+`pnpm dev:tui:agent -- --session <name> --fixture tui-navigation`; in another terminal, use
+`pnpm dev:tui:agent:ui -- --session <name> snapshot` after each navigation step, `press` to send keys,
+and `resize 120 40` to check the wider layout. Run
+`pnpm dev:tui:agent:flow -- --session <name> navigation` for the repeatable path, then
+`pnpm dev:tui:agent:ui -- --session <name> stop`. To compare shared content with the desktop, start
+`pnpm dev:agent -- --session <other-name> --fixture tui-navigation` with the same profile and seed.
+See [docs/local-development.md](./docs/local-development.md#agent-driven-terminal-development) for
+the commands, reports, and limits of the text snapshots.

@@ -236,6 +236,7 @@ export class CodexChildRouter {
           return [event]
         // A child's plan is not the session's plan, and there is nowhere to say whose it is.
         case 'plan':
+        case 'plan_proposal':
         case 'session_metadata':
         case 'request':
         case 'request_resolved':

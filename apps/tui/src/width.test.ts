@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { GLYPHS } from './kit/glyphs'
 import { clusterWidth, graphemes, sliceToWidth, stringWidth } from './width'
 
 // The corpus is the one that chose the measure in `./width.ts`, held as the column it chose. Every
@@ -29,27 +28,18 @@ describe('the width measure', () => {
     expect(stringWidth('🗒')).toBe(1) // notepad-text
     expect(stringWidth('🗃')).toBe(1) // database
     // The one that goes the other way. Unicode 16 moved U+2630 to `W`, so the standard and our table
-    // say two cells and any terminal with an older width table draws one. It is the glyph whose width
-    // the layout cannot predict, and the slice that owns `kit/glyphs.ts` replaces it.
+    // say two cells and any terminal with an older width table draws one. It is a glyph whose width
+    // the layout cannot predict.
     expect(stringWidth('☰')).toBe(2) // list
   })
 
   it('does not double the seven glyphs `string-width` doubles', () => {
     // `string-width` asks `emoji-regex` before it looks at East Asian Width, and that regex matches a
-    // bare text-presentation emoji. These seven carry nine names, and they are on the rail, the
-    // footer and half the rows in the app.
+    // bare text-presentation emoji. These examples remain useful width checks even though Lucide
+    // names no longer map to terminal marks.
     for (const glyph of ['▶', '☑', '⚠', '⌨', '☺', '👁', '🏷']) {
       expect(stringWidth(glyph), glyph).toBe(1)
     }
-  })
-
-  it('is one cell for every glyph in the table but `list`', () => {
-    // The assertion the comment at the top of `kit/glyphs.ts` should always have been: it claimed
-    // every glyph is one cell wide and tested that claim with `\p{Emoji_Presentation}`, which passes
-    // all 73 names and misses all six wide ones. This is the check that catches a seventh. Empty now:
-    // five of the six were only ever wide to OpenTUI's measure, and `list` gave up `☰` for `≡`.
-    const wide = Object.entries(GLYPHS).filter(([, glyph]) => stringWidth(glyph) !== 1)
-    expect(wide.map(([name]) => name)).toEqual([])
   })
 
   it('counts a combining mark as nothing and keeps it with its base', () => {

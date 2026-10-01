@@ -4,7 +4,7 @@
 // The diff toolkit sits on @acorn/plugin-api/ui/diff instead of here: it is a domain toolkit rather
 // than a primitive, and its `Row` type would collide with the `Row` layout component below.
 //
-// Off this surface: ContributionBoundary (host machinery), IconPicker/iconNodes, WorkspacePicker,
+// Off this surface: ContributionBoundary (host machinery), IconPicker/iconNodes,
 // tokenAxes, focus.ts. No plugin imports them, and page-level components on a contract are how a
 // design system stops being able to change.
 
@@ -52,6 +52,7 @@ export { tip } from '@acorn/client-core/kit/components/overlays/tips.tsx'
 // Behavior that isn't a component ships as a hook, following the dismissable.ts precedent.
 // Arm-to-confirm exists because a sandboxed frame's `window.confirm` silently returns false.
 export { createArmedConfirm } from '@acorn/client-core/kit/lib'
+export { modelProviderFailure } from '@acorn/client-core/kit/lib'
 export { default as CopyButton } from '@acorn/client-core/kit/components/inputs/CopyButton.tsx'
 // The field that completes what is typed after a sigil and colours what it has completed. `mentions`
 // is the short form (one list of logins after `@`); `sources` and `segments` are the general one, and
@@ -87,12 +88,12 @@ export { defaultModelIdFor } from '@acorn/client-core/features/settings'
 
 // ── Diff rows ─────────────────────────────────────────────────────────────────────────────────
 // The components of the diff toolkit; its model, virtualizer and find pass are on ./ui/diff.
-export { DiffLine, FileHead, NonCodeRow, SplitCell } from '@acorn/client-core/kit/diff/DiffRows.tsx'
+export { DiffLine, FileHead, NonCodeRow, SplitCell, StackedDiff } from '@acorn/client-core/kit/diff/DiffRows.tsx'
 export type { LineComposerController, ThreadCollapseController } from '@acorn/client-core/kit/diff'
 // The whole viewer as one component: virtualized unified and split lists, find, sticky file header,
 // per-file collapse, gap expansion, and the comment layer. Driven by a `DiffSource` from ./ui/diff.
-// A plugin reaching for the row components directly is building a simpler surface than this one, the
-// way the compare preview does.
+// A plugin reaching for the row components directly is building a simpler surface than this one.
+// StackedDiff is the read-only one already built: one file's patch shown inside something else.
 export { DiffPane } from '@acorn/client-core/features/diff/DiffPane.tsx'
 
 // ── The nodes the kit gained when it closed ───────────────────────────────────────────────────
@@ -107,8 +108,17 @@ export { Text } from '@acorn/client-core/kit/components/content'
 export { Link } from '@acorn/client-core/kit/components/content'
 export { Heading } from '@acorn/client-core/kit/components/content'
 export { Section } from '@acorn/client-core/kit/components/layout'
+// A settings page's titled group and its one setting: the label left, the control right, and the
+// Saved signal, the error, Reset and a value set elsewhere drawn the same way on every page. The save
+// helpers that drive them are on ./client (docs/frontend.md § Settings).
+export { SettingRow, SettingsSection } from '@acorn/client-core/kit/components/layout'
+export type { SettingRowProps, SettingsSectionProps } from '@acorn/client-core/kit/components/layout'
 export { Timeline, type TimelineControls } from '@acorn/client-core/kit/components/content'
 export type { ReadingPlace } from '@acorn/client-core/kit/lib'
+// Which of a long timeline's turns to draw: the newest page, and more on "Show earlier". A rule, not a
+// rendering, so both hosts share it (docs/managed-agents/client-surfaces.md § Client surfaces).
+export { createTimelineWindow } from '@acorn/client-core/kit/lib'
+export type { TimelineWindow } from '@acorn/client-core/kit/lib'
 export { Facts } from '@acorn/client-core/kit/components/content'
 export { ChipRow } from '@acorn/client-core/kit/components/layout'
 export { Log } from '@acorn/client-core/kit/components/content'

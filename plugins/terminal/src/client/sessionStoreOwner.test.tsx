@@ -10,6 +10,13 @@ import { initPtyChannel, wsAttach } from './wsChannel'
 import { _resetWsClient } from '@acorn/plugin-api/testkit/ws-client'
 import type { TerminalSession } from '../contract/wire'
 
+
+// These ownership gates supply a running terminal service; availability is covered by the host.
+vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@acorn/plugin-api/client')>(),
+  hasHostCapability: () => true,
+}))
+
 vi.mock('./terminalClient', () => ({ terminalApi: (nodeId: string) => ({ list: async () => {
   order.push(`read:${nodeId}`)
   return [{ id: 'same-session', taskId: 'same-task', title: nodeId }] as TerminalSession[]

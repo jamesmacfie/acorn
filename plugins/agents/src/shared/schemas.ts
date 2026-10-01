@@ -60,10 +60,35 @@ export const createAgentSessionSchema = z.object({
   profileId: z.string().min(1).max(100),
   title: z.string().trim().min(1).max(500).optional(),
   kind: z.enum(['interactive', 'workflow', 'delegated', 'imported']).default('interactive'),
+  origin: z.object({
+    kind: z.literal('inline-diff'),
+    source: z.enum(['changes', 'pull-request']),
+    taskId: z.string().uuid(),
+    path: z.string().min(1).max(4096),
+    side: z.enum(['old', 'new']),
+    line: z.number().int().positive(),
+    patchKey: z.string().min(1).max(200),
+    quote: z.string().max(2000),
+    access: z.enum(['read-only', 'full']).optional(),
+    scope: z.enum(['staged', 'unstaged']).optional(),
+    pull: z.object({ owner: z.string().min(1), repo: z.string().min(1), number: z.string().min(1) }).optional(),
+  }).optional(),
   resumeProviderSessionRef: z.string().min(1).max(2_000).optional(),
   parentSessionId: z.string().uuid().optional(),
   parentTurnId: z.string().uuid().optional(),
+  // Start from a saved custom agent. The node reads it and copies what the session keeps onto `config`,
+  // so a caller names the agent and never sends its instructions (docs/managed-agents.md § Custom agents).
+  customAgentId: z.string().min(1).max(200).optional(),
   config: z.record(z.string(), z.unknown()).default({}),
+}).superRefine((input, context) => {
+  if (!input.origin) return
+  if (input.kind !== 'interactive' || input.origin.taskId !== input.taskId) {
+    context.addIssue({ code: 'custom', message: 'Inline diff chats must be interactive sessions in the same task.' })
+  }
+  if ((input.origin.source === 'changes') !== !!input.origin.scope ||
+      (input.origin.source === 'pull-request') !== !!input.origin.pull) {
+    context.addIssue({ code: 'custom', message: 'Inline diff origin must identify its source.' })
+  }
 })
 
 export const importAgentTranscriptSchema = z.object({

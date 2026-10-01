@@ -37,6 +37,8 @@ export { registerKeybindings } from '@acorn/client-core/host/registries/commands
 // bring a `<div>` with it. The registration and the concern type are the model's own.
 export { registerWillHandler } from '@acorn/client-core/host/registries/shell/willPhaseModel.ts'
 export type { Concern } from '@acorn/client-core/host/registries/shell/willPhaseModel.ts'
+// The shell's one confirmation, drawn by the shell over whatever has the screen (../chrome/Confirmation.tsx).
+export { confirmAction } from '../chrome/confirmStore'
 export { slotFills } from '@acorn/client-core/host/tree'
 export { requestAnnotations, annotationsFor } from '@acorn/client-core/host/annotations/annotations.ts'
 export { selectPaneTab } from '@acorn/client-core/host/layouts/state.ts'
@@ -45,6 +47,9 @@ export type { RemoteTreeProps } from '../plugins/RemoteTree'
 // The `wizard` layout for a surface that is a wizard and is not a pane. The same component the layout
 // table hands the pane registry, so onboarding's overlay and a `wizard` pane are arranged alike.
 export { Wizard } from '../layouts/Wizard'
+
+// The compiled message composer uses the terminal projection of the host's model-choice control.
+export { ModelPickerPopover } from './asking/modelPickerPopover'
 
 // ── The acorn ────────────────────────────────────────────────────────────────────────────────────
 
@@ -274,8 +279,7 @@ export function Slot(props: SlotProps) {
   )
 }
 
-/** One item's marks, drawn where the owner put them. In `./showing.tsx` beside the diff line that
- *  draws them, because a `text` node cannot hold a component from a module that imports it back. */
+/** Keep the host API pointed at the diff renderer that owns annotation placement. */
 export { AnnotationMarks } from './showing'
 
 /**

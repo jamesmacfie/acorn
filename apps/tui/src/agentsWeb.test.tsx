@@ -8,7 +8,7 @@ import { enterDetail, openFirstSession, stopSaying } from './agentsDriving'
 // Every other tool card opens onto text, which a cell buffer draws much as a browser does. This one
 // opens onto links, and this host has no browser to hand one to — so the promise is different and a
 // desktop render is no evidence for it. The address has to be readable, and pressing a focused link
-// has to be what puts it on screen (../kit/showing.tsx § Link).
+// has to be what puts it on screen (../kit/showing/text.tsx § Link).
 //
 // Its own file for the reason ./agentsFollow.test.tsx is: the managed-session store is module state
 // and its snapshots outlive a render, so a case that wants a different transcript from its

@@ -1,42 +1,93 @@
-import { Agent, createServer, type Server } from 'node:http'
+import { Agent, createServer, type RequestListener, type Server } from 'node:http'
 import type { AddressInfo } from 'node:net'
+import { PassThrough } from 'node:stream'
 import { afterEach, describe, expect, it } from 'vitest'
-import { nodeRequest } from './nodeRequest'
+import { nodeRequest, NodeResponseTooLargeError, readBoundedResponse } from './nodeRequest'
 
 const servers: Server[] = []
 const agents: Agent[] = []
-afterEach(() => { for (const agent of agents.splice(0)) agent.destroy(); for (const server of servers.splice(0)) server.close() })
 
-describe('buffered Node response ownership', () => {
-  it('returns precise plain byte views for zero, single, and fragmented bodies, retained across requests', async () => {
-    const bytes = Buffer.from([0, 255, 1, 2, 128, 17])
-    const server = createServer((request, response) => {
-      if (request.url === '/empty') return response.end()
-      if (request.url === '/single') return response.end(bytes)
-      response.write(bytes.subarray(0, 2))
-      setImmediate(() => { response.write(bytes.subarray(2, 5)); response.end(bytes.subarray(5)) })
-    })
-    servers.push(server)
-    await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
-    const agent = new Agent({ keepAlive: true })
-    agents.push(agent)
-    const origin = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
-    const read = (path: string) => nodeRequest({ url: new URL(path, origin), method: 'GET', headers: {}, agent, signal: new AbortController().signal })
-    const retained = (await read('/single')).body
-    for (const path of ['/empty', '/single', '/fragmented']) {
-      const response = await read(path)
-      expect(response.body.constructor).toBe(Uint8Array)
-      expect([...response.body]).toEqual(path === '/empty' ? [] : [...bytes])
-    }
-    expect([...retained]).toEqual([...bytes])
+afterEach(async () => {
+  for (const agent of agents.splice(0)) agent.destroy()
+  for (const server of servers.splice(0)) {
+    server.closeAllConnections()
+    await new Promise<void>((resolve) => server.close(() => resolve()))
+  }
+})
+
+async function start(handler: RequestListener): Promise<URL> {
+  const server = createServer(handler)
+  servers.push(server)
+  await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+  return new URL(`http://127.0.0.1:${(server.address() as AddressInfo).port}/v1/core/test`)
+}
+
+function fetch(url: URL, maxResponseBytes: number) {
+  const agent = new Agent({ keepAlive: true })
+  agents.push(agent)
+  return nodeRequest({ url, method: 'GET', headers: {}, agent, signal: new AbortController().signal, maxResponseBytes })
+}
+
+describe('bounded Node responses', () => {
+  it('accepts a response exactly at the limit', async () => {
+    const url = await start((_req, res) => res.end('12345'))
+    const response = await fetch(url, 5)
+    expect(new TextDecoder().decode(response.body)).toBe('12345')
   })
 
-  it('checks pre-abort before accessing a body for encoding', async () => {
-    let reads = 0
-    const body = { kind: 'bytes' as const, get bytes() { reads += 1; return new Uint8Array([1, 2]) } }
-    const agent = new Agent()
+  it('rejects an oversized Content-Length before reading the body', async () => {
+    const url = await start((_req, res) => {
+      res.writeHead(200, { 'content-length': '1000000' })
+      res.flushHeaders()
+    })
+    await expect(fetch(url, 5)).rejects.toBeInstanceOf(NodeResponseTooLargeError)
+  })
+
+  it('rejects a chunked response that crosses the limit without a declared length', async () => {
+    const url = await start((_req, res) => {
+      res.write('12345')
+      res.end('6')
+    })
+    await expect(fetch(url, 5)).rejects.toBeInstanceOf(NodeResponseTooLargeError)
+  })
+
+  it('counts chunks when a Content-Length header is malformed', async () => {
+    // Node's HTTP parser usually rejects this before producing IncomingMessage. The reader itself
+    // must still never treat an unparseable declaration as permission to buffer without a limit.
+    const stream = new PassThrough() as PassThrough & { headers: Record<string, string> }
+    stream.headers = { 'content-length': 'not-a-number' }
+    const pending = readBoundedResponse(stream as unknown as import('node:http').IncomingMessage, 5)
+    stream.end('123456')
+    await expect(pending).rejects.toBeInstanceOf(NodeResponseTooLargeError)
+    expect(stream.destroyed).toBe(true)
+  })
+
+  it('aborts a streaming response and closes the connection', async () => {
+    let started!: () => void
+    const responseStarted = new Promise<void>((resolve) => { started = resolve })
+    let closed!: () => void
+    const responseClosed = new Promise<void>((resolve) => { closed = resolve })
+    const url = await start((_req, res) => {
+      res.on('close', closed)
+      res.write('12345')
+      started()
+    })
+    const agent = new Agent({ keepAlive: true })
     agents.push(agent)
-    await expect(nodeRequest({ url: new URL('http://127.0.0.1:1/no-send'), method: 'POST', headers: {}, body, agent, signal: AbortSignal.abort() })).rejects.toMatchObject({ name: 'AbortError' })
-    expect(reads).toBe(0)
+    const controller = new AbortController()
+    const pending = nodeRequest({ url, method: 'GET', headers: {}, agent, signal: controller.signal, maxResponseBytes: 5 })
+    await responseStarted
+    controller.abort()
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' })
+    await responseClosed
+  })
+
+  it('rejects a truncated response rather than returning partial bytes', async () => {
+    const url = await start((_req, res) => {
+      res.writeHead(200, { 'content-length': '5' })
+      res.write('12')
+      res.destroy()
+    })
+    await expect(fetch(url, 5)).rejects.toThrow()
   })
 })

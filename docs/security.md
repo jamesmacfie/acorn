@@ -11,7 +11,8 @@ and untrusted provider/preview content rather than implementing multi-user roles
 - Desktop shell and its helper: native host, broker, certificate pins, device-token custody, window policy, and
   preview `WebContentsView` host.
 - Node: authoritative data and execution environment. It is intentionally able to run developer
-  tools, so a compromised Node account is outside the application threat model.
+  tools. A compromised Node can compromise its own host, but its replies and plugin offers remain
+  untrusted input on a connecting client.
 - Node child: task-scoped internal caller. It receives only an allowlisted environment and scoped
   token; its routes and task identity are checked by the Node.
 - Terminal client (`acorn`, `docs/tui.md`): the first two collapsed into one process. UI code
@@ -21,14 +22,26 @@ and untrusted provider/preview content rather than implementing multi-user roles
   `apps/tui` that draws a cell. A loaded plugin still gets a realm of its own — a worker thread under
   `--permission` — so the boundary that matters most is the one that did not move.
 
-The application does not defend against root/other-user access to the host, a compromised Node
-account, or malicious first-party plugin code. Those are OS/deployment concerns.
+The application does not defend a Node host against root/other-user access or a compromised Node
+account, nor does it sandbox first-party plugin code. A client still treats a paired Node as an
+untrusted source of replies, events, content, and plugin offers until an owner authorizes code.
+
+The shell's Rust dependency patch and remaining upstream advisory warnings are recorded in
+[Rust dependency security](./shell.md#rust-dependency-security).
 
 ## Transport and auth
 
 - Nodes bind to `127.0.0.1` over TLS 1.3 and reject unexpected `Host` values.
 - The certificate is self-signed, persisted in the Node data root, and pinned by fingerprint in the
   helper's broker. A changed fingerprint is a hard stop.
+- A renderer request path is checked as a same-origin absolute path both at the helper schema and in
+  the broker immediately before joining it with the paired endpoint. Protocol-relative paths,
+  backslashes, and fragments cannot redirect a request carrying that node's bearer. The broker
+  bounds each HTTP reply to 64 MiB, the `/v1/node` compatibility probe to 16 KiB, and each
+  WebSocket message to 8 MiB before parsing or forwarding it.
+  The broker opens at most four HTTP sockets per Node. Automatic agent image previews ask for an
+  8 MiB transport ceiling and refuse oversized metadata or bytes before raster encoding; explicit
+  downloads still use the normal bounded reply path and require a save action.
 - The bearer rides the `/v1/events` upgrade request's headers, which a browser cannot set. On the
   desktop that is why the socket belongs to the helper rather than the renderer. The terminal client
   (`docs/tui.md`) is one process running under Node, so it sets the header itself: equal to
@@ -38,8 +51,20 @@ account, or malicious first-party plugin code. Those are OS/deployment concerns.
 - Every protected HTTP route passes request-id, principal resolution, the auth gate, and then the
   idempotency middleware before reaching a router.
 - `/v1/node` and `/v1/pair` are the only pre-auth routes. Device management, plugin toggles, audit,
-  security, backup, schedules, preferences, projects, and workspaces are device-only.
+  security, backup, schedules, preferences, projects, workspaces, and CLI plugin command dispatch are device-only.
+  A CLI command uses the active manifest descriptor, checks its declared core capability and resource
+  scope on the Node, then calls only the owner's `/cli/<name>` plugin route. The CLI never sends its
+  bearer token as command input; the worker receives its existing permission-filtered context.
 - `/v1/events` authenticates the upgrade and rechecks device activity for long-lived streams.
+  The Node enforces the broker's 8 MiB message ceiling before JSON parsing. Claimed upgrade sockets
+  own peer errors before asynchronous authentication; lookup, upgrade, and owner-handler failures
+  remain within that connection. Disposal closes pending upgrades as well as connected sockets.
+  Failed device-activity lookups close the affected authenticated sockets. Disconnect cleanup attempts
+  every owner's hook independently, including hooks that return rejected promises.
+- Raw preview tunnels enforce 64 KiB per WebSocket message at both Node and custody receivers.
+  Both senders split TCP chunks in order and wait for each write before resuming TCP reads.
+  The helper's request limit and browser receive boundary are documented in
+  [the shell contract](./shell.md#the-shell-process).
 - Revoking a device (`DELETE /v1/core/devices/:id`) closes that device's live sockets immediately and
   fails its in-flight requests. A device can revoke its own row; that is the same effect as unpairing
   itself.
@@ -251,6 +276,10 @@ child-process environment. Every call to `reveal()` sits outside the scrub-on-th
   through. `resolveInRoot` stayed the one implementation everywhere except the Docker plugin's
   container-label matcher, which compares paths reported by the daemon inside a container namespace;
   resolving those against this host's filesystem would be wrong, not merely redundant.
+  It distinguishes an absent entry from a dangling symlink with `lstat`, and refuses an
+  unresolvable link rather than approving its parent. New paths beneath real in-root directories
+  and aliases that resolve inside the root remain valid. Editor writes, Changes disk reads and
+  unstaged diffs, and both endpoints of worktree file copies use this policy.
 - Short-lived task work goes through the process broker, which uses explicit working directories,
   environment allowlists, process-group termination, bounded output, and production timeouts.
 - Long-lived engines own their own children, under the same environment hygiene. The broker's model is
@@ -267,11 +296,20 @@ child-process environment. Every call to `reveal()` sits outside the scrub-on-th
   acknowledged before execution; a changed snapshot fails closed with `needs-trust`/`config-changed`.
 - A workflow definition stored as a `workflow_defs` row is executable configuration with no committed
   bytes, so it is owner-typed instead of hashed. Every route under `/v1/p/workflows/defs` is
-  device-only, and a start by id refuses a row to a task-confined caller while still allowing a
-  committed file, which the snapshot does cover. Save to repo turns the row into a file and hands it
-  back to the snapshot: the write is a slug of the definition name, confined to `.acorn/workflows/`
+  device-only. Root workflow starts over HTTP also require a device principal, for file and database
+  definitions alike. They reject task and service credentials before reading the body: repository
+  trust does not authorize a caller to reset its tool ceiling or workflow tree accounting. Trusted
+  schedules and frozen child dispatch enter through their admission capabilities. Save to repo turns
+  the row into a file and hands it back to the snapshot: the write is a slug of the definition name,
+  confined to `.acorn/workflows/`
   by `resolveInRoot`, and the next start from that file asks for the acknowledgement
   ([workflows.md](./workflows.md) § Database definitions).
+- A gate answer is device-only. `POST /v1/p/workflows/workflows/runs/:runId/gate` refuses a
+  task-confined caller with 403 even on its own run, for approval and rejection alike, because the
+  agent working in the run holds that run's credential and a human gate it could answer would be no
+  gate. Retry is refused for the same reason. Cancel and kill stay open to the run's own task,
+  because both only stop work. A foreign or unknown run still answers 404 first, so the refusal does
+  not reveal which runs exist.
 - A child workflow is resolved in its parent task's workspace and project before any child task is
   created. Repository definitions re-enter the configuration trust check; database definitions stay
   device-owned. The child receives its own task-confined token, never the parent's token. Its tool
@@ -279,8 +317,11 @@ child-process environment. Every call to `reveal()` sits outside the scrub-on-th
   authority. The resolved graph and effective limits are persisted so restart recovery cannot gain
   authority from an edited definition. Cancellation closes admission before it stops descendants,
   which prevents a late child creation from escaping the tree-wide cancel.
-- Docker matching configuration is declarative; Docker and run-target execution remains subject to
-  the appropriate trust gate.
+- Docker task listings and teardown use host-stored worktree roots and daemon working-directory
+  metadata; declarative matcher hints affect only the device summary. Cleanup targets full container
+  IDs, never a project-wide name. Global Docker HTTP actions require owner device authority.
+  WebSocket Docker channels permit device and service principals while denying task-confined sockets.
+  Repository run-target execution uses the configuration trust gate. See [Docker](./docker.md).
 - External URLs opened through the OS pass a scheme allowlist. Preview navigation is limited to
   HTTP(S) URLs without userinfo.
 
@@ -309,6 +350,19 @@ Widening the snapshot changes the hash, so a project that already has script col
 one re-acknowledgement the next time something gated runs. That is the correct answer rather than a
 migration: the owner is being shown a snapshot that now covers more than the one they approved.
 
+Run-target resolution captures the executable snapshot before parsing the repository config and
+returns its hash through `core.tasks.runConfig`. Terminal supplies that expected hash to
+`core.projects.assertConfigTrusted` for repository-authored starts and restarts. The gate rejects
+identity drift even when the configuration on disk has reverted to acknowledged bytes. It does not
+reread a different config file to select the command. Running instances retain their admitted URL
+and stop commands, so default URL discovery does not execute repository edits without admission.
+Snapshots accept regular files within the repository root, including internal symlink aliases.
+Nonblocking descriptor opens reject special files before reading. Each file and the project settings
+entry are capped at 1 MiB, the formatted snapshot at 8 MiB, and the snapshot at 256 entries. Workflow
+directory scans stop after 1,024 entries, including non-TOML entries. Unsafe or oversized input fails
+closed with a configuration error. These static path checks do not eliminate concurrent path
+replacement between checks and use.
+
 Which paths ask. The three call sites that assert trust are the ones where the *checkout* authored what
 runs: a run target whose winning layer was the repo's config file, a `db_url_script` from the same
 place, and a workflow defined in the repo. The setup and teardown scripts run from the project row
@@ -321,10 +375,10 @@ and reported as unread rather than merged: they were merged over the project row
 nothing consumed the result, so a repo could declare a setup script and watch it do nothing. They are
 not wired instead of dropped because wiring them would make a committed file run a command on worktree
 creation and on archive, and neither path asks this gate first — that is a new execution surface, not a
-fix. The `[docker]` table is still read without the gate; the comment on
-`plugins/docker/src/server/dockerConfig.ts` now names the two invariants that make that safe, which are
-that exec is ref-addressed rather than matcher-addressed and that the WebSocket hub refuses docker
-channels to a task-confined socket. If either changes, that table needs the gate.
+fix. The `[docker]` table is still read without the gate. Its bounded, confined repository read
+contributes device-summary hints only. Task listing and archive/manual cleanup derive association
+independently of those hints. Exec remains explicitly ref-addressed and the WebSocket hub refuses
+Docker channels to a task-confined socket. Widening any of those seams needs a new authority review.
 
 **A known limit.** `resolveInRoot` is check-then-use: nothing re-validates between the containment
 check and the open, so an agent that can write in its own worktree can swap a path component for a
@@ -405,15 +459,32 @@ design all three constraints exist to prevent.
 
 ## Third-party plugin bundles
 
+A device-held plugin has no Node half. The desktop helper fetches a package from the source the owner
+entered, applies the Node installer's archive and manifest checks, refuses Node entries and
+Node-dependent contributions, and hashes the client bundle before adding it to the cache. The client
+checks the manifest again before registering any surface. Device-held and Node-delivered bundles use
+the same sandboxed iframe and remote-tree worker paths; neither executes in the shell process.
+
+Bundle cache entries and acknowledgement records carry `{ kind: 'node', nodeId }` or
+`{ kind: 'device' }` provenance. Old acknowledgement rows with `nodeId` and no source read as
+Node-sourced. The acknowledgement key remains `(pluginId, hash)`: identical bytes from both sources
+can share one decision only while their enforced declarations agree with the declaration approved.
+The prompt names the source as the owner entered it, warns that a folder is not pinned, and omits the
+Node execution disclosure for device bundles. An updated hash asks again.
+
 A plugin installed on a Node is distributed by that Node: its client bundle travels the existing
 broker pipe to every paired device. That makes a Node a source of executable code, so the bundle is
 gated twice — once on content, once on consent.
 
-**Trust binds to bytes, not to claims.** The hash a Node advertises in `/v1/core/plugins` is
+**Trust binds to bytes and the approved client declaration, not to Node claims.** The hash a Node advertises in `/v1/core/plugins` is
 untrusted input. The helper fetches the bundle itself (the bytes never pass through the renderer),
 hashes what arrived, and stores it content-addressed under that hash. A mismatch against the
 advertised value is refused and reported, never re-keyed. Every acknowledgement therefore binds a
-plugin id to a hash no one but this device computed.
+plugin id to a hash no one but this device computed. It also stores a canonical projection of the API
+version, permissions, contributions, and emitted events that the owner reviewed. A Node that changes
+that projection under unchanged bytes loses the client selection and asks for another review. Existing
+manual acknowledgements from before this binding have no projection; they fail closed and re-prompt.
+Development-mode acknowledgements remain an explicit exception, scoped to the granted source.
 
 The terminal client has no helper to do that, so it does it itself, with the same two stores
 (`@acorn/custody`'s `PluginCache` and `PluginTrustStore`, pointed at `$XDG_CONFIG_HOME/acorn/plugins/`
@@ -455,6 +526,17 @@ machine's to make. This mirrors repo-config trust one level out: that binds a pr
 a config the Node will execute and is stored on the Node; this binds a plugin to the hash of a bundle
 the device will execute and is stored beside the device token.
 
+The Node reports its running declaration separately from the package currently on disk. Custody can
+cache both hashes, but the renderer executes only an accepted bundle matching the current Node's
+running identity. A pending or rejected disk update cannot replace accepted UI while the older node
+half still runs. Acceptance is recorded before the distribution snapshot enables contributions;
+revoking an exact hash or ending a development grant removes its registrations and stops its worker.
+The same `(pluginId, hash)` decision can cover equivalent offers from two Nodes. If those Nodes attach
+conflicting enforced declarations to that key, the client withholds it instead of treating one
+acknowledgement as consent to both. A single changed offer is also withheld until its current
+declaration is approved. First-party auto-acceptance records the declaration read from app-owned
+resources, so a Node cannot widen it by claiming the same first-party bundle hash.
+
 **What "gained" means.** Each rendered permission line carries a stable grant key, separate from its
 sentence (`packages/client-core/src/host/trust/permissions.ts`). The update diff compares keys, not
 copy, so tightening a sentence's wording never re-prompts an existing owner as though the plugin had
@@ -467,9 +549,13 @@ The threats this closes, and the ones it does not:
   per-device acknowledgement that names the Node, and (phase 3) the sandbox the bundle runs in.
   Nothing a Node pushes runs unprompted. The sandbox is one of three, and the trust decision covers all
   of them because they are the same bytes: the iframe at `app-plugin://<hash>` for a bundle that draws
-  its own pixels, a Web Worker for one that draws a tree (`docs/shell.md § The plugin worker`), and — in
+  its own pixels, a Web Worker created by a host-owned relay at the same isolated plugin origin for
+  one that draws a tree (`docs/shell.md § The plugin worker`), and — in
   the terminal, where there is no iframe and no CSP — a `node:worker_threads` thread under
-  `--permission`. No path asks a second question, and none can start without an accepted hash.
+  `--permission` and an empty environment. Its builtin policy refuses network and privileged modules
+  through imports, CommonJS require and the synchronous process accessor before bundle evaluation.
+  See [the terminal sandbox contract](./tui/chrome-and-plugins.md#the-sandbox). No path asks a second
+  question, and none can start without an accepted hash.
 - **A Node lying in its listing** about hash, version or permissions — the hash is recomputed from the
   bytes. The permissions shown are the manifest as the Node's own loader read it; a Node that lies
   there also controls the bytes, so the containment rather than the disclosure is what bounds it.
@@ -518,7 +604,10 @@ could post an approval would answer the question that exists because an agent mu
 
 Because the installer only validates a manifest after fetching, the approval is two screens: the agent's
 ask (action, source, its stated reason) gates the *fetch*, and a second screen shows the real manifest read
-back off disk before anything runs — install never starts a plugin — with a No that uninstalls it again.
+back off disk before anything runs. A durable marker is published before the package reaches its installed
+path. Boot and reload refuse marked packages; their client bundles are withheld. Approval checks the
+marker generation and complete package fingerprint, then clears the marker. Dismissing review leaves it
+held across restarts, and the plugin's page under **Settings > Plugins > Installed** can approve or remove it. A No uninstalls it again.
 `docs/plugins.md § What the owner can know before the download` records why that ordering was chosen over
 downloading first.
 
@@ -574,12 +663,15 @@ own; for a remote node the owner types a path they know. That is a correctness g
 
 ### The dev grant
 
+A device-held plugin uses a grant for `(pluginId, { kind: 'device' })`. It cannot auto-accept a
+Node-delivered bundle with the same ID. Removing the device plugin revokes this grant and its automatic
+acknowledgements; decisions the owner made in the prompt remain.
+
 Per-hash consent is right for distribution and wrong for iteration, so a plugin the owner is actively
 developing can be put into **development mode**: a grant stored per `(pluginId, nodeId)` on the device,
 beside the acknowledgements, that auto-accepts future bundles of that plugin from that node. The node half
-of the key is not in the design note and is deliberate — fleet resolution picks a winner across every
-paired node, so a grant keyed on the plugin name alone would auto-trust a bundle a *different* node started
-serving under it.
+of the key is not in the design note and is deliberate: a grant keyed on the plugin name alone would
+auto-trust a bundle a *different* node offered under it.
 
 The grant writes ordinary accepted acknowledgements, in the helper, beside the hash it computed
 itself; nothing in the renderer can turn a bundle into an accepted one with or without a grant. Each such
@@ -593,7 +685,7 @@ review for this `(plugin, node)` pair. That is exactly the risk the owner accept
 
 Three things keep it bounded:
 
-- **Visible.** Settings → Plugins badges the row *in development — bundle changes are auto-trusted*. The
+- **Visible.** The plugin's row under **Settings > Plugins > Installed** says *In development. Bundle changes are trusted without asking*. The
   moment dev-mode behaviour is indistinguishable from a normal install, the trust story has rotted.
 - **Revocable, and revocation means something.** Ending dev mode drops the grant *and* every
   acknowledgement it wrote. What survives is whatever the owner answered by hand, so with nothing left the
@@ -640,20 +732,29 @@ privileged webview had no policy. It has one; the config is simply not where it 
 plainly, because the next reader will look in the same place.
 
 What the policy is a second layer behind. The renderer displays text this app did not author — agent
-transcripts, GitHub `bodyHTML`, Linear descriptions, Rollbar payloads, notes an agent wrote — and two
-bindings pass GitHub's `bodyHTML` to `innerHTML` verbatim, trusting GitHub's sanitizer:
+transcripts, GitHub `bodyHTML`, Linear descriptions, Rollbar payloads, notes an agent wrote. Two
+bindings display provider-rendered HTML:
 
 - `packages/client-core/src/host/components/ProviderHtml.tsx`, the host component every provider-rendered
   body now goes through: github's description, its comments and its review threads
 - `packages/client-core/src/kit/diff/DiffRows.tsx`
 
-The first was three hand-written bindings inside the github plugin until phase 7 of the layout
-programme. Neither is a known bug. They are listed because each one is a place where a sanitizer being wrong once
-would put script in a webview that can call into Rust, and the policy is what stands behind them if
-that ever happens.
+Both bindings call `packages/client-core/src/kit/lib/rendering/sanitizedHtml.ts` before inserting anything into
+the live DOM. It parses the provider string in an inert template, then creates fresh text and a small
+allowlist of formatting elements. The only copied attribute is a validated absolute HTTPS `href`;
+links get host-owned `target` and `rel` values. Scripts, forms, foreign namespaces, images, embeds,
+styles and other automatic resource loads are dropped, along with every provider attribute. The one
+exception is `class`, and only as a lookup: the GitHub class names that mark the removed and added
+lines of a suggested change, and the ones that colour its code, are read and replaced with fixed
+host class names, so the
+provider's own string is never written. The host
+adds bare-reference links only after this pass. Input length, node count and depth are bounded. The
+renderer CSP remains a second layer if this sanitizer is ever wrong.
 
-The Markdown renderer (`packages/client-core/src/kit/lib/markdown.ts`) is the other sink, and it is the app's
-own. It escapes first and builds tags afterwards, which holds. What did not hold was its sentinel: it
+The Markdown renderer (`packages/client-core/src/kit/lib/rendering/markdown.ts`) is the other sink, and it is the app's
+own. It escapes first and builds tags afterwards, which holds. It only emits images from bounded raster
+data URLs; remote image URLs in Node-provided markdown become alt text so they cannot trigger requests
+from the client's network. What did not hold was its sentinel: it
 reserved U+E000 to protect code spans and images across the escaping pass, on the stated grounds that
 real text never contains it. The input decides what is in it, so a source that spelled the sentinel
 forged an index into the token tables and crashed the render. `renderMarkdown` strips U+E000 on the way
@@ -668,6 +769,12 @@ plugin surfaces add a manifest host allowlist enforced on redirects. The remote 
 only declared task ports and authenticates its local loopback request with a per-tunnel secret before
 forwarding it to the Node.
 
+The preview pane refuses every remote Node URL, including public URLs and tunnelled loopback URLs.
+The child webview can check a navigation but cannot confine the page's redirects and subrequests to
+the remote Node's network. A tunnelled first request would still let page script contact services on
+the client's private network. Only a Node positively marked local by custody can supply a loadable
+preview URL; switching a pane to a remote Node evicts its kept-alive native view.
+
 Agent browser tools drive a separate browser of the node's own, through `plugins/browser`, rather than
 the person's preview pane. That separation is deliberate: the pane a person is looking at is not a
 surface an agent steers. Each task gets its own browsing context, so cookies, storage, and any login
@@ -677,7 +784,10 @@ read and the value it writes. The tools expose no arbitrary JavaScript evaluatio
 
 Screenshots are rows in the plugin's own database, keyed to the task, served back only through
 `/v1/p/browser/captures/:id` behind the same auth as every other node route. The newest twenty per
-task are kept.
+task are kept. The route checks the capture's recorded task against the authenticated principal:
+task credentials can read only their own captures; device and service credentials retain access
+across tasks. Foreign and unknown IDs return the same empty 404 response. Browser context allocation
+and page diagnostics also have resource budgets; see [Browser tools](./agent-tools.md#browser-tools).
 
 ## Untrusted provider data
 
@@ -713,7 +823,9 @@ with restrictive permissions. A Node lock prevents two processes from opening on
 report disk-encryption status on macOS and surfaces the warning when it cannot verify full-disk
 encryption.
 
-Backups snapshot core and plugin SQLite files through SQLite's online-backup API. Device rows and
+Backups snapshot core and plugin SQLite files through SQLite's online-backup API. Output is private
+from creation and atomically replaces a prior backup after success; see
+[data-layer.md § Backup and import](./data-layer.md#backup-and-import). Device rows and
 credential material are scrubbed, while blobs and worktrees are excluded because they are recoverable
 and can dominate archive size. Restore is a documented manual operation into a fresh data root.
 
@@ -722,7 +834,7 @@ and can dominate archive size. Restore is a documented manual operation into a f
 The append-only core `audit` table retains security-relevant decisions for 90 days. Producers include
 pairing-window changes, device pair/revoke, config-trust acknowledgement, secret create/replace/delete,
 plugin toggles, plugin install/update/uninstall/reload, the owner's answer to an agent-raised plugin
-request, backup, and attaching to or detaching from a control plane. The Settings → Security surface
+request, backup, and attaching to or detaching from a control plane. Settings → Audit log
 reads it. The trail is not tamper-evident against someone who already controls the database file.
 
 ### The vocabulary is closed, and a plugin can add to it
@@ -746,7 +858,7 @@ intact:
 - **An undeclared action writes nothing.** `recordAudit` refuses it and warns. Fail closed, because
   a trail that accepts arbitrary strings is one nobody can enumerate.
 - **The vocabulary is still enumerable.** `auditVocabulary()` lists every declared verb with the label
-  its plugin chose, and it rides out on each audit page so Settings → Security can name a row it has
+  its plugin chose, and it rides out on each audit page so Settings → Audit log can name a row it has
   never seen. A row whose plugin has since been removed draws as its raw qualified verb, which is the
   honest answer: the row is still evidence of something that happened.
 - **The actor is `system`, with the plugin id as `actorId`.** Nothing asked for a plugin's row over a

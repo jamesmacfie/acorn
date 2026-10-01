@@ -93,6 +93,9 @@ export type AcornBridge = {
     openPane(paneId: string): Promise<void>
     /** Open a cooperative destination explicitly declared by this surface. */
     openDestination(destinationId: string, resourceId: string, subresourceId?: string): Promise<void>
+    /** Go to a task on this node. Needs the `core.tasks:read` scope and a click or key handler, like
+     * `openUrl`. Rejects when the reader's task list does not have the task. */
+    openTask(taskId: string): Promise<void>
     /** Hand an `https` URL to the host. Anything else is refused, and resolving says only that the host
      * accepted it: where it lands is the host's business, because the frame does not know which surface
      * it is. */

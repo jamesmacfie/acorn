@@ -1,4 +1,5 @@
 import { measure, recordSample } from '../telemetry/emitter'
+import { registerPageFact } from '../telemetry/pageFacts'
 import { wordDiffBatch, type DiffWordsDocument, type WordDiffOutput } from '../../kit/diff/wordDiff'
 import type { WordDiffRequest, WordDiffResponse } from './wordDiffMessages'
 import { createDocumentWorker } from './documentWorker'
@@ -23,3 +24,5 @@ export const diffWordsDocument: DiffWordsDocument = async (pairs) => {
 
 /** Tests only: settle and retire this generation before trying a fresh worker. */
 export const resetWordDiffWorker = owner.reset
+
+registerPageFact('ui.page.workers.word_diff', owner.workerCount)

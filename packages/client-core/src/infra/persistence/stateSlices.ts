@@ -3,7 +3,7 @@ import { dashboardsSlice } from '../../features/dashboards/persist'
 import { hydrateNoticeValues, notices, type Notice } from '../../features/notifications/notifications'
 import { defaultLayout, normalizeLayout, type TaskLayout } from '../../features/tasks/taskLayout'
 import { hydrateTaskLayout, hydrateWorkspaceView, taskLayouts, workspaceViews } from '../../features/tasks/tasks'
-import { currentWorkspaceId } from '../../features/workspaces/lastWorkspace'
+import { currentWorkspaceId, hydrateWorkspaceHistory, MAX_RECENT_WORKSPACES, workspaceHistory, type WorkspaceHistory } from '../../features/workspaces/lastWorkspace'
 import type { WorkspaceView } from '../../features/workspaces/workspaceViewTransition'
 import { PrefKeys, PersistedSliceKeys } from './prefKeys'
 import { appStateBinding, parseJson, type PersistedStateSlice } from './persistedState'
@@ -71,6 +71,33 @@ export const workspaceViewSlice: PersistedStateSlice<WorkspaceView> = {
     values: workspaceViews,
     hydrate: hydrateWorkspaceView,
   },
+}
+
+const parseWorkspaceHistory = (raw: unknown): WorkspaceHistory => {
+  const value = parseJson(raw)
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return { recent: [] }
+  const candidate = value as { recent?: unknown; current?: unknown; previous?: unknown }
+  // Before the list there was only a pair, and reading it keeps the way back across the upgrade.
+  const ids = Array.isArray(candidate.recent) ? candidate.recent : [candidate.current, candidate.previous]
+  const recent = [...new Set(ids.filter((id): id is string => typeof id === 'string' && !!id))]
+  return { recent: recent.slice(0, MAX_RECENT_WORKSPACES) }
+}
+
+// The visit order is a client navigation choice, but both hosts already persist their last
+// workspace through the Node preference path. Keeping the order beside that value makes the terminal
+// client durable too; a workspace on another Node remains an id until the desktop resolves the fleet.
+export const workspaceHistorySlice: PersistedStateSlice<WorkspaceHistory> = {
+  id: 'core.workspace-history',
+  key: PrefKeys.workspaceHistory,
+  scope: 'app',
+  restore: 'workspace',
+  version: 1,
+  codec: { parse: parseWorkspaceHistory, serialize: (value) => value },
+  empty: () => ({ recent: [] }),
+  unknownIds: 'retain-inert',
+  // Room for MAX_RECENT_WORKSPACES ids.
+  maxBytes: 2 * 1024,
+  binding: appStateBinding(workspaceHistory, hydrateWorkspaceHistory),
 }
 
 // Which workspace was open, so a launch knows which workspace's memory above to reopen. Both clients

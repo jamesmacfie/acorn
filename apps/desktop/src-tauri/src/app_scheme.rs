@@ -3,13 +3,17 @@ use std::path::{Component, Path, PathBuf};
 
 use tauri::http::{Request, Response, Uri};
 
-use crate::plugin_scheme::{Frames, PLUGIN_SCHEME};
+use crate::plugin_scheme::PLUGIN_SCHEME;
 
 // The renderer's own origin and its Content-Security-Policy. See docs/shell.md, "Renderer origin and
 // protocol handler", for every directive below and the dev-only widening.
 
 pub const APP_SCHEME: &str = "app";
 pub const APP_ORIGIN: &str = "app://acorn";
+
+pub fn is_app_authority(uri: &Uri) -> bool {
+    uri.scheme_str() == Some(APP_SCHEME) && uri.authority().is_some_and(|authority| authority.as_str() == "acorn")
+}
 
 /// See docs/shell.md, "The syntax-highlighter worker's separate policy", for why this matches only
 /// the highlighter's worker entry and what a rename would cost. The shared renderer Vite config sets
@@ -22,24 +26,6 @@ fn is_highlight_worker(path: &str) -> bool {
 
 /// See docs/shell.md, "The syntax-highlighter worker's separate policy".
 const WORKER_CSP: &str = "default-src 'none'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'none'";
-
-/// A loaded plugin's bundle, run as a Web Worker instead of in a frame. See docs/shell.md, "The
-/// plugin worker", and docs/plugins.md § The tree contract.
-///
-/// Tighter than the highlighter's: no `wasm-unsafe-eval`, because a plugin bundle is a stranger's
-/// code and nothing it draws needs one. `connect-src 'none'` is the same load-bearing directive the
-/// plugin frame origin has — fetch, XHR, WebSocket and sendBeacon all fail inside this worker, so
-/// the bridge port is the only way out of it.
-const PLUGIN_WORKER_CSP: &str = "default-src 'none'; script-src 'self'; connect-src 'none'";
-
-/// `/plugin-worker/<sha256>.js`, and nothing else. The hash is validated here so the read below
-/// cannot be pointed anywhere but the content-addressed cache.
-fn plugin_worker_hash(path: &str) -> Option<&str> {
-    let rest = path.strip_prefix("/plugin-worker/")?;
-    let hash = rest.strip_suffix(".js")?;
-    let lowercase_hex = hash.len() == 64 && hash.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase());
-    if lowercase_hex { Some(hash) } else { None }
-}
 
 /// How long a content-hashed asset may be cached. A year, which is the conventional spelling of
 /// "forever" for a name that changes when its bytes do.
@@ -93,17 +79,21 @@ pub fn renderer_csp(helper_port: u16, dev_server: Option<&str>) -> String {
         &script,
         "style-src 'self' 'unsafe-inline'",
         "font-src 'self'",
-        "img-src 'self' data: blob: https:",
+        // GitHub avatars are the only automatic HTTPS images in renderer-owned content. A Node
+        // cannot turn a URL in a description or metadata row into a request from this device.
+        "img-src 'self' data: blob: https://github.com https://avatars.githubusercontent.com",
         &connect,
-        // Monaco's five ?worker chunks, and every loaded plugin's tree worker. `blob:` covers a
-        // bundler that inlines one. A plugin worker is `'self'` because it is served from this origin
-        // (`plugin_worker_hash` above), which is the only way a worker script may be loaded at all.
+        // Monaco's highlighter worker is the only worker this origin may start. Loaded plugin tree
+        // workers start in a host-owned document at app-plugin://<hash>, never in this origin.
         "worker-src 'self' blob:",
         // frame-src names only the plugin scheme, served by `plugin_scheme.rs`.
         &format!("frame-src {PLUGIN_SCHEME}:"),
         "object-src 'none'",
         "base-uri 'none'",
         "form-action 'none'",
+        // A plugin frame has allow-scripts and allow-same-origin for its own isolated scheme. If it
+        // navigated to this document, it must not become a same-origin child of the renderer.
+        "frame-ancestors 'none'",
     ]
     .join("; ")
 }
@@ -170,31 +160,14 @@ pub enum Source {
     DevServer(String),
 }
 
-pub fn serve(source: &Source, frames: Option<&Frames>, helper_port: u16, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
+pub fn serve(source: &Source, helper_port: u16, request: &Request<Vec<u8>>) -> Response<Vec<u8>> {
+    if !is_app_authority(request.uri()) { return refuse(403); }
     let pathname = request.uri().path().to_string();
+    if pathname.starts_with("/plugin-worker/") { return refuse(404); }
     let dev = match source {
         Source::DevServer(origin) => Some(origin.as_str()),
         Source::Files(_) => None,
     };
-
-    // Ahead of everything, and identical under `pnpm dev`: a plugin worker is read from the cache,
-    // never from the client root and never from Vite. Its policy is its own.
-    if let Some(hash) = plugin_worker_hash(&pathname) {
-        let bytes = frames.and_then(|f| f.bundle_path(hash)).and_then(|path| fs::read(path).ok());
-        return match bytes {
-            // A hash the cache does not hold: a bundle the owner rejected, or one that was swept. The
-            // renderer draws the placeholder; nothing is fetched from the node that offered it.
-            None => refuse(404),
-            Some(body) => Response::builder()
-                .status(200)
-                .header("content-type", "text/javascript; charset=utf-8")
-                .header("content-security-policy", PLUGIN_WORKER_CSP)
-                .header("x-content-type-options", "nosniff")
-                .header("cache-control", "no-store")
-                .body(body)
-                .unwrap_or_else(|_| refuse(500)),
-        };
-    }
 
     let csp = if is_highlight_worker(&pathname) { WORKER_CSP.to_string() } else { renderer_csp(helper_port, dev) };
 
@@ -290,7 +263,12 @@ fn refuse_node_route() -> (u16, String, Vec<u8>) {
 }
 
 fn refuse(status: u16) -> Response<Vec<u8>> {
-    Response::builder().status(status).body(Vec::new()).expect("a bodyless response always builds")
+    Response::builder()
+        .status(status)
+        .header("content-security-policy", "default-src 'none'; frame-ancestors 'none'")
+        .header("x-content-type-options", "nosniff")
+        .body(Vec::new())
+        .expect("a bodyless response always builds")
 }
 
 #[cfg(test)]
@@ -304,9 +282,19 @@ mod tests {
         assert!(csp.contains("script-src 'self';"), "{csp}");
         assert!(!csp.contains("unsafe-inline'; style"), "inline script must not be allowed in a packaged build: {csp}");
         assert!(csp.contains("frame-src app-plugin:"), "{csp}");
+        assert!(csp.contains("frame-ancestors 'none'"), "{csp}");
+        assert!(csp.contains("img-src 'self' data: blob: https://github.com https://avatars.githubusercontent.com"), "{csp}");
         assert!(csp.contains("object-src 'none'"), "{csp}");
         // No wildcard port ever reaches the directive.
         assert!(!csp.contains("127.0.0.1:*"), "{csp}");
+    }
+
+    #[test]
+    fn refusal_responses_cannot_become_renderer_origin_frames() {
+        let denied = refuse(403);
+        assert_eq!(denied.status(), 403);
+        assert_eq!(denied.headers().get("content-security-policy").unwrap(), "default-src 'none'; frame-ancestors 'none'");
+        assert_eq!(denied.headers().get("x-content-type-options").unwrap(), "nosniff");
     }
 
     #[test]
@@ -328,42 +316,36 @@ mod tests {
     }
 
     #[test]
-    fn the_policy_lets_a_plugin_worker_start_without_widening_frame_src() {
+    fn the_policy_only_frames_plugin_origins() {
         let csp = renderer_csp(51234, None);
-        // The directive the tree path needs. `'self'` and not the plugin scheme: a worker script has
-        // to be same-origin with the document that starts it, which is why the shell serves the
-        // bundle itself rather than pointing at `app-plugin://`.
         assert!(csp.contains("worker-src 'self' blob:"), "{csp}");
-        // And nothing about frames moved. A tree is not a rectangle.
         assert!(csp.contains("frame-src app-plugin:"), "{csp}");
         assert!(!csp.contains("worker-src app-plugin:"), "{csp}");
+        assert!(csp.contains("frame-ancestors 'none'"), "{csp}");
     }
 
     #[test]
-    fn only_a_content_addressed_bundle_is_a_plugin_worker() {
-        const HASH: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
-        assert_eq!(plugin_worker_hash(&format!("/plugin-worker/{HASH}.js")), Some(HASH));
-        assert_eq!(plugin_worker_hash(&format!("/plugin-worker/{}.js", HASH.to_uppercase())), None);
-        assert_eq!(plugin_worker_hash("/plugin-worker/.js"), None);
-        assert_eq!(plugin_worker_hash("/plugin-worker/../../etc/passwd.js"), None);
-        assert_eq!(plugin_worker_hash(&format!("/plugin-worker/{HASH}")), None);
-        assert_eq!(plugin_worker_hash("/assets/index-abc.js"), None);
-        // The worker's own policy gives it nothing: no network, no `wasm-unsafe-eval`, no document.
-        assert!(PLUGIN_WORKER_CSP.contains("connect-src 'none'"));
-        assert!(PLUGIN_WORKER_CSP.contains("default-src 'none'"));
-        assert!(!PLUGIN_WORKER_CSP.contains("wasm-unsafe-eval"));
+    fn only_the_exact_renderer_authority_is_served() {
+        for (url, allowed) in [
+            ("app://acorn/index.html", true),
+            ("app://acorn.evil/index.html", false),
+            ("app://acorn:123/index.html", false),
+            ("app://evil@acorn/index.html", false),
+            ("app-plugin://acorn/index.html", false),
+        ] {
+            let uri: Uri = url.parse().unwrap();
+            assert_eq!(is_app_authority(&uri), allowed, "{url}");
+        }
     }
 
     #[test]
-    fn a_plugin_worker_with_no_cache_behind_it_is_a_404_not_the_shell() {
+    fn a_plugin_worker_can_never_be_served_from_the_renderer_origin() {
         const HASH: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
         let request = Request::builder()
             .uri(format!("app://acorn/plugin-worker/{HASH}.js"))
             .body(Vec::new())
             .unwrap();
-        // Before the setup hook has run there are no frames, and the answer must not fall through to
-        // the client root, which would hand a Worker the shell's index.html.
-        let response = serve(&Source::Files(PathBuf::from("/nowhere")), None, 51234, &request);
+        let response = serve(&Source::Files(PathBuf::from("/nowhere")), 51234, &request);
         assert_eq!(response.status(), 404);
     }
 
@@ -392,7 +374,7 @@ mod tests {
 
         let cache_of = |source: &Source, path: &str| -> String {
             let request = Request::builder().uri(format!("app://acorn{path}")).body(Vec::new()).unwrap();
-            let response = serve(source, None, 51234, &request);
+            let response = serve(source, 51234, &request);
             response.headers().get("cache-control").unwrap().to_str().unwrap().to_string()
         };
 
@@ -446,7 +428,7 @@ mod tests {
         });
 
         let request = Request::builder().uri("app://acorn/@fs/plugins/preview/src/client/PreviewTaskPane.tsx").body(Vec::new()).unwrap();
-        let response = serve(&Source::DevServer(origin), None, 51234, &request);
+        let response = serve(&Source::DevServer(origin), 51234, &request);
         assert_eq!(response.status(), 504);
         assert_eq!(response.body(), b"Outdated Optimize\n");
         assert_eq!(response.headers().get("content-type").unwrap(), "text/plain");
@@ -461,7 +443,7 @@ mod tests {
         // Bound and dropped, so the port is closed rather than merely quiet.
         let port = std::net::TcpListener::bind("127.0.0.1:0").unwrap().local_addr().unwrap().port();
         let request = Request::builder().uri("app://acorn/index.html").body(Vec::new()).unwrap();
-        let response = serve(&Source::DevServer(format!("http://127.0.0.1:{port}")), None, 51234, &request);
+        let response = serve(&Source::DevServer(format!("http://127.0.0.1:{port}")), 51234, &request);
         assert_eq!(response.status(), 502);
     }
 

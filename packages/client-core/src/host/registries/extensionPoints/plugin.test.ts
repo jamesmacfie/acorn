@@ -2,10 +2,11 @@ import { describe, expect, it } from 'vitest'
 import { commandRegistry } from '../commands/commands'
 import { paneRegistry, type PaneContribution } from '../panes/panes'
 import { initClientPlugins, type ClientPlugin } from './plugin'
-import { Registry } from '../../../kit/lib/registry'
+import { Registry } from '../../../kit/lib/state/registry'
 import { sourceRegistry, type SourceContribution } from '../sources/sources'
 import { integrationFlowRegistry } from '../sources/integrationFlows'
 import { uiSlotRegistry } from './slots'
+import { settingsRegistry } from '../shell/settings'
 
 // The client half of packages/node-core/src/server/pluginHost/host.test.ts. Registration itself is
 // verified end to end by the e2e suite (S1 asserts the rail's four Source labels in order, S3 the
@@ -85,6 +86,39 @@ describe('the client plugin host', () => {
     ])
     expect(paneRegistry.get('host.own')).toBeDefined()
     clear('linear')
+  })
+
+  it('refuses a settings page filed in a group only core fills, or under a scope that does not exist', () => {
+    const page = (extra: object) => ({ id: 'board-settings', label: 'Board', order: 1, component: () => null, ...extra })
+    expect(() => initClientPlugins([
+      { name: 'board', init: (ctx) => ctx.settingsPages.register(page({ category: 'plugins' })) },
+    ])).toThrow(/settings page 'board-settings': category 'plugins' is not one a plugin can use/)
+    expect(() => initClientPlugins([
+      { name: 'board', init: (ctx) => ctx.settingsPages.register(page({ scope: 'galaxy' as never })) },
+    ])).toThrow(/scope 'galaxy' is not a settings scope/)
+    initClientPlugins([{ name: 'board', init: (ctx) => ctx.settingsPages.register(page({ category: 'agents', scope: 'device' })) }])
+    expect(settingsRegistry.get('board-settings')).toMatchObject({ category: 'agents', scope: 'device' })
+    clear('board')
+  })
+
+  it('refuses a rail switch on a source the page\'s plugin does not own, whichever it registers first', () => {
+    const page = (ids: string[]) => ({ id: 'board-settings', label: 'Board', order: 1, component: () => null, railSourceVisibility: ids })
+    initClientPlugins([{ name: 'other', init: (ctx) => ctx.sources.register(source('host.other')) }])
+    // Another plugin's source, and a core one nobody registered through a plugin.
+    expect(() => initClientPlugins([
+      { name: 'board', init: (ctx) => { ctx.sources.register(source('host.board')); ctx.settingsPages.register(page(['host.board', 'host.other'])) } },
+    ])).toThrow(/settings page 'board-settings' with a railSourceVisibility id 'host.other' that is not one of its sources/)
+    expect(() => initClientPlugins([
+      { name: 'board', init: (ctx) => ctx.settingsPages.register(page(['home'])) },
+    ])).toThrow(/railSourceVisibility id 'home'/)
+    // Its own source is accepted, and the page may come before the source it names.
+    initClientPlugins([
+      { name: 'board', init: (ctx) => { ctx.settingsPages.register(page(['host.board'])); ctx.sources.register(source('host.board')) } },
+    ])
+    expect(settingsRegistry.get('board-settings')?.railSourceVisibility).toEqual(['host.board'])
+    // Core's own pages have no plugin sources to name.
+    expect(() => settingsRegistry.register(page(['host.board']))).toThrow(/railSourceVisibility is for a plugin's own page/)
+    clear('board', 'other')
   })
 
   it('stamps the owner on a command, and a plugin cannot state its own', () => {

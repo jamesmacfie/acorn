@@ -3,7 +3,7 @@ import { QueryClient } from '@tanstack/solid-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { prefsKey } from '@acorn/protocol/api.ts'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
-import type { Disposable } from '../../../kit/lib/registry'
+import type { Disposable } from '../../../kit/lib/state/registry'
 import { PrefKeys } from '../../../infra/persistence/prefKeys'
 import { readDevicePrefs } from '../../../infra/persistence/devicePrefs'
 import {
@@ -135,15 +135,18 @@ describe('the notification settings', () => {
 })
 
 describe('the Settings pages', () => {
-  it('generates one row per registered general page, in the pages’ own order', () => {
+  it('generates one row per page in the rail\'s order, whatever group the page is in', () => {
     const opened: string[] = []
     held.push(settingsRegistry.register({
-      id: 'appearance', label: 'Appearance', group: 'general', order: 10, component: () => null,
+      id: 'runs', label: 'Run history', category: 'automation', order: 20, component: () => null,
     }))
     held.push(settingsRegistry.register({
-      id: 'shortcuts', label: 'Shortcuts', title: 'Keyboard shortcuts', group: 'general', order: 70, component: () => null,
+      id: 'shortcuts', label: 'Shortcuts', title: 'Keyboard shortcuts', category: 'general', scope: 'device', order: 30, component: () => null,
     }))
-    // A workspace page names no workspace on its own; the modal picks one from its own list.
+    held.push(settingsRegistry.register({
+      id: 'appearance', label: 'Appearance', category: 'general', scope: 'device', order: 10, component: () => null,
+    }))
+    // A workspace page names no workspace on its own; settings draws it inside the workspace it picks.
     held.push(settingsRegistry.register({
       id: 'workspace.detail', label: 'Workspace', group: 'workspace', order: 0, component: () => null,
     }))
@@ -151,7 +154,9 @@ describe('the Settings pages', () => {
     register(settingsPageCommands((page) => opened.push(page)))
     const graph = buildCommandGraph(commandRegistry.entries())
     expect(graph.children('core.settings.pages').map((node) => node.title))
-      .toEqual(['Appearance', 'Keyboard shortcuts'])
+      .toEqual(['Appearance', 'Keyboard shortcuts', 'Run history'])
+    expect(graph.children('core.settings.pages').map((node) => node.command.hint))
+      .toEqual(['General', 'General', 'Automation'])
 
     createRoot((dispose) => {
       const row = graph.children('core.settings.pages')[0]
@@ -159,5 +164,24 @@ describe('the Settings pages', () => {
       dispose()
     })
     expect(opened).toEqual(['appearance'])
+  })
+
+  it('adds a row per declared section after the page rows, matching its rows and keywords', () => {
+    const opened: string[] = []
+    held.push(settingsRegistry.register({
+      id: 'terminal', label: 'Terminal', category: 'features', scope: 'device', order: 10, component: () => null,
+      sections: [{ id: 'drawer', label: 'Drawer', rows: ['Default profile'], keywords: ['shell'] }],
+    }))
+
+    register(settingsPageCommands((target) => opened.push(target)))
+    const rows = buildCommandGraph(commandRegistry.entries()).children('core.settings.pages')
+    expect(rows.map((node) => node.title)).toEqual(['Terminal', 'Terminal › Drawer'])
+    expect(rows[1].command.keywords).toEqual(['Default profile', 'shell'])
+
+    createRoot((dispose) => {
+      void (rows[1].command as { run: (context: typeof DETACHED_COMMAND_CONTEXT) => void }).run(DETACHED_COMMAND_CONTEXT)
+      dispose()
+    })
+    expect(opened).toEqual(['terminal#drawer'])
   })
 })

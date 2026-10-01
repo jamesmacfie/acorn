@@ -20,3 +20,4 @@ references/
 
 # Local scratch: test runner artifacts
 test-results/
+.coverage/

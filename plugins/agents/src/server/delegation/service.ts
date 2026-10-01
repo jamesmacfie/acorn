@@ -15,6 +15,7 @@ import type {
   AgentWaitInput,
 } from '../../shared/delegationSchemas'
 import type { ManagedAgentRuntime } from '../sessions/runtime'
+import { findCustomAgent, type CustomAgent } from '../../shared/customAgents'
 import { assistantResult, parseStructuredResult } from '../sessions/resultContract'
 import {
   assertBoundedDelegationConfig,
@@ -120,7 +121,7 @@ export class AgentDelegationService {
     private readonly reconciled: Promise<void> = Promise.resolve(),
   ) {
     this.worktrees = new WorktreeProvisioning(runtime, store, tasks)
-    this.reports = new DelegationReports(runtime)
+    this.reports = new DelegationReports(runtime, store)
   }
 
   async canSpawn(context: ToolContext): Promise<boolean> {
@@ -264,6 +265,18 @@ export class AgentDelegationService {
     }
   }
 
+  /** The custom agent a spawn names, or null when it names none. Naming one and a different profile
+   *  is a contradiction the caller has to resolve, not one to pick a winner for. */
+  private async customAgentFor(input: AgentSpawnInput): Promise<CustomAgent | null> {
+    if (!input.agent) return null
+    const agent = findCustomAgent(await this.runtime.customAgents(), input.agent)
+    if (!agent) throw new ToolError('bad_request', `No custom agent is called '${input.agent}'.`)
+    if (input.profileId && input.profileId !== agent.profileId) {
+      throw new ToolError('bad_request', `${agent.name} runs on '${agent.profileId}'. Leave profileId out.`)
+    }
+    return agent
+  }
+
   private async spawnOnce(
     input: AgentSpawnInput,
     context: ToolContext,
@@ -277,14 +290,21 @@ export class AgentDelegationService {
     if (replay?.provisioningState === 'provisioned' || replay?.provisioningState === 'failed') {
       return spawnResult(replay)
     }
-    const providers = await this.runtime.providers()
-    const profileId = input.profileId ?? caller.profileId
-    const provider = providers.find((candidate) => candidate.profileId === profileId)
+    const custom = await this.customAgentFor(input)
+    const profileId = custom?.profileId ?? input.profileId ?? caller.profileId
+    const provider = await this.runtime.usableProvider((candidate) => candidate.profileId === profileId)
     if (!provider) throw new ToolError('bad_request', `Profile '${profileId}' does not support managed sessions.`)
     if (!provider.installed || provider.authenticated === false) {
       throw new ToolError('bad_request', provider.diagnostics[0] ?? `Profile '${profileId}' is unavailable.`)
     }
-    const toolCeiling = delegatedToolCeiling(context.toolCeiling, input.toolCeiling)
+    // A custom agent narrows like any other ceiling, between the caller's and the one asked for here.
+    const toolCeiling = delegatedToolCeiling(
+      custom?.maxToolRisk ? delegatedToolCeiling(context.toolCeiling, { maxRisk: custom.maxToolRisk }) : context.toolCeiling,
+      input.toolCeiling,
+    )
+    // The agent's options first, so a value the caller names for this one child wins.
+    const configOptions = custom ? { ...custom.options, ...input.configOptions } : input.configOptions
+    if (configOptions) input = { ...input, configOptions }
     let reserved: ReturnType<AgentDelegationStore['reserveShared']>
     try {
       reserved = input.isolation === 'worktree'
@@ -303,6 +323,7 @@ export class AgentDelegationService {
               toolCeiling,
               ...(input.resultSchema ? { resultSchema: input.resultSchema } : {}),
               ...(input.configOptions ? { configOptions: input.configOptions } : {}),
+              ...(custom ? { customAgentId: custom.id } : {}),
             },
           })
         : this.store.reserveShared({
@@ -336,6 +357,7 @@ export class AgentDelegationService {
         kind: 'delegated',
         parentSessionId: caller.managedSession?.id,
         parentTurnId: caller.parentTurnId ?? undefined,
+        ...(custom ? { customAgentId: custom.id } : {}),
         config: {
           delegationSpawnId: reserved.spawn.id,
           toolCeiling,

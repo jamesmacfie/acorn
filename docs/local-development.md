@@ -50,6 +50,28 @@ using it, so start this way when somebody is working in the app while the shell 
 Pick the new binary up by stopping it and starting `pnpm dev` again. Renderer hot reload is Vite's
 and works the same either way.
 
+### Headless CLI development
+
+Build the CLI and terminal bundles, then run the shared launcher. Help needs no Node; read and write
+commands attach to a running local Node. Use a temporary data root when testing service ownership:
+
+```sh
+pnpm --filter @acorn/cli build
+pnpm --filter @acorn/tui build
+pnpm --filter @acorn/node build
+node apps/cli/bin/acorn.mjs --help
+export ACORN_DATA_DIR="$(mktemp -d)"
+node apps/cli/bin/acorn.mjs node start --background --output json
+node apps/cli/bin/acorn.mjs node status --output json
+node apps/cli/bin/acorn.mjs node stop --output json
+```
+
+Keep the same `ACORN_DATA_DIR` for later commands, including `node stop`. The service uses the
+standalone Node bundle. The CLI test
+suite is `pnpm --filter @acorn/cli test`; the extracted artifact check is `pnpm pack:node` followed
+by `npm install --omit=dev` inside the extracted archive. See [CLI](./cli.md) for resource schemas,
+pairing, and end-to-end examples.
+
 ### Agent-driven desktop development
 
 An agent on a graphical development host can launch and drive a real Acorn window without using the
@@ -101,9 +123,139 @@ and host-owned child webviews still require native computer-use control or the r
 The WebDriver dependency and server exist only behind the `agent-automation` Cargo feature used by
 this launcher; normal development and packaged builds do not expose it.
 
+#### Native control of a session
+
+On macOS the launcher runs each session's window from its own copy of the build, wrapped in
+`.acorn/agent-dev/<name>/Acorn Agent Test.app` and signed ad hoc (`apps/desktop/scripts/agent/nativeApp.mjs`).
+A raw `target/debug` executable has no bundle identifier, so a native tool such as Computer Use had
+nothing stable to recognise it by. Every session's bundle uses the identifier
+`com.acorn.desktop.agent-test`, which is not the installed app's `com.acorn.desktop`. One
+**Always allow** for that identifier therefore covers later sessions and rebuilds, and trusts test
+builds rather than the app you use day to day. It also trusts any running session, not only the one
+an agent launched. The bundle gives WebKit its own storage for that identifier, so session windows no
+longer share `localStorage` with a debug build started by `pnpm dev`. They still share it with each
+other.
+
+Before handing a window to a native tool, ask the driver for it:
+
+```sh
+pnpm dev:agent:ui -- --session my-change target
+```
+
+`target` checks that the recorded process is still the launcher's own child running this session's
+executable, so a stopped window whose process ID has been reused is refused rather than reported.
+`stop` makes the same check before it signals anything. The output gives the process ID, the bundle
+identifier, and `app`, the session's own bundle path. Address `app` rather than the identifier,
+because every session shares the identifier. `sharedWith` lists the other running sessions that share
+it. If a native tool cannot tell those windows apart by path, stop the other sessions yourself. The
+driver never picks a window for you or stops another session. Use `target` for native menus, dialogs,
+and child webviews, keep the WebDriver commands for the main renderer, and end with `stop`.
+Computer Use keeps any grant itself ([managed-agents.md](./managed-agents.md) § App-access approval).
+Windows and Linux sessions run the raw executable and have no native identity.
+
+### Agent-driven terminal development
+
+Start an isolated terminal session from the checkout. It seeds the same Node data as the desktop
+agent launcher, checks the native Node ABI, builds the Node and TUI, and runs the compiled TUI
+inside a PTY with an 80 by 24 terminal by default:
+
+```sh
+pnpm dev:tui:agent -- --session tui-check --fixture tui-navigation
+```
+
+Keep that terminal open. In another terminal, inspect and drive the live screen:
+
+```sh
+pnpm dev:tui:agent:ui -- --session tui-check snapshot
+pnpm dev:tui:agent:ui -- --session tui-check press Tab
+pnpm dev:tui:agent:ui -- --session tui-check type "search text"
+pnpm dev:tui:agent:ui -- --session tui-check paste "pasted text"
+pnpm dev:tui:agent:ui -- --session tui-check resize 120 40
+pnpm dev:tui:agent:flow -- --session tui-check navigation
+pnpm dev:tui:agent:ui -- --session tui-check stop
+```
+
+`press` accepts a key or chord such as `Escape`, `Shift+Tab`, or `Ctrl+P`. `type` sends text as
+keystrokes; `paste` uses bracketed paste. The default `kitty` keyboard mode exercises the TUI's
+enhanced-key parser; `--keyboard legacy` exercises its fallback. Pass `--cols` and `--rows` to the
+launcher for a different initial size. `--onboarding` starts with an empty profile. With no fixture,
+the launcher adds `--project PATH` or the checkout as a local project. A fixture supplies its own
+project and cannot be combined with `--project` or `--onboarding`.
+
+The session manifest, Node data, TUI config, input trace, raw ANSI output, and flow reports live
+under `.acorn/agent-dev/tui/<session>/`. A stopped name needs `--reuse` to reopen its data. The
+driver listens only on loopback and keeps its control secret in the private session manifest. `stop`
+ends the PTY process; the launcher drains its child Node. A text snapshot is the terminal's visible
+cells at that size, so take another snapshot after each navigation step or resize.
+
+For a direct comparison, start a desktop window with the same fixture, profile, and seed, then run
+the desktop comparison flow:
+
+```sh
+pnpm dev:agent -- --session desktop-check --fixture tui-navigation
+pnpm dev:agent:ui -- --session desktop-check flow tui-navigation
+pnpm dev:agent:ui -- --session desktop-check stop
+```
+
+The two launchers keep separate data roots but generate the same scenario. Compare the task roster,
+workspace switcher, task panes, Changes, and agent content at 80 by 24 and 120 by 40. The flow
+reports and captured text provide repeatable checkpoints; inspect the live screens for focus,
+truncation, scrolling, and terminal-specific key behavior. Shared pane content comes from the same
+client-core code, while the terminal kit and chrome render it into cells. A different control layout
+can be expected; missing task information or unreachable navigation needs investigation.
+
 Working on a loaded plugin is `pnpm dev:plugin <id>` beside one of those. It rebuilds the plugin's
 package on every save. [plugins.md](./plugins.md) § The dev loop has the whole loop, including which
 target to build into and why the node restarts.
+
+### Large-surface flow
+
+The large-surface fixture puts a very large diff and a long agent transcript in front of the real
+window without GitHub ([testing.md](./testing.md) § Large-surface fixture):
+
+```sh
+pnpm dev:agent -- --session large-surfaces --fixture large-surfaces --profile scale
+pnpm dev:agent:ui -- --session large-surfaces flow large-surfaces
+pnpm dev:agent:ui -- --session large-surfaces stop
+```
+
+`--fixture large-surfaces` replaces the checkout as the project. The launcher generates a Git
+repository under the session directory at `fixture/repo`, commits the base side of every file, and
+leaves the head side in the working tree. It then adds that repository as the project, adds a task
+that runs in the project folder, and writes the review notes and a stopped agent session into the
+Changes and Agents databases through their testkits (`apps/desktop/scripts/agent/seed.ts`).
+`--profile` is `small` (the default), `scale`, or `canonical`, and `--seed` picks the data (default
+1). The manifest's `fixture` block records the profile, seed, digest, counts, and the task and session
+IDs. `--reuse` keeps a session's fixture rather than generating it again. A fixture brings its own
+project, so it refuses `--project`, `--onboarding`, and `--smoke`.
+
+`flow NAME` runs the file of that name in `apps/desktop/scripts/agent/flows/`. The `large-surfaces`
+flow opens the task's Changes pane cold and sweeps the diff from top to bottom and back. It opens a
+comment composer and deletes a note, resizes the window, collapses the file list and a file,
+switches to split and back, and jumps to a file. Then it leaves and returns, opens the transcript,
+checks it mounted no more than 400 turns, presses **Show earlier** once and checks again, jumps to
+its oldest and newest turns, and leaves the task. The transcript counts as mounted when every turn
+is drawn or hidden behind **Show earlier**. After each stage it reads the
+rendered-surface health snapshot ([telemetry.md](./telemetry.md) § Rendered-surface health). It
+waits on health conditions and animation frames, not fixed sleeps.
+
+A flow file is data. Each step is one action from a fixed list (`click`, `fill`, `wait`, `scroll`,
+`resize`, `frames`, `checkpoint`, `assert`, `repeat`). It targets controls by role and accessible
+name, and names its wait conditions and invariants. A field the runner does not know is refused, so a
+flow cannot carry a script. `repeat` is capped at 20 and cannot nest.
+`apps/desktop/scripts/agent/flow.mjs` owns the list.
+
+The report is written to `reports/` in the session directory as JSON, named for the flow, the
+profile, and the start time, and a short summary is printed. The report holds the environment (OS,
+CPU, memory, engine user agent, build), the fixture, each stage's waits in milliseconds, each
+checkpoint's snapshot, every invariant with the numbers it was decided on, and the `acorn:` spans on
+the performance timeline. The command exits non-zero when an invariant failed, after the whole flow
+has run and the report is saved.
+
+The window must stay visible for the whole run, for the reason in
+[Timing a task switch](#timing-a-task-switch): a covered window runs no animation frames, so the diff
+never draws. The runner checks `document.visibilityState` first and stops with that explanation
+rather than timing out.
 
 ## Native ABI
 
@@ -293,6 +445,9 @@ request counts still measure correctly in a hidden window, but a paint does not 
 puts them, all core and plugin migration chains, the plugin frame stylesheet, and the pinned Node
 runtime where the bundler will find them. The staging check detects missing artifacts but cannot
 identify stale output by itself, so build order is `package.json`'s job.
+`apps/cli` emits the headless bundle and launcher, while `apps/tui` emits the interactive bundle.
+`pnpm pack:node` stages all three in one archive with the runtime dependencies named by its generated
+manifest.
 
 ## Data and credentials
 

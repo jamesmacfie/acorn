@@ -1,7 +1,7 @@
 import { createSignal, Show } from 'solid-js'
 import { Alert, Button, CodeBlock, Input, Modal, ModalActions, ModalBody, Textarea } from '@acorn/plugin-api/ui/tree'
 import type { DbSavedQuery } from '../shared/database'
-import type { createDatabaseClient } from './databaseClient'
+import type { DatabaseClient } from './databaseClient'
 
 // Save the editor's SQL under a name for this project. Saving under a name that already exists
 // overwrites it, so the button says "Overwrite" when it will. The notes travel with the query into the
@@ -11,7 +11,7 @@ import type { createDatabaseClient } from './databaseClient'
 // a tree is not confined to a rectangle the way the iframe was. That is the one visible difference the
 // move made here, and it is the better of the two.
 export default function SaveQueryModal(props: {
-  client: ReturnType<typeof createDatabaseClient>
+  client: Pick<DatabaseClient, 'saveQuery'>
   taskId: string
   sql: string
   name: string // pre-filled from the last loaded query, so load → tweak → Save updates in place

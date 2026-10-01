@@ -1,9 +1,13 @@
+import { readFile, writeFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
+import { resolve } from 'node:path'
 import { Hono } from 'hono'
 import { z } from 'zod'
-import type { Project, ProjectsResponse } from '@acorn/protocol/api.ts'
+import type { Project, ProjectMcpFile, ProjectsResponse } from '@acorn/protocol/api.ts'
+import { inspectMcpConfig, MCP_CANDIDATES, STARTER_MCP_JSON } from '@acorn/protocol/mcp.ts'
 import { isValidProjectColor } from '@acorn/protocol/projectColor.ts'
 import { createProject, deleteProject, detectProject, getProject, listProjects, patchProject, type ProjectRow } from '../../projects'
-import { getProjectConfig, setProjectConfig, setProjectRunTargets } from '../../projectConfig'
+import { getProjectConfigWithRepo, setProjectConfig, setProjectRunTargets } from '../../projectConfig'
 import { getDb } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
 import { respondError } from '../../respond'
@@ -61,6 +65,26 @@ export const toWireProject = (row: ProjectRow): Project => ({
   github: row.githubOwner && row.githubName ? { owner: row.githubOwner, name: row.githubName, repoId: row.githubRepoId } : null,
 })
 
+// MCP config inspector (docs/mcp.md § Configuration): read only the known candidate files and mask
+// secrets here, so raw values never cross to the renderer. Read-only, since acorn never launches these
+// servers. Keyed by project rather than by task, because the files that matter are the ones committed
+// to the project, which every task's worktree checks out, so Settings shows the same servers whether or
+// not a task is open. A project with no folder yet reads the home file alone.
+async function inspectProjectMcp(root: string | null): Promise<ProjectMcpFile[]> {
+  const out: ProjectMcpFile[] = []
+  for (const candidate of MCP_CANDIDATES) {
+    const base = candidate.root === 'home' ? homedir() : root
+    if (!base) continue
+    const file = resolve(base, candidate.rel)
+    try {
+      out.push({ file, servers: inspectMcpConfig(await readFile(file, 'utf8')) })
+    } catch {
+      // absent file → not listed
+    }
+  }
+  return out
+}
+
 export const projects = new Hono<AppEnv>()
   .get('/', async (c) => {
     const rows = await listProjects(getDb(c.env))
@@ -79,7 +103,7 @@ export const projects = new Hono<AppEnv>()
     return c.json(toWireProject(row))
   })
   .get('/:id/config', async (c) => {
-    const response = await getProjectConfig(getDb(c.env), c.req.param('id'))
+    const response = await getProjectConfigWithRepo(getDb(c.env), c.req.param('id'))
     if (!response) return respondError(c, 404, 'not_found', ['No such project.'])
     return c.json(response)
   })
@@ -89,6 +113,28 @@ export const projects = new Hono<AppEnv>()
     const result = await setProjectConfig(getDb(c.env), c.req.param('id'), parsed.data.patch)
     if (!result.ok) return respondError(c, result.reason === 'No such project.' ? 404 : 400, result.reason === 'No such project.' ? 'not_found' : 'bad_request', [result.reason])
     return c.json(result.response)
+  })
+  .get('/:id/mcp', async (c) => {
+    const row = await getProject(getDb(c.env), c.req.param('id'))
+    if (!row) return respondError(c, 404, 'not_found', ['No such project.'])
+    return c.json(await inspectProjectMcp(row.path))
+  })
+  // Seeds an empty .mcp.json in the project's folder, never over an existing one. The folder rather than
+  // a task's worktree, because that is where the page reads it from; a task on a new branch picks it up
+  // once it is committed.
+  .post('/:id/mcp/starter', async (c) => {
+    const row = await getProject(getDb(c.env), c.req.param('id'))
+    if (!row) return respondError(c, 404, 'not_found', ['No such project.'])
+    if (!row.path) return c.json({ ok: false, reason: 'This project has no folder on this node yet.' })
+    // `wx` refuses any path that is already there, a symlink included, even one pointing nowhere. A
+    // check before the write would follow a committed link and write wherever it points.
+    try {
+      await writeFile(resolve(row.path, '.mcp.json'), STARTER_MCP_JSON, { encoding: 'utf8', flag: 'wx' })
+    } catch (error) {
+      const code = (error as NodeJS.ErrnoException).code
+      return c.json({ ok: false, reason: code === 'EEXIST' ? '.mcp.json already exists.' : `Could not write .mcp.json: ${code ?? 'unknown error'}.` })
+    }
+    return c.json({ ok: true })
   })
   .put('/:id/run-targets', async (c) => {
     const parsed = runTargetsBody.safeParse(await c.req.json().catch(() => null))

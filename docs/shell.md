@@ -112,6 +112,19 @@ the same fail-quiet stance `deviceTokenStore.ts` takes and the same blast radius
 The helper opens only this installation's custody root. Its handshake carries the current data key
 and paths; it does not read credentials from another application root.
 
+### Device config file
+
+The helper also owns `<userDataDir>/acorn.json`, a data-only projection of covered device
+preferences and requested device plugin sources. It watches the directory for edits and sends a
+`config-changed` push to the renderer. A read or write crosses the same helper socket as plugin
+custody through `config-read` and `config-write`; `config-location` supplies the path for Settings.
+Settings can ask the native shell to open that file; the shell creates an empty object first when
+the file does not yet exist.
+The helper writes atomically and preserves unknown keys from the last valid file. A parse error
+returns its line and column and leaves the last valid configuration active. The schema is generated
+from `@acorn/protocol/deviceConfig.ts` and committed as
+`packages/plugin-types/acorn-device.schema.json`.
+
 ## Node child
 
 The helper starts the staged `service.js` under the runtime it is itself running, the bundled Node:
@@ -199,6 +212,7 @@ way for the same kind of reason: it runs client-core in process
 | Every request to a node | `packages/custody/src/broker/nodeBroker.ts` | histogram `broker.request` with the node id and the method |
 | The socket's health | the same file | events `broker.reconnect`, `broker.degraded`, `broker.shed` and `broker.missed-pong`, each with the node id |
 | A node that died | `packages/custody/src/supervision/crashBudget.ts` | event `node.crash` with the count in the window; a fatal error when the budget is spent |
+| Memory, every 30 seconds on macOS | `packages/custody/src/telemetry.ts`, answered by the shell | gauge `runtime.memory.footprint` in bytes, for the helper and, in its own batch, the renderer. See § What the shell reports |
 | Every bridge call | `apps/desktop/src/shell/bridge.ts` | histogram `bridge.call` with the helper method, from the renderer |
 | Console lines | everywhere under `packages/custody/src` and `apps/desktop/src/helper` | log records through `createLogger(tag)` |
 
@@ -225,7 +239,9 @@ arrives after the boot is over. They are held either way, because `ACORN_PERF=1`
 
 ### What the shell reports
 
-One thing, and it arrives a launch late. A panic hook runs while the process is dying: it can write
+Two things: a crash record, a launch late, and memory numbers when the helper asks.
+
+A panic hook runs while the process is dying: it can write
 a file and nothing else, and the helper is this process's child and is going with it. So
 `apps/desktop/src-tauri/src/crash.rs` installs `std::panic::set_hook` as soon as `boot` has resolved
 the two roots, and a panic writes `shell-crash.json` into the custody root with the message, the
@@ -239,6 +255,24 @@ of the install.
 
 The file is the telemetry error record's own shape, minus the `kind` the reader adds. That is
 deliberate. A crash reporter in the shell, a native dialog offering to send it, reads the same file.
+
+The memory numbers exist because WebKit gives a page no way to read its own process's memory, and the
+renderer's process is the one that grows. Every 30 seconds while the switch is on, and only on macOS,
+the helper prints `{"acorn-helper":"footprint-request"}` on stdout. `apps/desktop/src-tauri/src/footprint.rs`
+answers on the helper's stdin with
+`{"command":"footprint","renderer":<bytes>|null,"helper":<bytes>|null}`. The helper emits its own
+number through its collector and posts the renderer's in a batch named `renderer`, both as
+`runtime.memory.footprint` ([telemetry.md](./telemetry.md) § Memory over a day).
+
+The helper owns the timer and the consent check, so a shell whose telemetry is off is never asked.
+The shell reads the main window's web content process through `_webProcessIdentifier`, a private
+WKWebView selector that WebKit has kept stable for years; wry and Tauri expose no public way to ask.
+It checks that the view answers the selector first, because an unknown one raises an Objective-C
+exception that would abort the process. The pid is read on every request, on the main thread,
+because WebKit replaces a crashed web content process with a new one under a new pid. The footprint is
+`proc_pid_rusage(pid, RUSAGE_INFO_V4)`'s `ri_phys_footprint`. A process that cannot be read, including
+a renderer being replaced, answers null. Host-owned child webviews are not measured. On any other
+platform the helper does not ask and the shell ignores the request.
 
 ## Renderer origin and protocol handler
 
@@ -258,6 +292,18 @@ parses as JSON is the worst answer available.
 
 Development proxies the Vite dev server through this same handler rather than loading `devUrl`
 directly, so developers exercise the origin the shipped app uses.
+
+Before it opens a development window, the shell requests `src/client/index.tsx` from Vite and waits
+for that entry module to settle. Tauri's own `devUrl` check requests only `index.html`, which Vite can
+serve while it is still rebuilding the optimized dependency graph; opening on that weaker signal let
+the entry request receive Vite's transient 504, and the window worked only after a manual reload. The
+shell retries that 504 and a temporarily unavailable socket for up to 30 seconds. Any other HTTP
+status ends the wait so the real Vite transform error reaches the startup guard instead of becoming a
+readiness timeout. The same check covers `tauri dev` and isolated automation sessions. Vite can
+invalidate the graph again while the window is loading. If the development entry script then fails,
+the page's startup guard probes it, shows a brief loading message, and reloads up to four times for
+a transient 502–504 or a newly settled JavaScript response. It leaves a transform error on the
+failure screen, and a successful mount clears the retry count.
 
 **The proxy forwards what Vite said, including a refusal.** A non-2xx is an answer, not a transport
 failure, and `ureq` reports both as `Err`. Two of them turn up on a cold launch: 504 is how Vite asks
@@ -301,7 +347,7 @@ test reads the JSON back and fails if `windows` reappears.
 preview pane is a child webview rather than a frame, so widening this for `http(s)` would buy
 nothing. Two more directives carry their own reason: `style-src 'unsafe-inline'` is required because
 Shiki emits `style="color:#…"` attributes into HTML that reaches `innerHTML`, and style attributes
-are gated independently of `el.style.x = v` assignments; `img-src https:` exists for GitHub avatars
+are gated independently of `el.style.x = v` assignments; remote images are limited to GitHub avatar hosts
 rendered in PR authorship (`kit/components/content/UserAvatar.tsx`), and narrowing it to the two GitHub avatar hosts is a
 one-line change once nothing else renders a remote image.
 
@@ -352,37 +398,47 @@ reader gets has the shell's focus handling, keyboard model, ARIA and style pack,
 iframe can borrow. `docs/plugins.md` § The client half of a loaded plugin has the plugin-facing half;
 this section is the shell's.
 
-The worker script is the plugin's own bundle, served by `app_scheme.rs` at
-`app://acorn/plugin-worker/<sha256>.js` from the same content-addressed cache the plugin scheme reads.
-It is served from *this* origin rather than from `app-plugin://<hash>` because a worker script has to
-be same-origin with the document that starts it; there is no way to point `new Worker()` at another
-scheme. The hash in the path is validated as 64 lowercase hex digits before the read, so the path can
-name a bundle this device holds and nothing else, and a hash the cache does not hold is a 404 rather
-than a fall-through to the client root — a Worker handed the shell's `index.html` would be a strange
-failure to debug.
+The renderer embeds a hidden, host-owned document at `app-plugin://<sha256>/worker.html`. That
+document loads only `/worker-host.js`, also written by the shell. It creates a module Worker from
+`/client.js`, so the plugin bundle executes under its own content-addressed origin and cannot read
+the renderer's IndexedDB, cache, or other same-origin storage. The renderer checks the relay frame's
+window, exact origin, and per-instance nonce before it transfers the bridge and tree ports. The relay
+checks its parent origin, nonce, protocol version, and port count before passing them to the Worker.
+There is no fallback that executes the bundle at `app://acorn` if the relay or Worker fails; the tree
+shows a failure. The old `/plugin-worker/*` renderer route now returns 404.
 
 The bytes are identical to what the frame origin serves as `/client.js`, and so is the trust decision:
-the owner accepted a bundle hash, and a worker is that hash with a different host. Nothing about the
-worker path asks a second question.
+the owner accepted the exact `(pluginId, hash)` pair. The worker path asks no second question.
 
-Its policy is its own, for the reason the highlighter's is (above): a same-origin worker takes its CSP
-from its own script's response headers. `PLUGIN_WORKER_CSP` is
-`default-src 'none'; script-src 'self'; connect-src 'none'` — tighter than the highlighter's, with no
-`wasm-unsafe-eval`, because a plugin bundle is a stranger's code and nothing a tree draws needs one.
-`connect-src 'none'` is the load-bearing directive it shares with the frame origin: fetch, XHR,
-WebSocket and `sendBeacon` all fail inside the worker, so the transferred `MessagePort` is the only way
-out of it. The document's `worker-src` names `'self' blob:` and never the plugin scheme.
+The relay document's CSP allows only its host script and one same-origin Worker. The bundle's own
+response has `default-src 'none'; script-src 'self'; worker-src 'none'; connect-src 'none'`, with no
+`wasm-unsafe-eval`. `connect-src 'none'` blocks direct network I/O; the transferred ports are its
+only host channel. The normal plugin frame document still has `worker-src 'none'`. The renderer's
+`worker-src` remains for its own highlighter only, and its `frame-src` admits the plugin scheme.
 
-The renderer's half is `packages/client-core/src/host/tree/`: `workerHost.ts` shares one worker per
-bundle hash for capable SDKs, with per-slot bridge authority and a bounded idle grace pool. Legacy
-SDKs use equivalent immutable authority contexts and terminate on their last lease.
+On Windows, Wry maps custom schemes to HTTP origins (`app://acorn` to `http://app.localhost` and
+`app-plugin://<hash>` to `http://app-plugin.<hash>`). The handshake accepts these exact mapped
+origins. A 64-character hash host has not been verified in WebView2; if that engine rejects the
+mapped hostname, the tree fails closed and cannot fall back to renderer-origin execution.
+
+The renderer's half is `packages/client-core/src/host/tree/`: `workerHost.ts` shares one modern worker
+per accepted `(pluginId, hash)`, with a distinct bridge port, focus, document, and selection context
+for every mounted slot. Modern workers have a bounded idle grace pool. Legacy SDKs use one immutable
+slot-affine worker per mounted tree and terminate with its final lease.
 [Mounted bridge ownership](./plugins/descriptors.md#mounted-bridge-ownership-and-sdk-compatibility)
-defines compatibility, admission, and idle bounds; `TreeHost.tsx` validates and applies each batch and is the only thing that turns a handler id
-into a function. A worker that misses two heartbeats is terminated and every tree it served is removed
-from the UI. The failure remains in the plugin diagnostics instead of replacing the contribution with
-an inline error.
+defines compatibility, admission, and idle bounds. `TreeHost.tsx` validates and applies each batch and
+is the only thing that turns a handler id into a function. A worker that misses two heartbeats is
+terminated and every tree it served is removed from the UI. The failure remains in plugin diagnostics
+instead of replacing the contribution with an inline error.
 
 ### The renderer bridge
+
+The `plugins` group exposes `plugins-install` and `plugins-remove` beside state, cache put, trust
+recording, and development grants. The helper validates the source, reads the manifest, hashes the
+bundle, and returns metadata; no executable bytes cross into the renderer over this bridge.
+`plugins-state` includes source provenance, the source label, and the validated device manifest so
+the client can re-check admission. A host that omits either install or remove fails platform contract
+validation.
 
 `apps/desktop/src/shell/bridge.ts` is built as one IIFE and injected as the window's initialization
 script, which runs before any page script. It assembles the narrow, validated `window.acorn` surface
@@ -392,15 +448,21 @@ commands. It never exposes a node token, a certificate, a database handle, or a 
 
 One thing on that socket is not JSON: terminal output. The helper's push channel carries a binary
 frame beside the JSON messages, tagged with the node id, wrapping the frame the node sent, which is
-itself tagged with the session id (`packages/protocol/src/ws.ts` § The one binary frame). The bridge
+itself tagged with the session id (`packages/protocol/src/transport/ws.ts` § The one binary frame). The bridge
 sets `binaryType = 'arraybuffer'`, peels the node id, and hands the rest to
 `packages/client-core/src/infra/node/wsClient.ts` through the seam's `onBytes`, which is the one module
 that reads the session id and the one place the bytes become text. So a busy build's output crosses two
 process boundaries with two copies and no parse, where it used to be JSON-escaped once per attached
 socket on the node and stringified again here. Request and response bodies stay base64 in the JSON
-messages: nothing else on this wire is measured in frames per second, and the largest body measured,
-the agent snapshot's first page at about 2 MB on 2026-09-03, is an order of magnitude under the
-ceiling `apps/desktop/src/shell/wire.ts` names.
+messages. The helper accepts at most 16 MiB per incoming serialized request before JSON parsing,
+including base64 and envelope bytes. This accommodates an 8 MiB binary body with encoding overhead.
+An oversized request closes with WebSocket code 1009 before dispatch.
+
+This request limit does not restrict outgoing replies. Custody bounds an HTTP response body to
+64 MiB before the helper encodes it, which can produce about 85.4 MiB of base64 plus its envelope.
+The renderer uses the browser WebSocket API, which offers no native receive-message ceiling.
+The Node broker owns the HTTP response bound and the 8 MiB Node-event receive bound. Peer errors and
+late replies are contained by the helper, and closing it terminates its live sockets and watchdogs.
 
 The file dialogs are the folder picker, `pick_files`, and `save_file`. The last two carry bytes, not
 paths: the renderer sends a byte array to save and receives one per file it picked, base64 in both
@@ -416,19 +478,20 @@ initialised in `src-tauri/src/lib.rs` for `app.notification()` alone: the render
 plugin's own commands, so `capabilities/default.json` still grants `core:default` and nothing else,
 and a page in the preview pane or a plugin webview cannot raise a banner wearing acorn's icon.
 
-The plugin gives desktop no activation callback, so `show_notification` records the notice id it
-raised a banner for and `window_focused` emits `acorn:notification-activated` when the main window
-comes back within 30 seconds. That is a guess, and a wrong one costs a task selection the owner did
-not ask for. Both halves of the alternative are worse: no click handling at all, or a second
-notifier process to shell out to.
+Window focus never opens a notification target. On macOS, `src-tauri/src/notifications.rs` posts
+through `mac-notification-sys` and waits for the native response on a background thread. Only a
+content click focuses the main window and emits `acorn:notification-activated`, carrying that banner's
+own notice id. Delivery, dismissal, and returning through the Dock or Cmd-Tab preserve the view.
+Multiple banners retain independent tags, so clicking an earlier banner opens its own target.
+Other desktop platforms use the Tauri notification plugin to show banners; its desktop API supplies
+no activation callback, so those banners do not select a task. The notification bell remains clickable
+on every platform. The command's boolean acknowledges submission, not interaction or OS delivery.
 
 macOS attaches a banner to an installed app, not to a running process, and `tauri dev` runs a bare
-binary with no bundle around it. The plugin's answer is to post dev banners as `com.apple.Terminal`,
-which is why they arrive titled Terminal with a terminal icon. `borrow_installed_identity` in
-`src-tauri/src/commands.rs` looks up whichever acorn the machine has installed and claims its
-identity before the plugin claims Terminal's, so a dev banner carries the acorn name and icon. It
+binary with no bundle around it. `src-tauri/src/notifications.rs` looks up whichever acorn the machine
+has installed and claims its identity, so a dev banner carries the acorn name and icon. It
 needs an acorn in `/Applications` or a `tauri build` bundle the system has seen; with neither, the
-Terminal banner stands, because an identity macOS cannot resolve leaves the process unable to post at
+`com.apple.Terminal` is the fallback, because an identity macOS cannot resolve leaves the process unable to post at
 all rather than falling back.
 
 The bridge also tells the shell what colour the app is. On macOS the window is built with
@@ -468,7 +531,9 @@ than a fetch. Phase 0 measured the arrangement in WKWebView: each hash is a real
 storage, `'self'` resolves against it, and the per-response CSP is honoured.
 
 Only `/index.html`, generated by the shell so the plugin never controls its own head, `/client.js`,
-and the host-owned `/ui.css` presentation kit exist there. The stylesheet is a staged file the
+the host-owned `/ui.css` presentation kit, and the host-owned tree relay document/script exist there.
+The relay document does not load the plugin bundle in its window; it creates a Worker for it.
+The stylesheet is a staged file the
 handler reads once at boot; `apps/desktop/scripts/stage.mjs` holds the ordered list of client-core
 modules that make it up, and `packages/client-core/src/infra/styles/cssHygiene.test.ts` reads that list and
 checks a frame is served a base rule for every class `primitives.css` styles. The handler resolves a
@@ -488,7 +553,7 @@ frame's only I/O is the `MessagePort` the shell transfers in, where each call is
 plugin's declared scopes (`docs/plugins.md`). The renderer's own CSP names this scheme in `frame-src`
 and nothing else.
 
-There is no `x-frame-options` or `frame-ancestors` on these responses: the shell frames a plugin from
+There is no `x-frame-options` or `frame-ancestors` on plugin responses: the shell frames a plugin from
 `app://acorn`, a different origin, so `SAMEORIGIN` would block the only embed that is meant to work.
 What bounds who can frame a plugin is that nothing else in this process can. The shell's own CSP is
 the only one naming this scheme in `frame-src`, and top-level navigation to it is denied below.
@@ -498,13 +563,20 @@ is nothing to gain and one more place for stale bytes to live.
 
 ### Navigation policy
 
-The window's `on_navigation` guard admits `app://acorn` and `app-plugin://` and refuses everything
-else. It fires for subframes as well as the main frame, which is the one guard covering both halves
+The window's `on_navigation` guard admits the exact `app://acorn` origin and hash-shaped
+`app-plugin://<hash>` origins (including Wry's mapped forms on Windows) and refuses everything else.
+It fires for subframes as well as the main frame, which is the one guard covering both halves
 Electron needed two events for: a plugin origin can never become the whole window, and a plugin frame
 cannot navigate itself off its own document. Returning false leaves the frame where it was, verified
 in phase 0. There is no OAuth exception: GitHub connects by device flow against the node
 (`POST /v1/p/github/auth/device/start`), so no window ever has to navigate to github.com.
 `on_new_window` denies `window.open` from anywhere, plugin frames included.
+
+The renderer response itself carries `frame-ancestors 'none'`. This is required even with the
+navigation callback: an isolated plugin iframe uses `allow-scripts allow-same-origin`, and must never
+load an `app://acorn` document as its child document, where it could become same-origin with the
+parent. The app scheme handler also refuses every authority other than `app://acorn`; a string-prefix
+lookalike such as `app://acorn.evil` never receives renderer assets.
 
 A frame's rendered content therefore reaches the outside world only by asking, over the bridge.
 `ui.openUrl` hands an `https` URL to the shell, which resolves it in-app if a content-link recogniser
@@ -532,6 +604,13 @@ scheme with no CORS.
 The renderer calls `nodeFetch(nodeId, request)` and the stream methods over the helper socket. The
 broker adds the bearer, validates the pinned certificate, and returns serializable response bytes.
 Node states are `online`, `degraded`, `offline`, `incompatible`, and `revoked`.
+
+The broker buffers each HTTP response before it crosses to the renderer, so custody caps ordinary
+responses at 64 MiB. A plugin bundle download has the tighter 8 MiB limit of the bundle format;
+the unverified pairing probe allows 16 KiB and the pinned pairing result 64 KiB. Each limit rejects
+an oversized declared `Content-Length` before reading, and counts actual chunks when the length is
+absent or false. The socket is closed as soon as the limit is crossed. A response limit error is a
+failure of that read, not evidence that the Node is offline.
 
 Both ends run a ping and pong watchdog. A sequence gap or watchdog failure makes the node stale and
 causes the client to reconnect and refetch, with one exception: a `ws:shed` marker says the node
@@ -608,15 +687,19 @@ revoked.
 `apps/desktop/src-tauri/src/webviews.rs` owns every child webview: the browser preview pane and
 loaded-plugin webview surfaces. It is one module rather than three because the difference between the
 two products is a policy function and a key prefix. Keys are `preview:<taskId>` and
-`plugin:<pluginId>:<nodeId>[:<surface>]`, and the prefix is validated rather than assumed, because it
-is what selects the policy.
+`plugin:<pluginId>:<nodeId>:<surface>[:<taskId>]`; the node ID keeps each node's page storage and
+navigation state separate. The prefix and key shape are validated because they select the policy.
 
 A child webview under `Window::add_child` composites over the main one and takes logical bounds from
 the renderer's pane geometry. It does not inherit DOM overflow clipping, so the renderer intersects
 the host element with the viewport and every clipping ancestor before it sends those bounds. The
 child hides when no visible area remains or an overlay covers the pane. `incognito(true)` gives it
-its own ephemeral data store. Preview is one kept-alive webview per task, restricted to HTTP and
-HTTPS URLs with no credentials, with an external chrome layer the renderer draws. In development,
+its own ephemeral data store. Local-node preview is one kept-alive webview per task, restricted to
+HTTP and HTTPS URLs with no credentials, with an external chrome layer the renderer draws. Remote-node
+preview is unavailable: the native webview has no network-level policy for page subrequests, so a
+remote page could reach services on the client's private network even when its first request goes
+through a preview tunnel. The pane explains this and evicts an existing view when its node becomes
+remote. In development,
 the preview's DevTools button addresses that child handle rather than the main renderer and reapplies
 the child's bounds after WebKit opens its inspector. A loaded plugin's webview surface is checked
 against its manifest hosts by the renderer broker and again here, and two independent checks is the
@@ -625,8 +708,62 @@ caps what a renderer bug that ensures in a loop can cost.
 
 wry exposes no navigation history, so the shell keeps its own. `on_navigation` reports every
 navigation, including the ones page script drives, and the module marks the traversals it asked for
-so they move the cursor instead of truncating the future. That is what lets the pane offer back and
-forward honestly rather than always-enabled.
+so they move the cursor instead of truncating the future. The callback reads the record's live host
+policy on every navigation. When `ensure` receives a changed policy, the shell swaps that policy and
+closes the old native view before opening a fresh one; this also cancels an in-flight navigation and
+discards a page or history entry on a now-revoked host. An empty or invalid replacement retires the
+old view. A failed replacement is reported to the pane.
+If native close fails, the shell hides and tries to blank the invalidated view, refuses further
+show/load/command calls for it, and retries close on the next `ensure`.
+
+`ensure` reconciles a normalized configured home independently of the page's browsing location.
+Rust uses Tauri's URL parser, preserving paths, ports, queries, and fragments. Equal homes and equal
+policies reuse the native document, even after a redirect or address entry. A changed home navigates
+once after native navigation accepts it. Failed navigation leaves the applied home unchanged, so a
+return or **Retry preview** can try again. **Home**, **Reload**, address entry, and history traversal
+remain explicit browser operations.
+
+The bridge registers its state listener before invoking `ensure`. Every successful reconciliation
+replays the retained URL, loading state, and shell history cursor to the mounted toolbar. It does not
+substitute the configured home for the browsing location. Operations are ordered per native key.
+Eviction advances that key's generation immediately, suppresses queued work, and orders retirement
+before any replacement. Retired native callbacks read a denied policy and stop reporting page loads.
+
+Pane cleanup removes observers and hides only its task's view. Overlay visibility changes do not call
+`ensure`. Pending configuration reads and authoritative absent URLs hide without evicting. A resolution
+error or native refusal offers **Retry preview**. A Node switch retires the shell's preview family,
+including records that outlived a renderer reload. A family generation rejects stale commands, and
+replacement owners wait for native retirement before using any task-only key.
+Only the positively identified local Node may create previews.
+Task archive, owner removal, window close, and shutdown release the corresponding resources. Loaded
+plugin pages keep their intentional unmount eviction and policy replacement behavior.
+
+### Background scheduling and document loss
+
+Acorn leaves browser background throttling at its default. Hidden pages retain their state while the
+engine retains their document, and their timers and network activity can continue at a reduced rate.
+There is no inactivity timer or automatic eviction. The shared 32-view limit remains in force.
+Retiring an incognito page discards its document and ephemeral storage.
+
+The pinned desktop stack is Tauri 2.11.5, tauri-runtime-wry 2.11.4, and wry 0.55.1. Tauri's builder
+exposes page-load events but no content-process termination callback. wry exposes a termination handler
+on macOS and iOS, but Tauri does not forward it. Acorn cannot reliably distinguish an engine unload
+from a page-requested reload or hot update through this interface. It performs no inferred automatic
+recovery and displays no invented recovery notice. **Reload** and **Home** provide explicit recovery.
+Neither an engine crash nor application restart preserves form values or complete browser history.
+The shell's history cursor tracks navigation callbacks, rather than a native back-forward list.
+
+| Platform | Scheduling | Observable process loss and recovery |
+| --- | --- | --- |
+| macOS | Default WebKit scheduling; measured in the preview acceptance record | No termination callback through Tauri; explicit Reload or Home |
+| Windows | Default WebView2 scheduling; not measured in this delivery | No portable Tauri termination callback; explicit Reload or Home |
+| Linux | Default WebKitGTK scheduling; not measured in this delivery | No portable Tauri termination callback; explicit Reload or Home |
+
+For measurements, navigation traces, and remaining graphical checks, see
+[Preview retention acceptance](./testing/preview-retention.md). The automation-only
+`webview_diagnostics` command reports web-content process IDs and physical footprints on macOS.
+It contains no page contents or URLs, adds no production telemetry, and reports no measurements on
+other platforms. Process IDs must be deduplicated before totaling shared memory.
 
 Normal development and packaged webviews expose no automation server. The explicit
 `agent-automation` build is the exception: its main Acorn webview has a loopback-only WebDriver server
@@ -643,10 +780,20 @@ and re-reads on `plugin:preview:url-changed { taskId, url, source }`, where `url
 connected client agree on the answer. The terminal recipe picker reaches preview through the
 `preview.recipeSelection` client capability, avoiding a reverse package import.
 
-For a task whose dev server is served by another node process,
-`@acorn/custody/supervision/previewTunnel.ts` opens an authenticated loopback listener that forwards
-raw bytes to the node's own tunnel endpoint over its pinned agent, so the preview pane can reach a
-dev server without the renderer ever touching the network directly. It binds `127.0.0.1` explicitly;
+The pane button and the **Open Preview** command appear only on a task that has somewhere to find a
+URL. `/v1/p/preview/configured` answers that for every active task by walking the same order and
+asking only whether each step is filled in: a picked recipe URL, a default target with `url` or
+`urlCommand`, or a project preview setting. It runs no script and needs no running dev server, so
+stopping the dev server does not close an open preview. The client holds the answer in
+`plugins/preview/src/client/configuredStore.ts` and re-reads it on a URL change, a project change,
+a task it has not seen, a Node switch, and a reconnect. A Node that answers 404, one built before the
+route, gets the pane on every task, so an unrestarted or out-of-date Node does not lose preview.
+
+The preview tunnel implementation remains in custody but the pane does not open it while remote
+preview is disabled. The following describes that dormant transport, not an enabled remote preview
+path. A tunnel alone is not a browser network boundary: after loading a page, the
+native webview can make additional requests directly from the client computer. The existing
+`@acorn/custody/supervision/previewTunnel.ts` listener binds `127.0.0.1` explicitly;
 binding `0.0.0.0` would publish another machine's dev server to the local network, the opposite of
 the tunnel's purpose. Because a task's preview URL can be resolved more than once while its resource
 is settling, opening for a key already in flight returns the same promise instead of racing a second
@@ -675,7 +822,7 @@ in the helper.
 
 ## Service protocol
 
-`packages/protocol/src/serviceProtocol.ts` defines the versioned lifecycle messages between the
+`packages/protocol/src/device/serviceProtocol.ts` defines the versioned lifecycle messages between the
 helper and the node it supervises: `service.start`, `service.stop`, and `service.preview-rules`. Both
 endpoints validate messages with Zod, and pending calls reject on timeout or peer exit. Product
 requests do not use this RPC; they use `/v1` over the broker.
@@ -689,9 +836,12 @@ The node receives no window handle, no webview handle, and no shell object of an
 
 `apps/node` emits `service.js`, `mcp.js`, `standalone.js`, and shared chunks. Third-party
 packages are bundled into them, and into the helper, except the native addons and run-time-loaded
-packages that `apps/node/externals.ts` lists. Node resolves those from `apps/desktop`'s
-`node_modules`. Loading packages as separate files was most of the node's and the helper's startup
-before that. `apps/node/scripts/check-service-budget.mjs` runs after the node build, fails it when
+packages that `apps/node/externals.ts` lists. Staging materializes their installed dependency graphs under
+`dist/helper/node_modules` without pnpm directory links, so the installed helper and service resolve
+them from application resources. Shared dependencies are hoisted to that directory to keep NSIS
+input paths within Windows' legacy path limit; conflicting versions remain nested beside their
+consumers. The shared runtime package list belongs to `scripts/nodeRuntimePackages.ts`.
+Loading packages as separate files was most of the node's and the helper's startup before that. `apps/node/scripts/check-service-budget.mjs` runs after the node build, fails it when
 `service.js` and the chunks it imports statically pass a byte ceiling, and prints what is left for
 Node to resolve. Both builds write the licence text of every package they bundled beside their
 output, as `THIRD-PARTY-NOTICES.txt` and `helper-THIRD-PARTY-NOTICES.txt`, so it ships in the
@@ -701,6 +851,10 @@ frame stylesheet, and the pinned Node runtime where the bundler will find them. 
 fetched from nodejs.org and verified against that release's `SHASUMS256.txt` rather than copied from
 whatever Node is running the build, and `node-runtime.json` is the single pin both this and
 `scripts/pack-node.mjs` read.
+Staging also copies the headless CLI bundle into `Resources/cli` with an ES module package boundary.
+Settings → Command line asks the Rust shell to write a launcher into a writable directory on the
+login shell's `PATH`. The launcher points to that build's pinned Node and CLI files; the renderer
+cannot choose a target path or command. A development build uses the checkout's staged files.
 
 `pnpm --filter @acorn/desktop run build` stages and builds the renderer, and checks the startup
 budget and the generated bundles' syntax. `pnpm --filter @acorn/desktop dist` adds the bundler pass
@@ -737,10 +891,92 @@ That process is the pinned Node in both a checkout and a bundle, so there is one
 standalone node is distributed separately as a tarball; it is not an npm package
 (`docs/node-distribution.md`).
 
-`.github/workflows/build-desktop.yml` runs the same commands on a push to main and on a `v*` tag,
-plus the boot test and the Rust suite before the bundler pass so a broken boot path fails in seconds
+`.github/workflows/build-desktop.yml` builds macOS Apple silicon and Windows x64 on a push to main
+and on a `v*` tag, plus manual dispatches. Both jobs run the boot test and the Rust suite before the bundler pass so a broken boot path fails in seconds
 rather than minutes. A tag builds and keeps its artifacts; publishing them is refused while the build
 is ad-hoc signed.
+
+### Windows test installer
+
+The Windows matrix entry uploads `acorn-windows-x64`, containing an NSIS setup executable and its
+updater signature. The macOS job uploads `acorn-dmg`. Both artifacts belong to the Actions run;
+the workflow does not publish GitHub Releases. Windows Authenticode signing is not configured.
+
+The platform override in `apps/desktop/src-tauri/tauri.windows.conf.json` selects NSIS, a Windows
+icon, installation for the current user, and the WebView2 bootstrapper. The installer downloads
+WebView2 if it is absent, so installation can require internet access. The runtime staging script
+fetches the pinned Windows `node.exe` directly and checks its published SHA-256 before caching it.
+The installed runtime lives beside `acorn-desktop.exe`; the helper, service, CLI, plugins, and renderer live
+under the installation directory. The helper's origin gate expects `http://app.localhost` on
+Windows, matching Wry's mapping of the app scheme.
+
+The Windows target needs Git on PATH for repository operations. The bundled service generates the
+local Node's TLS certificate in-process on first boot and reuses its persisted identity on later
+boots. It does not require an OpenSSL executable. Acorn bundles Node and its runtime packages, so
+the target does not need Node, pnpm, Rust, or a compiler installed. For the Node's
+other host requirements and Windows file permission limits, see [Node distribution](./node-distribution.md).
+
+Windows distribution verification installs the generated setup executable into a temporary directory,
+compares the installed resources with staging, checks the installed Node version and digest, and runs
+the helper boot test against that installation. The test uses a fresh data root outside the checkout
+with host executables removed from PATH and verifies an authenticated broker request to the local
+Node. It also checks the WebSocket secret and origin gates. It uninstalls the temporary application
+after verification. Run Windows distribution
+builds on a disposable build host: NSIS also writes application shortcuts and uninstall metadata.
+This check does not drive the WebView2 window or prove connectivity between different machines;
+those remain manual acceptance checks using the uploaded installer.
+
+### CI permissions and signing credentials
+
+Both GitHub Actions workflows grant the repository token only `contents: read`, and checkout does
+not persist its credentials. The jobs install, test, build, and upload run artifacts; they do not
+push repository changes or publish releases. Pull requests run the unsigned suites in
+`.github/workflows/ci.yml`. The desktop bundle workflow runs on main pushes, `v*` tags, and manual
+dispatches.
+
+The bundle job passes `TAURI_SIGNING_PRIVATE_KEY` only to its required-key check and distribution
+step, and passes `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` only to distribution. Setup, dependency
+installation, staging, tests, and artifact upload do not receive these signing variables. The
+distribution command runs repository build commands before signing, so those commands share the
+signing environment and must be trusted. Step scope reduces direct credential exposure; it does
+not isolate signing from a compromised build or earlier step.
+
+Action references use full commit hashes with version comments. To update one, verify the release
+commit in the action's upstream repository, review the change, and update the hash and comment
+together. The Rust toolchain action also sets `toolchain: stable` explicitly because pinning the
+action's code does not select or pin the compiler. For the underlying practices, see
+[GitHub's secure use reference](https://docs.github.com/en/actions/reference/security/secure-use).
+
+### Rust dependency security
+
+`apps/desktop/src-tauri/Cargo.lock` pins the shell's Rust dependency graph. The rustls dependency
+through `ureq` is 0.23.45, which fixes
+[RUSTSEC-2026-0285](https://rustsec.org/advisories/RUSTSEC-2026-0285.html). Acorn calls `ureq` in
+`app_scheme.rs` to proxy renderer content and in `dev_server.rs` to probe the development entry
+module. Both use the `ACORN_DEV_SERVER` origin read by `lib.rs`; the development launchers set a
+local HTTP origin. The packaged launch uses files unless that environment variable is supplied.
+The Node helper owns paired Node HTTPS connections, separately from this Rust client. The dependency
+finding does not establish exposure of those connections or a completed attacker handshake.
+
+The 2026-10-01 RustSec review reports zero vulnerabilities and seven informational warnings. One is
+[RUSTSEC-2024-0429](https://rustsec.org/advisories/RUSTSEC-2024-0429.html), an unsound string-array
+iterator in glib 0.18.5. This version enters through the Linux GTK 0.18 stack; the macOS and Windows
+target graphs do not include it. Acorn and the 26 reverse dependency source roots reviewed contain
+no calls to `VariantStrIter` or `array_iter_str` outside glib's own implementation, documentation,
+and tests. This source review does not prove runtime unreachability. Calling the affected iterator
+on a Linux build remains a crash risk. The published fix requires glib 0.20 or later, outside the
+GTK stack's 0.18 dependency constraint, and the registry has no patched 0.18 release. A maintained
+backport or coordinated GTK/Tauri migration needs Linux build and runtime validation.
+
+The other warnings identify unmaintained dependencies: `proc-macro-error` 1.0.4 through the Linux
+GTK/glib build macros, and five UNIC 0.9 crates through `urlpattern` 0.3 and `tauri-utils` 2.9.3.
+The UNIC crates are `unic-char-property`, `unic-char-range`, `unic-common`, `unic-ucd-ident`, and
+`unic-ucd-version`. Tauri uses URL patterns for remote capability contexts; Acorn's capability file
+grants only the local main webview. These advisories provide no patched releases. A
+[`tauri-utils` 2.10 migration](https://github.com/tauri-apps/tauri/releases/tag/tauri-utils-v2.10.0)
+changes the URL pattern dependency and raises its minimum Rust version to 1.90, beyond the desktop
+manifest's declared 1.82. Review that toolchain and framework migration
+separately. Keep these warnings visible in dependency audits until their upstream paths change.
 
 ### Signing gates and the updater
 

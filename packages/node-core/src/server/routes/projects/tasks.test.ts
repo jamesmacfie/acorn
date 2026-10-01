@@ -6,6 +6,7 @@ import { getDb, schema } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
 import { tasks } from './tasks'
 import { makeTestDb, type TestDb } from '../../../testkit/db'
+import { clearHooks, registerHookHandler } from '../../pluginHost/hooks'
 
 vi.mock('../../db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../db')>()
@@ -132,6 +133,37 @@ describe('the active-task list route', () => {
     expect((await patch('Renamed task')).status).toBe(200)
 
     expect(broadcasts).toEqual([{ channel: 'tasks:changed', taskId: task.id }])
+  })
+
+  it('runs the archiving hook once when a status change archives the task', async () => {
+    await seed(1, 1)
+    const archiving: string[] = []
+    registerHookHandler({
+      id: 'probe:archiving',
+      pluginId: 'probe',
+      point: 'core:task-archiving',
+      mode: 'transform',
+      priority: 500,
+      call: async (payload) => {
+        const [row] = await t.db.select().from(schema.tasks).where(eq(schema.tasks.id, payload.taskId as string))
+        archiving.push(`${payload.taskId as string}:${row?.status}`)
+        return { payload }
+      },
+    })
+    try {
+      const patch = (status: 'active' | 'archived') => app.request('http://acorn.test/api/tasks/task-0-0', {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      expect((await patch('archived')).status).toBe(200)
+      expect((await patch('archived')).status).toBe(200)
+      expect((await patch('active')).status).toBe(200)
+      // After the write, so nothing can start new work on the task while its plugins stop theirs.
+      expect(archiving).toEqual(['task-0-0:archived'])
+    } finally {
+      clearHooks('probe')
+    }
   })
 
   it('stores setup opt-out per task and defaults other task seeds to setup enabled', async () => {

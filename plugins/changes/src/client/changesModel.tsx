@@ -1,21 +1,24 @@
-import { For, createEffect, createMemo, createResource, createSignal, on, onCleanup } from 'solid-js'
+import { For, Show, createEffect, createMemo, createResource, createSignal, on, onCleanup } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
-  agentSessionsFor, clientEvents, effectiveModelPick, focusedPane, formatFileReference, isArchiving, prefsOptions,
+  agentSessionsFor, clientCapability, clientEvents, effectiveModelPick, focusedPane, formatFileReference, isArchiving, prefsOptions,
   openPane, projectsOptions, readGeneratePick, readJson, registerCommands, saveGeneratePick,
   sendReferenceToAgent, sendToSession, taskStatusRevision, type PaneModelContext, type Task,
 } from '@acorn/plugin-api/client'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import { Badge, IconButton, Inline, Stack, Text } from '@acorn/plugin-api/ui'
-import type { CodeRow, DiffFile, DiffSource } from '@acorn/plugin-api/ui/diff'
+import { MAX_DOCUMENT_FILES } from '@acorn/diff-document/document'
+import { documentTopology, loadDiffLineContext, type CodeRow, type DiffLineAnchor, type DiffSource } from '@acorn/plugin-api/ui/diff'
+import { sameInlineLine, type InlineDiffOrigin } from '@acorn/plugin-agents/contract/inlineDiff.ts'
+import { AGENTS_INLINE_DIFF } from '@acorn/plugin-agents/contract/inlineDiffClient.ts'
 import { addReviewNote, deleteReviewNote, markReviewNotesSent } from './reviewNoteMutations'
-import { emptyLocalStatus, reviewNotesRoute, type ModelPick, type ReviewNote } from '../shared/api'
+import { emptyLocalStatus, reviewNotesRoute, type LocalDocumentResponse, type LocalScope, type ModelPick, type ReviewNote } from '../shared/api'
 import { formatReviewPrompt } from '../shared/reviewPrompt'
 import { localGitApi } from './changesClient'
 import { readChangeView, saveChangeView } from './changesPrefs'
 import {
   changeKey, groupChanges, groupSections, isFolderKey, patchKey, pickSelected, remoteReason,
-  stackFor, stageableRows, stagedState, toPullFile, totals, viewNodes, type ChangeView, type RemoteAction,
+  stackFor, stageableRows, stagedState, documentFile, totals, viewNodes, type ChangeView, type RemoteAction,
 } from './model'
 import { CHANGES_PANE, changesBindings, changesCommands } from './commands'
 import { createCommitState } from './commitState'
@@ -131,46 +134,112 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     return (notes() ?? []).filter((n) => n.path === r.path && n.side === a.side && n.endLine === a.line)
   }
 
-  // The stacked file set, and the changes behind it so fetchPatches can find a path's staging area.
-  // A memo, not a plain getter: the viewer reads the file list from several memos of its own, and a
-  // fresh DiffFile per read would rebuild the row model's file rows for nothing.
+  // The stacked file set: one staging area at a time (./model.ts § stackFor).
   const stack = createMemo(() => stackFor(groups(), selected()))
-  const diffFiles = createMemo<DiffFile[]>(() => stack().map((c) => toPullFile(c, null)))
-  const stackByPath = createMemo(() => new Map(stack().map((c) => [c.path, c])))
+  const scope = (): LocalScope => (selected()?.staged ? 'staged' : 'unstaged')
 
-  // The diff column's whole contract with the shared viewer: the stacked files, their patches read on
-  // demand, and review notes as the annotation the viewer itself has no concept of.
+  // The stack as a document (docs/diff-rendering.md § The document). The node diffs, cuts and keys
+  // every file's patch; it is asked again whenever the stack or any file's status key moves, and diffs
+  // only the files whose key did (../server/localDocument.ts). The answer carries the request it was
+  // for, so the topology is always the node's view of one moment rather than a mix of two.
+  // At most the node's document limit. A stack past it, such as an unignored build folder, draws the
+  // rest as files with no diff rather than having the whole document refused.
+  const documentRequest = createMemo(
+    () => ({ scope: scope(), files: stack().slice(0, MAX_DOCUMENT_FILES).map((change) => ({ path: change.path, key: patchKey(change, statusRevision()) })) }),
+    undefined,
+    { equals: (a, b) => a.scope === b.scope && a.files.length === b.files.length && a.files.every((file, at) => file.path === b.files[at]!.path && file.key === b.files[at]!.key) },
+  )
+  type HeldDocument = { scope: LocalScope; changes: ReturnType<typeof stack>; answer: LocalDocumentResponse }
+  // A read that fails keeps the last document, and the next status change asks again. Letting the
+  // resource error would make every read of it throw, in whichever pane region built this model.
+  const [document, { refetch: refetchDocument }] = createResource<HeldDocument | undefined, ReturnType<typeof documentRequest>>(
+    () => (isArchiving(task.id) ? undefined : documentRequest()),
+    async (request, { value }) => {
+      try {
+        return { scope: request.scope, changes: stack(), answer: await localGitApi.document(task.id, request) }
+      } catch {
+        return value
+      }
+    },
+  )
+  // Segments and search go out under the scope of the document they were described by. The reader can
+  // switch staging area before the next document arrives, and the old document's digests are not the
+  // other area's.
+  const documentScope = () => document.latest?.scope ?? scope()
+  const topology = createMemo(() => {
+    const held = document.latest
+    if (!held) return undefined
+    const cut = new Map(held.answer.files.map((file) => [file.path, file]))
+    return documentTopology(held.changes.map((change) => documentFile(change, cut.get(change.path))))
+  })
+  const inline = () => clientCapability(AGENTS_INLINE_DIFF)
+  createEffect(() => inline()?.prime(task.id))
+  createEffect(() => {
+    const files = topology()?.files
+    if (files) inline()?.reportPatches(
+      { taskId: task.id, source: 'changes', scope: scope() },
+      Object.fromEntries(files.map((file) => [file.path, file.patchKey])),
+    )
+  })
+  const [openInline, setOpenInline] = createSignal<InlineDiffOrigin | null>(null)
+  createEffect(() => {
+    const opened = openInline()
+    if (opened && (opened.scope !== scope() || topology()?.files.find((file) => file.path === opened.path)?.patchKey !== opened.patchKey)) setOpenInline(null)
+  })
+  const inlineOrigin = (row: CodeRow): InlineDiffOrigin | null => {
+    const patchKey = topology()?.files.find((file) => file.path === row.path)?.patchKey
+    const line = row.kind === 'delete' ? row.oldNo : row.newNo
+    if (!patchKey || line == null) return null
+    return {
+      kind: 'inline-diff', source: 'changes', taskId: task.id, path: row.path,
+      side: row.kind === 'delete' ? 'old' : 'new', line, patchKey,
+      quote: row.raw.slice(0, 2_000), scope: scope(),
+    }
+  }
+  const inlineAnchors = createMemo<DiffLineAnchor[]>(() => {
+    const current = topology()
+    const visible = (inline()?.sessionsForTask(task.id) ?? []).flatMap((session) => {
+      const origin = session.origin
+      if (!origin || origin.source !== 'changes' || origin.scope !== scope() || session.archivedAt) return []
+      if (current?.files.find((file) => file.path === origin.path)?.patchKey !== origin.patchKey) return []
+      return [{ path: origin.path, side: origin.side, line: origin.line }]
+    })
+    const opened = openInline()
+    return opened ? [...visible, { path: opened.path, side: opened.side, line: opened.line }] : visible
+  })
+  // A segment request the tree has moved out from under reads the document again, and the viewer
+  // redraws from the new revision.
+  const conflicted = (error: unknown): never => {
+    if ((error as { status?: number }).status === 409) void refetchDocument()
+    throw error
+  }
+
+  // Review notes, known up front by the line they sit under, so the document reserves for them before
+  // the segment loads.
+  const noteAnchors = createMemo<DiffLineAnchor[]>(() => (notes() ?? []).map((note) => ({
+    path: note.path, side: note.side === 'deletions' ? 'old' : 'new', line: note.endLine,
+  })))
+
+  // The diff column's whole contract with the shared viewer: the stacked files as a document, its
+  // segments and search read on demand, and review notes as the annotation the viewer itself has no
+  // concept of.
   const source: DiffSource = {
     scope: { taskId: task.id, routeKey: CHANGES_ROUTE_KEY },
-    files: diffFiles,
-    loading: () => status.loading,
-    // Which files, and separately what they say. An agent saving a file moves the second, and the
-    // viewer keeps the reader's scroll position for that and reads only the file whose key moved; a
-    // file appearing or going moves the first, which does reset it.
+    topology,
+    loading: () => status.loading || document.loading,
+    // Which files. An agent saving a file moves the document's revision instead, and the viewer keeps
+    // the reader's scroll position for that and reloads only the segments whose content moved; a file
+    // appearing or going moves this, which does reset it.
     signature: () => stack().map(changeKey).join('\0'),
-    contentSignature: () => stack().map((c) => patchKey(c, statusRevision())).join('\0'),
-    contentKey: (path) => {
-      const change = stackByPath().get(path)
-      return change ? patchKey(change, statusRevision()) : ''
-    },
     // Only after a click. pickSelected falls back to the first row so something renders on open, and
     // treating that as a scroll target would mean the remembered offset never won.
     selectedPath: () => (selectedKey() ? selected()?.path ?? '' : ''),
-    cachedFile: () => null,
-    fetchPatches: async (paths) => {
-      const out: DiffFile[] = []
-      for (const path of paths) {
-        const change = stackByPath().get(path)
-        if (!change) continue
-        const res = await localGitApi.diff(task.id, path, change.staged ? 'staged' : 'unstaged')
-        // Thrown, not swallowed: the viewer turns a failed patch read into a row that says so and
-        // offers Retry.
-        if ('error' in res) throw new Error(res.error)
-        out.push(toPullFile(change, res.patch))
-      }
-      return out
+    loadSegments: (requests, signal) => localGitApi.segments(task.id, { scope: documentScope(), requests }, signal).catch(conflicted),
+    search: (request, signal) => {
+      const files = (topology()?.files ?? []).flatMap((file) => (file.patchKey ? [{ path: file.path, patchKey: file.patchKey }] : []))
+      return localGitApi.search(task.id, { ...request, scope: documentScope(), files }, signal).catch(conflicted)
     },
-    // Fills an expanded gap. `sha` is the staging area toPullFile put there, which is what says
+    // Fills an expanded gap. `sha` is the staging area documentFile put there, which is what says
     // whether the new side is the index or the file on disk.
     fileText: async ({ path, sha }) => {
       const res = await localGitApi.newSide(task.id, path, sha === 'staged' ? 'staged' : 'unstaged')
@@ -188,14 +257,30 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
       void refetchNotes()
     },
     draftPrefix: `changes:${task.id}`,
-    hasLineExtra: (row) => notesForRow(row).length > 0,
-    // Which notes exist and where, so adding or deleting one re-measures the row it sits under. The
-    // body length is in it because the note wraps, so its text is part of the height.
-    lineExtraSignature: () => (notes() ?? []).map((n) => `${n.path}:${n.side}:${n.endLine}:${n.body.length}`).join('\0'),
+    inlineChat: {
+      anchors: inlineAnchors,
+      open: (row) => setOpenInline(inlineOrigin(row)),
+      render: (row) => {
+        // The host calls this inside a tracked expression, and the task's sessions move on every
+        // update to any of them. Read directly, each one rebuilt the card and blurred its textarea.
+        // A memo that settles on the same line keeps the card mounted until the answer changes.
+        const shown = createMemo(() => {
+          const origin = inlineOrigin(row)
+          if (!origin || !inline()?.Card) return null
+          const exists = inline()?.sessionsForTask(task.id).some((session) => session.origin && sameInlineLine(session.origin, origin) && !session.archivedAt)
+          return exists || (openInline() && sameInlineLine(openInline()!, origin)) ? origin : null
+        }, null, { equals: (a, b) => a === b || (!!a && !!b && sameInlineLine(a, b)) })
+        return <Show when={shown()} keyed>{(origin) => {
+          const Card = inline()!.Card
+          return <Card origin={origin} loadContext={() => loadDiffLineContext(source, row)} onClose={() => setOpenInline(null)} />
+        }}</Show>
+      },
+    },
     // Drawn in the same shape another plugin's marks are, which is what the host puts under a line
     // (plugins/annotations/AnnotationMarks.tsx): a state, the text, and who it belongs to. What a
-    // review note has and a mark does not is a verb, because this one is the reader's own.
-    lineExtra: (row) => (
+    // review note has and a mark does not is a verb, because this one is the reader's own. The viewer
+    // measures the segment it sits in, so a note added, edited or deleted resizes its row.
+    lineExtra: { anchors: noteAnchors, render: (row) => (
       <For each={notesForRow(row)}>
         {(note) => (
           <Stack gap="none">
@@ -213,7 +298,7 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
           </Stack>
         )}
       </For>
-    ),
+    ) },
     lineAction: {
       title: '⌥-click: add line reference to the agent composer',
       run: (row, event) => {
@@ -253,7 +338,12 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   // The shared "Generate with" default, resolved against what is actually available. The same pick
   // the workflow generator opens on, so a reader who chose an installed CLI here does not choose it
   // again there (client-core features/settings/models/generatePick.ts).
-  const modelPick = createMemo(() => effectiveModelPick(modelBackends(), readGeneratePick(prefs.data)))
+  //
+  // The list is read only once it has arrived. This memo runs while the model is built, which happens
+  // inside the header region, and reading a resource that is still loading holds that region back.
+  // The header does not draw the wand, so it must not wait for the wand's list.
+  const modelPick = createMemo(() =>
+    effectiveModelPick(modelBackends.loading ? [] : modelBackends(), readGeneratePick(prefs.data)))
 
   // The commit editor: the message, the three options, and the two verbs (./commitState.ts). Built
   // here so it lives as long as the pane's model rather than as long as the footer, which the host

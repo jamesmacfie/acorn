@@ -26,6 +26,9 @@ vi.mock('./workerHost', async (original) => ({
     unmount: () => {},
     release: () => {},
     bridgePort: () => null,
+    select: () => {},
+    surfaceAction: () => {},
+    appearance: () => {},
     onHostRequest: (_slot: string, bound: (request: TreeHostRequest) => Promise<TreeHostResult>) => {
       handler = bound
       return () => { handler = null }
@@ -150,10 +153,25 @@ describe('opening a companion overlay', () => {
   // The regression this pair exists for. WebKit does not focus a button when it is clicked, which is
   // the platform the desktop shell runs on, so a focus-only gate meant a tree could never open its
   // companion overlay from a click at all.
-  it('opens on a press inside the tree even though focus never moved there', async () => {
+  it('refuses a synthetic press that never received a trusted gesture', async () => {
     mount()
     document.body.focus()
     pressInside()
+    await expect(ask({ op: 'overlay.open', name: 'markup.editor', payload: null }))
+      .resolves.toMatchObject({ ok: false, error: { code: 'needs_focus' } })
+    expect(pluginOverlayInvocation()).toBeNull()
+  })
+
+  it('opens on a press inside the tree even though focus never moved there', async () => {
+    const registered = vi.spyOn(HTMLElement.prototype, 'addEventListener')
+    mount()
+    const listener = registered.mock.calls.find(([type]) => type === 'pointerdown')?.[1]
+    registered.mockRestore()
+    expect(listener).toBeTypeOf('function')
+    document.body.focus()
+    // jsdom dispatches only untrusted events. Exercise the real registered host closure with the
+    // browser-owned trusted bit separately from the synthetic-event refusal above.
+    ;(listener as EventListener)({ isTrusted: true } as Event)
     expect(document.activeElement).not.toBe(host.querySelector('button'))
     const asked = ask({ op: 'overlay.open', name: 'markup.editor', payload: null })
     await Promise.resolve()

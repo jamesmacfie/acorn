@@ -4,7 +4,7 @@ import { createEffect, createMemo, on, onCleanup } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
 import type { Renderable } from '../tree/compat'
 import type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
-import { postSelect, postSurfaceAction, type FrameBinding } from '@acorn/client-core/host/frames/broker.ts'
+import type { FrameBinding } from '@acorn/client-core/host/frames/broker.ts'
 import { eligiblePlugins, isTaskPane } from '@acorn/client-core/host/plugins'
 import { recordSurfaceFailure } from '@acorn/client-core/host/plugins'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
@@ -152,27 +152,24 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   })
 
   const transport = worker.transport(slot)
+  worker.appearance(slot, { theme: 'terminal', style: 'terminal', tokens: {} })
   // Mount is also update: the first call starts the tree, every later one carries new props.
   createEffect(() => worker.mount(slot, contribution.entry, componentProps.props()))
 
-  // The three pushes that are not tree mutations, exactly as the DOM host sends them: they ride the
-  // bridge rather than the tree channel, because they are the same messages a frame gets.
+  // Selection and actions go to this slot's bridge, as they do in the DOM host.
   createEffect(on(() => scope().item, (next, previous) => {
-    const port = worker.bridgePort(slot)
-    if (!port || !next || next === previous) return
-    postSelect(port, next)
+    if (!next || next === previous) return
+    worker.select(slot, next)
   }, { defer: true }))
   const unselect = clientEvents.on('presentation:pane-intent', (event) => {
-    const port = worker.bridgePort(slot)
-    if (!port || event.taskId !== scope().taskId || event.paneId !== contribution.id) return
+    if (event.taskId !== scope().taskId || event.paneId !== contribution.id) return
     if (event.intent.kind !== 'plugin:select') return
     consumePaneIntent(event.taskId, event.paneId)
-    postSelect(port, event.intent.item)
+    worker.select(slot, event.intent.item)
   })
   const unaction = clientEvents.on('plugin:surface-action', (event) => {
-    const port = worker.bridgePort(slot)
-    if (!port || event.pluginId !== contribution.pluginId || event.surface !== contribution.id) return
-    postSurfaceAction(port, event.command)
+    if (event.pluginId !== contribution.pluginId || event.surface !== contribution.id) return
+    worker.surfaceAction(slot, event.command)
   })
 
   onCleanup(() => {

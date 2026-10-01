@@ -13,8 +13,9 @@ const closeTunnelsForTask = vi.fn()
 vi.mock('@acorn/plugin-api/client', () => ({
   closeTunnelsForTask: (taskId: string) => closeTunnelsForTask(taskId),
   onPluginFrame: () => () => {},
+  previewUrlForClient: () => null,
   readJson: async () => null,
-  tunnelUrl: async () => null,
+  remotePreviewBlocked: () => false,
 }))
 // The page itself is a native view the shell positions, and is not what this file is about.
 vi.mock('./PreviewPane', () => ({ default: (props: { taskId: string }) => <span class="page">{props.taskId}</span> }))

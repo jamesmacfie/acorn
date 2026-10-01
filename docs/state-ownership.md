@@ -39,7 +39,16 @@ client that pairs with a Node renders that Node's arrangements and the agent can
 Each Node has an independent data root and database set. A Node ID is part of every renderer query,
 selection scope, layout scope, and fleet aggregate input.
 
+The Node's loaded plugin runtime identity is process-owned: `active` records the declaration and
+client hash captured with the running service. The installed package is a separate disk candidate.
+Neither an install nor a cached roster response can change what the process is serving.
+
 ## Client-owned durable state
+
+Plugin bundle bytes and exact `(pluginId, hash)` trust decisions belong to device custody, which
+verifies bytes before it writes them. The renderer's per-Node distribution snapshot is transient:
+it derives current selections from Node observations and custody decisions and is never persisted as
+a second winner record. Revoking a decision updates that snapshot and withdraws the selected code.
 
 Saved query drafts are Node-owned, with compare-and-swap revisions. Their device-local recovery
 copies are keyed by Node, entity, and base revision and remain until acknowledgment or explicit
@@ -75,6 +84,7 @@ The desktop persists:
 - which Node this window talked to last, so the next launch can pick its cache partition before
   the fleet answers ([frontend.md](./frontend.md) § Startup readiness);
 - device-scoped appearance, shortcuts, rail order, and window geometry;
+- device-held plugin enablement and `plugin:<device-plugin-id>:*` state;
 - the per-Node IndexedDB query cache;
 - selection/restore state and local drafts.
 
@@ -99,6 +109,20 @@ on the next launch; a save while it is unavailable stays only in the current que
 remain in the owning Node's preferences, so switching Nodes
 does not transfer a layout.
 
+The device plugin state rule is prefix-aware because installed plugin IDs are unknown at build time.
+Only IDs present in the device bundle roster acquire that prefix; Node-delivered plugin state keeps
+using Node preferences. Uninstall removes that device prefix and the device enablement entry while
+preserving manual trust acknowledgements.
+
+`acorn.json` is a second interface to selected device preferences: appearance, keybinding overrides,
+rail order, collapse, and plugin source visibility, and exclusive-slot picks. The desktop helper reads and watches it in its
+user data directory; the terminal uses its own config directory. Incoming values pass through the
+normal device preference setter, which writes local storage before updating the query cache. A
+Settings change to a covered value writes the file. Unknown top-level keys survive a write, and a
+parse error leaves the last valid state on screen with a line and column notice. A `plugins` entry
+is an installation request shown to the user, never a trust grant. The file contains no Node
+preferences, plugin-owned state, credentials, commands, or executable paths.
+
 Use the persistence scope that owns the state:
 
 | State | Scope |
@@ -113,10 +137,12 @@ Use the persistence scope that owns the state:
 | Task layout, open files, PR filters, context selection | owning Node's prefs, keyed by Node + task/repo |
 | Dashboard panel definitions and their placements | owning Node's prefs, one app-scoped slice |
 | Last path, last task, last source, last Node | device |
-| Last view per workspace; last workspace (terminal client) | owning Node's prefs, keyed by Node + workspace |
+| Last view per workspace | owning Node's prefs, keyed by Node + workspace |
+| Last workspace and the two-workspace shortcut pair | active Node's app-scoped prefs |
 | Workspace/task selection | Node + workspace/task |
 | Draft editor/comment text, and a commit message in the Changes pane | client + current task |
 | Provider data and task mutations | owning Node |
+| Computer Use app-access grants ([managed-agents.md](./managed-agents.md) § App-access approval) | the Computer Use integration on the Node's computer; the Node keeps only the decision |
 
 Module-level signals or maps that reference a task or workspace must either include the Node ID or be
 cleared on a node switch. A state owner registers its OWN evictor beside the signal it clears, through
@@ -131,7 +157,7 @@ the active terminal tab, the workspace view — because switching back should re
 
 **A draft is device-local because it is losable, and keyed by the task because it belongs to a
 worktree.** Every draft goes through one helper, which writes `localStorage` under a prefix its caller
-names (`client-core/kit/lib/draftState.ts`): a comment box uses `comment-draft:`, and the Changes
+names (`client-core/kit/lib/state/draftState.ts`): a comment box uses `comment-draft:`, and the Changes
 pane's commit message uses `changes:commit-draft:<taskId>`. The node id is deliberately absent from
 that key. A commit message is about the files in front of the reader, and the same task on another
 node is another worktree with another set of changes in it.
@@ -239,7 +265,7 @@ one across a relaunch would need a scope and an eviction rule nobody has asked f
 [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) § Focus and typing.
 
 A scrolled list answers to the same rule, and for a while one list did not. A followed `Timeline` keeps
-the reader's place as the turn they were on, `ReadingPlace` in `client-core/kit/lib/readingPlace.ts`,
+the reader's place as the turn they were on, `ReadingPlace` in `client-core/kit/lib/timeline/readingPlace.ts`,
 and the timeline does not hold it: `plugins/agents/src/client/sessions/readingPlaceStore.ts` does,
 keyed by the view, cleared when the node drops the session and on a node switch. It used to be a pixel
 offset in a module map inside the kit node itself, which broke both halves of the rule above. The unit
@@ -248,6 +274,32 @@ transcript does continuously. And the owner was wrong: a map inside a kit compon
 cleared or seen, and its own comment said as much, bounding itself at fifty entries because `kit/` may
 not import the eviction store. Hold a reading place outside the thing that draws it, keyed by identity
 rather than by position, and clear it where you clear everything else about that entity.
+
+The diff keeps its reading place the same way. `DiffReadingPlace` in
+`client-core/features/diff/diffLayout.ts` is the item the viewport starts in (a file header, a segment
+by path and ordinal, a slice of revealed context) and a point in that item's code rows, or a thread or
+line block and an offset into it. `diff/viewState.ts` holds it per scope for the session, with the
+horizontal offset, the projection, and the file signature it was taken against, and evicts a task's
+entries when the task is archived. A place is put back only in the projection and file set it was
+taken in; a place whose item has gone lands on that file's header. A new revision of the same files
+keeps the place by its item key, so an agent saving the file under the reader leaves them at the same
+segment and depth rather than at the top of the file.
+
+The heights measured for the diff's threads and line blocks belong to the mounted pane and to nothing
+else. They are held per projection, keyed by block id, with the fingerprint of the state they were
+measured in and the width bucket they were measured at, and a height is reused only while the
+fingerprint matches. A new revision discards nothing: a thread keeps its id across revisions and its
+fingerprint says whether its height still holds, and a mounted block is measured again anyway. A new
+file signature clears every height, and so does leaving the pane. None of it is persisted: a height
+is a fact about one window's fonts and width.
+
+The diff's parsed rows are not the pane's. They are a node's, held in memory beside that node's query
+client by `client-core/features/diff/segmentCache.ts`, so a pane mounted again on the same node draws
+them without a request. The rule is the query cache's: one partition per node, cleared when the node is
+dropped, and a node switch reads the other node's. Unlike the query cache, none of it is persisted,
+and it holds no reader state. Heights, drafts, collapse, and the reading place stay where this section
+puts them, so a thread resolving changes a height and never a cached row
+([diff-rendering.md](./diff-rendering.md) § Resident segments).
 
 **A slice reads its own keys and nothing else.** Every slice used to carry a `legacy` reader as well,
 a second function that pulled the pre-scoped aggregate key the scoped keys replaced —
@@ -308,3 +360,13 @@ Compiled pane models and their drawn marks carry a captured Node shell generatio
 model per pane is shared across regions, survives pane removal, and retires with task replacement,
 task eviction, Node switch, or host/provider destruction. A late outgoing lease release cannot retire
 a returning equal-ID generation. This lifetime is independent of persisted query cache ownership.
+
+## Retained preview documents
+
+The Node owns preview configuration. The desktop shell owns each retained local preview's normalized
+configured home, browsing location, loading state, and navigation cursor. These facts are transient
+and stay outside the Node database and client query cache. Pane unmount hides the page and removes
+renderer observers. Refetching configuration reconciles the home without reloading an equal target.
+Node switches retire all previews so task IDs cannot cross Node ownership. Archive and shell shutdown
+also release native resources. Browser process loss and application exit can discard unsaved page
+state. For the lifecycle and recovery limits, see [Host-owned webviews](./shell.md#host-owned-webviews).

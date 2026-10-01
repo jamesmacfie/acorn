@@ -3,8 +3,8 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { basicSetup } from 'codemirror'
 import { EditorState, Prec, StateEffect, type Extension, type Text } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
-import { activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, type Task } from '@acorn/plugin-api/client'
-import { Alert, Button, DocumentTabs, EmptyState, ListDetail, Rectangle, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
+import { activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, toast, type Task } from '@acorn/plugin-api/client'
+import { Alert, Button, DocumentTabs, EmptyState, ListDetail, Only, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
 import { applyViewState, captureViewState, editorTheme, languageForPath, refreshEditorTheme, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
 import { editorApi, editorRootKey, EDITOR_ROOT_STALE_MS } from './editorClient'
 import { readEditorMode, saveEditorMode } from './editorPrefs'
@@ -15,9 +15,11 @@ import { canRevealActiveFile, type FileTreeRevealRequest } from './fileTreeRevea
 import { lineMarkerEffect, lineMarkerExtension } from './lineMarkerExtension'
 import SearchPanel from './search/SearchPanel'
 import type { EditorLineMarkerSet } from '../contract/lineMarkers'
+import { imageTypeForPath } from '../contract/imagePreview'
 
 // Only ever mounted in terminal mode, and it drags xterm in with it.
 const EditorTerminal = lazy(() => import('./EditorTerminal'))
+const ImagePreview = lazy(() => import('./ImagePreview'))
 const log = createLogger('editor', 'editor')
 const telemetry = telemetryFor('editor')
 
@@ -68,6 +70,8 @@ export default function EditorPane(props: { task: Task }) {
   const [pendingReveal, setPendingReveal] = createSignal<{ path: string; line: number; column?: number } | null>(null)
   const [treeReveal, setTreeReveal] = createSignal<FileTreeRevealRequest | null>(null)
   const [side, setSide] = createSignal<'files' | 'search'>('files')
+  const sidebarKey = paneCollapseKey('editor')
+  const [, setSidebarCollapsed] = sidebarCollapse(sidebarKey)
   let treeRevealRevision = 0
 
   let view: EditorView | undefined
@@ -128,25 +132,55 @@ export default function EditorPane(props: { task: Task }) {
   const revealActiveFile = () => {
     const path = active()
     if (!path) return
+    setSidebarCollapsed(false)
     setSide('files') // the tree is one of two things the sidebar shows; revealing into a hidden one is a no-op
     setTreeReveal({ path, revision: ++treeRevealRevision })
   }
 
+  // The open file's path is relative to the checkout, and the root is the checkout's absolute path.
+  const copyPath = (absolute: boolean) => {
+    const path = active()
+    const checkout = root()
+    if (!path || !checkout) return
+    const text = absolute ? `${checkout}/${path}` : path
+    void navigator.clipboard.writeText(text)
+    toast(`Copied ${text}`)
+  }
+
   onMount(() => {
+    // All three need the same thing: this task on screen, the editor focused, a file open, and a
+    // checkout mapped.
+    const when = () => canRevealActiveFile({
+      paneTaskId: taskId,
+      activeTaskId: activeTaskId(),
+      focusedPane: focusedPane(taskId),
+      activeFile: active(),
+      treeAvailable: !!root(),
+    })
     const commands = registerCommands([{
       id: 'editor.tree.reveal-active-file',
       title: 'Reveal active file in editor tree',
       category: 'navigation',
       hint: () => active() ?? undefined,
       palette: true,
-      when: () => canRevealActiveFile({
-        paneTaskId: taskId,
-        activeTaskId: activeTaskId(),
-        focusedPane: focusedPane(taskId),
-        activeFile: active(),
-        treeAvailable: !!root(),
-      }),
+      when,
       run: revealActiveFile,
+    }, {
+      id: 'editor.copy-relative-path',
+      title: 'Copy relative path of active file',
+      category: 'action',
+      hint: () => active() ?? undefined,
+      palette: true,
+      when,
+      run: () => copyPath(false),
+    }, {
+      id: 'editor.copy-absolute-path',
+      title: 'Copy absolute path of active file',
+      category: 'action',
+      hint: () => active() ?? undefined,
+      palette: true,
+      when,
+      run: () => copyPath(true),
     }])
     onCleanup(() => commands.dispose())
   })
@@ -247,7 +281,7 @@ export default function EditorPane(props: { task: Task }) {
       // depend on the root, so it is read now, beside it, and `show()` finds it already in the pool
       // (docs/editor.md § One round trip to text).
       const remembered = active()
-      if (remembered) void stateFor(remembered).catch(() => {})
+      if (remembered && !imageTypeForPath(remembered)) void stateFor(remembered).catch(() => {})
       // A checkout path already in the cache paints the rectangle in this tick, and the fetch below
       // returns it without a request while it is fresh. An absent root is never painted from the
       // cache: "no checkout yet" is the one thing that changes, so it is always awaited.
@@ -269,6 +303,7 @@ export default function EditorPane(props: { task: Task }) {
   // rather than value, so its source is a memo and not an inline getter.
   const prefs = createQuery(() => prefsOptions(true))
   const mode = createMemo(() => readEditorMode(prefs.data))
+  const imagePath = createMemo(() => mode() === 'graphical' && imageTypeForPath(active() ?? '') ? active() : null)
   const wantsTerminal = createMemo(() => (mode() === 'terminal' ? active() : null))
   const [ptyPath, setPtyPath] = createSignal<string | null>(null)
 
@@ -409,6 +444,7 @@ export default function EditorPane(props: { task: Task }) {
     if (!intent) return
     // ⌘⇧F and the "Find in files…" palette row.
     if (intent.kind === 'editor:search') {
+      setSidebarCollapsed(false)
       setSide('search')
       return
     }
@@ -501,9 +537,12 @@ export default function EditorPane(props: { task: Task }) {
       <Show when={root()} fallback={<EmptyState>Open a terminal first to map this repo's checkout.</EmptyState>}>
         <ListDetail
           listLabel="Editor sidebar"
+          collapseKey={sidebarKey}
+          collapseContent="empty"
           list={
             <>
               <Tabs
+                level="pane"
                 tabs={[{ id: 'files', label: 'Files' }, { id: 'search', label: 'Search' }]}
                 active={side()}
                 onChange={(id) => setSide(id === 'search' ? 'search' : 'files')}
@@ -531,6 +570,7 @@ export default function EditorPane(props: { task: Task }) {
           {/* Was a hand-rolled strip: the dirty state was a string-concatenated ●, the close
               button was mouse-only, and there were no arrow keys. */}
           <DocumentTabs
+            level="pane"
             idPrefix="editor"
             ariaLabel="Open files"
             active={active() ?? ''}
@@ -547,7 +587,7 @@ export default function EditorPane(props: { task: Task }) {
                   pressed={mode() === 'terminal'}
                   onPressedChange={(pressed) => void saveEditorMode(queryClient, pressed ? 'terminal' : 'graphical')}
                 >$EDITOR</ToggleButton>
-                <Show when={active()}>
+                <Show when={active() && !imagePath()}>
                   <Button
                     variant="bare"
                     size="sm"
@@ -575,7 +615,14 @@ export default function EditorPane(props: { task: Task }) {
               pane hands it a box rather than a tree. `mount` is the element it attaches to, drawn by
               the host (ui/Rectangle.tsx). In terminal mode the same box holds the reader's own editor
               instead, keyed on the path so switching tabs starts a new one. */}
-          <Show when={ptyPath()} fallback={<Rectangle kind="editor" label="Editor" mount={mountEditor} />} keyed>
+          <Show when={ptyPath()} fallback={
+            <Show when={imagePath()} fallback={<Rectangle kind="editor" label="Editor" mount={mountEditor} />} keyed>
+              {(path) => <>
+                <Only hosts={['dom']}><ImagePreview taskId={taskId} path={path} /></Only>
+                <Only hosts={['tui']}><EmptyState>Image preview is available in the desktop editor: {path}</EmptyState></Only>
+              </>}
+            </Show>
+          } keyed>
             {(path) => <EditorTerminal taskId={taskId} path={path} onExit={(code) => onEditorExit(path, code)} />}
           </Show>
         </ListDetail>

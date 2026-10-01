@@ -5,8 +5,8 @@
 // validated at this boundary: no `..` segments, no absolute paths.
 
 import { lstat, readFile } from 'node:fs/promises'
-import { isAbsolute, join, resolve } from 'node:path'
-import { git, gitOrThrow, gitText, invalidateWorktreeStatus, worktreeGitText, worktreeStatusText } from '@acorn/plugin-api/node'
+import { isAbsolute, join } from 'node:path'
+import { git, gitOrThrow, gitText, invalidateWorktreeStatus, resolveInRoot, worktreeGitText, worktreeStatusText } from '@acorn/plugin-api/node'
 import type { LocalChange, LocalStatus } from '@acorn/protocol/localGit.ts'
 import type { CommitOptions, HeadCommit, PullOptions, PushOptions } from '../shared/api'
 
@@ -167,7 +167,9 @@ export async function localStatus(worktree: string): Promise<LocalStatus> {
 // mtime still moves the key.
 async function diskStamp(worktree: string, change: LocalChange): Promise<string | undefined> {
   try {
-    const stat = await lstat(join(worktree, change.path))
+    const full = resolveInRoot(worktree, change.path)
+    if (!full) return undefined
+    const stat = await lstat(full)
     return `${stat.mode} ${stat.size} ${stat.mtimeMs} ${stat.ctimeMs}`
   } catch {
     // Gone is a steady answer for a deletion. Anything else, such as a path git C-quoted, leaves no
@@ -187,18 +189,26 @@ export const stripToHunks = (patch: string): string => {
 // Git's default -U3 for both callers: the pane wants hunks with expandable gaps between them, and the
 // MCP tool wants them for the tokens. The pane used to ask for a huge -U to get a whole-file view,
 // which made every change harder to find, not easier.
+/** A path as a pathspec that matches only itself: `app/[slug]/page.tsx` is a file name, not a pattern
+ *  that also matches `app/s/page.tsx`. */
+export const literalPath = (path: string) => `:(literal)${path}`
+
 export async function localDiff(worktree: string, path: string, scope: LocalScope): Promise<{ patch: string }> {
   if (!isValidRelPath(path)) throw new Error('Invalid path.')
+  // Staged diffs read Git objects. Every disk-backed diff, including --no-index for untracked
+  // files, must also reject symlinks in intermediate directories that leave the task root.
+  if (scope === 'unstaged' && !resolveInRoot(worktree, path)) throw new Error('Invalid path.')
   // Untracked files aren't in the index, so this renders an all-additions patch via --no-index.
-  const tracked = (await git(['ls-files', '--error-unmatch', '--', path], { cwd: worktree, timeoutMs: 10_000 })).code === 0
+  const tracked = (await git(['ls-files', '--error-unmatch', '--', literalPath(path)], { cwd: worktree, timeoutMs: 10_000 })).code === 0
   if (!tracked && scope === 'unstaged') {
     // --no-index exits 1 on "differences found", which counts as success for a diff. The broker
     // returns the exit code as data, so this needs no catch that inspects an exec error's shape.
-    const result = await git(['diff', '--no-index', '--', '/dev/null', path], { cwd: worktree, timeoutMs: 15_000 })
+    const result = await git(['diff', '--no-index', '--no-color', '--', '/dev/null', path], { cwd: worktree, timeoutMs: 15_000 })
     if (result.code !== 0 && result.code !== 1) throw new Error(result.stderr.trim() || 'git diff failed')
     return { patch: stripToHunks(result.stdout) }
   }
-  const args = ['diff', ...(scope === 'staged' ? ['--staged'] : []), '--', path]
+  // `--no-color`, because `color.ui=always` would hide the hunk headers from stripToHunks.
+  const args = ['diff', ...(scope === 'staged' ? ['--staged'] : []), '--no-color', '--', literalPath(path)]
   // gitOrThrow, not gitText: a patch is content, and gitText trims.
   const { stdout } = await gitOrThrow(args, { cwd: worktree, timeoutMs: 15_000 })
   return { patch: stripToHunks(stdout) }
@@ -431,12 +441,8 @@ export async function localNewSideText(worktree: string, path: string, scope: Lo
     const { stdout } = await gitOrThrow(['show', `:${path}`], { cwd: worktree, timeoutMs: 15_000 })
     return { text: stdout }
   }
-  // isValidRelPath already makes the join unescapable by path syntax. The resolve and the lstat cover
-  // what it cannot: a symlink inside the worktree pointing anywhere it likes, on a path that arrived
-  // over HTTP.
-  const full = resolve(join(worktree, path))
-  const root = resolve(worktree)
-  if (full !== root && !full.startsWith(root + '/')) throw new Error('Invalid path.')
+  const full = resolveInRoot(worktree, path)
+  if (!full) throw new Error('Invalid path.')
   const stat = await lstat(full)
   if (!stat.isFile() || stat.isSymbolicLink()) throw new Error('Not a regular file.')
   return { text: await readFile(full, 'utf8') }

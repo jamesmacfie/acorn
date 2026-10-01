@@ -1,8 +1,8 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { nodes } from '../../infra/node/fleet'
 import Icon from '../../kit/components/content/Icon'
-import { createDismissable } from '../../kit/lib/dismissable'
-import { pendingTrust, resolvePendingTrust, type PluginTrustRequest } from '../plugins/distribution'
+import { createDismissable } from '../../kit/lib/controls/dismissable'
+import { distribution, pendingTrust, resolvePendingTrust, type PluginTrustRequest } from '../plugins/distribution'
 import { recordTrustDecision, TIER_LABEL, trustTiers, type TierKey } from './trustModel'
 import './plugin-trust.css'
 import { Alert, Badge, Button, Kbd } from '../../kit/components/primitives'
@@ -42,6 +42,23 @@ export default function PluginTrustDialog() {
       .filter((tier) => tier.lines.length > 0),
   )
   const previousVersion = () => request()?.previous?.version
+  const sameBundleReview = () => request()?.previous?.hash === request()?.hash
+  const changedDeclaration = () => sameBundleReview() && !!request()?.previous?.declaration
+  const previousStillActive = () => {
+    const current = request()
+    if (!current?.previous || current.relation !== 'installed') return false
+    if (current.source?.kind === 'device') return false
+    return current.sourceNodeIds.every((nodeId) =>
+      distribution().selectionsByNode.get(nodeId)?.get(current.row.name)?.hash === current.previous?.hash)
+  }
+  const fallbackCopy = () => {
+    const current = request()
+    if (!current) return ''
+    if (current.source?.kind === 'device') return 'This device plugin stays unavailable until you accept this version.'
+    if (previousStillActive()) return 'The current version keeps working until the node activates this update.'
+    if (current.relation === 'installed' && !current.previous) return 'Accepting now allows this interface to appear after the node starts this plugin.'
+    return "This plugin's interface stays unavailable on the affected node until you accept this version or the node runs an accepted version."
+  }
 
   const decide = async (decision: 'accepted' | 'rejected') => {
     const current = request()
@@ -92,21 +109,23 @@ export default function PluginTrustDialog() {
             onClick={dismiss.onContainerClick}
             onKeyDown={dismiss.onKeyDown}
           >
-            <div class="overlay-title">{previousVersion() ? 'Plugin update' : 'Plugin trust'}</div>
+            <div class="overlay-title">{sameBundleReview() ? changedDeclaration() ? 'Plugin declaration changed' : 'Review plugin declaration' : previousVersion() ? 'Plugin update' : 'Plugin trust'}</div>
             <div class="overlay-body plugin-trust-body">
               <header class="plugin-trust-identity">
                 <span class="plugin-trust-glyph" aria-hidden="true">{current().row.name.slice(0, 1).toUpperCase()}</span>
                 <div>
                   <h2 id="plugin-trust-title">
                     <code>{current().row.name}</code>
-                    {previousVersion() ? (addedLines().length ? ' was updated — it asks for more' : ' was updated') : ' wants to run in acorn'}
+                    {sameBundleReview() ? changedDeclaration() ? ' changed what it asks for' : ' needs another review' : previousVersion() ? (addedLines().length ? ' was updated — it asks for more' : ' was updated') : ' wants to run in acorn'}
                   </h2>
                   <p class="plugin-trust-meta">
+                    <Badge size="xs">{sameBundleReview() ? current().row.installed?.version : previousVersion() ? `${previousVersion()} → ${current().row.installed?.version}` : current().row.installed?.version}</Badge>
                     <Badge size="xs">
-                      {previousVersion() ? `${previousVersion()} → ${current().row.installed?.version}` : current().row.installed?.version}
-                    </Badge>
-                    <Badge size="xs">
-                      <Icon name="monitor" /> from {nodeLabel(current().nodeId)}
+                      <Icon name="monitor" /> {current().source?.kind === 'device'
+                        ? current().sourceLabel?.startsWith('path:')
+                          ? `installed on this device from ${current().sourceLabel}; a folder pins nothing`
+                          : `installed on this device from ${current().sourceLabel ?? 'a package'}`
+                        : `from ${current().sourceNodeIds.map(nodeLabel).join(', ')}`}
                     </Badge>
                     <Show when={!previousVersion()}><Badge size="xs">first time</Badge></Show>
                   </p>
@@ -115,8 +134,12 @@ export default function PluginTrustDialog() {
 
               <p class="muted plugin-trust-intro">
                 <Show
-                  when={previousVersion()}
-                  fallback="None of its code has run yet. Review what it asks for below — you’ll only be asked once for this version."
+                  when={previousVersion() && !sameBundleReview()}
+                  fallback={sameBundleReview()
+                    ? changedDeclaration()
+                      ? 'The client code is the same, but this node changed its declaration. Acorn has withheld its interface until you review these permissions and contributions again.'
+                      : 'Acorn needs an approval that binds this client code to its current permissions and contributions. Its interface is withheld until you review them.'
+                    : 'None of its code has run yet. Review what it asks for below — acorn asks again if the bundle changes.'}
                 >
                   {(version) => (
                     <Show
@@ -128,6 +151,7 @@ export default function PluginTrustDialog() {
                   )}
                 </Show>
               </p>
+              <p class="muted plugin-trust-intro">{fallbackCopy()}</p>
 
               <Show when={error()}><Alert>{error()}</Alert></Show>
 
@@ -167,7 +191,9 @@ export default function PluginTrustDialog() {
               {/* The vocabulary, once, matching docs/security.md § Node-half plugin security. */}
               <p class="muted plugin-trust-legend">
                 <Show when={has('enforced')}>
-                  <span><strong>Enforced</strong> — acorn checks these in the sandboxed interface and isolated server realm; anything not listed is refused.</span>
+                  <span><strong>Enforced</strong> — {current().source?.kind === 'device'
+                    ? 'acorn checks these in the sandboxed interface; anything not listed is refused.'
+                    : 'acorn checks these in the sandboxed interface and isolated server realm; anything not listed is refused.'}</span>
                 </Show>
                 <Show when={has('declared')}>
                   <span>
@@ -181,14 +207,18 @@ export default function PluginTrustDialog() {
             </div>
             <div class="ui-modal-actions plugin-trust-actions plugin-trust-actions-with-hint">
               <p class="plugin-trust-escape">
-                Not sure? Press <Kbd size="xs">Esc</Kbd> — {previousVersion() ? `${previousVersion()} keeps running and ` : ''}acorn asks again next launch.
+                Press <Kbd size="xs">Esc</Kbd> to decide later. Acorn asks again next launch.
               </p>
               <div class="plugin-trust-buttons">
+                <Button variant="ghost" disabled={saving()} onPress={() => {
+                  const pending = request()
+                  if (pending) resolvePendingTrust(pending.row.name, pending.hash)
+                }}>Not now</Button>
                 <Button variant="ghost" disabled={saving()} onPress={() => void decide('rejected')}>
-                  {previousVersion() ? `Keep ${previousVersion()}` : 'Don’t run it'}
+                  {previousVersion() ? 'Reject update' : 'Reject plugin'}
                 </Button>
                 <Button disabled={saving()} onPress={() => void decide('accepted')}>
-                  {saving() ? 'Saving…' : previousVersion() ? 'Trust the update' : `Trust ${current().row.name} ${current().row.installed?.version}`}
+                  {saving() ? 'Saving…' : previousVersion() ? 'Accept update' : `Accept ${current().row.name} ${current().row.installed?.version}`}
                 </Button>
               </div>
             </div>

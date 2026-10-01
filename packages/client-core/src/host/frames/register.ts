@@ -9,6 +9,7 @@ import type { DocumentHandle } from '../../features/editor/documentModel'
 import { isPluginKeyClaim } from '@acorn/protocol/keybindings.ts'
 import type { PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
 import { isCoreExclusiveSlot, qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
+import { isPluginSettingsCategory, isSettingsScope } from '@acorn/protocol/settingsPages.ts'
 import { panelRegion } from '../../features/dashboards/region'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { registerPluginExtension } from '../chrome/chromeExtensionPoints'
@@ -16,15 +17,21 @@ import { commandRegistry } from '../registries/commands/commands'
 import { pluginProjectRoutePrefix } from '../registries/commands/corePaths'
 import { keybindingRegistry } from '../registries/commands/keybindings'
 import { paneRegistry } from '../registries/panes/panes'
+import { clientScheduleRegistry } from '../registries/shell/schedules'
+import { ownsRoute } from '../chrome/chromeData'
 import { suppliedExtendedPane } from '../chrome/extendedPane'
 import { suppliedLayout } from '../layouts/table'
 import { suppliedRemoteTree } from '../tree/table'
 import { projectImporterRegistry } from '../registries/sources/projectImporters'
 import { projectSurfaceRegistry } from '../registries/panes/projectSurfaces'
 import { clearExclusiveSlotFailures, exclusiveSlotFailed, exclusiveSlotRegistry } from '../registries/extensionPoints/exclusiveSlots'
+import type { PaneSwitcherProps } from '@acorn/protocol/paneSwitcher.ts'
+import { PANE_SWITCHER_ACTIONS, paneSwitcherRemote } from '../plugins/paneSwitcherRemote'
+import type { RailProps, TopbarProps } from '@acorn/protocol/chrome.ts'
+import { RAIL_ACTIONS, TOPBAR_ACTIONS, railRemote, topbarRemote } from '../plugins/chromeRemote'
 import { refPanelRegistry } from '../registries/panes/refPanels'
-import type { Disposable } from '../../kit/lib/registry'
-import { settingsRegistry } from '../registries/shell/settings'
+import type { Disposable } from '../../kit/lib/state/registry'
+import { settingsRegistry, settingsSearchProblem } from '../registries/shell/settings'
 import { uiSlotRegistry } from '../registries/extensionPoints/slots'
 import { activeTaskId } from '../../features/tasks/tasks'
 import {
@@ -38,6 +45,8 @@ import { clearSurfaceFailures, recordSurfaceFailure } from '../plugins/surfaceFa
 import type { FrameBinding } from './broker'
 import { isHostOwnedSurface, paneLayoutFor, remoteRegionEntry } from './layouts'
 import { closePluginOverlay, pluginOverlayOpen } from './overlays'
+import { paneAvailability } from './paneAvailability'
+import { suppliedDocumentSurface } from './documentSurface'
 import { createLogger } from '../../infra/telemetry/logger'
 
 const log = createLogger('plugins')
@@ -90,7 +99,9 @@ const DomExtendedPane = lazy(() => import('../chrome/ChromeExtendedPane'))
 const RemoteTree = lazy(async () => ({ default: suppliedRemoteTree() ?? (await import('../tree/RemoteTree')).RemoteTree }))
 // Lazy for the reason above, plus one more: this file is evaluated on every shell boot, and a static
 // import would put the editor and its grammars in the boot graph for a pane most sessions never open.
-const DocumentSurface = lazy(() => import('../../features/editor/DocumentSurface'))
+const DocumentSurface = lazy(async () => ({
+  default: suppliedDocumentSurface() ?? (await import('../../features/editor/DocumentSurface')).default,
+}))
 // The host's layouts. Its own lazy boundary rather than a branch inside the one above, so a shell that
 // only opens whole-pane documents never pulls the splitters and the tab strip in.
 const paneLayouts = () => import('../layouts')
@@ -208,7 +219,7 @@ function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow, tr
 function registerSurface(pluginId: string, hash: string, row: NodePluginRow, surface: PluginFrameSurface): Disposable {
   // Every registration in this function goes through `own`, so the plugin id reaches each registry's
   // owner side-map and the seams that build a telemetry record can name whose rectangle it was
-  // (kit/lib/registry.ts § the owner side-map). The same helper `host/chrome/chromeRegister.ts` uses,
+  // (kit/lib/state/registry.ts § the owner side-map). The same helper `host/chrome/chromeRegister.ts` uses,
   // and for the same reason: this is the pass that knows the owner, and a manifest cannot state one.
   const own = <T extends { id: string }>(registry: { register(entry: T, owner?: string): Disposable }, entry: T): Disposable =>
     registry.register(entry, pluginId)
@@ -412,7 +423,15 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         if (surface.providerId && surface.providerId !== pluginId) {
           throw new Error(`declared provider '${surface.providerId}' is not '${pluginId}'`)
         }
-        return own(paneRegistry, {
+        // The plugin's own answer to "can this task show the pane" (./paneAvailability.ts). Confined
+        // again for the reason the layout routes above are.
+        if (surface.availability !== undefined && !ownsRoute(pluginId, surface.availability)) {
+          throw new Error(`availability route '${surface.availability}' is not under '${pluginId}'`)
+        }
+        const availability = surface.availability
+          ? paneAvailability(`plugin.${pluginId}.${surface.id}.availability`, surface.availability)
+          : null
+        const pane = own(paneRegistry, {
           id: surface.id,
           label: surface.label,
           glyph: surface.glyph,
@@ -422,7 +441,8 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
           // The per-node gate. A plugin installed on node A contributes nothing to a task on node B, so
           // the switcher never offers a pane whose routes aren't there (distribution.ts).
           when: (task) => pluginEnabledOnNode(frameNode(), pluginId)
-            && (!surface.providerId || task.links.some((link) => link.providerId === surface.providerId)),
+            && (!surface.providerId || task.links.some((link) => link.providerId === surface.providerId))
+            && (!availability || availability.available(task.id)),
           component: (props) => {
             // The pane's regions. The wrapper below is separate from them because a footer strip and an
             // aside column belong to the pane rather than to whatever fills it.
@@ -442,6 +462,10 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
             })
           },
         })
+        // After the pane, so a duplicate pane id that throws above leaves no schedule running.
+        if (!availability) return pane
+        const schedule = clientScheduleRegistry.register(availability.schedule, pluginId)
+        return { dispose: () => { schedule.dispose(); pane.dispose() } }
       }
     case 'coreSlot': {
       // The exclusive slot: an offer to draw one of core's own surfaces (registries/exclusiveSlots.ts).
@@ -456,6 +480,57 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         throw new Error(`coreSlot surface '${surface.id}' names an unknown core surface '${surface.coreSlot}'`)
       }
       const slot = surface.coreSlot
+      if (slot === 'pane.switcher') {
+        const tree = singleRegionTree(surface)
+        if (!tree) throw new Error(`pane switcher '${surface.id}' needs a remote-tree region`)
+        return own(exclusiveSlotRegistry, {
+          id: `plugin:${pluginId}:${surface.id}`,
+          pluginId,
+          slot,
+          label: surface.label,
+          when: () => pluginEnabledOnNode(frameNode(), pluginId),
+          component: (props) => {
+            const value = () => props.value as PaneSwitcherProps
+            return createComponent(RemoteTree, {
+              contribution: tree,
+              props: () => paneSwitcherRemote(value()).data,
+              actions: () => paneSwitcherRemote(value()).actions,
+              declaredActions: () => PANE_SWITCHER_ACTIONS,
+              scope: () => ({ taskId: value().task.id, projectId: value().task.projectId }),
+            })
+          },
+        })
+      }
+      if (slot === 'rail' || slot === 'topbar') {
+        const tree = singleRegionTree(surface)
+        if (!tree) throw new Error(`${slot} surface '${surface.id}' needs a remote-tree region`)
+        return own(exclusiveSlotRegistry, {
+          id: `plugin:${pluginId}:${surface.id}`,
+          pluginId,
+          slot,
+          label: surface.label,
+          placesNestedSlot: surface.placesSlots?.includes(slot === 'rail' ? 'rail.taskList' : 'topbar.right') ?? false,
+          when: () => pluginEnabledOnNode(frameNode(), pluginId),
+          component: (props) => {
+            if (slot === 'rail') {
+              const value = () => props.value as RailProps
+              return createComponent(RemoteTree, {
+                contribution: tree,
+                props: () => railRemote(value()).data,
+                actions: () => railRemote(value()).actions,
+                declaredActions: () => RAIL_ACTIONS,
+              })
+            }
+            const value = () => props.value as TopbarProps
+            return createComponent(RemoteTree, {
+              contribution: tree,
+              props: () => topbarRemote(value()).data,
+              actions: () => topbarRemote(value()).actions,
+              declaredActions: () => TOPBAR_ACTIONS,
+            })
+          },
+        })
+      }
       return own(exclusiveSlotRegistry, {
         id: `plugin:${pluginId}:${surface.id}`,
         pluginId,
@@ -561,14 +636,38 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
       // manifest parser refuses a settings surface that names no layout, so this is a declaration
       // either way rather than a default.
       const settingsTree = singleRegionTree(surface)
+      // Placed by this build's own lists, because the row is bytes a node sent: a group or scope this
+      // build does not offer plugins leaves the page in its default place rather than out of settings.
+      // The node already reported the value when it read the manifest. No `followsNodeSwitcher`: a
+      // frame is pinned to the active node (`frameNode` above), so its header names that node.
       return own(settingsRegistry, {
         id: surface.id,
         label: surface.label,
+        ...(isPluginSettingsCategory(surface.category) ? { category: surface.category } : {}),
+        ...(isSettingsScope(surface.settingsScope) ? { scope: surface.settingsScope } : {}),
+        icon: surface.glyph,
+        // Checked again here for the same reason: a newer node may accept a list this build would not,
+        // and the registry refuses a page whose lists are past the limit. Losing the search entries is
+        // the cost, never the page.
+        ...(surface.keywords && !settingsSearchProblem({ keywords: surface.keywords }) ? { keywords: surface.keywords } : {}),
+        ...(surface.sections && !settingsSearchProblem({ sections: surface.sections }) ? { sections: surface.sections } : {}),
+        // Only this plugin's own sources. The node reported any other id when it read the manifest; here
+        // it is dropped, so a roster row can never put a switch for core's rail or another plugin's.
+        ...(ownRailSwitches(surface.railSourceVisibility, row) ?? {}),
         group: surface.group ?? 'general',
         order: surface.order,
-        component: () => settingsTree
-          ? createComponent(RemoteTree, { contribution: settingsTree, props: () => ({}) })
-          : createComponent(PluginFrame, { binding: frameBindingFor(pluginId, surface, row, { nodeId: mountedFrameNode() }), hash }),
+        requires: { loadedPlugin: pluginId },
+        // A `project` page is a tab on a project's settings page, so it is told which project, the
+        // same way a project pane is. The page is drawn afresh for each project, so a value read at
+        // mount stays right.
+        component: (props) => {
+          const nodeId = mountedFrameNode()
+          const project = props.context.scope.project?.id
+          const scope = project ? { projectId: project } : {}
+          return settingsTree
+            ? createComponent(RemoteTree, { contribution: settingsTree, props: () => scope, scope: () => scope })
+            : createComponent(PluginFrame, { binding: frameBindingFor(pluginId, surface, row, { ...scope, nodeId }), hash })
+        },
       })
     }
     case 'importer':
@@ -576,6 +675,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         id: surface.id,
         label: surface.label,
         glyph: surface.glyph,
+        requires: { loadedPlugin: pluginId },
         component: (props) => createComponent(PluginFrame, {
           binding: frameBindingFor(pluginId, surface, row, { nodeId: mountedFrameNode() }),
           hash,
@@ -590,14 +690,18 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
   }
 }
 
+const ownRailSwitches = (ids: readonly string[] | undefined, row: NodePluginRow): { railSourceVisibility: string[] } | undefined => {
+  const own = (row.installed?.contributions.sources ?? []).map((source) => source.id)
+  const kept = (ids ?? []).filter((id) => own.includes(id))
+  return kept.length ? { railSourceVisibility: kept } : undefined
+}
+
 /**
  * Register every accepted plugin's declared surfaces. Idempotent: called after the distribution pass and
- * again when a trust decision lands, and each call replaces what the previous one contributed. Not called
- * on a node switch, and doesn't need to be, since nothing registered here holds a node id.
+ * again when a trust decision or active node changes. Each call replaces the previous registrations.
  */
 export function syncFrameContributions(): void {
-  // Still gated on the distribution pass having run: a frame mounts bytes, and until one bundle has won
-  // per plugin id there's nothing to mount. The chrome pass has no such gate.
+  // A frame mounts bytes, so wait until the distribution pass has selected this node's runtime.
   if (!activeBundles()) return
 
   const entries = eligiblePlugins()

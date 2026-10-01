@@ -67,11 +67,11 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
   ['GET', '/v1/core/projects/:id/config'],
   ['PUT', '/v1/core/projects/:id/config'],
   ['PUT', '/v1/core/projects/:id/run-targets'],
+  ['GET', '/v1/core/projects/:id/mcp'],
+  ['POST', '/v1/core/projects/:id/mcp/starter'],
   ['POST', '/v1/core/tasks/:id/preview-url'],
   ['POST', '/v1/core/tasks/:id/on-created'],
   ['POST', '/v1/core/tasks/:id/archive'],
-  ['GET', '/v1/core/tasks/:id/mcp'],
-  ['POST', '/v1/core/tasks/:id/mcp/starter'],
   ['GET', '/v1/core/tasks/:id/context'], // taskContext
   ['GET', '/v1/core/tasks/:id/run'], // harness
   ['GET', '/v1/core/tasks/:id/tools'], // agentTools — the MCP/harness projection

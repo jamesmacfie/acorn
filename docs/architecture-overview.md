@@ -89,8 +89,37 @@ arch rule refuses an import of custody from anything in `apps/tui` that draws a 
 window, no webview and no keychain, so the affordances those gate are absent through the platform seam
 rather than stubbed. See [the terminal client doc](./tui.md).
 
+The headless CLI enters through the same `acorn` launcher when a subcommand is present. It reuses
+`@acorn/custody` for fleet membership, device tokens, certificate pins, and the broker, then reads
+one selected Node over `/v1`. Only explicit `node start --background` and `node stop` own a
+persistent local Node lifetime; ordinary resource commands attach without starting it. See
+[command-line client](./cli.md).
+
 Only serializable values cross a boundary. Product requests and streams use the broker and `/v1`.
 The service protocol is reserved for lifecycle messages.
+
+## Node-provided plugin UI
+
+A loaded plugin has separate runtime, distribution, custody, and presentation facts. The Node's
+`GET /v1/core/plugins` response reports `active`, the declaration and client hash captured with the
+running node half, beside `installed`, the current disk candidate. Install, update, and uninstall can
+change `installed` without changing `active`. The Node retains the active client bytes and serves them
+by exact hash until that runtime stops. An omitted `active` field is an older protocol response and is
+adapted conservatively; `null` explicitly means no loaded runtime is active.
+
+The client reconciles one observation per paired Node. Custody fetches and hashes both active and
+installed offers, then reads its durable decision for each `(pluginId, hash)`. The client selects only
+an accepted, cached bundle matching that Node's active runtime. A disk candidate can prompt for trust
+without replacing the running version. Source-aware plugin events, arrivals, reconnects, switches,
+stale reads, and unpairing update one distribution snapshot; the active Node's disposable
+registrations follow that snapshot. A stale or unreachable Node retains its last observation for
+explanation but supplies no live loaded UI.
+
+Availability checks combine the Node runtime state with the exact accepted selection. They gate
+loaded panes, settings, importers, footer slots, commands, and other contributions before use. The
+shell still owns placement and fallback. A remote tree worker is keyed by `(pluginId, hash)`; each
+mounted tree has its own slot and bridge authority. See [activation](./plugins/activation.md),
+[descriptors](./plugins/descriptors.md), and [security](./security.md).
 
 ## Package boundaries
 
@@ -107,7 +136,12 @@ its map enumerates its public modules one per line. That buys two things over th
 not importable from another package, and a new module is public only when someone adds the line, which
 is the decision the map exists to record.
 
-The other four libraries also publish enumerated subpaths. Their boundary map is:
+The source is grouped by contract owner: agents, appearance, chrome, content, data, dashboards,
+device, integrations, projects, runtime, and transport. The public subpaths remain flat, so moving a
+source file between these folders does not change a consumer import. `plugin/` and `tree/` keep their
+own wire families. `baseline.ts` stays at the source root because the Rust shell embeds that file.
+
+The other five libraries also publish enumerated subpaths. Their boundary map is:
 
 | Library | Public paths | Keep private |
 | --- | --- | --- |
@@ -115,6 +149,7 @@ The other four libraries also publish enumerated subpaths. Their boundary map is
 | `node-core` | Server service and composition seams; `testkit` for fixtures | Runtime implementations not named by the map |
 | `custody` | Broker, plugin custody, device, and startup seams | Store and supervision internals |
 | `dashboards-core` | Contract, projection, and rendering math | Individual pipeline modules not named by the map |
+| `diff-document` | One entrypoint, `./document`: the diff document's types, parser, segmenter, search, and parse cache | Its modules behind that entrypoint |
 
 Direct paths remain where a lazy component import, a side-effect stylesheet, a mock target, a
 composition entrypoint, or two same-named exports need their own loading boundary. Public files
@@ -126,6 +161,11 @@ may draw with is one row in `packages/client-core/src/kit/tokens/support.ts`, a 
 tokens rather than DOM attributes, and a type-level test refuses `class`, `className` and `style` on
 any of them ([ui design](./ui-design.md) § The closed kit). Two arch rules hold the rest — no plugin
 ships a stylesheet, and no plugin mounts a Solid root of its own.
+
+Within `client-core`, the kit depends on its own modules and the syntax highlighter, not on product
+features. It also imports public protocol and diff-document contracts. The boundary test counts
+type-only imports and re-exports: a display shape shared with a feature belongs in the kit, while
+the feature keeps its public type names for consumers.
 
 Test files follow the same rules as production files unless a rule names an exception. Remaining
 shrinking baselines are named at their own tests; plugin tests have no direct core-library imports.
@@ -277,7 +317,8 @@ reads them. Copy `plugins/docker/src/shared/model.ts`. Two boundary rules in
 protocol modules named for a plugin is an enumerated, shrinking list. That lets a plugin define its
 wire contract without editing core, which is the precondition for third-party plugins.
 
-`packages/dashboards-core` is the only other package both runtimes import. It holds the pure
+`packages/dashboards-core` and `packages/diff-document` are the other two packages both runtimes
+import. `dashboards-core` holds the pure
 dashboard pipeline: the panel model and its codec, shaping, cross-source mapping, layout, and chart
 and cell arithmetic, with no Solid, no registries, and no fetch. It exists because the node's measure
 sampler must compute a panel's number with the same functions the renderer draws it with. See
@@ -286,6 +327,16 @@ the day one changed, and the point of recording history is that a stored number 
 on screen means. Client-core re-exports every module it moved, so the components there still say
 `./model`, and the node imports it directly. Like protocol it declares no DOM and no node types,
 which keeps the standalone node's graph clean.
+
+`diff-document` is the diff viewer's document ([diff rendering](./diff-rendering.md) § The document):
+parsing a hunks-only patch into plain rows, cutting them into bounded segments, the descriptors that
+lay a document out without its text, and search across one. It exists because the document is built
+on the node and read in the renderer. GitHub's and Changes' routes cut patches into segments and
+answer descriptors, the plugins' client sources pass those through the `DiffSource` port, and
+client-core's viewer loads the segments near the reader. No provider type enters it, and it has no
+DOM, node, Solid, database, or transport dependency. It is the one library besides protocol and the
+facade a plugin may import directly, because it holds no host state; `@acorn/plugin-api/ui/diff`
+re-exports the types the port is written in.
 
 The renderer reaches the host through one seam, `packages/client-core/src/infra/platform/`. It groups what
 a host provides, namely node transport, fleet membership, plugin custody, and the native extras, into
@@ -332,6 +383,11 @@ and snapshots, batch reference resolutions, and typed data sources, whose rows a
 table beside another plugin's. See [the dashboards doc](./dashboards.md). Each parses
 all-or-nothing rather than sanitising field by field, because a half-accepted answer renders as
 complete and is not. Adding to this list means naming the same argument: untrusted wire, host-drawn.
+
+Runtime dependency security floors live in the root `package.json` overrides. The standalone packer
+carries them into npm's manifest; `tools/arch/dependencySecurity.test.ts` checks that pnpm's runtime
+overrides agree. See [dependency security policy](./node-distribution.md#dependency-security-policy)
+for direct dependency references and the standalone install's reproducibility limits.
 
 ## Product model
 
@@ -381,12 +437,15 @@ data plus async messages can be sandboxed, while PTY stream ownership and compon
 inside its own tree at a place it has not opened as an extension point need the shared realm and stay
 first-party.
 Client tree module lifetime is separate from mounted authority. Capable SDKs share a bundle worker
-while every mounted slot owns its bridge, pending requests, and document grant. A legacy SDK keeps
-an immutable equivalent context and terminates with its final lease. The host captures QueryClient
+while every mounted slot owns its bridge, pending requests, and document grant. A legacy SDK uses
+one immutable slot-affine worker per mounted tree and terminates with its final lease. The host captures QueryClient
 origin before lazy region construction, and structural document handle changes revoke prior grant
 generations. [Mounted bridge ownership](./plugins/descriptors.md#mounted-bridge-ownership-and-sdk-compatibility)
 defines capability negotiation, compatibility, resource bounds, and the selected-Node event boundary.
 
+A device can also hold a client-only loaded plugin. Its bundle has device provenance, wins over a Node
+offer of the same plugin ID, and uses the same client sandbox and trust gate. The device installer
+rejects any Node entry or Node-dependent contribution.
 [The plugins doc](./plugins.md) describes both tiers,
 [first-party plugins](./first-party-plugins.md) says which shipped plugins are in the first tier
 because they must be, and [extensibility](./extensibility.md) is why the split exists at all.
@@ -429,7 +488,7 @@ Every Node-backed query is rendered with `live`, `refreshing`, `stale`, `offline
 the user's text as a draft. There is no automatic mutation queue.
 
 A paired Node's own connection has a smaller vocabulary. `NodeConnectionState`
-(`packages/protocol/src/broker.ts`) is `online`, `degraded`, `offline`, `incompatible`, or `revoked`,
+(`packages/protocol/src/transport/broker.ts`) is `online`, `degraded`, `offline`, `incompatible`, or `revoked`,
 and nothing else. A certificate fingerprint mismatch is not a sixth state. It surfaces as `offline`
 with an `identity_mismatch` error, because it is a reason the Node is unreachable rather than a
 steady state the UI needs its own row for. `incompatible` is decided from the protocol major the

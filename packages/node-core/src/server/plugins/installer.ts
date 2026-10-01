@@ -14,8 +14,8 @@
 // runs it at the node's next start (pluginLoader.ts), which is why every result says
 // `installed-restart-required` rather than pretending the plugin is live.
 import { createHash, randomUUID } from 'node:crypto'
-import { createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, symlinkSync } from 'node:fs'
-import { isAbsolute, join, relative, resolve, sep } from 'node:path'
+import { createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, symlinkSync } from 'node:fs'
+import { isAbsolute, join, resolve } from 'node:path'
 import { Readable, Transform } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type {
@@ -24,23 +24,25 @@ import type {
   PluginUninstallResult,
   PluginUpdateResult,
 } from '@acorn/protocol/api.ts'
+import { describePluginSource, guardPluginUrl, resolvePluginSource, RELEASE_ASSET } from '@acorn/protocol/plugin/source.ts'
 import { writePrivateAtomic } from '../storage/dataRoot'
-import { runProcess } from '../core/proc'
-import { resolveInRoot } from '../core/fs'
+import { unpackPluginArchive } from './archive'
+import { assertPluginPackageTree } from './packageTree'
+import { hashPluginFile, visitPluginFile, MAX_CLIENT_BUNDLE_BYTES, MAX_PLUGIN_FILE_BYTES } from './packageFiles'
 import { MANIFEST_FILE, PLUGIN_API_MAJOR, readPluginManifestResult, speaksApiVersion, type PluginManifest } from './manifest'
 import { pluginDbPath, PLUGIN_DB_DIR } from './storage'
 import { markPluginRemoved, markPluginUserManaged } from './bundledState'
+import { hasPendingPluginReview, pluginReviewFingerprint, removePluginReview, stagePluginReview } from './pendingReview'
 
 // A plugin package is source plus a bundle or two. 32 MiB is roughly four times the client-bundle
 // ceiling and leaves room for assets; anything past it is not a plugin, and a node should not spool a
 // gigabyte to disk because a URL said so.
 export const MAX_ARCHIVE_BYTES = 32 * 1024 * 1024
 const DOWNLOAD_TIMEOUT_MS = 60_000
-const UNPACK_TIMEOUT_MS = 120_000
 
 // The convention this phase establishes: a GitHub release carries the package as one asset with this
 // exact name.
-export const RELEASE_ASSET = 'acorn-plugin.tgz'
+export { RELEASE_ASSET }
 
 // Everything a caller can be told about why an install did not happen. One class rather than a code
 // union because every one of these is the same outcome for the owner, "that package was refused, and
@@ -69,10 +71,14 @@ export type PluginLockfile = {
 }
 
 export const pluginInstallRoot = (dataRoot: string): string => join(resolve(dataRoot), PLUGIN_DB_DIR)
-export const pluginDir = (dataRoot: string, id: string): string => join(pluginInstallRoot(dataRoot), id)
+const checkedPluginId = (id: string): string => {
+  if (!/^[a-z][a-z0-9-]{1,31}$/.test(id)) fail('Invalid plugin id.')
+  return id
+}
+export const pluginDir = (dataRoot: string, id: string): string => join(pluginInstallRoot(dataRoot), checkedPluginId(id))
 // Beside `<id>/` and `<id>.sqlite`, and unable to collide with either: the manifest id regex forbids a
 // dot, so no plugin directory can be named `<id>.lock.json`.
-export const lockfilePath = (dataRoot: string, id: string): string => join(pluginInstallRoot(dataRoot), `${id}.lock.json`)
+export const lockfilePath = (dataRoot: string, id: string): string => join(pluginInstallRoot(dataRoot), `${checkedPluginId(id)}.lock.json`)
 
 /** Never throws. A missing or corrupt lockfile means "installed before lockfiles, or hand-copied", which
  * is a plugin with no known source rather than an error. */
@@ -88,68 +94,14 @@ export function readLockfile(dataRoot: string, id: string): PluginLockfile | nul
 }
 
 /** One line naming where a package came from, for the settings row. */
-export const describeSource = (source: PluginInstallSource): string =>
-  'github' in source
-    ? `github:${source.github}${source.tag ? `@${source.tag}` : ''}`
-    : 'npm' in source
-      ? `npm:${source.npm}${source.version ? `@${source.version}` : ''}`
-      : 'url' in source
-        ? source.url
-        : `path:${source.path}`
+export const describeSource = describePluginSource
 
 // ── Source resolution ─────────────────────────────────────────────────────────────────────────────
-
-type Resolved = { url: string; provenance: PluginProvenance }
-
-const json = async (url: string, accept: string): Promise<unknown> => {
-  guardUrl(url)
-  const res = await fetch(url, { headers: { accept }, signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) })
-  if (!res.ok) fail(`${url} answered ${res.status}.`)
-  return await res.json()
-}
-
-async function resolveGithub(source: { github: string; tag?: string }): Promise<Resolved> {
-  if (!/^[\w.-]+\/[\w.-]+$/.test(source.github)) fail(`'${source.github}' is not an owner/repo pair.`)
-  const base = `https://api.github.com/repos/${source.github}/releases`
-  const release = (await json(source.tag ? `${base}/tags/${encodeURIComponent(source.tag)}` : `${base}/latest`, 'application/vnd.github+json')) as {
-    tag_name?: string
-    assets?: { name?: string; browser_download_url?: string }[]
-  }
-  const asset = (release.assets ?? []).find((candidate) => candidate.name === RELEASE_ASSET)
-  if (!asset?.browser_download_url) {
-    fail(`That release has no ${RELEASE_ASSET} asset. An acorn plugin release publishes the package under exactly that name.`)
-  }
-  return { url: asset!.browser_download_url!, provenance: { tag: release.tag_name ?? source.tag ?? 'latest' } }
-}
-
-async function resolveNpm(source: { npm: string; version?: string }): Promise<Resolved> {
-  if (!/^(@[\w.-]+\/)?[\w.-]+$/.test(source.npm)) fail(`'${source.npm}' is not an npm package name.`)
-  const packument = (await json(`https://registry.npmjs.org/${source.npm.replace('/', '%2f')}`, 'application/json')) as {
-    'dist-tags'?: Record<string, string>
-    versions?: Record<string, { dist?: { tarball?: string; integrity?: string } }>
-  }
-  const version = source.version ?? packument['dist-tags']?.latest
-  if (!version) fail(`${source.npm} has no published version to install.`)
-  const dist = packument.versions?.[version!]?.dist
-  if (!dist?.tarball) fail(`${source.npm}@${version} has no tarball on the registry.`)
-  return { url: dist!.tarball!, provenance: { version: version!, ...(dist!.integrity ? { integrity: dist!.integrity } : {}) } }
-}
 
 // https everywhere, plus http on loopback so a test or a local build server can hand this a real
 // archive over a real socket. Anything else is a downgrade: a plugin package is code, and fetching it
 // in the clear means whoever is between the node and the host chooses what runs.
-export function guardUrl(raw: string): void {
-  let url: URL
-  try {
-    url = new URL(raw)
-  } catch {
-    return fail(`'${raw}' is not a URL.`)
-  }
-  if (url.protocol === 'https:') return
-  const loopback = url.hostname === 'localhost' || url.hostname === '127.0.0.1' || url.hostname === '[::1]' || url.hostname === '::1'
-  if (url.protocol === 'http:' && loopback) return
-  fail('A plugin package must be fetched over https (http is accepted only from localhost).')
-}
+export const guardUrl = guardPluginUrl
 
 // ── Download and unpack ───────────────────────────────────────────────────────────────────────────
 
@@ -209,17 +161,11 @@ async function download(url: string, dest: string, expectIntegrity?: string): Pr
 }
 
 async function unpack(archive: string, into: string): Promise<void> {
-  mkdirSync(into, { recursive: true, mode: 0o700 })
-  // Shelling out to tar, the same way server/storage/backup.ts writes one. No `-P`, so absolute paths and `..`
-  // members are stripped or refused by tar itself; the symlink walk below closes the remaining escape.
-  const result = await runProcess({
-    file: '/usr/bin/tar',
-    args: ['-xzf', archive, '-C', into, '--no-same-owner'],
-    cwd: into,
-    timeoutMs: UNPACK_TIMEOUT_MS,
-  })
-  if (result.spawnError) fail(`Could not run tar: ${result.spawnError}`)
-  if (result.code !== 0) fail(`That archive could not be unpacked: ${result.stderr.trim() || 'tar reported no output'}`)
+  try {
+    await unpackPluginArchive(archive, into)
+  } catch (error) {
+    fail(error instanceof Error ? error.message : 'That archive could not be unpacked.')
+  }
 }
 
 // npm tarballs wrap everything in `package/`, and a hand-rolled `tar -czf` of a plugin folder wraps it
@@ -233,54 +179,60 @@ function packageRoot(unpacked: string): string {
   return fail(`That archive has no ${MANIFEST_FILE} at its root.`)
 }
 
-// tar refuses `..` members, but a symlink inside the package pointing at ~/.ssh survives extraction
-// and would make the plugin directory a window onto the rest of the disk, for the loader, for the
-// bundle route, and for a backup. Reject the whole package rather than pruning: a package that ships
-// one is not one to run half of.
-function assertConfined(root: string): void {
-  const realRoot = realpathSync(root)
-  const walk = (dir: string): void => {
-    for (const entry of readdirSync(dir, { withFileTypes: true })) {
-      const full = join(dir, entry.name)
-      if (entry.isSymbolicLink()) {
-        let real: string
-        try {
-          real = realpathSync(full)
-        } catch {
-          return fail(`The package contains a broken symlink (${relative(root, full)}).`)
-        }
-        if (real !== realRoot && !real.startsWith(realRoot + sep)) {
-          fail(`The package contains a symlink pointing outside itself (${relative(root, full)}).`)
-        }
-      } else if (entry.isDirectory()) {
-        walk(full)
-      }
-    }
-  }
-  walk(root)
-}
-
-const digestOf = (root: string, relPath: string | undefined): string | undefined => {
+const digestOf = (root: string, relPath: string | undefined, maxBytes = MAX_PLUGIN_FILE_BYTES): string | undefined => {
   if (!relPath) return undefined
-  const abs = resolveInRoot(root, relPath)
-  if (!abs) return fail(`The entrypoint '${relPath}' resolves outside the plugin directory.`)
   try {
-    return createHash('sha256').update(readFileSync(abs)).digest('hex')
-  } catch {
-    return fail(`The manifest names '${relPath}', which the package does not contain.`)
+    return hashPluginFile(root, relPath, maxBytes)
+  } catch (error) {
+    return fail(`The package does not contain a readable regular entrypoint '${relPath}': ${error instanceof Error ? error.message : String(error)}`)
   }
 }
 
 function validate(root: string, expectId: string | null): PluginManifest {
-  assertConfined(root)
+  try { assertPluginPackageTree(root) }
+  catch (error) { fail(error instanceof Error ? error.message : 'The package could not be validated.') }
   const parsed = readPluginManifestResult(root)
   if (!parsed.ok) return fail(parsed.reason)
   const manifest = parsed.manifest
   if (!speaksApiVersion(manifest.apiVersion)) {
     fail(`That package is built for acorn plugin API ${manifest.apiVersion}; this node speaks ${PLUGIN_API_MAJOR}.`)
   }
+  if (manifest.node) {
+    try { visitPluginFile(root, manifest.node, MAX_PLUGIN_FILE_BYTES, () => undefined) }
+    catch (error) { fail(`The package does not contain a readable regular entrypoint '${manifest.node}': ${error instanceof Error ? error.message : String(error)}`) }
+  }
+  // Custody retains its established too-large projection; its callback reads client bytes with
+  // the shared descriptor guard. Node placement hashes with the client ceiling below.
   if (expectId && manifest.id !== expectId) fail(`That package is '${manifest.id}', not '${expectId}'.`)
   return manifest
+}
+
+/** Inspect downloaded package bytes without installing them on a node. The callback must copy what it
+ * needs before this returns; the staged directory is always removed. Desktop custody uses the same
+ * archive limit, integrity check, unpacking, and manifest parser as the node installer. */
+export async function withPluginPackage<T>(
+  stagingRoot: string,
+  source: PluginInstallSource,
+  inspect: (root: string, manifest: PluginManifest) => Promise<T> | T,
+): Promise<T> {
+  if ('path' in source) {
+    if (!isAbsolute(source.path)) fail('A local plugin path must be absolute.')
+    return inspect(source.path, validate(source.path, null))
+  }
+  mkdirSync(stagingRoot, { recursive: true, mode: 0o700 })
+  const staging = join(stagingRoot, `.staging-${randomUUID().slice(0, 8)}`)
+  mkdirSync(staging, { recursive: true, mode: 0o700 })
+  try {
+    const resolved = await resolvePluginSource(source)
+    const archive = join(staging, 'package.tgz')
+    await download(resolved.url, archive, resolved.provenance.integrity)
+    const unpacked = join(staging, 'unpacked')
+    await unpack(archive, unpacked)
+    const root = packageRoot(unpacked)
+    return await inspect(root, validate(root, null))
+  } finally {
+    rmSync(staging, { recursive: true, force: true })
+  }
 }
 
 // ── Versions ──────────────────────────────────────────────────────────────────────────────────────
@@ -361,6 +313,8 @@ export function sweepDebris(dataRoot: string): void {
 
 export type InstallOptions = {
   allowDowngrade?: boolean
+  /** An owner-approved first step of an agent request. The package is quarantined before placement. */
+  reviewRequestId?: string
 }
 
 export async function installPlugin(dataRoot: string, source: PluginInstallSource, options: InstallOptions = {}): Promise<PluginInstallResult> {
@@ -368,6 +322,7 @@ export async function installPlugin(dataRoot: string, source: PluginInstallSourc
 }
 
 export async function updatePlugin(dataRoot: string, id: string, options: InstallOptions = {}): Promise<PluginUpdateResult> {
+  if (hasPendingPluginReview(dataRoot, id)) fail(`'${id}' has an unreviewed package. Review or remove it first.`)
   const lock = readLockfile(dataRoot, id)
   if (!lock) fail(`acorn does not know where '${id}' came from, so it cannot update it. Reinstall it from its source.`)
   const result = await place(dataRoot, lock!.source, id, options)
@@ -383,21 +338,23 @@ async function place(dataRoot: string, source: PluginInstallSource, expectId: st
   const staging = join(root, `.staging-${randomUUID().slice(0, 8)}`)
   mkdirSync(staging, { recursive: true, mode: 0o700 })
   try {
-    const resolved = 'github' in source ? await resolveGithub(source) : 'npm' in source ? await resolveNpm(source) : { url: source.url, provenance: {} }
+    const resolved = await resolvePluginSource(source)
     const archive = join(staging, 'package.tgz')
     const archiveSha256 = await download(resolved.url, archive, resolved.provenance.integrity)
     const unpacked = join(staging, 'unpacked')
     await unpack(archive, unpacked)
     const pkg = packageRoot(unpacked)
     const manifest = validate(pkg, expectId)
+    if (hasPendingPluginReview(dataRoot, manifest.id)) fail(`'${manifest.id}' has an unreviewed package. Review or remove it first.`)
 
     const existing = readLockfile(dataRoot, manifest.id)
     guardDowngrade(existing, manifest.version, options)
     const entrypoints = {
       ...(manifest.node ? { node: digestOf(pkg, manifest.node)! } : {}),
-      ...(manifest.client ? { client: digestOf(pkg, manifest.client)! } : {}),
+      ...(manifest.client ? { client: digestOf(pkg, manifest.client, MAX_CLIENT_BUNDLE_BYTES)! } : {}),
     }
 
+    if (options.reviewRequestId) stagePluginReview(dataRoot, manifest.id, options.reviewRequestId, pluginReviewFingerprint(pkg))
     placeAtomically(dataRoot, manifest.id, pkg)
     writeLockfile(dataRoot, manifest.id, {
       source,
@@ -420,11 +377,13 @@ async function place(dataRoot: string, source: PluginInstallSource, expectId: st
 function linkLocal(dataRoot: string, source: { path: string }, expectId: string | null, options: InstallOptions): PluginInstallResult {
   if (!isAbsolute(source.path)) fail('A local plugin path must be absolute.')
   const manifest = validate(source.path, expectId)
+  if (hasPendingPluginReview(dataRoot, manifest.id)) fail(`'${manifest.id}' has an unreviewed package. Review or remove it first.`)
   guardDowngrade(readLockfile(dataRoot, manifest.id), manifest.version, options)
 
   mkdirSync(pluginInstallRoot(dataRoot), { recursive: true, mode: 0o700 })
   sweepDebris(dataRoot)
   const target = pluginDir(dataRoot, manifest.id)
+  if (options.reviewRequestId) stagePluginReview(dataRoot, manifest.id, options.reviewRequestId, pluginReviewFingerprint(source.path))
   rmSync(target, { recursive: true, force: true })
   symlinkSync(source.path, target)
   writeLockfile(dataRoot, manifest.id, {
@@ -450,11 +409,12 @@ function guardDowngrade(existing: PluginLockfile | null, next: string, options: 
 
 export function uninstallPlugin(dataRoot: string, id: string, options: { purgeData?: boolean } = {}): PluginUninstallResult {
   const target = pluginDir(dataRoot, id)
-  if (!existsSync(target) && !existsSync(lockfilePath(dataRoot, id))) fail(`'${id}' is not installed on this node.`)
+  if (!existsSync(target) && !existsSync(lockfilePath(dataRoot, id)) && !hasPendingPluginReview(dataRoot, id)) fail(`'${id}' is not installed on this node.`)
   markPluginRemoved(dataRoot, id)
   // lstat, so a `{ path }` folder symlink is unlinked rather than followed into the owner's directory.
   rmSync(target, { recursive: true, force: true })
   rmSync(lockfilePath(dataRoot, id), { force: true })
+  removePluginReview(dataRoot, id)
 
   // Retained by default, which mirrors what disabling has always done (docs/plugins.md: "SQLite files
   // remain on disk and can be re-enabled later"). Reinstalling then finds its data where it left it.

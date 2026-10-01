@@ -76,7 +76,7 @@ const scopeActive = (binding: ResolvedKeybinding, context: ScopeContext, event: 
   // pane's own field, which is where a reader presses it and where the changes pane's Commit lives.
   //
   // Two other paths already answer this question the same way. The sandboxed-frame SDK forwards a
-  // modified chord out of a frame's own input and refuses a bare one (../frames/sdk.ts), and the
+  // modified chord out of a frame's own input and refuses a bare one (../frames/sdk/bridgePort.ts), and the
   // terminal host's command layer shadows bare keys while a field has them and lets chords through
   // at every depth (apps/tui/src/keys/commandLayer.ts). The xterm case below is the same rule read
   // off the event rather than off the chord: a terminal focuses a hidden textarea, so it counts as a
@@ -118,9 +118,13 @@ export function installKeymap(root: HTMLElement, context: ScopeContext): void {
     ['nextPane', () => movePane(1)],
     ['prevPane', () => movePane(-1)],
   ]
+  // Not from inside a modal. The regions are behind it, so moving there would put focus, and every key
+  // typed after it, somewhere nobody can see: a full-window settings layer over a terminal is the case
+  // that made this matter.
+  const inModal = () => document.activeElement?.closest('[aria-modal="true"]') != null
   onCleanup(engine.registerLayer({
     priority: 5,
-    bindings: moves.flatMap(([intent, run]) => map[intent].map((key) => ({ key, cmd: run }))),
+    bindings: moves.flatMap(([intent, run]) => map[intent].map((key) => ({ key, cmd: () => !inModal() && run() }))),
   }))
 
   // The command catalog and the bindings that reach it, rebuilt whenever either registry or the

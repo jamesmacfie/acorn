@@ -40,6 +40,7 @@
       "../dist/client": "client",
       "../dist/bridge": "bridge",
       "../dist/helper": "helper",
+      "../dist/cli": "cli",
       "../dist/bundled-plugins": "plugins"
     },
     "macOS": {

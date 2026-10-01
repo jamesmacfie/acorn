@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, symlinkSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
@@ -80,6 +80,17 @@ describe('createProject / detectProject', () => {
     expect(first.ok && second.ok && first.project.id === second.project.id).toBe(true)
   })
 
+  it('reuses a project registered through another spelling of the same folder', async () => {
+    const folder = join(dir, 'canonical')
+    const alias = join(dir, 'alias')
+    mkdirSync(folder)
+    symlinkSync(folder, alias)
+    const first = await createProject(testDb.db, { path: folder })
+    const second = await createProject(testDb.db, { path: alias })
+    const third = await createProject(testDb.db, { path: join(dir, 'canonical', '..', 'canonical') })
+    expect(first.ok && second.ok && third.ok && first.project.id === second.project.id && second.project.id === third.project.id).toBe(true)
+  })
+
   it('rejects an unknown workspace and does not map two projects onto one folder', async () => {
     const firstFolder = join(dir, 'first')
     const secondFolder = join(dir, 'second')
@@ -92,6 +103,9 @@ describe('createProject / detectProject', () => {
     if (!first.ok || !second.ok) throw new Error('project setup failed')
 
     expect(await patchProject(testDb.db, second.project.id, { path: firstFolder })).toEqual({ ok: false, reason: 'Another project already uses that path.' })
+    const alias = join(dir, 'first-alias')
+    symlinkSync(firstFolder, alias)
+    expect(await patchProject(testDb.db, second.project.id, { path: alias })).toEqual({ ok: false, reason: 'Another project already uses that path.' })
     expect(await createProject(testDb.db, { path: secondFolder })).toMatchObject({ ok: true, project: { id: second.project.id } })
   })
 

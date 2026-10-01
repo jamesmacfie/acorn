@@ -88,6 +88,26 @@ it('says which call a closed row was without opening it', () => {
   expect(summary?.textContent).toContain('piranhagram')
 })
 
+it('names a skill in the closed row and keeps its JSON behind the disclosure', () => {
+  const host = draw({
+    id: 't', title: 'Skill', status: 'completed',
+    input: '{\n  "skill": "readable"\n}', output: 'Launching skill: readable',
+  }, false)
+  const fold = host.querySelector('details')!
+  expect(fold.open).toBe(false)
+  expect(fold.querySelector('summary')?.textContent).toContain('Launching skill: readable')
+  expect(host.textContent).not.toContain('"skill"')
+  fold.open = true
+  fold.dispatchEvent(new Event('toggle'))
+  expect(host.textContent).toContain('"skill": "readable"')
+  expect(host.querySelectorAll('.ui-code')).toHaveLength(1)
+})
+
+it('leaves malformed or unrelated tool inputs under their provider titles', () => {
+  expect(draw({ id: 'a', title: 'Skill', input: '{bad' }).querySelector('summary')?.textContent).toContain('Skill')
+  expect(draw({ id: 'b', title: 'Bash', input: '{"skill":"readable"}' }).querySelector('summary')?.textContent).toContain('Bash')
+})
+
 it('honours the reader’s fold setting rather than the call’s status', () => {
   expect(draw({ id: 't', title: 'Search web', web: { action: { type: 'search', queries: ['q'] } } }, false)
     .querySelector('details')?.open).toBe(false)
@@ -101,4 +121,16 @@ it('still draws a historic status-only row as the flat one it has always been', 
   const host = draw({ id: 't', title: 'Web search', kind: 'search', status: 'completed' })
   expect(host.querySelector('details')).toBeNull()
   expect(host.textContent).toContain('Web search')
+})
+
+it('builds nothing behind a closed card until the reader opens it', () => {
+  // A transcript holds hundreds of tool calls, most of them closed. Their output is the expensive part,
+  // and a closed disclosure has not built it (client-core kit/components/layout/Fold.tsx).
+  const host = draw({ id: 't', title: 'Run tests', status: 'completed', input: '{"cmd":"pnpm test"}', output: 'PASS 412 tests' }, false)
+  const details = host.querySelector('details')!
+  expect(details.querySelector('.ui-code')).toBeNull()
+  expect(host.textContent).not.toContain('PASS 412 tests')
+  details.open = true
+  details.dispatchEvent(new Event('toggle'))
+  expect(host.textContent).toContain('PASS 412 tests')
 })

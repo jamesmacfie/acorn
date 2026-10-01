@@ -1,4 +1,6 @@
 import type { AgentConfigOption, AgentSkillDescriptor } from '../../contract/wire.ts'
+import type { AgentMcpReportedServer } from '../../shared/mcpServers'
+import type { AgentDriverMcpServer } from './types'
 import { asObject } from './codexNormalizer'
 
 const stringValue = (value: unknown): string | null => typeof value === 'string' ? value : null
@@ -185,5 +187,46 @@ export function codexSkillsFromResponse(response: unknown): AgentSkillDescriptor
         path: stringValue(skill?.path) ?? undefined,
       }]
     })
+  })
+}
+
+/**
+ * The servers acorn declares, in the shape Codex reads from `config.toml`, for `thread/start` and
+ * `thread/resume`. Codex keeps nothing between processes, so the list goes with every call; a resume in
+ * a process that already holds the thread ignores it (docs/mcp.md § Your own servers). A declared name
+ * sits beside the CLI's own servers rather than replacing them.
+ */
+export function codexMcpConfig(servers: readonly AgentDriverMcpServer[]): { mcp_servers: Record<string, unknown> } | null {
+  if (!servers.length) return null
+  return {
+    mcp_servers: Object.fromEntries(servers.map((server) => [
+      server.name,
+      server.transport === 'stdio'
+        ? { command: server.command, args: server.args, env: server.env }
+        : { url: server.url, http_headers: server.headers },
+    ])),
+  }
+}
+
+// Codex reports a server's start as it happens, in `mcpServer/startupStatus/updated`, and its tools and
+// sign-in state only when asked, in `mcpServerStatus/list`. The panel wants both on one row.
+const CODEX_STARTUP_STATUS: Record<string, string> = { starting: 'starting', ready: 'connected', failed: 'failed', cancelled: 'failed' }
+
+export function codexReportedMcpServers(
+  response: unknown,
+  startup: ReadonlyMap<string, { status: string; error: string | null }>,
+): AgentMcpReportedServer[] {
+  const data = asObject(response)?.data
+  if (!Array.isArray(data)) return []
+  return data.flatMap((entry) => {
+    const server = asObject(entry)
+    const name = stringValue(server?.name)
+    if (!server || !name) return []
+    const started = startup.get(name)
+    const tools = asObject(server.tools)
+    const status = server.authStatus === 'notLoggedIn'
+      ? 'needs_auth'
+      : started ? CODEX_STARTUP_STATUS[started.status] ?? started.status : 'unknown'
+    return [{ name, status, toolCount: tools ? Object.keys(tools).length : null, error: started?.error ?? null }]
   })
 }

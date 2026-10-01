@@ -9,11 +9,15 @@ import type {
   AgentWsFrame,
 } from '../../contract/wire.ts'
 import type { AgentDriverEvent, AgentDriverMcpServer } from '../drivers/types'
+import { AgentMcpServerStore } from '../mcpServerStore'
+import { sessionMcpSelection } from '../../shared/mcpServers'
 import type { AgentSessionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { AgentLifecycleFrame } from '../../contract/lifecycle'
 import { parseToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import { defaultAgentConcurrency } from '../../shared/concurrency'
 import { readAgentConcurrency } from '../concurrencyStore'
+import { AGENT_IDLE_STOP_CHOICES, defaultAgentSessionDefaults } from '../../shared/sessionDefaults'
+import { readAgentSessionDefaults } from '../sessionDefaultsStore'
 import { agentDriverRegistry, type AgentDriverRegistry } from '../drivers/registry'
 import { safeProviderMessage } from '../drivers/diagnostics'
 import type { AgentDriver } from '../drivers/types'
@@ -22,6 +26,8 @@ import { AgentWebhookService, webhookEventKind } from '../webhookService'
 import { AgentAttachmentStore } from './attachmentStore'
 import { AgentArtifactStore } from './artifactStore'
 import { DurableAgentEventBuffer, type PendingAgentEvent } from './durableEventBuffer'
+import { compactLedgers } from './ledgerCompaction'
+import { directoryBytes, listProcesses, processTreeBytes, type ProcessRow } from './footprint'
 import { AgentStore } from './store'
 import { clientEventRecord } from './rowMapping'
 import {
@@ -43,17 +49,20 @@ import {
 /**
  * A session row as a client keeps it, for telling whether a recorded event changed it.
  *
- * It leaves out four fields. `lastEventSeq` and `updatedAt` move with every event, and the client
- * reads the event frame for the one of them it needs live (../../client/sessions/managedStore.ts
- * § eventSeqs). A
- * subagent's `updatedAt` is the node's clock for quieting a silent child, and no client reads it. The
- * status that quieting changes is still compared. `config` is too large to compare per event, and
+ * It leaves out five fields. `lastEventSeq`, `lastEventAt` and `updatedAt` move with every event, and
+ * the client reads the event frame for the one of them it needs live (../../client/sessions/managedStore.ts
+ * § eventSeqs). `lastEventAt` drives the sidebar's "latest activity" order, so that order re-sorts when
+ * a turn starts or ends rather than on every streamed chunk. A
+ * subagent's `updatedAt` is the node's clock for quieting a silent child, and moves with every tool call
+ * the child makes. The task sidebar's tooltip reads it only as of the row's last broadcast. The status
+ * that quieting changes is still compared. `config` is too large to compare per event, and
  * record() handles it separately.
  */
 const listedRow = (session: AgentSession): string => JSON.stringify({
   ...session,
   config: null,
   lastEventSeq: 0,
+  lastEventAt: 0,
   updatedAt: 0,
   subagents: session.subagents.map(({ updatedAt: _heardAt, ...entry }) => entry),
 })
@@ -73,23 +82,24 @@ const listedRow = (session: AgentSession): string => JSON.stringify({
  * The environment is spelled out rather than inherited. The agent process already holds these values,
  * because the session environment is what acorn spawned it with, but an agent is free to scrub
  * credential-shaped names out of what it passes its own children, and a stdio MCP server that loses
- * `ACORN_API_TOKEN` fails every call. `ACORN_SESSION_ID` is provenance for notes and memory writes, the
- * same value a task terminal passes; the token, not this, is what the node trusts for the session and
- * the tool ceiling (docs/mcp.md § Launch environment).
+ * `ACORN_API_TOKEN` or `ACORN_TASK_ID` fails every call. The session environment carries both, plus
+ * `ACORN_SESSION_ID`; the token, not these, is what the node trusts for the task, the session, and the
+ * tool ceiling (docs/mcp.md § Launch environment).
  */
 export function acornMcpServers(
   mcp: { name: string; launcher: Launcher } | null,
-  session: Pick<AgentSession, 'id' | 'profileId'>,
+  session: Pick<AgentSession, 'profileId'>,
   sessionEnv: Record<string, string>,
 ): AgentDriverMcpServer[] {
   if (!mcp) return []
   const profile = agentProfileRegistry.get(session.profileId)
   if (!profile || profile.mcpRegistration) return []
   return [{
+    transport: 'stdio',
     name: mcp.name,
     command: mcp.launcher.command,
     args: mcp.launcher.args,
-    env: { ...mcp.launcher.env, ...sessionEnv, ACORN_SESSION_ID: session.id },
+    env: { ...mcp.launcher.env, ...sessionEnv },
   }]
 }
 
@@ -108,9 +118,14 @@ type LiveSession = {
   handle: AgentDriverSession | null
   startPromise: Promise<AgentDriverSession> | null
   activeTurnId: string | null
+  // So archiving a task can find its processes without a read per live session.
+  taskId: string
   workspaceId: string
   providerId: string
   stopping: boolean
+  // The last provider event, dispatch, or turn settle. The idle sweep measures from here rather than
+  // from the start, so a session in use is never the one it stops.
+  lastActivityAt: number
   reconnectAttempt: number
   acceptedResponse: boolean
   driver: AgentDriver
@@ -149,6 +164,10 @@ export type AgentRuntimeOptions = {
   /** How long a background child may go quiet before its roster row is settled to `idle`. Overridable
    *  only so a test does not have to wait out the real minute. */
   subagentQuietMs?: number
+  /** How often the idle sweep runs. Overridable for the same reason. */
+  idleSweepMs?: number
+  /** How often provider processes are counted for telemetry. Overridable for the same reason. */
+  footprintSampleMs?: number
   /** Confirms a suspected provider usage-limit error and returns the account's reset time. */
   usageLimitResetAt?(providerId: string): Promise<number | null>
   /** Test seam for the small delay after the provider's advertised reset boundary. */
@@ -159,6 +178,17 @@ export type WaitCondition = 'ready' | 'attention' | 'turn_completed' | 'stopped'
 type RuntimeListener = (frame: AgentWsFrame) => void
 
 const RECONNECT_DELAYS_MS = [1_000, 2_000, 5_000]
+// How long a providers answer is served without probing again. After this it is still served, and a
+// probe runs behind it. Short, because signing in or installing a CLI should show within a visit.
+const PROVIDER_FRESH_MS = 30_000
+// How often idle provider processes are looked for. A process can outlive the owner's limit by up to
+// this much, which is cheap next to the limits on offer.
+const IDLE_SWEEP_MS = 5 * 60_000
+// How long a measured folder size is reused. See diskFootprint().
+const DISK_FOOTPRINT_MS = 30_000
+// How often provider processes are counted for telemetry. Each count with a live session lists every
+// process on the machine, so this stays slow. See armFootprintSample().
+const FOOTPRINT_SAMPLE_MS = 60_000
 
 const secretEnvironmentValues = (env: Record<string, string>): string[] =>
   Object.entries(env).flatMap(([key, value]) =>
@@ -183,6 +213,8 @@ export class ManagedAgentEngine {
   // Every internal token this engine has handed to a provider child, so a leaked value can still be
   // scrubbed out of provider messages and transcripts. Bounded by the number of sessions started.
   protected readonly mintedSecrets: string[] = []
+  /** The user's MCP servers (docs/mcp.md § Your own servers). Settings edits them through here too. */
+  readonly mcpServers: AgentMcpServerStore
   protected readonly currentUserId: () => string | null
   protected readonly registry: AgentDriverRegistry
   protected readonly publish?: (frame: PublishedFrame) => void
@@ -214,12 +246,26 @@ export class ManagedAgentEngine {
   protected queueWakeTimer: ReturnType<typeof setTimeout> | null = null
   protected queueWakeAt: number | null = null
   protected readonly subagentQuietMs: number
+  // Armed with the first provider start and cleared by stop(). A timer over the live map rather than a
+  // node schedule, because what it sweeps exists only in this process (docs/managed-agents.md
+  // § Operations and failure).
+  protected idleSweepTimer: ReturnType<typeof setInterval> | null = null
+  protected readonly idleSweepMs: number
+  // Armed at construction when there is a host to report to, and cleared by stop().
+  protected footprintTimer: ReturnType<typeof setInterval> | null = null
+  // The background pass over rows stored before the ledger fold, started by reconcile(). See there.
+  protected ledgerCompaction: { controller: AbortController; done: Promise<void> } | null = null
+  // The last folder measurement, shared by every caller inside DISK_FOOTPRINT_MS.
+  protected diskMeasure: { at: number; bytes: Promise<{ attachmentsBytes: number; artifactsBytes: number }> } | null = null
   protected readonly listeners = new Set<RuntimeListener>()
   // The last row broadcast for each session, as `listedRow` reads it. See record().
   protected readonly sentRows = new Map<string, string>()
   protected readonly providerEvents: DurableAgentEventBuffer
   protected readonly eventMaterializer: ProviderEventMaterializer
-  protected providerCache: { expiresAt: number; descriptors: AgentProviderDescriptor[] } | null = null
+  // The last probe answer, when that probe started, and which drivers it asked. See providers().
+  protected providerCache: { probedAt: number; driverIds: string; descriptors: AgentProviderDescriptor[] } | null = null
+  // The probe running now, which every caller that needs one joins.
+  protected providerProbe: Promise<AgentProviderDescriptor[]> | null = null
   protected pumping = false
   private readonly pumpIdleWaiters = new Set<() => void>()
   // Set when pump() is called while a scan is already running. That call cannot be a no-op: the scan's
@@ -244,6 +290,7 @@ export class ManagedAgentEngine {
     this.usageLimitResetAt = options.usageLimitResetAt
     this.usageContinuationGraceMs = options.usageContinuationGraceMs ?? USAGE_CONTINUATION_GRACE_MS
     this.subagentQuietMs = options.subagentQuietMs ?? SUBAGENT_QUIET_MS
+    this.idleSweepMs = options.idleSweepMs ?? IDLE_SWEEP_MS
     this.store = new AgentStore(options.db, options.core, (frame) => this.publish?.(frame))
     this.attachments = new AgentAttachmentStore(options.db, options.dataDir, options.core)
     this.artifacts = new AgentArtifactStore(options.db, options.dataDir)
@@ -252,7 +299,9 @@ export class ManagedAgentEngine {
     // accumulates them and the materializer holds a live reference to the same array.
     this.eventMaterializer = new ProviderEventMaterializer(this.artifacts, this.mintedSecrets)
     this.webhooks = new AgentWebhookService(options.db, options.secrets, options.core)
+    this.mcpServers = new AgentMcpServerStore(options.db, options.secrets)
     this.providerEvents = new DurableAgentEventBuffer((entry) => this.commitProviderEvent(entry))
+    this.armFootprintSample(options.footprintSampleMs ?? FOOTPRINT_SAMPLE_MS)
   }
 
   subscribe(listener: RuntimeListener): () => void {
@@ -260,11 +309,42 @@ export class ManagedAgentEngine {
     return () => this.listeners.delete(listener)
   }
 
+  /**
+   * What each registered harness says about itself: installed, signed in, what it can do.
+   *
+   * A probe starts CLI binaries, so it takes a few hundred milliseconds and sometimes seconds. The
+   * pane asks on every task visit. So the last answer is served at once, and a probe runs in the
+   * background once it is older than PROVIDER_FRESH_MS. Only the first call after boot, a call after
+   * a harness was added or removed, and `force` wait for one. `force` is the Refresh button, and the
+   * re-check a refused start makes before it refuses (runtime.ts, delegation/service.ts).
+   */
   async providers(force = false): Promise<AgentProviderDescriptor[]> {
-    if (!force && this.providerCache && this.providerCache.expiresAt > Date.now()) {
-      return this.providerCache.descriptors
+    const cached = this.providerCache
+    if (!force && cached && cached.driverIds === this.registry.providers().join('\n')) {
+      if (Date.now() - cached.probedAt > PROVIDER_FRESH_MS) void this.probeProviders(false).catch(() => undefined)
+      return cached.descriptors
     }
-    const descriptors = await Promise.all(this.registry.providers().map(async (providerId) => {
+    return this.probeProviders(force)
+  }
+
+  /**
+   * The provider `pick` finds, probed afresh when the served answer would refuse it. The served answer
+   * can be minutes old, and a start must not be turned down for a CLI the owner has since installed or
+   * signed in to.
+   */
+  async usableProvider(pick: (provider: AgentProviderDescriptor) => boolean): Promise<AgentProviderDescriptor | undefined> {
+    const served = (await this.providers()).find(pick)
+    if (served?.installed && served.authenticated !== false) return served
+    return (await this.providers(true)).find(pick)
+  }
+
+  // A forced read starts its own probe, because one already running may have started before the
+  // install or sign-in the caller is asking about. Any other caller joins the one running.
+  protected probeProviders(force: boolean): Promise<AgentProviderDescriptor[]> {
+    if (this.providerProbe && !force) return this.providerProbe
+    const probedAt = Date.now()
+    const driverIds = this.registry.providers()
+    const probe = Promise.all(driverIds.map(async (providerId) => {
       const driver = this.registry.create(providerId)
       if (!driver) throw new Error(`Agent driver disappeared during discovery: ${providerId}`)
       try {
@@ -286,9 +366,17 @@ export class ManagedAgentEngine {
           diagnostics: [error instanceof Error ? error.message : 'Provider discovery failed.'],
         }
       }
-    }))
-    this.providerCache = { expiresAt: Date.now() + 15_000, descriptors }
-    return descriptors
+    })).then((descriptors) => {
+      // An older probe that finishes last must not replace a newer answer.
+      if (!this.stopped && (!this.providerCache || this.providerCache.probedAt <= probedAt)) {
+        this.providerCache = { probedAt, driverIds: driverIds.join('\n'), descriptors }
+      }
+      return descriptors
+    }).finally(() => {
+      if (this.providerProbe === probe) this.providerProbe = null
+    })
+    this.providerProbe = probe
+    return probe
   }
 
   async reconcile(): Promise<void> {
@@ -315,6 +403,25 @@ export class ManagedAgentEngine {
     // on a provider start, and when a turn settles, none of which happen on their own after a restart.
     // Not awaited, because draining spawns a provider child per session and boot waits on reconcile().
     void this.pump()
+    this.compactLedgersInBackground()
+  }
+
+  // Tool calls and file changes stored before the ledger fold, put into the shape it writes
+  // (./ledgerCompaction.ts). Startup repair rather than a schedule: it converges, and each session is
+  // done once (docs/schedules.md § What deliberately is not a schedule). Not awaited, because the first
+  // pass over a 1.3 GB database took about half a minute and boot waits on reconcile().
+  protected compactLedgersInBackground(): void {
+    if (this.stopped || this.ledgerCompaction) return
+    const controller = new AbortController()
+    const done = compactLedgers(this.db, {
+      signal: controller.signal,
+      onError: (sessionId, error) => log.warn(`could not compact session ${sessionId}: ${describeError(error).message}`),
+    }).then((totals) => {
+      if (totals.deleted || totals.rewritten) {
+        log.info(`compacted ${totals.sessions} sessions: removed ${totals.deleted} superseded rows, rewrote ${totals.rewritten}`)
+      }
+    }, (error: unknown) => log.warn(`ledger compaction stopped: ${describeError(error).message}`))
+    this.ledgerCompaction = { controller, done }
   }
 
   // Releases what this engine holds, in the order docs/managed-agents.md § Operations and failure
@@ -328,6 +435,14 @@ export class ManagedAgentEngine {
     if (this.queueWakeTimer) clearTimeout(this.queueWakeTimer)
     this.queueWakeTimer = null
     this.queueWakeAt = null
+    if (this.idleSweepTimer) clearInterval(this.idleSweepTimer)
+    this.idleSweepTimer = null
+    if (this.footprintTimer) clearInterval(this.footprintTimer)
+    this.footprintTimer = null
+    // Stops at its next step. Awaited, because the database closes once stop() returns.
+    this.ledgerCompaction?.controller.abort()
+    await this.ledgerCompaction?.done
+    this.ledgerCompaction = null
     await Promise.all([...this.live.keys()].map((sessionId) => this.stopLive(sessionId)))
     if (this.pumping) {
       await new Promise<void>((resolve) => this.pumpIdleWaiters.add(resolve))
@@ -338,6 +453,7 @@ export class ManagedAgentEngine {
     this.listeners.clear()
     this.eventMaterializer.clear()
     this.providerCache = null
+    this.providerProbe = null
   }
 
   protected holdSessionReadiness(sessionId: string): void {
@@ -367,8 +483,7 @@ export class ManagedAgentEngine {
       return existing
     }
     if (session.controller !== 'acorn') throw new Error(`Session input is controlled by ${session.controller}.`)
-    const cwd = await this.core.tasks.root(session.taskId)
-    if (!cwd) throw new Error('The task has no mapped checkout.')
+    const cwd = await this.core.tasks.requireRoot(session.taskId)
     const workspaceId = await this.core.tasks.workspaceId(session.taskId)
     const driver = this.registry.create(session.providerId)
     if (!driver) throw new Error(`Managed provider is not registered: ${session.providerId}`)
@@ -376,9 +491,11 @@ export class ManagedAgentEngine {
       handle: null,
       startPromise: null,
       activeTurnId: null,
+      taskId: session.taskId,
       workspaceId,
       providerId: session.providerId,
       stopping: false,
+      lastActivityAt: Date.now(),
       reconnectAttempt: 0,
       acceptedResponse: false,
       driver,
@@ -388,18 +505,37 @@ export class ManagedAgentEngine {
     live.driver = driver
     live.stopping = false
     this.live.set(session.id, live)
+    this.armIdleSweep()
     const noProviderExecutionHistory = !(await this.store.hasProviderExecutionHistory(session.id))
     // Scoped to this session's task (docs/security.md § Credential handling). The credential cannot
     // drive another task's tools or read the owner's provider credentials.
-    const sessionEnv = this.internalEnv({
-      scope: 'task',
-      taskId: session.taskId,
-      sessionId: session.id,
-      // The session row is the authority across restarts. Workflow creation and later delegation
-      // persist the effective intersection here before any provider process is started.
-      toolCeiling: persistedToolCeiling(session.config),
-    })
+    const sessionEnv = {
+      ...this.internalEnv({
+        scope: 'task',
+        taskId: session.taskId,
+        sessionId: session.id,
+        // The session row is the authority across restarts. Workflow creation and later delegation
+        // persist the effective intersection here before any provider process is started.
+        toolCeiling: persistedToolCeiling(session.config),
+      }),
+      // The acorn MCP server lists no tools without a task ID. Claude Code and Codex start that server
+      // from their own registration, so it only sees what the provider process inherits from here. The
+      // node trusts the signed token for both values, never these.
+      ACORN_TASK_ID: session.taskId,
+      ACORN_SESSION_ID: session.id,
+    }
     for (const secret of secretEnvironmentValues(sessionEnv)) if (!this.mintedSecrets.includes(secret)) this.mintedSecrets.push(secret)
+    // The servers this session has switched on, resolved on every start because a harness keeps none of
+    // them between processes. Their secrets join the redaction list for the same reason the token does.
+    const userMcp = await this.mcpServers.resolve(sessionMcpSelection(session.config), 'agent MCP server: start a session')
+    for (const secret of userMcp.secrets) if (!this.mintedSecrets.includes(secret)) this.mintedSecrets.push(secret)
+    if (userMcp.unavailable.length) {
+      await this.record(session.id, null, {
+        type: 'diagnostic',
+        level: 'warning',
+        message: `This session runs without ${userMcp.unavailable.join(', ')}: a stored secret could not be opened. Enter it again in Settings → MCP servers.`,
+      })
+    }
     // The session's span covers starting the provider, not the session's whole life. A session
     // lives for hours and outlives the process, and a span nobody can close is not a measurement;
     // spawning or reconnecting the child is the part something waited on
@@ -411,7 +547,7 @@ export class ManagedAgentEngine {
       session,
       cwd,
       env: sessionEnv,
-      mcpServers: acornMcpServers(this.mcp(), session, sessionEnv),
+      mcpServers: [...acornMcpServers(this.mcp(), session, sessionEnv), ...userMcp.servers],
       noProviderExecutionHistory,
       onEvent: (event) => this.onProviderEvent(session.id, event),
       onClosed: (error) => this.onProviderClosed(session.id, error),
@@ -422,6 +558,7 @@ export class ManagedAgentEngine {
       // republish readiness or repopulate `live` while teardown is draining it.
       if (this.stopped || live.stopping) throw new Error('The managed agent runtime is shutting down.')
       live.handle = handle
+      live.lastActivityAt = Date.now()
       live.reconnectAttempt = 0
       span?.end('ok')
       void this.pump()
@@ -453,6 +590,7 @@ export class ManagedAgentEngine {
       && this.readinessHolds.has(sessionId)
     ) return
     const live = this.live.get(sessionId)
+    if (live) live.lastActivityAt = Date.now()
     if (live && !['session_state', 'session_metadata', 'diagnostic', 'error'].includes(event.type)) {
       live.acceptedResponse = true
     }
@@ -499,7 +637,10 @@ export class ManagedAgentEngine {
     const live = this.live.get(sessionId)
     const settlesTurn = event.type === 'turn_completed' || event.type === 'error'
     if (settlesTurn) {
-      if (live) live.activeTurnId = null
+      if (live) {
+        live.activeTurnId = null
+        live.lastActivityAt = Date.now()
+      }
       if (turnId) this.endTurnSpan(turnId, event.type === 'error' ? 'error' : 'completed')
     }
     await this.record(sessionId, turnId, event)
@@ -635,6 +776,7 @@ export class ManagedAgentEngine {
           if ((providerActive.get(live.providerId) ?? 0) >= limits.provider) continue
           live.activeTurnId = item.turn.id
           live.acceptedResponse = false
+          live.lastActivityAt = Date.now()
           workspaceActive.set(live.workspaceId, (workspaceActive.get(live.workspaceId) ?? 0) + 1)
           providerActive.set(live.providerId, (providerActive.get(live.providerId) ?? 0) + 1)
           this.interactiveStreak = item.turn.source === 'workflow' ? 0 : this.interactiveStreak + 1
@@ -852,6 +994,169 @@ export class ManagedAgentEngine {
 
   protected forkContext(source: AgentSession): ReturnType<typeof buildForkContext> {
     return buildForkContext(this.store, source)
+  }
+
+  // Called when the task is archived (core:task-archiving, ../../node/index.ts). Each process holds a
+  // provider CLI and its MCP servers, and nothing can prompt it until the task is restored. The
+  // sessions stay. A restored task resumes them on the next prompt, the same way it does after a
+  // restart, so this records what reconcile() records.
+  async stopTaskSessions(taskId: string): Promise<void> {
+    const stopping = [...this.live].filter(([, live]) => live.taskId === taskId)
+    await Promise.all(stopping.map(async ([sessionId, live]) => {
+      const turnId = live.activeTurnId
+      // Cleared before the stop, so the send that fails when the process dies is not retried or
+      // recorded as a provider failure.
+      live.activeTurnId = null
+      await this.stopLive(sessionId)
+      await this.store.interruptActiveTurn(sessionId, 'The task was archived while the provider turn was active.')
+      await this.store.expirePendingRequests(sessionId)
+      if (turnId) this.endTurnSpan(turnId, 'interrupted')
+      await this.record(sessionId, null, {
+        type: 'session_state',
+        state: 'stopped',
+        detail: 'The provider process stopped when this task was archived. Restore the task and send a prompt to resume.',
+      })
+    }))
+  }
+
+  protected armIdleSweep(): void {
+    if (this.idleSweepTimer || this.stopped) return
+    // Unref'd like the other timers here: nothing should hold a draining node open for a sweep.
+    this.idleSweepTimer = setInterval(() => {
+      void this.stopIdleSessions()
+        .catch((error: unknown) => log.warn(`idle sweep failed: ${describeError(error).message}`))
+    }, this.idleSweepMs)
+    this.idleSweepTimer.unref?.()
+  }
+
+  // Idle as far as this process can tell without a read: started, not stopping, no turn in flight,
+  // no start still being set up, and nothing heard from the provider since `before`.
+  protected idleLive(sessionId: string, live: LiveSession, before: number): boolean {
+    return live.handle != null
+      && !live.startPromise
+      && !live.stopping
+      && !live.activeTurnId
+      && !this.readinessHolds.has(sessionId)
+      && live.lastActivityAt <= before
+  }
+
+  /**
+   * Stops each provider process that has been idle past the owner's limit, and returns the sessions
+   * it stopped. Each one holds an agent CLI and its MCP servers, about 450 MB, and nothing else stops
+   * a session nobody prompts again. Read per sweep, so a change in Settings applies to the next one.
+   */
+  async stopIdleSessions(now = Date.now()): Promise<string[]> {
+    if (this.stopped || !this.live.size) return []
+    const userId = this.currentUserId()
+    const { stopIdleAfterMinutes: minutes } = userId
+      ? await readAgentSessionDefaults(this.core.prefs, userId)
+      : defaultAgentSessionDefaults()
+    if (!minutes) return []
+    const label = AGENT_IDLE_STOP_CHOICES.find((choice) => choice.minutes === minutes)?.label ?? `${minutes} minutes`
+    return this.stopIdle(
+      now - minutes * 60_000,
+      `The provider process stopped after ${label} idle to free memory. Send a prompt to resume.`,
+    )
+  }
+
+  /** Stop idle agents now, in Settings > Storage and memory: the sweep's rules with no time limit.
+   *  It runs whatever the owner's limit is, Never included, because the owner asked for it. */
+  async stopIdleSessionsNow(): Promise<string[]> {
+    if (this.stopped || !this.live.size) return []
+    return this.stopIdle(Date.now(), 'The provider process was stopped from Settings to free memory. Send a prompt to resume.')
+  }
+
+  /**
+   * The live sessions, how many of them the idle rules would stop now, and the memory of their process
+   * trees. `list` is a parameter so a test can hand it a fake table.
+   */
+  async processFootprint(
+    list: () => Promise<ProcessRow[] | null> = () => listProcesses(this.core.proc),
+  ): Promise<{ live: number; idle: number; memoryBytes: number | null }> {
+    const running = [...this.live].filter(([, live]) => !live.stopping)
+    const now = Date.now()
+    let idle = 0
+    for (const [sessionId, live] of running) {
+      if (await this.stoppableIdle(sessionId, live, now)) idle++
+    }
+    const pids = running.flatMap(([, live]) => (live.handle?.pid ? [live.handle.pid] : []))
+    const rows = running.length ? await list() : []
+    return { live: running.length, idle, memoryBytes: rows ? processTreeBytes(rows, pids) : null }
+  }
+
+  /**
+   * Report processFootprint() as three gauges owned by this plugin (docs/telemetry.md § Diagnosing
+   * an unresponsive view). Skipped whole while nothing is collecting, because the count runs `ps`
+   * through the process broker. Memory is left out when the table could not be read, rather than
+   * reported as zero.
+   */
+  protected armFootprintSample(everyMs: number): void {
+    const telemetry = this.telemetry
+    if (!telemetry || this.footprintTimer) return
+    this.footprintTimer = setInterval(() => {
+      if (this.stopped || !telemetry.enabled()) return
+      void this.processFootprint().then(({ live, idle, memoryBytes }) => {
+        if (this.stopped) return
+        telemetry.gauge('agent.processes.live', live)
+        telemetry.gauge('agent.processes.idle', idle)
+        if (memoryBytes !== null) telemetry.gauge('agent.processes.memory', memoryBytes)
+      }).catch((error: unknown) => log.warn(`process footprint failed: ${describeError(error).message}`))
+    }, everyMs)
+    // Unref'd like the other timers here.
+    this.footprintTimer.unref?.()
+  }
+
+  /** The size of the attachment and artifact folders. Walking them stats every file, so the answer is
+   *  kept for DISK_FOOTPRINT_MS and a page polling every few seconds reuses it. */
+  diskFootprint(now = Date.now()): Promise<{ attachmentsBytes: number; artifactsBytes: number }> {
+    if (this.diskMeasure && now - this.diskMeasure.at < DISK_FOOTPRINT_MS) return this.diskMeasure.bytes
+    const bytes = Promise.all([directoryBytes(this.attachments.root), directoryBytes(this.artifacts.root)])
+      .then(([attachmentsBytes, artifactsBytes]) => ({ attachmentsBytes, artifactsBytes }))
+    this.diskMeasure = { at: now, bytes }
+    return bytes
+  }
+
+  /**
+   * The session, if the idle rules would stop its process: idle since `before` and nothing living inside
+   * the process or waiting on it. That is a turn in flight or queued, a request the owner has not
+   * answered, a background subagent still running, or a start in progress. Delegation reports and
+   * workflow steps reach a session through enqueueTurn, which resumes a stopped one, so those need no
+   * exception.
+   */
+  protected async stoppableIdle(sessionId: string, live: LiveSession, before: number): Promise<AgentSession | null> {
+    if (!this.idleLive(sessionId, live, before)) return null
+    const session = await this.store.getSession(sessionId)
+    // `failed` too: a turn error leaves the process running, and the next prompt restarts a failed
+    // session anyway.
+    if (!session || !['ready', 'failed'].includes(session.runtimeState) || session.queuedTurns > 0) return null
+    if (session.subagents.some(isActiveSubagent)) return null
+    // The request rows are the authority here. `ready` is only what the last event projected.
+    if ((await this.store.pendingRequests(sessionId)).length) return null
+    return session
+  }
+
+  // The sweep and the Settings button, which differ only in `before` and in what the transcript says.
+  protected async stopIdle(before: number, detail: string): Promise<string[]> {
+    const stopped: string[] = []
+    for (const [sessionId, live] of [...this.live]) {
+      const session = await this.stoppableIdle(sessionId, live, before)
+      if (!session) continue
+      // Again, because a prompt could have arrived during the reads.
+      if (this.live.get(sessionId) !== live || !this.idleLive(sessionId, live, before)) continue
+      // Marked before the record, so the dispatcher leaves this process alone while it is written.
+      // Recorded before the stop, so a prompt that lands in between sees `stopped` and takes the resume
+      // path rather than queueing behind a process that is about to exit. A failed session's state is
+      // left as it is, so the failure still shows.
+      live.stopping = true
+      if (session.runtimeState === 'ready') {
+        await this.record(sessionId, null, { type: 'session_state', state: 'stopped', detail })
+      }
+      if (this.live.get(sessionId) === live) await this.stopLive(sessionId)
+      stopped.push(sessionId)
+    }
+    // A prompt that queued behind a stopping process has nothing else to wake it.
+    if (stopped.length) void this.pump()
+    return stopped
   }
 
   protected async stopLive(sessionId: string): Promise<void> {

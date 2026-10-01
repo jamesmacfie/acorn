@@ -3,7 +3,7 @@ import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { ContextMenuHost, type ContextMenuOpening } from './contextMenuHost'
 import { registerContextMenuItems, type TaskRowTarget } from './contextMenus'
-import type { Disposable } from '../../../kit/lib/registry'
+import type { Disposable } from '../../../kit/lib/state/registry'
 
 // The right-click door. The registry's decisions — which rows, in what order, filtered by `when` —
 // are unit-tested in `contextMenus.test.ts`; this file checks that the host turns those rows into a

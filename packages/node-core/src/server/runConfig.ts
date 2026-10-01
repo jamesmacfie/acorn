@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
-import type { BrowserRule, PreviewMode } from '@acorn/protocol/api.ts'
+import type { BrowserRule, PreviewMode, ProjectRepoConfig } from '@acorn/protocol/api.ts'
 
 export type RunTarget = {
   id: string
@@ -205,25 +205,44 @@ export function projectRunTargets(db: DbConfigFallback): RunTarget[] {
   }
 }
 
+// One `<dir>/.acorn/config.toml`, parsed. Missing is no layer; unreadable is no layer and an error.
+function readLayer(dir: string | null, label: string, errors: ConfigError[]): Layer | null {
+  if (!dir) return null
+  const file = join(dir, '.acorn', 'config.toml')
+  if (!existsSync(file)) return null
+  let text: string
+  try {
+    text = readFileSync(file, 'utf8')
+  } catch (e) {
+    errors.push({ source: label, message: e instanceof Error ? e.message : 'unreadable config' })
+    return null
+  }
+  return parseLayer(text, label, errors)
+}
+
+// The committed layer alone: what a checkout's own `.acorn/config.toml` sets over the project row,
+// for the project settings page to show where a value comes from. `null` when there is no file, or
+// when it does not parse. The same parse the merge below uses, so the page reads the file the way a
+// task does. A task reads its own worktree's copy, which a branch can change, and the machine's
+// `~/.acorn/config.toml` is not reported here.
+export function readCommittedConfig(repoDir: string): ProjectRepoConfig | null {
+  const layer = readLayer(repoDir, 'repo', [])
+  if (!layer) return null
+  return {
+    runTargets: [...layer.run.values()],
+    ...(layer.dbUrlScript ? { dbUrlScript: layer.dbUrlScript } : {}),
+    ...(layer.previewMode ? { previewMode: layer.previewMode } : {}),
+    ...(layer.previewValue ? { previewValue: layer.previewValue } : {}),
+  }
+}
+
 // Read + merge the layers. Repo overrides user overrides DB; run targets and layouts merge by id
 // (repo's id wins), scripts/copy are per-field.
-export function loadRepoConfig(repoDir: string | null, userConfigDir: string | null, db: DbConfigFallback): RepoConfig {
+export function loadRepoConfig(repoDir: string | null, userConfigDir: string | null, db: DbConfigFallback, repoText?: string | null): RepoConfig {
   const errors: ConfigError[] = []
-  const readLayer = (dir: string | null, label: string): Layer | null => {
-    if (!dir) return null
-    const file = join(dir, '.acorn', 'config.toml')
-    if (!existsSync(file)) return null
-    let text: string
-    try {
-      text = readFileSync(file, 'utf8')
-    } catch (e) {
-      errors.push({ source: label, message: e instanceof Error ? e.message : 'unreadable config' })
-      return null
-    }
-    return parseLayer(text, label, errors)
-  }
-  const repo = readLayer(repoDir, 'repo')
-  const user = readLayer(userConfigDir, 'user')
+  // A supplied snapshot is parsed verbatim; null means the captured snapshot had no config file.
+  const repo = repoText === undefined ? readLayer(repoDir, 'repo', errors) : repoText === null ? null : parseLayer(repoText, 'repo', errors)
+  const user = readLayer(userConfigDir, 'user', errors)
 
   const run = new Map<string, RunTarget>()
   // The `dev` target's layering: docs/workspaces-and-tasks.md § Worktrees and setup covers why.

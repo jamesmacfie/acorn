@@ -12,15 +12,22 @@ import type { Duplex } from 'node:stream'
 // forbids (server/plugins/nodePluginWorker.ts), taking the whole plugin down with it.
 import type { WebSocket, WebSocketServer } from 'ws'
 import type { DeviceService } from '../auth/deviceTokens'
-import { encodeIdFrame, WS_PATH, WS_VIEWERS_HEADER, type WsClientFrame, type WsServerFrame, type WsServerWireFrame } from '@acorn/protocol/ws.ts'
+import { MAX_NODE_WS_MESSAGE_BYTES, encodeIdFrame, WS_PATH, WS_VIEWERS_HEADER, type WsClientFrame, type WsServerFrame, type WsServerWireFrame } from '@acorn/protocol/ws.ts'
 import { WsViewers, type EventViewer } from './wsViewers'
 import { createWsViewerDispatch, isTaskConfinedWs } from './wsViewerDispatch'
 import { parsePluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { claimUpgrade } from './upgradeClaim'
 import { emitEvent, measure } from '../telemetry/collector'
-import { createLogger, describeError } from '../telemetry/logger'
+import { createLogger } from '../telemetry/logger'
 
 const log = createLogger('ws')
+
+// Owners may implement a void hook with an async function. Observe both synchronous throws and
+// returned rejections; cleanup invokes each owner independently so a failure cannot strand peers.
+function invokeOwner(action: () => unknown, failed: () => void = () => {}): void {
+  const reject = (): void => { failed(); log.warn('WebSocket owner handler failed.') }
+  try { void Promise.resolve(action()).catch(reject) } catch { reject() }
+}
 
 // A sink is one connection's outlet for stream frames. The owner defines the rest of each payload.
 type StreamMsg =
@@ -121,7 +128,7 @@ function holdStream(conn: Conn, id: string): void {
   conn.held.add(id)
   const next = (holds.get(id) ?? 0) + 1
   holds.set(id, next)
-  if (next === 1) handlers?.flowControl?.(id, true)
+  if (next === 1) invokeOwner(() => handlers?.flowControl?.(id, true))
 }
 
 function releaseStream(conn: Conn, id: string): void {
@@ -129,7 +136,7 @@ function releaseStream(conn: Conn, id: string): void {
   const next = (holds.get(id) ?? 1) - 1
   if (next <= 0) {
     holds.delete(id)
-    handlers?.flowControl?.(id, false)
+    invokeOwner(() => handlers?.flowControl?.(id, false))
   } else {
     holds.set(id, next)
   }
@@ -175,39 +182,41 @@ const channelPrefix = (channel: string): string => channel.split(':', 1)[0]
 const frameOwner = (channel: string): string => parsePluginChannel(channel)?.pluginId ?? 'core'
 
 function sendFrame(conn: Conn, frame: WsServerFrame, viewerId?: string | null): void {
-  if (conn.ws.readyState !== conn.ws.OPEN) {
-    // Nobody will read this socket's sequence again. Kept incrementing so the counter still describes
-    // what was offered to a connection that is on its way out.
-    conn.seq += 1
-    return
-  }
-  // Admission is a response to this viewer's request, so invalidation shedding cannot replace it.
-  if (conn.ws.bufferedAmount > conn.mark && frame.channel !== 'ws:viewer-error') {
-    const { id } = frame as { id?: unknown }
-    const streamId = frame.channel === 'term:out' && typeof id === 'string' ? id : null
-    if (streamId) {
-      holdStream(conn, streamId)
-      watchDrain(conn)
-      // and fall through: the frame goes out. Dropping bytes out of the middle of a terminal stream
-      // corrupts the screen, and there is no cursor to replay from.
-    } else {
-      watchDrain(conn)
-      if (conn.shedding) return
-      conn.shedding = true
+  try {
+    if (conn.ws.readyState !== conn.ws.OPEN) {
+      // Nobody will read this socket's sequence again. Kept incrementing so the counter still describes
+      // what was offered to a connection that is on its way out.
       conn.seq += 1
-      // One event per congested window, not per shed frame, because the socket falls silent after
-      // this until it drains and one "you are behind" is the whole message.
-      emitEvent(frameOwner(frame.channel), 'ws.shed', { seam: 'ws.frame', channel: channelPrefix(frame.channel) })
-      conn.ws.send(JSON.stringify({ channel: 'ws:shed', seq: conn.seq } satisfies WsServerWireFrame))
       return
     }
-  }
-  conn.seq += 1
-  const seq = conn.seq
-  const routed = viewerId ? { channel: 'ws:viewer', viewerId, frame } : frame
-  measure(frameOwner(frame.channel), 'ws.frame', () => conn.ws.send(JSON.stringify({ ...routed, seq } satisfies WsServerWireFrame)), {
-    channel: channelPrefix(frame.channel),
-  })
+    // Admission is a response to this viewer's request, so invalidation shedding cannot replace it.
+    if (conn.ws.bufferedAmount > conn.mark && frame.channel !== 'ws:viewer-error') {
+      const { id } = frame as { id?: unknown }
+      const streamId = frame.channel === 'term:out' && typeof id === 'string' ? id : null
+      if (streamId) {
+        holdStream(conn, streamId)
+        watchDrain(conn)
+        // and fall through: the frame goes out. Dropping bytes out of the middle of a terminal stream
+        // corrupts the screen, and there is no cursor to replay from.
+      } else {
+        watchDrain(conn)
+        if (conn.shedding) return
+        conn.shedding = true
+        conn.seq += 1
+        // One event per congested window, not per shed frame, because the socket falls silent after
+        // this until it drains and one "you are behind" is the whole message.
+        emitEvent(frameOwner(frame.channel), 'ws.shed', { seam: 'ws.frame', channel: channelPrefix(frame.channel) })
+        conn.ws.send(JSON.stringify({ channel: 'ws:shed', seq: conn.seq } satisfies WsServerWireFrame), (error) => { if (error) conn.ws.terminate() })
+        return
+      }
+    }
+    conn.seq += 1
+    const seq = conn.seq
+    const routed = viewerId ? { channel: 'ws:viewer', viewerId, frame } : frame
+    measure(frameOwner(frame.channel), 'ws.frame', () => conn.ws.send(JSON.stringify({ ...routed, seq } satisfies WsServerWireFrame), (error) => { if (error) conn.ws.terminate() }), {
+      channel: channelPrefix(frame.channel),
+    })
+  } catch { conn.ws.terminate() }
 }
 
 // Terminal output, as one binary frame instead of an escaped JSON string.
@@ -237,21 +246,23 @@ function outputFrame(id: string, msg: Extract<StreamMsg, { type: 'output' }>): U
 }
 
 function sendStreamFrame(conn: Conn, owner: EventViewer, id: string, msg: StreamMsg): void {
-  if (!owner.active) return
-  // `ready`, `exit` and `error` are one frame per attach or per lifetime, and they carry a session
-  // object rather than bytes. They stay JSON.
-  if (msg.type !== 'output') return sendFrame(conn, { channel: 'term:out', id, msg }, owner.id)
-  const frame = outputFrame(id, msg)
-  // An id this frame cannot spell (@acorn/protocol/ws.ts). The JSON path still works, so say it that
-  // way rather than dropping a terminal's output.
-  if (!frame) return sendFrame(conn, { channel: 'term:out', id, msg }, owner.id)
-  if (conn.ws.readyState !== conn.ws.OPEN) return
-  if (conn.ws.bufferedAmount > conn.mark) {
-    holdStream(conn, id)
-    watchDrain(conn)
-    // and fall through, for the reason sendFrame gives: there is no cursor to replay a hole from.
-  }
-  conn.ws.send(owner.id ? encodeIdFrame(owner.id, frame)! : frame, { binary: true })
+  try {
+    if (!owner.active) return
+    // `ready`, `exit` and `error` are one frame per attach or per lifetime, and they carry a session
+    // object rather than bytes. They stay JSON.
+    if (msg.type !== 'output') return sendFrame(conn, { channel: 'term:out', id, msg }, owner.id)
+    const frame = outputFrame(id, msg)
+    // An id this frame cannot spell (@acorn/protocol/ws.ts). The JSON path still works, so say it that
+    // way rather than dropping a terminal's output.
+    if (!frame) return sendFrame(conn, { channel: 'term:out', id, msg }, owner.id)
+    if (conn.ws.readyState !== conn.ws.OPEN) return
+    if (conn.ws.bufferedAmount > conn.mark) {
+      holdStream(conn, id)
+      watchDrain(conn)
+      // and fall through, for the reason sendFrame gives: there is no cursor to replay a hole from.
+    }
+    conn.ws.send(owner.id ? encodeIdFrame(owner.id, frame)! : frame, { binary: true }, (error) => { if (error) conn.ws.terminate() })
+  } catch { conn.ws.terminate() }
 }
 
 // Is this connection confined to a single task? The socket-level twin of requireUser.ts's
@@ -270,11 +281,7 @@ export function wsBroadcast(frame: WsServerFrame): void {
   for (const listener of nodeListeners) {
     // A plugin's listener throwing must not cost the other subscribers their frame, and must not
     // unwind into whatever core call did the broadcast.
-    try {
-      listener(frame)
-    } catch (error) {
-      log.warn(`a node-side event listener threw: ${describeError(error).message}`)
-    }
+    invokeOwner(() => listener(frame))
   }
 }
 
@@ -307,6 +314,8 @@ export type WsAuthDeps = {
   // a test sets it low so the pause and the resume can be driven over a real socket rather than by
   // pushing megabytes through one.
   maxBufferedBytes?: number
+  // Lower-only injection for bounded carrier regressions.
+  maxMessageBytes?: number
 }
 
 // What a successful upgrade resolved to. `deviceId` is what makes revocation actionable later: a
@@ -349,8 +358,9 @@ function onConnect(ws: WebSocket, authorized: Authorized, mark: number, multiple
     send: (frame, viewerId) => sendFrame(conn, frame, viewerId),
     stream: (owner, id, message) => sendStreamFrame(conn, owner, id, message),
     release: (id) => releaseStream(conn, id),
+    invoke: (action) => invokeOwner(action),
   })
-  ws.on('message', (raw) => dispatch.receive(raw.toString()))
+  ws.on('message', (raw) => invokeOwner(() => dispatch.receive(raw.toString()), () => ws.terminate()))
   const cleanup = () => {
     if (!conns.delete(conn)) return // 'error' and 'close' can both fire, run once
     // Before the detaches: a socket that died while it was behind must not leave the PTY it was
@@ -375,6 +385,15 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
   // Created on the first upgrade, not here, so importing this module does not import the `ws` package.
   // See the import note at the top for why that matters to loaded-plugin bundles.
   let wss: WebSocketServer | null = null
+  let loading: Promise<WebSocketServer> | null = null
+  let disposed = false
+  const pending = new Set<Duplex>()
+  const ready = (socket: Duplex): boolean => !disposed && !socket.destroyed && socket.writable
+  const refuse = (socket: Duplex): void => {
+    if (ready(socket)) {
+      try { socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\n\r\n', () => socket.destroy()) } catch { socket.destroy() }
+    } else socket.destroy()
+  }
   // Immediate path: the revoke that happened in this process tells us directly.
   const offRevoked = deps.devices.onRevoked(dropDevice)
   // Backstop for long-lived streams (docs/api-reference.md § Pairing, docs/security.md § Transport and
@@ -401,7 +420,7 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
     }
     void (async () => {
       for (const conn of [...conns]) {
-        if (conn.deviceId && !(await deps.devices.isActive(conn.deviceId))) conn.ws.terminate()
+        if (conn.deviceId && !(await deps.devices.isActive(conn.deviceId).catch(() => false))) conn.ws.terminate()
       }
     })()
   }, deps.revocationCheckMs ?? 60_000)
@@ -422,23 +441,38 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
     // Synchronously, before the async authorize below: the "nobody answered" sweeper runs as the last
     // upgrade listener and cannot wait for our promise (server/transport/upgradeClaim.ts).
     claimUpgrade(socket)
-    void authorize(req, deps).then(async (authorized) => {
-      if (!authorized) {
-        socket.write('HTTP/1.1 403 Forbidden\r\n\r\n')
-        socket.destroy()
-        return
-      }
-      // Lazy, and `??=` so two upgrades racing the first load settle on one server.
-      wss ??= new (await import('ws')).WebSocketServer({ noServer: true })
-      wss.handleUpgrade(req, socket, head, (ws) => onConnect(ws, authorized, deps.maxBufferedBytes ?? MAX_BUFFERED_BYTES, req.headers[WS_VIEWERS_HEADER] === '1'))
-    })
+    pending.add(socket)
+    const onPeerError = (): void => { socket.destroy() }
+    socket.on('error', onPeerError)
+    socket.once('close', () => pending.delete(socket))
+    void (async () => {
+      const authorized = await authorize(req, deps)
+      if (!ready(socket) || !authorized) return refuse(socket)
+      // Cache the import-and-construction promise, so concurrent first upgrades share one server.
+      loading ??= import('ws').then(({ WebSocketServer }) => {
+        if (disposed) throw new Error('WebSocket hub disposed')
+        return (wss = new WebSocketServer({ noServer: true, maxPayload: Math.min(deps.maxMessageBytes ?? MAX_NODE_WS_MESSAGE_BYTES, MAX_NODE_WS_MESSAGE_BYTES) }))
+      })
+      const loaded = await loading
+      if (!ready(socket)) return refuse(socket)
+      loaded.handleUpgrade(req, socket, head, (ws) => {
+        pending.delete(socket)
+        if (disposed) { ws.on('error', () => {}); ws.terminate(); return }
+        onConnect(ws, authorized, deps.maxBufferedBytes ?? MAX_BUFFERED_BYTES, req.headers[WS_VIEWERS_HEADER] === '1')
+        socket.off('error', onPeerError)
+      })
+    })().catch(() => refuse(socket))
   }
   server.on('upgrade', onUpgrade)
   hubDisposers.set(server, () => {
+    disposed = true
     server.off('upgrade', onUpgrade)
     clearInterval(sweep)
     offRevoked()
+    for (const socket of pending) socket.destroy()
+    pending.clear()
     for (const conn of [...conns]) conn.ws.terminate()
+    for (const ws of wss?.clients ?? []) ws.terminate()
     wss?.close()
   })
 }

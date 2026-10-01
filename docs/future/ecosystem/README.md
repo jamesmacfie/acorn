@@ -14,11 +14,14 @@ compose their own experience — dashboards, plugins, plugins talking to each ot
 authors get developer experience good enough that building a quality acorn plugin is an afternoon,
 not a week.
 
+Device-held client-only bundles are a separate provenance for this installer. They do not change
+the signing or discovery work assessed here.
+
 ## Where this stands (2026-08-16)
 
 Much of the original assessment has shipped. The agent-authored dev loop is real: the authoring
 contract is `docs/plugin-authoring.md`; a loaded plugin hot-reloads in place
-(`POST /v2/core/plugins/:id/reload`, candidate-then-commit, a `plugins:changed` event the client
+(`POST /v1/core/plugins/:id/reload`, candidate-then-commit, a `plugins:changed` event the client
 re-syncs on); the agent raises installs through an approval-mediated tool and iterates under a
 per-(plugin, node) dev grant; plugin themes, declarative chrome, context menus, cooperative
 extension points and exclusive slots are manifest vocabulary (`docs/plugins.md`,
@@ -68,8 +71,8 @@ code rather than described in prose — the scaffold's drift lock
 (`packages/create-acorn-plugin/index.test.ts`), the published declaration's
 (`packages/plugin-sdk/src/contract.test.ts`), the testkit deep-import ceiling (`MAX_DEEP_IMPORTS` in
 `tools/arch/boundaries.test.ts`), the three `// prune candidate` markers in
-`packages/plugin-api/src/client.ts`, and the unverified-chrome items in the smoke checklist
-(`docs/testing.md § The smoke checklist`, items 11 to 16).
+`packages/plugin-api/src/client.ts`, and the unverified-chrome items in the
+[desktop and plugin checks](../../testing/desktop-and-plugins.md), items 11 to 16.
 
 ## The bar for plugin DX
 

@@ -5,11 +5,15 @@
 // exist.
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/plugin-api/client'
+import { CORE_STORAGE_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { AGENTS_CONVERSATION } from '../contract/conversation'
+import { AGENTS_INLINE_DIFF } from '../contract/inlineDiffClient.ts'
+import { isStale, reportPatches } from './inlineDiff/patchStatus.ts'
+import { installManagedHandoff } from '../contract/handoffClient'
 import { ATTENTION_COPY, isActiveAgent, needsAttention } from './sessions/agentActivity'
 import { managedAgentApi } from './sessions/managedClient'
 import { activateManagedAgentNoticeTargets, activateManagedAgentPaneIntents, agentAttentionItemId } from './sessions/managedSelection'
-import { activateManagedAgentNotifications } from './sessions/managedStore'
+import { activateManagedAgentNotifications, managedAgentStore } from './sessions/managedStore'
 import { agentPaneContribution } from './paneContribution'
 import { agentRailMarkerContribution } from './railMarkerContribution'
 import { activateManagedAgentReferences } from './referenceContribution'
@@ -18,15 +22,19 @@ import { agentsCommands } from './commands'
 import { agentCommandsSlotContribution } from './AgentCommands'
 import { harnessTerminalCommands } from './terminalProfileCommands'
 import { agentToolFoldSlice } from './sessions/toolFoldPrefs'
+import { sessionOrderSlice } from './sessions/sessionOrder'
 
 // The conversation, for whoever else has a session to draw (../contract/conversation.ts). Lazy like
 // the settings pages below: the Workflows run pane is the only other caller and most windows never
 // open one, and the terminal client holds a byte ceiling over what loads at startup
 // (apps/tui/scripts/check-startup-graph.mjs).
 const AgentConversation = lazy(() => import('./sessions/AgentConversation'))
-const AgentConcurrencySettings = lazy(() => import('./settings/AgentConcurrencySettings'))
-const AgentPricingSettings = lazy(() => import('./settings/AgentPricingSettings'))
+const InlineDiffCard = lazy(() => import('./inlineDiff/InlineDiffCard.tsx'))
+const AgentLimitsSettings = lazy(() => import('./settings/AgentLimitsSettings'))
 const AgentSessionDefaultsSettings = lazy(() => import('./settings/AgentSessionDefaultsSettings'))
+const AgentMcpServersSettings = lazy(() => import('./settings/AgentMcpServersSettings'))
+const CustomAgentsSettings = lazy(() => import('./settings/CustomAgentsSettings'))
+const AgentStorageSection = lazy(() => import('./settings/AgentStorageSection'))
 
 export const agentsClientPlugin: ClientPlugin = {
   name: 'agents',
@@ -47,6 +55,13 @@ export const agentsClientPlugin: ClientPlugin = {
     // conversation. The run pane uses it to hold the transcript, the queue and the composer for the
     // node it has selected, so a step reads the same way in either place.
     ctx.capabilities.provide(AGENTS_CONVERSATION, { Conversation: AgentConversation })
+    ctx.capabilities.provide(AGENTS_INLINE_DIFF, {
+      prime: (taskId) => { void managedAgentStore.loadTask(taskId).catch(() => undefined) },
+      sessionsForTask: managedAgentStore.sessionsForTask,
+      reportPatches,
+      isStale,
+      Card: InlineDiffCard,
+    })
     // The four places another plugin may come into this pane (docs/plugins.md § Cooperative
     // extension points). The tool card is keyed by the harness's own name for what a call did; the
     // attachment chip by the file's media type; the composer's action bar takes everyone who has
@@ -84,17 +99,63 @@ export const agentsClientPlugin: ClientPlugin = {
     // How a transcript's tool cards start out (toolFoldPrefs.ts). This device's, so the slice is
     // declared here and the key is listed as device-owned in persistence/devicePrefs.ts.
     ctx.persistedStateSlices.register(agentToolFoldSlice)
+    ctx.persistedStateSlices.register(sessionOrderSlice)
+    // The Agents group's pages, each with the sections and rows it draws for search (each page's file
+    // draws the same ones). Core's Tools and permissions (order 30) and MCP config files (order 50) sit
+    // between them.
     ctx.settingsPages.register({
-      id: 'agent-concurrency', label: 'Agent concurrency', group: 'general', order: 44, requires: { plugin: 'agents' },
-      component: AgentConcurrencySettings,
-    })
-    ctx.settingsPages.register({
-      id: 'agent-pricing', label: 'Agent pricing', group: 'general', order: 45, requires: { plugin: 'agents' },
-      component: AgentPricingSettings,
-    })
-    ctx.settingsPages.register({
-      id: 'agent-defaults', label: 'Agent defaults', group: 'general', order: 43, requires: { plugin: 'agents' },
+      id: 'agent-defaults', label: 'Harnesses and defaults', category: 'agents', scope: 'node', icon: 'sliders-horizontal', order: 10, requires: { plugin: 'agents' },
+      // A section per installed harness is drawn as well, and left out because it depends on the node.
+      keywords: ['harness', 'claude code', 'codex', 'model', 'effort', 'reasoning', 'usage limit', 'fold', 'collapse', 'idle', 'retention'],
+      sections: [
+        { id: 'harnesses', label: 'Harnesses', keywords: ['installed', 'cli'] },
+        { id: 'usage', label: 'Usage limits', rows: ['Continue when usage resets'] },
+        { id: 'idle', label: 'Idle agents', rows: ['Stop idle agents after'], keywords: ['memory', 'stop'] },
+        { id: 'archived', label: 'Archived tasks', rows: ['Keep agent history for archived tasks'], keywords: ['retention', 'delete history', 'disk'] },
+        // The switch's label reads "Send task context at startup", which a search for the words people
+        // use for it would miss, so the section names them and search lands on the switch's section.
+        { id: 'new-sessions', label: 'New sessions', rows: ["Carry my last session's settings forward", 'Send task context at startup', 'MCP servers'], keywords: ['startup context', 'task context'] },
+        { id: 'inline', label: 'Inline diff chats', rows: ['Provider'] },
+        { id: 'transcript', label: 'Transcript', rows: ['Tool call display'], keywords: ['tool output'] },
+      ],
       component: AgentSessionDefaultsSettings,
+    })
+    // Saved starts for a session: a harness, its options, instructions and tool access
+    // (docs/managed-agents.md § Custom agents). "From plugins" is left out: it is only drawn while a
+    // plugin contributes an agent.
+    ctx.settingsPages.register({
+      id: 'custom-agents', label: 'Custom agents', category: 'agents', scope: 'node', icon: 'bot', order: 20, requires: { plugin: 'agents' },
+      keywords: ['instructions', 'system prompt', 'harness', 'preset'],
+      sections: [{ id: 'agents', label: 'Custom agents' }],
+      component: CustomAgentsSettings,
+    })
+    // Beside core's MCP config files page, which lists the servers each CLI loads by itself.
+    ctx.settingsPages.register({
+      id: 'agent-mcp-servers', label: 'MCP servers', category: 'agents', scope: 'node', icon: 'server-cog', order: 40, requires: { plugin: 'agents' },
+      keywords: ['mcp', 'model context protocol', 'tools', 'stdio', 'http', '/mcp'],
+      sections: [{ id: 'servers', label: 'Servers' }],
+      component: AgentMcpServersSettings,
+    })
+    // This plugin's numbers on core's Settings > Storage and memory page: running agents, their
+    // memory, and the stop for idle ones (./settings/AgentStorageSection.tsx).
+    ctx.extensions.register({
+      id: 'agents.storage', point: CORE_STORAGE_POINT, label: 'Running agents', order: 10,
+      requires: { plugin: 'agents' },
+      component: AgentStorageSection,
+    })
+    // Concurrency and pricing, which were two pages. Their old ids are aliases, so an old link, a
+    // remembered page or another plugin's `openSettings('agent-pricing')` lands on its section here.
+    // "Unpriced models" is left out: it is only drawn while recent usage names a model with no price.
+    ctx.settingsPages.register({
+      id: 'agent-limits', label: 'Limits and cost', category: 'agents', scope: 'node', icon: 'gauge', order: 60, requires: { plugin: 'agents' },
+      aliases: ['agent-concurrency#limits', 'agent-pricing#claude'],
+      keywords: ['concurrency', 'parallel', 'queue', 'limit', 'turns', 'cost', 'pricing', 'price', 'tokens', 'usd', 'estimate', 'cache'],
+      sections: [
+        { id: 'limits', label: 'Turns at once', rows: ['Turns at once per provider', 'Turns at once per workspace'] },
+        { id: 'claude', label: 'Claude prices', rows: ['Built-in models', 'Exact model ids'], keywords: ['anthropic'] },
+        { id: 'codex', label: 'Codex prices', rows: ['Built-in models', 'Exact model ids'], keywords: ['openai'] },
+      ],
+      component: AgentLimitsSettings,
     })
     // Fleet home's "agents running" number. Addressed at an explicit node, never the ambient one,
     // because the card exists to show several nodes at once.
@@ -138,6 +199,9 @@ export const agentsClientPlugin: ClientPlugin = {
   // this plugin back, so a second activation replaces the first rather than stacking on it.
   activate: () => {
     const stops = [
+      installManagedHandoff(async (sessionId) => {
+        managedAgentStore.upsertSession(await managedAgentApi.resumeManaged(sessionId))
+      }),
       activateManagedAgentReferences(),
       activateManagedAgentNotifications(),
       activateManagedAgentNoticeTargets(),

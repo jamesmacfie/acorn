@@ -66,6 +66,8 @@ export type BoxProps = FlexProps & {
   border?: boolean | readonly ('top' | 'right' | 'bottom' | 'left')[]
   borderStyle?: 'single'
   borderColor?: Color
+  /** Replace the left edge, including its corners, with one coloured glyph. */
+  borderLeftAccent?: { glyph: string; color: Color }
   /** Cells behind the content. Nothing in the kit asks for one — a terminal has no surface to paint
    *  and a role that wanted one would say `inverse` instead — but paint fills it where it is given,
    *  because a run drawn over it keeps it and that is what a highlighted row would need. */

@@ -14,7 +14,6 @@ import {
 } from '@acorn/plugin-api/client'
 import { workspacesRoute, type Workspace } from '@acorn/protocol/api.ts'
 import { noteDraft, type NoteDraft } from './noteDrafts'
-import { createArmedConfirm } from '@acorn/plugin-api/ui'
 import { SCRATCHPAD_SLUG } from '@acorn/protocol/notes.ts'
 import { notesApi, type NoteLocation, type NoteScope, type NoteSummary } from './notesClient'
 import { notesSelectionFor, rememberNotesSelection } from './notesPaneState'
@@ -61,8 +60,6 @@ export function createNotesModel(taskId: string, projectId: string | null) {
   const [filter, setFilter] = createSignal('')
   const [saving, setSaving] = createSignal(false)
   const [actionError, setActionError] = createSignal('')
-  // The armed button is the prompt; this used to be written into the error banner.
-  const deleteArmed = createArmedConfirm()
   const [landed, setLanded] = createSignal(false)
   let scratchCreate: Promise<void> | null = null
 
@@ -286,7 +283,7 @@ export function createNotesModel(taskId: string, projectId: string | null) {
 
   async function remove(scope: NoteScope, slug: string) {
     const location = locationFor(scope)
-    if (!live() || !location || !deleteArmed.request(`${scope}:${slug}`)) return
+    if (!live() || !location) return
     flush()
     const ticket = ++selectionRevision
     const draft = document?.slug === slug && selected()?.scope === scope ? document.draft : noteDraft(nodeId, location, slug)
@@ -341,7 +338,6 @@ export function createNotesModel(taskId: string, projectId: string | null) {
     setFilter,
     saving,
     actionError,
-    deleteArmed,
     matches,
     scratchpad,
     taskOther,

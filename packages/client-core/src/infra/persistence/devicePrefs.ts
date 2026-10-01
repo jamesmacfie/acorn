@@ -7,8 +7,11 @@ const DEVICE_KEYS: ReadonlySet<string> = new Set<string>([
   PrefKeys.themeLight,
   PrefKeys.themeDark,
   PrefKeys.style,
+  PrefKeys.devicePluginsDisabled,
   PrefKeys.keybindings,
   PrefKeys.railOrder,
+  PrefKeys.railVisibility,
+  PrefKeys.leftCollapsed,
   PrefKeys.diffView,
   PrefKeys.terminalRailDefault,
   PrefKeys.terminalHeight,
@@ -36,7 +39,28 @@ const PREFIX = `acorn-pref:${ACORN_BASELINE}:`
 // (persistence/persistedState.ts), and the scoped slices are exactly the four composition kinds
 // that now belong to the node they describe (docs/state.md § Scope rules). Unknown means node,
 // which is what a per-task layout key needs.
-export const isDevicePref = (key: string): boolean => DEVICE_KEYS.has(key)
+const devicePluginIds = new Set<string>()
+export const setDevicePluginIds = (ids: Iterable<string>): void => {
+  devicePluginIds.clear()
+  for (const id of ids) devicePluginIds.add(id)
+}
+export const isDevicePref = (key: string): boolean => {
+  if (DEVICE_KEYS.has(key)) return true
+  const match = /^plugin:([^:]+):/.exec(key)
+  return !!match && devicePluginIds.has(match[1])
+}
+
+export function removeDevicePluginPrefs(pluginId: string): void {
+  const store = storage()
+  if (!store) return
+  const prefix = `${PREFIX}plugin:${pluginId}:`
+  const keys: string[] = []
+  for (let i = 0; i < store.length; i++) {
+    const key = store.key(i)
+    if (key?.startsWith(prefix)) keys.push(key)
+  }
+  for (const key of keys) store.removeItem(key)
+}
 
 // `null` rather than a throw when there is no storage: this runs in a bare-Node vitest too, and a pref that
 // cannot be read is the same as one that was never set.
@@ -58,6 +82,18 @@ export function readDevicePrefs(): Record<string, string> {
     for (const key of DEVICE_KEYS) {
       const value = store.getItem(`${PREFIX}${key}`)
       if (value !== null) out[key] = value
+    }
+    // Installed device plugins own open-ended preference names. Only those installations need a
+    // storage scan; the fixed host keys above never enumerate unrelated drafts.
+    if (devicePluginIds.size > 0) {
+      for (let index = 0; index < store.length; index++) {
+        const storedKey = store.key(index)
+        if (!storedKey?.startsWith(`${PREFIX}plugin:`)) continue
+        const key = storedKey.slice(PREFIX.length)
+        if (!isDevicePref(key)) continue
+        const value = store.getItem(storedKey)
+        if (value !== null) out[key] = value
+      }
     }
   } catch {
     return {}

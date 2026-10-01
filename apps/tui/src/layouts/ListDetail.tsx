@@ -111,7 +111,7 @@ export function ListDetail(props: LayoutProps) {
               agents pane: its composer is the column's last child, so it scrolled away with the
               transcript and a reader had to go looking for the message box after every turn. Both
               panes that use this layout own their scroll, the transcript through `Timeline follow`
-              and the diff through `DiffPane` (../kit/grouping.tsx, ../kit/showing.tsx). */}
+              and the diff through `DiffPane` (../kit/grouping.tsx, ../kit/showing/diffPane.tsx). */}
           <Panel grow title="Detail" onBox={regionFocus({ paneId: props.stateKey, regionId: 'detail' }, 1, { x: DETAIL_COLUMN })}>
             {props.regions.detail?.()}
           </Panel>

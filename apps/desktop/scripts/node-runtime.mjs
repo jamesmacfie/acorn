@@ -15,15 +15,18 @@ import { dirname, resolve } from 'node:path'
 const CACHE = resolve(homedir(), '.cache/acorn/node-runtime')
 
 // nodejs.org spells platforms and architectures its own way. Only the targets a bundle is built for are
-// here; a Windows target needs the .zip layout and node.exe, which is out of scope for v1.
+// here. Windows publishes node.exe directly, so it needs no archive extractor.
 const DIST_NAMES = new Map([
   ['aarch64-apple-darwin', 'darwin-arm64'],
   ['x86_64-apple-darwin', 'darwin-x64'],
   ['aarch64-unknown-linux-gnu', 'linux-arm64'],
   ['x86_64-unknown-linux-gnu', 'linux-x64'],
+  ['x86_64-pc-windows-msvc', 'win-x64'],
 ])
 
 export const sha256 = (path) => createHash('sha256').update(readFileSync(path)).digest('hex')
+
+export const runtimeBinaryName = (triple) => `node-${triple}${triple.includes('-windows-') ? '.exe' : ''}`
 
 /// The triple `bundle.externalBin` will look for. An explicit target wins, because a cross-compiled
 /// build that silently bundled the host's Node would only fail on the machine that installed it.
@@ -44,16 +47,17 @@ const download = async (url) => {
 /// The extracted `node` binary for this version and triple, from the cache when it is there and intact.
 /// The cache records the digest of the extracted binary rather than the tarball's, so a hit re-verifies
 /// without going back to the network.
-const cachedRuntime = async (version, triple) => {
+const cachedRuntime = async (version, triple, cacheDir) => {
   const dist = DIST_NAMES.get(triple)
   if (!dist) throw new Error(`No nodejs.org build is mapped for ${triple}. Add it to DIST_NAMES, or set ACORN_TARGET_TRIPLE.`)
-  const cached = resolve(CACHE, `node-v${version}-${triple}`)
+  const cached = resolve(cacheDir, `node-v${version}-${triple}`)
   const digestFile = `${cached}.sha256`
   if (existsSync(cached) && existsSync(digestFile) && sha256(cached) === readFileSync(digestFile, 'utf8').trim()) {
     return { path: cached, source: 'cache' }
   }
 
-  const archive = `node-v${version}-${dist}.tar.gz`
+  const windows = triple.includes('-windows-')
+  const archive = windows ? `${dist}/node.exe` : `node-v${version}-${dist}.tar.gz`
   const base = `https://nodejs.org/dist/v${version}`
   const [shasums, tarball] = await Promise.all([download(`${base}/SHASUMS256.txt`), download(`${base}/${archive}`)])
 
@@ -70,12 +74,13 @@ const cachedRuntime = async (version, triple) => {
 
   const scratch = mkdtempSync(resolve(tmpdir(), 'acorn-node-runtime-'))
   try {
-    const local = resolve(scratch, archive)
+    const local = resolve(scratch, windows ? 'node.exe' : archive)
     writeFileSync(local, tarball)
     // Only the one file out of ~110 MB of runtime: the bundle ships a binary, not a Node installation.
-    execFileSync('tar', ['-xzf', local, '-C', scratch, '--strip-components=2', `node-v${version}-${dist}/bin/node`])
+    if (!windows) execFileSync('tar', ['-xzf', local, '-C', scratch, '--strip-components=2', `node-v${version}-${dist}/bin/node`])
     const extracted = resolve(scratch, 'node')
-    mkdirSync(CACHE, { recursive: true })
+    if (windows) writeFileSync(extracted, tarball)
+    mkdirSync(cacheDir, { recursive: true })
     // Written under its final name only once it is whole, so an interrupted stage cannot leave a
     // truncated runtime behind that the next run would trust.
     rmSync(cached, { force: true })
@@ -88,9 +93,9 @@ const cachedRuntime = async (version, triple) => {
 }
 
 /// Put the pinned runtime where `bundle.externalBin` resolves it, and answer where that is.
-export const stageNodeRuntime = async ({ pkg, version, triple }) => {
-  const { path: runtime, source } = await cachedRuntime(version, triple)
-  const binary = resolve(pkg, 'src-tauri/binaries', `node-${triple}`)
+export const stageNodeRuntime = async ({ pkg, version, triple, cacheDir = CACHE }) => {
+  const { path: runtime, source } = await cachedRuntime(version, triple, cacheDir)
+  const binary = resolve(pkg, 'src-tauri/binaries', runtimeBinaryName(triple))
   mkdirSync(dirname(binary), { recursive: true })
   // Removed before it is written, never overwritten in place. macOS caches a code signature against the
   // inode, so a `copyFileSync` over a runtime that has already run leaves the kernel refusing the new

@@ -21,6 +21,14 @@ The original [unit brief](../../../plans/performance/implementation-23-review-br
 The sections below reproduce the detailed assignment so this handoff carries its review concerns.
 No application fix for this unit is included in the units 01–08 commit.
 
+## Main-merge context
+
+[Simple memory](../memory/README.md) proposes direct agent writes and removal of Findings and its
+search index. It is not shipped. Revalidate its status before implementation: keep this performance
+work reusable at the current reconciliation owner, and avoid introducing new approval coupling or
+an index architecture that makes the proposed removal harder. If the proposal ships first, retire
+superseded acceptance checks and measure the replacement owner rather than optimizing deleted code.
+
 ## Detailed assignment
 
 Source review on October 1, 2026. Read area 14, docs/notes-and-memory.md, Findings approval/receipts,

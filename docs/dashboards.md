@@ -67,6 +67,9 @@ Home tabs are placement scopes. Their names and order live in the same preferenc
 still lives under ordinary placement and layout keys. Device-local editor recovery is temporary and
 is cleared by the versioned development-state transition.
 
+The Home tab header scrolls horizontally when the workspace has more tabs than fit. Its create button
+stays visible, and selecting a tab brings it into view without wrapping the header.
+
 ## Placement regions
 
 Plugin panel regions constrain publications by source ID, field role, and view kind. The check uses

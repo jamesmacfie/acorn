@@ -15,7 +15,7 @@
 // nothing: the paths worth hiding are the owner's home directory and the data root, and those two
 // are named (docs/telemetry.md § What never leaves the machine).
 import { homedir } from 'node:os'
-import { LOG_BODY_MAX } from '@acorn/protocol/telemetry.ts'
+import { ATTRS_MAX, ATTR_KEY_MAX, ATTR_VALUE_MAX, LOG_BODY_MAX, type TelemetryAttrs } from '@acorn/protocol/telemetry.ts'
 
 const TOKEN_PATTERNS = [
   /\b(?:sk|rk|pk)-[A-Za-z0-9_-]{8,}\b/g,
@@ -83,4 +83,41 @@ export function scrub(value: unknown, fallback = '', max = LOG_BODY_MAX): string
   }
   const bounded = message.trim().slice(0, max)
   return bounded || fallback
+}
+
+/** Pattern redaction and one-line formatting for local diagnostics. Arbitrary secrets still need
+ *  exact redaction at the boundary that knows their values. */
+export const scrubLine = (value: unknown, fallback = '', max = LOG_BODY_MAX): string =>
+  scrub(value, fallback, max).replace(/[\t\r\n]/g, ' ')
+
+/** Shared hygiene before stderr formatting or collector ingestion. Host attribution is stamped
+ *  separately, after keys have been scrubbed so a control character cannot disguise a reserved key. */
+export function scrubAttrs(attrs: TelemetryAttrs | undefined): { attrs: TelemetryAttrs; truncated: number } {
+  const out: TelemetryAttrs = Object.create(null)
+  const input = attrs ?? {}
+  let count = 0
+  let truncated = 0
+  for (const key in input) {
+    if (!Object.hasOwn(input, key)) continue
+    if (count >= ATTRS_MAX) {
+      truncated += 1
+      break
+    }
+    const short = scrubLine(key, '', ATTR_KEY_MAX)
+    if (!short || short === 'owner' || short === 'runtime') continue
+    const value = input[key]
+    if (value === undefined) continue
+    if (key.length > ATTR_KEY_MAX) truncated += 1
+    if (typeof value === 'string') {
+      if (value.length > ATTR_VALUE_MAX) truncated += 1
+      out[short] = scrubLine(value, '', ATTR_VALUE_MAX)
+    } else if (typeof value === 'number' || typeof value === 'boolean' || value === null) {
+      out[short] = value
+    } else {
+      truncated += 1
+      continue
+    }
+    count += 1
+  }
+  return { attrs: out, truncated }
 }

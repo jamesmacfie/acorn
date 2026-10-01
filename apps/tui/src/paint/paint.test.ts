@@ -54,6 +54,23 @@ describe('a box', () => {
     ])
   })
 
+  it('uses an accented left edge for the full height while keeping the other edges neutral', () => {
+    const buffer = createBuffer(8, 4)
+    const box = boxOf(8, 4, { border: true, borderColor: 8, borderLeftAccent: { glyph: '▍', color: 2 } })
+    layoutTree(box, 8, 4)
+    paint(box, buffer)
+
+    expect(bufferLines(buffer)).toEqual([
+      '▍──────┐',
+      '▍      │',
+      '▍      │',
+      '▍──────┘',
+    ])
+    expect(cellAt(buffer, 0, 0)).toMatchObject({ char: '▍', fg: 2 })
+    expect(cellAt(buffer, 0, 3)).toMatchObject({ char: '▍', fg: 2 })
+    expect(cellAt(buffer, 7, 0)).toMatchObject({ char: '┐', fg: 8 })
+  })
+
   it('draws one edge and no corners for a rule', () => {
     // A `Rule` is one side of a box rather than a run of repeated characters, so the renderer draws it
     // to whatever length the layout gave it (../kit/cells.tsx § Rule). A corner is drawn only where

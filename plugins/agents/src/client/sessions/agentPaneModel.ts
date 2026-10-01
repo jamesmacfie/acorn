@@ -1,8 +1,13 @@
-import { createEffect, createMemo, createResource, createSignal, on, onCleanup } from 'solid-js'
+import { createEffect, createMemo, createSignal, on, onCleanup } from 'solid-js'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   activeNodeId, defaultDeliveryContext, markAttentionSeen, saveFile, setTerminalOpen, type PaneModelContext, type Task,
 } from '@acorn/plugin-api/client'
-import type { AgentProviderDescriptor, AgentSession } from '../../contract/wire.ts'
+import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
+import type { AgentAttachment, AgentProviderDescriptor, AgentSession, AgentSessionSnapshot } from '../../contract/wire.ts'
+import { AUTOMATIC_TASK_CONTEXT_SOURCE } from '../composer/automaticTaskContext'
+import { composerDraftState } from '../composer/composerState'
+import { managedDraft } from './managedDrafts'
 import { managedAgentApi } from './managedClient'
 import { downloadName } from './downloadName'
 import { managedAgentStore } from './managedStore'
@@ -15,6 +20,9 @@ import {
   selectedManagedSession,
 } from './managedSelection'
 import { agentSessionRoster } from './sessionRoster'
+import { newSessionChoices, type NewSessionChoice } from './newSessionChoices'
+import { customAgentsOptions } from '../settings/customAgentsClient'
+import { agentProvidersOptions, refreshAgentProviders } from '../providersClient'
 
 // Everything the Agent pane's two regions have to agree on.
 //
@@ -37,6 +45,16 @@ export type SessionAction = {
  *  session that is not the open one. */
 export type AgentDialog = { kind: 'rename' | 'archive'; session: AgentSession }
 
+/** Nothing to lose by archiving: no turns and an empty draft. The task context the composer attaches
+ *  on its own does not count as input. An unloaded snapshot means we cannot tell, so we ask. */
+export function sessionIsBlank(
+  snapshot: Pick<AgentSessionSnapshot, 'turns'> | undefined,
+  draft: { text: string; attachments: AgentAttachment[]; contexts: AgentContextSnapshot[] },
+): boolean {
+  return !!snapshot && !snapshot.turns.length && !draft.text.trim() && !draft.attachments.length
+    && draft.contexts.every((context) => context.source === AUTOMATIC_TASK_CONTEXT_SOURCE)
+}
+
 export type AgentPaneModel = ReturnType<typeof createAgentPaneModel>
 
 const capability = (provider: AgentProviderDescriptor | undefined, name: string): boolean =>
@@ -47,7 +65,18 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
   const [creating, setCreating] = createSignal(false)
   const [dialog, setDialog] = createSignal<AgentDialog | null>(null)
   const [renameText, setRenameText] = createSignal('')
-  const [providers, { refetch: refreshProviders }] = createResource(() => managedAgentApi.providers())
+  const queryClient = useQueryClient()
+  const providersQuery = createQuery(() => agentProvidersOptions())
+  const customAgents = createQuery(() => customAgentsOptions())
+  // `.data` is read only once there is some. On an empty cache solid-query suspends the boundary above
+  // whoever reads it, and this model is built inside the first region that asks for it, which is the
+  // list header. Reading it bare held "Agents" off the screen for the whole providers probe. The New
+  // menu and the empty state say they are loading instead (./AgentPane.tsx).
+  const providers = (): AgentProviderDescriptor[] | undefined =>
+    providersQuery.isPending ? undefined : providersQuery.data
+  const providersLoading = () => providersQuery.isPending
+  const choices = createMemo(() =>
+    newSessionChoices(providers() ?? [], customAgents.isPending ? [] : customAgents.data ?? []))
 
   const taskSessions = createMemo(() =>
     managedAgentStore.sessionsForTask(task.id)
@@ -149,12 +178,12 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
     }
   }
 
-  async function createSession(descriptor: AgentProviderDescriptor) {
+  async function createSession({ provider: descriptor, agent }: NewSessionChoice) {
     if (!descriptor.installed || creating()) return
     setCreating(true)
     setError('')
     try {
-      const session = await managedAgentStore.startSession(task.id, descriptor)
+      const session = await managedAgentStore.startSession(task.id, descriptor, agent?.id)
       selectManagedSession(task.id, session.id)
       requestComposerFocus(session.id)
       await managedAgentStore.loadSnapshot(session.id)
@@ -198,6 +227,13 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
   function sessionAction(session: AgentSession, kind: 'rename' | 'archive' | 'stop') {
     if (kind === 'stop') return void action(() => managedAgentApi.cancel(session.id))
     if (kind === 'rename') setRenameText(session.title)
+    if (kind === 'archive') {
+      const shared = composerDraftState(session.id)
+      const blank = sessionIsBlank(managedAgentStore.snapshots()[session.id], {
+        text: managedDraft(session.id), attachments: shared.attachments(), contexts: shared.contexts(),
+      })
+      if (blank) return void archive(session)
+    }
     setDialog({ kind, session })
   }
 
@@ -336,7 +372,13 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
     task,
     sessionsLoaded,
     providers: () => providers() ?? [],
-    refreshProviders,
+    /** True until the first providers answer arrives, so a control can say so rather than look empty. */
+    providersLoading,
+    /** New's rows: every harness, then every custom agent (./newSessionChoices.ts). */
+    choices,
+    /** Probe the harnesses again, for the Refresh button in the New menu. */
+    refreshProviders: () => refreshAgentProviders(queryClient)
+      .catch((caught) => setError(caught instanceof Error ? caught.message : 'Unable to check the agent providers.')),
     taskSessions,
     sessionRoster,
     selected,

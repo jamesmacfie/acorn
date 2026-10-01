@@ -10,7 +10,7 @@ import { registerDockerWsChannel } from './wsChannel'
 let handler: Parameters<CompiledPluginBroadcast['channel']>[1]
 beforeEach(() => {
   fixture.open.mockReset(); fixture.spawn.mockReset()
-  registerDockerWsChannel({ send() {}, status() {}, worktreeStatus() {}, repoConfigTrustNotice() {}, notice() {}, on: () => ({ dispose() {} }), streams() {}, channel: (_prefix, value) => { handler = value } })
+  registerDockerWsChannel({ send() {}, status() {}, worktreeStatus() {}, repoConfigTrustNotice() {}, notice() {}, on: () => ({ dispose() {} }), streams() {}, channel: (_prefix, value) => { handler = value; return () => {} } })
 })
 
 it('shares a producer across distinct opaque connection tokens and retains only live handles after synchronous end', () => {

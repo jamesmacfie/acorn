@@ -5,9 +5,10 @@ import type { Project } from '../queries'
 // Also the module that seeds the built-in twelve into the theme registry, which is what makes
 // `resolveTheme` able to answer at all before Settings → Appearance has ever been opened.
 import { resolveTheme } from '../../features/settings/builtInThemes'
+import { resolveStyle } from '../../features/settings/uiStyles'
 import { PrefKeys } from './prefKeys'
 import { persistedStateRegistry, type PersistedStateSlice } from './persistedState'
-import { lastWorkspaceSlice } from './stateSlices'
+import { lastWorkspaceSlice, workspaceHistorySlice } from './stateSlices'
 import { createStartupRestore } from './startupRestore'
 
 // Every read goes through `resolveTheme` (settings/themes.ts), which falls back to the built-in
@@ -36,7 +37,7 @@ function applyTheme(prefs: Readonly<Record<string, string>>): () => void {
 // (colour). No disposer and no media listener: unlike light/dark there is no OS signal to follow.
 // 'terminal' is the attribute-less :root default, so this only ever writes a non-default pack.
 function applyStyle(prefs: Readonly<Record<string, string>>): void {
-  document.documentElement.dataset.style = prefs[PrefKeys.style] ?? 'terminal'
+  document.documentElement.dataset.style = resolveStyle(prefs[PrefKeys.style])
 }
 
 export type AppStartupOptions = {
@@ -68,7 +69,7 @@ export function createAppStartupRestore(options: AppStartupOptions): { restored:
   // before the pane layouts land in the last phase gets a default layout that the saved one then
   // declines to overwrite.
   const [lastWorkspaceId, setLastWorkspaceId] = createSignal('')
-  const shellSlices = [lastWorkspaceSlice(setLastWorkspaceId)] as readonly PersistedStateSlice<unknown>[]
+  const shellSlices = [workspaceHistorySlice, lastWorkspaceSlice(setLastWorkspaceId)] as readonly PersistedStateSlice<unknown>[]
 
   const { restored } = createStartupRestore({
     queryClient: options.queryClient,

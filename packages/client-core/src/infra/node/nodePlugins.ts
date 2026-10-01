@@ -3,6 +3,7 @@ import {
   corePluginInstallRoute,
   corePluginReloadRoute,
   corePluginRequestRoute,
+  corePluginReviewRoute,
   corePluginRoute,
   corePluginsRoute,
   corePluginUpdateRoute,
@@ -85,13 +86,13 @@ const mutate = async <T>(url: string, method: string, body: unknown, nodeId?: st
 
 export const installNodePlugin = async (
   source: PluginInstallSource,
-  options: { allowDowngrade?: boolean } = {},
+  options: { allowDowngrade?: boolean; reviewRequestId?: string } = {},
   nodeId?: string,
 ): Promise<PluginInstallResult> => await mutate(corePluginInstallRoute, 'POST', { source, ...options }, nodeId)
 
 export const updateNodePlugin = async (
   id: string,
-  options: { allowDowngrade?: boolean } = {},
+  options: { allowDowngrade?: boolean; reviewRequestId?: string } = {},
   nodeId?: string,
 ): Promise<PluginUpdateResult> => await mutate(corePluginUpdateRoute(id), 'POST', options, nodeId)
 
@@ -106,6 +107,15 @@ export const uninstallNodePlugin = async (
 // previous instance is still serving, so callers read the state rather than waiting for a rejection.
 export const reloadNodePlugin = async (id: string, nodeId?: string): Promise<PluginReloadResult> =>
   await mutate(corePluginReloadRoute(id), 'POST', {}, nodeId)
+
+export const reviewNodePlugin = async (
+  id: string,
+  review: { reviewId: string; fingerprint: string },
+  decision: 'approved' | 'denied',
+  nodeId?: string,
+): Promise<void> => {
+  await mutate(corePluginReviewRoute(id), 'POST', { ...review, decision }, nodeId)
+}
 
 // The owner's answer to one agent-raised approval request (docs/plugins.md § Approval-mediated
 // install). It installs nothing: by this point the device has done the install, or decided not to,

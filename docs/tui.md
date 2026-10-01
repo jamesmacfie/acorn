@@ -1,6 +1,10 @@
 # The terminal client
 
-`acorn` is the terminal client: client-core booted under Node, drawing the same pane tree the desktop
+The `acorn` launcher opens this client with no arguments. With a subcommand it opens the
+[headless command-line client](./cli.md), which shares custody but does not load the terminal
+renderer.
+
+`acorn` with no command is the terminal client: client-core booted under Node, drawing the same pane tree the desktop
 draws, in cells. It is the second host of the closed kit and the only test that the kit is intent
 rather than layout.
 
@@ -10,9 +14,9 @@ and the tree protocol are `packages/client-core`'s, unchanged. No plugin writes 
 a `tui` surface, or learns which host it is on.
 
 Three docs have "terminal" in the name. This one is acorn running in a terminal.
-[terminal.md](./terminal.md) is the terminal drawer inside the desktop app, a raw PTY with nothing
-between you and it. [managed-agents.md](./managed-agents.md) is the other way to run the same
-providers, driven over a protocol with a ledger.
+[terminal.md](./terminal.md) covers raw PTY sessions in the desktop drawer and this host's native
+session view. [managed-agents.md](./managed-agents.md) is the other way to run the same providers,
+driven over a protocol with a ledger.
 
 Two design records are in git rather than in the tree, and comments in `apps/tui` cite both:
 `docs/future/terminal/`, nine phases between 2026-08-30 and 2026-08-31, which is how this client came
@@ -23,12 +27,17 @@ it came to draw its own cells. Each was deleted the day it shipped. Find one wit
 ## What it is, in one screen
 
 ```text
-Topbar:   one line. Workspace > project, task count, the open branch, the node's state as a dot
+Topbar:   one line. Workspace > project and task count on the left; the open branch, node state,
+          and Task: title on the right. Focusing another task previews it as Task to open: title
 Left:     three framed panels — Menu, the sources; Browse, what is under the chosen one; Tasks
 Main:     one pane, or the chosen source's detail, with a strip of pane labels above it
-Overlays: the palette, the cheat sheet, the two pickers and a quit confirmation, where the pane is
+Overlays: commands, setup, settings, file paths, task promotion, terminal sessions, and confirmations
 Footer:   one line. What the keyboard will do, and the node's state when it needs a sentence
 ```
+
+In **Tasks**, moving the caret previews a row's title in the topbar as **Task to open**. Press Enter
+to open that task. The pane then mounts the opened task's content; moving the caret alone leaves the
+open pane in place.
 
 Run it from a checkout with `pnpm --filter @acorn/tui dev`. `pnpm --filter @acorn/tui capture` prints
 one frame at a fixed size against the fixture in `apps/tui/src/fixture.ts`, on a machine with no TTY,
@@ -40,6 +49,12 @@ The floor is the repo's. `node-runtime.json` holds the pin and the range every p
 lints and runs on, `apps/tui/package.json` declares that same range in its `engines`, and `acorn`
 needs no flag: the painter is this package's own TypeScript and Yoga arrives as WebAssembly, so
 drawing reaches no native library at all.
+
+The supported branches are Node 22 at 22.23.2 or later, Node 24 at 24.18.1 or later, and Node 26 at
+26.5.1 or later. Other branches are unsupported. The bundled runtime is 24.21.0. Before looking up
+a loaded client bundle or creating its worker, the terminal checks the shared policy in
+`packages/protocol/src/runtime/nodeRuntime.ts`. An unsupported runtime refuses loaded plugin
+execution with an upgrade message, even if package installation ignored the `engines` warning.
 
 So the whole suite draws on the Node the repo already has, with no skips and no second runtime to
 bundle ([testing.md](./testing.md) § Test layers, [future/bundle.md](./future/bundle.md)).
@@ -70,6 +85,11 @@ port. The footer says `starting the node…` until the handshake lands, and the 
 invalidates whatever the shell asked for while nothing was listening
 ([caching.md](./caching.md) § Renderer query cache).
 
+A prepared data root can have `node.json` before this TUI has ever saved a fleet row. The test
+fixture does this. The shell keeps that known Node ID while the handshake is in flight, then selects
+it against the completed fleet and refreshes active queries. Selecting against the still-empty fleet
+would clear the ID and leave the first screen with no tasks even after the Node came online.
+
 Two cases still wait, and both for the same reason — there is nothing to draw. A first-ever start has
 no `node.json` and no cache under it. And pairing asks a question on stdin, so it stays in front of the
 renderer whatever else moves behind it.
@@ -88,9 +108,11 @@ A second `acorn` in a second terminal finds the lock and attaches, and leaves th
 quits. The one that started it owns its lifetime, which is the desktop's rule too.
 
 Attaching needs a device token, and a node the desktop started holds a token that belongs to the
-desktop. So the first `acorn` against one prints that node's pid and the `kill -USR1 <pid>` that
-reopens its pairing window, and then runs the ordinary pairing exchange against loopback. A loopback
-mint route would remove the step and does not exist.
+desktop. The first `acorn` against one asks for a pairing code. For a desktop-supervised node, open
+**Settings → Nodes → Pair another client** in the desktop to show the code and identity words. For a
+standalone node, run `kill -USR1 <pid>` and read the code from its launching terminal. The TUI then
+runs the ordinary pairing exchange against loopback. A loopback mint route would remove the step and
+does not exist.
 
 The initial selected partition acquires the shared query-cache lifecycle after installing file
 storage. Restore finishes before the shell draws, and quit releases the lease and drains its pending
@@ -126,11 +148,32 @@ so a reader never sees half a snapshot and a crash mid-write leaves the previous
 are synchronous because there is one, before the renderer exists; writes are not, because they land
 while the renderer owns the terminal.
 
+When the selected Node returns, the TUI refreshes active queries without cancelling reads already in
+flight. It then refetches failed inactive queries: an error boundary may have unmounted the observer
+that would otherwise make the failed read active. After those reads settle, failed pane and region
+boundaries remount their content. A persistent error keeps its message and a keyboard-accessible
+`Retry` control. Retry refetches failed reads in the selected Node's cache partition before remounting
+that boundary.
+
+An empty project roster opens **Set up acorn** after the Node's roster query completes. The route
+chooses or creates a workspace, adds a project from an absolute path on that Node, and creates a task
+with the shared branch rules. `Ctrl+K` keeps **Set up acorn** and **New task** reachable afterward. The
+provider step lists connections, accepts descriptor-defined credentials with masked password fields,
+and starts device authorization when a provider offers it. Installed Claude and Codex CLIs are
+detected by the Agent pane. Settings is its own route (§ Settings).
+
 The device token is plain bytes at 0600. The desktop encrypts under the platform keychain through a
 `TokenCipher`; there is no keychain here, so the TUI supplies a pass-through, which is what the node
 beside it already does with its own TLS private key and session key. On NTFS the mode is advisory,
 which [future/bundle.md](./future/bundle.md) § The snags carries with the other file-mode claims
 Windows does not honour.
+
+`acorn.json` in this config directory holds device appearance, shortcuts, rail order, and selected
+exclusive providers. The TUI reads it at startup and watches for changes; valid fields pass through
+the same device preference setters as Settings. A parse error keeps the last valid values. Plugin
+entries appear as installation offers in the Plugins palette and never grant trust. Local-folder
+requests are omitted because this host has no folder picker. Unknown keys survive Settings writes.
+The schema is `packages/plugin-types/acorn-device.schema.json`.
 
 ### Signals and exit
 
@@ -185,6 +228,7 @@ pane needs them before it can draw.
 | `fleet` | The fleet store: `list`, `probe`, `pair`, `rename`, `forget`, `reconnect`, `restartLocal`. `nodeAdopt` and the tunnels are not installed. |
 | `pairing` | Probe only. The probe is remembered in the seam rather than handed back, so confirming a fingerprint is a step rather than a parameter a caller could skip. |
 | `plugins` | File-backed custody. See The sandbox below. |
+| `files` | A terminal path prompt reads local bytes for attachments and writes exports or artifacts locally. It requires an absolute path, rejects attachments above the Agent route's 10 MiB limit before reading bytes, reports read/write errors, and confirms replacement of an existing file. The Node never receives that local path. |
 | `recovery` | `openDataFolder` prints the path; `quit` exits. |
 | `desktop`, `desktopExtras`, `folderPicker`, `preview`, `webviews` | Absent by design. The affordances they gate disappear, which the seam models as a product state. |
 
@@ -227,9 +271,9 @@ is the whole of what makes a compiled pane draw in cells:
   which `codemirror` itself depends on and the `editor` pane really does import. A stub may only
   stand in front of a specifier no working surface reaches.
 - `lucide-static/icon-nodes.json` resolves to an empty table. It is 706 KB of SVG path data and there
-  is no SVG here: `Icon` on this host is a lookup from a Lucide name to one character, and the DOM
-  component that reads the table is in the graph because client-core's components have to resolve,
-  not because any of them draw.
+  is no SVG here: the TUI kit resolves selected shared `Icon` names to one-cell glyphs in
+  `apps/tui/src/kit/glyphs.ts`. Unmapped names draw nothing. The DOM component that reads the table
+  remains in the graph because client-core's components have to resolve, not because it draws here.
 
   That last one is a crash, not a saving, and it is worth knowing why. **The bundle externalises every
   bare import of a package outside the workspace**, so an import left alone is one Node resolves at
@@ -326,9 +370,9 @@ host decides.
 The component table is `apps/tui/src/kit/components.tsx`, keyed by `KitNodeName` exactly as the DOM
 host's is, and `tools/arch/kitTable.test.ts` holds three lists to one: the 80×24 appendix, the support
 matrix, and both hosts' tables. An entry may be a component or a loader for one
-(`client-core/host/tree/kitEntry.ts`), and on this host every entry is the component: the table is not
-in the eager graph at all, because `src/plugins/RemoteTree.tsx` is lazy, and the heavy nodes share
-`src/kit/showing.tsx` with the cheap ones, so a loader would cost a frame of blank and save no bytes.
+(`client-core/host/tree/kitEntry.ts`). On this host every entry is a component: the table loads with
+`src/plugins/RemoteTree.tsx`, outside the startup graph. Presentation components live by behavior
+under `src/kit/showing/`, with `src/kit/showing.tsx` preserving the kit import surface.
 The DOM host's table does hold loaders, because its copy is fetched on every cold window
 ([plugins.md](./plugins.md) § The tree contract). `TreeHost` draws each root under a `Suspense` with a
 `null` fallback either way, which is safe here because a node that leaves the tree is unlinked and
@@ -359,9 +403,11 @@ reads characters cannot see focus at all.
 Colour comes from `apps/tui/src/appearance.ts`, which collapses a theme's forty-odd tokens to the
 terminal's 16 slots plus `dim` and `bold`. `roleCell()` is `roleVar()`'s sibling and returns the
 cell style for a role value — a colour and an attribute bitmask — with `ignored` returning nothing.
-A theme picked in the app does not reach this host: a theme in acorn is an id whose tokens live in a
-`:root[data-theme=…]` block in a stylesheet, and publishing those as data is the appearance layer's
-change rather than the terminal's. The default was always the terminal's own palette.
+The terminal reads the device's `acorn.json` through the same schema and device preference setters
+as desktop. On a truecolour terminal, a built-in theme selection uses six colour primitives generated
+from the desktop theme stylesheet. Without a selected theme, or without truecolour support, the
+terminal uses its own palette. Follow-system mode uses the configured light theme because terminal
+emulators expose no reliable system light/dark signal.
 
 The seven layout components are `apps/tui/src/layouts/`, reaching the pane registry through
 `client-core/src/host/layouts/table.ts`, which is host-supplied for the same reason the component
@@ -443,9 +489,9 @@ only; a gap on both axes puts a blank row between the wrapped lines.
   the bytes a terminal sends, reading application cursor mode and bracketed paste off the emulator's
   own `modes` at the moment a key arrives rather than remembering them. The caller's source is the
   same file either way, which is what let Docker's exec panel and the editor's `$EDITOR` window cross
-  at about fifteen lines each. The terminal plugin's own drawer
-  surface keeps its xterm, because its options are a theme, a font size, a WebGL renderer and a
-  Shift+Enter rule, none of which means anything in cells ([terminal.md](./terminal.md) § Client).
+  at about fifteen lines each. The terminal plugin's desktop drawer retains its xterm, while this
+  host opens a full-screen session list and native PTY rectangle from a task with `t` or from the
+  palette. Sessions persist when that view closes; see [terminal.md](./terminal.md) § Client.
   The bytes reach the rectangle as bytes: `term:out` is the one channel on the node's socket that is a
   binary frame rather than JSON, and the broker in this process hands it straight to the client
   ([terminal.md](./terminal.md) § The screen, and who pays for it). A `pty` rectangle also takes
@@ -538,9 +584,56 @@ For the full contract, see [Terminal interaction and reporting](./tui/interactio
 
 ## Chrome
 
-For the full contract, see [Terminal chrome and plugins](./tui/chrome-and-plugins.md#chrome).
+For the full contract, see [Terminal chrome and plugins](./tui/chrome-and-plugins.md#chrome). Task
+rows project the allocator's complete ordered marker legend as a count. At narrow widths the row
+shows `+N`; focus that row and press `Shift+F10` or the menu key to inspect every label in the
+host-owned **Task markers** list. The desktop keeps its four-corner allocation.
+
+## Settings
+
+**Open settings** in the `Ctrl+K` palette opens the Settings route. It lists the desktop's nine
+groups, then a group's pages, then one page, and Escape climbs back one level at a time: an open
+detail, the page, the group, and then the route. The list is the registry the desktop's settings view
+reads. Core's pages come from the declaration table in
+`packages/client-core/src/features/settings/corePages.ts`, which the desktop's
+`apps/desktop/src/client/pageContributions.tsx` also draws from, and the roster's plugins register
+theirs through `ctx.settingsPages`. So the groups, the page order, the labels, and each page's scope
+match the desktop. `apps/tui/src/chrome/settingsPages.tsx` decides what this host draws:
+
+- A plugin page written with the kit draws unchanged, through the terminal projections of
+  `SettingsSection` and `SettingRow`. A row with `from` shows where its value comes from and no
+  control. The agents plugin's pages, Docker, and Workflows draw this way.
+- Notifications has a terminal form of its own. Its **Terminal alerts** row shows the mode
+  `ACORN_TUI_NOTIFY` chose, whether the variable set it or the default did, and whether this terminal
+  takes a notification sequence at all. The variable is the only way to change it, and the row says
+  so. The event switches and the test notification are the desktop's, through the same accessor. The
+  desktop's sound, system notification, and app icon switches are absent, because the environment
+  variable chooses this host's channels and the topbar count is always on.
+- Every other core page, and the terminal plugin's drawer page, is listed with **desktop app** beside
+  it. Opening it says why this host does not draw it and where to go. A node page's change on the
+  desktop applies here, because the node keeps it. A device page's does not, and for Appearance,
+  Keyboard shortcuts, Rail and surfaces, and Device config file the page names this client's own
+  `acorn.json`. Overview also offers **Set up acorn**.
+
+A page runs inside the same unsaved-changes and detail seams the desktop provides, so a form with
+Save and Cancel asks before Escape drops it, and a list page's detail puts its name in the
+breadcrumb. `confirmAction` from `@acorn/plugin-api/ui/host` is a real dialog here
+(`apps/tui/src/chrome/Confirmation.tsx`). It draws over whatever has the screen and keeps that
+surface mounted underneath, and its caret starts on **Cancel**. A notice target of kind `settings`
+and `presentation:open-settings` open the route on the page they name. A section in a deep link is
+ignored, because this host cannot scroll a page to one.
+
+The place in the route lasts for the session only. The palette carries **Open settings** alone rather
+than the desktop's row per page and per section ([command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md)).
 
 ## Loaded plugins
+
+The terminal's file-backed custody implements device install and remove through the same client-core
+platform contract as desktop. It uses the shared archive and manifest validation and keeps trust
+decisions and device preferences in its own configuration directory. The **Plugins on this device**
+palette group installs from a GitHub release, npm package, or HTTPS URL. It also updates, enables,
+disables, changes development trust, and removes installed bundles. Its source forms use the same
+resolver and trust prompt as the desktop. The terminal does not offer a local-folder picker.
 
 For the full contract, see [Terminal chrome and plugins](./tui/chrome-and-plugins.md#loaded-plugins).
 
@@ -554,7 +647,7 @@ For the full contract, see [Terminal chrome and plugins](./tui/chrome-and-plugin
 buffer, one per layout drawn from its projection, a twin of client-core's `keys.test.tsx` against the
 terminal adapter, a pane file that opens every first-party pane at exactly 80 by 24 and asks whether
 the thing the pane is for is on the first screen, a chrome file that drives the whole shell, a
-reachability file that walks every stop on seven surfaces and checks four invariants after every
+reachability file that walks every stop on nine surfaces and checks four invariants after every
 press, and five files that need no renderer at all: the focus invariants that are facts about
 the source, the palette's collapse to 16 slots, the clipboard
 sequence, the plugin sandbox, and the boot test. Nothing in the suite skips and nothing asks for a
@@ -577,6 +670,13 @@ questions only this host has: a second `acorn` attaches rather than starting a s
 the node refuses reads as `revoked` and stops retrying, and quitting drains the child and releases the
 root's lock.
 
+For terminal UX work, the agent driver runs the compiled TUI in a real PTY and captures its visible
+cells through a headless terminal. It sends raw keyboard input through the parser that the harness
+bypasses, records snapshots and resizes, and can run a bounded navigation flow against the shared
+desktop fixture. [local-development.md](./local-development.md#agent-driven-terminal-development)
+has the commands and comparison procedure. The driver complements the fast cell tests; a terminal
+emulator and human inspection still cover color, focus, and host-specific behavior.
+
 ## Shipping it
 
 Not shipped. `acorn` runs from a checkout. Putting it in the node tarball and the desktop bundle is
@@ -596,14 +696,8 @@ module and the signing gate. What that step still owes is written there.
 - **The node half out of process.** The worker factory, the flags and the two ports are the design
   rung 2 inherits; what it still owes is `ctx` as authorised calls and the plugin-scoped token behind
   them ([security.md](./security.md) § Rung 2).
-- **A device-held install.** `{ path }` is a form the custody accepts and nothing offers, which is the
-  client-plugins programme's phase 0 on this host.
 - **A read-only text view inside an `editor` rectangle**, with a find bar. The box and `$EDITOR` cover
   the case today.
-- **A device preference store.** There is no `localStorage` here and `writeDevicePref` is a no-op, so
-  every device-scoped setting the desktop holds is either a default or an environment variable on this
-  host — the notification switches among them (`ACORN_TUI_NOTIFY`). A file-backed store under the
-  TUI's config directory would let the Notifications settings page work here as it does there.
 - **A test for the no-shrink rule.** One `flexShrink` left at its default on a pane's path brings the
   interleaving back, and what catches it is a pane suite noticing a string is missing rather than a
   rule saying why.

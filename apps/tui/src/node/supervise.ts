@@ -51,9 +51,13 @@ export type SupervisedNode = {
 }
 
 /** Where the node's entry lives. Beside this bundle in a packaged artifact, which is what
- *  `bin/acorn` and the tarball give us (docs/tui.md); in a checkout there
- *  is no build, so fall back to the source entry under tsx, which is what `pnpm dev:node` runs. */
+ *  `bin/acorn` and the tarball give us (docs/tui.md); in a checkout fall back to the source entry
+ *  under tsx, which is what `pnpm dev:node` runs. */
 function nodeEntry(): { command: string; args: string[]; cwd?: string } {
+  // The PTY agent stages the built Node with its external runtime packages beside the artifact.
+  // ESM package resolution ignores NODE_PATH, so it passes that entry explicitly.
+  const agentEntry = process.env.ACORN_TUI_NODE_ENTRY
+  if (agentEntry) return { command: process.execPath, args: [agentEntry] }
   // Two candidates rather than one, because this file may end up in `dist/` or in `dist/chunks/`
   // depending on how rollup splits it, and `standalone.js` sits in `dist/`. Phase 7 pins that layout
   // and can drop whichever of these it does not use.

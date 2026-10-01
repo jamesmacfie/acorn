@@ -76,6 +76,7 @@ const sessionInput = (spawn: AgentSpawn, plan: AgentSpawnProvisioning): CreateAg
   kind: 'delegated',
   parentSessionId: plan.parentSessionId ?? undefined,
   parentTurnId: plan.parentTurnId ?? undefined,
+  ...(plan.customAgentId ? { customAgentId: plan.customAgentId } : {}),
   config: {
     delegationSpawnId: spawn.id,
     toolCeiling: plan.toolCeiling,

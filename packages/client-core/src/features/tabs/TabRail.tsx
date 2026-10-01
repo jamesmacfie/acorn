@@ -3,9 +3,9 @@ import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { integrationsOptions, prefsOptions, projectsOptions, tasksKey, tasksOptions, workspacesOptions, type Project, type Task } from '../../infra/queries'
 import { archiveTask, createTask, patchTask } from '../tasks/taskMutations'
-import { applyRailOrder, moveTask, parseRailOrder, pinTask, unpinTask, type RailDropPosition, type RailOrder } from './railOrder'
-import { checksState } from '../../kit/lib/displayMeta'
-import { createDismissable } from '../../kit/lib/dismissable'
+import { applyRailOrder, applySourceOrder, moveTask, parseRailOrder, pinTask, unpinTask, type RailDropPosition, type RailOrder } from './railOrder'
+import { checksState } from '../../kit/lib/rendering/displayMeta'
+import { createDismissable } from '../../kit/lib/controls/dismissable'
 import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
 import { defaultSourceId } from '../../host/registries/sources/sources'
 import { schedulePanePrefetch } from '../../host/registries/panes/panes'
@@ -13,6 +13,7 @@ import { projectPath } from '../../host/registries/commands/corePaths'
 import { activateTaskSignals, pathForTask } from '../tasks/activate'
 import { hasHostCapability } from '../../infra/node/hostCapabilities'
 import { availableSources } from './railSources'
+import { parseRailVisibility, shownInRail } from './railVisibility'
 import { createSourceScope } from './sourceScope'
 import { taskStatus } from '../tasks/taskStatus'
 import { markersFor } from '../../host/registries/rail/railMarkerFeed'
@@ -32,6 +33,7 @@ import { saveJsonPref } from '../settings/savePref'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { completeTaskArchive, isArchiving, withArchiving } from '../tasks/archiveLifecycle'
 import ExclusiveSlotHost from '../../host/plugins/ExclusiveSlotHost'
+import { registerCoreExclusiveSlot } from '../../host/registries/extensionPoints/exclusiveSlots'
 import { registerContextMenuItems, type TaskRowTarget } from '../../host/registries/panes/contextMenus'
 import { ContextMenuHost, ContextMenuItems, type ContextMenuOpening } from '../../host/registries/panes/contextMenuHost'
 import IconPicker, { randomIconName } from '../../kit/components/inputs/IconPicker'
@@ -39,11 +41,13 @@ import { loadIconNodes } from '../../kit/tokens/iconNodes'
 import './tabrail.css'
 import { RailTab } from './RailTab'
 import { taskOriginAppearance } from '../tasks/origin'
-import { Alert, Button, Checkbox, Select } from '../../kit/components/primitives'
+import { Alert, Button, Checkbox, Input, Select } from '../../kit/components/primitives'
 import { Menu } from '../../kit/components/overlays/Menu'
 import { workflowTaskHierarchy } from '../tasks/taskHierarchy'
 import { expandedWorkflowRoots, toggleWorkflowRoot } from '../tasks/taskTreeViewState'
 import { createRailDrag } from './createRailDrag'
+import type { RailProps } from '@acorn/protocol/chrome.ts'
+import { mintSlotRef, NestedChromeSlot } from '../../host/plugins/NestedChromeSlot'
 
 const originIcon = (origin: string) => taskOriginAppearance(origin).glyph
 
@@ -153,7 +157,13 @@ export default function TabRail() {
   // reads them.
   createEffect(() => requestTaskAnnotations(visibleTasks().map((task) => task.id)))
 
-  const sources = () => availableSources(integrations.data?.integrations, sourceScope())
+  // Every source that can open, then the ones this device draws an icon for. The palette opens the
+  // rest (./railVisibility.ts), so a hidden source is still one click away from somewhere.
+  const openableSources = () => applySourceOrder(availableSources(integrations.data?.integrations, sourceScope()), railOrder())
+  const sources = () => {
+    const visibility = parseRailVisibility(prefs.data?.[PrefKeys.railVisibility])
+    return openableSources().filter((source) => shownInRail(source.id, visibility))
+  }
   function selectSource(id: SourceId) {
     setMenuId(null)
     setSelectedSource(id)
@@ -356,30 +366,7 @@ export default function TabRail() {
     await invalidate()
   }
 
-  return (
-    <nav class="tabrail">
-      <div class="tabrail-zone tabrail-sources">
-        <For each={sources()}>
-          {(s) => (
-            <RailTab
-              class="tabrail-source"
-              label={s.label}
-              glyph={s.glyph}
-              active={selectedSource() === s.id}
-              markers={markersFor({ kind: 'source', id: s.id })}
-              data-tip-sub="Browse"
-              aria-current={selectedSource() === s.id ? 'page' : undefined}
-              onClick={() => selectSource(s.id)}
-            />
-          )}
-        </For>
-      </div>
-      <div class="tabrail-sep" />
-      {/* The one core surface a plugin may offer to replace (registries/exclusiveSlots.ts).
-          Registering an offer seizes nothing: the list below draws unless the owner picked a working
-          provider in Settings > Plugins. `core` is a getter, so the subtree and its queries cost
-          nothing while a replacement is up. */}
-      <ExclusiveSlotHost slot="rail.taskList" core={() => (
+  const CoreTaskList = () => (
       <div class="tabrail-list">
         <For each={visibleTasks()}>
           {(w) => {
@@ -487,7 +474,76 @@ export default function TabRail() {
           }}
         </For>
       </div>
-      )} />
+  )
+  const coreTaskList = registerCoreExclusiveSlot('rail.taskList', CoreTaskList)
+  onCleanup(() => coreTaskList.dispose())
+
+  const taskListRef = mintSlotRef()
+  const railProps = (): RailProps => ({
+    sources: sources().map((source) => ({
+      id: source.id, label: source.label, icon: source.glyph,
+      selected: selectedSource() === source.id,
+      markers: markersFor({ kind: 'source', id: source.id }),
+    })),
+    workspaces: (workspaces.data ?? []).filter((workspace) => workspace.projects.length).map((workspace) => ({
+      id: workspace.id, label: workspace.name, active: workspace.id === activeWorkspace()?.id,
+    })),
+    collapsed: prefs.data?.[PrefKeys.leftCollapsed] === 'true',
+    formFactor: 'desktop',
+    slots: { taskList: taskListRef },
+    selectSource: (id) => { if (sources().some((source) => source.id === id)) selectSource(id) },
+    openWorkspace: (id) => {
+      const workspace = workspaces.data?.find((candidate) => candidate.id === id)
+      const first = workspace?.projects[0]
+      if (first) navigate(projectPath(first.id))
+    },
+    toggleCollapsed: () => void saveJsonPref(queryClient, PrefKeys.leftCollapsed, prefs.data?.[PrefKeys.leftCollapsed] !== 'true'),
+    reorderSources: (ids) => {
+      const available = sources().map((source) => source.id)
+      if (ids.length !== available.length || new Set(ids).size !== available.length || ids.some((id) => !available.includes(id))) return
+      // The drawn icons take the drawn slots in their new order, and a hidden source keeps its own
+      // slot, so showing it again puts it back where it was.
+      const drawn = [...ids]
+      const merged = openableSources().map((source) => available.includes(source.id) ? drawn.shift()! : source.id)
+      void saveOrder({ ...railOrder(), sources: merged })
+    },
+    createTask: openNew,
+  })
+
+  const CoreRail = (own: { value?: unknown }) => {
+    const value = () => own.value as RailProps
+    return (
+      <nav class="tabrail" data-collapsed={value().collapsed || undefined}>
+        <div class="tabrail-zone tabrail-sources">
+          <For each={value().sources}>
+            {(source) => (
+              <RailTab
+                class="tabrail-source"
+                label={source.label}
+                glyph={source.icon}
+                active={source.selected}
+                markers={[...source.markers]}
+                data-tip-sub="Browse"
+                aria-current={source.selected ? 'page' : undefined}
+                onClick={() => value().selectSource(source.id)}
+              />
+            )}
+          </For>
+        </div>
+        <div class="tabrail-sep" />
+        <NestedChromeSlot slotRef={value().slots.taskList} />
+        <RailTab class="tabrail-bottom" label="New task" glyph="plus"
+          data-tip-sub="Start a task on a new branch" onClick={value().createTask} />
+      </nav>
+    )
+  }
+  const coreRail = registerCoreExclusiveSlot('rail', CoreRail)
+  onCleanup(() => coreRail.dispose())
+
+  return (
+    <div class="rail-host" data-collapsed={railProps().collapsed || undefined}>
+      <ExclusiveSlotHost slot="rail" value={railProps()}
+        nestedSlots={[{ ref: taskListRef, render: () => <ExclusiveSlotHost slot="rail.taskList" /> }]} />
       {/* One right-click menu for the whole list. Focus returns to the row's own button on dismiss,
           which is what keeps it usable from the keyboard. */}
       <ContextMenuHost
@@ -496,13 +552,6 @@ export default function TabRail() {
         opening={rowMenu}
         onClose={() => setRowMenu(null)}
         returnFocus={() => rowMenuReturnFocus}
-      />
-      <RailTab
-        class="tabrail-bottom"
-        label="New task"
-        glyph="plus"
-        data-tip-sub="Start a task on a new branch"
-        onClick={openNew}
       />
       <Show when={archiveErr()}><Alert>{archiveErr()}</Alert></Show>
       <Show when={draft()}>
@@ -519,27 +568,22 @@ export default function TabRail() {
                   <Show when={draftErr()}><Alert>{draftErr()}</Alert></Show>
                   <div style={{ display: 'flex', 'align-items': 'center', gap: '6px' }}>
                     <IconPicker value={iconDraft()} fallback={draftFallbackIcon()} onSelect={setIconDraft} />
-                    <input
-                      class="ui-input"
-                      style={{ flex: 1, 'min-width': 0 }}
-                      type="text"
+                    <Input
                       ref={(el) => queueMicrotask(() => el.focus())}
                       placeholder={d().mode === 'new' ? 'Task title' : 'Task name'}
                       value={text()}
-                      onInput={(e) => setText(e.currentTarget.value)}
+                      onInput={(value) => setText(value)}
                     />
                   </div>
                   <Show when={d().mode === 'new' && selectedProject()?.vcs === 'git'}>
                     <Show when={!noBranch()}>
-                      <input
-                        class="ui-input"
-                        type="text"
+                      <Input
                         placeholder="branch (from title)"
                         title="Branch name — defaults to a slug of the title"
                         value={branchTouched() ? branchText() : effectiveBranch()}
-                        onInput={(e) => {
+                        onInput={(value) => {
                           setBranchTouched(true)
-                          setBranchText(e.currentTarget.value)
+                          setBranchText(value)
                         }}
                         />
                     </Show>
@@ -569,6 +613,6 @@ export default function TabRail() {
           </div>
         )}
       </Show>
-    </nav>
+    </div>
   )
 }

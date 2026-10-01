@@ -12,9 +12,35 @@ export const agentSessionDefaultsPreferenceKey = 'agents:session-defaults:v1'
 /** providerId to optionId to the value that option is set to. */
 export type AgentDefaultValues = Record<string, Record<string, string>>
 
+/**
+ * "Stop idle agents after", in minutes, where 0 is Never. A closed list rather than a number field,
+ * because each choice is a label the transcript repeats when it stops a session.
+ */
+export const AGENT_IDLE_STOP_CHOICES = [
+  { minutes: 15, label: '15 minutes' },
+  { minutes: 30, label: '30 minutes' },
+  { minutes: 120, label: '2 hours' },
+  { minutes: 0, label: 'Never' },
+] as const
+
+/**
+ * "Keep agent history for archived tasks", in days, where 0 is Forever. Past the limit, a daily
+ * schedule removes the transcripts of that task's sessions for good (docs/data-layer.md § Retention).
+ */
+export const AGENT_ARCHIVED_HISTORY_CHOICES = [
+  { days: 30, label: '30 days' },
+  { days: 90, label: '90 days' },
+  { days: 365, label: '1 year' },
+  { days: 0, label: 'Forever' },
+] as const
+
 export type AgentSessionDefaults = {
   /** Resume a paused turn when its harness reports that the account usage window has reset. */
   continueAfterUsageLimit: boolean
+  /** Minutes an idle provider process is kept before the runtime stops it. 0 keeps it until the node exits. */
+  stopIdleAfterMinutes: number
+  /** Days an archived task keeps its agent history before the node removes it. 0 keeps it forever. */
+  keepArchivedHistoryDays: number
   /**
    * Carry each change forward instead of using `pinned`. On, a model or effort switch inside a
    * session becomes the value the next session of that provider starts with.
@@ -24,15 +50,21 @@ export type AgentSessionDefaults = {
   pinned: AgentDefaultValues
   /** Written by the runtime whenever a session's option changes, and used when following is on. */
   last: AgentDefaultValues
+  /** Choices for sessions opened from a diff line, independent of ordinary sessions. */
+  inline: { providerId: string | null; pinned: AgentDefaultValues }
 }
 
 // Following, because it needs no setup to be useful and it matches what a session switch means: you
 // picked that model because it is the one you want, not only for the session you were in.
 export const defaultAgentSessionDefaults = (): AgentSessionDefaults => ({
   continueAfterUsageLimit: true,
+  stopIdleAfterMinutes: 30,
+  // Forever, because removing history cannot be undone and has to be the owner's choice.
+  keepArchivedHistoryDays: 0,
   followLastSession: true,
   pinned: {},
   last: {},
+  inline: { providerId: null, pinned: {} },
 })
 
 // The client is the less-trusted side and this decides which model a provider child runs, so the
@@ -102,11 +134,35 @@ export function validateAgentSessionDefaults(
   if (record.continueAfterUsageLimit != null && typeof record.continueAfterUsageLimit !== 'boolean') {
     errors.push('continueAfterUsageLimit must be true or false.')
   }
+  if (record.stopIdleAfterMinutes != null
+    && !AGENT_IDLE_STOP_CHOICES.some((choice) => choice.minutes === record.stopIdleAfterMinutes)) {
+    errors.push(`stopIdleAfterMinutes must be one of ${AGENT_IDLE_STOP_CHOICES.map((choice) => choice.minutes).join(', ')}.`)
+  }
+  if (record.keepArchivedHistoryDays != null
+    && !AGENT_ARCHIVED_HISTORY_CHOICES.some((choice) => choice.days === record.keepArchivedHistoryDays)) {
+    errors.push(`keepArchivedHistoryDays must be one of ${AGENT_ARCHIVED_HISTORY_CHOICES.map((choice) => choice.days).join(', ')}.`)
+  }
   if (record.followLastSession != null && typeof record.followLastSession !== 'boolean') {
     errors.push('followLastSession must be true or false.')
   }
   const pinned = record.pinned == null ? undefined : values(record.pinned, 'pinned', errors)
   const last = record.last == null ? undefined : values(record.last, 'last', errors)
+  const inlineRecord = record.inline
+  let inline: AgentSessionDefaults['inline'] | undefined
+  if (inlineRecord != null) {
+    if (typeof inlineRecord !== 'object' || Array.isArray(inlineRecord)) errors.push('inline must be an object.')
+    else {
+      const fields = inlineRecord as Record<string, unknown>
+      if (fields.providerId != null && (typeof fields.providerId !== 'string' || fields.providerId.length > MAX_ID)) {
+        errors.push('inline.providerId must be a provider id.')
+      }
+      const pinnedInline = values(fields.pinned, 'inline.pinned', errors)
+      if (pinnedInline) inline = {
+        providerId: typeof fields.providerId === 'string' && fields.providerId ? fields.providerId : null,
+        pinned: pinnedInline,
+      }
+    }
+  }
   if (errors.length) return { ok: false, errors }
   return {
     ok: true,
@@ -114,9 +170,12 @@ export function validateAgentSessionDefaults(
       ...(typeof record.continueAfterUsageLimit === 'boolean'
         ? { continueAfterUsageLimit: record.continueAfterUsageLimit }
         : {}),
+      ...(typeof record.stopIdleAfterMinutes === 'number' ? { stopIdleAfterMinutes: record.stopIdleAfterMinutes } : {}),
+      ...(typeof record.keepArchivedHistoryDays === 'number' ? { keepArchivedHistoryDays: record.keepArchivedHistoryDays } : {}),
       ...(typeof record.followLastSession === 'boolean' ? { followLastSession: record.followLastSession } : {}),
       ...(pinned ? { pinned } : {}),
       ...(last ? { last } : {}),
+      ...(inline ? { inline } : {}),
     },
   }
 }

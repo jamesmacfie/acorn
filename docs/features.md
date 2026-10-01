@@ -60,14 +60,20 @@ after the first accepted prompt. Delegation can share the parent task or create 
 task with a lazy worktree. Aider is available through its terminal profile and keeps the deterministic
 prompt fallback because its profile has no contained one-shot mode.
 
+Custom agents are saved starts for a session: a harness, its model, effort and mode, instructions for
+its system prompt, and a ceiling on acorn's own tools. The owner keeps them under Settings > Custom
+agents, a plugin can ship them, and each is listed under New, in the palette, and to `agent_spawn` by
+name.
+
 ## Integrations and model providers
 
 GitHub uses device-flow OAuth. Linear connections, and Rollbar connections when its loaded package is
-installed, are managed from Settings and expose
-provider sources and task links. OpenAI and Anthropic are model-provider connections used by features
-such as SQL generation; prompts and responses are not persisted by the model-provider plugin.
-Settings also lists what this owner can generate with, keys and installed agent CLIs together, and
-holds the one "Generate with" default every Generate control in the app opens on
+installed, are managed from Settings > Services and expose provider sources and task links. A
+connection that needs signing in again is listed first, dots Services in the settings rail, and its
+page leads with the fix. OpenAI and Anthropic are model-provider connections used by features such as
+SQL generation; prompts and responses are not persisted by the model-provider plugin. Settings > AI
+models lists what this owner can generate with, keys and installed agent CLIs, and holds the one
+"Generate with" default every Generate control in the app opens on, a device row on a node page
 ([state-ownership.md](./state-ownership.md) § Scope rules). The first-run wizard shows the same list
 on a **Generate with AI** step and offers a key form per provider. It never blocks: an agent CLI
 already on the machine needs no setup at all, and someone who wants neither a CLI nor a key moves on
@@ -102,9 +108,44 @@ and variable data encrypted at rest; sending is restricted to an interactive dev
 
 ## Settings and fleet
 
-Settings includes workspaces, appearance, notifications, integrations, MCP, agent tools, pricing, workflows,
-terminal, Docker, HTTP requests, shortcuts, Nodes, Plugins, and Security. The Notifications page
+Settings is a full-window view with a searchable rail of nine groups. General holds Appearance,
+Notifications, Keyboard shortcuts, and Command line. Workspaces and projects holds Overview, a table
+of every project with a bar for moving, hiding, and colouring several at once, then a page per
+workspace and, under it, a page per project with General, Setup and scripts, Preview, Database, and
+Connections tabs. Values a project's `.acorn/config.toml` sets are read-only there. Agents holds Harnesses and defaults (each harness, when an idle agent stops, how long an
+archived task keeps its agent history, what a new session starts on, and whether a terminal agent is
+sent the task's context), Custom agents and MCP servers (each a list, then
+one item's editor in the same pane), Tools and permissions (grouped by owner or by tier), MCP config
+files (for a project picked on the page, whether or not a task is open), Limits and cost (concurrency
+and pricing), and Review after archive. Connections holds
+Services (each connection, a page per connection with where it shows up, and an Add connection
+gallery) and AI models (the model keys, the agent CLIs, and Generate with). Features holds Terminal, Docker, API requests, and any plugin page that names no group.
+Automation holds Schedules, Run history, and Workflows. Machines holds Nodes, Security and backup,
+Audit log, Telemetry, Storage and memory, and Sentry export. Storage and memory shows the node's
+running agents and their memory, the node's own memory, its database and blob cache sizes, and this
+device's saved cache for that node, with buttons to stop idle agents and clear the cache. Plugins holds Installed (the node's plugins and this device's,
+filtered to what needs you or to this device, each opening a page with Overview, Settings, Permissions,
+and Versions tabs, and one Install flow for either target) and Rail and surfaces (a Show in left rail
+switch for every plugin source, and the replaced-surface picker). Every plugin page carries a host-drawn
+strip with the plugin's origin, a link to its page, its rail switches, and its enabled switch. A hidden
+source still opens from the palette. Advanced holds Device config file,
+Clear cache, Extension points, and the Style gallery in development builds. Each page's header says
+whether a change affects this device, a node, a workspace, or a project, and one node switcher serves the node
+pages that can read another node ([frontend.md](./frontend.md) § Settings). The Notifications page
 switches sound, system notifications, the app-icon count, and each of the three things an agent can
-do that is worth interrupting for ([notifications.md](./notifications.md) § Settings). Nodes and plugins are
+do that is worth interrupting for ([notifications.md](./notifications.md) § Settings). The terminal
+client has a Settings route with the same groups, pages, and order. It draws the plugin pages written
+with the shared kit and its own Notifications page, which shows the `ACORN_TUI_NOTIFY` alert choice
+and the three event switches. Every other page is listed and says to open it in the desktop app, and
+why ([tui.md](./tui.md) § Settings). Plugins are
 managed per Node. With more than one Node, the shell adds Fleet home, Node labels, aggregate Agent
 Center/attention/search, Node-aware palette rows, and partial/offline states.
+
+## Command-line client
+
+`acorn` with no arguments opens the terminal client. Headless commands use the same paired Node
+custody to administer workspaces and projects, create tasks, queue managed agent turns, start
+published workflows, and inspect durable runs from a later process. `acorn node start --background`
+explicitly starts a persistent local service. Loaded Node plugins can declare typed commands under
+`acorn plugin ID COMMAND`; the Node validates scope and dispatches them through the plugin's owned
+route. See [CLI](./cli.md) for commands, JSON schemas, examples, and exit codes.

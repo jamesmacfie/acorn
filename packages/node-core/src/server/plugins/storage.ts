@@ -8,12 +8,14 @@
 //      manifest. Core owns the file either way.
 //   2. The handle stays in the owning plugin's closure, not on `Env`. `c.env` reaches every core and
 //      plugin route, so a per-plugin DB there would be readable by all of them.
-import { chmodSync, closeSync, existsSync, mkdirSync, openSync } from 'node:fs'
+import { closeSync, constants, fchmodSync, fstatSync, lstatSync, mkdirSync, openSync } from 'node:fs'
 import { join, resolve } from 'node:path'
 import { migrate } from 'drizzle-orm/better-sqlite3/migrator'
 import type { PluginStorage } from '../pluginHost/types'
 import { assertPluginMigrationHistory, pluginMigrationsFolder } from './migrations'
 import { drizzleOverSqlite, openSqlite } from '../storage/sqlite'
+import { installPluginStoragePolicy } from './storagePolicy'
+import { securePluginDbFiles, validatePluginDbFiles } from './pluginDbFiles'
 
 // One directory for every plugin DB, so a backup can enumerate them without knowing the plugin list
 // (docs/data-layer.md § Backup), and so `plugins/` stays visibly separate from core.sqlite.
@@ -35,16 +37,22 @@ export function preparePluginDbFiles(dataDir: string, plugin: string): readonly 
   const databasePath = pluginDbPath(dataDir, plugin)
   const dir = join(resolve(dataDir), PLUGIN_DB_DIR)
   mkdirSync(dir, { recursive: true, mode: 0o700 })
-  chmodSync(dir, 0o700)
-  const paths = [databasePath, `${databasePath}-wal`, `${databasePath}-shm`] as const
-  for (const path of paths) {
-    closeSync(openSync(path, 'a', 0o600))
-    chmodSync(path, 0o600)
+  // The data root can be a host alias, such as /var on macOS. Its immediate plugins directory
+  // must itself be a real directory, rather than a link redirecting every owned database path.
+  if (!lstatSync(dir).isDirectory()) throw new Error('Plugin database directory must be a directory.')
+  const fd = openSync(dir, constants.O_RDONLY | (constants.O_DIRECTORY ?? 0) | (constants.O_NOFOLLOW ?? 0) | (constants.O_NONBLOCK ?? 0))
+  try {
+    if (!fstatSync(fd).isDirectory()) throw new Error('Plugin database directory must be a directory.')
+    // Windows directory handles cannot be fchmodded. Access there is governed by the data
+    // root's ACL; POSIX hosts enforce owner-only permissions on the validated descriptor.
+    if (process.platform !== 'win32') fchmodSync(fd, 0o700)
+  } finally {
+    closeSync(fd)
   }
-  return paths
+  return securePluginDbFiles(databasePath, true)
 }
 
-export function openPluginDb(dataDir: string, plugin: string, options: { migrationsFolder: string; prepared?: boolean }): PluginDatabase {
+export function openPluginDb(dataDir: string, plugin: string, options: { migrationsFolder: string; prepared?: boolean; loaded?: boolean }): PluginDatabase {
   // The plugin id becomes a filename, so validate it here rather than trusting the caller. Same rule
   // the route registry applies to a plugin's namespace.
   if (!PLUGIN_ID_RE.test(plugin)) throw new Error(`Plugin database id must match ${PLUGIN_ID_RE.source}: '${plugin}'.`)
@@ -54,8 +62,11 @@ export function openPluginDb(dataDir: string, plugin: string, options: { migrati
   // because SQLite derives WAL/SHM permissions from the database file. An isolated realm receives
   // exact-file grants and therefore asks the parent to prepare them before it starts.
   if (!options.prepared) preparePluginDbFiles(dataDir, plugin)
+  validatePluginDbFiles(databasePath)
 
-  const sqlite = openSqlite(databasePath)
+  const sqlite = openSqlite(databasePath, options.loaded
+    ? { initialize: installPluginStoragePolicy, allowBackup: false }
+    : {})
   try {
     sqlite.pragma('journal_mode = WAL')
     sqlite.pragma('busy_timeout = 5000')
@@ -73,9 +84,7 @@ export function openPluginDb(dataDir: string, plugin: string, options: { migrati
     // un-migrate. Nothing in this system has down-migrations, so the author iterating on the plugin
     // owns the data they just reshaped.
     migrate(db, { migrationsFolder: options.migrationsFolder })
-    for (const path of [databasePath, `${databasePath}-wal`, `${databasePath}-shm`]) {
-      if (existsSync(path)) chmodSync(path, 0o600)
-    }
+    securePluginDbFiles(databasePath, false)
 
     const withBatch = db as unknown as PluginDatabase
     // `.batch([...])` as a synchronous transaction, matching openDb. All-or-nothing within this file

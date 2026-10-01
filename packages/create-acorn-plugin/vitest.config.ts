@@ -2,6 +2,6 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
-    include: ['index.test.ts'],
+    include: ['index.test.ts', 'scaffoldClient.test.ts'],
   },
 })

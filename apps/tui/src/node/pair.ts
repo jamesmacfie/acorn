@@ -29,7 +29,7 @@ export async function pairInteractively(endpoint: string, fleet: FleetStore, nod
   console.log(`  ${probe.endpoint}`)
   console.log(`  Identity      ${words}`)
   console.log('')
-  console.log('  Check those words match what the node printed at its own boot. If they do not,')
+  console.log('  Check those words against the node\'s pairing display. If they do not match,')
   console.log('  something is intercepting this connection: press Enter with no code.')
   console.log('')
 

@@ -1,6 +1,6 @@
 import { expect, it } from 'vitest'
 import { createRoot, createSignal } from 'solid-js'
-import { resetPaneAfterRecovery } from './PaneRow'
+import { resetPaneAfterRecovery } from './recovery'
 
 it('retries a failed pane only after the node query refresh completes', async () => {
   let dispose = () => {}

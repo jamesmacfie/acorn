@@ -1,210 +1,321 @@
 import { createSignal } from 'solid-js'
 import { corePluginsRoute, PLUGIN_API_MAJOR, type NodePluginRow, type NodePluginState } from '@acorn/protocol/api.ts'
-import type { PluginAckRecord } from '../../infra/platform'
+import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'
+import { hasNodeHalf } from '@acorn/protocol/plugin/bundles.ts'
+import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
+import type { PluginAckRecord, PluginHostState } from '../../infra/platform'
+import { PrefKeys } from '../../infra/persistence/prefKeys'
+import { readDevicePrefs, setDevicePluginIds } from '../../infra/persistence/devicePrefs'
 import { readJson } from '../../infra/node/apiClient'
+import { activeNodeId } from '../../infra/node/activeNode'
 import { nodes, nodeState } from '../../infra/node/fleet'
 import { cachePluginBundle, pluginHostAvailable, readPluginHostState } from './host'
-import { resolveActiveBundles, type ActiveBundle, type BundleCandidate } from '../trust/resolveBundles'
 import { createLogger } from '../../infra/telemetry/logger'
+import { runtimeIdentityForRow, legacyRuntimeIdentityWithheld } from './runtimeIdentity'
+import {
+  decisionKey, derivePluginDistribution,
+  type DevicePluginEntry, type NodePluginObservation, type PluginDistributionSnapshot, type PluginTrustRequest,
+} from './distributionModel'
+import { contributionAvailability, nodePluginRuntime, nodePluginServiceAvailable } from './availabilityModel'
+import { stopTreeWorker } from '../tree/workerHost'
 
 const log = createLogger('plugins')
+const emptyHost = (): PluginHostState => ({ cached: {}, acks: [], devGrants: [] })
+const emptySnapshot = (): PluginDistributionSnapshot => derivePluginDistribution(new Map(), emptyHost(), 0, PLUGIN_API_MAJOR)
+const [distribution, setDistribution] = createSignal<PluginDistributionSnapshot>(emptySnapshot())
+let initialized = false
+let requestedGeneration = 0
+let reconcileTail: Promise<void> = Promise.resolve()
+let lastHostState = emptyHost()
+const dismissed = new Set<string>()
+const listeners = new Set<() => void>()
 
-// Getting third-party plugin bundles from every node in the fleet onto this device, and asking the
-// owner about each one before anything runs it (docs/plugins.md § Loaded plugins: the client half;
-// docs/security.md § Third-party plugin bundles for the trust model).
-//
-// Three fleet-wide signals: `installedByNode` (each node's roster, unlike node/nodePlugins.ts which
-// tracks only the active node and clears on switch), `pendingTrust` (the queue the dialog drains), and
-// `activeBundles` (which single bundle wins per plugin id, pinned once per session; see below).
-//
-// Nothing here loads or executes a bundle: phase 3 does that. What this file guarantees is that by
-// the time it can, the bytes are cached, the hash was computed locally, and the owner has said yes.
+export { distribution }
+export type { PluginTrustRequest }
 
-const [installedByNode, setInstalledByNode] = createSignal<ReadonlyMap<string, readonly NodePluginRow[]>>(new Map())
-const [pendingTrust, setPendingTrust] = createSignal<readonly PluginTrustRequest[]>([])
-const [activeBundles, setActiveBundles] = createSignal<ReadonlyMap<string, ActiveBundle> | null>(null)
-// `<pluginId> <hash>` for every bundle this device has said yes to. Held here because it is read on the
-// same pass that reads it from main, and phase 3 needs it as a gate rather than a round trip: a bundle
-// with no acceptance must not get so far as registering a contribution.
-const [acceptedBundles, setAcceptedBundles] = createSignal<ReadonlySet<string>>(new Set())
-
-export { installedByNode, pendingTrust, activeBundles }
-
-/** Has this device agreed to run these exact bytes? Keyed on the pair, because consent was given to a
- * hash and not to a name (@acorn/custody/plugins/pluginTrustStore.ts). */
-export const bundleAccepted = (pluginId: string, hash: string): boolean => acceptedBundles().has(`${pluginId} ${hash}`)
-
-/** Called by the trust dialog once main has stored the decision, so a just-accepted plugin's surfaces can
- * appear without a reload. The durable answer still lives in main's trust store; this is the projection
- * catching up. */
-export function noteBundleAccepted(pluginId: string, hash: string): void {
-  setAcceptedBundles(new Set([...acceptedBundles(), `${pluginId} ${hash}`]))
+// Compatibility projections. The snapshot is the only mutable source of truth.
+export const installedByNode = (): ReadonlyMap<string, readonly NodePluginRow[]> =>
+  new Map([...distribution().byNode].map(([id, observation]) => [id, observation.rows]))
+export const devicePlugins = (): readonly DevicePluginEntry[] => distribution().devicePlugins
+export const pendingTrust = (): readonly PluginTrustRequest[] =>
+  distribution().pendingTrust.filter((request) => !dismissed.has(decisionKey(request.row.name, request.hash)))
+export const activeBundles = (): ReadonlyMap<string, { hash: string }> | null => {
+  if (!initialized) return null
+  const snapshot = distribution()
+  const nodeId = activeNodeId() ?? snapshot.byNode.keys().next().value
+  const selections = nodeId ? snapshot.selectionsByNode.get(nodeId) : undefined
+  const bundles = new Map([...(selections ?? [])].map(([id, selection]) => [id, { hash: selection.hash }]))
+  for (const [id, entry] of snapshot.selectedDevice) bundles.set(id, { hash: entry.hash })
+  return bundles
 }
+export const bundleAccepted = (pluginId: string, hash: string): boolean =>
+  distribution().acceptedKeys.has(decisionKey(pluginId, hash))
 
-// What the trust dialog renders. `previous` is the last bundle of this plugin the owner accepted,
-// present only when this is an update: it turns "do you trust this?" into "here is what changed".
-export type PluginTrustRequest = {
-  row: NodePluginRow
-  hash: string
-  nodeId: string
-  previous?: PluginAckRecord
+export const pluginEnabledOnNode = (nodeId: string, pluginId: string): boolean => {
+  const snapshot = distribution()
+  const local = snapshot.selectedDevice.get(pluginId)
+  if (local) return !local.row.disabled && snapshot.acceptedKeys.has(decisionKey(pluginId, local.hash))
+  return contributionAvailability(snapshot, nodeId, pluginId, PLUGIN_API_MAJOR).available
 }
-
-// The predicate phases 3 and 4 gate their surfaces on: does this node run this plugin? Deliberately
-// per-node and never ambient. A plugin enabled on the node you are looking at says nothing about the
-// node whose pane is open beside it. Sits alongside the `providerId` gate in tabs/sources.ts, which
-// answers the same shape of question for integrations.
-export const pluginEnabledOnNode = (nodeId: string, pluginId: string): boolean =>
-  (installedByNode().get(nodeId) ?? []).some((row) => row.name === pluginId && row.running)
+export const pluginServiceAvailableOnNode = (nodeId: string, pluginId: string): boolean =>
+  nodePluginServiceAvailable(distribution(), nodeId, pluginId)
 
 export type LoadedPluginState = 'enabled' | 'disabled' | 'absent'
-
 export const loadedPluginStateOnNode = (nodeId: string, pluginId: string): LoadedPluginState => {
-  const row = (installedByNode().get(nodeId) ?? []).find((candidate) => candidate.name === pluginId && candidate.installed)
-  if (!row) return 'absent'
-  return row.running ? 'enabled' : 'disabled'
+  const local = distribution().selectedDevice.get(pluginId)
+  if (local) return local.row.disabled ? 'disabled' : 'enabled'
+  const runtime = nodePluginRuntime(distribution(), nodeId, pluginId)
+  return runtime.kind === 'active' || runtime.kind === 'compiled-active' ? 'enabled'
+    : runtime.kind === 'absent' || runtime.kind === 'unknown' ? 'absent' : 'disabled'
 }
-
 export const pluginInstalledAtOnNode = (nodeId: string, pluginId: string): number | undefined =>
-  (installedByNode().get(nodeId) ?? []).find((candidate) => candidate.name === pluginId)?.installed?.installedAt
+  distribution().byNode.get(nodeId)?.rows.find((row) => row.name === pluginId)?.installed?.installedAt
 
-// Every bundle any known node is offering, as candidates for resolution.
-const candidatesFrom = (rosters: ReadonlyMap<string, readonly NodePluginRow[]>): BundleCandidate[] =>
-  [...rosters].flatMap(([nodeId, rows]) =>
-    rows.flatMap((row) =>
-      row.installed?.client
-        ? [{ pluginId: row.name, version: row.installed.version, apiVersion: row.installed.apiVersion, hash: row.installed.client.hash, nodeId }]
-        : [],
-    ),
-  )
-
-// Read one node's roster. A node that does not answer contributes nothing rather than clearing what
-// we already knew about it, the same stance node/nodePlugins.ts takes for the same reason: an
-// offline node is not a node with no plugins.
-const rosterFor = async (nodeId: string): Promise<readonly NodePluginRow[] | null> => {
-  // Asked only of a node that could answer. The same fail-fast the API client already does for a
-  // mutation (infra/node/apiClient.ts § isWritable), and here it is about noise as much as latency:
-  // this pass runs at boot, a host that draws in front of a node it just started has every node
-  // offline for the first seconds, and the catch below would print a stack per node for a question
-  // nobody could have answered.
-  if (nodeState(nodeId) === 'offline') return null
+const disabledDeviceIds = (): Set<string> => {
   try {
-    return (await readJson<NodePluginState>(corePluginsRoute, { nodeId })).plugins
-  } catch (error) {
-    log.warn(`could not read the plugin roster on ${nodeId}`, error)
-    return null
-  }
+    const list: unknown = JSON.parse(readDevicePrefs()[PrefKeys.devicePluginsDisabled] ?? '[]')
+    return new Set(Array.isArray(list) ? list.filter((id): id is string => typeof id === 'string') : [])
+  } catch { return new Set() }
 }
 
-// The boot pass: ask every node what it carries, cache anything new, and queue whatever this device
-// has never decided about.
-//
-// Fire-and-forget from the composition root. It must never fail a boot: a fleet where every node is
-// offline, or a build with no plugin host at all, simply ends with nothing pending.
-export async function syncPluginDistribution(options: { repin?: boolean } = {}): Promise<void> {
-  if (!pluginHostAvailable()) return
-
-  const rosters = new Map(installedByNode())
-  await Promise.all(
-    nodes().map(async (node) => {
-      const rows = await rosterFor(node.nodeId)
-      if (rows) rosters.set(node.nodeId, rows)
-    }),
-  )
-  setInstalledByNode(rosters)
-
-  // Fetch first, decide second. The hash the owner is asked about has to be one this device computed
-  // from bytes it holds, not one a node asserted, so a bundle is cached before it is ever named in a
-  // prompt and a node that lies about its hash is refused here rather than at the dialog.
-  const cached = new Set(Object.keys((await readPluginHostState()).cached))
-  for (const [nodeId, rows] of rosters) {
-    for (const row of rows) {
-      const client = row.installed?.client
-      if (!client || cached.has(client.hash)) continue
-      const result = await cachePluginBundle({ nodeId, pluginId: row.name, hash: client.hash, version: row.installed!.version })
-      if ('hash' in result) cached.add(result.hash)
-      else log.warn(`${row.name} from ${nodeId} was not cached: ${result.error}`, undefined, { 'plugin.id': row.name })
+export function deviceEntries(state: PluginHostState): DevicePluginEntry[] {
+  const disabled = disabledDeviceIds()
+  const entries: DevicePluginEntry[] = []
+  for (const [hash, cached] of Object.entries(state.cached)) {
+    if (cached.source?.kind !== 'device') continue
+    const parsed = pluginManifestShape.safeParse(cached.manifest)
+    if (!parsed.success || hasNodeHalf(cached.manifest) || parsed.data.id !== cached.pluginId || !parsed.data.client) {
+      log.warn(`invalid device manifest for ${cached.pluginId}; skipping bundle`)
+      continue
     }
+    const manifest = parsed.data
+    entries.push({ hash, row: {
+      name: manifest.id, required: false, disabled: disabled.has(manifest.id),
+      running: !disabled.has(manifest.id), state: disabled.has(manifest.id) ? 'disabled' : 'active',
+      emits: manifest.emits,
+      installed: {
+        version: manifest.version, apiVersion: manifest.apiVersion, permissions: manifest.permissions,
+        contributions: manifest.contributions, client: { hash, bytes: cached.bytes },
+        source: cached.sourceLabel, icon: manifest.icon, icons: manifest.icons, emits: manifest.emits,
+      },
+    }, sourceLabel: cached.sourceLabel ?? 'this device', nodeIds: cached.nodeIds ?? [], sameHashNodeIds: [], installSource: cached.installSource })
   }
-
-  // Chosen once per session and never recomputed (docs/plugins.md § The dev loop describes the one
-  // place this pin is deliberately dropped). `repin` is that exception: only the node's own
-  // "plugins changed" event asks for it (plugins/reload.ts), because a reload replaces the bytes
-  // behind a plugin id and the pinned winner would otherwise name a bundle the node no longer offers.
-  if (options.repin || !activeBundles()) {
-    setActiveBundles(resolveActiveBundles(candidatesFrom(rosters), { apiVersion: PLUGIN_API_MAJOR }))
-  }
-
-  await refreshPendingTrust(rosters)
+  return entries
 }
 
-// Everything cached that this device has never answered for. Read from the host rather than tracked
-// locally, so a decision made in a previous session is honoured without the renderer keeping its own
-// copy of the answer.
-async function refreshPendingTrust(rosters: ReadonlyMap<string, readonly NodePluginRow[]>): Promise<void> {
-  const { cached, acks } = await readPluginHostState()
-  const decided = new Set(acks.map((ack) => `${ack.pluginId}\0${ack.hash}`))
-  setAcceptedBundles(new Set(acks.filter((ack) => ack.decision === 'accepted').map((ack) => `${ack.pluginId} ${ack.hash}`)))
-  const requests: PluginTrustRequest[] = []
-  const queued = new Set<string>()
+export function onPluginDistributionCommit(listener: () => void): () => void {
+  listeners.add(listener)
+  return () => listeners.delete(listener)
+}
 
-  for (const [nodeId, rows] of rosters) {
-    for (const row of rows) {
-      const client = row.installed?.client
-      if (!client || !(client.hash in cached)) continue
-      const key = `${row.name}\0${client.hash}`
-      // One prompt per bundle, not per node offering it: the same bytes are the same decision, and
-      // the node named is simply the first one we saw them from.
-      if (decided.has(key) || queued.has(key)) continue
-      queued.add(key)
-      // `partial` rows are skipped: their snapshot is known-incomplete, so a diff against one would
-      // mark grants as newly requested that the owner had in fact already accepted. With no baseline
-      // the prompt degrades to a plain first-time decision, which is honest: it says "here is what
-      // this asks for" rather than a wrong "here is what it gained".
-      const previous = acks
-        .filter((ack) => ack.pluginId === row.name && ack.hash !== client.hash && ack.decision === 'accepted' && !ack.partial)
-        .sort((a, b) => b.decidedAt - a.decidedAt)[0]
-      requests.push({ row, hash: client.hash, nodeId, ...(previous ? { previous } : {}) })
+const activeSelectionSignature = (snapshot: PluginDistributionSnapshot): string => {
+  const nodeId = activeNodeId() ?? snapshot.byNode.keys().next().value
+  const selections = nodeId ? snapshot.selectionsByNode.get(nodeId) : undefined
+  const observation = nodeId ? snapshot.byNode.get(nodeId) : undefined
+  const runtimes = observation?.reachable && !observation.stale
+    ? observation.rows.map((row) => {
+      const runtime = runtimeIdentityForRow(row)
+      return [row.name, runtime?.version, runtime?.client?.hash, runtime?.contributions,
+        runtime ? null : row.installed?.contributions]
+    })
+    : []
+  const device = [...snapshot.selectedDevice].map(([id, entry]) => [
+    id, entry.hash, entry.row.disabled, snapshot.acceptedKeys.has(decisionKey(id, entry.hash)),
+  ])
+  return JSON.stringify([nodeId, runtimes, [...(selections ?? [])].map(([id, selection]) => [id, selection.hash]), device])
+}
+
+function publish(next: PluginDistributionSnapshot): void {
+  const previous = distribution()
+  const changed = activeSelectionSignature(previous) !== activeSelectionSignature(next)
+  const selectedKeys = (snapshot: PluginDistributionSnapshot): ReadonlySet<string> => {
+    const keys = [...snapshot.selectionsByNode.values()].flatMap((entries) =>
+      [...entries.values()].filter((selection) => selection.hash && !snapshot.selectedDevice.has(selection.pluginId))
+        .map((selection) => decisionKey(selection.pluginId, selection.hash)))
+    for (const [id, entry] of snapshot.selectedDevice) {
+      const key = decisionKey(id, entry.hash)
+      if (!entry.row.disabled && snapshot.acceptedKeys.has(key)) keys.push(key)
     }
+    return new Set(keys)
   }
-  setPendingTrust(requests)
+  const retained = selectedKeys(next)
+  for (const key of selectedKeys(previous)) if (!retained.has(key)) {
+    const [pluginId, hash] = JSON.parse(key) as [string, string]
+    stopTreeWorker({ pluginId, hash }, 'plugin selection withdrawn')
+  }
+  initialized = true
+  setDistribution(next)
+  if (changed) for (const listener of listeners) listener()
 }
 
-// Called by the dialog once a decision is recorded. Drops just that bundle, so a queue of three
-// prompts advances rather than being rebuilt from a round trip per answer.
+export function notifyActivePluginNodeChanged(): void {
+  for (const listener of listeners) listener()
+}
+
+export function markPluginNodeStale(nodeId: string): void {
+  const current = distribution()
+  const observation = current.byNode.get(nodeId)
+  if (!observation || observation.stale) return
+  const byNode = new Map(current.byNode)
+  byNode.set(nodeId, { ...observation, reachable: false, stale: true })
+  publish(derivePluginDistribution(byNode, lastHostState, current.revision + 1, PLUGIN_API_MAJOR, current.devicePlugins))
+}
+
+/** Remove a node immediately so an in-flight read cannot keep its authority alive. */
+export function forgetPluginNode(nodeId: string): void {
+  requestedGeneration++
+  const byNode = new Map(distribution().byNode)
+  if (!byNode.delete(nodeId)) return
+  const current = distribution()
+  publish(derivePluginDistribution(byNode, lastHostState, current.revision + 1, PLUGIN_API_MAJOR, current.devicePlugins))
+}
+
+async function rosterFor(nodeId: string): Promise<readonly NodePluginRow[]> {
+  return (await readJson<NodePluginState>(corePluginsRoute, { nodeId })).plugins
+}
+
+export type DistributionSyncOptions = { nodeIds?: readonly string[]; trustOnly?: boolean; deviceOnly?: boolean }
+
+/** Every input enters one serial queue. Reads publish in request order, so an older result cannot
+ * overwrite a newer one. Unpaired nodes are checked again at commit. */
+export function syncPluginDistribution(options: DistributionSyncOptions = {}): Promise<void> {
+  const generation = ++requestedGeneration
+  const pass = async (): Promise<void> => {
+    if (!pluginHostAvailable()) return
+    const previous = distribution()
+    const paired = new Set(nodes().map((node) => node.nodeId))
+    // Trust writes never change fleet membership. Keep the last observations even when a host does
+    // not expose a fleet list (the origin-node and terminal adapters).
+    if (options.trustOnly || options.deviceOnly) for (const id of previous.byNode.keys()) paired.add(id)
+    const byNode = new Map([...previous.byNode].filter(([id]) => paired.has(id)))
+    const wanted = options.trustOnly || options.deviceOnly ? new Set<string>() : new Set(options.nodeIds ?? paired)
+    for (const nodeId of paired) {
+      if (options.trustOnly || options.deviceOnly) continue
+      if (nodeState(nodeId) === 'offline') {
+        const old = byNode.get(nodeId)
+        if (old) byNode.set(nodeId, { ...old, reachable: false, stale: true })
+        continue
+      }
+      if (!wanted.has(nodeId)) continue
+      try {
+        const rows = await rosterFor(nodeId)
+        for (const row of rows) if (legacyRuntimeIdentityWithheld(row)) {
+          log.warn(`${row.name} on ${nodeId} has no provable running identity; loaded UI is withheld`)
+        }
+        byNode.set(nodeId, { nodeId, rows, reachable: true, stale: false, generation, observedAt: Date.now() })
+      } catch (error) {
+        log.warn(`could not read the plugin roster on ${nodeId}`, error)
+        const old = byNode.get(nodeId)
+        if (old) byNode.set(nodeId, { ...old, stale: true })
+      }
+    }
+    // Cache active and installed offers; caching an update never selects it.
+    const seen = new Set<string>()
+    for (const observation of options.deviceOnly ? [] : byNode.values()) {
+      if (!observation.reachable || observation.stale) continue
+      for (const row of observation.rows) {
+        const runtime = runtimeIdentityForRow(row)
+        const offers = [runtime, row.installed].filter((value) => value?.client)
+        for (const offer of offers) {
+          const hash = offer!.client!.hash
+          const sourceKey = decisionKey(observation.nodeId, hash)
+          if (seen.has(sourceKey)) continue
+          seen.add(sourceKey)
+          // Even a cached hash must be reported by this node to update provenance in custody.
+          const result = await cachePluginBundle({ nodeId: observation.nodeId, pluginId: row.name, hash, version: offer!.version })
+          if ('error' in result) log.warn(`${row.name} from ${observation.nodeId} was not cached: ${result.error}`, undefined, { 'plugin.id': row.name })
+        }
+      }
+    }
+    const host = await readPluginHostState()
+    lastHostState = host
+    const offers = [...byNode.values()].flatMap((observation) => observation.rows.flatMap((row) =>
+      [runtimeIdentityForRow(row), row.installed].filter((declaration) => declaration?.client).map((declaration) => ({
+        pluginId: row.name, nodeId: observation.nodeId, hash: declaration!.client!.hash,
+      }))))
+    const local = deviceEntries(host).map((entry) => ({
+      ...entry,
+      nodeIds: [...new Set(offers.filter((offer) => offer.pluginId === entry.row.name).map((offer) => offer.nodeId))],
+      sameHashNodeIds: [...new Set(offers.filter((offer) => offer.pluginId === entry.row.name && offer.hash === entry.hash).map((offer) => offer.nodeId))],
+    }))
+    setDevicePluginIds([...new Set(local.map((entry) => entry.row.name))])
+    const currentPaired = options.trustOnly || options.deviceOnly ? paired : new Set(nodes().map((node) => node.nodeId))
+    for (const id of byNode.keys()) if (!currentPaired.has(id)) byNode.delete(id)
+    publish(derivePluginDistribution(byNode, host, distribution().revision + 1, PLUGIN_API_MAJOR, local))
+  }
+  const result = reconcileTail.then(pass)
+  reconcileTail = result.catch((error: unknown) => log.warn('could not reconcile plugin distribution', error))
+  return result
+}
+
+/** Refresh the full snapshot after a durable trust write, before rebuilding registries. */
+export const refreshPluginTrust = async (): Promise<void> => {
+  await syncPluginDistribution({ trustOnly: true })
+}
+
 export function resolvePendingTrust(pluginId: string, hash: string): void {
-  setPendingTrust(pendingTrust().filter((request) => !(request.row.name === pluginId && request.hash === hash)))
+  dismissed.add(decisionKey(pluginId, hash))
+  setDistribution({ ...distribution() })
 }
 
-// Test seam. Standing in for a boot pass: `syncPluginDistribution` needs a plugin host, a fleet and a
-// broker, and the surfaces that read these signals (phase 3's frames, phase 4's chrome) are testable
-// without any of that.
 export function _seedPluginDistribution(
   rosters: Iterable<readonly [string, readonly NodePluginRow[]]>,
   accepted: readonly string[] = [],
 ): void {
-  const seeded = new Map(rosters)
-  setInstalledByNode(seeded)
-  setAcceptedBundles(new Set(accepted))
-  // Resolved the same way a real boot pass resolves it, because "which bundle wins" is now what
-  // decides which node's manifest a plugin's contributions come from and which bytes its trust
-  // decision is about (plugins/contributions.ts). A seam that left this null would have let the
-  // suites agree with each other about a world production never sees.
-  setActiveBundles(resolveActiveBundles(candidatesFrom(seeded), { apiVersion: PLUGIN_API_MAJOR }))
+  const byNode = new Map<string, NodePluginObservation>([...rosters].map(([nodeId, rows]) =>
+    [nodeId, { nodeId, rows, reachable: true, stale: false, generation: 1, observedAt: Date.now() }]))
+  const cached: PluginHostState['cached'] = {}
+  for (const observation of byNode.values()) for (const row of observation.rows) {
+    for (const declaration of [runtimeIdentityForRow(row), row.installed]) {
+      if (declaration?.client) cached[declaration.client.hash] = { pluginId: row.name, version: declaration.version, bytes: declaration.client.bytes }
+    }
+  }
+  const acks = accepted.map((value) => {
+    const split = value.lastIndexOf(' ')
+    const pluginId = value.slice(0, split)
+    const hash = value.slice(split + 1)
+    const declaration = [...byNode.values()].flatMap((observation) => observation.rows)
+      .filter((row) => row.name === pluginId)
+      .flatMap((row) => [runtimeIdentityForRow(row), row.installed])
+      .find((offer) => offer?.client?.hash === hash)
+    return { pluginId, hash, decision: 'accepted', ...(declaration ? { declaration: clientDeclaration(declaration) } : {}) } as PluginAckRecord
+  })
+  initialized = true
+  dismissed.clear()
+  lastHostState = { cached, acks, devGrants: [] }
+  setDistribution(derivePluginDistribution(byNode, lastHostState, distribution().revision + 1, PLUGIN_API_MAJOR))
+}
+
+/** Test seam for provenance arbitration and device enablement at the shared contribution gate. */
+export function _seedDevicePluginDistribution(entries: readonly DevicePluginEntry[]): void {
+  setDevicePluginIds(entries.map((entry) => entry.row.name))
+  const current = distribution()
+  const cached = { ...lastHostState.cached }
+  for (const entry of entries) cached[entry.hash] = {
+    pluginId: entry.row.name, version: entry.row.installed!.version, bytes: entry.row.installed!.client?.bytes ?? 0,
+  }
+  const acks = lastHostState.acks.map((ack) => {
+    const entry = entries.find((candidate) => candidate.row.name === ack.pluginId && candidate.hash === ack.hash)
+    return entry?.row.installed && ack.decision === 'accepted'
+      ? { ...ack, declaration: clientDeclaration(entry.row.installed) } : ack
+  })
+  lastHostState = { ...lastHostState, cached, acks }
+  publish(derivePluginDistribution(current.byNode, lastHostState, current.revision + 1, PLUGIN_API_MAJOR, entries))
 }
 
 // Test seam, for the half of the boot pass above that `_seedPluginDistribution` does not stand in for:
 // the queue the trust dialog drains. What is worth asserting about an answer is which entry it
 // removes, and, when the host could not store it, that it removes none.
 export function _seedPendingTrust(requests: readonly PluginTrustRequest[]): void {
-  setPendingTrust(requests)
+  dismissed.clear()
+  setDistribution({ ...distribution(), pendingTrust: requests })
 }
 
-// Test seam. The signals are module-level because the registries they feed are, and a suite that
-// asserts on one run must not inherit the previous one's fleet.
 export function _resetPluginDistribution(): void {
-  setInstalledByNode(new Map())
-  setPendingTrust([])
-  setActiveBundles(null)
-  setAcceptedBundles(new Set<string>())
+  setDevicePluginIds([])
+  requestedGeneration++
+  initialized = false
+  dismissed.clear()
+  lastHostState = emptyHost()
+  setDistribution(emptySnapshot())
 }

@@ -9,9 +9,9 @@ import type { DockerBridge } from '../server/routes/docker'
 import type { WsServerFrame } from '@acorn/protocol/ws.ts'
 import type { DockerComposeAction, DockerContainerAction, DockerContainerSummary, DockerPruneKind, DockerTaskSummary } from '../shared/model'
 import { docker, DockerCliError } from './cli'
-import { loadDockerOverrides } from './dockerConfig'
-import { containerMatchesTask } from './matcher'
-import { parseInspectOutput } from './parse'
+import { loadDockerLayers, loadDockerOverrides } from './dockerConfig'
+import { containerBelongsToTask, containerMatchesTask } from './matcher'
+import { parseInspectOutput, parsePsOutput } from './parse'
 import { getDockerService } from './dockerService'
 
 function toBridgeError(err: unknown): never {
@@ -28,10 +28,10 @@ const run = async <T>(fn: () => Promise<T>): Promise<T> => fn().catch(toBridgeEr
 
 const isActive = (c: DockerContainerSummary): boolean => c.state === 'running' || c.state === 'paused' || c.state === 'restarting'
 
-// `tasks` is a core table and this plugin owns none, so its two task reads, one id and the whole
-// active set for the rail badge, come through the core service rather than a db handle
-// (docs/data-layer.md § Plugin databases).
-export type DockerCoreServices = Pick<CoreServices, 'tasks'>
+// `tasks` and `projects` are core tables and this plugin owns none, so its task reads, one id and the
+// whole active set for the rail badge, and the one project read for its settings tab come through the
+// core services rather than a db handle (docs/data-layer.md § Plugin databases).
+export type DockerCoreServices = Pick<CoreServices, 'tasks' | 'projects'>
 
 export function dockerBridge(core: DockerCoreServices, broadcast?: (frame: WsServerFrame) => void): DockerBridge {
   const service = getDockerService(broadcast)
@@ -39,8 +39,7 @@ export function dockerBridge(core: DockerCoreServices, broadcast?: (frame: WsSer
   async function linkedContainers(taskId: string): Promise<DockerContainerSummary[]> {
     const task = await core.tasks.load(taskId)
     if (!task) throw new BridgeError(404, 'task_not_found')
-    const overrides = await loadDockerOverrides(task.worktreePath)
-    return (await service.containers()).filter((c) => containerMatchesTask(c, task, overrides))
+    return (await service.containers()).filter((c) => containerBelongsToTask(c, task))
   }
 
   // Decorate summaries with the stale signal: the compose working_dir no longer exists on disk. One
@@ -124,18 +123,34 @@ export function dockerBridge(core: DockerCoreServices, broadcast?: (frame: WsSer
     }),
     taskContainers: (taskId) => run(() => linkedContainers(taskId)),
     taskTeardown: (taskId) => run(async () => {
-      // Compose projects get `compose -p <project> down`: compose reconstructs the project from
-      // labels, so no compose file is needed and it works after the worktree is gone. Loose linked
-      // containers are stopped. Volumes are kept (no -v): this reclaims RAM, not data.
-      const matched = await linkedContainers(taskId)
-      const projects = [...new Set(matched.flatMap((c) => (c.composeProject ? [c.composeProject] : [])))]
-      const loose = matched.filter((c) => !c.composeProject && isActive(c))
-      for (const project of projects) await docker(['compose', '-p', project, 'down'], { timeout: 180_000 })
-      for (const c of loose) await docker(['stop', c.id], { timeout: 60_000 })
-      service.invalidate('containers')
+      const task = await core.tasks.load(taskId)
+      if (!task) throw new BridgeError(404, 'task_not_found')
+      // Refresh full immutable IDs for mutations; cached display IDs and project names are not
+      // action scope. A shared Compose project name cannot widen this task's cleanup to other roots.
+      const matched = parsePsOutput(await docker(['ps', '-a', '--no-trunc', '--format', '{{json .}}']))
+        .filter((c) => containerBelongsToTask(c, task))
+      if (matched.some((c) => !/^[a-f0-9]{64}$/.test(c.id))) throw new BridgeError(422, 'docker_invalid_container_id')
+      try {
+        for (const c of matched) {
+          if (c.state === 'paused') await docker(['unpause', c.id], { timeout: 60_000 })
+          if (isActive(c)) await docker(['stop', c.id], { timeout: 60_000 })
+          // Retain old Compose removal / loose-container stop semantics without deleting shared
+          // networks or volumes (-v). Never force-remove a container restarted during cleanup.
+          if (c.composeProject) await docker(['rm', c.id], { timeout: 60_000 })
+        }
+      } finally {
+        service.invalidate('containers')
+      }
       // Anyone holding state keyed to these containers (a port manager, a preview) wants this.
       broadcast?.({ channel: pluginChannel('docker', 'task-teardown'), taskId })
       return { ok: true as const }
     }),
+    // The project's own checkout, not a task's worktree: the settings page describes the project, and
+    // a worktree's copy of the file is the branch's business.
+    projectMatcher: async (projectId) => {
+      const project = await core.projects.byId(projectId)
+      if (!project) throw new BridgeError(404, 'project_not_found')
+      return loadDockerLayers(project.path)
+    },
   }
 }

@@ -19,11 +19,11 @@
   ],
   "license": "MIT",
   "scripts": {
-    "test": "vitest run index.test.ts"
+    "test": "vitest run"
   },
   "devDependencies": {
     "@acorn/node-core": "workspace:*",
     "@acorn/protocol": "workspace:*",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.11"
   }
 }

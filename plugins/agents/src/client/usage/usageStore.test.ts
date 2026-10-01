@@ -22,6 +22,7 @@ describe('agent usage store', () => {
     const client: AgentUsageClient = {
       read: vi.fn(async () => snapshot(Date.now())),
       refresh: vi.fn(async () => snapshot(Date.now())),
+      refreshProvider: vi.fn(async () => snapshot(Date.now())),
     }
     const store = createAgentUsageStore(client)
     const firstCleanup = store.init()
@@ -44,6 +45,7 @@ describe('agent usage store', () => {
     const client: AgentUsageClient = {
       read: () => initial.promise,
       refresh: () => forced.promise,
+      refreshProvider: () => forced.promise,
     }
     const store = createAgentUsageStore(client)
     const cleanup = store.init()
@@ -63,12 +65,32 @@ describe('agent usage store', () => {
       refresh: async () => {
         throw new Error('bridge unavailable')
       },
+      refreshProvider: async () => snapshot(2),
     }
     const store = createAgentUsageStore(client)
     await store.ensure()
     await store.refresh()
     expect(store.snapshot()?.refreshedAt).toBe(1)
     expect(store.error()).toBe('bridge unavailable')
+    expect(store.refreshing()).toBe(false)
+  })
+
+  it('refreshes only the requested provider and clears its busy state', async () => {
+    const claude = deferred<AgentUsageSnapshot>()
+    const client: AgentUsageClient = {
+      read: async () => snapshot(1),
+      refresh: async () => snapshot(2),
+      refreshProvider: vi.fn(() => claude.promise),
+    }
+    const store = createAgentUsageStore(client)
+    await store.ensure()
+    const refreshing = store.refreshProvider('claude')
+    expect(client.refreshProvider).toHaveBeenCalledWith('claude')
+    expect(store.refreshingProviderId()).toBe('claude')
+    claude.resolve(snapshot(3))
+    await refreshing
+    expect(store.snapshot()?.refreshedAt).toBe(3)
+    expect(store.refreshingProviderId()).toBeNull()
     expect(store.refreshing()).toBe(false)
   })
 })

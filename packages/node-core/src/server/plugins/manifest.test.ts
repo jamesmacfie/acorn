@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { THEME_PALETTE_TOKENS } from '@acorn/protocol/themeTokens.ts'
 import { parsePluginManifest, pluginManifestSchema } from './manifest'
+import { testCliCommandDescriptor } from '../../testkit/runtimeContributions'
 
 // The declarative-chrome half of the manifest (docs/plugins.md).
 //
@@ -33,6 +34,38 @@ const nodeManifest = (contributions: Record<string, unknown>) =>
   pluginManifestSchema.safeParse({
     id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1', node: './dist/node.js', contributions,
   })
+
+describe('CLI command declarations', () => {
+  const command = testCliCommandDescriptor()
+  const parse = (cliCommands: unknown[], core = ['tasks']) => pluginManifestSchema.safeParse({
+    id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '1',
+    node: './dist/node.js', permissions: { node: { core } }, contributions: { cliCommands },
+  })
+
+  it('accepts a bounded read and a described write in its own command namespace', () => {
+    expect(parse([command, testCliCommandDescriptor({
+      name: 'set', title: 'Set probe', summary: 'Set a fixture value.', effects: 'Replaces only the fixture probe value.',
+      risk: 'write', route: { method: 'POST', path: '/cli/set' },
+    })]).success).toBe(true)
+  })
+
+  it('rejects duplicates, cross-route references and undeclared capabilities', () => {
+    expect(parse([command, command]).success).toBe(false)
+    expect(parse([testCliCommandDescriptor({ route: { method: 'POST', path: '/v1/core/tasks' } })]).success).toBe(false)
+    expect(parse([testCliCommandDescriptor({ route: { method: 'POST', path: '/cli/other' } })]).success).toBe(false)
+    expect(parse([testCliCommandDescriptor({ name: 'commands', route: { method: 'POST', path: '/cli/commands' } })]).success).toBe(false)
+    expect(parse([command], []).success).toBe(false)
+    expect(parse([testCliCommandDescriptor({ capability: 'future:root' })], ['future:root']).success).toBe(false)
+    for (const name of ['trailing-', 'double--hyphen']) {
+      expect(parse([testCliCommandDescriptor({ name, route: { method: 'POST', path: `/cli/${name}` } })]).success).toBe(false)
+    }
+  })
+
+  it('requires a write effect and rejects unbounded schema language', () => {
+    expect(parse([testCliCommandDescriptor({ risk: 'write' })]).success).toBe(false)
+    expect(parse([testCliCommandDescriptor({ inputSchema: { type: 'object', $ref: 'https://hostile.test/schema' } })]).success).toBe(false)
+  })
+})
 
 const webviewManifest = (contributions: Record<string, unknown>) =>
   pluginManifestSchema.safeParse({
@@ -484,7 +517,39 @@ describe('migration entrypoint confinement', () => {
   })
 })
 
+describe('rail visibility', () => {
+  const SOURCE = { id: 'board', label: 'Board', order: 60, items: '/v1/p/board/items', showInRailByDefault: false }
+  const SETTINGS = { target: 'settings', id: 'board-settings', label: 'Board', layout: 'single', regions: { body: 'frame' } }
+
+  it('accepts a hidden-by-default source and a settings page that carries its switch', () => {
+    const result = manifest({ sources: [SOURCE], frames: [{ ...SETTINGS, railSourceVisibility: ['board'] }] })
+    expect(messages(result)).toEqual([])
+    expect(result.success && result.data.contributions.sources[0]?.showInRailByDefault).toBe(false)
+  })
+
+  // Reported rather than refused, so one bad id never costs the plugin its page. The report itself is
+  // checked with the other settings keys above.
+  it('keeps a settings page whose switch names a source this manifest does not declare', () => {
+    const result = manifest({ sources: [SOURCE], frames: [{ ...SETTINGS, railSourceVisibility: ['github'] }] })
+    expect(messages(result)).toEqual([])
+  })
+
+  it('refuses the field anywhere but a settings page', () => {
+    expect(messages(manifest({ sources: [SOURCE], frames: [{ ...PANE, railSourceVisibility: ['board'] }] })))
+      .toContain('railSourceVisibility is only valid on a settings surface')
+  })
+})
+
 describe('chrome descriptors', () => {
+  it('accepts a client-only remote-tree source and requires both regions', () => {
+    const source = { id: 'board', label: 'Board', order: 60, tree: { list: 'boardList', detail: 'boardDetail' } }
+    expect(webviewManifest({ sources: [source] }).success).toBe(true)
+    expect(messages(manifest({ sources: [source] }))).toContain('a remote-tree source requires a client bundle')
+    expect(messages(webviewManifest({ sources: [{ ...source, items: '/v1/p/board/items' }] })))
+      .toContain('a source needs either an items route or a remote tree')
+    expect(messages(webviewManifest({ sources: [{ ...source, tree: { list: 'boardList' } }] }))).not.toEqual([])
+  })
+
   it('accepts a chrome-only manifest with no frames at all', () => {
     const result = manifest({
       sources: [{ id: 'board', label: 'Board', glyph: 'kanban', order: 60, items: '/v1/p/board/rail-items' }],
@@ -1299,6 +1364,23 @@ describe('themes', () => {
   })
 })
 
+describe('styles', () => {
+  const style = (tokens: Record<string, string>) => ({ id: 'dense', label: 'Dense', tokens })
+
+  it('accepts a partial pack and rejects unsafe or out-of-family values', () => {
+    expect(manifest({ styles: [style({ '--row-h': '28px', '--font-mono': '"JetBrains Mono", monospace' })] }).success).toBe(true)
+    for (const [token, value] of [
+      ['--row-h', 'url(https://example.com/x)'],
+      ['--space-1', 'var(--shadow-1)'],
+      ['--shadow-2', '0 4px 8px #000'],
+      ['--gap-row', '5px'],
+      ['--unknown', '1px'],
+    ]) {
+      expect(manifest({ styles: [style({ [token]: value })] }).success, `${token}: ${value}`).toBe(false)
+    }
+  })
+})
+
 describe('slots', () => {
   const slot = (over: Record<string, unknown> = {}) =>
     ({ id: 'board-badge', slot: 'footer', data: '/v1/p/board/badge', ...over })
@@ -1458,8 +1540,28 @@ describe('extensions', () => {
     ({ id: 'board-issues', point: 'tracker:card-links', label: 'Issues', items: '/v1/p/board/issues', ...over })
 
   it('accepts a contribution naming another plugin’s point, and defaults its order', () => {
-    const parsed = manifest({ extensions: [extension()] })
+    const parsed = nodeManifest({ extensions: [extension()] })
     expect(parsed.success && parsed.data.contributions.extensions[0]!.order).toBe(500)
+  })
+
+  it('requires a node bundle for items and route carriers', () => {
+    expect(messages(manifest({ extensions: [extension()] })))
+      .toContain('an items extension calls a node route; declare `node` in the manifest')
+    expect(messages(manifest({ extensions: [extension({ items: undefined, route: '/v1/p/board/check', mode: 'observe' })] })))
+      .toContain('a route extension calls a node route; declare `node` in the manifest')
+
+    expect(nodeManifest({ extensions: [extension()] }).success).toBe(true)
+    expect(nodeManifest({ extensions: [extension({ items: undefined, route: '/v1/p/board/check', mode: 'observe' })] }).success).toBe(true)
+  })
+
+  it('keeps remote and frame carriers independent of the node bundle', () => {
+    expect(webviewManifest({
+      extensions: [extension({ items: undefined, remote: 'card' })],
+    }).success).toBe(true)
+    expect(webviewManifest({
+      frames: [{ target: 'inline', id: 'preview', label: 'Preview' }],
+      extensions: [extension({ items: undefined, frame: 'preview' })],
+    }).success).toBe(true)
   })
 
   it('refuses a point reference that is not one', () => {
@@ -1485,7 +1587,7 @@ describe('extensions', () => {
     expect(manifest({ extensions: [extension({ onSelect: { verb: 'createTask' } })] }).success).toBe(false)
     expect(messages(manifest({ extensions: [extension({ onSelect: { verb: 'openPane', pane: 'ghost' } })] })))
       .toContain("openPane names 'ghost', which this manifest does not declare as a task-scoped pane")
-    expect(manifest({
+    expect(nodeManifest({
       frames: [PANE],
       extensions: [extension({ onSelect: { verb: 'openPane', pane: 'board' } })],
     }).success).toBe(true)
@@ -1494,9 +1596,9 @@ describe('extensions', () => {
   it('caps the list and counts its ids in the one-id-per-contribution rule', () => {
     // Sixteen since the one key grew from rows to five kinds: a plugin that opens a pane, a slot in it,
     // a hook before it acts and an annotation on its rows is describing one integration, not four.
-    expect(manifest({ extensions: Array.from({ length: 16 }, (_, i) => extension({ id: `e-${i}` })) }).success).toBe(true)
-    expect(manifest({ extensions: Array.from({ length: 17 }, (_, i) => extension({ id: `e-${i}` })) }).success).toBe(false)
-    expect(messages(manifest({ extensions: [extension(), extension()] }))).toContain("duplicate contribution id 'board-issues'")
+    expect(nodeManifest({ extensions: Array.from({ length: 16 }, (_, i) => extension({ id: `e-${i}` })) }).success).toBe(true)
+    expect(nodeManifest({ extensions: Array.from({ length: 17 }, (_, i) => extension({ id: `e-${i}` })) }).success).toBe(false)
+    expect(messages(nodeManifest({ extensions: [extension(), extension()] }))).toContain("duplicate contribution id 'board-issues'")
   })
 })
 
@@ -1544,7 +1646,7 @@ describe('the five kinds', () => {
 
   it('makes a contribution name exactly one way in', () => {
     const extension = (over: Record<string, unknown>) =>
-      manifest({ frames: [PANE], extensions: [{ id: 'e', point: 'other:p', label: 'E', ...over }] })
+      nodeManifest({ frames: [PANE], extensions: [{ id: 'e', point: 'other:p', label: 'E', ...over }] })
     expect(extension({ items: '/v1/p/board/rows' }).success).toBe(true)
     expect(messages(extension({}))).toContain('an extension names exactly one of items, remote, frame or route')
     expect(messages(extension({ items: '/v1/p/board/rows', route: '/v1/p/board/hook', mode: 'veto' })))
@@ -1553,7 +1655,7 @@ describe('the five kinds', () => {
 
   it('makes a hook handler say what it asks to do, and refuses a mode on anything else', () => {
     const extension = (over: Record<string, unknown>) =>
-      manifest({ frames: [PANE], extensions: [{ id: 'e', point: 'other:p', label: 'E', ...over }] })
+      nodeManifest({ frames: [PANE], extensions: [{ id: 'e', point: 'other:p', label: 'E', ...over }] })
     expect(extension({ route: '/v1/p/board/scan', mode: 'veto' }).success).toBe(true)
     expect(messages(extension({ route: '/v1/p/board/scan' })))
       .toContain('a hook handler says what it asks to do: observe, transform or veto')
@@ -1604,9 +1706,17 @@ describe('the exclusive slot', () => {
   })
 
   it('refuses a core surface this acorn has not designated', () => {
-    expect(withBundle({ frames: [coreSlot({ coreSlot: 'topbar' })] }).success).toBe(false)
+    expect(withBundle({ frames: [coreSlot({ coreSlot: 'sidebar.future' })] }).success).toBe(false)
     expect(messages(withBundle({ frames: [coreSlot({ coreSlot: undefined })] })))
       .toContain('a coreSlot surface must name which core surface it replaces')
+  })
+
+  it('requires a remote tree for a pane switcher replacement', () => {
+    expect(messages(withBundle({ frames: [coreSlot({ coreSlot: 'pane.switcher' })] })))
+      .toContain('pane.switcher needs a single remote-tree body')
+    expect(messages(withBundle({ frames: [coreSlot({
+      coreSlot: 'pane.switcher', layout: 'single', regions: { body: { kind: 'remote', entry: 'switcher' } },
+    })] }))).toEqual([])
   })
 
   it('needs a client bundle, because the host mounts one here', () => {
@@ -1660,6 +1770,61 @@ describe('forward compatibility: unknown is retained and reported', () => {
     expect(result.ok && 'widgets' in result.manifest).toBe(false)
   })
 
+  it('keeps a settings page whose group or scope it does not offer, and names the value', () => {
+    // `plugins` is a group only core fills, and `galaxy` is no scope at all. Either one refused would
+    // drop the whole plugin over where one page is filed.
+    const settings = (extra: Record<string, unknown>) => ({
+      target: 'settings', id: 'board-settings', label: 'Board', layout: 'single', regions: { body: 'frame' }, ...extra,
+    })
+    const result = parse({ contributions: { frames: [settings({ category: 'plugins', settingsScope: 'galaxy' }), settings({ id: 'board-more', category: 'agents' })] } })
+    expect(result.ok && result.manifest.contributions.frames.map((frame) => [frame.id, frame.category, frame.settingsScope]))
+      .toEqual([['board-settings', undefined, undefined], ['board-more', 'agents', undefined]])
+    expect(result.ok && [...result.unknown].sort()).toEqual([
+      'contributions.frames.board-settings.category: plugins',
+      'contributions.frames.board-settings.settingsScope: galaxy',
+    ])
+  })
+
+  it('keeps a settings page whose search lists are past the limit, without those lists, and says so', () => {
+    const settings = (extra: Record<string, unknown>) => ({
+      target: 'settings', id: 'board-settings', label: 'Board', layout: 'single', regions: { body: 'frame' }, ...extra,
+    })
+    const words = Array.from({ length: 17 }, (_, index) => `word${index}`)
+    const result = parse({ contributions: { frames: [
+      settings({ keywords: words, sections: [{ id: 'bad id', label: 'Nope' }] }),
+      settings({ id: 'board-more', keywords: ['cards'], sections: [{ id: 'columns', label: 'Columns', keywords: ['lanes'] }] }),
+      // Two sections with one id: a link could reach only one of them.
+      settings({ id: 'board-twice', sections: [{ id: 'columns', label: 'Columns' }, { id: 'columns', label: 'Lanes' }] }),
+    ] } })
+    expect(result.ok && result.manifest.contributions.frames.map((frame) => [frame.id, frame.keywords, frame.sections])).toEqual([
+      ['board-settings', undefined, undefined],
+      ['board-more', ['cards'], [{ id: 'columns', label: 'Columns', keywords: ['lanes'] }]],
+      ['board-twice', undefined, undefined],
+    ])
+    expect(result.ok && [...result.unknown].sort()).toEqual([
+      'contributions.frames.board-settings.keywords: not accepted (at most 16 entries, each a short string)',
+      'contributions.frames.board-settings.sections: not accepted (at most 16 entries, each a short string or { id, label, keywords } with an id of its own)',
+      'contributions.frames.board-twice.sections: not accepted (at most 16 entries, each a short string or { id, label, keywords } with an id of its own)',
+    ])
+  })
+
+  it('keeps a settings page whose rail switch names a source the plugin does not own, and says which', () => {
+    const settings = (extra: Record<string, unknown>) => ({
+      target: 'settings', id: 'board-settings', label: 'Board', layout: 'single', regions: { body: 'frame' }, ...extra,
+    })
+    const board = { id: 'board', label: 'Board', order: 50, items: '/v1/p/board/items' }
+    const result = parse({ contributions: {
+      sources: [board],
+      frames: [settings({ railSourceVisibility: ['board', 'home', 'github'] })],
+    } })
+    // The page and its own source's switch survive. The core source and another plugin's are named.
+    expect(result.ok && result.manifest.contributions.frames[0]?.railSourceVisibility).toEqual(['board', 'home', 'github'])
+    expect(result.ok && [...result.unknown].sort()).toEqual([
+      "contributions.frames.board-settings.railSourceVisibility: 'github' is not one of this plugin's sources",
+      "contributions.frames.board-settings.railSourceVisibility: 'home' is not one of this plugin's sources",
+    ])
+  })
+
   it('reports nothing for a manifest this build understands completely', () => {
     expect(parse({ contributions: { commands: [] } })).toMatchObject({ ok: true, unknown: [] })
   })
@@ -1689,5 +1854,20 @@ describe('declared dependencies', () => {
 
   it('refuses a range that is not the majors-only grammar', () => {
     expect(requires([{ id: 'agents', version: '^1.2.0' }]).success).toBe(false)
+  })
+})
+
+it('reports cross-field errors in author-facing order with their descriptor paths', () => {
+  const result = parsePluginManifest({
+    id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '2',
+    requires: { plugins: [{ id: 'board' }] },
+    contributions: {
+      frames: [{ target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com', hosts: ['docs.example.com'] }],
+      commands: [{ id: 'open', kind: 'action', title: 'Open', action: { verb: 'openPane', pane: 'missing' } }],
+    },
+  })
+  expect(result).toEqual({
+    ok: false,
+    reason: 'acorn-plugin.json does not match the manifest schema — requires.plugins[0].id: a plugin cannot require itself; contributions.frames[0]: a webview surface needs a client bundle; declare `client` in the manifest; contributions.commands[0].action.pane: openPane names \'missing\', which this manifest does not declare as a task-scoped pane',
   })
 })

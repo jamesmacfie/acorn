@@ -4,12 +4,13 @@ import { Hono } from 'hono'
 import { bodyLimit } from 'hono/body-limit'
 import { createMiddleware } from 'hono/factory'
 import { z } from 'zod'
-import { type AppEnv, isTaskConfined, mayActOnTask, respondError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
+import { type AppEnv, isTaskConfined, mayActOnTask, requireDevice, respondError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 import type {
   AgentEventPage,
   AgentAttachment,
   AgentArtifact,
   AgentDeleteResult,
+  AgentFootprint,
   AgentProviderDescriptor,
   AgentRequest,
   AgentSession,
@@ -29,6 +30,7 @@ import {
   type EnqueueAgentTurnInput,
   type ImportAgentTranscriptInput,
 } from '../../shared/schemas'
+import { agentMcpSessionSelectionSchema, type AgentSessionMcp } from '../../shared/mcpServers'
 
 export type ManagedAgentsBridge = {
   // Ownership resolvers for the task-scope guard below. See docs/security.md § Transport and auth.
@@ -42,6 +44,9 @@ export type ManagedAgentsBridge = {
   taskIdForAttachment(attachmentId: string): Promise<string | null>
   taskIdForArtifact(artifactId: string): Promise<string | null>
   providers(force?: boolean): Promise<AgentProviderDescriptor[]>
+  // Settings > Storage and memory. Node-wide, like `runs`.
+  footprint(): Promise<AgentFootprint>
+  stopIdleNow(): Promise<{ stopped: number }>
   // The merged run list's source for this plugin (@acorn/protocol/runs.ts). Node-wide by construction.
   runs(): Promise<{ runs: RunRowInput[] }>
   uploadAttachment(taskId: string, filename: string, mediaType: string, bytes: Uint8Array): Promise<AgentAttachment>
@@ -66,12 +71,15 @@ export type ManagedAgentsBridge = {
   snapshot(sessionId: string, afterSeq?: number, eventLimit?: number, foldTools?: boolean): Promise<AgentSessionSnapshot>
   events(sessionId: string, afterSeq?: number, limit?: number, foldTools?: boolean): Promise<AgentEventPage>
   enqueueTurn(sessionId: string, input: EnqueueAgentTurnInput): Promise<AgentTurn>
+  implementCodexPlan(sessionId: string, itemId: string): Promise<AgentTurn>
   patchQueuedTurn(sessionId: string, turnId: string, patch: { input?: AgentTurn['input']; ordinal?: number }): Promise<AgentTurn>
   cancelTurn(sessionId: string, turnId?: string): Promise<void>
   resolveRequest(sessionId: string, requestId: string, resolution: unknown, idempotencyKey: string): Promise<AgentRequest>
   patchSession(sessionId: string, patch: { title?: string; archived?: boolean; lastReadSeq?: number; config?: Record<string, unknown> }): Promise<AgentSession>
   fork(sessionId: string, title?: string): Promise<AgentSession>
   compact(sessionId: string): Promise<void>
+  sessionMcp(sessionId: string): Promise<AgentSessionMcp>
+  setSessionMcp(sessionId: string, enabled: string[]): Promise<AgentSessionMcp>
   regenerateTitle(sessionId: string): Promise<AgentSession>
   deleteSession(sessionId: string): Promise<AgentDeleteResult>
   handoffToTerminal(sessionId: string): Promise<AgentSession>
@@ -110,6 +118,7 @@ const pageQuerySchema = z.object({
 const exportQuerySchema = z.object({ format: z.enum(['json', 'markdown']).default('json') })
 const forkBodySchema = z.object({ title: z.string().trim().min(1).max(500).optional() })
 const cancelBodySchema = z.object({ turnId: z.string().uuid().optional() })
+const implementPlanBodySchema = z.object({ itemId: z.string().min(1).max(2_000) })
 const attachmentQuerySchema = z.object({ taskId: z.string().uuid() })
 const idempotencyKey = (headers: Headers): string | null => {
   const key = headers.get('idempotency-key')?.trim()
@@ -151,6 +160,20 @@ export const managedAgents = new Hono<AppEnv>()
     maxSize: 12 * 1024 * 1024,
     onError: (c) => respondError(c, 413, 'request_too_large'),
   }))
+  // Renderer execution controls require owner authority, independently of session ownership.
+  // Register before the ownership resolvers so denied callers cannot reach any runtime operation.
+  // Agent execution uses the guarded delegation/workflow capabilities, never these HTTP controls.
+  .on('GET', ['/providers', '/sessions/:sessionId/mcp'], requireDevice)
+  .on('PUT', ['/sessions/:sessionId/mcp'], requireDevice)
+  .on('POST', [
+    '/sessions', '/transcript-imports', '/sessions/:sessionId/turns',
+    '/sessions/:sessionId/implement-plan', '/sessions/:sessionId/requests/:requestId/resolve',
+    '/sessions/:sessionId/fork', '/sessions/:sessionId/compact',
+    '/sessions/:sessionId/regenerate-title', '/sessions/:sessionId/handoff-terminal',
+    '/sessions/:sessionId/resume-managed', '/sessions/:sessionId/verify-imported-resume',
+  ], requireDevice)
+  .on('PATCH', ['/sessions/:sessionId', '/sessions/:sessionId/turns/:turnId'], requireDevice)
+  .on('DELETE', ['/sessions/:sessionId'], requireDevice)
   // One mount per id kind. Hono's trailing `/*` matches zero segments, so `/sessions/:sessionId/*`
   // already covers `/sessions/:sessionId` itself.
   //
@@ -162,15 +185,22 @@ export const managedAgents = new Hono<AppEnv>()
   .use('/attachments/:attachmentId/*', owns('attachmentId', (b, id) => b.taskIdForAttachment(id)))
   .use('/artifacts/:artifactId/*', owns('artifactId', (b, id) => b.taskIdForArtifact(id)))
   // This plugin's contribution to core's merged run list (@acorn/protocol/runs.ts). Read by the node
-  // with no client and no request in sight, so it takes no params and answers node-wide; core filters
-  // the merged answer for a confined caller, which is why there is no `confineFilter` here.
+  // with service authority, so it takes no params and answers node-wide. Task callers use core's
+  // filtered merged run list and cannot read this unfiltered source directly.
   //
   // A session is a run: it starts, takes time, spends money, and ends. Cost is not on the row —
   // it lives per turn inside `usage_json`, and parsing every turn's JSON to draw a list is the wrong
   // trade. The field is optional in the run shape for exactly this case.
-  .get('/runs', (c) => viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.runs()))
+  .get('/runs', (c) => isTaskConfined(c)
+    ? respondError(c, 403, 'forbidden')
+    : viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.runs()))
   .get('/providers', (c) =>
     viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.providers(c.req.query('force') === 'true')))
+  // Settings > Storage and memory (docs/managed-agents.md § Operations and failure). Device only: the
+  // numbers cover every task's agents, and the stop reaches every task's processes, so neither is
+  // something a task-scoped agent may ask for.
+  .get('/footprint', requireDevice, (c) => viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.footprint()))
+  .post('/stop-idle', requireDevice, (c) => viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.stopIdleNow()))
   .post('/attachments', async (c) => {
     const parsed = attachmentQuerySchema.safeParse(c.req.query())
     if (!parsed.success) return respondError(c, 400, 'bad_request')
@@ -267,7 +297,10 @@ export const managedAgents = new Hono<AppEnv>()
     // Spawning a provider CLI in a worktree: the taskId is in the body, so this is the check no mount
     // can make. Without it a task-scoped agent starts sessions in any task.
     if (!mayActOnTask(c, parsed.data.taskId)) return respondError(c, 404, 'not_found')
-    return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.createSession(parsed.data, key))
+    // A custom agent's snapshot is the node's to write, from `customAgentId`. One a client put in
+    // `config` itself would reach the agent's system prompt unread, so it is dropped here.
+    const { customAgent: _unread, ...config } = parsed.data.config
+    return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.createSession({ ...parsed.data, config }, key))
   })
   .post('/transcript-imports', async (c) => {
     const parsed = importAgentTranscriptSchema.safeParse(await c.req.json().catch(() => null))
@@ -303,6 +336,12 @@ export const managedAgents = new Hono<AppEnv>()
     )
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.enqueueTurn(c.req.param('sessionId'), parsed.data))
+  })
+  .post('/sessions/:sessionId/implement-plan', async (c) => {
+    const parsed = implementPlanBodySchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, MANAGED_AGENTS, (bridge) =>
+      bridge.implementCodexPlan(c.req.param('sessionId'), parsed.data.itemId))
   })
   .patch('/sessions/:sessionId/turns/:turnId', async (c) => {
     const parsed = patchQueuedTurnSchema.safeParse(await c.req.json().catch(() => null))
@@ -344,6 +383,15 @@ export const managedAgents = new Hono<AppEnv>()
       await bridge.compact(c.req.param('sessionId'))
       return { ok: true }
     }))
+  // Device only, for the reason Settings → MCP servers is (./mcpServers.ts): the switches decide which
+  // commands the session's next start runs, and an agent must not pick its own.
+  .get('/sessions/:sessionId/mcp', requireDevice, (c) =>
+    viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.sessionMcp(c.req.param('sessionId'))))
+  .put('/sessions/:sessionId/mcp', requireDevice, async (c) => {
+    const parsed = agentMcpSessionSelectionSchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.setSessionMcp(c.req.param('sessionId'), parsed.data.enabled))
+  })
   .post('/sessions/:sessionId/regenerate-title', (c) =>
     viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.regenerateTitle(c.req.param('sessionId'))))
   .post('/sessions/:sessionId/handoff-terminal', (c) =>

@@ -2,8 +2,8 @@
 // helpers.
 //
 // A frame has no network (`connect-src 'none'`), so there is no `readJson` and no CSRF envelope. Every
-// call is a message on the one MessagePort, and the host checks the path against this plugin's own
-// namespace before forwarding it (client-core/host/frames/scopes.ts).
+// call is a message on the mounted tree's bridge, and the host checks the path against this plugin's
+// own namespace before forwarding it (client-core/host/frames/scopes.ts).
 //
 // Capture the mounted region's API when constructing its client; calls retain that region's authority.
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
@@ -91,3 +91,5 @@ export function createDatabaseClient(captured: AcornBridge['api'] | (() => Acorn
     (await api().get<{ backends: ModelBackend[] }>(databaseModelBackendsRoute(taskId))).backends
   return { connectDb, disconnectDb, listTables, listColumns, listRows, runQuery, updateCell, insertRow, deleteRow, generateSql, readScratch, listSavedQueries, saveQuery, deleteSavedQuery, listModelBackends }
 }
+
+export type DatabaseClient = ReturnType<typeof createDatabaseClient>

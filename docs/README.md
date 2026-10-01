@@ -31,6 +31,7 @@ orientation map over the whole plugin system and it is much shorter than the ref
 | [security.md](./security.md) | The threat model, the trust boundaries, the containment ladder, and the audit trail. |
 | [node-enrollment.md](./node-enrollment.md) | How a provisioned node introduces itself to a control plane, and the versioned protocol it speaks. |
 | [security/node-plugin-security.md](./security/node-plugin-security.md) | The threat model and containment rules for loaded Node plugin code. |
+| [security/review-2026-10-01.md](./security/review-2026-10-01.md) | Ten-area security review, completed remediation ledger, verification evidence, and remaining limits. |
 
 ## The renderer
 
@@ -40,7 +41,7 @@ orientation map over the whole plugin system and it is much shorter than the ref
 | [ui-design.md](./ui-design.md) | The closed component kit, the appearance axes, and the design tokens. |
 | [panes.md](./panes.md) | The layout model and the pane vocabulary. |
 | [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) | The palette, the keymap, focus, and typing. |
-| [diff-rendering.md](./diff-rendering.md) | The diff model, the virtualizer, hydration, and the find pass. |
+| [diff-rendering.md](./diff-rendering.md) | The diff document and its segments, row geometry, the resident segment cache, find, and what large-surface rendering refuses. |
 | [editor.md](./editor.md) | The host-owned document surface: why the host draws the editor and what it lends. |
 | [notifications.md](./notifications.md) | What an agent is doing, which changes are worth interrupting for, and the gate every channel hangs off. |
 | [ui-design/appearance.md](./ui-design/appearance.md) | Themes, style packs, and the appearance token axes. |
@@ -90,10 +91,19 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | Document | What it holds |
 | --- | --- |
 | [local-development.md](./local-development.md) | Getting the app running, the dev loops, and the environment. |
-| [testing.md](./testing.md) | Where tests live, the tiers, the testkit, and the manual smoke checklist. |
+| [testing.md](./testing.md) | Test commands, coverage scope, test layers, and the alpha release pass. |
+| [testing/manual-checks.md](./testing/manual-checks.md) | Index of numbered, feature-specific manual acceptance checks. |
+| [testing/preview-retention.md](./testing/preview-retention.md) | Native preview retention acceptance, process measurements, and platform recovery limits. |
+| [testing/desktop-and-plugins.md](./testing/desktop-and-plugins.md) | Packaged shell, plugin installation, host webviews, and loaded plugin lifecycle checks. |
+| [testing/terminal-and-palette.md](./testing/terminal-and-palette.md) | Terminal keyboard and shared command palette checks. |
+| [testing/changes-and-large-surfaces.md](./testing/changes-and-large-surfaces.md) | Changes pane, large diff, transcript, and task restoration checks. |
+| [testing/workflows.md](./testing/workflows.md) | Workflow authoring, execution, child runs, schedules, and data-source checks. |
+| [testing/agents-and-providers.md](./testing/agents-and-providers.md) | Onboarding, model generation, delegation, and harness checks. |
+| [testing/rail-and-annotations.md](./testing/rail-and-annotations.md) | Rail layout, task marker, and appearance checks with dated results. |
 | [telemetry.md](./telemetry.md) | The five record kinds, the switch, the collector, the scrubber, and what a sink can see. |
 | [shell.md](./shell.md) | The Tauri shell: schemes, custody, webviews, the helper, and packaging. |
 | [tui.md](./tui.md) | The terminal client: `acorn` in a terminal, its process model, its host switch, how it draws a frame, and its chrome. |
+| [cli.md](./cli.md) | Headless `acorn` commands, Node selection, read resources, output, and exit codes. |
 | [tui/interaction.md](./tui/interaction.md) | Terminal key handling, focus, scrolling, and interaction telemetry. |
 | [tui/chrome-and-plugins.md](./tui/chrome-and-plugins.md) | Terminal chrome, loaded plugins, and their host fallbacks. |
 | [node-distribution.md](./node-distribution.md) | The standalone node tarball and how it boots without a desktop. |
@@ -106,8 +116,17 @@ Start with the plugin map, then follow the authoring guide or API reference.
   behaviour belongs in an owning doc above.
 - [Remaining performance work](./future/performance/README.md) — one handoff per pending specialist,
   dependencies, evidence, refusals, and sustained-use acceptance.
+
+- [Cloud tasks and control plane](./future/cloud/README.md) — proposed architecture, provider and
+  security gates, and sequenced delivery plan for team-owned projects and ephemeral task Nodes.
+- [Terminal UI review](./future/tui-review/README.md) — live UX evidence, feature coverage, host
+  projections, and acceptance gates for a standalone terminal client.
 - [Plugin list search proposal](./future/pluginsearch.md) — search beyond the loaded Linear,
   Rollbar, and GitHub list rows while keeping project and state scope.
+- [Native overlay layer requirements](./future/native-overlay-layer.md) — desktop overlays above
+  live preview and plugin webviews, with native composition, input routing, and acceptance gates.
+- [Outdated review comments](./future/outdated-review-comments.md) — hide outdated GitHub threads
+  from the review code pane while preserving history and distinguishing current and historical locations.
 - `schemas/` — generated, versioned JSON Schemas that are pinned by a test and immutable by rule.
   Today that is `docs/schemas/enrollment-v1.json`.
 
@@ -138,8 +157,8 @@ links; review the implementation to verify API signatures and behavior.
 
 ### Authoring guides
 
+- [CLI commands](./plugin-authoring/cli-commands.md)
 - [Events and capabilities](./plugin-authoring/events-and-capabilities.md)
-
 - [Installing a hand-written package](./plugin-authoring/installing-a-hand-written-package.md)
 - [Start from the scaffold](./plugin-authoring/start-from-the-scaffold.md)
 - [The manifest](./plugin-authoring/the-manifest.md)

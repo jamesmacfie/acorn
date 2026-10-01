@@ -6,11 +6,11 @@ import { connectIntegration, rotateIntegration } from './integrationClient'
 // The typed-credential half of connecting a provider: the fields a descriptor declares, what has been
 // entered, whether that is enough to submit, and the write.
 //
-// A shared module for the same reason `./deviceFlow.ts` is one. The Integrations page and the
+// A shared module for the same reason `./deviceFlow.ts` is one. The Add connection gallery and the
 // first-run wizard both add a key, and the parts worth getting right are not the input elements. They
 // are which fields are required, what a rejected credential reads as, and that a rotation is a PUT to
 // one connection while an addition is a POST to the provider. Those were inline in
-// `../settings/IntegrationsSettings.tsx`, tangled with the provider chips and the device-flow branch,
+// the old Integrations settings page, tangled with the provider chips and the device-flow branch,
 // so the wizard had no way to reach them.
 //
 // Free of JSX, and of any element, so both hosts can draw it. The wizard renders in the terminal
@@ -58,7 +58,7 @@ export function createCredentialForm(
   /**
    * The connection to replace, for a rotation. Null adds one.
    *
-   * An accessor rather than a value because the Integrations page decides between the two long after
+   * An accessor rather than a value because the connection page decides between the two long after
    * the form is mounted: pressing Rotate on a connection points the same form at that connection.
    */
   rotationId: () => string | null = () => null,

@@ -8,6 +8,7 @@ import {
   tasksOptions,
   toast,
   workspacesOptions,
+  wsOnPluginsChanged,
 } from '@acorn/plugin-api/client'
 import { Alert, Badge, Button, EmptyState, Icon, Row, Rows, SectionHeader, sidebarCollapsed, Stack, Text } from '@acorn/plugin-api/ui'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
@@ -68,7 +69,7 @@ function useScope() {
 
 export function WorkflowsBrowseList() {
   // The same signal the source's list column reads, keyed by the source id, so rows and column
-  // narrow together (client-core kit/lib/collapseState.ts).
+  // narrow together (client-core kit/lib/layout/collapseState.ts).
   const collapsed = sidebarCollapsed(WORKFLOWS_SOURCE_ID)
   const scope = useScope()
   const navigate = useNavigate()
@@ -89,6 +90,7 @@ export function WorkflowsBrowseList() {
   // and the rail list is the first consumer of `defs-changed` (../node/index.ts).
   createEffect(() => {
     const stopDefs = onPluginFrame('workflows', pluginChannel('workflows', 'defs-changed'), () => void refetchDefs())
+    const stopPlugins = wsOnPluginsChanged(() => void refetchDefs())
     const stopRuns = onPluginFrame('workflows', pluginChannel('workflows', 'run-changed'), () => {
       // A baseline run also completes schedule activation. Refresh both read models so the rail does
       // not keep showing “Activating” until its polling interval after the run has settled.
@@ -97,6 +99,7 @@ export function WorkflowsBrowseList() {
     })
     onCleanup(() => {
       stopDefs()
+      stopPlugins()
       stopRuns()
     })
   })
@@ -137,7 +140,7 @@ export function WorkflowsBrowseList() {
 
   // The three ways into a definition: a mouse press on the row, and the collection's own select and
   // activate for the keyboard. All of them come here, because a `Row` in a `Rows` has no click of its
-  // own unless it is given one (client-core kit/components/primitives.tsx § Row).
+  // own unless it is given one (client-core kit/components/layout/Row.tsx).
   const open = (key: string): void => {
     if (key.startsWith('problem:')) return
     navigate(workflowsSurfacePath(scope.projectId(), key))

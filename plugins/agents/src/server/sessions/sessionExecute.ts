@@ -5,18 +5,20 @@
 // session store and its turn lifecycle.
 import { randomUUID } from 'node:crypto'
 import { HEADLESS_TIMEOUT_MS, type HeadlessResult, type StreamEvent } from '@acorn/plugin-api/node'
-import type { AgentSessionSnapshot } from '../../contract/wire.ts'
+import { MAX_AGENT_CONTEXT_BYTES } from '@acorn/protocol/agentContext.ts'
+import type { AgentInputPart, AgentSessionSnapshot } from '../../contract/wire.ts'
 import { managedProviderForProfile, type AgentSessionExecute, type AgentSessionExecuteRequest } from '../../contract/sessionExecute'
 import type { ManagedAgentRuntime } from './runtime'
 import { assistantResult, parseStructuredResult, promptWithResultContract } from './resultContract'
+import { contextBlock } from '../drivers/contextBlock'
 
 // The profile-to-driver map moved to ../../contract/sessionExecute.ts, so a caller can ask before it
 // calls whether a profile has a managed path at all. Re-exported here for the callers already on it.
 export { managedProviderForProfile }
 
-function turnEvents(snapshot: AgentSessionSnapshot, turnId: string): StreamEvent[] {
+function turnEvents(snapshot: AgentSessionSnapshot, turnIds: readonly string[]): StreamEvent[] {
   return snapshot.events
-    .filter((record) => record.turnId === turnId)
+    .filter((record) => record.turnId != null && turnIds.includes(record.turnId))
     .map((record) => ({
       type: 'managed-agent',
       sequence: record.seq,
@@ -24,16 +26,52 @@ function turnEvents(snapshot: AgentSessionSnapshot, turnId: string): StreamEvent
     }))
 }
 
+// How many times a step whose turn ended without its result is told to carry on. Anthropic's guidance
+// for unattended runs is two or three, so that a run that is stuck ends and can be reviewed.
+const MAX_CONTINUATIONS = 2
+
+// Sent when a turn ended without what the step needs. The model can end a turn on a progress report,
+// and a step with nothing to parse would otherwise fail on work that was still going.
+const continuationPrompt = (schema: object | undefined): string => schema
+  ? 'Your turn ended before the fenced `json` result block this step needs. If the work is finished, reply with that block. If it is not, carry on and end with the block. If something is blocking you, say what it is.'
+  : 'Your turn ended without a final message. If the work is finished, reply with the result. If it is not, carry on. If something is blocking you, say what it is.'
+
+// The step's prompt, then its context as parts of their own. The model reads the same tagged blocks
+// either way. Past the per-turn context cap the blocks go inline in the text instead, which only the
+// larger whole-input cap bounds, so a step with a big diff upstream still runs.
+function stepInput(request: AgentSessionExecuteRequest): AgentInputPart[] {
+  const text = promptWithResultContract(request.prompt, request.schema)
+  const context = request.context ?? []
+  const bytes = context.reduce((total, item) => total + Buffer.byteLength(item.content, 'utf8'), 0)
+  if (bytes > MAX_AGENT_CONTEXT_BYTES) return [{ type: 'text', text: [text, ...context.map(contextBlock)].join('\n\n') }]
+  return [{ type: 'text', text }, ...context.map((item): AgentInputPart => ({
+    type: 'context',
+    contextId: randomUUID(),
+    ...item,
+    provenance: request.runId ? `Workflow run ${request.runId}` : 'Workflow',
+    byteSize: Buffer.byteLength(item.content, 'utf8'),
+    estimatedTokens: Math.ceil(Buffer.byteLength(item.content, 'utf8') / 4),
+    freshness: 'live',
+    sensitivity: 'workspace',
+    capturedAt: Date.now(),
+  }))]
+}
+
+/** The step's outcome once its latest turn has settled. `turnIds` is every turn the step has sent, in
+ *  order: the transcript it hands back covers all of them, and the result is the last one's. */
 function resultFromSnapshot(
   snapshot: AgentSessionSnapshot,
-  turnId: string,
+  turnIds: readonly string[],
   schema: object | undefined,
 ): HeadlessResult | null {
+  const turnId = turnIds[turnIds.length - 1]!
   const turn = snapshot.turns.find((candidate) => candidate.id === turnId)
   if (!turn || !['completed', 'failed', 'cancelled', 'interrupted'].includes(turn.status)) return null
-  const events = turnEvents(snapshot, turnId)
+  const events = turnEvents(snapshot, turnIds)
   const result = assistantResult(snapshot.events.filter((record) => record.turnId === turnId))
   const structuredOutput = result ? parseStructuredResult(result, schema) : null
+  // Usage and cost are the last turn's alone. A step that needed a continuation under-reports by the
+  // earlier turn, which is not summed because Codex reports cumulative totals and Claude does not.
   const capture = {
     result,
     structuredOutput,
@@ -57,6 +95,17 @@ function resultFromSnapshot(
       exitCode: null,
       capture,
       stderrTail: turn.error?.message ?? turn.stopReason ?? 'Managed agent turn failed.',
+      agentSessionId: snapshot.session.id,
+    }
+  }
+  // Before the malformed check: a declined turn has nothing to parse, and telling the step to carry
+  // on would only ask the same question again.
+  if (turn.stopReason === 'refusal') {
+    return {
+      status: 'error',
+      exitCode: null,
+      capture,
+      stderrTail: 'The model declined this request. Rephrase the step\'s prompt, or run the step on another model.',
       agentSessionId: snapshot.session.id,
     }
   }
@@ -118,8 +167,8 @@ export function createSessionExecute(runtime: ManagedAgentRuntime): AgentSession
     const session = await sessionFor(runtime, request, providerId)
     await applyRequestedConfig(runtime, session.id, request.configOptions)
     const beforeSeq = session.lastEventSeq
-    const turn = await runtime.enqueueTurn(session.id, {
-      input: [{ type: 'text', text: promptWithResultContract(request.prompt, request.schema) }],
+    const first = await runtime.enqueueTurn(session.id, {
+      input: stepInput(request),
       source: 'workflow',
       effectivePolicy: {
         // Codex reads the model and the effort off the policy at turn time; the Claude driver takes
@@ -135,9 +184,14 @@ export function createSessionExecute(runtime: ManagedAgentRuntime): AgentSession
       },
       idempotencyKey: `workflow-turn:${request.stepId ?? randomUUID()}:${beforeSeq}`,
     })
+    const turnIds = [first.id]
+    const currentTurnId = () => turnIds[turnIds.length - 1]!
+    // The events the loop below waits past. It moves on with each continuation, because a wait for
+    // `turn_completed` after `beforeSeq` is already met by the turn that needed continuing.
+    let waitSeq = beforeSeq
     let lastForwardedSeq = beforeSeq
     const unsubscribe = runtime.subscribe((frame) => {
-      if (frame.channel !== 'agent:event' || frame.event.sessionId !== session.id || frame.event.turnId !== turn.id) return
+      if (frame.channel !== 'agent:event' || frame.event.sessionId !== session.id || !turnIds.includes(frame.event.turnId ?? '')) return
       if (frame.event.seq <= lastForwardedSeq) return
       lastForwardedSeq = frame.event.seq
       // The session id rides along, because the caller's row has nowhere else to learn it: the outcome
@@ -155,7 +209,7 @@ export function createSessionExecute(runtime: ManagedAgentRuntime): AgentSession
     let cancelled = request.signal?.aborted ?? false
     const abort = () => {
       cancelled = true
-      void runtime.cancelTurn(session.id, turn.id)
+      void runtime.cancelTurn(session.id, currentTurnId())
     }
     request.signal?.addEventListener('abort', abort, { once: true })
     try {
@@ -163,7 +217,7 @@ export function createSessionExecute(runtime: ManagedAgentRuntime): AgentSession
         if (cancelled) {
           const snapshot = await runtime.store.snapshot(session.id, beforeSeq)
           return (
-            resultFromSnapshot(snapshot, turn.id, request.schema) ?? {
+            resultFromSnapshot(snapshot, turnIds, request.schema) ?? {
               status: 'cancelled',
               exitCode: null,
               capture: {
@@ -172,7 +226,7 @@ export function createSessionExecute(runtime: ManagedAgentRuntime): AgentSession
                 sessionId: snapshot.session.providerSessionRef,
                 costUsd: null,
                 usage: undefined,
-                events: turnEvents(snapshot, turn.id),
+                events: turnEvents(snapshot, turnIds),
               },
               stderrTail: '',
               agentSessionId: session.id,
@@ -181,7 +235,7 @@ export function createSessionExecute(runtime: ManagedAgentRuntime): AgentSession
         }
         const elapsed = Date.now() - startedAt
         if (elapsed >= timeoutMs) {
-          await runtime.cancelTurn(session.id, turn.id)
+          await runtime.cancelTurn(session.id, currentTurnId())
           const snapshot = await runtime.store.snapshot(session.id, beforeSeq)
           return {
             status: 'timeout',
@@ -192,15 +246,25 @@ export function createSessionExecute(runtime: ManagedAgentRuntime): AgentSession
               sessionId: snapshot.session.providerSessionRef,
               costUsd: null,
               usage: undefined,
-              events: turnEvents(snapshot, turn.id),
+              events: turnEvents(snapshot, turnIds),
             },
             stderrTail: `Managed workflow turn exceeded ${timeoutMs}ms.`,
             agentSessionId: session.id,
           }
         }
-        const snapshot = await runtime.wait(session.id, beforeSeq, 'turn_completed', Math.min(1_000, timeoutMs - elapsed))
-        const result = resultFromSnapshot(snapshot, turn.id, request.schema)
-        if (result) return result
+        const settled = await runtime.wait(session.id, waitSeq, 'turn_completed', Math.min(1_000, timeoutMs - elapsed))
+        const snapshot = waitSeq === beforeSeq ? settled : await runtime.store.snapshot(session.id, beforeSeq)
+        const result = resultFromSnapshot(snapshot, turnIds, request.schema)
+        if (!result) continue
+        if (result.status !== 'malformed' || turnIds.length > MAX_CONTINUATIONS || cancelled) return result
+        waitSeq = snapshot.session.lastEventSeq
+        const next = await runtime.enqueueTurn(session.id, {
+          input: [{ type: 'text', text: continuationPrompt(request.schema) }],
+          source: 'workflow',
+          effectivePolicy: { ...first.effectivePolicy, continuationOf: first.id },
+          idempotencyKey: `workflow-continue:${first.id}:${turnIds.length}`,
+        })
+        turnIds.push(next.id)
       }
     } finally {
       unsubscribe()

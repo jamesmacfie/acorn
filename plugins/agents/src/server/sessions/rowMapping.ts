@@ -1,4 +1,5 @@
 import type * as schema from '../../node/schema'
+import type { InlineDiffOrigin } from '../../contract/inlineDiff.ts'
 import type {
   AgentEventRecord,
   AgentInputPart,
@@ -25,6 +26,7 @@ export const mapAgentSession = (row: typeof schema.agentSessions.$inferSelect): 
   providerId: row.providerId,
   profileId: row.profileId,
   kind: row.kind as AgentSession['kind'],
+  origin: parseJson<InlineDiffOrigin | null>(row.originJson, null),
   driverKind: row.driverKind,
   driverVersion: row.driverVersion,
   providerSessionRef: row.providerSessionRef,
@@ -41,6 +43,7 @@ export const mapAgentSession = (row: typeof schema.agentSessions.$inferSelect): 
   queuedTurns: row.queuedTurns,
   lastEventSeq: row.lastEventSeq,
   lastReadSeq: row.lastReadSeq,
+  lastEventAt: row.lastEventAt,
   archivedAt: row.archivedAt,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,

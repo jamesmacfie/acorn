@@ -49,6 +49,19 @@ export async function bootFixture(): Promise<{ task: typeof TASK }> {
   }
   const { selectActiveNode } = await import('@acorn/client-core/infra/node/activeNode.ts')
   await selectActiveNode()
+  // Production loads the trust dialog after the first frame. The fixture has no main.tsx boot pass,
+  // so supply that deferred component before rendering a test that queues trust.
+  const [{ TrustPrompt }, { setTrustPromptComponent }] = await Promise.all([
+    import('./plugins/TrustPrompt'),
+    import('./plugins/trustPromptLoader'),
+  ])
+  setTrustPromptComponent(() => TrustPrompt)
+  // The shell registers core's settings pages behind a dynamic import when it mounts. Loaded here first,
+  // so a test that ends soon after mounting does not leave that import running after the environment
+  // is torn down.
+  await import('./chrome/settingsPages')
+  const { refreshNodePlugins } = await import('@acorn/client-core/infra/node')
+  await refreshNodePlugins('node-1')
   return { task: TASK }
 }
 
@@ -193,6 +206,10 @@ export async function renderFixture(size: {
   const { _resetRegions } = await import('./keys/regions')
   const { _resetLayoutState } = await import('@acorn/client-core/host/layouts/state.ts')
   const { _resetChrome } = await import('./chrome/state')
+  const { resetPromotion } = await import('./chrome/promotionStore')
+  const { resetFilePrompts } = await import('./chrome/filePrompt')
+  const { resetConfirmations } = await import('./chrome/confirmStore')
+  const { resetSettings } = await import('./chrome/settingsStore')
   const { _resetHints } = await import('./chrome/bindings')
   const { _resetRouter } = await import('./kit/router')
   const { clearAnnotations } = await import('@acorn/client-core/host/annotations/annotations.ts')
@@ -211,6 +228,10 @@ export async function renderFixture(size: {
   _resetRegions()
   _resetLayoutState()
   _resetChrome()
+  resetPromotion()
+  resetFilePrompts()
+  resetConfirmations()
+  resetSettings()
   // …and the footer's cached answer, which is keyed on the engine among other things and would
   // otherwise be the previous render's hints until something moved (./chrome/bindings.ts).
   _resetHints()

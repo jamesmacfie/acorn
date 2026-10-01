@@ -1,113 +1,219 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
-import type { AgentConfigOption } from '../../contract/wire.ts'
-import { prefsOptions } from '@acorn/plugin-api/client'
-import { Alert, Checkbox, Field, Section, Select, Stack, Text } from '@acorn/plugin-api/ui'
+import { createMemo, createResource, For, Show } from 'solid-js'
+import { createSettingSave, prefsOptions } from '@acorn/plugin-api/client'
+import { Alert, Checkbox, Inline, Link, Select, SettingRow, SettingsSection, Text } from '@acorn/plugin-api/ui'
+import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 import {
+  AGENT_ARCHIVED_HISTORY_CHOICES,
+  AGENT_IDLE_STOP_CHOICES,
   defaultAgentSessionDefaults,
   type AgentSessionDefaults,
 } from '../../shared/sessionDefaults'
 import { managedAgentApi } from '../sessions/managedClient'
 import ProviderGlyph from '../sessions/ProviderGlyph'
+import { advertisedOptionsByProvider } from './agentConfigOptions'
 import {
   agentSessionDefaultsOptions,
   writeAgentSessionDefaults,
 } from './sessionDefaultsClient'
 import {
   AGENT_TOOL_FOLD_CHOICES,
+  defaultAgentToolFoldPrefs,
   type AgentToolFoldMode,
   readAgentToolFoldPrefs,
   saveAgentToolFoldMode,
 } from '../sessions/toolFoldPrefs'
+import { saveStartupContextInjection, startupContextInjection } from './startupContext'
 
-// Settings -> Agent defaults: what a new session of each provider starts on
-// (docs/managed-agents.md § New-session defaults).
-export default function AgentSessionDefaultsSettings() {
+/** What the harness row says about the CLI on this machine. */
+const harnessState = (provider: AgentProviderDescriptor): string => {
+  if (!provider.installed) return provider.diagnostics[0] ?? 'Not installed on this machine.'
+  const installed = provider.executableVersion ? `Installed, ${provider.executableVersion}.` : 'Installed.'
+  return provider.authenticated === false ? `${installed} Not signed in.` : installed
+}
+
+// Settings -> Agents -> Harnesses and defaults: the harnesses this node can run, and what a new session
+// of each one starts on (docs/managed-agents.md § New-session defaults). Every control saves when it
+// changes, and a failure is said on the row that failed. A default seeds new sessions only; each row
+// that is one says which control changes a session already open. The fixed sections match the ones
+// `../index.ts` declares for search; the one per harness depends on what is installed, so search does
+// not list it.
+// The one piece of the settings page context this page uses. Optional, so the page draws on its own
+// in a test.
+type PageContext = { navigate: (target: string) => void }
+
+export default function AgentSessionDefaultsSettings(props: { context?: PageContext }) {
   const queryClient = useQueryClient()
   const stored = createQuery(() => agentSessionDefaultsOptions())
-  const [providers] = createResource(() => managedAgentApi.providers())
+  // Both only fill in choices, so a node that does not answer leaves them empty rather than taking the
+  // page down with it.
+  const [providers] = createResource(() => managedAgentApi.providers().catch(() => undefined))
   const prefs = createQuery(() => prefsOptions(true))
-  const [recent] = createResource(() => managedAgentApi.sessions({}))
-  const [error, setError] = createSignal('')
+  const [recent] = createResource(() => managedAgentApi.sessions({}).catch(() => undefined))
 
-  const record = () => stored.data ?? defaultAgentSessionDefaults()
+  // Over the defaults rather than instead of them: a cached answer from an older node can lack a field
+  // added since, and a Select with no value draws blank until the refetch lands.
+  const record = (): AgentSessionDefaults => ({ ...defaultAgentSessionDefaults(), ...stored.data })
 
-  /**
-   * Which options each provider offers, read off the newest session that advertised them. A provider
-   * only reports its models and reasoning levels once a session is running, so there is nowhere else
-   * to read them from before one starts.
-   *
-   * Bounded by whatever the sessions list returns, which is the 50 most recent. A provider you have
-   * not run in that many sessions shows no pickers until you run it again. Cache the advertised list
-   * per provider in the same preference row if that starts to bite.
-   */
-  const advertised = createMemo(() => {
-    const byProvider: Record<string, AgentConfigOption[]> = {}
-    for (const session of recent()?.sessions ?? []) {
-      if (byProvider[session.providerId]) continue
-      const options = session.config.configOptions
-      if (Array.isArray(options) && options.length) byProvider[session.providerId] = options as AgentConfigOption[]
-    }
-    return byProvider
-  })
+  // Pickers only for what a recent session advertised (./agentConfigOptions.ts says why).
+  const advertised = createMemo(() => advertisedOptionsByProvider(recent()?.sessions ?? []))
 
   // Each change is the save, through the shared writer the palette's setting command also uses
-  // (./sessionDefaultsClient.ts holds the cache rule). What this page adds is where the failure goes.
+  // (./sessionDefaultsClient.ts holds the cache rule). What this page adds is where the failure goes:
+  // the row's own save state, which the writer's rethrow feeds.
+  // Not before the record is read: a patch carries whole `pinned` and `inline` objects built from it, and
+  // built from the defaults it would wipe every other harness's pins on the node.
   const save = async (patch: Partial<AgentSessionDefaults>) => {
-    setError('')
-    try {
-      await writeAgentSessionDefaults(queryClient, record(), patch)
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Agent defaults could not be saved.')
-    }
+    if (!stored.data) throw new Error('This node\'s defaults have not been read yet. Try again in a moment.')
+    return writeAgentSessionDefaults(queryClient, record(), patch)
   }
+  const continueAfterLimit = createSettingSave()
+  const idleStop = createSettingSave()
+  const archivedHistory = createSettingSave()
+  const followLast = createSettingSave()
+  const inlineProviderSave = createSettingSave()
+  const foldSave = createSettingSave()
+  const startup = createSettingSave()
 
   // A different store from everything above: the fold setting is this device's preference about how a
   // transcript is drawn, not part of the record the node keeps of what a session launches with.
   const fold = () => readAgentToolFoldPrefs(prefs.data)
-  const chooseFold = (mode: AgentToolFoldMode) => void saveAgentToolFoldMode(queryClient, prefs.data, mode)
+  const chooseFold = (mode: AgentToolFoldMode) => void foldSave.run(() => saveAgentToolFoldMode(queryClient, prefs.data, mode))
 
   const choose = (providerId: string, optionId: string, value: string) => {
     const forProvider = { ...record().pinned[providerId] }
     if (value) forProvider[optionId] = value
     else delete forProvider[optionId]
-    void save({ pinned: { ...record().pinned, [providerId]: forProvider } })
+    return save({ pinned: { ...record().pinned, [providerId]: forProvider } })
+  }
+  const inlineProvider = createMemo(() => record().inline.providerId ?? providers()?.find((provider) => provider.installed)?.id ?? '')
+  const chooseInlineProvider = (providerId: string) =>
+    void inlineProviderSave.run(() => save({ inline: { ...record().inline, providerId } }))
+  const chooseInlineOption = (providerId: string, optionId: string, value: string) => {
+    const current = { ...record().inline.pinned[providerId] }
+    if (value) current[optionId] = value
+    else delete current[optionId]
+    return save({ inline: {
+      ...record().inline,
+      pinned: { ...record().inline.pinned, [providerId]: current },
+    } })
   }
 
   return (
-    <Stack gap="section">
-      <Text emphasis="muted" wrap>
-        Defaults Acorn applies to managed agent sessions, including how a paused usage window resumes
-        and what a new session starts on. Provider option changes are written into the transcript so
-        a session reads back under the settings it ran with.
-      </Text>
-
+    <>
       <Show when={stored.error}>
         <Alert>
-          {stored.error instanceof Error ? stored.error.message : 'Agent defaults could not be loaded.'}
+          {stored.error instanceof Error ? stored.error.message : 'Harnesses and defaults could not be loaded.'}
         </Alert>
       </Show>
 
-      <Section label="Usage limits">
-        <Checkbox
-          checked={record().continueAfterUsageLimit}
-          label="Continue when usage resets"
-          hint="If an agent stops because its plan usage is exhausted and reports a reset time, Acorn keeps the turn queued and continues it after that time."
-          onChange={(checked) => void save({ continueAfterUsageLimit: checked })}
-        />
-      </Section>
+      <SettingsSection
+        id="harnesses"
+        label="Harnesses"
+        description="The agent CLIs this node can run a session on. A plugin can add one, and it shows here as well."
+      >
+        <For each={providers() ?? []} fallback={<Text emphasis="muted">{providers.loading ? 'Loading harnesses…' : 'No harnesses on this node.'}</Text>}>
+          {(provider) => (
+            <SettingRow label={provider.label} description={harnessState(provider)}>
+              <ProviderGlyph glyph={provider.glyph} label={provider.label} />
+            </SettingRow>
+          )}
+        </For>
+      </SettingsSection>
 
-      <Checkbox
-        checked={record().followLastSession}
-        label="Carry my last session's settings forward"
-        hint="Switch model or effort inside a session and the next session of that provider starts there. Turn this off to pin the settings below instead."
-        onChange={(checked) => void save({ followLastSession: checked })}
-      />
+      <SettingsSection id="usage" label="Usage limits">
+        <SettingRow
+          label="Continue when usage resets"
+          description="If an agent stops because its plan usage is exhausted and reports a reset time, Acorn keeps the turn queued and continues it after that time."
+          error={continueAfterLimit.error()}
+        >
+          <Checkbox
+            switch
+            ariaLabel="Continue when usage resets"
+            checked={record().continueAfterUsageLimit}
+            onChange={(checked) => continueAfterLimit.run(() => save({ continueAfterUsageLimit: checked }))}
+          />
+        </SettingRow>
+      </SettingsSection>
+
+      <SettingsSection id="idle" label="Idle agents">
+        <SettingRow
+          label="Stop idle agents after"
+          description="An agent keeps its CLI and MCP servers running between prompts, which can use hundreds of megabytes each. Acorn stops one that has had nothing to do for this long. Your next prompt starts it again on the same conversation."
+          error={idleStop.error()}
+        >
+          <Select
+            label="Stop idle agents after"
+            value={String(record().stopIdleAfterMinutes)}
+            options={AGENT_IDLE_STOP_CHOICES.map((choice) => ({ value: String(choice.minutes), label: choice.label }))}
+            onChange={(value) => void idleStop.run(() => save({ stopIdleAfterMinutes: Number(value) }))}
+          />
+        </SettingRow>
+      </SettingsSection>
+
+      <SettingsSection id="archived" label="Archived tasks">
+        <SettingRow
+          label="Keep agent history for archived tasks"
+          description="Once a task has been archived for this long, Acorn deletes its agent transcripts, attachments and artifacts to free disk space. The task still lists its sessions. Removed history no longer shows in archive search, and it cannot be recovered, even if you restore the task."
+          error={archivedHistory.error()}
+        >
+          <Select
+            label="Keep agent history for archived tasks"
+            value={String(record().keepArchivedHistoryDays)}
+            options={AGENT_ARCHIVED_HISTORY_CHOICES.map((choice) => ({ value: String(choice.days), label: choice.label }))}
+            onChange={(value) => void archivedHistory.run(() => save({ keepArchivedHistoryDays: Number(value) }))}
+          />
+        </SettingRow>
+      </SettingsSection>
+
+      <SettingsSection
+        id="new-sessions"
+        label="New sessions"
+        description="What a new session of each harness starts on. A session keeps the settings it started with: to change an open one, use the pickers in its composer. Option changes are written into the transcript, so a session reads back under the settings it ran with."
+      >
+        <SettingRow
+          label="Carry my last session's settings forward"
+          description="Switch model or effort inside a session and the next session of that provider starts there. Turn this off to pin the settings below instead."
+          error={followLast.error()}
+        >
+          <Checkbox
+            switch
+            ariaLabel="Carry my last session's settings forward"
+            checked={record().followLastSession}
+            onChange={(checked) => followLast.run(() => save({ followLastSession: checked }))}
+          />
+        </SettingRow>
+        <SettingRow
+          label="Send task context at startup"
+          description="The pull request, linked issues and notes, sent to an agent you start in the terminal drawer. On for new sessions only: one already running is not sent it again."
+          error={startup.error()}
+        >
+          <Checkbox
+            switch
+            ariaLabel="Send task context at startup"
+            checked={startupContextInjection(prefs.data)}
+            onChange={(checked) => startup.run(() => saveStartupContextInjection(queryClient, checked))}
+          />
+        </SettingRow>
+        <Show when={props.context}>
+          {(context) => (
+            <SettingRow
+              label="MCP servers"
+              description="A new session also starts with every server that is on for new sessions. To change an open session's list, type /mcp in its composer."
+            >
+              <Inline>
+                <Link onPress={() => context().navigate('agent-mcp-servers')}>Open MCP servers</Link>
+              </Inline>
+            </SettingRow>
+          )}
+        </Show>
+      </SettingsSection>
 
       <Show when={!record().followLastSession}>
         <For each={providers()?.filter((provider) => provider.installed) ?? []}>
           {(provider) => (
-            <Section
+            <SettingsSection
+              id={`pinned-${provider.id}`}
               label={provider.label}
               actions={<ProviderGlyph glyph={provider.glyph} label={provider.label} />}
             >
@@ -119,47 +225,68 @@ export default function AgentSessionDefaultsSettings() {
                   </Text>
                 }
               >
-                <Stack gap="row">
-                  <For each={advertised()[provider.id]}>
-                    {(option) => (
-                      <Field label={option.label} layout="split">
+                <For each={advertised()[provider.id]}>
+                  {(option) => {
+                    const pin = createSettingSave()
+                    return (
+                      <SettingRow label={option.label} error={pin.error()}>
                         <Select
                           label={`${provider.label} ${option.label}`}
-                          size="sm"
                           value={record().pinned[provider.id]?.[option.id] ?? ''}
                           options={[
                             { value: '', label: `Whatever ${provider.label} picks` },
                             ...option.values.map((value) => ({ value: value.value, label: value.label, title: value.description })),
                           ]}
-                          onChange={(value) => choose(provider.id, option.id, value)}
+                          onChange={(value) => void pin.run(() => choose(provider.id, option.id, value))}
                         />
-                      </Field>
-                    )}
-                  </For>
-                </Stack>
+                      </SettingRow>
+                    )
+                  }}
+                </For>
               </Show>
-            </Section>
+            </SettingsSection>
           )}
         </For>
       </Show>
 
-      <Section label="Transcript">
-        <Field
+      <SettingsSection id="inline" label="Inline diff chats">
+        <SettingRow label="Provider" error={inlineProviderSave.error()}>
+          <Select label="Inline chat provider" value={inlineProvider()}
+            options={(providers() ?? []).filter((provider) => provider.installed).map((provider) => ({ value: provider.id, label: provider.label }))}
+            onChange={chooseInlineProvider} />
+        </SettingRow>
+        <For each={(advertised()[inlineProvider()] ?? []).filter((option) => option.category === 'model' || option.category === 'reasoning')}>
+          {(option) => {
+            const pin = createSettingSave()
+            return (
+              <SettingRow label={option.label} error={pin.error()}>
+                <Select label={`Inline chat ${option.label}`}
+                  value={record().inline.pinned[inlineProvider()]?.[option.id] ?? ''}
+                  options={[{ value: '', label: 'Provider default' }, ...option.values.map((value) => ({ value: value.value, label: value.label }))]}
+                  onChange={(value) => void pin.run(() => chooseInlineOption(inlineProvider(), option.id, value))} />
+              </SettingRow>
+            )
+          }}
+        </For>
+      </SettingsSection>
+
+      <SettingsSection id="transcript" label="Transcript">
+        <SettingRow
           label="Tool call display"
-          hint="How a tool call's output starts out when it first appears. This one is a setting for this device, not for a provider."
-          layout="split"
+          description="How a tool call's output starts out when it first appears, in every transcript this device draws."
+          scope="device"
+          error={foldSave.error()}
+          // The default is what a transcript draws with nothing stored.
+          onReset={fold().mode === defaultAgentToolFoldPrefs.mode ? undefined : () => chooseFold(defaultAgentToolFoldPrefs.mode)}
         >
           <Select
             label="Tool call display"
-            size="sm"
             value={fold().mode}
             onChange={(value) => chooseFold(value as AgentToolFoldMode)}
             options={[...AGENT_TOOL_FOLD_CHOICES]}
           />
-        </Field>
-      </Section>
-
-      <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
-    </Stack>
+        </SettingRow>
+      </SettingsSection>
+    </>
   )
 }

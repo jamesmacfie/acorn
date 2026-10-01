@@ -15,7 +15,10 @@
 // task, and not a device, because nobody is here.
 import type { Env } from '../bindings'
 import type { Principal } from '../middleware/auth'
-import { PLUGIN_NAMESPACE, resolvePluginFetch } from '../routes/registry'
+import { randomUUID } from 'node:crypto'
+import { Hono } from 'hono'
+import type { AppEnv } from '../middleware/auth'
+import { PLUGIN_NAMESPACE, pluginRouteContributions, routeMountPath } from '../routes/registry'
 import { buildPluginRequestContext, type PluginConnectionScope } from './requestContext'
 import { runWithTelemetry, startSpan } from '../telemetry/collector'
 
@@ -57,7 +60,11 @@ export async function dispatchPluginRoute(
   connectionScope?: PluginConnectionScope,
 ): Promise<Response> {
   const url = confinePluginPath(pluginId, path)
-  const match = resolvePluginFetch(pluginId, url.pathname)
+  // Built-in plugins contribute Hono routers; loaded plugins contribute fetch handlers. Both are
+  // served over HTTP, so the in-process path must resolve both carriers as well.
+  const match = pluginRouteContributions()
+    .filter((route) => route.plugin === pluginId && (url.pathname === routeMountPath(route) || url.pathname.startsWith(`${routeMountPath(route)}/`)))
+    .sort((a, b) => routeMountPath(b).length - routeMountPath(a).length)[0]
   if (!match) throw new Error(`no route serves ${url.pathname}; the plugin may be disabled or may not have registered it`)
 
   const userId = env.ACTIVE_IDENTITY.get()
@@ -71,7 +78,7 @@ export async function dispatchPluginRoute(
   // rides along untouched, which is what makes a declared source parameter reach the plugin as the
   // same string a client would have sent.
   const forwarded = new URL(url)
-  forwarded.pathname = url.pathname.slice(match.mount.length) || '/'
+  forwarded.pathname = url.pathname.slice(routeMountPath(match).length) || '/'
   // The one seam where the host calls a plugin's route with no HTTP request behind it, so the
   // request middleware's span cannot cover it. `path` is the declared route, which is a pattern the
   // manifest wrote down rather than a URL a caller composed (docs/telemetry.md § Node seams).
@@ -80,16 +87,22 @@ export async function dispatchPluginRoute(
     // Entered for the same reason the request middleware enters it: the handler is about to run
     // arbitrary plugin code, and the git spawns and SQL statements it makes are this plugin's
     // (../telemetry/context.ts).
-    const response = await runWithTelemetry({ traceId: span.traceId, spanId: span.spanId, owner: pluginId }, () =>
-      match.fetch(
-        new Request(forwarded, {
-          method: init.method,
-          ...(init.body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: init.body }),
-          signal,
-        }),
-        buildPluginRequestContext(env, principal, pluginId, connectionScope),
-      ),
-    )
+    const request = new Request(forwarded, {
+      method: init.method,
+      ...(init.body === undefined ? {} : { headers: { 'content-type': 'application/json' }, body: init.body }),
+      signal,
+    })
+    const response = await runWithTelemetry({ traceId: span.traceId, spanId: span.spanId, owner: pluginId }, () => {
+      if (match.fetch) return match.fetch(request, buildPluginRequestContext(env, principal, pluginId, connectionScope))
+      const app = new Hono<AppEnv>()
+      app.use('*', async (c, next) => {
+        c.set('principal', principal)
+        c.set('requestId', randomUUID())
+        await next()
+      })
+      app.route('/', match.router)
+      return app.fetch(request, env)
+    })
     span.end(response.ok ? 'ok' : 'error', { status: response.status })
     return response
   } catch (error) {

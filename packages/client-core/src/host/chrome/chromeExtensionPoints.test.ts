@@ -15,6 +15,9 @@ const { extensionDeliveries, extensionPointFor, extensionPointRegistry, extensio
   await import('../registries/extensionPoints/extensionPoints')
 const { _resetPluginDistribution, _seedPluginDistribution } = await import('../plugins/distribution')
 const { _resetChromeContributions, syncChromeContributions } = await import('./chromeRegister')
+const { clearAnnotations } = await import('../annotations/annotations')
+const { requestTaskAnnotations } = await import('../annotations/taskAnnotations')
+const { markersFor } = await import('../registries/rail/railMarkerFeed')
 // The two carriers that run a plugin's own bytes register in the frames pass instead, where the
 // accepted bundle hash and the trust answer are both in scope. Only the five-kinds case below needs it.
 const { _resetFrameContributions, syncFrameContributions } = await import('../frames/register')
@@ -60,7 +63,9 @@ const GUEST_PLUGIN: Partial<PluginContributions> = {
   }],
 }
 
-const pointIds = () => extensionPointRegistry.entries().map((entry) => entry.id)
+const pointIds = () => extensionPointRegistry.entries()
+  .filter((entry) => entry.ownerId !== 'core')
+  .map((entry) => entry.id)
 const extensionIds = () => extensionRegistry.entries().map((entry) => entry.id)
 
 beforeEach(() => {
@@ -74,6 +79,7 @@ afterEach(() => {
   _resetChromeContributions()
   _resetFrameContributions()
   _resetPluginDistribution()
+  clearAnnotations()
   setActiveNode(null)
 })
 
@@ -110,6 +116,38 @@ describe('cooperative extension points', () => {
     expect(items).toEqual([{ id: 'ACO-1', title: 'Fix the thing', subtitle: 'in review', badge: '3' }])
   })
 
+  it('registers a loaded core:task manifest contribution, posts one key batch and reaches the rail', async () => {
+    _seedPluginDistribution([['node-a', [row('tracker', {
+      extensions: [{
+        id: 'task-status',
+        point: 'core:task',
+        label: 'Tracker status',
+        order: 500,
+        items: '/v1/p/tracker/task-status',
+      }],
+    })]]])
+    syncChromeContributions()
+    writeJson.mockResolvedValue({ items: [
+      { key: { task: 'task-1' }, severity: 'warn', text: 'Waiting on review' },
+      { key: { task: 'task-2' }, severity: 'purple', text: 'Malformed' },
+    ] })
+
+    requestTaskAnnotations(['task-1', 'task-2'])
+    await vi.waitFor(() => expect(markersFor({ kind: 'task', id: 'task-1' })).toHaveLength(1))
+
+    expect(writeJson).toHaveBeenCalledTimes(1)
+    expect(writeJson).toHaveBeenCalledWith('/v1/p/tracker/task-status', expect.objectContaining({
+      method: 'POST',
+      nodeId: 'node-a',
+      body: JSON.stringify({ keys: [{ task: 'task-1' }, { task: 'task-2' }] }),
+    }))
+    expect(markersFor({ kind: 'task', id: 'task-1' })[0]).toMatchObject({
+      label: 'Waiting on review — tracker',
+      dotTone: 'warn',
+    })
+    expect(markersFor({ kind: 'task', id: 'task-2' })).toEqual([])
+  })
+
   it('delivers nothing when the point was never declared', () => {
     // The guest alone. Its contribution still registers: a point comes from another manifest in a pass
     // whose order nobody controls, so refusing here would make delivery depend on roster order. It
@@ -137,8 +175,8 @@ describe('cooperative extension points', () => {
       row('tracker', GUEST_PLUGIN),
     ]]])
     syncChromeContributions()
-    // Both rows are registered (the roster still describes them), and the gate is at delivery.
-    expect(pointIds()).toEqual(['board:card-links'])
+    // Inactive plugins retain command metadata, but no extension point authority.
+    expect(pointIds()).toEqual([])
     expect(extensionDeliveries('board:card-links')).toEqual([])
 
     _resetChromeContributions()
@@ -277,7 +315,7 @@ describe('cooperative extension points', () => {
     syncChromeContributions()
     syncFrameContributions()
 
-    expect(extensionPointRegistry.entries().map((entry) => [entry.id, entry.kind])).toEqual([
+    expect(extensionPointRegistry.entries().filter((entry) => entry.ownerId !== 'core').map((entry) => [entry.id, entry.kind])).toEqual([
       ['sink:card-links', 'rows'],
       ['sink:row-note', 'annotation'],
       ['sink:beside-row', 'remote'],

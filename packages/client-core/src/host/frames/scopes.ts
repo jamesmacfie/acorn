@@ -7,9 +7,9 @@
 // allowlist of (path shape, method) pairs rather than a prefix match.
 //
 // Why not `core.tasks:read ⇒ GET /v1/core/tasks*`, which is what the phase doc sketches: that glob
-// also matches `GET /v1/core/tasks/:id/mcp/starter`, which hands out an MCP configuration for the
-// task, and `GET /v1/core/tasks/:id/preview-url`, which hands out a tunnel URL. Both are read-shaped
-// and neither belongs to a plugin. The star was the wrong granularity; every rule below names its
+// also matches `GET /v1/core/tasks/:id/preview-url`, which hands out a tunnel URL, and the same shape
+// over `/v1/core/projects*` would match `GET /v1/core/projects/:id/mcp`, which hands out the commands a
+// project's agents run. Both are read-shaped and neither belongs to a plugin. The star was the wrong granularity; every rule below names its
 // path.
 //
 // Three groups, and the difference between the last two is intent rather than effect:
@@ -111,6 +111,8 @@ const RULES: readonly RouteRule[] = [
     scopes: {},
     note: 'Same as config: run targets are commands the Node runs.',
   },
+  { path: shape(`/v1/core/projects/${SEG}/mcp`), scopes: {}, note: 'The MCP servers a project’s agents load, commands and masked environments included.' },
+  { path: shape(`/v1/core/projects/${SEG}/mcp/starter`), scopes: {}, note: 'Writes a file into the project folder.' },
 
   // ── Workspaces ──────────────────────────────────────────────────────────────────────────────────
   { path: shape('/v1/core/workspaces'), scopes: { GET: 'core.workspaces:read' } },
@@ -126,6 +128,7 @@ const RULES: readonly RouteRule[] = [
   // Node administration and owner surfaces. Nothing here has a read a plugin needs, and several would
   // hand over credentials or a way to run code.
   { path: shape('/v1/core/security'), scopes: {}, note: 'Node security posture; owner surface.' },
+  { path: shape('/v1/core/storage'), scopes: {}, note: 'Node memory and disk sizes; owner surface.' },
   { path: shape('/v1/core/audit'), scopes: {}, note: 'The audit trail must not be readable by the code it audits.' },
   { path: shape('/v1/core/backup'), scopes: {}, note: 'Writes an archive to a path on the Node.' },
   // The batch route the renderer and the other runtimes post to (docs/telemetry.md § Other
@@ -165,10 +168,13 @@ const RULES: readonly RouteRule[] = [
   // default instead of unclassified. `destroy` is the sharpest: irreversible, on a machine that may
   // hold the only copy of something.
   { path: shape(`/v1/core/nodes/${SEG}`), scopes: {}, note: 'Every node lifecycle verb, including destroy.' },
+  { path: shape('/v1/core/pair/start'), scopes: {}, note: 'A pairing code grants a new device full owner authority.' },
+  { path: shape('/v1/core/pair'), scopes: {}, note: 'Pairing window administration belongs to the owner.' },
   { path: shape('/v1/core/devices'), scopes: {}, note: 'Pairing administration.' },
   { path: shape(`/v1/core/devices/${SEG}`), scopes: {} },
   { path: shape('/v1/core/plugins'), scopes: {}, note: 'Which code a device runs is an owner decision, not a plugin one.' },
   { path: shape(`/v1/core/plugins/${SEG}/client.js`), scopes: {}, note: 'Another plugin’s bundle bytes.' },
+  { path: shape(`/v1/core/plugins/${SEG}/bundles/${SEG}`), scopes: {}, note: 'Another plugin’s bundle bytes.' },
   // Permanently unmapped, and the sharpest case in this table. A frame that could reach these would let
   // a sandboxed plugin fetch and install arbitrary code that runs unsandboxed inside the node. Every
   // other line here would stop mattering (docs/security.md).
@@ -178,6 +184,7 @@ const RULES: readonly RouteRule[] = [
   // exactly why a frame must not be able to reach it: a prompt-injected agent driving a frame could
   // otherwise re-run a plugin's node half on its own timing.
   { path: shape(`/v1/core/plugins/${SEG}/reload`), scopes: {} },
+  { path: shape(`/v1/core/plugins/${SEG}/review`), scopes: {}, note: 'Clears a durable gate before Node code can run.' },
   // The owner's answer to an agent's install request. Unmappable for the same reason as the three above,
   // and it is the line that keeps the approval split honest: a frame that could POST an approval would be
   // able to answer the very question that exists because an agent must not install code.
@@ -198,8 +205,6 @@ const RULES: readonly RouteRule[] = [
   { path: shape(`/v1/core/tasks/${SEG}/config-trust`), scopes: {}, note: 'Acknowledging repo config trust is the user’s act, and the whole guard on the code-execution path.' },
   { path: shape(`/v1/core/tasks/${SEG}/preview-url`), scopes: {}, note: 'Read-shaped, but hands out a tunnel URL.' },
   { path: shape(`/v1/core/tasks/${SEG}/on-created`), scopes: {}, note: 'Runs the task setup script.' },
-  { path: shape(`/v1/core/tasks/${SEG}/mcp`), scopes: {}, note: 'MCP configuration for the task.' },
-  { path: shape(`/v1/core/tasks/${SEG}/mcp/starter`), scopes: {}, note: 'Read-shaped, but hands out an MCP starter configuration.' },
   { path: shape('/v1/core/integrations'), scopes: {}, note: 'Connected-account rows. Cross-plugin reads happen server-side via capabilities, never here.' },
   { path: shape(`/v1/core/integrations/${SEG}`), scopes: {} },
   { path: shape(`/v1/core/integrations/${SEG}/test`), scopes: {}, note: 'Spends another plugin’s credential.' },
@@ -220,13 +225,49 @@ const RULES: readonly RouteRule[] = [
   { path: shape('/v1/core/models/backends'), scopes: {}, note: 'The whole model roster. A plugin proxies its own through ctx.core.models.' },
 ]
 
-export type ApiDecision = { allowed: true } | { allowed: false; reason: string }
+export type ApiDecision = { allowed: true; path: string } | { allowed: false; reason: string }
 
 const DENY = (reason: string): ApiDecision => ({ allowed: false, reason })
 
 // The path a rule is matched against: query string dropped, since no rule keys off one and a `?` is
 // never part of a route's identity.
 const pathOnly = (path: string): string => path.split(/[?#]/, 1)[0]
+
+// URL parsing in custody is the final authority on the request target. Parse here with the same URL
+// semantics, then forward the parsed path so the route we authorize is the route the Node receives.
+// In particular, WHATWG URL parsing removes percent-encoded dot segments and treats backslashes as
+// separators. Encoded separators are refused too: a router or proxy must not be able to interpret a
+// segment as a different path shape after this check.
+function bridgePath(path: string): { target: string; forwarded: string } | null {
+  if (!path.startsWith('/') || path.startsWith('//') || path.includes('#')) return null
+  const target = pathOnly(path)
+  let url: URL
+  try {
+    url = new URL(path, 'https://acorn.invalid')
+  } catch {
+    return null
+  }
+  if (url.origin !== 'https://acorn.invalid' || url.pathname !== target) return null
+  for (const segment of target.split('/')) {
+    let decoded = segment
+    // Reject nested encodings as well as a single encoded separator. The Node router must never get
+    // a later chance to turn an opaque id into a path delimiter or traversal segment.
+    for (let depth = 0; depth < 8; depth += 1) {
+      let next: string
+      try {
+        next = decodeURIComponent(decoded)
+      } catch {
+        if (depth === 0) return null
+        break // A literal percent sign decoded from %25 is an opaque id, not another escape.
+      }
+      if (next === '.' || next === '..' || next.includes('/') || next.includes('\\')) return null
+      if (next === decoded) break
+      decoded = next
+      if (depth === 7) return null
+    }
+  }
+  return { target: url.pathname, forwarded: `${url.pathname}${url.search}` }
+}
 
 /**
  * Is this frame allowed to make this call? `api` is the plugin's manifest-declared scope list, read by
@@ -239,15 +280,14 @@ export function allowApi(
 ): ApiDecision {
   if (!isApiMethod(method)) return DENY(`unsupported method ${method}`)
 
-  // Shape first. A path that is not an absolute node path is not a path we can classify at all, and a
-  // protocol-relative `//host/x` would be a URL wearing a path's clothes.
-  if (!path.startsWith('/') || path.startsWith('//')) return DENY('path must be absolute')
-  const target = pathOnly(path)
-  if (target.split('/').includes('..')) return DENY('path must not traverse')
+  // Shape first. The path checked here is the path custody will send, including its query string.
+  const parsed = bridgePath(path)
+  if (!parsed) return DENY('path must be absolute and canonical')
+  const { target, forwarded } = parsed
 
   // The plugin's own namespace, always allowed: it is the plugin's own node half answering.
   const own = `${PLUGIN_NAMESPACE}${binding.pluginId}`
-  if (target === own || target.startsWith(`${own}/`)) return { allowed: true }
+  if (target === own || target.startsWith(`${own}/`)) return { allowed: true, path: forwarded }
   // Another plugin's namespace. Cross-plugin collaboration is a server-side capability, not an HTTP
   // call one plugin's UI makes into another's routes.
   if (target.startsWith(PLUGIN_NAMESPACE)) return DENY('another plugin’s namespace')
@@ -257,7 +297,7 @@ export function allowApi(
   const scope = rule.scopes[method]
   if (!scope) return DENY(`${method} ${target} cannot be granted to a plugin`)
   if (!binding.api.includes(scope)) return DENY(`missing scope ${scope}`)
-  return { allowed: true }
+  return { allowed: true, path: forwarded }
 }
 
 /**

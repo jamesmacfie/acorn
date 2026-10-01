@@ -35,6 +35,55 @@ afterEach(async () => {
 })
 
 describe('query cache capture lifecycle', () => {
+  it('clears after an outstanding capture and keeps only active queries in later snapshots', async () => {
+    const entered = deferred<void>(), release = deferred<void>()
+    const records = new Map<string, string>()
+    let first = true
+    const removeItem = vi.fn(async (key: string) => { records.delete(key) })
+    const { client, persistence } = setup({
+      getItem: async (key) => records.get(key),
+      setItem: async (key, value) => {
+        if (first) { first = false; entered.resolve(); await release.promise }
+        records.set(key, value)
+      },
+      removeItem,
+    })
+    await persistence.acquire().restored
+    client.setQueryData(['inactive'], 'discard')
+    client.setQueryData(['active'], 'keep')
+    const observer = new QueryObserver(client, { queryKey: ['active'], staleTime: Infinity, queryFn: async () => 'keep' })
+    const off = observer.subscribe(() => {})
+    const capture = persistence.flush()
+    await entered.promise
+    const clearing = persistence.clearInactive()
+    await Promise.resolve()
+    expect(removeItem).not.toHaveBeenCalled()
+    release.resolve()
+    await capture
+    await clearing
+    expect(records.size).toBe(0)
+    expect(client.getQueryData(['inactive'])).toBeUndefined()
+    expect(client.getQueryData(['active'])).toBe('keep')
+    await vi.advanceTimersByTimeAsync(5_000)
+    expect(JSON.parse(records.get('partition')!).clientState.queries.map((row: { queryKey: unknown[] }) => row.queryKey)).toEqual([['active']])
+    off()
+  })
+
+  it('finishes hydration before clearing restored inactive data', async () => {
+    const read = deferred<string>()
+    const seed = new QueryClient()
+    seed.setQueryData(['restored'], 'discard')
+    const removeItem = vi.fn(async () => {})
+    const { client, persistence } = setup({ getItem: () => read.promise, setItem: async () => {}, removeItem })
+    const lease = persistence.acquire()
+    const clearing = persistence.clearInactive()
+    read.resolve(snapshot(seed))
+    await lease.restored
+    await clearing
+    expect(client.getQueryData(['restored'])).toBeUndefined()
+    expect(removeItem).toHaveBeenCalledOnce()
+  })
+
   it('marks a 3,000-query invalidation burst dirty without traversing and captures once at five seconds', async () => {
     const { client, persistence, records, visits } = setup()
     const lease = persistence.acquire()

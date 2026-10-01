@@ -7,12 +7,9 @@ import { isFieldKind, laysOut, type Kind, type Node } from './node'
 // A node as everything above the painter reads one: the region store, the key layers, and every
 // component that takes a `ref`.
 //
-// `../keys/regions.ts` is 1,071 lines that walk `parent`, read `visible`, `isDestroyed` and
-// `focusable` and a rectangle off a node, and index a node among `getChildren()`. That vocabulary is
-// OpenTUI's, and this file is what answers it now that OpenTUI is gone: a `Renderable` here is our
-// own plain object with those names on its prototype. Rewriting the store to read `Node` directly is
-// a pass of its own and it is not this one — the names are the store's whole surface, so changing
-// them is a thousand lines of diff with no behaviour in it.
+// `../keys/regions.ts` owns focus and walks `parent` and `getChildren()`. It also reads `visible`,
+// `isDestroyed`, and `focusable`. This compatibility type supplies those OpenTUI-shaped fields on
+// a plain node without keeping another copy of focus state.
 //
 // **A prototype per kind, not fields per node.** An accessor per node would be ten `defineProperty`
 // calls on every one of the 1,708 nodes a pane builds. A named constructor function per kind also
@@ -55,7 +52,7 @@ export interface Renderable extends Node {
    *  a field nor a viewport, and both askers check.
    *
    *    handleKeyPress       the dispatcher's typing hand-off, which asks whatever has the keys
-   *                         (`../kit/asking.tsx § FieldApi`, `../keys/install.ts § typeInto`).
+   *                         (`../kit/asking/fieldRef.ts § FieldApi`, `../keys/install.ts § typeInto`).
    *    scrollChildIntoView  the store's reveal, which walks up to the viewports a stop is inside
    *                         (`../kit/scrolling.tsx`, `../keys/regions.ts § revealInViewports`). */
   handleKeyPress?: (key: KeyPress) => boolean
@@ -148,7 +145,7 @@ const accessors = {
   // them unconditionally — and deliberately so now that there is a caret to draw. A field asks the
   // store whether it has the keys and writes the answer into its own props, where paint reads it, so
   // the mirror stays one-way: nothing here holds focus state for the store to disagree with
-  // (`../kit/asking.tsx § fieldRef`, `../paint/paint.ts § drawField`).
+  // (`../kit/asking/fieldRef.ts § fieldRef`, `../paint/paint.ts § drawField`).
   focus: { value() {} },
   blur: { value() {} },
   getChildren: {

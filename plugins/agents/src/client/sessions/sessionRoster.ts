@@ -29,10 +29,14 @@ export type AgentSessionRosterRow =
  * Delegated managed sessions follow their managed parent. Provider-native subagents still follow
  * the provider session that reported them. Missing parents and malformed cycles stay selectable as
  * top-level rows instead of disappearing.
+ *
+ * Siblings keep the order of `sessions`. Provider subagents keep the provider's order unless
+ * `compareSubagents` is given.
  */
 export function agentSessionRoster(
   sessions: readonly AgentSession[],
   delegationBySession: Readonly<Record<string, AgentSessionDelegation>>,
+  compareSubagents?: (left: AgentSubagent, right: AgentSubagent) => number,
 ): AgentSessionRosterRow[] {
   const sessionsById = new Map(sessions.map((session) => [session.id, session]))
   const children = new Map<string, AgentSession[]>()
@@ -84,7 +88,8 @@ export function agentSessionRoster(
       delegation,
       managedParent,
     })
-    for (const subagent of session.subagents ?? []) {
+    const subagents = session.subagents ?? []
+    for (const subagent of compareSubagents ? [...subagents].sort(compareSubagents) : subagents) {
       rows.push({
         kind: 'provider-subagent',
         key: `${session.id}/${subagent.id}`,
@@ -112,4 +117,17 @@ export function delegationSummary(row: Extract<AgentSessionRosterRow, { kind: 'm
     ? `Delegated by ${delegation.owner.label}${delegation.owner.profileId ? ` (${delegation.owner.profileId})` : ''}`
     : row.managedParent ? 'Delegated' : 'Delegated · parent unavailable'
   return `${owner} · depth ${delegation.depth} · ${delegation.isolation}`
+}
+
+/** Direct managed children in the node's projected lineage, including children on another task. */
+export function liveDelegatedChildren(
+  parentSessionId: string,
+  sessions: readonly AgentSession[],
+  delegationBySession: Readonly<Record<string, AgentSessionDelegation>>,
+): AgentSession[] {
+  return sessions.filter((session) => {
+    const owner = delegationBySession[session.id]?.owner
+    return !session.archivedAt && !['archived', 'stopped', 'failed'].includes(session.runtimeState)
+      && owner?.kind === 'managed' && owner.parentSessionId === parentSessionId
+  })
 }

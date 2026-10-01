@@ -3,16 +3,17 @@
 // review rows in github" split would be a redesign of the component, and the changes pane already
 // renders NonCodeRow today. What each surface actually varies is passed in as props (composers,
 // resolve/reply callbacks, gap expansion), so nothing here reaches back into a plugin.
-import { createEffect, createSignal, For, Match, on, Show, Switch } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Match, on, Show, Switch } from 'solid-js'
 import CopyButton from '../components/inputs/CopyButton'
-import { fileStatusMeta } from '../lib/displayMeta'
+import { fileStatusMeta } from '../lib/rendering/displayMeta'
 import MentionTextarea from '../components/inputs/MentionTextarea'
 import type { DiffFile, DiffThread } from './diffModel'
 import { UserAvatar } from '../components/content/UserAvatar'
-import { fileAnchor, type CodeRow, type FileRow, type GapRow, type HunkRow, type LoadDiffRow, type LoadDiffStatus, type Row, type ThreadRowT } from './diffModel'
+import { buildDiffRows, fileAnchor, isCodeRow, plainTokenize, type CodeRow, type FileRow, type GapRow, type HunkRow, type LoadDiffRow, type LoadDiffStatus, type Row, type ThreadRowT } from './diffModel'
 import { markTokens, type FindHighlight } from './find'
-import { persistDraft } from '../lib/draftState'
+import { persistDraft } from '../lib/state/draftState'
 import { Button } from '../components/primitives'
+import SanitizedHtml from '../components/content/SanitizedHtml'
 
 export type LineComposerController = {
   isOpen: () => boolean
@@ -101,12 +102,28 @@ export function NonCodeRow(props: {
 // Per-file header bar: opens each file's section in the stacked diff, and doubles as the sticky
 // current-file header DiffView pins to the top of the scroller (no anchor id there).
 export function FileHead(props: {
-  file: DiffFile
+  /** Only what the header draws, so a document's file and a whole-patch file both fit. */
+  file: Pick<DiffFile, 'path' | 'status' | 'additions' | 'deletions'>
   anchorId?: string
   collapsed?: boolean
   onToggleCollapse?: (path: string) => void
+  /** Indexes into the path that a file filter matched, drawn as find marks. */
+  marks?: readonly number[]
 }) {
   const status = () => fileStatusMeta(props.file.status)
+  // The path as runs of marked and unmarked characters, so each run of hits is one mark.
+  const pathRuns = createMemo(() => {
+    const path = props.file.path
+    const marks = new Set(props.marks)
+    const runs: { text: string; mark: boolean }[] = []
+    for (let i = 0; i < path.length; i++) {
+      const mark = marks.has(i)
+      const last = runs[runs.length - 1]
+      if (last?.mark === mark) last.text += path[i]
+      else runs.push({ text: path[i]!, mark })
+    }
+    return runs
+  })
   return (
     <div class="diff-file-head copyable" id={props.anchorId}>
       <Show when={props.onToggleCollapse}>
@@ -123,7 +140,9 @@ export function FileHead(props: {
       <span class={`file-status file-status-${status().tone}`} title={status().label}>
         {status().letter}
       </span>
-      <span class="diff-file-path">{props.file.path}</span>
+      <span class="diff-file-path">
+        <For each={pathRuns()}>{(run) => (run.mark ? <mark class="ui-find-mark">{run.text}</mark> : run.text)}</For>
+      </span>
       <CopyButton text={() => props.file.path} title="Copy path" />
       <span class="file-stat add">+{props.file.additions ?? 0}</span>
       <span class="file-stat del">&#8722;{props.file.deletions ?? 0}</span>
@@ -159,6 +178,7 @@ export function DiffLine(props: {
   mentions?: string[]
   highlight?: FindHighlight
   openLine?: (row: CodeRow) => void
+  askAgent?: (row: CodeRow) => void
 }) {
   return (
     <>
@@ -166,6 +186,7 @@ export function DiffLine(props: {
         <span class="diff-gutter">
           {props.r.oldNo ?? ''}
           <OpenLineButton row={props.r} onOpen={props.openLine} />
+          <AskAgentButton row={props.r} onOpen={props.askAgent} />
         </span>
         <span class="diff-gutter">{props.r.newNo ?? ''}</span>
         <span class="diff-marker">{props.r.kind === 'insert' ? '+' : props.r.kind === 'delete' ? '\u2212' : ' '}</span>
@@ -183,6 +204,53 @@ export function DiffLine(props: {
   )
 }
 
+/**
+ * One file's patch as a read-only stacked diff in normal document flow: the file header, then its
+ * hunks. No comments, no gap expansion, no split view and no virtual list, for a surface that shows a
+ * small patch inside something else, such as an agent's step in its thread. Rows are built when this
+ * mounts, so put it inside a closed Fold and a long thread of them costs nothing until one is opened.
+ * Plain text, since the highlighter is asynchronous and these are short.
+ *
+ * `lineNumbers={false}` blanks both number columns, for hunks whose numbers count from the top of an
+ * excerpt rather than the file.
+ */
+export function StackedDiff(props: { path: string; patch: string; lineNumbers?: boolean }) {
+  const rows = createMemo(() => {
+    const file = { path: props.path, status: null, additions: null, deletions: null, sha: null, viewed: false, patch: props.patch }
+    return buildDiffRows(file, plainTokenize).flatMap<HunkRow | CodeRow>((row) => {
+      if (row.kind === 'hunk') return [row]
+      if (!isCodeRow(row)) return []
+      return [props.lineNumbers === false ? { ...row, oldNo: null, newNo: null } : row]
+    })
+  })
+  const head = createMemo(() => ({
+    path: props.path,
+    status: /^@@ -0,0 /.test(props.patch) ? 'added' : / \+0,0 @@/.test(props.patch) ? 'removed' : null,
+    additions: rows().filter((row) => row.kind === 'insert').length,
+    deletions: rows().filter((row) => row.kind === 'delete').length,
+  }))
+  return (
+    <div class="diff diff-stacked">
+      <div class="diff-rows">
+        <div class="diff-row diff-file-row"><FileHead file={head()} /></div>
+        <For each={rows()}>
+          {(row) => (
+            <Show when={isCodeRow(row) ? row : null} fallback={
+              <div class="diff-row diff-hunk"><span class="diff-hunk-text">{(row as HunkRow).text}</span></div>
+            }>
+              {(code) => (
+                <div class="diff-row" classList={{ 'diff-add': code().kind === 'insert', 'diff-del': code().kind === 'delete' }}>
+                  <DiffLine r={code()} canAdd={false} addComment={async () => {}} onMutated={() => {}} />
+                </div>
+              )}
+            </Show>
+          )}
+        </For>
+      </div>
+    </div>
+  )
+}
+
 export function SplitCell(props: {
   r: CodeRow | null
   gutter: number | null
@@ -193,6 +261,7 @@ export function SplitCell(props: {
   mentions?: string[]
   highlight?: FindHighlight
   openLine?: (row: CodeRow) => void
+  askAgent?: (row: CodeRow) => void
 }) {
   return (
     <div
@@ -209,6 +278,7 @@ export function SplitCell(props: {
             <span class="diff-gutter">
               {props.gutter ?? ''}
               <OpenLineButton row={r()} onOpen={props.openLine} />
+              <AskAgentButton row={r()} onOpen={props.askAgent} />
             </span>
             <span class="diff-marker">{r().kind === 'insert' ? '+' : r().kind === 'delete' ? '\u2212' : ' '}</span>
             <Show when={props.canAdd && props.composer}>
@@ -247,13 +317,28 @@ function OpenLineButton(props: { row: CodeRow; onOpen?: (row: CodeRow) => void }
   )
 }
 
+function AskAgentButton(props: { row: CodeRow; onOpen?: (row: CodeRow) => void }) {
+  return <Show when={props.onOpen && (props.row.newNo != null || props.row.oldNo != null)}>
+    <button
+      type="button"
+      class="diff-ask-btn"
+      title="Ask agent about this line"
+      aria-label={`Ask agent about ${props.row.path}:${props.row.newNo ?? props.row.oldNo}`}
+      onClick={(event) => { event.stopPropagation(); props.onOpen?.(props.row) }}
+    >✦</button>
+  </Show>
+}
+
 function CodeContent(props: { r: CodeRow; highlight?: FindHighlight }) {
   const hl = () => (props.highlight && props.highlight.ranges.length ? props.highlight : null)
+  // One `.diff-code` for both branches. In split mode it is the element that scrolls sideways, and a
+  // row's word spans arrive after its plain text: a span per branch would be replaced when they land,
+  // back at column 0.
   return (
-    <Show
-      when={props.r.words}
-      fallback={
-        <span class="diff-code">
+    <span class="diff-code">
+      <Show
+        when={props.r.words}
+        fallback={
           <Show
             when={hl()}
             fallback={<For each={props.r.toks}>{(t) => <span style={{ '--l': t.light, '--r': t.dark }}>{t.content}</span>}</For>}
@@ -269,11 +354,9 @@ function CodeContent(props: { r: CodeRow; highlight?: FindHighlight }) {
               </For>
             )}
           </Show>
-        </span>
-      }
-    >
-      {(words) => (
-        <span class="diff-code">
+        }
+      >
+        {(words) => (
           <Show
             when={hl()}
             fallback={
@@ -295,9 +378,9 @@ function CodeContent(props: { r: CodeRow; highlight?: FindHighlight }) {
               </For>
             )}
           </Show>
-        </span>
-      )}
-    </Show>
+        )}
+      </Show>
+    </span>
   )
 }
 
@@ -372,7 +455,7 @@ function ThreadRow(props: {
   // Persist an in-progress reply per thread so it survives navigation and reloads.
   persistDraft(() => `thread-reply:${props.thread.threadId}`, body, setBody)
   const resolved = () => optimisticResolved() ?? props.thread.resolved
-  const collapsed = () => resolved() && (props.collapse?.collapsed() ?? localCollapsed())
+  const collapsed = () => props.collapse?.collapsed() ?? localCollapsed()
   const setCollapsed = (value: boolean) => {
     if (props.collapse) props.collapse.setCollapsed(value)
     else setLocalCollapsed(value)
@@ -443,13 +526,11 @@ function ThreadRow(props: {
     >
       <div class="diff-thread-head">
         <span class="diff-thread-status">{resolved() ? 'Resolved' : 'Conversation'}</span>
-        <Show when={resolved()}>
-          <Button variant="bare" onPress={toggleCollapsed}>
-            {collapsed() ? 'Show' : 'Hide'}
-          </Button>
-        </Show>
         <Button variant="bare" disabled={busy()} onPress={toggleResolve}>
           {resolved() ? 'Unresolve' : 'Resolve'}
+        </Button>
+        <Button variant="bare" onPress={toggleCollapsed}>
+          {collapsed() ? 'Show' : 'Hide'}
         </Button>
       </div>
       <Show when={!collapsed()}>
@@ -460,7 +541,7 @@ function ThreadRow(props: {
                 <UserAvatar login={c.author} />
                 <strong>{c.author ?? 'unknown'}</strong>
               </div>
-              <div class="ui-markdown" innerHTML={c.body ?? ''} />
+              <SanitizedHtml html={c.body ?? ''} />
             </div>
           )}
         </For>

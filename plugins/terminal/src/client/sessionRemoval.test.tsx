@@ -8,6 +8,13 @@ import type { TerminalSession } from '../contract/wire'
 
 let roster: TerminalSession[] = []
 let failRead = false
+
+// These ownership gates supply a running terminal service; availability is covered by the host.
+vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@acorn/plugin-api/client')>(),
+  hasHostCapability: () => true,
+}))
+
 vi.mock('./terminalClient', () => ({ terminalApi: () => ({ list: async () => {
   if (failRead) throw Error('offline')
   return roster

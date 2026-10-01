@@ -1,4 +1,5 @@
-import { batch } from 'solid-js'
+import { batch, untrack } from 'solid-js'
+import { foreignRailSources, RAIL_SOURCE_VISIBILITY_MAX } from '@acorn/protocol/settingsPages.ts'
 import type { AgentContextContribution } from '@acorn/protocol/agentContext.ts'
 import { persistedStateRegistry, type PersistedStateSlice } from '../../../infra/persistence/persistedState'
 import { agentContextRegistry } from '../sources/agentContexts'
@@ -13,8 +14,8 @@ import { qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
 import { brandMarkRegistry, type BrandMark } from '../../../kit/tokens/brandMarks'
 import { railMarkerRegistry, type RailMarkerContribution } from '../rail/railMarkerFeed'
 import { clientCapability, clientCapabilityIds, provideClientCapability, requireClientCapability, type ClientCapabilityId } from '../../../infra/node/clientCapabilities'
-import type { Disposable, Registry } from '../../../kit/lib/registry'
-import { settingsRegistry, type SettingsContribution } from '../shell/settings'
+import type { Disposable, Registry } from '../../../kit/lib/state/registry'
+import { pluginSettingsPlacementProblem, settingsRegistry, type SettingsContribution } from '../shell/settings'
 import { sourceRegistry, type SourceContribution } from '../sources/sources'
 import { commandRegistry, stampCommandOwner, type ContributedCommand } from '../commands/commands'
 import { keybindingRegistry, type KeybindingContribution } from '../commands/keybindings'
@@ -181,7 +182,7 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
   // stores: a pane may declare a layout and regions, and the registry turns that into a component.
   // The plugin name goes to `register` as the owner, so each registry's side-map can answer who
   // contributed an entry and the seams that build a telemetry record can name it
-  // (kit/lib/registry.ts § the owner side-map).
+  // (kit/lib/state/registry.ts § the owner side-map).
   const own = <T extends { id: string }>(registry: { register: (entry: T, owner?: string) => Disposable }): ClientContributionPoint<T> => ({
     register: (entry: T) => {
       const provider = declaredProvider(entry)
@@ -220,6 +221,17 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
       }, name))
     },
   }
+  // `own`, plus the placement check. Core fills three of the nine settings groups itself, and a page
+  // filed under one of them, or under a scope that does not exist, is a mistake the author should
+  // hear about at activation rather than find as a page in the wrong place.
+  const settingsPages = own(settingsRegistry)
+  const ownSettingsPage: ClientContributionPoint<SettingsContribution> = {
+    register: (entry) => {
+      const problem = pluginSettingsPlacementProblem(entry)
+      if (problem) throw new Error(`Plugin '${name}' registered settings page '${entry.id}': ${problem}`)
+      settingsPages.register(entry)
+    },
+  }
   const ownExtension: ClientContributionPoint<CompiledExtension> = {
     register: (entry) => {
       record(extensionRegistry.register({ ...entry, pluginId: name, carrier: 'component' }, name))
@@ -236,7 +248,7 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
     keybindings,
     integrationFlows: ownIntegrationFlow,
     projectImporters: own(projectImporterRegistry),
-    settingsPages: own(settingsRegistry),
+    settingsPages: ownSettingsPage,
     slots: own(uiSlotRegistry),
     extensionPoints: ownExtensionPoint,
     extensions: ownExtension,
@@ -259,6 +271,24 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
       ids: () => clientCapabilityIds(),
     },
   }
+}
+
+// A settings page's **Show in left rail** switches may name only its own plugin's sources, because the
+// host draws the switch and a plugin must not hide core's rail or another plugin's. Checked once the
+// plugin has registered everything rather than as the page arrives, so a page registered before its
+// source is not refused for the order the author wrote them in.
+function railSwitchProblem(pluginId: string): string | undefined {
+  return untrack(() => {
+    const own = sourceRegistry.entries().map((source) => source.id).filter((id) => sourceRegistry.ownerOf(id) === pluginId)
+    for (const page of settingsRegistry.entries()) {
+      const ids = page.railSourceVisibility
+      if (!ids || settingsRegistry.ownerOf(page.id) !== pluginId) continue
+      if (ids.length > RAIL_SOURCE_VISIBILITY_MAX) return `settings page '${page.id}' with more than ${RAIL_SOURCE_VISIBILITY_MAX} railSourceVisibility ids`
+      const foreign = foreignRailSources(ids, own)[0]
+      if (foreign) return `settings page '${page.id}' with a railSourceVisibility id '${foreign}' that is not one of its sources`
+    }
+    return undefined
+  })
 }
 
 export function initClientPlugins(
@@ -303,6 +333,8 @@ export function initClientPlugins(
       // half-registered shell is worse than one that fails loudly at boot.
       const ctx = makeContext(plugin.name, (disposable) => disposables.push(disposable))
       plugin.init(ctx)
+      const railSwitch = railSwitchProblem(plugin.name)
+      if (railSwitch) throw new Error(`Plugin '${plugin.name}' registered ${railSwitch}`)
       enabled.push(plugin.name)
       if (plugin.activate) activations.push({ plugin, ctx, disposables })
     }

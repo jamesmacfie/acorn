@@ -9,7 +9,8 @@ Typed dashboard panels use the matching device-only `/v1/core/dashboards/:operat
 The Node exposes one Hono application under `/v1`. It serves JSON routes and one authenticated
 WebSocket. It serves no HTML, JavaScript, or static assets.
 
-Route and response types live in `packages/protocol/src/api.ts`; the server composition is
+Core route builders and response types are published through `@acorn/protocol/api.ts`. Their source is
+grouped by contract owner under `packages/protocol/src/transport/api/`. The server composition is
 `packages/node-core/src/server/index.ts`; plugin route declarations are registered by each Node
 plugin. The table below maps routes by responsibility. Use the route modules for fields and
 validation details when changing a contract.
@@ -23,6 +24,10 @@ validation details when changing a contract.
 | Core | `/v1/core/*` | device or permitted internal principal |
 | Plugin | `/v1/p/<plugin>/*` | device or permitted internal principal |
 | Events/streams | `GET /v1/events` | authenticated WebSocket upgrade |
+
+An authenticated `GET /v1/node` response includes `nodeId`. A CLI-owned background Node also
+includes an optional `serviceInstanceId` UUID for local lifecycle ownership checks. The
+unauthenticated probe never exposes either field.
 
 A request that reaches a node through the desktop broker is killed after 30 seconds. That is less
 than one model call is allowed to take, so a caller that knows its route is slow passes `timeoutMs`
@@ -64,6 +69,13 @@ an exhausted attempt budget, a wrong code, or a malformed body. A caller cannot 
 hit, so there is no oracle for "right code, wrong something". The attempt counter increments before
 the code comparison runs, so racing concurrent guesses cannot dodge the budget.
 
+The route accepts at most 4 KiB of raw request bytes. It checks `Content-Length` and counts streamed
+bytes before JSON parsing. An oversized request returns `413 payload_too_large` and spends no code
+attempt. Ordinary malformed requests retain `401 pairing_failed`. A separate per-Node ceiling admits
+20 requests per minute, including malformed and oversized requests, then returns `429 rate_limited`.
+Custody's first-contact probe has an absolute eight-second deadline across connection, headers, and
+body, and a 16 KiB response ceiling. Pairing uses the pinned connection with an eight-second deadline.
+
 `POST /v1/pair` returns the device's bearer token once, in that response, and the node stores only
 its hash from then on. The node's unauthenticated probe response carries the TLS certificate
 fingerprint for the new client to compare against the node's own screen. Sending the fingerprint over
@@ -80,7 +92,7 @@ paired device already has full owner authority, so there is no separate self-rev
 pair result also carries `baseline: "acorn-1"`. A client rejects a missing or different baseline
 before pairing or opening a WebSocket, even when the numeric protocol is 1.
 
-The protocol number has one meaning. `NODE_PROTOCOL_VERSION` (`packages/protocol/src/node.ts`) is the
+The protocol number has one meaning. `NODE_PROTOCOL_VERSION` (`packages/protocol/src/device/node.ts`) is the
 protocol major. There is no minor or separate feature handshake. Each side refuses a major it does not speak. The pairing probe refuses
 before pairing, and the broker re-probes `GET /v1/node` on every connect, producing the
 `incompatible` connection state and the `protocol_mismatch` error code. Checking only at pairing is
@@ -139,7 +151,10 @@ unchanged.
 `Idempotency-Key` is optional for most mutations and required by agent session creation, agent-turn
 enqueue, and request resolution. A device-keyed replay stores the request hash and final response;
 reuse with a different body returns `idempotency_conflict`. Internal callers have no device replay
-namespace.
+namespace. The generic replay row expires after 24 hours. A crash after a domain write but before
+the replay save can still leave an ambiguous result; callers should inspect known resource IDs and
+retain their key across retries. Managed agent session and turn creation also keep plugin-owned
+operation records.
 
 The client mints the key, never the broker: only the call site knows that a retry is the same
 logical mutation, and a broker-minted key would defeat replay entirely.
@@ -176,11 +191,14 @@ itself is broken, and marking it retryable would invite a client to hammer it.
 | `GET` | `/v1/core/devices` | List paired devices |
 | `DELETE` | `/v1/core/devices/:id` | Revoke a device |
 | `GET` | `/v1/core/plugins` | List plugin status and capabilities |
+| `POST` | `/v1/core/plugins/:id/cli/:name` | Invoke one active manifest CLI command with `{ input }`; Node rechecks device, capability, resource scope, and JSON schemas |
+| `GET` | `/v1/core/plugins/:id/bundles/:hash` | Read the exact active or installed client bundle for device custody |
 | `PUT` | `/v1/core/plugins/:name` | Enable/disable an optional plugin |
 | `POST` | `/v1/core/plugins/:id/reload` | Swap a loaded plugin's node half in the running process |
 | `POST` | `/v1/core/plugins/requests/:requestId` | Answer an agent-raised install request (`approved`/`denied`) |
 | `GET` | `/v1/core/audit` | Read the retained audit trail |
 | `GET` | `/v1/core/security` | Read Node security posture |
+| `GET` | `/v1/core/storage` | Node memory and database, plugin database, and blob cache sizes |
 | `GET` | `/v1/core/attachment` | Which control plane this Node is attached to, if any |
 | `DELETE` | `/v1/core/attachment` | Detach: revoke the control plane's device row and forget it |
 | `GET` | `/v1/core/nodes` | Nodes this Node's plugins know about, plus which verbs each provider declared |
@@ -202,6 +220,16 @@ These routes are device-only. Backup uses Node filesystem paths, so an internal 
 reach it. Schedules are the same class for a different reason: a schedule is code the node runs
 unattended, so declaring one is a way to make code run later. For more information, see
 [the schedules doc](./schedules.md).
+
+Each plugin roster row may contain `active`, the declaration and client hash captured with its running
+loaded runtime, alongside `installed`, the current package on disk. `active: null` says no loaded
+runtime is active; an omitted field is an older response. `running` and `state` still describe the
+Node's activation and restart status. The bundle route resolves by the requested hash, including
+retained active bytes after an on-disk update, so custody can verify the hash before any trust decision.
+CLI command discovery uses only `active.contributions.cliCommands` on a running loaded Node plugin.
+The invocation route resolves the descriptor again at call time and requires an `Idempotency-Key`
+for write commands. It calls only the plugin's reserved `/v1/p/<id>/cli/<name>` path and returns
+`{ result }` after validating the plugin response. See [CLI command authoring](./plugin-authoring/cli-commands.md).
 
 `GET /v1/core/plugins` also carries `requests`, the queue of installs an agent has asked for and the
 owner has not answered, and the decision route closes one. A task-scoped agent can raise a request
@@ -292,14 +320,14 @@ The core worktree router covers project configuration and task lifecycle surface
 /v1/core/task-statuses
 /v1/core/projects/:id/run-targets
 /v1/core/projects/:id/config
+/v1/core/projects/:id/{mcp,mcp/starter}
 /v1/core/tasks/:id/{preview-url,on-created,archive,restore}
-/v1/core/tasks/:id/{mcp,mcp/starter}
 /v1/core/tasks/:id/config-trust
 /v1/core/tasks/:id/run/*
 ```
 
 The exact method/body contracts are in `packages/node-core/src/server/routes/projects/worktree.ts`,
-`configTrust.ts`, and `harness.ts`. Executable repo configuration is hash-gated before it can be
+`projects.ts`, `configTrust.ts`, and `harness.ts`. Executable repo configuration is hash-gated before it can be
 used.
 
 ## Plugin routes
@@ -325,10 +353,49 @@ are authoritative.
 GitHub reads use the plugin SQLite mirror with TTL/ETag revalidation where supported. Patch and file
 bodies use the shared immutable blob cache. GitHub writes update or invalidate the affected mirror.
 
+The pull request read routes, with types in `plugins/github/src/shared/api.ts`:
+
+| Route | Response |
+| --- | --- |
+| `GET …/pulls/:number` | `PullDetail`, with every GraphQL connection exhausted and child lists in GitHub's order |
+| `GET …/pulls/:number/files` | `PullFilesResponse`: `{ files, completeness }`, files in `position` order with patch bodies |
+| `GET …/pulls/:number/files?summary=1` | `PullFilesResponse` with `patch: null` on every file and no blob reads |
+| `GET …/pulls/:number/files?path=P` | `PullFilesResponse` holding that one file, when the pull has it |
+| `GET …/pulls/:number/diff` | `PullDiffResponse`: `{ document, completeness }`, the files as a diff document with no patch text |
+| `POST …/pulls/batch` | `PullBatchItem[]`: `{ number, detail, files? }`; `files` is absent for mode `none` or a failed files refresh |
+| `GET …/compare?base=&head=` | `Compare`: `{ aheadBy, document, completeness, commits }` |
+| `POST …/:owner/:repo/diff/segments` | `DiffSegmentPayload[]` for 1 to 32 `requests` of `{ path, patchKey, ordinal }`, in request order |
+| `POST …/:owner/:repo/diff/search` | `DiffSearchPage`: up to 500 matches over the named `files`, reading at most 1,000 segments, with a `nextCursor`. A page can be empty and still carry a cursor |
+
+`completeness` is `PullTopologyCompleteness`. `{ kind: 'complete' }` means the list is everything
+GitHub has. `{ kind: 'incomplete', cause: 'upstream-cap', resource, received, reportedTotal, limit }`
+means GitHub's own ceiling cut it short: resource `files` at 3,000 or `compare-files` at 300.
+`reportedTotal` is GitHub's count, or null when it gave none. A failed refresh is not incomplete: the
+route serves the previous mirror stale, or fails cold.
+
+`PullFile` has `position`, its zero-based place in GitHub's list, and `patchState`. With
+`patchState: 'available'`, `patchKey` is the `sha256:<hex>` digest of the patch text, and `patch` is
+the body unless the read was a summary. With `patchState: 'unavailable'`, GitHub sent no patch, and
+`patchKey` and `patch` are null. `sha` stays the new-side blob, for `blobs/:sha`. `?force=true` on the
+detail, files and diff reads blocks on a full refresh. A batch refresh that fails with `401`, `403`, or
+`429` fails the batch; any other failure leaves that pull's previous mirror.
+
+A diff document is `DiffDocumentTopology` from `@acorn/diff-document` ([diff-rendering.md](./diff-rendering.md)
+§ The document): every file with its segment descriptors, totals, and a revision. The two repository
+routes read what a pull's diff or a compare preview named. A segment request's `patchKey` must be a
+`sha256:<hex>` digest; a digest whose body this node does not hold answers `404 segment_not_found`,
+an ordinal past the file's last segment `400 bad_ordinal`, and more than 32 requests, none, or a
+malformed body `400 bad_request`. A search body is `{ query, caseSensitive, cursor, files }` with a
+query of at most 256 characters and at most 5,000 files; a cursor this node did not write answers
+`400 bad_cursor`. The query is never logged. A path in either body is at most 4,096 characters, as
+it is on the Changes document routes.
+
 ### Agents
 
 ```text
 /v1/p/agents/providers
+/v1/p/agents/footprint
+/v1/p/agents/stop-idle
 /v1/p/agents/usage
 /v1/p/agents/pricing
 /v1/p/agents/concurrency
@@ -428,13 +495,22 @@ allowed by the definition's structural schemas.
 The runner refuses a required input with no value and a name the definition does not declare. `GET` on the same path answers the task's file layers, plus the workspace's rows for a
 device caller. `POST .../runs/:runId/retry` takes `{ stepId, prompt? }` and puts a
 failed node back to pending. Retry answers 403 to a task-confined caller, because an agent could
-otherwise loop a failed step past the rail that stopped it. Every other run-scoped path treats a
-foreign or unknown run as a 404.
+otherwise loop a failed step past the rail that stopped it. `POST .../runs/:runId/gate` takes
+`{ stepId, approved, values? }` and answers `{ ok: true }`. `values` answers a gate's form and comes
+only with an approval ([execution](./workflows/execution.md#human-gates)). The route answers 403 to a
+task-confined caller, even on its own run, because the gate exists to stop that agent. It answers 404
+`not_found` when the run has no such step, 409 `gate-resolved` when another answer already landed,
+and 400 `gate-invalid` with one line per refused form field, leaving the gate waiting. Every other
+run-scoped path treats a foreign or unknown run as a 404.
 
-`GET /v1/p/workflows/tasks/:id/workflows/runs` returns task-scoped run projections. Each projection
+`GET /v1/p/workflows/tasks/:id/workflows/runs` returns task-scoped run projections.
+`GET /v1/p/workflows/workflows/runs/:runId` returns one run projection. Unknown and foreign run IDs
+return the same 404 to task-confined callers. Each projection
 has explicit root and parent run IDs, the corresponding task IDs and names, depth, and usage. A root
 reports aggregate tree usage; a child reports only its own turns.
-`GET /v1/p/workflows/workflows/runs/:runId/steps` adds a `children` list to each dispatch step. Every child
+`GET /v1/p/workflows/workflows/runs/:runId/step-statuses` returns up to 200 `{ id, status }` rows
+with a `truncated` marker for bounded polling. `GET /v1/p/workflows/workflows/runs/:runId/steps`
+adds a `children` list to each dispatch step. Every child
 summary carries its task and run IDs, item key, dispatch and run status, bounded result or error, and
 usage. These are durable reads, not event payload reconstruction.
 
@@ -506,7 +582,7 @@ task-scoped credentials can reach only their own task notes.
 
 | Plugin | Route surface |
 | --- | --- |
-| `changes` | task-local Git actions, a model-written commit message, and review notes |
+| `changes` | task-local Git actions, the working tree's diff document, a model-written commit message, and review notes |
 | `database` | task-scoped PostgreSQL schema/query operations |
 | `docker` | Node inventory and task container actions |
 | `editor` | task file reads/writes and search |
@@ -516,6 +592,25 @@ task-scoped credentials can reach only their own task notes.
 | `linear` | projects, issues, comments, reference resolution, and rail rows (loaded package) |
 | `rollbar` | normalized items, occurrences, and details |
 | `preview` | preview rules, node-owned URL resolution, and recipe selection |
+
+### Changes diff document
+
+The Changes pane reads its stacked diff as a document ([diff-rendering.md](./diff-rendering.md)
+§ Data flow), one staging area at a time, with types in `plugins/changes/src/shared/api.ts`:
+
+| Route | Body | Response |
+| --- | --- | --- |
+| `POST /v1/p/changes/tasks/:id/local/document` | `{ scope, files: { path, key }[] }`, at most 5,000 files | `{ files: { path, patchKey, segments }[] }`, in request order |
+| `POST /v1/p/changes/tasks/:id/local/document/segments` | `{ scope, requests }`, 1 to 32 | `DiffSegmentPayload[]` |
+| `POST /v1/p/changes/tasks/:id/local/document/search` | `{ scope, query, caseSensitive, cursor, files }` | `DiffSearchPage` |
+
+`scope` is `staged` or `unstaged`. `key` is the pane's status key for the file; the node diffs again
+only the files whose key moved. A null `patchKey` means the file has no diff in that scope. A segment
+or search request naming a digest that is not the one the last document gave that file, or not what
+git produces now when the node holds no document for it, answers `409 revision_conflict`, and the
+pane reads the document again. A path is validated where it reaches git, as the other routes do. A
+file git cannot read answers a null `patchKey` rather than failing the document. A task with no
+worktree answers `404 not_found`.
 
 ### Command palette routes
 
@@ -600,11 +695,21 @@ A renderer's online reattach is idempotent after this automatic replay. Disposin
 queued command ownership and removes its desired state; delivery across disposal is not guaranteed.
 Cleanup targeting a captured Node cannot create a retired viewer or change active event interest.
 
+Node and custody each enforce an 8 MiB incoming event-message ceiling before parsing or dispatch.
+Oversized messages close with WebSocket code 1009. The open channel envelope remains plugin-owned;
+the transport contains synchronous and asynchronous owner-handler failures within the connection.
+
 The preview tunnel (`/v1/tunnel`, `packages/node-core/src/server/transport/tunnel.ts`) is a separate upgrade on
 the same listener, resolved from `?task=<uuid>&port=<n>` and gated by the same device and
 internal-token authorization as `/v1/events`. It forwards raw bytes to `127.0.0.1` on the named port
 only, never to a resolved hostname. Only declared ports are tunnellable, and there is no general
 SOCKS proxy to whatever else listens on the node's loopback.
+
+Both tunnel receivers enforce 64 KiB per message. Both senders split arbitrary TCP reads, including
+the custody listener's authorized request head and any body bytes read beside it, into ordered slices.
+Each sender waits for a slice's write callback before sending the next and resumes TCP reads after
+the complete chunk. Total HTTP streams can exceed the message ceiling without dropped or reordered
+bytes. Oversized incoming messages close with code 1009 and close the corresponding TCP pipe.
 
 A port counts as declared when the task's run bridge names it as a run target's URL, or when the
 project's `previewMode` is `'port'` or `'url'`. `previewMode: 'script'` is not a source, because its

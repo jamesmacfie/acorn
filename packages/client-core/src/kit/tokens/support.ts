@@ -67,6 +67,13 @@ export const NODE_SUPPORT = {
   TabPanel: { dom: 'full', tui: 'full' },
   // The gap that pushes what follows to the far end of a toolbar.
   ToolbarSpacer: { dom: 'full', tui: 'full' },
+  // A settings page's titled group and its one setting. Nodes rather than a convention, so a plugin's
+  // page lines up with core's and search has an anchor to land on (docs/frontend.md § Settings).
+  SettingsSection: { dom: 'full', tui: 'full' },
+  SettingRow: {
+    dom: 'full', tui: 'reduced',
+    loss: 'a row whose value is set elsewhere names where and draws no control, so the value this machine holds is not shown',
+  },
 
   // Showing
   Text: { dom: 'full', tui: 'full' },
@@ -130,6 +137,10 @@ export const NODE_SUPPORT = {
     dom: 'full', tui: 'reduced',
     loss: 'no per-file collapse control; the path and the counts only',
   },
+  StackedDiff: {
+    dom: 'full', tui: 'reduced',
+    loss: 'no intra-line word highlight, and the header has no copy control',
+  },
   NonCodeRow: {
     dom: 'full', tui: 'reduced',
     loss: 'a dim line saying what is not being shown, with no control to act on it',
@@ -148,14 +159,14 @@ export const NODE_SUPPORT = {
   },
   Icon: {
     dom: 'full', tui: 'reduced',
-    loss: 'a glyph from the name table, an emoji as itself, and nothing for a name with neither',
+    loss: 'a one-cell glyph from apps/tui/src/kit/glyphs.ts, and nothing for an unmapped name or literal',
   },
 
   // Asking
   Button: { dom: 'full', tui: 'full' },
   ConfirmButton: { dom: 'full', tui: 'full' },
   IconButton: { dom: 'full', tui: 'reduced',
-    loss: 'the mark is one cell from apps/tui/src/kit/glyphs.ts rather than a drawn icon, and a name with no glyph there falls back to the `label`, which is why the kit makes that prop mandatory' },
+    loss: 'the text label is the control; the icon name is not drawn' },
   Input: { dom: 'full', tui: 'full' },
   Textarea: { dom: 'full', tui: 'full' },
   Select: { dom: 'full', tui: 'full' },

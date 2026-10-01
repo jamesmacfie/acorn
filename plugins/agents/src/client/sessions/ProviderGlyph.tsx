@@ -2,7 +2,7 @@ import { brandMarkRegistry } from '@acorn/plugin-api/client'
 import { Icon } from '@acorn/plugin-api/ui'
 
 // A provider's mark, drawn wherever a surface names the provider: the onboarding cards, the New
-// picker's rows, and each provider's block in Settings -> Agent defaults.
+// picker's rows, and each harness's row and block in Settings -> Harnesses and defaults.
 //
 // The name comes off the descriptor, which is the node's answer rather than this file's guess, so a
 // contributed harness gets the same treatment as the two built-in ones. It may be a `brand:` mark, a

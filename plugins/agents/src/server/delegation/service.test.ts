@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestNodeContext, type TestNodeContext } from '@acorn/plugin-api/testkit'
 import type { ToolContext } from '@acorn/plugin-api/node'
-import type { AgentProviderDescriptor } from '../../contract/wire.ts'
+import type { AgentProviderDescriptor, AgentRequestKind } from '../../contract/wire.ts'
 import type { TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
 import { AgentStore } from '../sessions/store'
 import type { ManagedAgentRuntime } from '../sessions/runtime'
 import { AgentDelegationStore } from './store'
 import { AgentDelegationService } from './service'
+import type { CustomAgent } from '../../shared/customAgents'
 
 const PROVIDER: AgentProviderDescriptor = {
   id: 'codex',
@@ -49,6 +50,7 @@ describe('agent delegation service', () => {
   let service: AgentDelegationService
   let terminals: TerminalSession[]
   let runtime: ManagedAgentRuntime
+  let customAgents: CustomAgent[]
   let childTasks: Map<string, { parentTaskId: string; title: string; branch: string }>
   let createChildTask: ReturnType<typeof vi.fn<(
     parentTaskId: string,
@@ -75,9 +77,11 @@ describe('agent delegation service', () => {
       childTasks.set(intendedChildId, { parentTaskId, ...seed })
       return intendedChildId
     })
+    customAgents = []
     runtime = {
       store: sessions,
-      providers: async () => [PROVIDER],
+      usableProvider: async (pick: (provider: typeof PROVIDER) => boolean) => [PROVIDER].find(pick),
+      customAgents: async () => customAgents,
       acceptSession: vi.fn(async (input: Parameters<ManagedAgentRuntime['acceptSession']>[0]) => sessions.createSession(input, PROVIDER)),
       enqueueTurn: vi.fn(async (sessionId: string, input: Parameters<ManagedAgentRuntime['enqueueTurn']>[1]) =>
         (await sessions.enqueueTurn(sessionId, input)).turn),
@@ -173,6 +177,36 @@ describe('agent delegation service', () => {
       },
     })
     expect((await sessions.turn(first.turnId!))?.source).toBe('delegation')
+  })
+
+  it('starts a custom agent by name, with its options and a ceiling no wider than its own', async () => {
+    customAgents = [{
+      id: 'agent-1', name: 'Bug reviewer', providerId: 'codex', profileId: 'codex',
+      options: { reasoning: 'high', model: 'gpt-codex' }, maxToolRisk: 'read', source: { kind: 'user' },
+    }]
+    const parent = await managedCaller()
+    const result = await service.spawn({
+      title: 'Review',
+      prompt: 'Review the diff.',
+      isolation: 'shared',
+      agent: 'bug reviewer',
+      configOptions: { model: 'gpt-codex-mini' },
+    }, context(parent.taskId, parent.id, 'custom-agent'))
+
+    expect(runtime.acceptSession).toHaveBeenCalledWith(expect.objectContaining({ customAgentId: 'agent-1' }), expect.any(String))
+    const child = await sessions.requireSession(result.sessionId!)
+    // The caller's own choice for this child wins over the agent's.
+    expect(child.config.requestedConfigOptions).toEqual({ reasoning: 'high', model: 'gpt-codex-mini' })
+    expect(child.config.toolCeiling).toEqual({ allow: ['agent_spawn', 'agent_read', 'task_context'], maxRisk: 'read' })
+
+    await expect(service.spawn(
+      { title: 'Nobody', prompt: 'x', isolation: 'shared', agent: 'Missing' },
+      context(parent.taskId, parent.id, 'missing-agent'),
+    )).rejects.toThrow("No custom agent is called 'Missing'")
+    await expect(service.spawn(
+      { title: 'Clash', prompt: 'x', isolation: 'shared', agent: 'Bug reviewer', profileId: 'claude-code' },
+      context(parent.taskId, parent.id, 'clashing-agent'),
+    )).rejects.toThrow('Leave profileId out')
   })
 
   it('does not accept a spawn until restart reconciliation has finished', async () => {
@@ -449,6 +483,17 @@ describe('agent delegation service', () => {
       { title: 'No id', prompt: 'No id', isolation: 'shared' },
       { ...context(ordinary.taskId, ordinary.id), callId: undefined },
     )).rejects.toMatchObject({ kind: 'bad_request' })
+  })
+
+  it('withholds delegation from durable workflow sessions even without a config marker', async () => {
+    const workflow = await sessions.createSession({
+      taskId: '11111111-1111-4111-8111-111111111111', providerId: 'codex', profileId: 'codex',
+      title: 'Workflow without legacy metadata', kind: 'workflow', config: {},
+    }, PROVIDER)
+    expect(await service.canSpawn(context(workflow.taskId, workflow.id))).toBe(false)
+    await expect(service.spawn({ title: 'No', prompt: 'No', isolation: 'shared' }, context(workflow.taskId, workflow.id)))
+      .rejects.toMatchObject({ kind: 'not_found' })
+    expect(runtime.acceptSession).not.toHaveBeenCalled()
   })
 
   it('pages and folds useful output while omitting verbose tool payloads', async () => {
@@ -738,6 +783,20 @@ describe('agent delegation service', () => {
     }
     const reports = async (sessionId: string) =>
       (await sessions.snapshot(sessionId)).turns.filter((turn) => turn.source === 'delegation_report')
+    const block = async (
+      sessionId: string,
+      turnId: string,
+      kind: AgentRequestKind,
+      requestId = `${kind}-request`,
+      detail = 'Review the requested action.',
+    ) => {
+      await sessions.startTurn(turnId)
+      await sessions.recordEvent(sessionId, turnId, {
+        type: 'request', requestId, kind, title: 'Child needs input', detail,
+      })
+      await service.reports.deliverRequest(sessionId, requestId)
+      return (await sessions.request(sessionId, requestId))!
+    }
 
     it('marks the child turn with its owner and tells the child its role', async () => {
       const { parent, child } = await spawnChild()
@@ -760,6 +819,127 @@ describe('agent delegation service', () => {
       expect(queued[0]!.input).toContainEqual(expect.objectContaining({
         type: 'context', source: 'delegation_report', label: 'Child', resourceId: child.sessionId,
       }))
+    })
+
+    it.each([
+      ['permission', 'permission'],
+      ['question', 'an answer'],
+      ['elicitation', 'elicitation input'],
+    ] as const)('reports a pending %s request to the owner once', async (kind, need) => {
+      const { parent, child } = await spawnChild()
+      const request = await block(child.sessionId!, child.turnId!, kind)
+      await service.reports.deliverRequest(child.sessionId!, request.providerRequestId)
+
+      const queued = await reports(parent.id)
+      expect(queued).toHaveLength(1)
+      expect(queued[0]).toMatchObject({
+        source: 'delegation_report',
+        status: 'queued',
+        effectivePolicy: { reportFrom: { sessionId: child.sessionId, turnId: child.turnId } },
+      })
+      expect(queued[0]!.input[0]).toMatchObject({
+        type: 'text',
+        text: expect.stringContaining(`Child is blocked and needs ${need}.`),
+      })
+      expect(queued[0]!.input[0]).toMatchObject({
+        type: 'text',
+        text: expect.stringContaining('A human must resolve it in the child session'),
+      })
+      expect(queued[0]!.input).toContainEqual(expect.objectContaining({
+        type: 'context', source: 'delegation_report', label: 'Child', resourceId: child.sessionId,
+        deepLink: { pane: 'agents', intent: { sessionId: child.sessionId } },
+      }))
+      expect(await sessions.request(child.sessionId!, request.providerRequestId)).toMatchObject({
+        id: request.id, status: 'pending', resolution: null,
+      })
+    })
+
+    it('keeps request detail bounded and uses the request row id for replay protection', async () => {
+      const { parent, child } = await spawnChild()
+      const request = await block(child.sessionId!, child.turnId!, 'permission', 'provider-request', 's'.repeat(2_000))
+      await service.reports.deliverRequest(child.sessionId!, request.providerRequestId)
+
+      const [report] = await reports(parent.id)
+      expect(report?.input[0]).toMatchObject({ type: 'text', text: expect.stringContaining('s'.repeat(400)) })
+      expect((report!.input[0] as { text: string }).text).not.toContain('s'.repeat(501))
+      expect(await sessions.turnForIdempotency(parent.id, `delegation-request:${request.id}`)).toMatchObject({ id: report?.id })
+      expect(await reports(parent.id)).toHaveLength(1)
+    })
+
+    it('leaves an earlier interactive turn ahead of a blocked-request report', async () => {
+      const { parent, child } = await spawnChild()
+      const { turn: interactive } = await sessions.enqueueTurn(parent.id, {
+        input: [{ type: 'text', text: 'User work first.' }],
+        source: 'interactive', effectivePolicy: {}, idempotencyKey: 'interactive-before-request',
+      })
+      await block(child.sessionId!, child.turnId!, 'question')
+
+      const [report] = await reports(parent.id)
+      expect(interactive.ordinal).toBeLessThan(report!.ordinal)
+      expect((await sessions.nextQueuedTurn(parent.id))?.id).toBe(interactive.id)
+    })
+
+    it('does not report a request in a manually entered child turn', async () => {
+      const { parent, child } = await spawnChild()
+      const { turn } = await sessions.enqueueTurn(child.sessionId!, {
+        input: [{ type: 'text', text: 'Manual follow-up.' }],
+        source: 'interactive', effectivePolicy: {}, idempotencyKey: 'manual-child-turn',
+      })
+      await block(child.sessionId!, turn.id, 'permission', 'manual-request')
+
+      expect(await reports(parent.id)).toHaveLength(0)
+    })
+
+    it('requires reportTo on the request turn even when the session has a parent', async () => {
+      const { parent, child } = await spawnChild()
+      const { turn } = await sessions.enqueueTurn(child.sessionId!, {
+        input: [{ type: 'text', text: 'Unaddressed delegation.' }],
+        source: 'delegation', effectivePolicy: {}, idempotencyKey: 'unaddressed-delegation',
+      })
+      await block(child.sessionId!, turn.id, 'permission', 'unaddressed-request')
+
+      expect(await reports(parent.id)).toHaveLength(0)
+    })
+
+    it('cannot route a child request to another session through reportTo alone', async () => {
+      const { parent, child } = await spawnChild()
+      const other = await managedCaller(parent.taskId)
+      const { turn } = await sessions.enqueueTurn(child.sessionId!, {
+        input: [{ type: 'text', text: 'Forged delegated turn.' }],
+        source: 'delegation', effectivePolicy: { reportTo: other.id }, idempotencyKey: 'foreign-report-to',
+      })
+      await block(child.sessionId!, turn.id, 'question', 'foreign-request')
+
+      expect(await reports(parent.id)).toHaveLength(0)
+      expect(await reports(other.id)).toHaveLength(0)
+    })
+
+    it('does not report a terminal-owned child request without a managed owner', async () => {
+      const taskId = '11111111-1111-4111-8111-111111111111'
+      terminals.push(terminal('terminal-owner', taskId))
+      const child = await service.spawn(
+        { title: 'Terminal child', prompt: 'Go.', isolation: 'shared' },
+        context(taskId, 'terminal-owner', 'terminal-request-spawn'),
+      )
+      const request = await block(child.sessionId!, child.turnId!, 'elicitation')
+
+      expect((await sessions.turn(child.turnId!))?.effectivePolicy.reportTo).toBeUndefined()
+      expect(await sessions.request(child.sessionId!, request.providerRequestId)).toMatchObject({ status: 'pending' })
+      expect(await reports(child.sessionId!)).toHaveLength(0)
+    })
+
+    it('does not recreate request reports for expired requests during startup reconciliation', async () => {
+      const { parent, child } = await spawnChild()
+      await sessions.startTurn(child.turnId!)
+      await sessions.recordEvent(child.sessionId!, child.turnId, {
+        type: 'request', requestId: 'expired-request', kind: 'permission', title: 'Approval needed',
+      })
+      await sessions.expirePendingRequests(child.sessionId!)
+
+      await reconcileAfterRestart()
+
+      expect(await sessions.request(child.sessionId!, 'expired-request')).toMatchObject({ status: 'expired' })
+      expect(await reports(parent.id)).toHaveLength(0)
     })
 
     it('does not report a turn before it settles, or to a terminal owner', async () => {

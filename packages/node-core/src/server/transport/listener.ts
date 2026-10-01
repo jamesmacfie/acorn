@@ -268,12 +268,13 @@ export async function drainWithDeadline(
 // the composition root, which reads it from the packaged app and passes it in ServiceStartConfig. The
 // plain-Node entry has no packaged version, and saying so is more useful than parsing a package.json
 // that will not exist beside the bundled artifact.
-export function makeRuntime(root: DataRoot, appVersion = '0.0.0-dev', capabilities = new CapabilityRegistry()): RuntimeBindings {
+export function makeRuntime(root: DataRoot, appVersion = '0.0.0-dev', capabilities = new CapabilityRegistry(), serviceInstanceId?: string): RuntimeBindings {
   return makeBindings({
     dbPath: resolveDatabasePath(root.dir),
     blobsDir: resolve(root.dir, 'blobs'),
     nodeId: root.nodeId,
     appVersion,
+    serviceInstanceId,
     capabilities,
   })
 }

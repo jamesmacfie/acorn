@@ -33,16 +33,29 @@ Drawn by the shell. A loaded plugin's UI is an iframe (`frames`), a tree of the 
 emitted from a worker (`remote`), or a descriptor the host renders. It never hands the shell a
 component: a tree names one, and the host mounts its own.
 
+A device-held client-only package may declare client contributions that need no Node handler. A rail
+source uses `tree: { list, detail }`, with both names pointing at entries in its remote-tree worker;
+the route-backed `items` form needs a Node half. Route-backed slots, attention, node stats, agent
+contexts, reference resolvers, commands, document regions, and extension carriers are also refused.
+See [Device-held plugins](./plugins/activation.md#device-held-plugins).
+
+Every loaded client kind is registered from the current Node's active declaration and selected exact
+bundle. Its availability gate follows that Node's runtime and trust state, so a failed, stale, absent,
+or unaccepted runtime cannot leave a visible settings page, importer, footer row, command, or tree
+calling routes that do not exist. A compiled contribution's `{ plugin: id }` requirement checks that
+Node's running service instead. [Activation](./plugins/activation.md) owns the selection and reason
+model; the table below owns the kinds themselves.
+
 | Kind | Tier | Where | Host |
 | --- | --- | --- | --- |
 | Panes | Both | `ctx.panes` / `contributions.frames` (`target: 'pane'`) | A task's pane layout |
 | Project surfaces | Both | `ctx.contribute(projectSurfaceRegistry)` / a project-scoped `frames` entry plus its `contributions.routes` entry | The project view, beside the plugin's rail list |
 | Reference panels | Both | `ctx.refPanels` / `frames` (`target: 'refPanel'`) | The side panel over an external item |
 | Overlays | Both | `ctx.slots` (`slot: 'overlay'`) / `frames` (`target: 'overlay'`) | A window-level modal |
-| Settings pages | Both | `ctx.settingsPages` / `frames` (`target: 'settings'`) | Settings |
+| Settings pages | Both | `ctx.settingsPages` / `frames` (`target: 'settings'`) | Settings, in the rail group the page names as `category`, or Features. A plugin may use six of the nine groups, and names what a change affects as `scope` (`settingsScope` on a frame). `keywords` and `sections` feed the settings search and the palette's section rows, and a section id is a deep-link anchor ([frontend.md](./frontend.md) § Search and deep links). A `workspace` or `project` page has no rail row: it is a tab on every workspace's or project's page ([frontend.md](./frontend.md) § Workspaces and projects). A compiled page that absorbed another lists the old id in `aliases`, so links to it still land. The host draws the plugin strip above every plugin page, and `railSourceVisibility` names the plugin's own sources whose **Show in left rail** switch it carries ([frontend.md](./frontend.md) § The plugin strip) |
 | Importers | Both | `ctx.projectImporters` / `frames` (`target: 'importer'`) | The project-import modal |
 | Webviews | Both | — / `frames` (`target: 'webview'`) | A pane showing external web content |
-| Rail sources | Both | `ctx.sources` / `contributions.sources` | The left rail |
+| Rail sources | Both | `ctx.sources` / `contributions.sources` | The left rail. `showInRailByDefault: false` starts the icon hidden; the person's **Show in left rail** choice wins, and a hidden source stays available and opens from the palette ([frontend.md](./frontend.md) § Rail source visibility) |
 | Session sources | Compiled | `ctx.sessionSources` | Node-scoped session summaries and optional send/focus actions for shared pickers, quit concerns, and navigation. The owner keeps full rows and fetches. **Direction: stays compiled.** Loaded plugins use commands and attention descriptors; no loaded session carrier is needed without a concrete consumer. |
 | Slots | Both | `ctx.slots` / `contributions.slots` | See the slot vocabulary below |
 | Commands | Both | `ctx.commands` / `contributions.commands` | The command palette and chords. One kind, five explicit shapes: an action, a group, a search, an input, a setting ([command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md)). |
@@ -53,13 +66,14 @@ component: a tree names one, and the host mounts its own.
 | Agent contexts | Both | `ctx.agentContexts` / `contributions.agentContexts` | The context tray on an agent launch |
 | Ref resolvers | Both | `ctx.contribute(refResolverRegistry)` / `contributions.refResolvers` | External-item label resolution |
 | Themes | Both | `ctx.contribute(themeRegistry)` / `contributions.themes` | The appearance picker |
+| Style packs | Loaded | `contributions.styles` | Settings → Appearance; the host validates token data and generates the CSS block. No plugin selector enters the shell. **Direction: shipped as validated data.** |
 | Context menus | Both | `ctx.contribute(contextMenuRegistry)` / `contributions.contextMenus` | Host-drawn context menus, at one of two locations: `task.row` is a row in the tab rail and matches on `origin`, `projectId` and `pinned`; `item.row` is a row in an integration's list — Rollbar, Linear, GitHub — and matches on `providerId` and `projectId` (docs/plugins.md § Context menus) |
 | Extension points | Both | `ctx.extensionPoints` / `contributions.extensionPoints` | A surface a plugin opens to others, in one of five kinds: rows, annotations, remote trees, rectangles, hooks (docs/plugins.md § Cooperative extension points). The host mints `<pluginId>:<id>` from the plugin doing the registering, either way in. A `remote` point may also declare `actions`, the closed list of things a contributor's tree may ask it to do (docs/plugins.md § Asking the owner); the owner binds a handler of the same name per `Slot`, and a name missing from either list is refused. |
-| Extensions | Both | `ctx.extensions` / `contributions.extensions` | A contribution into someone else's point. A compiled plugin's carrier is a `component` the host mounts where it would mount a worker's tree; a loaded plugin's is `items`, `remote`, `frame` or `route`. A `remote` one may name `overlay`, one of its own manifest's overlay frames that this tree may ask the host to present (docs/plugins.md § Companion overlays). That is a qualifier on the carrier, not a sixth carrier: a descriptor still names exactly one. |
+| Extensions | Both | `ctx.extensions` / `contributions.extensions` | A contribution into someone else's point. A compiled plugin's carrier is a `component` the host mounts where it would mount a worker's tree; a loaded plugin's is `items`, `remote`, `frame` or `route`. An `items` extension aimed at `core:task` is how a loaded plugin publishes task status for the rail. A `remote` one may name `overlay`, one of its own manifest's overlay frames that this tree may ask the host to present (docs/plugins.md § Companion overlays). That is a qualifier on the carrier, not a sixth carrier: a descriptor still names exactly one. |
 | Brand marks | Both | `ctx.brandMarks` / manifest `icon` and `icons` | The `brand:` glyph namespace |
 | Client schedules | Compiled | `ctx.schedules` | The device-local scheduler. **Direction: stays compiled.** A loaded plugin's periodic work belongs on the node, which runs whether or not a client is open (docs/schedules.md § Why the node, and only the node). The client registry exists for work that has no meaning without a window. |
 | Integration flows | Compiled | `ctx.integrationFlows` | The connect-a-provider wizard. **Direction: gains a manifest twin.** Named as a blocker on moving `github` out of tree ([compiled-tier.md](./future/compiled-tier.md)); the flow is already a sequence of steps rather than a component, so the descriptor is a shape question, not a seam question. |
-| Rail markers | Compiled | `ctx.railMarkers` | A status dot on a rail control. **Direction: gains a manifest twin,** in rail-tab slice 3 ([rail-tab.md](./future/rail-tab.md)). Data only, no click verb, so the descriptor is a route plus a colour. Not landed as of 2026-08-28. |
+| Rail markers | Compiled | `ctx.railMarkers` | A status marker on a task, source, or pane control. **Direction: stays compiled.** Loaded task status uses the generic `core:task` annotation point through `contributions.extensions`; source and pane status need an owner-declared annotation point before a loaded plugin has a real consumer. There is no rail-marker manifest twin. |
 | Persisted state slices | Compiled | `ctx.persistedStateSlices` | Device-local persisted state. **Direction: stays compiled.** A loaded plugin has `plugin:<id>:*` prefs through `ctx.core.prefs` and its frame's own `state` verb, which is the same capability with the namespace bound by the host. A second mechanism would be a second namespace to police. |
 | Client capabilities | Compiled | `ctx.capabilities` | Plugin-to-plugin function calls in the renderer. **Direction: stays compiled, permanently.** A live function cannot cross the iframe boundary. The loaded tier's equivalent is a route, and that is the right shape for it. |
 
@@ -75,14 +89,16 @@ Run by the node, with or without a client attached.
 | Source discovery | Both | `ctx.dataSources.discover` / `contributions.dataSourceDiscoveries` | Scoped dynamic source catalogues |
 | Task checks | Both | `ctx.taskChecks` / `contributions.taskChecks` | The archive gate |
 | Search providers | Compiled | `ctx.search` | The grouped search the archive page draws (docs/plugins.md § Search providers). **Direction: gains a manifest twin** when a loaded plugin wants to be searchable. A provider answers a query with plain-data hits, so the twin is a route the host calls, the same shape task checks already use. |
-| Runs | Both | `ctx.runs` | The merged run list at Settings → Runs. A pointer at a route that lists this plugin's runs |
+| Runs | Both | `ctx.runs` | The merged run list at Settings → Run history. A pointer at a route that lists this plugin's runs |
 | Audit actions | Both | `ctx.audit` / `contributions.auditActions` | The owner-readable trail, qualified `<pluginId>:<actionId>` (docs/security.md § Audit) |
 | Extension points | Both | `ctx.extensionPoints` (`declare` / `handle` / `handlers`) | The node's many-to-many seam for typed values: one plugin declares a point, any number fill it |
 | Hooks | Both | `ctx.hooks` / `contributions.extensionPoints` (`kind: 'hook'`) and `contributions.extensions` (a `route` plus a `mode`) | A turn in one plugin's decision before it happens, in a chain the host runs with a timeout and a verdict (docs/plugins.md § Hooks) |
 | Harnesses | Both | host seam / `contributions.harnesses` | Managed agent sessions (docs/managed-agents.md) |
+| Custom agents | Both | host seam / `contributions.customAgents` | New's saved agents: a harness, its options, instructions and a tool ceiling (docs/managed-agents.md § Custom agents) |
 | Node actions | Both | host seam / a `commands` entry whose verb is `runNodeAction` | Work a plugin does when something asks. A user schedule is what asks today |
 | Agent tools | Both | `ctx.tools` / `contributions.agentTools` | The MCP, direct harness HTTP and renderer projections. Loaded descriptors carry a bounded JSON Schema and an owned handler route; the host compiles them into the same registry, qualifies the name as `<pluginId>_<localId>`, and applies task/session authority, permissions, risk ceilings and limits before dispatch. |
 | Context sections | Both | `ctx.contextSections` / `contributions.contextSections` | The assembled task-context prompt. A loaded descriptor carries a label, deterministic order, owned read route and byte/token limits; the host adapts its bounded response into the same registry and assembler. |
+| CLI commands | Loaded | `contributions.cliCommands` | The headless CLI discovers descriptors from the selected Node's running roster, validates typed input, and dispatches through a device-gated Node route into the plugin's reserved `/cli/<name>` path. **Direction: stays loaded-only** because the host validates static manifest metadata before activation. Plugin command help requires a reachable Node. See [CLI command authoring](./plugin-authoring/cli-commands.md). |
 | Providers | Both | `ctx.providers` | Connection, integration, model-provider and node registries. A model adapter has one asynchronous `generateText` callback whose input and result cross the worker RPC boundary as data. The other registration methods use the same loaded context; `providers.integration` accepts a fetch handler for routes. A node provider is functions and no route or descriptor (docs/plugins.md § Node providers). A contribution's `detail` member lets a loaded provider answer a core-owned agent tool without a `ctx.tools` of its own. |
 | Capabilities | Both | `ctx.capabilities` | Cross-plugin typed functions. A loaded plugin may provide only ids inside its own `<pluginId>.` namespace |
 | Storage | Both | `ctx.storage` | One host-opened, host-migrated SQLite file per plugin |

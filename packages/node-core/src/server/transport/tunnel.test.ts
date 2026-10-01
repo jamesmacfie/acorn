@@ -66,6 +66,7 @@ beforeEach(async () => {
     },
     // Short, so the sweep case does not need fake timers (the same injection wsHub.test.ts uses).
     revocationCheckMs: 40,
+    maxTunnelMessageBytes: 16,
   })
   // The sweeper server/transport/listener.ts registers last in production, reproduced here because the path-claim case
   // below depends on it: without it an unclaimed upgrade hangs its socket and `close()` never returns.
@@ -140,6 +141,58 @@ function hold(target: string, headers: Record<string, string>): Promise<{ closed
 }
 
 describe('attachTunnel', () => {
+  it('splits a longer TCP response without dropping or reordering bytes', async () => {
+    const ws = new WebSocket(url('task-1', echoPort), { headers: { authorization: `Bearer ${DEVICE_TOKEN}` } })
+    ws.on('error', () => {})
+    await new Promise<void>((resolve) => ws.once('open', resolve))
+    const chunks: Buffer[] = []
+    const done = new Promise<void>((resolve) => ws.on('message', (bytes: Buffer) => {
+      chunks.push(bytes)
+      if (Buffer.concat(chunks).length === 48) resolve()
+    }))
+    for (const char of ['a', 'b', 'c']) ws.send(char.repeat(16))
+    try {
+      await done
+      expect(chunks.every((chunk) => chunk.length <= 16)).toBe(true)
+      expect(Buffer.concat(chunks).toString()).toBe('A'.repeat(16) + 'B'.repeat(16) + 'C'.repeat(16))
+    } finally { ws.terminate() }
+  })
+
+  it('closes an oversized tunnel frame with 1009 and tears down its TCP pipe', async () => {
+    const ws = new WebSocket(url('task-1', echoPort), { headers: { authorization: `Bearer ${DEVICE_TOKEN}` } })
+    ws.on('error', () => {})
+    await new Promise<void>((resolve) => ws.once('open', resolve))
+    const closed = new Promise<number>((resolve) => ws.once('close', (code) => resolve(code)))
+    ws.send('x'.repeat(17))
+    expect(await closed).toBe(1009)
+  })
+
+  it('contains an authentication rejection and remains available', async () => {
+    const original = devices.authenticate
+    devices.authenticate = async () => { throw new Error('synthetic lookup failed') }
+    try { await expect(open(url('task-1', echoPort), { authorization: `Bearer ${DEVICE_TOKEN}` })).rejects.toThrow('status 403') }
+    finally { devices.authenticate = original }
+    await expect(open(url('task-1', echoPort), { authorization: `Bearer ${DEVICE_TOKEN}` })).resolves.toBe('PING')
+  })
+
+  it('closes a live pipe when its device activity lookup rejects', async () => {
+    const peer = await hold(url('task-1', echoPort), { authorization: `Bearer ${DEVICE_TOKEN}` })
+    const original = devices.isActive
+    devices.isActive = async () => { throw new Error('synthetic lookup failed') }
+    try { await peer.closed } finally { devices.isActive = original }
+  })
+
+  it('disposes claimed sockets while port resolution is outstanding', async () => {
+    slowPorts = 60
+    const ws = new WebSocket(url('task-1', echoPort), { headers: { authorization: `Bearer ${DEVICE_TOKEN}` } })
+    ws.on('error', () => {})
+    const upgraded = new Promise<void>((resolve) => http.once('upgrade', () => resolve()))
+    const closed = new Promise<void>((resolve) => ws.once('close', () => resolve()))
+    await upgraded
+    disposeTunnel(http)
+    await closed
+    await new Promise<void>((resolve) => setTimeout(resolve, 80))
+  })
   it('pipes bytes both ways to a declared port for a device caller', async () => {
     await expect(open(url('task-1', echoPort), { authorization: `Bearer ${DEVICE_TOKEN}` })).resolves.toBe('PING')
   })

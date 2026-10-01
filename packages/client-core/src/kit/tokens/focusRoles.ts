@@ -48,6 +48,8 @@ export const NODE_FOCUS = {
   SectionHeader: 'none',
   TabPanel: 'none',
   ToolbarSpacer: 'none',
+  SettingsSection: 'none',
+  SettingRow: 'none',
 
   // Showing
   Text: 'none',
@@ -86,6 +88,7 @@ export const NODE_FOCUS = {
   DiffPane: 'none',
   DiffLine: 'none',
   FileHead: 'none',
+  StackedDiff: 'none',
   NonCodeRow: 'none',
   SplitCell: 'none',
   EmptyState: 'none',

@@ -1,6 +1,9 @@
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
+import { parseFlow, runFlow, summarizeReport } from './flow.mjs'
 import { renderPlace, renderSnapshot, WebDriverClient } from './webdriver.mjs'
-import { readJson, refsPath, resolveManifest, writePrivateJson } from './state.mjs'
+import { activeManifests, readJson, refsPath, resolveManifest, writePrivateJson } from './state.mjs'
+import { nativeTarget, requireSessionApp } from './nativeApp.mjs'
 
 function parseArgs(argv) {
   let session = null
@@ -11,7 +14,7 @@ function parseArgs(argv) {
     else rest.push(argv[index])
   }
   const [command, ...args] = rest
-  if (!command) throw new Error('Usage: pnpm dev:agent:ui -- [--session NAME] snapshot|click|fill|scroll|screenshot|status|stop')
+  if (!command) throw new Error('Usage: pnpm dev:agent:ui -- [--session NAME] snapshot|click|fill|scroll|screenshot|flow|status|target|stop')
   return { session, command, args }
 }
 
@@ -32,7 +35,15 @@ async function main() {
     process.stdout.write(`${JSON.stringify(manifest, null, 2)}\n`)
     return
   }
+  // The window to hand a native tool such as Computer Use, checked live: this session's own process,
+  // its app path, and any other running session that shares the identity (./nativeApp.mjs).
+  if (command === 'target') {
+    process.stdout.write(`${JSON.stringify(await nativeTarget(manifest, await activeManifests()), null, 2)}\n`)
+    return
+  }
   if (command === 'stop') {
+    // Checked first, so a recorded PID that now belongs to something else is never signalled.
+    await requireSessionApp(manifest)
     process.kill(manifest.appPid, 'SIGTERM')
     console.log(`Stopping agent session ${manifest.name}.`)
     return
@@ -77,6 +88,21 @@ async function main() {
       throw new Error('Screenshot names must be simple .png file names.')
     }
     console.log(await client.screenshot(join(manifest.directory, 'screenshots', file)))
+    return
+  }
+  // A declarative flow from ./flows, run against this session's window, with a dated report written
+  // beside the session's screenshots (docs/local-development.md § Large-surface flow). A failed
+  // invariant fails the command after the whole flow has run and the report is on disk.
+  if (command === 'flow') {
+    if (args.length !== 1 || !/^[a-z0-9-]+$/.test(args[0])) throw new Error('Usage: flow NAME (a file in scripts/agent/flows)')
+    const flow = parseFlow(await readFile(join(import.meta.dirname, 'flows', `${args[0]}.json`), 'utf8'))
+    const report = await runFlow(client, flow, { fixture: manifest.fixture ?? null, log: (line) => console.log(line) })
+    const stamp = report.startedAt.replace(/[:.]/g, '-')
+    const base = join(manifest.directory, 'reports', `${flow.name}-${manifest.fixture?.profile ?? 'none'}-${stamp}`)
+    await writePrivateJson(`${base}.json`, report)
+    console.log(summarizeReport(report))
+    console.log(`Report: ${base}.json`)
+    if (report.failed) process.exitCode = 1
     return
   }
   throw new Error(`Unknown command: ${command}`)

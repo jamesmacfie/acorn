@@ -2,7 +2,7 @@ import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import ExtensionPointsDev from './ExtensionPointsDev'
 import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '../../host/registries/extensionPoints/extensionPoints'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 
 // The screen that exists because everything else is silent (docs/plugins.md § Seeing what matched).
 //

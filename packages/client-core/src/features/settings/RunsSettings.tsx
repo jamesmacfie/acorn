@@ -1,17 +1,17 @@
-import { createSignal, For, Show } from 'solid-js'
+import { For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { coreRunsRoute, isTerminalRunStatus, type RunRow, type RunStatus } from '@acorn/protocol/runs.ts'
 import { readJson } from '../../infra/node/apiClient'
-import { formatRelativeTime } from '../../kit/lib/formatRelativeTime'
-import { activeNodeId } from '../../infra/node/activeNode'
+import { formatRelativeTime } from '../../kit/lib/rendering/formatRelativeTime'
 import { nodes } from '../../infra/node/fleet'
-import { Alert, Badge, Button, Row, Select, StatusDot } from '../../kit/components/primitives'
+import { Alert, Badge, Button, Row, StatusDot } from '../../kit/components/primitives'
+import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import './settings.css'
 
-// Settings → Runs, per node (@acorn/protocol/runs.ts): everything on this machine that started, is
-// taking time, and will end — whoever owns it. A workflow run and an agent session are the same kind
-// of thing to the person paying for them, and until now they were in two databases with no surface
-// that could show both.
+// Settings → Run history, per node and following the settings header's node switcher
+// (@acorn/protocol/runs.ts): everything on this machine that started, is taking time, and will end —
+// whoever owns it. A workflow run and an agent session are the same kind of thing to the person paying
+// for them, and until now they were in two databases with no surface that could show both.
 //
 // There is no table behind this. Each plugin declares a route that lists its own runs and core merges
 // the answers, so this page adds no migration and no ownership: a plugin that goes away takes its rows
@@ -39,9 +39,8 @@ function describeDuration(run: RunRow, now: number): string {
 
 const money = (usd: number): string => (usd < 0.01 ? '<$0.01' : `$${usd.toFixed(2)}`)
 
-export default function RunsSettings() {
-  const [target, setTarget] = createSignal<string | null>(null)
-  const nodeId = () => target() ?? activeNodeId()
+export default function RunsSettings(props: { nodeId: string | null }) {
+  const nodeId = () => props.nodeId
   const node = () => nodes().find((candidate) => candidate.nodeId === nodeId()) ?? null
 
   const runs = createQuery(() => ({
@@ -56,20 +55,12 @@ export default function RunsSettings() {
   const spend = () => rows().reduce((total, run) => total + (run.costUsd ?? 0), 0)
 
   return (
-    <div class="settings-section">
-      <Show when={nodes().length > 1}>
-        <label class="settings-field">
-          <span>Node</span>
-          <Select value={nodeId() ?? ''} onChange={(value) => setTarget(value || null)} options={[...nodes().map((candidate) => ({ value: candidate.nodeId, label: candidate.label }))]} />
-        </label>
-      </Show>
-
-      <p class="muted">
-        Work <strong>{node()?.label ?? 'this node'}</strong> has started, from every plugin that owns
-        any: workflow runs, agent sessions, and whatever else is installed. To act on one, open it
-        where it lives.
-      </p>
-
+    <SettingsSection
+      id="runs"
+      label="Runs"
+      description={`Work ${node()?.label ?? 'this node'} has started, from every plugin that owns any: workflow runs, agent sessions, and whatever else is installed. To act on one, open it where it lives.`}
+      actions={<Button size="sm" disabled={runs.isFetching} onPress={() => void runs.refetch()}>Refresh</Button>}
+    >
       {/* Which owners could not answer, so a short list reads as short rather than as complete. */}
       <Show when={runs.data?.failed.length}>
         <Alert tone="warn">
@@ -80,7 +71,7 @@ export default function RunsSettings() {
 
       <Show when={runs.error}>{(error) => <Alert>{String(error())}</Alert>}</Show>
 
-      <Show when={rows().length} fallback={<p class="muted">Nothing has run on this node yet.</p>}>
+      <Show when={rows().length} fallback={<Show when={runs.isSuccess}><p class="muted">Nothing has run on this node yet.</p></Show>}>
         <Show when={spend() > 0}>
           <p class="muted">{money(spend())} across {rows().length} runs on this page.</p>
         </Show>
@@ -105,10 +96,6 @@ export default function RunsSettings() {
           }}
         </For>
       </Show>
-
-      <div class="settings-actions">
-        <Button size="sm" disabled={runs.isFetching} onPress={() => void runs.refetch()}>Refresh</Button>
-      </div>
-    </div>
+    </SettingsSection>
   )
 }

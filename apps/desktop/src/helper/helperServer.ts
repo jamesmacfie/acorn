@@ -2,6 +2,7 @@ import { createServer, type Server } from 'node:http'
 import { timingSafeEqual } from 'node:crypto'
 import { WebSocketServer, type WebSocket } from 'ws'
 import { z } from 'zod'
+import type { DeviceConfig } from '@acorn/protocol/deviceConfig.ts'
 import {
   nodeAdoptRequestSchema,
   nodeFetchRequestSchema,
@@ -19,12 +20,14 @@ import { encodeIdFrame, wsFrameSchema, wsSubscriptionIntentSchema } from '@acorn
 import type { Helper } from '@acorn/custody/runtime'
 import { toNodeRecord } from '@acorn/custody/broker'
 import { pairWithNode, probeNode } from '@acorn/custody/broker/nodePairing.ts'
-import { decodeBytes, type HelperMessage, type HelperMethod, type HelperPush, type HelperRequest, type WireFetchRequest } from '../shell/wire'
+import { MAX_HELPER_REQUEST_BYTES, decodeBytes, type HelperMessage, type HelperMethod, type HelperPush, type HelperRequest, type WireFetchRequest } from '../shell/wire'
 import {
   decisionSchema,
   devGrantSchema,
   disclosureSchema,
   NO_DISCLOSURE,
+  installSchema,
+  removeSchema,
   putSchema,
   type PluginsState,
 } from '@acorn/custody/plugins'
@@ -72,8 +75,10 @@ const HELPER_PATH = '/helper'
 
 // Constant-time, and length-checked first because timingSafeEqual throws on a length mismatch.
 const secretMatches = (expected: string, presented: string | null): boolean => {
-  if (!presented || presented.length !== expected.length) return false
-  return timingSafeEqual(Buffer.from(presented), Buffer.from(expected))
+  if (!presented) return false
+  const a = Buffer.from(presented)
+  const b = Buffer.from(expected)
+  return a.byteLength === b.byteLength && timingSafeEqual(a, b)
 }
 
 const toFetchRequest = (wire: WireFetchRequest): unknown => {
@@ -89,11 +94,16 @@ const toFetchRequest = (wire: WireFetchRequest): unknown => {
   }
 }
 
-export function startHelperServer(helper: Helper, options: { secret: string; appOrigin: string }): Promise<HelperServer> {
+export function startHelperServer(helper: Helper, options: { secret: string; appOrigin: string; maxRequestBytes?: number }): Promise<HelperServer> {
   const { secret, appOrigin } = options
   const sockets = new Set<WebSocket>()
   const connections = new Map<WebSocket, RendererConnection>()
   const watchdogs = new Map<WebSocket, ReturnType<typeof createRendererWatchdog>>()
+  const send = (socket: WebSocket, payload: string | Uint8Array): void => {
+    if (socket.readyState !== socket.OPEN) return
+    try { socket.send(payload, (error) => { if (error) socket.terminate() }) }
+    catch { socket.terminate() }
+  }
   const watchdogTimer = setInterval(() => { for (const watchdog of watchdogs.values()) watchdog.tick() }, 1000)
   watchdogTimer.unref()
 
@@ -102,9 +112,10 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
     for (const [socket, owner] of connections) {
       if (viewerId && owner.viewerId !== viewerId) continue
       if ('push' in message && message.push === 'node-frame' && !owner.interestedIn(message.nodeId)) continue
-      if (socket.readyState === socket.OPEN) socket.send(payload ??= JSON.stringify(message))
+      send(socket, payload ??= JSON.stringify(message))
     }
   }
+  const stopConfigWatch = helper.config.watch((state) => push({ push: 'config-changed', state }))
 
   // The same filter as `push` above, and the same reason: an N-node fleet used to deliver every node's
   // terminal output to a renderer that drops all but the active one's. Tagged with the node id rather
@@ -116,7 +127,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
       if (!owner.interestedIn(nodeId) || socket.readyState !== socket.OPEN) continue
       tagged ??= encodeIdFrame(nodeId, frame)
       if (!tagged) return // a node id this frame cannot spell; the renderer hears nothing rather than nonsense
-      socket.send(tagged, { binary: true })
+      send(socket, tagged)
     }
   }
 
@@ -135,6 +146,11 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
   let pending: Awaited<ReturnType<typeof probeNode>> | null = null
 
   const handlers: Record<HelperMethod, (params: unknown, owner: RendererConnection) => unknown | Promise<unknown>> = {
+    'config-read': () => helper.config.read(),
+    // DeviceConfigStore validates the merged document, including the schema's refinement. Zod
+    // cannot derive .partial() from a refined object, so only assert the patch's wire shape here.
+    'config-write': (raw) => helper.config.write(z.record(z.string(), z.unknown()).parse(raw) as Partial<DeviceConfig>),
+    'config-location': () => helper.config.path,
     'renderer-pulse': () => undefined,
     'node-interest': (raw, owner) => {
       const { nodeId } = z.strictObject({ nodeId: z.string().min(1).nullable() }).parse(raw)
@@ -254,6 +270,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
       helper.broker.remove(nodeId)
       for (const owner of connections.values()) owner.forget(nodeId)
       helper.fleet.forget(nodeId)
+      helper.pluginCache.forgetNode(nodeId)
       // A pipe to a node we have just stopped trusting must not outlive the pairing.
       helper.tunnels.closeFor({ nodeId })
     },
@@ -277,7 +294,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
       // Projected rather than passed through: `nodeIds` and the eviction timestamps are the helper's
       // bookkeeping, and a field added to the cache entry must not reach the renderer by default.
       cached: Object.fromEntries(
-        Object.entries(helper.pluginCache.list()).map(([hash, entry]) => [hash, { pluginId: entry.pluginId, version: entry.version, bytes: entry.bytes }]),
+        Object.entries(helper.pluginCache.list()).map(([hash, entry]) => [hash, { pluginId: entry.pluginId, version: entry.version, bytes: entry.bytes, source: entry.source ?? (entry.nodeIds[0] ? { kind: 'node' as const, nodeId: entry.nodeIds[0] } : undefined), nodeIds: entry.nodeIds, installSource: entry.installSource, sourceLabel: entry.sourceLabel, manifest: entry.manifest }]),
       ),
       acks: helper.pluginTrust.list(),
       devGrants: helper.pluginTrust.listDevGrants(),
@@ -288,10 +305,28 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
       if ('hash' in result) helper.pluginTrust.recordDevAccept({ pluginId, nodeId, hash: result.hash, version })
       return result
     },
+    'plugins-install': async (raw) => {
+      const { source, expectedPluginId } = installSchema.parse(raw)
+      const result = await helper.pluginCache.putFromSource(source, expectedPluginId)
+      if ('hash' in result) helper.pluginTrust.recordDevAccept({ pluginId: result.pluginId, nodeId: '', source: { kind: 'device' }, hash: result.hash, version: result.version })
+      return result
+    },
+    'plugins-remove': (raw): void => {
+      const { pluginId } = removeSchema.parse(raw)
+      helper.pluginCache.removeDevice(pluginId)
+      helper.pluginTrust.forgetDevGrant(pluginId, { kind: 'device' })
+    },
     'plugins-dev-grant': (raw): void => {
-      const { pluginId, nodeId, path, grant } = devGrantSchema.parse(raw)
-      if (!grant) return helper.pluginTrust.revokeDev(pluginId, nodeId)
-      helper.pluginTrust.grantDev({ pluginId, nodeId, ...(path ? { path } : {}), grantedAt: Date.now() })
+      const { pluginId, nodeId, source, path, grant } = devGrantSchema.parse(raw)
+      if (!grant) return helper.pluginTrust.revokeDev(pluginId, source ?? nodeId)
+      helper.pluginTrust.grantDev({ pluginId, nodeId, source: source ?? { kind: 'node', nodeId }, ...(path ? { path } : {}), grantedAt: Date.now() })
+      if (source?.kind === 'device') {
+        for (const [hash, entry] of Object.entries(helper.pluginCache.list())) {
+          if (entry.pluginId === pluginId && entry.source?.kind === 'device') {
+            helper.pluginTrust.recordDevAccept({ pluginId, nodeId: '', source, hash, version: entry.version })
+          }
+        }
+      }
     },
     'plugins-trust-record': (raw): void => {
       const decision = decisionSchema.parse(raw)
@@ -303,6 +338,13 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
         { 'plugin.id': decision.pluginId },
       )
       helper.pluginTrust.record({ ...decision, ...NO_DISCLOSURE, partial: true, decidedAt: Date.now() })
+    },
+    'plugins-trust-forget': (raw): void => {
+      const { pluginId, hash } = z.object({
+        pluginId: z.string().min(1),
+        hash: z.string().regex(/^[0-9a-f]{64}$/),
+      }).parse(raw)
+      helper.pluginTrust.forgetDecision(pluginId, hash)
     },
   }
 
@@ -316,7 +358,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
     const handlerFrom = performance.now()
     const reply = (message: object): void => {
       if (owner.closed || socket.readyState !== socket.OPEN) return
-      socket.send(JSON.stringify({
+      send(socket, JSON.stringify({
       id: request.id,
       ...message,
       timing: { receivedAt, repliedAt: Date.now(), handlerMs: performance.now() - handlerFrom },
@@ -338,34 +380,39 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
   }
 
   const http = createServer((_request, response) => response.writeHead(426).end())
-  http.on('close', () => { clearInterval(watchdogTimer); watchdogs.clear() })
-  http.on('error', () => clearInterval(watchdogTimer))
-  const wss = new WebSocketServer({ noServer: true })
+  http.on('close', () => { stopConfigWatch(); clearInterval(watchdogTimer); watchdogs.clear() })
+  http.on('error', () => { stopConfigWatch(); clearInterval(watchdogTimer) })
+  const wss = new WebSocketServer({ noServer: true, maxPayload: Math.min(options.maxRequestBytes ?? MAX_HELPER_REQUEST_BYTES, MAX_HELPER_REQUEST_BYTES) })
 
   http.on('upgrade', (request, socket, head) => {
-    const url = new URL(request.url ?? '/', 'http://127.0.0.1')
-    const origin = request.headers.origin
-    if (url.pathname !== HELPER_PATH || !secretMatches(secret, url.searchParams.get('secret')) || (origin && origin !== appOrigin)) {
-      socket.destroy()
-      return
-    }
-    wss.handleUpgrade(request, socket, head, (ws) => {
-      sockets.add(ws)
-      connections.set(ws, new RendererConnection(helper.broker))
-      watchdogs.set(ws, createRendererWatchdog())
-      const retire = () => { connections.get(ws)?.close(); connections.delete(ws); sockets.delete(ws); watchdogs.delete(ws) }
-      ws.on('close', retire)
-      ws.on('error', retire)
-      ws.on('message', (data) => {
-        let parsed: unknown
-        try {
-          parsed = JSON.parse(String(data))
-        } catch {
-          return
-        }
-        void serve(ws, parsed)
+    const onPeerError = (): void => { socket.destroy() }
+    socket.on('error', onPeerError)
+    try {
+      const url = new URL(request.url ?? '/', 'http://127.0.0.1')
+      const origin = request.headers.origin
+      if (url.pathname !== HELPER_PATH || !secretMatches(secret, url.searchParams.get('secret')) || (origin && origin !== appOrigin)) {
+        socket.destroy()
+        return
+      }
+      wss.handleUpgrade(request, socket, head, (ws) => {
+        sockets.add(ws)
+        connections.set(ws, new RendererConnection(helper.broker))
+        watchdogs.set(ws, createRendererWatchdog())
+        const cleanup = (): void => { connections.get(ws)?.close(); connections.delete(ws); sockets.delete(ws); watchdogs.delete(ws) }
+        ws.on('close', cleanup)
+        ws.on('error', cleanup)
+        socket.off('error', onPeerError)
+        ws.on('message', (data) => {
+          let parsed: unknown
+          try {
+            parsed = JSON.parse(String(data))
+          } catch {
+            return
+          }
+          void serve(ws, parsed).catch(() => ws.terminate())
+        })
       })
-    })
+    } catch { socket.destroy() }
   })
 
   // Every node remembered from a previous launch, brought up before the listener opens, so the
@@ -387,7 +434,8 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
         pushBytes,
         close: () =>
           new Promise<void>((done) => {
-            for (const [socket, owner] of connections) { owner.close(); socket.close() }
+            for (const owner of connections.values()) owner.close()
+            for (const socket of wss.clients) socket.terminate()
             wss.close()
             ;(http as Server).close(() => done())
           }),

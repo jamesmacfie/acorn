@@ -1,21 +1,26 @@
-import { createMemo } from 'solid-js'
+import { createEffect, createMemo, createSignal, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useSearchParams } from '@solidjs/router'
-import { openPane } from '@acorn/plugin-api/client'
-import { filesKey, filePatchKey, pullKey, type PullFile } from '../shared/api'
-import { fetchFilePatches, fileBlobOptions, fileSummariesOptions, filesOptions, mentionsOptions, pullDetailOptions } from './queries'
+import { clientCapability, openPane } from '@acorn/plugin-api/client'
+import { pullKey } from '../shared/api'
+import { fetchDiffSegments, fileBlobOptions, mentionsOptions, pullDetailOptions, pullDiffOptions, searchDiff } from './queries'
 import { addReviewComment, replyReview, resolveThread } from './mutations'
-import { DiffPane } from '@acorn/plugin-api/ui'
+import { Alert, DiffPane } from '@acorn/plugin-api/ui'
+import { loadDiffLineContext, type CodeRow, type DiffLineAnchor } from '@acorn/plugin-api/ui/diff'
+import { sameInlineLine, type InlineDiffOrigin } from '@acorn/plugin-agents/contract/inlineDiff.ts'
+import { AGENTS_INLINE_DIFF } from '@acorn/plugin-agents/contract/inlineDiffClient.ts'
 import type { DiffSource } from '@acorn/plugin-api/ui/diff'
 import { DIFF_LINE_POINT } from './extensionPoints'
+import { incompleteFilesMessage } from './completeness'
 
 // Right (Diff) pane: the shared diff shell (client-core's DiffPane, docs/diff-rendering.md) filled in
 // from a pull request. Everything here answers one of the shell's questions and nothing more: which
-// files, where their patch bodies come from, which threads to interleave, and what a comment does.
+// document, where its segments come from, which threads to place, and what a comment does.
 //
-// Browse requests full files. A task opened from the PR list already has file summaries in cache, so
-// its diff can draw file rows immediately and fetch patch bodies through the hydrator in small batches.
-// Binary and too-large files have no patch; the shell renders a "No diff" row for them.
+// The document is the node's (docs/github-integration.md § Diff documents): every file with the
+// segments its patch was cut into, and no patch text. The viewer asks for the segments it is near.
+// Binary and too-large files have no patch; the shell renders a "No diff" row for them. This component
+// owns the warning that GitHub's 3,000-file API limit cut the list short.
 export type PullRoute = {
   owner: string
   repo: string
@@ -31,41 +36,65 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
   const number = props.route.number
   const taskId = props.taskId
 
-  const files = createQuery<PullFile[]>(() => props.router
-    ? filesOptions(owner, repo, number, true)
-    : fileSummariesOptions(owner, repo, number, true))
+  const diff = createQuery(() => pullDiffOptions(owner, repo, number, true))
   const detail = createQuery(() => pullDetailOptions(owner, repo, number, true))
   const mentionsQuery = createQuery(() => mentionsOptions(owner, repo, true))
-
-  // A force-push or a new commit changes this, which is the shell's signal to drop parse state, the
-  // remembered scroll offset, and any collapsed files.
-  const signature = createMemo(() => (files.data ?? []).map((file) => `${file.path}:${file.sha}:${file.additions}:${file.deletions}`).join('\0'))
+  const topology = () => diff.data?.document
+  const inline = () => clientCapability(AGENTS_INLINE_DIFF)
+  createEffect(() => { if (taskId) inline()?.prime(taskId) })
+  createEffect(() => {
+    const files = topology()?.files
+    if (taskId && files) inline()?.reportPatches(
+      { taskId, source: 'pull-request', pull: { owner, repo, number } },
+      Object.fromEntries(files.map((file) => [file.path, file.patchKey])),
+    )
+  })
+  const [openInline, setOpenInline] = createSignal<InlineDiffOrigin | null>(null)
+  createEffect(() => {
+    const opened = openInline()
+    if (opened && topology()?.files.find((file) => file.path === opened.path)?.patchKey !== opened.patchKey) setOpenInline(null)
+  })
+  const inlineOrigin = (row: CodeRow): InlineDiffOrigin | null => {
+    if (!taskId) return null
+    const patchKey = topology()?.files.find((file) => file.path === row.path)?.patchKey
+    const line = row.kind === 'delete' ? row.oldNo : row.newNo
+    if (!patchKey || line == null) return null
+    return {
+      kind: 'inline-diff', source: 'pull-request', taskId, path: row.path,
+      side: row.kind === 'delete' ? 'old' : 'new', line, patchKey,
+      quote: row.raw.slice(0, 2_000),
+      pull: { owner, repo, number },
+    }
+  }
+  const inlineAnchors = createMemo<DiffLineAnchor[]>(() => {
+    if (!taskId) return []
+    const visible = (inline()?.sessionsForTask(taskId) ?? []).flatMap((session) => {
+      const origin = session.origin
+      if (!origin || origin.source !== 'pull-request' || session.archivedAt ||
+          origin.pull?.owner !== owner || origin.pull.repo !== repo || origin.pull.number !== number) return []
+      if (topology()?.files.find((file) => file.path === origin.path)?.patchKey !== origin.patchKey) return []
+      return [{ path: origin.path, side: origin.side, line: origin.line }]
+    })
+    const opened = openInline()
+    return opened ? [...visible, { path: opened.path, side: opened.side, line: opened.line }] : visible
+  })
 
   const source: DiffSource = {
     scope: { taskId: props.taskId, routeKey: props.route.key },
-    files: () => files.data,
-    loading: () => files.isLoading,
-    signature,
+    topology,
+    // The threads come with the detail, so the document is not ready until both are in.
+    loading: () => diff.isLoading || detail.isLoading,
+    // A force-push, a new commit, or a new base moves the revision, which is the shell's signal to
+    // drop expanded gaps, the remembered scroll offset, and any collapsed files. A patch's key is its
+    // own digest, so a base change that leaves the head blob alone still moves it.
+    signature: () => topology()?.revision ?? '',
     selectedPath: () => typeof searchParams.file === 'string' ? searchParams.file : '',
     threads: () => detail.data?.threads,
     mentions: () => mentionsQuery.data ?? [],
-    // Patch-body source, checked in order: the per-path patch cache entry, then the warmed files
-    // query (which also resolves binary and too-large files to their legitimate null patch).
-    cachedFile: (path) => {
-      const current = files.data?.find((file) => file.path === path)
-      const direct = queryClient.getQueryData<PullFile>(filePatchKey(owner, repo, number, path))
-      if (direct && direct.sha === current?.sha) return direct
-      const warmed = queryClient.getQueryData<PullFile[]>(filesKey(owner, repo, number))
-      const file = warmed?.find((entry) => entry.path === path)
-      return file && file.sha === current?.sha ? file : null
-    },
-    // Anything still missing comes from the batch patch endpoint, seeding per-path cache entries.
-    fetchPatches: async (paths, signal) => {
-      const fetched = await fetchFilePatches(owner, repo, number, paths, signal)
-      for (const file of fetched) {
-        queryClient.setQueryData(filePatchKey(owner, repo, number, file.path), file)
-      }
-      return fetched
+    loadSegments: (requests, signal) => fetchDiffSegments(owner, repo, requests, signal),
+    search: async (request, signal) => {
+      const document = topology()
+      return document ? searchDiff(owner, repo, document, request, signal) : { matches: [], nextCursor: null }
     },
     // Immutable by sha, so one fetch per blob serves every gap in that file.
     fileText: async ({ sha }) => (await queryClient.fetchQuery(fileBlobOptions(owner, repo, sha))).text,
@@ -78,6 +107,24 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
     } : {}),
     invalidate: () => void queryClient.invalidateQueries({ queryKey: pullKey(owner, repo, number) }),
     draftPrefix: `${owner}/${repo}/${number}`,
+    ...(taskId ? { inlineChat: {
+      anchors: inlineAnchors,
+      open: (row: CodeRow) => setOpenInline(inlineOrigin(row)),
+      render: (row: CodeRow) => {
+        // Memoised for the reason plugins/changes/src/client/changesModel.tsx gives: read directly,
+        // every session update rebuilt the card and blurred its textarea.
+        const shown = createMemo(() => {
+          const origin = inlineOrigin(row)
+          if (!origin || !inline()?.Card) return null
+          const exists = inline()?.sessionsForTask(taskId).some((session) => session.origin && sameInlineLine(session.origin, origin) && !session.archivedAt)
+          return exists || (openInline() && sameInlineLine(openInline()!, origin)) ? origin : null
+        }, null, { equals: (a, b) => a === b || (!!a && !!b && sameInlineLine(a, b)) })
+        return <Show when={shown()} keyed>{(origin) => {
+          const Card = inline()!.Card
+          return <Card origin={origin} loadContext={() => loadDiffLineContext(source, row)} onClose={() => setOpenInline(null)} />
+        }}</Show>
+      },
+    } } : {}),
     ...(taskId ? {
       openLine: (row: Parameters<NonNullable<DiffSource['openLine']>>[0]) => {
         if (row.newNo == null) return
@@ -97,5 +144,12 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
   // What another plugin knows about a line of this diff — coverage, a lint result — drawn under the
   // row it belongs to. The host fetches, batches and stamps; this only names the point
   // (docs/plugins.md § Cooperative extension points, the `annotation` kind).
-  return <DiffPane source={source} annotations={DIFF_LINE_POINT} />
+  // A sibling of the pane rather than a wrapper: DiffPane is a fragment that fills its container, and
+  // the warning stays above it whichever file is on screen.
+  return (
+    <>
+      <Show when={incompleteFilesMessage(diff.data?.completeness)}>{(message) => <Alert tone="warn">{message()}</Alert>}</Show>
+      <DiffPane source={source} annotations={DIFF_LINE_POINT} />
+    </>
+  )
 }

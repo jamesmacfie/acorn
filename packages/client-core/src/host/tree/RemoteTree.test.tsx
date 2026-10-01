@@ -13,7 +13,6 @@ import type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
 // Without it a palette search whose `onSelect` opens a pane worked only when the pane was already
 // open, which is the half of the time nobody would report as a bug.
 
-const connects: ((port: MessagePort) => unknown)[] = []
 const contexts: PluginFrameContext[] = []
 let port: MessagePort | null = null
 
@@ -32,13 +31,18 @@ vi.mock('../frames/broker', () => ({
 vi.mock('./workerHost', async (original) => ({
   ...await original<typeof import('./workerHost')>(),
   acquireTreeWorker: (options: { connect: (port: MessagePort) => unknown }) => {
-    connects.push(options.connect)
     return {
       transport: () => ({}),
-      mount: () => {},
+      mount: (_slot: string, _entry: string, _props: unknown, authority: () => { connect: (port: MessagePort) => unknown }) => {
+        if (authority) authority().connect(null as unknown as MessagePort)
+        else options.connect(null as unknown as MessagePort)
+      },
       unmount: () => {},
       release: () => {},
       bridgePort: () => port,
+      select: () => {},
+      surfaceAction: () => {},
+      appearance: () => {},
       onHostRequest: () => () => {},
     }
   },
@@ -56,14 +60,11 @@ const mount = (scope: { taskId?: string; projectId?: string; item?: string }) =>
     () => <RemoteTree contribution={contribution} props={() => scope} scope={() => scope} />,
     document.createElement('div'),
   )
-  // The worker is acquired during setup; connecting is the host's job and the fake above captured it.
-  connects.at(-1)?.(null as unknown as MessagePort)
   return dispose
 }
 
 describe('a remote tree’s connect context', () => {
   beforeEach(() => {
-    connects.length = 0
     contexts.length = 0
     port = null
     setActiveNode('node-a')

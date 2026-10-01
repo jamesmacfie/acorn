@@ -1,3 +1,4 @@
+import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentSession, AgentSessionSnapshot } from '../../contract/wire.ts'
@@ -12,15 +13,16 @@ import type { AgentSession, AgentSessionSnapshot } from '../../contract/wire.ts'
 // file holds, because it is invisible to every other test and to tsc.
 
 vi.mock('@tanstack/solid-query', () => ({
-  createQuery: () => ({ data: undefined }),
+  createQuery: () => ({ data: [{ id: 't1', title: 'Parent task' }, { id: 't2', title: 'Child task' }] }),
   useQueryClient: () => ({ setQueryData: () => {} }),
 }))
+vi.mock('@solidjs/router', () => ({ useNavigate: () => () => {} }))
 
 // The composer walks a worktree and the queue reads a concurrency route; neither is what this asks
 // about, and both would need a node.
-vi.mock('../composer/AgentComposer', () => ({ default: () => null }))
+vi.mock('../composer/AgentComposer', () => ({ default: () => <textarea aria-label="Prompt" /> }))
 vi.mock('../composer/QueuedAgentTurns', () => ({ default: () => null }))
-vi.mock('./AgentEventCard', () => ({ default: () => null }))
+vi.mock('./AgentEventCard', () => ({ default: (props: { item: { event: { text?: string } } }) => <div>{props.item.event.text}</div> }))
 
 const SESSION = 's1'
 const session = {
@@ -57,10 +59,13 @@ const snapshot = {
   requests: [],
 } as unknown as AgentSessionSnapshot
 
+let listedSessions: AgentSession[] = [session]
+let listedDelegations: unknown[] = []
+const snapshotsById: Record<string, AgentSessionSnapshot> = { [SESSION]: snapshot }
 vi.mock('./managedClient', () => ({
   managedAgentApi: {
-    snapshot: async () => snapshot,
-    sessions: async () => ({ sessions: [session], delegations: [], nextCursor: null }),
+    snapshot: async (id: string) => snapshotsById[id],
+    sessions: async () => ({ sessions: listedSessions, delegations: listedDelegations, nextCursor: null }),
   },
 }))
 vi.mock('./wsChannel', () => ({ wsOnAgentFrame: () => () => {} }))
@@ -77,6 +82,10 @@ const hosts: Array<() => void> = []
 afterEach(() => {
   for (const teardown of hosts.splice(0).reverse()) teardown()
   managedAgentStore.clear()
+  listedSessions = [session]
+  listedDelegations = []
+  snapshotsById[SESSION] = snapshot
+  for (const id of Object.keys(snapshotsById)) if (id !== SESSION) delete snapshotsById[id]
 })
 
 const draw = () => {
@@ -98,5 +107,82 @@ describe('the conversation in a pane region', () => {
     const scroller = host.querySelector('.ui-timeline-scroll')
     expect(scroller).not.toBeNull()
     expect(scroller?.parentElement).toBe(host)
+  })
+
+  it('keeps the composer node, focus, draft and selection while a child changes', async () => {
+    const child = { ...session, id: 'child', taskId: 't2', title: 'Child', kind: 'delegated' as const,
+      runtimeState: 'working' as const }
+    listedSessions = [session, child]
+    listedDelegations = [{ sessionId: child.id, depth: 1, isolation: 'shared',
+      owner: { kind: 'managed', parentSessionId: SESSION } }]
+    managedAgentStore.upsertSession(session)
+    const host = draw()
+    await managedAgentStore.loadSnapshot(SESSION)
+    await managedAgentStore.loadAll()
+    const composer = host.querySelector('textarea[aria-label="Prompt"]') as HTMLTextAreaElement
+    composer.value = 'Keep this draft'
+    composer.focus()
+    composer.setSelectionRange(5, 9)
+
+    managedAgentStore.upsertSession({ ...child, runtimeState: 'waiting', attention: 'permission' })
+    await Promise.resolve()
+    expect(host.textContent).toContain('Child')
+    expect(host.querySelector('textarea[aria-label="Prompt"]')).toBe(composer)
+    expect(document.activeElement).toBe(composer)
+    expect(composer.value).toBe('Keep this draft')
+    expect([composer.selectionStart, composer.selectionEnd]).toEqual([5, 9])
+  })
+
+  it('shows the selected session without remounting the task pane', async () => {
+    const other = { ...session, id: 's2', title: 'Another session' }
+    snapshotsById[other.id] = {
+      ...snapshot,
+      session: other,
+      events: [{ ...snapshot.events[0], id: 'e2', sessionId: other.id,
+        event: { type: 'assistant_message', text: 'second conversation', messageId: 'm2' } }],
+    }
+    listedSessions = [session, other]
+    managedAgentStore.upsertSession(session)
+    managedAgentStore.upsertSession(other)
+    const [selected, setSelected] = createSignal(SESSION)
+    ;(globalThis as { ResizeObserver?: unknown }).ResizeObserver = TestResizeObserver
+    const host = document.createElement('div')
+    document.body.append(host)
+    const dispose = render(() => <AgentConversation sessionId={selected()} viewKeyPrefix="test" />, host)
+    hosts.push(() => { dispose(); host.remove() })
+
+    await managedAgentStore.loadSnapshot(SESSION)
+    expect(host.textContent).toContain('hello')
+    setSelected(other.id)
+    await vi.waitFor(() => expect(host.textContent).toContain('second conversation'))
+    expect(host.textContent).not.toContain('hello')
+    setSelected(SESSION)
+    await vi.waitFor(() => expect(host.textContent).toContain('hello'))
+    expect(host.textContent).not.toContain('second conversation')
+  })
+
+  it('changes conversations when a workflow pane selects another step', async () => {
+    const first = { ...session, config: { workflowStepId: 'step-1' } }
+    const second = { ...session, id: 's2', config: { workflowStepId: 'step-2' } }
+    snapshotsById[SESSION] = { ...snapshot, session: first }
+    snapshotsById[second.id] = {
+      ...snapshot,
+      session: second,
+      events: [{ ...snapshot.events[0], id: 'e2', sessionId: second.id,
+        event: { type: 'assistant_message', text: 'step two', messageId: 'm2' } }],
+    }
+    managedAgentStore.upsertSession(first)
+    managedAgentStore.upsertSession(second)
+    const [step, setStep] = createSignal('step-1')
+    ;(globalThis as { ResizeObserver?: unknown }).ResizeObserver = TestResizeObserver
+    const host = document.createElement('div')
+    document.body.append(host)
+    const dispose = render(() => <AgentConversation workflowStepId={step()} viewKeyPrefix="workflow" />, host)
+    hosts.push(() => { dispose(); host.remove() })
+
+    await vi.waitFor(() => expect(host.textContent).toContain('hello'))
+    setStep('step-2')
+    await vi.waitFor(() => expect(host.textContent).toContain('step two'))
+    expect(host.textContent).not.toContain('hello')
   })
 })

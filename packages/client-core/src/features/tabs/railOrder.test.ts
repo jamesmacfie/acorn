@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyRailOrder, EMPTY_RAIL_ORDER, moveTask, parseRailOrder, pinTask, serializeRailOrder, unpinTask } from './railOrder'
+import { applyRailOrder, applySourceOrder, EMPTY_RAIL_ORDER, moveTask, parseRailOrder, pinTask, serializeRailOrder, unpinTask } from './railOrder'
 
 const tasks = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }]
 
@@ -79,6 +79,16 @@ describe('moveTask (drag-reorder)', () => {
 })
 
 describe('persistence round-trip', () => {
+  it('keeps source order separate from task order across old and new prefs', () => {
+    const older = parseRailOrder('{"pinned":["task-a"],"order":["task-b"]}')
+    const sources = [{ id: 'home' }, { id: 'github' }, { id: 'fleet' }]
+    expect(applySourceOrder(sources, older).map((entry) => entry.id)).toEqual(['home', 'github', 'fleet'])
+    const chosen = { ...older, sources: ['fleet', 'home'] }
+    expect(applySourceOrder(sources, parseRailOrder(serializeRailOrder(chosen))).map((entry) => entry.id))
+      .toEqual(['fleet', 'home', 'github'])
+    expect(moveTask(chosen, ['task-a', 'task-b'], 'task-b', 'task-a', 'before').sources).toEqual(chosen.sources)
+  })
+
   it('serialize → parse is identity; junk parses to empty', () => {
     const o = { pinned: ['x'], order: ['y', 'z'] }
     expect(parseRailOrder(serializeRailOrder(o))).toEqual(o)

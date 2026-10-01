@@ -4,6 +4,23 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { loadRepoConfig, projectRunTargets } from './runConfig'
 
+describe('captured repo configuration', () => {
+  it('parses supplied snapshot bytes and treats a captured missing file as no repo layer', () => {
+    const repo = mkdtempSync(join(tmpdir(), 'acorn-config-snapshot-'))
+    try {
+      mkdirSync(join(repo, '.acorn'))
+      const captured = '[scripts.run.dev]\ncommand = "captured-command"\n'
+      writeFileSync(join(repo, '.acorn', 'config.toml'), '[scripts.run.dev]\ncommand = "edited-command"\n')
+      expect(loadRepoConfig(repo, null, {}, captured).runTargets).toEqual([{ id: 'dev', command: 'captured-command' }])
+      expect(loadRepoConfig(repo, null, { devScript: 'db-command' }, null)).toMatchObject({
+        runTargets: [{ id: 'dev', command: 'db-command' }], repoTargetIds: [],
+      })
+    } finally {
+      rmSync(repo, { recursive: true, force: true })
+    }
+  })
+})
+
 describe('loadRepoConfig (docs/workflows.md §2)', () => {
   let dir: string
   let repoDir: string

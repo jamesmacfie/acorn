@@ -14,24 +14,31 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | Folder | What it is | Status |
 | --- | --- | --- |
-| [client-plugins/](./client-plugins/README.md) | Plugins a device holds with no node half, and core chrome (pane switcher, rail, topbar) as exclusive slots a plugin may offer to fill. Style packs as data. Five phases. | Proposal, 2026-08-29. Not started; nothing blocks it. |
+| [cloud/](./cloud/README.md) | Hosted cloud tasks: account service, team Nodes, relay, task workers, archive, isolation, plugin policy, billing, and eleven deployable phases. | Proposed, 2026-09-29; nothing built. |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
 | [dashboards/](./dashboards/README.md) | Remaining taskless database and write-back proposals. Shared data discovery and authoring now belong to workflow v2. | Redesign shipped; overlapping proposals superseded, 2026-09-13. |
 | [performance/](./performance/README.md) | Remaining sequential performance assignments, paired evidence, resource ownership, and sustained-use validation. | Units 01–08 reviewed; units 09–28 and final validation deferred, 2026-10-01. |
+
+| [dynamic-ui/](./dynamic-ui/README.md) | Agent-built apps: task apps drawn as transcript cards and panes in host components, published to the project, edited through drafts, and exported as plugins. A spike and five phases. | Proposed, 2026-10-01; nothing built. |
+| [memory/](./memory/README.md) | Simple memory: direct agent writes, the memory index in every session's system prompt, undo instead of review, and the removal of Findings. Four phases. | Proposed, 2026-10-01; nothing built. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
+| [tui-review/](./tui-review/README.md) | Live terminal UX audit, feature inventory, host projections, and acceptance plan. | Icon removal, startup repair, and the Settings route (the navigation P0) implemented; broader acceptance open. |
 
 ## The single files
 
 | File | What it is | Status |
 | --- | --- | --- |
-| [bundle.md](./bundle.md) | Packaging a downloadable node: native deps, the CI matrix, the snags. | DX half shipped; distribution half remains. |
+| [bundle.md](./bundle.md) | Packaging a downloadable node: native deps, the CI matrix, the snags. | DX and CLI/TUI tarball staging shipped; platform binaries, installer, container image, and desktop embedding remain. |
 | [compiled-tier.md](./compiled-tier.md) | Which compiled plugin moves to the loaded tier next and what blocks it. | Standing map. Three of its four couplings dissolved when the remote component tree shipped. |
+| [editor-files.md](./editor-files.md) | Letting plugins render files in the editor pane: one `replace` point keyed by file, a read-only file capability, and a catalogue of renderers for third-party plugins. | Design proposal, 2026-09-29. Not started. |
 | [integration-ideas.md](./integration-ideas.md) | The catalogue of integrations a workspace could hold, and the four shapes they collapse into. | Research notes. |
 | [kimi.md](./kimi.md) | Kimi Code CLI as a contributed tier 1 harness: the manifest, the four declarations to get right, and the Kimi usage API research behind the optional probes. | Proposal, 2026-09-18. Not started. |
-| [message.md](./message.md) | Agent-to-agent messaging for delegated sessions: what six reference apps do, and what is left after reports to the owner shipped. | Reports, the role note, and sender labels shipped 2026-09-24; the blocked-request wake and the children row remain. |
+| [message.md](./message.md) | Delivery record for delegated-session messaging, with reference-app research and the optional queued-report merge. | Owner reports, blocked-request wakes, and live child rows shipped by 2026-09-26; merging awaits evidence of noise. |
+| [mods.md](./mods.md) | What acorn takes from Claude Code's function hooks: the comparison, and a veto-only `agents:before-permission` hook over every harness's permission requests. | Proposal, 2026-09-29. Not started. |
+| [native-overlay-layer.md](./native-overlay-layer.md) | Product requirements for native desktop overlays above live preview and plugin webviews, with composition, input, security, and acceptance gates. | Proposal, 2026-10-01. Not implemented. |
+| [outdated-review-comments.md](./outdated-review-comments.md) | Hide outdated GitHub review threads from the code pane while preserving conversation history, location metadata, and refresh correctness. | Product requirements, 2026-10-01. Not implemented. |
 | [pluginsearch.md](./pluginsearch.md) | Search within Linear, Rollbar, and GitHub lists beyond the loaded rows while retaining project mappings and state. | Proposal, 2026-09-24. Not started. |
-| [rail-tab.md](./rail-tab.md) | Rail controls and status markers, and closing the gaps in the `core:task` annotation point that replaced loaded rail markers. | Rail control and marker allocator shipped; annotation freshness, the response budget, the node-bundle check and terminal markers remain, 2026-09-12. |
 | [remote.md](./remote.md) | Web client, mobile PWA, and a relay service. | Preparation items shipped; the rest waits on a web client. |
 | [scoll_fix.md](./scoll_fix.md) | Agent transcript scroll and focus repair: retained view state, stable row identity, consumable navigation intent, and cross-session regression coverage. | Implementation proposal, 2026-09-14. Reading position, row identity and reveal intent shipped; filter and disclosure state not built. |
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
@@ -40,10 +47,11 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 Host-owned plugin UI is the seam most of the others lean on, and it shipped in 2026-08. The terminal
 client ([tui.md](../tui.md)) was the second host built on it, which is why the kit's `tui` column is
-read rather than asserted, and what is left of shipping it is step 7 of [bundle.md](./bundle.md).
+read rather than asserted. The terminal and headless clients now ship in the standalone Node tarball;
+desktop embedding and platform release artifacts remain in [bundle.md](./bundle.md).
 The PWA is the layouts' narrow projections,
-compiled-tier's component couplings dissolved into slots, rail-tab's slice 3 became the `core:task`
-annotation point, and the marketing plugin docs should be written against the tree rather than the
+compiled-tier's component couplings dissolved into slots, the `core:task` annotation point carries
+loaded task status, and the marketing plugin docs should be written against the tree rather than the
 frame. Client-plugins consumes the remote root and `replace` arbitration and adds device provenance
 beside them; nothing in it waits any more. Sandbox is independent of all of that. Ecosystem's shipped
 rung-2 containment is recorded in `blockers.md` and sandbox's
@@ -51,12 +59,72 @@ rung-2 containment is recorded in `blockers.md` and sandbox's
 
 ## Retired folders
 
-`phased-review-steps/`, `user-extensions/`, `node-first/`, `acp/`, `tauri/`, `events/` and the later
+`client-plugins/` shipped its five phases in 2026-09 and was deleted on 2026-09-27.
+[Plugins](../plugins.md), [security](../security.md), [frontend composition](../frontend.md),
+[pane layout](../panes.md), [appearance](../ui-design/appearance.md), and
+[terminal chrome and plugins](../tui/chrome-and-plugins.md) own the behavior. [remote.md](./remote.md)
+owns browser custody. The parked icon-pack proposal and the refused alternatives remain in git history.
+
+`cli/` shipped on 2026-09-27 and was deleted after final review. [CLI](../cli.md) owns command
+grammar, output schemas, service lifecycle, and examples; [Node distribution](../node-distribution.md)
+owns packaging; [API reference](../api-reference.md) owns the invocation route; and
+[CLI command authoring](../plugin-authoring/cli-commands.md) owns the loaded-plugin descriptor.
+The five-phase proposal and its refused alternatives remain in git history.
+
+`rail-source-visibility.md` shipped on 2026-09-30 and was deleted. [Frontend](../frontend.md#rail-source-visibility)
+owns the preference, the rail projection, and the palette opener; [the manifest](../plugin-authoring/the-manifest.md)
+owns `showInRailByDefault` and `railSourceVisibility`; [activation](../plugins/activation.md#the-plugin-strip)
+owns the plugin strip; and [testing](../testing.md) holds the manual checks.
+
+`approval.md` shipped on 2026-09-29 and was deleted. [Workflow
+execution](../workflows/execution.md#human-gates) owns the gate form's contract,
+[workflows](../workflows.md) owns the run pane, [authoring](../workflows/authoring.md) owns the
+inspector and generation, [security](../security.md) records that a gate answer is device-only, and
+[API reference](../api-reference.md) owns the gate route. The manual check is part of item 52 in
+[testing](../testing.md). The deferred rejection branch, rejection note, and tool-call gates remain
+in git history.
+
+`phased-review-steps/`, `user-extensions/`, `node-first/`, `node/`, `acp/`, `tauri/`, `events/` and the later
 `events.md` follow-up (shipped on 2026-09-11), `layout/`, `structure/`,
 `structure-followup/`, `before-terminal-ui/`, `terminal/`, `terminal-updates/`, `terminal-rewrite/`,
-`notifications/`, and
-the single files `live-qa.md`, `dx.md` and `web_search_run.md` are in git history. Each ended by saying
+`notifications/`, `git-inspired/`, and
+the single files `live-qa.md`, `dx.md`, `web_search_run.md`, and `rail-tab.md` are in git history. The
+rail component and compiled marker contract live in [ui-design.md](../ui-design.md), and loaded task
+annotations live in
+[Cooperative extension points](../plugins/cooperative-extension-points.md#task-annotations). Each ended by saying
 where its behaviour moved.
+
+`node/` shipped on 2026-09-26. [Architecture overview](../architecture-overview.md) owns the
+runtime-to-client data flow; [plugin activation](../plugins/activation.md) owns active versus installed
+identity, per-Node selection, trust transitions, and availability; [descriptors](../plugins/descriptors.md)
+and [shell](../shell.md) own per-tree bridge authority; [security](../security.md) and
+[caching](../caching.md) own exact-hash custody; [testing](../testing.md) retains the multi-node and
+multi-tree manual checks. The proposal's global winner terminology was replaced with selection from
+each Node's running identity. No persisted trust, cache, layout, or plugin state was cleared.
+
+`git-inspired/` was six phases of bounded large-surface rendering, after GitHub's 2026 account of
+rendering a 2,200-file, million-line pull request: complete GitHub topology, segmented diff
+documents, dynamic-block geometry, a resident segment cache, and bounded timelines. Shipped and
+deleted 2026-09-27 on branch `large-render`. [diff-rendering.md](../diff-rendering.md) owns the
+viewer: § The document, § The source port, § Data flow, § Parsing and highlighting, § Resident
+segments, § Row geometry, and § What large-surface rendering refuses, which holds the eighteen
+decisions. [github-integration.md](../github-integration.md) § Pull request detail and files has the
+full walk, the stage-then-swap, the 3,000-file and 300-file ceilings, and the unconfirmed 250-commit
+cap; § Diff documents has the descriptor blobs, the two repository routes, and the node-wide digest
+limit; § Conversation has turn identity, near-viewport bodies, and snippets.
+[client-surfaces.md](../managed-agents/client-surfaces.md) has the transcript's fixed window, why it
+shipped, its three refusals including `content-visibility`, and its known limits.
+[caching.md](../caching.md) has the digest-keyed blobs, the unpruned cache, and the resident cache;
+[telemetry.md](../telemetry.md) § Rendered-surface health has the probes;
+[state-ownership.md](../state-ownership.md) has the reading places and the per-node cache;
+[api-reference.md](../api-reference.md) and [data-layer.md](../data-layer.md) have the routes and the
+mirror columns; [package-shape.md](../plugins/package-shape.md) § The plugin API and
+[plugin-authoring.md](../plugin-authoring.md) § Drawing a diff have plugin API major 2; and
+[tui/interaction.md](../tui/interaction.md) has the terminal's diff pane. The fixture and the flow are
+[testing.md](../testing.md) § Large-surface fixture and
+[local-development.md](../local-development.md) § Large-surface flow. Smoke items 81 to 85 in
+[changes-and-large-surfaces.md](../testing/changes-and-large-surfaces.md) are the real-window acceptance it still owes: none has run on a visible
+WebKit window.
 
 `web_search_run.md` made a managed transcript show what an agent searched for, which pages it opened,
 and which sources came back, the same way whichever harness ran it. Shipped and deleted 2026-09-15.
@@ -92,7 +160,7 @@ kit has the renamed picker, [features.md](../features.md) and
 [first-party-plugins.md](../first-party-plugins.md) have the Settings section and the wizard step,
 [api-reference.md](../api-reference.md) has the route, and
 [workflows.md](../workflows.md) § What an agent step sees has `decide` on Codex and why a manifest
-harness passes that check and then fails at run time. [testing.md](../testing.md) holds everything the
+harness passes that check and then fails at run time. [agents-and-providers.md](../testing/agents-and-providers.md) holds everything the
 programme owes: five manual checks, items 58 to 62, including the acceptance test that someone writes
 the OpenCode plugin from the authoring doc alone. Its refusals are in git history, and the two worth
 not re-arguing are a CLI as a synthesized connection row and a second `models:harness` permission
@@ -130,7 +198,7 @@ owner-typed row and the save that re-enters the snapshot, and
 grown row, [integrations.md](../integrations.md) has **Start workflow…** as a registry contribution
 rather than three menus, and [ui-design.md](../ui-design.md) § The closed kit and
 [tui.md](../tui.md) § What a plugin loses here have the kit's `Graph` node and its two projections.
-[testing.md](../testing.md) holds what the programme owes: nine manual checks, items 48 to 56, six
+[workflows.md](../testing/workflows.md) holds what the programme owes: nine manual checks, items 48 to 56, six
 for the editor and the run pane, two for the start-from-an-item flow and one for the graph view. None
 of them has been run.
 
@@ -154,7 +222,7 @@ message beside the database plugin's SQL as the two `generateText` consumers;
 [command-palette-and-shortcuts.md](../command-palette-and-shortcuts.md) § Plugin shortcuts has the two
 commit chords and the palette rows; [first-party-plugins.md](../first-party-plugins.md) and
 [api-reference.md](../api-reference.md) have the plugin's row and its route surface; and
-[testing.md](../testing.md) has smoke items 43 to 47.
+[changes-and-large-surfaces.md](../testing/changes-and-large-surfaces.md) has smoke items 43 to 47.
 
 `command-palette/` was seven phases that gave acorn one command graph and one host-neutral palette
 session. Shipped and deleted 2026-09-03.
@@ -204,7 +272,7 @@ promotion, native menus, dialogs and keychain prompts) stay manual.
 `unarchive.md` recorded the archive page: search, a read-only preview, and restore. Shipped
 2026-09-24 and deleted 2026-09-26. [workspaces-and-tasks.md](../workspaces-and-tasks.md) § Restoring
 a task owns the behaviour, [plugins.md](../plugins.md) § Search providers owns `ctx.search`, and
-[testing.md](../testing.md) item 79 is the manual smoke it owed. Left out on purpose: more search
+[changes-and-large-surfaces.md](../testing/changes-and-large-surfaces.md) item 79 is the manual smoke it owed. Left out on purpose: more search
 providers than core tasks and the agents plugin, a loaded-tier search route (loaded task panes can
 still opt into the preview with `readsArchived: true` on their `frames` entry), search across active
 tasks, external-content FTS (it needs stable rowids and `agent_events` has a text key), opening an
@@ -295,7 +363,7 @@ box rather than remembered in a flag. The three invariants the programme added a
 § The invariants, and the trace flag a developer turns on first is § Seeing what the keys did. What
 it refused is recorded where the refusal binds: no column wrap and an arrow edge as a wall in
 § Focus regions, no second keymap in § What must never happen, and the four manual checks it still
-owed are items 27 to 30 of [testing.md](../testing.md) § The smoke checklist.
+owed are items 27 to 30 of [terminal-and-palette.md](../testing/terminal-and-palette.md).
 
 `structure/` was eight phases that made the folder names say what the architecture doc says: `main/`
 retired everywhere, client-core regrouped into `kit/`, `host/`, `infra/`, and `features/`, one shape
@@ -319,10 +387,10 @@ and auth, Third-party plugin bundles and The containment ladder for the worker-t
 [first-party-plugins.md](../first-party-plugins.md) § What each of these loses in a terminal for the
 plugin-by-plugin table, [terminal.md](../terminal.md) § Client and [editor.md](../editor.md) for
 `attachPty` and the `$EDITOR` handoff, [node-distribution.md](../node-distribution.md) § Reaching a
-node with `acorn`, and [testing.md](../testing.md) § Test layers for the six suites. Phase 7, putting
-`acorn` in the two artifacts, is the one phase that never ran; its design is
-[bundle.md](./bundle.md) § Shipping `acorn`, which is where it belonged all along, because the tarball
-is that file's pipeline and not this programme's.
+node with `acorn`, and [testing.md](../testing.md) § Test layers for the six suites. Phase 7's tarball
+half shipped with the headless CLI on 2026-09-27: `scripts/pack-node.mjs` stages the shared launcher
+and both client bundles. Embedding that launcher in the desktop app and the platform release pipeline
+remain in [bundle.md](./bundle.md) § Shipping `acorn`.
 
 `before-terminal-ui/` was eight phases that emptied the plugin client tier of the raw DOM a second
 host cannot draw, shipped and deleted 2026-08-31. The kit grew four nodes and
@@ -351,7 +419,7 @@ context type says which tier each member belongs to, so reaching across the line
 instead of a runtime "not a function" ([plugins.md](../plugins.md) §§ The two contexts, one per tier
 and One vocabulary across the registries). The four facts it named to keep a cloud control plane
 possible sit with their owners: the dial in [plugins.md](../plugins.md) § Node providers, the two node
-ids in `packages/protocol/src/nodeProviders.ts`, `ACORN_BUNDLED_PLUGINS_DIR` as a developer path in
+ids in `packages/protocol/src/device/nodeProviders.ts`, `ACORN_BUNDLED_PLUGINS_DIR` as a developer path in
 [node-distribution.md](../node-distribution.md) § Plugins, and the opaque `options` bag beside its
 schema.
 

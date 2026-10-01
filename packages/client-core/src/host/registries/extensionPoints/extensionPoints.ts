@@ -15,7 +15,7 @@ import {
 } from '@acorn/protocol/extensionPoints.ts'
 import type { Component } from 'solid-js'
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
-import { Registry } from '../../../kit/lib/registry'
+import { Registry } from '../../../kit/lib/state/registry'
 
 export type { ArbitrationMode, ExtensionPointKind, ExtensionPointLocation }
 
@@ -41,6 +41,9 @@ export type ExtensionPointContribution = {
   mode?: ArbitrationMode
   /** `stack` only: how many contributors fit before the host draws a disclosure. */
   max: number
+  /** `annotation` only: accepted marks retained from each contributor for one request. The raw
+   * response ceiling is a separate protocol guard; this is the owner's surface policy. */
+  acceptedMarks?: number
   /** `remote` only: what a contributor's tree may ask this owner to do (docs/plugins.md § Asking the
    *  owner). Names only. The owner binds a handler of the same name on each `Slot` it draws, and the
    *  host refuses a request missing from either list, so declaring one here grants nothing on its own. */
@@ -97,6 +100,10 @@ export type ExtensionContribution = {
   fetch?: (signal: AbortSignal) => Promise<PluginExtensionItem[]>
   /** `items` on an annotation point only: the batched marks call. */
   marks?: (keys: PluginAnnotationKey[], signal: AbortSignal) => Promise<PluginAnnotationMark[]>
+  /** Host-owned request scope. Loaded contributions use the active node id. */
+  requestScope?: () => string
+  /** Host-owned freshness dependency. Loaded contributions use `chromeDeps(pluginId)`. */
+  freshnessRevision?: () => number
   /** Absent when the contribution declared no verb, a read-only list, which is a real answer. */
   run?: (item: PluginExtensionItem) => void
 }

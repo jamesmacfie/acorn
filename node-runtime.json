@@ -1,6 +1,6 @@
 {
-  "//": "The Node runtime pin, in one place because two artifacts ship one runtime: the desktop bundle's external binary (apps/desktop/scripts/stage.mjs) and the standalone node tarball (scripts/pack-node.mjs). See docs/shell.md § Build and packaging.",
-  "version": "24.11.0",
-  "//engines": "The floor the packed artifact declares. node:sqlite is what sets it (docs/node-distribution.md); apps/node/scripts/build-plugin.mjs importing a .ts file directly is the other reason.",
-  "engines": ">=22.18 <23 || >=24.4"
+  "//": "The desktop bundle's Node runtime pin (apps/desktop/scripts/stage.mjs). The standalone tarball declares the same supported security range through root package.json. See docs/shell.md § Build and packaging.",
+  "version": "24.21.0",
+  "//engines": "The security floor for the permission model used by loaded plugins, aligned with root package.json and @acorn/protocol/nodeRuntime.ts (docs/node-distribution.md).",
+  "engines": ">=22.23.2 <23 || >=24.18.1 <25 || >=26.5.1 <27"
 }

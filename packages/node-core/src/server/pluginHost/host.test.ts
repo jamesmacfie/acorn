@@ -15,6 +15,7 @@ import { agentToolContributions } from '../agentTools/registry'
 import type { AppEnv } from '../middleware/auth'
 import { pluginRouteContributions } from '../routes/registry'
 import { AGENTS_HARNESS_REGISTRY, type ManifestHarness } from './harnesses'
+import { AGENTS_CUSTOM_AGENT_REGISTRY, type ManifestCustomAgent } from './customAgents'
 import { clearRegistrations, initPlugins, type LoadedPluginBinding } from './host'
 import type { NodePermissions } from '../plugins/manifest'
 import type { CompiledNodePluginContext, NodePlugin } from './types'
@@ -102,6 +103,34 @@ describe('plugin host', () => {
       dataDir: '',
       disabled,
     })
+
+  it('keeps the previous loaded instance serving when a reload candidate fails in ready', async () => {
+    let previousDisposed = false
+    const binding: LoadedPluginBinding = {
+      permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+      storage: { open: () => { throw new Error('test storage is not configured') } },
+    }
+    const result = await initPlugins([plugin('widget', { dispose: () => void (previousDisposed = true) })], {
+      capabilities: new CapabilityRegistry(),
+      core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+      dataDir: '',
+      loaded: new Map([['widget', binding]]),
+    })
+    const error = vi.spyOn(console, 'error').mockImplementation(noop)
+    try {
+      expect(await result.reload('widget', {
+        plugin: plugin('widget', { ready: () => { throw new Error('candidate ready failed') } }),
+        binding,
+      })).toEqual({ ok: false, error: 'candidate ready failed', retained: true })
+      expect(previousDisposed).toBe(false)
+      expect(result.enabled).toContain('widget')
+      expect(result.roster[0]).toMatchObject({ state: 'failed', stage: 'ready', reason: 'candidate ready failed' })
+    } finally {
+      error.mockRestore()
+      await result.dispose()
+    }
+    expect(previousDisposed).toBe(true)
+  })
 
   // Starts, not finishes: the pass is kicked off in declaration order, and a plugin that awaits inside
   // its init finishes whenever it finishes. The order-independence block at the bottom of this file is
@@ -894,5 +923,52 @@ describe('order independence', () => {
     expect(result.roster.find((entry) => entry.name === 'broken')?.state).toBe('failed')
     await result.dispose()
     error.mockRestore()
+  })
+})
+
+describe('delivering a manifest-declared custom agent', () => {
+  let shared: ReturnType<typeof makeTestDb> | null = null
+  const coreDb = () => (shared ??= makeTestDb()).db
+  afterAll(() => shared?.cleanup())
+
+  it('mints the id, qualifies a harness the manifest declares, and passes any other harness on as written', async () => {
+    const registered: ManifestCustomAgent[] = []
+    const result = await initPlugins([
+      {
+        name: 'agents',
+        init: (ctx) => void ctx.capabilities.provide(AGENTS_CUSTOM_AGENT_REGISTRY, {
+          register: (agent) => {
+            registered.push(agent)
+            return { dispose: () => void registered.splice(registered.indexOf(agent), 1) }
+          },
+        }),
+      },
+      { name: 'reviews', init: () => {} },
+    ], {
+      capabilities: new CapabilityRegistry(),
+      core: createCoreServices({ secrets: new SecretService('b'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+      dataDir: '',
+      loaded: new Map([['reviews', {
+        permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+        storage: { open: () => { throw new Error('test storage is not configured') } },
+        harnesses: [{
+          id: 'reviewer-cli', label: 'Reviewer', spawn: { command: 'reviewer', args: ['acp'] }, envPassthrough: [],
+          quirks: { manualCompaction: false, sessionPersistence: false },
+        }] as never,
+        customAgents: [
+          { id: 'strict', name: 'Strict reviewer', harness: 'reviewer-cli', options: {}, instructions: 'Be strict.' },
+          { id: 'claude-review', name: 'Claude reviewer', harness: 'claude', options: { model: 'opus' }, maxToolRisk: 'read' },
+        ],
+      } satisfies Partial<LoadedPluginBinding> as never]]),
+    })
+
+    expect(registered).toEqual([
+      { id: 'reviews:strict', pluginId: 'reviews', name: 'Strict reviewer', providerId: 'reviews:reviewer-cli', options: {}, instructions: 'Be strict.' },
+      { id: 'reviews:claude-review', pluginId: 'reviews', name: 'Claude reviewer', providerId: 'claude', options: { model: 'opus' }, maxToolRisk: 'read' },
+    ])
+    // Rolled back with the plugin's other registrations, since the agents live in the consumer's list.
+    clearRegistrations('reviews')
+    expect(registered).toEqual([])
+    await result.dispose()
   })
 })

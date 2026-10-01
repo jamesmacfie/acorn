@@ -1,5 +1,7 @@
 import { AGENT_TOOL_PASSTHROUGH, brokerEnv, createLogger } from '@acorn/plugin-api/node'
+import { sessionCustomAgent } from '../../shared/customAgents'
 import { execFile } from 'node:child_process'
+import { randomUUID } from 'node:crypto'
 import { basename, resolve } from 'node:path'
 import { promisify } from 'node:util'
 import type {
@@ -18,16 +20,19 @@ import {
 } from './codexNormalizer'
 import { JsonRpcProcess, type JsonRpcServerRequest } from './jsonRpcProcess'
 import type { AgentDriver, AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from './types'
+import { contextBlock } from './contextBlock'
 import { probeCodexAuthentication } from './authProbe'
 import { canReplaceMissingCodexSession } from './codexSessionRecovery'
 import { providerStderrNotice } from './diagnostics'
 import {
   codexCollaborationModeForTurn,
   codexCollaborationModes,
+  codexMcpConfig,
   codexModelOptions,
   codexOptionsWithThreadSettings,
   codexPermissionOptions,
   codexReasoningOptions,
+  codexReportedMcpServers,
   codexSkillsFromResponse,
   codexThreadSettings,
   type CodexThreadSettings,
@@ -89,7 +94,7 @@ function codexInput(
       case 'context':
         input.push({
           type: 'text',
-          text: `<acorn-context source="${part.source}" label="${part.label}">\n${part.content}\n</acorn-context>`,
+          text: contextBlock(part),
           text_elements: [],
         })
         break
@@ -186,6 +191,8 @@ export class CodexAgentDriver implements AgentDriver {
     const pendingRequests = new Map<string, JsonRpcServerRequest>()
     const childRouter = new CodexChildRouter()
     let rpc!: JsonRpcProcess
+    const mcpStartup = new Map<string, { status: string; error: string | null }>()
+    const mcpConfig = codexMcpConfig(options.mcpServers)
 
     const onServerRequest = (request: JsonRpcServerRequest): void => {
       const event = normalizeCodexServerRequest(request)
@@ -193,8 +200,12 @@ export class CodexAgentDriver implements AgentDriver {
         rpc.respondError(request.id, -32601, `Acorn does not implement server request ${request.method}.`)
         return
       }
-      pendingRequests.set(event.requestId, request)
-      void options.onEvent(event)
+      // Our own id, not Codex's. Codex numbers its requests from 0 in every app-server process, and a
+      // session starts a new process when it resumes, so its number can repeat one this session
+      // already answered. The store keys a request on session and id, and would keep the old row.
+      const requestId = randomUUID()
+      pendingRequests.set(requestId, request)
+      void options.onEvent({ ...event, requestId })
     }
 
     rpc = new JsonRpcProcess({
@@ -207,6 +218,14 @@ export class CodexAgentDriver implements AgentDriver {
       // credential, bypassing canUseProviderCredential and SecretService.
       env: brokerEnv({ env: options.env, passthrough: [...AGENT_TOOL_PASSTHROUGH, 'CODEX_*'] }),
       onNotification: (notification) => {
+        // Server start-up is the process's, not a thread's, so it is kept for the panel and goes no
+        // further. The transcript has nothing to say about a server that finished connecting.
+        if (notification.method === 'mcpServer/startupStatus/updated') {
+          const params = asObject(notification.params)
+          const name = stringValue(params?.name)
+          if (name) mcpStartup.set(name, { status: stringValue(params?.status) ?? 'unknown', error: stringValue(params?.error) })
+          return
+        }
         // Routed before it is normalized as the session's own. A Codex subagent is a full app-server
         // thread on this same connection, so an unrouted child `turn/completed` would end the parent's
         // turn and an unrouted child status would flip the parent's state (drivers/codexChildRouting.ts
@@ -263,11 +282,17 @@ export class CodexAgentDriver implements AgentDriver {
     })
     rpc.notify('initialized')
 
+    // A custom agent's instructions, from the snapshot the session was created with. Sent on resume as
+    // well as start, and unchanged, for the reason Claude's appended system prompt is.
+    const instructions = sessionCustomAgent(options.session.config)?.instructions
+    const developerInstructions = instructions ? { developerInstructions: instructions } : {}
     const startThread = () => rpc.request<Record<string, unknown>>('thread/start', {
       cwd: options.cwd,
       runtimeWorkspaceRoots: [options.cwd],
       threadSource: 'appServer',
       ephemeral: false,
+      ...(mcpConfig ? { config: mcpConfig } : {}),
+      ...developerInstructions,
     }, 60_000)
     let sessionResponse: Record<string, unknown>
     try {
@@ -278,6 +303,8 @@ export class CodexAgentDriver implements AgentDriver {
             cwd: options.cwd,
             runtimeWorkspaceRoots: [options.cwd],
             excludeTurns: false,
+            ...(mcpConfig ? { config: mcpConfig } : {}),
+            ...developerInstructions,
           }, 60_000)
         } catch (error) {
           if (!canReplaceMissingCodexSession(error, options.noProviderExecutionHistory)) throw error
@@ -360,6 +387,9 @@ export class CodexAgentDriver implements AgentDriver {
       get ready() {
         return ready && currentTurnId == null && !rpc.closed
       },
+      get pid() {
+        return rpc.pid
+      },
       async sendTurn(turnOptions: AgentDriverTurnOptions) {
         if (!threadId) throw new Error('Codex thread is not initialized.')
         if (!ready || currentTurnId) throw new Error('Codex session is not ready for another turn.')
@@ -395,8 +425,10 @@ export class CodexAgentDriver implements AgentDriver {
       async resolveRequest(providerRequestId, resolution) {
         const request = pendingRequests.get(providerRequestId)
         if (!request) throw new Error('Codex request is no longer pending.')
+        // Built first: an answer the request never offered throws here, before anything is sent.
+        const response = codexServerRequestResponse(request, resolution)
         pendingRequests.delete(providerRequestId)
-        rpc.respond(request.id, codexServerRequestResponse(request, resolution))
+        rpc.respond(request.id, response)
       },
       async setConfig(optionId, value) {
         configOptions = configOptions.map((option) => option.id === optionId ? { ...option, currentValue: value } : option)
@@ -407,6 +439,10 @@ export class CodexAgentDriver implements AgentDriver {
       async compact() {
         if (!threadId) return
         await rpc.request('thread/compact/start', { threadId }, 60_000)
+      },
+      async mcpStatus() {
+        const response = await rpc.request('mcpServerStatus/list', { threadId, detail: 'toolsAndAuthOnly', limit: 100 }, 15_000)
+        return codexReportedMcpServers(response, mcpStartup)
       },
       async fork() {
         if (!threadId) throw new Error('Codex thread is not initialized.')

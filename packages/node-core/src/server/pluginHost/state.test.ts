@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { InstalledPluginInfo, PluginLoadFailure } from '../plugins/loader'
+import type { ActivePluginSnapshot, InstalledPluginInfo, PluginLoadFailure } from '../plugins/loader'
 import type { PluginRosterEntry } from './host'
 import { pluginState, type PluginsBridge } from './state'
 
@@ -9,9 +9,9 @@ import { pluginState, type PluginsBridge } from './state'
 const NO_PERMISSIONS = { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } }
 const NO_CONTRIBUTIONS = {
   frames: [], remote: [], sources: [], slots: [], commands: [], keybindings: [],
-  attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [],
+  attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [],
   contextMenus: [], extensionPoints: [], extensions: [],
-  schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [],
+  schedules: [], taskChecks: [], auditActions: [], harnesses: [], customAgents: [], agentTools: [], contextSections: [], cliCommands: [],
 }
 const installed = (id: string, over: Partial<InstalledPluginInfo> = {}): InstalledPluginInfo => ({
   id,
@@ -24,6 +24,10 @@ const installed = (id: string, over: Partial<InstalledPluginInfo> = {}): Install
   hasNode: true,
   ...over,
 })
+const activeSnapshot = (id: string, version: string): ActivePluginSnapshot => {
+  const { id: _id, hasNode: _hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...identity } = installed(id, { version })
+  return { id, identity: { ...identity, activation: 'node' }, bundle: null }
+}
 
 type Situation = {
   roster?: PluginRosterEntry[]
@@ -33,6 +37,7 @@ type Situation = {
   // Unstamped, and the helper adds the clock: what these cases are about is the reason text and the
   // resulting state, and every literal carrying an identical `at:` would only bury that.
   loadFailures?: Omit<PluginLoadFailure, 'at'>[]
+  review?: Record<string, { reviewId: string; requestId: string; fingerprint: string; stagedAt: number } | { corrupt: true }>
 }
 
 // A fixed instant so a test can assert the row carries the loader's stamp rather than a fresh clock.
@@ -45,9 +50,13 @@ const bridge = (situation: Situation): PluginsBridge => {
     installed: () => onDisk,
     // The steady state is "what is on disk is what booted"; a test says otherwise only when it is
     // about the gap between the two.
-    booted: () => situation.booted ?? onDisk.map((entry) => ({ id: entry.id, version: entry.version })),
+    booted: () => (situation.booted ?? onDisk.map((entry) => ({ id: entry.id, version: entry.version })))
+      .map((entry) => activeSnapshot(entry.id, entry.version)),
     disabled: () => situation.disabled ?? [],
     loadFailures: () => (situation.loadFailures ?? []).map((failure) => ({ ...failure, at: FAILED_AT })),
+    pendingReview: (id) => situation.review?.[id] ?? null,
+    pendingReviewIds: () => Object.keys(situation.review ?? {}),
+    approveReview: () => { throw new Error('not under test') },
     clientBundle: async () => null,
     setDisabled: () => {},
     install: async () => ({ id: '', version: '', state: 'installed-restart-required' }),
@@ -60,6 +69,26 @@ const bridge = (situation: Situation): PluginsBridge => {
 const row = (result: ReturnType<typeof pluginState>, name: string) => result.plugins.find((entry) => entry.name === name)
 
 describe('pluginState', () => {
+  it('holds a staged client-only package and an orphan marker for recovery without a restart banner', () => {
+    const review = { reviewId: 'r', requestId: 'q', fingerprint: 'f', stagedAt: 1 }
+    const candidate = installed('client-only', { hasNode: false })
+    const state = pluginState(bridge({ installed: [candidate], booted: [], review: { 'client-only': review, orphan: { corrupt: true } } }))
+    expect(row(state, 'client-only')).toMatchObject({ state: 'pending-review', running: false, active: null, pendingReview: { reviewId: 'r', fingerprint: 'f', stagedAt: 1 } })
+    expect(row(state, 'orphan')).toMatchObject({ state: 'pending-review', running: false, pendingReview: { corrupt: true } })
+    expect(state.restartRequired).toBe(false)
+  })
+
+  it('keeps an invalid staged manifest removable when the loader has no installed row', () => {
+    const state = pluginState(bridge({
+      loadFailures: [{ id: 'broken', dir: '/data/plugins/broken', reason: 'manifest does not parse' }],
+      review: { broken: { corrupt: true } },
+    }))
+    expect(row(state, 'broken')).toMatchObject({
+      state: 'pending-review', running: false, active: null,
+      pendingReview: { corrupt: true }, stage: 'load', reason: 'manifest does not parse',
+    })
+    expect(state.restartRequired).toBe(false)
+  })
   it('reports a running node with nothing pending', () => {
     const result = pluginState(bridge({ roster: [{
       name: 'github', required: false, disabled: false, state: 'active',
@@ -99,6 +128,8 @@ describe('pluginState', () => {
       }),
     )
     expect(row(result, 'ntfy')?.state).toBe('pending-restart')
+    expect(row(result, 'ntfy')?.active).toMatchObject({ version: '1.0.0', client: { hash: 'a'.repeat(64) } })
+    expect(row(result, 'ntfy')?.installed?.version).toBe('2.0.0')
     expect(result.restartRequired).toBe(true)
   })
 
@@ -110,8 +141,11 @@ describe('pluginState', () => {
         booted: [{ id: 'ntfy', version: '1.0.0' }],
       }),
     )
-    // A restart cannot fix a plugin whose init throws, so it must not raise the banner.
+    // A failed reload leaves the old runtime serving, while the newer disk candidate will be tried
+    // at restart. The failure remains visible beside the honest restart requirement.
     expect(row(result, 'ntfy')?.state).toBe('failed')
+    expect(row(result, 'ntfy')?.active?.version).toBe('1.0.0')
+    expect(result.restartRequired).toBe(true)
   })
 
   it('adds a just-installed package the host never saw, waiting on a restart', () => {
@@ -235,5 +269,15 @@ describe('pluginState', () => {
     const result = pluginState(bridge({ installed: [installed('theme', { hasNode: false })], booted: [] }))
     expect(row(result, 'theme')).toMatchObject({ running: true, state: 'active' })
     expect(result.restartRequired).toBe(false)
+  })
+
+  it('keeps a serving node half authoritative when its disk replacement is client-only', () => {
+    const result = pluginState(bridge({
+      roster: [{ name: 'theme', required: false, disabled: false, state: 'active' }],
+      installed: [installed('theme', { version: '2.0.0', hasNode: false })],
+      booted: [{ id: 'theme', version: '1.0.0' }],
+    }))
+    expect(row(result, 'theme')).toMatchObject({ state: 'pending-restart', active: { version: '1.0.0', activation: 'node' }, installed: { version: '2.0.0' } })
+    expect(result.restartRequired).toBe(true)
   })
 })

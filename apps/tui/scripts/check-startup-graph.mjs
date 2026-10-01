@@ -65,7 +65,10 @@ const dist = resolve(distFlag === -1 ? resolve(import.meta.dirname, '../dist') :
 // What is left is the chrome, the client-core it draws with, and the painter, which is what the first
 // frame is made of. There is no registry in it and nothing here is waiting to be made lazy: the next
 // honest saving is a smaller kit, not a later import.
-const CEILING = 1_130_000
+// The 2026-09-28 security pass put Node message validation and safe URL handling on the client
+// boundary. Those checks run before any untrusted content is rendered, so they belong in the eager
+// graph. The acceptance build measured 1,137,492 B across 131 chunks; retain about 3% headroom.
+const CEILING = 1_175_000
 
 // The same list the desktop's check holds, for the same reason: a chunk with one of these names in a
 // startup graph is a lazy surface that leaked into the eager one. Written twice rather than shared,

@@ -10,20 +10,59 @@ pnpm lint
 pnpm test
 pnpm --filter @acorn/arch-tests test
 pnpm --filter @acorn/desktop test
+pnpm --filter @acorn/cli test
 pnpm db:check
+pnpm test:coverage
 ```
 
 `pnpm test` rebuilds native modules for plain Node and runs Vitest through Turborepo with bounded
 concurrency, and reports every package rather than cancelling the rest on the first failure. Run it
 rather than `turbo run test` directly: the bound is what keeps the suite honest. Many of these tests
 spawn a real subprocess, mint a certificate, or run git, and turning the bound off oversubscribes the
-machine badly enough that they time out while passing in isolation.
+machine badly enough that they time out while passing in isolation. The bound is six packages at a
+time. Set `ACORN_TEST_CONCURRENCY` to change it. CI sets it to one. Each package's Vitest already
+starts a worker per core, and six packages at once on a four-core runner made tests 10 to 15 times
+slower than they run locally.
 
 The TUI suite also limits its internal test forks to two. Package concurrency alone does not bound
 Vitest workers; cold shell transforms across many forks can exceed fixture deadlines under load.
 
-The desktop package's `test` stages the bundle inputs first, then runs its Vitest suites and the Rust
-unit tests, so the boot test always exercises fresh artifacts.
+The desktop package's `test` stages the bundle inputs first, including a build of the plugin SDK for
+bundled plugin imports. It then runs its Vitest suites and the Rust unit tests, so the boot test
+exercises fresh artifacts.
+
+## Coverage measurement
+
+`pnpm test:coverage` runs focused Vitest suites for four contract paths and writes JSON summaries to
+`.coverage/<path>/coverage-summary.json`. Each target names the source files to include, including
+files no test imports. The command reports coverage for these test selections only:
+
+| Target | Tests | Source in report |
+| --- | --- | --- |
+| Protocol plugin contract | `packages/protocol/src/plugin/` | `packages/protocol/src/plugin/**/*.ts` |
+| Node plugin loader | `packages/node-core/src/server/plugins/` | `packages/node-core/src/server/plugins/**/*.ts` |
+| Client frame bridge and host | `packages/client-core/src/host/frames/`, including `PluginFrame.test.tsx` for iframe connection, startup deadline, and teardown | `packages/client-core/src/host/frames/**/*.{ts,tsx}` |
+| Workflow execution | Seven suites covering dispatch, child lifecycle, maps, nested runs, processing, projection, and schedules | Seven modules: `runs/runner.ts`, `steps/execution.ts`, `dispatch/dispatcher.ts`, `dispatch/childLifecycle.ts`, `processing/rules.ts`, `runs/read/projection.ts`, and `schedules/service.ts` under `plugins/workflows/src/server/` |
+
+Use the report to find untested branches before changing these boundaries. It is not a monorepo
+coverage percentage. Integration tests in other packages can exercise a contract without appearing
+in its package-local report. The Node plugin worker runs in a separate thread, so its source appears
+uncovered in this in-process V8 report even when loader tests exercise it. No global percentage
+threshold is set.
+
+The TUI agent driver has focused protocol, screen, and flow tests under
+`apps/tui/scripts/agent/`. A live PTY run is an opt-in acceptance check because it builds and starts
+a real Node and needs time for the terminal to draw. See
+[local-development.md](./local-development.md#agent-driven-terminal-development) for launch,
+snapshot, key, resize, flow, and stop commands.
+
+The CLI suite checks argument parsing, versioned resource projection against golden JSON Schema
+examples, Node pin selection, writes, agent and workflow waits, plugin command validation, and local
+service ownership. Node-core route tests cover device-only plugin dispatch, active declaration and
+scope checks, output validation, and keyed write replay. The standalone archive smoke starts a Node,
+reads it from a second CLI process, then stops it. See
+[local development](./local-development.md#headless-cli-development) for the commands and
+[CLI](./cli.md) for output and exit contracts.
 
 The workflow-v2 transition test creates a fixture, copies it, and runs only against the copy. It
 asserts both the targeted reset and survival of unrelated tasks, links, credentials/connections,
@@ -75,6 +114,18 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
   checks machinery, not pixels: a contribution under test renders a `<span>` carrying its own id. The
   smoke checklist below is still the eyes-on pass, and it is a good thing to run once after touching
   any of these;
+- annotation lifecycle tests cover contributor-specific freshness, disable and re-enable, reload,
+  removal, identical task ids across nodes, stale responses, failure isolation, registered-order
+  merging, and request cancellation. The chrome integration test registers a loaded manifest,
+  receives the annotation POST, and follows the valid mark into the rail registry. Protocol defines
+  the generic 4,096-row ceiling, client tests keep it separate from `core:task`'s 256-accepted-mark
+  limit, node-core tests require a node bundle for route-backed extensions, and the TUI chrome test
+  covers the ordered marker projection, `+N` disclosure, and keyboard inspection;
+- exclusive chrome tests exercise core fallback for the task list, pane switcher, rail, and topbar;
+  remote-tree failure reports; host-minted nested slot placement; and the action boundary that refuses
+  source, node, and route choices the host did not offer. A real-window pass still checks the visual
+  arrangement, collapse control, nested task list and status items, and fallback after disabling or
+  removing a selected provider;
 - the palette session has one fixture suite and both hosts are held to it.
   `host/registries/commands/sessionStore.test.tsx` drives the session directly and asserts what the reader
   feels: what the empty root lists, what typing searches, what Enter does to a group, what Escape gives
@@ -147,8 +198,9 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
   back at 100, the palette opening on its chord and giving the keys back where it found them, a
   notification appearing above the footer without taking focus, and `q` asking before it stops a node
   this `acorn` started. A reachability file (`src/reachability.test.tsx`) is the keyboard's property
-  rather than a scenario: it walks every stop on eight surfaces, which are the browse rail, the six
-  panes the pane sweep opens, and the browse rail again with the cheat sheet open over it. After
+  rather than a scenario: it walks every stop on nine surfaces, which are the browse rail, the six
+  panes the pane sweep opens, the browse rail again with the cheat sheet open over it, and the
+  Settings route open on Notifications, the one core page the terminal draws a form for. After
   every press it asks that at most one caret is drawn, that focus is on a node still on screen, that
   the word the footer puts beside each bare key is what that key does there, that the one focus value
   names a node that is in the tree and can hold the keys, and that the keys have not reached out of
@@ -216,6 +268,77 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
   those components and a plugin's own suite could not render one. A plugin test reaches the host
   through `@acorn/plugin-api/testkit/client`, not by importing into `client-core` (`tools/arch/
   boundaries.test.ts` § plugin tests holds the shrinking budget for that);
+- the GitHub mirror's topology tests use `plugins/github/src/server/routes/mirror/fakeGithub.helper.ts`,
+  a deterministic GitHub that paginates the way GitHub documents: 100 nodes a page, a `Link` header on
+  the files pages, and the 3,000-file cap. `prFetch.test.ts` asserts requests, cursors, order, and
+  completeness: 2,200 files in 22 requests, 3,000 of 3,000 complete, 3,000 of 3,418 capped, a full
+  page 30 with no count capped, and 400 review threads, a 250-comment thread, 150 commits, and 120
+  checks all exhausted. It also fails a repeated cursor, a duplicate path, a malformed page, a partial
+  GraphQL error, and a failed middle page, and holds thread-comment requests to four in flight.
+  `prMirror.test.ts` runs against the real migrated `github.sqlite`: a failed page 12 leaves every old
+  row, `fetched_at`, and completeness unchanged; two patches of one head blob read back apart; a
+  missing body is an integrity failure; and a summary read touches no blob. `pullFiles.test.ts`,
+  `pullsBatch.test.ts`, and `prCreate.test.ts` cover the routes, including the diff document, segment
+  and search reads by digest and the bounded refusals of a forged digest, an unknown body, a bad
+  ordinal and an oversized batch, and a compare answered as a document with its patches stored by
+  digest. `DiffForPull.test.tsx` covers the capped-list warning and that the pane reads segments and
+  never a whole patch;
+- the diff document has three tiers. `packages/diff-document/src/segment.test.ts` holds the segmenter
+  to its rules over a generated corpus: every row kept in order, the same cut every time, both
+  limits honoured except for one oversize row that is alone and marked, a gap only at a segment's
+  edge, a deletion run kept with its insertions, the raw fallback bounded, and keys that follow the
+  patch and not the file's position; `search.test.ts` pages across files and stops reading once a
+  page is full. `testkit/largeDiff.test.ts` holds every descriptor of the `scale` profile to the
+  bounded row builders the renderer draws with: rows, columns and split bands.
+  `plugins/changes/src/server/routes/localGit.test.ts` runs the Changes document over a real tree,
+  including a stale digest refused as a revision conflict and staged and unstaged kept apart.
+  `features/diff/DiffPane.test.tsx` renders the real pane over the fixture with a jsdom layout model
+  (`features/diff/layout.helper.ts`): plain rows before colour, a pane left open asking for a few
+  dozen of the `scale` profile's thousands of segments and then nothing more, a jump to the last
+  file that loads nothing in between, a new revision that reloads only the file that moved, find
+  across unloaded segments, gap expansion, and collapse. The layout helper also models a
+  `ResizeObserver`, block heights by `data-block`, and a `scrollTop` that clamps the way a browser's
+  does, so a test cannot assert a position no browser would accept;
+- the diff's dynamic-block geometry has three layers of test. `kit/diff/layoutIndex.test.ts` holds a
+  million rows as segments with 400 blocks: 2,000 random resizes leave every fixed start where it was
+  and write at most log2(items) + 1 tree nodes each, places and offsets convert both ways in both
+  projections, and a slow reference agrees through inserts, resizes, removals, collapse, expansion and
+  a change of projection. `kit/diff/measureScheduler.test.ts` models the observer and the frames: a
+  burst is one read batch and one commit a frame, a block above a scrolling reader waits for the
+  settle, a mounted dirty block is read even when its height is current, an unmounted one never is,
+  and teardown returns everything to zero. `features/diff/diffLayout.test.tsx` drives the real pane:
+  a thread growing above the reader keeps their row, one below moves nothing, a composer moves what
+  follows once in one commit, a scrolling reader holds a correction back until they stop, the pane's
+  own correction scrolls do not count as the reader, a collapsed file lands the reader on its header,
+  and a width change that resizes every block keeps the place with no fixed rebuild;
+- the diff's resident segment cache has three layers of test. `features/diff/segmentCache.test.ts`
+  holds the weight estimator, least-recently-wanted order, each ceiling alone, held segments under
+  pressure, one held oversize segment, colour going before plain rows, the key's parts, a superseded
+  patch, and one cache per query client. `features/diff/segmentLoader.test.tsx` runs the loader
+  against a cache with no room, so what stays resident is exactly what the pane holds, through a
+  success, a range change, an abort, a failure, a new revision, and unmount.
+  `features/diff/DiffPane.test.tsx` remounts a diff on the same node against a source that never
+  answers and finds its rows drawn and coloured from memory, checks that a no-op poll drops nothing
+  and a moved file drops its old patch, that a resolved thread asks for nothing, and that a
+  dehydrated query client holds no segment text. `infra/node/fleet.test.ts` checks that `dropNode`
+  clears that node's segments and no other's;
+- long timelines have three layers of test. `kit/lib/timeline/timelineWindow.test.tsx` holds the window's rules:
+  the newest page on open, appended turns joining it, a page per **Show earlier**, a page-aligned
+  reveal, keeping its size when its oldest key leaves, and trims that only move forward.
+  `kit/components/content/Timeline.test.tsx` drives a windowed followed Timeline over geometry read
+  from the DOM's order: hidden counts and `aria-posinset`, **Show earlier** keeping the reader's turn at
+  its offset and its element, a hidden reading place revealed rather than substituted, a gone one
+  substituted and counted, a trim once a page while following, no trim under a selection or focus or
+  while the reader is away, and deferred bodies built in the same element once near, with the
+  observer gone at teardown. `plugins/agents/src/client/sessions/AgentTranscript.test.tsx` opens a
+  1,000-card session on its newest page, starts another session on its own page, reveals a request a
+  notice named, draws everything on **Go to top**, and keeps a real cross-card selection while the
+  newest card streams. `toolRendererRegistry.test.tsx` checks a closed tool card builds no output, and
+  `plugins/github/src/client/pullDetail/Conversation.test.tsx` checks `kind:id` turn keys, bodies and
+  snippets arriving in the same element, only near threads reading segments, **Snippet unavailable.**
+  for a file the document lacks, and a refetch keeping every turn's element.
+  `features/diff/diffSnippets.test.tsx` checks a snippet reads only its segment, loads nothing for a
+  file with no patch, and shares uncoloured rows with the diff through the node cache;
 - four arch rules read source text rather than the import graph, because what they police is a
   global rather than an import: `window.acorn` outside the platform seam, and `console.*` outside
   each of the three loggers. Each carries a **baseline** of the files that survive, and each asserts
@@ -262,18 +385,23 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
 ## The desktop boot test
 
 `apps/desktop/test/boot.test.ts` is the shell's loadability check: it catches "the shell
-cannot load its world". It runs the staged helper under the bundled Node against a fresh data root,
-which spawns the real `service.js` over the service protocol, then asks the helper the first two
+cannot load its world". It runs the staged helper under the bundled Node against a fresh data root
+with host executables removed from PATH, so first-run certificate creation cannot depend on OpenSSL.
+The helper spawns the real `service.js` over the service protocol. The test asks it the first two
 questions the renderer asks: which nodes are there, and can a `/v1` request reach one. A 200 from
 `/v1/node` means the pinned TLS connection came up and the device token authenticated, so one
 assertion covers the custody stack end to end. Two more check the gate: a socket without the secret
 is refused, and a plain HTTP request gets 426.
 
 It also prints how long the node took to start, from the helper's ready line to its `service.start`
-mark, and fails over 1,500 ms. That span is spawning the node, evaluating the service bundle, and
-the node's boot to a bound listener, about 270 ms on an M2 Pro. The bound is loose on purpose, since
-timing on a shared CI runner is noisy. It catches a change that adds seconds, and the printed number
-is the one to compare between builds.
+mark, and fails at 10,000 ms on Windows or 1,500 ms on other hosts. That span is spawning the node,
+evaluating the service bundle, and the node's boot to a bound listener. It measured about 270 ms on
+an M2 Pro and 2,705-5,126 ms on Windows CI on 2026-10-01. The bounds leave room for shared-runner
+variation while catching startup regressions. The desktop test command runs the boot test in a
+separate Vitest invocation after the unit suites, so their Git, database, and transformation work
+does not compete with the measured startup. `pnpm --filter @acorn/desktop test:boot` runs that
+invocation against staged files; Windows installer verification uses it against installed resources.
+Compare the printed number between builds on the same host.
 
 The Rust unit tests in `apps/desktop/src-tauri/src/` cover what a headless run cannot reach through
 the helper: the renderer CSP and the dev-only widening a packaged build must not carry, the traversal
@@ -281,8 +409,9 @@ guard, the highlighter worker's separate policy, the refusal to answer a node ro
 own HTML, the handshake and ready-line parsing, the data key's shape and file fallback, the plugin
 scheme's hash grammar and frame CSP, the webview URL policies and the key grammar that picks between
 them, the navigation-history bookkeeping, the capability file's webview scoping, and the three
-packaging properties in `tauri.conf.json`. `.github/workflows/build-desktop.yml` runs both halves
-before the bundler pass, so a broken boot path fails in seconds rather than minutes.
+packaging properties in `tauri.conf.json`. The macOS pull request job in `.github/workflows/ci.yml`
+runs both halves. `.github/workflows/build-desktop.yml` runs them again before the bundler pass on
+`main` and tags, so a broken boot path fails before packaging.
 
 What no headless run reaches is compositing: a child webview positioned over a window needs a window.
 That is what items 4 and 5 of the smoke checklist are for.
@@ -302,65 +431,138 @@ console line the page logged with the value it saw. Opt-in through
 `pnpm test` should pay for. On a machine with no Chrome it takes the other branch and asserts the
 tools reported why.
 
+## Large-surface fixture
+
+The `tui-navigation` variant uses the same generated diff, review notes, and stopped agent session
+as `large-surfaces`, then adds another task in the first project and a task in a second workspace.
+Both agent launchers accept `--fixture tui-navigation --profile small|scale|canonical --seed N`.
+Run the terminal `navigation` flow and desktop `tui-navigation` flow against separate sessions with
+the same profile and seed. Their reports capture visible text at comparable navigation checkpoints;
+they do not assert pixel parity across renderers. The terminal's 80 by 24 and 120 by 40 checkpoints
+are also useful for spotting content hidden by layout, while the manual pass checks focus and
+scrolling that plain text cannot describe. The fixture test checks the seeded tasks and workspaces
+in a disposable database.
+
+Large diffs and long transcripts are tested against one generated fixture, built from a seed at run
+time so nothing a million lines long is checked in. It has three profiles:
+
+| Profile | Files | Fixed rows | Threads and notes | Agent session | Use |
+| --- | ---: | ---: | ---: | ---: | --- |
+| `small` | 22 | 9,048 | 20 each | 19 turns, 280 events, about 135 cards | Fast tests and a quick real-window run |
+| `scale` | 220 | 104,234 | 100 each | 94 turns, 1,384 events, about 670 cards | The scaling comparison |
+| `canonical` | 2,200 | 1,077,852 | 400 each | 476 turns, 7,012 events, about 3,400 cards | Real-engine acceptance and profiling |
+
+The counts are for seed 1. Two generators own the data:
+
+- `packages/client-core/src/testkit/largeDiff.ts`, exported as `@acorn/client-core/testkit/large-diff`,
+  streams the files one at a time. Each file carries both sides, the unified patch between them, the
+  source's threads, and review notes. The files include very large ones, binary, renamed, added and
+  removed files, tabs, very long lines, many hunks with gaps, and text that repeats across files.
+  Threads sit on both sides, resolved and not, with several comments, Markdown, images, `<details>`,
+  and suggestions. `largeDiffSource` turns the files into a `DiffSource` for rendering the real
+  `DiffPane` in a test: it cuts the patches with `@acorn/diff-document` as a provider's node does and
+  answers segments and search from them, and it can record every segment request or hold each answer
+  back.
+- `plugins/agents/src/testkit/largeSession.ts` generates the session's turns and writes them through
+  the plugin's own store, the way an imported transcript is written. The session ends stopped with
+  every request resolved, so a booting node has nothing to recover.
+
+The tests that hold the fixture and the health probes to their contract:
+
+- `largeDiff.test.ts` pins the small profile's digest, checks that every file's row count matches what
+  the diff model builds, that every thread and note sits on a drawn line, that the segmented document
+  describes each file with the counts its rows have, and streams the canonical profile to check its
+  size without holding it;
+- `largeSession.test.ts` seeds a session into a migrated database, reads it back page by page, and
+  projects it into cards;
+- `plugins/changes/src/testkit/reviewNotes.test.ts` checks that seeded notes are the rows the route
+  returns;
+- `kit/lib/telemetry/surfaceHealth.test.ts` covers the registry and its privacy rule,
+  `features/diff/diffHealth.test.tsx` renders the real pane over the small profile, and
+  `Timeline.test.tsx` checks projected against mounted turns, the window's counts, and exact teardown;
+- `apps/desktop/scripts/agent/flow.test.mjs` checks that a flow file with an unknown action, a
+  script, an unbounded loop, or no assertions is refused, and runs a flow against a fake window.
+
+The real-window run is the large-surface flow
+([local-development.md](./local-development.md) § Large-surface flow). It is not part of `pnpm test`,
+because it needs a visible window on a graphical host and minutes of real rendering. It asserts
+invariants that do not depend on the machine: no blank or uncovered block in a settled viewport, at
+most one geometry commit per frame, no source topology after ready, mounted rows under a fixed
+ceiling at every profile, the transcript under the same 400-turn ceiling on open and after one
+**Show earlier**, and teardown back to zero. It records, and does not gate, time to first
+content, time to ready, preparation and measurement time, correction pixels, and resident bytes,
+with the host, engine, build, and fixture beside them. The segmented document was built after the
+first partial run, which was the unsegmented baseline; a visible run at `scale` and at `canonical`
+is still owed for both. Run it on the host used for release checks and keep both JSON reports.
+
 ## Continuous integration
 
-`.github/workflows/ci.yml` runs `pnpm lint` and `pnpm test` on every pull request and on push to
-`main`. Before it existed, the architecture rules and the path checker ran only on whoever remembered
-to run them: `.github/workflows/build-desktop.yml` has no `pull_request` trigger and tests the desktop
-package alone. That is how twelve doc paths rotted without anything going red.
+`.github/workflows/ci.yml` runs `pnpm lint` and the non-desktop `pnpm test` suites on every pull
+request and on push to `main`. A separate macOS job runs `pnpm --filter @acorn/desktop test` on pull
+requests without signing secrets. `.github/workflows/build-desktop.yml` runs the same desktop tests
+before building the signed artifact on `main` and tags.
 
-It runs on Linux, for two reasons that are both about the runner rather than the code. A macOS runner
-has no Docker for the container probes to find, and its `/var` is a symlink to `/private/var`, which is
-the artefact behind one of the pre-existing failures below.
+The non-desktop job runs on Linux. A macOS runner has no Docker for the container probes to find,
+and its `/var` is a symlink to `/private/var`, which causes one of the pre-existing failures below.
 
-`@acorn/desktop` is filtered out of the test run. Its `test` script stages the whole bundle and then
-runs `cargo test`, and `build-desktop.yml` already has the Rust toolchain, the staged inputs, and the
-pinned-runtime cache to do it in. That does mean the boot test and the Rust suite gate `main` rather
-than the pull request.
+`@acorn/desktop` is filtered out of the Linux test run. Its macOS pull request job installs Rust and
+caches the pinned Node runtime; the package's `test` script stages the bundle inputs, builds the
+renderer, runs Vitest including the helper boot test, and runs `cargo test`. It does not require
+updater signing secrets or build a distributable.
 
-Nothing is cached between runs, so CI runs the suites a local `pnpm test` usually serves from
-Turborepo's cache. A green local run with 30 of 31 tasks cached is not evidence about the one task you
-changed.
+The workflows cache dependencies and the pinned Node runtime, but not Turborepo task outputs. CI
+runs suites that a local `pnpm test` might serve from Turborepo's cache. A green local run with 30 of
+31 tasks cached is not evidence about the one task you changed.
 
-Two checks live in a `build` script rather than in a suite, because what they assert is a property of
-built output that no test process has. `@acorn/desktop`'s `build` runs
+The startup budget checks live in `build` scripts because they assert properties of built output.
+`@acorn/desktop`'s `build` runs
 `apps/desktop/scripts/check-renderer-budget.mjs` over the built `index.html` and Vite's manifest, and
 `@acorn/tui`'s `build` runs `apps/tui/scripts/check-startup-graph.mjs` over its built chunks. Both fail
 the build over a byte ceiling or a denylisted chunk name; [frontend.md](./frontend.md) § Startup budget owns what they
-enforce.
+enforce. The TUI build also checks that Node can resolve every external import in its emitted modules,
+including lazy chunks, through `apps/tui/scripts/check-runtime-imports.mjs`.
 
-Neither runs in this workflow, which only runs `lint` and `test`: the renderer's runs in
-`build-desktop.yml`, which builds the bundle, and the terminal client's runs whenever somebody builds
-that package. So each has a fixture suite beside it that drives the same script against a directory it
-writes itself — `apps/desktop/test/scripts/` and `apps/tui/src/startupGraph.test.ts`. Those are what
-gate a pull request: they prove the rule, and the `build` invocation is what applies it to the real
-bytes.
+The desktop pull request job builds the renderer through its `test` script, but does not run the
+renderer budget check; `build-desktop.yml` applies that check to the real build output. The terminal
+client's build check runs when somebody builds that package. Each has a fixture suite that drives the
+same script against a directory it writes itself — `apps/desktop/test/scripts/` and
+`apps/tui/src/startupGraph.test.ts`. The TUI's `apps/tui/src/runtimeImports.test.ts` exercises its
+external-import check. Those fixture suites gate pull requests.
 
 ## The smoke checklist
 
-Run this checklist per release. The automation-only development launcher covers main-renderer flows,
-but it deliberately does not replace checks of the packaged app, native chrome, host-owned child
-webviews, or real external CLIs. Its first pass is still owed, on a machine that never had the Electron
-build, and nothing ships to a person until it passes (docs/shell.md § Signing gates and the updater).
+Run this pass against the packaged desktop app on a clean host before an alpha release. Record the
+artifact version, operating system, result, and any issue for each step. The development window and
+headless suites do not exercise native chrome, packaged schemes, or host-owned child webviews.
 
-1. Install and launch; the window appears and the local node reaches online.
-2. Pair a second node by code; fingerprint words match.
-3. Open a terminal; a TUI renders and survives resize.
-4. Open a preview pane against a task dev server through the tunnel. Navigate, go back, and cover it
-   with an overlay; the child webview hides rather than floating above it.
-5. Open a loaded plugin pane; it renders, and a network call from its frame fails.
-6. Open a loaded plugin's webview surface; a link to a host its manifest does not name is refused.
-7. Trigger the quit flow with an active agent; the concern prompt appears; quit drains cleanly.
-8. Kill the node process five times; the recovery screen appears on the sixth.
-9. Install a data-only harness plugin against an agent CLI on the machine; the trust prompt names the
-   command under `Enforced`, and after approving it the agent appears in the Agent Center and completes
-   a turn. Nothing automated can cover this one: the suites can prove the descriptor reaches the driver
-   registry, and only a real CLI can prove the transcript.
+First run `pnpm lint`, `pnpm test`, `pnpm --filter @acorn/desktop test`, and `pnpm db:check` on the
+release commit. `pnpm test:coverage` is a diagnostic for four critical code paths; it has no release
+threshold. See [Coverage measurement](#coverage-measurement) for its scope.
 
-For managed-session naming, run one detailed first prompt with both Claude Code and Codex. Confirm the
-prompt fallback appears immediately and is replaced by a short title without interrupting the turn.
-Repeat while renaming the session before the generated result arrives, and confirm the user title
-wins. Signed-out CLIs and Aider must retain the fallback without adding a transcript warning.
+1. Install the signed artifact on a clean host. Launch it, finish onboarding, open a local project,
+   create a task, and confirm the local Node reaches online. Quit and relaunch; the task and pairing
+   remain available.
+2. Pair a second Node by code. Confirm the fingerprint words, switch between Nodes, and open a task
+   on each. Disconnect and reconnect the second Node; the first Node's task data remains scoped to it.
+3. Start a managed agent with an installed CLI, approve or deny one tool request, and reopen its
+   transcript after a restart. Open a terminal session, send a command, and confirm that it survives
+   switching tasks.
+4. Open a task preview through the tunnel and a host-owned editor. Navigate the preview, open an
+   overlay, and confirm that the child webview stays behind it. Check the native menu and one file
+   dialog.
+5. Install a freshly scaffolded plugin from a local package. Accept the bundle, open its own pane,
+   run its command, and confirm its Node route result appears. Reload after editing its entry and
+   route module, then disable, enable, and remove it. Confirm that its UI and command follow each
+   transition and that an unaccepted bundle cannot draw.
+6. Open the terminal client at 80 by 24 and 120 by 40. Navigate the rail, pane strip, plugin pane,
+   palette, and a PTY with the keyboard. Confirm that Escape restores focus and that the trust prompt
+   holds focus until a decision.
+7. Create and run a workflow with a gate, inspect its child task and history, and resume or cancel it.
+   If release accounts are configured, run a query-backed schedule against a real provider and check
+   that a repeated check creates no duplicate child.
+8. Quit with an active agent and confirm the concern prompt and clean shutdown. Exercise Node
+   recovery by stopping the helper's Node repeatedly; the recovery screen appears after the retry
+   limit.
 
 10. Build the reference node provider into the running node's data root
     (`pnpm --filter @acorn/node build:plugin nodes-file`, with `ACORN_NODES_FILE` set), write one
@@ -498,7 +700,7 @@ desktop and in `acorn` in a terminal, and expect the two to agree.
     actually stored. Open Settings → Appearance: it agrees.
 37. With the palette open over a task, switch node or task from another window or another pane. The
     palette closes rather than acting on rows fetched for somewhere else.
-38. Open a plugin's search frame, then disable that plugin from Settings → Plugins. The frame closes,
+38. Open a plugin's search frame, then disable that plugin from Settings → Plugins → Installed. The frame closes,
     nothing is invoked, and the plugin's whole group is gone from the root. Re-enable it: the group and
     everything under it come back, once.
 39. Find a Rollbar issue from the palette and pick it. The URL changes and the surface beside the rail
@@ -544,7 +746,7 @@ real remote with real credentials does.
     puts the branch back where it was. Last, commit from a terminal in the same worktree and watch the
     ahead count move without touching the pane.
 46. With no model provider connected and no agent CLI installed, the commit toolbar has no wand at the
-    left of it. Connect one in Settings, under Integrations, reopen the pane, and stage two files.
+    left of it. Add one in Settings, under AI models, reopen the pane, and stage two files.
     Press the wand: it spins, and
     within ten seconds the editor holds a subject and a body. Commit, and the message lands. Now type
     a message of your own and press the wand again: it reads **Replace?** and does nothing until a
@@ -589,7 +791,11 @@ Run them on the desktop and in `acorn` in a terminal.
     worktree-isolated agent step and check the conversation you get is the child task's.
 52. Let the run reach the gate. The bell rings, and the row in it lands on the gate node with Approve
     and Reject in front of you; the inbox has the same row and it stays there until you answer.
-    Approve, and the run finishes and keeps a notice.
+    Approve, and the run finishes and keeps a notice. Then run a definition whose gate has a form
+    bound to an agent step's structured output, and a later step bound to the gate's `/values`. The
+    gate node shows the proposed values. Edit one, check it is marked **Edited** and that **Reset**
+    restores it, edit it again, and approve. Confirm the later step received the edited value, and
+    that the terminal client draws the same form.
 53. Make one node fail, by pointing its command at something that exits non-zero. The pane offers
     **Retry**, and an agent node also offers **Retry with edited prompt**; both put the run back to
     running from that node. Then check the pane is not there at all on a task that has never run a
@@ -630,7 +836,7 @@ Next is the editor's **Generate** button
 and drives the reader from a table, and neither can see whether the teaching worked on a real model.
 
 57. With nothing to generate with, no key and no agent CLI, the editor toolbar has no **Generate**
-    between the tab strip and **Undo**. Connect one in Settings, under Integrations, reopen a workflow
+    between the tab strip and **Undo**. Add one in Settings, under AI models, reopen a workflow
     row, and press it.
     Describe the owner's first workflow in words: two agents investigate one issue from different
     angles at the same time, a third reads both and writes the synthesis, and somebody approves
@@ -653,7 +859,7 @@ machine, or the wizard's own flow around the step.
     one that offers a one-shot mode and is not there is a quiet row saying so, with no alert. Press a
     provider card, paste a key, and press **Connect**: the rows above gain that provider, and the
     step's **Next** was enabled before you did any of it. Then walk the wizard again on a machine
-    with no CLI installed and no key: the step says Settings, under Integrations, is where this lives,
+    with no CLI installed and no key: the step says Settings, under AI models, is where this lives,
     and **Next** still works.
 
 The last four are the Generate list's, owed since the backends over installed agent CLIs shipped and
@@ -677,7 +883,7 @@ and no API key at all. Run them with the keys disconnected first.
     ([managed-agents.md](./managed-agents.md) § Harnesses).
 61. Pick Anthropic in the commit wand, then open **Generate** in the workflow editor: it opens on
     Anthropic. Disconnect the key and open it again: it opens on Claude Code. Change the default in
-    Settings, under Integrations, and both open on that instead. The SQL dialog is expected not to
+    Settings, under AI models, and both open on that instead. The SQL dialog is expected not to
     follow any of this and to open on the first backend every time
     ([state-ownership.md](./state-ownership.md) § Scope rules).
 62. The acceptance test for the manifest one-shot block, which needs `opencode` installed. Write the
@@ -693,7 +899,7 @@ the available checkout cannot launch the app without GitHub credentials. The aut
 the Node, storage, MCP, runtime, and component contracts; these items remain the provider-backed
 acceptance pass.
 
-63. Enable the execute tier in Settings → Agent tools. From a Claude Code terminal, call
+63. Enable the execute tier in Settings → Tools and permissions. From a Claude Code terminal, call
     `agent_spawn` once with shared isolation and once with worktree isolation. Use `agent_wait` and
     paged `agent_read` to collect each answer, then use `agent_prompt` for a second turn and
     `agent_cancel` on an active turn. Repeat from a Codex terminal. Confirm that retrying the original
@@ -797,6 +1003,316 @@ bindings rather than the prose.
     every line printed while you were away. Open more than four terminals across tasks and switch
     between them: each draws, and none goes blank after its GPU context is given to another. Close the
     tab and check that switching back does not bring it back.
+81. With GitHub connected, open a pull request with more than 100 files, more than 100 commits, or a
+    review thread with more than 100 comments. Every file, commit, and comment is there in GitHub's
+    order. Open one with more than 3,000 files: the diff and the file list both say GitHub returned
+    3,000 of its total. Compare two branches with more than 300 changed files in the create form: the
+    count reads "first 300 files" and the preview says the comparison may have more.
+82. Open the diff of the largest pull request to hand, in unified and then split. The scrollbar is its
+    final length at once, file headers and the widest line are in place before their rows, rows appear
+    plain and then take colour, and a thread's space is there before its segment loads. Drag the
+    scrollbar to the end and back: every segment you land on draws within a moment and nothing between
+    loads. Find a word that appears only near the end and step to it. Expand a gap, collapse a file from
+    the sticky header, and leave the pane open for a minute: the health snapshot shows nothing queued.
+    In split mode, scroll a long line sideways before its colour arrives: it stays scrolled when the
+    colour lands. Find a match in split mode: the view lands on the band that holds it. With find
+    open, expand a gap above the match: the view does not jump back to the match.
+    Then do the same in the Changes pane while an agent edits a file: only that file's segments
+    reload, and the reader stays where they were. Run `git config diff.noprefix true` in the task's
+    worktree and reopen the Changes pane: every changed file still shows its diff. Unset it afterwards,
+    because the setting is the whole repository's.
+83. In that pull request, scroll to a place with a thread a screen above you and one below. Expand
+    and collapse the one above, reply in it so the box grows, and resolve it: the line you are reading
+    does not move. Open a `<details>` block and wait for a late image in the one below: nothing on
+    screen moves. Open a line composer on screen: what follows moves down once, with no frame where the
+    composer overlaps the next line. Flick-scroll through several threads: nothing jumps while you
+    move, and the view settles without a correction you can see. Narrow the pane by dragging the
+    sidebar, then widen it: the same line stays at the top. Leave the pane and take a health snapshot:
+    no observers, no scheduled frames, and `maxAnchorDrift` under a pixel.
+84. Open that pull request's diff, scroll to the middle, and switch to another task and back: the
+    rows you left are on screen, coloured, before any segment request, and the health snapshot's
+    `resident.hits` rose. Open a dozen other large diffs one after another: `resident.rows` and
+    `resident.estimatedBytes` stay under `rowCeiling` and `byteCeiling`. In the Changes pane, let an
+    agent save the same file several times: `resident.segments` does not grow with each save.
+85. Open the `canonical` fixture's Agent pane: it opens on the newest cards with **Show earlier** above
+    them, and the health snapshot shows 200 mounted of about 3,400 turns. Scroll a little way up and
+    press **Show earlier**: the card you were reading stays put. Select text across two cards, scroll
+    to the foot, and let a live session stream past 400 cards: the selection survives, and once you
+    clear it the next page of cards trims the window back to 200. The console shows no
+    `ResizeObserver loop` error while the stream passes 400 cards. Press **Go to top**: the oldest turn
+    is on screen, and the page's find matches its text. Open a notice for an old request: its card is
+    drawn and focused. With VoiceOver, a card reads its place in the whole session. In a pull request
+    with many threads, open the conversation and scroll: each comment's HTML and each thread's snippet
+    appear before you reach them, a capped file's thread says **Snippet unavailable.**, and nothing
+    already drawn is rebuilt when the pull refetches.
+86. On two paired Nodes with different accepted versions of one loaded plugin, switch between them.
+    Each Node shows contributions from its own running version. Update the inactive Node, reject then
+    reconsider its new client hash, and switch again: its old runtime remains visible until its Node
+    commits the update. After restart, the new version appears only when its exact bytes are accepted.
+    Disconnect, reconnect, and unpair one Node; stale or removed observations authorize no loaded UI.
+87. Open two remote trees from one loaded bundle with different task or project scopes. Select in one,
+    invoke a scoped action in each, then unmount the first. The second remains functional and never
+    receives the first tree's selection, document effects, or gesture authority. Revoke the accepted
+    hash while a tree is mounted; its worker and registrations disappear immediately.
+88. On a Node without a loaded plugin, check its settings page, project importer, task footer, command,
+    shortcut, and cooperative slot. They are absent or disabled, and a previously open importer closes.
+    Repeat with a failed load and with an unaccepted active runtime. In the terminal client, confirm
+    the same selection and trust behavior for a remote tree.
+
+The plugin lifecycle checks are supported by `distributionModel.test.ts`,
+`distribution.test.ts`, `availabilityModel.test.ts`, the Node state and bundle-route tests, and the
+worker/remote-tree suites. The real desktop driver reaches the main renderer but not native dialogs
+or host-owned child webviews; use the release pass for those surfaces. On 2026-09-26 an isolated Tauri
+session verified Settings → Plugins and a Findings remote settings tree, including its two controls.
+
+The task-annotation lifecycle's automated coverage described under Test layers was implemented on
+2026-09-26. The following real-window and real-terminal checks keep the same host behavior reviewable
+when the annotation or rail contracts change.
+
+89. Check the rail under the Terminal, Modern, Cozy, and Cute style packs.
+90. Check source, task, pane, run, terminal, add, and close controls at rest, hover, focus, active,
+    and busy.
+91. Confirm that the left add control and right close control occupy equal 52-pixel boxes with aligned
+    dividers.
+92. Confirm that project accent stripes stay on the left and right-rail active stripes stay on the
+    right.
+93. Open a task with pin, Docker, unread, working, dirty, checks, and loaded-plugin annotations.
+    Confirm that markers do not overlap and that the tooltip and accessible description list every
+    accepted state.
+94. Turn on reduced motion and confirm that marker and busy animations stop.
+95. Open and dismiss a task-row menu. Confirm that it anchors to the rail button and returns focus to
+    that button.
+96. Change a loaded plugin's task status without changing the task list. Confirm that its marker
+    refreshes after a plugin push, global status, and declared polling.
+97. Disable, enable, reload, and remove that plugin. Confirm that its marks disappear synchronously
+    and return only while its contribution is eligible.
+98. Switch between two nodes that contain the same task id. Delay one node's response and confirm
+    that neither the delayed answer nor either retained mark appears on the other node.
+99. In `acorn`, show more task markers than the row can fit. Confirm that the row shows `+N`, then
+    focus it and press `Shift+F10` to inspect every marker label in the **Task markers** list.
+100. Under Settings > Custom agents, make a Codex agent with high reasoning and one instruction line.
+     Start it from **New**, from the empty pane's card, and from the palette's own "New *agent*
+     session" row. Confirm that the composer shows high, the header chip names the agent, and asking
+     the agent what it was told returns the instruction, including after a node restart resumes it.
+101. Repeat check 100 on Claude Code, then edit the agent's instructions. Confirm that a running session
+     keeps the old text and a new one gets the new text.
+102. Install a loaded package whose manifest declares only `customAgents`. Confirm that the trust prompt
+     shows the instructions in full, that the agent is listed with **Duplicate** but not **Edit**, and
+     that disabling the package takes it out of **New**.
+
+145. Install a loaded plugin whose source declares `showInRailByDefault: false` and whose settings page
+     declares `railSourceVisibility`. Confirm that no rail icon appears and the palette offers
+     **Open <label>**, which opens the source without adding the icon.
+146. Turn **Show in left rail** on from the plugin's page. Confirm that the icon appears at once, the
+     switch under Settings > Plugins agrees, and the current view does not change. Drag the icons, hide
+     it again while it is selected, and confirm that the window returns to Home and the drag kept its
+     slot.
+147. Hide a project-scoped source such as GitHub. From Home with no project routed, run its palette
+     opener and confirm that the palette keeps an error instead of closing. Disable the plugin and
+     confirm that its switch and opener disappear, then re-enable it and confirm that the saved choice
+     returns.
+148. In `acorn`, confirm that the hidden source is still listed in the terminal's source menu.
+
+Checks 149–154 cover Computer Use app-access approval ([managed-agents.md](./managed-agents.md)
+§ App-access approval). Run them on macOS with Computer Use installed, against a `dev:agent` session
+whose app has no saved grant. Record the codex-cli, Computer Use, macOS, and Acorn versions with the
+result.
+
+149. From a managed Codex session, ask the agent to read the test app's state through Computer Use,
+     addressing the path that `pnpm dev:agent:ui -- target` reports. Confirm that the card names
+     **Acorn Agent Test (com.acorn.desktop.agent-test)** and offers **Allow for this session**,
+     **Always allow**, and **Decline**. Reach **Always allow** with the keyboard alone. Save the
+     sanitized request `_meta` beside `plugins/agents/src/server/drivers/__fixtures__/codexComputerUseApproval.json`
+     and correct the fixture where the two differ.
+150. After **Always allow** in check 149, start a new managed session and ask again: no card appears.
+     Quit Acorn and Codex, start them again, and ask again: no card. Stop the session, start one with a
+     different name, and ask again: no card, because every session shares the identifier.
+151. In a fresh session, choose **Allow for this session**. Ask again in the same session: no card.
+     Ask in a new session: the card appears.
+152. Revoke the grant in the ChatGPT app's Computer Use settings. Ask again: the card appears, and the
+     old session's history still reads as it did. Note whether an action already running finished.
+153. With the installed Acorn and two `dev:agent` sessions open, have each session's agent address its
+     own `target` path. Confirm that each acts only on its own window, that `target` lists the other
+     session under `sharedWith`, and that a native menu in one window is reachable while the other
+     receives no input.
+154. Stop a session, then run `target` and `stop` against its name: both refuse. Start it again and
+     confirm that `target` reports the new process.
+
+Checks 96–99 passed on 2026-09-27 with an isolated `dev:agent` data root and a loaded fixture plugin.
+The Tauri window refreshed only that plugin after its push, cleared marks across disable, enable,
+reload, and removal, and switched between two nodes whose copied task databases contained the same
+task id without retaining the other node's label. The real terminal projected six accepted markers
+as `+6`; `Shift+F10` opened **Task markers**, and End reached the sixth label. That run also caught and
+fixed a long-title layout that could previously shrink the disclosure out of the row.
+
+The following checks cover [frontend.md](./frontend.md) § Settings. The rail's order, deep links, the
+remembered page, and the settings-local node switcher have automated coverage in
+`packages/client-core/src/features/settings/SettingsView.test.tsx`; these checks cover the window.
+
+103. Open a task with a running agent session and a terminal running `top`. Press ⌘, and confirm that
+     settings covers the whole window, top bar included. Wait ten seconds, press Escape, and confirm
+     that the agent's transcript and `top` kept updating and that the terminal has focus again.
+104. Open settings, click into the search field, and type into it. Confirm that nothing reaches the
+     terminal underneath. Press F6 or the region chord from a rail row and confirm that focus stays
+     in settings.
+105. Walk every group in the rail and open each page once. Confirm that each page's body draws, that
+     its breadcrumb names its group, and that the scope chip reads **This device**, **Node: <label>**,
+     or **Workspace: <name>** as the page's registration says.
+106. Pair a second node. On Installed, Security and backup, Audit log, Schedules, Run history, and
+     Telemetry, switch the header to the second node and confirm that the page shows that node's
+     data while the top bar's node, after closing settings, is still the first. On Services and
+     on a loaded plugin's page, confirm that the chip is plain text naming the active node.
+107. From the GitHub pane's shortcuts link, confirm that settings opens on **Keyboard shortcuts**.
+     From the palette's **Settings** group, confirm that every page in the rail has a row and that
+     picking one while settings is open moves to that page.
+108. With a Select open on Appearance, press Escape once. Confirm that the list closes and settings
+     stays open. Press Escape again and confirm that settings closes.
+109. Narrow the window below 900 px. Confirm that the rail fills the window, that picking a page shows
+     the page with a **‹ Settings** link, and that the link returns to the rail.
+
+The next checks cover [frontend.md](./frontend.md) § Search and deep links and § Pages and the save
+model. Saved, a failed write, the unsaved-changes question on Escape, and search ranking with the
+section highlight have automated coverage in `settingSave.test.tsx` and `SettingsView.test.tsx` beside
+the view; these checks cover the window and the pages.
+
+110. Walk every settings page. Confirm that no page has a **Save** button outside a form, and that
+     every text field shows **Saved** beside it after you change it and press Tab or Enter.
+111. Stop the node, or take the machine offline, and change a text field on a node page such as Limits
+     and cost. Confirm that the field keeps what you typed and the row shows the error. Bring the
+     node back and commit again, and confirm that **Saved** appears.
+112. Type a declared section's keyword in the rail's search, for example `text size` for Terminal › Drawer.
+     Confirm that the result reads **Page › Section** with a scope chip, and that Enter opens the page,
+     scrolls to the section, and outlines it for about three seconds. With Reduce Motion on, confirm
+     that the outline still shows. Repeat from the palette's **Settings** group, and with
+     `openSettings('terminal#drawer')`.
+113. Start a new schedule or edit an MCP server, type into it, and press Escape. Confirm that settings
+     asks before discarding, that **Cancel** keeps the form, and that **Discard changes** closes
+     settings. Repeat with a rail row and with **Back to acorn**.
+114. On a page with a danger zone, such as a workspace's page, press its delete button. Confirm that the
+     confirmation paints above settings and names what goes and what stays, and that **Cancel** leaves
+     the workspace in place.
+115. Change the terminal text size away from its default. Confirm that the row shows a dot and
+     **Reset**, and that Reset puts the default back and the dot goes.
+
+The next checks cover [frontend.md](./frontend.md) § Workspaces and projects. The run-targets table's
+round trip, the read-only provenance row, Default's protection, a plugin's project tab, and the rail's
+tree with ⌘[ have automated coverage in `RunTargetsTable.test.tsx`, `ProjectSettings.test.tsx`,
+`WorkspaceSettings.test.tsx`, and `SettingsView.test.tsx`, and the node's `repoConfig` in
+`packages/node-core/src/server/routes/projects/membership.test.ts`.
+
+116. On Overview, select two projects in different workspaces. Confirm that the bar says **2 selected**,
+     and that **Move to workspace**, **Hide**, **Set colour**, and **New workspace…** each change both
+     rows and say so under the bar. Confirm that **Clear** empties the selection.
+117. Open a workspace from the rail. Confirm that its projects appear under it only while it is
+     expanded, that the chevron and the Right and Left arrows expand and collapse it, and that typing a
+     project's name in the rail's search finds its page with the workspace collapsed.
+118. Open a project from Overview, then press ⌘[. Confirm that it returns to Overview. Open the same
+     project from its workspace's page and press ⌘[ twice: the workspace, then Overview. Confirm that
+     the header reads **Project: <name>**, and names the node too with two paired.
+119. Walk each tab of a project's page and change one field on each. Confirm that each shows **Saved**,
+     and that the value is still there after closing and reopening settings.
+120. Add, edit, and remove a run target from the table. Confirm that a task on that project shows the
+     run buttons the table lists, and that a second default moves the default rather than adding one.
+121. Commit a `.acorn/config.toml` to a project with a `[scripts.run.dev]` target, a `[database]
+     url_script`, and a `[preview] mode`. Confirm that the dev script, the database connection script,
+     and the preview URL rows read **From .acorn/config.toml**, cannot be edited, and show the file's
+     value above this machine's. Delete the file and confirm that the rows are editable again.
+122. Try to rename or delete Default from its page, from Overview, and from the rail. Confirm that
+     none of them offers it.
+
+The next checks cover [frontend.md](./frontend.md) § Agents. The header's detail and back link, old
+page ids, and the device chip have automated coverage in `SettingsView.test.tsx` and the terminal kit
+test. The custom agent and MCP server editors, Harnesses and defaults, and both core pages are covered
+in `plugins/agents/src/client/settings/*.test.tsx`, `AgentToolsSettings.test.tsx`, and
+`McpSettings.test.tsx`, and the project MCP routes and the catalog's owners in
+`packages/node-core/src/server/routes/projects/projects.test.ts` and `agentTools.test.ts`.
+
+123. On Harnesses and defaults, turn **Send task context at startup** off, then open Claude Code in a
+     task's terminal drawer. Confirm that no task context arrives. Turn it back on and confirm that the
+     next one gets it, and that the Terminal page no longer shows the switch.
+124. On Custom agents, create an agent, then edit it. Confirm that the editor opens in the pane, that
+     the header names it with a back link, and that ⌘[ with an unsaved change asks before going back.
+     Delete it from the danger zone and confirm that it leaves New and the palette.
+125. On MCP servers, add a server, edit it, and remove it from its danger zone. Confirm that each step
+     happens in the pane, that the list names `/mcp`, and that its link opens MCP config files.
+126. With no task open, open MCP config files, pick a project with a committed `.mcp.json`, and note
+     its servers. Open a task in that project, open the page again, and confirm that it starts on that
+     project and lists the same servers.
+127. On Tools and permissions, switch between **By owner** and **By tier**. Confirm that a loaded
+     plugin's tools sit under its id, and that turning the Execute tier on and off moves every execute
+     tool's switch.
+128. From a queued agent turn's **Change** link, and with `openSettings('agent-pricing')`, confirm that
+     Limits and cost opens on **Turns at once** and on **Claude prices**.
+129. Under **Settings > Plugins > Installed**, install a GitHub package on the node and a client-only
+     package on this device from **Install…**. Confirm that each target asks for trust, that the device
+     plugin appears under **This device**, and that a package waiting for approval appears under
+     **Needs you** with a dot on **Installed** in the settings rail.
+130. On a plugin page, open each of **Overview**, **Settings**, **Permissions**, and **Versions**. Approve
+     a staged package an agent requested, end dev mode for a plugin in development, and revoke one
+     approval. Uninstall one plugin with **Keep its data** and another with **Delete its data**, and
+     confirm that each confirmation names what goes and what stays.
+131. Turn an optional node plugin off from its page's strip. Confirm that the strip says it is off, that
+     the page still saves, that **Installed** shows the restart banner, and that the settings rail shows
+     a dot until the node restarts. Turn a device plugin off from its strip and confirm that settings
+     opens its page under **Installed**.
+132. Open the plugin strip on a compiled plugin page (Docker), a remote tree (Sentry export), and a frame
+     page. Confirm that the strip sits above the page, outside it, and stays in place while the page
+     scrolls.
+133. On **Rail and surfaces**, hide a plugin source. Confirm that its icon leaves the rail, that the
+     palette offers **Open <source>** and opens it, that the source stays open after it is opened from
+     the palette, and that hiding it while it is selected returns to Home. Reorder the rail while it is
+     hidden, show it again, and confirm that it returns to its slot. In the terminal client, confirm
+     that the source is still in the source menu.
+134. With a switch whose write fails (stop the node, then flip **Hidden** on a project page), confirm
+     that the switch returns to the stored value and the row shows the error. After confirming a
+     danger-zone delete from a clicked button, confirm that Escape still closes settings.
+135. With a real Linear key, connect it from **Settings > Connections > Services > Add connection**.
+     Confirm that the Linear card asks for **Personal API key**, that typing a key and pressing Escape
+     asks before it drops it, and that Save lands back on the list with the connection in it. Open
+     **Add connection** again after connecting GitHub: its card says **Connected, one allowed** and
+     opens the GitHub connection.
+136. Revoke that Linear key at Linear, then press **Test** on its page. Confirm that it moves to the top
+     of Services with an amber dot, that the settings rail shows the dot beside **Services**, that the
+     bell has a row for it, and that its page starts with the refusal and **Replace key**. Replace the
+     key and confirm that the dot, the row, and the banner all clear without reopening settings.
+137. On a Linear connection's page, follow a project into one workspace from **Where it shows up**.
+     Confirm that the workspace's page lists it under **Connections**, that the project's
+     **Connections** tab lists it too, and that **Manage** there opens the connection's page. Search
+     for the connection's name and confirm that Enter opens its page, not just Services.
+138. On **AI models**, confirm that **Generate with** carries the **This device** chip, that an
+     Anthropic key is listed under **API keys** and not on Services, and that an installed `claude`
+     is listed under **Agent CLIs**. Search `startup context` and confirm that Enter lands on
+     **Harnesses and defaults › New sessions**.
+139. In the terminal client at 80 by 24, search `settings` in the palette and confirm that **Open
+     settings** is the first row and opens the route on the nine groups. Open a page in each group and
+     confirm that a page marked **desktop app** says why and where to go, that Escape climbs one level
+     at a time with the caret back on the row it left, and that the plugin pages (Harnesses and
+     defaults, Docker, Workflows) draw and scroll to their last row. Repeat at 120 by 40.
+140. Start the terminal client with `ACORN_TUI_NOTIFY=bell`, then with no value, and open
+     **Settings > General > Notifications**. Confirm that **Terminal alerts** says **Bell only** and
+     **From ACORN_TUI_NOTIFY**, then **Bell and terminal notification** and **The default**. In a
+     terminal acorn has no notification sequence for (Apple Terminal), confirm that the row says only
+     the bell reaches you. Turn **An agent needs me** off and confirm that the change survives a
+     restart, then press **Send a test notification** and confirm that the terminal rings.
+141. In the terminal client, add an MCP server or a custom agent, type into its form, and press Escape.
+     Confirm that **Discard unsaved changes?** opens with the caret on **Cancel**, that Cancel keeps
+     the typed value, and that **Discard changes** returns to the list. Save one, then remove it from
+     its danger zone, and confirm that the confirmation names what goes and that the list no longer
+     shows it.
+
+The following checks cover [mcp.md](./mcp.md) § Your own servers. The store, routes, runtime,
+drivers, handoff flags, and test button have automated coverage in `plugins/agents`; these checks cover
+the real harnesses and the window.
+
+142. In Settings → MCP servers, add a stdio server with one secret environment variable and press
+     **Test**. The tools are listed. Edit it, leave the secret empty, save, and test again: it still
+     connects.
+143. Open a Claude Code session and a Codex session, and ask each to call one of the server's tools.
+     Type `/mcp` in each composer: the panel opens and nothing is sent. Codex lists every server it has
+     with a status. Switch the server off, apply, and confirm that the transcript notes the restart and
+     that the agent no longer has the tool while the conversation continues.
+144. Continue each session in a terminal and run `/mcp` there. The server is listed. While the terminal
+     runs, `ps -axww` shows the server's command but never its secret value.
 
 One known appearance bug is recorded here so it is decided rather than slipped into an unrelated
 diff: `:root:not([data-theme="light"])` under `prefers-color-scheme: dark` has the same specificity as
@@ -817,8 +1333,12 @@ uses migrated temporary SQLite stores for revision and publication behavior; and
 cover local display semantics and device recovery. Real-window checks still exercise the composed
 editor and placement because those interactions are not proved by pure tests.
 
-A worktree cannot run the app without the main checkout's `.env`. An existing development instance
-also owns the desktop renderer's fixed port, 4319. Run the whole checklist from the main checkout.
+A normal worktree development run may need the main checkout's `.env`, and an existing development
+instance may own the renderer's fixed port, 4319. `pnpm dev:agent` uses isolated data and ports for
+real-window checks from a worktree.
+Run the relevant [specialized manual checks](./testing/manual-checks.md) after changes to plugins,
+large diffs, transcripts, palette behavior, appearance, accessibility, provider integrations, or
+other surfaces not covered by this pass. The catalog retains the detailed scenarios and dated results.
 
 ## Composition-root tests
 

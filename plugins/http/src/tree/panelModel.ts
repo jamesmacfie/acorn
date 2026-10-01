@@ -14,7 +14,6 @@
 // Equivalent host grants share live state. The latest inactive subject keeps its draft, without
 // retaining bridges; per-region actions use that region's bridge and never borrow a sibling's lease.
 import { createEffect, createMemo, createResource, createRoot, createSignal, getOwner, onCleanup } from 'solid-js'
-import { createArmedConfirm } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import { fromCurl, toCurl, type HttpRequest, type SendResult } from '../shared/model'
 import { createHttpClient } from './httpClient'
@@ -185,8 +184,6 @@ function build(subject: PanelSubject, bridge: () => AcornBridge, hasBridge: (bri
     void adhocActions.refetch()
   }
 
-  const armedDelete = createArmedConfirm()
-
   const current = createMemo<HttpRequest | null>(() => {
     const sel = selection()
     if (sel.kind !== 'saved') return null
@@ -201,7 +198,6 @@ function build(subject: PanelSubject, bridge: () => AcornBridge, hasBridge: (bri
   const patch = (p: Partial<Draft>) => setDraft((d) => ({ ...d, ...p }))
 
   function open(row: HttpRequest) {
-    armedDelete.disarm()
     setSelection({ kind: 'saved', id: row.id })
     setDraft(toDraft(row))
     setResult(null)
@@ -278,7 +274,6 @@ function build(subject: PanelSubject, bridge: () => AcornBridge, hasBridge: (bri
   }
 
   async function remove(row: HttpRequest, origin = bridge()) {
-    if (!armedDelete.request(row.id)) return
     const { deleteRequest } = createHttpClient(origin.api)
     try {
       await deleteRequest(projectId, row.id)
@@ -350,7 +345,6 @@ function build(subject: PanelSubject, bridge: () => AcornBridge, hasBridge: (bri
     sending, saving,
     saveOpen, setSaveOpen, openSave, onSaveClick, saveTarget, persist,
     saved, adhoc, groups, folders,
-    armedDelete,
     current, dirty,
     open, startNew, remove, fire,
     commitUrl, copy, copyAsCurl,

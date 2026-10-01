@@ -9,7 +9,9 @@
     "./broker/nodePairing.ts": "./src/broker/nodePairing.ts",
     "./custody/deviceTokenStore.ts": "./src/custody/deviceTokenStore.ts",
     "./plugins": "./src/plugins/public.ts",
-    "./runtime": "./src/runtime/public.ts"
+    "./config": "./src/config/deviceConfig.ts",
+    "./runtime": "./src/runtime/public.ts",
+    "./local": "./src/local/public.ts"
   },
   "scripts": {
     "lint": "tsc --noEmit",
@@ -25,6 +27,6 @@
     "@types/node": "^26.0.0",
     "@types/ws": "^8.5.13",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.11"
   }
 }

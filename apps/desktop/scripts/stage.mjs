@@ -3,6 +3,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, write
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { stageNodeRuntime, targetTriple } from './node-runtime.mjs'
+import { stageRuntimeDependencies } from './stage-runtime-dependencies.mjs'
 
 // Everything the Rust shell needs on disk before `tauri dev` or `tauri build` runs: the bundled Node
 // runtime, the node service beside the helper, and the migration chains where the node's own walk-up
@@ -31,6 +32,16 @@ need(resolve(HELPER, 'helper.js'), 'run `pnpm run build:helper` first.')
 // ones. Cleared first, or each old chunk stays beside the helper and ships as a resource.
 rmSync(resolve(HELPER, 'chunks'), { recursive: true, force: true })
 cpSync(dist, HELPER, { recursive: true })
+stageRuntimeDependencies(PKG, HELPER)
+
+// The installed command runs the headless CLI under the same pinned Node runtime as the desktop.
+// Its chunks must stay beside cli.js, and Node needs this package boundary to parse them as ESM.
+const cliSource = need(resolve(ROOT, 'apps/cli/dist'), 'run `pnpm --filter @acorn/cli build` first.')
+need(resolve(cliSource, 'cli.js'), 'run `pnpm --filter @acorn/cli build` first.')
+const cliTarget = resolve(PKG, 'dist/cli')
+rmSync(cliTarget, { recursive: true, force: true })
+cpSync(cliSource, cliTarget, { recursive: true })
+writeFileSync(resolve(cliTarget, 'package.json'), '{"type":"module"}\n')
 
 // Migration chains, beside the helper for the same reason. Unset `process.resourcesPath` under a real
 // Node means node-core walks up from the service module looking for a `migrations` directory, so this
@@ -74,7 +85,7 @@ const FRAME_STYLES = [
   'infra/styles/copy.css',
   'infra/styles/tabs.css',
   // The delegated tooltip bubble. A frame mounts its own listener, `mountFrameTips` from
-  // client-core/kit/lib/frameTips.ts, because the shell's singleton cannot see into another document. It
+  // client-core/kit/lib/controls/frameTips.ts, because the shell's singleton cannot see into another document. It
   // lives apart from kit/components/overlays/tips.tsx so a frame bundle does not pull Solid and the primitives in with it.
   'kit/components/overlays/tips.css',
   'infra/styles/topbar.css',

@@ -29,7 +29,7 @@ with a named diagnostic. A command without `kind` is also rejected. Unknown keys
 still use the reporting path above.
 
 Those rows, and every other row a loaded plugin raises through `contributions.attention`, land on the
-plugin's own rail source when it has one and on Settings > Plugins when it does not. The manifest
+plugin's own rail source when it has one and on **Settings > Plugins > Installed** when it does not. The manifest
 names no target and the wire carries display strings only, so the host supplies it
 ([notifications.md](../notifications.md) § What a row points at).
 
@@ -90,7 +90,7 @@ a stranger learns what exists.
 
 **Hearing a core event.** `ctx.events.on(event, listener)` is the receive side, and it fires whether or
 not a client is attached, which is the point on a node nobody is sitting at. The event must be one core
-publishes (`NODE_EVENT_CHANNELS` in `packages/protocol/src/nodeEvents.ts`) and, for a loaded plugin,
+publishes (`NODE_EVENT_CHANNELS` in `packages/protocol/src/transport/nodeEvents.ts`) and, for a loaded plugin,
 one its manifest named in `permissions.events`, the same grant list its frames subscribe against, so
 there is one vocabulary and one trust sentence per grant rather than two of each. Disposal follows
 unload, exactly as a route registration does. The catalogue is in `nodeEvents.ts`.

@@ -9,10 +9,10 @@
 //             request references it. Its output is never stored.
 import { createEffect, createResource, createSignal, Index, Show } from 'solid-js'
 import {
-  Button, Checkbox, createArmedConfirm, Heading, Icon, Inline, Input, Select, Stack, Text, Toolbar,
+  Button, Checkbox, ConfirmButton, Heading, Icon, Inline, Input, Select, Stack, Text, Toolbar,
 } from '@acorn/plugin-api/ui/tree'
 import { variableKinds, type HttpVariable, type VariableKind } from '../shared/model'
-import type { createHttpClient } from './httpClient'
+import type { HttpClient } from './httpClient'
 
 const KIND_HINT: Record<VariableKind, string> = {
   value: 'Used exactly as typed.',
@@ -31,7 +31,7 @@ type Row = { id: string | null; name: string; kind: VariableKind; value: string;
 const toRow = (v: HttpVariable): Row => ({ id: v.id, name: v.name, kind: v.kind, value: v.value, enabled: v.enabled, hasStoredSecret: v.kind === 'secret' })
 const blankRow = (): Row => ({ id: null, name: '', kind: 'value', value: '', enabled: true, hasStoredSecret: false })
 
-export default function HttpVariables(props: { projectId: string; projectName: string; client: ReturnType<typeof createHttpClient> }) {
+export default function HttpVariables(props: { client: HttpClient; projectId: string; projectName: string }) {
   const { createVariable, deleteVariable, listVariables, updateVariable } = props.client
   const [error, setError] = createSignal<string | null>(null)
   const [busy, setBusy] = createSignal<string | null>(null)
@@ -46,8 +46,6 @@ export default function HttpVariables(props: { projectId: string; projectName: s
     const saved = stored()
     if (saved) setRows(saved.map(toRow))
   })
-
-  const armedDelete = createArmedConfirm()
 
   const editRow = (index: number, patch: Partial<Row>) => setRows((current) => current.map((r, i) => (i === index ? { ...r, ...patch } : r)))
   const dropRow = (index: number) => setRows((current) => current.filter((_, i) => i !== index))
@@ -71,8 +69,6 @@ export default function HttpVariables(props: { projectId: string; projectName: s
   async function remove(index: number) {
     const row = rows()[index]
     if (!row.id) return dropRow(index)
-    // Two clicks rather than a dialog (docs/http-client.md § Client).
-    if (!armedDelete.request(row.id)) return
     try {
       await deleteVariable(props.projectId, row.id)
       dropRow(index)
@@ -123,16 +119,19 @@ export default function HttpVariables(props: { projectId: string; projectName: s
               <Button size="sm" busy={busy() === (row().id ?? row().name)} onPress={() => void save(index)}>
                 Save
               </Button>
-              <Button
-                variant="bare"
-                size="sm"
-                tone={armedDelete.armed() === row().id ? 'danger' : undefined}
-                title={armedDelete.armed() === row().id ? `Click again to delete "${row().name}"` : 'Delete'}
-                label={armedDelete.armed() === row().id ? 'Confirm delete' : 'Delete'}
-                onPress={() => void remove(index)}
-              >
-                <Show when={armedDelete.armed() === row().id} fallback={<Icon name="trash-2" />}>Delete?</Show>
-              </Button>
+              {/* Index reuses this position after a deletion. Key only the confirmation control by
+                  row identity so an armed button cannot move onto another variable. */}
+              <Show when={row().id ?? row()} keyed>
+                <ConfirmButton
+                  variant="bare"
+                  size="sm"
+                  title={`Delete ${row().name}`}
+                  label="Delete"
+                  confirmLabel="Confirm delete"
+                  skipConfirm={!row().id}
+                  onConfirm={() => void remove(index)}
+                ><Icon name="trash-2" /></ConfirmButton>
+              </Show>
             </Inline>
             <Text tone="muted">{KIND_HINT[row().kind]}</Text>
           </Stack>

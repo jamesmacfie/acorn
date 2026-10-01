@@ -16,6 +16,7 @@
     "./ui/diff": "./src/ui/diff.ts",
     "./ui/editor": "./src/ui/editor.ts",
     "./ui/host": "./src/ui/host.ts",
+    "./ui/model-provider-failure": "./src/ui/model-provider-failure.ts",
     "./ui/sdk": "./src/ui/sdk.ts",
     "./ui/tokens": "./src/ui/tokens.ts",
     "./ui/tree": "./src/ui/tree.ts"
@@ -26,6 +27,7 @@
   },
   "dependencies": {
     "@acorn/client-core": "workspace:*",
+    "@acorn/diff-document": "workspace:*",
     "@acorn/node-core": "workspace:*",
     "@acorn/protocol": "workspace:*"
   },
@@ -33,6 +35,6 @@
     "@types/node": "^26.0.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.11"
   }
 }

@@ -36,8 +36,12 @@ export type WorkflowBridge = {
   // the definition in the body is what lets the repo trust snapshot be checked for real.
   startById(taskId: string, defId: string, inputs: Record<string, DataValue> | undefined, allowDatabaseDefinitions: boolean): Promise<{ runId?: string; error?: string }>
   runs(taskId: string): Promise<WorkflowRunProjection[]>
+  run(runId: string): Promise<WorkflowRunProjection | null>
   steps(runId: string): Promise<WorkflowStepProjection[]>
-  gate(runId: string, stepId: string, approved: boolean): Promise<{ ok: boolean }>
+  stepStatuses(runId: string): Promise<{ steps: { id: string; status: string }[]; truncated: boolean }>
+  // Throws 404 for no such gate, 409 `gate-resolved` when another answer won, and 400 `gate-invalid`
+  // when the form's values are refused. A refused answer leaves the gate waiting.
+  gate(runId: string, stepId: string, approved: boolean, values?: Record<string, DataValue>): Promise<{ ok: boolean }>
   cancel(runId: string): Promise<{ ok: boolean }>
   kill(runId: string, stepId: string): Promise<{ ok: boolean }>
   retry(runId: string, stepId: string, prompt?: string): Promise<{ ok: boolean; error?: string }>
@@ -72,22 +76,16 @@ const startBody = z
   // One or the other, never both and never neither.
   .refine((body) => !!body.def !== !!body.defId)
 
-// A `defId` that names a file rather than a row. A row is owner-typed configuration that skips the
-// repo trust snapshot, so a task-confined caller may start a file and not a row.
-const FILE_DEF_ID = /^(repo|user):/
-const referencesDatabaseChild = (def: unknown): boolean => {
-  if (!def || typeof def !== 'object') return false
-  const steps = (def as { steps?: unknown }).steps
-  if (!Array.isArray(steps)) return false
-  return steps.some((step) => {
-    if (!step || typeof step !== 'object') return false
-    const child = (step as { childWorkflow?: unknown }).childWorkflow
-    if (!child || typeof child !== 'object') return false
-    const ref = (child as { ref?: unknown }).ref
-    return !!ref && typeof ref === 'object' && (ref as { source?: unknown }).source === 'database'
-  })
-}
-const gateBody = z.object({ stepId: z.string().min(1), approved: z.boolean() })
+// `values` answers a gate's form, so it comes only with an approval. Which names and types are legal
+// is the runner's answer, because only the frozen definition knows the fields.
+const gateBody = z.object({
+  stepId: z.string().min(1),
+  approved: z.boolean(),
+  values: z.record(z.string(), z.unknown().transform((value, ctx) => {
+    try { return parseDataValue(value, DATA_LIMITS.selectionBytes) }
+    catch { ctx.addIssue({ code: 'custom', message: 'Expected a bounded JSON value' }); return z.NEVER }
+  })).optional(),
+}).refine((body) => body.approved || body.values === undefined)
 const killBody = z.object({ stepId: z.string().min(1) })
 const retryBody = z.object({ stepId: z.string().min(1), prompt: z.string().optional() })
 const recordsQuery = z.object({
@@ -119,6 +117,7 @@ const ownsRun = createMiddleware<AppEnv>(async (c, next) => {
 // Mounted at the plugin namespace root so it can carry both task-scoped (/tasks/:id/...) and run-scoped
 // (/workflows/runs/:runId/...) paths in one router.
 export const workflow = new Hono<AppEnv>()
+  .use('/workflows/runs/:runId', ownsRun)
   .use('/workflows/runs/:runId/*', ownsRun)
   // The editor's list of what a step may be, including project-scoped saved workflow references.
   // Device-only because database definitions are owner-authored executable configuration.
@@ -126,21 +125,27 @@ export const workflow = new Hono<AppEnv>()
   .get('/workflows/task-navigation', requireDevice, (c) => viaBridge(c, WORKFLOW_ROUTE,
     b => b.taskNavigation?.() ?? Promise.resolve({ groups: [] })))
   .get('/tasks/:id/workflows', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.defs(c.req.param('id'), !isTaskConfined(c))))
-  .post('/tasks/:id/workflows', async (c) => {
+  // A root start creates fresh authority and tree accounting. Repository trust does not authorize
+  // an agent to escape its signed ceiling or existing workflow tree. Trusted schedules and child
+  // dispatch use their own admission capabilities, not this renderer HTTP control.
+  .post('/tasks/:id/workflows', requireDevice, async (c) => {
     const parsed = startBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    const { def, defId, inputs } = parsed.data
+    const { defId, inputs } = parsed.data
     if (defId) {
-      if (isTaskConfined(c) && !FILE_DEF_ID.test(defId)) return respondError(c, 403, 'forbidden')
-      return viaBridge(c, WORKFLOW_ROUTE, (b) => b.startById(c.req.param('id'), defId, inputs, !isTaskConfined(c)))
+      return viaBridge(c, WORKFLOW_ROUTE, (b) => b.startById(c.req.param('id'), defId, inputs, true))
     }
-    // A database definition is owner-authored configuration without a repository trust snapshot.
-    // The same device-only rule applies when an inline parent refers to one as a child.
-    if (isTaskConfined(c) && referencesDatabaseChild(def)) return respondError(c, 403, 'forbidden')
     return respondError(c, 400, 'published_definition_required', ['Publish this workflow and start it by its definition ID.'])
   })
   .get('/tasks/:id/workflows/runs', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.runs(c.req.param('id'))))
+  .get('/workflows/runs/:runId', async (c) => {
+    const bridge = routeCapabilityFor(c, WORKFLOW_ROUTE)
+    if (!bridge) return viaBridge(c, WORKFLOW_ROUTE, (b) => b.run(c.req.param('runId')))
+    const run = await bridge.run(c.req.param('runId'))
+    return run ? c.json(run) : respondError(c, 404, 'not_found')
+  })
   .get('/workflows/runs/:runId/steps', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.steps(c.req.param('runId'))))
+  .get('/workflows/runs/:runId/step-statuses', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.stepStatuses(c.req.param('runId'))))
   .get('/workflows/runs/:runId/records', requireDevice, async (c) => {
     const parsed = recordsQuery.safeParse(c.req.query())
     if (!parsed.success) return respondError(c, 400, 'bad_request')
@@ -168,10 +173,13 @@ export const workflow = new Hono<AppEnv>()
       c.req.param('runId'), c.req.param('recordId'), parsed.data.digest, parsed.data.requestId,
     ) ?? Promise.resolve(null))
   })
+  // A gate answer is a device action too. The gate exists to stop the agent working in the run, so
+  // the agent's own task credential must not be able to approve it or reject it.
   .post('/workflows/runs/:runId/gate', async (c) => {
+    if (isTaskConfined(c)) return respondError(c, 403, 'forbidden')
     const parsed = gateBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, WORKFLOW_ROUTE, (b) => b.gate(c.req.param('runId'), parsed.data.stepId, parsed.data.approved))
+    return viaBridge(c, WORKFLOW_ROUTE, (b) => b.gate(c.req.param('runId'), parsed.data.stepId, parsed.data.approved, parsed.data.values))
   })
   .post('/workflows/runs/:runId/cancel', (c) => viaBridge(c, WORKFLOW_ROUTE, (b) => b.cancel(c.req.param('runId'))))
   .post('/workflows/runs/:runId/kill', async (c) => {

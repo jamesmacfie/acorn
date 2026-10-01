@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { and, asc, desc, eq, inArray, isNotNull, isNull, like, lte, ne, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray, isNotNull, isNull, like, lte, ne, notExists, notInArray, or, sql } from 'drizzle-orm'
 import type { CoreServices, PluginDatabase, SearchHit } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
 import type {
@@ -17,9 +17,15 @@ import { eventSubagentId, foldSubagentRoster, projectAgentEvent, touchSubagentRo
 import type { AgentLifecyclePublisher, AgentSessionChange, SessionRenameSource } from '../../contract/lifecycle'
 import { AgentLifecycle } from './lifecycle'
 import { continuesStream, isAppendDelta } from './durableEventBuffer'
+import { LedgerFold } from './ledgerFold'
 import { normalizeStoredSessionTitle } from './sessionTitle'
 
 const now = (): number => Date.now()
+
+type Transaction = Parameters<Parameters<PluginDatabase['transaction']>[0]>[0]
+
+/** The files a removed session leaves behind, which the runtime collects after the transaction. */
+export type RemovedSessionObjects = { attachmentIds: string[]; artifactObjects: RemovedArtifactObject[] }
 
 // Tolerant on purpose: a roster that cannot be decoded starts over rather than failing the event
 // insert. Losing the roster costs a sidebar row; failing the insert loses the transcript.
@@ -55,8 +61,9 @@ type SessionSearchFilter = {
 /**
  * Session projection, request-resolution, deletion, and search repository.
  *
- * The append-only event transaction lives here because it is the authority that advances the
- * session sequence and all query projections atomically. Turn queue operations remain in
+ * The event transaction lives here because it is the authority that advances the session sequence
+ * and all query projections atomically. It appends, and folds a tool call's or a file change's
+ * superseded rows into the new one in the same step (./ledgerFold.ts). Turn queue operations remain in
  * AgentStore; both slices share one inherited database handle.
  *
  * See docs/managed-agents.md § Session model for how a workspace-scoped read resolves task ids
@@ -64,6 +71,8 @@ type SessionSearchFilter = {
  */
 export class AgentSessionRepository {
   protected readonly lifecycle: AgentLifecycle
+  // Which rows each open tool call and file change has, so an update can supersede them (./ledgerFold.ts).
+  protected readonly ledgerFold = new LedgerFold()
 
   constructor(
     protected readonly db: PluginDatabase,
@@ -101,11 +110,18 @@ export class AgentSessionRepository {
           lastEventSeq: schema.agentSessions.lastEventSeq,
           configJson: schema.agentSessions.configJson,
           subagentsJson: schema.agentSessions.subagentsJson,
+          kind: schema.agentSessions.kind,
         })
         .from(schema.agentSessions)
         .where(eq(schema.agentSessions.id, sessionId))
         .get()
       if (!current) throw new Error(`Managed agent session not found: ${sessionId}`)
+      // A workflow's session answers to its run, not to the owner. A finished or failed step is the
+      // run's news, told once by the workflows plugin as run-done or run-failed, so only a request the
+      // agent is waiting on reaches the owner from here.
+      const attention = current.kind === 'workflow' && (projection.attention === 'completed' || projection.attention === 'error')
+        ? 'none'
+        : projection.attention
       const seq = current.lastEventSeq + 1
       const configJson = event.type === 'session_metadata'
         ? JSON.stringify({
@@ -137,9 +153,10 @@ export class AgentSessionRepository {
       tx.update(schema.agentSessions)
         .set({
           lastEventSeq: seq,
+          lastEventAt: timestamp,
           updatedAt: timestamp,
           ...(projection.runtimeState ? { runtimeState: projection.runtimeState } : {}),
-          ...(projection.attention ? { attention: projection.attention } : {}),
+          ...(attention ? { attention } : {}),
           ...(projection.providerSessionRef ? { providerSessionRef: projection.providerSessionRef } : {}),
           ...(configJson ? { configJson } : {}),
           ...(subagentsJson ? { subagentsJson } : {}),
@@ -147,23 +164,39 @@ export class AgentSessionRepository {
         .where(eq(schema.agentSessions.id, sessionId))
         .run()
 
+      // A tool call or file change update lands as the card's whole state, and the rows it supersedes
+      // go in this transaction. The opener stays where it is, with no search text of its own, so the
+      // call is indexed once (./ledgerFold.ts).
+      const fold = this.ledgerFold.plan(tx, sessionId, turnId, event)
+      const stored = fold?.stored ?? event
       const values: typeof schema.agentEvents.$inferInsert = {
         id: eventId,
         sessionId,
         turnId,
         seq,
         schemaVersion: AGENT_EVENT_SCHEMA_VERSION,
-        eventJson: JSON.stringify(event),
-        searchText: this.appendToStreamHead(tx, sessionId, current.lastEventSeq, turnId, event) ? null : agentEventSearchText(event),
+        eventJson: JSON.stringify(stored),
+        searchText: !fold && this.appendToStreamHead(tx, sessionId, current.lastEventSeq, turnId, event) ? null : agentEventSearchText(stored),
         createdAt: timestamp,
       }
       tx.insert(schema.agentEvents).values(values).run()
+      if (fold?.head) {
+        if (fold.superseded.length) tx.delete(schema.agentEvents).where(inArray(schema.agentEvents.id, fold.superseded)).run()
+        tx.update(schema.agentEvents)
+          .set({ searchText: null })
+          .where(and(eq(schema.agentEvents.id, fold.head), isNotNull(schema.agentEvents.searchText)))
+          .run()
+      }
       const changed = this.applyEventProjection(tx, sessionId, turnId, event, timestamp)
       return {
-        row: { ...values, turnId: values.turnId ?? null, searchText: values.searchText ?? null },
+        // What the socket and the node's listeners get: the update as the provider reported it, so a
+        // frame stays the size of the change. The stored row folds to the same card (./ledgerFold.ts).
+        row: { ...values, eventJson: JSON.stringify(event), turnId: values.turnId ?? null, searchText: values.searchText ?? null },
+        fold,
         ...changed,
       }
     })
+    committed.fold?.commit(eventId)
     if (committed.turnChanged && turnId) await this.lifecycle.announceTurn(turnId)
     if (committed.requestChanged && (event.type === 'request' || event.type === 'request_resolved')) {
       await this.lifecycle.announceRequest(sessionId, event.requestId)
@@ -231,7 +264,12 @@ export class AgentSessionRepository {
           status: 'pending',
           title: event.title,
           detail: event.detail ?? null,
-          payloadJson: JSON.stringify({ options: event.options ?? [], questions: event.questions ?? [] }),
+          // Additive: a row written before `approval` existed reads as the plain consent it was.
+          payloadJson: JSON.stringify({
+            options: event.options ?? [],
+            questions: event.questions ?? [],
+            ...(event.approval ? { approval: event.approval } : {}),
+          }),
           createdAt: timestamp,
         })
         .onConflictDoNothing()
@@ -497,38 +535,152 @@ export class AgentSessionRepository {
     return this.requireSession(sessionId)
   }
 
-  async deleteSession(sessionId: string): Promise<{
-    attachmentIds: string[]
-    artifactObjects: RemovedArtifactObject[]
-  }> {
+  async deleteSession(sessionId: string): Promise<RemovedSessionObjects> {
     const session = await this.getSession(sessionId)
     if (!session) return { attachmentIds: [], artifactObjects: [] }
-    const turns = await this.db.select({ id: schema.agentTurns.id }).from(schema.agentTurns).where(eq(schema.agentTurns.sessionId, sessionId))
-    const turnIds = turns.map((turn) => turn.id)
-    const [attachmentRows, artifactRows] = await Promise.all([
-      turnIds.length
-        ? this.db
-            .selectDistinct({ attachmentId: schema.agentAttachmentRefs.attachmentId })
-            .from(schema.agentAttachmentRefs)
-            .where(inArray(schema.agentAttachmentRefs.turnId, turnIds))
-        : Promise.resolve([]),
-      this.db
-        .select({ id: schema.agentArtifacts.id, storageKey: schema.agentArtifacts.storageKey })
-        .from(schema.agentArtifacts)
-        .where(eq(schema.agentArtifacts.sessionId, sessionId)),
-    ])
-    this.db.transaction((tx) => {
-      if (turnIds.length) tx.delete(schema.agentAttachmentRefs).where(inArray(schema.agentAttachmentRefs.turnId, turnIds)).run()
-      tx.delete(schema.agentArtifacts).where(eq(schema.agentArtifacts.sessionId, sessionId)).run()
-      tx.delete(schema.agentRequests).where(eq(schema.agentRequests.sessionId, sessionId)).run()
+    const removed = this.db.transaction((tx) => {
+      const owned = this.deleteOwnedRows(tx, sessionId)
       tx.delete(schema.agentEvents).where(eq(schema.agentEvents.sessionId, sessionId)).run()
-      tx.delete(schema.agentTurns).where(eq(schema.agentTurns.sessionId, sessionId)).run()
       tx.delete(schema.agentSessions).where(eq(schema.agentSessions.id, sessionId)).run()
+      return owned
     })
+    this.ledgerFold.forget(sessionId)
     this.lifecycle.announceSession(session, ['deleted'])
+    return removed
+  }
+
+  // What a session owns apart from its row and its events, deleted inside the caller's transaction:
+  // its requests, its turns, the attachment references those turns hold, and its artifacts. Returns
+  // the attachments and artifact files to collect once the transaction commits. deleteSession and
+  // finishHistoryRemoval share it, so the two cannot disagree about what a session owns.
+  private deleteOwnedRows(tx: Transaction, sessionId: string): RemovedSessionObjects {
+    const turnIds = tx
+      .select({ id: schema.agentTurns.id })
+      .from(schema.agentTurns)
+      .where(eq(schema.agentTurns.sessionId, sessionId))
+    const attachmentIds = tx
+      .selectDistinct({ attachmentId: schema.agentAttachmentRefs.attachmentId })
+      .from(schema.agentAttachmentRefs)
+      .where(inArray(schema.agentAttachmentRefs.turnId, turnIds))
+      .all()
+      .map((row) => row.attachmentId)
+    const artifactObjects = tx
+      .select({ id: schema.agentArtifacts.id, storageKey: schema.agentArtifacts.storageKey })
+      .from(schema.agentArtifacts)
+      .where(eq(schema.agentArtifacts.sessionId, sessionId))
+      .all()
+    tx.delete(schema.agentAttachmentRefs).where(inArray(schema.agentAttachmentRefs.turnId, turnIds)).run()
+    tx.delete(schema.agentArtifacts).where(eq(schema.agentArtifacts.sessionId, sessionId)).run()
+    tx.delete(schema.agentRequests).where(eq(schema.agentRequests.sessionId, sessionId)).run()
+    tx.delete(schema.agentTurns).where(eq(schema.agentTurns.sessionId, sessionId)).run()
+    return { attachmentIds, artifactObjects }
+  }
+
+  // Removing a session's history, for the retention pass (docs/data-layer.md § Retention). It works in
+  // three steps so the caller can yield between them: find a session, delete its events a batch at a
+  // time, then finish it. The session row stays, so an archived or restored task still lists the
+  // session, and its transcript says what happened to it.
+
+  /**
+   * The oldest session of these tasks whose history is still stored. Never one in `live`, the sessions
+   * with a provider process in this node, and never one with a turn being dispatched or running.
+   * Synchronous, so a caller can check and write with nothing in between.
+   */
+  sessionWithHistory(taskIds: readonly string[], live: ReadonlySet<string>): string | null {
+    if (!taskIds.length) return null
+    const running = this.db
+      .select({ id: schema.agentTurns.id })
+      .from(schema.agentTurns)
+      .where(and(
+        eq(schema.agentTurns.sessionId, schema.agentSessions.id),
+        inArray(schema.agentTurns.status, ['dispatching', 'active']),
+      ))
+    return this.db
+      .select({ id: schema.agentSessions.id })
+      .from(schema.agentSessions)
+      .where(and(
+        inArray(schema.agentSessions.taskId, [...taskIds]),
+        isNull(schema.agentSessions.historyRemovedAt),
+        notExists(running),
+        live.size ? notInArray(schema.agentSessions.id, [...live]) : undefined,
+      ))
+      .orderBy(asc(schema.agentSessions.createdAt))
+      .limit(1)
+      .get()?.id ?? null
+  }
+
+  /** Deletes up to `limit` of a session's oldest events in one transaction. Returns how many went. The
+   *  search index loses their rows through the delete trigger. */
+  deleteOldestEvents(sessionId: string, limit: number): number {
+    return this.db.transaction((tx) => {
+      const ids = tx
+        .select({ id: schema.agentEvents.id })
+        .from(schema.agentEvents)
+        .where(eq(schema.agentEvents.sessionId, sessionId))
+        .orderBy(asc(schema.agentEvents.seq))
+        .limit(limit)
+        .all()
+        .map((row) => row.id)
+      if (ids.length) tx.delete(schema.agentEvents).where(inArray(schema.agentEvents.id, ids)).run()
+      return ids.length
+    })
+  }
+
+  /**
+   * The last step, in one transaction: the events still left, everything deleteOwnedRows removes, then
+   * one diagnostic event with `message`, so the transcript explains itself. The row is marked, and its
+   * roster, queue count and unread state are cleared, because each was read off the rows just deleted.
+   * Returns null when the session is gone or already marked, which makes a second run a no-op.
+   */
+  async finishHistoryRemoval(sessionId: string, message: string): Promise<(RemovedSessionObjects & {
+    session: AgentSession
+    event: AgentEventRecord
+  }) | null> {
+    const timestamp = now()
+    const event: AgentNormalizedEvent = { type: 'diagnostic', level: 'info', message }
+    const committed = this.db.transaction((tx) => {
+      const current = tx
+        .select({ lastEventSeq: schema.agentSessions.lastEventSeq, historyRemovedAt: schema.agentSessions.historyRemovedAt })
+        .from(schema.agentSessions)
+        .where(eq(schema.agentSessions.id, sessionId))
+        .get()
+      if (!current || current.historyRemovedAt != null) return null
+      const owned = this.deleteOwnedRows(tx, sessionId)
+      tx.delete(schema.agentEvents).where(eq(schema.agentEvents.sessionId, sessionId)).run()
+      // The next sequence, never a reused one: a client that held this session resumes after its mark.
+      const seq = current.lastEventSeq + 1
+      const row: typeof schema.agentEvents.$inferSelect = {
+        id: randomUUID(),
+        sessionId,
+        turnId: null,
+        seq,
+        schemaVersion: AGENT_EVENT_SCHEMA_VERSION,
+        eventJson: JSON.stringify(event),
+        searchText: agentEventSearchText(event),
+        createdAt: timestamp,
+      }
+      tx.insert(schema.agentEvents).values(row).run()
+      // `updatedAt` is left alone, so the task's sessions keep their order.
+      tx.update(schema.agentSessions)
+        .set({
+          lastEventSeq: seq,
+          lastReadSeq: seq,
+          attention: 'none',
+          subagentsJson: null,
+          queuedTurns: 0,
+          historyRemovedAt: timestamp,
+        })
+        .where(eq(schema.agentSessions.id, sessionId))
+        .run()
+      return { ...owned, row }
+    })
+    if (!committed) return null
+    this.ledgerFold.forget(sessionId)
     return {
-      attachmentIds: attachmentRows.map((row) => row.attachmentId),
-      artifactObjects: artifactRows,
+      attachmentIds: committed.attachmentIds,
+      artifactObjects: committed.artifactObjects,
+      session: await this.requireSession(sessionId),
+      event: mapAgentEvent(committed.row),
     }
   }
 

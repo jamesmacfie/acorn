@@ -1,4 +1,4 @@
-import { randomUUID } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, like, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import * as schema from '../../node/schema'
 import type { AgentEventPage, AgentEventRecord, AgentProviderDescriptor, AgentSession, AgentSessionList, AgentSessionSnapshot, AgentTurn } from '../../contract/wire.ts'
@@ -7,6 +7,7 @@ import { mapAgentEvent, mapAgentRequest, mapAgentSession, mapAgentTurn } from '.
 import { AgentSessionRepository } from './sessionRepository'
 import { isActiveSubagent } from './stateMachine'
 import { DEFAULT_SESSION_TITLE, deterministicSessionTitle } from './sessionTitle'
+import { codexModeOption, codexPlanHandoffState } from '../../shared/codexPlanHandoff'
 
 export type EnqueueTurnOutcome = {
   turn: AgentTurn
@@ -29,6 +30,75 @@ const now = (): number => Date.now()
 
 export class AgentStore extends AgentSessionRepository {
 
+  /** Accept one completed Codex proposal and queue its continuation as one SQLite decision. */
+  async acceptCodexPlan(sessionId: string, itemId: string, prompt: string): Promise<{ turn: AgentTurn; inserted: boolean }> {
+    const key = `codex-plan:${createHash('sha256').update(itemId).digest('hex')}`
+    const result = this.db.transaction((tx) => {
+      const sessionRow = tx.select().from(schema.agentSessions)
+        .where(eq(schema.agentSessions.id, sessionId)).get()
+      if (!sessionRow) throw new Error(`Managed agent session not found: ${sessionId}`)
+      const existing = tx.select().from(schema.agentTurns)
+        .where(and(eq(schema.agentTurns.sessionId, sessionId), eq(schema.agentTurns.idempotencyKey, key))).get()
+      if (existing) return { turn: mapAgentTurn(existing), inserted: false }
+      const lastRow = tx.select().from(schema.agentTurns)
+        .where(eq(schema.agentTurns.sessionId, sessionId))
+        .orderBy(desc(schema.agentTurns.ordinal)).limit(1).get()
+      if (!lastRow) throw new Error('This plan is no longer available to implement.')
+      const eventRows = tx.select().from(schema.agentEvents)
+        .where(and(eq(schema.agentEvents.sessionId, sessionId), eq(schema.agentEvents.turnId, lastRow.id)))
+        .orderBy(asc(schema.agentEvents.seq)).all()
+      const events = eventRows.map(mapAgentEvent)
+      const proposal = events.findLast((record) => record.event.type === 'plan_proposal'
+        && record.event.itemId === itemId)
+      const session = mapAgentSession(sessionRow)
+      if (!proposal || codexPlanHandoffState(session, [mapAgentTurn(lastRow)], events, proposal) !== 'actionable') {
+        throw new Error('This plan is no longer available to implement.')
+      }
+      const mode = codexModeOption(session)!
+      const options = session.config.configOptions as Array<{
+        id: string; label: string; category: string; currentValue: string | null
+      }>
+      const nextOptions = options.map((option) => option.id === mode.id
+        ? { ...option, currentValue: 'default' }
+        : option)
+      const policy = Object.fromEntries(nextOptions.flatMap((option) =>
+        option.currentValue == null ? [] : [[option.id === 'reasoning' ? 'effort' : option.id, option.currentValue]]))
+      const timestamp = now()
+      const turnId = randomUUID()
+      tx.update(schema.agentSessions).set({
+        configJson: JSON.stringify({ ...session.config, configOptions: nextOptions }),
+        queuedTurns: sessionRow.queuedTurns + 1,
+        updatedAt: timestamp,
+      }).where(eq(schema.agentSessions.id, sessionId)).run()
+      tx.insert(schema.agentTurns).values({
+        id: turnId,
+        sessionId,
+        ordinal: lastRow.ordinal + 1,
+        source: 'interactive',
+        status: 'queued',
+        inputJson: JSON.stringify([{ type: 'text', text: prompt }]),
+        effectivePolicyJson: JSON.stringify({
+          ...policy,
+          mode: 'default',
+          acceptedPlanItemId: itemId,
+          acceptedPlanTurnId: lastRow.id,
+          providerAdvertisedPolicy: nextOptions.flatMap((option) =>
+            ['permission', 'mode', 'model', 'reasoning'].includes(option.category)
+              ? [{ id: option.id, label: option.label, category: option.category, value: option.currentValue }]
+              : []),
+          providerStatusAuthority: session.statusAuthority,
+          capturedAt: timestamp,
+        }),
+        idempotencyKey: key,
+        createdAt: timestamp,
+      }).run()
+      const turnRow = tx.select().from(schema.agentTurns).where(eq(schema.agentTurns.id, turnId)).get()!
+      return { turn: mapAgentTurn(turnRow), inserted: true }
+    })
+    if (result.inserted) await this.lifecycle.announceTurn(result.turn.id)
+    return result
+  }
+
   async createSession(input: CreateAgentSessionInput, provider: AgentProviderDescriptor): Promise<AgentSession> {
     const timestamp = now()
     const id = randomUUID()
@@ -38,6 +108,7 @@ export class AgentStore extends AgentSessionRepository {
       providerId: input.providerId,
       profileId: input.profileId,
       kind: input.kind,
+      originJson: input.origin ? JSON.stringify(input.origin) : null,
       driverKind: provider.driverKind,
       driverVersion: provider.driverVersion,
       providerSessionRef: input.resumeProviderSessionRef ?? null,

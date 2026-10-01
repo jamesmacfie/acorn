@@ -1,13 +1,33 @@
 # Managed agents
 
+The headless [CLI](./cli.md#commands) uses the same provider roster, durable session and
+turn operations, event pages, and bounded wait route as the desktop Agent Center. It queues turns
+through the Agents plugin; it does not drive raw terminal sessions or resolve approvals.
+
 Session, turn, event, request, and attachment wire types live in
 `plugins/agents/src/contract/wire.ts`. The pure tool-status tone shared with Changes lives in
 `plugins/agents/src/contract/toolTone.ts`. Core receives only the small attention snapshot defined
-by `packages/protocol/src/attention.ts`; Agents maps its session rows to that snapshot.
+by `packages/protocol/src/agents/attention.ts`; Agents maps its session rows to that snapshot.
 
 The agents plugin manages structured Claude and Codex sessions. It stores a durable normalized event
 ledger and exposes the same session through the Agent Center, task Agent pane, HTTP routes, and live
 WebSocket streams.
+
+## HTTP control authority
+
+The paired desktop, terminal client, and headless CLI use device authority for provider discovery and
+session execution controls. Session creation, transcript import, configuration changes, deletion,
+turn creation and editing, plan implementation, forks, compaction, title generation, terminal
+handoff, managed resume, imported resume verification, and request resolution require a device
+principal. Service and task credentials receive `403` before the runtime is called. A task credential
+cannot answer its own provider permission, question, or elicitation request on behalf of a human.
+
+Task credentials retain task-scoped session reads, event replay, search, export, wait, attachment and
+artifact access, and cancellation. An unknown or foreign opaque ID receives `404`. The direct
+`/runs` source is node-wide and accepts device and service callers, while task callers use the
+filtered core run list. Managed delegation and workflow execution call guarded capabilities and
+the runtime directly. These HTTP controls do not replace tool permissions, signed ceilings, or
+delegation admission.
 
 ## Session model
 
@@ -45,8 +65,11 @@ Center's chip needs no names and so needs no request: the two ids are on the row
 
 The ids are also how the run pane finds a session for a step that is still running, since the step row
 records `agentSessionId` only later. Nothing there is a second copy of the truth: the config is
-written once, when the node creates the session, and every later write to a session's config spreads
-what was there.
+written when the node creates the session. General configuration replacement retains
+`workflowRunId`, `workflowStepId`, `delegationSpawnId`, the `customAgent` snapshot, `toolCeiling`, and
+`mcpServers`. It cannot add, change, or remove those fields. Dedicated MCP selection can change the
+server list after checking Settings. A fork carries its source's identity and authority snapshots.
+Both durable `kind: 'workflow'` and the workflow config marker exclude a session from managed delegation.
 
 A workspace-scoped list or search resolves the task ids first, through
 `CoreServices.tasks.idsForWorkspace()`, then narrows this plugin's own tables to those ids. An empty
@@ -67,6 +90,12 @@ title from an already inserted turn. **Regenerate title** is the explicit except
 first durable text prompt, asks the same profile again, and compares against the title that was current
 when the request started. A rename made while regeneration runs still wins. A generation failure leaves
 the current title and adds nothing to the transcript.
+
+`plugins/agents/src/server/sessions/runtime.ts` coordinates session commands with the provider
+engine. `sessionTitleGeneration.ts` owns title requests and cancellation,
+`sessionDefaultsCommands.ts` applies saved provider options, and `transcriptCommands.ts` imports,
+verifies, and exports transcripts. `sessionWait.ts` checks live frames against the durable snapshot.
+The runtime keeps the public methods and durable store boundary.
 
 ### Cross-plugin lifecycle
 
@@ -116,6 +145,13 @@ node busy". It closes on whichever of the four endings comes first, which is a c
 error, a provider that closed underneath it, or a safe-transient retry putting the same turn back in
 the queue. A turn the process died in the middle of reports nothing.
 
+Every 60 seconds while telemetry is on, the engine also reports its provider processes as three
+gauges: `agent.processes.live` (sessions with a running process), `agent.processes.idle` (those the
+idle rules would stop now), and `agent.processes.memory` (the summed resident bytes of their process
+trees). These are the numbers Settings > Storage and memory draws, from `processFootprint()`. Counting
+memory runs `ps` through the process broker, so the sample is skipped while telemetry is off, and the
+memory gauge is left out when the process table cannot be read.
+
 ## Harnesses
 
 A harness is one agent acorn can manage. A driver adapts its protocol into the common session and
@@ -151,6 +187,14 @@ discovers Default and Plan through
 `thread/settings/updated` so a preset's effective model and effort stay synchronized with the generic
 configuration shown by acorn. App-servers that do not expose the experimental list endpoint continue
 without a Mode picker.
+Codex's `turn/plan/updated` steps remain a progress card. A completed `plan` item is stored as a
+separate proposal with its item and provider turn IDs and shown in the transcript. For the latest
+successfully completed interactive Plan turn under Acorn control, the shared desktop and terminal card
+offers **Implement plan**. The Node checks the proposal and turn again in one SQLite transaction,
+switches only the session's Mode option to Default, and queues one continuation in the same Codex
+thread. The accepted turn records the proposal identity, so a second click or client reuses that turn
+and a reload shows the proposal as handled. Planning question responses remain request resolutions;
+they never accept a plan. A revision turn or a rejected handoff leaves Plan selected.
 A native driver is written when a vendor protocol carries product value the generic driver cannot,
 and it lives in plugins/agents with the rest of the first-party code. The registry has two doors and
 the names are the point: `register(spec)` takes data, `registerNative(id, factory)` takes code.
@@ -163,6 +207,21 @@ this seam with the `generated_artifacts` capability and maps completed `imageGen
 Another native provider can emit the same driver event without adding a provider-specific client path.
 
 Claude runs on tier 1 and Codex on tier 2, which makes the two of them the worked example of each.
+
+**What a built-in adapter is told depends on the session.** A built-in spec's `acpSessionMeta` is a
+function of the session, sent on create and again on every resume, so it must return the same value
+for the same session. Claude's uses it for two things. It turns off Claude Code's own
+continue-after-usage-limit, and for a workflow or delegated session it appends the turn-ending
+instruction to Claude Code's system prompt
+([workflow execution](./workflows/execution.md#a-turn-that-ends-early)). The instruction goes in at
+creation rather than partway through, because a system prompt that changes mid-session invalidates
+the model's earlier thinking.
+
+**A context part cannot pass for the reader's words.** Both drivers send a context part as an
+`<acorn-context>` block (`plugins/agents/src/server/drivers/contextBlock.ts`). Its label and source
+are escaped as attributes, and a closing tag inside its content is broken, because a loaded plugin's
+label or a pull request body could otherwise end the block early and have what follows read as the
+reader's message.
 
 **plugins/agents stays first-party.** It owns the stream and the surfaces, and a harness contribution
 is a descriptor delivered to it rather than a fork of it. The contributing plugin describes the
@@ -178,7 +237,7 @@ only way in). That facet forwards to the
 `agents.harnessRegistry` capability plugins/agents publishes, resolved at delivery time and never
 cached, so agents disabled means the same silent nothing every unmatched contribution gets, and
 re-enabling redelivers. A harness package with no node bundle still gets a real plugin row, so it is
-listed in Settings → Plugins and the owner can turn it off.
+listed in **Settings > Plugins > Installed** and the owner can turn it off.
 
 A harness names a program acorn will run, so it is disclosed under **Enforced** in the trust prompt,
 honestly: the host spawns the declared command with the declared arguments and nothing else. The
@@ -266,7 +325,9 @@ on `session/new` and on the call that picks a session back up, so the driver nam
 for any harness that has no `mcp add` command of its own to register through. Claude Code and Codex
 keep the config-file door they already had, and a harness gets one door, never both.
 [mcp.md](./mcp.md) § Configuration owns this, including why the launch environment is spelled out
-rather than inherited.
+rather than inherited. The user's own servers from Settings → MCP servers reach every harness,
+Claude Code and Codex included, through the protocol on each start ([mcp.md](./mcp.md) § Your own
+servers).
 
 **What ACP offers the client side is declined, except the one that lets an agent ask.** The driver
 answers no to `fs` and `terminal` at `initialize`. `mcpServers`, the client capability, stays declined
@@ -291,7 +352,9 @@ One schema property becomes one question (`server/drivers/formElicitation.ts`), 
 mapping knows a vendor's field names, so property-bearing ACP and Codex app-server forms map the same
 way. Claude pairs every choice with a free-text box, which lands as its own question titled "Other".
 For Codex, a form with no properties is consent rather than an empty question: the card offers Allow
-and Decline, and sends the chosen MCP action back to the provider. An answer travels back as the
+and Decline, and sends the chosen MCP action back to the provider. A Computer Use app-access request
+is the one consent form that offers more, because it says how long a grant can last
+(§ App-access approval). An answer travels back as the
 option's own value behind the label a person picked, because the card answers with labels and Codex
 numbers its own question options positionally. A question is answered in the same card, by the same
 route, and against the same durable row as a permission (§ Client surfaces).
@@ -302,12 +365,27 @@ answered, the agent's own call would never settle, and the durable row would sit
 "Needs you" for good. The driver drains whatever is still parked when `session/prompt` returns,
 answering each with `cancel` and recording a `request_resolved`, which is what releases the row.
 
+**Which harnesses are installed and signed in is served from memory.** A probe starts each harness's
+CLI, so `GET /v1/p/agents/providers` took 211 ms typically and up to 5 s. The Node keeps the last
+answer and serves it at once. Once that answer is 30 seconds old, the next read still gets it and one
+probe runs behind the read to replace it; callers that arrive meanwhile share that probe
+(`ManagedAgentEngine.providers`, `plugins/agents/src/server/sessions/runtimeEngine.ts`). Three things
+wait for a fresh probe instead: the first read after boot, a read after a harness was added or
+removed, and `?force=true`, which the New menu's Refresh button sends. A session start or a delegated
+spawn that the served answer would refuse, because the harness looks missing or signed out, probes
+once more before it refuses, so installing or signing in to a CLI never needs a Node restart. Custom
+agents, MCP servers, and session defaults are not part of this answer, so editing them drops nothing.
+
 The Node probes harness availability and usage on bounded intervals. Usage and pricing details are
 displayed in the Agent pane; pricing overrides are local preferences and provider prompts/responses
-are not stored by the model-provider plugin. The same pricing page holds the built-in Claude and Codex
-catalogues plus exact-model overrides. Plan usage is per harness: the built-in CLI probes and a
+are not stored by the model-provider plugin. Settings > Limits and cost holds the built-in Claude and
+Codex catalogues plus exact-model overrides, under the concurrency ceilings. Plan usage is per harness: the built-in CLI probes and a
 contributed harness's `probes.usage` route feed one registry, and a harness with no collector shows no
 usage section.
+
+The Agent pane shows a refresh icon beside each harness's usage. It probes only that harness and
+keeps the other readings in place. The full refresh action and five-minute polling still check every
+harness; a single-harness refresh does not delay the next full check.
 
 Each quota row draws a bar under its sentence, coloured by the same reading as the dot beside the
 harness name, with a small triangle marking where a steady spend would have left the fill by now. A
@@ -318,6 +396,46 @@ draws the bar without the mark. The built-in probes know their own windows; a co
 no way to declare one yet. A reset further out than the whole window drops the mark as well: Codex
 labels a row "Session (5h)" and then reports it resetting in four days, and a mark pinned to the right
 end would read as miles ahead of pace when the truth is that the window is not the one acorn assumed.
+
+### App-access approval
+
+When a Codex agent asks Computer Use to operate an app, Computer Use sends a consent form through the
+app-server's `mcpServer/elicitation/request`. Its `_meta` names the app by bundle identifier
+(`tool_params.app`), gives the name a person reads (`tool_params_display`), and lists the scopes its
+policy allows in `persist`: `['session', 'always']`, or `['session']` when policy forbids a saved grant.
+The Codex adapter reads that shape into a typed `approval` on the request event
+(`plugins/agents/src/server/drivers/codexAppApproval.ts`). The card then offers **Allow for this
+session**, **Always allow** only when `always` was advertised, and **Decline**. It names the app with
+its identifier, explains both scopes, and shows any warning Computer Use attached.
+
+Computer Use owns every grant. Acorn stores the decision and never the grant. The answer goes back as
+`_meta: { persist: 'session' | 'always' }`, and the integration's `node_repl` keeps a session grant per
+Codex thread under `$CODEX_HOME/computer-use/sessions/` and an always grant in its own approvals file.
+A later request it already holds a grant for is answered by the integration and never reaches Acorn.
+A Codex thread is one managed session, so a session grant lasts as long as that session, and a fork
+asks again. The grant belongs to the computer the agent runs on, which for a remote node is that
+node's computer. Nothing synchronises it across nodes or devices.
+
+To revoke an always grant, use Computer Use's own settings in the ChatGPT app. Acorn has no second
+list, because two stores would disagree about what is allowed. A sent response is not proof the grant
+was saved, so the settled card says Computer Use saves it and names where to revoke it. It never says
+the grant exists.
+
+The descriptor is additive in the request's stored payload. A row written before it existed, or a
+request whose metadata is missing, malformed, oversized, or from another connector, reads as the
+plain Allow and Decline it always was. An app identifier too long to store is refused, not cut short,
+because a shortened bundle identifier names a different app. A form with fields stays a question
+whatever its metadata says. Before claiming an answer, the runtime checks it against the options the
+stored request offered. The adapter then rebuilds the response from the provider's original request,
+so a forged option, an unadvertised scope, or a changed target never reaches Computer Use. The route
+stays device-only (§ HTTP control authority), so an agent cannot approve its own access.
+
+Always allow trusts an app identifier, not only the windows an agent launched. The agent test app has
+an identifier of its own for this reason ([Local development](./local-development.md#native-control-of-a-session)).
+
+The request shape was read from the integration's source (Codex Computer Use 26.915.1001093,
+`@oai/sky` 0.7.5, codex-cli 0.159.2). A live capture and the grant lifetimes still need a real run
+([Testing](./testing.md), checks 149-154).
 
 ## Provider-native subagents
 
@@ -340,7 +458,9 @@ row reaches every client live, and a count computed only when the list is fetche
 by the next broadcast. A queued turn leaves `runtimeState` at `ready` or `working`, so without this
 count the task sidebar has no way to mark a session whose only sign of a waiting prompt is the prompt
 itself. Enqueuing a follow-up on a session held idle behind the concurrency limit broadcasts the row on
-its own, because no event would otherwise wake it.
+its own, because no event would otherwise wake it. The queue shows each waiting turn's text and its
+image or file attachments with the same tiles used in the sent transcript. An attachment-only turn
+shows the tiles without a generic input count.
 
 A subagent's own progress never touches its session's runtime state. Turn boundaries own that, and a
 child that settles after its parent's turn completed, which Codex allows, would otherwise drag the
@@ -474,6 +594,10 @@ children below an available managed parent and marks that ownership with the sam
 provider-native subagents, labels terminal-owned children without inventing a parent row, shows depth
 and isolation, and links a selected child back to its managed parent.
 Provider-native subagent rows keep their original place under the provider session.
+Above a managed parent's composer, one row per live direct child shows its title, runtime and
+attention state, and the task title when the child belongs to another task. The rows use the same
+session-list lineage projection and live session roster as the sidebar. Activating one opens its task
+and managed session. Child updates do not remount the parent's composer.
 
 Only a direct owner can address a child. A child may create one more level, but a third level is
 refused. Each root admits at most 12 live delegated sessions in the reservation transaction, counting
@@ -493,14 +617,28 @@ has neither, and does not report.
 When a `reportTo` turn settles as completed, failed, cancelled, or interrupted, the Agents plugin
 queues one `delegation_report` turn on the owner. The report text holds the child's title, the
 outcome, any error, the final assistant message cut to its last 8 KiB, and the validated structured
-result when the turn declared a `resultSchema`. A `delegation_report` context part names the child
-and links to it. The report queues behind whatever the owner is doing and never steers an active
+result when the turn declared a `resultSchema`. The final message sits inside `<pasted_content>`
+tags, which Claude Code's system prompt explains: text the owner's user didn't write, whose
+instructions the owner follows only where its own user asked. A child that read a hostile page can
+repeat what it read, and unmarked, that would reach the owner as a request. The transcript hides the
+tags. A turn the model refused reports its outcome as refused, not completed. A `delegation_report`
+context part names the child and links to it. The report queues behind whatever the owner is doing and never steers an active
 turn. The owner answers by calling `agent_prompt`, and that turn reports in its turn.
 
 The idempotency key `delegation-report:<child turn id>` makes delivery exactly-once. The trigger is
 the post-commit `turn-changed` broadcast, which every settle path already sends. It is not durable,
 so the startup reconcile pass looks for settled `reportTo` turns with no report and queues the
-missing ones. No report is queued in these cases:
+missing ones.
+
+When a delegated turn pauses on a pending permission, question, or elicitation request, the
+post-commit `request-changed` lifecycle event queues a separate informational report keyed by
+`delegation-request:<request id>`. It names the child, the request kind, and bounded request text,
+and links back to the child session. The parent can inspect the child, but a human resolves the
+request in the child pane; no agent tool grants approval or response authority. Only a direct managed
+owner whose turn carries `reportTo` receives this wake. Pending requests expire on restart, so the
+startup reconciliation pass remains limited to settled-turn reports.
+
+No report is queued in these cases:
 
 - The owner cancelled the turn itself with `agent_cancel`.
 - The owner session is archived or failed.
@@ -513,7 +651,10 @@ redundant report. A terminal owner has no session to wake and keeps using `agent
 
 The transcript labels a `delegation` turn "From" and the owner's title, and a `delegation_report`
 turn "From" and the child's title, using the matching context part
-(`plugins/agents/src/client/sessions/turnSender.ts`). Every other user turn is "You".
+(`plugins/agents/src/client/sessions/turnSender.ts`). A workflow step's prompt is "Workflow", and
+the turn acorn sends when a step's turn ended without its result is "Acorn"
+([workflow execution](./workflows/execution.md#a-turn-that-ends-early)). Every other user turn is
+"You".
 
 Message headers show a small time in the reader's device timezone, styled like the sender label.
 Hovering or focusing that time shows the full local date and time with its timezone and relative age.
@@ -542,7 +683,8 @@ type AgentWebAction =
   | { type: 'fetch_page'; url?: string; prompt?: string }
   | { type: 'other' }
 
-type AgentWebActivity = { action?: AgentWebAction; results?: AgentWebResult[] }
+type AgentWebStatus = { code: number; text?: string }
+type AgentWebActivity = { action?: AgentWebAction; results?: AgentWebResult[]; status?: AgentWebStatus }
 type AgentToolCall = { /* … */ web?: AgentWebActivity }
 ```
 
@@ -584,6 +726,15 @@ Claude reports no domain for a result and Codex does. The card reads the host of
 field is absent rather than storing a derived one, so the two read the same without the ledger
 carrying a second thing to keep true.
 
+**A fetched page's HTTP status is its own field**, read from `toolResponse.code` and `codeText`.
+Claude Code reports a 404 as a completed call whose result is a note saying the body was not
+retrieved, so without the status a missing page finishes with a green dot. The status sits beside
+the action rather than inside it, because it arrives on an update that carries no request and the
+fold replaces an action whole. The open card always shows it. The closed row shows it only outside
+2xx, in the warning tone, after the host. `toolResponse.url` is the requested URL even when the page
+redirects, so there is no final address to show, and the redirect target appears only in the
+provider's prose.
+
 **The payload is bounded twice before it reaches SQLite**, in `boundProviderEvent.ts`: every string
 and collection on its own, and then the whole payload against the 64 KiB the inline tool budget uses.
 Overflow drops trailing sources and only that. The per-field limits are chosen so the action fits
@@ -614,11 +765,82 @@ discarded it, and they keep rendering as the flat `Web search` row they always d
 files may still hold the payload, but they are private provider storage that can be pruned or live on
 another node, so a transcript read never touches `~/.codex` or `~/.claude`.
 
+## File changes
+
+A `file_change` event records what one step of the agent did to a file. Its `patch` is that file's
+unified hunks, from the first `@@` on with no file header, which is the shape GitHub returns and the
+diff rows parse. The exception is Codex's whole-turn diff: it has no `path`, and its `patch` is a
+multi-file git patch. The transcript draws the patch in place (see
+[client surfaces](./managed-agents/client-surfaces.md#client-surfaces)). The diff is what the step
+did when it ran, so a later step that changes the same lines leaves it as it was.
+
+```ts
+type FileChange = {
+  type: 'file_change'
+  path?: string
+  patch?: string
+  summary?: string
+  subagentId?: string
+  changeId?: string        // the tool call, Codex item, or `turn:<id>` this belongs to
+  snippet?: boolean        // the hunks count lines from an excerpt, not the file
+  patchArtifactId?: string // the patch went to this artifact instead
+}
+```
+
+**Agents report one edit more than once, so `changeId` names the edit.** The transcript keeps one row
+per change id and path, holding the latest report, in the place the first one opened. Codex streams
+`item/fileChange/patchUpdated` before the `fileChange` item completes, and re-sends `turn/diff/updated`
+with the whole turn's diff every time it grows. Claude sends an excerpt when an edit starts and the
+real hunks once it has run. So each edit is one row, and each turn has one whole-turn row showing the
+latest diff. The ledger stores each edit the same way: its first report, which fixes where the row
+sits, and its latest ([client surfaces](./managed-agents/client-surfaces.md) § The transcript store).
+
+Each driver builds the patch from what its provider sends:
+
+- **Codex** sends `changes: [{ path, kind: { type }, diff }]` on both the item and the patch update. For
+  an update, `diff` is already headerless hunks. For an added or deleted file it is the file's whole
+  text, which the normalizer turns into hunks. Before this, the patch update read `params.path` and
+  `params.patch`, which Codex never sends, so every one of those events was stored empty. The item
+  kept its paths only.
+- **ACP** diff blocks carry `path`, `oldText` and `newText`, which the normalizer turns into hunks with
+  the `diff` package. A missing `oldText` is a new file. ACP means the texts to be whole files, but
+  Claude's adapter sends the edit's `old_string` and `new_string` when the call starts, so their line
+  numbers count from the top of the excerpt. That change is marked `snippet`, and the thread leaves its
+  line numbers blank rather than guess. Once the edit has run, the adapter sends each real hunk as its
+  own block, with the hunk's first line as the matching entry of `locations`. Those hunks get their
+  real line numbers, and they replace the excerpt under the same change id.
+
+A patch over 64 KiB goes to an artifact, like large command output, and the event keeps
+`patchArtifactId` in place of the patch. Events stored before patches were kept have neither, and
+their row still opens Changes, as it always did.
+
 ## Client surfaces
 
 For the full contract, see [Managed agent client surfaces](./managed-agents/client-surfaces.md#client-surfaces).
 
 ## New-session defaults
+
+Inline diff chats are interactive managed sessions with a typed `origin` on the durable session row.
+The origin records the task, source, path, side, line, patch key, and original quote; a local origin
+also records staged or unstaged scope, while a PR origin records its repository and number. The
+Agents client capability supplies the compact diff card to Changes and GitHub without either plugin
+owning transcripts. The card draws the thread's chats-only view with the thread's own cards: the
+messages, and any question the agent asks, which the reader answers in place. Tool calls and other
+activity stay in the full session in Agents. The header leads with the session's state mark, the same
+one the sidebar draws. **Hide** folds a chat
+down to its header line, the way a resolved review thread folds, for the rest of the app session.
+The inline message field sends with the same commit chord as the agent thread: Command-Enter on
+macOS or Control-Enter on Windows and Linux. Enter alone inserts a newline.
+The task sidebar groups these sessions under Inline chats. A patch change
+detaches the card from the line while leaving the session and its original context available in
+Agents. The client marks a session stale once it has seen that diff's newer document.
+
+Inline chats have separate provider, model, and effort defaults in the existing session-defaults
+preference. Their sparkle picker opens above the send row with the provider and model choices beneath
+a Read only / Write access control. Each new chat starts with Read only selected. When the provider
+advertises a read-only permission profile, the requested profile is applied before the first turn;
+otherwise the card labels the choice best effort and asks the agent not to write. Write access is an
+explicit per-chat choice.
 
 A new session starts on the settings the owner last used, not on the provider's own choice. Switch
 Codex to a higher reasoning effort in one session and the next Codex session starts there.
@@ -628,12 +850,26 @@ when a session starts, so a default is a value keyed by the provider id and the 
 from. A harness added later is defaultable the moment it advertises anything, and a new kind of
 option, a fast mode say, needs no change on the acorn side to be remembered.
 
-One `prefs` row (`agents:session-defaults:v1`) holds four fields. `followLastSession`, on by
+One `prefs` row (`agents:session-defaults:v1`) holds seven fields. `followLastSession`, on by
 default, decides which of `last` and `pinned` applies. `last` is written by the runtime whenever a session's
-option changes, and `pinned` is written by the owner under Settings > Agent defaults. Neither writer
+option changes, and `pinned` is written by the owner under Settings > Harnesses and defaults. Neither writer
 sends the other's field, and the write merges server-side, so the Settings page cannot flatten a
 switch made while it was open. `continueAfterUsageLimit`, also on by default, controls the durable
-usage-window continuation described under Operations and failure.
+usage-window continuation described under Operations and failure. `stopIdleAfterMinutes`, 30 by
+default, is **Stop idle agents after** under an Idle agents heading: 15, 30, or 120 minutes, or 0 for
+Never. It is described under Operations and failure too. `keepArchivedHistoryDays`, 0 by default,
+is **Keep agent history for archived tasks** under an Archived tasks heading: 30, 90, or 365 days, or 0
+for Forever. It is described under Operations and failure as well. `inline` holds the inline chat
+choices above.
+
+Settings > Harnesses and defaults (`plugins/agents/src/client/settings/AgentSessionDefaultsSettings.tsx`)
+lists each harness the node declares and whether this machine can run it, then these fields. Its
+new-session rows say they seed new sessions only and name the control that changes an open one: the
+pickers in the session's composer, and `/mcp` for the servers a session starts with. The same page
+holds **Send task context at startup**, core's `startup_context_injection` preference, which decides
+whether an agent started in the terminal drawer is sent the task's pull request, linked issues, and
+notes. It moved from the Terminal page because it is part of what a session starts with. It also
+holds **Tool call display**, which is this device's and carries a **This device** chip.
 
 Both halves hang off `ManagedAgentRuntime`, which is where every path that opens a session and every
 path that changes one already meets:
@@ -670,16 +906,96 @@ The same page carries one setting that is not a session default and does not tra
 draws its tool cards (section Client surfaces). It is there because that is where somebody looks for
 it, not because it shares a store with anything above it.
 
+## Custom agents
+
+A custom agent is a saved start for a managed session: a harness, the provider options it starts on,
+text for its system prompt, and a ceiling on acorn's own tools. It shows up under **New** in the Agent
+pane, on the empty pane's cards, and in the command palette. Triggered workflows stay the tool for a
+job with several steps. A custom agent is one session with a known setup.
+
+The record is `CustomAgent` in `plugins/agents/src/shared/customAgents.ts`. Its options are the same
+`optionId -> value` table a session default is, because model, reasoning, and permission mode are all
+options a provider advertises about itself (§ New-session defaults). Nothing in the record names one.
+`maxToolRisk` is the highest risk of acorn tool the session may call, and like every ceiling it only
+narrows ([agent-tools.md](./agent-tools.md)).
+
+**Two feeders, one list.** The owner's own agents are one `prefs` row per user,
+`agents:custom-agents:v1`, beside every other agent setting. A plugin's are held in memory for as long
+as the plugin is enabled, and are never written anywhere (§ From a plugin). `GET
+/v1/p/agents/custom-agents` answers the owner's first, in order, then every plugin's. `POST`, `PUT
+/:id`, and `DELETE /:id` write the owner's and are device only, because an agent decides what a later
+session's system prompt says, and a task-scoped agent must not be able to write one. A plugin's agent
+refuses a write, and Settings offers **Duplicate** for it instead.
+
+**The node reads the agent, not the caller.** `POST /sessions` takes `customAgentId`, and
+`reserveSession` copies what the session keeps onto its `config`: a `customAgent` snapshot of id,
+name, glyph, and instructions, the agent's options as `requestedConfigOptions`, and its ceiling as
+`toolCeiling`. A `customAgent` a caller put in `config` itself is dropped, and an agent on a different
+harness from the one named is refused. The options go on after the owner's defaults, so an agent that
+names only a model still starts on the owner's reasoning level, and applying them does not write the
+owner's `last` values.
+
+**Drivers read the snapshot, never the live list.** Editing an agent changes the sessions started
+from it later, not the ones running, and a resumed session is told exactly what it was told at
+creation:
+
+- Claude Code appends the instructions to its system prompt through `acpSessionMeta`, ahead of the
+  unattended turn-ending text when both apply.
+- Codex sends them as `developerInstructions` on `thread/start` and `thread/resume`.
+- Any other harness has no system prompt acorn can reach. The generic driver sends the instructions
+  as an `<acorn-context>` block with source `context.agent.instructions`, ahead of the first prompt of
+  each provider session it creates, and never to one it picks back up. A compaction can drop them,
+  and the editor says so. A harness spec opts out of this with `systemPromptInstructions`.
+
+The session header draws a chip with the agent's name from the snapshot, so renaming or deleting the
+agent leaves it alone.
+
+**Settings > Custom agents** lists your agents with **Edit** and **Duplicate**, and a plugin's under
+**From plugins** with **Duplicate** only. An agent opens in the same pane, with the settings header
+naming it and a back link to the list. The editor saves on its button rather than on each change,
+unlike the rest of Settings, because an agent needs a name and a harness before it can exist, and it
+asks before you leave with changes. **Delete agent** sits in its danger zone and asks first. Its model,
+effort, and mode pickers are read off the newest session that advertised them, the same way Harnesses
+and defaults reads them, with the same limit: a harness you have not run inside the 50 most recent sessions shows no
+pickers until you run it again.
+
+**Another agent can start one by name.** `agent_spawn` takes `agent`, a name or an id
+([agent-tools.md](./agent-tools.md) § Managed-session orchestration). The lookup is by id first, then by name ignoring
+case.
+
+**Not built.** Tool servers from Settings > MCP servers, which wait for that list to exist, and a workflow step
+naming an agent in place of `profile` and `config_options`.
+
+### From a plugin
+
+A manifest declares agents in `contributions.customAgents`, up to eight: `{ id, name, glyph?,
+description?, harness, options?, instructions?, maxToolRisk? }`. Data only. It names no program and
+cannot bring a tool server, because a server is a program to run, which is what `agentTools` is for.
+
+Delivery is the harness seam's (§ Harnesses). The composition root carries the entries on the loaded
+plugin binding, and `node-core/server/pluginHost/host.ts` hands each one to the host-only
+`customAgents` facet after every init, which forwards to the `agents.customAgentRegistry` capability
+this plugin publishes. The host mints the id as `<pluginId>:<id>`, and qualifies `harness` when it
+names one of the manifest's own harnesses; any other harness id, such as `claude`, passes as written.
+A package that declares only agents or harnesses still gets a plugin row with an empty `init`, so the
+owner can turn it off (`contributesNodeData` in `node-core/server/plugins/manifest.ts`). A compiled
+plugin calls the capability itself.
+
+The instructions are the grant. They are text the plugin puts into the system prompt of every session
+an owner starts from the agent, so the trust prompt shows them in full under **Declared**, beside the
+context sections, and they are in the grant key, so a version that changes one word asks again.
+
 ## From the command palette
 
-Seven rows plus the open session's own actions, all registered by this plugin rather than by the
-shell.
+Seven rows, one more per custom agent, plus the open session's own actions, all registered by this
+plugin rather than by the shell.
 [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) covers how the palette runs a
 search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
 
 | Row | Kind | What it does |
 | --- | --- | --- |
-| New agent session | search, task-scoped | Lists the harnesses this node has installed, and starting one creates the session, selects it, and shows the Agent pane |
+| New agent session | search, task-scoped | Lists the harnesses this node has installed, then the custom agents on them, and starting one creates the session, selects it, and shows the Agent pane |
+| New *agent* session | action, task-scoped | One row per custom agent, so typing its name finds it without opening New agent session first. Desktop only |
 | Open Agent Center | action, no scope | Selects the `agents` rail source, which is this device's view of the node rather than a property of a task |
 | Find an agent session | search, task-scoped | The node's own search over session titles, events, and artifacts, asked about the task the palette session captured |
 | New Claude Code terminal | action, needs an open task | Creates a terminal on this plugin's `claude-code` profile, opens the drawer, and focuses it |
@@ -730,6 +1046,8 @@ quietly fail to persist is worse than an absent row.
 **The session's own actions are registered by the pane, for as long as the pane is drawn.** They need
 a selected session, which only the pane model has, and two of them — rename and archive — are dialogs
 the detail region draws, so a row offered while that region is unmounted would run and show nothing.
+Archive skips its dialog when there is nothing to lose: the session has no turns and its draft is
+empty, not counting the task context the composer attaches on its own (`sessionIsBlank`).
 Mounted is therefore the gate: you can reach these when you are looking at the run they are about.
 The pane model stays the only place the roster is written
 (`plugins/agents/src/client/sessions/agentPaneModel.ts` § `sessionActions`). Nothing is enumerated a
@@ -808,7 +1126,7 @@ what makes the agent receive the altered image.
 ## Operations and failure
 
 Only one turn dispatches per session. Workspace and provider ceilings bound concurrency, and the owner
-sets both under Settings > Agent concurrency. The provider ceiling is counted against one agent CLI
+sets both under Settings > Limits and cost. The provider ceiling is counted against one agent CLI
 across the whole node, which is what holds a single provider account to a few turns at once. The
 workspace ceiling is counted across all providers in one workspace. Both live in one `prefs` row
 (`agents:concurrency:v1`), read per scan rather than captured, so a raise applies to the scan the write
@@ -830,7 +1148,7 @@ operation. At the stored time the dispatcher sends the continuation prompt into 
 session; the attempt counter advances and the final provider completion settles the turn normally.
 
 The queue time survives a Node restart and the transcript says when Acorn will continue. The queued
-card shows the same time and may be removed by the owner. Settings > Agent defaults exposes
+card shows the same time and may be removed by the owner. Settings > Harnesses and defaults exposes
 `continueAfterUsageLimit`; turning it off leaves later limit errors on the ordinary failure path.
 Harnesses do not need a continuation-specific hook. A built-in or contributed harness gets this
 behavior when its normalized failure names the limit and its registered usage collector returns
@@ -846,6 +1164,111 @@ terminal; they continue to use the owner's Claude setting.
 Cancellation, timeout, provider disconnect, and restart are explicit states. A live stream can be
 lost without killing the provider process, and the client reattaches from the session sequence or
 terminal replay tail.
+
+A provider process runs until something stops it: the session is archived or deleted, its MCP servers
+change, it moves to a terminal, its task is archived, it sits idle past the owner's limit, or the node
+exits. Each one holds an agent CLI and its MCP servers, about 450 MB, and an idle Claude Code process
+grows over time. Archiving the task and the idle limit are the steps that keep them from piling up,
+because nothing else stops a session nobody will prompt again. The plugin handles core's
+`core:task-archiving` hook ([plugins/node-side-extension-points.md § Hooks](./plugins/node-side-extension-points.md#hooks)),
+which runs whether or not the owner ticked anything in the archive dialog. It runs before the worktree
+is removed, because a turn in progress is still writing into that folder. For each of the task's live
+sessions, `stopTaskSessions` in `runtimeEngine.ts` stops the process, marks an active turn
+`interrupted`, expires pending requests, and records `stopped` with "The provider process stopped when
+this task was archived. Restore the task and send a prompt to resume." That is the record a restart
+leaves, so nothing else changes. The sessions are not archived, and the archived task's Agent pane
+still reads them. After a restore, the next prompt resumes the session as it does after a restart.
+
+The idle limit is **Stop idle agents after** under Settings > Agents > Harnesses and defaults, 30
+minutes unless the owner picks 15 minutes, 2 hours, or Never. `stopIdleSessions` in `runtimeEngine.ts` runs every five
+minutes and reads the limit each time, so a change applies from the next sweep. It stops a live
+process only when all of these hold:
+
+- the process has started and is not being set up, stopped, or reconnected;
+- no turn is in flight and none is queued;
+- no request is waiting on the owner, because an approval or a question would be lost;
+- no background subagent is still running, because it lives inside the provider process;
+- nothing has come from the provider, and no turn has been dispatched or settled, for the whole limit.
+
+Idleness counts from that last event, not from the start. A `ready` session records `stopped` with
+"The provider process stopped after 30 minutes idle to free memory. Send a prompt to resume.", with
+the limit that applied. That is the same record a restart leaves, so the client shows it as resumable,
+and the next prompt starts the provider on the same conversation: Claude Code through `session/load`
+on the stored reference, Codex through `thread/resume` on the stored thread. A `failed` session's
+process is stopped too, since a turn error leaves it running, but nothing is recorded, so the failure
+still shows. The next prompt restarts a failed session anyway.
+
+Delegated children and workflow sessions get no exception. A delegation report, an `agent_prompt`,
+and a workflow step all reach a session through `enqueueTurn`, which resumes a stopped one. A workflow
+gate is a pending request, so it keeps its session. An idle child that has been stopped no longer
+counts toward a delegation tree's 12 live descendants, the same as after a restart.
+
+Settings > Storage and memory shows the agents on the node and offers the same stop without the
+wait. The agents plugin draws its own section into core's `core:storage` point
+(`client/settings/AgentStorageSection.tsx`), and reads `GET /v1/p/agents/footprint`, which answers
+`AgentFootprint`: how many provider processes are running, how many the rules above would stop now,
+their memory, and the size of the `agent-objects` and `agent-artifacts` folders. Memory is the resident
+memory of each session's process tree, the provider child and every process under it, MCP servers
+included. The engine keeps each child's process id on its driver handle (`pid` on
+`AgentDriverSession`), lists every process once with `ps -A -o pid=,ppid=,rss=`, and walks down from
+those ids (`server/sessions/footprint.ts`). Resident memory counts shared pages in every process and
+misses compressed ones on macOS, so the page says "about". Where `ps` fails, or on Windows, the counts
+are shown without memory. The folder sizes are measured at most every 30 seconds. **Stop idle agents
+now** is `POST /v1/p/agents/stop-idle`, which runs `stopIdleSessionsNow`: the same rules through the
+same code as the sweep, with no time limit and whatever the owner's limit is, Never included. A
+`ready` session records "The provider process was stopped from Settings to free memory. Send a prompt
+to resume." Both routes are device only, because they reach every task's agents. The section links to
+Harnesses and defaults, where the idle limit and history retention are set.
+
+The sweep is a timer the engine owns, not a node schedule
+([schedules.md § What deliberately is not a schedule](./schedules.md#what-deliberately-is-not-a-schedule)).
+What it sweeps is the engine's map of live processes, which exists only in this process, and the
+owner's control is the setting above rather than a schedule row. The timer is armed by the first
+provider start and cleared by `stop()` with the other engine timers.
+
+**An archived task can give up its agent history, when the owner chooses.** Nothing else deletes a
+session's events, and they are most of `plugins/agents.sqlite`. **Keep agent history for archived
+tasks** under Settings > Agents > Harnesses and defaults is Forever unless the owner picks 30 days,
+90 days, or 1 year.
+The `agents:archived-history-prune` schedule runs daily at 03:50 and does nothing while it is Forever
+([schedules.md § What is registered](./schedules.md#what-is-registered)). Otherwise it asks core for
+the tasks archived longer than the limit, through `ctx.core.tasks.archivedBefore`, and removes the
+history of each of their sessions. A restore clears a task's archive date, so a restored task is never
+in that list, and neither is an active one.
+
+History means everything the session owns except its row: its events and their search rows, its turns
+and requests, the attachment references its turns hold, and its artifacts. Attachments and artifact
+files nothing else references are then deleted from disk. The row stays, with one diagnostic event in
+place of the transcript: "Acorn removed this session's history because its task had been archived for
+more than 90 days." It is marked with `history_removed_at`, which is what makes a second run a no-op.
+The row is kept, rather than deleted the way **Delete** deletes a session, for four reasons:
+
+- The archive page previews an archived task through its Agent pane, and a restored task opens the
+  same pane. Without the row, a pruned task would look as if it never had an agent. With it, the pane
+  lists the session and the note says what happened.
+- Other rows name the session by id: core's task pull relations, the delegation ledger, workflow
+  steps, terminal handoffs, and memory proposals. They stay valid.
+- The provider's own conversation is untouched. Deleting it would mean starting each session's CLI,
+  which is what **Delete** does and what an unattended pass should not. So a restored task can still
+  prompt the session, and the agent remembers what the transcript no longer shows.
+- The row is small. The events are what take the space.
+
+The pass never touches a session with a provider process in this node or a turn being dispatched or
+running. It leaves those for a later run. The database is synchronous, so the pass works in steps: each
+step is one transaction deleting 200 of a session's oldest events, and the node gets a turn between
+steps. On 20,000 synthetic tool rows of about 2 KB, a step took a median of 7 ms. When a session's
+events are gone, one last transaction removes its turns, requests, attachment references and
+artifacts, writes the note, and marks the row. Core is asked for the list of tasks again before every
+step, and nothing yields between that answer and the write, so a task restored part-way through keeps
+whatever it still has. The run stops itself after four minutes, inside the scheduler's 300-second
+ceiling, and the next day's run carries on. When it has deleted anything it merges the search index,
+as the ledger compaction does. The file keeps its size; see
+[data-layer.md § Retention](./data-layer.md#retention).
+
+A window that has a pruned session open keeps the events it already drew until it reloads, because a
+reader resumes after its mark and the pass deleted rows below it. The note arrives as an ordinary
+event, and a reload shows only the note. The pass sends no delete frame, because the session still
+exists.
 
 Only a turn moves a session into `working`. A harness can stream past the prompt call it was
 answering, and `turn_completed` fires only as that call's return value, so an event carrying no turn

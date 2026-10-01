@@ -6,6 +6,9 @@
 // boundary.
 
 export const HELPER_PROTOCOL = 1
+// Incoming JSON requests include base64 bodies; 16 MiB leaves room for an 8 MiB body and its
+// envelope. Replies have a separate 64 MiB HTTP-body ceiling in custody, before base64 encoding.
+export const MAX_HELPER_REQUEST_BYTES = 16 * 1024 * 1024
 
 // Every call is request and reply, including the ones the seam types as void. One code path is worth
 // more than the bytes a fire-and-forget notification saves, and a reply is what lets a caller see
@@ -28,8 +31,14 @@ export type HelperMethod =
   | 'node-tunnel-close'
   | 'plugins-state'
   | 'plugins-cache-put'
+  | 'plugins-install'
+  | 'plugins-remove'
   | 'plugins-trust-record'
+  | 'plugins-trust-forget'
   | 'plugins-dev-grant'
+  | 'config-read'
+  | 'config-write'
+  | 'config-location'
 
 export type HelperRequest = { id: number; method: HelperMethod; params: unknown }
 export type HelperReplyTiming = {
@@ -53,6 +62,7 @@ export type HelperPush =
   | { push: 'node-status'; status: unknown }
   | { push: 'node-replaced' }
   | { push: 'node-transport-error'; nodeId: string; error: import('@acorn/protocol/broker.ts').NodeTransportError }
+  | { push: 'config-changed'; state: unknown }
 
 export type HelperMessage = HelperReply | HelperPush
 
@@ -109,5 +119,6 @@ export type WireFetchRequest = {
   headers?: Record<string, string>
   body?: WireFetchBody
   timeoutMs?: number
+  maxResponseBytes?: number
 }
 export type WireFetchResponse = { status: number; headers: Record<string, string>; body: string }

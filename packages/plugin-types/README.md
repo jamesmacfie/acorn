@@ -42,7 +42,7 @@ your manifest at it and every contribution array is validated as you type:
   "name": "My widget",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "1"
+  "apiVersion": "2"
 }
 ```
 
@@ -76,10 +76,10 @@ drizzle handle behind `ctx.storage.open()`. The manifest-carried `PluginAgentToo
 exported here without adding a runtime dependency. The rest of the surface is exact, and a test in
 the acorn repository fails if it drifts.
 
-`apiVersion` is a range over plugin API majors. The minimum/current major for agent-tool and context
-descriptors is `"12"`; write `"12"`, or `"11 || 12"` only after checking a plugin that does not use
-those keys against both. These descriptor keys are an additive API-11 change, so the major did not
-move: the compatibility promise permits additions and forbids removing an API-11 name.
+`apiVersion` is a range over plugin API majors. This host speaks major `2`; write `"2"` for a plugin
+tested against it. A range such as `"1 || 2"` covers both majors, but declare one only after testing
+the plugin against each included host. Additive descriptor fields do not change the major; removing a
+published field does.
 
 ## Related
 

@@ -1,6 +1,6 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Disposable } from '../../../kit/lib/registry'
+import type { Disposable } from '../../../kit/lib/state/registry'
 import { closeRefPanel, openRefPanel, refPanelRegistry, type RefPanelProps, type RefPanelTarget } from './refPanels'
 import { RefPanelHost } from './refPanelHost'
 

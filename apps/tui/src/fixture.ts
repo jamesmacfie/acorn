@@ -1,5 +1,6 @@
 import type { Task } from '@acorn/protocol/api.ts'
 import type { NoteSummary } from '@acorn/protocol/notes.ts'
+import { documentTopology, fileDocument, type DiffDocumentTopology, type DiffSegmentPayload } from '@acorn/diff-document/document'
 
 // One task and three notes, as the node would answer them. Shared by the smoke test and the capture
 // script (`pnpm --filter @acorn/tui capture`), which is how this package gets a screenshot on a machine
@@ -137,6 +138,13 @@ const AGENT_SESSIONS = [{
   updatedAt: 0,
 }]
 
+const agentSessions = () => process.env.ACORN_FIXTURE_CODEX_PLAN
+  ? [{ ...AGENT_SESSIONS[0]!, kind: 'interactive', driverKind: 'codex-app-server',
+      providerId: 'codex', profileId: 'codex', runtimeState: 'ready',
+      config: { configOptions: [{ id: 'mode', label: 'Mode', category: 'mode', currentValue: 'plan',
+        values: [{ value: 'plan', label: 'Plan' }, { value: 'default', label: 'Default' }] }] } }]
+  : AGENT_SESSIONS
+
 // One turn, a prompt, an answer, a tool card and an approval still waiting: the four things the sweep
 // has to see on the agents transcript (docs/tui.md).
 const AGENT_TURN = {
@@ -198,8 +206,23 @@ const agentWebActivity = () => (process.env.ACORN_FIXTURE_WEB_ACTIVITY
   })]
   : [])
 
-const agentSnapshot = () => ({
-  session: AGENT_SESSIONS[0],
+const agentSnapshot = () => process.env.ACORN_FIXTURE_CODEX_PLAN ? ({
+  session: agentSessions()[0],
+  turns: [{ ...AGENT_TURN, source: 'interactive', status: 'completed',
+    effectivePolicy: { mode: 'plan' }, providerTurnRef: 'codex-turn-1', stopReason: 'completed' }],
+  events: [
+    event(1, { type: 'request', requestId: 'question-1', kind: 'question', title: 'Shall I plan it?' }),
+    event(2, { type: 'tool', tool: { id: 'tool-1', title: 'Write src/login.ts', status: 'completed' } }),
+    event(3, { type: 'plan', entries: [{ id: 'step-1', text: 'Inspect code', status: 'completed' }] }),
+    event(4, { type: 'plan_proposal', itemId: 'plan-1', providerTurnId: 'codex-turn-1',
+      text: '1. Update the API\n2. Test the UI' }),
+    event(5, { type: 'turn_completed', stopReason: 'completed' }),
+  ],
+  requests: [{ id: 'question-1', sessionId: 'session-1', turnId: 'turn-1', providerRequestId: 'question-1',
+    kind: 'question', status: 'resolved', title: 'Shall I plan it?', detail: null, payload: {},
+    resolution: { answers: { go: 'Yes, plan it' } }, expiresAt: null, createdAt: 0, resolvedAt: 0 }],
+}) : ({
+  session: agentSessions()[0],
   turns: [AGENT_TURN],
   events: [
     ...agentFiller(),
@@ -281,7 +304,7 @@ const PULL_REF = { owner: 'runn-fast', repo: 'acorn', number: 42 }
 
 /** How many pull requests the browse list answers with. One, unless a test asks for more: a list
  *  longer than the panel it draws in is its own case — the window, the scrollbar, and the panels
- *  below it staying on the screen (./panel.tsx, ./kit/showing.tsx § Rows). */
+ *  below it staying on the screen (./panel.tsx, ./kit/showing/collection.tsx § Rows). */
 const pulls = () => {
   const count = Number(process.env.ACORN_FIXTURE_PULLS ?? 1)
   return count > 1
@@ -348,9 +371,32 @@ const pullFiles = () => {
 }
 
 const PULL_FILES = [
-  { path: 'src/login.ts', status: 'modified', additions: 12, deletions: 3, sha: 'a', viewed: false, patch: LOGIN_PATCH },
-  { path: 'src/session.ts', status: 'modified', additions: 4, deletions: 0, sha: 'b', viewed: false, patch: null },
+  { path: 'src/login.ts', status: 'modified', additions: 12, deletions: 3, sha: 'a', viewed: false, position: 0, patchState: 'available', patchKey: 'sha256:login', patch: LOGIN_PATCH },
+  { path: 'src/session.ts', status: 'modified', additions: 4, deletions: 0, sha: 'b', viewed: false, position: 1, patchState: 'unavailable', patchKey: null, patch: null },
 ]
+
+type FixtureFile = { path: string; status: string | null; additions: number | null; deletions: number | null; sha: string | null; patch: string | null }
+
+/** Files as a diff document, cut the way a provider's node cuts one, and every segment of it. The stub
+ *  transport sees no request body, so a segments request is answered with all of them and the viewer
+ *  keeps the ones it asked for. Exported for the kit's own DiffPane case. */
+export function fixtureDocument(files: readonly FixtureFile[]): { topology: DiffDocumentTopology; segments: DiffSegmentPayload[] } {
+  const segments: DiffSegmentPayload[] = []
+  const topology = documentTopology(files.map((file, index) => {
+    const doc = fileDocument(file.path, file.patch)
+    const patchKey = file.patch ? `fixture:${index}:${file.patch.length}` : null
+    doc.segments.forEach((rows, ordinal) => segments.push({ path: file.path, patchKey: patchKey!, ordinal, rows }))
+    return { path: file.path, status: file.status, additions: file.additions, deletions: file.deletions, sha: file.sha, viewed: false, patchKey, segments: doc.descriptors }
+  }))
+  return { topology, segments }
+}
+
+/** The working tree's one patch, as the Changes node answers a document: per file, the digest and the
+ *  cut, and only for the files it has a patch for. */
+const localDocument = () => {
+  const { topology, segments } = fixtureDocument([{ path: 'src/login.ts', status: 'modified', additions: 2, deletions: 1, sha: 'unstaged', patch: PATCH.slice(PATCH.indexOf('@@')) }])
+  return { files: topology.files.map(({ path, patchKey, segments: cut }) => ({ path, patchKey, segments: cut })), segments }
+}
 
 const EDITOR_ENTRIES = [
   { name: 'src', dir: true },
@@ -414,6 +460,14 @@ const json = (value: unknown) => ({
       // sources that need no provider and the Browse panel has nothing to draw. The pull routes below
       // were always answered here; this is the row that lets a reader reach them.
       if (path === '/v1/core/prefs') return json({})
+      // Compiled client contributions now require the node's running roster. The fixture mirrors
+      // the built-in services its pane routes below represent; there are no loaded client bundles.
+      if (path === '/v1/core/plugins') return json({
+        restartRequired: false,
+        requests: [],
+        plugins: ['agents', 'browser', 'changes', 'docker', 'editor', 'github', 'memory', 'notes', 'preview', 'terminal', 'workflows']
+          .map((name) => ({ name, required: false, disabled: false, running: true, state: 'active', active: null })),
+      })
       if (path === '/v1/core/integrations') return json({ integrations: [GITHUB_INTEGRATION], providers: [] })
       if (path === '/v1/core/workspaces') return json([
         { id: 'ws-1', name: 'acorn', projects: [{ id: 'project-1', name: 'acorn' }, { id: 'project-2', name: 'sibling' }] },
@@ -432,6 +486,10 @@ const json = (value: unknown) => ({
         { id: 'rotate', title: 'Rotate the signing key' },
         { id: 'copy', title: 'Password reset copy' },
       ] })
+      if (path === '/v1/p/probe/task-items') return json({ items: [
+        { id: 'first', title: 'First incident', task: { title: 'First incident' } },
+        { id: 'second', title: 'Second incident', task: { title: 'Second incident' } },
+      ] })
       if (path === '/v1/core/projects') return json({
         projects: [PROJECT, OTHER_PROJECT, ...(process.env.ACORN_FIXTURE_SECOND_WORKSPACE ? [SECOND_PROJECT] : [])],
       })
@@ -445,16 +503,17 @@ const json = (value: unknown) => ({
       // whether a reader can find the thing the pane is for in 24 rows — and a pane showing one
       // `Alert` reads the same however unreadable the real thing is.
       if (path === '/v1/p/agents/providers') return json(AGENT_PROVIDERS)
-      if (path.startsWith('/v1/p/agents/sessions?')) return json({ sessions: AGENT_SESSIONS, delegations: [], nextCursor: null })
+      if (path.startsWith('/v1/p/agents/sessions?')) return json({ sessions: agentSessions(), delegations: [], nextCursor: null })
       // Before the snapshot line, which is `/sessions/:id?…` and would otherwise claim this: `search`
       // reads as a session id, and the caller would get a snapshot object where it expects an array
       // and throw inside `found.map` (plugins/agents/src/client/commands.ts § agents.sessions.find).
-      if (path.startsWith('/v1/p/agents/sessions/search?')) return json(AGENT_SESSIONS)
+      if (path.startsWith('/v1/p/agents/sessions/search?')) return json(agentSessions())
       if (/^\/v1\/p\/agents\/sessions\/[^/]+\?/.test(path)) return json(agentSnapshot())
       if (path.startsWith('/v1/p/agents/sessions/') && path.includes('/events')) return json({ events: [], nextCursor: null })
       if (path === `/v1/p/changes/tasks/${TASK.id}/local/status`) return json(LOCAL_STATUS)
       if (path === `/v1/p/changes/tasks/${TASK.id}/review-notes`) return json([])
-      if (path.startsWith(`/v1/p/changes/tasks/${TASK.id}/local/diff`)) return json({ patch: PATCH })
+      if (path === `/v1/p/changes/tasks/${TASK.id}/local/document`) return json({ files: localDocument().files })
+      if (path === `/v1/p/changes/tasks/${TASK.id}/local/document/segments`) return json(localDocument().segments)
       if (path.startsWith(`/v1/core/tasks/${TASK.id}/context`)) return json(TASK_CONTEXT)
       if (path === `/v1/p/workflows/tasks/${TASK.id}/workflows/runs`) return json([])
       if (path === `/v1/p/editor/tasks/${TASK.id}/editor/root`) return json({ root: TASK.worktreePath })
@@ -465,7 +524,11 @@ const json = (value: unknown) => ({
       // Any number, not only 42, so a test that walks a long list gets a loaded detail on every row
       // rather than "Not found" on all but the first.
       if (/^\/v1\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+$/.test(path)) return json(PULL_DETAIL)
-      if (/^\/v1\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+\/files/.test(path)) return json(pullFiles())
+      // Every GET on the files route answers with the list and whether it is all of them, and the diff
+      // route with the same files as a document (plugins/github/src/shared/api.ts § PullDiffResponse).
+      if (/^\/v1\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+\/files/.test(path)) return json({ files: pullFiles(), completeness: { kind: 'complete' } })
+      if (/^\/v1\/p\/github\/repos\/runn-fast\/acorn\/pulls\/\d+\/diff$/.test(path)) return json({ document: fixtureDocument(pullFiles()).topology, completeness: { kind: 'complete' } })
+      if (path === '/v1/p/github/repos/runn-fast/acorn/diff/segments') return json(fixtureDocument(pullFiles()).segments)
       if (path.startsWith('/v1/p/github/repos/runn-fast/acorn/pulls?')) return json(pulls())
       if (path === '/v1/p/github/repos/runn-fast/acorn/labels') return json([])
       if (path === '/v1/p/github/repos/runn-fast/acorn/mentions') return json([])

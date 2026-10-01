@@ -16,7 +16,7 @@ import type { Node } from './tree/node'
 //
 // **The cache is here rather than in `./layout/measure.ts`, and the reason is a byte count.** That
 // module imports `MeasureMode` from `yoga-layout`, which is a runtime value, so a static import of it
-// from `./kit/asking.tsx` — which `./main.tsx` reaches eagerly — put the whole own-painter layout
+// from `./kit/asking/fieldRef.ts` — which `./main.tsx` reaches eagerly — put the whole own-painter layout
 // module and Yoga's wasm binary into the startup closure of the *OpenTUI* build: 41 KB of chunk and an
 // `await loadYoga()` before the first frame, in a build that never lays a node out with it. Same trap
 // `./keyEvent.ts` exists to avoid, one module over (`../scripts/check-startup-graph.mjs`).
@@ -119,7 +119,7 @@ const cache = new WeakMap<Node, Wrapped>()
  *
  * Three readers want this answer and they must not disagree: Yoga asks a `textarea` how tall it is
  * (`./layout/measure.ts § measureField`), paint asks which characters go on which row, and
- * `./kit/asking.tsx` asks which row the caret is on so that Up and Down can move between them. A
+ * `./kit/asking/fieldRef.ts` asks which row the caret is on so that Up and Down can move between them. A
  * second wrap anywhere would draw a caret on a row the reader is not looking at.
  *
  * Which is also why the rows are held beside the model rather than rebuilt per frame: a wrap of a
@@ -131,7 +131,7 @@ const cache = new WeakMap<Node, Wrapped>()
  * reconciler patches, so something has to tell the cache. A field's are one prop this function reads
  * on the way in, so a value that changed is a key that does not match. What the component still owes
  * is `markDirty` on the Yoga node, because Yoga will not call a measure function it does not think is
- * stale (./kit/asking.tsx § fieldRef).
+ * stale (./kit/asking/fieldRef.ts § fieldRef).
  */
 export function measuredField(node: Node, limit: number): Wrapped {
   const text = typeof node.props.value === 'string' ? node.props.value : ''

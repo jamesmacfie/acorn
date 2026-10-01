@@ -32,12 +32,13 @@
 // The default target is the development data root. `--package-root` is the generic staging seam used
 // by the desktop build: the same validated package shape is copied into application resources and
 // reconciled into the writable data root on boot.
-import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { builtinModules } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { build } from 'vite'
 import solid from 'vite-plugin-solid'
+import { runPnpm } from '../../../scripts/run-pnpm.mjs'
 
 const NODE_APP = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ROOT = resolve(NODE_APP, '../..')
@@ -97,6 +98,7 @@ if (!configPath || !existsSync(configPath)) {
 // The directory name IS the plugin id — it binds the `/v1/p/<id>` namespace, provider ids and task
 // origins, which is why the config file does not carry a second copy to disagree with.
 const spec = (await import(pathToFileURL(configPath).href)).default
+const pluginPackage = JSON.parse(readFileSync(join(PLUGINS_DIR, id, 'package.json'), 'utf8'))
 const packageRootIndex = args.indexOf('--package-root')
 const packageRoot = packageRootIndex === -1 ? null : args[packageRootIndex + 1]
 if (packageRootIndex !== -1 && !packageRoot) throw new Error('--package-root requires a directory')
@@ -104,7 +106,13 @@ if (packageRootIndex !== -1 && !packageRoot) throw new Error('--package-root req
 // Matches server/storage/paths.ts's dev root, and honours the same override the node itself reads.
 const dataRoot = process.env.ACORN_DATA_DIR || join(NODE_APP, '.acorn')
 const outDir = join(packageRoot ? resolve(packageRoot) : join(dataRoot, 'plugins'), id)
-// Imported, not scraped. This used to be a regex over the source text of packages/protocol/src/api.ts,
+// A workspace SDK resolves through its generated dist exports, unlike the source-consumed @acorn
+// packages. Build it before Vite follows a client import, including for direct build:plugin calls
+// and the integration tests that invoke this script without desktop staging.
+if (pluginPackage.dependencies?.['acorn-plugin-sdk']?.startsWith('workspace:')) {
+  runPnpm(['--filter', 'acorn-plugin-sdk', 'build'], { cwd: ROOT, stdio: 'inherit' })
+}
+// Imported, not scraped. This used to be a regex over the source text of packages/protocol/src/transport/api.ts,
 // because a .mjs script cannot import a built package — but it can import a .ts file with nothing in it
 // but one const, which is why pluginApiVersion.ts exists.
 //
@@ -130,13 +138,14 @@ if (!baseline) throw new Error('The Acorn baseline is unavailable')
 // does. Client-only and descriptor-only plugins need no stand-in: their absence of a node half is a
 // real manifest capability, not a reason to manufacture an empty lifecycle.
 //
-// One directory per plugin id, because the cleanup below removes the directory whole: two builds
-// running at once used to share `.plugin-build`, and the first to finish deleted the other's entry.
-const entryDir = join(NODE_APP, '.plugin-build', id)
+// A private directory per invocation. Desktop staging and a Node integration test can build the
+// same plugin concurrently; cleanup must not remove the other build's temporary entry.
+const scratchRoot = join(NODE_APP, '.plugin-build')
+mkdirSync(scratchRoot, { recursive: true })
+const entryDir = mkdtempSync(join(scratchRoot, `${id}-`))
 const entryFile = join(entryDir, `${id}.js`)
 if (spec.entry) {
   if (!spec.factory) throw new Error(`${id} declares a node entry but no factory`)
-  mkdirSync(entryDir, { recursive: true })
   writeFileSync(entryFile, `import { ${spec.factory} } from '${spec.entry}'\nexport default ${spec.factory}()\n`)
 }
 // A descriptor-only package has no Vite build to create its directory. Clear the previous package
@@ -228,7 +237,7 @@ if (spec.migrations) {
   cpSync(source, join(outDir, 'migrations'), { recursive: true })
 }
 
-const { version } = JSON.parse(readFileSync(join(PLUGINS_DIR, id, 'package.json'), 'utf8'))
+const { version } = pluginPackage
 writeFileSync(
   join(outDir, 'acorn-plugin.json'),
   `${JSON.stringify({

@@ -1,11 +1,13 @@
 # Agent messaging
 
-Status: proposal, 2026-09-24. The report back to the owner, the per-turn role note, and the sender
-labels shipped on 2026-09-24. The wake on a blocked request and the children row remain.
+Status: delivered, 2026-09-26. The report back to the owner, per-turn role note, and sender labels
+shipped on 2026-09-24. The blocked-request wake and live children rows shipped on 2026-09-26.
+Merging queued reports remains optional until real use shows separate reports are noisy.
 
 An orchestrator agent in a main task spawns child tasks, and then it needs to talk to the agents in
 them. Acorn shipped the parent-to-child half first: `agent_spawn`, `agent_prompt`, `agent_wait`,
-`agent_read`, and `agent_cancel`. This file sketched the other half and holds what is still to build.
+`agent_read`, and `agent_cancel`. This file records the delivery decisions and the optional work
+still under consideration.
 
 Owning docs win where this disagrees with them.
 [agent-tools.md](../agent-tools.md#managed-session-orchestration) holds the five orchestration tools,
@@ -69,23 +71,29 @@ Two rules changed on the way:
 - Past 100 reports, the node logs a warning and stops queuing reports for that owner. The sketch
   called for a notice on the root task, which would need the notice plumbing for one rare case.
 
-## What is left
+## Delivery and optional follow-up
 
 ### Wake the owner when a child is blocked
 
-A child that stops on a permission, question, or elicitation request doesn't settle its turn, so no
-report goes out. Queue a report keyed by the request ID that tells the owner which child is blocked
-and on what. The human answers the request in the child's pane. The owner is told, but it can't
-approve, because one agent approving another's tool use widens what that agent can do. Pending
-requests expire at restart, so this needs no startup pass.
+Delivered 2026-09-26.
+
+A child that stops on a permission, question, or elicitation request doesn't settle its turn, so the
+post-commit request event queues a separate report keyed by the request ID. It tells the owner which
+child is blocked and on what. The human answers the request in the child's pane. The owner is told,
+but it can't approve, because one agent approving another's tool use widens what that agent can do.
+Pending requests expire at restart, so this has no startup pass.
 
 ### A row per child above the composer
 
-The Agent pane nests managed children under their parent. Above the owner's composer, add one row
-per live child with its state and attention, and let a click open the child's task. Build it from
-the lineage projection the session list already has.
+Delivered 2026-09-26.
+
+The Agent pane nests managed children under their parent. Above the owner's composer, one row per
+live child shows its state and attention, and activation opens the child's task. The rows use the
+lineage projection the session list already has.
 
 ### Merge reports that queue together
+
+Deferred. Separate reports retain provenance for a tree of at most 12 children.
 
 When several children finish while the owner is busy, each queues its own report. `patchQueuedTurn`
 can edit a queued turn's input, so these could merge into one. At 12 children at most, separate
@@ -104,14 +112,15 @@ reports are acceptable until someone finds them noisy.
 - Steering a report into an active turn.
 - A parent approving a child's permission request.
 
-## Verify before building
+## Implementation seams
 
-- Where a request row is written, so the blocked-request report can hook the same post-commit
-  `request-changed` broadcast the turn report uses (`AgentLifecycle.announceRequest` in
+- A request row is written before the blocked-request report hooks the post-commit
+  `request-changed` broadcast (`AgentLifecycle.announceRequest` in
   `plugins/agents/src/server/sessions/lifecycle.ts`).
 - That the report turn source, `delegation_report`, sorts behind interactive turns in the pump, as
   `delegation` does.
-- The terminal client's rendering of a user turn, if it ever stops sharing `AgentEventCard.tsx`.
+- The terminal client shares `AgentEventCard.tsx`; revisit its sender projection if it stops sharing
+  that component.
 
 ## Left open
 

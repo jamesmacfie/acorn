@@ -101,7 +101,9 @@ export const workflowApi = {
   defs: (taskId: string) => readJson<Defs>(workflowTaskDefsRoute(taskId)),
   runs: (taskId: string) => readJson<WorkflowRunProjection[]>(workflowRunsRoute(taskId)),
   steps: (runId: string, at: At = {}) => readJson<WorkflowStepProjection[]>(workflowStepsRoute(runId), at),
-  gate: (runId: string, stepId: string, approved: boolean) => post<{ ok: boolean }>(workflowGateRoute(runId), { stepId, approved }),
+  // A 409 means another device answered first, and a 400 names each form field the node refused.
+  gate: (runId: string, stepId: string, approved: boolean, values?: Record<string, DataValue | undefined>) =>
+    post<{ ok: boolean }>(workflowGateRoute(runId), { stepId, approved, ...(values ? { values } : {}) }),
   cancel: (runId: string) => writeJson<{ ok: boolean }>(workflowCancelRoute(runId), { method: 'POST' }),
   kill: (runId: string, stepId: string) => post<{ ok: boolean }>(workflowKillRoute(runId), { stepId }),
   // A failed or safety-railed node, back to pending, and the run back to running. Device-only on the

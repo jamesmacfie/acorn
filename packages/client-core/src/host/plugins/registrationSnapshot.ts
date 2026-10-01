@@ -12,7 +12,7 @@ const canonical = (value: unknown): unknown => {
 
 export const registrationSnapshot = (entry: EligiblePlugin): string => {
   const { version, apiVersion, unknown, permissions, contributions, emits, icon, icons, client } = entry.installed
-  return JSON.stringify(canonical({ hash: entry.hash, trusted: entry.trusted,
+  return JSON.stringify(canonical({ hash: entry.hash, trusted: entry.trusted, inactive: entry.inactive === true,
     installed: { version, apiVersion, unknown, permissions, contributions, emits, icon, icons, client: client?.hash ?? null },
   }))
 }

@@ -13,7 +13,7 @@ disk and the client registers contributions from the same shape. Its top-level k
 | `name` | yes | Display name, 1–120 characters. |
 | `version` | yes | Free-form string, 1–64 characters. Compared on update by the installer's downgrade guard. |
 | `baseline` | yes | Exactly `"acorn-1"`. A missing or different marker is rejected before the plugin runs, including on an old API-1 package. |
-| `apiVersion` | yes | A range over plugin API majors that has to cover this node's current major, `"1"` (`packages/protocol/src/plugin/apiVersion.ts`). Anything the range does not cover is a failed roster row with both versions in its reason. |
+| `apiVersion` | yes | A range over plugin API majors that has to cover this node's current major, `"2"` (`packages/protocol/src/plugin/apiVersion.ts`). Anything the range does not cover is a failed roster row with both versions in its reason. |
 | `icon` / `icons` | no | One SVG path `d` string, or a map of them, authored in a 24×24 box. Not an SVG document — a document would mean `<script>`, `<use href>`, `on*` handlers and an allowlist parser, for a logo. Registered as `brand:<id>` and `brand:<id>/<key>` and nameable as any contribution's `glyph`. |
 | `node` | no | Relative path to the ESM entrypoint the node imports. Omit it for a client-only or descriptor-only plugin. |
 | `client` | no | Relative path to the single client file. Omit it for a plugin that ships only descriptors and document surfaces — it then has no bytes to trust and no trust prompt. |
@@ -103,8 +103,8 @@ host cannot draw.
 
 | Key | Cap | What it declares |
 | --- | --- | --- |
-| `frames` | 32 | A surface your client file draws: `pane` (task- or project-scoped), `refPanel`, `settings`, `importer`, `webview`, `overlay`, `coreSlot`. A `pane`, a `refPanel` and a `settings` surface **must** name a `layout` and its `regions`; a region is a tree (`{ "kind": "remote", "entry": "…" }`), a rectangle (`"frame"`), or a host-drawn document. A `list-detail` pane may set `collapsible: true`; loaded panes collapse to an empty rail with the host-owned expand control because their worker cannot read host collapse state to author compact rows. A task pane may set `showInSwitcher: false` when it is deliberately command-only; it remains a valid layout and `openPane` target. Set `readsArchived: true` only when a task pane reads stored history without a worktree and disables actions that would start work; the field opts the pane into the archived-task preview and its right rail. This is also where a pane declares `claimsKeys` and up to eight cooperative `destinations`, and where a `coreSlot` surface names the core surface that it offers to replace. |
-| `sources` | 8 | A rail source. Rows come from a route on your node half; the host draws them and executes the `onSelect` verb. |
+| `frames` | 32 | A surface your client file draws: `pane` (task- or project-scoped), `refPanel`, `settings`, `importer`, `webview`, `overlay`, `coreSlot`. A `pane`, a `refPanel` and a `settings` surface **must** name a `layout` and its `regions`; a region is a tree (`{ "kind": "remote", "entry": "…" }`), a rectangle (`"frame"`), or a host-drawn document. A `list-detail` pane may set `collapsible: true`; loaded panes collapse to an empty rail with the host-owned expand control because their worker cannot read host collapse state to author compact rows. A task pane may set `showInSwitcher: false` when it is deliberately command-only; it remains a valid layout and `openPane` target. Set `readsArchived: true` only when a task pane reads stored history without a worktree and disables actions that would start work; the field opts the pane into the archived-task preview and its right rail. A task pane may name an `availability` route of its own that answers `{ [taskId]: boolean }` for the Node's active tasks; the pane is then hidden on any task the answer does not mark `true` (docs/panes.md § Contributions). This is also where a pane declares `claimsKeys` and up to eight cooperative `destinations`, and where a `coreSlot` surface names the core surface that it offers to replace. A `settings` surface is placed by three optional keys, described under the table. |
+| `sources` | 8 | A rail source. Rows come from a route on your node half; the host draws them and executes the `onSelect` verb. Set `showInRailByDefault: false` to start without a desktop rail icon; the user can turn it on under Settings > Plugins, and the palette opens it meanwhile. The source `id` is the key of that preference, so keep it stable across releases. Set `requiresGitProject: true` to draw the source only while the active workspace has a project that is a git repository. |
 | `slots` | 8 | A badge in an enumerated host slot: `footer` (the **task** footer, so it is invisible until a task is open) or `topbar` (the topbar's right end — the app's status bar). Nothing else is open, and `docs/plugins.md § Descriptors for facts, trees for UI, rectangles for pixels` records why each refused slot is refused. |
 | `commands` | 32 | A command, id-qualified by the host to `plugin.<id>.<command>`. Each entry requires `kind`: an `action` with one narrow verb, a `group` that holds children, a `search` naming a GET route and one static `onSelect`, an `input` naming a POST route and one static `onSuccess`, or a `setting` naming a read route, a write route and 2-32 labelled choices. The `palette` flag on a command controls its visibility there. `docs/plugins.md § Command kinds` has the fields and bounds. |
 | `keybindings` | 32 | A chord for a command from the same manifest. Canonical `meta+ctrl+alt+shift+key` order, must include `meta`, `ctrl` or `alt`, `when` is `global`/`task`/`surface`, and one binding per command. In the terminal client a terminal emulator keeps the command key for itself, so the host reads your `meta` as Ctrl: `meta+shift+p` is pressed there as Ctrl+Shift+P, and `meta+ctrl+alt+shift+d` as Ctrl+Option+Shift+D. You declare the chord once (`docs/tui.md` § What a plugin loses here). |
@@ -121,11 +121,91 @@ host cannot draw.
 | `extensionPoints` | 4 | A place inside one of **your** surfaces that other plugins may fill: `{ id, label, kind, … }`. `kind` picks which of the five a point takes and which other fields it reads: `rows` and `annotation` take a `location` or a `key`, `remote` and `rectangle` take a `mode`, and `hook` takes a `payload` and an `allows` list. The host mints the id as `<yourId>:<pointId>`. You write no code for a `rows` or `annotation` point — the host draws it. |
 | `schedules` | 4 | Work the node runs on a timer: `{ id, name, run, cadence, timeout? }`. `run` is a POST on your own namespace, called with `{ scheduleId }`, and its response is ignored beyond ok or error. `timeout` is seconds, defaulting to 60. The host mints the key from your plugin id, which is what opts the schedule into the 300-second plugin cadence floor. See `docs/schedules.md`. |
 | `taskChecks` | 4 | What you have to say when the owner archives a task, and the cleanup you offer to do: `{ id, check, apply?, timeout? }`. `check` is a GET answering `{ concern }`; `apply` is a POST the archive runs if the owner leaves your checkbox ticked. See below. |
-| `extensions` | 8 | What **you** bring to another plugin's point: `{ id, point, label, order?, … }`. `point` is `<ownerPluginId>:<pointId>`, and naming the owner out loud is the disclosure. Exactly one carrier says what you bring: `items` is a GET on your own namespace, for rows and annotations; `remote` is a key of the object your bundle passed to `mountTree`, for a tree; `frame` is an `inline` surface of yours, for a rectangle; `route` is a POST on your own namespace, for a hook handler. `matches` narrows a tree or a rectangle to the key values it draws, and `onSelect` takes the narrow verb set. |
+| `extensions` | 8 | What **you** bring to another plugin's point: `{ id, point, label, order?, … }`. `point` is `<ownerPluginId>:<pointId>`, and naming the owner out loud is the disclosure. Exactly one carrier says what you bring: `items` is a route on your own namespace, read with GET for rows and POST for annotations; `remote` is a key of the object your bundle passed to `mountTree`, for a tree; `frame` is an `inline` surface of yours, for a rectangle; `route` is a POST on your own namespace, for a hook handler. `items` and `route` require a `node` entry because only the node bundle can serve them. `matches` narrows a tree or a rectangle to the key values it draws, and `onSelect` takes the narrow verb set. |
 | `auditActions` | 8 | A verb you write onto the node's audit trail: `{ id, label }`. The host qualifies it as `<yourId>:<id>` and refuses a `ctx.audit.record` naming one you did not declare, so the trail stays enumerable. Record what a person reviewing this machine would want to see, not every call you make. |
 | `harnesses` | 4 | A managed agent acorn starts, drives and draws a transcript for: `{ id, label, glyph?, spawn, envPassthrough?, quirks?, probes?, terminal? }`. The only contribution that names a program acorn will run, and the only node-side one that needs no bundle at all. See [§ Harnesses](the-manifest.md#harnesses). |
+| `customAgents` | 8 | A saved start for a managed session, listed under New beside the harnesses: `{ id, name, glyph?, description?, harness, options?, instructions?, maxToolRisk? }`. Data only, and the trust prompt shows the instructions in full. See [§ Custom agents](the-manifest.md#custom-agents). |
 | `agentTools` | 16 | A task-scoped agent tool projected through the ordinary registry: `{ id, description, inputSchema, risk, handler, scope?, requiresSession?, timeoutMs?, maxOutputBytes? }`. `handler` must be in your own `/v1/p/<id>/` namespace. The host qualifies the runtime name as `<pluginId>_<id>`, validates the bounded JSON Schema at install and validates every call again. See [Agent tools](../agent-tools.md#loaded-manifest-carriers). |
 | `contextSections` | 8 | Bounded reference data for the task prompt: `{ id, label, order, read, maxBytes, maxTokens, scope?, defaultIncluded?, timeoutMs? }`. `read` must be in your own namespace and answers the fixed host-owned response shape. See [Agent tools](../agent-tools.md#loaded-manifest-carriers). |
+| `cliCommands` | 16 | Typed headless commands under `acorn plugin <id> <name>`. Each declares a name, title, summary, read/write risk, scope, required core capability, bounded object input/output schemas, and a relative `/cli/<name>` POST route. Writes also describe effects. See [CLI command authoring](./cli-commands.md). |
+
+A settings page takes three optional keys that say where it sits and what it affects:
+
+- `category` is the rail group: `general`, `agents`, `connections`, `features`, `automation`, or
+  `machines`. Without one the page is filed under **Features**. The other three groups, Workspaces and
+  projects, Plugins, and Advanced, hold acorn's own pages.
+- `settingsScope` is what a change on the page affects, named in the page's header: `device`, `node`,
+  `workspace`, or `project`. Without one it is `node`. A `workspace` or `project` page has no rail row
+  of its own: it is a tab on every workspace's or project's settings page. A `project` page's binding
+  carries that project's `projectId`, as a project pane's does.
+- `glyph` is the page's icon, a Lucide name or a `brand:` mark, as on every other surface.
+
+The compiled `SettingsContribution` spells the second and third `scope` and `icon`. The frame keeps
+`settingsScope` because `scope` on a frame already means a pane's task or project scope, and a wider
+enum there would make an older acorn refuse the whole manifest. `group` is still read: `workspace`
+means `settingsScope: "workspace"`, and `general` means the defaults.
+
+A value outside those lists does not drop the page. The page registers in its default place, and the
+roster reports the key and its value as one this version of acorn does not recognise, the same way it
+reports an unknown key ([forward compatibility](../plugins/forward-compatibility.md)). None of the
+three needs a newer `apiVersion`: an older acorn strips the keys and reports them the same way.
+
+Two more keys make the page findable from the settings search and the palette:
+
+- `keywords` is up to 16 words someone might type that are not in the page's label, such as
+  `["error tracking", "dsn"]`.
+- `sections` is up to 16 `{ id, label, keywords? }`, one per `SettingsSection` your tree draws, in the
+  order it draws them. Each is a search result reading **Page › Section** and a deep link,
+  `settings/<page id>#<section id>`, that scrolls to the section and marks it. `id` is letters, digits,
+  `.`, `_`, and `-`, and must match the `id` of the `SettingsSection` in your tree.
+
+```js
+frames: [{
+  target: 'settings', id: 'sentry-telemetry', label: 'Sentry export', category: 'machines',
+  keywords: ['error tracking', 'dsn'],
+  sections: [{ id: 'export', label: 'What to send', keywords: ['sample rate'] }],
+  layout: 'single', regions: { body: { kind: 'remote', entry: 'settings' } },
+}]
+```
+
+A compiled page's `sections` also take `rows`, the labels of the rows in each section, which search
+ranks between section names and keywords. A manifest has no `rows`: an index built from what a
+sandboxed tree draws would have to read the tree. A list past its limit costs the page its search
+entries, never the page, and the roster reports it. Neither key needs a newer `apiVersion`.
+
+The two kit nodes a settings page is drawn with, `SettingsSection` and `SettingRow`, are different: a
+tree that names them on an acorn that predates them draws the labelled placeholder any unknown node
+draws. Raise the floor of your `apiVersion` range to the release that has them if you use them
+([docs/frontend.md](../frontend.md) § Pages and the save model).
+
+A settings page's header names the node its body reads. A frame always reads the active node, so its
+header names that node as plain text rather than offering the node switcher core's own node pages use.
+
+acorn draws a plugin strip above your page: your plugin's name and origin, **Manage plugin**, the
+**Enabled** switch, and a line when the plugin is off, waiting for approval, failed, or offline. Don't draw
+your own enable switch or status line. To put the **Show in left rail** switch for one of your sources
+there, name it in `railSourceVisibility`. The host draws the switch and keeps the preference, so your
+tree never reads or writes it:
+
+```js
+sources: [{ id: 'board', label: 'Board', glyph: 'layout-dashboard', order: 50, items: '/v1/p/board/items', showInRailByDefault: false }],
+frames: [{
+  target: 'settings', id: 'board-settings', label: 'Board', railSourceVisibility: ['board'],
+  layout: 'single', regions: { body: { kind: 'remote', entry: 'settings' } },
+}]
+```
+
+- `showInRailByDefault: false` on a source starts its icon hidden. The source still registers, its
+  commands and panes still work, and the palette offers **Open <label>** for it. The person's own choice
+  wins over the default. Absent means shown.
+- `railSourceVisibility` lists up to 16 of your own source ids. An id that names a core source or another
+  plugin's is reported in the roster's `unknown` list, as
+  `contributions.frames.<id>.railSourceVisibility: '<source>' is not one of this plugin's sources`, and
+  gets no switch. The page stays. A compiled page that names one throws when its plugin registers.
+- A source id is the key the person's choice is stored under, so keep it stable across releases.
+- Without `railSourceVisibility`, the switch is still under **Settings > Plugins > Rail and surfaces**.
+
+Neither key needs a newer `apiVersion`: an older acorn strips both and shows the icon.
 
 A theme is the one contribution with no route and no bundle behind it, so it is the cheapest thing a
 plugin can be. `tokens` must carry **exactly** the palette token names and nothing else: a missing one,
@@ -159,11 +239,92 @@ row's id. A contribution to a point that is not there — owner not installed, d
 the point in an update — delivers nothing, silently; that is the designed outcome, not a failure to
 chase. **Call `plugin_authoring` for the current location list.**
 
-A `coreSlot` frame is the related pattern for acorn's *own* surfaces:
-`{ target: "coreSlot", id, label, coreSlot }` plus a client bundle, where `coreSlot` names one of the
-designated surfaces (`rail.taskList` today). Declaring one **seizes nothing** — the user picks the
-provider in Settings → Plugins, and acorn draws its own again the moment your plugin is disabled or your
-surface throws. It is not a pane, so no verb can name it and it never appears in the pane switcher.
+#### Add task annotations
+
+Use the core-owned `core:task` annotation point to publish loaded-plugin status on task rows. This
+complete manifest has a node bundle and one route-backed extension:
+
+```json
+{
+  "id": "deploy-status",
+  "name": "Deploy status",
+  "version": "1.0.0",
+  "baseline": "acorn-1",
+  "apiVersion": "2",
+  "node": "./node.js",
+  "contributions": {
+    "extensions": [
+      {
+        "id": "task-deployments",
+        "point": "core:task",
+        "label": "Deployments",
+        "items": "/v1/p/deploy-status/task-annotations"
+      }
+    ]
+  }
+}
+```
+
+The node route receives the visible task ids in one POST. Return only marks for keys that you know:
+
+```js
+const deployments = new Map([
+  ['task-123', { failed: false }],
+  ['task-456', { failed: true }],
+])
+
+export default {
+  name: 'deploy-status',
+  init(ctx) {
+    ctx.routes.fetch(async (request) => {
+      const url = new URL(request.url)
+      if (request.method !== 'POST' || url.pathname !== '/task-annotations') {
+        return new Response('Not found', { status: 404 })
+      }
+
+      const body = await request.json()
+      const keys = Array.isArray(body.keys) ? body.keys : []
+      const items = keys.flatMap((key) => {
+        if (!key || typeof key.task !== 'string') return []
+        const deployment = deployments.get(key.task)
+        if (!deployment) return []
+        return [{
+          key: { task: key.task },
+          severity: deployment.failed ? 'danger' : 'info',
+          text: deployment.failed ? 'Deployment failed' : 'Deployment is live',
+          icon: deployment.failed ? 'circle-alert' : 'rocket',
+        }]
+      })
+      return Response.json({ items })
+    })
+  },
+}
+```
+
+`core:task` keys contain one scalar string field, `task`. A mark contains that key, an `info`, `warn`,
+or `danger` severity, text that the host caps at 200 characters, and an optional Lucide or `brand:`
+icon name that the host resolves. It contains no JSX, CSS, geometry, color, or action. The host stamps
+your plugin id as provenance, accepts at most 256 valid marks from this contributor and request, and
+draws them through its own desktop and terminal rail projections. The generic annotation transport
+inspects at most 4,096 raw rows before the point-specific limit. Malformed rows are dropped
+independently.
+
+For request identity, freshness, cancellation, and failure isolation, see
+[Task annotations](../plugins/cooperative-extension-points.md#task-annotations).
+
+The node requirement applies only to the route-backed `items` and `route` carriers. `remote` and
+`frame` keep their client-bundle checks, and a descriptor-only harness can still omit `node` unless it
+declares a probe route.
+
+A `coreSlot` surface is the related pattern for acorn's *own* surfaces:
+`{ target: "coreSlot", id, label, coreSlot }` plus a client bundle. The designated surfaces are
+`rail.taskList`, `pane.switcher`, `rail`, and `topbar`. The last three require a `single` layout with
+one remote-tree `body`; the host gives that tree data and named actions. A rail or topbar tree can
+place its one nested host slot with the `Slot` node and the `slotRef` in its props. Declare
+`placesSlots: ["rail.taskList"]` or `["topbar.right"]` when you place it; Settings warns when the
+declaration is absent. Declaring a replacement **seizes nothing** — the user picks the provider in
+**Settings > Plugins > Rail and surfaces**, and acorn draws its own again when your plugin is disabled or its surface fails.
+It is not a pane, so no pane verb can name it.
 
 A `taskChecks` entry is the one contribution that runs when a person is about to lose something.
 Archiving a task removes its worktree, so the host asks every plugin first and draws the answers in one
@@ -194,9 +355,10 @@ Both routes are confined like every other, and both are shown in the trust promp
 says you offer to clean up, so a version that starts changing something where it used to only warn
 reads as newly requested.
 
-Every path in every descriptor is confined at parse time to `/v1/p/<id>/` — your own namespace and
-nothing else. That check lives in `server/plugins/manifest.ts` rather than on the fields because it needs `id`,
-and it is the parse-time twin of the runtime confinement the frame bridge applies.
+Every path in every descriptor is confined at parse time to `/v1/p/<id>/`, the plugin's own
+namespace. `server/plugins/manifestValidation/references.ts` checks this after the field schema
+parses, because confinement needs the manifest's `id`. The frame bridge applies the matching rule
+at runtime.
 
 The cross-field rules are worth knowing before you write a manifest that parses and then does nothing:
 an `openPane` must name a task-scoped pane this manifest declares; a `navigate` must name a
@@ -205,8 +367,9 @@ whose `onSelect` navigates to it (its only mount site); an `overlay` needs an ac
 `surfaceAction` may name only a pane that draws a region of its own, as an iframe or as a worker
 tree; a webview needs a client bundle; an
 extension point must hang off a `pane` this manifest declares and only one may sit at each location on
-it; an `extensions` entry's `point` must be a `<pluginId>:<pointId>` reference and its `items` route
-must be your own; a `taskChecks` entry needs a `node` half, since only that serves the namespace its two
+it; an `extensions` entry's `point` must be a `<pluginId>:<pointId>` reference, its `items` or `route`
+path must be your own, and either route-backed carrier requires a `node` half; a `taskChecks` entry
+needs a `node` half, since only that serves the namespace its two
 routes live in; a `harnesses` entry's `spawn` must name exactly one of `command` and `entry`, may only
 carry `requires` beside an `entry`, and needs a `node` half if it declares any `probes`; a `coreSlot`
 surface needs both a designated slot name and a client bundle; and no id may repeat across
@@ -230,7 +393,7 @@ This is the whole plugin that adds OpenCode:
   "name": "OpenCode",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "1",
+  "apiVersion": "2",
   "icon": { "d": "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" },
   "contributions": {
     "harnesses": [
@@ -369,6 +532,47 @@ workflow `decide` step can, but it needs a JSON verdict back and a manifest cann
 one, so a `text` harness will answer prose and the step will fail. A harness that needs either is asking
 for first-party investment, not a bigger manifest.
 
+### Custom agents
+
+A custom agent is a harness with the settings, instructions, and tool access a session should start
+on. The owner makes their own under Settings > Custom agents, and a plugin can ship some. Each one is
+listed under **New** in the Agent pane and in the command palette, and another agent can start it by
+name through `agent_spawn`. For more information, see
+[Custom agents](../managed-agents.md#custom-agents).
+
+```json
+{
+  "contributions": {
+    "customAgents": [
+      {
+        "id": "reviewer",
+        "name": "Bug reviewer",
+        "harness": "codex",
+        "options": { "reasoning": "high" },
+        "instructions": "Review the change for correctness. Report each bug with its file and line.",
+        "maxToolRisk": "read"
+      }
+    ]
+  }
+}
+```
+
+The host mints the id as `<yourId>:<id>`, and it is copied onto every session started from the agent.
+`harness` is `claude`, `codex`, another plugin's `<pluginId>:<harnessId>`, or the bare id of a harness
+this same manifest declares, which the host qualifies for you. `options` is provider option id to value,
+as the harness advertises them. A value the harness does not offer is dropped when the session starts,
+with a line in the transcript, so the session still runs. `maxToolRisk` narrows acorn's own tools and
+never widens them.
+
+`instructions` go into the system prompt of every session an owner starts from the agent, on Claude Code
+and Codex, and in front of the first message on any other harness. That makes them the grant: the trust
+prompt shows the full text, and a version that changes it asks again. An agent cannot bring a tool
+server, because a server is a program to run. Declare `agentTools` for that.
+
+A package made of nothing but harnesses and custom agents needs no bundle at all. The owner sees it in
+**Settings > Plugins > Installed** and can turn it off, which takes its agents out of New. The owner cannot edit a
+plugin's agent, only duplicate it into one of their own.
+
 ### The action verbs
 
 Descriptors do not run plugin code. They hand the host a verb from a closed set, and the host executes
@@ -415,11 +619,11 @@ Filesystem, environment, process, and network grants are also absent unless decl
   exporting a capability is a contribution, not an access grant.
 - `secrets` / `exec`: booleans, separate from `core` because they are the two asks a reviewer should
   have to see spelled out.
-- `net`: exact hostnames the worker's `fetch` may reach, or `'*'` for a plugin whose user chooses any
-  destination. An any-host grant permits redirects and appears as broad network access in the
-  permission prompt. Raw network modules stay unavailable unless
-  `sockets` is also granted. Redirects are returned rather than followed so fetching the next
-  location rechecks its host.
+- `net`: exact hostnames or `*.domain` patterns that the worker's `fetch` may reach. A pattern
+  matches one subdomain label, not the parent domain or deeper subdomains. `'*'` grants access to
+  any hostname, permits redirects, and appears as broad network access in the permission prompt.
+  Raw network modules stay unavailable unless `sockets` is also granted. With a host-scoped grant,
+  redirects are returned rather than followed so fetching the next location rechecks its host.
 - `sockets`: unrestricted raw socket access for protocols that cannot use the hostname-scoped fetch
   broker. This broad, high-risk grant has no hostname allowlist.
 - `env`: parent-environment variable names the worker may inherit in addition to the process broker's

@@ -1,13 +1,14 @@
 import { measure, recordDuration, recordSample, telemetryEnabled } from '../telemetry/emitter'
 // The main-thread half of the highlight worker: one worker, lazily spawned, requests matched to
 // replies by id. See docs/diff-rendering.md § Syntax highlighting for why every caller sends a
-// whole document (for a diff, one side of one hunk: ui/diff/model.ts § buildDiffRowsAsync) rather
+// whole document (for a diff, one side of one hunk: kit/diff/diffModel.ts § enrichDiffRows) rather
 // than a line.
 import { getHighlighter } from './shiki'
 import { langFor } from './langs'
 import type { HighlightLines, HighlightRequest, HighlightResponse } from './messages'
 import { createLogger } from '../telemetry/logger'
 import { createDocumentWorker } from './documentWorker'
+import { registerPageFact } from '../telemetry/pageFacts'
 
 const log = createLogger('highlight')
 
@@ -54,28 +55,39 @@ async function onMainThread(path: string, code: string): Promise<HighlightLines>
   }
 }
 
-/** Never rejects. A highlighter that degrades beats one that takes its surface down. */
-export const tokenizeDocument: TokenizeDocument = async (path, code) => {
+/** A document's lines, and whether they are the main thread's stand-in for a worker that did not
+ *  answer in time. A timeout can pass, so a caller that keeps the colour should not keep that one as
+ *  if it were final. Every other fallback lasts: a dead worker stays dead, and a grammar error
+ *  repeats on the same code. */
+export type HighlightResult = { lines: HighlightLines; timedOut: boolean }
+
+/** As `tokenizeDocument`, saying whether a timeout decided the result. Never rejects. */
+export async function highlightDocument(path: string, code: string): Promise<HighlightResult> {
   const lang = langFor(path)
-  if (lang === 'text') return plain(code)
+  if (lang === 'text') return { lines: plain(code), timedOut: false }
   recordSample('core', 'highlight.characters', code.length)
-  const fallback = (reason: string) => {
+  const fallback = async (reason: string): Promise<HighlightResult> => {
     recordSample('core', 'highlight.fallback', 1, '1', { reason })
-    return measure('core', 'highlight.main_thread', () => onMainThread(path, code))
+    const lines = await measure('core', 'highlight.main_thread', () => onMainThread(path, code))
+    return { lines, timedOut: reason === 'timeout' }
   }
   const result = await owner.request((id) => ({
     id, lang, code, ...(telemetryEnabled() ? { sentAt: performance.timeOrigin + performance.now() } : {}),
   }))
   if (result.kind === 'degraded') {
     recordSample('core', 'highlight.fallback', 1, '1', { reason: 'retired' })
-    return plain(code)
+    return { lines: plain(code), timedOut: true }
   }
   if (result.kind === 'fallback') return fallback('unavailable')
   const lines = result.value
   if (lines.length === 0 && code.length > 0) return fallback('empty-result')
   recordSample('core', 'highlight.lines', lines.length)
-  return lines
+  return { lines, timedOut: false }
 }
 
 /** Tests only: settle and retire this generation before trying a fresh worker. */
 export const resetHighlightWorker = owner.reset
+
+registerPageFact('ui.page.workers.highlight', owner.workerCount)
+
+export const tokenizeDocument: TokenizeDocument = async (path, code) => (await highlightDocument(path, code)).lines

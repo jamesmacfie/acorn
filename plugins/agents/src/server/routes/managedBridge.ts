@@ -66,6 +66,11 @@ export function managedAgentsBridge(
       return sessionId ? await taskIdForSession(sessionId) : null
     },
     providers: (force) => guarded(() => runtime.providers(force)),
+    footprint: async () => ({
+      ...await runtime.processFootprint(),
+      ...await runtime.diskFootprint(),
+    }),
+    stopIdleNow: async () => ({ stopped: (await runtime.stopIdleSessionsNow()).length }),
     // A session projected to the merged run list's shape (@acorn/protocol/runs.ts). Live sessions
     // only: the list answers "what is happening on this node", and an archived session is history the
     // Agents pane already shows in full.
@@ -124,6 +129,7 @@ export function managedAgentsBridge(
       return { ...page, events: events.map(clientEventRecord) }
     }),
     enqueueTurn: (sessionId, input) => guarded(() => runtime.enqueueTurn(sessionId, input)),
+    implementCodexPlan: (sessionId, itemId) => guarded(() => runtime.implementCodexPlan(sessionId, itemId)),
     patchQueuedTurn: (sessionId, turnId, patch) =>
       guarded(() => runtime.patchQueuedTurn(sessionId, turnId, patch)),
     cancelTurn: (sessionId, turnId) => guarded(() => runtime.cancelTurn(sessionId, turnId)),
@@ -132,6 +138,8 @@ export function managedAgentsBridge(
     patchSession: (sessionId, patch) => guarded(() => runtime.patchSession(sessionId, patch)),
     fork: (sessionId, title) => guarded(() => runtime.fork(sessionId, title)),
     compact: (sessionId) => guarded(() => runtime.compact(sessionId)),
+    sessionMcp: (sessionId) => guarded(() => runtime.sessionMcp(sessionId)),
+    setSessionMcp: (sessionId, enabled) => guarded(() => runtime.setSessionMcpServers(sessionId, enabled)),
     regenerateTitle: (sessionId) => guarded(() => runtime.regenerateTitle(sessionId)),
     deleteSession: (sessionId) => guarded(() => runtime.deleteSession(sessionId)),
     handoffToTerminal: (sessionId) => guarded(() => runtime.handoffToTerminal(sessionId)),

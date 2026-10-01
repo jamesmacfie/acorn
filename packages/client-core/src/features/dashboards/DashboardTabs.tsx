@@ -1,24 +1,25 @@
-import { createSignal, Index, Show } from 'solid-js'
+import { createEffect, createSignal, Index, Show } from 'solid-js'
 import { Input } from '../../kit/components/primitives'
 import { IconButton } from '../../kit/components/inputs/IconButton'
-import { createArmedConfirm } from '../../kit/lib/confirm'
+import { createArmedConfirm } from '../../kit/lib/controls/confirm'
 import { isTypingTarget } from '@acorn/protocol/keybindings.ts'
 import { ContextMenu, Menu, type MenuContext } from '../../kit/components/overlays/Menu'
 import { addTab, homeTabDomId, HOME_TAB_PANEL_ID, renameTab, shiftTab } from './homeTab'
 import { MAX_TABS, removeHomeTab, setHomeTabs, type DashboardTab } from './persist'
+import { revealActiveTab } from '../../kit/components/layout/tabScroll'
 
 // The Home tab bar (docs/dashboards.md § Persistence). It draws one workspace's list of names and
 // calls three functions; a tab's content is the ordinary `home/<tabId>/<workspaceId>` placement the
 // grid beside it renders, so there is nothing here about panels at all.
 //
-// This is not `ui/Tabs.tsx`, which is the one judgement call in the file. A tab here carries an
+// This is not the kit's `Tabs.tsx`, which is the one judgement call in the file. A tab here carries an
 // inline rename input and an overflow trigger, and neither can live inside a `<button role="tab">`
 // without nesting interactive elements. Growing the shared strip a JSX label and a trailing slot for
 // one consumer buys a worse primitive; the roving/arrow behaviour it would have supplied is
 // `createListNavigation`, the same three lines either way.
 //
 // The root is a `<span>` because the bar takes the section header's label seat: tabs are the heading
-// when there are several (`SectionHeader`, primitives.tsx).
+// when there are several (`SectionHeader`, kit/components/layout/SectionHeader.tsx).
 
 const NEXT_KEYS = new Set(['ArrowRight', 'ArrowDown', 'j'])
 const PREV_KEYS = new Set(['ArrowLeft', 'ArrowUp', 'k'])
@@ -54,10 +55,13 @@ export default function DashboardTabs(props: {
   active: string
   onSelect: (id: string) => void
 }) {
+  let stripRef: HTMLSpanElement | undefined
   const [renaming, setRenaming] = createSignal<string>()
   const [menuAt, setMenuAt] = createSignal<{ x: number; y: number } | null>(null)
   const [menuTab, setMenuTab] = createSignal<DashboardTab>()
   const confirmDelete = createArmedConfirm()
+
+  createEffect(() => revealActiveTab(stripRef, homeTabDomId(props.active)))
 
   const focusTab = (id: string) => document.getElementById(homeTabDomId(id))?.focus()
 
@@ -157,7 +161,14 @@ export default function DashboardTabs(props: {
   )
 
   return (
-    <span class="dash-tabs" role="tablist" aria-label="Dashboards" onKeyDown={onKeyDown}>
+    <span class="dash-tabs">
+      <span
+        class="ui-tab-scroll dash-tabs-strip"
+        ref={(element) => { stripRef = element }}
+        role="tablist"
+        aria-label="Dashboards"
+        onKeyDown={onKeyDown}
+      >
       {/* `Index`, not `For`. `homeTabs` rebuilds its entries on every dashboard write, so a
           reference-keyed list would rebuild every row — and the row being rebuilt is the one holding
           the rename input a person is typing into (the recorded For/Index defocus trap). */}
@@ -215,6 +226,7 @@ export default function DashboardTabs(props: {
           </span>
         )}
       </Index>
+      </span>
 
       {/* The ghost `+`. Past the cap it stays visible and disabled: a button that vanishes at eight
           is a bug report. */}

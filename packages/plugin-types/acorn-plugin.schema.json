@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://acorn.sh/schemas/acorn-plugin.schema.json",
-  "title": "acorn plugin manifest (plugin API major 1)",
+  "title": "acorn plugin manifest (plugin API major 2)",
   "type": "object",
   "properties": {
     "$schema": {
@@ -312,6 +312,11 @@
               "readsArchived": {
                 "type": "boolean"
               },
+              "availability": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 256
+              },
               "formFactor": {
                 "default": [
                   "desktop"
@@ -339,11 +344,94 @@
                   "workspace"
                 ]
               },
+              "category": {
+                "type": "string",
+                "enum": [
+                  "general",
+                  "agents",
+                  "connections",
+                  "features",
+                  "automation",
+                  "machines"
+                ]
+              },
+              "settingsScope": {
+                "type": "string",
+                "enum": [
+                  "device",
+                  "node",
+                  "workspace",
+                  "project"
+                ]
+              },
+              "keywords": {
+                "maxItems": 16,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              },
+              "sections": {
+                "maxItems": 16,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$"
+                    },
+                    "label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "keywords": {
+                      "maxItems": 16,
+                      "type": "array",
+                      "items": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 64
+                      }
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "label"
+                  ]
+                }
+              },
+              "railSourceVisibility": {
+                "maxItems": 16,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 64
+                }
+              },
               "coreSlot": {
                 "type": "string",
                 "enum": [
-                  "rail.taskList"
+                  "rail.taskList",
+                  "pane.switcher",
+                  "rail",
+                  "topbar"
                 ]
+              },
+              "placesSlots": {
+                "maxItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "rail.taskList",
+                    "topbar.right"
+                  ]
+                }
               },
               "url": {
                 "type": "string",
@@ -584,7 +672,33 @@
                 "minLength": 1,
                 "maxLength": 256
               },
+              "tree": {
+                "type": "object",
+                "properties": {
+                  "list": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  },
+                  "detail": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 64
+                  }
+                },
+                "required": [
+                  "list",
+                  "detail"
+                ],
+                "additionalProperties": false
+              },
               "projectScoped": {
+                "type": "boolean"
+              },
+              "showInRailByDefault": {
+                "type": "boolean"
+              },
+              "requiresGitProject": {
                 "type": "boolean"
               },
               "defaultPane": {
@@ -904,8 +1018,7 @@
             "required": [
               "id",
               "label",
-              "order",
-              "items"
+              "order"
             ]
           }
         },
@@ -2274,6 +2387,45 @@
             ]
           }
         },
+        "styles": {
+          "default": [],
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              "label": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 240
+              },
+              "tokens": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "tokens"
+            ]
+          }
+        },
         "contextMenus": {
           "default": [],
           "maxItems": 8,
@@ -3265,6 +3417,73 @@
             ]
           }
         },
+        "customAgents": {
+          "default": [],
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64,
+                "pattern": "^[a-z0-9][a-z0-9-]*$"
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "glyph": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "harness": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 130
+              },
+              "options": {
+                "default": {},
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "additionalProperties": {
+                  "type": "string",
+                  "maxLength": 500
+                }
+              },
+              "instructions": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 16000
+              },
+              "maxToolRisk": {
+                "type": "string",
+                "enum": [
+                  "read",
+                  "write",
+                  "execute"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "harness"
+            ]
+          }
+        },
         "agentTools": {
           "default": [],
           "maxItems": 16,
@@ -3392,6 +3611,100 @@
               "maxBytes",
               "maxTokens"
             ]
+          }
+        },
+        "cliCommands": {
+          "default": [],
+          "maxItems": 16,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "pattern": "^[a-z](?:[a-z0-9]|-(?=[a-z0-9])){0,63}$"
+              },
+              "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 80
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 300
+              },
+              "effects": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 500
+              },
+              "risk": {
+                "type": "string",
+                "enum": [
+                  "read",
+                  "write"
+                ]
+              },
+              "scope": {
+                "type": "string",
+                "enum": [
+                  "node",
+                  "workspace",
+                  "project",
+                  "task"
+                ]
+              },
+              "capability": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
+              "inputSchema": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "outputSchema": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "route": {
+                "type": "object",
+                "properties": {
+                  "method": {
+                    "type": "string",
+                    "const": "POST"
+                  },
+                  "path": {
+                    "type": "string",
+                    "pattern": "^\\/cli\\/[a-z][a-z0-9-]{0,63}$"
+                  }
+                },
+                "required": [
+                  "method",
+                  "path"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "name",
+              "title",
+              "summary",
+              "risk",
+              "scope",
+              "capability",
+              "inputSchema",
+              "outputSchema",
+              "route"
+            ],
+            "additionalProperties": false
           }
         }
       },

@@ -2,6 +2,7 @@ import { stepIdentity } from '../../shared/workflowIdentity'
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import {
   Badge,
+  Alert,
   Button,
   Chip,
   ChipRow,
@@ -22,10 +23,12 @@ import type {
   WorkflowStepDef,
 } from '../../shared/workflowContracts'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
+import { unavailableCatalogKind, unavailableStepKindMessage } from '../../shared/stepKindAvailability'
 import AgentNodeForm from './AgentNodeForm'
 import BranchesField from './BranchesField'
 import DefinitionInspector from './DefinitionInspector'
 import InputsInspector from './InputsInspector'
+import GateFormEditor from './GateFormEditor'
 import WorkflowDispatchForm from './WorkflowDispatchForm'
 import StepConfigurationFields from './StepConfigurationFields'
 import StepPreview from './StepPreview'
@@ -149,12 +152,14 @@ export default function NodeInspector(props: {
             <Inline gap="inline">
               <Heading level={3}>{current().name}</Heading>
               <Badge>{describe()?.label ?? kindOf(current())}</Badge>
-              <Show when={!props.readOnly}>
-                <Button size="sm" variant="bare" onPress={() => props.actions.remove(stepIdentity(current()))}>Delete node</Button>
-              </Show>
             </Inline>
             <Show when={describe()?.description}>
               {(text) => <Text emphasis="muted" wrap>{text()}</Text>}
+            </Show>
+            <Show when={unavailableCatalogKind(kindOf(current()), props.catalog)}>
+              <Alert tone="warn" title="Workflow step unavailable">
+                {unavailableStepKindMessage(kindOf(current()))} Its saved settings remain below.
+              </Alert>
             </Show>
 
             <Field
@@ -237,6 +242,16 @@ export default function NodeInspector(props: {
                 disabled={props.readOnly}
                 onChange={(patch) => props.actions.setStep(stepIdentity(current()), patch)}
                 onCreateChild={(schema) => props.actions.createChild(stepIdentity(current()), schema)}
+              />
+            </Show>
+
+            <Show when={kindOf(current()) === 'gate-human'}>
+              <GateFormEditor
+                def={def()}
+                step={current()}
+                catalog={props.catalog}
+                disabled={props.readOnly}
+                onChange={(form) => props.actions.setStep(stepIdentity(current()), { form })}
               />
             </Show>
 

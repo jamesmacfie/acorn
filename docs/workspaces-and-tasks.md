@@ -11,26 +11,33 @@ workspace and has a stable opaque ID, display name, optional folder path, option
 optional Git/GitHub facets. A project may be a plain folder or a Git checkout. Facets are cached
 observations and may be refreshed; the project ID is the application identity.
 
-The project colour is an optional machine-local accent edited in Settings → Projects. Every task for
+The project colour is an optional machine-local accent, set on the project's settings page or for
+several projects at once from Settings → Overview. Every task for
 that project draws it as the strip down the left of its left-rail tab. Clearing the colour removes the
 project strip; an active tab still uses the application theme's normal active accent.
 
 `path` is nullable and the model tolerates a path-null project, but nothing creates one. The GitHub
 importer's "defer" action was the only producer, and it is gone. Rows that predate that stay readable
-and are repaired by giving them a folder in Settings → Projects.
+and are repaired by giving them a folder in Settings → Overview.
 
 The `Default` workspace is created lazily by the first project, not at boot: both `createProject` and
 `createProjectRef` fall back to it when no workspace is named. The owner adds folders from Settings →
 Projects or imports repositories explicitly through the GitHub plugin. Moving or hiding a project
 changes only its core row; deleting a project never deletes its folder.
 
-Settings → Projects lists projects grouped under their workspace rather than giving every row a
-workspace dropdown in isolation. The grouping is what is being edited, so it is the layout. The card
-owns the column tracks, and its header and rows subgrid into them, so names, selects, and buttons
-share one set of columns. Workspace and project names are edited in place. A row's workspace menu
-moves it, and the menu's last option creates the workspace being moved to. A workspace can be deleted
-from its own header, except the default, which is where an orphaned workspace's projects land. A
-project whose workspace has vanished appears under `Unassigned` so it can always be rescued.
+Registering a local folder through the CLI requires an explicit workspace and an absolute Node-host
+path. Core compares the folder's resolved path with registered project paths, so symlink and `..`
+aliases reuse an existing project ID. The stored path remains the spelling originally registered.
+See [Command-line client](./cli.md) for the administration commands and typed pipe contract.
+
+Settings → Overview is one table of projects grouped under their workspace, because the grouping is
+what is being arranged. Selecting rows opens a bar that moves them to a workspace, the last option
+creating one, hides or shows them, or sets their colour. A row opens its project's settings page,
+which holds the name, folder, colour, workspace, visibility, and the project's configuration below. A
+workspace's own page renames and deletes it, except the default, which is where a deleted workspace's
+projects land and so can be neither renamed nor deleted. A project whose workspace has vanished
+appears under `Unassigned` so it can always be rescued. [Frontend](./frontend.md) § Workspaces and
+projects has the pages.
 
 Deleting a project takes its tasks and task links with it, because `tasks.project_id` has no foreign
 key and rows left behind are invisible in every rail and impossible to remove. The confirmation names
@@ -39,7 +46,7 @@ the task count first. Nothing on disk is touched: the folder and any task worktr
 A node with zero projects opens the first-run wizard (`plugins/onboarding`) instead: welcome, add
 projects by folder or GitHub, name them and their workspace, pick what to generate text with, done. Its gate is `shouldShowOnboarding`,
 meaning zero projects and no `onboarded` preference, and both finishing and skipping write that
-preference, so it never opens twice. Everything it offers is also in Settings → Projects.
+preference, so it never opens twice. Everything it offers is also in Settings → Overview.
 
 Opening is a one-way door (`onboardingVisible`). "No projects yet" is the right trigger and the wrong
 latch, because the wizard's own first step creates a project: re-evaluating the trigger every render
@@ -66,7 +73,7 @@ A link may name one project in the workspace instead of the whole of it. That is
 repositories in one workspace show different Linear issues or different Rollbar errors: the routed
 project names the workspace, then keeps the links that either name it or name no project at all.
 
-The map is edited in Settings → Integrations, under the connection itself, and that surface is the
+The map is edited in Settings > Services, on the connection's own page, and that surface is the
 host's for every provider rather than any one plugin's. Under the connection because one Linear or
 Rollbar connection usually serves every workspace on the machine, so its whole map reads better in one
 place than a checkbox list repeated on every workspace page. The host's because of ownership: the
@@ -150,6 +157,17 @@ it. A worktree that cannot be created is refused with `worktree-unavailable` rat
 to the main checkout. Either fallback hands the task another branch's files, which is the tree its
 agent then reads and edits.
 
+Read-only panes can treat an unavailable worktree as an empty root. Execution surfaces, including
+managed agents, use the core task service's `requireRoot` call so a missing project mapping and a Git
+worktree failure remain distinct errors. On macOS, the Node retries Git with the standalone Command
+Line Tools binary when Apple's selected Xcode Git refuses a command solely because its license has
+not been accepted.
+
+If another worktree or the project checkout already has the task's branch checked out, Git refuses
+creation. Acorn reports the occupied branch and path from Git's worktree roster. Release that branch
+in the reported checkout, then reopen the task to retry creation. Acorn leaves the other checkout
+and its uncommitted files untouched. Setup runs only after creation succeeds.
+
 A new task branch starts from the branch checked out in the mapped project folder. Acorn runs
 `git worktree add -b` from that folder without an explicit start point, so Git uses the folder's
 current `HEAD`. Remote-tracking refs such as `origin/main` do not take precedence over local commits.
@@ -159,7 +177,8 @@ The project's setup script runs in the new worktree as an ordinary terminal sess
 so its output is readable while it works. The task's rail row says so too: a pulsing dot sits under
 the task glyph until that session exits, in the slot teardown's spinner uses at the other end of the
 task's life ([ui-design.md](./ui-design.md) § Rail controls).
-The New task dialog offers "Skip setup script" for a Git worktree task. The choice is stored on the
+The New task dialog offers "Skip setup script" for a Git worktree task, and so does the box that
+makes a task from an integration's item, "Start workflow…" included. The choice is stored on the
 task, so it also skips setup if another surface creates the worktree later or the task is restored.
 Unchecked tasks keep the project's configured setup behavior.
 
@@ -167,7 +186,9 @@ A project's `.acorn/config.toml`, committed or personal, may list `copy` paths: 
 usually gitignored (`.env.local` and similar), copied into a freshly created worktree so it works
 without a setup script. Missing sources warn rather than fail worktree creation, existing targets
 are never overwritten, and a repo's list wins over a personal one outright rather than merging with
-it.
+it. Both source and destination use the canonical task-root path guard: links outside either root
+and dangling links are rejected with a warning. Sources must be regular files; safe aliases inside
+the roots remain supported. Existing destination entries, including links, are never replaced.
 
 ### Worktree status reads
 
@@ -200,8 +221,12 @@ a file, waits 100 milliseconds, and expects the removal to be refused.
 
 Archive runs the configured teardown flow where the desktop runtime is available and reports partial
 failures instead of pretending removal succeeded. Its order is guard, review-input capture, repo
-teardown script, stop sessions, plugin cleanups, remove worktree, mark archived. Capture and the two
-teardown steps sit before removal so anything that needs the worktree still has it. A failed review
+teardown script, stop sessions, plugin cleanups, remove worktree, mark archived. Stopping sessions
+kills the task's running terminal sessions, then runs core's `core:task-archiving` hook, where the
+agents plugin stops the provider process behind each of the task's agent sessions
+([managed-agents.md § Operations and failure](./managed-agents.md)). Capture, the teardown steps, and
+the stops sit before removal, so anything that needs the worktree still has it and nothing is still
+writing into it when it goes. A failed review
 handoff does not strand the task: archive completes and the rail reports that review was not queued.
 
 Archive claims the task's worktree lifecycle before teardown starts. New root reads return no path
@@ -235,7 +260,10 @@ removal as a list of deleted files. A failed archive clears the flag and trigger
 
 Project configuration lives on `projects`: setup/dev/restart/teardown/database/preview values,
 run targets, browser rules, and branch prefix. A committed `.acorn/config.toml` can override these
-machine-local values.
+machine-local values. `GET /v1/core/projects/:id/config` returns the row as `config` and, when the
+project has a folder whose `.acorn/config.toml` exists, what that file sets as `repoConfig`: its run
+targets, and the database connection script and preview mode and value when it sets them. The
+project's settings page reads it to mark those values read-only. An older node leaves it out.
 
 The node publishes `workspace:changed { workspaceId }` after create, rename, and deletion. Project
 membership remains `project:changed`; a deletion that reassigns projects announces each affected
@@ -258,11 +286,15 @@ right, unknown or duplicate pane ids are dropped, and a recipe naming no valid p
 
 ## Restoring a task
 
-Archive deletes less than it looks like. It removes the worktree folder, stops what was running, drops
-the terminal plugin's saved sessions, and clears state the client held in memory. The task row, its
+Archive deletes less than it looks like. It removes the worktree folder, stops what was running
+(terminal sessions and agent provider processes), drops the terminal plugin's saved sessions, and
+clears state the client held in memory. The task row, its
 links and pull requests, its branch, its agent sessions, its notes, and every plugin's rows all stay.
-Plugins store `task_id` as a plain id and none of them deletes anything on archive. The one real delete
-is removing a project, which removes its task rows and leaves plugin rows with nothing to point at, so
+Plugins store `task_id` as a plain id and none of them deletes anything on archive. Later, if the owner
+set **Keep agent history for archived tasks**, a task archived longer than that loses its agent
+transcripts for good. Its sessions still list, each with a note saying so
+([data-layer.md § Retention](./data-layer.md#retention)). The one real delete on the spot is removing
+a project, which removes its task rows and leaves plugin rows with nothing to point at, so
 those tasks cannot be restored.
 
 The Archive entry at the bottom of the rail lists archived tasks, newest first, with a search box over
@@ -289,7 +321,8 @@ leaving that to the first pane, because the two ways it fails need the owner:
 
 Containers, terminal sessions and scrollback do not come back. Agent sessions come back on their own:
 a session under an archived task counts as retired when the list is read, so it returns to the live
-list with its task. A session someone archived on its own is restored from Agent Center
+list with its task. Its provider process stopped at archive, and the next prompt starts it again and
+resumes the conversation. A session someone archived on its own is restored from Agent Center
 ([managed-agents.md § Client surfaces](./managed-agents.md)).
 
 ## Task creation and navigation

@@ -1,10 +1,9 @@
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-// Settings → Agent concurrency saves from its button and from nothing else. The page dropped its
-// `<form>` wrapper when the plugin's client half went kit-only, which took Enter-to-submit with
-// it. That is a deliberate behaviour change, so it is recorded here rather than left to be
-// rediscovered as a bug.
+// Settings → Limits and cost's concurrency section saves each ceiling when its field is committed, on blur or Enter,
+// which the browser reports as one `change` event. A number the route would refuse stays in the
+// field with the reason beside it, and so does one the node failed to store.
 
 const saveAgentConcurrency = vi.fn(async (limits: unknown) => limits)
 
@@ -31,13 +30,16 @@ const draw = () => {
   return host
 }
 
-const type = (input: HTMLInputElement, value: string) => {
+// What the browser fires on blur, and on Enter, for a field whose text changed.
+const commit = (input: HTMLInputElement, value: string) => {
   input.value = value
   input.dispatchEvent(new Event('input', { bubbles: true }))
+  input.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
-const saveButton = (host: HTMLElement) =>
-  [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('Save'))!
+const settle = async () => {
+  for (let turn = 0; turn < 5; turn++) await Promise.resolve()
+}
 
 afterEach(() => {
   for (const teardown of hosts.splice(0).reverse()) teardown()
@@ -45,30 +47,33 @@ afterEach(() => {
 })
 
 describe('the agent concurrency settings page', () => {
-  it('saves when the button is pressed', async () => {
+  it('saves a ceiling when its field is committed, with the other one as stored', async () => {
     const host = draw()
     const [provider] = host.querySelectorAll<HTMLInputElement>('input[type="number"]')
-    type(provider, '3')
-    saveButton(host).click()
-    await Promise.resolve()
+    commit(provider, '3')
+    await settle()
     expect(saveAgentConcurrency).toHaveBeenCalledWith({ provider: 3, workspace: 4 })
+    expect(host.textContent).toContain('Saved')
+    expect([...host.querySelectorAll('button')].some((button) => button.textContent?.includes('Save'))).toBe(false)
   })
 
-  it('does not save on Enter in a field, because the page has no form', () => {
+  it('refuses a bad number beside the field and keeps what was typed', async () => {
     const host = draw()
     const [provider] = host.querySelectorAll<HTMLInputElement>('input[type="number"]')
-    type(provider, '3')
-    expect(host.querySelector('form')).toBeNull()
-    provider.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    commit(provider, '0')
+    await settle()
     expect(saveAgentConcurrency).not.toHaveBeenCalled()
+    expect(provider.value).toBe('0')
+    expect(host.querySelector('[role="alert"]')?.textContent).toMatch(/provider/i)
   })
 
-  it('refuses a bad number in the field rather than sending it', () => {
+  it('keeps the typed value when the node fails to store it', async () => {
+    saveAgentConcurrency.mockRejectedValueOnce(new Error('agent concurrency 500'))
     const host = draw()
-    const [provider] = host.querySelectorAll<HTMLInputElement>('input[type="number"]')
-    type(provider, '0')
-    saveButton(host).click()
-    expect(saveAgentConcurrency).not.toHaveBeenCalled()
-    expect(host.textContent).toMatch(/provider/i)
+    const [, workspace] = host.querySelectorAll<HTMLInputElement>('input[type="number"]')
+    commit(workspace, '6')
+    await settle()
+    expect(workspace.value).toBe('6')
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe('agent concurrency 500')
   })
 })

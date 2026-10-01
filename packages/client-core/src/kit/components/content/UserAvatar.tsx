@@ -1,5 +1,5 @@
 import { Show } from 'solid-js'
-import { githubAvatarUrl } from '../../lib/displayMeta'
+import { githubAvatarUrl } from '../../lib/rendering/displayMeta'
 
 type UserAvatarProps = {
   login: string | null | undefined

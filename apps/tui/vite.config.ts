@@ -46,6 +46,8 @@ const isAliased = (id: string) => id === '@solidjs/router' || id === 'lucide-sta
   || id === '@xterm/xterm' || id.startsWith('@xterm/xterm/')
   || id === '@xterm/addon-fit' || id === '@xterm/addon-webgl'
   || id === 'shiki' || id.startsWith('shiki/')
+// Archive-only entry bundles its parser closure; none of these packages enters startup.
+const isArchivePackage = (id: string) => ['tar', '@isaacs/fs-minipass', 'chownr', 'minipass', 'minizlib', 'yallist'].some((name) => id === name || id.startsWith(`${name}/`))
 const externalizeBareImports = (id: string) =>
   !id.startsWith('.') && !isAbsolute(id) && !isWorkspacePackage(id) && !isReactiveRuntime(id) && !isAliased(id)
 
@@ -84,6 +86,9 @@ export default defineConfig({
       // consumer that runs Solid on a real Node process points at the client build instead.
       { find: /^solid-js$/, replacement: 'solid-js/dist/solid.js' },
       { find: /^solid-js\/store$/, replacement: 'solid-js/store/dist/store.js' },
+      // TanStack Solid Query reads `isServer` from this entry. Node's default export condition
+      // resolves the server build, where queries never subscribe or fetch in a live TUI.
+      { find: /^solid-js\/web$/, replacement: 'solid-js/web/dist/web.js' },
       // CodeMirror's grammar and highlight-style half, browser xterm.js and its two addons, and
       // shiki. Three packages' worth of specifiers, three stubs, and one reason for all of them: each
       // is reached only from a DOM surface this host cannot draw — a CodeMirror `EditorView` in a
@@ -135,9 +140,10 @@ export default defineConfig({
         // The plugin sandbox's bootstrap, emitted beside `main.js` because a worker is pointed at it
         // by path and it has to be one file a thread with almost no filesystem can read. Its own
         // entry rather than a chunk, so its name is stable and `workerFactory.ts` can spell it.
+        'archive-worker': resolve(import.meta.dirname, '../../packages/node-core/src/server/plugins/archiveWorker.ts'),
         pluginWorker: resolve(import.meta.dirname, 'src/plugins/pluginWorker.js'),
       },
-      external: (id: string) => externalizeBareImports(id) || builtinModules.includes(id.replace(/^node:/, '')),
+      external: (id: string) => (!isArchivePackage(id) && externalizeBareImports(id)) || builtinModules.includes(id.replace(/^node:/, '')),
       output: {
         format: 'es',
         entryFileNames: '[name].js',
@@ -146,8 +152,8 @@ export default defineConfig({
         // tiny manifest carrier from being coalesced into the much larger data-query chunk merely
         // because both lazy editors also consume it.
         manualChunks: (id: string) => {
-          if (id.endsWith('/packages/protocol/src/dataSourceContributions.ts')) return 'data-source-contributions'
-          if (id.endsWith('/packages/protocol/src/dashboardViews.ts')) return 'dashboard-views'
+          if (id.endsWith('/packages/protocol/src/data/dataSourceContributions.ts')) return 'data-source-contributions'
+          if (id.endsWith('/packages/protocol/src/dashboards/dashboardViews.ts')) return 'dashboard-views'
           return undefined
         },
       },

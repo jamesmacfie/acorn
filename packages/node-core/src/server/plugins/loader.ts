@@ -9,18 +9,21 @@
 // only way a package reaches `<dataRoot>/plugins` now is through the installer, an
 // owner-authenticated route, and the device asks again before it runs the client half.
 import { createHash } from 'node:crypto'
-import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { readFile } from 'node:fs/promises'
-import { join } from 'node:path'
-import { confineExistingFile, resolveInRoot } from '../core/fs'
+import { readdirSync, statSync } from 'node:fs'
+import { basename, join } from 'node:path'
+import { resolveInRoot } from '../core/fs'
 import { describeSource, pluginInstallRoot, readLockfile, sweepDebris } from './installer'
-import { PLUGIN_API_MAJOR, readPluginManifestResult, speaksApiVersion, type ManifestUnknown, type PluginManifest } from './manifest'
+import { contributesNodeData, PLUGIN_API_MAJOR, readPluginManifestResult, speaksApiVersion, type ManifestUnknown, type PluginManifest } from './manifest'
 import { PluginMigrationsError, pluginMigrationsChain } from './migrations'
 import { openPluginDb } from './storage'
 import { readBundledPluginState } from './bundledState'
 import { disposeUnstartedPlugin, isolateNodePlugin } from './isolation'
+import { hasPendingPluginReview } from './pendingReview'
 import type { NodePlugin, PluginStorage } from '../pluginHost/types'
 import { createLogger } from '../telemetry/logger'
+import type { PluginRuntimeIdentity } from '@acorn/protocol/api.ts'
+
+import { MAX_CLIENT_BUNDLE_BYTES, MAX_PLUGIN_FILE_BYTES, readPluginFile, streamPluginFile, visitPluginFile } from './packageFiles'
 
 const log = createLogger('plugins')
 
@@ -28,7 +31,7 @@ const log = createLogger('plugins')
 // (docs/plugins.md). The ceiling is here rather than only in the
 // device's cache because a node should not read a gigabyte into memory to answer a GET, and it is
 // generous enough that no honest bundle meets it.
-export const MAX_CLIENT_BUNDLE_BYTES = 8 * 1024 * 1024
+export { MAX_CLIENT_BUNDLE_BYTES } from './packageFiles'
 
 export type LoadedPlugin = {
   manifest: PluginManifest
@@ -130,18 +133,18 @@ const digestCache = new Map<string, { key: string; value: { hash: string; bytes:
 // never sees a bundle to cache.
 function clientDigest(dir: string, relPath: string | undefined): { hash: string; bytes: number } | null {
   if (!relPath) return null
-  const abs = resolveInRoot(dir, relPath)
-  if (!abs) return null
   try {
-    const stats = statSync(abs)
-    const key = `${stats.mtimeMs}:${stats.size}:${stats.ino}`
-    const cached = digestCache.get(abs)
-    if (cached?.key === key) return cached.value
-    const bytes = readFileSync(abs)
-    if (bytes.byteLength > MAX_CLIENT_BUNDLE_BYTES) return null
-    const value = { hash: createHash('sha256').update(bytes).digest('hex'), bytes: bytes.byteLength }
-    digestCache.set(abs, { key, value })
-    return value
+    return visitPluginFile(dir, relPath, MAX_CLIENT_BUNDLE_BYTES, (fd, stats) => {
+      const key = `${stats.mtimeMs}:${stats.ctimeMs}:${stats.size}:${stats.ino}:${stats.dev}`
+      const cacheKey = `${dir}:${relPath}`
+      const cached = digestCache.get(cacheKey)
+      if (cached?.key === key) return cached.value
+      const hash = createHash('sha256')
+      const bytes = streamPluginFile(fd, stats.size, MAX_CLIENT_BUNDLE_BYTES, (chunk) => hash.update(chunk))
+      const value = { hash: hash.digest('hex'), bytes }
+      digestCache.set(cacheKey, { key, value })
+      return value
+    })
   } catch {
     return null
   }
@@ -164,6 +167,28 @@ export const installedPluginInfo = (entry: InstalledPlugin): InstalledPluginInfo
   ...(entry.unknown.length ? { unknown: entry.unknown } : {}),
 })
 
+export type ActivePluginSnapshot = {
+  id: string
+  identity: PluginRuntimeIdentity
+  bundle: { bytes: Uint8Array<ArrayBuffer>; hash: string } | null
+}
+
+/** Retain the manifest and the exact client bytes as one boot or reload candidate. The reported
+ * digest is computed from these retained bytes, never from a later disk scan. */
+export async function snapshotActivePlugin(entry: InstalledPlugin): Promise<ActivePluginSnapshot> {
+  const { id, hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...declaration } = installedPluginInfo(entry)
+  const bundle = await readClientBundle([entry], id)
+  return {
+    id,
+    identity: {
+      ...declaration,
+      client: bundle ? { hash: bundle.hash, bytes: bundle.bytes.byteLength } : null,
+      activation: hasNode || contributesNodeData(declaration.contributions) ? 'node' : 'client-only',
+    },
+    bundle,
+  }
+}
+
 // The bytes behind GET /v1/core/plugins/:id/client.js. Re-confines the path rather than trusting the
 // one resolved at boot, and re-hashes rather than reporting the boot hash: the two disagree exactly
 // when the file changed underneath us, and the honest answer is the hash of what is being sent.
@@ -173,11 +198,8 @@ export async function readClientBundle(
 ): Promise<{ bytes: Uint8Array<ArrayBuffer>; hash: string } | null> {
   const entry = installed.find((candidate) => candidate.manifest.id === id)
   if (!entry?.manifest.client) return null
-  const confined = await confineExistingFile(entry.dir, entry.manifest.client)
-  if (!confined.ok) return null
   try {
-    const bytes = await readFile(confined.path)
-    if (bytes.byteLength > MAX_CLIENT_BUNDLE_BYTES) return null
+    const bytes = readPluginFile(entry.dir, entry.manifest.client, MAX_CLIENT_BUNDLE_BYTES)
     // Uint8Array.from rather than a view over the Buffer: Node's Buffers sit in a shared pool, and
     // the response body must not alias memory the next read can reuse.
     return { bytes: Uint8Array.from(bytes), hash: createHash('sha256').update(bytes).digest('hex') }
@@ -357,14 +379,15 @@ async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: Rea
   // No node bundle. Its client bundle still has to reach every paired device, which is the whole
   // reason `installed` exists alongside `loaded`.
   if (!manifest.node) {
-    // But it may still contribute to the node, as data. A managed agent harness is the one kind that
-    // needs no route of its own and therefore no bundle at all (docs/managed-agents.md § Harnesses),
-    // and the whole point of that tier is that adding an agent costs one manifest.
+    // But it may still contribute to the node, as data. A managed agent harness and a custom agent are
+    // the two kinds that need no route of their own and therefore no bundle at all
+    // (docs/managed-agents.md § Harnesses), and the point of that tier is that adding an agent costs one
+    // manifest.
     //
     // It goes through the host as a real plugin with an empty `init`, rather than being delivered
     // beside it, so it gets everything a plugin row gets: a line in Settings → Plugins, an owner who
     // can disable it, and registrations that roll back with the rest.
-    if (manifest.contributions.harnesses.length === 0) return { installed: entry }
+    if (!contributesNodeData(manifest.contributions)) return { installed: entry }
     // Shadowing is a node-half concept: there is nothing here to run in a built-in's place, and
     // letting the id through would delete that built-in from the graph and put nothing back.
     if (builtins.has(manifest.id)) {
@@ -412,6 +435,9 @@ async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: Rea
 
   let plugin: NodePlugin
   try {
+    // Validate the opened entry before asking the module loader to read the path. Development
+    // packages remain mutable; this is a bounded preflight, not an atomic module graph snapshot.
+    visitPluginFile(dir, manifest.node, MAX_PLUGIN_FILE_BYTES, () => undefined)
     plugin = await isolateNodePlugin({
       entrypoint,
       pluginDir: dir,
@@ -431,7 +457,7 @@ async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: Rea
       if (!migrationsFolder) {
         throw new PluginMigrationsError(`Plugin '${manifest.id}' opened storage but declares no migrations.`)
       }
-      return openPluginDb(dataRoot, manifest.id, { migrationsFolder })
+      return openPluginDb(dataRoot, manifest.id, { migrationsFolder, loaded: true })
     },
   }
   // Installed only now. A package whose node half declared itself and then failed to import is
@@ -464,7 +490,12 @@ export async function loadExternalPlugins(
   // Every package starts at once, and the results fold back in directory order. A worker's start
   // happens almost entirely off this thread: its bootstrap and the bundle's evaluation take about
   // 45 ms a package. Awaiting them one at a time would make boot wait for the sum.
-  const outcomes = await Promise.all(scan.installed.map((entry) => loadEntry(entry, dataRoot, builtins)))
+  const outcomes = await Promise.all(scan.installed.map((entry) =>
+    // This is shared by boot and live reload. Checking before loadEntry also blocks manifest-only
+    // harness registration; merely setting `disabled` would still import the Node bundle above it.
+    hasPendingPluginReview(dataRoot, basename(entry.dir)) || hasPendingPluginReview(dataRoot, entry.manifest.id)
+      ? Promise.resolve({ installed: entry } as EntryOutcome)
+      : loadEntry(entry, dataRoot, builtins)))
   for (const outcome of outcomes) {
     if (outcome.failure) failures.push(outcome.failure)
     if (outcome.loaded) {

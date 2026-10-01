@@ -48,6 +48,11 @@ by a node — it is `dom`. `Only` and `Fallback` are the only things that read i
 a node that wants to know which host it is on is a node about to draw something host-specific, and the
 answer to that is a `<Fallback>` child, not a branch.
 
+Compiled controls can compose these nodes without joining the remote vocabulary. For example,
+`ModelPickerPopover` on `@acorn/plugin-api/ui/host` arranges a popover, its trigger, and the model
+choices its caller supplies as JSX. The desktop and terminal hosts provide that composition. It has
+no support-matrix row because a remote tree describes the component nodes themselves.
+
 Two hosts exist, and both draw the whole kit. `dom` is the desktop and the browser, from
 `client-core/host/tree/components.ts`. `tui` is the terminal, from `apps/tui/src/kit/components.tsx`,
 since 2026-08-31 (`docs/tui.md`). The two tables have the same
@@ -65,7 +70,7 @@ curves: the workflows editor authors a definition on it and the run pane watches
 the kit rather than in the plugin because plugin client code may not emit raw DOM or SVG, and a canvas
 is the one thing a terminal cannot draw — so admitting it meant writing both projections first. In
 cells it is the indented list the editor already drew: the same cards, the same order, the same
-selection, indented by rank instead of placed by coordinate. `kit/lib/graphLayout.ts` is the geometry,
+selection, indented by rank instead of placed by coordinate. `kit/lib/layout/graphLayout.ts` is the geometry,
 shared by both hosts, so the two cannot disagree about which card sits under which. Where a card goes
 is a device preference the caller holds, never part of what it is drawing.
 
@@ -88,16 +93,16 @@ named hosts and nowhere else. `Fallback forNode="Grid"` draws its children where
 this host cannot draw that node. Both are here before there is a second host, so a plugin can be
 written against one before it arrives.
 
-**A node has one name, and a handler has one of eleven.** Both fell out of the remote path, where a
+**A node has one name, and a handler has one of twelve.** Both fell out of the remote path, where a
 node is a type string on a message port and a prop is JSON. A compound spelling has nowhere to put its
 dot, so `Modal.Body`, `Modal.Actions`, `Tabs.Panel` and `Toolbar.Spacer` are also exported as
 `ModalBody`, `ModalActions`, `TabPanel` and `ToolbarSpacer`; the dotted names stay as aliases because
 they read better beside the node they belong to. And a callback prop is only sendable under one of the
-kit's eleven semantic events, which is why `Modal` takes `onDismiss` rather than `onClose`, `Input` and
+kit's twelve semantic events, which is why `Modal` takes `onDismiss` rather than `onClose`, `Input` and
 `Textarea` take `onChange` for the committed value rather than `onCommit`, and `Grid` takes `onSelect`
-rather than `onSelectRow`. A name outside the eleven — `onInput`, `onKeyDown`, `onPaste` — still works
-in the shell and is dropped on the way to a sandbox, which is the honest answer: a terminal host has
-no paste event to deliver.
+rather than `onSelectRow`. `ConfirmButton` sends `onConfirm` only after its own confirmation step. A
+name outside the twelve — `onInput`, `onKeyDown`, `onPaste` — still works in the shell and is dropped
+on the way to a sandbox, which is the honest answer: a terminal host has no paste event to deliver.
 
 **Behaviour a pane keeps redoing becomes a node's prop.** Three arrived with the agents pane, and each
 replaced a copy of the same machinery in a plugin. `Timeline follow` makes the timeline the scroller
@@ -120,7 +125,7 @@ For `Timeline follow` it means **a place is a turn, not a pixel.** "Two thousand
 means something while everything above those two thousand pixels keeps its height, and in a live
 transcript nothing does: a message keeps streaming, a code fence grows, an image loads, highlighting
 lands a frame or two after the paint. So the reader's place is the turn the viewport starts in and how
-far into it, which is `ReadingPlace` in `kit/lib/readingPlace.ts`, and putting them back is a
+far into it, which is `ReadingPlace` in `kit/lib/timeline/readingPlace.ts`, and putting them back is a
 correction measured against that turn's current position rather than an offset replayed. Following is
 the same value's other case, not a flag beside it, because the two used to be kept in agreement by
 hand and every defect found in that code was them disagreeing.
@@ -133,6 +138,15 @@ counts for as much as the gesture does. Most input scrolls nothing at all, a cli
 drag across a line, so the gesture it armed used to sit there until something else moved the view, and
 that move was then filed as the place the reader chose. Focus counts as a gesture when it lands on a
 turn in this list, because revealing a card scrolls it into view and then focuses it.
+
+The timeline's own moves are told apart from the reader's by where they left the view, not only by
+when. Each write marks scroll events as the timeline's own until the next frame. But the browser sends
+one scroll event per frame, whatever moved the view, so a reader who scrolls in the frame after a pin
+shares the pin's event. While a card was streaming, that event was dropped as the timeline's, and the
+next growth pinned the reader back to the bottom. So a marked event only counts as the timeline's
+while the view is still where its write left it, read back after the write so clamps and rounding are
+already in it. A resize checks the same thing before it pins, because WebKit can report a resize
+before the scroll event for the move that caused it.
 
 A list that the reader has no place in opens at the foot, and so does a list they were following.
 Those two are the same value, `{ at: 'live' }`, which is also why the timeline acts on a place equal
@@ -159,6 +173,28 @@ component is a place lost on every workspace switch, and a map hidden inside a k
 scope or clear it. The agents plugin owns them, beside the drafts, in
 `plugins/agents/src/client/sessions/readingPlaceStore.ts`.
 
+**Two nodes are a settings page.** `SettingsSection` and `SettingRow` joined when settings became a
+place of its own ([docs/frontend.md](../frontend.md) § Settings), because every page, core's and each
+plugin's, was drawing the same label-left, control-right shape with its own spacing and its own idea
+of when a value had saved. The row draws the save state rather than owning it. `savedAt` is a
+timestamp, so the row keeps the two-second **Saved** timer and every page's signal lasts as long,
+and `error` is a string. Both are JSON, which is what lets a sandboxed tree use the same row. `from`
+names where a value is set instead and wraps the control in a disabled fieldset, so the row goes
+inert without reaching into its child. `scope="device"` is for a row this device stores on a page about
+the node, such as **Tool call display** on Harnesses and defaults. It draws the header's **This device**
+chip at row size, because the header can name only one scope and the row's differs. `device` is the
+only value, since no page has needed another. `onReset` is a shell-side handler: reset is not one of the
+twelve events, so a remote tree's Reset is dropped on the way, the way `onInput` is. A section's `id`
+is an anchor rather than an element id, because two pages can each have a `general` section and a
+document holds one element per id. The settings view finds it inside the page it drew, to scroll to
+a search result and mark it. On a terminal a row whose value is set elsewhere says where and draws
+no control, because that host has no read-only form of an arbitrary child, which is the `reduced`
+level and the loss written beside it.
+
+Adding them changed the published SDK by two names and removed none, so `PLUGIN_API_MAJOR` stayed
+where it was. A tree that names either node on an older acorn draws the labelled placeholder any
+unknown node draws, so an author who uses them raises the floor of their `apiVersion` range.
+
 **A prop that has to hold an element has a data form beside it.** `ListDetail`'s `list` prop cannot
 cross, so `ListColumn` and `DetailColumn` are children; `Picker`'s `results(query)` callback cannot, so
 `items` is a list it filters itself; `DescriptionList.Item` children cannot, so `Facts` takes
@@ -180,8 +216,10 @@ declared axes:
 
 ### How the kit is built
 
-`primitives.css` holds the shared CSS for the components in `kit/components/primitives.tsx` and the component
-files beside it. Specificity is layered by convention: a node's base rule is a bare class, `(0,1,0)`;
+`primitives.css` holds the shared CSS for the components in `kit/components/inputs/`,
+`kit/components/content/`, and `kit/components/layout/`. The `kit/components/primitives.tsx` package
+subpath resolves to `primitives.ts` and keeps the established import contract.
+Specificity is layered by convention: a node's base rule is a bare class, `(0,1,0)`;
 a variant selector adds an attribute, `(0,2,0)`; a style pack's override adds a
 `:root[data-style="x"]` prefix, `(0,3,0)`. A pack wins because it is more specific, never because its
 stylesheet loads last.
@@ -200,7 +238,7 @@ The CSS clash and Checkbox checks stay, for the host's own code. Core still writ
 stylesheets and can still lose a rule to a primitive's own attribute selector.
 
 **`Markdown` renders block by block, and that is a contract rather than an optimisation.**
-`kit/lib/markdown.ts` exposes `renderBlocks(text)`, which returns one `{ key, html }` per block with
+`kit/lib/rendering/markdown.ts` exposes `renderBlocks(text)`, which returns one `{ key, html }` per block with
 the key hashed over that block's own source, and `renderMarkdown` is now that list joined. The
 component keeps the element it rendered for each key, so an update replaces only the blocks whose
 source moved: appending to a message changes exactly one key, its last. Three things follow, and every

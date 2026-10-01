@@ -1,6 +1,9 @@
-import { onCleanup, onMount } from 'solid-js'
+import { createEffect, createMemo, onCleanup, onMount } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { prefsOptions, registerCommands, type UiSlotContribution } from '@acorn/plugin-api/client'
+import { prefsOptions, registerCommands, type ContributedCommand, type UiSlotContribution } from '@acorn/plugin-api/client'
+import type { CustomAgent } from '../shared/customAgents'
+import { startSessionFromPalette } from './commands'
+import { customAgentsOptions } from './settings/customAgentsClient'
 import { agentSessionDefaultsOptions, writeAgentSessionDefaults } from './settings/sessionDefaultsClient'
 import {
   AGENT_TOOL_FOLD_CHOICES,
@@ -82,7 +85,45 @@ export function AgentCommands() {
     onCleanup(() => commands.dispose())
   })
 
+  const customAgents = createQuery(() => customAgentsOptions())
+  registerCustomAgentCommands(() => customAgents.data ?? [])
+
   return null
+}
+
+/**
+ * One "New <agent> session" row per custom agent, so typing the agent's name finds it without opening
+ * New agent session first. Registered again only when the set of ids changes; a rename reaches the row
+ * through the live read in `title`. Desktop only, for the reason the two settings above are: this
+ * needs the query cache, and the terminal still reaches every agent through New agent session.
+ */
+function registerCustomAgentCommands(list: () => readonly CustomAgent[]): void {
+  const agents = createMemo(list)
+  const live = (id: string) => agents().find((agent) => agent.id === id)
+  const roster = createMemo(() => agents().map((agent) => agent.id), [] as string[], {
+    equals: (before, after) => before.join() === after.join(),
+  })
+  createEffect(() => {
+    const ids = roster()
+    if (!ids.length) return
+    const registered = registerCommands(ids.map((id): ContributedCommand => ({
+      id: `agents.custom-agent.${id}`,
+      title: () => `New ${live(id)?.name ?? 'agent'} session`,
+      hint: 'a custom agent, started in this task',
+      keywords: ['agent', 'new', 'session', 'custom'],
+      category: 'action',
+      palette: true,
+      scope: 'task',
+      requires: { plugin: 'agents' },
+      when: () => !!live(id),
+      run: (context) => {
+        const agent = live(id)
+        if (!agent || !context.taskId) return
+        return startSessionFromPalette(context.taskId, { id: agent.providerId, profileId: agent.profileId }, agent.id)
+      },
+    })))
+    onCleanup(() => registered.dispose())
+  })
 }
 
 export const agentCommandsSlotContribution: UiSlotContribution = {

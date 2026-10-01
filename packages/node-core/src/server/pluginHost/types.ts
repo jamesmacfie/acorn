@@ -14,6 +14,7 @@ import type { RunSourceRegistration } from '../runs/registry'
 import type { Extension, ExtensionPointId } from './extensionPoints'
 import type { PluginContextSection } from '../agentTools/contextSections'
 import type { PluginHarnessRegistry } from './harnesses'
+import type { PluginCustomAgentRegistry } from './customAgents'
 import type { TaskCheck } from './taskChecks'
 import type { SearchProvider } from './search'
 import type { AppEnv, Principal } from '../middleware/auth'
@@ -81,8 +82,8 @@ export type PluginProviderRuntime = {
   // across every connection before there's a connectionId to key a resource call on.
   //
   // The host checks the plugin owns `providerId` at the ask, and the store it returns is built for that
-  // provider. One live-object exception: it returns a store synchronously rather than plain data, so it
-  // needs a proxy before loaded plugins can move out of process.
+  // provider. The loaded-plugin worker receives the store through a synchronous RPC proxy; its
+  // read and write methods remain asynchronous.
   items(providerId: string): ExternalItemStore
 }
 
@@ -467,10 +468,12 @@ export type CompiledNodePluginContext = NodePluginContext & {
 // `runNodeAction`) and harnesses, and server/pluginHost/host.ts replays those declarations through here.
 // Sitting on a context a plugin author reads they'd look like members to reach for, and in 21 plugins
 // nobody ever did. `harnesses` is not even a registry: it is a handover to whichever plugin owns agent
-// sessions (./harnesses.ts).
+// sessions (./harnesses.ts), and `customAgents` is the same handover for a manifest's saved agents
+// (./customAgents.ts).
 export type HostPluginContext = CompiledNodePluginContext & {
   nodeActions: PluginNodeActionRegistry
   harnesses: PluginHarnessRegistry
+  customAgents: PluginCustomAgentRegistry
 }
 
 export type NodePlugin = {
