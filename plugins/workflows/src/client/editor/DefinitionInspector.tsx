@@ -1,4 +1,4 @@
-import { Field, Fold, Input, Select, Stack, Textarea } from '@acorn/plugin-api/ui'
+import { Field, Input, SectionHeader, Select, Stack, Textarea } from '@acorn/plugin-api/ui'
 import type { WorkflowBudget, WorkflowDef } from '../../shared/workflowContracts'
 import TimeBudgetField from './TimeBudgetField'
 
@@ -8,77 +8,74 @@ export default function DefinitionInspector(props: {
   onChange: (patch: Partial<WorkflowDef>) => void
 }) {
   const budget = (): WorkflowBudget => props.def.budget ?? {}
-  const setBudget = (key: keyof WorkflowBudget, value: string): void => {
+  const setBudget = (key: keyof WorkflowBudget, value: number | undefined): void => {
     const next = { ...budget() }
-    if (value.trim()) next[key] = Number(value)
+    if (value !== undefined) next[key] = value
     else delete next[key]
     props.onChange({ budget: Object.keys(next).length ? next : undefined })
   }
+  const number = (value: string): number | undefined => (value.trim() ? Number(value) : undefined)
 
   return (
     <Stack gap="stack">
       <Field label="Name" group>
-        <Input size="sm" label="Name" disabled={props.disabled} value={props.def.name}
+        <Input label="Name" disabled={props.disabled} value={props.def.name}
           onInput={(value) => props.onChange({ name: value })} />
       </Field>
-      <Field label="Posture" hint="An autonomous run passes a human gate without stopping, so it needs a tool ceiling." group>
-        <Select size="sm" label="Posture" disabled={props.disabled} value={props.def.posture ?? 'gated'}
-          options={[{ value: 'gated', label: 'Gated' }, { value: 'autonomous', label: 'Autonomous' }]}
+      <Field label="Approvals" hint="To skip approvals, set a tool limit below." group>
+        <Select label="Approvals" disabled={props.disabled} value={props.def.posture ?? 'gated'}
+          options={[{ value: 'gated', label: 'Stop and ask' }, { value: 'autonomous', label: 'Skip' }]}
           onChange={(value) => props.onChange({ posture: value === 'gated' ? undefined : 'autonomous' })} />
       </Field>
-      <Fold label="Tools" level="group">
-        <Stack gap="row">
-          <Field label="Highest risk allowed" group>
-            <Select size="sm" label="Highest risk allowed" disabled={props.disabled}
-              value={props.def.tools?.maxRisk ?? ''}
-              options={[
-                { value: '', label: 'No ceiling' },
-                { value: 'read', label: 'Read' },
-                { value: 'write', label: 'Write' },
-                { value: 'execute', label: 'Execute' },
-              ]}
-              onChange={(value) => props.onChange({
-                tools: { ...props.def.tools, maxRisk: (value || undefined) as 'read' | 'write' | 'execute' | undefined },
-              })} />
-          </Field>
-          <Field label="Only these tools" hint="One name per line. Leave it empty to allow every tool inside the risk ceiling." group>
-            <Textarea size="sm" rows={3} mono assist={false} label="Only these tools" disabled={props.disabled}
-              value={(props.def.tools?.allow ?? []).join('\n')}
-              onInput={(value) => {
-                const allow = value.split('\n').map((line) => line.trim()).filter(Boolean)
-                props.onChange({ tools: { ...props.def.tools, allow: allow.length ? allow : undefined } })
-              }} />
-          </Field>
-        </Stack>
-      </Fold>
-      <Fold label="Execution limits" level="group">
-        <Stack gap="row">
-          <Field label="Descendant tasks" hint="Counts the whole tree, including nested follow-ups. Default 100; maximum 500." group>
-            <Input size="sm" type="number" label="Descendant tasks" disabled={props.disabled} value={props.def.maxDescendants ?? ''}
-              onInput={(value) => props.onChange({ maxDescendants: value.trim() ? Number(value) : undefined })} />
-          </Field>
-          <Field label="Concurrent agents" hint="Agents only. Waiting parents, gates, and data reads use no slot. Default 4." group>
-            <Input size="sm" type="number" label="Concurrent agents" disabled={props.disabled} value={props.def.maxConcurrency ?? ''}
-              onInput={(value) => props.onChange({ maxConcurrency: value.trim() ? Number(value) : undefined })} />
-          </Field>
-        </Stack>
-      </Fold>
-      <Fold label="Budget" level="group">
-        <Stack gap="row">
-          <Field label="Cost ceiling, in dollars" group>
-            <Input size="sm" type="number" width="narrow" label="Cost ceiling" disabled={props.disabled}
-              value={budget().maxCostUsd ?? ''} onInput={(value) => setBudget('maxCostUsd', value)} />
-          </Field>
-          <TimeBudgetField label="Workflow timeout in minutes"
-            hint="Limits the whole run, including child workflows. Leave empty for no run limit. Without a time budget, agent turns default to 10 minutes."
-            budget={props.def.budget} disabled={props.disabled}
-            onChange={(budget) => props.onChange({ budget })} />
-          <Field label="Turns" group>
-            <Input size="sm" type="number" width="narrow" label="Turns" disabled={props.disabled}
-              value={budget().maxTurns ?? ''} onInput={(value) => setBudget('maxTurns', value)} />
-          </Field>
-        </Stack>
-      </Fold>
+
+      <SectionHeader level="sub">Tools</SectionHeader>
+      <Field label="Riskiest tools allowed" group>
+        <Select label="Riskiest tools allowed" disabled={props.disabled}
+          value={props.def.tools?.maxRisk ?? ''}
+          options={[
+            { value: '', label: 'No limit' },
+            { value: 'read', label: 'Read only' },
+            { value: 'write', label: 'Read and write' },
+            { value: 'execute', label: 'Anything, including commands' },
+          ]}
+          onChange={(value) => props.onChange({
+            tools: { ...props.def.tools, maxRisk: (value || undefined) as 'read' | 'write' | 'execute' | undefined },
+          })} />
+      </Field>
+      <Field label="Only these tools" hint="One tool name per line. Leave it empty to allow any tool under the limit." group>
+        <Textarea rows={3} mono assist={false} label="Only these tools" disabled={props.disabled}
+          value={(props.def.tools?.allow ?? []).join('\n')}
+          onInput={(value) => {
+            const allow = value.split('\n').map((line) => line.trim()).filter(Boolean)
+            props.onChange({ tools: { ...props.def.tools, allow: allow.length ? allow : undefined } })
+          }} />
+      </Field>
+
+      <SectionHeader level="sub">Limits</SectionHeader>
+      <Field label="Most child tasks" help="Counts every task the run makes, however deep. Up to 500." group>
+        <Input type="number" width="narrow" label="Most child tasks" placeholder="100" disabled={props.disabled}
+          value={props.def.maxDescendants ?? ''}
+          onInput={(value) => props.onChange({ maxDescendants: number(value) })} />
+      </Field>
+      <Field label="Agents at once" help="Only running agents count. Steps that wait or read data don't." group>
+        <Input type="number" width="narrow" label="Agents at once" placeholder="4" disabled={props.disabled}
+          value={props.def.maxConcurrency ?? ''}
+          onInput={(value) => props.onChange({ maxConcurrency: number(value) })} />
+      </Field>
+
+      <SectionHeader level="sub">Budget</SectionHeader>
+      <Field label="Cost limit in US dollars" group>
+        <Input type="number" width="narrow" label="Cost limit in US dollars" disabled={props.disabled}
+          value={budget().maxCostUsd ?? ''} onInput={(value) => setBudget('maxCostUsd', number(value))} />
+      </Field>
+      <TimeBudgetField label="Workflow timeout in minutes"
+        hint="Limits the whole run, including child workflows. Leave empty for no run limit. Without a time budget, agent turns default to 10 minutes."
+        budget={props.def.budget} disabled={props.disabled}
+        onChange={(budget) => props.onChange({ budget })} />
+      <Field label="Agent turns" group>
+        <Input type="number" width="narrow" label="Agent turns" disabled={props.disabled}
+          value={budget().maxTurns ?? ''} onInput={(value) => setBudget('maxTurns', number(value))} />
+      </Field>
     </Stack>
   )
 }

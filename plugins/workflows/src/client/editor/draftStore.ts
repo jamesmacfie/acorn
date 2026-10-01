@@ -32,7 +32,12 @@ export const defRefKey = (ref: DefRef): string => `${ref.source === 'database' ?
 /** Where a definition is kept, as a mark rather than a word. The list draws one per row and the editor
  *  one in its header, so both name the same three icons here. One line, because the icon census reads a
  *  name only off a line that mentions an icon (client-core scripts/icon-census.mjs). */
-export const SOURCE_GLYPH: Record<DefRef['source'], { icon: string; title: string }> = { database: { icon: 'database', title: 'Kept in this workspace' }, repo: { icon: 'git-branch', title: 'A file the repository commits' }, user: { icon: 'user', title: 'A file of yours on this machine' } }
+export const SOURCE_GLYPH: Record<DefRef['source'], { icon: string; title: string }> = { database: { icon: 'database', title: 'Saved in this workspace' }, repo: { icon: 'git-branch', title: 'Saved in the repository' }, user: { icon: 'user', title: 'Saved on this computer' } }
+
+/** Where the draft stands against the node. One badge draws it: "Saving…" covers the autosave gap as
+ *  well as the write itself, because a word that changes during every pause in typing reads as a
+ *  different state. "unsaved" means the last write failed; the device copy is what keeps the work. */
+export type SaveState = 'saved' | 'saving' | 'unsaved' | 'conflict'
 
 /** A key arrives either from the address, where it is encoded, or straight from `defRefKey`, where it
  *  is not. A malformed escape is not worth throwing over: the caller reads it as unparseable. */
@@ -82,7 +87,7 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
   const [busy, setBusy] = createSignal(false)
   const [message, setMessage] = createSignal<string | undefined>()
   const recovery = workflowRecoveryStore(deviceStorage())
-  const [saveState, setSaveState] = createSignal('Draft saved')
+  const [saveState, setSaveState] = createSignal<SaveState>('saved')
   const [publishedRevision, setPublishedRevision] = createSignal<number | null>(null)
   const [publishedDef, setPublishedDef] = createSignal<WorkflowDef | undefined>()
   const [publication, setPublication] = createSignal<WorkflowPublication | undefined>()
@@ -135,7 +140,7 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
       const merged = mergeWorkflow(copy.base, copy.local, def)
       setConflicts(merged.conflicts)
       setDraftRaw(newDraft(merged.value))
-      setSaveState(merged.conflicts.length ? 'Resolve save conflict' : 'Saved on this device')
+      setSaveState(merged.conflicts.length ? 'conflict' : dirty() ? 'saving' : 'saved')
     }
     if (row.workspaceId && workflowApi.publications) void workflowApi.publications(row.workspaceId).then(operations => {
       setPublication(operations.find(operation => operation.rootId === row.id && operation.state !== 'complete'))
@@ -236,12 +241,12 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
     const nodeId = activeNodeId() ?? ''
     const copy: WorkflowRecovery = { nodeId, entityId: entityId(), baseRevision: revision(), base: baseDef, local: def, savedAt: Date.now() }
     pendingCopy = copy
-    const durable = recovery.save(copy)
-    setSaveState('Saving')
+    recovery.save(copy)
+    setSaveState('saving')
     const readCurrent = async () => current.source === 'database' ? workflowApi.def(current.id) : (await workflowApi.files({ action: 'open', target: fileTarget() })).draft!
     const row = await guard(async () => current.source === 'database' ? workflowApi.updateDef(current.id, def, revision()) : (await workflowApi.files({ action: 'save', target: fileTarget(), def, revision: revision() })).draft!)
     if (!row) {
-      setSaveState(durable ? 'Saved on this device' : 'Could not save')
+      setSaveState('unsaved')
       setMessage((text) => text ?? 'That save did not land.')
       const remote = await readCurrent().catch(() => null)
       if (remote && remote.revision !== copy.baseRevision) {
@@ -252,7 +257,7 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
         setRevision(remote.revision)
         baseDef = remote.def as WorkflowDef
         setSaved(toJson(baseDef))
-        setSaveState(merged.conflicts.length ? 'Resolve save conflict' : 'Saved on this device')
+        setSaveState(merged.conflicts.length ? 'conflict' : 'unsaved')
       }
       return false
     }
@@ -261,7 +266,7 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
     setRevision(row.revision)
     baseDef = row.def as WorkflowDef
     setSaved(toJson(def))
-    setSaveState('Draft saved')
+    setSaveState('saved')
     return true
   }
 
@@ -271,7 +276,8 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
     if (!current || readOnly() || !dirty() || !revision() || conflicts().length) return
     const copy: WorkflowRecovery = { nodeId: activeNodeId() ?? '', entityId: entityId(), baseRevision: revision(), base: baseDef, local: draft().def, savedAt: Date.now() }
     pendingCopy = copy
-    setSaveState(recovery.save(copy) ? 'Saved on this device' : 'Not saved')
+    recovery.save(copy)
+    setSaveState('saving')
     autosave()
   }))
   onCleanup(() => { autosave.cancel(); if (dirty() && !conflicts().length) void save() })

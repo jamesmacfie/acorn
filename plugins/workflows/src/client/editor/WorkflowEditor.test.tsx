@@ -161,17 +161,18 @@ it('refreshes a missing step when its plugin returns without changing the saved 
     { id: 'send', name: 'Send', kind: 'mail:send', with: { recipient: 'team' } },
   ] }
   await mount('db:abc')
-  expect(document.body.textContent).toContain("Plugin 'mail' does not provide this step")
-  expect(document.body.textContent).toContain('Run unavailable')
+  expect(document.body.textContent).toContain("The mail plugin isn't on this computer.")
+  expect(document.body.textContent).toContain("Can't run this workflow")
   currentKinds = [{ id: 'mail:send', pluginId: 'mail', describe: {
     label: 'Send mail', description: 'Send mail to the team.', icon: 'send', fields: [],
     output: { description: 'The delivery receipt.' },
   } }]
   pluginChanged?.()
   await settle()
-  expect(document.body.textContent).toContain('Send mail to the team.')
-  expect(document.body.textContent).not.toContain("Plugin 'mail' does not provide this step")
-  expect(document.body.textContent).not.toContain('Run unavailable')
+  // The outline row names the kind once its plugin is back.
+  expect(document.body.textContent).toContain('Send mail')
+  expect(document.body.textContent).not.toContain("The mail plugin isn't on this computer.")
+  expect(document.body.textContent).not.toContain("Can't run this workflow")
   expect(document.body.textContent).toContain('Not published')
   expect(currentDef.steps[0]?.with).toEqual({ recipient: 'team' })
 })
@@ -187,7 +188,7 @@ describe('reviewing an AI proposal', () => {
     await press('Apply reviewed edit')
     expect(document.body.textContent).toContain('synthesise')
     expect(document.body.textContent).not.toContain('Plan the change')
-    expect(toasts).toEqual(['AI proposal applied. Undo restores the previous draft.'])
+    expect(toasts).toEqual(["AI's changes applied. Undo puts your version back."])
 
     await press('Undo')
     expect(document.body.textContent).toContain('plan')

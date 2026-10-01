@@ -1,6 +1,6 @@
 # 07-19. Three status marks in the editor header
 
-**Status:** not started. Batch B07a. Written 2026-10-01. Line numbers are from 2026-10-01 and may
+**Status:** done 2026-10-02 on `more-ui`. Batch B07a. Written 2026-10-01. Line numbers are from 2026-10-01 and may
 have moved.
 
 The editor header shows a layer glyph (with the browser's tooltip "Kept in this workspace"), a save

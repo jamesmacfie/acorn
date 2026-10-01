@@ -171,7 +171,7 @@ export function WorkflowsBrowseList() {
     <Stack gap="none">
       <SectionHeader
         count={definitions().length}
-        actions={<Button size="sm" disabled={!scope.workspaceId()} onPress={() => void create()}>+ New</Button>}
+        actions={<Button size="sm" disabled={!scope.workspaceId()} onPress={() => void create()}><Icon name="plus" /> New</Button>}
       >
         Definitions
       </SectionHeader>

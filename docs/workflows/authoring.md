@@ -28,15 +28,23 @@ are a `list-detail` pair inside that. Every control is a kit node, so none of th
 either host had to be given.
 
 The primary view is an outline with three kinds of row. **Definition** carries the workflow's name,
-posture, tool ceiling, and budget. **Inputs** carries the values supplied when a run starts. Step
-rows show a behavior summary, an **After** line with readable dependencies, and visible branch
-labels. Roots appear in declaration order, followed by each step after the last dependency. Move
-controls reorder declarations without changing stable IDs or explicit edges. A referenced-step
-deletion names the affected dependencies and bindings before applying the edit. **Add** lists the
-catalog's kinds, with built-in actions first and each contributed kind's icon and description.
+approvals, tool limit, limits, and budget. **Inputs** carries the values supplied when a run starts.
+A step row is two lines: the name, then the kind's label, or a summary when the step has something
+of its own to say (an If's condition, a For each's source, a Find records query). Branch labels sit
+at the row's end. Roots appear in declaration order, followed by each step after the last
+dependency. A row indents only where the graph forks: a branch target, or a step that waits on more
+than one. **Add step** groups the catalog's kinds as **Ask AI**, **Records**, and **Flow**, then one
+group per plugin under its name, each sorted by label.
 
-The selected row opens its configuration and a contextual preview. The preview describes the step,
-dependencies, branch, and declared output fields. It does not run an agent or invent sample output.
+The selected row opens its configuration under a header bar: the kind's icon, the step name with the
+kind's description behind its help mark, the kind badge, and **Move up**, **Move down**, and
+**Delete**. Moving reorders declarations without changing stable IDs or explicit edges. Deleting a
+step that other steps use names them before the edit applies. A contextual preview lists the branch,
+a gate's form fields, and the output fields later steps can read, by name. It does not run an agent
+or invent sample output.
+
+A required field shows its error after someone touches it, or after **Publish…** or **Run…** is
+pressed. The footer lists the first problem, which selects its step, and a count of the rest.
 **Graph** and **Code** are secondary views over the same definition and stable step IDs. They do not
 maintain a separate graph model. Outline edits, binding changes, code edits, and generated proposals
 share one undo and redo history.
