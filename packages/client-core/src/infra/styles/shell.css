@@ -382,6 +382,9 @@
   margin-inline: calc(-1 * var(--pane-pad));
   padding-inline: var(--pane-pad);
 }
+/* An `sm` action row would otherwise take the pane-edge pad above on top of the footer's own, and
+   start a pad to the right of the field over it. */
+.layout-list-footer .ui-toolbar[data-variant='actions'] { padding-inline: 0; }
 /* Collapsed: the same width the icon rails read, so a pack that moves them moves this
    (tokens-style.css § --tabrail-w). The dragged pixel value stops being applied while it is, which
    is why the component drops the inline custom property rather than this rule fighting it. */

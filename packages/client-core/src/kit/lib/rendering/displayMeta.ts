@@ -14,21 +14,21 @@ export function fileStatusMeta(status: string | null | undefined): FileStatusMet
     case 'added':
     case 'add':
     case 'new':
-      return { letter: 'A', label: 'added', tone: 'ok' }
+      return { letter: 'A', label: 'Added', tone: 'ok' }
     case 'removed':
     case 'deleted':
     case 'delete':
-      return { letter: 'D', label: 'deleted', tone: 'danger' }
+      return { letter: 'D', label: 'Deleted', tone: 'danger' }
     case 'renamed':
     case 'rename':
-      return { letter: 'R', label: 'renamed', tone: 'warn' }
+      return { letter: 'R', label: 'Renamed', tone: 'warn' }
     case 'copied':
     case 'copy':
-      return { letter: 'C', label: 'copied', tone: 'muted' }
+      return { letter: 'C', label: 'Copied', tone: 'muted' }
     case 'changed':
     case 'modified':
     default:
-      return { letter: 'M', label: 'modified', tone: 'warn' }
+      return { letter: 'M', label: 'Modified', tone: 'warn' }
   }
 }
 

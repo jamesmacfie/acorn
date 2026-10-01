@@ -92,7 +92,7 @@ export function DiffCanvas(props: {
       </Match>
       <Match when={item().kind === 'nodiff'}>
         <FullRow split={split()} class="diff-thread-row">
-          <span class="diff-nodiff muted">No diff (binary or too large).</span>
+          <span class="diff-nodiff muted">Can't show this file. It's binary or too large.</span>
         </FullRow>
       </Match>
       <Match when={item().kind === 'segment' || item().kind === 'overlay' ? (item() as Extract<DiffItem, { kind: 'segment' | 'overlay' }>) : null}>
@@ -213,9 +213,9 @@ function SegmentPlaceholder(props: { height: number; failed: boolean; onRetry: (
   return (
     <div class="diff-segment-pending" style={{ height: `${Math.max(props.height, 20)}px` }}>
       <span class="diff-load" classList={{ 'diff-load-error': props.failed }}>
-        <span>{props.failed ? 'Could not load diff.' : 'Loading diff…'}</span>
+        <span>{props.failed ? "Couldn't load this part." : 'Loading…'}</span>
         <Show when={props.failed}>
-          <Button variant="bare" onPress={props.onRetry}>Retry</Button>
+          <Button variant="ghost" size="xs" onPress={props.onRetry}>Try again</Button>
         </Show>
       </span>
     </div>
@@ -242,7 +242,6 @@ function UnifiedRow(props: { row: Row; ctx: DiffRowContext; itemKey: string }) {
         'diff-del': props.row.kind === 'delete',
         'diff-thread-row': props.row.kind === 'thread',
       }}
-      title={props.ctx.lineAction && code() ? props.ctx.lineAction.title : undefined}
       onClick={(event) => {
         const row = code()
         if (row && props.ctx.lineAction) props.ctx.lineAction.run(row, event)
@@ -276,6 +275,7 @@ function UnifiedRow(props: { row: Row; ctx: DiffRowContext; itemKey: string }) {
                 highlight={props.ctx.findHighlight(row())}
                 openLine={props.ctx.openLine}
                 askAgent={props.ctx.askAgent}
+                askHint={props.ctx.lineAction?.title}
               />
               {/* Its own line under the code. `.diff-row` wraps, so anything drawn beside `DiffLine`
                   needs a full basis or it shares the line with the code and squeezes it. The wrapper

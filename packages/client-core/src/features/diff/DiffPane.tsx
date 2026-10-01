@@ -12,7 +12,7 @@ import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { registerCommands } from '../../host/registries/commands/commands'
 import { registerKeybindings } from '../../host/registries/commands/keybindings'
 import { savePref } from '../settings/savePref'
-import { EmptyState } from '../../kit/components/primitives'
+import { Button, EmptyState } from '../../kit/components/primitives'
 import { DiffCanvas } from './DiffCanvas'
 import { FileHead, type LineComposerController, type ThreadCollapseController } from '../../kit/diff/DiffRows'
 import { AnnotationMarks } from '../../host/annotations/AnnotationMarks'
@@ -655,12 +655,22 @@ export function DiffPane(props: {
   return (
     <Show
       when={topology()?.files.length}
-      fallback={<EmptyState align="start" busy={source().loading()}>{source().loading() ? 'Loading…' : 'No files.'}</EmptyState>}
+      fallback={<Show when={source().loading()} fallback={<EmptyState title="No changes" />}>
+        <EmptyState busy>Loading…</EmptyState>
+      </Show>}
     >
       <DiffToolbar find={findController} viewMode={viewMode} setViewMode={setViewMode} fileQuery={fileQuery} setFileQuery={setFileQuery} />
-      <Show when={fileFilter()?.size === 0}>
-        <EmptyState align="start">No files match.</EmptyState>
-      </Show>
+      {/* Instead of the canvas, not beside it. The canvas remounts when the filter clears, the same way
+          it does on a switch between unified and split, so the scroller and layout re-attach. */}
+      <Show
+        when={fileFilter()?.size !== 0}
+        fallback={
+          <EmptyState
+            title={`No files match "${fileQuery().trim()}"`}
+            action={<Button variant="ghost" size="sm" onPress={() => setFileQuery('')}>Clear filter</Button>}
+          />
+        }
+      >
       <DiffCanvas
         viewMode={viewMode}
         items={items}
@@ -698,6 +708,7 @@ export function DiffPane(props: {
           observeBlock: layout.observeBlock,
         }}
       />
+      </Show>
     </Show>
   )
 }

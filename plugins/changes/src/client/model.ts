@@ -97,16 +97,6 @@ export function stagedState(rows: readonly FileRow[]): 'all' | 'some' | 'none' {
   return rows.some((row) => row.staged || row.partial) ? 'some' : 'none'
 }
 
-/** The header's `+N −M`, summed over the rows on screen. A row with no counts — a conflict, an
- *  untracked file, a binary — contributes nothing rather than a zero, so the sum stays a fact about
- *  the files git could count. */
-export function totals(rows: readonly FileRow[]): { additions: number; deletions: number } {
-  return rows.reduce(
-    (sum, row) => ({ additions: sum.additions + (row.additions ?? 0), deletions: sum.deletions + (row.deletions ?? 0) }),
-    { additions: 0, deletions: 0 },
-  )
-}
-
 /** What the commit button does, and what it says.
  *
  *  `staged` commits the index. `tracked` is Zed's rule and removes the most common extra click:
@@ -152,7 +142,7 @@ export function primaryRemote(state: RemoteState): RemoteVerb {
  *  Empty when the branch is level with its upstream. Nothing to report is better said by saying
  *  nothing than by two zeros. */
 export function remoteCounts(state: RemoteState): string {
-  if (state.upstream == null) return 'no upstream'
+  if (state.upstream == null) return 'Not published'
   const parts: string[] = []
   if (state.behind) parts.push(`↓${state.behind}`)
   if (state.ahead) parts.push(`↑${state.ahead}`)

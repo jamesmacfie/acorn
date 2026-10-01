@@ -57,17 +57,22 @@
 .diff-line-extra {
   flex-basis: 100%;
   min-width: 0;
-  padding-left: calc(2 * var(--diff-gutter-w) + var(--diff-marker-w));
+  padding-left: calc(2 * var(--diff-gutter-w) + var(--diff-marker-w) + var(--diff-btn-w));
 }
+/* Split cells have one gutter, so the code starts one gutter further left. */
+.diff-split-band > .diff-line-extra { padding-left: calc(var(--diff-gutter-w) + var(--diff-marker-w) + var(--diff-btn-w)); }
 .diff-line-extra:empty { display: none; }
 /* The negative margin backs the chat out of .diff-line-extra's indent to the card inset; notes and
-   marks in the same wrapper stay under the code. */
+   marks in the same wrapper stay under the code. Change it with the indent above, in both views. */
 .diff-inline-chat {
   position: sticky;
   left: var(--diff-card-inset);
   width: calc(100cqw - var(--diff-card-inset) - var(--pane-pad));
-  margin: 6px 0 6px calc(var(--diff-card-inset) - 2 * var(--diff-gutter-w) - var(--diff-marker-w));
+  margin: 6px 0 6px calc(var(--diff-card-inset) - 2 * var(--diff-gutter-w) - var(--diff-marker-w) - var(--diff-btn-w));
   white-space: normal;
+}
+.diff-split-band > .diff-line-extra > .diff-inline-chat {
+  margin-left: calc(var(--diff-card-inset) - var(--diff-gutter-w) - var(--diff-marker-w) - var(--diff-btn-w));
 }
 .diff-gutter { position: relative; flex: none; width: var(--diff-gutter-w); padding-right: var(--space-4); text-align: right; color: var(--text-faint); user-select: none; }
 .diff-marker { flex: none; width: var(--diff-marker-w); text-align: center; color: var(--text-faint); user-select: none; }
@@ -168,14 +173,19 @@
 }
 .diff-file-collapse {
   flex: none;
-  width: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h-xs);
+  height: var(--control-h-xs);
   padding: 0;
   border: none;
+  border-radius: var(--radius-control);
   background: none;
   color: var(--text-muted);
-  font-size: var(--fs-2xs);
   cursor: pointer;
 }
+.diff-file-collapse:hover { background: var(--bg-hover); }
 .diff-file-collapse:hover { color: var(--text); }
 .diff-file-head .diff-file-path {
   flex: 1;
@@ -347,12 +357,17 @@
 
 /* ── File status ────────────────────────────────────────────────────────────────────────────
    See docs/ui-design.md § How the kit is built for why this owns .file-status now. */
+/* The look of the xs Badge the Changes list draws for the same status, so one status reads one way
+   on both sides of the divider. Kept as its own class because the header is diff code (no kit node
+   inside the measured rows). */
 .file-status {
   flex: none;
-  width: 16px;
-  text-align: center;
-  font-weight: 700;
-  font-size: var(--fs-xs);
+  padding: 0 var(--space-3);
+  background: var(--chip-bg);
+  border: var(--control-bw) solid currentColor;
+  border-radius: var(--radius-chip);
+  font-size: var(--fs-2xs);
+  line-height: 1.6;
 }
 .file-status-ok { color: var(--add-marker); }
 .file-status-danger { color: var(--del-marker); }

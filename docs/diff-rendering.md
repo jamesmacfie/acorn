@@ -102,7 +102,7 @@ can describe different trees. It is one `git status --porcelain=v2 --branch --un
 call plus two numstats and a filesystem check for a half-finished merge or rebase, and the node shares
 all of it across clients for two seconds ([workspaces-and-tasks.md](./workspaces-and-tasks.md)
 § Worktree status reads). Two reads would
-disagree for a poll interval, which is why the header's totals, the groups, the branch bar's counts
+disagree for a poll interval, which is why the header's count, the groups, the branch bar's counts
 and the banner all derive from this one record. The last flag is what makes an untracked directory
 arrive as the files inside it: git's default collapses one to a single `dir/` entry, and a row named
 after a directory has no patch to show and no file to discard.
@@ -111,7 +111,8 @@ Three members exist for what a caller draws that the viewer has no concept of. `
 conversations, complete when the topology is, and placed by their line number. `lineExtra` puts
 content under a code row: `anchors` names every line that has some, up front, so the document reserves
 for it before the segment loads, and `render` draws one line's inside the segment so its height is
-measured with it. `lineAction` adds a click affordance on a code line. The changes pane uses the
+measured with it. `lineAction` adds a click affordance on a code line, and its `title` is the second
+line of the **Ask agent** button's tip rather than a tooltip on the line. The changes pane uses the
 second for review notes and the third for Alt-click to send a line reference to the agent.
 The Changes source and a task's GitHub PR source supply `openLine`: an added line shows a hover button
 in its first gutter that opens the task's file at that new-side line in the editor. Repository PR browse
@@ -164,8 +165,11 @@ reads the summaries already warmed by the PR list. The client never holds a whol
 
 The changes pane's list is a navigator, not a selector: every file's hunks are stacked in one
 scroller and clicking a row scrolls to it, the way the pull-request pane's list works. Staging is a
-checkbox, one per row and one per group; the two verbs that are not staging, Discard and Send to
-agent, are in the row's overflow menu.
+checkbox, one per row and one per group, and the row's box is its last trailing control so it lines
+up with its group's; the two verbs that are not staging, Discard and Send to agent, are in the row's
+overflow menu, before the box. The list header is the house list header, **Changes** with its count,
+and unsent review notes get a banner at the top of the list with **Send to agent**, where the result
+of the send also lands.
 
 The panel's footer reads top to bottom in the order things happen: the banner while a merge or rebase
 is in flight, the branch bar, the `changes:push-actions` slot where another plugin says what to do next
@@ -512,6 +516,8 @@ The file filter at the start of the toolbar drops every file whose path does not
 all, and scrolls the list back to its top (`diff/fileFilter.ts`). The query matches as a whole,
 ignoring case, where it appears last in the path, which is usually the file name. The header marks
 the matched characters with the find mark. Find still counts matches in the files the filter hides.
+When nothing matches, a centred empty state with **Clear filter** draws instead of the canvas, which
+remounts when the filter clears, as it does on a switch between unified and split.
 
 The reading place, collapsed files, and file filter are remembered per scope for the session (`diff/viewState.ts`):
 a task and the classic browser keep separate entries for the same content, and a task's entries are

@@ -2,7 +2,7 @@ import { createSignal, Show } from 'solid-js'
 import { fileStatusMeta, type Task } from '@acorn/plugin-api/client'
 import {
   Alert, Badge, Button, Checkbox, DiffPane, EmptyState, Fold, Icon, IconButton, Inline, Menu,
-  paneCollapseKey, Row, Rows, sidebarCollapsed, Stack, Text, Toolbar, TreeRow,
+  paneCollapseKey, Row, Rows, SectionHeader, sidebarCollapsed, Stack, Text, Toolbar, TreeRow,
 } from '@acorn/plugin-api/ui'
 import type { LocalChange } from '@acorn/protocol/localGit.ts'
 import { type ChangesModel } from './changesModel'
@@ -30,7 +30,7 @@ import { DIFF_LINE_POINT } from './extensionPoints'
 // about a working tree, so the two states only git has get their letters here: `U` is what git itself
 // prints for an unmerged file.
 const statusMeta = (status: LocalChange['status']) => {
-  if (status === 'conflicted') return { letter: 'U', label: 'conflicted', tone: 'danger' as const }
+  if (status === 'conflicted') return { letter: 'U', label: 'Conflicted', tone: 'danger' as const }
   const meta = fileStatusMeta(status === 'untracked' ? 'added' : status)
   // `muted` is the file-status vocabulary's word for "nothing special"; the badge's is `neutral`.
   return { ...meta, tone: meta.tone === 'muted' ? ('neutral' as const) : meta.tone }
@@ -39,13 +39,10 @@ const statusMeta = (status: LocalChange['status']) => {
 const fileName = (path: string) => path.slice(path.lastIndexOf('/') + 1)
 const directory = (path: string) => (path.includes('/') ? path.slice(0, path.lastIndexOf('/') + 1) : '')
 
-// What the header says about the tree in words, ahead of the line counts. Conflicts get their own
-// clause because they are the one state where nothing else in the panel should be the next move.
-const summary = (model: ChangesModel): string => {
+// How many files the header counts. Conflicts are among them, and their own group says how many.
+const changedCount = (model: ChangesModel): number => {
   const groups = model.groups()
-  const count = groups.conflicted.length + groups.tracked.length + groups.untracked.length
-  if (!count) return 'working tree clean'
-  return `${count} uncommitted${groups.conflicted.length ? `, ${groups.conflicted.length} conflicted` : ''}`
+  return groups.conflicted.length + groups.tracked.length + groups.untracked.length
 }
 
 // Every section the list can draw, in the order it draws them. Conflicts first because a conflict
@@ -92,7 +89,6 @@ function ViewMenu(props: { model: ChangesModel }) {
         <IconButton
           icon="sliders-horizontal"
           label="View options"
-          title="How this list is drawn"
           opens="menu"
           expanded={open()}
           onPress={toggle}
@@ -122,50 +118,72 @@ function ViewMenu(props: { model: ChangesModel }) {
   )
 }
 
+// The house list header: the label and its count, then the list's own controls. The line totals
+// are gone, because every row already carries its own, and Send moved into a banner at the top of
+// the list, where it has room to say whether the send worked.
 export function ChangesHeader(props: { task: Task; model: ChangesModel }) {
   const model = () => props.model
-  const counted = () => model().totals().additions > 0 || model().totals().deletions > 0
   return (
-    <Toolbar ariaLabel="Changes">
-      <Text emphasis="muted">{model().isGit() ? summary(model()) : 'not a git project'}</Text>
-      <Show when={counted()}>
-        <Text emphasis="muted">+{model().totals().additions} −{model().totals().deletions}</Text>
-      </Show>
-      <Show when={model().isGit()}>
-        <ViewMenu model={model()} />
-        <IconButton
-          icon="refresh-cw"
-          label="Refresh changes"
-          title="Refresh changes"
-          spin={model().status.loading}
-          disabled={model().status.loading}
-          onPress={() => void model().refresh()}
-        />
-      </Show>
-      <Toolbar.Spacer />
-      {/* One button, not two: there is nothing to stage once everything is staged, and nothing to do
-          either way on a clean tree. */}
-      <Show when={model().headerStage() === 'stage'}>
-        <Button variant="bare" size="sm" tip="Stage every change" tipSub="git add -A" onPress={() => void model().stageAll()}>
-          Stage all
-        </Button>
-      </Show>
-      <Show when={model().headerStage() === 'unstage'}>
-        <Button variant="bare" size="sm" tip="Unstage everything" tipSub="git reset" onPress={() => void model().unstageAll()}>
-          Unstage all
-        </Button>
-      </Show>
-      <Show when={model().unsent().length}>
-        <Button
-          size="sm"
-          title="Bracketed-paste the unsent notes into the task's agent (queued until idle)"
-          onPress={() => void model().sendNotes()}
-        >
-          Send {model().unsent().length} note{model().unsent().length === 1 ? '' : 's'} → agent{model().agentIdle() ? ' ●' : ''}
-        </Button>
-      </Show>
-      <Show when={model().sendMsg()}>{(text) => <Text emphasis="muted">{text()}</Text>}</Show>
-    </Toolbar>
+    <SectionHeader
+      count={model().isGit() ? changedCount(model()) : undefined}
+      actions={
+        <Show when={model().isGit()}>
+          <ViewMenu model={model()} />
+          <IconButton
+            icon="refresh-cw"
+            label="Refresh changes"
+            spin={model().status.loading}
+            disabled={model().status.loading}
+            onPress={() => void model().refresh()}
+          />
+          {/* One button, not two: there is nothing to stage once everything is staged, and nothing to
+              do either way on a clean tree. */}
+          <Show when={model().headerStage() === 'stage'}>
+            <Button variant="ghost" size="sm" tip="Stage every change" tipSub="git add -A" onPress={() => void model().stageAll()}>
+              Stage all
+            </Button>
+          </Show>
+          <Show when={model().headerStage() === 'unstage'}>
+            <Button variant="ghost" size="sm" tip="Unstage everything" tipSub="git reset" onPress={() => void model().unstageAll()}>
+              Unstage all
+            </Button>
+          </Show>
+        </Show>
+      }
+    >
+      Changes
+    </SectionHeader>
+  )
+}
+
+// The review notes waiting for the agent, and what the last send did. One banner for both, so the
+// result of a press lands where the press was.
+function NotesBanner(props: { model: ChangesModel }) {
+  const model = () => props.model
+  const count = () => model().unsent().length
+  return (
+    <Show when={count() || model().sendMsg()}>
+      <Alert
+        variant="banner"
+        tone={count() ? 'warn' : 'ok'}
+        actions={
+          <Show when={count()}>
+            <Button
+              size="sm"
+              tip="Sends your unsent notes to this task's agent. If it's busy, they wait until it's free."
+              onPress={() => void model().sendNotes()}
+            >
+              Send to agent
+            </Button>
+          </Show>
+        }
+        onDismiss={count() ? undefined : () => model().clearSendMsg()}
+      >
+        {count() ? `${count()} note${count() === 1 ? '' : 's'} not sent` : ''}
+        {count() && model().sendMsg() ? ' ' : ''}
+        {model().sendMsg()}
+      </Alert>
+    </Show>
   )
 }
 
@@ -208,7 +226,7 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
     const conflicted = () => row().group === 'conflicted'
     // The name stays put and the tooltip moves: a checkbox announces its own checked state, and a name
     // that flips to "Unstage" while the box reads checked says the opposite thing twice.
-    const stageHint = () => (row().partial ? 'Staged, then edited again — stage the rest' : row().staged ? 'Unstage this file' : 'Stage this file')
+    const stageHint = () => (row().partial ? 'Partly staged. Tick to stage the rest.' : row().staged ? 'Unstage this file' : 'Stage this file')
     return (
       <Row
         item={rowProps.item}
@@ -217,7 +235,7 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
         selected={model().isSelected(row().change)}
         onPress={() => model().select(row().change)}
         title={conflicted()
-          ? `${row().path} — unmerged; staging it marks the conflict resolved`
+          ? `${row().path} has conflicts. Staging it marks them resolved.`
           : row().oldPath ? `${row().oldPath} → ${row().path}` : row().path}
         label={row().path}
         collapsed={collapsed() ? <Badge size="xs" tone={meta().tone}>{meta().letter}</Badge> : undefined}
@@ -229,9 +247,10 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
         }
         trailing={
           <>
-            {/* No checkbox on a conflict: there is no half of it that can sit in the index while the
-                rest does not, so a tri-state control would suggest a state git cannot hold. Marking
-                it resolved is in the overflow menu. */}
+            <FileTools row={row()} model={model()} />
+            {/* Last, so it lines up with the group's box above it. No checkbox on a conflict: there is
+                no half of it that can sit in the index while the rest does not, so a tri-state control
+                would suggest a state git cannot hold. Marking it resolved is in the overflow menu. */}
             <Show when={!conflicted()}>
               <Checkbox
                 size="sm"
@@ -242,7 +261,6 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
                 onChange={(checked) => void (checked ? model().stage([row().path]) : model().unstage([row().path]))}
               />
             </Show>
-            <FileTools row={row()} model={model()} />
           </>
         }
       >
@@ -281,8 +299,8 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
           <Show when={rowProps.staging}>
             <Checkbox
               size="sm"
-              ariaLabel={`Stage everything under ${rowProps.node.path}`}
-              title={state() === 'all' ? `Unstage everything under ${rowProps.node.path}` : `Stage everything under ${rowProps.node.path}`}
+              ariaLabel={`Stage all ${rowProps.node.path} files`}
+              title={state() === 'all' ? `Unstage all ${rowProps.node.path} files` : `Stage all ${rowProps.node.path} files`}
               checked={state() === 'all'}
               indeterminate={state() === 'some'}
               onChange={(checked) => setStaged(files(), checked)}
@@ -320,8 +338,10 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
   const sectionOf = (key: string): Section | undefined => model().sections().find((section) => section.key === key)
 
   return (
-    <Show when={model().isGit()} fallback={<EmptyState title="Not a Git project">Changes are unavailable here.</EmptyState>}>
+    // Nothing in the list when the folder is not Git: the detail column says so, once.
+    <Show when={model().isGit()}>
       <Stack gap="none">
+        <NotesBanner model={model()} />
         {SECTIONS.map(({ key, title }) => (
           <Show when={sectionOf(key)}>
             {(section) => {
@@ -344,8 +364,8 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
                       <Show when={staging}>
                         <Checkbox
                           size="sm"
-                          ariaLabel={`Stage everything under ${title}`}
-                          title={state() === 'all' ? `Unstage everything under ${title}` : `Stage everything under ${title}`}
+                          ariaLabel={`Stage all ${title.toLowerCase()} files`}
+                          title={state() === 'all' ? `Unstage all ${title.toLowerCase()} files` : `Stage all ${title.toLowerCase()} files`}
                           checked={state() === 'all'}
                           indeterminate={state() === 'some'}
                           onChange={(checked) => setStaged(section().rows, checked)}
@@ -359,8 +379,8 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
             }}
           </Show>
         ))}
-        <Show when={!model().sections().length}>
-          <EmptyState>Working tree clean.</EmptyState>
+        <Show when={model().loaded() && !model().sections().length}>
+          <EmptyState align="start" size="sm">No changes</EmptyState>
         </Show>
       </Stack>
     </Show>
@@ -394,7 +414,7 @@ export function ChangesFooter(props: { task: Task; model: ChangesModel }) {
           <IconButton
             icon="square-pen"
             label="Expand the message"
-            title="Write the message in a bigger box"
+            tip="Open a bigger editor"
             onPress={() => setExpanded(true)}
           />
           <Toolbar.Spacer />
@@ -420,13 +440,27 @@ export function ChangesFooter(props: { task: Task; model: ChangesModel }) {
   )
 }
 
+// The detail is never blank: a folder that is not Git and a clean tree each get the centred state.
+// The clean check waits for the first status read, so a task that is loading does not flash it.
 export function ChangesDiff(props: { task: Task; model: ChangesModel }) {
   const model = () => props.model
   return (
-    <Show when={model().isGit()} fallback={<EmptyState>Nothing to diff.</EmptyState>}>
-      {/* Marks from other plugins land under the same lines this pane's own review notes do
-          (docs/plugins.md § Cooperative extension points, the `annotation` kind). */}
-      <DiffPane source={model().source} annotations={DIFF_LINE_POINT} />
+    <Show
+      when={model().isGit()}
+      fallback={
+        <EmptyState title="Not a Git project">
+          This folder isn't a Git repository, so there are no changes to show.
+        </EmptyState>
+      }
+    >
+      <Show
+        when={!model().loaded() || model().sections().length}
+        fallback={<EmptyState title="No changes">Everything is committed.</EmptyState>}
+      >
+        {/* Marks from other plugins land under the same lines this pane's own review notes do
+            (docs/plugins.md § Cooperative extension points, the `annotation` kind). */}
+        <DiffPane source={model().source} annotations={DIFF_LINE_POINT} />
+      </Show>
     </Show>
   )
 }

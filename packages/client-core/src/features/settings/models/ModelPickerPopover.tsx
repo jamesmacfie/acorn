@@ -11,6 +11,8 @@ import Popover from '../../../kit/components/overlays/Popover'
 export default function ModelPickerPopover(props: {
   label?: string
   title: string
+  /** The tip's second line, such as the choice in force. */
+  tipSub?: string
   sparkle?: boolean
   above?: JSX.Element
   children: JSX.Element
@@ -27,7 +29,8 @@ export default function ModelPickerPopover(props: {
           size="sm"
           iconOnly={!props.sparkle}
           label={props.label ?? 'Model for the message'}
-          title={props.title}
+          tip={props.title}
+          tipSub={props.tipSub}
           opens="dialog"
           expanded={open()}
           onPress={toggle}

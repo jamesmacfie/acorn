@@ -3,7 +3,7 @@ import type { LocalChange } from '@acorn/protocol/localGit.ts'
 import {
   buildTree, changeKey, commitMode, DEFAULT_CHANGE_VIEW, filesUnder, folderState,
   generateReason, groupChanges, groupSections, isFolderKey, patchKey, pickSelected, primaryRemote, remoteCounts,
-  remoteReason, sortRows, stackFor, stageableRows, stagedState, documentFile, totals, unstagedPathsOf,
+  remoteReason, sortRows, stackFor, stageableRows, stagedState, documentFile, unstagedPathsOf,
   viewNodes, visibleNodes, type ChangeView, type TreeNode,
 } from './model'
 import { DIFF_LINE_KEY, DIFF_LINE_POINT, PUSH_ACTIONS_MAX, PUSH_ACTIONS_POINT } from './extensionPoints'
@@ -115,18 +115,6 @@ describe('commitMode', () => {
   // A file staged and then edited again is in the index, so the index is what a commit takes.
   it('commits the index for a file staged and then edited again', () => {
     expect(commitMode(groupChanges([c('a.ts', true), c('a.ts', false)]))).toBe('staged')
-  })
-})
-
-describe('totals', () => {
-  const counted = (path: string, additions: number | null, deletions: number | null): LocalChange => ({
-    path, status: 'modified', staged: false, additions, deletions,
-  })
-
-  it('sums the rows on screen and skips the ones git could not count', () => {
-    const groups = groupChanges([counted('a.ts', 3, 1), counted('b.ts', null, null), counted('c.ts', 10, 0)])
-    expect(totals(groups.tracked)).toEqual({ additions: 13, deletions: 1 })
-    expect(totals([])).toEqual({ additions: 0, deletions: 0 })
   })
 })
 
@@ -381,7 +369,7 @@ describe('primaryRemote', () => {
 
 describe('remoteCounts', () => {
   it('says so when there is no upstream to count against', () => {
-    expect(remoteCounts(at(null, null, null))).toBe('no upstream')
+    expect(remoteCounts(at(null, null, null))).toBe('Not published')
   })
 
   it('draws behind before ahead, which is the order the arrows read in', () => {

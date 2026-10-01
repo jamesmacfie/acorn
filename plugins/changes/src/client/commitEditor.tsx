@@ -100,7 +100,7 @@ export function CommitOptionsMenu(props: { model: ChangesModel }) {
           variant="outline"
           size="sm"
           label="Commit options"
-          title="Amend, sign-off, and skipping git's hooks"
+          tip="Commit options"
           opens="menu"
           expanded={open()}
           onPress={toggle}
@@ -128,7 +128,7 @@ export function CommitOptionsMenu(props: { model: ChangesModel }) {
           <Toggle
             menu={menu}
             on={model().noVerify()}
-            hint="git's pre-commit and commit-msg hooks; acorn's before-commit chain still runs."
+            hint="Skips Git's pre-commit and commit-msg hooks. acorn's own checks still run."
             onSelect={() => model().setNoVerify(!model().noVerify())}
           >
             Skip git hooks

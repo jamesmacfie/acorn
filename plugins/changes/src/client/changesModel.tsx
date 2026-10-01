@@ -18,7 +18,7 @@ import { localGitApi } from './changesClient'
 import { readChangeView, saveChangeView } from './changesPrefs'
 import {
   changeKey, groupChanges, groupSections, isFolderKey, patchKey, pickSelected, remoteReason,
-  stackFor, stageableRows, stagedState, documentFile, totals, viewNodes, type ChangeView, type RemoteAction,
+  stackFor, stageableRows, stagedState, documentFile, viewNodes, type ChangeView, type RemoteAction,
 } from './model'
 import { CHANGES_PANE, changesBindings, changesCommands } from './commands'
 import { createCommitState } from './commitState'
@@ -285,12 +285,11 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
         {(note) => (
           <Stack gap="none">
             <Inline gap="inline">
-              <Badge size="xs" tone={note.sentAt ? 'ok' : 'warn'}>{note.sentAt ? '✓ sent' : '● unsent'}</Badge>
+              <Badge size="xs" tone={note.sentAt ? 'ok' : 'warn'}>{note.sentAt ? 'Sent' : 'Not sent'}</Badge>
               <Text emphasis="muted" wrap>{note.body}</Text>
               <IconButton
                 icon="x"
                 tone="danger"
-                title="Delete note"
                 label="Delete note"
                 onPress={() => void deleteReviewNote(task.id, note.id).then(() => refetchNotes())}
               />
@@ -300,7 +299,7 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
       </For>
     ) },
     lineAction: {
-      title: '⌥-click: add line reference to the agent composer',
+      title: '⌥-click a line to add it to your message',
       run: (row, event) => {
         if (!event.altKey) return
         const line = row.newNo ?? row.oldNo
@@ -406,12 +405,12 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     const list = unsent()
     if (!list.length) return
     const target = agentSessionsFor(task.id)[0]
-    if (!target) return setSendMsg('No running agent session.')
+    if (!target) return setSendMsg('No agent is running for this task.')
     const res = await sendToSession(target, formatReviewPrompt(list), 'after-ready')
-    if (!res.ok) return setSendMsg(res.reason ?? 'Send failed.')
+    if (!res.ok) return setSendMsg(res.reason ?? "Couldn't send the notes.")
     await markReviewNotesSent(task.id, list.map((n) => n.id))
     await refetchNotes()
-    setSendMsg(res.queued ? 'Queued — delivers when the agent is idle.' : 'Sent.')
+    setSendMsg(res.queued ? "Queued. The agent gets them when it's free." : 'Sent.')
   }
 
   return {
@@ -419,6 +418,9 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     project,
     isGit: () => project()?.vcs === 'git',
     status,
+    /** Whether the first status read has landed. Until then the empty status is a placeholder, not a
+     *  clean tree. */
+    loaded: () => statusRevision() > 0,
     refresh: () => refetch(),
     groups,
     /** The sections the list draws, each with its rows already ordered and its nodes already shaped
@@ -443,8 +445,6 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
       return true
     },
     closedFolders,
-    /** The header's `+N −M`, over every row the list draws. */
-    totals: () => totals([...groups().conflicted, ...stageable()]),
     /** Which single button the header shows: Stage all until everything is in the index, then
      *  Unstage all, and neither on a clean tree. Conflicts are not part of it — they are resolved one
      *  at a time. */
@@ -460,6 +460,7 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     },
     actionError,
     sendMsg,
+    clearSendMsg: () => setSendMsg(''),
     /** Whether a fetch, pull, push or abort is in flight. One flag, because the bar has one place to
      *  show it and none of the four is safe to start while another runs. */
     remoteBusy,
@@ -477,7 +478,6 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
     // second dot in every one of their reads would say nothing extra.
     ...editor,
     unsent,
-    agentIdle: () => !!agentSessionsFor(task.id)[0]?.idle,
     // Paths, not a path: a row's checkbox sends one and a group's sends every unstaged path under it,
     // which is the shape the folder checkbox in the tree view needs too.
     stage: (paths: string[]) => gitAction(() => localGitApi.stage(task.id, paths)),

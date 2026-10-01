@@ -51,6 +51,7 @@ const model = (changes: LocalChange[], chosen: Partial<ChangeView> = {}, commit:
     // The two ids the footer's slot hands a contributor.
     task: { id: 't1', projectId: 'p1' },
     isGit: () => true,
+    loaded: () => true,
     groups,
     view,
     setView,
@@ -65,7 +66,6 @@ const model = (changes: LocalChange[], chosen: Partial<ChangeView> = {}, commit:
       setClosed(next)
       return true
     },
-    totals: () => ({ additions: 0, deletions: 0 }),
     headerStage: () => (stagedState(stageableRows(groups())) === 'all' ? 'unstage' : 'stage'),
     isSelected: () => false,
     select: () => {},
@@ -104,7 +104,7 @@ const model = (changes: LocalChange[], chosen: Partial<ChangeView> = {}, commit:
     project: () => undefined,
     unsent: () => [],
     sendMsg: () => '',
-    agentIdle: () => false,
+    clearSendMsg: () => {},
   } as unknown as ChangesModel
 }
 
@@ -225,7 +225,34 @@ describe('an empty tree', () => {
   it('draws no groups at all', () => {
     draw([])
     expect(host.querySelectorAll('details')).toHaveLength(0)
-    expect(host.textContent).toContain('Working tree clean')
+    expect(host.textContent).toContain('No changes')
+  })
+})
+
+describe('the review notes banner', () => {
+  const drawNotes = (unsent: number, sendMsg: string) => {
+    const sendNotes = vi.fn()
+    const built = { ...model([]), unsent: () => Array.from({ length: unsent }, () => ({})), sendMsg: () => sendMsg, sendNotes } as unknown as ChangesModel
+    disposers.push(render(() => <ChangesList task={{ id: 't1' } as unknown as Task} model={built} />, host))
+    return sendNotes
+  }
+
+  it('counts the unsent notes and sends them from its own button', () => {
+    const sendNotes = drawNotes(2, '')
+    expect(host.querySelector('.ui-alert')?.textContent).toContain('2 notes not sent')
+    ;[...host.querySelectorAll<HTMLButtonElement>('.ui-alert button')].find((b) => b.textContent === 'Send to agent')!.click()
+    expect(sendNotes).toHaveBeenCalledOnce()
+  })
+
+  it('keeps the result of the last send where the button was', () => {
+    drawNotes(0, 'Sent.')
+    expect(host.querySelector('.ui-alert')?.textContent).toContain('Sent.')
+    expect(host.querySelector('.ui-alert')?.textContent).not.toContain('Send to agent')
+  })
+
+  it('draws nothing with no notes and no result', () => {
+    drawNotes(0, '')
+    expect(host.querySelector('.ui-alert')).toBeNull()
   })
 })
 

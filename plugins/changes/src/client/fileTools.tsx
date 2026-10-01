@@ -29,7 +29,7 @@ export function FileTools(props: { row: FileRow; model: ChangesModel }) {
           </Show>
           <Menu.Item
             context={menu}
-            title="Add a file reference to the composer"
+            title="Adds this file to your message to the agent"
             onSelect={() => void props.model.sendRef(formatFileReference(row().path))}
           >
             Send to agent
@@ -38,7 +38,7 @@ export function FileTools(props: { row: FileRow; model: ChangesModel }) {
             context={menu}
             tone="danger"
             confirm="Discard?"
-            title="Put this file back the way the last commit has it — cannot be undone"
+            title="Throws away your changes to this file. You can't undo this."
             onSelect={() => void props.model.discard(row().path, row().status === 'untracked', row().oldPath)}
           >
             Discard

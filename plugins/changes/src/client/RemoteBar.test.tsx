@@ -107,18 +107,21 @@ describe('the primary button', () => {
 })
 
 describe('the bar itself', () => {
-  it('names the project and the branch, and carries the folder\'s copy button', () => {
+  it('names the branch alone, because the top bar names the project', () => {
     draw({ branch: 'james/thing', upstream: 'origin/james/thing', ahead: 0, behind: 0 })
-    expect(host.textContent).toContain('widget /')
+    expect(host.textContent).not.toContain('widget /')
     expect(host.textContent).toContain('james/thing')
-    // Moved down from the header in this phase. The path is the title, because it is too long to
-    // draw beside a branch name.
-    expect(host.querySelector<HTMLElement>('.copy-btn')?.dataset.tip).toBe('Copy the project folder: /src/widget')
+    expect(host.querySelector('.copy-btn')).toBeNull()
+  })
+
+  it('says the counts in words in their tip', () => {
+    draw({ branch: 'james/thing', upstream: 'origin/james/thing', ahead: 1, behind: 2 })
+    expect(host.querySelector<HTMLElement>('[data-tip="2 behind, 1 ahead"]')?.textContent).toBe('↓2 ↑1')
   })
 
   it('says so rather than drawing a blank branch on a detached HEAD', () => {
     draw({ branch: null })
-    expect(host.textContent).toContain('detached HEAD')
+    expect(host.textContent).toContain('No branch (detached)')
   })
 })
 

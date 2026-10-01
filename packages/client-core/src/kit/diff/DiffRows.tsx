@@ -65,17 +65,17 @@ export function NonCodeRow(props: {
         {(g) => <GapRowView gap={g()} expandGap={props.expandGap} />}
       </Match>
       <Match when={props.row.kind === 'nodiff'}>
-        <span class="diff-nodiff muted">No diff (binary or too large).</span>
+        <span class="diff-nodiff muted">Can't show this file. It's binary or too large.</span>
       </Match>
       <Match when={props.row.kind === 'load' ? (props.row as LoadDiffRow) : null}>
         {(row) => {
           const failed = () => (props.loadStatus?.(row().file.path) ?? row().status) === 'error'
           return (
           <span class="diff-load" classList={{ 'diff-load-error': failed() }}>
-            <span>{failed() ? 'Could not load diff.' : 'Loading diff…'}</span>
+            <span>{failed() ? "Couldn't load this part." : 'Loading…'}</span>
             <Show when={failed()}>
-              <Button variant="bare" onPress={() => props.retryDiff?.(row().file)}>
-                Retry
+              <Button variant="ghost" size="xs" onPress={() => props.retryDiff?.(row().file)}>
+                Try again
               </Button>
             </Show>
           </span>
@@ -131,13 +131,14 @@ export function FileHead(props: {
           type="button"
           class="diff-file-collapse"
           aria-expanded={!props.collapsed}
-          title={props.collapsed ? 'Expand file' : 'Collapse file'}
+          aria-label={props.collapsed ? 'Expand file' : 'Collapse file'}
+          data-tip={props.collapsed ? 'Expand file' : 'Collapse file'}
           onClick={() => props.onToggleCollapse?.(props.file.path)}
         >
           {props.collapsed ? '▸' : '▾'}
         </button>
       </Show>
-      <span class={`file-status file-status-${status().tone}`} title={status().label}>
+      <span class={`file-status file-status-${status().tone}`} data-tip={status().label}>
         {status().letter}
       </span>
       <span class="diff-file-path">
@@ -152,7 +153,9 @@ export function FileHead(props: {
 
 function GapRowView(props: { gap: GapRow; expandGap?: (gap: GapRow) => Promise<unknown> }) {
   const [busy, setBusy] = createSignal(false)
-  const label = () => (props.gap.side === 'bottom' ? 'Expand below' : `Expand ${props.gap.count ?? ''} lines`.replace('  ', ' '))
+  const label = () => (props.gap.side === 'bottom'
+    ? 'Show the rest of the file'
+    : props.gap.count == null ? 'Show hidden lines' : `Show ${props.gap.count} hidden lines`)
   const run = async () => {
     if (!props.expandGap || props.gap.sha == null) return
     setBusy(true)
@@ -164,7 +167,7 @@ function GapRowView(props: { gap: GapRow; expandGap?: (gap: GapRow) => Promise<u
   }
   return (
     <button class="diff-gap" disabled={busy() || props.gap.sha == null || !props.expandGap} onClick={run}>
-      {busy() ? 'Expanding…' : `⋯ ${label()} ⋯`}
+      {busy() ? 'Loading…' : label()}
     </button>
   )
 }
@@ -179,6 +182,8 @@ export function DiffLine(props: {
   highlight?: FindHighlight
   openLine?: (row: CodeRow) => void
   askAgent?: (row: CodeRow) => void
+  /** The second line of the ask button's tip: what a click on the line itself does. */
+  askHint?: string
 }) {
   return (
     <>
@@ -186,7 +191,7 @@ export function DiffLine(props: {
         <span class="diff-gutter">
           {props.r.oldNo ?? ''}
           <OpenLineButton row={props.r} onOpen={props.openLine} />
-          <AskAgentButton row={props.r} onOpen={props.askAgent} />
+          <AskAgentButton row={props.r} onOpen={props.askAgent} hint={props.askHint} />
         </span>
         <span class="diff-gutter">{props.r.newNo ?? ''}</span>
         <span class="diff-marker">{props.r.kind === 'insert' ? '+' : props.r.kind === 'delete' ? '\u2212' : ' '}</span>
@@ -262,6 +267,7 @@ export function SplitCell(props: {
   highlight?: FindHighlight
   openLine?: (row: CodeRow) => void
   askAgent?: (row: CodeRow) => void
+  askHint?: string
 }) {
   return (
     <div
@@ -278,7 +284,7 @@ export function SplitCell(props: {
             <span class="diff-gutter">
               {props.gutter ?? ''}
               <OpenLineButton row={r()} onOpen={props.openLine} />
-              <AskAgentButton row={r()} onOpen={props.askAgent} />
+              <AskAgentButton row={r()} onOpen={props.askAgent} hint={props.askHint} />
             </span>
             <span class="diff-marker">{r().kind === 'insert' ? '+' : r().kind === 'delete' ? '\u2212' : ' '}</span>
             <Show when={props.canAdd && props.composer}>
@@ -317,12 +323,15 @@ function OpenLineButton(props: { row: CodeRow; onOpen?: (row: CodeRow) => void }
   )
 }
 
-function AskAgentButton(props: { row: CodeRow; onOpen?: (row: CodeRow) => void }) {
+// The styled tip rather than `title`: the host's one delegated listener reads `data-tip`, so a tip per
+// row costs no handler per row (kit/components/overlays/tips.tsx).
+function AskAgentButton(props: { row: CodeRow; onOpen?: (row: CodeRow) => void; hint?: string }) {
   return <Show when={props.onOpen && (props.row.newNo != null || props.row.oldNo != null)}>
     <button
       type="button"
       class="diff-ask-btn"
-      title="Ask agent about this line"
+      data-tip="Ask agent about this line"
+      data-tip-sub={props.hint}
       aria-label={`Ask agent about ${props.row.path}:${props.row.newNo ?? props.row.oldNo}`}
       onClick={(event) => { event.stopPropagation(); props.onOpen?.(props.row) }}
     >✦</button>
@@ -410,7 +419,7 @@ function LineComposer(props: {
       }
       onMutated()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'failed')
+      setErr(e instanceof Error ? e.message : "Couldn't save. Try again.")
     } finally {
       setBusy(false)
     }
@@ -425,10 +434,10 @@ function LineComposer(props: {
         mentions={props.mentions}
       />
       <div class="diff-composer-actions">
-        <Button disabled={busy() || !props.composer.body().trim()} onPress={submit}>
+        <Button variant="ghost" onPress={() => props.composer.setOpen(false)}>Cancel</Button>
+        <Button variant="solid" disabled={busy() || !props.composer.body().trim()} onPress={submit}>
           {busy() ? 'Adding\u2026' : 'Comment'}
         </Button>
-        <Button onPress={() => props.composer.setOpen(false)}>Cancel</Button>
       </div>
       <Show when={err()}>
         <span class="diff-thread-err">{err()}</span>
@@ -488,7 +497,7 @@ function ThreadRow(props: {
       publishLayoutChange()
       props.onMutated()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'failed')
+      setErr(e instanceof Error ? e.message : "Couldn't save. Try again.")
     } finally {
       setBusy(false)
     }
@@ -510,7 +519,7 @@ function ThreadRow(props: {
       setBody('')
       props.onMutated()
     } catch (e) {
-      setErr(e instanceof Error ? e.message : 'failed')
+      setErr(e instanceof Error ? e.message : "Couldn't save. Try again.")
     } finally {
       setBusy(false)
     }

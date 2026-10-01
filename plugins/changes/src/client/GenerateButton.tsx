@@ -46,11 +46,12 @@ export function GenerateButton(props: { model: ChangesModel }) {
           {/* One control for both states rather than two that swap: `skipConfirm` is off the moment
               there is text to lose, so a press over an empty field generates and a press over a
               message somebody wrote arms first and reads Replace?. `ConfirmButton` is the prompt on
-              every host (docs/ui-design.md § The closed kit), and no `iconOnly`, because the armed
-              label needs the room. */}
+              every host (docs/ui-design.md § The closed kit). A ghost square, so the glyph has a 26 by
+              26 box to press. Armed, the kit lets an icon-only button grow to fit its prompt. */}
           <ConfirmButton
-            variant="bare"
+            variant="ghost"
             size="sm"
+            iconOnly
             label="Write the commit message"
             confirmLabel="Replace?"
             skipConfirm={!model().draft().trim()}
@@ -66,7 +67,7 @@ export function GenerateButton(props: { model: ChangesModel }) {
             <Icon name="sparkles" />
           </ConfirmButton>
           <Show when={model().modelBackends().length > 1}>
-            <ModelPickerPopover title={`Which provider writes the message. Now: ${labelFor(model())}`}>
+            <ModelPickerPopover title="Choose who writes the message" tipSub={labelFor(model())}>
               <ModelBackendPicker
                 backends={model().modelBackends()}
                 backendId={model().modelPick()?.backendId ?? ''}

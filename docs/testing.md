@@ -753,15 +753,14 @@ real remote with real credentials does.
     untouched. Then open the options menu, turn Amend on with the field empty, and the last commit's
     message appears; Cmd+Option+Enter from the field amends. Press the expand button and the same text
     is in the modal, with room for a body.
-45. On a task whose branch has never been pushed, the bar above the commit editor names the project
-    and the branch, its button reads **Publish**, and the counts beside it read "no upstream". Press
+45. On a task whose branch has never been pushed, the bar above the commit editor names the branch,
+    its button reads **Publish**, and the counts beside it read "Not published". Press
     it: the button reads **Fetch** and the counts go quiet. Commit something and the button reads
     **Push** with **↑1** beside it; press that, then amend the commit from the options menu and press
     **Push** again. It is refused, and the reason ends by pointing at Force push. Open the menu
     beside the button, press **Force push** once — the item reads **Force push?** — and press it again;
     the push lands. Then have somebody else, or a second clone, push to the same branch and press
-    **Fetch**: the counts read **↓1** and the button reads **Pull**. Copy the project folder from the
-    button beside the branch name, which used to be in the header. Pull a branch that has diverged and
+    **Fetch**: the counts read **↓1** and the button reads **Pull**, and their tip reads "1 behind, 0 ahead". Pull a branch that has diverged and
     the refusal names Pull with rebase; take it, and if it conflicts the banner reads **Rebase in
     progress**, the Conflicts group is first in the list, the primary button is disabled, and **Abort**
     puts the branch back where it was. Last, commit from a terminal in the same worktree and watch the

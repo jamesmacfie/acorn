@@ -91,7 +91,8 @@ export type DiffSource = {
   }
   /**
    * A click on a code line, for a source with a modifier-key affordance of its own. Unified mode
-   * only: a split band holds two rows and cannot say which one the click landed on.
+   * only: a split band holds two rows and cannot say which one the click landed on. `title` is the
+   * second line of the ask button's tip, not a tooltip on the line, so it stays off the code.
    */
   lineAction?: { title: string; run: (row: CodeRow, event: MouseEvent) => void }
   /** Open an added line in the source's editor. Omit to hide the gutter control. */

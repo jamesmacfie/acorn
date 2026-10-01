@@ -2,7 +2,7 @@ import { Show } from 'solid-js'
 import { bytesOf, formatSize, openInAppUrl, openPane, type Task } from '@acorn/plugin-api/client'
 import { SCRATCHPAD_SLUG } from '@acorn/protocol/notes.ts'
 import {
-  Alert, Button, Checkbox, ConfirmButton, EmptyState, Icon, IconButton, Input, Markdown, Row, Rows, Section, Stack, Text,
+  Alert, Button, Checkbox, EmptyState, IconButton, Input, Markdown, Menu, Row, RowActions, Rows, Section, Stack, Text,
   Textarea, ToggleButton, Toolbar,
 } from '@acorn/plugin-api/ui'
 import type { NotesModel } from './notesModel'
@@ -30,12 +30,14 @@ export function NotesList(props: { task: Task; model: NotesModel }) {
 
   // "In the agent's context" as the checkbox it always was. It used to be a 10px round button with a
   // stylesheet of its own; the state it reports and the state a Checkbox reports are the same state.
+  // The row's last trailing control, as an include or stage box is in every list, so titles keep one
+  // left edge whether or not a row has a box.
   const IncludeBox = (boxProps: { scope: NoteScope; note: NoteSummary }) => (
     <Checkbox
       size="sm"
       checked={boxProps.note.included}
-      ariaLabel={boxProps.note.included ? 'Included in agent context' : 'Excluded from agent context'}
-      title={boxProps.note.included ? 'Included in agent context' : 'Excluded from agent context'}
+      ariaLabel="Include in the agent's context"
+      title="Include in the agent's context"
       onChange={(checked) => void model().toggleIncluded(boxProps.scope, boxProps.note.slug, checked)}
     />
   )
@@ -45,22 +47,26 @@ export function NotesList(props: { task: Task; model: NotesModel }) {
       <Row
         item={rowProps.item}
         density="compact"
-        reveal
         label={rowProps.note.title}
         selected={model().isActive(rowProps.scope, rowProps.note.slug)}
         onPress={() => void model().open(rowProps.scope, rowProps.note.slug)}
-        leading={<IncludeBox scope={rowProps.scope} note={rowProps.note} />}
         meta={authorBadge(rowProps.note.author)}
         trailing={
-          <ConfirmButton
-            variant="bare"
-            size="sm"
-            iconOnly
-            label="Delete note"
-            title={`Delete ${rowProps.note.title}`}
-            confirmLabel="Delete note?"
-            onConfirm={() => void model().remove(rowProps.scope, rowProps.note.slug)}
-          ><Icon name="x" /></ConfirmButton>
+          <>
+            <RowActions ariaLabel={`Actions for ${rowProps.note.title}`}>
+              {(menu) => (
+                <Menu.Item
+                  context={menu}
+                  tone="danger"
+                  confirm="Delete note?"
+                  onSelect={() => void model().remove(rowProps.scope, rowProps.note.slug)}
+                >
+                  Delete
+                </Menu.Item>
+              )}
+            </RowActions>
+            <IncludeBox scope={rowProps.scope} note={rowProps.note} />
+          </>
         }
       >
         {rowProps.note.title}
@@ -139,7 +145,7 @@ export function NoteBody(props: { task: Task; model: NotesModel }) {
       <Show when={model().api} fallback={<EmptyState>Notes need the desktop app.</EmptyState>}>
         <Show
           when={model().selected()}
-          fallback={<EmptyState>Select or create a note.</EmptyState>}
+          fallback={<EmptyState title="No note open">Pick one from the list, or press + to start one.</EmptyState>}
         >
           {(sel) => (
             <>
@@ -158,8 +164,8 @@ export function NoteBody(props: { task: Task; model: NotesModel }) {
                   size="sm"
                   checked={model().selectedIncluded()}
                   disabled={sel().virtual}
-                  ariaLabel={model().selectedIncluded() ? 'Included in agent context' : 'Excluded from agent context'}
-                  title={model().selectedIncluded() ? 'Included in agent context' : 'Excluded from agent context'}
+                  ariaLabel="Include in the agent's context"
+                  title="Include in the agent's context"
                   onChange={(checked) => void model().toggleIncluded(sel().scope, sel().slug, checked)}
                 />
                 <ToggleButton

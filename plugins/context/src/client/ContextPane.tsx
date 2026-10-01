@@ -152,7 +152,7 @@ export function ContextBody(props: { task: Task; model: ContextModel }) {
   }
 
   return (
-    <Show when={model().ctx()} fallback={<EmptyState busy>Assembling…</EmptyState>}>
+    <Show when={model().ctx()} fallback={<EmptyState busy>Loading context…</EmptyState>}>
       <Stack gap="none">
         <For each={model().visibleSections()}>{(section) => <SectionFold section={section} />}</For>
       </Stack>

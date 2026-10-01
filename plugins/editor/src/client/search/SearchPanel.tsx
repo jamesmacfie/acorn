@@ -55,7 +55,7 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
   }))
 
   const status = () => {
-    if (!debounced().trim()) return 'Type to search the worktree.'
+    if (!debounced().trim()) return "Type to search this task's files."
     if (results.loading) return 'Searching…'
     const hits = `${totalHits()} result${totalHits() === 1 ? '' : 's'}`
     const where = `${files().length} file${files().length === 1 ? '' : 's'}`

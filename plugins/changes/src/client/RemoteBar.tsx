@@ -1,6 +1,6 @@
 import { Show } from 'solid-js'
 import {
-  Alert, Button, ConfirmButton, CopyButton, Icon, IconButton, Menu, Text, Toolbar,
+  Alert, Button, ConfirmButton, Icon, IconButton, Menu, Text, Toolbar,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import type { ChangesModel } from './changesModel'
@@ -41,6 +41,10 @@ const COMMAND: Record<Exclude<RemoteAction, 'abort'>, string> = {
   push: 'git push --set-upstream origin HEAD',
   force: 'git push --force-with-lease --set-upstream origin HEAD',
 }
+
+/** The short counts in words, for their tip. None when there is no upstream to count against. */
+const countsTip = (state: ReturnType<ChangesModel['status']>): string | undefined =>
+  state.upstream == null ? undefined : `${state.behind ?? 0} behind, ${state.ahead ?? 0} ahead`
 
 /** Which verb the primary button runs. Publish and Push are one call
  *  (../server/localDiff.ts § pushArgs). Never `abort`, which only the banner offers. */
@@ -100,7 +104,7 @@ function RemoteMenu(props: { model: ChangesModel }) {
         <IconButton
           icon="chevron-down"
           label="Remote actions"
-          title="Fetch, pull, push"
+          tip="More sync actions"
           opens="menu"
           expanded={open()}
           disabled={model().remoteBusy()}
@@ -149,16 +153,13 @@ export function RemoteBar(props: { model: ChangesModel }) {
       <OperationBanner model={model()} />
       <Toolbar size="sm" ariaLabel="Branch">
         <Icon name="git-branch" title="Branch" />
-        <Show when={model().project()?.name}>{(name) => <Text emphasis="muted">{name()} /</Text>}</Show>
-        <Text>{status().branch ?? 'detached HEAD'}</Text>
-        {/* The project folder, moved down from the header. `always`, because the bar is not inside a
-            `.copyable` ancestor for a hover to reveal it, and the path itself is the title: it is
-            too long to draw beside a branch name in a 40-cell row. */}
-        <Show when={model().project()?.path}>
-          {(path) => <CopyButton always text={() => path()} title={`Copy the project folder: ${path()}`} />}
-        </Show>
+        {/* The branch alone. The top bar names the project on a task, and the branch is the one fact
+            this bar exists to show, so nothing before it takes its width. */}
+        <Text>{status().branch ?? 'No branch (detached)'}</Text>
         <Toolbar.Spacer />
-        <Show when={remoteCounts(status())}>{(counts) => <Text emphasis="muted">{counts()}</Text>}</Show>
+        <Show when={remoteCounts(status())}>
+          {(counts) => <Text emphasis="muted" tip={countsTip(status())}>{counts()}</Text>}
+        </Show>
         <Button
           size="sm"
           busy={model().remoteBusy()}

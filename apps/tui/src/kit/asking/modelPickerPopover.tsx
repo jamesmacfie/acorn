@@ -10,6 +10,8 @@ import { Button } from './buttons'
 export function ModelPickerPopover(props: {
   label?: string
   title: string
+  /** The desktop tip's second line. A terminal has no hover, so it is accepted and not drawn. */
+  tipSub?: string
   sparkle?: boolean
   above?: JSX.Element
   children: JSX.Element
