@@ -130,11 +130,11 @@ async function waitForText(client, text, timeoutMs = 20_000) {
 }
 
 async function runSmoke(client, directory) {
-  const welcome = await waitForText(client, 'Welcome.')
+  const welcome = await waitForText(client, 'Welcome to acorn')
   const start = welcome.elements.find((element) => element.name === 'Get started')
   if (!start) throw new Error('The onboarding screen has no Get started button.')
   await client.click(await client.resolveElement(start.ref))
-  await waitForText(client, 'Add your first project.')
+  await waitForText(client, 'Add your first project')
   const screenshot = join(directory, 'screenshots', 'smoke.png')
   await client.screenshot(screenshot)
   console.log(`Agent automation smoke test passed. Screenshot: ${screenshot}`)

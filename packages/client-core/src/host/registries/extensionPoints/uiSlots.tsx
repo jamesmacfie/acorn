@@ -41,9 +41,14 @@ export function SlotHost(props: { slot: UiSlotId; context: UiSlotContext }) {
   return (
     <For each={contributions()}>
       {(contribution) => (
-        <ContributionBoundary contributionId={contribution.id} owner={uiSlotRegistry.ownerOf(contribution.id)} quiet={props.slot === 'topbar.right'}>
-          <Dynamic component={contribution.component} context={props.context} />
-        </ContributionBoundary>
+        // A stable root per contribution keeps lazy and conditional content out of the For's
+        // shared insertion range. Detached empty-text placeholders can otherwise abort effects,
+        // including the first-run modal's Portal mount.
+        <div class="ui-slot-contribution">
+          <ContributionBoundary contributionId={contribution.id} owner={uiSlotRegistry.ownerOf(contribution.id)} quiet={props.slot === 'topbar.right'}>
+            <Dynamic component={contribution.component} context={props.context} />
+          </ContributionBoundary>
+        </div>
       )}
     </For>
   )

@@ -235,6 +235,12 @@ the Solid transform and renders all seven of them
 module is still the right shape, because a rule with a plain unit test is cheaper to reason about than
 the same rule inferred from a rendered tree.
 
+Each shell slot contribution mounts inside a stable DOM root with `display: contents`. The ordered
+list reconciles those roots while lazy modules and conditional content change inside them. This keeps
+empty text placeholders from detaching during startup and aborting queued effects, including the
+first-run wizard's portal mount. `pnpm dev:agent:smoke` checks the wizard on a fresh desktop profile
+and advances from the welcome screen to adding a project.
+
 The shell imports no feature UI directly. `App.tsx`, `TaskView.tsx`, and `CommandPalette.tsx` consume
 registry entries and client-core contracts. A feature that needs native behavior goes through the
 platform seam (`client-core/src/infra/platform/`), which `@acorn/plugin-api/client` re-exports the plugin-safe
