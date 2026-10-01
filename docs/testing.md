@@ -24,6 +24,9 @@ time. Set `ACORN_TEST_CONCURRENCY` to change it. CI sets it to one. Each package
 starts a worker per core, and six packages at once on a four-core runner made tests 10 to 15 times
 slower than they run locally.
 
+The TUI suite also limits its internal test forks to two. Package concurrency alone does not bound
+Vitest workers; cold shell transforms across many forks can exceed fixture deadlines under load.
+
 The desktop package's `test` stages the bundle inputs first, including a build of the plugin SDK for
 bundled plugin imports. It then runs its Vitest suites and the Rust unit tests, so the boot test
 exercises fresh artifacts.

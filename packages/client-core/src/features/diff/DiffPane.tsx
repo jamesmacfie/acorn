@@ -105,7 +105,13 @@ export function DiffPane(props: {
   const threads = () => source().threads?.()
   const mentionsList = () => source().mentions?.() ?? []
   const canComment = () => source().canComment()
-  const invalidate = () => source().invalidate()
+  const invalidate = createMemo(() => { const origin = source(); return () => origin.invalidate() })
+  let ownerLive = true
+  let composerEpoch = 0
+  let gapEpoch = 0
+  const gapFileEpochs = new Map<string, number>()
+  let gapFileSequence = 0
+  onCleanup(() => { ownerLive = false; gapEpoch++; composerEpoch++ })
   let lastTarget = ''
 
   const viewMode = (): ViewMode => (prefs.data?.[PrefKeys.diffView] === 'split' ? 'split' : 'unified')
@@ -279,9 +285,20 @@ export function DiffPane(props: {
     scrollEl,
   })
 
+  createEffect(on(() => [source(), scopeKey()] as const, () => {
+    composerEpoch++
+    gapEpoch++
+    gapFileEpochs.clear()
+    setLineComposer(null)
+    setOverlays(new Map())
+  }))
+
   // A different set of files: nothing about the old view survives.
   createEffect(on(signature, (next, previous) => {
     lastTarget = ''
+    composerEpoch++
+    gapEpoch++
+    gapFileEpochs.clear()
     health.reset()
     loader.reset()
     layout.reset()
@@ -308,9 +325,15 @@ export function DiffPane(props: {
     if (shown && next && shown.signature === signature()) {
       const now = new Map(next.files.map((file) => [file.path, file.patchKey]))
       for (const file of shown.topology.files) {
-        if (file.patchKey && now.has(file.path) && now.get(file.path) !== file.patchKey) loader.supersede(file.path, file.patchKey)
+        if (file.patchKey && now.get(file.path) !== file.patchKey) {
+          gapFileEpochs.set(file.path, ++gapFileSequence)
+          if (now.has(file.path)) loader.supersede(file.path, file.patchKey)
+        }
       }
     }
+    const currentPaths = new Set(next?.files.map((file) => file.path) ?? [])
+    for (const path of gapFileEpochs.keys()) if (!currentPaths.has(path)) gapFileEpochs.delete(path)
+    for (const path of currentPaths) if (!gapFileEpochs.has(path)) gapFileEpochs.set(path, ++gapFileSequence)
     shown = next ? { signature: signature(), topology: next } : null
   }))
   createEffect(() => {
@@ -381,15 +404,24 @@ export function DiffPane(props: {
   // Read the file's new side once, slice the gap's hidden lines, and put them beside the segment the
   // gap sat at the edge of. A source with no fileText renders the gap inert.
   const handleExpand = async (gap: GapRow) => {
-    const fileText = source().fileText
+    const origin = source()
+    const epoch = gapEpoch
+    const fileEpoch = gapFileEpochs.get(gap.path) ?? 0
+    const scope = scopeKey()
+    const fileSet = signature()
+    const fileText = origin.fileText
     const file = view.fileByPath().get(gap.path)
     if (gap.sha == null || !fileText || !file?.patchKey) return
     const at = gapPosition(gap)
     if (!at) return
+    const current = () => ownerLive && source() === origin && gapEpoch === epoch && (gapFileEpochs.get(gap.path) ?? 0) === fileEpoch && scopeKey() === scope
+      && signature() === fileSet && view.fileByPath().get(gap.path)?.patchKey === file.patchKey
+      && !!loader.rows(at.segment)
     try {
-      const lines = await expandGapAsync(gap, await fileText({ path: gap.path, sha: gap.sha }), tokenizeDocument)
-      // A newer revision of the file arrived while the body was being read: this gap is gone.
-      if (!loader.rows(at.segment)) return
+      const body = await fileText({ path: gap.path, sha: gap.sha })
+      if (!current()) return
+      const lines = await expandGapAsync(gap, body, tokenizeDocument)
+      if (!current()) return
       setOverlays((current) => {
         const next = new Map(current)
         const key = overlayKey(gap.path, at.segment.contentKey)
@@ -582,23 +614,39 @@ export function DiffPane(props: {
   // composer is single-slot (one open line at a time), so this seeds body from the draft when it
   // opens and writes back on edit; submitting sets body to '' which removes the key.
   const lineDraftKey = (key: string) => `line-comment:${source().draftPrefix}:${key}`
-  const composerFor = (key: string): LineComposerController => ({
-    isOpen: () => lineComposer()?.key === key,
-    body: () => {
-      const current = lineComposer()
-      return current?.key === key ? current.body : ''
-    },
-    setOpen: (open) => {
-      setLineComposer((current) => {
-        if (open) return { key, body: current?.key === key ? current.body : readDraft(lineDraftKey(key)) }
-        return current?.key === key ? null : current
-      })
-    },
-    setBody: (body) => {
-      writeDraft(lineDraftKey(key), body)
-      setLineComposer({ key, body })
-    },
-  })
+  const composerFor = (key: string): LineComposerController => {
+    const draftKey = lineDraftKey(key)
+    const origin = props.source
+    const epoch = composerEpoch
+    const ownsVisibleSlot = () => ownerLive && props.source === origin && composerEpoch === epoch
+    return {
+      isOpen: () => ownsVisibleSlot() && lineComposer()?.key === key,
+      body: () => {
+        const current = lineComposer()
+        return ownsVisibleSlot() && current?.key === key ? current.body : ''
+      },
+      setOpen: (open) => {
+        if (!ownsVisibleSlot()) return
+        setLineComposer((current) => {
+          if (open) return { key, body: current?.key === key ? current.body : readDraft(draftKey) }
+          return current?.key === key ? null : current
+        })
+      },
+      setBody: (body) => {
+        writeDraft(draftKey, body)
+        if (!ownsVisibleSlot()) return
+        setLineComposer((current) => current?.key === key ? { key, body } : current)
+      },
+      acknowledge: (originalBody) => {
+        // Compare the captured namespace even when another line or source owns the visible slot.
+        if (readDraft(draftKey) !== originalBody) return
+        writeDraft(draftKey, '')
+        if (!ownsVisibleSlot()) return
+        setLineComposer((current) => current?.key === key && current.body === originalBody ? null : current)
+      },
+    }
+  }
+
   const splitComposer = (r: CodeRow | null, side: CommentSide) => {
     const lineNo = side === 'LEFT' ? r?.oldNo : r?.newNo
     return r && lineNo != null ? composerFor(commentTargetKey(r.path, side, lineNo)) : undefined
@@ -628,7 +676,7 @@ export function DiffPane(props: {
         onToggleFileCollapse={toggleFileCollapse}
         fileMarks={fileMarks}
         rows={{
-          onMutated: invalidate,
+          onMutated: invalidate(),
           resolveThread: (threadId, resolved) => source().resolveThread?.(threadId, resolved) ?? rejectUnsupported(),
           replyReview: (databaseId, body) => source().reply?.(databaseId, body) ?? rejectUnsupported(),
           expandGap: handleExpand,

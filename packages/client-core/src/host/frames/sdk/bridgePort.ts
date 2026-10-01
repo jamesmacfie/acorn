@@ -34,7 +34,7 @@ export function resetBridgePort(): void {
   detachKeyForwarding = null
 }
 
-export function attach(port: MessagePort): Promise<AcornBridge> {
+export function attach(port: MessagePort, options: { mode?: AcornBridge['treeBridgeMode']; onDispose?(dispose: () => void): void } = {}): Promise<AcornBridge> {
   return new Promise<AcornBridge>((ready, rejectReady) => {
     const pending = new Map<number, Pending>()
     const listeners = new Map<string, Set<(payload: unknown) => void>>()
@@ -48,7 +48,7 @@ export function attach(port: MessagePort): Promise<AcornBridge> {
     let active = true
     let didReady = false
 
-    bridgeDisposers.set(port, () => {
+    const dispose = () => {
       if (!active) return
       active = false
       const error = new AcornBridgeError({ code: 'unmounted', message: 'the host unmounted this tree', retryable: false, requestId: '' })
@@ -62,10 +62,12 @@ export function attach(port: MessagePort): Promise<AcornBridge> {
       appearanceListeners.clear()
       selectListeners.clear()
       actionListeners.clear()
+      subscribing.clear()
       keyTarget.removeEventListener?.('keydown', onKeyDown, { capture: true })
       port.onmessage = null
       port.close()
-    })
+    }
+    bridgeDisposers.set(port, dispose)
 
     const keyTarget = globalThis as unknown as {
       addEventListener?: (type: 'keydown', listener: (event: KeyboardEvent) => void, options?: { capture?: boolean }) => void
@@ -114,9 +116,11 @@ export function attach(port: MessagePort): Promise<AcornBridge> {
           // instead of a blank rectangle.
           if (!didReady) {
             didReady = true
-            keyTarget.addEventListener?.('keydown', onKeyDown, { capture: true })
-            detachKeyForwarding = () => keyTarget.removeEventListener?.('keydown', onKeyDown, { capture: true })
-            port.postMessage({ kind: 'connected' })
+            if (!options.mode) {
+              keyTarget.addEventListener?.('keydown', onKeyDown, { capture: true })
+              detachKeyForwarding = () => keyTarget.removeEventListener?.('keydown', onKeyDown, { capture: true })
+            }
+            port.postMessage({ kind: 'connected', ...(options.mode === 'bootstrap' ? { treeSlotBridge: 1 } : {}) })
             ready(api)
           }
           return
@@ -136,7 +140,6 @@ export function attach(port: MessagePort): Promise<AcornBridge> {
           return
       }
     }
-    port.start?.()
 
     const request = <T>(message: Record<string, unknown>, signal?: AbortSignal): Promise<T> => {
       if (!active) return Promise.reject(new AcornBridgeError({ code: 'unmounted', message: 'the host unmounted this tree', retryable: false, requestId: '' }))
@@ -144,7 +147,7 @@ export function attach(port: MessagePort): Promise<AcornBridge> {
       return new Promise<T>((resolve, reject) => {
         const waiter: Pending = { resolve: resolve as (value: unknown) => void, reject }
         pending.set(id, waiter)
-        port.postMessage({ ...message, id })
+        try { port.postMessage({ ...message, id }) } catch (error) { pending.delete(id); reject(error); return }
         if (!signal) return
         if (signal.aborted) return void abort(id, reject, signal)
         const onAbort = () => abort(id, reject, signal)
@@ -170,6 +173,7 @@ export function attach(port: MessagePort): Promise<AcornBridge> {
     const { telemetry, log } = createBridgeTelemetry(port)
 
     const onEvent = (channel: string, listener: (payload: unknown) => void): (() => void) => {
+      if (!active) return () => {}
       const set = listeners.get(channel) ?? new Set()
       set.add(listener)
       listeners.set(channel, set)
@@ -189,6 +193,7 @@ export function attach(port: MessagePort): Promise<AcornBridge> {
     }
 
     const api: AcornBridge = {
+      ...(options.mode ? { treeBridgeMode: options.mode } : {}),
       get context() {
         if (!context) throw new Error('acorn: context is only available after connect() resolves')
         return context
@@ -247,6 +252,7 @@ export function attach(port: MessagePort): Promise<AcornBridge> {
       log,
       keys: {
         claim(chords) {
+          if (!active) return
           const declared = new Set((context?.claimsKeys ?? []).filter(isPluginKeyClaim))
           const next = new Set<string>()
           for (const chord of chords) {
@@ -260,17 +266,21 @@ export function attach(port: MessagePort): Promise<AcornBridge> {
         },
       },
       onAppearance(listener) {
+        if (!active) return () => {}
         appearanceListeners.add(listener)
         return () => appearanceListeners.delete(listener)
       },
       onSelect(listener) {
+        if (!active) return () => {}
         selectListeners.add(listener)
         return () => void selectListeners.delete(listener)
       },
       onSurfaceAction(listener) {
+        if (!active) return () => {}
         actionListeners.add(listener)
         return () => void actionListeners.delete(listener)
       },
     }
+    try { options.onDispose?.(dispose); if (active) port.start?.() } catch (error) { rejectReady(error); dispose() }
   })
 }

@@ -1,0 +1,8 @@
+{
+  "owner": "actual portable HTTP route/send, synthetic outbound fetch and plugin SQLite",
+  "callerAborted": true,
+  "outboundAborted": false,
+  "outboundRequests": 1,
+  "routeStatusAfterCallerAbort": 200,
+  "note": "No network request or command variable ran. Native cancellation propagation through loaded RPC belongs to area02."
+}

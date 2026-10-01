@@ -119,7 +119,7 @@ export type TreeSandboxMessage = z.infer<typeof sandboxMessage>
 /** Host to sandbox. A second `tree:mount` for a slot already mounted is a props update, which is what
  *  keeps a tool card's redraw one message rather than a teardown. */
 export const hostMessage = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('tree:mount'), slot: slotId, entry: z.string().min(1).max(64), props: z.unknown(), context: z.custom<PluginFrameContext>().optional(), bridgePort: z.custom<MessagePort>().optional() }),
+  z.object({ kind: z.literal('tree:mount'), slot: slotId, entry: z.string().min(1).max(64), props: z.unknown(), slotBridge: z.literal(1).optional(), context: z.custom<PluginFrameContext>().optional(), bridgePort: z.custom<MessagePort>().optional() }),
   z.object({ kind: z.literal('tree:unmount'), slot: slotId }),
   z.object({ kind: z.literal('tree:event'), slot: slotId, handler: z.number().int().positive(), event: z.enum(KIT_EVENTS), payload: z.unknown() }),
   z.object({ kind: z.literal('tree:ping') }),

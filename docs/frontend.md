@@ -855,6 +855,23 @@ The desktop installs responsiveness monitoring in the renderer entrypoint, not t
 preload bridge, so it observes the same consent and interaction state as the application.
 [Telemetry](telemetry.md#diagnosing-an-unresponsive-view) owns the vocabulary and diagnostic workflow.
 
+
+### Node shell navigation lifetime
+
+The desktop's keyed QueryCacheProvider contains PaneModelHost before the Router. The query provider
+owns persistence independently; PaneModelHost leases the selected Node generation for detached pane
+models. `setActiveNode` declares transport interest even for an equivalent selection, then batches a
+changed signal, device memory, and `runtime:node-switched`. Event listeners see the new Node before
+incoming reactive construction while the outgoing DOM still exists. Scope eviction carries `from`
+and `to`; owners retire the captured outgoing generation rather than reading an ambient cleanup
+scope. Individual region/pane removal preserves its model. Provider destruction retires observers
+and drawn marks. The explicit host wrapper is available for the TUI composition programme.
+
+TabRail memoizes the scalar stored `railOrder` value, parses it once per changed value, and shares a
+pin membership Set. Selection, same-value preference writes, and unrelated preferences reuse that
+projection. Row identity, reactive contributed markers, and the persisted representation remain the
+rail's existing contracts.
+
 ## Preview pane lifetime
 
 The preview pane mounts its toolbar and observers for the selected task. The desktop shell retains

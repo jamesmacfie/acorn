@@ -44,3 +44,6 @@ export { paneRegistry } from '@acorn/client-core/host/registries/panes/panes.ts'
 export { evictScope } from '@acorn/client-core/host/registries/shell'
 export { setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 export { isDarkColor } from '@acorn/client-core/kit/tokens'
+
+// Node-qualified client ownership fixtures populate the real fleet/status projection.
+export { refreshFleet } from '@acorn/client-core/infra/node/fleet.ts'

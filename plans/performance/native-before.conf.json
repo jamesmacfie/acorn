@@ -1,0 +1,8 @@
+{
+  "productName": "Acorn Performance Baseline",
+  "identifier": "com.acorn.performance.baseline",
+  "bundle": {
+    "targets": ["app"],
+    "createUpdaterArtifacts": false
+  }
+}

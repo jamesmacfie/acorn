@@ -1,0 +1,344 @@
+{
+  "sourceRoot": "/Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance",
+  "node": "v24.11.0",
+  "fixture": "Actual selected source RPC and request-context owners, two endpoints in one isolate, forced GC. Elapsed/CPU excludes sample GC. No provider/network calls.",
+  "routes": [
+    {
+      "calls": 1000,
+      "batch": 1000,
+      "wallMs": 78.96775000000002,
+      "cpuMs": 156.825,
+      "hostFunctionEncodes": 4000,
+      "peerFunctionEncodes": 3,
+      "heapBytes": 22065896,
+      "host": {
+        "functions": 0,
+        "remoteFunctions": 3,
+        "scopes": 0,
+        "pending": 0,
+        "incoming": 0,
+        "localSignals": 0,
+        "remoteSignals": 0,
+        "replyBuffers": 0,
+        "bodyReads": 0,
+        "remoteScopes": 0
+      },
+      "peer": {
+        "functions": 3,
+        "remoteFunctions": 0,
+        "scopes": 0,
+        "pending": 0,
+        "incoming": 0,
+        "localSignals": 0,
+        "remoteSignals": 0,
+        "replyBuffers": 0,
+        "bodyReads": 0,
+        "remoteScopes": 0
+      },
+      "frames": {
+        "call": 1000,
+        "result": 1000
+      }
+    },
+    {
+      "calls": 11000,
+      "batch": 10000,
+      "wallMs": 530.520709,
+      "cpuMs": 757.477,
+      "hostFunctionEncodes": 44000,
+      "peerFunctionEncodes": 3,
+      "heapBytes": 22274592,
+      "host": {
+        "functions": 0,
+        "remoteFunctions": 3,
+        "scopes": 0,
+        "pending": 0,
+        "incoming": 0,
+        "localSignals": 0,
+        "remoteSignals": 0,
+        "replyBuffers": 0,
+        "bodyReads": 0,
+        "remoteScopes": 0
+      },
+      "peer": {
+        "functions": 3,
+        "remoteFunctions": 0,
+        "scopes": 0,
+        "pending": 0,
+        "incoming": 0,
+        "localSignals": 0,
+        "remoteSignals": 0,
+        "replyBuffers": 0,
+        "bodyReads": 0,
+        "remoteScopes": 0
+      },
+      "frames": {
+        "call": 11000,
+        "result": 11000
+      }
+    },
+    {
+      "calls": 21000,
+      "batch": 10000,
+      "wallMs": 475.18075,
+      "cpuMs": 621.583,
+      "hostFunctionEncodes": 84000,
+      "peerFunctionEncodes": 3,
+      "heapBytes": 22700040,
+      "host": {
+        "functions": 0,
+        "remoteFunctions": 3,
+        "scopes": 0,
+        "pending": 0,
+        "incoming": 0,
+        "localSignals": 0,
+        "remoteSignals": 0,
+        "replyBuffers": 0,
+        "bodyReads": 0,
+        "remoteScopes": 0
+      },
+      "peer": {
+        "functions": 3,
+        "remoteFunctions": 0,
+        "scopes": 0,
+        "pending": 0,
+        "incoming": 0,
+        "localSignals": 0,
+        "remoteSignals": 0,
+        "replyBuffers": 0,
+        "bodyReads": 0,
+        "remoteScopes": 0
+      },
+      "frames": {
+        "call": 21000,
+        "result": 21000
+      }
+    }
+  ],
+  "bodies": [
+    {
+      "calls": 1000,
+      "batch": 1000,
+      "wallMs": 61.69295800000009,
+      "cpuMs": 123.635,
+      "heapBytes": 22438736,
+      "host": {
+        "functions": 0,
+        "remoteFunctions": 1,
+        "scopes": 0,
+        "pending": 0,
+        "incoming": 0,
+        "localSignals": 0,
+        "remoteSignals": 0,
+        "replyBuffers": 0,
+        "bodyReads": 0,
+        "remoteScopes": 0
+      },
+      "peer": {
+        "functions": 1,
+        "remoteFunctions": 0,
+        "scopes": 0,
+        "pending": 0,
+        "incoming": 0,
+        "localSignals": 0,
+        "remoteSignals": 0,
+        "replyBuffers": 0,
+        "bodyReads": 0,
+        "remoteScopes": 0
+      },
+      "frames": {
+        "call": 1000,
+        "result": 1000
+      }
+    },
+    {
+      "calls": 5000,
+      "batch": 4000,
+      "wallMs": 229.33375,
+      "cpuMs": 299.663,
+      "heapBytes": 22611856,
+      "host": {
+        "functions": 0,
+        "remoteFunctions": 1,
+        "scopes": 0,
+        "pending": 0,
+        "incoming": 0,
+        "localSignals": 0,
+        "remoteSignals": 0,
+        "replyBuffers": 0,
+        "bodyReads": 0,
+        "remoteScopes": 0
+      },
+      "peer": {
+        "functions": 1,
+        "remoteFunctions": 0,
+        "scopes": 0,
+        "pending": 0,
+        "incoming": 0,
+        "localSignals": 0,
+        "remoteSignals": 0,
+        "replyBuffers": 0,
+        "bodyReads": 0,
+        "remoteScopes": 0
+      },
+      "frames": {
+        "call": 5000,
+        "result": 5000
+      }
+    },
+    {
+      "calls": 10000,
+      "batch": 5000,
+      "wallMs": 210.56341699999984,
+      "cpuMs": 307.853,
+      "heapBytes": 22240248,
+      "host": {
+        "functions": 0,
+        "remoteFunctions": 1,
+        "scopes": 0,
+        "pending": 0,
+        "incoming": 0,
+        "localSignals": 0,
+        "remoteSignals": 0,
+        "replyBuffers": 0,
+        "bodyReads": 0,
+        "remoteScopes": 0
+      },
+      "peer": {
+        "functions": 1,
+        "remoteFunctions": 0,
+        "scopes": 0,
+        "pending": 0,
+        "incoming": 0,
+        "localSignals": 0,
+        "remoteSignals": 0,
+        "replyBuffers": 0,
+        "bodyReads": 0,
+        "remoteScopes": 0
+      },
+      "frames": {
+        "call": 10000,
+        "result": 10000
+      }
+    }
+  ],
+  "spans": [
+    {
+      "calls": 1000,
+      "batch": 1000,
+      "wallMs": 42.09845899999982,
+      "cpuMs": 72.53,
+      "heapBytes": 22387968,
+      "host": {
+        "functions": 6,
+        "remoteFunctions": 0,
+        "scopes": 0,
+        "pending": 0,
+        "incoming": 0,
+        "localSignals": 0,
+        "remoteSignals": 0,
+        "replyBuffers": 0,
+        "bodyReads": 0,
+        "remoteScopes": 0
+      },
+      "peer": {
+        "functions": 0,
+        "remoteFunctions": 6,
+        "scopes": 0,
+        "pending": 0,
+        "incoming": 0,
+        "localSignals": 0,
+        "remoteSignals": 0,
+        "replyBuffers": 0,
+        "bodyReads": 0,
+        "remoteScopes": 0
+      },
+      "frames": {
+        "call": 4000,
+        "result": 4000,
+        "release": 1000
+      }
+    },
+    {
+      "calls": 5000,
+      "batch": 4000,
+      "wallMs": 146.6795000000002,
+      "cpuMs": 198.986,
+      "heapBytes": 22397520,
+      "host": {
+        "functions": 6,
+        "remoteFunctions": 0,
+        "scopes": 0,
+        "pending": 0,
+        "incoming": 0,
+        "localSignals": 0,
+        "remoteSignals": 0,
+        "replyBuffers": 0,
+        "bodyReads": 0,
+        "remoteScopes": 0
+      },
+      "peer": {
+        "functions": 0,
+        "remoteFunctions": 6,
+        "scopes": 0,
+        "pending": 0,
+        "incoming": 0,
+        "localSignals": 0,
+        "remoteSignals": 0,
+        "replyBuffers": 0,
+        "bodyReads": 0,
+        "remoteScopes": 0
+      },
+      "frames": {
+        "call": 20000,
+        "result": 20000,
+        "release": 5000
+      }
+    },
+    {
+      "calls": 10000,
+      "batch": 5000,
+      "wallMs": 196.42333299999973,
+      "cpuMs": 221.938,
+      "heapBytes": 22406488,
+      "host": {
+        "functions": 6,
+        "remoteFunctions": 0,
+        "scopes": 0,
+        "pending": 0,
+        "incoming": 0,
+        "localSignals": 0,
+        "remoteSignals": 0,
+        "replyBuffers": 0,
+        "bodyReads": 0,
+        "remoteScopes": 0
+      },
+      "peer": {
+        "functions": 0,
+        "remoteFunctions": 6,
+        "scopes": 0,
+        "pending": 0,
+        "incoming": 0,
+        "localSignals": 0,
+        "remoteSignals": 0,
+        "replyBuffers": 0,
+        "bodyReads": 0,
+        "remoteScopes": 0
+      },
+      "frames": {
+        "call": 40000,
+        "result": 40000,
+        "release": 10000
+      }
+    }
+  ],
+  "retainedBeforeClose": false,
+  "abortResult": {
+    "requestAborted": true,
+    "explicitAborted": true
+  },
+  "routesHeapAfterClose": 22377280,
+  "retainedAfterClose": false,
+  "bodiesHeapAfterClose": 22240800,
+  "spansHeapAfterClose": 22352792
+}

@@ -219,8 +219,8 @@ The draft lives on the pane's model, above every region
 there: a shortcut that comes and goes with a column is not a shortcut.
 
 The host holds that shared thing. A compiled pane declares a `model` beside its regions, and the host
-builds it once per task inside its own reactive root, hands it to every region, and disposes it when
-the task is evicted (`client-core/src/host/registries/panes/paneModels.ts`):
+keeps one current task model per pane inside a detached reactive root, shares it across regions, and
+disposes it when that task is replaced or evicted, or its Node shell retires (`client-core/src/host/registries/panes/paneModels.ts`):
 
 ```ts
 ctx.panes.register({
@@ -241,8 +241,12 @@ the admission rule's own test. A pane whose regions share nothing omits `model` 
 handed `undefined`.
 
 The model outlives the pane that asked for it. The host keeps one per pane, and a model stays until a
-different task asks for that pane or the task is evicted, so after the reader moves on its effects
-keep running with nobody looking. The host therefore calls `model(task, pane)`, and `pane.shown()` is
+different task asks for that pane, the task is evicted, or the owning Node shell/provider is destroyed.
+Closing a pane or unmounting a region keeps the model. The shell mounts the explicit `PaneModelHost`
+component inside its selected QueryClient provider. Its captured Node generation qualifies model
+reuse and drawn marks; outgoing scope eviction retires observers before an incoming shell builds.
+Late cleanup from an earlier generation cannot release a replacement model or its drawn marks. A
+failed builder disposes its partially constructed root before a retry. The host therefore calls `model(task, pane)`, and `pane.shown()` is
 true only while a mounted pane is drawing that task. It is false on another task, behind a rail source
 such as Home, and while the same task shows a different pane. An effect that polls, or marks something
 as seen, reads it first. The agent pane marks sessions read and acknowledges finished turns only while

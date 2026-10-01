@@ -52,6 +52,10 @@ const stubHelper = (): Stub => {
       }),
       upsert: (record: unknown) => void upserted.push(record),
       statuses: () => [],
+      abort: () => {},
+      send: () => {},
+      closeViewer: () => {},
+      openViewer: () => true,
     },
     fleet: {
       list: () => remembered.map((entry) => entry.node),
@@ -213,7 +217,7 @@ it('terminates an oversized peer still waiting in its closing handshake during h
 // renderer drops whatever is not the active node on arrival
 // (@acorn/client-core/infra/node/wsClient.ts). So an N-node fleet paid two process boundaries, a
 // stringify and a parse per frame to deliver frames that were then thrown away.
-// Nobody has to tell the helper which node is active: every request the renderer makes names one.
+// Interest is declared by selection, independently of reads and cleanup writes.
 describe('the helper forwards only the active node', () => {
   const connect = async () => {
     const { helper } = stubHelper()
@@ -249,8 +253,7 @@ describe('the helper forwards only the active node', () => {
   it('drops a frame from a node the renderer is not addressing, and keeps every node\'s status', async () => {
     const { socket, settled, server } = await connect()
     try {
-      // Addressing node-a is what makes it the active one. `node-send` and `node-fetch` both count.
-      socket.send(JSON.stringify({ id: 1, method: 'node-send', params: { nodeId: 'node-a', frame: { channel: 'term:attach', id: 's1' } } }))
+      socket.send(JSON.stringify({ id: 1, method: 'node-interest', params: { nodeId: 'node-a' } }))
       await settled()
 
       server.push({ push: 'node-frame', nodeId: 'node-a', frame: { channel: 'tasks:changed' } })
@@ -276,13 +279,13 @@ describe('the helper forwards only the active node', () => {
     }
   })
 
-  // A node switch changes the fact with the renderer's first request to the new node.
+  // A cached Node switch changes interest without any API read.
   it('follows the renderer to a new node', async () => {
     const { socket, settled, server } = await connect()
     try {
-      socket.send(JSON.stringify({ id: 1, method: 'node-send', params: { nodeId: 'node-a', frame: { channel: 'term:attach', id: 's1' } } }))
+      socket.send(JSON.stringify({ id: 1, method: 'node-interest', params: { nodeId: 'node-a' } }))
       await settled()
-      socket.send(JSON.stringify({ id: 2, method: 'node-send', params: { nodeId: 'node-b', frame: { channel: 'term:attach', id: 's2' } } }))
+      socket.send(JSON.stringify({ id: 2, method: 'node-interest', params: { nodeId: 'node-b' } }))
       await settled()
 
       server.push({ push: 'node-frame', nodeId: 'node-a', frame: { channel: 'tasks:changed' } })

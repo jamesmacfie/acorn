@@ -1,0 +1,143 @@
+{
+  "environment": {
+    "node": "v24.11.0",
+    "platform": "darwin",
+    "arch": "arm64"
+  },
+  "traversal": [
+    {
+      "size": 100,
+      "sameDataUpdates": 30,
+      "sameDataChecks": 3000,
+      "sameDataWallMs": 3.054417000000001,
+      "sameDataCpuMs": 7.598,
+      "fetchChecks": 200,
+      "invalidateAllChecks": 10000,
+      "invalidateAllWallMs": 2.000208999999984,
+      "invalidateAllCpuMs": 4.658,
+      "events": {
+        "updated:success": 31,
+        "updated:fetch": 1,
+        "updated:invalidate": 100
+      },
+      "writes": [
+        {
+          "key": "acorn-cache:acorn-1:synthetic-100",
+          "bytes": 262022,
+          "queryCount": 100
+        },
+        {
+          "key": "acorn-cache:acorn-1:synthetic-100",
+          "bytes": 261923,
+          "queryCount": 100
+        }
+      ],
+      "serializedBytes": 261923,
+      "serializeWallMs": 0.2827919999999722,
+      "serializeCpuMs": 0.281,
+      "deserializeWallMs": 0.2710830000005444,
+      "deserializeCpuMs": 0.272
+    },
+    {
+      "size": 1000,
+      "sameDataUpdates": 30,
+      "sameDataChecks": 30000,
+      "sameDataWallMs": 11.617541999999958,
+      "sameDataCpuMs": 19.204,
+      "fetchChecks": 2000,
+      "invalidateAllChecks": 1000000,
+      "invalidateAllWallMs": 204.66833299999962,
+      "invalidateAllCpuMs": 378.596,
+      "events": {
+        "updated:success": 31,
+        "updated:fetch": 1,
+        "updated:invalidate": 1000
+      },
+      "writes": [
+        {
+          "key": "acorn-cache:acorn-1:synthetic-1000",
+          "bytes": 2625422,
+          "queryCount": 1000
+        },
+        {
+          "key": "acorn-cache:acorn-1:synthetic-1000",
+          "bytes": 2624423,
+          "queryCount": 1000
+        }
+      ],
+      "serializedBytes": 2624423,
+      "serializeWallMs": 1.8253340000010212,
+      "serializeCpuMs": 1.826,
+      "deserializeWallMs": 2.193750000000364,
+      "deserializeCpuMs": 2.195
+    },
+    {
+      "size": 3000,
+      "sameDataUpdates": 30,
+      "sameDataChecks": 90000,
+      "sameDataWallMs": 30.60029200000099,
+      "sameDataCpuMs": 65.223,
+      "fetchChecks": 6000,
+      "invalidateAllChecks": 9000000,
+      "invalidateAllWallMs": 1245.7397500000006,
+      "invalidateAllCpuMs": 1266.869,
+      "events": {
+        "updated:success": 31,
+        "updated:fetch": 1,
+        "updated:invalidate": 3000
+      },
+      "writes": [
+        {
+          "key": "acorn-cache:acorn-1:synthetic-3000",
+          "bytes": 7889422,
+          "queryCount": 3000
+        },
+        {
+          "key": "acorn-cache:acorn-1:synthetic-3000",
+          "bytes": 7886423,
+          "queryCount": 3000
+        }
+      ],
+      "serializedBytes": 7886423,
+      "serializeWallMs": 5.3133750000015425,
+      "serializeCpuMs": 5.313,
+      "deserializeWallMs": 6.600957999999082,
+      "deserializeCpuMs": 6.588
+    }
+  ],
+  "memory": {
+    "uniqueTextBytes": 16777216,
+    "queries": 128,
+    "observers": 0,
+    "gcTime": 86400000,
+    "persistedQueries": 0,
+    "retainedHeapBytes": 16819520,
+    "heapAfterClearBytes": 148112
+  },
+  "durableBodies": {
+    "keys": [
+      [
+        "job-log",
+        "fixture",
+        "repository",
+        123
+      ],
+      [
+        "compare",
+        "fixture",
+        "repository",
+        "main",
+        "feature"
+      ]
+    ],
+    "persistedBytes": 3146640
+  },
+  "cancellation_false": {
+    "aborted": false,
+    "data": "synthetic answer"
+  },
+  "cancellation_true": {
+    "aborted": true,
+    "data": null
+  }
+}

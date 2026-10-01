@@ -24,7 +24,7 @@ export function activateScopedStateEviction(): () => void {
   // And this is where that payoff stops. Feature state held in module-level signals sits outside the
   // QueryClient partition and survived a node switch. Only live rosters clear; durable per-task and
   // per-workspace memory is keyed by node instead, so switching back restores it.
-  const offSwitch = clientEvents.on('runtime:node-switched', () => evictScope({ scope: 'node-switched' }))
+  const offSwitch = clientEvents.on('runtime:node-switched', ({ from, to }) => evictScope({ scope: 'node-switched', from, to }))
   return () => {
     offSwitch()
     offNode()

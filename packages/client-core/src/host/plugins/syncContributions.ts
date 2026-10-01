@@ -1,5 +1,6 @@
 import { syncChromeContributions } from '../chrome/chromeRegister'
 import { syncFrameContributions } from '../frames/register'
+import { batch } from 'solid-js'
 
 /**
  * Both registration passes, in order. They must always run as a pair, since the frames pass draws the
@@ -11,6 +12,8 @@ import { syncFrameContributions } from '../frames/register'
  * one they depend on.
  */
 export function syncPluginContributions(): void {
-  syncFrameContributions()
-  syncChromeContributions()
+  batch(() => {
+    syncFrameContributions()
+    syncChromeContributions()
+  })
 }

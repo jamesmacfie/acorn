@@ -2,7 +2,7 @@
 // node's NotesStore, so it 503s in dev:node. Note shapes are canonical in
 // @acorn/protocol/notes.ts; re-exported here so existing feature imports keep working.
 import { noteIncludedRoute, noteRoute, noteTitleRoute, notesListRoute } from '../shared/api'
-import { openPane, readJson, writeJson } from '@acorn/plugin-api/client'
+import { activeNodeId, openPane, readJson, writeJson } from '@acorn/plugin-api/client'
 import type { Note, NoteKind, NoteLocation, NoteScope, NoteSummary } from '@acorn/protocol/notes.ts'
 export type { Note, NoteAuthor, NoteKind, NoteLocation, NoteScope, NoteSummary } from '@acorn/protocol/notes.ts'
 
@@ -16,21 +16,21 @@ export type NotesApi = {
   remove(location: NoteLocation, slug: string): Promise<{ ok: boolean } | { error: string }>
 }
 
-const post = <T>(url: string, body?: unknown) =>
-  writeJson<T>(url, { method: 'POST', headers: body === undefined ? undefined : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
-
-const api: NotesApi = {
-  list: (location) => readJson<NoteSummary[] | { error: string }>(notesListRoute(location)),
-  read: (location, slug) => readJson<Note | { error: string }>(noteRoute(location, slug)),
-  create: (location, title, kind) => post<{ slug: string } | { error: string }>(notesListRoute(location), { title, kind }),
-  write: (location, slug, body) =>
-    writeJson<{ ok: boolean } | { error: string }>(noteRoute(location, slug), { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ body }) }),
-  setIncluded: (location, slug, included) => post<{ ok: boolean } | { error: string }>(noteIncludedRoute(location, slug), { included }),
-  setTitle: (location, slug, title) => post<{ ok: boolean } | { error: string }>(noteTitleRoute(location, slug), { title }),
-  remove: (location, slug) => writeJson<{ ok: boolean } | { error: string }>(noteRoute(location, slug), { method: 'DELETE' }),
+// A factory captures custody once; null explicitly targets the serving origin.
+export function notesApi(nodeId: string | null = activeNodeId()): NotesApi {
+  const options = { nodeId }
+  const post = <T>(url: string, body?: unknown) =>
+    writeJson<T>(url, { ...options, method: 'POST', headers: body === undefined ? undefined : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+  return {
+    list: (location) => readJson(notesListRoute(location), options),
+    read: (location, slug) => readJson(noteRoute(location, slug), options),
+    create: (location, title, kind) => post(notesListRoute(location), { title, kind }),
+    write: (location, slug, body) => writeJson(noteRoute(location, slug), { ...options, method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ body }) }),
+    setIncluded: (location, slug, included) => post(noteIncludedRoute(location, slug), { included }),
+    setTitle: (location, slug, title) => post(noteTitleRoute(location, slug), { title }),
+    remove: (location, slug) => writeJson(noteRoute(location, slug), { ...options, method: 'DELETE' }),
+  }
 }
-
-export const notesApi = (): NotesApi => api
 
 export const requestNoteOpen = (taskId: string, slug: string, scope: NoteScope = 'workspace') =>
   openPane(taskId, 'notes', { kind: 'notes:open', slug, scope })

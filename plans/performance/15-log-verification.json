@@ -1,0 +1,33 @@
+{
+  "fixture": "Actual Log/ScrollViewport at 80x24 with 1k/10k unique synthetic lines; warm 30-frame traversal, no terminal sink latency",
+  "cases": [
+    {
+      "count": 1000,
+      "initial": {
+        "wallMs": 15.293499999999767,
+        "cpuMs": 28.739,
+        "nodes": 2005,
+        "yoga": 1004
+      },
+      "warmFrames": {
+        "repeats": 30,
+        "wallMs": 21.030666999999085,
+        "cpuMs": 25.84
+      }
+    },
+    {
+      "count": 10000,
+      "initial": {
+        "wallMs": 267.86891599999944,
+        "cpuMs": 449.256,
+        "nodes": 20005,
+        "yoga": 10004
+      },
+      "warmFrames": {
+        "repeats": 30,
+        "wallMs": 163.9138750000002,
+        "cpuMs": 180.253
+      }
+    }
+  ]
+}

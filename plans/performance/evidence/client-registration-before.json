@@ -1,0 +1,77 @@
+{
+  "benchmark": "unchanged loaded contribution reconciliation",
+  "plugins": 20,
+  "checkpoints": [
+    {
+      "unchangedPass": 1,
+      "ms": 2.770915999999943,
+      "registryObserverRuns": 40,
+      "paneListMounts": 20,
+      "paneListUnmounts": 20
+    },
+    {
+      "unchangedPass": 2,
+      "ms": 2.0254999999999654,
+      "registryObserverRuns": 40,
+      "paneListMounts": 20,
+      "paneListUnmounts": 20
+    },
+    {
+      "unchangedPass": 3,
+      "ms": 1.806833000000097,
+      "registryObserverRuns": 40,
+      "paneListMounts": 20,
+      "paneListUnmounts": 20
+    },
+    {
+      "unchangedPass": 4,
+      "ms": 1.3306250000000546,
+      "registryObserverRuns": 40,
+      "paneListMounts": 20,
+      "paneListUnmounts": 20
+    },
+    {
+      "unchangedPass": 5,
+      "ms": 1.2182500000001255,
+      "registryObserverRuns": 40,
+      "paneListMounts": 20,
+      "paneListUnmounts": 20
+    },
+    {
+      "unchangedPass": 6,
+      "ms": 1.0907499999998436,
+      "registryObserverRuns": 40,
+      "paneListMounts": 20,
+      "paneListUnmounts": 20
+    },
+    {
+      "unchangedPass": 7,
+      "ms": 1.449292000000014,
+      "registryObserverRuns": 40,
+      "paneListMounts": 20,
+      "paneListUnmounts": 20
+    },
+    {
+      "unchangedPass": 8,
+      "ms": 1.0177080000000842,
+      "registryObserverRuns": 40,
+      "paneListMounts": 20,
+      "paneListUnmounts": 20
+    },
+    {
+      "unchangedPass": 9,
+      "ms": 0.9849169999999958,
+      "registryObserverRuns": 40,
+      "paneListMounts": 20,
+      "paneListUnmounts": 20
+    },
+    {
+      "unchangedPass": 10,
+      "ms": 9.57224999999994,
+      "registryObserverRuns": 40,
+      "paneListMounts": 20,
+      "paneListUnmounts": 20
+    }
+  ],
+  "registryObserverSawEmptyRoster": true
+}

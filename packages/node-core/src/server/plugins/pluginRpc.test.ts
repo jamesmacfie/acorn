@@ -66,7 +66,7 @@ describe('plugin RPC synchronous replies', () => {
       // the deadlock needed: the worker owes the host an answer it can only give once the host runs
       // again, and the host is about to stop running.
       let waiting = false
-      void plugin.slow(async () => {
+      const slow = plugin.slow(async () => {
         waiting = true
         await new Promise((resolve) => setTimeout(resolve, 1_000))
       })
@@ -74,6 +74,7 @@ describe('plugin RPC synchronous replies', () => {
       expect(waiting).toBe(true)
 
       expect(plugin.pure()).toBe('pure')
+      await slow
     } finally {
       await worker.terminate()
     }

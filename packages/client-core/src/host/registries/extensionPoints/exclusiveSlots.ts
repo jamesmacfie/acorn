@@ -50,8 +50,9 @@ export const exclusiveSlotFailureCount = (slot: CoreExclusiveSlot, pluginId: str
 
 /** Cleared by the contribution sync, which is the one moment the bytes behind a provider can have
  *  changed. Also the test seam. */
-export const clearExclusiveSlotFailures = (): void => {
-  failures.clear()
+export const clearExclusiveSlotFailures = (pluginId?: string): void => {
+  if (pluginId === undefined) failures.clear()
+  else for (const key of failures.keys()) if (key.endsWith(`:${pluginId}`)) failures.delete(key)
   setFailureEpoch((epoch) => epoch + 1)
 }
 

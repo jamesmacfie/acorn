@@ -1,0 +1,26 @@
+{
+  "runtime": "v24.11.0",
+  "note": "Actual loopback listener ownership; no remote Node or preview page is dialled.",
+  "records": [
+    {
+      "name": "concurrent-cap",
+      "requests": 24,
+      "openedListeners": 24,
+      "rejected": 0,
+      "ownPortsWithHeaders": 24
+    },
+    {
+      "name": "pending-close-task",
+      "listenerAliveAfterClose": true
+    },
+    {
+      "name": "pending-dispose",
+      "listenerAliveAfterClose": true
+    },
+    {
+      "name": "same-key-dedupe",
+      "requests": 8,
+      "openedListeners": 1
+    }
+  ]
+}

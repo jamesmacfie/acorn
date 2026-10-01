@@ -1,0 +1,24 @@
+Baseline HEAD: f8e4b59caadfe846a9e2c6491ac42b91ec3cf66f
+Application source unchanged.
+
+rtk proxy env ACORN_PERF_TAG=before pnpm exec vitest run --config plans/performance/15-probe.config.mts
+At the initial suite revision: 5 files / 9 cases passed, 13.16 seconds.
+
+rtk proxy env ACORN_PERF_TAG=before-v2 pnpm exec vitest run --config plans/performance/15-probe.config.mts plans/performance/15-collection-probe.test.ts
+1 file / 1 case passed, 2.95 seconds. Adds plain ordinary-object CPU lane to the counting-getter probe.
+
+rtk proxy env ACORN_PERF_TAG=before pnpm exec vitest run --config plans/performance/15-probe.config.mts plans/performance/15-render-probe.test.tsx -t 'with a retained hidden log'
+1 case passed, 5 skipped, 2.33 seconds. Additional hidden-overlay Log/Spinner fixture.
+
+rtk proxy env ACORN_PERF_TAG=before pnpm exec vitest run --config plans/performance/15-probe.config.mts plans/performance/15-render-probe.test.tsx -t 'when a retained pane is hidden'
+1 case passed, 6 skipped, 1.67 seconds. Additional retained virtual Rows visibility fixture.
+
+rtk proxy pnpm --filter @acorn/tui exec vitest run src/input/parser.test.ts src/width.test.ts src/tree/tree.test.ts src/paint/paint.test.ts src/node/cache.test.ts src/kit/scrolling.test.tsx src/keys/keys.test.tsx --maxWorkers 1
+7 files / 147 cases passed, 4.07 seconds.
+
+Replay the final configuration with ACORN_PERF_TAG=sample or a new coordinator-before/after tag.
+Before files reject overwrite. The initial .ts config could not evaluate import.meta.resolve;
+renaming the audit config to .mts fixed the harness. Absolute dependency aliases preserve the TUI
+universal transform and one Solid/query module instance. No failed harness attempt is evidence.
+
+No paid providers, normal profiles, external messages, checkout Git writes, or source edits.

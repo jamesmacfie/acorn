@@ -35,7 +35,7 @@ export class NodeResponseTooLargeError extends Error {
 
 // Shared by the pinned transport and the unverified probe. Content-Length is an early rejection,
 // not an authority: chunked and dishonest responses are counted before each chunk is retained.
-export function readBoundedResponse(res: IncomingMessage, maxBytes: number): Promise<Buffer> {
+export function readBoundedResponse(res: IncomingMessage, maxBytes: number): Promise<Buffer<ArrayBuffer>> {
   return new Promise((resolve, reject) => {
     const declared = res.headers['content-length']
     if (declared && /^\d+$/.test(declared) && BigInt(declared) > BigInt(maxBytes)) {
@@ -83,6 +83,7 @@ export function readBoundedResponse(res: IncomingMessage, maxBytes: number): Pro
 
 export function nodeRequest(options: NodeRequestOptions): Promise<NodeFetchResponse> {
   const { url, agent, signal } = options
+  if (signal.aborted) return Promise.reject(abortError())
   const encoded = encodeBody(options.body)
   const send = url.protocol === 'https:' ? httpsRequest : httpRequest
 
@@ -117,7 +118,7 @@ export function nodeRequest(options: NodeRequestOptions): Promise<NodeFetchRespo
             // joining rather than dropping keeps it honest.
             headers[key] = Array.isArray(value) ? value.join(', ') : value
           }
-          resolve({ status: res.statusCode ?? 0, headers, body: new Uint8Array(body) })
+          resolve({ status: res.statusCode ?? 0, headers, body: new Uint8Array(body.buffer, body.byteOffset, body.byteLength) })
         }, reject)
       },
     )

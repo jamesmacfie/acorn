@@ -62,6 +62,8 @@ export type PluginByteResponse = { bytes: Uint8Array; type: string; filename: st
 // Named for what it is rather than for the app: `Acorn` on @acorn/plugin-api/ui is the shell component,
 // and two things called Acorn in one plugin's imports is a trap.
 export type AcornBridge = {
+  /** Per-mount authority, legacy host fallback, or authority-free module bootstrap. */
+  readonly treeBridgeMode?: 'mount' | 'legacy' | 'bootstrap'
   /** What this frame was opened to look at. A snapshot, not reactive: a frame is recreated when its
    * subject changes. */
   readonly context: PluginFrameContext

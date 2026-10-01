@@ -1,0 +1,14 @@
+{
+  "environment": { "node": "v24.11.0", "platform": "darwin", "arch": "arm64" },
+  "ring": [
+    { "chunkBytes": 4096, "retainedBytes": 262144, "retainedChunks": 64, "heapDelta": 18976, "fillMs": 0.367708, "fillCpuMs": 0.383, "overflowChunks": 8, "overflowMs": 0.062541, "overflowCpuMs": 0.109, "tailValid": true },
+    { "chunkBytes": 64, "retainedBytes": 262144, "retainedChunks": 4096, "heapDelta": 496736, "fillMs": 1.381542, "fillCpuMs": 4.484, "overflowChunks": 512, "overflowMs": 0.158291, "overflowCpuMs": 0.260, "tailValid": true },
+    { "chunkBytes": 8, "retainedBytes": 262144, "retainedChunks": 32768, "heapDelta": 3210832, "fillMs": 4.702958, "fillCpuMs": 11.502, "overflowChunks": 4096, "overflowMs": 106.930750, "overflowCpuMs": 108.858, "tailValid": true },
+    { "chunkBytes": 1, "retainedBytes": 262144, "retainedChunks": 262144, "heapDelta": 26449088, "fillMs": 26.484500, "fillCpuMs": 36.774, "overflowChunks": 8192, "overflowMs": 1707.419666, "overflowCpuMs": 1707.391, "tailValid": true }
+  ],
+  "overlappingStart": { "calls": 8, "spawned": 8, "returnedSessions": ["s1", "s2", "s3", "s4", "s5", "s6", "s7", "s8"], "killed": ["s8"], "surviving": ["s1", "s2", "s3", "s4", "s5", "s6", "s7"], "trackedInstances": 0 },
+  "runTargetRetention": { "completedDistinctTasks": 1000, "trackedInstances": 0, "retainedExitCodes": 1000, "exitListenerCount": 1, "afterDispose": { "exitCodes": 0, "exitListeners": 0 } },
+  "attachRebuild": { "replayBytes": 262144, "snapshotBytes": 16633, "elapsedMs": 22.442459, "cpuMs": 52.126 },
+  "attachPending": { "pendingFrames": 1000, "pendingBytes": 4096000, "emulating": true, "deliveredBeforeSnapshot": 1, "afterSnapshot": { "emulating": false, "delivered": 1002, "screenDisposals": 1 } },
+  "parserBurst": { "acceptedBytes": 50003968, "pendingData": 50003968, "firstError": "write data discarded, use flow control to avoid losing data", "note": "Synchronous synthetic producer; characterizes the actual xterm safety limit, not observed live traffic." }
+}

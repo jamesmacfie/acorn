@@ -1,0 +1,37 @@
+{
+  "fixture": "actual WS channel -> managedStore; 8000 synthetic 1KiB append updates for one tool; no DOM, no real network, timings are synchronous elapsed dispatch+store; no CPU measurement in this first run; serialized bytes are not retained heap",
+  "samples": [
+    {
+      "updates": 2000,
+      "rawJsonBytes": 2512680,
+      "foldedRows": 1,
+      "foldedJsonBytes": 2048250,
+      "batchSynchronousWallMs": 2.7363330000000587,
+      "averagePerAppendWallMs": 0.0013681665000000293
+    },
+    {
+      "updates": 4000,
+      "rawJsonBytes": 5028680,
+      "foldedRows": 1,
+      "foldedJsonBytes": 4096250,
+      "batchSynchronousWallMs": 1.5269579999999223,
+      "averagePerAppendWallMs": 0.0007634789999999611
+    },
+    {
+      "updates": 6000,
+      "rawJsonBytes": 7544680,
+      "foldedRows": 1,
+      "foldedJsonBytes": 6144250,
+      "batchSynchronousWallMs": 1.5434999999999945,
+      "averagePerAppendWallMs": 0.0007717499999999973
+    },
+    {
+      "updates": 8000,
+      "rawJsonBytes": 10060680,
+      "foldedRows": 1,
+      "foldedJsonBytes": 8192250,
+      "batchSynchronousWallMs": 1.7490000000000236,
+      "averagePerAppendWallMs": 0.0008745000000000118
+    }
+  ]
+}

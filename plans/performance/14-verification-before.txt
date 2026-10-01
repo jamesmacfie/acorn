@@ -1,0 +1,67 @@
+Area 14 verification, baseline f8e4b59c, October 1, 2026
+
+Application source was read-only. No branches, commits, nested agents, live profile changes,
+provider requests, model turns, or external messages. Every command used RTK. Synthetic databases
+and Memory files were created under the operating system temporary directory and removed in finally.
+
+Authoritative Node owner probes:
+rtk proxy node --expose-gc --import tsx plans/performance/14-node-probe.mjs memory before
+  Completed. 14-memory-before.json. Real registerKnowledgeChannel and plugin SQLite migrations.
+rtk proxy node --expose-gc --import tsx plans/performance/14-node-probe.mjs workflow before
+  Completed. 14-workflow-before.json. Real workflowRunList, workflowTaskNavigation, workflowRunsForTask.
+rtk proxy node --expose-gc --import tsx plans/performance/14-node-probe.mjs processing before
+  Completed. 14-processing-before.json. Real workflowSelectionPage and durable plugin tables.
+
+Authoritative renderer owner probes:
+rtk proxy env ACORN_PERF_TAG=before-v7 pnpm exec vitest run --config plans/performance/14-probe.config.ts
+  3 files, 4 tests passed. Duration 2.99s, tests 115ms.
+  14-run-pane-before-v7.json: 4,928,680 logical text characters retained; 30 runs and 30 steps refresh reads.
+  14-client-schedules-before-v7.json: initial plus 30 edges admitted 31 concurrent schedule runs.
+  14-authoring-before-v7.json: actual updateDef/API/broker delivery sent cleanup draft to Node B;
+    reactive store reuse accepted A's ack into B. Both disposable Nodes were marked connected at
+    the fleet availability boundary. Definitions/catalog/validation and the broker reply were synthetic.
+
+Focused baseline invariant suite:
+rtk proxy pnpm exec vitest run --config plans/performance/14-existing.config.ts
+  8 files, 46 tests passed. Duration 4.22s, tests 538ms.
+  Memory reconciliation, workflow run projection, processing read models, authoring recovery,
+  Node scheduler, provider budgets, data selection, and renderer run model.
+  Root config sets maxWorkers=1; the project output showed several worker process IDs. This was
+  correctness verification, not a timed CPU probe. The authoritative renderer probe above ran alone.
+
+Independent coordinator replay:
+  ACORN_PERF_TAG=coordinator-before renderer suite passed all 3 files and 4 cases in 3.04s.
+  Sequential memory, workflow, and processing Node probes completed with coordinator-before tags.
+  Five unchanged Memory reconciles again issued 3,000 inserts and 10 deletes, about 548ms CPU.
+  Workflow navigation again selected 33.29MB of string cells, about 103ms CPU.
+  Processing again selected 22.33MB per page with exact counts, about 56ms CPU on the first page.
+  The six 14-*-coordinator-before.json files preserve this replay.
+
+Harness refinement retained for auditability:
+  The first renderer mock did not resolve the plugin API's physical workspace module. The probe
+  config now aliases @acorn/plugin-api/client to its actual source entrypoint. Unaliased failures
+  are harness failures and provide no finding evidence.
+  before-v2 and before-v3 authoring used a mocked updateDef and manually recorded the ambient Node.
+  Those authoring records are superseded by actual request delivery in before-v7.
+  before-v4/v5/v6 authoring records are excluded: the real API rejected an unavailable synthetic
+  Node before request delivery. Their suite failed one authoring case, while the independent run-pane
+  and client-schedule probes passed. The first case had insufficient success assertions in those runs.
+  The final authoring probe declares both synthetic Nodes connected, verifies a request landed,
+  and requires the delayed save to succeed. The same real request path selects the destination Node.
+  All prior before files remain intact. Sample outputs are disposable replay outputs.
+
+Replay without overwriting before evidence (run sequentially while the benchmark window is idle):
+rtk proxy node --expose-gc --import tsx plans/performance/14-node-probe.mjs memory coordinator
+rtk proxy node --expose-gc --import tsx plans/performance/14-node-probe.mjs workflow coordinator
+rtk proxy node --expose-gc --import tsx plans/performance/14-node-probe.mjs processing coordinator
+rtk proxy env ACORN_PERF_TAG=coordinator pnpm exec vitest run --config plans/performance/14-probe.config.ts
+rtk proxy pnpm exec vitest run --config plans/performance/14-existing.config.ts
+
+After implementation:
+  Adapt before-characterization assertions to the intended invariant. In particular, run-pane raw
+  stdout events need not remain at 200, a coalesced schedule requires draining its dirty follow-up,
+  and authoring assertions must require Node A delivery and B revision 5 staying clean.
+  Keep loading the production owner if it moves. Do not benchmark a retired function.
+  Use a distinct tag such as after-v1. Before-prefixed files reject overwrite.
+  Add the behavior gates in 14-background.md, run relevant owning suites and pnpm lint, and verify
+  visible desktop changes in the real isolated Tauri window. Hidden-window jsdom timing is not UI latency.

@@ -599,6 +599,9 @@ importers:
       '@tanstack/query-async-storage-persister':
         specifier: ^5.101.0
         version: 5.101.0
+      '@tanstack/query-persist-client-core':
+        specifier: ^5.101.0
+        version: 5.101.0
       '@tanstack/solid-query':
         specifier: ^5.101.0
         version: 5.101.0(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))

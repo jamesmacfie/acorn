@@ -102,6 +102,32 @@ describe('OutputRing', () => {
   })
 })
 
+it('keeps exact UTF-8 byte suffixes across physical block cuts, wraps, and oversized callbacks', () => {
+  const ring = new OutputRing()
+  let reference = Buffer.alloc(0)
+  const chunks = ['a'.repeat(4095), '🌰中é', 'x'.repeat(RING_CAP - 23), 'é'.repeat(RING_CAP), '',
+    ...Array.from({ length: 170 }, (_, i) => `row${i}中\n`.repeat(777))]
+  for (const chunk of chunks) {
+    const encoded = Buffer.from(chunk)
+    reference = Buffer.concat([reference, encoded]).subarray(-RING_CAP)
+    ring.push(chunk)
+    expect(ring.bytes).toBe(reference.length)
+    for (const count of [0, 1, 3, 4095, 4096, 4097, RING_CAP, RING_CAP + 1]) {
+      expect(ring.tail(count)).toBe(count === 0 ? '' : reference.subarray(-count).toString('utf8'))
+    }
+  }
+})
+
+it('retains few fixed blocks after tiny callbacks and repeated head overflow', () => {
+  const ring = new OutputRing()
+  for (let i = 0; i < RING_CAP + 8192; i++) ring.push(i % 2 ? 'a' : 'b')
+  expect(ring.bytes).toBe(RING_CAP)
+  expect(ring.tail()).toBe('ba'.repeat(RING_CAP / 2))
+  const blocks = (ring as unknown as { blocks: Buffer[] }).blocks
+  expect(blocks.filter(Boolean)).toHaveLength(64)
+  expect(blocks.every(block => block.buffer.byteLength === 4096)).toBe(true)
+})
+
 describe('resolveBackend', () => {
   it('uses tmux only when preferred and available, else degrades to node-pty', () => {
     expect(resolveBackend('tmux', true)).toBe('tmux')

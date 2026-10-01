@@ -436,6 +436,13 @@ tiers are permanent, and the line between them is what a contribution needs. Any
 data plus async messages can be sandboxed, while PTY stream ownership and components the shell renders
 inside its own tree at a place it has not opened as an extension point need the shared realm and stay
 first-party.
+Client tree module lifetime is separate from mounted authority. Capable SDKs share a bundle worker
+while every mounted slot owns its bridge, pending requests, and document grant. A legacy SDK uses
+one immutable slot-affine worker per mounted tree and terminates with its final lease. The host captures QueryClient
+origin before lazy region construction, and structural document handle changes revoke prior grant
+generations. [Mounted bridge ownership](./plugins/descriptors.md#mounted-bridge-ownership-and-sdk-compatibility)
+defines capability negotiation, compatibility, resource bounds, and the selected-Node event boundary.
+
 A device can also hold a client-only loaded plugin. Its bundle has device provenance, wins over a Node
 offer of the same plugin ID, and uses the same client sandbox and trust gate. The device installer
 rejects any Node entry or Node-dependent contribution.

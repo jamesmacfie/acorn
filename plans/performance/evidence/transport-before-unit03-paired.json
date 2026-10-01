@@ -1,0 +1,231 @@
+{
+  "sourceRoot": "/tmp/acorn-perf-original-f8e4b59c",
+  "mode": "before",
+  "node": "v24.11.0",
+  "provenance": [
+    {
+      "path": "apps/desktop/src/helper/helperServer.ts",
+      "sha256": "0c2a0f44334508b92ac190f23a71067566df47f2a6d6162b4ce83d54a1c0e1fe"
+    },
+    {
+      "path": "packages/custody/src/broker/nodeBroker.ts",
+      "sha256": "5b96d409513f0180b60234c8b8807f4a5a03e582331cb9875a6a4f3e92ebcf68"
+    },
+    {
+      "path": "packages/custody/src/broker/nodeRequest.ts",
+      "sha256": "14244a1567dd890106bd66905dbcbd3ef7c14cf0ddc877de594a136b8ac58277"
+    },
+    {
+      "path": "packages/node-core/src/server/transport/wsHub.ts",
+      "sha256": "483c48fbb0208baee5be8f8a5a37eeb7f5e048bc148f7beeb50ffae812381f2f"
+    },
+    {
+      "path": "plugins/docker/src/server/wsChannel.ts",
+      "sha256": "929459ed5eefc25a964af55e399c3d60085314fc8654aea683d16b84b8afecda"
+    },
+    {
+      "path": "plugins/terminal/src/server/terminalDisplay.ts",
+      "sha256": "599187c60d4efa0b5aadfda6bd2536e0218299e84b16dd70f255aa0a4e2d2919"
+    },
+    {
+      "path": "plugins/terminal/src/client/wsChannel.ts",
+      "sha256": "fc0e34cc029240b3c453c986b5229c957c4113a84f672ab510fdc272a214d9ab"
+    },
+    {
+      "path": "plugins/terminal/src/client/terminalClient.ts",
+      "sha256": "8a8e7babe605b30c3f0c9f14266f4558d55bb49f630407f52d6a4db43488c2e2"
+    },
+    {
+      "path": "packages/protocol/src/ws.ts",
+      "sha256": "f8dd3bf24752b64c8d4927f4d410980267f4590db415912da746c4caf8bec04f"
+    },
+    {
+      "path": "packages/protocol/src/node.ts",
+      "sha256": "31a95f2bd97b73c42d0d3921bfeacef8d0ae950e755f4145a57ea6255b31c680"
+    },
+    {
+      "path": "apps/desktop/src/shell/wire.ts",
+      "sha256": "b132cb125ba05aa6d073ac4a463b682c44064c7350861e745b197e15fe88da81"
+    }
+  ],
+  "fixture": "Two separate authenticated wsHub Node child processes, real isolated node-pty cat and production xterm headless serialization, actual helper and broker, disposable Docker executable. No private state, real Docker daemon, Tauri, or visible latency measurement.",
+  "adaptations": [
+    "Legacy raw API; records known viewer sharing/zero-renderer defects without asserting corrected outcomes."
+  ],
+  "joined": {
+    "node": {
+      "id": 2,
+      "attaches": 1,
+      "detaches": 0,
+      "sinks": 1,
+      "snapshots": 1,
+      "producers": 1,
+      "stops": 0,
+      "physicalSockets": 1,
+      "size": {
+        "cols": 80,
+        "rows": 24
+      },
+      "pids": [
+        95247,
+        95256,
+        95290
+      ]
+    },
+    "aReady": 1,
+    "bReady": 0,
+    "aResetDelta": 0
+  },
+  "surviving": {
+    "node": {
+      "id": 4,
+      "attaches": 1,
+      "detaches": 1,
+      "sinks": 0,
+      "snapshots": 1,
+      "producers": 1,
+      "stops": 1,
+      "physicalSockets": 1,
+      "size": {
+        "cols": 80,
+        "rows": 24
+      },
+      "pids": [
+        95247,
+        95256
+      ]
+    },
+    "bAdditionalTerminalFrames": 0
+  },
+  "inactive": {
+    "downstreamFrames": 128,
+    "downstreamBytes": 0,
+    "elapsedMs": 55.69599999999991,
+    "parentProcessCpuMs": 8.381
+  },
+  "reconnect": {
+    "readyDelta": 1,
+    "latestSize": {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "cols": 144,
+      "rows": 44
+    },
+    "before": {
+      "id": 6,
+      "attaches": 1,
+      "detaches": 1,
+      "sinks": 0,
+      "snapshots": 1,
+      "producers": 1,
+      "stops": 1,
+      "physicalSockets": 1,
+      "size": {
+        "cols": 144,
+        "rows": 44
+      },
+      "pids": [
+        95247,
+        95256
+      ]
+    },
+    "after": {
+      "id": 8,
+      "attaches": 2,
+      "detaches": 1,
+      "sinks": 1,
+      "snapshots": 2,
+      "producers": 1,
+      "stops": 1,
+      "physicalSockets": 2,
+      "size": {
+        "cols": 144,
+        "rows": 44
+      },
+      "pids": [
+        95247,
+        95256
+      ]
+    }
+  },
+  "retired": {
+    "id": 9,
+    "attaches": 2,
+    "detaches": 1,
+    "sinks": 1,
+    "snapshots": 2,
+    "producers": 1,
+    "stops": 1,
+    "physicalSockets": 2,
+    "size": {
+      "cols": 144,
+      "rows": 44
+    },
+    "pids": [
+      95247,
+      95256
+    ]
+  },
+  "upstream": {
+    "json": 148,
+    "binary": 2,
+    "binaryBytes": 170
+  },
+  "bodies": [
+    {
+      "bytes": 65536,
+      "base64Chars": 87384,
+      "medianMs": 3.3662500000000364,
+      "medianProcessCpuMs": 2.216
+    },
+    {
+      "bytes": 2097152,
+      "base64Chars": 2796204,
+      "medianMs": 68.60970899999984,
+      "medianProcessCpuMs": 59.628
+    },
+    {
+      "bytes": 8388608,
+      "base64Chars": 11184812,
+      "medianMs": 221.19787499999984,
+      "medianProcessCpuMs": 207.621
+    }
+  ],
+  "responseAssembly": {
+    "bytes": 8388608,
+    "fragmentedWrites": 128,
+    "retainedResponses": 7,
+    "retainedBytes": 58720256,
+    "medianMs": 8.757582999999613,
+    "medianProcessCpuMs": 21.481,
+    "bodySizedAssemblyAllocationsPerResponse": 2,
+    "allocationCountEvidence": "Production owner source; timing includes HTTP, not an allocation profiler."
+  },
+  "limitations": [
+    "Terminal engine adapter mirrors production attach/resize/display flow; uses actual PTY/emulator, not full plugin registration/database.",
+    "Base64 timing calls the selected production encoder; response timing includes loopback HTTP.",
+    "No heap-profiler or visible UI timing; structural allocation counts are labeled separately.",
+    "Opted-in binary adds a 36-byte viewer header per upstream targeted frame; helper preserves its existing 36-byte Node header. Dimension changes add one idempotent attach control frame."
+  ],
+  "cleanup": [
+    {
+      "pid": 95247,
+      "alive": false
+    },
+    {
+      "pid": 95259,
+      "alive": false
+    },
+    {
+      "pid": 95256,
+      "alive": false
+    },
+    {
+      "pid": 95287,
+      "alive": false
+    },
+    {
+      "pid": 95290,
+      "alive": false
+    }
+  ]
+}

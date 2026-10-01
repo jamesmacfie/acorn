@@ -1,0 +1,87 @@
+{
+  "runCount": 12,
+  "eventsPerRun": 200,
+  "charsPerEvent": 2048,
+  "selectedRunId": "run-11",
+  "retained": [
+    {
+      "stepId": "run-0-step",
+      "events": 200,
+      "chars": 410690,
+      "tailChars": 4000
+    },
+    {
+      "stepId": "run-1-step",
+      "events": 200,
+      "chars": 410690,
+      "tailChars": 4000
+    },
+    {
+      "stepId": "run-2-step",
+      "events": 200,
+      "chars": 410690,
+      "tailChars": 4000
+    },
+    {
+      "stepId": "run-3-step",
+      "events": 200,
+      "chars": 410690,
+      "tailChars": 4000
+    },
+    {
+      "stepId": "run-4-step",
+      "events": 200,
+      "chars": 410690,
+      "tailChars": 4000
+    },
+    {
+      "stepId": "run-5-step",
+      "events": 200,
+      "chars": 410690,
+      "tailChars": 4000
+    },
+    {
+      "stepId": "run-6-step",
+      "events": 200,
+      "chars": 410690,
+      "tailChars": 4000
+    },
+    {
+      "stepId": "run-7-step",
+      "events": 200,
+      "chars": 410690,
+      "tailChars": 4000
+    },
+    {
+      "stepId": "run-8-step",
+      "events": 200,
+      "chars": 410690,
+      "tailChars": 4000
+    },
+    {
+      "stepId": "run-9-step",
+      "events": 200,
+      "chars": 410690,
+      "tailChars": 4000
+    },
+    {
+      "stepId": "run-10-step",
+      "events": 200,
+      "chars": 410890,
+      "tailChars": 4000
+    },
+    {
+      "stepId": "run-11-step",
+      "events": 200,
+      "chars": 410890,
+      "tailChars": 4000
+    }
+  ],
+  "totalRetainedChars": 4928680,
+  "childFrames": 30,
+  "refreshReads": {
+    "runs": 30,
+    "steps": 30
+  },
+  "expected": "An explicit byte and ownership budget bounds nonvisible run events; refresh bursts use one current read plus at most one follow-up for intervening edges."
+}

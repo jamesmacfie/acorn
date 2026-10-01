@@ -32,6 +32,7 @@ const stubWorker = (record: Sandbox): Worker => ({
   postMessage: (_message: unknown, transfer?: Transferable[]) => {
     // The hello: the bridge port first, the tree port second, exactly as a frame's hello carries one.
     const port = ((transfer ?? []) as MessagePort[])[1]!
+    ;((transfer ?? []) as MessagePort[])[0]!.postMessage({ kind: 'connected' })
     record.port = port
     port.onmessage = (event: MessageEvent) => record.seen.push(event.data)
     port.start()
@@ -48,7 +49,7 @@ const slotBridge = (): TreeSlotBridge => ({
 })
 
 const acquire = (refused: string[] = []) =>
-  acquireTreeWorker({ pluginId: 'stranger', hash: HASH, connect: () => bridge(), onRefused: (reason) => refused.push(reason) })
+  acquireTreeWorker({ pluginId: 'stranger', hash: HASH, authority: 'equivalent-test-context', connect: () => bridge(), onRefused: (reason) => refused.push(reason) })
 
 const start = (scoped = false): void => {
   sandbox = null
@@ -80,19 +81,20 @@ afterEach(() => {
 })
 
 describe('one worker per bundle', () => {
-  it('reports an unavailable isolated origin through the normal tree failure path', async () => {
+  it('reports unavailable isolation through its surface without creating an app-origin worker', async () => {
     _setWorkerFactory(() => { throw new Error('unknown renderer origin for a plugin worker') })
     const refused: string[] = []
-    const handle = acquire(refused)
     const failures: string[] = []
+    const handle = acquire(refused)
     handle.transport('s1').onFailed((reason) => failures.push(reason))
     await settle()
-    expect(refused).toContain('unknown renderer origin for a plugin worker')
-    expect(failures).toContain('unknown renderer origin for a plugin worker')
+    expect(refused).toEqual(['unknown renderer origin for a plugin worker'])
+    expect(failures).toEqual(refused)
     expect(handle.bridgePort()).toBeNull()
+    handle.release()
   })
 
-  it('isolates identical bytes by plugin id, including each bridge’s API namespace', () => {
+  it('isolates identical bytes by plugin id, including each bridge’s API namespace', async () => {
     start()
     const connected: string[] = []
     const take = (pluginId: string) => acquireTreeWorker({
@@ -109,6 +111,7 @@ describe('one worker per bundle', () => {
     const alpha = take('alpha')
     const beta = take('beta')
     expect(sandboxes).toHaveLength(2)
+    await settle()
     expect(connected).toEqual(['alpha', 'beta'])
     expect(alpha.bridgePort()).not.toBe(beta.bridgePort())
 
@@ -119,11 +122,12 @@ describe('one worker per bundle', () => {
     expect(beta.bridgePort()).not.toBeNull()
   })
 
-  it('keeps different hashes of one plugin independent', () => {
+  it('keeps different hashes of one plugin independent', async () => {
     start()
     const alpha = acquireTreeWorker({ pluginId: 'alpha', hash: HASH, connect: () => bridge(), onRefused: () => {} })
     const newer = acquireTreeWorker({ pluginId: 'alpha', hash: OTHER_HASH, connect: () => bridge(), onRefused: () => {} })
     expect(sandboxes).toHaveLength(2)
+    await settle()
     stopTreeWorker({ pluginId: 'alpha', hash: HASH }, 'replaced')
     expect(sandboxes.map(({ terminated }) => terminated)).toEqual([true, false])
     expect(alpha.bridgePort()).toBeNull()
@@ -142,7 +146,7 @@ describe('one worker per bundle', () => {
     // advance it. The grace period below is a timer, and that is what the fake clock is for.
     await settle()
     expect(sandbox!.seen.map((message) => {
-      const { bridgePort: _port, context: _context, ...rest } = message as Record<string, unknown>
+      const { bridgePort: _port, context: _context, slotBridge: _slotBridge, ...rest } = message as Record<string, unknown>
       return rest
     })).toEqual([
       { kind: 'tree:mount', slot: 's1', entry: 'toolCard', props: { tool: 'a' } },
@@ -169,10 +173,12 @@ describe('one worker per bundle', () => {
   })
 
   it('leaves another plugin alive when the first plugin’s grace expires', async () => {
-    start()
-    vi.useFakeTimers()
+    start(true)
     const alpha = acquireTreeWorker({ pluginId: 'alpha', hash: HASH, connect: () => bridge(), onRefused: () => {} })
     const beta = acquireTreeWorker({ pluginId: 'beta', hash: HASH, connect: () => bridge(), onRefused: () => {} })
+    beta.mount('beta-slot', 'toolCard', {}, slotBridge)
+    await settle()
+    vi.useFakeTimers()
     const [alphaWorker, betaWorker] = sandboxes
     answerHeartbeats(alphaWorker!)
     answerHeartbeats(betaWorker!)
@@ -180,15 +186,17 @@ describe('one worker per bundle', () => {
     for (let i = 0; i < 3; i++) await vi.advanceTimersByTimeAsync(10_000)
     expect(alphaWorker!.terminated).toBe(true)
     expect(betaWorker!.terminated).toBe(false)
-    expect(beta.bridgePort()).not.toBeNull()
+    expect(beta.bridgePort('beta-slot')).not.toBeNull()
   })
 
-  it('cannot stop a replacement with an old generation’s timer or worker error', () => {
-    start()
-    vi.useFakeTimers()
-    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout')
+  it('cannot stop a replacement with an old generation’s timer or worker error', async () => {
+    start(true)
     const first = acquireTreeWorker({ pluginId: 'alpha', hash: HASH, connect: () => bridge(), onRefused: () => {} })
     const oldWorker = sandbox!
+    first.mount('s1', 'toolCard', {}, slotBridge)
+    await vi.waitFor(() => expect(oldWorker.seen.some((message) => (message as { kind?: string }).kind === 'tree:mount')).toBe(true))
+    vi.useFakeTimers()
+    const timeoutSpy = vi.spyOn(globalThis, 'setTimeout')
     first.release()
     const oldGrace = timeoutSpy.mock.calls.find(([, delay]) => delay === 30_000)?.[0]
     expect(oldGrace).toBeTypeOf('function')
@@ -201,22 +209,23 @@ describe('one worker per bundle', () => {
     timeoutSpy.mockRestore()
     expect(oldWorker.terminated).toBe(true)
     expect(newWorker.terminated).toBe(false)
-    expect(next.bridgePort()).not.toBeNull()
+    next.release()
   })
 
-  it.each(['mounted', 'in grace'] as const)('stops a revoked worker immediately while %s', (state) => {
-    start()
-    vi.useFakeTimers()
+  it.each(['mounted', 'in grace'] as const)('stops a revoked worker immediately while %s', async (state) => {
+    start(true)
     const dispose = vi.fn()
     const handle = acquireTreeWorker({ pluginId: 'alpha', hash: HASH, connect: () => ({ dispose }), onRefused: () => {} })
     const failures: string[] = []
     handle.transport('s1').onFailed((reason) => failures.push(reason))
     handle.mount('s1', 'toolCard', {})
+    await settle()
+    vi.useFakeTimers()
     if (state === 'in grace') handle.release()
     stopTreeWorker({ pluginId: 'alpha', hash: HASH }, 'trust withdrawn')
     expect(sandbox!.terminated).toBe(true)
     expect(dispose).toHaveBeenCalledTimes(1)
-    expect(failures).toEqual(['trust withdrawn'])
+    expect(failures).toEqual(state === 'mounted' ? ['trust withdrawn'] : [])
     expect(handle.bridgePort()).toBeNull()
     expect(vi.getTimerCount()).toBe(0)
   })
@@ -278,19 +287,19 @@ describe('what reaches a tree', () => {
     handle.release()
   })
 
-  it('refuses a second mount from an old SDK rather than lending it the first bridge', async () => {
-    start()
-    const refused: string[] = []
-    const handle = acquire(refused)
-    const failed: string[] = []
-    handle.transport('s1').onFailed(() => {})
-    handle.transport('s2').onFailed((reason) => failed.push(reason))
+  it('gives concurrent legacy mounts separate immutable workers without lending the first bridge', async () => {
+    start(false)
+    const handle = acquire()
     handle.mount('s1', 'toolCard', {})
     handle.mount('s2', 'toolCard', {})
-    await vi.waitFor(() => expect(sandbox!.seen).toHaveLength(1))
-    expect((sandbox!.seen[0] as { slot: string }).slot).toBe('s1')
-    expect(failed).toEqual([expect.stringContaining('older tree SDK')])
-    expect(refused).toEqual([expect.stringContaining('older tree SDK')])
+    await settle()
+    expect(sandboxes).toHaveLength(2)
+    expect(sandboxes[0]!.seen).toEqual([expect.objectContaining({ slot: 's1' })])
+    await vi.waitFor(() => expect(sandboxes[1]!.seen).toEqual([expect.objectContaining({ slot: 's2' })]))
+    expect(handle.bridgePort('s1')).not.toBe(handle.bridgePort('s2'))
+    handle.unmount('s1')
+    expect(sandboxes[0]!.terminated).toBe(true)
+    expect(sandboxes[1]!.terminated).toBe(false)
     handle.release()
   })
 
