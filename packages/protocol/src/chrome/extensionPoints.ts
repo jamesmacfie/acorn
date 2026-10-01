@@ -351,10 +351,22 @@ export const CORE_STORAGE_POINT = 'core:storage'
 export type AgentToolCardProps = {
   tool: AgentToolCardCall
   taskId: string
+  /** Recorded changes made by this call, matched by turn and tool id. These are historical patches,
+   *  independent of the working tree the Changes pane reads. */
+  fileChanges?: readonly AgentToolFileChange[]
   /** Whether this card's disclosure should start open, resolved from the reader's setting. Seed a
    *  signal with it and leave it alone: read reactively, it would shut a card the moment its call
    *  finished, which is when somebody is most likely to be reading it. */
   defaultOpen: boolean
+}
+
+export type AgentToolFileChange = {
+  path: string
+  patch?: string
+  /** Excerpt coordinates are not file line numbers. */
+  snippet?: boolean
+  /** Oversized patches remain available as artifacts rather than inline text. */
+  patchArtifactId?: string
 }
 
 /** Room in the agent composer's own action bar, beside Attach and the two pickers. A `stack` point,

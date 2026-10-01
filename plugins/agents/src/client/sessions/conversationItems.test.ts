@@ -17,6 +17,53 @@ const event = (seq: number, value: AgentEventRecord['event'], turnId: string | n
 })
 
 describe('conversation projection', () => {
+  it('shows each edit inside its tool while streamed patches replace excerpts and add files', () => {
+    const project = createConversationProjection()
+    const records = [event(1, { type: 'tool', tool: { id: 'edit', title: 'Edit', status: 'running' } })]
+    project(records)
+    records.push(event(2, { type: 'file_change', changeId: 'edit', path: 'a.ts', patch: 'excerpt', snippet: true }))
+    expect(visibleConversationItems(project(records)).map((item) => item.event.type)).toEqual(['tool'])
+    records.push(
+      event(3, { type: 'tool', tool: { id: 'edit', title: '', status: 'completed' } }),
+      event(4, { type: 'file_change', changeId: 'edit', path: 'a.ts', patch: 'full hunks' }),
+      event(5, { type: 'file_change', changeId: 'edit', path: 'b.ts', patchArtifactId: 'large-patch' }),
+      event(6, { type: 'file_change', changeId: 'turn:turn', patch: 'whole turn' }),
+    )
+    const shown = visibleConversationItems(project(records))
+    expect(shown.map((item) => item.event.type)).toEqual(['tool', 'file_change'])
+    expect(shown[0].event).toMatchObject({ tool: { status: 'completed' } })
+    expect(shown[0].fileChanges).toEqual([
+      { path: 'a.ts', patch: 'full hunks', snippet: undefined, patchArtifactId: undefined },
+      { path: 'b.ts', patch: undefined, snippet: undefined, patchArtifactId: 'large-patch' },
+    ])
+  })
+
+  it('keeps an unmatched patch visible until its tool arrives on another page', () => {
+    const project = createConversationProjection()
+    const records = [event(1, { type: 'file_change', changeId: 'edit', path: 'a.ts', patch: 'saved edit' })]
+    expect(visibleConversationItems(project(records)).map((item) => item.event.type)).toEqual(['file_change'])
+    records.push(event(2, { type: 'tool', tool: { id: 'edit', title: 'Edit' } }))
+    const shown = visibleConversationItems(project(records))
+    expect(shown.map((item) => item.event.type)).toEqual(['tool'])
+    expect(shown[0].fileChanges?.[0].patch).toBe('saved edit')
+  })
+
+  it('keeps recorded diffs in their owning subagent and turn when later edits reuse an id', () => {
+    const items = buildConversationItems([
+      event(1, { type: 'subagent', subagent: { id: 'child' } }),
+      event(2, { type: 'tool', tool: { id: 'edit', title: 'Edit', subagentId: 'child' } }),
+      event(3, { type: 'file_change', changeId: 'edit', path: 'a.ts', patch: 'child patch' }),
+      event(4, { type: 'tool', tool: { id: 'edit', title: 'Edit again' } }, 'next-turn'),
+      event(5, { type: 'file_change', changeId: 'edit', path: 'a.ts', patch: 'later patch' }, 'next-turn'),
+    ])
+    const shown = visibleConversationItems(items)
+    expect(shown.map((item) => item.event.type)).toEqual(['subagent', 'tool'])
+    const child = visibleConversationItems(shown[0].children ?? [])
+    expect(child.map((item) => item.event.type)).toEqual(['tool'])
+    expect(child[0].fileChanges?.[0].patch).toBe('child patch')
+    expect(shown[1].fileChanges?.[0].patch).toBe('later patch')
+  })
+
   it('coalesces only matching append deltas', () => {
     const items = buildConversationItems([
       event(1, { type: 'assistant_message', text: 'hello', messageId: 'a' }),

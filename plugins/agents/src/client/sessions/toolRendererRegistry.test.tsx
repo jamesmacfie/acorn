@@ -2,6 +2,7 @@ import { render } from 'solid-js/web'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { afterEach, expect, it } from 'vitest'
 import type { AgentToolCall } from '../../contract/wire.ts'
+import type { AgentToolCardProps } from '@acorn/protocol/extensionPoints.ts'
 import { AgentToolCallCard } from './toolRendererRegistry'
 import { AgentToolFoldContext, type AgentToolFoldSetting } from './toolFoldPrefs'
 
@@ -11,7 +12,7 @@ import { AgentToolFoldContext, type AgentToolFoldSetting } from './toolFoldPrefs
 const hosts: Array<() => void> = []
 afterEach(() => { for (const dispose of hosts.splice(0).reverse()) dispose() })
 
-const draw = (tool: AgentToolCall, startsOpen = true, createdAt = Date.parse('2026-09-25T03:24:18Z')) => {
+const draw = (tool: AgentToolCall, startsOpen = true, createdAt = Date.parse('2026-09-25T03:24:18Z'), fileChanges?: AgentToolCardProps['fileChanges']) => {
   const host = document.createElement('div')
   document.body.append(host)
   const setting: AgentToolFoldSetting = { startsOpen: () => startsOpen, onToggle: () => {} }
@@ -20,13 +21,25 @@ const draw = (tool: AgentToolCall, startsOpen = true, createdAt = Date.parse('20
   const dispose = render(() => (
     <QueryClientProvider client={new QueryClient()}>
       <AgentToolFoldContext.Provider value={setting}>
-        <AgentToolCallCard tool={tool} taskId="task-1" createdAt={createdAt} />
+        <AgentToolCallCard tool={tool} taskId="task-1" createdAt={createdAt} fileChanges={fileChanges} />
       </AgentToolFoldContext.Provider>
     </QueryClientProvider>
   ), host)
   hosts.push(() => { dispose(); host.remove() })
   return host
 }
+
+it('shows recorded patches in the fallback when no plugin contributes a file-tool card', () => {
+  const host = draw({ id: 'edit', title: 'Edit' }, false, 0, [
+    { path: 'a.ts', patch: '@@ -1 +1 @@\n-old\n+new' },
+  ])
+  const fold = host.querySelector('details')!
+  expect(host.querySelector('.diff-row')).toBeNull()
+  fold.open = true
+  fold.dispatchEvent(new Event('toggle'))
+  expect(host.querySelector('.diff-add')?.textContent).toContain('new')
+  expect(host.textContent).toContain('Open in Changes')
+})
 
 it('shows the local and relative time below an expanded command, with no row hover time', () => {
   const at = Date.now() - 2 * 60_000
