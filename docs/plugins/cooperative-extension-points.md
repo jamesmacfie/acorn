@@ -248,7 +248,7 @@ owner's own words, which is why no two of these agree on a shape:
 
 | Point | Mode | Props |
 | --- | --- | --- |
-| `agents:tool-card` | `replace`, keyed by tool name | `{ tool, taskId, defaultOpen }` |
+| `agents:tool-card` | `replace`, keyed by tool name | `{ tool, taskId, defaultOpen, fileChanges? }` |
 | `agents:attachment` | `replace`, keyed by media type | `{ attachment, taskId, sessionId }` |
 | `agents:composer-actions` | `stack`, up to four | `{ taskId, sessionId }` |
 | `agents:session-header` | `stack`, up to two | `{ taskId, sessionId, providerId, tokenAccounting, costAccounting, turns }` |

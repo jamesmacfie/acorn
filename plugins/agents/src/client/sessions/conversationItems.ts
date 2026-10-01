@@ -10,6 +10,7 @@ import type {
 import { mergeAgentUsage as mergeUsage } from '../../shared/usageFold'
 // Tool calls fold by the same rule on the node too, for a reader that asks (../../shared/toolFold.ts).
 import { mergeToolCall, toolCardKey } from '../../shared/toolFold'
+import type { AgentToolFileChange } from '@acorn/protocol/extensionPoints.ts'
 
 export type AgentConversationItem = {
   key: string
@@ -19,6 +20,10 @@ export type AgentConversationItem = {
   createdAt: number
   turnId: string | null
   event: AgentNormalizedEvent
+  /** Recorded per-file edits owned by a tool card. The ledger keeps their separate events. */
+  fileChanges?: AgentToolFileChange[]
+  /** Suppress the standalone row only after its tool card can display it. */
+  fileChangeAttached?: boolean
   /** Present on a subagent card: what that subagent did, in its own order. */
   children?: AgentConversationItem[]
   /** Present on a `turn_completed` card: how much of the model's context window was in use when the
@@ -75,7 +80,7 @@ export const visibleConversationItems = (
   items: AgentConversationItem[],
   requestFor?: RequestLookup,
 ): AgentConversationItem[] =>
-  items.filter((item) => VISIBLE_EVENT_TYPES.has(item.event.type) && belongsInThread(item.event, requestFor))
+  items.filter((item) => !item.fileChangeAttached && VISIBLE_EVENT_TYPES.has(item.event.type) && belongsInThread(item.event, requestFor))
 
 /** A card that is somebody talking — the reader or the agent — as opposed to a tool call, reasoning,
  *  or a note. What the "show chats only" toggle above the composer keeps.
@@ -210,6 +215,7 @@ function openFold(): Fold {
   // once it has run, Codex streams patch updates before the item completes, and Codex's whole-turn diff
   // arrives again every time the turn's diff grows. The reader wants the last word on each, once.
   const fileChangeCards = new Map<string, { stream: Stream; at: number }>()
+  const changesByTool = new Map<string, Array<{ stream: Stream; at: number }>>()
   // What changed since the last `settle`. Positions past `settled` are new, so they need no entry.
   let settled = 0
   const changed = new Set<number>()
@@ -224,6 +230,34 @@ function openFold(): Fold {
     stream.items[at] = item
     if (stream !== top) grown.add(stream)
     else if (at < settled) changed.add(at)
+  }
+
+  // Keep unmatched changes visible. A truncated page can deliver the patch before the tool, and a
+  // later page must move it into that tool's body without changing either card's sequence cursor.
+  const attachFileChanges = (record: AgentEventRecord): void => {
+    const event = record.event
+    const id = event.type === 'tool' ? event.tool.id : event.type === 'file_change' ? event.changeId : undefined
+    if (id === undefined) return
+    const key = toolCardKey(record.turnId, id)
+    if (event.type === 'file_change' && event.path !== undefined) {
+      const changeKey = fileChangeKey(record)
+      const target = changeKey === undefined ? undefined : fileChangeCards.get(changeKey)
+      if (!target) return
+      const files = changesByTool.get(key) ?? []
+      if (!files.some((file) => file.stream === target.stream && file.at === target.at)) files.push(target)
+      changesByTool.set(key, files)
+    }
+    const tool = toolCards.get(key)
+    const files = changesByTool.get(key)
+    if (!tool || !files?.length) return
+    const changes: AgentToolFileChange[] = []
+    for (const file of files) {
+      const item = file.stream.items[file.at]
+      if (item.event.type !== 'file_change' || item.event.path === undefined) continue
+      changes.push({ path: item.event.path, patch: item.event.patch, snippet: item.event.snippet, patchArtifactId: item.event.patchArtifactId })
+      if (!item.fileChangeAttached) write(file.stream, file.at, { ...item, fileChangeAttached: true })
+    }
+    write(tool.stream, tool.at, { ...tool.stream.items[tool.at], fileChanges: changes })
   }
 
   // Put the turn's context figure on the line that closes it. Positional rather than by turn id,
@@ -297,6 +331,7 @@ function openFold(): Fold {
       if (record.event.type === 'usage') lastUsage = { at: fold.at, before: card }
       if (record.seq <= card.lastSeq) return
       write(fold.stream, fold.at, foldInto(card, record))
+      attachFileChanges(record)
       if (record.event.type === 'usage') restamp()
       return
     }
@@ -346,6 +381,7 @@ function openFold(): Fold {
       grown.add(child)
     }
     write(stream, at, item)
+    attachFileChanges(record)
     if (stream === top && record.event.type === 'turn_completed') {
       closedSinceUsage.push(at)
       stamp(at)
