@@ -17,51 +17,79 @@
 // inside that bundle already is the shared thing (`mountTree({ list, detail })`); this seam exists
 // because a compiled plugin's regions are components in the shell's realm with no module of their
 // own to share.
-import { createRoot, createSignal } from 'solid-js'
+import { createContext, createRoot, createSignal, useContext } from 'solid-js'
+import { activeNodeId } from '../../../infra/node/activeNode'
 import { startSpan } from '../../../infra/telemetry/emitter'
 import { onScopeEvicted } from '../shell/scopeEviction'
 
-type Held = { taskId: string; model: unknown; dispose: () => void }
+export type PaneModelScope = { readonly id: number; readonly nodeId: string | null; retired: boolean; leases: number }
+export const PaneModelScopeContext = createContext<PaneModelScope>()
+const scopes = new Map<string | null, PaneModelScope>()
+let nextScope = 0
 
-// Keyed by pane id, holding one task at a time. One task is on screen at a time, so anything else is
-// a task somebody navigated away from, and disposing it eagerly is what flushes a pending save —
-// which is the behaviour every one of the four hand-rolled maps had, and the reason this is not a
-// two-level map.
+function scopeFor(nodeId: string | null): PaneModelScope {
+  let scope = scopes.get(nodeId)
+  if (!scope || scope.retired) {
+    scope = { id: ++nextScope, nodeId, retired: false, leases: 0 }
+    scopes.set(nodeId, scope)
+  }
+  return scope
+}
+
+/** Capture before creating lazy regions or deferred model callbacks. */
+export const paneModelScope = (): PaneModelScope => useContext(PaneModelScopeContext) ?? scopeFor(activeNodeId())
+
+/** A shell owns a lease; closing a pane or region does not release it. */
+export function acquirePaneModelHost(nodeId: string | null): { scope: PaneModelScope; release(): void } {
+  const scope = scopeFor(nodeId)
+  scope.leases++
+  let released = false
+  return {
+    scope,
+    release() {
+      if (released) return
+      released = true
+      scope.leases--
+      if (!scope.leases) retireScope(scope)
+    },
+  }
+}
+
+type Held = { taskId: string; scope: PaneModelScope; model: unknown; dispose: () => void }
+// One current task per pane, shared by its independently mounted regions.
 const held = new Map<string, Held>()
 
-/**
- * The model for this pane and this task, built on first ask.
- *
- * `build` runs inside the new root, so everything it creates is disposed together. It is called at
- * most once per (pane, task); a later call with the same task returns what it returned.
- *
- * The `pane.model` span covers the build and nothing else. A cache hit is not timed, because a pane
- * whose model is already there did no work, and averaging the hits in would hide the build that
- * takes a second (docs/telemetry.md § The admission rule for a span).
- */
-export function paneModel<M>(paneId: string, taskId: string, build: () => M, owner = 'core'): M {
+function releaseModel(paneId: string, entry: Held): void {
+  if (held.get(paneId) === entry) held.delete(paneId)
+  entry.dispose()
+}
+
+/** Build in a detached root that inherits provider context and retires with its captured shell. */
+export function paneModel<M>(paneId: string, taskId: string, build: () => M, owner = 'core', scope = paneModelScope()): M {
   const entry = held.get(paneId)
-  if (entry && entry.taskId === taskId) return entry.model as M
-  entry?.dispose()
+  if (entry && entry.taskId === taskId && entry.scope === scope && !scope.retired) return entry.model as M
+  if (entry) releaseModel(paneId, entry)
+  if (scope.retired) throw new Error('Cannot build a pane model in a retired Node shell.')
   const span = startSpan(owner, { name: 'pane.model', attrs: { seam: 'pane.model', 'pane.id': paneId, 'task.id': taskId } })
+  let disposeRoot: (() => void) | undefined
   try {
-    const next = createRoot((dispose) => ({ taskId, model: build(), dispose }))
+    const next = createRoot((dispose) => {
+      disposeRoot = dispose
+      return { taskId, scope, model: build(), dispose }
+    })
+    if (scope.retired) throw new Error('The Node shell retired while building its pane model.')
     held.set(paneId, next)
     span.end()
     return next.model as M
   } catch (error) {
+    disposeRoot?.()
     span.end('error')
     throw error
   }
 }
 
-// How many mounted panes are drawing each (pane, task) right now. The map above keeps a model after
-// the reader leaves its task, and it stays until another task asks for that pane, which may be never.
-// Its effects keep running all that time, so a model that polls, or marks something as seen, asks
-// this before it acts (`shown` in ./panes.ts). A count rather than a flag, because a switch can mount
-// the next view before the last one has let go.
 const [drawn, setDrawn] = createSignal<ReadonlyMap<string, number>>(new Map())
-const drawnKey = (paneId: string, taskId: string): string => `${paneId}\u0000${taskId}`
+const drawnKey = (scope: PaneModelScope, paneId: string, taskId: string): string => `${scope.id}\u0000${paneId}\u0000${taskId}`
 
 function countDrawn(key: string, by: number): void {
   setDrawn((current) => {
@@ -73,9 +101,10 @@ function countDrawn(key: string, by: number): void {
   })
 }
 
-/** Count this pane as drawing this task until the returned function is called. */
-export function markPaneDrawn(paneId: string, taskId: string): () => void {
-  const key = drawnKey(paneId, taskId)
+/** Count only this captured shell generation until its surface releases the mark. */
+export function markPaneDrawn(paneId: string, taskId: string, scope = paneModelScope()): () => void {
+  if (scope.retired) return () => {}
+  const key = drawnKey(scope, paneId, taskId)
   countDrawn(key, 1)
   let released = false
   return () => {
@@ -85,21 +114,33 @@ export function markPaneDrawn(paneId: string, taskId: string): () => void {
   }
 }
 
-/** Whether a mounted pane is drawing this task. Reactive. */
-export const paneDrawn = (paneId: string, taskId: string): boolean => (drawn().get(drawnKey(paneId, taskId)) ?? 0) > 0
+export const paneDrawn = (paneId: string, taskId: string, scope = paneModelScope()): boolean =>
+  !scope.retired && (drawn().get(drawnKey(scope, paneId, taskId)) ?? 0) > 0
+
+function retireScope(scope: PaneModelScope): void {
+  if (scope.retired) return
+  scope.retired = true
+  if (scopes.get(scope.nodeId) === scope) scopes.delete(scope.nodeId)
+  for (const [paneId, entry] of held) if (entry.scope === scope) releaseModel(paneId, entry)
+  setDrawn((current) => new Map([...current].filter(([key]) => !key.startsWith(`${scope.id}\u0000`))))
+}
 
 onScopeEvicted((event) => {
-  if (event.scope !== 'task') return
-  for (const [paneId, entry] of held) {
-    if (entry.taskId !== event.taskId) continue
-    entry.dispose()
-    held.delete(paneId)
+  if (event.scope === 'node-switched') {
+    for (const scope of [...scopes.values()]) {
+      if (event.from === undefined ? scope.nodeId !== activeNodeId() : scope.nodeId === event.from) retireScope(scope)
+    }
+  }
+  if (event.scope === 'task') {
+    for (const [paneId, entry] of held) {
+      if (entry.taskId === event.taskId && entry.scope.nodeId === activeNodeId()) releaseModel(paneId, entry)
+    }
   }
 })
 
-/** Test seam. Disposes everything held, so one suite's models do not reach the next. */
+/** Test seam; production shells release their own lease. */
 export const _resetPaneModels = (): void => {
-  for (const entry of held.values()) entry.dispose()
-  held.clear()
+  for (const scope of [...scopes.values()]) retireScope(scope)
+  for (const [paneId, entry] of held) releaseModel(paneId, entry)
   setDrawn(new Map())
 }

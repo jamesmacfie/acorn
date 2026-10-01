@@ -20,6 +20,8 @@ export type LineComposerController = {
   body: () => string
   setOpen: (open: boolean) => void
   setBody: (body: string) => void
+  /** Clear only the draft whose exact body the mutation acknowledged. */
+  acknowledge?: (originalBody: string) => void
 }
 
 export type ThreadCollapseController = {
@@ -392,15 +394,21 @@ function LineComposer(props: {
   const [err, setErr] = createSignal<string | null>(null)
 
   const submit = async () => {
-    const text = props.composer.body().trim()
+    const submitting = props.composer
+    const onMutated = props.onMutated
+    const originalBody = submitting.body()
+    const text = originalBody.trim()
     if (!text) return
     setBusy(true)
     setErr(null)
     try {
       await props.addComment(text)
-      props.composer.setBody('')
-      props.composer.setOpen(false)
-      props.onMutated()
+      if (submitting.acknowledge) submitting.acknowledge(originalBody)
+      else if (submitting.body() === originalBody) {
+        submitting.setBody('')
+        submitting.setOpen(false)
+      }
+      onMutated()
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'failed')
     } finally {

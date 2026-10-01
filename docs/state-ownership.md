@@ -327,9 +327,39 @@ There is no optimistic assumption that an invalidated cache reflects a completed
 The shell restores fleet and Node scope before task scope. Switching Nodes remounts Node-scoped
 client state so effects and query clients cannot retain the previous Node's assumptions.
 
+
+Preference writes capture their QueryClient's registered Node before asynchronous ordering or
+cleanup. Custom clients capture the active Node at the call; a captured missing target cannot follow
+a later selection. Confirmation, ordering, and optimistic rollback are per QueryClient and key.
+Device keys are read directly from the declared finite set, and device storage is written before
+query-cache observers are notified.
+
+Startup restore captures the same QueryClient identity for scoped-key generation and hydration
+filtering. It hydrates workspace, view, and pane phases before arming writes. Registry membership
+owns one independently disposable effect per bound slice. Each effect tracks codec reads, including
+deep mutable Solid stores; a change in one slice does not serialize unrelated slices. Equivalent
+queued values retain their first deadline, and a reversion cancels stale queued work. In-flight
+reversions remain queued until their exact saved value is durable. Late plugins hydrate before
+writing, disablement preserves stored data, removed scopes write tombstones, and disposal flushes
+pending writes to their captured Node.
+
 Disabling a plugin removes its client contributions at activation and stops its Node routes/services
 on the next Node initialization. Its data file remains in the Node root until the owner explicitly
 deletes it.
+
+
+### Notes recovery and compiled pane ownership
+
+Notes body/title recovery is feature-owned device state keyed by Node, complete scope address, and
+slug. It remains until the exact local edit is acknowledged or the document is explicitly deleted;
+no arbitrary size/count cap drops dirty text. The 250 ms device batch and forced flush points are
+specified in [notes-and-memory.md](./notes-and-memory.md). Notes does not implement the server
+compare-and-swap contract used by saved queries. Its selection memory is Node + task, session-only.
+
+Compiled pane models and their drawn marks carry a captured Node shell generation. One current task
+model per pane is shared across regions, survives pane removal, and retires with task replacement,
+task eviction, Node switch, or host/provider destruction. A late outgoing lease release cannot retire
+a returning equal-ID generation. This lifetime is independent of persisted query cache ownership.
 
 ## Retained preview documents
 

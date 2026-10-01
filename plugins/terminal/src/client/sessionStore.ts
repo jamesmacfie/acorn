@@ -16,18 +16,14 @@ let generation = 0
 export async function refreshSessions(): Promise<void> {
   const requestedNode = node()
   const request = ++generation
-  try {
-    const rows = hasHostCapability({ plugin: 'terminal' }) ? await terminalApi().list() : []
-    if (request !== generation || requestedNode !== node()) return
-    setSessionNode(requestedNode)
-    setSessions(rows)
-    // After the write, so a drawer showing a session that has gone has already let its xterm go.
-    releaseGoneTerminals(requestedNode, rows.map((session) => session.id))
-    replaceAttentionSource('terminal', requestedNode, rows.flatMap((session) => fromTerminalSession(session, requestedNode) ?? []))
-  } catch (error) {
-    if (request === generation && requestedNode === node()) { setSessions([]); forgetAttentionSource('terminal', requestedNode) }
-    throw error
-  }
+  // A failed read rejects without replacing authoritative rows, attention or warm xterms.
+  const rows = hasHostCapability({ plugin: 'terminal' }) ? await terminalApi(activeNodeId()).list() : []
+  if (request !== generation || requestedNode !== node()) return
+  setSessionNode(requestedNode)
+  setSessions(rows)
+  // After the write, so a drawer showing a session that has gone has already let its xterm go.
+  releaseGoneTerminals(requestedNode, rows.map((session) => session.id))
+  replaceAttentionSource('terminal', requestedNode, rows.flatMap((session) => fromTerminalSession(session, requestedNode) ?? []))
 }
 
 export function addSession(session: TerminalSession, createdNode = node()): void {

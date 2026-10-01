@@ -1,0 +1,207 @@
+{
+  "environment": {
+    "node": "v24.11.0",
+    "platform": "darwin",
+    "arch": "arm64",
+    "commit": "f8e4b59c",
+    "synthetic": true
+  },
+  "helper": {
+    "activeA": [
+      {
+        "push": "node-frame",
+        "nodeId": "00000000-0000-4000-8000-000000000001",
+        "frame": {
+          "channel": "tasks:changed",
+          "taskId": null
+        }
+      },
+      {
+        "binary": "00000000-0000-4000-8000-000000000001"
+      },
+      {
+        "push": "node-status",
+        "status": {
+          "nodeId": "00000000-0000-4000-8000-000000000001",
+          "state": "online"
+        }
+      },
+      {
+        "push": "node-status",
+        "status": {
+          "nodeId": "00000000-0000-4000-8000-000000000002",
+          "state": "online"
+        }
+      }
+    ],
+    "afterFleetRead": [
+      {
+        "push": "node-status",
+        "status": {
+          "nodeId": "00000000-0000-4000-8000-000000000001",
+          "state": "online"
+        }
+      },
+      {
+        "push": "node-frame",
+        "nodeId": "00000000-0000-4000-8000-000000000002",
+        "frame": {
+          "channel": "tasks:changed",
+          "taskId": null
+        }
+      },
+      {
+        "binary": "00000000-0000-4000-8000-000000000002"
+      },
+      {
+        "push": "node-status",
+        "status": {
+          "nodeId": "00000000-0000-4000-8000-000000000002",
+          "state": "online"
+        }
+      }
+    ],
+    "malformedRejected": true,
+    "afterMalformed": [
+      {
+        "push": "node-status",
+        "status": {
+          "nodeId": "00000000-0000-4000-8000-000000000001",
+          "state": "online"
+        }
+      },
+      {
+        "push": "node-frame",
+        "nodeId": "00000000-0000-4000-8000-000000000002",
+        "frame": {
+          "channel": "tasks:changed",
+          "taskId": null
+        }
+      },
+      {
+        "binary": "00000000-0000-4000-8000-000000000002"
+      },
+      {
+        "push": "node-status",
+        "status": {
+          "nodeId": "00000000-0000-4000-8000-000000000002",
+          "state": "online"
+        }
+      }
+    ],
+    "afterSecondRenderer": [
+      {
+        "push": "node-status",
+        "status": {
+          "nodeId": "00000000-0000-4000-8000-000000000001",
+          "state": "online"
+        }
+      },
+      {
+        "push": "node-frame",
+        "nodeId": "00000000-0000-4000-8000-000000000002",
+        "frame": {
+          "channel": "tasks:changed",
+          "taskId": null
+        }
+      },
+      {
+        "binary": "00000000-0000-4000-8000-000000000002"
+      },
+      {
+        "push": "node-status",
+        "status": {
+          "nodeId": "00000000-0000-4000-8000-000000000002",
+          "state": "online"
+        }
+      }
+    ],
+    "afterDisconnect": {
+      "active": 1,
+      "aborts": 0
+    },
+    "afterManualCompletion": {
+      "active": 0,
+      "aborts": 0
+    }
+  },
+  "downstreamBackpressure": {
+    "stalled": {
+      "payloadBytes": 16777216,
+      "helperMaxBuffered": 16010792,
+      "hubMaxBuffered": 0,
+      "pauses": 0,
+      "received": 0,
+      "elapsedMs": 693.557
+    },
+    "deliveredAfterResume": 256
+  },
+  "upstreamCancellation": {
+    "errorName": "AbortError",
+    "routeAborted": true,
+    "propagationMs": 2.4697499999999764
+  },
+  "bodies": {
+    "rows": [
+      {
+        "bytes": 65536,
+        "wireChars": 87384,
+        "encode": {
+          "medianMs": 1.4693749999999,
+          "maxMs": 1.6492080000000442
+        },
+        "decode": {
+          "medianMs": 0.10225000000014006,
+          "maxMs": 0.3578330000000278
+        },
+        "nativeEncode": {
+          "medianMs": 0.014250000000174623,
+          "maxMs": 0.03133399999978792
+        }
+      },
+      {
+        "bytes": 2097152,
+        "wireChars": 2796204,
+        "encode": {
+          "medianMs": 48.61245900000017,
+          "maxMs": 52.03275000000008
+        },
+        "decode": {
+          "medianMs": 3.1620419999999285,
+          "maxMs": 3.55925000000002
+        },
+        "nativeEncode": {
+          "medianMs": 0.16083400000002257,
+          "maxMs": 0.37829099999999016
+        }
+      },
+      {
+        "bytes": 8388608,
+        "wireChars": 11184812,
+        "encode": {
+          "medianMs": 191.3135420000001,
+          "maxMs": 203.89941700000008
+        },
+        "decode": {
+          "medianMs": 12.585959000000003,
+          "maxMs": 13.550958999999693
+        },
+        "nativeEncode": {
+          "medianMs": 0.5866669999995793,
+          "maxMs": 3.0288329999998496
+        }
+      }
+    ],
+    "responseAssembly8MiB": {
+      "copied": {
+        "medianMs": 1.4986669999998412,
+        "maxMs": 2.8587500000003274
+      },
+      "oneBuffer": {
+        "medianMs": 0.7152909999999792,
+        "maxMs": 2.2513749999998254
+      },
+      "removableAllocationBytes": 8388608
+    }
+  }
+}

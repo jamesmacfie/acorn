@@ -103,12 +103,40 @@ away the first paint. So the device remembers the id
 has gone reaches the `node-replaced` reload. A launch with nothing remembered has no cache to draw
 either, and renders the onboarding path instead.
 
-Where a partition is written is the host's, through `setCacheStorage`. IndexedDB is the default,
-because the hosts that had one were browsers; the terminal client has none and installs a directory
-of files instead, one per partition key, before the first cache is built. That host drives the
-persister itself — `persistQueryClient` from `@tanstack/query-persist-client-core`, with the same
-`maxAge` and dehydration predicate the desktop's provider passes — and awaits the restore before it
-renders, which is its `isRestoring`.
+Where a partition is written is the host's, through `setCacheStorage`. IndexedDB is the default;
+the terminal client installs a directory of files before the first cache is built. Each partition
+captures its adapter at construction. Changing the installed adapter affects partitions constructed
+afterward. Fleet readers can construct and warm memory without restoring or persisting a partition.
+
+`packages/client-core/src/infra/persistence/queryCacheLifecycle.ts` owns selected-partition persistence.
+Both hosts acquire a lease. The desktop composes the public `QueryClientProvider`,
+`IsRestoringProvider`, and `persistQueryClientRestore` APIs; the terminal awaits the same restore
+before drawing. Concurrent leases share one restore and one subscription. A later remount restores
+again so an empty cache after inactive garbage collection can recover a valid offline snapshot.
+Public hydration preserves fresher in-memory rows.
+
+Meaningful query and mutation events mark the partition dirty in constant time. One five-second
+clock coalesces full dehydration, serialization, and the storage write. The first dirty capture waits
+up to five seconds, replacing the prior immediate first snapshot. There is no second storage throttle;
+preference requests keep their separate write policy. Observer-only changes do not schedule capture.
+Writes are serialized, with one active capture and a dirty follow-up when changes arrive during it.
+Capture telemetry uses `cache.dehydrate` and `cache.dehydrate.count`, separately from serialization
+and storage duration. Query eligibility, snapshot schema, and the age rules below are preserved.
+
+Releasing the last selection lease keeps its listener through synchronous child cleanup, then stops
+query and mutation subscriptions. Dirty, queued, and in-flight durability survives an ordinary switch;
+an unchanged release writes nothing. Inactive fleet updates do not start background persistence.
+Explicit Node retirement stops every partition subscriber and queued capture, fences delayed reads,
+drains started writes, and deletes through the captured adapter. A replacement with the same Node ID
+waits for deletion before restoring or writing. This ordering also owns the TUI file adapter's fixed
+sibling temporary file.
+
+A failed deletion remains a barrier and is logged; it does not retarget to another adapter or retry
+in a loop. Repeated explicit removal retries the original deletion. The fleet's
+`retryCacheRetirement(nodeId)` recovery entry point retries through that adapter, then reacquires
+restore and flushes a mounted replacement's dirty memory. It rejects if deletion, restore, or flush
+fails so its caller can report or retry the failure. Selected dirty tracking continues behind a
+failed barrier, and all storage access remains fenced until deletion succeeds.
 
 One client per node is a contract, not a convention. The terminal client was the host that broke it:
 it minted a second `QueryClient` for its shell beside the per-node one, so the shell read a cache
@@ -131,7 +159,9 @@ window does not make the snapshot any bigger.
 **Clear cache** on Settings > Machines > Storage and memory empties the cache of the node the settings
 header's node switcher names, while it stays connected (`clearNodeCache` in `packages/client-core/src/infra/node/fleet.ts`). It removes every entry
 nothing is drawing, deletes the saved snapshot through the host's cache store, and refetches the
-queries on screen. Those rows stay drawn until their refetch lands, so the window does not go blank.
+queries on screen. Clearing waits for hydration and outstanding captures, then deletes through the
+partition's captured storage adapter and write queue so an older write cannot restore the cleared
+snapshot. Those rows stay drawn until their refetch lands, so the window does not go blank.
 The persister writes a new snapshot within five seconds, holding only what was on screen. It is not
 `dropNode`, which is for a node leaving the fleet: that also removes the node from the fleet list and
 the status map and throws away the `QueryClient` the mounted provider still holds. The page shows the

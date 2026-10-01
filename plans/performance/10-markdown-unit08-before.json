@@ -1,0 +1,95 @@
+[
+  {
+    "case": "settled-growing-fence",
+    "codeCharacters": 20000,
+    "frames": 4,
+    "samples": [
+      {
+        "characters": 20011,
+        "htmlCharacters": 160688,
+        "elapsedMs": 91.7677500000002,
+        "cpuMs": 157.325
+      },
+      {
+        "characters": 20011,
+        "htmlCharacters": 160688,
+        "elapsedMs": 70.38375000000019,
+        "cpuMs": 78.134
+      },
+      {
+        "characters": 20011,
+        "htmlCharacters": 160688,
+        "elapsedMs": 71.35525000000007,
+        "cpuMs": 93.718
+      },
+      {
+        "characters": 20011,
+        "htmlCharacters": 160688,
+        "elapsedMs": 66.26462500000002,
+        "cpuMs": 84.864
+      }
+    ],
+    "totalCharacters": 80044,
+    "totalHighlightMs": 299.7713750000005,
+    "wallMs": 519.487625,
+    "cpuMs": 849.528,
+    "elements": 3280,
+    "spans": 3276
+  },
+  {
+    "case": "settled-growing-fence",
+    "codeCharacters": 80000,
+    "frames": 4,
+    "samples": [
+      {
+        "characters": 80011,
+        "htmlCharacters": 641680,
+        "elapsedMs": 253.57349999999974,
+        "cpuMs": 271.317
+      },
+      {
+        "characters": 80011,
+        "htmlCharacters": 641680,
+        "elapsedMs": 271.2821250000002,
+        "cpuMs": 299.065
+      },
+      {
+        "characters": 80011,
+        "htmlCharacters": 641680,
+        "elapsedMs": 258.49175000000014,
+        "cpuMs": 283.844
+      },
+      {
+        "characters": 80011,
+        "htmlCharacters": 641680,
+        "elapsedMs": 256.1363329999999,
+        "cpuMs": 262.403
+      }
+    ],
+    "totalCharacters": 320044,
+    "totalHighlightMs": 1039.483708,
+    "wallMs": 1874.474667,
+    "cpuMs": 2289.993,
+    "elements": 13097,
+    "spans": 13093
+  },
+  {
+    "case": "same-small-cold-cache-inflight",
+    "callers": 8,
+    "calls": 8,
+    "characters": 80000
+  },
+  {
+    "case": "same-tick-replaced-fences",
+    "updates": 8,
+    "stillLive": 1,
+    "highlightCalls": 8,
+    "characters": 160088,
+    "highlightMs": 506.573542000001
+  },
+  {
+    "case": "dispose-before-import-resumes",
+    "highlightCalls": 1,
+    "characters": 20012
+  }
+]

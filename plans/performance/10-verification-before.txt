@@ -1,0 +1,10 @@
+Coordinator replay on baseline f8e4b59caadfe846a9e2c6491ac42b91ec3cf66f.
+
+Command:
+rtk proxy env ACORN_PERF_TAG=coordinator-before pnpm exec vitest run --config plans/performance/10-probe.config.ts
+
+Result: 4 test files, 10 cases passed. Duration 10.03 s; tests 4.05 s.
+Outputs use coordinator-before and preserve the specialist's before artifacts.
+Fixtures exercise the production DiffCanvas, DiffPane, worker owners and Markdown/Shiki paths;
+Worker construction and virtualizer inputs are controlled fixtures, and DOM is jsdom.
+These results do not establish visible WebKit paint latency.

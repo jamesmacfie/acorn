@@ -92,7 +92,7 @@ export function liveXterm(nodeId: string, sessionId: string, host: HTMLElement, 
 }
 
 function buildXterm(nodeId: string, sessionId: string, firstHost: HTMLElement, initialFontSize: number): LiveXterm {
-  const api = terminalApi()
+  const api = terminalApi(nodeId || null)
   installScrollAreaGuard()
   let fontSize = initialFontSize
   // No convertEol: the PTY already emits CRLF for normal output (kernel ONLCR) and a full-screen
@@ -148,6 +148,7 @@ function buildXterm(nodeId: string, sessionId: string, firstHost: HTMLElement, i
   // while the reader is on another task. What that costs is the parse and nothing else: xterm's render
   // service pauses while its element is out of view.
   const detach = api.attach(sessionId, (m) => {
+    if (disposed) return
     if (m.type === 'ready') {
       if (m.session.cols !== term.cols || m.session.rows !== term.rows) void api.resize(sessionId, term.cols, term.rows)
     }
@@ -169,6 +170,7 @@ function buildXterm(nodeId: string, sessionId: string, firstHost: HTMLElement, i
   // on CR; a bare LF (\n, same byte as Ctrl+J) is Claude's setup-free "insert newline". Swallow
   // the event so xterm doesn't also send the CR that would submit.
   term.attachCustomKeyEventHandler((e) => {
+    if (disposed) return false
     if (e.type === 'keydown' && e.shiftKey && e.key === 'Enter') {
       e.preventDefault() // stop the browser inserting its own newline into xterm's textarea
       api.write(sessionId, '\n')
@@ -180,8 +182,8 @@ function buildXterm(nodeId: string, sessionId: string, firstHost: HTMLElement, i
     if (e.type === 'keydown' && e.metaKey) return false
     return true
   })
-  term.onData((d) => api.write(sessionId, d))
-  term.onResize(({ cols, rows }) => void api.resize(sessionId, cols, rows))
+  term.onData((d) => { if (!disposed) api.write(sessionId, d) })
+  term.onResize(({ cols, rows }) => { if (!disposed) void api.resize(sessionId, cols, rows) })
 
   // Refit on any size change of the surface: drawer drag-resize, window resize, layout shifts. A
   // ResizeObserver catches the drawer-height change that window 'resize' would miss.

@@ -3,6 +3,7 @@ import { createConnection } from 'node:net'
 import { Duplex } from 'node:stream'
 import { WebSocket, WebSocketServer } from 'ws'
 import { afterEach, expect, it, vi } from 'vitest'
+import { WS_VIEWERS_HEADER } from '@acorn/protocol/ws.ts'
 import type { DeviceService } from '../auth/deviceTokens'
 import { _resetWsHub, attachWsHub, disposeWsHub, onWsBroadcast, registerWsChannelHandler, setStreamHandlers, wsBroadcast } from './wsHub'
 
@@ -29,8 +30,8 @@ async function start(over: Partial<DeviceService> = {}, maxMessageBytes = 128, r
   await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
   const host = `127.0.0.1:${(server.address() as { port: number }).port}`
   attachWsHub(server, { devices: devices(over), allowedHosts: new Set([host]), internalToken: 'synthetic', maxMessageBytes, revocationCheckMs })
-  const open = async () => {
-    const ws = new WebSocket(`ws://${host}/v1/events`, { headers: { authorization: 'Bearer dummy' } })
+  const open = async (multiplexed = false) => {
+    const ws = new WebSocket(`ws://${host}/v1/events`, { headers: { authorization: 'Bearer dummy', ...(multiplexed ? { [WS_VIEWERS_HEADER]: '1' } : {}) } })
     peers.push(ws)
     await new Promise<void>((resolve, reject) => { ws.once('open', resolve); ws.on('error', reject) })
     return ws
@@ -102,6 +103,25 @@ it('contains a rejecting terminal hook', async () => {
   const ended = closed(ws)
   ws.send(JSON.stringify({ channel: 'term:input', id: 's1', data: 'hello' }))
   await ended
+})
+
+it('retires all viewer sinks after a nested owner rejects despite a failing detach', async () => {
+  const detached = vi.fn(() => { throw new Error('native exited') })
+  const cleaned = vi.fn((_owner: object) => {})
+  setStreamHandlers({ input: () => {}, attach: () => {}, detach: detached, streamTaskId: () => 't1' })
+  registerWsChannelHandler('bad', { onFrame: async () => { throw new Error('owner failed') }, onDisconnect: cleaned })
+  const { open } = await start({}, 1_024)
+  const ws = await open(true)
+  const a = '11111111-1111-4111-8111-111111111111'
+  const b = '22222222-2222-4222-8222-222222222222'
+  const send = (viewerId: string, frame: Record<string, unknown>) => ws.send(JSON.stringify({ channel: 'ws:viewer', viewerId, frame }))
+  send(a, { channel: 'term:attach', id: 's1' })
+  send(b, { channel: 'term:attach', id: 's2' })
+  const ended = closed(ws)
+  send(a, { channel: 'bad:frame' })
+  await ended
+  await vi.waitFor(() => expect(detached).toHaveBeenCalledTimes(2))
+  expect(cleaned.mock.calls.map(([owner]) => (owner as { id: string | null }).id)).toEqual(expect.arrayContaining([a, b]))
 })
 
 it('fails closed on a rejected device activity lookup', async () => {

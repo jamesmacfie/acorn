@@ -1,6 +1,7 @@
 import { createEffect, onCleanup, untrack } from 'solid-js'
 import { Rectangle } from '@acorn/plugin-api/ui'
-import { activeNodeId } from '@acorn/plugin-api/client'
+import { useQueryClient } from '@tanstack/solid-query'
+import { activeNodeId, queryOwner } from '@acorn/plugin-api/client'
 import { liveXterm, type LiveXterm } from './liveXterm'
 
 // One session's box in the drawer (docs/terminal.md § Client). The xterm inside is not this
@@ -10,6 +11,9 @@ import { liveXterm, type LiveXterm } from './liveXterm'
 // tasks the drawer itself unmounts, and coming back moves the same attached xterm into the new box
 // instead of building a fresh one and asking the node for its screen.
 export default function TerminalSurface(props: { sessionId: string; fontSize: number; hidden?: boolean; onExit?: (exitCode: number | null) => void }) {
+  const owner = queryOwner(useQueryClient())
+  const nodeId = owner === undefined ? activeNodeId() : owner
+  let frame: number | undefined
   let host!: HTMLElement
   let terminal: LiveXterm | undefined
   let gone = false
@@ -31,15 +35,17 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
     // and the session id on its way past, and tracking those would rebuild nothing but would re-run
     // `show()` — which focuses the terminal, so a font-size preference change would steal the caret.
     untrack(() => {
-      terminal ??= liveXterm(activeNodeId() ?? '', props.sessionId, host, props.fontSize)
+      terminal ??= liveXterm(nodeId ?? '', props.sessionId, host, props.fontSize)
       terminal.mount(host, (exitCode) => props.onExit?.(exitCode))
       terminal.setFontSize(props.fontSize)
-      requestAnimationFrame(() => { if (!gone && !props.hidden) terminal?.show() })
+      if (frame !== undefined) cancelAnimationFrame(frame)
+      frame = requestAnimationFrame(() => { if (!gone && activeNodeId() === nodeId && !props.hidden) terminal?.show() })
     })
   })
 
   onCleanup(() => {
     gone = true
+    if (frame !== undefined) cancelAnimationFrame(frame)
     terminal?.unmount(host)
   })
 

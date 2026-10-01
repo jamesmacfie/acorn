@@ -1,0 +1,35 @@
+{
+  "fixture": "actual channel, wsClient and scope mapping; transport records frames, no PTY",
+  "afterSwitch": [
+    {
+      "nodeId": "node-a",
+      "frame": {
+        "channel": "term:attach",
+        "id": "11111111-2222-4333-8444-555555555555"
+      }
+    }
+  ],
+  "allFrames": [
+    {
+      "nodeId": "node-a",
+      "frame": {
+        "channel": "term:attach",
+        "id": "11111111-2222-4333-8444-555555555555"
+      }
+    },
+    {
+      "nodeId": "node-b",
+      "frame": {
+        "channel": "term:attach",
+        "id": "11111111-2222-4333-8444-555555555555"
+      }
+    },
+    {
+      "nodeId": "node-b",
+      "frame": {
+        "channel": "term:detach",
+        "id": "11111111-2222-4333-8444-555555555555"
+      }
+    }
+  ]
+}

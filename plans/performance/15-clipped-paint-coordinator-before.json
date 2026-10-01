@@ -1,0 +1,26 @@
+{
+  "fixture": "Actual writeRun to an 80x1 buffer; clipping leaves the same 80 cells, return width contract preserved",
+  "cases": [
+    {
+      "length": 80,
+      "repeats": 20,
+      "returnedWidth": 80,
+      "wallMs": 0.10304100000030303,
+      "cpuMs": 0.113
+    },
+    {
+      "length": 10000,
+      "repeats": 20,
+      "returnedWidth": 10000,
+      "wallMs": 3.5628749999996217,
+      "cpuMs": 6.832
+    },
+    {
+      "length": 1000000,
+      "repeats": 20,
+      "returnedWidth": 1000000,
+      "wallMs": 258.6173749999998,
+      "cpuMs": 278.191
+    }
+  ]
+}

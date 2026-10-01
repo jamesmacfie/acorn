@@ -162,6 +162,11 @@ once, before a frame reaches any channel handler or the `term:` dispatch, and it
 unknown stream id rather than allowing it, since failing open would make the check bypassable by
 racing session creation.
 
+Logical viewer dispatch reads these claims from its physical authenticated parent on every frame.
+The opaque viewer token passed to a compiled channel handler is a resource-lifetime key, never a
+replacement connection or a credential. Nesting a viewer envelope cannot widen a task-scoped token's
+terminal access or grant it a plugin channel.
+
 A task-confined connection also receives none of `wsBroadcast`'s frames. No broadcast channel is
 task-addressed: `workflow:step:event` carries another task's raw agent stream (assistant text and tool
 results), `workflow:notice` carries another task's title, `agent:session`/`agent:event` carry another
@@ -491,14 +496,23 @@ is the only file in that package permitted to name either class.
 **Storing a bundle is idempotent, and the application's own bundles go through the same door.** The
 shell caches and acknowledges the bundles in its own resource directory at every launch, because that
 grant covers bytes the build produced and nothing else writes there. Doing it at every launch does not
-mean writing at every launch. `putBundled` hashes the bytes, and when the cache already holds that
-hash and the file is on disk it returns and touches nothing. The index is rewritten only when a row is
-added, the boot sweep rewrites it only when it evicted something, and the trust store compares the
-stored acknowledgement field by field, ignoring `decidedAt`, and writes only on a difference. So five
-bundled plugins cost five bundle writes and ten fsynced rewrites on the launch after an app update, and
-zero on every launch after that. The two disagreement cases still self-heal: a row whose file is gone
-is rewritten because the file is checked as well as the row, and a file with no row is deleted by the
-sweep.
+mean writing at every launch. The bundled pass hashes one client body at a time. When the cache
+already holds that hash and the file is on disk, it touches neither the body nor its index row. It
+places missing bodies before committing the successful cache rows in one atomic, fsynced index
+write. It then validates each trust disclosure and commits the successful decisions in one atomic,
+fsynced trust write. A malformed or unreadable sibling does not discard the successful packages.
+The trust store compares the acknowledgement field by field, ignoring `decidedAt`, and keeps the
+first timestamp for an unchanged decision. A fresh roster requires at most two metadata commits.
+An application-version-only provenance change requires at most one. An unchanged pass writes
+nothing. The boot sweep rewrites its index only when it evicts something.
+
+The cache and trust files commit separately, in that order. A failed metadata commit leaves that
+store's remembered rows unchanged, and the bundled pass reports no successful acknowledgements.
+The following launch retries. A cache commit followed by a failed trust commit leaves reusable
+cached bytes without granting trust to them. A row whose file is gone is repaired because the file
+is checked as well as the row, and a file with no row is deleted by the sweep. Remote bundles and
+owner decisions retain their individual validation and commit paths. The
+`ACORN_PROMPT_BUNDLED_PLUGIN_TRUST=1` opt-out still skips bundled cache and trust initialization.
 
 Skipping a write is not skipping a decision. The hash is still computed from the bytes on every
 launch, so a bundle whose contents changed produces a hash the cache does not hold and takes the full

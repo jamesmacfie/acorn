@@ -36,7 +36,7 @@ function handshake(): Promise<AcornBridge> {
       // transfers one, so this is undefined there and `mountTree` refuses, which is the honest answer
       // for a bundle asking a rectangle to draw a tree.
       acceptTreePort(event.ports?.[1] ?? null)
-      resolve(attach(port))
+      resolve(attach(port, event.ports?.[1] ? { mode: (event.data as { treeSlotBridge?: number }).treeSlotBridge === 1 ? 'bootstrap' : 'legacy' } : {}))
     }
     target.addEventListener('message', onWindowMessage)
   })
@@ -55,12 +55,13 @@ function handshake(): Promise<AcornBridge> {
  * ```
  */
 export function mountTree(renderers: Record<string, TreeRender>): void {
-  void connect().then(() => {
+  void connect().then((bridge) => {
     // `connect()` resolving means the hello has landed, so the answer is already known either way.
     // A surface with no tree channel is a rectangle, and saying so is more use than hanging.
     const port = acceptedTreePort()
     if (!port) throw new Error('acorn: mountTree needs a tree channel, and this surface has none')
-    runTreeChannel(port, renderers)
+    if (bridge.treeBridgeMode === 'legacy') console.warn('[acorn] this host uses legacy tree bridge semantics; update acorn for mounted authority isolation')
+    runTreeChannel(port, renderers, bridge)
   }).catch((error: unknown) => {
     console.error('[acorn] mountTree failed:', error)
   })

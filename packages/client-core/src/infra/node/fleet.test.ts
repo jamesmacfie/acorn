@@ -160,7 +160,7 @@ describe('dropNode', () => {
     const client = clientFor('remote').client
     client.setQueryData(['tasks'], [{ id: 'gone' }])
 
-    dropNode('remote')
+    await dropNode('remote')
 
     expect(client.getQueryData(['tasks'])).toBeUndefined()
     expect(idb.del).toHaveBeenCalledWith('acorn-cache:acorn-1:remote')
@@ -214,6 +214,35 @@ describe('clearNodeCache', () => {
     unsubscribe()
   })
 
+  it('clears through the partition adapter captured before a host adapter change', async () => {
+    const key = cacheKeyFor('captured-clear')
+    const original = new Map([[key, 'original']])
+    const replacement = new Map([[key, 'replacement canary']])
+    const removeReplacement = vi.fn(async (entry: string) => { replacement.delete(entry) })
+    setCacheStorage({
+      getItem: async (entry) => original.get(entry),
+      setItem: async (entry, value) => { original.set(entry, value) },
+      removeItem: async (entry) => { original.delete(entry) },
+    })
+    const cache = clientFor('captured-clear')
+    cache.client.setQueryData(['inactive'], 'discard')
+    setCacheStorage({
+      getItem: async (entry) => replacement.get(entry),
+      setItem: async (entry, value) => { replacement.set(entry, value) },
+      removeItem: removeReplacement,
+    })
+    try {
+      await clearNodeCache('captured-clear')
+      expect(original.has(key)).toBe(false)
+      expect(replacement.get(key)).toBe('replacement canary')
+      expect(removeReplacement).not.toHaveBeenCalled()
+      expect(clientFor('captured-clear')).toBe(cache)
+      expect(cache.client.getQueryData(['inactive'])).toBeUndefined()
+    } finally {
+      setCacheStorage({ getItem: (entry) => idb.get(entry), setItem: idb.set, removeItem: idb.del })
+    }
+  })
+
   it('reads the saved snapshot\'s size and entry count from the store', async () => {
     const stored = new Map<string, string>()
     setCacheStorage({
@@ -231,5 +260,132 @@ describe('clearNodeCache', () => {
     } finally {
       setCacheStorage({ getItem: (key) => idb.get(key), setItem: idb.set, removeItem: idb.del })
     }
+  })
+})
+
+// Gated adapters exercise generation barriers without browser IndexedDB or a normal host profile.
+describe('partition persistence custody', () => {
+  const adapter = () => {
+    const records = new Map<string, string>()
+    return {
+      records,
+      getItem: vi.fn(async (key: string) => records.get(key)),
+      setItem: vi.fn(async (key: string, value: string) => { records.set(key, value) }),
+      removeItem: vi.fn(async (key: string) => { records.delete(key) }),
+    }
+  }
+  const gate = () => {
+    let release!: () => void
+    const promise = new Promise<void>((resolve) => { release = resolve })
+    return { promise, release }
+  }
+
+  it('keeps a constructed partition on its adapter and leaves never-selected fleet clients memory-only', async () => {
+    const { setCacheStorage } = await import('./fleet')
+    const a = adapter(), b = adapter()
+    setCacheStorage(a)
+    const selected = clientFor('selected'), memoryOnly = clientFor('fleet-only')
+    setCacheStorage(b)
+    const lease = selected.persistence.acquire()
+    await lease.restored
+    selected.client.setQueryData(['tasks'], ['A'])
+    await selected.persistence.flush()
+    memoryOnly.client.setQueryData(['tasks'], ['memory-only'])
+    expect(a.getItem).toHaveBeenCalledTimes(1)
+    expect(a.setItem).toHaveBeenCalledTimes(1)
+    expect(b.getItem).not.toHaveBeenCalled()
+    expect(b.setItem).not.toHaveBeenCalled()
+    await dropNode('selected')
+    expect(a.removeItem).toHaveBeenCalledWith(cacheKeyFor('selected'))
+    expect(b.removeItem).not.toHaveBeenCalled()
+    lease.release()
+  })
+
+  it('orders same-ID replacement restore/write after the retiring owner deletes through its adapter', async () => {
+    const { setCacheStorage } = await import('./fleet')
+    const first = adapter(), replacement = adapter(), entered = gate(), writeGate = gate()
+    const initialWrite = first.setItem.getMockImplementation()!
+    first.setItem.mockImplementation(async (key, value) => { entered.release(); await writeGate.promise; await initialWrite(key, value) })
+    setCacheStorage(first)
+    const old = clientFor('same')
+    const lease = old.persistence.acquire(); await lease.restored
+    old.client.setQueryData(['tasks'], ['old'])
+    const saving = old.persistence.flush(); await entered.promise
+    const dropping = dropNode('same')
+    setCacheStorage(replacement)
+    const fresh = clientFor('same')
+    const mounted = fresh.persistence.acquire()
+    await Promise.resolve(); await Promise.resolve()
+    expect(replacement.getItem).not.toHaveBeenCalled()
+    expect(first.removeItem).not.toHaveBeenCalled()
+    writeGate.release()
+    await Promise.all([saving, dropping, mounted.restored])
+    expect(first.records.size).toBe(0)
+    fresh.client.setQueryData(['tasks'], ['fresh'])
+    await fresh.persistence.flush()
+    expect(JSON.parse(replacement.records.get(cacheKeyFor('same'))!).clientState.queries[0].state.data).toEqual(['fresh'])
+    expect(first.removeItem).toHaveBeenCalledTimes(1)
+    expect(replacement.removeItem).not.toHaveBeenCalled()
+    lease.release(); mounted.release()
+  })
+
+  it('keeps replacements blocked after failed removal and retries the original adapter through repeated explicit removal', async () => {
+    const { setCacheStorage } = await import('./fleet')
+    const first = adapter(), replacement = adapter()
+    first.removeItem.mockRejectedValueOnce(new Error('locked'))
+    setCacheStorage(first)
+    const old = clientFor('retry')
+    await old.persistence.acquire().restored
+    old.client.setQueryData(['tasks'], ['old'])
+    await old.persistence.flush()
+    await dropNode('retry')
+    setCacheStorage(replacement)
+    const fresh = clientFor('retry')
+    await expect(fresh.persistence.acquire().restored).rejects.toThrow('locked')
+    expect(replacement.getItem).not.toHaveBeenCalled()
+    // Dropping the blocked replacement retries its predecessor before retiring itself.
+    await dropNode('retry')
+    expect(first.removeItem).toHaveBeenCalledTimes(2)
+    expect(first.records.size).toBe(0)
+    expect(replacement.removeItem).toHaveBeenCalledTimes(1)
+    const recovered = clientFor('retry')
+    await recovered.persistence.acquire().restored
+    recovered.client.setQueryData(['tasks'], ['recovered'])
+    await recovered.persistence.flush()
+    expect(replacement.records.size).toBe(1)
+  })
+
+  it('recovers a mounted blocked replacement and flushes its dirty memory through an explicit retry', async () => {
+    const { setCacheStorage, retryCacheRetirement } = await import('./fleet')
+    const first = adapter(), replacement = adapter()
+    first.removeItem.mockRejectedValueOnce(new Error('locked'))
+    setCacheStorage(first); clientFor('mounted-retry')
+    await dropNode('mounted-retry')
+    setCacheStorage(replacement)
+    const fresh = clientFor('mounted-retry'), mounted = fresh.persistence.acquire()
+    await expect(mounted.restored).rejects.toThrow('locked')
+    fresh.client.setQueryData(['tasks'], ['dirty while blocked'])
+    await expect(fresh.persistence.flush()).rejects.toThrow('locked')
+    expect(replacement.setItem).not.toHaveBeenCalled()
+    await retryCacheRetirement('mounted-retry')
+    expect(first.removeItem).toHaveBeenCalledTimes(2)
+    expect(JSON.parse(replacement.records.get(cacheKeyFor('mounted-retry'))!).clientState.queries[0].state.data).toEqual(['dirty while blocked'])
+    fresh.client.setQueryData(['tasks'], ['still mounted'])
+    await fresh.persistence.flush()
+    expect(replacement.setItem).toHaveBeenCalledTimes(2)
+    mounted.release()
+    await dropNode('mounted-retry')
+  })
+
+  it('retries a failed removal with no replacement without retargeting to the installed adapter', async () => {
+    const { setCacheStorage } = await import('./fleet')
+    const first = adapter(), other = adapter()
+    first.removeItem.mockRejectedValueOnce(new Error('locked'))
+    setCacheStorage(first); clientFor('removed')
+    await dropNode('removed')
+    setCacheStorage(other)
+    await dropNode('removed')
+    expect(first.removeItem).toHaveBeenCalledTimes(2)
+    expect(other.removeItem).not.toHaveBeenCalled()
   })
 })

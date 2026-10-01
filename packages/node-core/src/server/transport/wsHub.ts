@@ -12,7 +12,9 @@ import type { Duplex } from 'node:stream'
 // forbids (server/plugins/nodePluginWorker.ts), taking the whole plugin down with it.
 import type { WebSocket, WebSocketServer } from 'ws'
 import type { DeviceService } from '../auth/deviceTokens'
-import { MAX_NODE_WS_MESSAGE_BYTES, encodeIdFrame, WS_PATH, type WsClientFrame, type WsServerFrame, type WsServerWireFrame, wsFrameSchema } from '@acorn/protocol/ws.ts'
+import { MAX_NODE_WS_MESSAGE_BYTES, encodeIdFrame, WS_PATH, WS_VIEWERS_HEADER, type WsClientFrame, type WsServerFrame, type WsServerWireFrame } from '@acorn/protocol/ws.ts'
+import { WsViewers, type EventViewer } from './wsViewers'
+import { createWsViewerDispatch, isTaskConfinedWs } from './wsViewerDispatch'
 import { parsePluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { claimUpgrade } from './upgradeClaim'
 import { emitEvent, measure } from '../telemetry/collector'
@@ -80,7 +82,8 @@ export function registerWsChannelHandler(prefix: string, handler: WsChannelHandl
 // reconnect legitimately restarts at 1 and the client compares only within one socket's lifetime.
 type Conn = {
   ws: WebSocket
-  sinks: Map<string, StreamSink>
+  viewers: WsViewers
+  multiplexed: boolean
   deviceId: string | null
   seq: number
   // The claims of an internal credential, when this socket authenticated with one. Retained rather
@@ -178,7 +181,7 @@ function watchDrain(conn: Conn): void {
 const channelPrefix = (channel: string): string => channel.split(':', 1)[0]
 const frameOwner = (channel: string): string => parsePluginChannel(channel)?.pluginId ?? 'core'
 
-function sendFrame(conn: Conn, frame: WsServerFrame): void {
+function sendFrame(conn: Conn, frame: WsServerFrame, viewerId?: string | null): void {
   try {
     if (conn.ws.readyState !== conn.ws.OPEN) {
       // Nobody will read this socket's sequence again. Kept incrementing so the counter still describes
@@ -186,7 +189,8 @@ function sendFrame(conn: Conn, frame: WsServerFrame): void {
       conn.seq += 1
       return
     }
-    if (conn.ws.bufferedAmount > conn.mark) {
+    // Admission is a response to this viewer's request, so invalidation shedding cannot replace it.
+    if (conn.ws.bufferedAmount > conn.mark && frame.channel !== 'ws:viewer-error') {
       const { id } = frame as { id?: unknown }
       const streamId = frame.channel === 'term:out' && typeof id === 'string' ? id : null
       if (streamId) {
@@ -208,7 +212,8 @@ function sendFrame(conn: Conn, frame: WsServerFrame): void {
     }
     conn.seq += 1
     const seq = conn.seq
-    measure(frameOwner(frame.channel), 'ws.frame', () => conn.ws.send(JSON.stringify({ ...frame, seq } satisfies WsServerWireFrame), (error) => { if (error) conn.ws.terminate() }), {
+    const routed = viewerId ? { channel: 'ws:viewer', viewerId, frame } : frame
+    measure(frameOwner(frame.channel), 'ws.frame', () => conn.ws.send(JSON.stringify({ ...routed, seq } satisfies WsServerWireFrame), (error) => { if (error) conn.ws.terminate() }), {
       channel: channelPrefix(frame.channel),
     })
   } catch { conn.ws.terminate() }
@@ -240,29 +245,30 @@ function outputFrame(id: string, msg: Extract<StreamMsg, { type: 'output' }>): U
   return frame
 }
 
-function sendStreamFrame(conn: Conn, id: string, msg: StreamMsg): void {
+function sendStreamFrame(conn: Conn, owner: EventViewer, id: string, msg: StreamMsg): void {
   try {
+    if (!owner.active) return
     // `ready`, `exit` and `error` are one frame per attach or per lifetime, and they carry a session
     // object rather than bytes. They stay JSON.
-    if (msg.type !== 'output') return sendFrame(conn, { channel: 'term:out', id, msg })
+    if (msg.type !== 'output') return sendFrame(conn, { channel: 'term:out', id, msg }, owner.id)
     const frame = outputFrame(id, msg)
     // An id this frame cannot spell (@acorn/protocol/ws.ts). The JSON path still works, so say it that
     // way rather than dropping a terminal's output.
-    if (!frame) return sendFrame(conn, { channel: 'term:out', id, msg })
+    if (!frame) return sendFrame(conn, { channel: 'term:out', id, msg }, owner.id)
     if (conn.ws.readyState !== conn.ws.OPEN) return
     if (conn.ws.bufferedAmount > conn.mark) {
       holdStream(conn, id)
       watchDrain(conn)
       // and fall through, for the reason sendFrame gives: there is no cursor to replay a hole from.
     }
-    conn.ws.send(frame, { binary: true }, (error) => { if (error) conn.ws.terminate() })
+    conn.ws.send(owner.id ? encodeIdFrame(owner.id, frame)! : frame, { binary: true }, (error) => { if (error) conn.ws.terminate() })
   } catch { conn.ws.terminate() }
 }
 
 // Is this connection confined to a single task? The socket-level twin of requireUser.ts's
 // `isTaskConfined`, kept here rather than imported because that one reads a Hono context and this one
 // reads a Conn: same rule, two different carriers of the same claims.
-const isConfined = (conn: Conn): boolean => !!conn.internal && conn.internal.scope !== 'service'
+const isConfined = isTaskConfinedWs
 
 // Session-status pings and workflow notices go to every open socket (notify.ts); a session's own
 // output goes only to attached sockets, through their per-session sink. A task-confined socket
@@ -342,77 +348,25 @@ async function authorize(req: IncomingMessage, deps: WsAuthDeps): Promise<Author
   return claims ? { deviceId: null, internal: claims } : null
 }
 
-// May this connection address the stream `id`?
-//
-// Device sockets and the 'service' scope: yes. A 'task'-scoped internal socket: only when the stream
-// belongs to that task. The engine answers the ownership question because it owns the session map.
-function mayDriveStream(conn: Conn, id: string | null): boolean {
-  if (!isConfined(conn)) return true
-  if (!id || !conn.internal?.taskId) return false
-  return handlers?.streamTaskId(id) === conn.internal.taskId
-}
-
-function onConnect(ws: WebSocket, authorized: Authorized, mark: number): void {
-  const conn: Conn = { ws, sinks: new Map(), deviceId: authorized.deviceId, seq: 0, internal: authorized.internal, missedPongs: 0, held: new Set(), shedding: false, drainTimer: null, mark }
+function onConnect(ws: WebSocket, authorized: Authorized, mark: number, multiplexed: boolean): void {
+  const conn: Conn = { ws, viewers: new WsViewers(), multiplexed, deviceId: authorized.deviceId, seq: 0, internal: authorized.internal, missedPongs: 0, held: new Set(), shedding: false, drainTimer: null, mark }
   conns.add(conn)
   ws.on('pong', () => {
     conn.missedPongs = 0
   })
-  ws.on('message', (raw) => invokeOwner(() => {
-    let frame: WsClientFrame
-    try {
-      const parsed = wsFrameSchema.safeParse(JSON.parse(raw.toString()))
-      if (!parsed.success) return
-      frame = parsed.data
-    } catch {
-      return // non-JSON noise, ignore defensively
-    }
-    if (frame.channel.startsWith('term:')) {
-      if (!handlers) return
-      // Scope check before any handler runs (docs/security.md § Transport and auth). Narrowed once,
-      // here, because the frame envelope is open now (@acorn/protocol/ws.ts): the runtime guards below
-      // are load-bearing on their own, since the union only ever proved the shapes to the compiler,
-      // never to a peer sending JSON.
-      const { id, data, cols, rows } = frame as { id?: unknown; data?: unknown; cols?: unknown; rows?: unknown }
-      const streamId = typeof id === 'string' ? id : null
-      if (!mayDriveStream(conn, streamId)) return
-      if (!streamId) return
-      if (frame.channel === 'term:input') {
-        if (typeof data === 'string') return handlers.input(streamId, data)
-      } else if (frame.channel === 'term:attach') {
-        if (conn.sinks.has(streamId)) return
-        const sink: StreamSink = (msg) => sendStreamFrame(conn, streamId, msg)
-        conn.sinks.set(streamId, sink)
-        // Engine restores the canonical screen before queued live frames. The engine clamps the size.
-        return handlers.attach(streamId, sink, typeof cols === 'number' && typeof rows === 'number' ? { cols, rows } : undefined)
-      } else if (frame.channel === 'term:detach') {
-        const sink = conn.sinks.get(streamId)
-        if (sink) {
-          conn.sinks.delete(streamId)
-          return handlers.detach(streamId, sink)
-        }
-      }
-      return
-    }
-    // Every non-`term:` channel is refused outright for a task-confined socket, the same posture
-    // workflows' node-wide trigger-poll route takes: there is no task to narrow the frame to, so the
-    // only honest answer is no (docs/security.md § Transport and auth, on the docker-exec finding this
-    // check closes).
-    //
-    // A per-channel opt-in on WsChannelHandler was considered and rejected: docker browse and exec are
-    // a renderer surface with no agent consumer, so the opt-in would have no takers, and the safe
-    // default has to be the one a channel added later inherits.
-    if (isConfined(conn)) return
-    return channelHandlers.get(frame.channel.split(':', 1)[0])?.onFrame(frame, (f) => sendFrame(conn, f), conn)
-  }, () => ws.terminate()))
+  const dispatch = createWsViewerDispatch(conn, () => handlers, channelHandlers, {
+    send: (frame, viewerId) => sendFrame(conn, frame, viewerId),
+    stream: (owner, id, message) => sendStreamFrame(conn, owner, id, message),
+    release: (id) => releaseStream(conn, id),
+    invoke: (action) => invokeOwner(action),
+  })
+  ws.on('message', (raw) => invokeOwner(() => dispatch.receive(raw.toString()), () => ws.terminate()))
   const cleanup = () => {
     if (!conns.delete(conn)) return // 'error' and 'close' can both fire, run once
     // Before the detaches: a socket that died while it was behind must not leave the PTY it was
     // holding paused forever. That would be a session that never produces output again.
     releaseAll(conn)
-    for (const [id, sink] of conn.sinks) invokeOwner(() => handlers?.detach(id, sink))
-    conn.sinks.clear()
-    for (const handler of channelHandlers.values()) invokeOwner(() => handler.onDisconnect(conn))
+    dispatch.close()
   }
   ws.on('close', cleanup)
   ws.on('error', cleanup)
@@ -504,7 +458,7 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
       loaded.handleUpgrade(req, socket, head, (ws) => {
         pending.delete(socket)
         if (disposed) { ws.on('error', () => {}); ws.terminate(); return }
-        onConnect(ws, authorized, deps.maxBufferedBytes ?? MAX_BUFFERED_BYTES)
+        onConnect(ws, authorized, deps.maxBufferedBytes ?? MAX_BUFFERED_BYTES, req.headers[WS_VIEWERS_HEADER] === '1')
         socket.off('error', onPeerError)
       })
     })().catch(() => refuse(socket))

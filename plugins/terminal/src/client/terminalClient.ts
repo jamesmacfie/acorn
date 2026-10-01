@@ -6,8 +6,8 @@
 import type { CreateOpts, ServerMsg, TerminalProfile, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
 import { terminalProfilesRoute, terminalSessionActionRoute, terminalSessionsRoute } from '../shared/api'
 import type { SendSubmit } from '../shared/send'
-import { readJson, writeJson, wsOnNotice, wsOnWorkflowStepEvent, type WorkflowNotice } from '@acorn/plugin-api/client'
-import { wsAttach, wsWrite } from './wsChannel'
+import { activeNodeId, readJson, writeJson, wsOnNotice, wsOnWorkflowStepEvent, type WorkflowNotice } from '@acorn/plugin-api/client'
+import { wsAttach, wsRememberSize, wsWrite } from './wsChannel'
 
 export type TerminalApi = {
   list(): Promise<TerminalSession[]>
@@ -27,25 +27,29 @@ export type TerminalApi = {
   }
 }
 
-const post = <T>(url: string, body?: unknown) =>
-  writeJson<T>(url, { method: 'POST', headers: body === undefined ? undefined : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
-
 // Always available: every verb here is an HTTP route or a WebSocket frame against the node. It used to
 // return null unless the shell exposed a native folder picker, which is neither a PTY nor
 // anything this file has an opinion about (git history: docs/future/node-first/platform-seam.md). Whether the node
 // runs terminals at all is `hasHostCapability({ plugin: 'terminal' })`, read from the node's plugin roster.
-export const terminalApi = (): TerminalApi => {
+export const terminalApi = (nodeId: string | null = activeNodeId()): TerminalApi => {
+  const post = <T>(url: string, body?: unknown) => writeJson<T>(url, { nodeId, method: 'POST', headers: body === undefined ? undefined : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
   return {
-    list: () => readJson<TerminalSession[]>(terminalSessionsRoute),
-    profiles: () => readJson<TerminalProfile[]>(terminalProfilesRoute),
+    list: () => readJson<TerminalSession[]>(terminalSessionsRoute, { nodeId }),
+    profiles: () => readJson<TerminalProfile[]>(terminalProfilesRoute, { nodeId }),
     create: (opts) => post<TerminalSession>(terminalSessionsRoute, opts),
     kill: (id) => post<boolean>(terminalSessionActionRoute(id, 'kill')),
     interrupt: (id) => post<boolean>(terminalSessionActionRoute(id, 'interrupt')),
     remove: (id) => post<boolean>(terminalSessionActionRoute(id, 'remove')),
-    resize: (id, cols, rows) => post<boolean>(terminalSessionActionRoute(id, 'resize'), { cols, rows }),
+    resize: (id, cols, rows) => {
+      wsRememberSize(id, cols, rows, nodeId)
+      return post<boolean>(terminalSessionActionRoute(id, 'resize'), { cols, rows })
+    },
     send: (id, text, submit) => post(terminalSessionActionRoute(id, 'send'), { text, submit }),
-    write: wsWrite,
-    attach: wsAttach,
-    workflow: { onNotice: wsOnNotice, onStepEvent: wsOnWorkflowStepEvent },
+    write: (id, data) => wsWrite(id, data, nodeId),
+    attach: (id, on, size) => wsAttach(id, on, size, nodeId),
+    workflow: {
+      onNotice: (cb) => wsOnNotice((notice) => { if (activeNodeId() === nodeId) cb(notice) }),
+      onStepEvent: (cb) => wsOnWorkflowStepEvent((event) => { if (activeNodeId() === nodeId) cb(event) }),
+    },
   }
 }

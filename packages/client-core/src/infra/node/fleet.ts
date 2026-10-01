@@ -1,12 +1,14 @@
 import { createSignal } from 'solid-js'
 import { MutationCache, QueryCache, QueryClient } from '@tanstack/solid-query'
-import { createAsyncStoragePersister } from '@tanstack/query-async-storage-persister'
 import { del, get, set } from 'idb-keyval'
 import type { NodeConnectionState, NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { fleetBridge, nodeTransport } from '../platform'
-import { emitError, measure, recordDuration, recordSample, telemetryEnabled } from '../telemetry/emitter'
+import { emitError, recordDuration, recordSample, telemetryEnabled } from '../telemetry/emitter'
 import { createLogger, describeError } from '../telemetry/logger'
+import { queryCacheLifecycle, type CacheStorage, type QueryCacheLifecycle } from '../persistence/queryCacheLifecycle'
+import { registerQueryOwner } from './queryOwnership'
+export type { CacheStorage } from '../persistence/queryCacheLifecycle'
 import { dropSegmentCache } from '../../features/diff/segmentCaches'
 
 // The fleet store: which nodes this client knows, what state each connection is in, and one query
@@ -147,23 +149,35 @@ export async function refreshFleet(): Promise<void> {
   setStatuses(Object.fromEntries(fleet.statuses.map((status) => [status.nodeId, status])))
 }
 
-// The persister type is inferred rather than imported, because the package exports only the factory.
-export type NodeCache = { hydrated(): void; client: QueryClient; persister: ReturnType<typeof createAsyncStoragePersister> }
+export type NodeCache = { hydrated(): void; client: QueryClient; persister: QueryCacheLifecycle['persister']; persistence: QueryCacheLifecycle }
 
 const caches = new Map<string, NodeCache>()
+type Retirement = { pending: Promise<void>; retry?: () => Promise<void> }
+const retirements = new Map<string, Retirement>()
+
+function retryRetirement(nodeId: string, record: Retirement): void {
+  if (record.retry) record.pending = record.retry()
+  const pending = record.pending
+  void pending.then(() => {
+    if (record.pending !== pending) return
+    record.retry = undefined
+    if (retirements.get(nodeId) === record) retirements.delete(nodeId)
+  }, () => {})
+}
+
+function trackRetirement(nodeId: string, retry: () => Promise<void>): Retirement {
+  const record: Retirement = { pending: Promise.resolve(), retry }
+  retirements.set(nodeId, record)
+  retryRetirement(nodeId, record)
+  return record
+}
 
 export const cacheKeyFor = (nodeId: string): string => `${CACHE_KEY_PREFIX}${nodeId}`
 
 // Where a cache partition is written. IndexedDB is the default because the two hosts that had one
 // were both browsers; a host without one installs its own before the first cache is built, which is
 // what the terminal client does with a directory of files (apps/tui/src/node/cache.ts). Three
-// functions rather than an interface with two implementations: the persister already names them.
-export type CacheStorage = {
-  getItem(key: string): Promise<string | undefined | null>
-  setItem(key: string, value: string): Promise<unknown>
-  removeItem(key: string): Promise<void>
-}
-
+// operations match the public persister contract. Each partition captures this adapter once.
 let cacheStorage: CacheStorage = { getItem: (key) => get<string>(key), setItem: set, removeItem: del }
 
 /** Persist query caches somewhere other than IndexedDB. Call it before anything asks for a cache: a
@@ -172,59 +186,51 @@ export const setCacheStorage = (storage: CacheStorage): void => {
   cacheStorage = storage
 }
 
-// The one place a QueryClient is constructed in production. Created lazily so a fleet of ten nodes
-// costs one cache for the node actually being looked at.
+// The one place a QueryClient is constructed in production. Fleet readers can warm memory here;
+// persistence starts only when a host acquires the partition for selection.
 export function clientFor(nodeId: string): NodeCache {
   const existing = caches.get(nodeId)
   if (existing) return existing
   let restoreStarted: number | null = null
-  const cache: NodeCache = {
-    hydrated: () => {
-      if (restoreStarted !== null) recordDuration('core', 'cache.restore_to_hydrated', performance.now() - restoreStarted)
-      restoreStarted = null
-    },
-    client: new QueryClient({
-      ...failureCaches(),
-      // Keeps focus refreshes useful without turning a quick app switch into a fan-out across every
-      // active query. Queries that need fresher data override this. gcTime has to outlive a session so
-      // persisted entries survive a reload (docs/caching.md § Renderer query cache).
-      defaultOptions: {
-        queries: {
-          refetchOnWindowFocus: true,
-          staleTime: 30_000,
-          gcTime: 1000 * 60 * 60 * 24,
-        },
-      },
-    }),
-    // Persisted so a restart renders from last-known data. One key per node, or node A's snapshot
-    // rehydrates into node B.
-    persister: createAsyncStoragePersister({
-      // Through the indirection rather than the object, so a host that swaps the store gets the swap
-      // rather than whatever was installed when this line was evaluated.
-      storage: {
-        getItem: (key) => measure('core', 'cache.read', () => cacheStorage.getItem(key)),
-        setItem: (key, value) => measure('core', 'cache.write', () => cacheStorage.setItem(key, value)),
-        removeItem: (key) => cacheStorage.removeItem(key),
-      },
-      serialize: (client) => measure('core', 'cache.serialize', () => {
-        recordSample('core', 'cache.entries', client.clientState.queries.length)
-        const text = JSON.stringify(client)
-        recordSample('core', 'cache.characters', text.length)
-        return text
-      }),
-      deserialize: (text) => measure('core', 'cache.deserialize', () => JSON.parse(text)),
-      key: cacheKeyFor(nodeId),
-      // Persistence serializes the whole dehydrated cache, so a wider coalescing window stops a burst
-      // of query updates stringifying the same growing snapshot over and over.
-      throttleTime: 5_000,
-    }),
+  const storage = cacheStorage
+  const predecessor = retirements.get(nodeId)
+  const hydrated = () => {
+    if (restoreStarted !== null) recordDuration('core', 'cache.restore_to_hydrated', performance.now() - restoreStarted)
+    restoreStarted = null
   }
+  const client = new QueryClient({
+    ...failureCaches(),
+    // Keeps focus refreshes useful without turning a quick app switch into a fan-out across every
+    // active query. Queries that need fresher data override this. gcTime has to outlive a session so
+    // persisted entries survive a reload (docs/caching.md § Renderer query cache).
+    defaultOptions: {
+      queries: {
+        refetchOnWindowFocus: true,
+        staleTime: 30_000,
+        gcTime: 1000 * 60 * 60 * 24,
+      },
+    },
+  })
+  let offTelemetry = () => {}
+  const persistence = queryCacheLifecycle({
+    client, storage, key: cacheKeyFor(nodeId),
+    beforeAccess: () => predecessor?.pending ?? Promise.resolve(),
+    beforeRetire: () => {
+      if (predecessor?.retry) retryRetirement(nodeId, predecessor)
+      return predecessor?.pending ?? Promise.resolve()
+    },
+    onHydrated: hydrated,
+    onRetire: () => offTelemetry(),
+    onError: (error) => log.warn('could not persist query cache', error),
+  })
+  const cache: NodeCache = { client, persistence, persister: persistence.persister, hydrated }
+  registerQueryOwner(client, nodeId === ORIGIN_NODE_ID ? null : nodeId)
   const restore = cache.persister.restoreClient
   cache.persister.restoreClient = () => {
     restoreStarted = telemetryEnabled() ? performance.now() : null
     return restore()
   }
-  cache.client.getQueryCache().subscribe((event) => {
+  offTelemetry = cache.client.getQueryCache().subscribe((event) => {
     // Fixed action names only. Query keys can contain task IDs, search text, and file paths.
     if (event.type === 'updated') recordSample('core', 'cache.updates', 1, '1', { action: event.action.type })
     else if (event.type === 'added' || event.type === 'removed') recordSample('core', 'cache.entries.changed', 1, '1', { action: event.type })
@@ -240,11 +246,11 @@ export const homeClient = (): QueryClient => clientFor(homeNodeId() ?? ORIGIN_NO
 // out to ten state owners.
 //
 // The in-memory client and the IndexedDB key are independent tiers, so dropping only the key leaves a
-// live cache that re-persists itself on the next write. The diff's resident segments sit beside the
-// client, keyed by it, and go with it (features/diff/segmentCache.ts).
-export function dropNode(nodeId: string): void {
+// live cache that re-persists itself on the next write.
+export function dropNode(nodeId: string): Promise<void> {
   const cache = caches.get(nodeId)
   caches.delete(nodeId)
+  if (cache) void cache.persistence.retire().catch(() => {})
   if (cache) dropSegmentCache(cache.client)
   cache?.client.clear()
   setNodes((current) => current.filter((node) => node.nodeId !== nodeId))
@@ -253,11 +259,34 @@ export function dropNode(nodeId: string): void {
     delete next[nodeId]
     return next
   })
-  void cacheStorage.removeItem(cacheKeyFor(nodeId)).catch((error: unknown) => {
-    // A snapshot that could not be deleted only matters if the same nodeId comes back, which needs a
-    // re-pair. Say so rather than failing the removal the owner asked for.
+  const predecessor = retirements.get(nodeId)
+  // Repeated explicit removal retries a failed deletion through the adapter that owned it.
+  if (!cache && predecessor?.retry) retryRetirement(nodeId, predecessor)
+  const storage = cacheStorage
+  const retiring = cache
+    ? trackRetirement(nodeId, () => cache.persistence.retire())
+    : predecessor ?? trackRetirement(nodeId, async () => { await storage.removeItem(cacheKeyFor(nodeId)) })
+  return retiring.pending.catch((error: unknown) => {
     log.warn(`could not delete the persisted cache for ${nodeId}`, error)
   })
+}
+
+// Recover a failed removal through its original adapter, then restore and flush the selected
+// replacement's dirty memory. Explicit only; failures do not start a retry loop.
+export async function retryCacheRetirement(nodeId: string): Promise<void> {
+  const record = retirements.get(nodeId)
+  if (!record?.retry) return
+  retryRetirement(nodeId, record)
+  await record.pending
+  const cache = caches.get(nodeId)
+  if (!cache) return
+  const lease = cache.persistence.acquire()
+  try {
+    await lease.restored
+    await cache.persistence.flush()
+  } finally {
+    lease.release()
+  }
 }
 
 /**
@@ -274,10 +303,11 @@ export function dropNode(nodeId: string): void {
  * `clear` is written for a node that is gone: it drops the claims a mounted diff pane holds.
  */
 export async function clearNodeCache(nodeId: string): Promise<void> {
-  const client = caches.get(nodeId)?.client
-  client?.removeQueries({ type: 'inactive' })
-  await cacheStorage.removeItem(cacheKeyFor(nodeId))
-  void client?.invalidateQueries({ type: 'active' })
+  const cache = clientFor(nodeId)
+  await cache.persistence.clearInactive()
+  if (caches.get(nodeId) === cache && !cache.persistence.retired()) {
+    void cache.client.invalidateQueries({ type: 'active' })
+  }
 }
 
 /** The saved snapshot for a node: its size as UTF-8 and how many entries it holds, or null when there
@@ -299,7 +329,13 @@ export async function persistedCacheSize(nodeId: string): Promise<{ bytes: numbe
 export function _resetFleet(): void {
   subscribed = false
   chased.clear()
+  for (const cache of caches.values()) {
+    void cache.persistence.retire().catch(() => {})
+    cache.client.clear()
+  }
   caches.clear()
+  retirements.clear()
+  cacheStorage = { getItem: (key) => get<string>(key), setItem: set, removeItem: del }
   setNodes([])
   setStatuses({})
 }

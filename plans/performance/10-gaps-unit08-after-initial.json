@@ -1,0 +1,16 @@
+[
+  {
+    "case": "old-expansion-after-signature-change",
+    "staleRows": 0,
+    "activeSha": "B"
+  },
+  {
+    "case": "old-expanded-context-after-key-refresh",
+    "staleRows": 0,
+    "remainingTopGap": true
+  },
+  {
+    "case": "disposed-expansion-still-tokenizes",
+    "callsAfterDispose": 0
+  }
+]

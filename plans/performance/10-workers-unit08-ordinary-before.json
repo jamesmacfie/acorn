@@ -1,0 +1,14 @@
+[
+  {
+    "case": "ordinary-cold-and-four-warm-builds",
+    "cold": {
+      "syntax": 1,
+      "words": 1
+    },
+    "afterWarm": {
+      "syntax": 1,
+      "words": 1
+    },
+    "rows": 5
+  }
+]
