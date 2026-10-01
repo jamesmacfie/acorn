@@ -31,7 +31,7 @@
     "pack:node": "node scripts/pack-node.mjs",
     "rebuild:node": "node scripts/rebuild-node-abi.mjs",
     "release": "pnpm dist",
-    "test": "node scripts/rebuild-node-abi.mjs && turbo run test --continue --concurrency=${ACORN_TEST_CONCURRENCY:-6}",
+    "test": "node scripts/rebuild-node-abi.mjs && VITEST_MAX_WORKERS=${VITEST_MAX_WORKERS:-3} turbo run test --continue --concurrency=${ACORN_TEST_CONCURRENCY:-6}",
     "test:coverage": "node scripts/test-coverage.mjs"
   },
   "//overrides": "Runtime security floors, copied into the standalone npm manifest by scripts/pack-node.mjs. tools/arch/dependencySecurity.test.ts verifies pnpm uses the same policy.",

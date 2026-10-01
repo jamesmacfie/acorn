@@ -10,6 +10,12 @@ import base from './vite.config'
 // cells in an array, so every drawing test runs on the 24.21.0 the repo pins
 // (../../node-runtime.json, docs/tui.md § The runtime floor).
 
+// The root `pnpm test` sets VITEST_MAX_WORKERS=3, and Vitest lets that variable override the
+// `maxWorkers: 2` below. Lower the variable rather than the config, so the suite cap can't lift this
+// package above two. Vitest reads it after it loads this file.
+const WORKERS = 2
+if (Number(process.env.VITEST_MAX_WORKERS) > WORKERS) process.env.VITEST_MAX_WORKERS = String(WORKERS)
+
 export default mergeConfig(base, defineConfig({
   // `ws` ships a `browser` export condition whose whole body is a throw, and this pipeline picks it:
   // the broker's `new WebSocket(...)` then fails with "not a constructor" after the HTTP half of the
@@ -18,11 +24,12 @@ export default mergeConfig(base, defineConfig({
   // exports its root and nothing else.
   resolve: { alias: [{ find: /^ws$/, replacement: fileURLToPath(import.meta.resolve('ws')) }] },
   test: {
+    experimental: { fsModuleCache: true },
     environment: 'node',
     include: ['src/**/*.test.{ts,tsx}', 'scripts/agent/**/*.test.mjs'],
     pool: 'forks',
     // The repository runs six packages concurrently. Bound this package's cold shell transforms
     // so their fixture startup does not exhaust the five-second test deadline under suite load.
-    maxWorkers: 2,
+    maxWorkers: WORKERS,
   },
 }))

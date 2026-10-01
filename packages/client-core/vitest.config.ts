@@ -14,6 +14,7 @@ import { defineConfig } from 'vitest/config'
 // Split by extension rather than by folder so a host test sits beside the host it renders.
 export default defineConfig({
   test: {
+    experimental: { fsModuleCache: true },
     // Diff geometry tests share the host CPU with many jsdom workers; more than four lets their
     // short timers expire before the observer and frame callbacks run.
     maxWorkers: 4,
