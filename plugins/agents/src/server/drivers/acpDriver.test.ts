@@ -2,7 +2,8 @@ import { describe, expect, it } from 'vitest'
 import { fileURLToPath } from 'node:url'
 import type { AgentNormalizedEvent, AgentSession } from '../../contract/wire.ts'
 import type { AgentDriverStartOptions } from './types'
-import { AcpDriver, acpMcpServers, clientFor, type PendingRequest } from './acpDriver'
+import { AcpDriver } from './acpDriver'
+import { acpMcpServers, clientFor, type PendingRequest } from './acpSession'
 import { harnessCapabilities } from './harness'
 
 const sessionWithRef = (providerSessionRef: string): AgentSession => ({

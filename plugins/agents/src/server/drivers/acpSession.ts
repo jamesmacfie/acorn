@@ -1,0 +1,439 @@
+import type {
+  Agent, Client, ContentBlock, CreateElicitationResponse, McpServer,
+  RequestPermissionResponse, SessionConfigOption,
+} from '@agentclientprotocol/sdk'
+import { randomUUID } from 'node:crypto'
+import { Readable, Writable } from 'node:stream'
+import { pathToFileURL } from 'node:url'
+import { brokerEnv, AGENT_TOOL_PASSTHROUGH, createLogger } from '@acorn/plugin-api/node'
+import { spawnOwnedProcess } from '../processes/ownedProcess'
+import type { AgentInputPart, AgentNormalizedEvent } from '../../contract/wire.ts'
+import { normalizeAcpConfig, normalizeAcpElicitation, normalizeAcpPermission, normalizeAcpUpdate, acpElicitationResponse } from './acpNormalizer'
+import { providerStderrNotice } from './diagnostics'
+import { contextBlock } from './contextBlock'
+import { sessionCustomAgent } from '../../shared/customAgents'
+import type { HarnessLaunchSpec } from './harness'
+import type { AcpLaunch } from './acpDriver'
+import type { AgentDriverMcpServer, AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from './types'
+
+const log = createLogger('agents:provider', 'agents')
+
+// The two JSON-RPC codes that mean "the session this row points at is gone". The protocol reserves the
+// first for a resource the agent cannot find, which is what `session/load` answers; the second is plain
+// invalid params, which is how an agent that only has `session/resume` refuses a reference it never
+// stored. Either one is worth recovering from, and nothing else is.
+const ACP_RESOURCE_NOT_FOUND = -32002
+const ACP_INVALID_PARAMS = -32602
+
+// One parked question, whatever kind it was. Each entry carries its own way back to its own corner of
+// the protocol, so the resolve path below does not have to know a permission from a form.
+export type PendingRequest = {
+  resolve(resolution: unknown): void
+  drain(): void
+}
+
+const drain = (pending: Map<string, PendingRequest>): void => {
+  for (const request of pending.values()) request.drain()
+  pending.clear()
+}
+
+
+function acpPrompt(
+  parts: AgentInputPart[],
+  attachments: AgentDriverTurnOptions['attachments'],
+): ContentBlock[] {
+  return parts.map((part) => {
+    switch (part.type) {
+      case 'text':
+        return { type: 'text', text: part.text }
+      case 'context':
+        return {
+          type: 'text',
+          text: contextBlock(part),
+        }
+      case 'file':
+        return {
+          type: 'text',
+          text: `Please use the workspace file @${part.path}${part.lineStart ? `:${part.lineStart}${part.lineEnd ? `-${part.lineEnd}` : ''}` : ''}.`,
+        }
+      case 'attachment':
+      case 'image': {
+        const attachment = attachments[part.attachmentId]
+        if (!attachment) throw new Error(`Attachment is unavailable: ${part.attachmentId}`)
+        return {
+          type: 'resource_link',
+          uri: pathToFileURL(attachment.localPath).href,
+          name: attachment.filename,
+          mimeType: attachment.mediaType,
+          size: attachment.byteSize,
+        }
+      }
+    }
+  })
+}
+
+// Parked before the session hears about it, deliberately: announcing runs as far as SQLite and the
+// websocket, and a reader who answered inside that window would find an empty map. If the announcement
+// fails the entry has to go, or it is a question nobody can ever answer.
+const announce = async (
+  pending: Map<string, PendingRequest>,
+  requestId: string,
+  options: AgentDriverStartOptions,
+  event: AgentNormalizedEvent,
+): Promise<void> => {
+  try {
+    await options.onEvent(event)
+  } catch (error) {
+    pending.get(requestId)?.drain()
+    pending.delete(requestId)
+    throw error
+  }
+}
+
+// Exported for its own test: everything here is a pure function of `options` and `pending`, and driving
+// it directly is how the parked-request path is covered without spawning a child.
+export function clientFor(
+  options: AgentDriverStartOptions,
+  label: string,
+  pending: Map<string, PendingRequest>,
+  replaying: () => boolean,
+): Client {
+  return {
+    async requestPermission(params) {
+      const requestId = randomUUID()
+      const response = new Promise<RequestPermissionResponse>((resolve) => pending.set(requestId, {
+        resolve: (resolution) => {
+          const row = typeof resolution === 'object' && resolution != null ? resolution as Record<string, unknown> : {}
+          const optionId = typeof row.optionId === 'string' ? row.optionId : null
+          resolve(optionId ? { outcome: { outcome: 'selected', optionId } } : { outcome: { outcome: 'cancelled' } })
+        },
+        drain: () => resolve({ outcome: { outcome: 'cancelled' } }),
+      }))
+      await announce(pending, requestId, options, normalizeAcpPermission(requestId, params))
+      return response
+    },
+    // Claude Code's AskUserQuestion and any MCP server's own form both arrive here. A url-mode
+    // elicitation cannot: we advertise `form` alone, and an agent honours what the client declared.
+    async unstable_createElicitation(params) {
+      // A form is the only mode acorn advertises, and a form with no fields has no card. Both are
+      // declined here rather than parked, because a parked request nobody can answer is a "Needs you"
+      // that never goes away.
+      if (params.mode !== 'form') return { action: 'decline' }
+      const event = normalizeAcpElicitation(randomUUID(), params)
+      if (event.type !== 'request' || !event.questions?.length) return { action: 'decline' }
+      const requestId = event.requestId
+      const response = new Promise<CreateElicitationResponse>((resolve) => pending.set(requestId, {
+        resolve: (resolution) => resolve(acpElicitationResponse(params, resolution)),
+        // Not `decline`. The turn is over, so the tool call that asked should end with it rather than
+        // run on with an empty answer.
+        drain: () => resolve({ action: 'cancel' }),
+      }))
+      await announce(pending, requestId, options, event)
+      return response
+    },
+    async sessionUpdate(params) {
+      if (replaying()) return
+      for (const event of normalizeAcpUpdate(params.update, label)) await options.onEvent(event)
+    },
+  }
+}
+
+// ACP names an environment as an ordered list of pairs rather than a map, so that a server declaring
+// the same name twice is a protocol error the agent can report instead of a silent last-wins.
+//
+// An HTTP server goes only to an agent that said at `initialize` it takes one. Every ACP agent takes
+// stdio, so that is the only transport with no capability to check.
+export const acpMcpServers = (
+  servers: readonly AgentDriverMcpServer[],
+  capabilities: { http?: boolean } = {},
+): { servers: McpServer[]; unsupported: string[] } => {
+  const pairs = (record: Record<string, string>) => Object.entries(record).map(([name, value]) => ({ name, value }))
+  const out: McpServer[] = []
+  const unsupported: string[] = []
+  for (const server of servers) {
+    if (server.transport === 'stdio') {
+      out.push({ name: server.name, command: server.command, args: server.args, env: pairs(server.env) })
+    } else if (capabilities.http) {
+      out.push({ type: 'http', name: server.name, url: server.url, headers: pairs(server.headers) })
+    } else {
+      unsupported.push(server.name)
+    }
+  }
+  return { servers: out, unsupported }
+}
+
+export async function startAcpSession(
+  options: AgentDriverStartOptions,
+  spec: HarnessLaunchSpec,
+  launch: AcpLaunch,
+  own: (stop: () => Promise<void>) => void,
+): Promise<AgentDriverSession> {
+  // Read the spec here, not through `this` below. The returned literal's methods rebind `this` to
+  // the literal.
+  const { id, label, quirks } = spec
+  // The SDK loads here, not at the top of the file. Building its generated schemas takes about 30 ms,
+  // the node loads this module on every boot, and most launches never start an ACP session.
+  const { ClientSideConnection, ndJsonStream, RequestError } = await import('@agentclientprotocol/sdk')
+  await options.onEvent({
+    type: 'session_state',
+    state: options.session.providerSessionRef ? 'replaying' : 'connecting',
+  })
+
+  options.signal?.throwIfAborted()
+  const { child, owner } = spawnOwnedProcess({
+    command: launch.file,
+    args: launch.args,
+    cwd: options.cwd,
+    // brokerEnv, not `{ ...process.env }`: spreading the parent environment would hand the session
+    // SESSION_ENC_KEY, INTERNAL_TOKEN, and GITHUB_CLIENT_*. See docs/security.md § Credential
+    // handling. A passthrough glob is for tool configuration, never for credentials, which is why
+    // `ANTHROPIC_*` and `OPENAI_*` are absent from the base allowlist AGENT_TOOL_PASSTHROUGH names.
+    env: {
+      ...brokerEnv({
+        env: options.env,
+        passthrough: [...AGENT_TOOL_PASSTHROUGH, ...(spec.envPassthrough ?? [])],
+      }),
+      ...launch.env,
+    },
+  })
+  // The node's log, not the transcript. An adapter writes its startup banner here, so this used to put
+  // a permanent row in the reader's conversation on every spawn, saying only how many bytes it could
+  // not show them. The content stays unlogged either way (docs/security.md, credential handling).
+  child.stderr.on('data', (chunk: Buffer) => {
+    if (chunk.byteLength) log.warn(providerStderrNotice(label, chunk.byteLength))
+  })
+  const pending = new Map<string, PendingRequest>()
+  let replaying = options.session.providerSessionRef != null
+  let agent!: Agent
+  let stopped = false
+  let providerSessionRef = options.session.providerSessionRef
+  const stop = (): Promise<void> => {
+    stopped = true
+    drain(pending)
+    return owner.stop(async () => {
+      if (providerSessionRef && agent?.closeSession) await agent.closeSession({ sessionId: providerSessionRef })
+      child.stdin.end()
+    }).finally(() => {
+      child.stdin.destroy()
+      child.stdout.destroy()
+      child.stderr.destroy()
+    })
+  }
+  own(stop)
+  const stream = ndJsonStream(
+    Writable.toWeb(child.stdin) as WritableStream<Uint8Array>,
+    Readable.toWeb(child.stdout) as unknown as ReadableStream<Uint8Array>,
+  )
+  const connection = new ClientSideConnection((remote) => {
+    agent = remote
+    return clientFor(options, label, pending, () => replaying)
+  }, stream)
+
+  let notified = false
+  const closed = (error?: Error): void => {
+    drain(pending)
+    if (stopped || notified) return
+    notified = true
+    void stop().then(() => options.onClosed(error)).catch(() => undefined)
+  }
+  child.on('error', closed)
+  child.on('exit', (code) => closed(code === 0 ? undefined : new Error(`${label} exited with code ${code ?? 'unknown'}.`)))
+  void connection.closed.then(() => closed(new Error(`${label} ACP connection closed.`)), closed)
+
+  const initialized = await agent.initialize({
+    protocolVersion: 1,
+    clientInfo: { name: 'acorn', version: '1.0.0' },
+    // acorn declines every client capability but one. See docs/managed-agents.md § Harnesses for
+    // what each buys and why it is parked.
+    //
+    // Form elicitation is the exception, and declaring it is what lets an agent ask a question at
+    // all: Claude Code's adapter disallows its own AskUserQuestion tool outright when this is
+    // absent, and auto-declines anything an MCP server asks. `{}` is how the protocol spells yes.
+    clientCapabilities: {
+      fs: { readTextFile: false, writeTextFile: false },
+      terminal: false,
+      session: { configOptions: {} },
+      elicitation: { form: {} },
+    },
+  })
+  // Two ways back into a session the agent still holds, and they are different calls. `session/load`
+  // replays the history the agent kept; `session/resume` restores the context and sends nothing back.
+  // An agent advertises whichever one it implements, Claude Code the first and DeepSeek the second, and
+  // acorn reads that off the wire rather than out of a manifest, because the protocol already says it.
+  const supportsResume = initialized.agentCapabilities?.sessionCapabilities?.resume != null
+    && typeof agent.resumeSession === 'function'
+  const supportsLoad = initialized.agentCapabilities?.loadSession === true && typeof agent.loadSession === 'function'
+
+  let configOptions: readonly SessionConfigOption[] = []
+  // acorn's own tool server and the user's, named on every session call. The runtime decides which:
+  // a harness that registers acorn's through its CLI's own config file gets only the user's here, so
+  // nothing is offered twice (docs/mcp.md § Configuration).
+  const declared = acpMcpServers(options.mcpServers, initialized.agentCapabilities?.mcpCapabilities ?? {})
+  const mcpServers = declared.servers
+  if (declared.unsupported.length) {
+    await options.onEvent({
+      type: 'diagnostic',
+      level: 'warning',
+      message: `${label} does not take HTTP MCP servers, so this session runs without ${declared.unsupported.join(', ')}.`,
+    })
+  }
+  const sessionMeta = spec.acpSessionMeta?.(options.session)
+  // A custom agent's instructions, for a harness with no system prompt acorn can reach. Owed to each
+  // provider session this driver creates, and never to one it picks back up, which already has them.
+  const customAgent = sessionCustomAgent(options.session.config)
+  const fallbackInstructions = !spec.systemPromptInstructions && customAgent?.instructions
+    ? contextBlock({ source: 'context.agent.instructions', label: `${customAgent.name} instructions`, content: customAgent.instructions })
+    : null
+  let instructionsOwed = false
+  const createSession = async (): Promise<void> => {
+    const created = await agent.newSession({
+      cwd: options.cwd,
+      additionalDirectories: [],
+      mcpServers,
+      ...(sessionMeta ? { _meta: sessionMeta } : {}),
+    })
+    providerSessionRef = created.sessionId
+    configOptions = created.configOptions ?? []
+    instructionsOwed = fallbackInstructions != null
+  }
+  if (providerSessionRef && (supportsResume || supportsLoad)) {
+    // The same four fields either way: neither call takes a prompt, and acorn names no extra roots on
+    // any session call it makes.
+    const reference = {
+      sessionId: providerSessionRef,
+      cwd: options.cwd,
+      additionalDirectories: [],
+      // Named again rather than remembered. An agent that keeps a session does not keep the servers
+      // it was told about, because the token in one of them is minted per start and the old one is
+      // already dead.
+      mcpServers,
+      ...(sessionMeta ? { _meta: sessionMeta } : {}),
+    }
+    try {
+      const reconnected = supportsResume
+        ? await agent.resumeSession!(reference)
+        : await agent.loadSession!(reference)
+      configOptions = reconnected?.configOptions ?? []
+    } catch (error) {
+      // The agent no longer holds the session this row points at. Claude Code, for one, keys its
+      // store by working directory, so a checkout that moved or a pruned transcript both land here.
+      // Without the fallback the row's dead reference is retried on every start, the queued turn
+      // never dispatches, and the session is stuck reporting provider_start_failed.
+      //
+      // A transport failure still throws. The recovery is for an agent that answered and said no.
+      const code = error instanceof RequestError ? error.code : null
+      if (code !== ACP_RESOURCE_NOT_FOUND && code !== ACP_INVALID_PARAMS) throw error
+      await createSession()
+      // Say it out loud. The transcript on screen stays, but the fresh session has never seen it,
+      // so a reader who is not told will read the next answer as if the agent remembered. Not when no
+      // turn ever ran: Claude Code stores nothing before one, so a restart then (an MCP change, say)
+      // lands here with nothing lost.
+      if (!options.noProviderExecutionHistory) {
+        await options.onEvent({
+          type: 'diagnostic',
+          level: 'warning',
+          message: `${label} no longer has the earlier session, so it starts fresh and cannot see the conversation above.`,
+        })
+      }
+    }
+  } else {
+    await createSession()
+  }
+  replaying = false
+  await options.onEvent({
+    type: 'session_metadata',
+    providerSessionRef: providerSessionRef ?? undefined,
+    configOptions: normalizeAcpConfig(configOptions),
+  })
+  await options.onEvent({ type: 'session_state', state: 'ready' })
+
+  let active = false
+  let currentConfig = normalizeAcpConfig(configOptions)
+  // ACP has one call for everything the client sends the agent, so a turn and a compaction request
+  // both go through here. It emits nothing itself, because only one of the two is a turn.
+  const prompt = async (blocks: ContentBlock[]): Promise<string | undefined> => {
+    if (!providerSessionRef) throw new Error(`${label} has no initialized ACP session.`)
+    if (active) throw new Error(`${label} already has an active turn.`)
+    active = true
+    try {
+      return (await agent.prompt({ sessionId: providerSessionRef, prompt: blocks })).stopReason
+    } finally {
+      active = false
+      // Whatever is still parked here is dead. No cancellation signal reaches an elicitation handler,
+      // so this is the only place that hears about a question the agent gave up on, and without it
+      // the ACP request is never answered and the durable row sits in "Needs you" for good.
+      for (const [requestId, request] of [...pending]) {
+        request.drain()
+        pending.delete(requestId)
+        // Swallowed: a failed write must not replace the turn's own outcome on the way out.
+        try {
+          await options.onEvent({ type: 'request_resolved', requestId, resolution: { cancelled: true } })
+        } catch { /* the turn's own result is the one worth reporting */ }
+      }
+    }
+  }
+  return {
+    get providerSessionRef() {
+      return providerSessionRef
+    },
+    get ready() {
+      return !active && !stopped && !connection.signal.aborted
+    },
+    pid: child.pid,
+    async sendTurn(turnOptions: AgentDriverTurnOptions) {
+      try {
+        const blocks = acpPrompt(turnOptions.input, turnOptions.attachments)
+        if (instructionsOwed && fallbackInstructions) {
+          blocks.unshift({ type: 'text', text: fallbackInstructions })
+          instructionsOwed = false
+        }
+        const stopReason = await prompt(blocks)
+        await options.onEvent({ type: 'turn_completed', ...(stopReason ? { stopReason } : {}) })
+        return {}
+      } catch (error) {
+        await options.onEvent({
+          type: 'error',
+          code: `${id}_turn_failed`,
+          message: error instanceof Error ? error.message : `${label} turn failed.`,
+          retryable: false,
+        })
+        throw error
+      }
+    },
+    // ACP has no compaction call, so the `manualCompaction` quirk means the agent implements a
+    // `/compact` command. Without the quirk this stays undefined and the runtime refuses the request
+    // rather than sending a prompt the agent answers as prose. No `turn_completed` here: this is not
+    // a turn, and one would end whatever the transcript thinks is in flight.
+    ...(quirks?.manualCompaction
+      ? {
+        compact: async () => {
+          await prompt([{ type: 'text', text: '/compact' }])
+          await options.onEvent({ type: 'diagnostic', level: 'info', message: `${label} compacted the conversation.` })
+        },
+      }
+      : {}),
+    async cancel() {
+      if (!providerSessionRef || !active) return
+      await agent.cancel({ sessionId: providerSessionRef })
+      drain(pending)
+    },
+    async resolveRequest(providerRequestId, resolution) {
+      const request = pending.get(providerRequestId)
+      if (!request) throw new Error(`The ${label} request is no longer pending.`)
+      pending.delete(providerRequestId)
+      request.resolve(resolution)
+    },
+    async setConfig(optionId, value) {
+      if (!providerSessionRef || !agent.setSessionConfigOption) return
+      const response = await agent.setSessionConfigOption({
+        sessionId: providerSessionRef,
+        configId: optionId,
+        value,
+      })
+      currentConfig = normalizeAcpConfig(response.configOptions)
+      await options.onEvent({ type: 'session_metadata', configOptions: currentConfig })
+      return currentConfig
+    },
+    stop,
+  }
+}

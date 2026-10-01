@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process'
+import { spawnOwnedProcess } from '../processes/ownedProcess'
 import type { AgentProviderUsageReading, AgentUsageQuota } from '../../shared/usage'
 import {
   clampRemaining, SESSION_WINDOW_SECONDS, usageHealth, WEEKLY_WINDOW_SECONDS, worstUsageHealth,
@@ -15,7 +15,7 @@ import {
 export type CodexRpcProcess = {
   write(line: string): void
   end(): void
-  kill(): void
+  kill(): void | Promise<void>
   onData(listener: (chunk: string) => void): () => void
   onExit(listener: (code: number | null) => void): () => void
   onError(listener: (error: Error) => void): () => void
@@ -41,17 +41,18 @@ export function startCodexAppServer(): CodexRpcProcess {
   // `-a never` rather than `-a untrusted`: codex 0.154 dropped `untrusted` from --ask-for-approval,
   // so the app-server died on the flag before it could answer and usage read as "no data". Reading
   // rate limits never asks for approval anyway; the flag is only here to keep the probe silent.
-  const child = spawn(executable, ['-s', 'read-only', '-a', 'never', 'app-server'], {
-    env,
-    stdio: ['pipe', 'pipe', 'ignore'],
-    shell: false,
+  const { child, owner } = spawnOwnedProcess({
+    command: executable, args: ['-s', 'read-only', '-a', 'never', 'app-server'], env,
   })
+  child.stderr.resume()
   return {
     write: (line) => child.stdin.write(line),
     end: () => child.stdin.end(),
-    kill: () => {
-      if (!child.killed) child.kill()
-    },
+    kill: () => owner.stop().finally(() => {
+      child.stdin.destroy()
+      child.stdout.destroy()
+      child.stderr.destroy()
+    }),
     onData: (listener) => {
       const handler = (chunk: Buffer) => listener(chunk.toString('utf8'))
       child.stdout.on('data', handler)
@@ -63,7 +64,8 @@ export function startCodexAppServer(): CodexRpcProcess {
     },
     onError: (listener) => {
       child.on('error', listener)
-      return () => child.off('error', listener)
+      child.stdin.on('error', listener)
+      return () => { child.off('error', listener); child.stdin.off('error', listener) }
     },
   }
 }
@@ -142,7 +144,9 @@ export async function readCodexRateLimitsViaRpc(
         return
       }
       pending.set(id, { resolve, reject })
-      process.write(`${JSON.stringify({ id, method, params })}\n`)
+      try { process.write(`${JSON.stringify({ id, method, params })}\n`) } catch (error) {
+        failAll(error instanceof Error ? error : new Error('Codex usage write failed.'))
+      }
     })
   }
 
@@ -153,11 +157,15 @@ export async function readCodexRateLimitsViaRpc(
   } finally {
     finished = true
     clearTimeout(timeout)
-    offData()
-    offExit()
-    offError()
-    process.end()
-    process.kill()
+    try {
+      process.end()
+    } finally {
+      try { await process.kill() } finally {
+        offData()
+        offExit()
+        offError()
+      }
+    }
   }
 }
 

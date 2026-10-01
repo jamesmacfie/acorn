@@ -1,3 +1,4 @@
+import { awaitWithSignal, startCancellation } from '../processes/startCancellation'
 import { AGENT_TOOL_PASSTHROUGH, brokerEnv, createLogger } from '@acorn/plugin-api/node'
 import { sessionCustomAgent } from '../../shared/customAgents'
 import { execFile } from 'node:child_process'
@@ -170,7 +171,35 @@ export class CodexAgentDriver implements AgentDriver {
   }
 
   async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
+    const cancellation = startCancellation(options.signal)
+    let cleanup: () => Promise<void> = async () => {}
+    const scoped = {
+      ...options,
+      signal: cancellation.signal,
+      onEvent: (event: Parameters<AgentDriverStartOptions['onEvent']>[0]) => {
+        cancellation.signal.throwIfAborted()
+        return options.onEvent(event)
+      },
+    }
+    try {
+      cancellation.signal.throwIfAborted()
+      const handle = await awaitWithSignal(this.startSession(scoped, (stop) => { cleanup = stop }), cancellation.signal)
+      cancellation.signal.throwIfAborted()
+      return handle
+    } catch (error) {
+      await cleanup()
+      throw error
+    } finally {
+      cancellation.dispose()
+    }
+  }
+
+  private async startSession(
+    options: AgentDriverStartOptions,
+    own: (stop: () => Promise<void>) => void,
+  ): Promise<AgentDriverSession> {
     const descriptor = await this.probe()
+    options.signal?.throwIfAborted()
     if (!descriptor.executable) throw new Error('Codex is not available on PATH.')
     await options.onEvent({
       type: 'session_state',
@@ -194,7 +223,13 @@ export class CodexAgentDriver implements AgentDriver {
     const mcpStartup = new Map<string, { status: string; error: string | null }>()
     const mcpConfig = codexMcpConfig(options.mcpServers)
 
+    const emit = (event: Parameters<AgentDriverStartOptions['onEvent']>[0]): void => {
+      if (options.signal?.aborted) return
+      try { void Promise.resolve(options.onEvent(event)).catch(() => undefined) } catch { /* retired callback */ }
+    }
+
     const onServerRequest = (request: JsonRpcServerRequest): void => {
+      if (options.signal?.aborted || rpc.closed) return
       const event = normalizeCodexServerRequest(request)
       if (!event || event.type !== 'request') {
         rpc.respondError(request.id, -32601, `Acorn does not implement server request ${request.method}.`)
@@ -205,7 +240,7 @@ export class CodexAgentDriver implements AgentDriver {
       // already answered. The store keys a request on session and id, and would keep the old row.
       const requestId = randomUUID()
       pendingRequests.set(requestId, request)
-      void options.onEvent({ ...event, requestId })
+      emit({ ...event, requestId })
     }
 
     rpc = new JsonRpcProcess({
@@ -218,6 +253,7 @@ export class CodexAgentDriver implements AgentDriver {
       // credential, bypassing canUseProviderCredential and SecretService.
       env: brokerEnv({ env: options.env, passthrough: [...AGENT_TOOL_PASSTHROUGH, 'CODEX_*'] }),
       onNotification: (notification) => {
+        if (options.signal?.aborted || rpc.closed) return
         // Server start-up is the process's, not a thread's, so it is kept for the panel and goes no
         // further. The transcript has nothing to say about a server that finished connecting.
         if (notification.method === 'mcpServer/startupStatus/updated') {
@@ -232,7 +268,7 @@ export class CodexAgentDriver implements AgentDriver {
         // states the hazards and the capture they came from).
         const routed = childRouter.route(notification)
         if (routed.to === 'subagent') {
-          for (const event of routed.events) void options.onEvent(event)
+          for (const event of routed.events) emit(event)
           return
         }
         if (notification.method === 'thread/settings/updated') {
@@ -252,7 +288,7 @@ export class CodexAgentDriver implements AgentDriver {
                   for (const message of diagnostics) {
                     await options.onEvent({ type: 'diagnostic', level: 'info', message })
                   }
-                })()
+                })().catch(() => undefined)
               }
             }
           }
@@ -260,17 +296,23 @@ export class CodexAgentDriver implements AgentDriver {
         for (const event of normalizeCodexNotification(notification)) {
           if (event.type === 'session_state') ready = event.state === 'ready'
           if (event.type === 'turn_completed' || event.type === 'error') currentTurnId = null
-          void options.onEvent(event)
+          emit(event)
         }
         const generatedArtifact = codexGeneratedArtifact(notification)
-        if (generatedArtifact) void options.onEvent(generatedArtifact)
+        if (generatedArtifact) emit(generatedArtifact)
       },
       onRequest: onServerRequest,
       // The node's log rather than the transcript: a byte count the reader cannot act on is not part of
       // the conversation.
       onStderr: (line) => log.warn(providerStderrNotice('Codex app-server', Buffer.byteLength(line, 'utf8'))),
-      onClosed: (error) => void options.onClosed(error),
+      onClosed: (error) => {
+        ready = false
+        pendingRequests.clear()
+        void Promise.resolve(options.onClosed(error)).catch(() => undefined)
+      },
     })
+
+    own(() => rpc.stop())
 
     await rpc.request('initialize', {
       clientInfo: { name: 'acorn', version: '1.0.0' },
@@ -469,8 +511,10 @@ export class CodexAgentDriver implements AgentDriver {
       },
       async stop() {
         ready = false
-        if (threadId) await rpc.request('thread/unsubscribe', { threadId }).catch(() => undefined)
-        await rpc.stop()
+        pendingRequests.clear()
+        await rpc.stop(async () => {
+          if (threadId) await rpc.request('thread/unsubscribe', { threadId }, 1_000)
+        })
       },
     }
   }

@@ -1,4 +1,5 @@
-import { spawn, type ChildProcessWithoutNullStreams } from 'node:child_process'
+import type { ChildProcessWithoutNullStreams } from 'node:child_process'
+import { spawnOwnedProcess, type OwnedProcess } from '../processes/ownedProcess'
 import { StringDecoder } from 'node:string_decoder'
 import { z } from 'zod'
 
@@ -54,6 +55,8 @@ export class JsonRpcProcess {
   #buffer = ''
   readonly #decoder = new StringDecoder('utf8')
   #closed = false
+  readonly #owner: OwnedProcess
+  #stop: Promise<void> | null = null
 
   constructor(options: JsonRpcProcessOptions) {
     this.#requestTimeoutMs = options.requestTimeoutMs ?? 30_000
@@ -61,13 +64,13 @@ export class JsonRpcProcess {
     this.#onNotification = options.onNotification
     this.#onRequest = options.onRequest
     this.#onClosed = options.onClosed
-    this.#child = spawn(options.command, options.args, {
-      cwd: options.cwd,
-      env: options.env,
-      shell: false,
-      stdio: ['pipe', 'pipe', 'pipe'],
-    })
+    const { child, owner } = spawnOwnedProcess(options)
+    this.#child = child
+    this.#owner = owner
+    this.#child.stdin.on('error', (error) => this.#close(error))
     this.#child.stdout.on('data', (chunk: Buffer) => this.#consume(chunk))
+    this.#child.stdout.on('end', () => this.#close(new Error('Agent protocol output closed.')))
+    this.#child.stdout.on('error', (error) => this.#close(error))
     this.#child.stderr.on('data', (chunk: Buffer) => {
       for (const line of chunk.toString('utf8').split(/\r?\n/)) {
         if (line.trim()) options.onStderr?.(line.trim())
@@ -121,19 +124,26 @@ export class JsonRpcProcess {
     if (!this.#closed) this.#write({ jsonrpc: '2.0', id, error: { code, message } })
   }
 
-  async stop(): Promise<void> {
-    if (this.#closed) return
-    this.#closed = true
-    this.#child.stdin.end()
-    if (!this.#child.killed) this.#child.kill()
-    this.#rejectPending(new Error('Agent protocol process stopped.'))
+  stop(polite?: () => Promise<unknown>): Promise<void> {
+    if (!polite) this.#close(new Error('Agent protocol process stopped.'), false)
+    return this.#stop ??= this.#owner.stop(async () => {
+      if (polite && !this.#closed) await polite()
+      this.#child.stdin.end()
+    }).finally(() => this.#close(new Error('Agent protocol process stopped.'), false))
   }
 
   #write(message: JsonObject): void {
-    this.#child.stdin.write(`${JSON.stringify(message)}\n`)
+    try {
+      this.#child.stdin.write(`${JSON.stringify(message)}\n`, (error) => {
+        if (error) this.#close(error)
+      })
+    } catch (error) {
+      this.#close(error instanceof Error ? error : new Error('Agent protocol write failed.'))
+    }
   }
 
   #consume(chunk: Buffer): void {
+    if (this.#closed) return
     this.#buffer += this.#decoder.write(chunk)
     for (;;) {
       const newline = this.#buffer.indexOf('\n')
@@ -146,6 +156,7 @@ export class JsonRpcProcess {
         return
       }
       this.#handleLine(line)
+      if (this.#closed) return
     }
     if (Buffer.byteLength(this.#buffer, 'utf8') > this.#maxBufferedBytes) {
       this.#rejectOversizedOutput()
@@ -180,17 +191,20 @@ export class JsonRpcProcess {
     if (method) this.#onNotification?.({ method, params: asObject(message.params) ?? {} })
   }
 
-  #close(error?: Error): void {
+  #close(error?: Error, notify = true): void {
     if (this.#closed) return
     this.#closed = true
     this.#rejectPending(error ?? new Error('Agent protocol process closed.'))
-    this.#onClosed?.(error)
+    this.#buffer = ''
+    if (notify) {
+      void this.stop().catch(() => undefined)
+      this.#onClosed?.(error)
+    }
   }
 
   #rejectOversizedOutput(): void {
     const error = new Error(`Agent protocol message exceeded ${this.#maxBufferedBytes} bytes.`)
-    void this.stop()
-    this.#onClosed?.(error)
+    this.#close(error)
   }
 
   #rejectPending(error: Error): void {
