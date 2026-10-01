@@ -85,6 +85,17 @@ select per option that harness advertises through `GET /v1/p/agents/providers`, 
 runs and what it does with its upstream outputs. A plugin contributing a kind that runs an agent
 never restates the model list.
 
+**Workflow timeout in minutes**, under Definition's Budget section, limits the whole run and its
+child workflows. **Step timeout in minutes** limits active step execution, including agent loops and child
+workflow dispatches. Both accept fractional minutes and store `budget.maxWallTimeMs` in the
+definition, or `max_wall_time_ms` in TOML. A step timeout must fit within the workflow timeout.
+Clearing a timeout removes that limit and preserves the other budget fields.
+The workflow timeout governs time spent waiting for human approval.
+
+Without either time budget, agent turns default to 10 minutes. Set a step timeout such as 30 minutes
+to allow longer work without setting a deadline for the whole workflow. A workflow time budget
+also supplies the agent turn timeout, and the run's remaining time can stop a step earlier.
+
 ### Child workflow authoring
 
 Add **Run a workflow** to start one saved workflow, or **Map to workflows** to start one copy for
