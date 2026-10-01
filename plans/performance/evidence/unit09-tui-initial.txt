@@ -1,0 +1,24 @@
+Default > repo · 2 tasks                                                       ●
+┌─Menu─────────────────┐
+│› Docker              │  Select a container.
+│  Workflows           │
+│  Agents              │
+│  Memory              │
+│                      │
+└──────────────────────┘
+┌─Browse───────────────┐
+│Nothing to list here. │
+│                      │
+│                      │
+│                      │
+│                      │
+│                      │
+└──────────────────────┘
+┌─Tasks────────────────┐
+│  Review changed fil  │
+│  Plan follow-up wor  │
+│                      │
+│                      │
+│                      │
+└──────────────────────┘
+j/k move · enter open · esc back · ctrl+k commands · ? help · w switch worksp…

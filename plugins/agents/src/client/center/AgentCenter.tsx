@@ -51,7 +51,14 @@ export default function AgentCenter() {
   const workspaceTasks = createMemo(() =>
     (tasks.data ?? []).filter((task) => workspaceProjectIds().has(task.projectId)))
   const workspaceTaskIds = createMemo(() => new Set(workspaceTasks().map((task) => task.id)))
-  const [providers] = createResource(() => managedAgentApi.providers())
+  const [providers] = createResource(
+    () => managedAgentStore.captureRead(),
+    async (owner) => {
+      const rows = await managedAgentApi.providers(false, owner)
+      owner.check()
+      return rows
+    },
+  )
   // The harness's own glyph, falling back to the label's first letter. Deriving it from the provider
   // id draws Codex's mark for every harness that is not Claude.
   const providerGlyph = (providerId: string): string => {
@@ -69,15 +76,16 @@ export default function AgentCenter() {
     () => {
       const value = query().trim()
       const activeId = workspaceId()
-      return value && activeId && !fleetScope() ? { value, activeId } : null
+      return value && activeId && !fleetScope() ? { value, activeId, owner: managedAgentStore.captureRead() } : null
     },
-    (target) => managedAgentApi.search(target.value, { workspaceId: target.activeId }),
+    (target) => managedAgentApi.search(target.value, { workspaceId: target.activeId }, target.owner).then((rows) => { target.owner.check(); return rows }),
   )
   const [workspaceSessions] = createResource(
-    workspaceId,
-    async (activeId) => {
+    () => ({ activeId: workspaceId(), owner: managedAgentStore.captureRead() }),
+    async ({ activeId, owner }) => {
       if (!activeId) return []
-      const page = await managedAgentApi.sessions({ workspaceId: activeId, archived: false })
+      const page = await managedAgentApi.sessions({ workspaceId: activeId, archived: false }, owner)
+      owner.check()
       managedAgentStore.upsertSessions(page.sessions)
       return page.sessions
     },
@@ -85,8 +93,12 @@ export default function AgentCenter() {
   // Asked for only when the archived filter is chosen. This used to load on every visit and every
   // workspace switch, which is a second full session page fetched to fill a list nobody had opened.
   const [archived, { refetch: refetchArchived }] = createResource(
-    () => (stateFilter() === 'archived' ? workspaceId() || null : null),
-    async (activeId) => (await managedAgentApi.sessions({ workspaceId: activeId, archived: true })).sessions,
+    () => stateFilter() === 'archived' && workspaceId() ? { activeId: workspaceId(), owner: managedAgentStore.captureRead() } : null,
+    async ({ activeId, owner }) => {
+      const page = await managedAgentApi.sessions({ workspaceId: activeId, archived: true }, owner)
+      owner.check()
+      return page.sessions
+    },
   )
 
   // The fleet halves. Sessions and tasks are two fan-outs because a row needs both: the session comes from
