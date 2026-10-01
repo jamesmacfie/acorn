@@ -46,13 +46,14 @@ function StartFromItem(props: { target: import('./startFromItem').WorkflowSource
   const workspace = () => workspaceForProject(workspaces.data, props.target.projectId)
 
   // Every definition the workspace can run: its own rows, its projects' committed files, and the user
-  // layer, merged by the node (./workflowsClient.ts § defsList). A definition with a problem is left
-  // out rather than offered and refused at start.
+  // layer, merged by the node (./workflowsClient.ts § defsList). Only published database definitions
+  // and file definitions without known problems can be offered for a run.
   const [defs] = createResource(
     () => workspace()?.id || null,
     async (workspaceId) => workflowApi.defsList(workspaceId),
   )
-  const definitions = createMemo(() => (defs()?.workflows ?? []).filter((entry) => !entry.problems?.length))
+  const definitions = createMemo(() => (defs()?.workflows ?? []).filter((entry) =>
+    !entry.problems?.length && (entry.source !== 'database' || !!entry.publishedRevision)))
   const [defId, setDefId] = createSignal('')
   const selectedDefId = () => defId() || definitions()[0]?.id || ''
   const chosen = createMemo(() => definitions().find((entry) => entry.id === selectedDefId()))
@@ -110,7 +111,7 @@ function StartFromItem(props: { target: import('./startFromItem').WorkflowSource
   createEffect(() => {
     if (defs.state !== 'ready' || definitions().length) return
     closeStartFromItem()
-    toast('This workspace has no workflows. Make one from the Workflows rail.')
+    toast('This workspace has no runnable workflows. Create and publish one from the Workflows rail.')
   })
 
   return (
