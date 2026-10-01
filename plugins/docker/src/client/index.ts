@@ -56,9 +56,9 @@ export const dockerClientPlugin: ClientPlugin = {
       // The page's sections and rows, for search (DockerSettings.tsx draws the same ones).
       keywords: ['containers', 'compose', 'daemon', 'engine'],
       sections: [
-        { id: 'daemon', label: 'Daemon', rows: ['Docker engine'] },
-        { id: 'behaviour', label: 'Behaviour', rows: ['Ask twice before destructive actions', 'Show stopped containers in the Docker source'], keywords: ['confirm', 'prune', 'stopped'] },
-        { id: 'linking', label: 'Task linking', rows: ['Per-repo matcher'], keywords: ['config.toml', 'labels', 'compose project'] },
+        { id: 'daemon', label: 'Status', rows: ['Docker engine'], keywords: ['daemon'] },
+        { id: 'behaviour', label: 'Behaviour', rows: ['Ask twice before destructive actions', 'Show stopped containers in the Docker list'], keywords: ['confirm', 'prune', 'stopped'] },
+        { id: 'linking', label: 'Task linking', rows: ['Project rules'], keywords: ['config.toml', 'labels', 'compose project', 'matcher'] },
       ],
       component: DockerSettings,
     })

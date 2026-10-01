@@ -6,6 +6,9 @@ import { confirmTaskArchive } from './confirmTaskArchive'
 describe('confirmTaskArchive', () => {
   let host: HTMLElement
   let dispose: (() => void) | undefined
+  // The dialog is a Modal, which portals to the body.
+  const dialog = () => document.querySelector('[role="alertdialog"]')
+  const footer = () => [...document.querySelectorAll<HTMLButtonElement>('[role="alertdialog"] .ui-modal-actions button')]
 
   beforeEach(() => {
     host = document.createElement('div')
@@ -14,20 +17,28 @@ describe('confirmTaskArchive', () => {
   })
 
   afterEach(() => {
-    host.querySelector<HTMLButtonElement>('button')?.click()
+    footer()[0]?.click()
     dispose?.()
     host.remove()
   })
 
   it('asks before archiving a task with no reported concerns', async () => {
-    const decision = confirmTaskArchive('task-1')
+    const decision = confirmTaskArchive({ id: 'task-1', branch: 'feature', worktreePath: '/tmp/worktrees/feature' })
 
-    await expect.poll(() => host.querySelector('[role="alertdialog"]')?.textContent)
-      .toContain('Are you sure you want to archive this task?')
-    const buttons = [...host.querySelectorAll<HTMLButtonElement>('button')]
-    expect(buttons.map((button) => button.textContent)).toEqual(['Cancel', 'Archive task'])
+    await expect.poll(() => dialog()?.textContent).toContain('deletes its worktree')
+    expect(footer().map((button) => button.textContent)).toEqual(['Cancel', 'Archive task'])
 
-    buttons[0]!.click()
+    footer()[0]!.click()
+    await expect(decision).resolves.toEqual({ confirmed: false, checked: [] })
+  })
+
+  it('says the project folder stays when the task has no worktree of its own', async () => {
+    const decision = confirmTaskArchive({ id: 'task-2', branch: null, worktreePath: '/tmp/project' })
+
+    await expect.poll(() => dialog()?.textContent).toContain('leaves the project folder as it is')
+    expect(dialog()?.textContent).not.toContain('worktree')
+
+    footer()[0]!.click()
     await expect(decision).resolves.toEqual({ confirmed: false, checked: [] })
   })
 })

@@ -87,7 +87,7 @@ export function githubCommands(deps: GithubCommandDeps): ContributedCommand[] {
   return [
     // Not in the palette: the shortcut reference is a Settings page, and the palette already has a row
     // that opens Settings.
-    { id: 'help.shortcuts.open', title: 'Open keyboard shortcuts', category: 'navigation', run: deps.openShortcuts },
+    { id: 'help.shortcuts.open', title: 'Edit keyboard shortcuts', category: 'navigation', run: deps.openShortcuts },
     {
       id: 'github.files.find',
       kind: 'search',

@@ -13,8 +13,8 @@ import {
   updateNodePlugin,
 } from '../../infra/node/nodePlugins'
 import Icon from '../../kit/components/content/Icon'
-import { createDismissable } from '../../kit/lib/controls/dismissable'
-import { Alert, Badge, Button } from '../../kit/components/primitives'
+import { Alert, Badge, Button, SectionHeader, ToolbarSpacer } from '../../kit/components/primitives'
+import { Modal } from '../../kit/components/overlays/Modal'
 import { closePluginApproval, describePluginRequest, pluginApprovalTask, pluginRequestOutcomeMessage } from './approval'
 import { syncPluginDistribution } from '../plugins/distribution'
 import { setPluginDevGrant } from '../plugins/host'
@@ -178,118 +178,104 @@ export default function PluginApprovalDialog() {
       if (!request()) closePluginApproval()
     })
 
-  let dialog!: HTMLElement
   // Escape is "not now" and records nothing, exactly as it does in the bundle trust prompt: the request
   // stays in the node's queue, the bell still points at it, and an owner who wants to read the package
   // before answering is not trapped in a modal.
   //
   // Escaping review leaves the candidate held by the Node's durable marker. Settings → Plugins can
   // resume the review after reconnect or restart; neither boot nor reload imports it meanwhile.
-  const dismiss = createDismissable({ onDismiss: () => { reset(); closePluginApproval() }, container: () => dialog })
+  const notNow = () => { reset(); closePluginApproval() }
 
+  // The request is the title, so nothing in the body repeats it. An `alertdialog`, so focus starts on
+  // the first footer button that does nothing irreversible: **Deny** or **Remove plugin**, never the
+  // download or the switch-on.
   return (
     <Show when={request()}>
       {(current) => (
-          <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>
-            <section
-              ref={(el) => {
-                dialog = el
-                queueMicrotask(() => el.focus())
-              }}
-              tabindex="-1"
-              class="overlay plugin-trust-dialog"
-              role="alertdialog"
-              aria-modal="true"
-              aria-labelledby="plugin-approval-title"
-              onClick={dismiss.onContainerClick}
-              onKeyDown={dismiss.onKeyDown}
+        <Modal
+          title={screen() === 'ask' ? describePluginRequest(current()) : 'Check what it asks for'}
+          role="alertdialog"
+          onDismiss={notNow}
+        >
+          <Modal.Body>
+            <p class="plugin-trust-meta">
+              <Badge size="xs"><Icon name="monitor" /> on {nodeLabel()}</Badge>
+              <Show when={current().dev}><Badge size="xs" tone="warn">development mode</Badge></Show>
+            </p>
+
+            <Show when={error()}><Alert>{error()}</Alert></Show>
+
+            <Show when={screen() === 'ask'}>
+              {/* The agent's own sentence. Interpolated as text — it is written by a model that may be
+                  reading hostile content, and it is capped by the tool's input schema. It explains the
+                  request; it is not evidence for it. */}
+              <Show when={current().reason}>
+                {(reason) => (
+                  <blockquote class="plugin-trust-intro">
+                    <span class="muted">The agent says:</span> {reason()}
+                  </blockquote>
+                )}
+              </Show>
+              <p class="muted plugin-trust-intro">
+                Nothing is downloaded yet. If you allow it, acorn downloads the plugin without running it,
+                then shows you what it asks for.
+              </p>
+              <Show when={current().dev}>
+                <p class="muted plugin-trust-intro">
+                  In development mode, new versions from {nodeLabel()} install without asking, so the agent
+                  can edit and reload the plugin. Each version still gets only what it asks for. You can turn
+                  this off in Settings, under Plugins.
+                </p>
+              </Show>
+            </Show>
+
+            <Show when={screen() === 'review'}>
+              <p class="muted plugin-trust-intro">
+                <code>{landed()?.pluginId}</code> {landed()?.version} is downloaded and hasn’t run. Here’s
+                what it asks for.
+              </p>
+              <SectionHeader
+                level="sub"
+                help="acorn blocks anything not on this list. It can’t check what the plugin does with what it’s allowed."
+              >
+                What it asks for
+              </SectionHeader>
+              <ul class="plugin-trust-permissions" data-tier="declared">
+                <For each={declared()} fallback={<li><Icon name="circle" /><span>It declares nothing at all.</span></li>}>
+                  {(line) => (
+                    <li classList={{ high: line.high }}>
+                      <Icon name={line.icon} />
+                      <span>{line.text}</span>
+                    </li>
+                  )}
+                </For>
+              </ul>
+            </Show>
+          </Modal.Body>
+          <Modal.Actions>
+            <Show
+              when={screen() === 'review'}
+              fallback={
+                <>
+                  <Button variant="ghost" disabled={busy()} onPress={() => void deny()}>
+                    Deny
+                  </Button>
+                  <Button variant="solid" disabled={busy()} onPress={() => void approve()}>
+                    {busy() ? 'Working…' : current().action === 'uninstall' ? 'Remove plugin' : 'Download'}
+                  </Button>
+                </>
+              }
             >
-              <div class="overlay-title">{screen() === 'ask' ? 'An agent wants to change acorn' : 'Review what it declares'}</div>
-              <div class="overlay-body plugin-trust-body">
-                <header class="plugin-trust-identity">
-                  <span class="plugin-trust-glyph" aria-hidden="true"><Icon name="puzzle" /></span>
-                  <div>
-                    <h2 id="plugin-approval-title">{describePluginRequest(current())}</h2>
-                    <p class="plugin-trust-meta">
-                      <Badge size="xs"><Icon name="monitor" /> on {nodeLabel()}</Badge>
-                      <Show when={current().dev}><Badge size="xs" tone="warn">development mode</Badge></Show>
-                    </p>
-                  </div>
-                </header>
-
-                <Show when={error()}><Alert>{error()}</Alert></Show>
-
-                <Show when={screen() === 'ask'}>
-                  {/* The agent's own sentence. Interpolated as text — it is written by a model that may be
-                      reading hostile content, and it is capped by the tool's input schema. It explains the
-                      request; it is not evidence for it. */}
-                  <Show when={current().reason}>
-                    {(reason) => (
-                      <blockquote class="plugin-trust-intro">
-                        <span class="muted">The agent says:</span> {reason()}
-                      </blockquote>
-                    )}
-                  </Show>
-                  <p class="muted plugin-trust-intro">
-                    Nothing has been downloaded. acorn can’t show you what this package declares until it has
-                    it — approving fetches and unpacks it, runs none of it, and then shows you exactly what it
-                    asks for before anything starts.
-                  </p>
-                  <Show when={current().dev}>
-                    <p class="muted plugin-trust-intro">
-                      <strong>Development mode</strong> means later versions of this plugin from{' '}
-                      {nodeLabel()} are trusted on this device without asking again, so the agent can edit and
-                      reload it without asking again. Each version still runs in its own permission-scoped
-                      realm. End it from Settings → Plugins whenever you like.
-                    </p>
-                  </Show>
-                </Show>
-
-                <Show when={screen() === 'review'}>
-                  <p class="muted plugin-trust-intro">
-                    <code>{landed()?.pluginId}</code> {landed()?.version} is on {nodeLabel()}’s disk and none of it
-                    has run. This is what it says it touches.
-                  </p>
-                  <ul class="plugin-trust-permissions" data-tier="declared">
-                    <For each={declared()} fallback={<li><Icon name="circle" /><span>It declares nothing at all.</span></li>}>
-                      {(line) => (
-                        <li classList={{ high: line.high }}>
-                          <Icon name={line.icon} />
-                          <span>{line.text}</span>
-                        </li>
-                      )}
-                    </For>
-                  </ul>
-                  <p class="muted plugin-trust-legend">
-                    Its server code runs in a permission-scoped realm. Acorn enforces the listed host,
-                    filesystem, process, and context grants; it cannot verify what the plugin intends to do with them.
-                  </p>
-                </Show>
-              </div>
-              <div class="ui-modal-actions plugin-trust-actions">
-                <Show
-                  when={screen() === 'review'}
-                  fallback={
-                    <>
-                      <Button variant="ghost" disabled={busy()} onPress={() => void deny()}>
-                        Deny
-                      </Button>
-                      <Button disabled={busy()} onPress={() => void approve()}>
-                        {busy() ? 'Working…' : current().action === 'uninstall' ? 'Remove it' : 'Fetch it'}
-                      </Button>
-                    </>
-                  }
-                >
-                  <Button variant="ghost" tone="danger" disabled={busy()} onPress={() => void removeIt()}>
-                    Remove it
-                  </Button>
-                  <Button disabled={busy()} onPress={() => void enableIt()}>
-                    {busy() ? 'Working…' : current().dev ? 'Trust and develop' : 'Keep it'}
-                  </Button>
-                </Show>
-              </div>
-            </section>
-          </div>
+              <Button variant="ghost" tone="danger" disabled={busy()} onPress={() => void removeIt()}>
+                Remove plugin
+              </Button>
+              <ToolbarSpacer />
+              <Button variant="solid" disabled={busy()} onPress={() => void enableIt()}>
+                {busy() ? 'Working…' : current().dev ? 'Turn on in development mode' : 'Turn on'}
+              </Button>
+            </Show>
+          </Modal.Actions>
+        </Modal>
       )}
     </Show>
   )

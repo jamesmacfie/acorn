@@ -3,6 +3,7 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { CORE_EXCLUSIVE_SLOTS } from '@acorn/protocol/extensionPoints.ts'
 import { integrationsOptions, prefsOptions } from '../../../infra/queries'
 import { PrefKeys } from '../../../infra/persistence/prefKeys'
+import { pluginLabel } from '../../../host/plugins/pluginLabel'
 import {
   CORE_SLOT_PROVIDER, exclusiveSlotChoices, exclusiveSlotFailed, exclusiveSlotOffers, withExclusiveSlotChoice, type CoreExclusiveSlot,
 } from '../../../host/registries/extensionPoints/exclusiveSlots'
@@ -48,7 +49,7 @@ function RailSources() {
     return save
   }
   const description = (source: PluginRailSource) => [
-    `From the ${source.pluginId} plugin.`,
+    `From the ${pluginLabel(source.pluginId)} plugin.`,
     source.showInRailByDefault === false ? 'Hidden until you show it.' : '',
     available().has(source.id)
       ? 'The command palette opens it either way.'
@@ -112,7 +113,7 @@ function ReplacedSurfaces() {
                   { value: CORE_SLOT_PROVIDER, label: "acorn's own" },
                   ...row.offers.map((offer) => ({
                     value: offer.pluginId,
-                    label: `${offer.label} (${offer.pluginId})${!offer.placesNestedSlot && row.slot === 'rail' ? ' — hides the task list' : ''}${!offer.placesNestedSlot && row.slot === 'topbar' ? ' — hides plugin status items' : ''}`,
+                    label: `${offer.label} (${pluginLabel(offer.pluginId)})${!offer.placesNestedSlot && row.slot === 'rail' ? ' — hides the task list' : ''}${!offer.placesNestedSlot && row.slot === 'topbar' ? ' — hides plugin status items' : ''}`,
                   })),
                 ]}
                 onChange={(value) => void pick(row.slot, value)}

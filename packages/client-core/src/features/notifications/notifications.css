@@ -20,23 +20,21 @@
 /* Carries `[role='dialog']` to outrank the padding the kit gives a dialog surface, which this inbox
    does not want: a row's hover band has to reach both edges. Specificity, not source order. */
 .ui-popover[role='dialog']:has(> .notify-inbox) { padding: 0; }
-.notify-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: var(--space-3) var(--space-5);
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-  border-bottom: var(--chrome-divider);
-}
 .notify-list { list-style: none; margin: 0; padding: 0; max-height: 50vh; overflow-y: auto; }
-.notify-empty { padding: var(--space-6); font-size: var(--fs-sm); }
+/* The surface has no padding here (above), so the group headers take the rows' inset themselves. */
+.ui-popover[role='dialog'] .notify-inbox > .section-header[data-level='group'] {
+  padding: var(--space-5) var(--pane-pad) var(--space-2);
+}
+/* Two lines: the title with its time at the end, then the detail. On one line a long title pushed
+   the time out of the panel. */
 .notify-row {
   width: 100%;
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
   align-items: baseline;
-  gap: var(--space-4);
-  padding: var(--space-3) var(--space-5);
+  column-gap: var(--space-4);
+  row-gap: var(--space-1);
+  padding: var(--space-3) var(--pane-pad);
   font: inherit;
   font-size: var(--fs-sm);
   text-align: left;
@@ -50,10 +48,12 @@
 .notify-row.unread { color: var(--text); }
 .notify-glyph { flex: none; font-family: var(--font-glyph); }
 .notify-warn { color: var(--warn); }
-.notify-title { flex: none; }
-.notify-detail { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.notify-time { flex: none; margin-left: auto; }
+.notify-line { display: flex; align-items: baseline; gap: var(--space-4); min-width: 0; }
+.notify-title { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.notify-detail { grid-column: 2; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.notify-time { flex: none; }
 .notify-node {
+  flex: none;
   font-size: var(--fs-xs);
   white-space: nowrap;
 }

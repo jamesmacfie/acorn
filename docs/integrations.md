@@ -348,8 +348,8 @@ search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
 
 | Command | Route | Rows |
 | --- | --- | --- |
-| Linear: find an issue | `/v1/p/linear/palette/issues` | active issues in the Linear projects the routed project's workspace links |
-| Rollbar: find an item | `/v1/p/rollbar/palette/issues` | active items in the connections the routed project's workspace maps |
+| Find a Linear issue | `/v1/p/linear/palette/issues` | active issues in the Linear projects the routed project's workspace links |
+| Find a Rollbar item | `/v1/p/rollbar/palette/issues` | active items in the connections the routed project's workspace maps |
 
 Each route is given two things and nothing else: `projectId`, the project the palette session
 captured, and `q`, the typed text. Neither the manifest nor a previous answer writes either one.

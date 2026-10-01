@@ -6,13 +6,17 @@ import type { Space } from '../../tokens/tokens'
 
    Not Toolbar, which is a bar with a role and a border; this is grouping and nothing else.
 
+   `even` gives every child an equal share of the row, for a row of choices or fields that should
+   match. A child narrower than about 12rem wraps to a new line, so a narrow window stacks them.
+
    At 80×24: children on one line separated by a space, wrapping to a Stack when too wide. */
-export function Inline(props: { gap?: Space; wrap?: boolean; spread?: boolean; children: JSX.Element }) {
+export function Inline(props: { gap?: Space; wrap?: boolean; spread?: boolean; even?: boolean; children: JSX.Element }) {
   return (
     <div
       class="ui-inline"
       data-wrap={props.wrap ? '' : undefined}
       data-spread={props.spread ? '' : undefined}
+      data-even={props.even ? '' : undefined}
       style={{ '--kit-gap': roleVar('space', props.gap ?? 'inline') }}
     >
       {props.children}

@@ -9,6 +9,13 @@
   overflow-y: hidden;
 }
 .ui-tab-scroll > * { flex-shrink: 0; }
+/* macOS hides the scrollbar, so a strip that runs past its edge fades that edge instead. The tab
+   component sets `data-overflow` from the strip's scroll position. */
+.ui-tab-scroll[data-overflow='end'] { mask-image: linear-gradient(to right, black calc(100% - var(--space-10)), transparent); }
+.ui-tab-scroll[data-overflow='start'] { mask-image: linear-gradient(to left, black calc(100% - var(--space-10)), transparent); }
+.ui-tab-scroll[data-overflow='both'] {
+  mask-image: linear-gradient(to right, transparent, black var(--space-10), black calc(100% - var(--space-10)), transparent);
+}
 
 /* Reusable content-tab strip (kit/components/layout/Tabs.tsx). */
 .ui-tabs {
@@ -18,7 +25,8 @@
   min-width: 0;
   max-width: 100%;
   min-height: var(--tab-strip-h);
-  padding: 0 var(--pane-pad);
+  /* Less the tab's own pad, so the first label starts on the pane pad like every other bar's text. */
+  padding: 0 calc(var(--pane-pad) - var(--space-6));
   border-bottom: var(--chrome-divider);
   background: var(--bg-subtle);
 }
@@ -44,16 +52,12 @@
   white-space: nowrap;
 }
 .active.ui-tab { color: var(--text); border-bottom-color: var(--accent); }
+/* A list column is too narrow for the minimum: four tabs at 88 needed 380 of Docker's 300. */
+:is(.ui-listdetail-list, .layout-region-list) .ui-tab { min-width: 0; }
 .ui-tab:active { background: var(--bg-selected); }
-.ui-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
-.ui-tab-count {
-  padding: 1px 5px;
-  font-family: var(--font-ui);
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
-  background: var(--bg-selected);
-  border-radius: var(--radius-pill);
-}
+.ui-tab:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: -3px; }
+/* A plain faint number, the same as a section header's count, rather than a fourth kind of pill. */
+.ui-tab-count { color: var(--text-faint); font-variant-numeric: var(--tabular); }
 @media (hover: hover) {
   .ui-tab:hover { color: var(--text); background: var(--bg-hover); }
 }
@@ -65,3 +69,6 @@
 .ui-tabs-actions { flex: none; display: flex; align-items: center; gap: var(--space-2); padding-left: var(--space-2); }
 .ui-tab-panel { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: auto; }
 .ui-tab-panel[hidden] { display: none; }
+/* A panel that is a split drops the inline pad a padded region hands it, so the split's divider reaches
+   the region's edge. Rollbar's Occurrences tab is the case. */
+.ui-tab-panel:has(> .ui-listdetail) { padding-inline: 0; }

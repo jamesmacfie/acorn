@@ -1,6 +1,7 @@
 import { ErrorBoundary, type JSX } from 'solid-js'
 import { reportContributionError } from '../../lib/telemetry/contributionErrors'
 import { Button } from '../inputs/Button'
+import { EmptyState } from './EmptyState'
 
 export function ContributionBoundary(props: { contributionId: string; owner?: string; children: JSX.Element; quiet?: boolean }) {
   return (
@@ -12,10 +13,13 @@ export function ContributionBoundary(props: { contributionId: string; owner?: st
         reportContributionError({ contributionId: props.contributionId, owner: props.owner, error })
         return props.quiet ? null : (
           <section class="pane contribution-failed" role="status">
-            <strong>Contribution failed</strong>
-            <span class="muted">{props.contributionId}</span>
-            <Button onPress={reset}>Try again</Button>
-            <span class="sr-only">{error instanceof Error ? error.message : String(error)}</span>
+            {/* Host-neutral words: this boundary wraps settings pages and UI slots as well as panes.
+                The id stays for a screen reader and in telemetry, where it helps; on screen it
+                meant nothing to the person looking at it. */}
+            <EmptyState title="This view stopped working" action={<Button onPress={reset}>Try again</Button>}>
+              Something went wrong while drawing it.
+            </EmptyState>
+            <span class="sr-only">{props.contributionId}: {error instanceof Error ? error.message : String(error)}</span>
           </section>
         )
       }}

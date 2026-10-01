@@ -43,8 +43,8 @@ export function AgentCommands() {
       {
         id: 'agents.settings.follow-last-session',
         kind: 'setting',
-        title: 'Carry the last session’s model forward',
-        hint: 'a model or effort switch becomes what the next session starts with',
+        title: 'Start new sessions with my last model',
+        hint: 'uses the model and effort you last picked',
         category: 'action',
         palette: true,
         scope: 'none',
@@ -66,8 +66,8 @@ export function AgentCommands() {
       {
         id: 'agents.settings.tool-cards',
         kind: 'setting',
-        title: 'How a tool call starts out',
-        hint: 'the disclosure on every tool card in a transcript',
+        title: 'Tool call display',
+        hint: 'open or closed in transcripts',
         category: 'action',
         palette: true,
         scope: 'none',

@@ -19,7 +19,7 @@ export const agentPaneContribution: PaneLayoutContribution<AgentPaneModel> = {
   id: AGENT_PANE_ID,
   label: 'Agent',
   glyph: 'bot',
-  description: 'Managed Claude Code and Codex sessions',
+  description: 'Agent sessions for this task',
   order: 15,
   defaultChord: 'meta+shift+a',
   requires: { plugin: 'agents' },

@@ -39,6 +39,20 @@ describe('the remote root', () => {
     expect(op.node.children[0]!.props).toEqual({ tone: 'ok' })
   })
 
+  it('sends a number in a text run as its digits', async () => {
+    // Solid's universal renderer passes `{200}` in a list of children through as a number, and the
+    // wire carries text runs as strings.
+    const { root, ops } = collect()
+    const run = createText(200)
+    insertNode(root.node, run, null)
+    setText(run, 404)
+    await flush()
+    const [insert, text] = ops()
+    if (insert?.op !== 'insert') throw new Error('unreachable')
+    expect(insert.node.props).toEqual({ value: '200' })
+    expect(text).toMatchObject({ op: 'text', value: '404' })
+  })
+
   it('coalesces a synchronous run into one batch, and starts a new one after it', async () => {
     const { root, batches } = collect()
     const a = createNode('Row')

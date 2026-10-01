@@ -4,6 +4,7 @@ import { createDomCollection } from '../../keys/collection'
 import { restoreFocusOnCleanup, trapTab } from '../../keys/trap'
 import { createAnchoredPopover, type AnchoredPopover, type Placement } from '../../lib/controls/anchor'
 import { createArmedConfirm } from '../../lib/controls/confirm'
+import Icon from '../content/Icon'
 
 // A dropdown menu: Popover plus menu semantics. See docs/ui-design.md § Menus and right-click for
 // why this replaced four earlier implementations and how ContextMenu below reuses the same surface.
@@ -133,13 +134,20 @@ export function ContextMenu(props: {
  *  reads `Discard?`, and only the second press calls `onSelect`. It belongs here rather than at the
  *  call site because a `ConfirmButton` dropped into a menu is a button among menu items — a different
  *  height, and no `.ui-menu-item` for the roving focus to land on, so the arrows walk straight past
- *  it. */
+ *  it.
+ *
+ *  `kind` makes the item a choice: `radio` for one of a set, `checkbox` for an on-off setting.
+ *  `checked` says whether it is chosen. The item draws a check mark before its label, or a blank of
+ *  the same width, so the labels line up. A checkbox item leaves the menu open, so several can be
+ *  flipped in one visit. */
 Menu.Item = (props: {
   context: MenuContext
   onSelect: () => void
   disabled?: boolean
-  /** Default true. */
+  /** Default true, and false for a `checkbox` item. */
   closeOnSelect?: boolean
+  kind?: 'radio' | 'checkbox'
+  checked?: boolean
   /** Arm to confirm: the label the item wears between the first press and the second. */
   confirm?: string
   tone?: 'neutral' | 'danger'
@@ -156,11 +164,12 @@ Menu.Item = (props: {
       type="button"
       ref={(el) => props.context.register(el)}
       class="ui-menu-item"
-      role="menuitem"
+      role={props.kind === 'radio' ? 'menuitemradio' : props.kind === 'checkbox' ? 'menuitemcheckbox' : 'menuitem'}
+      aria-checked={props.kind ? !!props.checked : undefined}
       data-tone={isArmed() ? 'danger' : props.tone ?? 'neutral'}
       data-armed={isArmed() ? '' : undefined}
       disabled={props.disabled}
-      title={props.title}
+      data-tip={props.title}
       onKeyDown={(event) => {
         if (event.key !== 'Escape' || !isArmed()) return
         // The menu's own Escape would close the surface. An armed item takes the first one.
@@ -171,10 +180,13 @@ Menu.Item = (props: {
       onClick={() => {
         // Arming leaves the menu open, or the prompt would close under the press that raised it.
         if (props.confirm && !armed.request('confirm')) return
-        if (props.closeOnSelect !== false) props.context.close()
+        if (props.closeOnSelect ?? props.kind !== 'checkbox') props.context.close()
         props.onSelect()
       }}
     >
+      <Show when={props.kind}>
+        <span class="ui-menu-check" aria-hidden="true"><Show when={props.checked}><Icon name="check" /></Show></span>
+      </Show>
       <Show when={props.leading}><span class="ui-menu-leading">{props.leading}</span></Show>
       <span class="ui-menu-label">{isArmed() ? props.confirm : props.children}</span>
       <Show when={props.trailing}><span class="ui-menu-trailing">{props.trailing}</span></Show>

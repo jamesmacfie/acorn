@@ -113,7 +113,7 @@ describe('the bar itself', () => {
     expect(host.textContent).toContain('james/thing')
     // Moved down from the header in this phase. The path is the title, because it is too long to
     // draw beside a branch name.
-    expect(host.querySelector('.copy-btn')?.getAttribute('title')).toBe('Copy the project folder: /src/widget')
+    expect(host.querySelector<HTMLElement>('.copy-btn')?.dataset.tip).toBe('Copy the project folder: /src/widget')
   })
 
   it('says so rather than drawing a blank branch on a detached HEAD', () => {

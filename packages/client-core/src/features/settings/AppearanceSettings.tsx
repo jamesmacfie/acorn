@@ -45,7 +45,7 @@ export default function AppearanceSettings() {
 
   return (
     <>
-      <SettingsSection id="style" label="Style" description="Shape, typography and density. Colour is the theme below.">
+      <SettingsSection id="style" label="Style" help="Style sets shapes, fonts, and spacing. Theme sets the colours.">
         <SettingRow
           label="Style"
           error={style.error()}
@@ -60,10 +60,10 @@ export default function AppearanceSettings() {
         </SettingRow>
       </SettingsSection>
       <SettingsSection id="theme" label="Theme">
-        <SettingRow label="Follow system light and dark" error={follow.error()}>
+        <SettingRow label="Match the system's light or dark mode" error={follow.error()}>
           <Checkbox
             switch
-            ariaLabel="Follow system light and dark"
+            ariaLabel="Match the system's light or dark mode"
             checked={themeFollowsSystem(prefs.data)}
             onChange={(checked) => follow.run(() => saveThemeFollowsSystem(qc, checked))}
           />

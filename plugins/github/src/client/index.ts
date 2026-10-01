@@ -60,7 +60,7 @@ export const githubClientPlugin: ClientPlugin = {
     ctx.projectImporters.register({ id: 'github', label: 'Import from GitHub', glyph: 'brand:github', component: GithubImporter })
     ctx.commands.register({
       id: 'source.github.open',
-      title: 'Go to GitHub in the left rail',
+      title: 'Open GitHub',
       category: 'navigation',
       palette: true,
       run: () => setSelectedSource('github'),
@@ -68,7 +68,7 @@ export const githubClientPlugin: ClientPlugin = {
     ctx.keybindings.register({
       id: 'source.github.open',
       command: 'source.github.open',
-      description: 'Go to GitHub in the left rail',
+      description: 'Open GitHub',
       category: 'Tasks',
       defaultChord: 'meta+0',
       when: 'global',

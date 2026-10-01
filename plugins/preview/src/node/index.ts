@@ -24,6 +24,7 @@ export const previewPlugin = (): NodePlugin => {
 
   return {
     name: 'preview',
+    label: 'Preview',
     emits: [
       { verb: 'url-changed', description: 'A task’s resolved preview home URL changed' },
     ],

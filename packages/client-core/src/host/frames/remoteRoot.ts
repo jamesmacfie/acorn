@@ -59,9 +59,14 @@ export const createNode = (type: string): RemoteNode => ({
   children: [],
 })
 
-export const createText = (value: string): RemoteNode => {
+// Solid's universal renderer hands a number in a list of children straight to `createTextNode`, so
+// `{status} {statusText}` arrives here as 200, " ", "OK". The wire carries text runs as strings, and
+// the host used to draw the 200 as nothing.
+const textOf = (value: string | number): string => (typeof value === 'number' ? String(value) : value)
+
+export const createText = (value: string | number): RemoteNode => {
   const node = createNode(TEXT_NODE)
-  node.props.value = value
+  node.props.value = textOf(value)
   return node
 }
 
@@ -159,9 +164,10 @@ export function setProperty(node: RemoteNode, name: string, value: unknown): voi
   root.push({ op: 'patch', id: node.id, props: { [name]: wire === undefined ? null : wire } })
 }
 
-export function setText(node: RemoteNode, value: string): void {
-  node.props.value = value
-  rootOf.get(node)?.push({ op: 'text', id: node.id, value })
+export function setText(node: RemoteNode, value: string | number): void {
+  const text = textOf(value)
+  node.props.value = text
+  rootOf.get(node)?.push({ op: 'text', id: node.id, value: text })
 }
 
 export function insertNode(parent: RemoteNode, node: RemoteNode, anchor?: RemoteNode | null): void {

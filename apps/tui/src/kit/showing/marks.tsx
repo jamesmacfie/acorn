@@ -14,6 +14,8 @@ export function Badge(props: {
   shape?: 'tag' | 'pill'
   size?: Extract<Size, 'xs' | 'sm'>
   dashed?: boolean
+  /** A hover tip: this host has no hover, so it draws nothing. */
+  tip?: string
   children: JSX.Element
 }) {
   return <Line tone={props.tone}>{`[${flatten(props.children)}]`}</Line>
@@ -65,6 +67,8 @@ export function StatusDot(props: {
   mixed?: boolean
   pulse?: boolean
   label?: string
+  /** A hover tip: this host has no hover, so it draws nothing. */
+  tip?: string
   size?: Extract<Size, 'sm' | 'md'>
 }) {
   return <Line tone={props.tone}>{props.mixed ? '◐' : props.tone === 'muted' ? '○' : '●'}</Line>

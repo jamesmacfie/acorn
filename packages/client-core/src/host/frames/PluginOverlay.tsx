@@ -2,7 +2,7 @@ import { Show } from 'solid-js'
 import PluginFrame from './PluginFrame'
 import type { FrameBinding } from './broker'
 import { closePluginOverlay, closePluginOverlayWith, pluginOverlayInvocation } from './overlays'
-import { Button } from '../../kit/components/primitives'
+import { IconButton } from '../../kit/components/inputs/IconButton'
 
 // The host's chrome around a plugin overlay: the full-screen picker slot, what the editor's ⌘P file
 // palette occupies as a compiled contribution (docs/plugins.md § Frame contribution kind).
@@ -36,8 +36,8 @@ export default function PluginOverlay(props: PluginOverlayProps) {
         <div class="overlay-backdrop" onClick={closePluginOverlay}>
           <div class="overlay plugin-overlay" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
             <header class="overlay-title plugin-overlay-head">
-              <span>{props.label}</span>
-              <Button variant="bare" onPress={closePluginOverlay} label="Close">✕</Button>
+              <span class="overlay-title-text">{props.label}</span>
+              <IconButton icon="x" label="Close" onPress={closePluginOverlay} />
             </header>
             <div class="plugin-overlay-body">
               <PluginFrame

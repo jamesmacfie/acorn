@@ -178,7 +178,7 @@ describe('running an agent from a terminal', () => {
       await openFirstSession(screen)
       await enterDetail(screen)
       // The visible label identifies the action without relying on a Lucide substitute.
-      await stopSaying(screen, '[Session actions]')
+      await stopSaying(screen, 'Session actions')
       await screen.press('RETURN')
       // `until`, not `frame`: the rows are built from the provider list, which is a resource the pane
       // is still fetching when the menu opens.

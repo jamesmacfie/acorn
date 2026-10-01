@@ -1,7 +1,7 @@
 import { createEffect, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
 import { CORE_STORAGE_POINT } from '@acorn/protocol/extensionPoints.ts'
 import type { NodeStorageReport } from '@acorn/protocol/api.ts'
-import { clearNodeCache, nodes, ORIGIN_NODE_ID, persistedCacheSize } from '../../infra/node/fleet'
+import { clearNodeCache, ORIGIN_NODE_ID, persistedCacheSize } from '../../infra/node/fleet'
 import { nodeStorageReport } from '../../infra/node/nodeStorage'
 import { extensionPointRegistry } from '../../host/registries/extensionPoints/extensionPoints'
 import { Slot } from '../../host/tree/Slot'
@@ -10,7 +10,8 @@ import { Facts } from '../../kit/components/content/Facts'
 import { Text } from '../../kit/components/content/Text'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import { Stack } from '../../kit/components/layout/Stack'
-import { Alert, Button } from '../../kit/components/primitives'
+import { Alert, Button, EmptyState } from '../../kit/components/primitives'
+import { pluginLabel } from '../../host/plugins/pluginLabel'
 
 // Settings > Storage and memory: what the node holds in memory and on disk, and what this device keeps
 // for it (docs/data-layer.md § What the node reports, docs/caching.md § Renderer query cache).
@@ -41,7 +42,6 @@ export default function StorageSettings(props: { nodeId: string | null }) {
   // The key the fleet keeps this node's cache under, the same one `activeCacheId` names for the
   // active node.
   const cacheId = () => nodeId() ?? ORIGIN_NODE_ID
-  const nodeLabel = () => nodes().find((node) => node.nodeId === nodeId())?.label ?? 'This node'
   const [report, setReport] = createSignal<NodeStorageReport | null>(null)
   const [saved, setSaved] = createSignal<SavedCache | undefined>(undefined)
   const [error, setError] = createSignal('')
@@ -83,7 +83,7 @@ export default function StorageSettings(props: { nodeId: string | null }) {
     setCleared('')
     try {
       await clearNodeCache(cacheId())
-      setCleared('Cleared. What is on screen is loading again.')
+      setCleared('Cleared.')
       await read()
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure))
@@ -92,20 +92,16 @@ export default function StorageSettings(props: { nodeId: string | null }) {
     }
   }
 
+  // "plugin" after the name, because the memory plugin's database would otherwise read "Memory", a
+  // line below Node process › Memory.
   const diskFacts = (value: NodeStorageReport) => [
     { label: 'Core database', value: formatBytes(value.coreDatabaseBytes) },
-    ...value.pluginDatabases.map((entry) => ({ label: `${entry.plugin} plugin`, value: formatBytes(entry.bytes) })),
+    ...value.pluginDatabases.map((entry) => ({ label: `${pluginLabel(entry.plugin)} plugin`, value: formatBytes(entry.bytes) })),
     { label: 'Blob cache', value: formatBytes(value.blobCacheBytes) },
   ]
 
   return (
     <Stack gap="section">
-      <Text emphasis="muted" wrap>
-        {nodeLabel()}: what the node holds in memory and on disk, and what this device keeps for it.
-        The numbers refresh every five seconds while this page is open. Memory is resident memory, so
-        treat it as an estimate.
-      </Text>
-
       <Show when={error()}>
         <Alert>{error()}</Alert>
       </Show>
@@ -113,27 +109,22 @@ export default function StorageSettings(props: { nodeId: string | null }) {
       <Slot point={CORE_STORAGE_POINT} props={() => ({ nodeId: nodeId() })} />
 
       <SettingsSection id="process" label="Node process">
-        <Show when={report()} fallback={<Text emphasis="muted">Loading</Text>}>
+        <Show when={report()} fallback={<EmptyState busy align="start" size="sm">Loading…</EmptyState>}>
           {(value) => <Facts grouping="rows" items={[{ label: 'Memory', value: `about ${formatBytes(value().rssBytes)}` }]} />}
         </Show>
       </SettingsSection>
 
-      <SettingsSection id="disk" label="Disk">
-        <Stack gap="row">
-          <Show when={report()} fallback={<Text emphasis="muted">Loading</Text>}>
-            {(value) => <Facts grouping="rows" items={diskFacts(value())} />}
-          </Show>
-          <Text emphasis="muted" wrap>
-            Each database includes its write-ahead log. Worktrees are not counted. Sizes are measured at
-            most every 30 seconds.
-          </Text>
-        </Stack>
+      <SettingsSection id="disk" label="Disk" help="Worktrees aren't counted. Sizes update every 30 seconds.">
+        <Show when={report()} fallback={<EmptyState busy align="start" size="sm">Loading…</EmptyState>}>
+          {(value) => <Facts grouping="rows" items={diskFacts(value())} />}
+        </Show>
       </SettingsSection>
 
       <SettingsSection
         id="cache"
         label="Saved cache on this device"
-        actions={<Button size="sm" busy={clearing()} onPress={() => void clear()}>Clear cache</Button>}
+        help="A copy of what this node last sent, so acorn opens without waiting for it. Clearing it makes acorn load everything again."
+        actions={<Button size="sm" busy={clearing()} onPress={() => void clear()}>Clear this node's copy</Button>}
       >
         <Stack gap="row">
           <Show when={saved() !== undefined}>
@@ -146,10 +137,6 @@ export default function StorageSettings(props: { nodeId: string | null }) {
               )}
             </Show>
           </Show>
-          <Text emphasis="muted" wrap>
-            Last-known data this device saves so the app opens without waiting for the node. Clearing it
-            drops that copy and fetches what is on screen again.
-          </Text>
           <Show when={cleared()}>
             <Text emphasis="muted" wrap>{cleared()}</Text>
           </Show>

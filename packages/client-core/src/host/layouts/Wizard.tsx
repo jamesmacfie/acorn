@@ -1,4 +1,4 @@
-import { For, Show } from 'solid-js'
+import { createEffect, For, on, onCleanup, onMount, Show } from 'solid-js'
 import { Button } from '../../kit/components/primitives'
 // Imported for `use:regionFocus` below: Solid compiles a directive to a bare reference, so the
 // import has to be here even though nothing calls it.
@@ -13,10 +13,32 @@ import type { LayoutProps } from './regions'
 // branches are its own: onboarding's GitHub screen is a detour that shares a position with the screen
 // after it. The host owns the chrome, which is the part every wizard drew twice.
 //
+// The footer holds every action, so a step's body is content only: skip at the start, then Back and
+// Next at the end, and the finish action in Next's place on the last step. It has the modal
+// footer's padding and divider.
+//
+// The body takes focus on open and on every step change, so a screen reader reads the new step.
+// It also takes it back whenever a change inside it drops focus to the page, because the button
+// pressed there has just unmounted. Before this a keyboard user started again from the top. The
+// second watch covers a detour that shares its step's place, such as onboarding's GitHub screen.
+//
 // Narrow and terminal: unchanged.
 export function Wizard(props: LayoutProps) {
   const steps = () => props.steps ?? []
   const at = () => steps().findIndex((step) => step.id === props.current)
+  const last = () => at() === steps().length - 1
+  let body: HTMLDivElement | undefined
+  const reclaim = () => {
+    const active = document.activeElement
+    if (!active || active === document.body) body?.focus({ preventScroll: true })
+  }
+  createEffect(on(() => props.current, () => body?.focus({ preventScroll: true }), { defer: true }))
+  onMount(() => {
+    body?.focus({ preventScroll: true })
+    const watch = new MutationObserver(reclaim)
+    if (body) watch.observe(body, { childList: true, subtree: true })
+    onCleanup(() => watch.disconnect())
+  })
 
   const step = (offset: number) => {
     const next = steps()[at() + offset]
@@ -34,13 +56,29 @@ export function Wizard(props: LayoutProps) {
           >{entry.label}</li>
         )}</For>
       </ol>
-      <div class="layout-wizard-body" use:regionFocus={{ paneId: props.stateKey, regionId: 'step' }}>{props.regions.step?.()}</div>
+      <div
+        ref={body}
+        class="layout-wizard-body"
+        tabindex="-1"
+        use:regionFocus={{ paneId: props.stateKey, regionId: 'step' }}
+      >{props.regions.step?.()}</div>
       <div class="layout-wizard-actions">
-        <Show when={at() > 0}>
-          <Button variant="bare" onPress={() => step(-1)}>Back</Button>
+        <Show when={props.onSkip && !last()}>
+          <Button variant="ghost" tip={props.skipTip} onPress={() => props.onSkip?.()}>{props.skipLabel ?? 'Skip'}</Button>
         </Show>
-        <Show when={at() >= 0 && at() < steps().length - 1}>
-          <Button tone="accent" disabled={props.canAdvance === false} onPress={() => step(1)}>Next</Button>
+        <span class="layout-wizard-spacer" />
+        <Show when={at() > 0}>
+          <Button variant="ghost" onPress={() => step(-1)}>Back</Button>
+        </Show>
+        <Show when={at() >= 0 && !last()}>
+          <Button variant="solid" tone="accent" disabled={props.canAdvance === false} onPress={() => step(1)}>
+            {props.nextLabel ?? 'Next'}
+          </Button>
+        </Show>
+        <Show when={last() && props.onFinish}>
+          <Button variant="solid" tone="accent" disabled={props.canAdvance === false} onPress={() => props.onFinish?.()}>
+            {props.finishLabel ?? 'Finish'}
+          </Button>
         </Show>
       </div>
     </div>

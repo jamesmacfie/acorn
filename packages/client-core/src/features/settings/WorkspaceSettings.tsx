@@ -12,7 +12,7 @@ import {
 } from '../../host/registries/shell/settings'
 import { ContributionBoundary } from '../../kit/components/content/ContributionBoundary'
 import { PluginStrip } from './plugins/PluginStrip'
-import { Button, Input } from '../../kit/components/primitives'
+import { Button, EmptyState, Input } from '../../kit/components/primitives'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import { Stack } from '../../kit/components/layout/Stack'
@@ -109,7 +109,7 @@ function General(props: { workspace: Workspace; context: SettingsPageContext }) 
       // What the node's delete route does: projects move to Default, and only the workspace row and
       // its tracker-project links are removed.
       stays: 'Its projects and their tasks move back to Default. Nothing on disk is removed.',
-      concerns: [{ id: `workspace:${props.workspace.id}`, feature: 'Workspaces', message: 'The workspace and the tracker projects it follows are removed', severity: 'danger' }],
+      concerns: [{ id: `workspace:${props.workspace.id}`, feature: 'Workspaces', message: 'The workspace and its links to tracker projects are deleted.', severity: 'danger' }],
     })
     if (!confirmed) return
     setBusy(true)
@@ -125,7 +125,7 @@ function General(props: { workspace: Workspace; context: SettingsPageContext }) 
 
   return (
     <>
-      <SettingsSection id="general" label="Workspace">
+      <SettingsSection id="general" label="General">
         <SettingRow
           label="Name"
           description={props.workspace.isDefault ? "The Default workspace can't be renamed." : undefined}
@@ -142,8 +142,8 @@ function General(props: { workspace: Workspace; context: SettingsPageContext }) 
         </SettingRow>
       </SettingsSection>
 
-      <SettingsSection id="projects" label="Projects" description="Open a project for its scripts, preview, database and connections.">
-        <Show when={members().length} fallback={projects.data ? <span class="muted settings-hint">No projects in this workspace. Move one here from Overview.</span> : undefined}>
+      <SettingsSection id="projects" label="Projects" help="Open a project to set its scripts, preview, database, and connections.">
+        <Show when={members().length} fallback={projects.data ? <EmptyState align="start" size="sm">This workspace has no projects. Move one here from Overview.</EmptyState> : undefined}>
           <ProjectTable
             groups={[{ id: props.workspace.id, label: props.workspace.name, workspaceId: props.workspace.id, projects: members() }]}
             workspaces={workspaces.data ?? []}

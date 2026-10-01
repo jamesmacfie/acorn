@@ -23,8 +23,15 @@ export function IconButton(props: Omit<ButtonProps, 'children' | 'iconOnly' | 'l
   spin?: boolean
 }) {
   const [own, rest] = splitProps(props, ['icon', 'spin'])
+  // A mark says nothing on its own, so a button with no tip of its own shows its label on hover.
   return (
-    <Button {...rest} iconOnly variant={rest.variant ?? 'bare'} size={rest.size ?? 'sm'}>
+    <Button
+      {...rest}
+      tip={rest.tip ?? (rest.title ? undefined : rest.label)}
+      iconOnly
+      variant={rest.variant ?? 'bare'}
+      size={rest.size ?? 'sm'}
+    >
       <Icon name={own.icon} spin={own.spin} />
     </Button>
   )

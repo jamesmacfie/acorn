@@ -1,5 +1,5 @@
 import { createSignal, Show, type JSX } from 'solid-js'
-import { Button } from '../inputs/Button'
+import { IconButton } from '../inputs/IconButton'
 
 /* CodeBlock: the mono sunken block. Syntax highlighting stays out; callers that highlight pass
    tokenized children. A code textarea is `Textarea mono` instead. Logs that stream keep their own
@@ -36,9 +36,8 @@ export function CodeBlock(props: {
 function CopyButtonSlot(props: { text: () => string; onCopy?: (text: string) => void }) {
   const [done, setDone] = createSignal(false)
   return (
-    <Button
-      variant="bare"
-      size="sm"
+    <IconButton
+      icon={done() ? 'check' : 'copy'}
       label={done() ? 'Copied' : 'Copy'}
       onPress={() => {
         const text = props.text()
@@ -47,8 +46,6 @@ function CopyButtonSlot(props: { text: () => string; onCopy?: (text: string) => 
         setDone(true)
         setTimeout(() => setDone(false), 1200)
       }}
-    >
-      {done() ? '✓' : '⧉'}
-    </Button>
+    />
   )
 }

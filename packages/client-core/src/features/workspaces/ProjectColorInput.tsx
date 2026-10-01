@@ -1,7 +1,7 @@
 import { Show } from 'solid-js'
 import { PROJECT_COLORS, resolveProjectColor } from '@acorn/protocol/projectColor.ts'
 import { IconButton } from '../../kit/components/inputs/IconButton'
-import './onboarding.css'
+import './projects.css'
 
 /** Named presets for a colour list, in the order `PROJECT_COLORS` holds them. */
 export const PROJECT_COLOR_OPTIONS = Object.keys(PROJECT_COLORS).map((key) => ({
@@ -9,7 +9,7 @@ export const PROJECT_COLOR_OPTIONS = Object.keys(PROJECT_COLORS).map((key) => ({
   label: key[0]!.toUpperCase() + key.slice(1),
 }))
 
-// A project's task tab colour: the native colour well, which is the one control that offers any colour,
+// A project's rail colour: the native colour well, which is the one control that offers any colour,
 // and a clear button beside it once one is set. The kit has no colour node, and this is not a text
 // entry, so it stays a raw input here rather than an Input wearing a colour type.
 export function ProjectColorInput(props: {
@@ -26,8 +26,8 @@ export function ProjectColorInput(props: {
         class="ws-project-color"
         classList={{ 'ws-project-color-empty': !props.color }}
         type="color"
-        aria-label={`Task tab colour for ${props.name}`}
-        title={props.color ? 'Change task tab colour' : 'Choose a task tab colour'}
+        aria-label={`Rail colour for ${props.name}`}
+        data-tip={props.color ? 'Change rail colour' : 'Choose a rail colour'}
         value={resolveProjectColor(props.color) ?? PROJECT_COLORS.gray}
         disabled={props.disabled}
         onChange={(event) => {
@@ -39,8 +39,8 @@ export function ProjectColorInput(props: {
       <Show when={props.color}>
         <IconButton
           icon="x"
-          label={`Clear task tab colour for ${props.name}`}
-          title="Clear task tab colour"
+          label={`Clear rail colour for ${props.name}`}
+          title="Clear rail colour"
           disabled={props.disabled}
           onPress={() => props.onChange(null)}
         />

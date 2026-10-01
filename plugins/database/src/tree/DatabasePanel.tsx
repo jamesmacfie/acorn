@@ -509,7 +509,7 @@ function RowDetail(props: {
             {/* RowDetail stays mounted when selection changes. Remount the armed control with its
                 row so a second press cannot delete a different row. */}
             <Show when={props.row} keyed>
-              <ConfirmButton tone="danger" disabled={props.busy} confirmLabel="Confirm delete" onConfirm={() => void props.onDelete?.()}>
+              <ConfirmButton tone="danger" disabled={props.busy} confirmLabel="Delete row?" onConfirm={() => void props.onDelete?.()}>
                 Delete
               </ConfirmButton>
             </Show>

@@ -64,3 +64,39 @@ it('scrolls the active tab within one row while keeping trailing actions visible
     Element.prototype.scrollIntoView = previous
   }
 })
+
+// jsdom lays nothing out, so the strip's widths are stubbed. The attribute is what tabs.css fades on.
+it('marks the edge of the strip that hides tabs', async () => {
+  const host = document.createElement('div')
+  document.body.append(host)
+  const dispose = render(() => (
+    <Tabs
+      tabs={[{ id: 'one', label: 'One' }, { id: 'two', label: 'Two' }]}
+      active="one"
+      onChange={() => {}}
+      idPrefix="overflow"
+      ariaLabel="Sections"
+    />
+  ), host)
+  try {
+    const strip = host.querySelector<HTMLElement>('.ui-tab-scroll')!
+    Object.defineProperty(strip, 'scrollWidth', { configurable: true, value: 300 })
+    Object.defineProperty(strip, 'clientWidth', { configurable: true, value: 100 })
+    const scrollTo = (left: number) => {
+      strip.scrollLeft = left
+      strip.dispatchEvent(new Event('scroll'))
+    }
+    scrollTo(0)
+    expect(strip.dataset.overflow).toBe('end')
+    scrollTo(100)
+    expect(strip.dataset.overflow).toBe('both')
+    scrollTo(200)
+    expect(strip.dataset.overflow).toBe('start')
+    Object.defineProperty(strip, 'scrollWidth', { configurable: true, value: 100 })
+    scrollTo(0)
+    expect(strip.dataset.overflow).toBeUndefined()
+  } finally {
+    dispose()
+    host.remove()
+  }
+})

@@ -296,12 +296,12 @@ describe('the grouping', () => {
 })
 
 /** The view menu's items, which the kit portals to the document rather than into the header. The
- *  chosen one is the one whose mark is titled, since `Menu.Item` has no checked state to read. */
+ *  chosen one is the radio item whose `aria-checked` is true. */
 const openViewMenu = () => {
   host.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]')!.click()
   return [...document.querySelectorAll<HTMLElement>('.ui-menu-item')].map((item) => ({
     label: item.querySelector('.ui-menu-label')?.textContent ?? '',
-    chosen: !!item.querySelector('.ui-menu-leading [role="img"]'),
+    chosen: item.getAttribute('role') === 'menuitemradio' && item.getAttribute('aria-checked') === 'true',
     press: () => item.click(),
   }))
 }
@@ -349,7 +349,7 @@ const commitOptions = () => {
   trigger.click()
   return [...document.querySelectorAll<HTMLElement>('.ui-menu-item')].map((item) => ({
     label: item.querySelector('.ui-menu-label')?.textContent ?? '',
-    on: !!item.querySelector('.ui-menu-leading [role="img"]'),
+    on: item.getAttribute('role') === 'menuitemcheckbox' && item.getAttribute('aria-checked') === 'true',
     press: () => item.click(),
   }))
 }

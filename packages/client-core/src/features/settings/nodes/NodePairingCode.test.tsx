@@ -8,7 +8,7 @@ vi.mock('../../../infra/node/fleetActions', () => ({
   closeNodePairingWindow: pairing.close,
 }))
 
-import NodePairingCode from './NodePairingCode'
+import { createNodePairing, NodePairingButton, NodePairingPanel } from './NodePairingCode'
 
 const node: NodeRecord = {
   nodeId: 'node-a', label: 'This computer', endpoint: 'https://127.0.0.1:4317', local: true,
@@ -22,7 +22,10 @@ beforeEach(() => {
   pairing.close.mockReset().mockResolvedValue(undefined)
   host = document.createElement('div')
   document.body.append(host)
-  dispose = render(() => <NodePairingCode node={node} />, host)
+  dispose = render(() => {
+    const pairingState = createNodePairing(() => node.nodeId)
+    return <><NodePairingButton pairing={pairingState} /><NodePairingPanel node={node} pairing={pairingState} /></>
+  }, host)
 })
 
 afterEach(() => {

@@ -31,7 +31,7 @@ nothing to draw, so it gets no button ([shell.md](./shell.md) § Host-owned webv
 
 The loaded Findings pane is deliberately absent from this list. Its manifest sets
 `showInSwitcher: false`, so the pane remains a valid persisted layout target and can be opened by
-**Findings: inspect task evidence**, but raw review inputs do not occupy the everyday task switcher.
+**Show what acorn recorded for this task**, but raw review inputs do not occupy the everyday task switcher.
 
 Compiled provider panes appear when their linked provider is connected and the task has relevant
 data. The four loaded ones, `database`, `http`, `linear`, and `rollbar`, are declared in a manifest and
@@ -65,6 +65,15 @@ There are two layers of layout, and they answer different questions.
 The layout reducer owns show/add, close/unpin, pin, move, resize, equalize, maximize, and recipe
 replacement. Pinned panes survive a switcher selection; a normal selection focuses the target. Closing
 the last unpinned pane falls back to the PR pane when one is available.
+
+When none of the row's panes can draw for a task, such as the PR pane on a project with no GitHub
+remote, the host draws the first pane the task offers. The switcher marks that pane, and show, add,
+close, and pin act on the layout as drawn: the first such action writes it as the task's layout. Render
+never writes the repair, because a render can run before the saved layouts load.
+
+Each pane's pin and close are `xs` icon buttons at its top right, centred on the header line. The bar
+under them, the first bar of the pane's last column or a single-column pane's header, reserves their
+width with `padding-inline-end` (`task-view.css`), so a pane's own controls never sit beneath them.
 
 The pane switcher is the `pane.switcher` exclusive slot. Core registers the default provider; a
 selected client plugin may replace its rendering. The host passes available panes, labels, icons,
@@ -111,7 +120,7 @@ the answer; a new named layout is.
 | `document-over-frame` | `document`, `frame` | a host-owned editor over a plugin region, with the handle between | the frame region collapses to a sheet the document can summon | both halves, each framed; the document is a host text view, read-only for now |
 | `frame-beside-document` | the same two, with the axis flipped by the name rather than by a prop | side by side | as `document-over-frame` | the same |
 | `stack-split` | `top`, `bottom` | two stacked regions with a handle | `bottom` becomes a full-height sheet | native, as on desktop, each region framed |
-| `wizard` | `step`; the host draws the indicator and the back and next controls | one step at a time | unchanged | the step is framed and titled with the pane's name |
+| `wizard` | `step`; the host draws the indicator and a footer with every action: skip, back, next, and finish on the last step | one step at a time | unchanged | the step is framed and titled with the pane's name |
 
 **Every terminal region draws a frame, and no rule between two of them.** A frame carries the region's
 name in its top border and lights while the keys are inside it, which is what a landmark's label and
@@ -296,6 +305,17 @@ to switch with and two columns of 38 cells is a column nobody can read.
 A wizard is the one arrangement a non-pane surface can reach for. Onboarding is a component in the
 `overlay` slot rather than a pane, so it imports `Wizard` from `@acorn/plugin-api/ui/host` and fills its
 `step` region. Every other surface names a layout on its contribution and never imports one.
+
+The step body holds content only. The footer holds every action, in one order: skip at the start
+(`skipLabel`, `onSkip`, `skipTip`), then **Back**, then the primary. The primary is **Next** with the
+step's own `nextLabel`, such as "Continue" or "Add a project to continue" while `canAdvance` is false.
+On the last step it is the finish action (`finishLabel`, `onFinish`). A step that is busy passes
+`canAdvance={false}` so the primary cannot be pressed twice.
+
+The strip numbers its steps, and a finished step shows a check instead of its number. The step body
+is the scroller between the strip and the footer, padded on every side, so a long step scrolls
+instead of pushing its content under the footer. In a dialog the wizard keeps one height on every
+step, so the footer does not move under the pointer.
 
 ## Addressing a pane
 

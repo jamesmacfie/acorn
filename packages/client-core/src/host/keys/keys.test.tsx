@@ -233,10 +233,10 @@ describe('a tab strip is a collection', () => {
     ), host)
     const [first, second] = host.querySelectorAll<HTMLElement>('.ui-tab')
     expect(first.querySelector('.ui-icon')).not.toBeNull()
-    expect(first.title).toBe('Mentioned in #2')
+    expect(first.dataset.tip).toBe('Mentioned in #2')
     expect(first.getAttribute('role')).toBe('tab')
     expect(second.querySelector('.ui-icon')).toBeNull()
-    expect(second.title).toBe('')
+    expect(second.dataset.tip).toBeUndefined()
   })
 })
 

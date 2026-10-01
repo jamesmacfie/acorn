@@ -116,7 +116,7 @@ export default function NodeList(props: {
               variant="bare"
               disabled={!selectedNode()}
               skipConfirm={!selectedHasEdges() && !selectedReferences().length}
-              confirmLabel={selectedReferences().length ? `Remove ${selectedReferences().length} references?` : 'Delete it?'}
+              confirmLabel={selectedReferences().length ? `Remove ${selectedReferences().length} references?` : 'Delete step?'}
               onConfirm={() => {
                 const name = selectedNode()
                 if (name) props.onRemove(name)

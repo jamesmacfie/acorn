@@ -55,6 +55,12 @@
 .ui-btn[data-variant='bare'][data-icon-only][data-size='sm'] { min-height: var(--control-h-sm); }
 .ui-btn[data-variant='bare'][data-icon-only][data-size='xs'] { min-height: var(--control-h-xs); }
 .ui-btn[data-variant='bare'][data-icon-only]:hover:not(:disabled) { background: var(--bg-hover); }
+/* A bare text button standing in a row of actions is a control, not a link in a sentence, so it
+   takes the small rung's height as its target: 26px rather than the 12px of its text. `.ui-inline`
+   stays out, because it reaches rows in virtual lists, whose heights are fixed. */
+:is(.ui-toolbar, .ui-modal-actions, .layout-wizard-actions, .ui-settings-section-actions, .ui-section-header-actions, .ui-alert-actions, .ui-empty-action) > .ui-btn[data-variant='bare']:not([data-icon-only]) {
+  min-height: var(--control-h-sm);
+}
 
 .ui-btn[data-tone='accent'] { color: var(--accent); }
 .ui-btn[data-tone='danger'] { color: var(--danger); }
@@ -81,7 +87,7 @@
   border-radius: var(--radius-control);
   /* The same height rungs as .ui-btn, so a select beside a button in a toolbar lines up with it. */
   min-height: var(--control-h);
-  padding: 7px var(--space-5);
+  padding: var(--space-5);
 }
 .ui-input::placeholder { color: var(--text-faint); }
 .ui-input:focus { outline: none; border-color: var(--accent); }
@@ -145,9 +151,9 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 /* See docs/ui-design.md § How the kit is built (Field) for `data-layout='split'`. */
 .ui-field[data-layout='split'] {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 18rem);
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--setting-control-w));
   align-items: center;
-  column-gap: var(--space-4);
+  column-gap: var(--space-6);
   row-gap: var(--space-2);
 }
 .ui-field[data-layout='split'] > .ui-field-hint,
@@ -226,7 +232,8 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   height: var(--pane-head-h);
   padding: 0 var(--pane-pad);
   margin: 0;
-  background: var(--bg);
+  /* The chrome tint every other bar uses, so a list header beside a Toolbar reads as one bar. */
+  background: var(--bg-subtle);
   border-bottom: var(--chrome-divider);
   font-size: var(--label-size);
   color: var(--text-muted);
@@ -234,11 +241,14 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   letter-spacing: var(--label-tracking);
   font-weight: var(--label-weight);
 }
+/* A group label sits on the list, not on the chrome, so it keeps the list's colour while it sticks. It
+   starts on the pane pad, the same edge as the pane header, the filter, and the first tab. */
 .section-header[data-level='group'] {
   height: auto;
-  padding: var(--space-5) var(--space-6) var(--space-2);
+  padding: var(--space-5) var(--pane-pad) var(--space-2);
+  background: var(--bg);
   border-bottom: 0;
-  color: var(--text-faint);
+  color: var(--text-muted);
 }
 .section-header[data-level='sub'] {
   height: auto;
@@ -248,6 +258,15 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   letter-spacing: 0;
   color: var(--text);
 }
+/* Only a pane header and a group label stick. A subheading or a fold summary that stuck sat over the
+   first line of the rows under it, and painted a band of the wrong colour inside a card. `sticky` on
+   the node is how one asks to stick anyway. */
+.section-header:is([data-level='sub'], .ui-fold-summary):not([data-sticky]) {
+  position: static;
+  background: transparent;
+}
+/* A subheading after a setting row starts a new group, so it takes the section gap above it. */
+.ui-setting-row + .section-header[data-level='sub'] { padding-top: var(--gap-section); }
 .ui-section-header-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ui-section-header-count { flex: none; margin-left: var(--space-2); color: var(--text-faint); font-variant-numeric: var(--tabular); }
 .ui-section-header-actions { margin-left: auto; display: flex; align-items: center; gap: var(--space-2); }
@@ -310,18 +329,45 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 .ui-row[data-density='compact'] { min-height: var(--row-h-sm); }
 .ui-row[data-density='roomy'] { min-height: calc(var(--row-h) + var(--space-4)); }
 .ui-row:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: calc(-1 * var(--focus-ring-w)); }
-/* Actions inside a header or an alert take the dense rung: their container is chrome, and a
-   form-height button inside a 44px strip is what made every pane header look top-heavy. `bare`
-   opts out, since it has no box to size. */
+/* Actions inside a header, a bar, a tab strip, a settings section's head or an alert take the dense
+   rung: their container is chrome, and a form-height button inside a 44px strip is what made every
+   pane header look top-heavy. `bare` opts out, since it has no box to size. A bar that holds a field
+   is a form row, so its buttons keep the field's height and a Send button still lines up with its
+   URL box. */
 .ui-section-header-actions .ui-btn:not([data-variant='bare']),
+.ui-toolbar:not([data-variant='actions'], :has(.ui-input)) .ui-btn:not([data-variant='bare']),
+.ui-tabs-actions .ui-btn:not([data-variant='bare']),
+.ui-doctabs-actions .ui-btn:not([data-variant='bare']),
+.ui-settings-section-actions .ui-btn:not([data-variant='bare']),
 .ui-alert-actions .ui-btn:not([data-variant='bare']) {
   min-height: var(--control-h-sm);
   padding: var(--pad-control);
   font-size: var(--fs-xs);
 }
+/* The same rung for a square button, which would otherwise keep its 32px width over a 26px height. */
+:is(.ui-section-header-actions, .ui-toolbar:not([data-variant='actions'], :has(.ui-input)), .ui-tabs-actions, .ui-doctabs-actions, .ui-settings-section-actions, .ui-alert-actions) .ui-btn[data-icon-only]:not([data-variant='bare'], [data-armed]) {
+  width: var(--control-h-sm);
+  padding: 0;
+}
 .ui-row-leading { flex: none; display: inline-flex; align-items: center; gap: var(--space-2); }
-.ui-row-body { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ui-row-meta { flex: none; color: var(--text-muted); font-variant-numeric: var(--tabular); }
+/* The title keeps a floor and the meta a ceiling, so a long meta, such as an error or a path, is cut
+   short instead of squeezing the title to nothing and pushing the list sideways. Horizontal only: a
+   virtualizer owns the row's height. */
+.ui-row-body { flex: 1; min-width: 8ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* A body written as a line of texts, such as a file name and then its folder, keeps the first whole
+   and lets the rest give way. The name is what a reader scans the list for. */
+.ui-row-body > .ui-inline > .ui-text:first-child { flex-shrink: 0; max-width: 100%; }
+.ui-row-body > .ui-inline > .ui-text ~ .ui-text { flex: 1 1 0; min-width: 0; }
+.ui-row-meta {
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-muted);
+  font-variant-numeric: var(--tabular);
+}
 /* See docs/ui-design.md § How the kit is built (Row) for data-fields and minmax(0, …). */
 .ui-row {
   /* docs/ui-design.md § Runtime-set custom properties covers --row-field-w. */
@@ -333,6 +379,7 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 .ui-row-meta[data-fields] {
   flex: 0 1 auto;
   min-width: 0;
+  max-width: none;
   display: grid;
   grid-auto-flow: column;
   grid-auto-columns: minmax(0, var(--row-field-w));
@@ -358,24 +405,28 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 .overlay[data-layout='split'] { flex-direction: row; }
 .overlay-backdrop:has(> .overlay[data-align='center']) { align-items: center; padding-top: 0; }
 .ui-modal-actions {
+  flex: none;
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: var(--space-4);
-  padding: 0 var(--pane-pad) var(--pane-pad);
+  gap: var(--gap-row);
+  padding: var(--pane-pad);
+  border-top: var(--chrome-divider);
 }
 
 /* ── Alert ──────────────────────────────────────────────────────────────────────────────────
    See docs/ui-design.md § How the kit is built for why this owns what `.action-error`
-   used to, and why the inline variant matches it value-for-value. */
+   used to. */
 .ui-alert { font-size: var(--fs-sm); }
 .ui-alert-title { display: block; font-weight: var(--fw-semibold); }
-.ui-alert-actions { flex: none; display: inline-flex; align-items: center; gap: var(--space-3); }
+.ui-alert-actions { flex: none; display: inline-flex; align-items: center; gap: var(--gap-row); }
 
-/* Not flex: `.action-error` set only margin/size/colour, so it inherited whatever display its
-   element had, some sites block divs, some inline spans mid-sentence. Making the inline variant a
-   flex container would reflow all of them. Only the banner needs a box. */
-.ui-alert[data-variant='inline'] { margin-top: var(--space-3); }
+/* Not flex: `.action-error` set only size and colour, so it inherited whatever display its element
+   had, some sites block divs, some inline spans mid-sentence. Making the inline variant a flex
+   container would reflow all of them. Only the banner needs a box. No outer margin either: the stack
+   around an alert spaces it, and a margin here doubled that gap. The actions follow the text on its
+   line, so they need their own space from it. */
+.ui-alert[data-variant='inline'] .ui-alert-actions { margin-inline-start: var(--space-3); }
 .ui-alert[data-variant='banner'] {
   display: flex;
   align-items: center;
@@ -408,6 +459,8 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   text-align: center;
 }
 .ui-empty[data-align='start'] { align-items: flex-start; justify-content: flex-start; text-align: left; }
+/* A loading line in a list is one line, the spinner beside its text, as a row would be. */
+.ui-empty[data-align='start'][data-busy] { flex-direction: row; align-items: center; }
 .ui-empty[data-size='md'] { min-height: var(--space-11); flex: 1; }
 /* Tighter than the base only down the block. The inline padding stays `--pane-pad`, because a small
    empty state stands in for the rows that would have been there and has to start where they do. */
@@ -416,7 +469,7 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 .ui-empty-title { margin: 0; color: var(--text); font-weight: var(--fw-medium); }
 .ui-empty-text { margin: 0; max-width: 42ch; }
 .ui-empty[data-align='start'] .ui-empty-text { max-width: none; }
-.ui-empty-action { display: inline-flex; gap: var(--space-3); margin-top: var(--space-2); }
+.ui-empty-action { display: inline-flex; gap: var(--gap-row); margin-top: var(--space-2); }
 
 /* ── StatusDot ──────────────────────────────────────────────────────────────────────────────
    See docs/ui-design.md § How the kit is built for the two colour vocabularies this
@@ -459,7 +512,7 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
    box belongs at the top of the two-line stack. */
 .ui-check:not(:has(.ui-check-hint)) { align-items: center; }
 .ui-check-label { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
-.ui-check-hint { color: var(--text-muted); font-size: var(--fs-xs); }
+.ui-check-hint { color: var(--text-muted); font-size: var(--fs-sm); }
 .ui-check-box {
   flex: none;
   width: var(--space-6);
@@ -470,16 +523,17 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 }
 .ui-check-box:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: var(--focus-ring-offset); }
 .ui-check:has(.ui-check-box:disabled) { opacity: 0.5; cursor: default; }
-/* Not a switch: its own size below would lose to this and draw a labelled switch as a small circle. */
-.ui-check[data-size='md'] .ui-check-box:not([data-switch]) { width: var(--icon-size); height: var(--icon-size); }
+/* Not a switch: its own size below would lose to this and draw a labelled switch as a small circle. On
+   the input, so an unlabelled box asked for at md is md too. */
+.ui-check-box[data-size='md']:not([data-switch]) { width: var(--icon-size); height: var(--icon-size); }
 
 /* The switch is presentation on the same input and the same events. `appearance: none` applies
    only here so the plain checkbox keeps its native mark. On the input rather than its label, because a
    switch in a setting row has no visible label and so no label element. */
 .ui-check-box[data-switch] {
   appearance: none;
-  width: var(--space-9);
-  height: var(--space-6);
+  width: var(--space-11);
+  height: var(--control-h-xs);
   border: var(--control-border);
   border-radius: var(--radius-pill);
   background: var(--bg-subtle);
@@ -491,20 +545,22 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   position: absolute;
   top: 50%;
   left: var(--space-1);
-  width: var(--space-4);
-  height: var(--space-4);
+  width: var(--icon-size);
+  height: var(--icon-size);
   border-radius: var(--radius-circle);
   background: var(--text-muted);
   transform: translateY(-50%);
   transition: left var(--dur-short) var(--ease-out), background var(--dur-short) var(--ease-out);
 }
 .ui-check-box[data-switch]:checked { background: var(--accent); border-color: var(--accent); }
-.ui-check-box[data-switch]:checked::after { left: calc(100% - var(--space-5)); background: var(--accent-fg); }
+.ui-check-box[data-switch]:checked::after { left: calc(100% - var(--icon-size) - var(--space-1)); background: var(--accent-fg); }
 
 /* ── ConfirmButton ──────────────────────────────────────────────────────────────────────────
    No new box: the armed state is Button's danger tone plus this ring, so the button reads as
    "one more click and it happens" without a banner claiming an error occurred. */
 .ui-btn[data-armed] { box-shadow: var(--ring); }
+/* An icon button's prompt is words, so while armed it sizes to them instead of holding its square. */
+.ui-btn[data-armed][data-icon-only] { width: auto; padding: var(--pad-control); }
 
 /* ── Popover ────────────────────────────────────────────────────────────────────────────────
    The floating surface for ui/anchor.ts. See docs/ui-design.md § How the kit is built for
@@ -525,6 +581,13 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
    holds prose and numbers, and 2px of surface left them touching the border. Anything that wants
    the tight surface back sets `padding: 0` on its own content, the way the notification inbox does. */
 .ui-popover[role='dialog'] { padding: var(--space-5); }
+/* A popover's heading is a group label on the surface's own inset, so it lines up with the content
+   under it. The surface already pads it, and it has no list to stick over. */
+.ui-popover[role='dialog'] .section-header[data-level='group'] {
+  position: static;
+  padding: 0 0 var(--space-2);
+  background: none;
+}
 
 /* ── Kbd ────────────────────────────────────────────────────────────────────────────────────
    The union of three separate keycap rules (.rail-tip-key, .help-key, .plugin-trust-escape kbd).
@@ -575,6 +638,13 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
    and the first row below reads as part of the list. Only the filter strip gets the inset, so the
    button strips keep their height. */
 .ui-toolbar[data-size='sm']:has(> .ui-input[data-kind='filter']) { padding-block: var(--space-3); }
+/* A bar that ends a region which fills its pane is that region's footer, so its rule goes on top, where
+   it meets the content, and not under it against the pane's edge. The workflow editor's problem bar is
+   the one case. */
+.ui-stack[data-grow] > .ui-toolbar:not([data-variant='actions']):last-child:not(:first-child) {
+  border-top: var(--chrome-divider);
+  border-bottom: 0;
+}
 /* Form and modal footers: no strip, items to the end. Subsumes .ui-modal-actions' role. */
 .ui-toolbar[data-variant='actions'] {
   justify-content: flex-end;
@@ -584,7 +654,7 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   padding: 0;
   background: none;
   border-bottom: 0;
-  gap: var(--space-4);
+  gap: var(--gap-row);
 }
 .ui-toolbar-spacer { flex: 1; }
 .ui-toolbar-group { display: inline-flex; align-items: center; gap: var(--space-2); }
@@ -615,8 +685,9 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
    provider glyph — so it gets a little more air than the bar's gap alone. Written against the
    heading rather than the mark because an unmatched icon name draws as a span, not an svg. */
 .ui-toolbar > .ui-heading:not(:first-child) { margin-inline-start: var(--space-2); }
-.ui-toolbar > .ui-heading > .ui-heading-title,
-.ui-toolbar > .ui-heading > .ui-heading-eyebrow {
+/* Descendants, so a title wrapped with its help mark in `.ui-titled` is cut short too. */
+.ui-toolbar > .ui-heading .ui-heading-title,
+.ui-toolbar > .ui-heading .ui-heading-eyebrow {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -656,6 +727,8 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 .ui-chip[data-tone='ok'] { color: var(--state-ok); border-color: var(--state-ok); }
 .ui-chip[data-tone='danger'] { color: var(--danger); border-color: var(--danger); }
 .ui-chip[data-tone='warn'] { color: var(--warn); border-color: var(--warn); }
+/* After the tones, so a picked filter chip reads as picked whatever its tone. */
+.ui-chip[data-selected] { background: var(--bg-selected); border-color: var(--accent); color: var(--text); }
 .ui-chip-label { overflow: hidden; text-overflow: ellipsis; }
 .ui-chip-leading { flex: none; display: inline-flex; align-items: center; }
 
@@ -756,7 +829,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 
 /* ── Menu ───────────────────────────────────────────────────────────────────────────────────
    Sits on .ui-popover, which owns the surface. This is the item vocabulary only. */
-.ui-menu { min-width: var(--space-11); }
+.ui-menu { min-width: 10rem; }
 .ui-menu-item {
   display: flex;
   align-items: center;
@@ -780,11 +853,15 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-menu-item[data-armed] { box-shadow: var(--ring); }
 .ui-menu-item:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: calc(-1 * var(--focus-ring-w)); }
 .ui-menu-leading { flex: none; display: inline-flex; align-items: center; }
+/* A choice item's check, or a blank as wide, so chosen and unchosen labels start together. */
+.ui-menu-check { flex: none; display: inline-flex; align-items: center; width: 1em; }
 .ui-menu-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .ui-menu-trailing { flex: none; color: var(--text-faint); font-size: var(--fs-2xs); }
+/* The same group label a list draws, inset to the menu's items. */
 .ui-menu-label-row {
-  padding: var(--space-2) var(--space-4);
-  font-size: var(--fs-2xs);
+  padding: var(--space-5) var(--space-4) var(--space-2);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
   color: var(--text-muted);
   text-transform: var(--label-transform);
   letter-spacing: var(--label-tracking);
@@ -811,6 +888,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   transition: transform var(--dur-short) var(--ease-out);
 }
 .ui-fold[open] > .ui-fold-summary .ui-fold-marker { transform: rotate(90deg); }
+.ui-fold-leading { flex: none; display: inline-flex; align-items: center; }
 @media (prefers-reduced-motion: reduce) { .ui-fold-marker { transition: none; } }
 /* Inset behind a left rule, so header and body both read as owned by the card above. Width is
    --stripe-w, which no pack zeros, because the rule carries the nesting, not decoration. */
@@ -1015,12 +1093,16 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
    Thin: real <table> semantics plus tokens. The scroll wrapper is part of the component because
    both hand-rolled sites had to write it and one of them forgot, which is how a wide table ends up
    scrolling the whole pane sideways. */
-.ui-table-scroll { min-width: 0; }
-.ui-table-scroll[data-scroll] { overflow-x: auto; }
+.ui-table-scroll { min-width: 0; overflow-x: auto; }
+/* A scroller of its own would pin a sticky head to itself, and it never scrolls up or down, so a sticky
+   table leaves the scrolling to the pane it sits in. */
+.ui-table-scroll:has(> .ui-table[data-sticky]) { overflow-x: visible; }
 .ui-table { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
 .ui-table th,
 .ui-table td { padding: var(--pad-cell); text-align: left; border-bottom: var(--divider); }
-.ui-table th {
+/* The column heading look is for a column's label. A row's own label, `TableCell header`, is the name
+   of the thing on that row and reads as one. */
+.ui-table th[scope='col'] {
   color: var(--text-muted);
   font-size: var(--fs-xs);
   font-weight: var(--label-weight);
@@ -1028,8 +1110,14 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   letter-spacing: var(--label-tracking);
   white-space: nowrap;
 }
+.ui-table th[scope='row'] { font-weight: var(--fw-medium); color: var(--text); white-space: nowrap; }
 .ui-table[data-size='sm'] th,
 .ui-table[data-size='sm'] td { padding: var(--space-2) var(--space-4); }
+/* A row's actions stay on one line, so a squeezed actions column does not stack them and double the
+   row's height. */
+.ui-table td > .ui-toolbar[data-variant='actions'] { flex-wrap: nowrap; }
+.ui-table tr[role='button'] { cursor: pointer; }
+.ui-table tr[role='button']:hover { background: var(--bg-hover); }
 .ui-table[data-sticky] thead th { position: sticky; top: 0; z-index: var(--z-sticky); background: var(--bg-subtle); }
 /* `align` on a head or a cell. Start is the default the rule above already sets, so only the two
    other values need a line. `--priority` has no rule on purpose: on a wide-enough host the answer
@@ -1112,12 +1200,14 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 /* RowActions: the same reveal, but scoped to the overflow button instead of the whole trailing
    slot, so a badge beside it stays visible. Opt-in per button rather than per row, so it needs no
    `reveal` on the Row. `aria-expanded` covers the open menu: the surface is portalled, so
-   :focus-within does not reach back to the trigger. */
-.ui-row-actions { opacity: 0; }
+   :focus-within does not reach back to the trigger. Opacity rather than `display`, so the row keeps
+   the button's room and nothing shifts on hover; a flex box of its own, so the wrapper adds no line
+   box and no height. */
+.ui-row-actions { display: inline-flex; align-items: center; opacity: 0; }
 .ui-row:hover .ui-row-actions,
 .ui-row:focus-within .ui-row-actions,
 .ui-row[data-selected] .ui-row-actions,
-.ui-row-actions[aria-expanded='true'] { opacity: 1; }
+.ui-row-actions:has([aria-expanded='true']) { opacity: 1; }
 
 /* ── SplitHandle ────────────────────────────────────────────────────────────────────────────
    Lifted from `.pane-divider`: a wide hit area around a hairline. The negative margin keeps the
@@ -1166,6 +1256,19 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   visibility: hidden;
   padding-inline: 0;
 }
+/* The collapse control rides the divider, half over each column's first bar, so those two bars make
+   room for it rather than running under it. The bar can sit a wrapper or two down (a Stack, a remote
+   tree). Collapsed to the edge, the rule below owns the detail header instead. The host's layout has
+   the same rule in shell.css. */
+.ui-listdetail:has(> .ui-listdetail-edge > .ui-btn):not([data-list='collapsed']) > .ui-listdetail-list > :is(.section-header, .ui-toolbar:not([data-variant='actions']), .ui-tabs, .ui-doctabs):first-child,
+.ui-listdetail:has(> .ui-listdetail-edge > .ui-btn):not([data-list='collapsed']) > .ui-listdetail-list > :first-child > :is(.section-header, .ui-toolbar:not([data-variant='actions']), .ui-tabs, .ui-doctabs):first-child,
+.ui-listdetail:has(> .ui-listdetail-edge > .ui-btn):not([data-list='collapsed']) > .ui-listdetail-list > :first-child > :first-child > :is(.section-header, .ui-toolbar:not([data-variant='actions']), .ui-tabs, .ui-doctabs):first-child {
+  padding-inline-end: calc(var(--pane-pad) + var(--control-h-xs) / 2);
+}
+.ui-listdetail:has(> .ui-listdetail-edge > .ui-btn):not([data-collapse-to='edge'][data-list='collapsed']) > .ui-listdetail-detail > :is(.section-header, .ui-toolbar:not([data-variant='actions']), .ui-tabs, .ui-doctabs):first-child,
+.ui-listdetail:has(> .ui-listdetail-edge > .ui-btn):not([data-collapse-to='edge'][data-list='collapsed']) > .ui-listdetail-detail > :first-child > :is(.section-header, .ui-toolbar:not([data-variant='actions']), .ui-tabs, .ui-doctabs):first-child {
+  padding-inline-start: calc(var(--pane-pad) + var(--control-h-xs) / 2);
+}
 /* With no rail, put the toggle inside the detail header and give its label room. */
 .ui-listdetail[data-list='collapsed'][data-collapse-to='edge'] > .ui-listdetail-edge > .ui-btn {
   left: var(--space-2);
@@ -1194,6 +1297,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   flex: none;
   height: var(--pane-head-h);
   border-bottom: var(--chrome-divider);
+  background: var(--bg-subtle);
 }
 /* The edge is a grid track here and a flex item in the host's `list-detail` layout, so it declares
    both. Expanded, the handle's hairline is the divider; collapsed, the handle is gone and the edge
@@ -1235,11 +1339,15 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
    padding for the same reason the list column does: its children are content, and content that starts
    at the border has nothing to sit off.
 
-   Except when it holds a split of its own, at any depth: that inner divider is two columns' shared
-   edge and has to reach this column's, and the inner columns pad themselves. Rollbar's occurrence
-   workbench is the case. */
+   Except when its child is a split of its own: that inner divider is two columns' shared edge and has
+   to reach this column's, and the inner columns pad themselves. A child only, not any depth. Tab panels
+   stay mounted while hidden, so Rollbar's occurrence split, inside its Occurrences tab, took the inset
+   off every item's Overview as well. */
 .ui-listdetail-detail[data-scroll] { display: block; overflow: auto; padding: var(--space-5) var(--pane-pad); }
-.ui-listdetail-detail[data-scroll]:has(.ui-listdetail) { padding: 0; }
+.ui-listdetail-detail[data-scroll]:has(> .ui-listdetail, > .remote-tree > .ui-listdetail) { padding: 0; }
+/* A form or a document in a detail column stops at a settings page's width and starts on the column's
+   start edge, where the column's own header starts. Its chrome still spans the column. */
+.ui-listdetail-detail[data-measure='page'] > :not(.ui-toolbar, .ui-tabs, .section-header) { width: 100%; max-width: var(--page-measure); }
 
 /* See docs/ui-design.md § Two-column panes for ListDetail's narrow-width behaviour. */
 
@@ -1385,15 +1493,31 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 
 /* ── KeyValueEditor ─────────────────────────────────────────────────────────────────────────
    The editable rows grid, given a home. Column count is driven by the caller's extra columns so the
-   head and the rows cannot drift apart. */
+   head and the rows cannot drift apart.
+
+   Each row is a grid of its own, so a track sized by its content would size differently per row: the
+   head's empty first cell and the blank row's empty last cell would collapse and shift everything
+   beside them. The enable track is the checkbox's width and the remove track is the button's, so
+   every row lines up with the head. The extra tracks are written only when there are some, because
+   `repeat(0, …)` is invalid and takes the whole template with it, which drew every cell on a line of
+   its own. */
 .ui-kvgrid { display: flex; flex-direction: column; min-width: 0; }
 .ui-kvgrid-head,
 .ui-kvgrid-row {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.4fr) repeat(var(--kv-extra-cols, 0), auto) auto;
+  grid-template-columns: var(--space-6) minmax(0, 1fr) minmax(0, 1.4fr) var(--control-h-sm);
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-1) var(--space-4);
+}
+.ui-kvgrid[data-extra-cols] :is(.ui-kvgrid-head, .ui-kvgrid-row) {
+  grid-template-columns: var(--space-6) minmax(0, 1fr) minmax(0, 1.4fr) repeat(var(--kv-extra-cols), auto) var(--control-h-sm);
+}
+.ui-kvgrid[data-no-enable] :is(.ui-kvgrid-head, .ui-kvgrid-row) {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) var(--control-h-sm);
+}
+.ui-kvgrid[data-no-enable][data-extra-cols] :is(.ui-kvgrid-head, .ui-kvgrid-row) {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) repeat(var(--kv-extra-cols), auto) var(--control-h-sm);
 }
 .ui-kvgrid-head {
   color: var(--text-muted);
@@ -1490,7 +1614,9 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 /* The height lives on the strip, not only on the tabs: with no tabs open the strip is empty and
    would otherwise measure whatever the buttons in `actions` come to, which left the terminal
    drawer's header at icon height until the first session started. */
-.ui-doctabs { --tab-strip-h: var(--tab-h); flex: none; display: flex; align-items: stretch; min-width: 0; min-height: var(--tab-strip-h); border-bottom: var(--chrome-divider); background: var(--bg-subtle); }
+/* Padded by the pane pad less a label's own pad, so the first document name starts on the same edge as
+   every other bar's text. */
+.ui-doctabs { --tab-strip-h: var(--tab-h); flex: none; display: flex; align-items: stretch; min-width: 0; min-height: var(--tab-strip-h); padding: 0 calc(var(--pane-pad) - var(--space-4)); border-bottom: var(--chrome-divider); background: var(--bg-subtle); }
 .ui-doctabs[data-level='pane'] { --tab-strip-h: var(--pane-head-h); }
 .ui-doctabs-strip { flex: 1; }
 .ui-doctabs-actions { flex: none; display: flex; align-items: center; gap: var(--space-2); padding: 0 var(--space-3); }
@@ -1524,7 +1650,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-doctab[data-active] .ui-doctab-label { color: var(--text); }
 /* Same ring `.ui-tab` draws (styles/tabs.css), inset so it is not clipped by the tab's own edges.
    Two of the three strips were relying on the browser's default outline. */
-.ui-doctab-label:focus-visible { outline: 2px solid var(--accent); outline-offset: -3px; }
+.ui-doctab-label:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: -3px; }
 .ui-doctab-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ui-doctab > .ui-btn { flex: none; padding: 0 var(--space-3); opacity: 0; }
 /* Keyboard-reachable, unlike the mouse-only ✕ this replaces. */
@@ -1587,11 +1713,27 @@ a.ui-row:hover { background: var(--bg-hover); }
 .ui-inline[data-wrap] { flex-wrap: wrap; }
 /* Push the last child to the far edge: a label on the left, its one action on the right. */
 .ui-inline[data-spread] { justify-content: space-between; }
+/* `even`: equal columns that wrap when a column would drop below 12rem. A grid, not flex shares,
+   so a wrapped child keeps the same width as the ones above it. Children sit at the top, so a
+   field's error line does not move its neighbour. Cards stretch, so a row of choices lines up. */
+.ui-inline[data-even] {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  align-items: start;
+}
+.ui-inline[data-even] > .ui-card { align-self: stretch; }
 
 /* Text: the role pair, as attributes rather than as six classes. `neutral` is the default colour and
    so has no rule: a tone that restates the inherited value is a rule that has to be kept in step
-   with it. */
-.ui-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+   with it.
+
+   Every emphasis draws at the working size, 12px, rather than inheriting the body's 13, so a line of
+   Text on a page body matches the descriptions and hints around it. Two places keep their own size:
+   the agent transcript, which is sized as a whole, and a description list's value, which is sized by
+   the list. `muted` and `eyebrow` set their size after the guard, so they read the same there as
+   they always did. */
+.ui-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: var(--fs-sm); }
+:is(.ui-timeline, .ui-dl-value) .ui-text { font-size: inherit; }
 .ui-text[data-wrap] { overflow: visible; white-space: normal; overflow-wrap: anywhere; }
 .ui-text[data-emphasis='strong'] { font-weight: var(--fw-semibold); }
 .ui-text[data-emphasis='muted'] { color: var(--text-muted); font-size: var(--fs-sm); }
@@ -1655,17 +1797,58 @@ a.ui-row:hover { background: var(--bg-hover); }
 
 .ui-section { display: flex; flex-direction: column; min-width: 0; }
 
+/* ── Help mark ──────────────────────────────────────────────────────────────────────────────
+   The "?" a titled node draws after its title when given `help` (content/HelpMark.tsx). The title and
+   the mark share one inline box, so the mark sits `--space-2` after the words in every host whatever
+   that host's own gap. The mark's box is `--icon-box`, the height of a 12px label line, so a row with
+   a mark is no taller than one without. Muted rather than faint, because a meaningful mark needs 3:1
+   contrast. */
+.ui-titled { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; max-width: 100%; }
+.ui-titled > :not(.ui-help) { flex: 0 1 auto; min-width: 0; }
+.ui-help {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--icon-box);
+  height: var(--icon-box);
+  padding: 0;
+  font-size: var(--icon-size);
+  color: var(--text-muted);
+  background: none;
+  border: 0;
+  border-radius: var(--radius-circle);
+  cursor: help;
+}
+.ui-help:hover, .ui-help:focus-visible { color: var(--text); }
+/* Inside the box: outside it, the ring ran into the last letter of the title 4px away. */
+.ui-help:focus-visible { outline-offset: calc(-1 * var(--focus-ring-w)); }
+
 /* ── SettingsSection / SettingRow ─────────────────────────────────────────────────────────────
    A settings page is sections of rows (docs/frontend.md § Settings). An inline row is a two-column
    grid, the words left and the control right, so every control on a page starts at the same edge
    whatever its label measures. A stacked row is one column with the control at the full width. */
-.ui-settings-section { display: flex; flex-direction: column; gap: var(--space-3); min-width: 0; scroll-margin-top: var(--space-5); }
+.ui-settings-section { display: flex; flex-direction: column; gap: var(--gap-inline); min-width: 0; scroll-margin-top: var(--space-5); }
 .ui-settings-section-head { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
-.ui-settings-section-label { flex: 1; min-width: 0; margin: 0; font-size: var(--fs-md); font-weight: 600; color: var(--text); }
-.ui-settings-section-actions { flex: none; display: flex; align-items: center; gap: var(--space-2); }
+.ui-settings-section-label { flex: 1; min-width: 0; margin: 0; font-size: var(--fs-md); font-weight: var(--heading-weight); color: var(--text); }
+.ui-settings-section-actions { flex: none; display: flex; align-items: center; gap: var(--gap-row); margin-inline-start: auto; }
 .ui-settings-section-description { margin: 0; font-size: var(--fs-sm); color: var(--text-muted); }
 .ui-settings-section-rows { display: flex; flex-direction: column; min-width: 0; }
 .ui-settings-section-rows > .ui-setting-row + .ui-setting-row { border-top: var(--divider); }
+/* A list row inside a section starts on the section's edge, as a setting row does, rather than a pane
+   inset and a selection marker in from it. */
+.ui-settings-section-rows > .ui-row { padding-inline: 0; border-left-width: 0; }
+/* An empty or loading line in a section starts on the same edge, not a pane pad in. */
+.ui-settings-section .ui-empty[data-align='start'] { padding-inline: 0; }
+/* Read-only facts line up with the controls on the rows around them: the label on the left, the value
+   in the control column, ending on the same edge. */
+.ui-settings-section .ui-dl[data-layout='columns'] { grid-template-columns: minmax(0, 1fr) minmax(0, var(--setting-control-w)); }
+.ui-settings-section .ui-dl[data-layout='columns'] .ui-dl-value { text-align: end; }
+/* A rule and a section's gap above each heading after the first, so a heading sits nearer the rows it
+   heads than the rows before it. In the kit block rather than under `.settings-page`, so a remote
+   tree's page and a tab's panel get it too. `--divider` is zero in Modern and Cute, where the space
+   alone does it. The danger zone is a box of its own. */
+.ui-settings-section + .ui-settings-section:not([data-tone='danger']) { padding-top: var(--gap-section); border-top: var(--divider); }
 /* The danger zone: a box at the foot of a detail page, outlined in the danger colour rather than
    tinted, so the one control inside it carries the weight. */
 .ui-settings-section[data-tone='danger'] {
@@ -1678,47 +1861,57 @@ a.ui-row:hover { background: var(--bg-hover); }
 /* Where a search result or a deep link landed. A fill and an outline that are there at once, so the
    reader sees it with motion reduced; the fade out is the only thing that moves. */
 .ui-settings-section[data-highlight] {
-  outline: 2px solid var(--accent);
+  outline: var(--focus-ring-w) var(--focus-ring-style) var(--accent);
   outline-offset: var(--space-3);
   border-radius: var(--radius-surface);
   background: var(--bg-selected);
+  /* Fills the band between the section and its outline, which showed the page colour. */
+  box-shadow: var(--ring-highlight);
 }
 @media (prefers-reduced-motion: no-preference) {
-  .ui-settings-section { transition: background-color 0.6s ease, outline-color 0.6s ease; }
+  .ui-settings-section { transition: background-color 0.6s ease, outline-color 0.6s ease, box-shadow 0.6s ease; }
 }
 
 .ui-setting-row {
   display: grid;
   /* The control column is a fixed measure rather than `auto`, so a select or a field set to the full
      width has a width to fill and every row's control starts at one edge, as Field's split does. */
-  grid-template-columns: minmax(0, 1fr) minmax(0, 18rem);
+  grid-template-columns: minmax(0, 1fr) minmax(0, var(--setting-control-w));
   align-items: center;
   column-gap: var(--space-6);
   row-gap: var(--space-2);
-  padding: var(--space-4) 0;
+  padding-block: var(--gap-row);
   min-width: 0;
 }
+/* One height for every inline row, whatever its control: a switch row no longer sits 14px shorter
+   than the select rows around it. */
+.ui-setting-row[data-layout='inline'] { min-height: calc(var(--control-h) + 2 * var(--gap-row)); }
 .ui-setting-row[data-layout='stacked'] { grid-template-columns: minmax(0, 1fr); }
 .ui-setting-text { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
-.ui-setting-label { font-size: var(--fs-sm); color: var(--text); }
-.ui-setting-changed { margin-left: var(--space-2); color: var(--accent); }
-/* The header's scope chip at row size, for a row stored somewhere other than its page. */
-.ui-setting-scope {
-  margin-left: var(--space-1);
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
-  border: var(--control-border);
-  border-radius: var(--radius-popover);
-  padding: 0 var(--space-3);
-  white-space: nowrap;
-}
+/* The label, then the changed dot, the scope chip, and Saved or Reset. On the baseline, so they sit on
+   a long label's first line rather than beside its middle. */
+.ui-setting-title { display: flex; align-items: baseline; gap: var(--space-3); min-width: 0; }
+.ui-setting-title > * { flex: none; }
+.ui-setting-label { flex: 0 1 auto; min-width: 0; font-size: var(--fs-sm); color: var(--text); }
+/* A label with a help mark shrinks as a bare label does. The mark tops the first line rather than
+   centring on a label that wraps: its box is one line of the label's text high. */
+.ui-setting-title > .ui-titled { flex: 0 1 auto; align-items: flex-start; }
+.ui-setting-changed { color: var(--accent); }
 .ui-setting-description { font-size: var(--fs-sm); color: var(--text-muted); }
 .ui-setting-from { font-size: var(--fs-xs); color: var(--text-muted); }
-.ui-setting-control { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); min-width: 0; }
+.ui-setting-control { display: flex; align-items: center; justify-content: flex-end; min-width: 0; }
 .ui-setting-row[data-layout='stacked'] .ui-setting-control { justify-content: flex-start; }
 /* A fieldset is here for `disabled` and nothing else, so it draws nothing of its own. */
 .ui-setting-fieldset { display: flex; align-items: center; justify-content: flex-end; gap: var(--space-3); flex: 1; border: 0; margin: 0; padding: 0; min-width: 0; }
 .ui-setting-row[data-layout='stacked'] .ui-setting-fieldset { flex-direction: column; align-items: stretch; }
+/* A column stretches its children, which suits a text area or a table and not an action: a button
+   720px wide reads as a text field. A button, a link, or a segmented control in a column is as wide
+   as its words. `.ui-confirm` is `display: contents`, so its button is the column's child in layout. */
+.ui-setting-row[data-layout='stacked'] .ui-setting-fieldset > :is(.ui-btn, .ui-link),
+.ui-settings-section-rows > :is(.ui-btn, .ui-link),
+.ui-stack > :is(.ui-btn, .ui-link),
+:is(.ui-setting-row[data-layout='stacked'] .ui-setting-fieldset, .ui-settings-section-rows, .ui-stack) > .ui-confirm > .ui-btn,
+.ui-field[data-layout='stack'] > :is(.ui-segments, .ui-btn) { align-self: flex-start; }
 .ui-setting-status { font-size: var(--fs-xs); color: var(--state-ok); white-space: nowrap; }
 .ui-setting-status:empty { display: none; }
 .ui-setting-error { grid-column: 1 / -1; font-size: var(--fs-sm); color: var(--danger); }

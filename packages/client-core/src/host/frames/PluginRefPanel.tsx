@@ -1,11 +1,14 @@
-import { Show } from 'solid-js'
+import { createUniqueId, onMount, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import PluginFrame from './PluginFrame'
 import { RemoteTree } from '../tree/RemoteTree'
 import type { RemoteContribution } from '../tree/treeRegistry'
 import type { FrameBinding } from './broker'
-import { Button, Toolbar } from '../../kit/components/primitives'
+import { Toolbar } from '../../kit/components/primitives'
+import { IconButton } from '../../kit/components/inputs/IconButton'
 import RefPanelTaskLink from '../components/RefPanelTaskLink'
+import { createDismissable } from '../../kit/lib/controls/dismissable'
+import { restoreFocusOnCleanup } from '../../kit/keys/trap'
 
 // The host's chrome around a plugin reference panel: the backdrop, the box, the title and the
 // dismiss affordance (docs/plugins.md § Frame contribution kind).
@@ -35,18 +38,34 @@ export type PluginRefPanelProps = {
 }
 
 export default function PluginRefPanel(props: PluginRefPanelProps) {
+  // A dialog's keys and focus, as RefPanelBox has. Escape reaches this only while focus is in the
+  // host's part of the panel: a key pressed inside the frame stays in the frame.
+  let panel!: HTMLElement
+  const titleId = createUniqueId()
+  const dismiss = createDismissable({ onDismiss: () => props.onClose(), container: () => panel })
+  restoreFocusOnCleanup()
+  onMount(() => queueMicrotask(() => panel?.focus({ preventScroll: true })))
   return (
     <Portal>
-      <div class="integrations-panel-backdrop" onClick={props.onClose} />
-      <aside class="integrations-panel plugin-ref-panel">
+      <div class="integrations-panel-backdrop" onClick={dismiss.onBackdropClick} />
+      <aside
+        ref={panel}
+        class="integrations-panel plugin-ref-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        tabindex="-1"
+        onClick={dismiss.onContainerClick}
+        onKeyDown={dismiss.onKeyDown}
+      >
         <header class="integrations-panel-head">
           {/* No fallback, deliberately. `openRefPanel` refuses a falsy `displayId`, so a panel with
               no subject is unreachable and a `?? 'Reference'` here would only be able to hide a bug
               — which is precisely what it would have done: the empty title was the visible half of
               the reserved-`ref`-prop defect, and the reason it was found at all. */}
-          <span class="integrations-panel-title">{props.displayId}</span>
+          <span class="integrations-panel-title" id={titleId}>{props.displayId}</span>
           <Toolbar.Spacer />
-          <Button onPress={props.onClose} label="Close">✕</Button>
+          <IconButton icon="x" label="Close" onPress={props.onClose} />
         </header>
         <Show
           when={props.tree}

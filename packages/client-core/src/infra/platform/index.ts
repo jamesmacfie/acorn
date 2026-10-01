@@ -94,7 +94,15 @@ export type DesktopExtras = {
   openConfigFile(): Promise<void>
 }
 
-export type CliInstallState = { available: boolean; installed: boolean; location: string | null; message: string }
+export type CliInstallState = {
+  available: boolean
+  installed: boolean
+  /** acorn's launcher is there but runs another copy of the app, so installing updates it. Absent
+   *  from a shell built before the field. */
+  outdated?: boolean
+  location: string | null
+  message: string
+}
 export type CliInstaller = {
   status(): Promise<CliInstallState>
   install(): Promise<CliInstallState>

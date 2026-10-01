@@ -6,7 +6,7 @@ import { Line, slot } from '../cells'
 import { spaceLines } from '../roles'
 import { Button } from '../asking/buttons'
 
-/** The label in bold, the description in grey under it, then the rows. The danger zone's label is in
+/** The label in bold, the description and the help in grey under it, then the rows. The danger zone's label is in
  *  the danger colour, because a frame round it would cost two lines of a 24-line screen. */
 export function SettingsSection(props: SettingsSectionProps) {
   return (
@@ -16,6 +16,8 @@ export function SettingsSection(props: SettingsSectionProps) {
       </box>
       <Show when={props.actions}>{slot(props.actions)}</Show>
       <Show when={props.description}><Line role="muted" wrap>{props.description!}</Line></Show>
+      {/* No hover here to hide the help behind, so it prints where the description does. */}
+      <Show when={props.help}><Line role="muted" wrap>{props.help!}</Line></Show>
       {props.children}
     </box>
   )
@@ -40,6 +42,7 @@ export function SettingRow(props: SettingRowProps) {
         </Show>
       </box>
       <Show when={props.description}><Line role="muted" wrap>{props.description!}</Line></Show>
+      <Show when={props.help}><Line role="muted" wrap>{props.help!}</Line></Show>
       <Show when={props.error}><Line tone="danger" wrap>{props.error!}</Line></Show>
     </box>
   )

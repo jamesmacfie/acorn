@@ -1143,7 +1143,8 @@ section highlight have automated coverage in `settingSave.test.tsx` and `Setting
 the view; these checks cover the window and the pages.
 
 110. Walk every settings page. Confirm that no page has a **Save** button outside a form, and that
-     every text field shows **Saved** beside it after you change it and press Tab or Enter.
+     every text field shows **Saved** beside its label after you change it and press Tab or Enter,
+     and that the field keeps its width while it does.
 111. Stop the node, or take the machine offline, and change a text field on a node page such as Limits
      and cost. Confirm that the field keeps what you typed and the row shows the error. Bring the
      node back and commit again, and confirm that **Saved** appears.
@@ -1260,7 +1261,7 @@ in `plugins/agents/src/client/settings/*.test.tsx`, `AgentToolsSettings.test.tsx
      **From ACORN_TUI_NOTIFY**, then **Bell and terminal notification** and **The default**. In a
      terminal acorn has no notification sequence for (Apple Terminal), confirm that the row says only
      the bell reaches you. Turn **An agent needs me** off and confirm that the change survives a
-     restart, then press **Send a test notification** and confirm that the terminal rings.
+     restart, then press **Send a test** and confirm that the terminal rings.
 141. In the terminal client, add an MCP server or a custom agent, type into its form, and press Escape.
      Confirm that **Discard unsaved changes?** opens with the caret on **Cancel**, that Cancel keeps
      the typed value, and that **Discard changes** returns to the list. Save one, then remove it from

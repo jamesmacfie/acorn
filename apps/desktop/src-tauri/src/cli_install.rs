@@ -13,6 +13,8 @@ const HEADER: &str = "#!/bin/sh\n# acorn desktop CLI launcher v1\n";
 pub struct CliInstallState {
     available: bool,
     installed: bool,
+    /// The launcher there is acorn's, but for another copy of the app, so installing updates it.
+    outdated: bool,
     location: Option<String>,
     message: String,
 }
@@ -177,6 +179,7 @@ fn state(app: &AppHandle) -> CliInstallState {
             return CliInstallState {
                 available: false,
                 installed: false,
+                outdated: false,
                 location: None,
                 message,
             }
@@ -188,6 +191,7 @@ fn state(app: &AppHandle) -> CliInstallState {
             return CliInstallState {
                 available: false,
                 installed: false,
+                outdated: false,
                 location: None,
                 message,
             }
@@ -199,33 +203,35 @@ fn state(app: &AppHandle) -> CliInstallState {
         Ok(Some(content)) if content == expected => CliInstallState {
             available: true,
             installed: true,
+            outdated: false,
             location,
             message: "The acorn command is installed. Open a new terminal to use it.".into(),
         },
         Ok(Some(content)) if content.starts_with(HEADER) => CliInstallState {
             available: true,
             installed: false,
+            outdated: true,
             location,
-            message: "The launcher points to another Acorn build. Update it to use this one."
-                .into(),
+            message: "The acorn command points to a different copy of acorn.".into(),
         },
         Ok(None) => CliInstallState {
             available: true,
             installed: false,
+            outdated: false,
             location,
-            message: "Install the acorn command in a directory on your login shell PATH.".into(),
+            message: "Not installed.".into(),
         },
         Ok(Some(_)) => CliInstallState {
             available: false,
             installed: false,
+            outdated: false,
             location,
-            message:
-                "Another acorn command already occupies this location. Acorn will not replace it."
-                    .into(),
+            message: "Another program called acorn is already there, so acorn leaves it alone.".into(),
         },
         Err(message) => CliInstallState {
             available: false,
             installed: false,
+            outdated: false,
             location,
             message,
         },
@@ -239,6 +245,7 @@ pub async fn cli_install_status(app: AppHandle) -> CliInstallState {
         .unwrap_or_else(|error| CliInstallState {
             available: false,
             installed: false,
+            outdated: false,
             location: None,
             message: error.to_string(),
         })

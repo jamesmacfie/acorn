@@ -515,7 +515,7 @@ describe('architecture boundaries', () => {
     const ALLOWED_CSS = new Set([
       // A stylesheet isn't re-exportable, since `export … from` carries bindings and this file has none.
       // Core-owned CSS for a core-owned component the plugin renders.
-      '@acorn/client-core/features/workspaces/onboarding.css',
+      '@acorn/client-core/features/workspaces/projects.css',
     ])
     // `@acorn/diff-document` beside protocol: a runtime-neutral contract with no host state in it,
     // which a provider's node builds diff documents with and its client hands the viewer

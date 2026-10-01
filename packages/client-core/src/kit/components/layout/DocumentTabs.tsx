@@ -1,7 +1,7 @@
 import { createEffect, For, Show, type JSX } from 'solid-js'
 import { IconButton } from '../inputs/IconButton'
 import { StatusDot } from '../content/StatusDot'
-import { revealActiveTab } from './tabScroll'
+import { revealActiveTab, trackTabOverflow } from './tabScroll'
 
 export type DocTabDef = {
   id: string
@@ -56,7 +56,7 @@ export function DocumentTabs(props: {
   return (
     <div class="ui-doctabs" data-level={props.level}>
       <div
-        ref={stripRef}
+        ref={(element) => { stripRef = element; trackTabOverflow(element) }}
         class="ui-tab-scroll ui-doctabs-strip"
         role="tablist"
         aria-label={props.ariaLabel}
@@ -80,7 +80,9 @@ export function DocumentTabs(props: {
               aria-selected={props.active === tab.id}
               aria-controls={`${props.idPrefix}-panel-${tab.id}`}
               tabindex={props.active === tab.id ? 0 : -1}
-              title={tab.title ?? tab.label}
+              // The browser's tooltip only for a name the strip cut short; anything more is the app's tip.
+              title={tab.title ? undefined : tab.label}
+              data-tip={tab.title}
               onClick={() => props.onActivate(tab.id)}
               onDblClick={() => props.onPromote?.(tab.id)}
               // Middle-click closes, which is the convention every editor has and none of these had.

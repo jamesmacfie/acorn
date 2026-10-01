@@ -102,7 +102,7 @@ function StartDialog(props: { request: StartRequest }) {
         </Stack>
       </ModalBody>
       <ModalActions>
-        <Button variant="bare" onPress={closeWorkflowStart}>Cancel</Button>
+        <Button variant="ghost" onPress={closeWorkflowStart}>Cancel</Button>
         <Button variant="solid" busy={busy()} disabled={!ready()} onPress={() => void start()}>Run</Button>
       </ModalActions>
     </Modal>

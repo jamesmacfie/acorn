@@ -38,8 +38,18 @@ export type LayoutProps = {
   steps?: readonly { id: string; label: string }[]
   current?: string
   onStep?: (id: string) => void
-  /** `wizard` only. Blocks next while the step is incomplete. */
+  /** `wizard` only. Blocks next, and the finish action, while the step is incomplete or busy. */
   canAdvance?: boolean
+  /** `wizard` only. The step's **Next** text, such as "Continue". Defaults to "Next". */
+  nextLabel?: string
+  /** `wizard` only. The last step's button, which the host draws in place of **Next**. */
+  finishLabel?: string
+  onFinish?: () => void
+  /** `wizard` only. A way out of the whole flow, at the footer's start, on every step but the last. */
+  skipLabel?: string
+  onSkip?: () => void
+  /** `wizard` only. The skip button's tip, for what skipping means. */
+  skipTip?: string
 }
 
 export type Layout = (props: LayoutProps) => JSX.Element

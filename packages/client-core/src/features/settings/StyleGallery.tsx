@@ -1,5 +1,9 @@
-import { For, Show, createSignal } from 'solid-js'
-import { Badge, Button, Field, Input, Row, SectionHeader, Select, Spinner, Textarea } from '../../kit/components/primitives'
+import { For, createSignal } from 'solid-js'
+import { Badge, Button, Checkbox, Field, Input, Row, SectionHeader, SegmentedControl, Select, Spinner, Textarea } from '../../kit/components/primitives'
+import { Tabs } from '../../kit/components/layout/Tabs'
+import { SettingRow } from '../../kit/components/layout/SettingRow'
+import { SettingsSection } from '../../kit/components/layout/SettingsSection'
+import { Text } from '../../kit/components/content/Text'
 import { STYLES } from './uiStyles'
 import { THEMES } from './builtInThemes'
 
@@ -14,16 +18,18 @@ export default function StyleGallery() {
   const [style, setStyle] = createSignal(document.documentElement.dataset.style ?? 'terminal')
   const [theme, setTheme] = createSignal(document.documentElement.dataset.theme ?? 'light')
   const [busy, setBusy] = createSignal(false)
+  // Local state for the settings sample, so its controls move without saving anything.
+  const [on, setOn] = createSignal(true)
+  const [size, setSize] = createSignal('13')
+  const [density, setDensity] = createSignal<'compact' | 'comfortable'>('comfortable')
+  const [tab, setTab] = createSignal('general')
 
   const applyStyle = (id: string) => { setStyle(id); document.documentElement.dataset.style = id }
   const applyTheme = (id: string) => { setTheme(id); document.documentElement.dataset.theme = id }
 
   return (
     <div class="gallery">
-      <p class="settings-hint muted">
-        Preview only — these pickers set the DOM attributes without saving, so your real Appearance
-        settings are untouched.
-      </p>
+      <Text emphasis="muted" wrap>Preview only. Nothing here is saved.</Text>
 
       <div class="gallery-pickers">
         <Field label="Style" layout="row">
@@ -33,6 +39,34 @@ export default function StyleGallery() {
           <Select value={theme()} options={THEMES().map(([value, label]) => ({ value, label }))} onChange={(value) => applyTheme(value)} />
         </Field>
       </div>
+
+      {/* What a settings page is made of, so a pack author sees rows, sections and the save state. */}
+      <SettingsSection id="gallery-settings" label="A settings section" description="A section's one line of description." help="The help text, behind the mark.">
+        <SettingRow label="An inline row" description="Its control sits on the right.">
+          <Select label="An inline row" value={size()} options={['12', '13', '14'].map((value) => ({ value, label: `${value} px` }))} onChange={setSize} />
+        </SettingRow>
+        <SettingRow label="A switch row" help="A row can carry a help mark too.">
+          <Checkbox switch ariaLabel="A switch row" checked={on()} onChange={setOn} />
+        </SettingRow>
+        <SettingRow label="A changed row" onReset={() => setSize('13')}>
+          <SegmentedControl
+            ariaLabel="A changed row"
+            value={density()}
+            options={[{ value: 'compact', label: 'Compact' }, { value: 'comfortable', label: 'Comfortable' }]}
+            onChange={setDensity}
+          />
+        </SettingRow>
+        <SettingRow label="A stacked row" description="Its control takes the full width under the words." layout="stacked">
+          <Textarea rows={2} placeholder="A script or a long value" />
+        </SettingRow>
+      </SettingsSection>
+      <Tabs
+        idPrefix="gallery-tabs"
+        ariaLabel="Sample tabs"
+        active={tab()}
+        onChange={setTab}
+        tabs={[{ id: 'general', label: 'General' }, { id: 'advanced', label: 'Advanced', count: 3 }]}
+      />
 
       <SectionHeader level="sub">Buttons</SectionHeader>
       <div class="gallery-row">
@@ -93,7 +127,6 @@ export default function StyleGallery() {
         <pre class="gallery-term">$ acorn --version{'\n'}1.0.0</pre>
       </div>
 
-      <Show when={false}><span /></Show>
     </div>
   )
 }

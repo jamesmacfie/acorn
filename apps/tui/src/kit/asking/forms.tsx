@@ -79,6 +79,7 @@ export function Field(props: {
   label?: string
   hint?: string
   error?: string
+  help?: string
   layout?: 'stack' | 'row' | 'split'
   group?: boolean
   children: JSX.Element
@@ -88,6 +89,7 @@ export function Field(props: {
       <Show when={props.label}><Line role="muted">{props.label!}</Line></Show>
       {props.children}
       <Show when={props.hint}><Line role="muted">{props.hint!}</Line></Show>
+      <Show when={props.help}><Line role="muted" wrap>{props.help!}</Line></Show>
       <Show when={props.error}><Line tone="danger">{props.error!}</Line></Show>
     </box>
   )

@@ -7,12 +7,13 @@ import { clearCache } from './clearCache'
 export default function ClearCacheSettings() {
   const queryClient = useQueryClient()
   return (
-    <SettingsSection id="cache" label="Cache">
+    <SettingsSection id="cache" label="This window">
       <SettingRow
-        label="Cached answers"
-        description="Forget what this window remembers from every node and reload. Nothing on a node changes, and the window asks each node again."
+        label="Saved copies of what acorn loaded"
+        description="Your tasks and settings aren't affected."
+        help="acorn keeps copies of what it loaded so the window opens fast. Clearing them makes it load everything again."
       >
-        <Button size="sm" onPress={() => void clearCache(queryClient)}>Clear cache and reload</Button>
+        <Button onPress={() => void clearCache(queryClient)}>Clear cache and reload</Button>
       </SettingRow>
     </SettingsSection>
   )

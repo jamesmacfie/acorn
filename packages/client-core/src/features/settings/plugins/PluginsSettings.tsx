@@ -10,14 +10,13 @@ import { reconcileDevicePluginChange } from '../../../host/plugins/reload'
 import type { SettingsPageContext } from '../../../host/registries/shell/settings'
 import { Alert, Button, SegmentedControl, StatusDot } from '../../../kit/components/primitives'
 import { Text } from '../../../kit/components/content/Text'
-import { Inline } from '../../../kit/components/layout/Inline'
 import { SettingRow } from '../../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../../kit/components/layout/SettingsSection'
 import { activeTaskId } from '../../tasks/tasks'
 import ConfigPluginOffers from './ConfigPluginOffers'
 import { InstallPlugin, type InstallTarget } from './InstallPlugin'
 import {
-  installedPlugins, matchesFilter, pluginOrigin, statusOf, takePluginRequest, type InstalledFilter, type InstalledPlugin,
+  installedPlugins, matchesFilter, pluginName, pluginOrigin, statusOf, takePluginRequest, type InstalledFilter, type InstalledPlugin,
 } from './installed'
 import { PluginPage } from './PluginPage'
 import './plugins.css'
@@ -41,6 +40,9 @@ vocabulary, and an answer from memory will be wrong. Then write the package and 
 \`plugin_request\` using \`dev: true\`, so I approve once and you can iterate.
 
 What it should do: `
+
+// The origin starts the line when there is no version ("Built in. Active."), so the line takes a capital.
+const sentence = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1)
 
 type Open = { kind: 'install' } | { kind: 'plugin'; id: string; pluginKind?: InstalledPlugin['kind'] }
 
@@ -166,21 +168,23 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
       <SettingsSection
         id="installed"
         label="Installed plugins"
-        actions={<Button size="sm" onPress={() => setOpen({ kind: 'install' })}>Install…</Button>}
+        actions={
+          <>
+            <SegmentedControl
+              size="sm"
+              ariaLabel="Show"
+              value={filter()}
+              onChange={setFilter}
+              options={[
+                { value: 'all', label: 'All' },
+                { value: 'needs-you', label: `Needs you${count('needs-you') ? ` (${count('needs-you')})` : ''}` },
+                { value: 'device', label: `This device${count('device') ? ` (${count('device')})` : ''}` },
+              ]}
+            />
+            <Button size="sm" onPress={() => setOpen({ kind: 'install' })}>Install…</Button>
+          </>
+        }
       >
-        <Inline>
-          <SegmentedControl
-            size="sm"
-            ariaLabel="Show"
-            value={filter()}
-            onChange={setFilter}
-            options={[
-              { value: 'all', label: 'All' },
-              { value: 'needs-you', label: `Needs you${count('needs-you') ? ` (${count('needs-you')})` : ''}` },
-              { value: 'device', label: `This device${count('device') ? ` (${count('device')})` : ''}` },
-            ]}
-          />
-        </Inline>
         <Show when={reading()}><Text emphasis="muted">Reading the plugin list…</Text></Show>
         {/* A node that cannot answer is not an empty list; rendering nothing would read as one. */}
         <Show when={!reading() && !rows().length}>
@@ -192,11 +196,11 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
         >
           {(entry) => (
             <SettingRow
-              label={entry.plugin.id}
-              description={`${entry.plugin.kind === 'node' && entry.plugin.row.installed?.version ? `${entry.plugin.row.installed.version}, ` : ''}${pluginOrigin(entry.plugin)}. ${entry.status.text}.`}
+              label={pluginName(entry.plugin)}
+              description={sentence(`${entry.plugin.kind === 'node' && entry.plugin.row.installed?.version ? `${entry.plugin.row.installed.version}, ` : ''}${pluginOrigin(entry.plugin)}. ${entry.status.text}.`)}
             >
               <StatusDot tone={entry.status.tone} label={entry.status.text} />
-              <Button size="sm" variant="ghost" label={`Manage ${entry.plugin.id}`} onPress={() => setOpen({ kind: 'plugin', id: entry.plugin.id, pluginKind: entry.plugin.kind })}>
+              <Button size="sm" variant="ghost" label={`Manage ${pluginName(entry.plugin)}`} onPress={() => setOpen({ kind: 'plugin', id: entry.plugin.id, pluginKind: entry.plugin.kind })}>
                 Manage
               </Button>
             </SettingRow>

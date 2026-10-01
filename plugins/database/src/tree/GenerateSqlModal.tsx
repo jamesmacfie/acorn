@@ -129,7 +129,7 @@ export default function GenerateSqlModal(props: {
         </Show>
       </ModalBody>
       <ModalActions>
-        <Button disabled={busy()} onPress={dismiss}>Cancel</Button>
+        <Button variant="ghost" disabled={busy()} onPress={dismiss}>Cancel</Button>
         <Button variant="solid" disabled={busy() || !prompt().trim()} onPress={() => void generate()}>
           {busy() ? 'Generating…' : 'Generate'}
         </Button>

@@ -114,8 +114,8 @@ describe('the delegated session sidebar', () => {
     expect(rowNamed('Nested child').dataset.nested).toBe('')
     expect(rowNamed('Parent').dataset.nested).toBeUndefined()
     expect(rowNamed('Nested child').textContent).toContain('waiting')
-    // The attention mark is an icon now, so what a reader gets is its title rather than a pill's words.
-    expect(rowNamed('Nested child').querySelector('svg > title')?.textContent).toBe('Wants permission')
+    // The attention mark is an icon now, so what a reader gets is its name rather than a pill's words.
+    expect(rowNamed('Nested child').querySelector('svg[aria-label]')?.getAttribute('aria-label')).toBe('Wants permission')
     expect(rowNamed('Nested child').textContent).toContain('depth 1 · shared')
     expect(rowNamed('Terminal child').dataset.depth).toBeUndefined()
     expect(rowNamed('Terminal child').dataset.nested).toBeUndefined()
@@ -131,11 +131,11 @@ describe('the delegated session sidebar', () => {
     mount([waiting, busy], {})
 
     const leadOf = (title: string) => rowNamed(title).querySelector('.ui-row-leading .ui-icon')
-    expect(leadOf('Holding a prompt')?.querySelector('title')?.textContent).toBe('2 queued follow-ups')
+    expect(leadOf('Holding a prompt')?.getAttribute('aria-label')).toBe('2 queued follow-ups')
     // Motion wins while something is in flight, so the busy row keeps its turning mark and says nothing
     // about the one prompt behind it.
     expect(leadOf('Running one')?.getAttribute('data-spin')).toBe('')
-    expect(leadOf('Running one')?.querySelector('title')).toBeNull()
+    expect(leadOf('Running one')?.getAttribute('aria-label')).toBeNull()
   })
 
   it('shows Codex reasoning effort beside its model', () => {

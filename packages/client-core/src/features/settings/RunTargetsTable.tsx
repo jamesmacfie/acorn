@@ -1,6 +1,7 @@
 import { createMemo, createSignal, Index, Show, type JSX } from 'solid-js'
 import type { ProjectRunTarget } from '@acorn/protocol/api.ts'
-import { Button, Checkbox, Field, Input, Table, TableCell, TableHead, TableRow } from '../../kit/components/primitives'
+import { Button, Card, Checkbox, EmptyState, Field, Input, Table, TableCell, TableHead, TableRow } from '../../kit/components/primitives'
+import { Inline } from '../../kit/components/layout/Inline'
 import { Text } from '../../kit/components/content/Text'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { Toolbar } from '../../kit/components/layout/Toolbar'
@@ -134,49 +135,36 @@ export function RunTargetsTable(props: {
 
   const remove = (index: number) => void write(targets().filter((_, at) => at !== index))
 
-  return (
+  // This machine's list and its form. Under its own label only when the repo's list sits above it;
+  // otherwise the section's heading names it.
+  const machine = () => (
     <>
-      <Show when={props.repoTargets.length}>
-        <SettingRow
-          label="Run targets"
-          description="The repo sets these, so they're read-only here. Edit .acorn/config.toml to change them."
-          layout="stacked"
-          from={REPO_CONFIG_FILE}
-        >
-          <TargetsTable targets={props.repoTargets} />
-        </SettingRow>
+      <Show when={parsed().unreadable}>
+        <Text tone="warn" wrap tip={props.stored ?? undefined}>
+          Some saved run targets couldn't be read. If you save here, only the ones listed are kept.
+        </Text>
+      </Show>
+      <Show when={targets().length} fallback={<EmptyState align="start" size="sm">No run targets.</EmptyState>}>
+        <TargetsTable
+          targets={targets()}
+          overridden={(target) => repoIds().has(target.id)}
+          actions={(index) => (
+            <Toolbar variant="actions" size="sm">
+              <Button size="sm" variant="ghost" disabled={!!editing()} onPress={() => setEditing({ index, draft: draftOf(targets()[index]!) })}>Edit</Button>
+              <Button size="sm" variant="ghost" tone="danger" disabled={!!editing()} onPress={() => remove(index)}>Remove</Button>
+            </Toolbar>
+          )}
+        />
       </Show>
 
-      <SettingRow
-        label={props.repoTargets.length ? 'This machine\'s run targets' : 'Run targets'}
-        description="Named commands run in a task's worktree, each a run button on the task. A committed .acorn/config.toml overrides these."
-        layout="stacked"
-        savedAt={saving.savedAt()}
-        error={saving.error()}
+      <Show
+        when={editing()}
+        fallback={<Button onPress={() => setEditing({ index: null, draft: emptyDraft })}>Add run target</Button>}
       >
-        <Show when={parsed().unreadable}>
-          <Text tone="warn" wrap>
-            {`Some of the stored run targets could not be read: ${props.stored ?? ''}. Saving from this table keeps only the ones listed.`}
-          </Text>
-        </Show>
-        <Show when={targets().length} fallback={<Text emphasis="muted">No run targets on this machine.</Text>}>
-          <TargetsTable
-            targets={targets()}
-            overridden={(target) => repoIds().has(target.id)}
-            actions={(index) => (
-              <Toolbar variant="actions" size="sm">
-                <Button size="sm" variant="ghost" disabled={!!editing()} onPress={() => setEditing({ index, draft: draftOf(targets()[index]!) })}>Edit</Button>
-                <Button size="sm" variant="ghost" tone="danger" disabled={!!editing()} onPress={() => remove(index)}>Remove</Button>
-              </Toolbar>
-            )}
-          />
-        </Show>
-
-        <Show
-          when={editing()}
-          fallback={<div><Button onPress={() => setEditing({ index: null, draft: emptyDraft })}>Add run target</Button></div>}
-        >
-          {(open) => (
+        {(open) => (
+          // The settings page's one shape for a boxed form: a card of fields, then the primary action
+          // and Cancel under the last one.
+          <Card>
             <form
               class="run-target-form"
               aria-label={open().index === null ? 'New run target' : `Edit ${open().draft.id}`}
@@ -184,19 +172,48 @@ export function RunTargetsTable(props: {
             >
               <Field label="Name"><Input label="Name" assist={false} placeholder="dev" value={open().draft.id} onInput={(id) => setDraft({ id })} /></Field>
               <Field label="Command"><Input label="Command" assist={false} placeholder="./scripts/dev.sh" value={open().draft.command} onInput={(command) => setDraft({ command })} /></Field>
-              <Field label="Stop command"><Input label="Stop command" assist={false} placeholder="(blank = interrupt it)" value={open().draft.stop} onInput={(stop) => setDraft({ stop })} /></Field>
+              <Field label="Stop command" hint="Leave blank to stop it with Ctrl-C."><Input label="Stop command" assist={false} placeholder="pkill -f vite" value={open().draft.stop} onInput={(stop) => setDraft({ stop })} /></Field>
               <Field label="Preview URL"><Input label="Preview URL" assist={false} placeholder="http://localhost:3000" value={open().draft.url} onInput={(url) => setDraft({ url })} /></Field>
-              <Field label="Or a command that prints the preview URL"><Input label="Or a command that prints the preview URL" assist={false} placeholder="./scripts/dev-url.sh" value={open().draft.urlCommand} onInput={(urlCommand) => setDraft({ urlCommand })} /></Field>
-              <Checkbox switch label="The task's default run target" checked={open().draft.isDefault} onChange={(isDefault) => setDraft({ isDefault })} />
+              <Field label="Preview URL command" hint="Use instead of a fixed URL. acorn opens what it prints."><Input label="Preview URL command" assist={false} placeholder="./scripts/dev-url.sh" value={open().draft.urlCommand} onInput={(urlCommand) => setDraft({ urlCommand })} /></Field>
+              <Checkbox switch label="Default run target" checked={open().draft.isDefault} onChange={(isDefault) => setDraft({ isDefault })} />
               <Show when={open().problem}>{(problem) => <Text tone="danger" wrap>{problem()}</Text>}</Show>
-              <Toolbar variant="actions">
-                <Button variant="bare" onPress={() => setEditing(undefined)}>Cancel</Button>
+              <Inline gap="row">
                 <Button submit variant="solid" tone="accent">Save</Button>
-              </Toolbar>
+                <Button variant="ghost" onPress={() => setEditing(undefined)}>Cancel</Button>
+              </Inline>
             </form>
-          )}
-        </Show>
-      </SettingRow>
+          </Card>
+        )}
+      </Show>
+    </>
+  )
+
+  return (
+    <>
+      <Show when={props.repoTargets.length}>
+        <SettingRow
+          label="Set by the repo"
+          description="To change these, edit .acorn/config.toml in the repo."
+          layout="stacked"
+          from={REPO_CONFIG_FILE}
+        >
+          <TargetsTable targets={props.repoTargets} />
+        </SettingRow>
+      </Show>
+
+      <Show
+        when={props.repoTargets.length}
+        fallback={
+          <>
+            {machine()}
+            <Show when={saving.error()}>{(message) => <Text tone="danger" wrap>{message()}</Text>}</Show>
+          </>
+        }
+      >
+        <SettingRow label="This machine's run targets" layout="stacked" savedAt={saving.savedAt()} error={saving.error()}>
+          {machine()}
+        </SettingRow>
+      </Show>
     </>
   )
 }
@@ -222,8 +239,8 @@ function TargetsTable(props: {
         {(target, index) => (
           <TableRow>
             <TableCell header>{target().id}</TableCell>
-            <TableCell><Text emphasis="mono">{target().command}</Text></TableCell>
-            <TableCell>{previewOf(target())}</TableCell>
+            <TableCell><Text emphasis="mono" wrap>{target().command}</Text></TableCell>
+            <TableCell><Text wrap>{previewOf(target())}</Text></TableCell>
             <TableCell align="center">{target().default ? 'Yes' : ''}</TableCell>
             <Show when={props.actions}>
               {(actions) => (

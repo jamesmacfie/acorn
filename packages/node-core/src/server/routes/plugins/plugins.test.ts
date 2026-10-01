@@ -28,6 +28,7 @@ const ROSTER: PluginRosterEntry[] = [
 const NO_PERMISSIONS = { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } }
 const installedEntry = (id: string, over: Partial<InstalledPluginInfo> = {}): InstalledPluginInfo => ({
   id,
+  label: `Plugin ${id}`,
   version: '1.0.0',
   apiVersion: '1',
   permissions: NO_PERMISSIONS,
@@ -38,7 +39,7 @@ const installedEntry = (id: string, over: Partial<InstalledPluginInfo> = {}): In
   ...over,
 })
 const activeSnapshot = (id: string, version: string): ActivePluginSnapshot => {
-  const { id: _id, hasNode: _hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...identity } = installedEntry(id, { version })
+  const { id: _id, label: _label, hasNode: _hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...identity } = installedEntry(id, { version })
   return { id, identity: { ...identity, activation: 'node' }, bundle: null }
 }
 
@@ -208,7 +209,7 @@ describe('loaded CLI command dispatch', () => {
       permissions: { ...NO_PERMISSIONS, node: { ...NO_PERMISSIONS.node, core: ['tasks'] } },
       contributions: { ...installedEntry('fixture').contributions, cliCommands: commands },
     })
-    const { id: _id, hasNode: _hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...identity } = entry
+    const { id: _id, label: _label, hasNode: _hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...identity } = entry
     return { id: 'fixture', identity: { ...identity, activation: 'node' as const }, bundle: null }
   }
 

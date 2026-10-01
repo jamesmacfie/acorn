@@ -233,7 +233,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
           />
         </Modal.Body>
         <Modal.Actions>
-          <Button variant="bare" onPress={() => setRetrying(null)}>Cancel</Button>
+          <Button variant="ghost" onPress={() => setRetrying(null)}>Cancel</Button>
           <Button variant="solid" onPress={() => submitRetry(retrying() ?? undefined)}>Retry</Button>
         </Modal.Actions>
       </Modal>

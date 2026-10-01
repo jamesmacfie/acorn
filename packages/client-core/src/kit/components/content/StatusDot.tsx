@@ -9,6 +9,9 @@ export function StatusDot(props: {
   mixed?: boolean
   pulse?: boolean
   label?: string
+  /** What the colour means, on hover. Asked for rather than taken from `label`: a dot inside a tipped
+   *  rail tab would otherwise answer the pointer first and hide the tab's own tip. */
+  tip?: string
   size?: Extract<Size, 'sm' | 'md'>
 }) {
   return (
@@ -21,6 +24,7 @@ export function StatusDot(props: {
       role={props.label ? 'status' : undefined}
       aria-label={props.label}
       aria-hidden={props.label ? undefined : 'true'}
+      data-tip={props.tip}
     />
   )
 }

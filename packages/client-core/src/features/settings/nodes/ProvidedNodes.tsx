@@ -13,7 +13,11 @@ import {
 } from '../../../infra/node/providedNodes'
 import { nodes } from '../../../infra/node/fleet'
 import { canPairNodes } from '../../../infra/platform'
-import { Alert, Badge, Button, Input } from '../../../kit/components/primitives'
+import { Alert, Badge, Button, Card, Field, Input } from '../../../kit/components/primitives'
+import Icon from '../../../kit/components/content/Icon'
+import { Inline } from '../../../kit/components/layout/Inline'
+import { Stack } from '../../../kit/components/layout/Stack'
+import { pluginLabel } from '../../../host/plugins/pluginLabel'
 import { confirmAction } from '../../../host/registries/shell/willPhase'
 import { SettingRow } from '../../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../../kit/components/layout/SettingsSection'
@@ -89,32 +93,38 @@ export default function ProvidedNodes() {
     }
   }
 
+  // A provider's own name, or its plugin's when no node listed the provider: its id is
+  // `<pluginId>:<providerId>`.
+  const providerName = (id: string): string =>
+    provided().rows.flatMap((answer) => answer.data.providers).find((provider) => provider.id === id)?.label
+      ?? pluginLabel(id.split(':')[0]!)
+
   return (
     <Show when={hasNodeProviders(provided())}>
       <SettingsSection
         id="provided"
         label="Nodes from a provider"
-        description="Machines a plugin on one of your nodes knows about. Adopting one adds it to this client's fleet; the plugin vouches for its identity, and acorn checks that against the certificate the node presents."
+        help="Machines a plugin, such as a cloud provider, can run for you. Add one to use it here. acorn checks its identity when it connects."
       >
         {/* A provider that could not answer is a line, never a failed page: the rest of the list is
             still true (docs/architecture-overview.md § Client state and fleet behavior). */}
         <For each={providerFailures(provided())}>
-          {(failure) => <Alert tone="warn" variant="banner">{failure.providerId} could not list its nodes — {failure.reason}</Alert>}
+          {(failure) => <Alert tone="warn" variant="banner">{providerName(failure.providerId)} couldn't list its machines: {failure.reason}</Alert>}
         </For>
 
         <For each={rows()}>
           {(row: ProvidedNodeRow) => (
             <SettingRow label={row.label} description={row.endpoint ?? row.providerNodeId}>
-              <div class="node-actions">
+              <Inline gap="row" wrap>
                 <Badge tone={STATE_TONE[row.state]}>{STATE_LABEL[row.state]}</Badge>
-                <span class="node-badge">via {row.providerLabel}</span>
-                <Show when={row.adoptedAs}><span class="node-badge">In this fleet</span></Show>
+                <Badge size="xs">From {row.providerLabel}</Badge>
+                <Show when={row.adoptedAs}><Badge size="xs">In this fleet</Badge></Show>
                 {/* Adoption needs a host that holds device tokens. In a plain browser served by a
                     node there is none, so the row shows without the button rather than offering one
                     that cannot work. */}
                 <Show when={!row.adoptedAs && row.state === 'ready' && canPairNodes()}>
-                  <Button disabled={busy()} onPress={() => void run(async () => { await adoptProvidedNode(row) })}>
-                    Add to this client
+                  <Button size="sm" disabled={busy()} onPress={() => void run(async () => { await adoptProvidedNode(row) })}>
+                    Add to this computer
                   </Button>
                 </Show>
                 <For each={OFFERED[row.state].filter((verb) => row.verbs.includes(verb))}>
@@ -122,7 +132,7 @@ export default function ProvidedNodes() {
                     <Show
                       when={NODE_LIFECYCLE_RISK[verb] === 'execute'}
                       fallback={
-                        <Button disabled={busy()} onPress={() => void run(() => runNodeLifecycle(verb, row))}>
+                        <Button size="sm" disabled={busy()} onPress={() => void run(() => runNodeLifecycle(verb, row))}>
                           {VERB_LABEL[verb]}
                         </Button>
                       }
@@ -132,11 +142,12 @@ export default function ProvidedNodes() {
                           is the most consequential button in the product, and it is the only one here
                           that asks twice. */}
                       <Button
+                        size="sm"
                         tone="danger"
                         disabled={busy()}
                         onPress={async () => {
                           const confirmed = await confirmAction({
-                            title: `${VERB_LABEL[verb]} ${row.label}?`,
+                            title: `${VERB_LABEL[verb]} ${row.label}`,
                             actionLabel: VERB_LABEL[verb],
                             goes: `${row.providerLabel} ${VERB_LABEL[verb].toLowerCase()}s ${row.label}, with everything stored on that machine.`,
                             stays: 'Your other nodes, and everything this device keeps, stay as they are.',
@@ -150,7 +161,7 @@ export default function ProvidedNodes() {
                     </Show>
                   )}
                 </For>
-              </div>
+              </Inline>
             </SettingRow>
           )}
         </For>
@@ -166,21 +177,26 @@ export default function ProvidedNodes() {
                 when={creating() === target().id}
                 fallback={
                   <Button onPress={() => { setCreating(target().id); setNewLabel('') }}>
-                    <span class="integration-add-icon">+</span> New node on {target().label}
+                    <Icon name="plus" /> New node on {target().label}
                   </Button>
                 }
               >
-                <div class="node-step">
-                  <SettingRow label="Name for the new node" layout="stacked">
+                {/* The settings page's one boxed-form shape: a card of fields, then the primary
+                    action and Cancel under the last one. */}
+                <Card>
+                  <Stack gap="row">
+                  <Field label="Name for the new node">
                     <Input
                       label="Name for the new node"
                       value={newLabel()}
                       ref={(el) => queueMicrotask(() => el.focus())}
                       onInput={(value) => setNewLabel(value)}
                     />
-                  </SettingRow>
-                  <div class="node-step-actions">
+                  </Field>
+                  <Inline gap="row">
                     <Button
+                      variant="solid"
+                      tone="accent"
                       disabled={busy() || !newLabel().trim()}
                       onPress={() => void run(async () => {
                         await createProvidedNode({ providerId: target().id, sourceNodeId: target().sourceNodeId }, newLabel().trim())
@@ -189,9 +205,10 @@ export default function ProvidedNodes() {
                     >
                       {busy() ? 'Creating…' : 'Create'}
                     </Button>
-                    <Button onPress={() => setCreating(null)}>Cancel</Button>
-                  </div>
-                </div>
+                    <Button variant="ghost" onPress={() => setCreating(null)}>Cancel</Button>
+                  </Inline>
+                  </Stack>
+                </Card>
               </Show>
             )
           }}

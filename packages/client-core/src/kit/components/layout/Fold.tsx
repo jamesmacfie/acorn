@@ -35,6 +35,9 @@ export function Fold(props: {
   /** Beside the label rather than after the actions: context's per-section Meter, docker's stream
    *  state. A fact about the fold, not a control on it. */
   meta?: JSX.Element
+  /** A control that belongs to the whole fold, drawn before the label: Context's include box, so the
+   *  box sits beside the name it switches. Click-isolated from the toggle, the same as `actions`. */
+  leading?: JSX.Element
   /** Rendered in the summary row and click-isolated from the toggle: a CopyButton in a fold's header
    *  must not open the fold. */
   actions?: JSX.Element
@@ -60,6 +63,7 @@ export function Fold(props: {
   const visited = createMemo((previous) => previous || open(), false)
   // Read once, for the reason on Row's parts (./Row.tsx): testing a slot and then inserting it
   // ran the caller's JSX twice, and a transcript's tool card built its whole status line twice.
+  const leading = children(() => props.leading)
   const meta = children(() => props.meta)
   const actions = children(() => props.actions)
 
@@ -80,6 +84,9 @@ export function Fold(props: {
           pack styles both with one selector. */}
       <summary class="section-header ui-fold-summary" data-level={props.level ?? 'group'}>
         <span class="ui-fold-marker" aria-hidden="true" />
+        <Show when={leading()}>
+          <span class="ui-fold-leading" onClick={(event) => event.stopPropagation()}>{leading()}</span>
+        </Show>
         <span class="ui-section-header-label">{props.label}</span>
         <Show when={props.count != null}><span class="ui-section-header-count">{props.count}</span></Show>
         <Show when={meta()}><span class="ui-fold-meta">{meta()}</span></Show>

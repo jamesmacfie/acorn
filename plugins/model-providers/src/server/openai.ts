@@ -62,7 +62,7 @@ export const createOpenAIProviders = (
         label: 'API key',
         type: 'password',
         placeholder: 'sk-…',
-        hint: 'OpenAI Platform → API keys. The key stays encrypted on this Mac.',
+        hint: 'OpenAI Platform → API keys. acorn stores it encrypted.',
         required: true,
       }],
       async validate(credentials) {

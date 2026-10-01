@@ -105,6 +105,20 @@ describe('the kit as a plugin writes it', () => {
     expect(pressed).toHaveBeenCalledTimes(1)
   })
 
+  it('draws a tree Button that has only a label', async () => {
+    // A tree hands every node its children as a list, and an empty list is truthy, so the label used
+    // to lose to an empty body and the button drew as an empty box.
+    await draw(() => node('Button', { variant: 'outline', size: 'sm', label: 'Open agent run' }), host)
+    expect(host.querySelector('button')!.textContent).toBe('Open agent run')
+  })
+
+  it('draws a number among a Text node\'s children', async () => {
+    // What `<Text>{200} OK</Text>` compiles to: the universal renderer passes the 200 through as a
+    // number, which the wire used to turn into nothing.
+    await draw(() => node('Text', { children: [200, ' OK'] }), host)
+    expect(host.querySelector('.ui-text')!.textContent).toBe('200 OK')
+  })
+
   it('refuses a class a plugin tried to set, and still draws the node', async () => {
     const refused: string[] = []
     const batches: TreeMutation[][] = []

@@ -22,7 +22,7 @@ export const changesClientPlugin: ClientPlugin = {
     ctx.commands.register({
       id: 'changes.open',
       title: 'Open the Changes pane',
-      hint: 'the diff between this task and its base',
+      hint: 'what changed in this task',
       keywords: ['diff', 'git', 'staged', 'commit'],
       category: 'navigation',
       palette: true,

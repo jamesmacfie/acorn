@@ -72,7 +72,7 @@
   color: var(--text-muted);
   background: var(--bg-subtle);
   border: var(--control-border);
-  font: 9px/1 var(--font-ui);
+  font: var(--fs-2xs)/1 var(--font-ui);
   cursor: pointer;
 }
 .tabrail-task-disclosure:hover,
@@ -90,7 +90,8 @@
   background: transparent;
   border: 0;
   border-bottom: var(--divider);
-  border-left: var(--tab-active-w) solid transparent;
+  /* The stripe width on every rail control, so a source, a task, and a pane share one active edge. */
+  border-left: var(--stripe-w) solid transparent;
   cursor: pointer;
   line-height: 1;
   position: relative;
@@ -116,7 +117,7 @@
 
 /* A second line under the glyph, for run targets. */
 .tabrail-tab-sub {
-  font-size: 8px;
+  font-size: var(--fs-2xs);
   line-height: 1;
   max-width: 100%;
   overflow: hidden;
@@ -150,7 +151,7 @@
   bottom: 4px;
   inset-inline-start: 0;
   inset-inline-end: 0;
-  font-size: 9px;
+  font-size: var(--fs-2xs);
   text-align: center;
 }
 .tabrail-marker[data-tone="accent"] { color: var(--accent); }
@@ -159,7 +160,9 @@
 
 /* Sources zone (docs/workspaces-and-tasks.md): fixed browse entry points above the workspace roster. */
 .tabrail-zone { flex: none; }
-.tabrail-source { font-size: var(--fs-md); }
+.tabrail-source { font-size: var(--fs-lg); }
+/* The separator below draws the line here, so the last source does not draw a second one 4px above it. */
+.tabrail-sources > .tabrail-tab:last-child { border-bottom: 0; }
 
 /* Unicode source glyphs stay on the mono stack in every style pack: the box-drawing and dingbat
    characters only have consistent metrics there. */

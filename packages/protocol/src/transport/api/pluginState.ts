@@ -7,7 +7,14 @@
 // init threw is `'failed'`. It stays out of `running` because `restartRequired` is computed from
 // `running` alone, and a restart cannot fix a broken plugin (docs/plugins.md § Loaded plugins).
 export type NodePluginRow = {
+  /** The plugin's id. Routes, files, settings keys and the command line all use it. */
   name: string
+  /** The name a person reads, such as "GitHub" or "API requests". A loaded plugin's comes from its
+   * manifest `name`, and a compiled plugin's from its definition. Display text only: never key
+   * anything on it. Optional so a node that predates it still parses, and so the client can fall back
+   * to the id (client-core/host/plugins/pluginLabel.ts). A loaded plugin writes its own, so trust
+   * prompts keep showing the id. */
+  label?: string
   /** Events this running or installed plugin declares for cross-plugin subscribers. */
   emits?: readonly import('../../plugin/contract.ts').PluginEmit[]
   required: boolean

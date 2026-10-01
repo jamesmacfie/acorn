@@ -129,7 +129,7 @@ describe('the custom agents settings page', () => {
     await settle()
     buttons(host, 'Delete agent')[0]!.click()
     await settle()
-    expect(confirmAction).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Delete Bug reviewer?' }))
+    expect(confirmAction).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Delete Bug reviewer' }))
     expect(deleteCustomAgent).not.toHaveBeenCalled()
 
     confirmAction.mockResolvedValueOnce(true)

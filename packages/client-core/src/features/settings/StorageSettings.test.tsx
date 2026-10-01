@@ -52,7 +52,6 @@ describe('Settings → Storage and memory', () => {
   it('draws the node\'s numbers and this device\'s saved cache', async () => {
     await settle()
     const text = host.textContent ?? ''
-    expect(text).toContain('Studio: what the node holds')
     expect(text).toContain('about 300 MB')
     expect(text).toContain('agents plugin')
     expect(text).toContain('1.3 GB')
@@ -76,7 +75,7 @@ describe('Settings → Storage and memory', () => {
   it('clears the cache of the node on screen and reads the sizes again', async () => {
     await settle()
     mocks.saved.mockResolvedValue(null)
-    const button = [...host.querySelectorAll('button')].find((candidate) => candidate.textContent?.includes('Clear cache'))!
+    const button = [...host.querySelectorAll('button')].find((candidate) => candidate.textContent?.includes("Clear this node's copy"))!
     button.click()
     await settle()
     expect(mocks.clear).toHaveBeenCalledWith('node-1')

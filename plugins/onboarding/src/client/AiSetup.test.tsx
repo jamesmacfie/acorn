@@ -1,6 +1,6 @@
 import { render } from 'solid-js/web'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { Wizard } from '@acorn/plugin-api/ui/host'
 import { integrationsKey, modelBackendsKey } from '@acorn/protocol/api.ts'
 import type { IntegrationsResponse } from '@acorn/protocol/api.ts'
@@ -33,6 +33,11 @@ const noProviders: IntegrationsResponse = { providers: [], integrations: [] }
 
 let host: HTMLDivElement
 let dispose: (() => void) | undefined
+
+// jsdom has no layout, so it has no scrollIntoView. The key form scrolls itself into view as it opens.
+beforeAll(() => {
+  if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {}
+})
 
 afterEach(() => {
   dispose?.()
@@ -71,9 +76,9 @@ describe('the AI step', () => {
   it('reports an installed CLI and one that is not on this machine', () => {
     mount(backends, noProviders)
     expect(text()).toContain('Claude Code')
-    expect(text()).toContain('Installed. Generate SQL, commit messages, and workflows with it.')
+    expect(text()).toContain('Installed')
     expect(text()).toContain('Codex')
-    expect(text()).toContain('Not found on this machine.')
+    expect(text()).toContain('Not installed')
     // Quiet, not an error. A missing CLI is a fact about the machine, and an alert here would read as
     // something the reader has to fix before going on.
     expect(host.querySelector('.ui-alert')).toBeNull()
@@ -85,7 +90,7 @@ describe('the AI step', () => {
     expect(next).toBeTruthy()
     expect(next!.disabled).toBe(false)
     // The one line that has to be there when there is nothing else to say.
-    expect(text()).toContain('Settings, under AI models')
+    expect(text()).toContain('later in Settings under AI models')
   })
 
   it('offers a key form built from the provider descriptor', () => {

@@ -1,7 +1,7 @@
 import { createEffect, For, Show, type JSX } from 'solid-js'
 import Icon from '../content/Icon'
 import { createCollection } from '../../keys/collection'
-import { revealActiveTab } from './tabScroll'
+import { revealActiveTab, trackTabOverflow } from './tabScroll'
 
 export type TabDef = {
   id: string
@@ -10,7 +10,7 @@ export type TabDef = {
   /** A Lucide name, drawn before the label. For a strip whose labels are numbers and whose tabs
    *  differ by kind: github's pull strip labels every tab `#1234` and marks the related ones. */
   icon?: string
-  /** Hover and screen-reader text, where the label alone does not say what the tab is. */
+  /** The tip on hover and focus, where the label alone does not say what the tab is. */
   title?: string
 }
 
@@ -50,6 +50,7 @@ export function Tabs(props: {
 
   const bindStrip = (element: HTMLDivElement) => {
     stripRef = element
+    trackTabOverflow(element)
     const attachCollection = collection.containerProps.ref as (element: HTMLElement) => void
     attachCollection(element)
   }
@@ -75,10 +76,10 @@ export function Tabs(props: {
             aria-controls={`${props.idPrefix}-panel-${t.id}`}
             class="ui-tab"
             classList={{ active: props.active === t.id }}
-            title={t.title}
+            data-tip={t.title}
             onClick={() => props.onChange(t.id)}
           >
-            <Show when={t.icon}>{(name) => <Icon name={name()} size={12} />}</Show>
+            <Show when={t.icon}>{(name) => <Icon name={name()} />}</Show>
             {t.label}
             <Show when={t.count != null}><span class="ui-tab-count">{t.count}</span></Show>
           </button>

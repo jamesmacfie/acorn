@@ -3,10 +3,10 @@ import type { AgentAttachment, AgentConfigOption, AgentInputPart, AgentSession }
 import { agentContextBudget, type AgentContextContribution, type AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import { AGENT_COMPOSER_ACTIONS_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { managedAgentApi } from '../sessions/managedClient'
-import { agentContextContributions, clearLocal, pickFiles, readLocal, writeLocal } from '@acorn/plugin-api/client'
+import { agentContextContributions, clearLocal, formatChord, pickFiles, readLocal, writeLocal } from '@acorn/plugin-api/client'
 import {
   Alert, Button, Chip, ChipRow, CodeBlock, Field, Icon, IconButton, Inline, Kbd, MentionTextarea, Only, Picker,
-  Popover, Select, Stack, Text, Toolbar, type MentionSegment, type MentionSource,
+  Popover, SectionHeader, Select, Stack, Text, Toolbar, type MentionSegment, type MentionSource,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { consumeComposerFocus } from '../sessions/managedSelection'
@@ -671,7 +671,7 @@ export default function AgentComposer(props: {
               label={expanded() ? 'Collapse the message box' : 'Expand the message box'}
               pressed={expanded()}
               tip={expanded() ? 'Collapse' : 'Expand'}
-              tipKey="⌘⇧↩"
+              tipKey={formatChord('meta+shift+enter')}
               onPress={() => setExpanded((current) => !current)}
             />
           </Only>
@@ -744,9 +744,12 @@ export default function AgentComposer(props: {
               </Button>
             )}
           >
-            <CodeBlock wrap maxHeight="block">
-              {contexts().map((context) => `## ${context.label}\n${context.content}`).join('\n\n')}
-            </CodeBlock>
+            <Stack gap="row">
+              <SectionHeader level="group">Sent context</SectionHeader>
+              <CodeBlock wrap maxHeight="block">
+                {contexts().map((context) => `## ${context.label}\n${context.content}`).join('\n\n')}
+              </CodeBlock>
+            </Stack>
           </Popover>
         </Show>
         {/* Room for another plugin beside this pane's own controls. A `stack` point: several plugins
@@ -758,7 +761,7 @@ export default function AgentComposer(props: {
           props={() => ({ taskId: props.session.taskId, sessionId: props.session.id })}
         />
         <Toolbar.Spacer />
-        <Text emphasis="muted"><Kbd size="xs">Shift+Enter</Kbd> for newline</Text>
+        <Text emphasis="muted"><Kbd size="xs">{formatChord('shift+enter')}</Kbd> for newline</Text>
         <Button
           variant="solid"
           tone="accent"

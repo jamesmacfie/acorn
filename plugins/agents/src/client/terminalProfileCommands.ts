@@ -32,6 +32,6 @@ const command = (id: string, title: string, hint: string, profileId: string): Co
 })
 
 export const harnessTerminalCommands: readonly CommandContribution[] = [
-  command('task.terminal.new-claude', 'New Claude Code terminal', 'run claude in the task worktree', 'claude-code'),
-  command('task.terminal.new-codex', 'New Codex terminal', 'run codex in the task worktree', 'codex'),
+  command('task.terminal.new-claude', 'New Claude Code terminal', 'run Claude Code in this task’s folder', 'claude-code'),
+  command('task.terminal.new-codex', 'New Codex terminal', 'run Codex in this task’s folder', 'codex'),
 ]

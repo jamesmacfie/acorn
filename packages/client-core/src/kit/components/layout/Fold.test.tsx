@@ -54,7 +54,7 @@ it('builds each slot once, in a fold header and a row', () => {
   }
   const dispose = render(() => (
     <>
-      <Fold label="Tool" meta={<Mark />} actions={<Mark />}>
+      <Fold label="Tool" leading={<Mark />} meta={<Mark />} actions={<Mark />}>
         <span />
       </Fold>
       <Row leading={<Mark />} meta={<Mark />} trailing={<Mark />}>Changed files</Row>
@@ -62,8 +62,28 @@ it('builds each slot once, in a fold header and a row', () => {
     </>
   ), host)
   try {
-    expect(host.querySelectorAll('b')).toHaveLength(6)
-    expect(built).toBe(6)
+    expect(host.querySelectorAll('b')).toHaveLength(7)
+    expect(built).toBe(7)
+  } finally {
+    dispose()
+  }
+})
+
+// The include box on a Context section rides here, and pressing it must not open or close the fold.
+it('draws a leading control before the label without toggling the fold', () => {
+  const host = document.createElement('div')
+  const dispose = render(() => (
+    <Fold label="Notes" leading={<input type="checkbox" aria-label="Include notes" />}>
+      <span>Body</span>
+    </Fold>
+  ), host)
+  try {
+    const summary = host.querySelector('summary')!
+    const box = summary.querySelector('input')!
+    expect(box.compareDocumentPosition(summary.querySelector('.ui-section-header-label')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    box.click()
+    expect(box.checked).toBe(true)
+    expect(host.querySelector('details')!.open).toBe(false)
   } finally {
     dispose()
   }

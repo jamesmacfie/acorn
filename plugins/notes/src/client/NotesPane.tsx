@@ -58,7 +58,7 @@ export function NotesList(props: { task: Task; model: NotesModel }) {
             iconOnly
             label="Delete note"
             title={`Delete ${rowProps.note.title}`}
-            confirmLabel="Confirm delete"
+            confirmLabel="Delete note?"
             onConfirm={() => void model().remove(rowProps.scope, rowProps.note.slug)}
           ><Icon name="x" /></ConfirmButton>
         }

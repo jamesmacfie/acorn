@@ -62,7 +62,7 @@ const text = () => host.textContent ?? ''
 
 describe('ExtensionPointsDev', () => {
   it('says nothing is open when nothing is', () => {
-    expect(text()).toContain('No plugin here has opened a point')
+    expect(text()).toContain('No plugin offers an extension point')
     expect(text()).toContain('Everything contributed here has somewhere to go')
   })
 
@@ -72,8 +72,8 @@ describe('ExtensionPointsDev', () => {
     contribution('tracker', 'board:card-links', 'items')
     dispose()
     dispose = render(() => <ExtensionPointsDev />, host)
-    expect(text()).toContain('filled by tracker')
-    expect(text()).toContain('nobody fills it')
+    expect(text()).toContain('Used by tracker.')
+    expect(text()).toContain('Not used.')
   })
 
   it('names a contribution whose point nobody declared, and guesses what was meant', () => {
@@ -82,8 +82,8 @@ describe('ExtensionPointsDev', () => {
     dispose()
     dispose = render(() => <ExtensionPointsDev />, host)
     expect(text()).toContain('tracker → board:card-link')
-    expect(text()).toContain('no plugin on this node declares that point')
-    expect(text()).toContain('did you mean board:card-links?')
+    expect(text()).toContain('No plugin on this node declares that point.')
+    expect(text()).toContain('Did you mean board:card-links?')
   })
 
   it('names a contribution whose carrier the point does not take', () => {
@@ -91,7 +91,7 @@ describe('ExtensionPointsDev', () => {
     contribution('tracker', 'board:card-links', 'remote')
     dispose()
     dispose = render(() => <ExtensionPointsDev />, host)
-    expect(text()).toContain('that point takes rows, and this contributes remote')
+    expect(text()).toContain('That point takes rows, and this contributes remote.')
   })
 
   it('offers a picker only where two contributors are tied for one replace slot', () => {

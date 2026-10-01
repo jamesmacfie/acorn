@@ -294,7 +294,7 @@ export function RunRecords(props: {
                 <Text emphasis="muted">The child task is missing or archived. Its run history is retained here.</Text>
               </Show>
               <Show when={recordCanRetry(row())}>
-                <ConfirmButton size="sm" confirmLabel="Retry this failed attempt with its original snapshot?" disabled={busy()} onConfirm={() => void retry(row())}>Retry attempt</ConfirmButton>
+                <ConfirmButton size="sm" confirmLabel="Retry attempt?" tip="Runs this failed attempt again from its original snapshot" disabled={busy()} onConfirm={() => void retry(row())}>Retry attempt</ConfirmButton>
               </Show>
               <Show when={recordCanReprocess(row())}>
                 <Button size="sm" disabled={busy()} onPress={() => void prepare(row())}>Reprocess…</Button>
@@ -304,7 +304,7 @@ export function RunRecords(props: {
               <Alert tone="warn" title={`Reprocess ${review().title}`}>
                 <Stack gap="row">
                   <Text>This creates a new root attempt from the frozen input. It does not rerun the source query or restart successful siblings.</Text>
-                  <ConfirmButton size="sm" confirmLabel="Create this new attempt?" disabled={busy()} onConfirm={() => void reprocess(row())}>Create new attempt</ConfirmButton>
+                  <ConfirmButton size="sm" confirmLabel="Start attempt?" disabled={busy()} onConfirm={() => void reprocess(row())}>Create new attempt</ConfirmButton>
                 </Stack>
               </Alert>
             )}</Show>

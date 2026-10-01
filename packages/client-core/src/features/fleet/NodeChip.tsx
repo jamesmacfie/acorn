@@ -53,17 +53,20 @@ export default function NodeChip(props: { nodeId: string; label?: string; query?
     // "never" is true of a node that is still starting and reads as an accusation. Nothing to add.
     (starting() ? '' : freshness() === 'stale' || freshness() === 'offline' ? formatLastSeen(status()?.lastSeenAt) : '')
 
+  // One word for the state, on the chip and in its tip.
+  const stateLabel = () => hard()?.label ?? (starting() ? 'Starting' : FRESHNESS_LABELS[freshness()])
+
   return (
     <span
       class="node-chip"
       classList={{ compact: props.compact }}
       data-freshness={hard() ? 'error' : freshness()}
-      data-tip={`${label()}: ${starting() ? 'starting' : nodeState(props.nodeId)}`}
+      data-tip={`${label()}: ${stateLabel()}`}
       data-tip-sub={detail() || undefined}
     >
       <StatusDot tone={FRESHNESS_TONE[hard() ? 'error' : freshness()]} />
       <Show when={props.label}>{(label) => <span class="node-chip-label">{label()}</span>}</Show>
-      <span class="node-chip-state">{hard()?.label ?? (starting() ? 'Starting' : FRESHNESS_LABELS[freshness()])}</span>
+      <span class="node-chip-state">{stateLabel()}</span>
       <Show when={detail() && !hard()}>
         <span class="node-chip-age">{detail()}</span>
       </Show>

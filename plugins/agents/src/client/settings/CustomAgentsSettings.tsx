@@ -1,6 +1,6 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createMemo, createResource, createSignal, For, Show, type Accessor } from 'solid-js'
-import { useSettingsDetail, useUnsavedChanges } from '@acorn/plugin-api/client'
+import { pluginLabel, useSettingsDetail, useUnsavedChanges } from '@acorn/plugin-api/client'
 import {
   Alert, Button, Chip, Field, Inline, Input, Select, SettingRow, SettingsSection, Stack, Text, Textarea, Toolbar,
 } from '@acorn/plugin-api/ui'
@@ -74,7 +74,7 @@ export default function CustomAgentsSettings() {
       <Inline>
         <ProviderGlyph glyph={agent.glyph ?? providerFor(agent.providerId)?.glyph} label={agent.name} />
         <Show when={agent.source.kind === 'plugin' ? agent.source.pluginId : undefined}>
-          {(pluginId) => <Chip size="xs">From {pluginId()}</Chip>}
+          {(pluginId) => <Chip size="xs">From {pluginLabel(pluginId())}</Chip>}
         </Show>
         <Show when={agent.source.kind === 'user'}>
           <Button size="sm" variant="ghost" onPress={() => open(agent.id, inputOf(agent))}>Edit</Button>
@@ -100,7 +100,7 @@ export default function CustomAgentsSettings() {
               label="Custom agents"
               description="A custom agent is a harness with the settings, instructions, and tool access a session should start on. Each one appears under New in the Agent pane and in the command palette. Editing an agent changes the sessions you start from it later, not the ones already running."
               actions={
-                <Button variant="solid" onPress={create} disabled={!providers()?.some((provider) => provider.installed)}>
+                <Button onPress={create} disabled={!providers()?.some((provider) => provider.installed)}>
                   New agent
                 </Button>
               }
@@ -170,7 +170,7 @@ function AgentEditor(props: {
   const back = () => {
     if (!dirty()) return props.onClose()
     void confirmAction({
-      title: 'Discard unsaved changes?',
+      title: 'Discard unsaved changes',
       actionLabel: 'Discard changes',
       goes: 'The changes to this agent that are not saved yet.',
       stays: props.editing().id ? 'The agent as it was last saved.' : undefined,
@@ -197,7 +197,7 @@ function AgentEditor(props: {
     const current = props.editing()
     if (!current.id) return
     const confirmed = await confirmAction({
-      title: `Delete ${current.opened.name}?`,
+      title: `Delete ${current.opened.name}`,
       actionLabel: 'Delete agent',
       goes: `The custom agent ${current.opened.name}, and its place under New and in the command palette.`,
       stays: 'Sessions you already started from it keep running with the settings they started on.',

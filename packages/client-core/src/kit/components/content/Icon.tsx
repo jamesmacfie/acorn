@@ -1,4 +1,4 @@
-import { For, Match, Show, Switch } from 'solid-js'
+import { For, Match, Switch } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { BRAND, brandMarkRegistry } from '../../tokens/brandMarks'
 import { iconNode } from '../../tokens/iconNodes'
@@ -36,7 +36,10 @@ export default function Icon(props: {
     height: props.size ?? '1em',
     viewBox: '0 0 24 24',
     role: props.title ? ('img' as const) : undefined,
+    'aria-label': props.title,
     'aria-hidden': props.title ? undefined : true,
+    // The app's tip, not an SVG <title>, which the browser shows as a second kind of tooltip.
+    'data-tip': props.title,
   })
   return (
     <Switch
@@ -47,8 +50,10 @@ export default function Icon(props: {
           data-tone={props.tone}
           data-spin={props.spin ? '' : undefined}
           style={style()}
+          role={props.title ? 'img' : undefined}
+          aria-label={props.title}
           aria-hidden={props.title ? undefined : true}
-          title={props.title}
+          data-tip={props.title}
         >
           {props.name}
         </span>
@@ -57,7 +62,6 @@ export default function Icon(props: {
       <Match when={mark()}>
         {(brand) => (
           <svg {...shared()} fill="currentColor">
-            <Show when={props.title}>{(t) => <title>{t()}</title>}</Show>
             <path d={brand().d} />
           </svg>
         )}
@@ -76,7 +80,6 @@ export default function Icon(props: {
             stroke-linecap="round"
             stroke-linejoin="round"
           >
-            <Show when={props.title}>{(t) => <title>{t()}</title>}</Show>
             <For each={icon()}>{([tag, attrs]) => <Dynamic component={tag} {...attrs} />}</For>
           </svg>
         )}

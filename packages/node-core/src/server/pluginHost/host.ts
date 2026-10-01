@@ -88,6 +88,9 @@ export type PluginHostOptions = {
 // whole list, including a checkbox for one the owner turned off, and which names are `required`.
 export type PluginRosterEntry = {
   name: string
+  // A compiled plugin's display name, from its definition. Absent for a loaded plugin, whose name
+  // comes from its manifest (server/pluginHost/state.ts).
+  label?: string
   emits?: readonly PluginEmit[]
   required: boolean
   disabled: boolean
@@ -547,6 +550,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     const failure = failures.get(plugin.name)
     return {
       name: plugin.name,
+      ...(plugin.label ? { label: plugin.label } : {}),
       ...(plugin.emits?.length ? { emits: plugin.emits } : {}),
       required: plugin.required === true,
       disabled: isDisabled,

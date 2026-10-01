@@ -7,7 +7,8 @@ import { isValidBranch, slugifyBranch } from '@acorn/protocol/branch.ts'
 import { sourceRegistry } from '../../host/registries/sources/sources'
 import { Tabs } from '../../kit/components/layout/Tabs'
 import { createDismissable } from '../../kit/lib/controls/dismissable'
-import { Alert, Button, Checkbox, Input, Select } from '../../kit/components/primitives'
+import { Alert, Button, Checkbox, Field, Input, Select, ToolbarSpacer } from '../../kit/components/primitives'
+import { Inline } from '../../kit/components/layout/Inline'
 import { taskBridge } from '../tasks/taskBridge'
 import { defaultBranchForTask } from '../tasks/defaultBranch'
 
@@ -187,33 +188,35 @@ export function PromoteToTaskModal(props: {
           <Show when={mode() === 'new'}>
             <form id="promote-panel-new" role="tabpanel" class="integration-key-row" style={formStyle} onSubmit={submitNew}>
               <p class="muted">New task in {project()?.name ?? 'this project'}.</p>
-              <Input placeholder="Task title" value={title()} disabled={!!prepared()} onInput={(value) => setTitle(value)} />
+              <Field label="Title">
+                <Input value={title()} disabled={!!prepared()} onInput={(value) => setTitle(value)} />
+              </Field>
               <Show when={project()?.vcs === 'git'}>
-                <Input
-                  placeholder="branch (from title)"
-                  title="Branch name — defaults to a slug of the title"
-                  value={branchTouched() || branch().trim() ? branch() : defaultBranch()}
-                  disabled={!!prepared()}
-                  onInput={(value) => {
-                    setBranch(value)
-                    setBranchTouched(true)
-                  }}
-                />
+                <Field label="Branch">
+                  <Input
+                    value={branchTouched() || branch().trim() ? branch() : defaultBranch()}
+                    disabled={!!prepared()}
+                    onInput={(value) => {
+                      setBranch(value)
+                      setBranchTouched(true)
+                    }}
+                  />
+                </Field>
                 <Checkbox
                   size="sm"
                   label="Skip setup script"
-                  title="Do not run this project's setup script for this task"
                   checked={skipSetup()}
                   disabled={!!prepared()}
                   onChange={setSkipSetup}
                 />
               </Show>
-              <div class="close-actions">
-                <Button onPress={props.onClose}>Cancel</Button>
-                <Button submit disabled={busy() || (props.action ? !props.action.ready() : false) || (!prepared() && (!title().trim() || (project()?.vcs === 'git' && !effectiveBranch())))}>
+              <Inline gap="row">
+                <ToolbarSpacer />
+                <Button variant="ghost" onPress={props.onClose}>Cancel</Button>
+                <Button variant="solid" submit disabled={busy() || (props.action ? !props.action.ready() : false) || (!prepared() && (!title().trim() || (project()?.vcs === 'git' && !effectiveBranch())))}>
                   {prepared() ? `Retry ${props.action?.label ?? 'action'}` : props.action ? `Create & ${props.action.label}` : 'Create task'}
                 </Button>
-              </div>
+              </Inline>
             </form>
           </Show>
 
@@ -225,12 +228,13 @@ export function PromoteToTaskModal(props: {
                 options={props.attachTasks.map((task) => ({ value: task.id, label: `${task.title} · ${task.branch}` }))}
                 onChange={(value) => setAttachId(value)}
               />
-              <div class="close-actions">
-                <Button onPress={props.onClose}>Cancel</Button>
-                <Button submit disabled={busy() || (props.action ? !props.action.ready() : false) || (!prepared() && !attachId())}>
-                  {prepared() ? `Retry ${props.action?.label ?? 'action'}` : props.action ? `Attach & ${props.action.label}` : 'Attach'}
+              <Inline gap="row">
+                <ToolbarSpacer />
+                <Button variant="ghost" onPress={props.onClose}>Cancel</Button>
+                <Button variant="solid" submit disabled={busy() || (props.action ? !props.action.ready() : false) || (!prepared() && !attachId())}>
+                  {prepared() ? `Retry ${props.action?.label ?? 'action'}` : props.action ? `Attach & ${props.action.label}` : 'Attach to task'}
                 </Button>
-              </div>
+              </Inline>
             </form>
           </Show>
         </div>

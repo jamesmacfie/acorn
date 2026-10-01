@@ -21,6 +21,18 @@ import type { Log } from '../components/content/Log'
 import type { Section } from '../components/layout/Section'
 import type { Stack } from '../components/layout/Stack'
 import type { Timeline } from '../components/content/Timeline'
+import type { SettingRow } from '../components/layout/SettingRow'
+import type { SettingsSection } from '../components/layout/SettingsSection'
+import type { Tabs } from '../components/layout/Tabs'
+import type { DocumentTabs } from '../components/layout/DocumentTabs'
+import type { Sections } from '../components/layout/Sections'
+import type { Text } from '../components/content/Text'
+import type { Link } from '../components/content/Link'
+import type { IconButton } from '../components/inputs/IconButton'
+import type { Modal } from '../components/overlays/Modal'
+import type { Menu } from '../components/overlays/Menu'
+import type Popover from '../components/overlays/Popover'
+import type Picker from '../components/inputs/Picker'
 
 /** The props of anything callable with props, whether it was written as a function or typed as a
  *  `Component`. */
@@ -69,6 +81,19 @@ type _Timeline = NoStyling<Styling<typeof Timeline>>
 type _ToggleButton = NoStyling<Styling<typeof ToggleButton>>
 type _Toolbar = NoStyling<Styling<typeof Toolbar>>
 type _TreeRow = NoStyling<Styling<typeof TreeRow>>
+type _SettingRow = NoStyling<Styling<typeof SettingRow>>
+type _SettingsSection = NoStyling<Styling<typeof SettingsSection>>
+type _Tabs = NoStyling<Styling<typeof Tabs>>
+type _DocumentTabs = NoStyling<Styling<typeof DocumentTabs>>
+type _Sections = NoStyling<Styling<typeof Sections>>
+type _Text = NoStyling<Styling<typeof Text>>
+type _Link = NoStyling<Styling<typeof Link>>
+type _IconButton = NoStyling<Styling<typeof IconButton>>
+type _Modal = NoStyling<Styling<typeof Modal>>
+type _Menu = NoStyling<Styling<typeof Menu>>
+type _Popover = NoStyling<Styling<typeof Popover>>
+type _MenuItem = NoStyling<Styling<typeof Menu.Item>>
+type _Picker = NoStyling<Styling<typeof Picker>>
 
 // A role-typed prop takes its enum and nothing else: `tone="brandpurple"` has to fail.
 type Assignable<T, Prop extends keyof PropsOf<T>> = string extends PropsOf<T>[Prop] ? Prop : never

@@ -1,5 +1,5 @@
 import { createResource, Show } from 'solid-js'
-import { Button } from '../../kit/components/primitives'
+import { Button, EmptyState } from '../../kit/components/primitives'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import { desktopExtras, deviceConfigBridge } from '../../infra/platform'
@@ -13,17 +13,22 @@ export default function DeviceConfigSettings() {
   return (
     <SettingsSection
       id="file"
-      label="Device config file"
-      description="Edit this file to change appearance, shortcuts and replacement surfaces on this device."
+      label="Location"
+      description="Your appearance, shortcut, and layout choices for this computer are saved here. You can edit the file by hand."
     >
-      <Show when={configPath()} fallback={<p class="muted">This app keeps no config file on this device.</p>}>{(path) =>
-        <SettingRow label="Location" layout="stacked">
-          <code>{path()}</code>
-          <Show when={desktopExtras()}>{(desktop) =>
-            <Button size="sm" onPress={() => void desktop().openConfigFile()}>Open config file</Button>
-          }</Show>
-        </SettingRow>
-      }</Show>
+      <Show
+        when={configPath()}
+        fallback={<EmptyState align="start" size="sm" busy={configPath.loading}>{configPath.loading ? undefined : 'This app keeps no config file on this device.'}</EmptyState>}
+      >
+        {(path) => (
+          // One row: the path is what the row describes, and opening it is the one thing to do.
+          <SettingRow label="File" description={path()}>
+            <Show when={desktopExtras()}>{(desktop) =>
+              <Button onPress={() => void desktop().openConfigFile()}>Open file</Button>
+            }</Show>
+          </SettingRow>
+        )}
+      </Show>
     </SettingsSection>
   )
 }

@@ -1,6 +1,6 @@
 import { splitProps } from 'solid-js'
 import { bindIntents } from '../../keys/keymapHost'
-import { assistAttrs, controlAttrs, type ControlOwn } from './controlAttrs'
+import { assistAttrs, claimField, controlAttrs, type ControlOwn } from './controlAttrs'
 
 export type TextareaProps = ControlOwn & {
   value?: string
@@ -39,9 +39,10 @@ export function Textarea(props: TextareaProps) {
     props,
     ['size', 'invalid', 'width', 'kind', 'label', 'title', 'id', 'name', 'disabled', 'required', 'autofocus', 'assist'],
   )
+  const field = claimField(own.id)
   return (
     <textarea
-      {...controlAttrs(own)}
+      {...controlAttrs(own, 'ui-input', field)}
       {...assistAttrs(own)}
       ref={props.onCommit ? (element) => {
         if (typeof props.ref === 'function') props.ref(element)

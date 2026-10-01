@@ -1,5 +1,6 @@
 import { createEffect, Show, type JSX } from 'solid-js'
 import type { Size } from '../../tokens/tokens'
+import { claimField } from './controlAttrs'
 
 /* Checkbox. See docs/ui-design.md § How the kit is built for why it styles the native
    input rather than rebuilding it, and how `switch` reuses the same element. */
@@ -23,6 +24,12 @@ export function Checkbox(props: {
   onChange?: (checked: boolean) => unknown
 }) {
   let ref: HTMLInputElement | undefined
+  // A labelled box is md unless asked otherwise. An unlabelled one keeps the small box a table or a
+  // list row draws, unless a caller asks for md.
+  const size = () => props.size ?? (props.label ? 'md' : 'sm')
+  // A box with words of its own is named by them. A bare one takes the caption of the row or field it
+  // sits in, which is what makes clicking "Play a sound" flip the switch beside it.
+  const field = props.label ? undefined : claimField(props.id)
   // Tri-state is a DOM property, not an attribute, so it takes an effect.
   createEffect(() => {
     if (ref) ref.indeterminate = !!props.indeterminate
@@ -32,12 +39,15 @@ export function Checkbox(props: {
       ref={(el) => { ref = el }}
       type="checkbox"
       class="ui-check-box"
-      id={props.id}
+      data-size={size()}
+      id={field?.id ?? props.id}
       name={props.name}
       checked={props.checked}
       disabled={props.disabled}
-      title={props.label ? undefined : props.title}
-      aria-label={props.ariaLabel}
+      data-tip={props.label ? undefined : props.title}
+      // The tip used to be the browser's `title`, which doubled as the name of a bare box.
+      aria-label={props.ariaLabel ?? (props.label || field ? undefined : props.title)}
+      aria-describedby={field?.describedBy()}
       role={props.switch ? 'switch' : undefined}
       data-switch={props.switch ? '' : undefined}
       onChange={(event) => {
@@ -57,10 +67,10 @@ export function Checkbox(props: {
     <Show when={props.label} fallback={input}>
       <label
         class="ui-check"
-        data-size={props.size ?? 'md'}
+        data-size={size()}
         data-switch={props.switch ? '' : undefined}
         data-nested={props.nested ? '' : undefined}
-        title={props.title}
+        data-tip={props.title}
       >
         {input}
         <span class="ui-check-label">

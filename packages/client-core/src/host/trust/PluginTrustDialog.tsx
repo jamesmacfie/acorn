@@ -1,11 +1,12 @@
-import { createMemo, createSignal, For, Show } from 'solid-js'
+import { createMemo, createSignal, createUniqueId, For, Show } from 'solid-js'
 import { nodes } from '../../infra/node/fleet'
 import Icon from '../../kit/components/content/Icon'
 import { createDismissable } from '../../kit/lib/controls/dismissable'
 import { distribution, pendingTrust, resolvePendingTrust, type PluginTrustRequest } from '../plugins/distribution'
 import { recordTrustDecision, TIER_LABEL, trustTiers, type TierKey } from './trustModel'
 import './plugin-trust.css'
-import { Alert, Badge, Button, Kbd } from '../../kit/components/primitives'
+import { Alert, Badge, Button, ToolbarSpacer } from '../../kit/components/primitives'
+import { HelpMark } from '../../kit/components/content/HelpMark'
 
 // The consent surface for running code a node handed this device
 // (docs/plugins.md).
@@ -20,9 +21,9 @@ import { Alert, Badge, Button, Kbd } from '../../kit/components/primitives'
 // rule 6). `Enforced` is a fence held by the UI bridge and isolated node realm. `Declared`
 // describes plugin-authored unattended behavior whose intent cannot be verified. `Web pages` is
 // enforced by the shell but reaches the live internet, so it is neither of
-// the other two. The vocabulary is defined once in the legend rather than being spelled out on every
-// heading, and the groups may never be rendered as one list: a strong claim must not lend
-// credibility to a weaker one sitting next to it.
+// the other two. Each group heading says what its word means behind a help mark, and the groups may
+// never be rendered as one list: a strong claim must not lend credibility to a weaker one sitting next
+// to it.
 
 export default function PluginTrustDialog() {
   const [saving, setSaving] = createSignal(false)
@@ -33,7 +34,6 @@ export default function PluginTrustDialog() {
 
   const tiers = createMemo(() => trustTiers(request()))
 
-  const has = (key: TierKey) => tiers().some((tier) => tier.key === key && tier.lines.length > 0)
   // What an update is actually about. Leading with it is the reason an update re-prompts at all.
   const addedLines = createMemo(() => tiers().flatMap((tier) => tier.lines.filter((line) => line.added)))
   const keptTiers = createMemo(() =>
@@ -109,7 +109,7 @@ export default function PluginTrustDialog() {
             onClick={dismiss.onContainerClick}
             onKeyDown={dismiss.onKeyDown}
           >
-            <div class="overlay-title">{sameBundleReview() ? changedDeclaration() ? 'Plugin declaration changed' : 'Review plugin declaration' : previousVersion() ? 'Plugin update' : 'Plugin trust'}</div>
+            <div class="overlay-title">{sameBundleReview() ? changedDeclaration() ? 'Plugin changed what it asks for' : 'Review plugin again' : previousVersion() ? 'Plugin update' : 'New plugin'}</div>
             <div class="overlay-body plugin-trust-body">
               <header class="plugin-trust-identity">
                 <span class="plugin-trust-glyph" aria-hidden="true">{current().row.name.slice(0, 1).toUpperCase()}</span>
@@ -123,28 +123,32 @@ export default function PluginTrustDialog() {
                     <Badge size="xs">
                       <Icon name="monitor" /> {current().source?.kind === 'device'
                         ? current().sourceLabel?.startsWith('path:')
-                          ? `installed on this device from ${current().sourceLabel}; a folder pins nothing`
-                          : `installed on this device from ${current().sourceLabel ?? 'a package'}`
-                        : `from ${current().sourceNodeIds.map(nodeLabel).join(', ')}`}
+                          ? 'From a folder on this device'
+                          : `From ${current().sourceLabel ?? 'a package'}`
+                        : `From ${current().sourceNodeIds.map(nodeLabel).join(', ')}`}
                     </Badge>
-                    <Show when={!previousVersion()}><Badge size="xs">first time</Badge></Show>
+                    <Show when={!previousVersion()}><Badge size="xs">New</Badge></Show>
                   </p>
                 </div>
               </header>
 
+              {/* A security note, so it stays in the body rather than behind a help mark. */}
+              <Show when={current().source?.kind === 'device' && current().sourceLabel?.startsWith('path:')}>
+                <p class="muted plugin-trust-intro">A plugin from a folder isn't pinned to a version.</p>
+              </Show>
               <p class="muted plugin-trust-intro">
                 <Show
                   when={previousVersion() && !sameBundleReview()}
                   fallback={sameBundleReview()
                     ? changedDeclaration()
-                      ? 'The client code is the same, but this node changed its declaration. Acorn has withheld its interface until you review these permissions and contributions again.'
-                      : 'Acorn needs an approval that binds this client code to its current permissions and contributions. Its interface is withheld until you review them.'
-                    : 'None of its code has run yet. Review what it asks for below — acorn asks again if the bundle changes.'}
+                      ? "The plugin's code is the same, but it asks for different things. Its interface stays hidden until you review it."
+                      : 'acorn needs you to approve this plugin again. Its interface stays hidden until you review it.'
+                    : 'None of its code has run yet. acorn asks again if the plugin changes.'}
                 >
                   {(version) => (
                     <Show
                       when={addedLines().length}
-                      fallback={`You last approved ${version()}. This version asks for nothing new — its code changed, which is why you’re being asked again.`}
+                      fallback={`You approved ${version()}. This version asks for nothing new, but its code changed.`}
                     >
                       {`You last approved ${version()}. This version asks for ${addedLines().length === 1 ? 'one thing' : `${addedLines().length} things`} it did not have before; everything else is unchanged.`}
                     </Show>
@@ -187,40 +191,19 @@ export default function PluginTrustDialog() {
                   </details>
                 </Show>
               </Show>
-
-              {/* The vocabulary, once, matching docs/security.md § Node-half plugin security. */}
-              <p class="muted plugin-trust-legend">
-                <Show when={has('enforced')}>
-                  <span><strong>Enforced</strong> — {current().source?.kind === 'device'
-                    ? 'acorn checks these in the sandboxed interface; anything not listed is refused.'
-                    : 'acorn checks these in the sandboxed interface and isolated server realm; anything not listed is refused.'}</span>
-                </Show>
-                <Show when={has('declared')}>
-                  <span>
-                    <strong>Declared</strong> — plugin-authored scheduled and check behavior. Acorn confines when and where it runs, but cannot verify what the code intends to do.
-                  </span>
-                </Show>
-                <Show when={has('web')}>
-                  <span><strong>Web pages</strong> — these load from the internet with their own cookies and logins. The plugin cannot read them or type into them.</span>
-                </Show>
-              </p>
             </div>
-            <div class="ui-modal-actions plugin-trust-actions plugin-trust-actions-with-hint">
-              <p class="plugin-trust-escape">
-                Press <Kbd size="xs">Esc</Kbd> to decide later. Acorn asks again next launch.
-              </p>
-              <div class="plugin-trust-buttons">
-                <Button variant="ghost" disabled={saving()} onPress={() => {
-                  const pending = request()
-                  if (pending) resolvePendingTrust(pending.row.name, pending.hash)
-                }}>Not now</Button>
-                <Button variant="ghost" disabled={saving()} onPress={() => void decide('rejected')}>
-                  {previousVersion() ? 'Reject update' : 'Reject plugin'}
-                </Button>
-                <Button disabled={saving()} onPress={() => void decide('accepted')}>
-                  {saving() ? 'Saving…' : previousVersion() ? 'Accept update' : `Accept ${current().row.name} ${current().row.installed?.version}`}
-                </Button>
-              </div>
+            <div class="ui-modal-actions">
+              <Button variant="ghost" disabled={saving()} onPress={() => void decide('rejected')}>
+                {previousVersion() ? 'Reject update' : 'Reject plugin'}
+              </Button>
+              <ToolbarSpacer />
+              <Button variant="ghost" tip="acorn asks again next time it starts." disabled={saving()} onPress={() => {
+                const pending = request()
+                if (pending) resolvePendingTrust(pending.row.name, pending.hash)
+              }}>Not now</Button>
+              <Button variant="solid" disabled={saving()} onPress={() => void decide('accepted')}>
+                {saving() ? 'Saving…' : previousVersion() ? 'Accept update' : 'Accept plugin'}
+              </Button>
             </div>
           </section>
         </div>
@@ -229,10 +212,22 @@ export default function PluginTrustDialog() {
   )
 }
 
+// What each tier's word means, matching docs/security.md § Node-half plugin security.
+const TIER_HELP: Record<TierKey, string> = {
+  enforced: 'acorn blocks anything not listed.',
+  declared: 'Jobs and checks the plugin runs. acorn controls when they run, not what they do.',
+  web: "These load from the internet with their own cookies and logins. The plugin can't read them or type into them.",
+}
+
 function TierGroup(props: { tier: { key: TierKey; lines: readonly { text: string; icon: string; high: boolean }[] } }) {
+  const titleId = createUniqueId()
   return (
     <section class="plugin-trust-group" data-tier={props.tier.key}>
-      <h3><span class="plugin-trust-dot" aria-hidden="true" />{TIER_LABEL[props.tier.key]}</h3>
+      <h3>
+        <span class="plugin-trust-dot" aria-hidden="true" />
+        <span id={titleId}>{TIER_LABEL[props.tier.key]}</span>
+        <HelpMark text={TIER_HELP[props.tier.key]} titleId={titleId} />
+      </h3>
       <ul class="plugin-trust-permissions" data-tier={props.tier.key}>
         <For each={props.tier.lines}>
           {(line) => (

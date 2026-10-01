@@ -100,13 +100,16 @@ export type SanitizedProps = { props: Record<string, unknown>; dropped: string[]
 export function sanitizeProps(type: string, raw: unknown): SanitizedProps {
   const dropped: string[] = []
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return { props: type === TEXT_NODE ? { value: '' } : {}, dropped }
-  // A text run is a string and nothing else. Handled first because everything below is about props a
-  // component reads, and a text run has no component.
+  // A text run is a string, or a finite number drawn as one, and nothing else. Handled first
+  // because everything below is about props a component reads, and a text run has no component.
   if (type === TEXT_NODE) {
     const entries = Object.entries(raw as Record<string, unknown>)
     const value = entries.find(([key]) => key === 'value')?.[1]
     for (const [key] of entries) if (key !== 'value') dropped.push(key)
     if (typeof value === 'string') return { props: { value }, dropped }
+    // A bundle built before the remote root turned numbers into text sends them as numbers. A finite
+    // number is drawn as its digits. Nothing else is, so an object still cannot reach the page.
+    if (typeof value === 'number' && Number.isFinite(value)) return { props: { value: String(value) }, dropped }
     return { props: { value: '' }, dropped: [...dropped, 'value'] }
   }
   const props: Record<string, unknown> = {}

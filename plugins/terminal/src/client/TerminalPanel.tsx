@@ -1,13 +1,13 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { activeNodeId, clientEvents, consumeTerminalFocusIntent, isTerminalMax, onClosePaneWithin, PrefKeys, prefsOptions, registerCommands, savePref, type Task, termFontSize } from '@acorn/plugin-api/client'
+import { activeNodeId, clientEvents, consumeTerminalFocusIntent, formatChord, isTerminalMax, onClosePaneWithin, PrefKeys, prefsOptions, registerCommands, savePref, type Task, termFontSize } from '@acorn/plugin-api/client'
 import { activeTerminal, addSession, refreshSessions, rememberActiveTerminal, sessions } from './sessionStore'
 import { terminalApi } from './terminalClient'
 import TerminalSurface from './TerminalSurface'
 import type { TerminalProfile, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import {
-  Alert, Button, createSplitDrag, DocumentTabs, EmptyState, IconButton, Menu, SplitHandle,
+  Alert, createSplitDrag, DocumentTabs, EmptyState, IconButton, Menu, SplitHandle,
 } from '@acorn/plugin-api/ui'
 import { Drawer } from '@acorn/plugin-api/ui/host'
 import { resolveTerminalFontSize } from './preferences'
@@ -278,9 +278,9 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
               trigger={({ toggle, open }) => (
                 <IconButton
                   icon="plus"
-                  label="New session"
+                  // A disabled button shows no tip, so the reason it is off is in its name.
+                  label={ws() ? 'New terminal' : 'New terminal. Open a task first.'}
                   disabled={busy() || !ws()}
-                  title={ws() ? 'New session' : 'Select a task first'}
                   opens="menu"
                   expanded={open()}
                   onPress={toggle}
@@ -293,14 +293,16 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
                     <Menu.Item
                       context={menu}
                       disabled={!p.available}
-                      title={!p.available ? `${p.label} not found on PATH` : p.tmuxMissing ? 'tmux not found on PATH — this session will not survive an app restart' : undefined}
+                      title={!p.available
+                        ? `acorn can't find ${p.label} on your PATH.`
+                        : p.tmuxMissing ? "tmux isn't installed, so this session ends when acorn quits." : undefined}
                       onSelect={() => void startProfile(p.id)}
                       trailing={
                         <>
-                          <Show when={!p.available}>not found</Show>
+                          <Show when={!p.available}>Not installed</Show>
                           {/* tmux degrade hint (docs/terminal-and-agents.md): the profile still
                               works, but the durable backend silently fell back to node-pty. */}
-                          <Show when={p.available && p.tmuxMissing}>tmux missing — won't survive restart</Show>
+                          <Show when={p.available && p.tmuxMissing}>Closes when acorn quits</Show>
                         </>
                       }
                     >
@@ -311,11 +313,15 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
               )}
             </Menu>
             <Show when={activeRunning()}>
-              <Button variant="bare" size="sm" title="Interrupt (Ctrl-C)" onPress={() => void api.interrupt(activeId()!)}>
-                ^C
-              </Button>
+              <IconButton
+                icon="square"
+                label="Stop"
+                tip="Stop the running command"
+                tipKey={formatChord('ctrl+c')}
+                onPress={() => void api.interrupt(activeId()!)}
+              />
             </Show>
-            <IconButton icon="x" onPress={props.onClose} title="Close drawer (sessions keep running)" label="Close" />
+            <IconButton icon="x" onPress={props.onClose} label="Hide terminals" tipSub="They keep running." />
           </>
         }
       />

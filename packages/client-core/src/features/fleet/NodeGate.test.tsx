@@ -24,5 +24,5 @@ it('shows the startup loader after fleet selection while the local node is still
   document.body.append(host)
   dispose = render(() => <NodeGate />, host)
 
-  expect(host.textContent).toContain('starting local node…')
+  expect(host.textContent).toContain('Starting acorn…')
 })

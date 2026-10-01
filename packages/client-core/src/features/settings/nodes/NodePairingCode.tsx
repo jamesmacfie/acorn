@@ -3,11 +3,20 @@ import type { NodeRecord } from '@acorn/protocol/broker.ts'
 import type { PairingWindow } from '@acorn/protocol/node.ts'
 import { fingerprintPhrase } from '@acorn/protocol/fingerprintWords.ts'
 import { closeNodePairingWindow, openNodePairingWindow } from '../../../infra/node/fleetActions'
-import { Alert, Button } from '../../../kit/components/primitives'
+import { Alert, Button, Card } from '../../../kit/components/primitives'
+import CopyButton from '../../../kit/components/inputs/CopyButton'
+import { Text } from '../../../kit/components/content/Text'
+import { Stack } from '../../../kit/components/layout/Stack'
 
 // Settings → Nodes is already an owner-authenticated client. It asks the selected Node for a
 // one-time code and shows that Node's pinned identity beside it for the other client to compare.
-export default function NodePairingCode(props: { node: NodeRecord }) {
+//
+// Three parts, because the button sits in the node's row of actions and the code opens under them:
+// the state, the button, and the panel.
+
+export type NodePairing = ReturnType<typeof createNodePairing>
+
+export function createNodePairing(nodeId: () => string) {
   const [pairing, setPairing] = createSignal<PairingWindow | null>(null)
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
@@ -21,7 +30,7 @@ export default function NodePairingCode(props: { node: NodeRecord }) {
     setPairing(null)
     clearTimeout(expiryTimer)
     try {
-      const opened = await openNodePairingWindow(props.node.nodeId)
+      const opened = await openNodePairingWindow(nodeId())
       setPairing(opened)
       expiryTimer = setTimeout(() => setPairing(null), opened.expiresInMs)
     } catch (cause) {
@@ -35,7 +44,7 @@ export default function NodePairingCode(props: { node: NodeRecord }) {
     setBusy(true)
     setError('')
     try {
-      await closeNodePairingWindow(props.node.nodeId)
+      await closeNodePairingWindow(nodeId())
       clearTimeout(expiryTimer)
       setPairing(null)
     } catch (cause) {
@@ -45,26 +54,45 @@ export default function NodePairingCode(props: { node: NodeRecord }) {
     }
   }
 
+  return { pairing, busy, error, open, close }
+}
+
+export function NodePairingButton(props: { pairing: NodePairing }) {
   return (
-    <div class="node-pairing">
-      <Button disabled={busy()} onPress={() => void open()}>
-        {pairing() ? 'New pairing code' : 'Pair another client'}
-      </Button>
-      <Show when={pairing()}>
+    <Button size="sm" disabled={props.pairing.busy()} onPress={() => void props.pairing.open()}>
+      {props.pairing.pairing() ? 'New pairing code' : 'Pair another client'}
+    </Button>
+  )
+}
+
+/** The open code, drawn the way Add connection draws a device code: large, in the code font, with a
+ *  copy button, because it is read off this screen and typed on another. */
+export function NodePairingPanel(props: { node: NodeRecord; pairing: NodePairing }) {
+  return (
+    <>
+      <Show when={props.pairing.pairing()}>
         {(active) => (
-          <div class="node-pairing-code">
-            <p>Enter this code in the other client within {Math.ceil(active().expiresInMs / 60_000)} minutes.</p>
-            <code>{active().code}</code>
-            <Show when={fingerprintPhrase(props.node.fingerprint)}>
-              {(words) => (
-                <p>Check that its identity words match: <span class="node-fingerprint-words">{words()}</span></p>
-              )}
-            </Show>
-            <Button disabled={busy()} onPress={() => void close()}>Close pairing</Button>
-          </div>
+          <Card>
+            <div class="integration-device">
+              <Text wrap>Enter this code on the other computer within {Math.ceil(active().expiresInMs / 60_000)} minutes.</Text>
+              <div class="integration-device-code copyable">
+                <code>{active().code}</code>
+                <CopyButton text={() => active().code} title="Copy the code" always />
+              </div>
+              <Show when={fingerprintPhrase(props.node.fingerprint)}>
+                {(words) => (
+                  <Stack gap="inline">
+                    <Text emphasis="muted" wrap>Check that its identity words match:</Text>
+                    <span class="node-fingerprint-words">{words()}</span>
+                  </Stack>
+                )}
+              </Show>
+              <Button size="sm" variant="ghost" disabled={props.pairing.busy()} onPress={() => void props.pairing.close()}>Close pairing</Button>
+            </div>
+          </Card>
         )}
       </Show>
-      <Show when={error()}><Alert>{error()}</Alert></Show>
-    </div>
+      <Show when={props.pairing.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
+    </>
   )
 }

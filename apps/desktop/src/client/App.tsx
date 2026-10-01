@@ -111,7 +111,7 @@ export default function App() {
   // keydown listener. Maximize is focus-directed and never enters persisted TaskLayout state.
   onMount(() => {
     const commands = registerCommands([
-      { id: 'core.settings.open', title: 'Open settings', hint: 'on the page used last', category: 'navigation', palette: true, run: () => openSettings() },
+      { id: 'core.settings.open', title: 'Open settings', hint: 'on the page you used last', category: 'navigation', palette: true, run: () => openSettings() },
       { id: 'core.rail.toggle', title: 'Toggle rail', category: 'navigation', run: () => toggleRail() },
       {
         id: 'core.surface.toggle-maximize', title: 'Toggle focused surface maximize', category: 'pane',
@@ -137,7 +137,7 @@ export default function App() {
     const bindings = registerKeybindings([
       { id: 'core.settings.open', command: 'core.settings.open', description: 'Open settings', category: 'Global', defaultChord: 'meta+,', when: 'global' },
       { id: 'core.rail.toggle', command: 'core.rail.toggle', description: 'Toggle rail', category: 'Global', defaultChord: 'meta+b', when: 'global' },
-      { id: 'core.surface.toggle-maximize', command: 'core.surface.toggle-maximize', description: 'Toggle focused pane or terminal maximize', category: 'Panes', defaultChord: 'meta+shift+enter', when: 'task' },
+      { id: 'core.surface.toggle-maximize', command: 'core.surface.toggle-maximize', description: 'Maximize or restore the focused pane', category: 'Panes', defaultChord: 'meta+shift+enter', when: 'task' },
       // The command is the palette's own Last workspace row, registered with the rest of the Go to
       // group (client-core/host/palette/navigationCommands.ts); this is the chord that reaches it.
       { id: 'core.goto.workspace-last', command: 'core.goto.workspace-last', description: 'Switch to the last workspace', category: 'Global', defaultChord: 'meta+;', when: 'global' },
@@ -185,7 +185,7 @@ export default function App() {
     const offQuit = registerWillHandler('app:quit', 'Terminal', () => {
       const active = sessionSummaries().filter((session) => session.running)
       return active.length
-        ? { id: 'sessions:all', feature: 'Terminal', message: `${active.length} active session${active.length === 1 ? '' : 's'}`, severity: 'warn' }
+        ? { id: 'sessions:all', feature: 'Terminal', message: `${active.length} terminal${active.length === 1 ? ' is' : 's are'} still running`, severity: 'warn' }
         : null
     })
     onCleanup(() => { offQuit(); offNode() })
@@ -446,23 +446,29 @@ export default function App() {
   })
 
   // The project picker appears where choosing a project changes something: a source that declared
-  // itself project-scoped, or a task view, where it is the only thing naming the task's project
-  // (`/t/:taskId` carries no projectId, so the breadcrumb shows the brand instead). On Home it used to
-  // sit there looking like navigation and move nothing but the breadcrumb.
+  // itself project-scoped. A task's project cannot change, so the task view names it in the
+  // breadcrumb instead. On Home the picker used to sit there looking like navigation and move nothing
+  // but the breadcrumb.
   //
   // Through `sourceIsProjectScoped` rather than a local check, so a palette command that switches
   // project can ask the same question and the two can never disagree.
-  const showProjectPicker = () => scopedProjects().length > 0
-    && (inTaskView() || sourceIsProjectScoped(selectedSource()))
+  const showProjectPicker = () => scopedProjects().length > 0 && sourceIsProjectScoped(selectedSource())
 
   const rightSlotRef = mintSlotRef()
   const topbarProps = (): TopbarProps => {
     const active = activeNodeId()
     const project = scopedProjects().find((candidate) => candidate.id === contextProjectId())
     const breadcrumb: { label: string; route?: string }[] = []
-    if (params.projectId) {
-      breadcrumb.push({ label: projects.data?.find((candidate) => candidate.id === params.projectId)?.name ?? params.projectId,
-        route: projectPath(params.projectId) })
+    const projectName = (id: string) => projects.data?.find((candidate) => candidate.id === id)?.name ?? id
+    // A crumb links only to somewhere else. The one naming the page you are on is plain text.
+    const routeUnlessHere = (route: string) => (route === location.pathname ? undefined : route)
+    const task = inTaskView() ? activeTask() : null
+    if (task) {
+      // `/t/:taskId` carries no project, so the task names it: the project, then the task itself.
+      breadcrumb.push({ label: projectName(task.projectId), route: projectPath(task.projectId) })
+      breadcrumb.push({ label: task.title })
+    } else if (params.projectId) {
+      breadcrumb.push({ label: projectName(params.projectId), route: routeUnlessHere(projectPath(params.projectId)) })
       if (params.number) breadcrumb.push({ label: `#${params.number}` })
       if (isNew()) breadcrumb.push({ label: 'new' })
     }
@@ -475,7 +481,7 @@ export default function App() {
       project: project ? { id: project.id, label: project.name } : null,
       projects: scopedProjects().map((entry) => ({ id: entry.id, label: entry.name })),
       projectPickerVisible: showProjectPicker(),
-      projectPickerDisabled: !selectedSource() && !!activeTask(),
+      projectPickerDisabled: false,
       breadcrumb,
       node: active ? { id: active, label: nodes().find((entry) => entry.nodeId === active)?.label ?? active, state: nodeState(active) } : null,
       nodes: nodes().map((entry) => ({ id: entry.nodeId, label: entry.label, state: nodeState(entry.nodeId) })),
@@ -497,7 +503,16 @@ export default function App() {
       pickNode: (id) => { if (nodes().some((candidate) => candidate.nodeId === id)) setActiveNode(id) },
       openSettings: () => openSettings(),
       collapseRail: toggleRail,
-      navigate: (route) => { if (breadcrumb.some((item) => item.route === route)) navigate(route) },
+      navigate: (route) => {
+        if (!breadcrumb.some((item) => item.route === route)) return
+        // From a task, the project crumb leaves the task for the project's default source, as picking
+        // a project does. The route alone would leave the task on screen.
+        if (!selectedSource()) {
+          const source = defaultSourceId()
+          if (source) setSelectedSource(source)
+        }
+        navigate(route)
+      },
       clearCache: () => clearCache(queryClient),
     }
   }

@@ -4,7 +4,7 @@ import { createCredentialForm, integrationsOptions, modelBackendsOptions } from 
 import { integrationsKey, modelBackendsKey } from '@acorn/protocol/api.ts'
 import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
-import { Alert, Button, Card, Field, Heading, Inline, Input, Stack, Text } from '@acorn/plugin-api/ui'
+import { Alert, Badge, Button, Card, DescriptionList, Field, Heading, Inline, Input, Stack, Text } from '@acorn/plugin-api/ui'
 
 // The AI branch of the wizard: what this machine can already generate with, and a form for a key if
 // it can generate with nothing.
@@ -17,12 +17,9 @@ import { Alert, Button, Card, Field, Heading, Inline, Input, Stack, Text } from 
 // Settings and moves on, which is why there is no gate on the wizard's Next here. Generating text is
 // a feature acorn has, not a step in setting it up.
 
-/** What a row says under the label. The two words a first-run reader needs: a key acorn holds, or a
- *  program already on this machine. */
-const readyLine = (backend: ModelBackend): string =>
-  backend.kind === 'harness'
-    ? 'Installed. Generate SQL, commit messages, and workflows with it.'
-    : 'Connected. Generate SQL, commit messages, and workflows with it.'
+/** The word beside a tool: a program already on this machine, or a key acorn holds. The step's
+ *  intro already says what either is for. */
+const readyWord = (backend: ModelBackend): string => (backend.kind === 'harness' ? 'Installed' : 'Connected')
 
 export default function AiSetup() {
   const queryClient = useQueryClient()
@@ -71,55 +68,54 @@ export default function AiSetup() {
 
   return (
     <Stack gap="row">
-      <Heading level={2}>Generate with AI.</Heading>
+      <Heading level={2}>Generate with AI</Heading>
       <Text emphasis="muted" wrap>
-        acorn writes commit messages, SQL and workflows for you. It can spend an API key you paste
-        here, or an agent CLI you already have installed.
+        acorn can write commit messages, SQL queries, and workflows for you. It uses an AI tool already
+        on this computer, or an API key you add here.
       </Text>
 
-      {/* Index, not For: this list refetches on a 30 second stale time, so every row would be a new
-          object each time and a rebuilt row loses focus under the reader's hands. */}
-      <Index each={backends()}>
-        {(backend) => (
-          <Card>
-            <Stack gap="row">
-              <Text emphasis="strong">{backend().label}</Text>
-              <Text emphasis="muted" wrap>{readyLine(backend())}</Text>
-            </Stack>
-          </Card>
-        )}
-      </Index>
-      <Index each={missing()}>
-        {(harness) => (
-          <Card>
-            <Stack gap="row">
-              <Text emphasis="strong">{harness().label}</Text>
-              <Text emphasis="muted" wrap>Not found on this machine.</Text>
-            </Stack>
-          </Card>
-        )}
-      </Index>
+      {/* A list of facts, not cards: a card here looked exactly like the key cards below it, which
+          can be pressed. Index, not For: this list refetches on a 30 second stale time, so every row
+          would be a new object each time. */}
+      <Show when={backends().length || missing().length}>
+        <DescriptionList>
+          <Index each={backends()}>
+            {(backend) => (
+              <DescriptionList.Item label={backend().label}>
+                <Badge tone="ok">{readyWord(backend())}</Badge>
+              </DescriptionList.Item>
+            )}
+          </Index>
+          <Index each={missing()}>
+            {(harness) => (
+              <DescriptionList.Item label={harness().label}>
+                <Badge>Not installed</Badge>
+              </DescriptionList.Item>
+            )}
+          </Index>
+        </DescriptionList>
+      </Show>
 
       <Show when={!backends().length}>
         <Text emphasis="muted" wrap>
-          Nothing to generate with yet. Settings, under AI models, is where this lives whenever you
-          want it.
+          {keyProviders().length
+            ? 'No AI tools found on this computer. You can add a key below, or later in Settings under AI models.'
+            : 'No AI tools found on this computer. You can add a key later in Settings under AI models.'}
         </Text>
       </Show>
 
       <Show when={keyProviders().length}>
-        <Text emphasis="strong">Add a key</Text>
-        <Inline gap="stack" wrap>
+        <Heading
+          level={3}
+          help="acorn stores the key on this computer and sends it only to the provider. Your agents never see it."
+        >
+          Add an API key
+        </Heading>
+        <Inline gap="stack" even>
           <Index each={keyProviders()}>
             {(provider) => (
               <Card interactive selected={openId() === provider().id} onPress={() => choose(provider())}>
-                <Stack gap="row">
-                  <Text emphasis="strong">{provider().label}</Text>
-                  <Text emphasis="muted" wrap>
-                    The node spends the key. It never reaches an agent CLI or leaves this machine.
-                  </Text>
-                  <Text emphasis="eyebrow">optional · anytime in settings</Text>
-                </Stack>
+                <Text emphasis="strong">{provider().label}</Text>
               </Card>
             )}
           </Index>
@@ -128,7 +124,9 @@ export default function AiSetup() {
 
       <Show when={open()}>
         {(provider) => (
-          <Card>
+          // `focus` scrolls the form into view as it opens. It opens below the cards, and without
+          // this the press looked like it did nothing whenever the form landed under the fold.
+          <Card focus>
             <Stack gap="row">
               <Text emphasis="strong">{`Connect ${provider().label}`}</Text>
               {/* Drawn from `connection.fields`, so nothing about either provider's credential is
@@ -158,7 +156,7 @@ export default function AiSetup() {
                 >
                   Connect
                 </Button>
-                <Button variant="bare" onPress={() => setOpenId('')}>Cancel</Button>
+                <Button variant="ghost" onPress={() => setOpenId('')}>Cancel</Button>
               </Inline>
               <Show when={form.error()}>{(text) => <Alert>{text()}</Alert>}</Show>
             </Stack>

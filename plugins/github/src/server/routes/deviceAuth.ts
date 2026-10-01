@@ -50,7 +50,7 @@ export const githubDeviceAuth = (clientId: () => string) => new Hono<AppEnv>()
   .post('/auth/device/start', async (c) => {
     ownerId(c)
     const id = clientId()
-    if (!id) return respondError(c, 503, 'provider_unavailable', ['GitHub integration is not configured on this node.'])
+    if (!id) return respondError(c, 503, 'provider_unavailable', ["This copy of acorn can't sign in to GitHub."])
     const response = await fetch(DEVICE_CODE_URL, form({ client_id: id, scope: SCOPES }))
     if (!response.ok) return respondError(c, 502, 'provider_unavailable', ['GitHub did not issue a device code.'])
     const body = (await response.json().catch(() => ({}))) as Partial<DeviceCodeResponse>
@@ -75,7 +75,7 @@ export const githubDeviceAuth = (clientId: () => string) => new Hono<AppEnv>()
     const { deviceCode } = parsed.data
 
     const id = clientId()
-    if (!id) return respondError(c, 503, 'provider_unavailable', ['GitHub integration is not configured on this node.'])
+    if (!id) return respondError(c, 503, 'provider_unavailable', ["This copy of acorn can't sign in to GitHub."])
     const response = await fetch(
       TOKEN_URL,
       form({

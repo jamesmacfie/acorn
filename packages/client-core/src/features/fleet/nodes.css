@@ -39,44 +39,6 @@
   padding-inline: var(--space-4);
 }
 .node-row-alarm + .node-row { border-top: 0; }
-.node-sub {
-  font-family: var(--font-mono);
-  font-size: var(--fs-sm);
-  color: var(--text-muted);
-}
-.node-meta {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: var(--space-3);
-}
-.node-badge {
-  font-size: var(--fs-sm);
-  font-weight: 400;
-  color: var(--text-muted);
-  padding: 1px var(--space-2);
-  border: var(--control-border);
-  border-radius: var(--radius-pill-fixed);
-}
-.node-actions,
-.node-step-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-}
-.node-attachment {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-2);
-  padding: var(--pane-pad);
-  border: var(--control-border);
-  border-radius: var(--radius-surface);
-}
-.node-attachment p {
-  margin: 0;
-  font-size: var(--fs-sm);
-}
 .node-alarm {
   display: flex;
   flex-direction: column;
@@ -85,10 +47,6 @@
   border: var(--control-border);
   border-color: var(--danger);
   border-radius: var(--radius-surface);
-}
-.node-alarm p {
-  color: var(--text-muted);
-  font-size: var(--fs-sm);
 }
 .node-fingerprints {
   display: grid;
@@ -114,39 +72,6 @@
   border: var(--control-border);
   border-radius: var(--radius-surface);
   background: var(--bg);
-}
-.node-pairing {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-3);
-}
-.node-pairing-code {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: var(--space-3);
-  padding: var(--pane-pad);
-  border: var(--control-border);
-  border-radius: var(--radius-surface);
-  background: var(--bg);
-}
-.node-pairing-code p {
-  margin: 0;
-}
-.node-pairing-code code {
-  font-family: var(--font-mono);
-  overflow-wrap: anywhere;
-  user-select: text;
-}
-
-.node-step {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  padding: var(--pane-pad);
-  border: var(--surface-border);
-  border-radius: var(--radius-surface);
 }
 
 /* Fleet home (node/FleetHome.tsx). Card grid rather than a table: a node has five facts and two
@@ -193,16 +118,6 @@
 .fleet-card-label {
   font-weight: var(--fw-medium);
 }
-.fleet-card-badge {
-  padding: 0 var(--space-2);
-  border-radius: var(--radius-control);
-  background: var(--bg-subtle);
-  color: var(--text-muted);
-  font-size: var(--fs-xs);
-}
-.fleet-card-badge-active {
-  color: var(--accent);
-}
 .fleet-card-endpoint {
   color: var(--text-muted);
   font-family: var(--font-mono);
@@ -247,14 +162,3 @@
   color: var(--text-muted);
   overflow-wrap: anywhere;
 }
-
-/* Paired-client list per node (settings/NodeDevices.tsx). Collapsed by default: on a one-device
-   install it says "you are here", and unfolding it is the act of auditing access. */
-.node-devices {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-}
-.node-device-list { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
-.node-device { display: flex; align-items: center; gap: var(--space-3); font-size: var(--fs-sm); }
-.node-device-name { font-weight: var(--fw-medium); }

@@ -46,12 +46,12 @@ const iconTone = (severity: PluginRailItem['severity']): 'accent' | 'warn' | 'da
 
 export type ChromeSourcePanelProps = { pluginId: string; descriptor: PluginSourceDescriptor }
 
-// A source's `emptyState` replaces the host's fixed "Nothing here yet." See docs/plugins.md on
+// A source's `emptyState` replaces the host's fixed "Nothing to show." See docs/plugins.md on
 // `emptyState` for why it is fetch-success-only and bounded to a sentence and one action. This adapter
 // contributes the plugin's message and its action, and shared CSS owns the geometry.
 function SourceEmpty(props: { pluginId: string; nodeId: string; empty?: PluginSourceEmptyState }) {
   return (
-    <Show when={props.empty} fallback={<EmptyState align="start">Nothing here yet.</EmptyState>}>
+    <Show when={props.empty} fallback={<EmptyState align="start">Nothing to show.</EmptyState>}>
       {(empty) => (
         <EmptyState
           align="start"
@@ -245,7 +245,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
           <Input
             kind="filter"
             size="sm"
-            placeholder="Filter…"
+            placeholder={`Filter ${props.descriptor.label}…`}
             label={`Filter ${props.descriptor.label} by title`}
             value={filter()}
             onInput={(value) => setFilter(value)}
@@ -263,11 +263,11 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
             when={!collapsed()}
             fallback={(
               <Inline>
-                <Icon name="triangle-alert" tone="warn" title={`${entry().label} unavailable — ${entry().reason}`} />
+                <Icon name="triangle-alert" tone="warn" title={`Couldn't reach ${entry().label}. ${entry().reason}`} />
               </Inline>
             )}
           >
-            <Alert>{entry().label} unavailable — {entry().reason}</Alert>
+            <Alert>Couldn't reach {entry().label}. {entry().reason}</Alert>
           </Show>
         )}
       </Show>

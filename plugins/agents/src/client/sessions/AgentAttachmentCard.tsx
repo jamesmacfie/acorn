@@ -76,8 +76,8 @@ export default function AgentAttachmentCard(props: { attachmentId: string }) {
                   <Markdown text={`![${alt()}](${full()})`} images="inline" />
                 </Modal.Body>
                 <Modal.Actions>
-                  <Button variant="ghost" onPress={() => void download()}>Download</Button>
-                  <Button variant="solid" tone="accent" onPress={() => setOpen(false)}>Close</Button>
+                  <Button variant="ghost" onPress={() => setOpen(false)}>Close</Button>
+                  <Button variant="solid" tone="accent" onPress={() => void download()}>Download</Button>
                 </Modal.Actions>
               </Modal>
             )}

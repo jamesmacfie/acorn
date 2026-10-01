@@ -7,7 +7,7 @@ export type StyleTokenFamily =
 
 const families = {
   radius: '--radius-0 --radius-xs --radius-sm --radius-md --radius-lg --radius-xl --radius-pill --radius-circle --radius-control --radius-surface --radius-popover --radius-chip --radius-pill-fixed --radius-marker --radius --pane-radius',
-  length: '--bw-0 --bw --bw-strong --bw-marker --divider-w --chrome-divider-w --pane-divider-w --pane-bw --control-bw --surface-bw --marker-w --stripe-w --tab-active-w --pane-measure --row-h --row-h-sm --row-h-virt --control-h --control-h-sm --control-h-xs --topbar-h --pane-head-h --tab-h --tabrail-w --task-footer-h --listdetail-w --listdetail-w-narrow --listdetail-w-wide --icon-size --icon-box --avatar-sm --avatar-md --diff-line-h --term-fs --focus-ring-w --focus-ring-offset',
+  length: '--bw-0 --bw --bw-strong --bw-marker --divider-w --chrome-divider-w --pane-divider-w --pane-bw --control-bw --surface-bw --marker-w --stripe-w --tab-active-w --pane-measure --page-measure --row-h --row-h-sm --row-h-virt --control-h --control-h-sm --control-h-xs --topbar-h --pane-head-h --tab-h --tabrail-w --task-footer-h --listdetail-w --listdetail-w-narrow --listdetail-w-wide --setting-control-w --icon-size --icon-box --avatar-sm --avatar-md --diff-line-h --term-fs --focus-ring-w --focus-ring-offset',
   space: '--space-0 --space-1 --space-2 --space-3 --space-4 --space-5 --space-6 --space-7 --space-8 --space-9 --space-10 --space-11 --pane-pad --pane-pad-y --gap-inline --gap-row --gap-stack --gap-section --pad-control --pad-control-lg --pad-chip --pad-cell --pad-surface --pad-body --shell-pad --pane-gap',
   font: '--font-mono --font-ui --font-glyph --font-display',
   fontSize: '--fs-2xs --fs-xs --fs-sm --fs --fs-md --fs-lg --fs-xl --label-size',
@@ -15,7 +15,7 @@ const families = {
   weight: '--fw-normal --fw-medium --fw-semibold --fw-bold --label-weight --heading-weight',
   transform: '--label-transform --heading-transform',
   tracking: '--label-tracking --heading-tracking',
-  shadow: '--shadow-0 --shadow-1 --shadow-2 --shadow-3 --shadow-4 --shadow-5 --shadow-drawer-l --shadow-drawer-l-sm --ring',
+  shadow: '--shadow-0 --shadow-1 --shadow-2 --shadow-3 --shadow-4 --shadow-5 --shadow-drawer-l --shadow-drawer-l-sm --ring --ring-highlight',
   elevation: '--elev-popover --elev-menu --elev-modal --elev-drawer --elev-panel --elev-card --elev-pane --elev-row-hover',
   border: '--divider --chrome-divider --control-border --surface-border',
   borderStyle: '--focus-ring-style',
@@ -45,7 +45,7 @@ export const DERIVED_STYLE_TOKENS = [
   '--tabrail-w', '--font-ui', '--font-glyph', '--font-display',
   '--label-weight', '--label-size', '--heading-weight',
   '--elev-popover', '--elev-menu', '--elev-modal', '--elev-drawer', '--elev-panel',
-  '--elev-card', '--elev-pane', '--elev-row-hover', '--ring', '--scrim',
+  '--elev-card', '--elev-pane', '--elev-row-hover', '--ring', '--ring-highlight', '--scrim',
   '--card-bg', '--pane-bg', '--popover-bg', '--input-bg', '--chip-bg',
   '--pane-radius', '--ease-interactive', '--transition-color',
 ] as const

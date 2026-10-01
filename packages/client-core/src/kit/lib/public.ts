@@ -8,6 +8,8 @@ export {
 } from './rendering/displayMeta.ts'
 export { persistDraft, readDraft, writeDraft } from './state/draftState.ts'
 export { formatRelativeTime } from './rendering/formatRelativeTime.ts'
+export { formatChord } from './rendering/formatChord.ts'
+export { formatPath } from './rendering/formatPath.ts'
 export { bytesOf, formatBytes, formatSize } from './rendering/formatSize.ts'
 export { fuzzyScore } from './controls/fuzzy.ts'
 export { graphParents, graphRanks } from './layout/graphLayout.ts'

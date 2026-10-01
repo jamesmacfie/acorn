@@ -19,6 +19,7 @@ import {
 } from '../plugins/distribution'
 import { declaredSurfaces, eligiblePlugins, hasWithheldCode, type DeclaredSurfaces } from '../plugins/contributions'
 import { pluginRowTarget, setPluginRowSource } from '../plugins/rowTargets'
+import { pluginLabel } from '../plugins/pluginLabel'
 import { pluginCommand, usablePluginCommands } from './chromeCommands'
 import { suppliedSourcePanel } from './sourcePanel'
 import { remoteSourcePanel } from './remoteSource'
@@ -186,7 +187,7 @@ function registerChrome(pluginId: string, hash: string, row: NodePluginRow, refr
       id,
       command: id,
       description: command.title,
-      category: row.name,
+      category: pluginLabel(row),
       defaultChord: descriptor.defaultChord,
       when: descriptor.when === 'surface' ? 'pane' : descriptor.when,
       ...(descriptor.surface ? { pane: descriptor.surface } : {}),

@@ -3,9 +3,10 @@ import { createQuery } from '@tanstack/solid-query'
 import { coreRunsRoute, isTerminalRunStatus, type RunRow, type RunStatus } from '@acorn/protocol/runs.ts'
 import { readJson } from '../../infra/node/apiClient'
 import { formatRelativeTime } from '../../kit/lib/rendering/formatRelativeTime'
-import { nodes } from '../../infra/node/fleet'
-import { Alert, Badge, Button, Row, StatusDot } from '../../kit/components/primitives'
+import { Alert, Badge, Button, EmptyState, Row, StatusDot } from '../../kit/components/primitives'
+import { Text } from '../../kit/components/content/Text'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
+import { pluginLabel } from '../../host/plugins/pluginLabel'
 import './settings.css'
 
 // Settings → Run history, per node and following the settings header's node switcher
@@ -41,7 +42,6 @@ const money = (usd: number): string => (usd < 0.01 ? '<$0.01' : `$${usd.toFixed(
 
 export default function RunsSettings(props: { nodeId: string | null }) {
   const nodeId = () => props.nodeId
-  const node = () => nodes().find((candidate) => candidate.nodeId === nodeId()) ?? null
 
   const runs = createQuery(() => ({
     queryKey: ['runs', nodeId()],
@@ -57,23 +57,22 @@ export default function RunsSettings(props: { nodeId: string | null }) {
   return (
     <SettingsSection
       id="runs"
-      label="Runs"
-      description={`Work ${node()?.label ?? 'this node'} has started, from every plugin that owns any: workflow runs, agent sessions, and whatever else is installed. To act on one, open it where it lives.`}
+      label="Recent runs"
+      help="Workflow runs, agent sessions, and other work this node has started. To stop or change one, open it in its task."
       actions={<Button size="sm" disabled={runs.isFetching} onPress={() => void runs.refetch()}>Refresh</Button>}
     >
       {/* Which owners could not answer, so a short list reads as short rather than as complete. */}
       <Show when={runs.data?.failed.length}>
         <Alert tone="warn">
-          Could not read runs from: {runs.data!.failed.join(', ')}. The list below is missing whatever
-          they own.
+          Couldn't load runs from {runs.data!.failed.map((id) => pluginLabel(id)).join(', ')}, so some are missing.
         </Alert>
       </Show>
 
       <Show when={runs.error}>{(error) => <Alert>{String(error())}</Alert>}</Show>
 
-      <Show when={rows().length} fallback={<Show when={runs.isSuccess}><p class="muted">Nothing has run on this node yet.</p></Show>}>
+      <Show when={rows().length} fallback={<Show when={runs.isSuccess}><EmptyState align="start" size="sm">Nothing has run on this node.</EmptyState></Show>}>
         <Show when={spend() > 0}>
-          <p class="muted">{money(spend())} across {rows().length} runs on this page.</p>
+          <Text emphasis="muted">{money(spend())} across these {rows().length} runs.</Text>
         </Show>
         <For each={rows()}>
           {(run) => {
@@ -82,15 +81,15 @@ export default function RunsSettings(props: { nodeId: string | null }) {
               <Row
                 variant="stacked"
                 leading={<StatusDot tone={STATUS_TONE[run.status]} label={run.status} />}
-                meta={<Show when={run.costUsd}>{(cost) => <span class="muted">{money(cost())}</span>}</Show>}
+                meta={<Show when={run.costUsd}>{(cost) => <Text emphasis="muted">{money(cost())}</Text>}</Show>}
               >
                 <span class="settings-label">
-                  {run.title} <Badge size="xs" tone="accent">{run.pluginId}</Badge>
+                  {run.title} <Badge size="xs" tone="accent">{pluginLabel(run.pluginId)}</Badge>
                 </span>
-                <span class="muted">
+                <Text emphasis="muted" wrap>
                   {run.status} · started {formatRelativeTime(run.startedAt)} · {describeDuration(run, now)}
                   <Show when={run.detail}>{(detail) => <> · {detail()}</>}</Show>
-                </span>
+                </Text>
               </Row>
             )
           }}

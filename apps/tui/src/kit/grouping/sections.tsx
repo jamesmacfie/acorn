@@ -1,25 +1,20 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createSignal, For, Show, type JSX } from 'solid-js'
+import { createSignal, For, Show } from 'solid-js'
 import type { Renderable } from '../../tree/compat'
-import type { KitSection } from '@acorn/client-core/kit/components/layout'
+import type { KitSection, SectionHeaderProps } from '@acorn/client-core/kit/components/layout'
 import { flatten, Line, slot } from '../cells'
 import { ScrollViewport } from '../scrolling'
 import { TabPanel, Tabs } from './tabs'
 
 /** Keep the section name visible when action labels need the full width of a terminal panel. */
-export function SectionHeader(props: {
-  level?: 'pane' | 'group' | 'sub'
-  sticky?: boolean
-  count?: number
-  actions?: JSX.Element
-  children: JSX.Element
-}) {
+export function SectionHeader(props: SectionHeaderProps) {
   return (
     <box flexDirection="column" flexShrink={0}>
       <box flexDirection="row" gap={1} flexShrink={0}>
         <Line role="strong">{flatten(props.children)}</Line>
         <Show when={props.count !== undefined}><Line role="muted">{String(props.count)}</Line></Show>
       </box>
+      <Show when={props.help}><Line role="muted" wrap>{props.help!}</Line></Show>
       <Show when={props.actions}>{slot(props.actions)}</Show>
     </box>
   )

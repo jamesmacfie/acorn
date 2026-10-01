@@ -590,7 +590,8 @@ match the desktop. `apps/tui/src/chrome/settingsPages.tsx` decides what this hos
 
 - A plugin page written with the kit draws unchanged, through the terminal projections of
   `SettingsSection` and `SettingRow`. A row with `from` shows where its value comes from and no
-  control. The agents plugin's pages, Docker, and Workflows draw this way.
+  control. A row's or a section's `help` prints as a grey line under its description, because this
+  host has no hover to hide it behind. The agents plugin's pages, Docker, and Workflows draw this way.
 - Notifications has a terminal form of its own. Its **Terminal alerts** row shows the mode
   `ACORN_TUI_NOTIFY` chose, whether the variable set it or the default did, and whether this terminal
   takes a notification sequence at all. The variable is the only way to change it, and the row says

@@ -162,7 +162,7 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
       >
         <Show
           when={items().length}
-          fallback={<EmptyState title={props.descriptor.label}>{props.descriptor.emptyState?.message ?? 'Nothing here yet.'}</EmptyState>}
+          fallback={<EmptyState title={props.descriptor.label}>{props.descriptor.emptyState?.message ?? 'Nothing to show.'}</EmptyState>}
         >
           <Rows
             virtual

@@ -195,6 +195,16 @@ export function ListColumn(props: {
   )
 }
 
-export function DetailColumn(props: { scroll?: boolean; children: JSX.Element }) {
-  return <div class="ui-listdetail-detail" data-scroll={props.scroll ? '' : undefined}>{props.children}</div>
+export function DetailColumn(props: {
+  scroll?: boolean
+  /** `page` caps the column's content at a settings page's width, from its start edge, for a detail
+   *  that is a form or a document rather than a canvas. Chrome still spans the column. */
+  measure?: 'page'
+  children: JSX.Element
+}) {
+  return (
+    <div class="ui-listdetail-detail" data-scroll={props.scroll ? '' : undefined} data-measure={props.measure}>
+      {props.children}
+    </div>
+  )
 }

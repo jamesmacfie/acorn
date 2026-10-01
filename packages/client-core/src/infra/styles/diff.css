@@ -293,7 +293,7 @@
   min-height: var(--pane-head-h);
   padding: 0 var(--pane-pad);
   border-bottom: var(--chrome-divider);
-  background: var(--bg);
+  background: var(--bg-subtle);
 }
 /* The find bar is a cluster in this bar, not a strip of its own. `[data-size]` outweighs the
    pane-edge padding rule in shell.css. */

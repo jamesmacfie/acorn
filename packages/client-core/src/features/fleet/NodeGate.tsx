@@ -12,20 +12,20 @@ export default function NodeGate() {
     <main class="node-gate">
       <Switch>
         <Match when={readiness().kind === 'starting' || activeNodeStarting()}>
-          <Acorn label="starting local node…" />
+          <Acorn label="Starting acorn…" />
         </Match>
         <Match when={readiness().kind === 'unpaired'}>
-          <Acorn label="no node paired yet" />
+          <Acorn label="Not connected yet" />
           {/* Pairing itself is main-side work that lands with Settings → Nodes; until then this state
               is unreachable, because the local node is always adopted at boot. */}
-          <p class="muted">Add a node from Settings → Nodes.</p>
+          <p class="muted">Connect a computer in Settings, under Nodes.</p>
         </Match>
         <Match when={readiness().kind === 'failed'}>
-          <Acorn label="local node failed" />
+          <Acorn label="acorn couldn't start" />
           <div class="node-gate-actions">
-            <Button onPress={() => void selectActiveNode()}>Retry</Button>
+            <Button variant="solid" onPress={() => void selectActiveNode()}>Try again</Button>
             <Button expanded={showReason()} onPress={() => setShowReason((v) => !v)}>
-              Diagnostics
+              Show details
             </Button>
             <Show when={recoveryActions()}>
               {(recovery) => (

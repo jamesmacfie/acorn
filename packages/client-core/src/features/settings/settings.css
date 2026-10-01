@@ -16,7 +16,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  padding: var(--space-5) var(--space-4);
+  padding: var(--space-5) var(--space-3);
   border-right: var(--chrome-divider);
   background: var(--bg-subtle);
   min-height: 0;
@@ -25,8 +25,10 @@
 .settings-rail > .ui-input { flex: none; }
 .settings-rail-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 1px; }
 .settings-rail-group { display: flex; flex-direction: column; gap: 1px; }
+/* The group label a list column draws (primitives.css § SectionHeader), inset to the rail's items. */
 .settings-rail-heading {
-  font-size: var(--fs-xs);
+  font-size: var(--label-size);
+  font-weight: var(--label-weight);
   text-transform: var(--label-transform);
   letter-spacing: var(--label-tracking);
   color: var(--text-muted);
@@ -51,59 +53,71 @@
 .settings-rail-item[data-depth='2'] { padding-left: calc(var(--space-8) * 2); }
 /* Hangs in the row's left padding, so a workspace's name starts where its neighbours' do whether or
    not it has projects to show. */
-.settings-rail-chevron { flex: none; width: 1em; margin-left: -1.25em; color: var(--text-muted); text-align: center; }
+.settings-rail-chevron { flex: none; display: inline-flex; width: 1em; margin-left: -1.25em; color: var(--text-muted); }
 .settings-rail-item:hover { background: var(--bg-hover); }
 .settings-rail-item[aria-current='page'] { background: var(--bg-selected); }
 .settings-rail-label { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-/* A search result: **Page › Section** over the row label or keyword that matched, and the scope a
-   change there affects. */
-.settings-rail-result { align-items: flex-start; }
-.settings-rail-result-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: var(--space-1); }
-/* A result's title wraps rather than cutting the section name, which is the half someone searched for. */
+/* A search result: its page as a faint step, the section it lands on, then the row label or keyword
+   that matched. Three lines, each the rail's full width. */
+.settings-rail-result { flex-direction: column; align-items: stretch; gap: var(--space-1); }
+.settings-rail-result-page,
+.settings-rail-result-match { font-size: var(--fs-xs); color: var(--text-muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+/* The name wraps rather than cutting the section, which is what someone searched for. */
 .settings-rail-result .settings-rail-label { white-space: normal; }
-.settings-rail-result-match { font-size: var(--fs-xs); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.settings-rail-result-scope {
-  flex: none;
-  font-size: var(--fs-xs);
-  color: var(--text-muted);
-  border: var(--control-border);
-  border-radius: var(--radius-popover);
-  padding: 0 var(--space-3);
-  white-space: nowrap;
-}
-.settings-rail-empty { padding: var(--space-4); font-size: var(--fs-sm); }
+/* The no-match line starts where a result's words do, not a pane's pad in. */
+.settings-rail-empty > .ui-empty { padding-inline: var(--space-4); }
 
 .settings-main { flex: 1; min-width: 0; display: flex; flex-direction: column; min-height: 0; }
 .settings-header {
   flex: none;
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-5);
   padding: var(--space-7) var(--pane-pad) var(--space-5);
   border-bottom: var(--chrome-divider);
 }
-.settings-heading-text { min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
-.settings-breadcrumb { font-size: var(--fs-sm); }
-.settings-title { margin: 0; font-size: var(--fs-xl); font-weight: 600; color: var(--text); }
-.settings-header-side { flex: none; display: flex; flex-direction: column; align-items: flex-end; gap: var(--space-3); }
-.settings-scopes { display: flex; align-items: center; gap: var(--space-2); }
-.settings-scope {
-  font-size: var(--fs-sm);
-  color: var(--text);
-  border: var(--control-border);
-  border-radius: var(--radius-popover);
-  padding: var(--space-1) var(--space-4);
-  white-space: nowrap;
+/* The header's words and controls keep to the page's width, so the scope and the close sit by the
+   title rather than at the window's edge. */
+.settings-heading-text { min-width: 0; max-width: var(--page-measure); display: flex; flex-direction: column; gap: var(--space-2); }
+.settings-header[data-width='full'] .settings-heading-text { max-width: none; }
+/* The group label's look, as an eyebrow over the title. */
+.settings-breadcrumb {
+  font-size: var(--fs-2xs);
+  font-weight: var(--label-weight);
+  text-transform: var(--label-transform);
+  letter-spacing: var(--label-tracking);
+  color: var(--text-muted);
 }
+.settings-crumb { font: inherit; color: inherit; text-transform: inherit; letter-spacing: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+.settings-crumb:hover { color: var(--text); text-decoration: underline; }
+.settings-title-line { display: flex; align-items: center; gap: var(--space-4); min-width: 0; }
+.settings-title { margin: 0; min-width: 0; font-size: var(--fs-xl); font-weight: var(--heading-weight); color: var(--text); }
+.settings-scopes { display: flex; align-items: center; gap: var(--space-2); }
+.settings-close { margin-inline-start: auto; display: flex; }
 .settings-back-to-rail { display: none; }
 
 /* The scroll container is the full-width column, so the scrollbar sits at the window's edge. The page
    grows to at least the column's height, which is what lets a plugin's frame, a flex child that takes
    the space left, fill it the way it filled the modal's fixed-height pane. */
 .settings-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; padding: var(--pane-pad); }
-.settings-page { flex: 1 0 auto; width: 100%; max-width: 720px; display: flex; flex-direction: column; gap: var(--space-5); }
+.settings-page { flex: 1 0 auto; width: 100%; max-width: var(--page-measure); display: flex; flex-direction: column; gap: var(--gap-section); container: settings-page / inline-size; }
 .settings-page[data-width='full'] { max-width: none; }
+/* A narrow page stacks its inline rows, the control under the words, so a long label is not squeezed
+   into a third of the page beside a mostly empty control column. The query reads the page, not the
+   window, because a page can be narrow in a wide window. A size container is also the containing
+   block for anything positioned `fixed` inside it. The kit's overlays portal to the body, so none of
+   them is affected. */
+@container settings-page (max-width: 32rem) {
+  .settings-page .ui-setting-row[data-layout='inline'] { grid-template-columns: minmax(0, 1fr); min-height: 0; }
+  .settings-page .ui-setting-row[data-layout='inline'] :is(.ui-setting-control, .ui-setting-fieldset) { justify-content: flex-start; }
+}
+/* A page's tab strip is the page's navigation, not a card in its content, so it has no fill, and its
+   first label starts on the content edge where the headings below it start. At the top of the page it
+   also sits flush under the header's divider rather than a body pad below it. A stopgap until the
+   frame draws a page's tabs in its header. */
+.settings-page > .ui-tabs {
+  margin-inline-start: calc(-1 * var(--pane-pad));
+  max-width: calc(100% + var(--pane-pad));
+  background: transparent;
+}
+.settings-page > .ui-tabs:first-child { margin-top: calc(-1 * var(--pane-pad)); }
 /* A detail page's tabs (ProjectSettings.tsx): the settings body is the scroller, so a panel does not
    clip. Clipped, it cut off the outline a search result draws around the section it landed on. */
 .settings-page .ui-tab-panel { overflow: visible; }
@@ -128,14 +142,14 @@
 .settings-hint { font-size: var(--fs-sm); }
 /* Was styled only by an inline `style={{ color: 'var(--danger, #d33)' }}` at its two call sites. */
 .settings-error { margin: 0; font-size: var(--fs-sm); color: var(--danger); }
-.settings-actions { display: flex; align-items: center; gap: var(--space-5); }
+.settings-actions { display: flex; align-items: center; gap: var(--gap-row); }
 /* Editable shortcut key: styled like .help-key but focusable/centred; highlights on focus while it waits for a keypress. */
-.shortcut-input { width: 3.5em; text-align: center; text-transform: lowercase; outline: none; cursor: pointer; }
+.shortcut-input { box-sizing: border-box; height: var(--control-h-sm); min-width: 3.5em; text-align: center; outline: none; cursor: pointer; }
 .shortcut-input:focus { border-color: var(--accent); color: var(--accent); }
 
-/* A run target's form under the project page's table (RunTargetsTable.tsx): its fields in two columns,
-   the switch and the buttons across both. */
-.run-target-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-4); padding: var(--space-4); border: var(--surface-border); border-radius: var(--radius-surface); }
+/* A run target's form under the project page's table (RunTargetsTable.tsx), inside the card that draws
+   its box: its fields in two columns, the switch and the buttons across both. */
+.run-target-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start; gap: var(--space-4); }
 .run-target-form > :not(.ui-field) { grid-column: 1 / -1; }
 
 /* MCP inspector (docs/mcp.md). */
@@ -147,7 +161,7 @@
 .mcp-server-cmd { max-width: 40ch; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-family: var(--font-mono); }
 .mcp-server-env { font-family: var(--font-mono); }
 .shortcut-conflict { border-color: var(--del-marker); }
-.shortcut-claims { display: flex; flex-direction: column; gap: var(--space-1); font-size: var(--fs-xs); }
+.shortcut-claims { display: flex; flex-direction: column; gap: var(--space-1); }
 
 /* Dev-only style gallery (StyleGallery.tsx): every primitive × variant in one place so a style
    pack can be authored against the whole vocabulary at once. */
@@ -172,18 +186,12 @@
 .audit-list { display: flex; flex-direction: column; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
 .audit-row { display: flex; flex-direction: column; gap: var(--space-1); }
 .audit-action { font-size: var(--fs-sm); }
-.audit-meta { font-size: var(--fs-xs); }
+.audit-meta { font-size: var(--fs-xs); color: var(--text-muted); }
 
 /* The extension-point developer view (settings/ExtensionPointsDev.tsx). A list of facts, so it is a
    list: no cards, no grid, nothing that would make an author's typo look like a designed screen. */
 .plugin-point-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--gap-row); }
-.plugin-point { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-inline); min-width: 0; }
+.plugin-point { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.plugin-point-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--gap-inline); min-width: 0; }
 .plugin-point-id { font-family: var(--font-mono); font-size: var(--fs-sm); }
 
-/* Settings → Telemetry: what the node has collected, per owner and kind. A three-column grid
-   rather than a table because the middle column is a word and the last is a number, and a table
-   here would draw rules around nine cells of nothing. */
-.telemetry-counts { display: grid; grid-template-columns: 1fr auto auto; gap: var(--space-2) var(--space-5); font-size: var(--fs-sm); }
-.telemetry-count-row { display: contents; }
-.telemetry-owner { color: var(--text); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.telemetry-number { font-variant-numeric: tabular-nums; text-align: right; }

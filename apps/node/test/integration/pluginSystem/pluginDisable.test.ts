@@ -210,6 +210,13 @@ describe('disabling a node plugin', () => {
     }
   })
 
+  it('gives every compiled plugin a name for people', () => {
+    // Settings, the shortcut sheet and the tool list show this instead of the id
+    // (docs/plugins/activation.md § What the owner sees).
+    const unnamed = buildPlugins(join(tmpdir(), 'acorn-plugin-labels')).filter((plugin) => !plugin.label?.trim()).map((plugin) => plugin.name)
+    expect(unnamed).toEqual([])
+  })
+
   it('boots the whole set with nothing disabled', async () => {
     const { enabled, skipped, snapshot } = await start()
     expect(skipped).toEqual([])

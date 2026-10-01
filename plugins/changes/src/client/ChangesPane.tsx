@@ -70,19 +70,15 @@ type MenuContext = Parameters<Parameters<typeof Menu>[0]['children']>[0]
 
 // The view menu: the three choices in `ChangeView`, as three runs of radio items.
 //
-// No heading above a run and no rule between them. `Menu.Label` and `Menu.Separator` are DOM-only
-// halves of `Menu` — the terminal host's table has neither (apps/tui/src/kit/components.tsx) — so a
-// heading here would be a pane that only draws on one of the two hosts. Each label carries its own
-// section instead, and the leading `○` or `◉` says which of a run is chosen.
+// No heading above a run and no rule between them. Each label carries its own section instead, and
+// the check mark says which of a run is chosen.
 function ViewMenu(props: { model: ChangesModel }) {
   const view = () => props.model.view()
   const Choice = (own: { menu: MenuContext; chosen: boolean; patch: Partial<ChangeView>; children: string }) => (
     <Menu.Item
       context={own.menu}
-      // `Menu.Item` has no checked state, so the mark is the whole answer to "which of these am I
-      // on". Titled only when it is the chosen one, which is what a reader who cannot see the dot
-      // hears.
-      leading={<Icon name={own.chosen ? 'circle-dot' : 'circle'} title={own.chosen ? 'Chosen' : undefined} />}
+      kind="radio"
+      checked={own.chosen}
       onSelect={() => props.model.setView(own.patch)}
     >
       {own.children}

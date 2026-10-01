@@ -10,6 +10,7 @@ export const editorPlugin = (): NodePlugin => {
   let routeDisposables: { dispose(): void }[] = []
   return {
     name: 'editor',
+    label: 'Editor',
     init: (ctx) => {
       ctx.extensionPoints.declare(EDITOR_LINE_MARKERS, 'Editor line markers')
       // The one decision this plugin opens to other plugins (docs/plugins.md § Hooks): a formatter's

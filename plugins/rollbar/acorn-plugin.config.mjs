@@ -95,7 +95,7 @@ export default {
       // project, so picking a row changes the URL and `rollbar-item` draws beside the list. Promoting
       // one into a task is deliberately not what picking it means.
       id: 'find-item',
-      title: 'Rollbar: find an item',
+      title: 'Find a Rollbar item',
       hint: 'active items in the projects this repository follows',
       keywords: ['error', 'exception', 'issue', 'rollbar'],
       category: 'navigation',

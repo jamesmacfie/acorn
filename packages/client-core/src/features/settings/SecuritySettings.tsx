@@ -1,8 +1,10 @@
-import { createResource, createSignal, Show } from 'solid-js'
+import { createEffect, createResource, createSignal, on, Show } from 'solid-js'
 import type { NodeSecurityPosture } from '@acorn/protocol/api.ts'
 import { nodes } from '../../infra/node/fleet'
 import { createNodeBackup, nodeSecurityPosture, suggestedBackupPath } from '../../infra/node/nodeSecurity'
 import { Alert, Button, Input } from '../../kit/components/primitives'
+import { Facts } from '../../kit/components/content/Facts'
+import { Text } from '../../kit/components/content/Text'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import './settings.css'
@@ -38,6 +40,12 @@ export default function SecuritySettings(props: { nodeId: string | null }) {
       return id ? await suggestedBackupPath(id).then((s) => s.suggestedPath).catch(() => null) : null
     },
   )
+  // The suggestion goes in as the field's value, so the field shows the path the button will write
+  // to. Only into an empty field, and only when a suggestion arrives, so it never replaces what the
+  // owner typed and a field they cleared stays clear.
+  createEffect(on(suggestion, (suggested) => {
+    if (suggested && !destPath().trim()) setDestPath(suggested)
+  }))
 
   const runBackup = async () => {
     const target = destPath().trim() || suggestion()
@@ -47,7 +55,7 @@ export default function SecuritySettings(props: { nodeId: string | null }) {
     setBackingUp(true)
     try {
       const result = await createNodeBackup(target, nodeId() ?? undefined)
-      setBackupDone(`Wrote ${Math.round(result.bytes / 1024).toLocaleString()} KB to ${result.path}`)
+      setBackupDone(`Saved ${Math.round(result.bytes / 1024).toLocaleString()} KB to ${result.path}.`)
     } catch (failure) {
       setError(failure instanceof Error ? failure.message : String(failure))
     } finally {
@@ -59,41 +67,41 @@ export default function SecuritySettings(props: { nodeId: string | null }) {
   // perfectly well encrypted LUKS volume is indistinguishable from an unencrypted one without
   // guessing. Rendering that as "not encrypted" would be a confident wrong answer.
   const encryption = (current: NodeSecurityPosture) =>
-    current.diskEncrypted === true ? 'On' : current.diskEncrypted === false ? 'Off' : `Not detectable on ${current.platform}`
+    current.diskEncrypted === true ? 'On' : current.diskEncrypted === false ? 'Off' : `Can't tell on ${current.platform}`
 
   return (
     <>
       <SettingsSection id="encryption" label="Disk encryption">
         <Show when={posture()?.diskEncrypted === false}>
           <Alert tone="warn" variant="banner">
-            <strong>{node()?.label ?? 'This node'}</strong> does not have full-disk encryption turned
-            on. Acorn encrypts credentials and backup archives only — worktrees, caches, scrollback
-            and agent transcripts rely on the operating system.
+            Full-disk encryption is off on {node() && !node()!.local ? node()!.label : 'this computer'}. acorn encrypts
+            your credentials and backups. Your code, terminal history, and agent transcripts are only as
+            safe as the disk.
           </Alert>
         </Show>
-        <SettingRow label="Full-disk encryption">
-          <span class="muted">
-            {posture() ? encryption(posture()!) : posture.loading ? 'Asking the node…' : 'The node did not say.'}
-          </span>
-        </SettingRow>
+        {/* A fact, not a setting: it lines up with the controls on other pages (05-13). */}
+        <Facts
+          grouping="rows"
+          items={[{ label: 'Full-disk encryption', value: posture() ? encryption(posture()!) : posture.loading ? 'Checking…' : 'Unknown' }]}
+        />
       </SettingsSection>
 
       <SettingsSection
         id="backup"
         label="Backup"
-        description="Writes this node's databases to one archive on that node's machine. Credentials, device tokens and the TLS key are left out, so restoring means entering them again and pairing again. Worktrees and the blob cache are left out too, because git and GitHub hold both."
+        description="Saves this node's data to one file on that computer."
+        help="Credentials, pairings, and the security certificate aren't included, so after a restore you sign in and pair again. Worktrees aren't included either, because git holds them."
       >
-        <SettingRow label="Archive path" layout="stacked" error={error() || undefined}>
+        <SettingRow label="Save to" layout="stacked" error={error() || undefined}>
           <Input
-            label="Archive path"
+            label="Save to"
             value={destPath()}
-            placeholder={suggestion() ?? 'Loading…'}
             onInput={(value) => setDestPath(value)}
           />
-          <Button size="sm" disabled={backingUp() || !(destPath() || suggestion())} onPress={() => void runBackup()}>
+          <Button disabled={backingUp() || !(destPath() || suggestion())} onPress={() => void runBackup()}>
             {backingUp() ? 'Backing up…' : 'Back up this node'}
           </Button>
-          <Show when={backupDone()}>{(done) => <span class="muted">{done()}</span>}</Show>
+          <Show when={backupDone()}>{(done) => <Text emphasis="muted" wrap>{done()}</Text>}</Show>
         </SettingRow>
       </SettingsSection>
     </>

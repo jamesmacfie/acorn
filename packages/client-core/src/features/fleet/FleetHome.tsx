@@ -10,7 +10,8 @@ import { reconnectNode } from '../../infra/node/fleetActions'
 import { formatLastSeen } from '../../infra/node/freshness'
 import NodeChip from './NodeChip'
 import './nodes.css'
-import { Alert, Button } from '../../kit/components/primitives'
+import { Alert, Badge, Button } from '../../kit/components/primitives'
+import { pluginLabel } from '../../host/plugins/pluginLabel'
 
 // Fleet home: the landing view once more than one node is paired, a card per node with connection
 // state, counts, last-refresh, and the two actions that matter from here.
@@ -79,14 +80,14 @@ export default function FleetHome() {
               <li class="fleet-card" classList={{ active: active() }} data-node-id={node.nodeId}>
                 <div class="fleet-card-head">
                   <span class="fleet-card-label">{node.label}</span>
-                  <Show when={node.local}><span class="fleet-card-badge">This computer</span></Show>
+                  <Show when={node.local}><Badge size="xs">This computer</Badge></Show>
                   {/* Provenance: adopted through a plugin's node provider rather than paired by hand,
                       so this is a row that goes away if that plugin does (docs/plugins.md § Node
                       providers). */}
                   <Show when={node.provider}>
-                    {(provider) => <span class="fleet-card-badge">via {provider().providerId}</span>}
+                    {(provider) => <Badge size="xs">From {pluginLabel(provider().providerId.split(':')[0]!)}</Badge>}
                   </Show>
-                  <Show when={active()}><span class="fleet-card-badge fleet-card-badge-active">Active</span></Show>
+                  <Show when={active()}><Badge size="xs" tone="accent">Active</Badge></Show>
                 </div>
                 <NodeChip nodeId={node.nodeId} query={{}} />
                 <div class="fleet-card-endpoint">{node.endpoint}</div>

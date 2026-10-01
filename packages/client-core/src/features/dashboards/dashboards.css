@@ -81,7 +81,7 @@
   text-overflow: ellipsis;
 }
 .dash-tab[aria-selected='true'] { color: var(--text); border-bottom-color: var(--accent); }
-.dash-tab:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.dash-tab:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: -2px; }
 @media (hover: hover) {
   .dash-tab:hover { color: var(--text); background: var(--bg-hover); }
 }

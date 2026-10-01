@@ -478,6 +478,10 @@ export type HostPluginContext = CompiledNodePluginContext & {
 
 export type NodePlugin = {
   name: string
+  // The name a person reads in settings, the shortcut sheet and anywhere else the plugin is named. Use
+  // the name the plugin already shows in the rail or its settings page, so it has one name. A loaded
+  // plugin's comes from its manifest `name` instead, and this field is ignored for it.
+  label?: string
   // agents, memory, notes and terminal: core, or the shell in front of it, assumes their contributions
   // exist, so they can't be disabled. GitHub owns an optional provider surface and importer.
   required?: boolean

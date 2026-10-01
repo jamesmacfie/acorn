@@ -83,11 +83,10 @@ function OperationBanner(props: { model: ChangesModel }) {
 
 /** Fetch, the two pulls, and the two pushes.
  *
- *  No heading above the run and no rule between the items: `Menu.Label` and `Menu.Separator` are
- *  DOM-only halves of `Menu` and the terminal host's table has neither, as the view menu and the
- *  commit options both found. Each label says the whole verb instead.
+ *  No heading above the run. Each label says the whole verb instead.
  *
- *  Force push is a `Menu.Item` with `confirm`, on the pattern the row's Discard set (./fileTools.tsx):
+ *  Force push sits last, below a rule, as every destructive item does (docs/ui-design.md § Menus and
+ *  right-click). It is a `Menu.Item` with `confirm`, on the pattern the row's Discard set (./fileTools.tsx):
  *  the armed label is the prompt on every host, and a dialog was refused by the programme's
  *  decisions table. */
 function RemoteMenu(props: { model: ChangesModel }) {
@@ -117,6 +116,7 @@ function RemoteMenu(props: { model: ChangesModel }) {
           </Menu.Item>
           <Menu.Item context={menu} title={COMMAND.rebase} onSelect={() => run('rebase')}>Pull with rebase</Menu.Item>
           <Menu.Item context={menu} title={COMMAND.push} onSelect={() => run('push')}>Push</Menu.Item>
+          <Menu.Separator />
           <Menu.Item
             context={menu}
             tone="danger"

@@ -10,7 +10,7 @@ disk and the client registers contributions from the same shape. Its top-level k
 | Key | Required | What it is |
 | --- | --- | --- |
 | `id` | yes | Matches `/^[a-z][a-z0-9-]{1,31}$/` — 2 to 32 characters, lowercase, no dots. The dot ban is what keeps `<dataRoot>/plugins/<id>/` and `<dataRoot>/plugins/<id>.sqlite` in one directory without colliding. |
-| `name` | yes | Display name, 1–120 characters. |
+| `name` | yes | The name people read, 1–120 characters. Settings, the shortcut sheet and the tool list show it in place of the id. Use the name your settings page or rail icon already shows, so the plugin has one name. Trust prompts still show the id. |
 | `version` | yes | Free-form string, 1–64 characters. Compared on update by the installer's downgrade guard. |
 | `baseline` | yes | Exactly `"acorn-1"`. A missing or different marker is rejected before the plugin runs, including on an old API-1 package. |
 | `apiVersion` | yes | A range over plugin API majors that has to cover this node's current major, `"2"` (`packages/protocol/src/plugin/apiVersion.ts`). Anything the range does not cover is a failed roster row with both versions in its reason. |

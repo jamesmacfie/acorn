@@ -22,7 +22,8 @@ import { formatChord } from '@acorn/client-core/features/tasks'
 import { taskStatus } from '@acorn/client-core/features/tasks'
 import TaskPaneHost from '@acorn/client-core/features/tasks/TaskPaneHost.tsx'
 import { confirmTaskArchive } from '@acorn/client-core/features/tasks/confirmTaskArchive.ts'
-import { Alert, Button } from '@acorn/client-core/kit/components/primitives.tsx'
+import { Alert, Button, StatusDot } from '@acorn/client-core/kit/components/primitives.tsx'
+import Icon from '@acorn/client-core/kit/components/content/Icon.tsx'
 import { TaskSlotHost } from '@acorn/client-core/host/registries/extensionPoints/uiSlots.tsx'
 import { completeTaskArchive, isArchiving, withArchiving } from '@acorn/client-core/features/tasks'
 import { defaultSourceId } from '@acorn/client-core/host/registries/sources'
@@ -93,7 +94,7 @@ export default function TaskView(props: {
   async function openClose() {
     setCloseError('')
     setTeardownFailed(false)
-    const decision = await confirmTaskArchive(props.task.id)
+    const decision = await confirmTaskArchive(props.task)
     if (!decision.confirmed) return
     // Held rather than passed straight through, because the teardown-failed path re-invokes the
     // archive from a button and the cleanups the owner ticked are still the cleanups they ticked.
@@ -264,7 +265,7 @@ export default function TaskView(props: {
         glyph="square-terminal"
         active={props.terminalOpen}
         data-tip-key={shortcutFor('task.terminal.toggle') ? formatChord(shortcutFor('task.terminal.toggle')!) : undefined}
-        data-tip-sub="Shell in the worktree"
+        data-tip-sub="Terminals for this task"
         aria-expanded={props.terminalOpen}
         onClick={props.onToggleTerminal}
       />
@@ -290,23 +291,30 @@ export default function TaskView(props: {
         </Show>
       </main>
       <footer class="workspace-footer">
-        <Show when={props.task.worktreePath} fallback={<span class="workspace-footer-worktree">no worktree</span>}>
+        <Show when={props.task.worktreePath} fallback={<span class="workspace-footer-worktree">Project folder</span>}>
           {(path) => (
             <>
               <span class="workspace-footer-worktree">
-                worktree
+                Worktree
                 <CopyButton text={path} title="Copy worktree path" />
               </span>
-              <span class="workspace-footer-branch">⎇ {props.task.branch}</span>
-              <TaskSlotHost slot="task.footer" taskId={props.task.id} />
-              <Show when={status()?.missing}><span class="workspace-footer-repair">⚠ needs repair (removed on disk)</span></Show>
-              <Show when={!status()?.missing && status()?.dirty}>
-                <span class="workspace-footer-dirty">● dirty ({status()?.dirtyCount} file{status()?.dirtyCount === 1 ? '' : 's'})</span>
+              <span class="workspace-footer-branch"><Icon name="git-branch" /> {props.task.branch}</span>
+              <Show when={status()?.missing}>
+                <span class="workspace-footer-repair"><Icon name="triangle-alert" /> Worktree folder is missing</span>
               </Show>
-              <Show when={status() && !status()!.missing && !status()!.dirty}><span class="muted">● clean</span></Show>
+              <Show when={!status()?.missing && status()?.dirty}>
+                <span class="workspace-footer-dirty">
+                  <StatusDot tone="warn" /> {status()?.dirtyCount} uncommitted file{status()?.dirtyCount === 1 ? '' : 's'}
+                </span>
+              </Show>
+              <Show when={status() && !status()!.missing && !status()!.dirty}>
+                <span class="muted"><StatusDot tone="ok" /> No uncommitted changes</span>
+              </Show>
             </>
           )}
         </Show>
+        {/* Outside the worktree check, so a plugin's badge shows for a task in the project folder too. */}
+        <TaskSlotHost slot="task.footer" taskId={props.task.id} />
       </footer>
     </div>
   )

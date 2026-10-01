@@ -14,7 +14,7 @@ export const contextClientPlugin: ClientPlugin = {
     ctx.commands.register({
       id: 'context.open',
       title: 'Open the Context pane',
-      hint: 'what an agent on this task is given to read',
+      hint: 'what the agent gets when you send',
       keywords: ['context', 'prompt'],
       category: 'navigation',
       palette: true,

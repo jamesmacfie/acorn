@@ -1,9 +1,10 @@
-import { createMemo, For, Show } from 'solid-js'
+import { createMemo, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import { createDeviceFlow, integrationsOptions, type Project, projectImporterRegistry } from '@acorn/plugin-api/client'
-import { Alert, Badge, Button, Card, ChipRow, Chip, CopyButton, Heading, Inline, Stack, Text, Toolbar } from '@acorn/plugin-api/ui'
+import { Alert, Button, Card, CopyButton, Heading, Inline, Stack, Text, Toolbar } from '@acorn/plugin-api/ui'
 import { safeVerificationUrl } from '@acorn/protocol/externalUrl.ts'
+import { AddedTally } from './AddedTally'
 
 // The GitHub branch of the wizard: the device grant, then whatever GitHub registered as a project
 // importer. Neither half is written here. The grant is core's shared createDeviceFlow, the same one
@@ -11,12 +12,12 @@ import { safeVerificationUrl } from '@acorn/protocol/externalUrl.ts'
 // projectImporterRegistry so this plugin never imports another plugin.
 //
 // The screen doesn't leave on its own after an import. An account has many repositories and taking
-// several is normal, so the list stays put, says what has been added so far, and waits for the owner.
+// several is normal, so the list stays put, says what has been added so far, and waits for the owner
+// to press the wizard's Next, which reads "Done adding" here.
 export default function GithubConnect(props: {
   onImported: (projectIds?: readonly string[]) => void
   onBack: () => void
   added: Project[]
-  onContinue: () => void
 }) {
   const integrations = createQuery(() => integrationsOptions(true))
   const connected = () =>
@@ -34,7 +35,12 @@ export default function GithubConnect(props: {
         when={connected()}
         fallback={
           <Stack gap="row">
-            <Heading level={2}>Connect GitHub.</Heading>
+            <Heading
+              level={2}
+              help="If you don't finish signing in, nothing breaks. You can connect GitHub later in Settings, under Services."
+            >
+              Connect GitHub
+            </Heading>
             <Text emphasis="muted" wrap>Enter a code at GitHub to sign in. acorn never sees your password.</Text>
             <Show
               when={flow.device()}
@@ -49,7 +55,7 @@ export default function GithubConnect(props: {
               {(started) => (
                 <Card>
                   <Stack gap="row">
-                    <Show when={githubVerification(started().verificationUri)} fallback={<Alert>GitHub returned an unsafe sign-in address. Cancel and retry.</Alert>}>
+                    <Show when={githubVerification(started().verificationUri)} fallback={<Alert>GitHub sent a sign-in link that acorn doesn't trust. Cancel and try again.</Alert>}>
                       {(url) => <Text emphasis="muted">{url().host}{url().pathname}</Text>}
                     </Show>
                     {/* The code is the thing to read, so it gets the emphasis. */}
@@ -63,28 +69,24 @@ export default function GithubConnect(props: {
                       <Show when={githubVerification(started().verificationUri)}>
                         {(url) => <Button href={url().href}>Open GitHub</Button>}
                       </Show>
-                      <Button variant="bare" onPress={flow.cancel}>Cancel</Button>
+                      <Button variant="ghost" onPress={flow.cancel}>Cancel</Button>
                     </Toolbar>
-                    <Text emphasis="muted">Waiting for approval…</Text>
+                    <Text emphasis="muted">Waiting for you to approve on GitHub…</Text>
                   </Stack>
                 </Card>
               )}
             </Show>
             <Show when={flow.error()}>{(text) => <Alert>{text()}</Alert>}</Show>
-            <Text emphasis="muted" wrap>
-              If you close this or deny the request, nothing breaks — you land in the app and can retry
-              from Settings → Services.
-            </Text>
           </Stack>
         }
       >
         <Stack gap="row">
-          <Heading level={2}>Pick your repositories.</Heading>
+          <Heading level={2}>Choose repositories</Heading>
           <Text emphasis="muted" wrap>
-            Clone them fresh, or map ones you already have on disk. Add as many as you like — anything you
-            skip stays in GitHub, and you can import it from Settings whenever you want it.
+            Clone a repository, or link one you already have on this computer. You can import more later
+            in Settings.
           </Text>
-          <Show when={importer()} fallback={<Text emphasis="muted">The GitHub importer is not available on this node.</Text>}>
+          <Show when={importer()} fallback={<Text emphasis="muted">GitHub import isn't available on this computer.</Text>}>
             {(entry) => (
               // showClose: the wizard's own chrome already has back and skip.
               <Dynamic component={entry().component} onClose={props.onBack} onImported={props.onImported} showClose={false} />
@@ -92,19 +94,7 @@ export default function GithubConnect(props: {
           </Show>
           {/* The running tally is the whole reason this screen can stay put: without it, adding a third
               repository is an act of faith. */}
-          <Show when={props.added.length}>
-            <Inline gap="stack" wrap>
-              <Badge tone="ok">{props.added.length} project{props.added.length === 1 ? '' : 's'} added</Badge>
-              <ChipRow ariaLabel="Projects added">
-                <For each={props.added}>{(project) => <Chip>{project.name}</Chip>}</For>
-              </ChipRow>
-            </Inline>
-          </Show>
-          <Toolbar variant="actions" size="sm">
-            <Button variant="solid" tone="accent" disabled={!props.added.length} onPress={props.onContinue}>
-              {props.added.length ? 'Done adding' : 'Add a repository to continue'}
-            </Button>
-          </Toolbar>
+          <AddedTally added={props.added} />
         </Stack>
       </Show>
     </Stack>

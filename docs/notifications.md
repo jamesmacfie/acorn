@@ -196,7 +196,7 @@ to this one.
 ### What a row is drawn with
 
 `glyph` is a Lucide name a source may put on its own rows. Without one the inbox draws the pair it
-always has, `info` or `alert-triangle`, chosen by `severity`.
+always has, `info` or `triangle-alert`, chosen by `severity`.
 
 The tone stays with the severity either way. What a row is and how urgent it is are two different
 questions: a memory proposal is a nudge whether or not it is drawn with the memory mark, and a source
@@ -373,7 +373,7 @@ The three event switches turn an edge off entirely, row included. Off means the 
 to hear about it, and a row that lands silently but still counts in the pill is hearing about it.
 
 Settings shows five checkboxes, plus the app-icon row where `canSetBadge()` is true, and a
-**Send a test notification** button that runs a synthetic unseen edge through `deliverNotice`
+**Send a test** button that runs a synthetic unseen edge through `deliverNotice`
 (`packages/client-core/src/features/settings/NotificationSettings.tsx`). The button is also where the
 browser asks for notification permission.
 

@@ -79,8 +79,8 @@ export type PluginsBridge = {
 export const PLUGIN_STATE = routeCapability<PluginsBridge>('core.pluginStateRoute')
 
 // What `declared()` below sends to a device: everything the loader knows about a package, minus the two
-// fields that are this node's own bookkeeping.
-type DeclaredRow = Omit<InstalledPluginInfo, 'id' | 'hasNode'>
+// fields that are this node's own bookkeeping and the label, which travels on the row itself.
+type DeclaredRow = Omit<InstalledPluginInfo, 'id' | 'label' | 'hasNode'>
 
 type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false
 
@@ -95,12 +95,12 @@ type Exact<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false
 const DECLARED_ROW_IS_EXACTLY_THE_WIRE_ROW: Exact<keyof DeclaredRow, keyof InstalledPluginRow> = true
 void DECLARED_ROW_IS_EXACTLY_THE_WIRE_ROW
 
-type RuntimeDeclaration = Omit<InstalledPluginInfo, 'id' | 'hasNode' | 'source' | 'installedAt' | 'bundled'>
+type RuntimeDeclaration = Omit<InstalledPluginInfo, 'id' | 'label' | 'hasNode' | 'source' | 'installedAt' | 'bundled'>
 const RUNTIME_DECLARATION_IS_EXACTLY_THE_WIRE_ROW: Exact<keyof RuntimeDeclaration, keyof Omit<PluginRuntimeIdentity, 'activation'>> = true
 void RUNTIME_DECLARATION_IS_EXACTLY_THE_WIRE_ROW
 
 const runtimeFromInstalled = (entry: InstalledPluginInfo): PluginRuntimeIdentity => {
-  const { id: _id, hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...declaration } = entry
+  const { id: _id, label: _label, hasNode, source: _source, installedAt: _installedAt, bundled: _bundled, ...declaration } = entry
   return {
     ...declaration,
     activation: hasNode || contributesNodeData(declaration.contributions) ? 'node' : 'client-only',
@@ -161,15 +161,21 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
   // Present only for a package that came off disk. A built-in's version is the app's, and it has no
   // manifest and no bundle to distribute, so the whole block is absent rather than filled with nulls.
   //
-  // A spread of what `installedPluginInfo` already built, minus the two fields the row does not carry.
+  // A spread of what `installedPluginInfo` already built, minus the three fields `installed` does not carry.
   // This used to re-list all nine members, which made it a second projection of the same manifest kept in
   // step with the first by hand, the exact habit the one-declaration contract exists to end. What keeps
   // the spread honest is the exactness assertion at the top of this file.
   const declared = (name: string): Pick<NodePluginRow, 'installed'> => {
     const entry = installed.get(name)
     if (!entry) return {}
-    const { id: _id, hasNode: _hasNode, ...row } = entry satisfies InstalledPluginInfo
+    const { id: _id, label: _label, hasNode: _hasNode, ...row } = entry satisfies InstalledPluginInfo
     return { installed: row satisfies DeclaredRow }
+  }
+  // The name a person reads. A package on disk names itself in its manifest, and that wins over a
+  // compiled definition of the same id, because the disk copy is the one the owner installed.
+  const labelFor = (id: string, compiled?: string): Pick<NodePluginRow, 'label'> => {
+    const label = installed.get(id)?.label ?? compiled
+    return label ? { label } : {}
   }
   // `disabled` is what will be true after a restart; `running` is what is true now. A required plugin is
   // never disabled either way, whatever the file says.
@@ -178,6 +184,7 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
     const emits = active?.emits ?? entry.emits ?? installed.get(entry.name)?.emits
     return {
       name: entry.name,
+      ...labelFor(entry.name, entry.label),
       ...(emits?.length ? { emits } : {}),
       required: entry.required,
       disabled: !entry.required && pending.has(entry.name),
@@ -219,6 +226,7 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
     const waiting = !held && runtimeFromInstalled(entry).activation === 'node' && !off && !failure && !active
     rows.push({
       name: entry.id,
+      ...labelFor(entry.id),
       ...(entry.emits?.length ? { emits: entry.emits } : {}),
       required: false,
       disabled: off,

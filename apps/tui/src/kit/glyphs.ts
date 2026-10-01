@@ -16,6 +16,7 @@ const GLYPHS: Record<string, string> = {
   'shield-question-mark': '?',
   'triangle-alert': '⚠',
   'workflow': '◇',
+  'x': '✕',
 }
 
 // One shell-owned tick drives both Spinner and spinning Icon instances. A render without a running

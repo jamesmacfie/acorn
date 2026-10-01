@@ -30,7 +30,7 @@ export function SegmentedControl<T extends string>(props: {
           class="ui-segment"
           aria-checked={option.value === props.value}
           disabled={option.disabled}
-          title={option.title}
+          data-tip={option.title}
           onClick={() => props.onChange(option.value)}
         >
           {option.label}

@@ -1,5 +1,5 @@
 import { Show, createSignal } from 'solid-js'
-import { Button, Chip, Icon } from '@acorn/plugin-api/ui'
+import { Chip, Icon, IconButton } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { AGENT_ATTACHMENT_POINT } from '@acorn/protocol/extensionPoints.ts'
 import type { AgentAttachment } from '../../contract/wire.ts'
@@ -54,7 +54,7 @@ export function AttachmentSlot(props: {
         </Chip>
       </Slot>
       <Show when={replaced()}>
-        <Button variant="bare" size="xs" onPress={props.onRemove} label={`Remove ${props.attachment.filename}`}>✕</Button>
+        <IconButton icon="x" size="xs" onPress={props.onRemove} label={`Remove ${props.attachment.filename}`} />
       </Show>
     </>
   )

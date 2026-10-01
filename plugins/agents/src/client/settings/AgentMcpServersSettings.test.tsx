@@ -62,7 +62,7 @@ describe('the MCP servers page', () => {
     button('Edit')!.click()
     button('Remove server')!.click()
     await settle()
-    expect(mocks.confirm).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Remove linear?', stays: "Servers set up in a CLI's own config files." }))
+    expect(mocks.confirm).toHaveBeenLastCalledWith(expect.objectContaining({ title: 'Remove linear', stays: "Servers set up in a CLI's own config files." }))
     expect(mocks.remove).not.toHaveBeenCalled()
 
     mocks.confirm.mockResolvedValueOnce(true)

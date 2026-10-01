@@ -38,7 +38,7 @@
 //     the host hands the frame its `taskId` in `context`, and everything the panel does with a task goes
 //     through this plugin's own routes, which need no bridge scope at all.
 export default {
-  name: 'HTTP',
+  name: 'API requests',
   entry: '@acorn/plugin-http/node/index.ts',
   factory: 'httpPlugin',
   client: {

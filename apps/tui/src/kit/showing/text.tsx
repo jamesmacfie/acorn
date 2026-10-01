@@ -1,6 +1,7 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createSignal, Show, type JSX } from 'solid-js'
 import type { TextRole, Tone } from '@acorn/client-core/kit/tokens'
+import type { HeadingProps } from '@acorn/client-core/kit/components/content'
 import { flatten, Line, runStyle } from '../cells'
 import { borderCell } from '../roles'
 import { stop } from '../../keys/stops'
@@ -37,11 +38,12 @@ export function Link(props: { href?: string; onPress?: () => void; children: JSX
   )
 }
 
-export function Heading(props: { level?: 1 | 2 | 3; eyebrow?: string; children: JSX.Element }) {
+export function Heading(props: HeadingProps) {
   return (
     <box flexDirection="column">
       <Show when={props.eyebrow}><Line role="eyebrow">{props.eyebrow!}</Line></Show>
       <Line role="heading">{props.children}</Line>
+      <Show when={props.help}><Line role="muted" wrap>{props.help!}</Line></Show>
     </box>
   )
 }

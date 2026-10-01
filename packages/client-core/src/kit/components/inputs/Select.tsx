@@ -2,7 +2,7 @@ import { createSignal, For, onMount, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { createAnchoredPopover, type AnchoredPopover } from '../../lib/controls/anchor'
 import { createDomCollection } from '../../keys/collection'
-import { controlAttrs, type ControlOwn } from './controlAttrs'
+import { claimField, controlAttrs, FieldProvider, NO_FIELD, type ControlOwn } from './controlAttrs'
 import { Input } from './Input'
 
 /** How many options it takes before the list grows a filter box. A native <select> answers a
@@ -105,7 +105,7 @@ function SelectList(props: {
                 data-value={option.value}
                 aria-selected={option.value === props.value()}
                 disabled={option.disabled}
-                title={option.title}
+                data-tip={option.title}
                 onClick={() => props.onPick(option)}
               >
                 <span class="ui-menu-label">{option.label}</span>
@@ -136,6 +136,7 @@ export function Select(props: SelectProps) {
   let triggerRef: HTMLButtonElement | undefined
   const current = () => props.options.find((option) => option.value === props.value)
   const label = () => current()?.label ?? ''
+  const field = claimField(props.id)
 
   const popover = createAnchoredPopover({
     anchor: () => triggerRef,
@@ -171,7 +172,7 @@ export function Select(props: SelectProps) {
         </For>
       </select>
       <button
-        {...controlAttrs(props, 'ui-input ui-select')}
+        {...controlAttrs(props, 'ui-input ui-select', field)}
         type="button"
         ref={triggerRef}
         autofocus={props.autofocus}
@@ -188,13 +189,16 @@ export function Select(props: SelectProps) {
         <span class="ui-select-chevron" aria-hidden="true">▾</span>
       </button>
       <Show when={popover.open()}>
-        <SelectList
-          popover={popover}
-          options={() => props.options}
-          value={() => props.value}
-          ariaLabel={props.label}
-          onPick={pick}
-        />
+        {/* The list's filter box is not the control a caption names. */}
+        <FieldProvider value={NO_FIELD}>
+          <SelectList
+            popover={popover}
+            options={() => props.options}
+            value={() => props.value}
+            ariaLabel={props.label}
+            onPick={pick}
+          />
+        </FieldProvider>
       </Show>
     </>
   )

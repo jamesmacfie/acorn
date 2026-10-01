@@ -37,6 +37,8 @@ import { projectPath } from '../registries/commands/corePaths'
 
 /** The node a fleet row belongs to, and the task it names. Rebuilt per query; the lookup is by both,
  *  because a task id is only unique within a node and this list puts two nodes' ids side by side. */
+export const projectCount = (count: number): string => `${count} project${count === 1 ? '' : 's'}`
+
 type FleetTask = { task: Task; nodeId: string }
 
 export function registerNavigationCommands(options: {
@@ -64,12 +66,13 @@ export function registerNavigationCommands(options: {
     return fleetTasks().rows.flatMap((row) => row.data.map((task) => ({ task, nodeId: row.nodeId })))
   })
 
-  const taskItem = (row: FleetTask): CommandSearchItem => ({
-    id: row.task.id,
-    title: row.task.title,
-    subtitle: row.task.github ? `${row.task.github.owner}/${row.task.github.name}` : row.task.projectId,
-    taskId: row.task.id,
-  })
+  // The project's name, never its id. A task from another node's project is not in this node's list,
+  // and it gets no subtitle rather than a UUID.
+  const projectName = (id: string) => projects.data?.find((project) => project.id === id)?.name
+  const taskItem = (row: FleetTask): CommandSearchItem => {
+    const subtitle = row.task.github ? `${row.task.github.owner}/${row.task.github.name}` : projectName(row.task.projectId)
+    return { id: row.task.id, title: row.task.title, ...(subtitle ? { subtitle } : {}), taskId: row.task.id }
+  }
 
   const workspaceEntries = () => options.fleetWorkspaces().entries
 
@@ -102,7 +105,7 @@ export function registerNavigationCommands(options: {
           .map(taskItem)),
         select: (item, context): CommandOutcome => {
           const row = everyTask().find((candidate) => candidate.task.id === item.id && candidate.nodeId === (context.nodeId ?? ''))
-          if (!row) throw new Error('that task is no longer here')
+          if (!row) throw new Error("That task isn't here any more.")
           // The node first: `activateTaskSignals` and the route both resolve against the active node,
           // so a remote task opened without switching addresses the wrong machine.
           if (row.nodeId && row.nodeId !== activeNodeId()) setActiveNode(row.nodeId)
@@ -127,13 +130,13 @@ export function registerNavigationCommands(options: {
           .map((entry): CommandSearchItem => ({
             id: entry.workspace.id,
             title: entry.workspace.name,
-            subtitle: `${entry.workspace.projects.length} projects`,
+            subtitle: projectCount(entry.workspace.projects.length),
             workspaceId: entry.workspace.id,
           }))),
         select: (item, context): CommandOutcome => {
           const entry = workspaceEntries().find((candidate) =>
             candidate.workspace.id === item.id && candidate.nodeId === (context.nodeId ?? ''))
-          if (!entry) throw new Error('that workspace is no longer here')
+          if (!entry) throw new Error("That workspace isn't here any more.")
           // Mirrors the topbar picker, including the node switch
           // (features/workspaces/fleetWorkspaces.ts explains the order). The rail source is restored
           // per-workspace by the activeWorkspace effect in App.tsx.
@@ -155,7 +158,7 @@ export function registerNavigationCommands(options: {
         when: () => !!previousWorkspaceId(),
         run: (): CommandOutcome => {
           const entry = workspaceEntries().find((candidate) => candidate.workspace.id === previousWorkspaceId())
-          if (!entry) throw new Error('that workspace is no longer here')
+          if (!entry) throw new Error("That workspace isn't here any more.")
           // Same handoff as the search above, node switch included.
           selectFleetWorkspace(entry, navigate)
           return COMMAND_CLOSED

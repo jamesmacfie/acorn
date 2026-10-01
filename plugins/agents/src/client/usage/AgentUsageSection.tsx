@@ -1,5 +1,5 @@
 import { For, onCleanup, onMount, Show } from 'solid-js'
-import { Alert, Facts, IconButton, Inline, Meter, Stack, StatusDot, Text, Toolbar } from '@acorn/plugin-api/ui'
+import { Alert, Facts, IconButton, Inline, Meter, SectionHeader, Stack, StatusDot, Text } from '@acorn/plugin-api/ui'
 import { agentUsageStore } from './usageStore'
 import { providerMetaLine, providerUsageRows } from './usageModel'
 import { usageMeterTone, usageTone } from '../sessions/stateTone'
@@ -15,17 +15,9 @@ export default function AgentUsageSection(props: { showHeader?: boolean }) {
   return (
     <Stack gap="section">
       <Show when={props.showHeader !== false}>
-        <Toolbar ariaLabel="Agent provider usage">
-          <Text emphasis="eyebrow">Usage</Text>
-          <Toolbar.Spacer />
-          <IconButton
-            icon="refresh-cw"
-            label="Refresh agent usage"
-            busy={agentUsageStore.refreshing()}
-            disabled={agentUsageStore.refreshing()}
-            onPress={() => void agentUsageStore.refresh()}
-          />
-        </Toolbar>
+        {/* A popover's heading is a group label (docs/ui-design.md § Chrome and overlays). Each
+            provider below has its own refresh. */}
+        <SectionHeader level="group">Plan usage</SectionHeader>
       </Show>
       <Show when={agentUsageStore.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
       <Show when={!agentUsageStore.snapshot() && agentUsageStore.loading()}>

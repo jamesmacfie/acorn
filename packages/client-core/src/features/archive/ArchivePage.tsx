@@ -125,7 +125,8 @@ export default function ArchivePage() {
               type="search"
               value={text()}
               label="Search archived tasks"
-              placeholder="Search titles, branches and agent transcripts…"
+              placeholder="Search archive…"
+              title="Searches titles, branches, and agent conversations."
               onInput={setText}
             />
           </Toolbar>
@@ -139,7 +140,7 @@ export default function ArchivePage() {
                 when={tasks().length}
                 fallback={(
                   <Show when={!collapsed()}>
-                    <EmptyState title="Nothing archived">Tasks you archive land here, with their history.</EmptyState>
+                    <EmptyState align="start" size="sm">Nothing archived. Tasks you archive land here, with their history.</EmptyState>
                   </Show>
                 )}
               >
@@ -186,22 +187,22 @@ export default function ArchivePage() {
           >
             <Show
               when={!results.loading || results()}
-              fallback={<Show when={!collapsed()}><Text emphasis="muted">Searching…</Text></Show>}
+              fallback={<Show when={!collapsed()}><EmptyState busy align="start" size="sm">Searching…</EmptyState></Show>}
             >
               <Show
                 when={groups().length}
                 fallback={(
                   <Show when={!collapsed()}>
-                    <EmptyState title="No matches">Nothing archived matches “{query()}”.</EmptyState>
+                    <EmptyState align="start" size="sm">Nothing archived matches “{query()}”.</EmptyState>
                   </Show>
                 )}
               >
                 <For each={groups()}>
                   {(group) => (
                     <Stack gap="row">
-                      <SectionHeader count={group.hits.length}>{group.label}</SectionHeader>
+                      <SectionHeader level="group" count={group.hits.length}>{group.label}</SectionHeader>
                       <Show when={!collapsed() && group.status !== 'ok'}>
-                        <Text emphasis="muted">{group.status === 'timeout' ? 'Took too long to answer.' : 'Could not answer.'}</Text>
+                        <Text emphasis="muted">{group.status === 'timeout' ? `${group.label} took too long to search.` : `Couldn't search ${group.label}.`}</Text>
                       </Show>
                       <For each={group.hits}>
                         {(hit) => (

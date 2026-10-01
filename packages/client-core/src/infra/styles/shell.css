@@ -26,6 +26,8 @@
   align-items: center;
   min-width: 0;
   padding: 0 var(--pane-pad);
+  /* The collapse button sits centred over the rail below it. */
+  padding-inline-start: calc((var(--tabrail-w) - var(--control-h-sm)) / 2);
   border-bottom: var(--chrome-divider);
   font-size: var(--fs-sm);
 }
@@ -139,7 +141,6 @@
 .layout-stack-split { flex-direction: column; }
 .layout-document-split[data-axis='y'] { flex-direction: column; }
 
-.layout-wizard-body,
 .layout-region-detail,
 .layout-region-frame,
 .layout-region-top { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
@@ -156,7 +157,9 @@
   overflow: auto;
   padding-inline: var(--pane-pad);
 }
-.layout-tabs-panel:has(> .ui-listdetail) { padding-inline: 0; }
+/* A remote tree adds a `display: contents` wrapper. It draws no box, but `>` still counts it as the
+   child, so each escape in this file names the wrapped form too. */
+.layout-tabs-panel:has(> .ui-listdetail, > .remote-tree > .ui-listdetail) { padding-inline: 0; }
 
 /* `header-body-footer`'s two pinned strips. The body already takes the pane's inline padding; these
    did not, so a chip row or a summary line sat flush against the pane's border with the scrolling
@@ -165,6 +168,9 @@
 .layout-hbf-header,
 .layout-hbf-footer { flex: none; min-width: 0; padding-inline: var(--pane-pad); }
 .layout-hbf-header { padding-block: var(--space-3); border-bottom: var(--chrome-divider); }
+/* A header that is a Toolbar is the bar itself: the toolbar pulls out of the inline pad and draws the
+   one divider. */
+.layout-hbf-header:has(> .ui-toolbar, > .remote-tree > .ui-toolbar) { padding-block: 0; border-bottom: 0; }
 
 /* `header-body-footer`. The body is the scroller and the other two are pinned, which is the whole
    difference between this layout and `single`. Same `padding-inline` rule and the same reason. */
@@ -179,7 +185,7 @@
 }
 /* A region that manages its own scrolling fills the box instead of overflowing it, and a split's
    divider has to reach the pane's edge. Same escape as `single`'s. */
-.layout-hbf-body:has(> .ui-listdetail) { padding-inline: 0; }
+.layout-hbf-body:has(> .ui-listdetail, > .remote-tree > .ui-listdetail) { padding-inline: 0; }
 
 /* `single`. The one region is the scroller; see the comment in layouts/Single.tsx for why the layout
    root cannot be. `padding-inline` rather than `padding`, because the vertical rhythm inside a region
@@ -195,11 +201,11 @@
 }
 /* Except when the region is a split. Its divider is the two columns' shared edge and has to reach the
    pane's, and its list column does its own padding. */
-.layout-single-body:has(> .ui-listdetail) { padding-inline: 0; }
+.layout-single-body:has(> .ui-listdetail, > .remote-tree > .ui-listdetail) { padding-inline: 0; }
 /* Or a rectangle. Somebody else's pixels fill the box edge to edge — the browser preview's
    `WebContentsView`, positioned from this element's own rect — and an inline pad would letterbox it.
    The `Toolbar` above it carries its own padding, as chrome always does. */
-.layout-single-body:has(> .ui-rect) { padding-inline: 0; }
+.layout-single-body:has(> .ui-rect, > .remote-tree > .ui-rect) { padding-inline: 0; }
 
 /* The regions a drag sizes take an inline pixel length; their sibling takes what is left. */
 .layout-region-document,
@@ -236,12 +242,12 @@
    `:where()` round the regions so the whole selector weighs what the chrome list alone weighs, which
    is what lets the two cancels below out-specify it on one class. */
 :where(
-  .layout-single-body:not(:has(> .ui-listdetail, > .ui-rect)),
-  .layout-hbf-body:not(:has(> .ui-listdetail)),
+  .layout-single-body:not(:has(> .ui-listdetail, > .ui-rect, > .remote-tree > .ui-listdetail, > .remote-tree > .ui-rect)),
+  .layout-hbf-body:not(:has(> .ui-listdetail, > .remote-tree > .ui-listdetail)),
   .layout-hbf-header,
   .layout-hbf-footer,
-  .layout-tabs-panel:not(:has(> .ui-listdetail)),
-  .layout-region-detail:not(:has(> .ui-listdetail, > .diff-toolbar)),
+  .layout-tabs-panel:not(:has(> .ui-listdetail, > .remote-tree > .ui-listdetail)),
+  .layout-region-detail:not(:has(> .ui-listdetail, > .remote-tree > .ui-listdetail, > .diff-toolbar)),
   .ui-listdetail-detail[data-scroll]
 ) :is(.ui-toolbar, .ui-tabs, .section-header[data-level='pane'], .ui-row) {
   margin-inline: calc(-1 * var(--pane-pad));
@@ -249,6 +255,8 @@
      box: pulled left by a pane-pad it kept its old width and hung a pane-pad short on the right.
      `auto` hands the width back to the flex stretch it was there to stand in for. */
   width: auto;
+  /* `.ui-tabs` also caps itself at 100%, which stopped Linear's strip two pads short of the right edge. */
+  max-width: calc(100% + 2 * var(--pane-pad));
 }
 /* A scroller in the middle hands the padding on rather than clipping it. `overflow` clips at the
    padding box, and a bar pulled a pane-pad left of a scroller's content box lands outside it: the
@@ -257,11 +265,12 @@
    — out by a pane-pad, in by a pane-pad — which leaves a bar inside it sitting exactly on the clip
    edge. It nests: a `Rows` scroller inside a `TabPanel` does the same trick against the panel. */
 :where(
-  .layout-single-body:not(:has(> .ui-listdetail, > .ui-rect)),
-  .layout-hbf-body:not(:has(> .ui-listdetail)),
-  .layout-tabs-panel:not(:has(> .ui-listdetail)),
-  .layout-region-detail:not(:has(> .ui-listdetail, > .diff-toolbar)),
+  .layout-single-body:not(:has(> .ui-listdetail, > .ui-rect, > .remote-tree > .ui-listdetail, > .remote-tree > .ui-rect)),
+  .layout-hbf-body:not(:has(> .ui-listdetail, > .remote-tree > .ui-listdetail)),
+  .layout-tabs-panel:not(:has(> .ui-listdetail, > .remote-tree > .ui-listdetail)),
+  .layout-region-detail:not(:has(> .ui-listdetail, > .remote-tree > .ui-listdetail, > .diff-toolbar)),
   .ui-listdetail-detail[data-scroll],
+  .ui-listdetail-list[data-scroll],
   .ui-tab-panel,
   .ui-rows-scroll
 ) :is(.ui-tab-panel, .ui-rows-scroll, .ui-timeline-scroll, .ui-grid-scroll) {
@@ -283,14 +292,16 @@
   .layout-hbf-footer,
   .layout-tabs-panel,
   .layout-region-detail,
-  .ui-listdetail-detail
+  .ui-listdetail-detail,
+  .ui-listdetail-list,
+  .layout-region-list
 ) .ui-toolbar[data-size='sm'] { padding-inline: var(--pane-pad); }
-:is(.ui-card, .ui-listdetail-list) .ui-toolbar[data-size='sm'] { padding-inline: var(--space-4); }
+.ui-card .ui-toolbar[data-size='sm'] { padding-inline: var(--space-4); }
 
 /* Three exceptions. A card owns its own inset, so a bar or a row inside it belongs to the card's edge
-   and not the pane's — Linear draws every comment as a card with a byline bar in it. A list column is
-   flush already. And an `actions` toolbar is a footer with no background and no padding of its own,
-   so it has nothing to take back. */
+   and not the pane's — Linear draws every comment as a card with a byline bar in it. A list column of
+   rows is flush already (a scrolling one is below). And an `actions` toolbar is a footer with no
+   background and no padding of its own, so it has nothing to take back. */
 :is(.ui-card, .ui-listdetail-list) :is(.ui-toolbar, .ui-tabs, .section-header[data-level='pane'], .ui-row),
 .ui-toolbar[data-variant='actions'] { margin-inline: 0; }
 /* Except a pane-level strip at the top of a document column: it is that column's header, so it spans
@@ -301,12 +312,23 @@
   margin-inline: calc(-1 * var(--pane-pad));
   max-width: calc(100% + 2 * var(--pane-pad));
 }
+/* A scrolling list column pads itself like a pane body, so its chrome takes the pad back the same way,
+   out by a pane pad and in by one. Without it a pull request's rows started at 31 and its fold labels
+   at 35 under a heading at 14. A card or an alert keeps its own inset, as above. */
+.ui-listdetail-list[data-scroll] :is(.ui-row, .section-header, .ui-toolbar:not([data-variant='actions'])):not(:is(.ui-card, .ui-alert) *) {
+  margin-inline: calc(-1 * var(--pane-pad));
+  padding-inline: var(--pane-pad);
+  width: auto;
+}
+/* A banner in a list column of rows sits on the column's inset, not on its border. */
+:is(.ui-listdetail-list:not([data-scroll]), .layout-region-list) .ui-alert[data-variant='banner'] { margin-inline: var(--pane-pad); }
 
 /* Two bars in a row are one piece of chrome, so the column's stack gap does not go between them. That
    gap is for content, and between a pane's header and the bar under it — the agents pane over its
    subagent bar — it drew a strip of pane background through a divider that is meant to be the two
    bars' shared edge. */
-.layout-region-detail > .ui-toolbar + .ui-toolbar { margin-block-start: calc(-1 * var(--gap-stack)); }
+.layout-region-detail > .ui-toolbar + .ui-toolbar,
+.layout-region-detail > .remote-tree > :is(.ui-toolbar, .ui-tabs) + :is(.ui-toolbar, .ui-tabs) { margin-block-start: calc(-1 * var(--gap-stack)); }
 
 /* The reading column stops at `--pane-measure` and sits in the middle of whatever is left. A pane
    is as wide as the display someone gave it, and on a 3700px one a transcript line runs to about
@@ -323,9 +345,9 @@
 }
 /* Two children are edge-to-edge by nature and opt the whole column out: a split, whose divider is its
    columns' shared edge and whose columns pad themselves, and a diff, which is a canvas. */
-.layout-region-detail:has(> .ui-listdetail),
+.layout-region-detail:has(> .ui-listdetail, > .remote-tree > .ui-listdetail),
 .layout-region-detail:has(> .diff-toolbar) { padding: 0; row-gap: 0; }
-.layout-region-detail:has(> .ui-listdetail) > *,
+.layout-region-detail:has(> .ui-listdetail, > .remote-tree > .ui-listdetail) > *,
 .layout-region-detail:has(> .diff-toolbar) > * { max-width: none; margin-inline: 0; }
 
 /* `list-detail`. The list column's width is a style token until someone drags the handle, which
@@ -346,7 +368,11 @@
 .layout-list-footer {
   flex: none;
   padding: 0 var(--pane-pad) var(--pane-pad);
+  /* The rule goes between the scrolling list and the footer, where the last row ran straight into
+     the footer's first bar. That bar's own rule, under it, moves up to here. */
+  border-top: var(--chrome-divider);
 }
+.layout-list-footer > .ui-stack > .ui-toolbar:first-child { border-bottom: 0; }
 /* Footer chrome still reaches the column edges; fields and action rows keep the footer inset. */
 .layout-list-footer .ui-toolbar:not([data-variant='actions']) {
   width: auto;
@@ -361,30 +387,71 @@
   flex: none;
   height: var(--pane-head-h);
   border-bottom: var(--chrome-divider);
+  background: var(--bg-subtle);
 }
 /* As the kit node does: a label and a count have no room in a rail, and the rail's icon already says
    which list this is. See primitives.css § ListDetail for why this is a rule and not a prop. */
 .layout-region-list[data-collapsed] .section-header { display: none; }
 /* The divider and the collapse control are `CollapseEdge`, the kit's own node, so their styling is
    in primitives.css § ListDetail rather than here. */
+/* The control rides the divider, half over each column's first bar, so those two bars make room for
+   it: the Changes header's last button ran under it, and the agent header's icon sat 4px after it.
+   The bar can be a region's first child or sit a wrapper or two down (a Stack, a remote tree), which is
+   as deep as any pane puts its header. The kit's split does the same in primitives.css § ListDetail. */
+.layout-list-detail:has(> .ui-listdetail-edge) > .layout-region-list > :is(.section-header, .ui-toolbar:not([data-variant='actions']), .ui-tabs, .ui-doctabs):first-child,
+.layout-list-detail:has(> .ui-listdetail-edge) > .layout-region-list > :first-child > :is(.section-header, .ui-toolbar:not([data-variant='actions']), .ui-tabs, .ui-doctabs):first-child,
+.layout-list-detail:has(> .ui-listdetail-edge) > .layout-region-list > :first-child > :first-child > :is(.section-header, .ui-toolbar:not([data-variant='actions']), .ui-tabs, .ui-doctabs):first-child {
+  padding-inline-end: calc(var(--pane-pad) + var(--control-h-xs) / 2);
+}
+.layout-list-detail:has(> .ui-listdetail-edge) > .layout-region-detail > :is(.section-header, .ui-toolbar:not([data-variant='actions']), .ui-tabs, .ui-doctabs, .diff-toolbar):first-child,
+.layout-list-detail:has(> .ui-listdetail-edge) > .layout-region-detail > :first-child > :is(.section-header, .ui-toolbar:not([data-variant='actions']), .ui-tabs, .ui-doctabs, .diff-toolbar):first-child {
+  padding-inline-start: calc(var(--pane-pad) + var(--control-h-xs) / 2);
+}
 
-/* `wizard`. The host draws the indicator and the two controls; the step is the plugin's. */
+/* `wizard`. The host draws the indicator and the two controls; the step is the plugin's.
+   The strip numbers its steps so it does not read as one sentence, and a finished step trades its
+   number for a check. Finished steps are muted, not accent: they are not links. */
 .layout-wizard-steps {
   display: flex;
-  gap: var(--space-4);
+  align-items: center;
+  gap: var(--gap-section);
+  min-height: var(--tab-h);
   margin: 0;
-  padding: var(--space-3) var(--pane-pad);
+  padding: 0 var(--pane-pad);
   list-style: none;
+  counter-reset: step;
   font-size: var(--fs-sm);
-  color: var(--text-muted);
+  color: var(--text-faint);
   border-bottom: var(--chrome-divider);
 }
+.layout-wizard-step { counter-increment: step; }
+.layout-wizard-step::before { content: counter(step) '. '; }
 .layout-wizard-step[data-state='current'] { color: var(--text); font-weight: var(--fw-semibold); }
-.layout-wizard-step[data-state='done'] { color: var(--accent); }
-.layout-wizard-actions {
+.layout-wizard-step[data-state='done'] { color: var(--text-muted); }
+.layout-wizard-step[data-state='done']::before { content: '\2713\00a0'; }
+/* The step is the scroller between two pinned bars, so unlike `single` it pads on every side. A
+   step longer than the dialog scrolls here instead of pushing its content under the footer. */
+.layout-wizard-body {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
   display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-  padding: var(--space-3) var(--pane-pad);
+  flex-direction: column;
+  overflow-y: auto;
+  padding: var(--gap-section) var(--pane-pad);
+}
+/* A wizard in a dialog has one fixed height, so the footer stays put as the steps change, and it
+   draws no pane box of its own inside the dialog's box (the Modern and Cute packs give a pane edges). */
+.overlay:has(> .layout-wizard) { height: min(70vh, 600px); }
+.overlay > .layout-wizard { border: 0; border-radius: var(--radius-0); box-shadow: var(--shadow-0); }
+/* The modal footer's padding and divider (primitives.css § Modal), so the two read as one footer. */
+.layout-wizard-actions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--gap-row);
+  padding: var(--pane-pad);
   border-top: var(--chrome-divider);
 }
+.layout-wizard-spacer { flex: 1; }
+.layout-wizard-body:focus { outline: none; }

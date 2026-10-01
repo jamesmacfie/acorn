@@ -51,6 +51,11 @@ export function ConfirmButton(props: ButtonProps & {
     if (props.skipConfirm || armed.request('confirm')) props.onConfirm()
   }
   const isArmed = () => armed.armed() !== null
+  // A prompt is written as a question, "Delete note?", so only a bare label gets the mark added.
+  const prompt = () => {
+    const text = props.confirmLabel ?? body()
+    return text.endsWith('?') ? text : `${text}?`
+  }
   return (
     <Button
       variant={props.variant}
@@ -60,7 +65,7 @@ export function ConfirmButton(props: ButtonProps & {
       armed={isArmed()}
       onPress={press}
     >
-      {isArmed() ? `${props.confirmLabel ?? body()}?` : body()}
+      {isArmed() ? prompt() : body()}
     </Button>
   )
 }

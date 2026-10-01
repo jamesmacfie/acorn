@@ -1,4 +1,5 @@
 import { createSignal, For, onCleanup } from 'solid-js'
+import { IconButton } from '../../kit/components/inputs/IconButton'
 import { activeToasts, dismissToast, type Toast } from './toast'
 
 // The stack. State lives in toast.ts; see the note there on why they are separate files.
@@ -45,7 +46,7 @@ function ToastRow(props: { entry: Toast }) {
       onFocusOut={() => { setPaused(false); start() }}
     >
       <span class="ui-toast-message">{props.entry.message}</span>
-      <button type="button" class="ui-toast-close" aria-label="Dismiss" onClick={() => dismissToast(props.entry.id)}>✕</button>
+      <IconButton icon="x" label="Dismiss" size="xs" onPress={() => dismissToast(props.entry.id)} />
     </div>
   )
 }

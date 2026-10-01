@@ -1,6 +1,6 @@
 import { createEffect, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
 import { clientEvents, formatBytes } from '@acorn/plugin-api/client'
-import { Alert, Button, Facts, Link, SettingsSection, Stack, Text } from '@acorn/plugin-api/ui'
+import { Alert, Button, EmptyState, Facts, SettingsSection, Stack, Text } from '@acorn/plugin-api/ui'
 import type { AgentFootprint } from '../../contract/wire.ts'
 import { managedAgentApi } from '../sessions/managedClient'
 
@@ -70,34 +70,31 @@ export default function AgentStorageSection(props: { nodeId?: string | null }) {
     <SettingsSection
       id="agents"
       label="Agents"
+      help="Running agents keep their tools in memory between messages. Stopping an idle one frees that memory, and your next message starts it again in the same conversation."
+      // Only while there is something to stop: a disabled button says nothing the Idle count doesn't.
       actions={
-        <Button size="sm" busy={stopping()} disabled={!footprint()?.idle} onPress={() => void stopIdle()}>
-          Stop idle agents now
-        </Button>
+        <Show when={footprint()?.idle || stopping()}>
+          <Button size="sm" busy={stopping()} onPress={() => void stopIdle()}>
+            Stop idle agents now
+          </Button>
+        </Show>
       }
     >
       <Stack gap="row">
         <Show when={error()}>
           <Alert>{error()}</Alert>
         </Show>
-        <Show when={footprint()} fallback={<Text emphasis="muted">Loading</Text>}>
+        <Show when={footprint()} fallback={<EmptyState busy align="start" size="sm">Loading…</EmptyState>}>
           {(value) => <Facts grouping="rows" items={facts(value())} />}
         </Show>
-        <Text emphasis="muted" wrap>
-          Each running agent keeps its CLI and MCP servers in memory between prompts. Memory counts
-          those processes. An idle agent has no turn running or queued and no question waiting for you.
-          Stopping one frees its memory, and your next prompt starts it again on the same conversation.
-        </Text>
         <Show when={stopped()}>
           <Text emphasis="muted" wrap>{stopped()}</Text>
         </Show>
-        <Text emphasis="muted" wrap>
-          When idle agents stop on their own, and how long archived tasks keep agent history, are set
-          in Harnesses and defaults.
-        </Text>
-        <Link onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'agent-defaults#idle' })}>
-          Open Harnesses and defaults
-        </Link>
+        {/* When idle agents stop on their own, and how long history is kept, live on that page. A
+            button named after the page it opens, as every settings link to another page is. */}
+        <Button size="sm" variant="ghost" onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'agent-defaults#idle' })}>
+          Harnesses and defaults
+        </Button>
       </Stack>
     </SettingsSection>
   )

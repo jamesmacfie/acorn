@@ -56,9 +56,8 @@ function OrderMenu(props: { taskId: string; group: SessionGroup; label: string }
       {(menu) => SESSION_ORDER_CHOICES.map((choice) => (
         <Menu.Item
           context={menu}
-          // The same chosen mark as the changes pane's view menu, because `Menu.Item` has no checked
-          // state (plugins/changes ChangesPane.tsx).
-          leading={<Icon name={chosen() === choice.value ? 'circle-dot' : 'circle'} title={chosen() === choice.value ? 'Chosen' : undefined} />}
+          kind="radio"
+          checked={chosen() === choice.value}
           onSelect={() => setSessionOrder(props.taskId, props.group, choice.value)}
         >
           {choice.label}
@@ -223,14 +222,15 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                           {(menu) => (
                             <>
                               <Show when={canStopAgent(current())}>
-                                <Menu.Item context={menu} onSelect={() => model.sessionAction(current(), 'stop')}>
+                                <Menu.Item context={menu} leading={<Icon name="circle-stop" />} onSelect={() => model.sessionAction(current(), 'stop')}>
                                   Stop
                                 </Menu.Item>
                               </Show>
-                              <Menu.Item context={menu} onSelect={() => model.sessionAction(current(), 'rename')}>
+                              <Menu.Item context={menu} leading={<Icon name="pencil" />} onSelect={() => model.sessionAction(current(), 'rename')}>
                                 Rename session
                               </Menu.Item>
-                              <Menu.Item context={menu} onSelect={() => model.sessionAction(current(), 'archive')}>
+                              <Menu.Separator />
+                              <Menu.Item context={menu} tone="danger" leading={<Icon name="archive" />} onSelect={() => model.sessionAction(current(), 'archive')}>
                                 Archive session…
                               </Menu.Item>
                             </>

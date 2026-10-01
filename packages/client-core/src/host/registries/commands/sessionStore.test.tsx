@@ -627,7 +627,7 @@ describe('a search frame', () => {
       answer = () => Promise.reject(new Error('the node said no'))
       session.setQuery('roll')
       await tick(300)
-      expect(labels(session)).toEqual(['search: the node said no'])
+      expect(labels(session)).toEqual(['Couldn\'t search. the node said no'])
       expect(session.selectedRow()).toBeNull()
 
       answer = async () => [item('issue-1', { subtitle: 'runn/runn', badge: '12' })]
@@ -807,7 +807,7 @@ describe('scope', () => {
       session.openAt('everywhere')
       await settle()
       // The error first, then the rows the other node did answer with.
-      expect(labels(session)).toEqual(['desktop: no answer within 5s', 'dup'])
+      expect(labels(session)).toEqual(['Couldn\'t search desktop. no answer within 5s', 'dup'])
       expect(ids(session)).toEqual(['error:desktop:0', 'node-1:dup'])
       expect(session.rows()[1]?.hint).toBe('laptop')
 

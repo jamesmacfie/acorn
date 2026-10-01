@@ -329,16 +329,18 @@ describe('new task setup choice', () => {
     createTaskMock.mockResolvedValue(task('created', 'Skip setup'))
 
     host.querySelector<HTMLButtonElement>('.tabrail-bottom')!.click()
-    const checkbox = () => [...host.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')]
+    // The dialog is a Modal, which portals to the body rather than rendering inside the rail.
+    const checkbox = () => [...document.querySelectorAll<HTMLInputElement>('[role="dialog"] input[type="checkbox"]')]
       .find((input) => input.closest('label')?.textContent?.includes('Skip setup script'))
     expect(checkbox()?.checked).toBe(false)
 
-    const title = host.querySelector<HTMLInputElement>('input[placeholder="Task title"]')!
+    const titleLabel = [...document.querySelectorAll<HTMLLabelElement>('[role="dialog"] label')].find((label) => label.textContent === 'Title')!
+    const title = document.getElementById(titleLabel.htmlFor) as HTMLInputElement
     title.value = 'Skip setup'
     title.dispatchEvent(new InputEvent('input', { bubbles: true }))
     checkbox()!.click()
     expect(checkbox()?.checked).toBe(true)
-    host.querySelector<HTMLFormElement>('form.integration-key-row')!.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+    ;[...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find((button) => button.textContent === 'Create task')!.click()
     await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ skipSetup: true })))
 
     host.querySelector<HTMLButtonElement>('.tabrail-bottom')!.click()

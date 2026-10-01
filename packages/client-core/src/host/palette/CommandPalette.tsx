@@ -2,7 +2,7 @@ import { Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { nodes } from '../../infra/node/fleet'
-import { activeTaskId } from '../../features/tasks/tasks'
+import { activeTaskId, selectedSource } from '../../features/tasks/tasks'
 import { taskById } from '../../features/tasks/taskLookup'
 import { workspaceForProject } from '../../features/workspaces/activeWorkspace'
 import { createFleetWorkspaces } from '../../features/workspaces/fleetWorkspaces'
@@ -28,7 +28,10 @@ export default function CommandPalette() {
   const fleetWorkspaces = createFleetWorkspaces()
 
   const context = (): CommandExecutionContext => {
-    const taskId = activeTaskId()
+    // The rail's own test for "a task is on screen". `activeTaskId` stays set when you leave a task
+    // for a source, and the palette then aimed task commands at a task you could not see, and hid that
+    // task from Go to task.
+    const taskId = selectedSource() ? null : activeTaskId()
     // A task route carries no project parameter. Commands still run in the task's project, matching
     // the shell and rail scope rather than silently falling back to an unscoped project action.
     const projectId = params.projectId ?? (taskId ? taskById(taskId)?.projectId : undefined)
@@ -71,6 +74,11 @@ export default function CommandPalette() {
   // A way back to every plugin source the rail is not drawing.
   registerHiddenSourceOpeners(() => context().workspaceId)
 
+  // Back to a frame further up, as Escape would get there one step at a time.
+  const popTo = (depth: number) => {
+    while (session.frames().length - 1 > depth) session.back()
+  }
+
   const announce = () => {
     if (session.busy()) return 'Loading…'
     if (session.status()) return session.status()
@@ -84,9 +92,12 @@ export default function CommandPalette() {
       items={session.rows()}
       ariaLabel="Command palette"
       // A search or an input frame asks for its own thing; the root and a group are still this list.
-      placeholder={session.placeholder() || 'Run a target, switch a pane, task or workspace, archive…'}
+      placeholder={session.placeholder()
+        || (session.kind() === 'group' && session.frame()?.title ? `Filter ${session.frame()!.title}…` : 'Search commands and settings…')}
       emptyText="No matches."
       breadcrumb={session.breadcrumb()}
+      // Segment i names frame i + 1 (the root has no title). A segment for the frame on screen is text.
+      crumbAction={(index) => (index + 1 < session.frames().length - 1 ? () => popTo(index + 1) : undefined)}
       busy={session.busy()}
       announce={announce()}
       onComposing={session.setComposing}
@@ -95,12 +106,16 @@ export default function CommandPalette() {
       rowClassList={(row) => ({ 'palette-error': row.action.effect === 'none' })}
       row={(row) => (
         <>
-          <span class="palette-label">{row.label}</span>
+          {/* Where the row lives, then what it is, then what it does: "Run › Focus a terminal",
+              with the hint after in a second colour so the three never read as one sentence. */}
+          <span class="palette-label">
+            <Show when={row.breadcrumb?.length}>
+              <span class="palette-crumb">{row.breadcrumb?.join(' › ')} › </span>
+            </Show>
+            {row.label}
+          </span>
           <Show when={row.badge}>
             <span class="palette-badge muted">{row.badge}</span>
-          </Show>
-          <Show when={row.breadcrumb?.length}>
-            <span class="palette-crumb muted">{row.breadcrumb?.join(' › ')}</span>
           </Show>
           <Show when={row.hint}>
             <span class="palette-hint muted">{row.hint}</span>

@@ -1,8 +1,7 @@
-import { createResource, createSignal, For, Show } from 'solid-js'
+import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import type { AuditEntry } from '@acorn/protocol/api.ts'
-import { nodes } from '../../infra/node/fleet'
 import { nodeAuditPage } from '../../infra/node/nodeSecurity'
-import { Alert, Button } from '../../kit/components/primitives'
+import { Alert, Button, EmptyState } from '../../kit/components/primitives'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import './settings.css'
 
@@ -38,19 +37,32 @@ const ACTION_LABELS: Record<string, string> = {
   'backup.created': 'Backup created',
 }
 
-const describeActor = (entry: AuditEntry): string => {
-  if (entry.actor === 'device') return entry.actorId ? `device ${entry.actorId.slice(0, 8)}` : 'a device'
-  if (entry.actor === 'internal') return `an agent (${entry.actorId ?? 'internal'})`
+// A device is named by what it was called when it paired, which `device.paired` records in its
+// details. A device whose pairing is not in the rows read so far is "a device": its raw id told the
+// owner nothing. Naming a revoked device whose pairing has aged out needs the node to keep its name.
+type DeviceNames = ReadonlyMap<string, string>
+
+const deviceName = (names: DeviceNames, id: string | null | undefined): string => (id && names.get(id)) || 'a device'
+
+const describeActor = (entry: AuditEntry, names: DeviceNames): string => {
+  if (entry.actor === 'device') return deviceName(names, entry.actorId)
+  if (entry.actor === 'internal') return 'an agent'
   return 'this node'
 }
 
+const describeSubject = (entry: AuditEntry, names: DeviceNames): string | undefined => {
+  if (!entry.subject) return undefined
+  return entry.action.startsWith('device.') ? deviceName(names, entry.subject) : entry.subject
+}
+
+// The name a pairing recorded is already the row's subject, so it is not repeated here.
 const describeDetails = (entry: AuditEntry): string =>
   Object.entries(entry.details ?? {})
+    .filter(([key]) => !(entry.action === 'device.paired' && key === 'name'))
     .map(([key, value]) => `${key}: ${String(value)}`)
     .join(' · ')
 
 export default function AuditLogSettings(props: { nodeId: string | null }) {
-  const node = () => nodes().find((candidate) => candidate.nodeId === props.nodeId) ?? null
   // Accumulated across pages rather than replaced, so "Load older" appends. Reset by the resource below
   // whenever the node changes, because a trail from the previous machine under the new one's heading
   // would be exactly the lie this page exists to prevent.
@@ -87,6 +99,8 @@ export default function AuditLogSettings(props: { nodeId: string | null }) {
   const label = (action: string): string => ACTION_LABELS[action] ?? pluginLabels()[action] ?? action
 
   const rows = () => [...firstPage(), ...older()]
+  const deviceNames = createMemo((): DeviceNames => new Map(rows().flatMap((entry) =>
+    entry.action === 'device.paired' && entry.subject && typeof entry.details?.name === 'string' ? [[entry.subject, entry.details.name] as const] : [])))
 
   const loadOlder = async () => {
     const last = rows().at(-1)
@@ -106,16 +120,16 @@ export default function AuditLogSettings(props: { nodeId: string | null }) {
   return (
     <SettingsSection
       id="trail"
-      label="Audit trail"
-      description={`Security-relevant actions on ${node()?.label ?? 'this node'}: pairing, device revocation, credential changes, repo-config trust and plugin changes. Kept for 90 days.`}
+      label="Recent activity"
+      help="Pairings, revoked devices, credential changes, trusted repo settings, and plugin changes on this node. Entries are kept for 90 days."
       actions={<Button size="sm" disabled={firstPage.loading} onPress={() => void refetch()}>Refresh</Button>}
     >
       <Show when={error()}><Alert>{error()}</Alert></Show>
-      <Show when={firstPage.loading && !rows().length}><p class="muted">Reading the audit trail…</p></Show>
+      <Show when={firstPage.loading && !rows().length}><EmptyState busy align="start" size="sm">Loading…</EmptyState></Show>
       {/* An empty trail is a real state on a fresh node, and saying so beats rendering nothing — which
           reads as a page that failed to load. */}
       <Show when={!firstPage.loading && !rows().length && !error()}>
-        <p class="muted">Nothing recorded yet on this node.</p>
+        <EmptyState align="start" size="sm">Nothing recorded on this node.</EmptyState>
       </Show>
 
       <ul class="audit-list">
@@ -123,9 +137,9 @@ export default function AuditLogSettings(props: { nodeId: string | null }) {
           {(entry) => (
             <li class="audit-row">
               <span class="audit-action">{label(entry.action)}</span>
-              <span class="audit-meta muted">
-                {new Date(entry.at).toLocaleString()} · by {describeActor(entry)}
-                <Show when={entry.subject}>{(subject) => <> · {subject()}</>}</Show>
+              <span class="audit-meta">
+                {new Date(entry.at).toLocaleString()} · by {describeActor(entry, deviceNames())}
+                <Show when={describeSubject(entry, deviceNames())}>{(subject) => <> · {subject()}</>}</Show>
                 <Show when={describeDetails(entry)}>{(details) => <> · {details()}</>}</Show>
               </span>
             </li>

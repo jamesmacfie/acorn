@@ -39,11 +39,11 @@ const IS_TEST = /\.(test|test-d|spec)\.(ts|tsx|js|jsx|mjs)$/
 // An icon name spelled at a call site: `<Icon name="pin" />`, `icon: 'pin'`, `glyph: 'pin'`. Broad on
 // purpose — `name` catches attributes that have nothing to do with icons, and the Lucide membership
 // test below throws those away. Over-inclusion costs a few hundred bytes; a miss costs a flash of text.
-const KEYED = /(?:\b(?:name|icon|glyph|iconName)\s*[:=]\s*|\b(?:name|icon|glyph)=)['"`]([a-z0-9][a-z0-9-]{1,40})['"`]/g
+const KEYED = /(?:\b(?:name|icon|glyph|iconName)\s*[:=]\s*|\b(?:name|icon|glyph)=)['"`]([a-z0-9][a-z0-9-]{0,40})['"`]/g
 // …and a name in a table of them, where the key beside it says nothing (`EXTENSION_KIND_ICON`,
 // `LEAD`, a switch arm). Any short lowercase literal on a line that mentions an icon at all. Same
 // membership test, same trade.
-const LITERAL = /['"]([a-z][a-z0-9-]{1,40})['"]/g
+const LITERAL = /['"]([a-z][a-z0-9-]{0,40})['"]/g
 const MENTIONS_ICON = /icon|glyph/i
 
 function sourceFiles(root) {

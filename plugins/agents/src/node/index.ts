@@ -105,6 +105,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
   let lifecycleCapabilities: Array<{ dispose(): void }> = []
   return {
     name: 'agents',
+    label: 'Agents',
     required: true,
     emits: [
       { verb: 'turn-changed', description: 'An agent turn changed queue or execution state' },

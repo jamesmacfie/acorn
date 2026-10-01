@@ -3,7 +3,7 @@
 The findings plugin records evidence discovered during a task without creating a notification or a
 review obligation. It prepares explicit review bundles when a task is archived or when the owner
 runs **Review learnings**. Memory owns the preview and approval experience for proposed knowledge
-changes. Raw task evidence is a diagnostic surface opened through **Findings: inspect task evidence**
+changes. Raw task evidence is a diagnostic surface opened through **Show what acorn recorded for this task**
 in the command palette; it does not occupy the task pane switcher.
 
 ## Consolidated review

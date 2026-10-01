@@ -50,7 +50,7 @@ export const dockerCommands: readonly ContributedCommand[] = [
   {
     id: 'source.docker.open',
     title: 'Open Docker',
-    hint: 'containers, images, volumes and networks on this node',
+    hint: 'containers, images, volumes, and networks on this computer',
     keywords: ['docker', 'containers'],
     category: 'navigation',
     palette: true,
@@ -63,7 +63,7 @@ export const dockerCommands: readonly ContributedCommand[] = [
     id: 'docker.find',
     kind: 'search',
     title: 'Find a Docker resource',
-    hint: 'a container, image, volume or network',
+    hint: 'a container, image, volume, or network',
     keywords: ['docker', 'container', 'image', 'volume', 'network'],
     category: 'navigation',
     palette: true,
