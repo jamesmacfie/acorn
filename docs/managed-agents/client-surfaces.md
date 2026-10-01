@@ -4,6 +4,39 @@ Part of [managed-agents.md](../managed-agents.md).
 
 ## Client surfaces
 
+Session reads capture their Node and the store generation before dispatch. Snapshot continuation
+pages use that captured Node. A switch, clear, or deletion rejects a departed read before it publishes
+rows, indexes events, advances completeness, or starts another page. In-flight cleanup and snapshot
+holds belong to their generation, so an outgoing surface cannot release an incoming surface's hold.
+Agent Center resources and session launch completions use the same ownership check.
+
+Unsent agent payloads belong to a Node and session, including text, attachment ids, and context.
+Both composers share hydration and operation guards. Hydration, native pickers, uploads,
+replacements, context capture, and sends complete on the captured draft. Successful sends clear text only
+when its edit revision matches, and remove the exact submitted attachment and context objects. Switching Nodes preserves unsent
+work in memory and in the scoped local record. Deletion invalidates the addressed draft and removes
+its storage. Empty settled drafts release their memory when their final surface leaves; dirty drafts
+have no eviction cap. A consumed fork draft retains hydration while the Node still advertises its
+pending fork context, so remounting cannot attach that context twice. Storage failure retains the
+payload in memory and does not schedule replay.
+
+The durable record uses an ownership key shape, `acorn.agent-payload.` followed by the JSON
+pair of Node id and session id, with separate `.text`, `.attachmentIds`, and `.contexts` suffixes.
+A text edit writes only its field, so a retained context is not serialized on each keystroke. A legacy
+session-only payload is synchronously claimed by the first selected Node that hydrates it. Its source
+keys remain until all scoped fields are confirmed in storage. An in-memory claim prevents another
+Node from inheriting ambiguous attachment ids when storage rejects that claim. If storage rejects
+all writes, recovery across an application restart remains limited to the original legacy payload.
+Generic task text storage has a separate contract.
+
+Attachment and artifact cards hold an Agents-owned cache entry keyed by Node, media kind, and id.
+Consumers share metadata, full bytes, and one data-URL conversion. Downloads reuse the held bytes and
+retain the response's media type and filename. One departing consumer does not cancel another's read.
+Idle entries retain at most 16 MiB, counting bytes plus two bytes per retained URL character; entries
+on screen can exceed that budget. Least recently released idle entries leave first, and failures and
+metadata-only entries leave when settled and unused. The raster allowlist and 8 MiB preview limit
+remain in force. URLs stay as data URLs, so each DOM image still has its own source attribute.
+
 The agents client claims the `agent` WebSocket channel when its first frame subscriber attaches and
 releases it when the last subscriber leaves. Plugin activation holds an application-lifetime
 subscription for agent attention. Loading a lazy surface, including an inline diff card, does not
@@ -167,7 +200,7 @@ it fails for any reason a selection can break, not only for the one it was writt
   session id, and the Workflows run pane draws the same one through the `agents.conversation` client
   capability. So a session can be on screen twice, and everything two composers have to agree about —
   the attachments and captured context of an unsent turn, and the guards over sending it — lives in a
-  module map keyed by session (`plugins/agents/src/client/composer/composerState.ts`) rather than in
+  module map keyed by Node and session (`plugins/agents/src/client/composer/composerState.ts`) rather than in
   the component. What stays per mount is view state: how tall the box is, which picker is open, and
   which surface's scroll place the transcript restores.
 - A roster row puts the provider's live reasoning effort beside its live model name. Codex reports

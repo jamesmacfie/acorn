@@ -273,7 +273,7 @@ export async function readJson<T>(url: string, options: ReadOptions = {}): Promi
 // The one non-JSON read: a download. Under app:// a route builder's URL resolves against the protocol
 // handler rather than a node, so it cannot be an `href` or `src`. A download comes back as bytes and
 // becomes a blob URL on this side.
-export async function readBytes(url: string, fallback = 'download failed', options: { maxResponseBytes?: number } = {}): Promise<{ bytes: Uint8Array; type: string; filename: string | null }> {
+export async function readBytes(url: string, fallback = 'download failed', options: ReadOptions & { maxResponseBytes?: number } = {}): Promise<{ bytes: Uint8Array; type: string; filename: string | null }> {
   const res = await send(url, options)
   if (!res.ok) raise(res, fallback)
   return {
@@ -373,8 +373,8 @@ export async function sendJson<T = void>(url: string, init: WriteInit, fallback:
 
 // Multipart upload. The parts are described, not encoded, so main builds the real body and the
 // renderer never hand-rolls a boundary.
-export async function sendForm<T>(url: string, parts: Extract<NodeFetchBody, { kind: 'form' }>['parts'], fallback = 'upload failed'): Promise<T> {
-  const res = await send(url, { method: 'POST', body: { kind: 'form', parts } })
+export async function sendForm<T>(url: string, parts: Extract<NodeFetchBody, { kind: 'form' }>['parts'], fallback = 'upload failed', options: ReadOptions = {}): Promise<T> {
+  const res = await send(url, { ...options, method: 'POST', body: { kind: 'form', parts } })
   if (!res.ok) raise(res, fallback)
   return parseJson<T>(res)
 }

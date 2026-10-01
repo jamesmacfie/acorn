@@ -781,3 +781,11 @@ payloads follow the same rule; their shapes are in `@acorn/protocol/nodeEvents.t
 
 All of them are invalidation, not replay: a client that missed a frame is not owed a delta, which is
 why each field is what the thing now is rather than what changed about it.
+
+### Captured client origins
+
+The public client transport accepts optional `nodeId` and `signal` on JSON reads and writes,
+byte reads, and multipart uploads. Omitted `nodeId` selects the active fleet Node. Explicit `null`
+keeps the serving-origin path in a browser without a broker; a broker rejects it rather than selecting
+a fleet Node. Multipart callers can capture this origin before awaiting file bytes or a native picker.
+The broker retains credentials and builds the multipart body from typed parts.

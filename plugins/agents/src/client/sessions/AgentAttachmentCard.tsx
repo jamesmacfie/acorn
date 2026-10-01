@@ -1,8 +1,8 @@
 import { createResource, createSignal, Show } from 'solid-js'
 import { saveFile } from '@acorn/plugin-api/client'
 import { Button, Card, Icon, Markdown, Modal, Stack, Text } from '@acorn/plugin-api/ui'
-import { managedAgentApi } from './managedClient'
-import { dataUrl, imageAlt, isInlineImageType, MAX_INLINE_IMAGE_BYTES } from './inlineImage'
+import { createAgentMedia } from './agentMediaStore'
+import { imageAlt } from './inlineImage'
 
 // One attachment the reader sent, as the thing itself rather than as its id.
 //
@@ -28,24 +28,22 @@ const sizeLabel = (byteSize: number): string =>
 
 export default function AgentAttachmentCard(props: { attachmentId: string }) {
   const [open, setOpen] = createSignal(false)
-  // Metadata first, bytes only for a picture. Both are per card and neither is cached beyond it:
-  // ponytail: a transcript with thirty screenshots fetches thirty times, and the day that hurts the
-  // answer is a shared cache keyed by attachment id, not a smaller image.
-  const [loaded] = createResource(() => props.attachmentId, async (attachmentId) => {
-    const attachment = await managedAgentApi.attachment(attachmentId).catch(() => null)
+  const media = createAgentMedia('attachment', () => props.attachmentId)
+  const [loaded] = createResource(media, async (lease) => {
+    const attachment = await lease.attachment().catch(() => null)
     if (!attachment) return null
-    if (!isInlineImageType(attachment.mediaType) || attachment.byteSize > MAX_INLINE_IMAGE_BYTES) return { attachment, source: null }
-    const content = await managedAgentApi.attachmentPreview(attachmentId).catch(() => null)
-    return { attachment, source: content ? await dataUrl(content.bytes, content.type) : null }
+    return { lease, attachment, source: await lease.preview(attachment).catch(() => null) }
   })
 
-  const attachment = () => loaded()?.attachment
-  const source = () => loaded()?.source
+  // A resource retains its previous value during a replacement read. Keep that value with its lease.
+  const currentMedia = () => loaded()?.lease === media() ? loaded() : undefined
+  const attachment = () => currentMedia()?.attachment
+  const source = () => currentMedia()?.source
   const alt = () => imageAlt(attachment()?.filename ?? '') || 'Attachment'
   const download = async (): Promise<void> => {
     const current = attachment()
     if (!current) return
-    const content = await managedAgentApi.attachmentContent(current.id)
+    const content = await media().content()
     await saveFile({ bytes: content.bytes, mimeType: content.type, suggestedName: content.filename ?? current.filename })
   }
 
