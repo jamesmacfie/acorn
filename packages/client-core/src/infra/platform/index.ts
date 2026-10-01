@@ -1,3 +1,4 @@
+import type { VisibleElementRect } from './webviewGeometry'
 import type { ResponsivenessPulse } from '../telemetry/responsiveness'
 import type {
   NodeAdoptRequest,
@@ -237,6 +238,7 @@ export type PluginDeviceInstallResult = { hash: string; pluginId: string; versio
 // The preload object, shaped as the groups above rather than as a flat bag, so the adapters below are
 // projections instead of translations. Everything is optional: an older preload, or none at all.
 type AcornPreload = {
+  rendererLayer?: RendererLayer
   desktop?: boolean
   platform?: string
   onClosePane?: DesktopExtras['onClosePane']
@@ -476,3 +478,13 @@ export const setBadge = (count: number | null): void => acornGlobal()?.notify?.s
 // Whether this host can change fleet membership rather than only read it (`fleetBridge`). Settings →
 // Nodes hides itself rather than offering buttons that cannot work.
 export const canPairNodes = (): boolean => !!acornGlobal()?.nodeProbe
+
+// Transient native composition. The owning DOM remains the only renderer and action authority.
+export type OverlayPresentation = {
+  generation: number
+  viewport?: { width: number; height: number }
+  pages: Array<{ bounds: VisibleElementRect; blockers: number[] }>
+  surfaces: Array<{ id: number; role: 'tooltip' | 'popover' | 'menu' | 'modal' | 'toast' | 'drawer' | 'custom'; bounds: VisibleElementRect; radius: number[]; interactive: boolean; modal: boolean }>
+}
+export type RendererLayer = { update(presentation: OverlayPresentation): Promise<boolean> }
+export const rendererLayer = (): RendererLayer | null => acornGlobal()?.rendererLayer ?? null
