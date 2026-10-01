@@ -18,6 +18,7 @@ export default mergeConfig(base, defineConfig({
   // exports its root and nothing else.
   resolve: { alias: [{ find: /^ws$/, replacement: fileURLToPath(import.meta.resolve('ws')) }] },
   test: {
+    experimental: { fsModuleCache: true },
     environment: 'node',
     include: ['src/**/*.test.{ts,tsx}', 'scripts/agent/**/*.test.mjs'],
     pool: 'forks',

@@ -2,6 +2,7 @@ import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
   test: {
+    experimental: { fsModuleCache: true },
     environment: 'node',
     include: ['src/**/*.test.ts'],
     // The broker tests open real HTTP and HTTPS listeners and shell out to openssl. Under the whole
