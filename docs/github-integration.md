@@ -197,8 +197,19 @@ The task-scoped `github_pull_create` agent tool shares the same create service a
 route. It infers the head from the task branch, uses the requested base, and atomically attaches the
 created PR through `CoreServices.tasks.attachPull`: the first attachment claims
 `tasks.pull_number`, while later attachments become durable related rows with the managed session id.
-Shelling out to `gh pr create` still has only branch-adoption semantics and does not gain agent
-attribution.
+After a managed agent turn completes, the GitHub plugin checks the task branch for an open PR using
+the Node owner's GitHub connection. A single result whose head and base repositories match the task
+project is adopted into active tasks on that branch that have no primary PR. The task-change event
+refreshes client task caches, which enables **PR review** in the right rail without opening the
+repository's PR list. Tasks without a branch or GitHub project, and tasks with a primary PR, skip the
+lookup. Ambiguous results and fork heads are not adopted. This lookup uses GitHub's
+[head filter](https://docs.github.com/en/rest/pulls/pulls#list-pull-requests) and does not replace the
+repository's full PR mirror with a branch-filtered list.
+
+Shelling out to `gh pr create` gains this branch adoption but no agent attribution: discovering a PR
+after a turn does not prove who created it. A missing connection leaves the task unchanged. Provider
+failures are logged and another completed turn can retry; the check runs without a connected client
+and does not delay the agent's completion event. There is no startup replay of completed turns.
 
 Two read-tier tools sit beside it. `pr_review_comments` returns the submitted reviews, the inline
 threads and the conversation comments for the task's PR, and `pr_checks` returns every mirrored check

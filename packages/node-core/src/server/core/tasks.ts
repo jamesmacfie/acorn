@@ -191,13 +191,19 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
         const pullNumber = task.branch ? branchToPull.get(task.branch) : undefined
         return pullNumber == null
           ? []
-          : [db.update(schema.tasks).set({ pullNumber, updatedAt: now }).where(eq(schema.tasks.id, task.id))]
+          : [db.update(schema.tasks).set({ pullNumber, updatedAt: now }).where(and(
+            eq(schema.tasks.id, task.id),
+            eq(schema.tasks.branch, task.branch!),
+            eq(schema.tasks.status, 'active'),
+            isNull(schema.tasks.pullNumber),
+          ))]
       })
       if (!updates.length) return 0
       // One batch within core's file, which is all the atomicity docs/data-layer.md permits here.
-      await db.batch(updates as [(typeof updates)[number], ...(typeof updates)[number][]])
-      broadcastTasksChanged({ taskId: null })
-      return updates.length
+      const results = await db.batch(updates as [(typeof updates)[number], ...(typeof updates)[number][]])
+      const adopted = results.reduce((count, result) => count + Number(result.changes), 0)
+      if (adopted) broadcastTasksChanged({ taskId: null })
+      return adopted
     },
     load: async (taskId) => {
       const row = await loadTask(db, taskId)
