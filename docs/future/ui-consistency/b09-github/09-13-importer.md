@@ -30,7 +30,7 @@ The partial fix. Making **Connect** open Add connection with GitHub already chos
   **Close** as ghost sm in its header.
 - A repository that already has a project shows "Added as {project name}" and keeps its buttons (two
   clones are legal).
-- Rows follow the settings list row ([06-3](../b06-integrations/06-3-one-list-row.md)).
+- Rows follow the settings list row (06-3).
 - `packages/client-core/src/features/workspaces/WorkspaceProjectAssignments.tsx:128-135` hosts it.
 
 ## Copy

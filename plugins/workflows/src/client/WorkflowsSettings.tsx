@@ -37,13 +37,14 @@ export default function WorkflowsSettings() {
     <SettingsSection
       id="loaded"
       label="Loaded workflows"
-      description="Read-only view of the workflows the active task's worktree would load (.acorn/workflows/*.toml in the repo, plus ~/.acorn/workflows). Launch one from the command palette (⌘K). To write one, open Workflows in the left rail: that is where every workflow this workspace can run is listed, and where the editor is."
+      description="Workflows the open task can run, and any that failed to load."
+      help="acorn reads .acorn/workflows in the repo and ~/.acorn/workflows. To write or edit one, open Workflows in the left rail. To run one, use the command palette."
       actions={<Button size="sm" onPress={() => void refetch()}>Rescan</Button>}
     >
       <Show when={failure()}>{(message) => <Alert>{`Could not read the workflows: ${message()}`}</Alert>}</Show>
       <Show
         when={workflows().length}
-        fallback={<EmptyState align="start">No workflows found{taskId() ? '' : ' — open a task to scan its worktree'}.</EmptyState>}
+        fallback={<EmptyState align="start" size="sm">{taskId() ? 'No workflows found.' : 'No workflows found. Open a task to check its worktree.'}</EmptyState>}
       >
         <For each={workflows()}>
           {(wf) => (

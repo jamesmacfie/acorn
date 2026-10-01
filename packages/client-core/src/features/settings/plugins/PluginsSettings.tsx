@@ -8,7 +8,8 @@ import { installPluginOnDevice, readPluginHostState } from '../../../host/plugin
 import { devicePlugins, distribution, syncPluginDistribution } from '../../../host/plugins/distribution'
 import { reconcileDevicePluginChange } from '../../../host/plugins/reload'
 import type { SettingsPageContext } from '../../../host/registries/shell/settings'
-import { Alert, Button, SegmentedControl, StatusDot } from '../../../kit/components/primitives'
+import { Alert, Badge, Button, SegmentedControl } from '../../../kit/components/primitives'
+import { Inline } from '../../../kit/components/layout/Inline'
 import { Text } from '../../../kit/components/content/Text'
 import { SettingRow } from '../../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../../kit/components/layout/SettingsSection'
@@ -16,9 +17,10 @@ import { activeTaskId } from '../../tasks/tasks'
 import ConfigPluginOffers from './ConfigPluginOffers'
 import { InstallPlugin, type InstallTarget } from './InstallPlugin'
 import {
-  installedPlugins, matchesFilter, pluginName, pluginOrigin, statusOf, takePluginRequest, type InstalledFilter, type InstalledPlugin,
+  installedPlugins, matchesFilter, pluginName, pluginOrigin, statusBadgeTone, statusDetail, statusOf, statusWord, takePluginRequest, type InstalledFilter, type InstalledPlugin,
 } from './installed'
 import { PluginPage } from './PluginPage'
+import type { PluginStatus } from '../../../host/plugins/pluginStatus'
 import './plugins.css'
 
 // Settings > Plugins > Installed: every plugin the node in the header runs and every client-only plugin
@@ -43,6 +45,14 @@ What it should do: `
 
 // The origin starts the line when there is no version ("Built in. Active."), so the line takes a capital.
 const sentence = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1)
+const stop = (text: string): string => (/[.!?…]$/.test(text) ? text : `${text}.`)
+/** A row's line: its version and where it came from, then the status sentence when the badge's word
+ *  leaves something out. */
+const rowText = (entry: { plugin: InstalledPlugin; status: PluginStatus }): string => {
+  const version = entry.plugin.kind === 'node' && entry.plugin.row.installed?.version ? `Version ${entry.plugin.row.installed.version}, ` : ''
+  const detail = statusDetail(entry.status)
+  return sentence(`${version}${pluginOrigin(entry.plugin)}.${detail ? ` ${stop(detail)}` : ''}`)
+}
 
 type Open = { kind: 'install' } | { kind: 'plugin'; id: string; pluginKind?: InstalledPlugin['kind'] }
 
@@ -188,21 +198,20 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
         <Show when={reading()}><Text emphasis="muted">Reading the plugin list…</Text></Show>
         {/* A node that cannot answer is not an empty list; rendering nothing would read as one. */}
         <Show when={!reading() && !rows().length}>
-          <Text emphasis="muted">{nodeLabel()} did not report a plugin list. It may be offline.</Text>
+          <Text emphasis="muted">{nodeLabel()} didn't send its plugin list. It may be offline.</Text>
         </Show>
         <For
           each={shown()}
-          fallback={<Show when={rows().length || devicePlugins().length}><Text emphasis="muted">{filter() === 'needs-you' ? 'Nothing needs you.' : 'No plugins held by this device.'}</Text></Show>}
+          fallback={<Show when={rows().length || devicePlugins().length}><Text emphasis="muted">{filter() === 'needs-you' ? 'Nothing needs you.' : 'No plugins on this device.'}</Text></Show>}
         >
           {(entry) => (
-            <SettingRow
-              label={pluginName(entry.plugin)}
-              description={sentence(`${entry.plugin.kind === 'node' && entry.plugin.row.installed?.version ? `${entry.plugin.row.installed.version}, ` : ''}${pluginOrigin(entry.plugin)}. ${entry.status.text}.`)}
-            >
-              <StatusDot tone={entry.status.tone} label={entry.status.text} />
-              <Button size="sm" variant="ghost" label={`Manage ${pluginName(entry.plugin)}`} onPress={() => setOpen({ kind: 'plugin', id: entry.plugin.id, pluginKind: entry.plugin.kind })}>
-                Manage
-              </Button>
+            <SettingRow label={pluginName(entry.plugin)} description={rowText(entry)}>
+              <Inline>
+                <Badge tone={statusBadgeTone(entry.status)}>{statusWord(entry.status)}</Badge>
+                <Button size="sm" variant="ghost" label={`Manage ${pluginName(entry.plugin)}`} onPress={() => setOpen({ kind: 'plugin', id: entry.plugin.id, pluginKind: entry.plugin.kind })}>
+                  Manage
+                </Button>
+              </Inline>
             </SettingRow>
           )}
         </For>
@@ -211,9 +220,9 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
       <SettingsSection id="create" label="Create a plugin">
         <SettingRow
           label="Ask an agent to write one"
-          description="Drafts a prompt in the current task's agent. It writes the package and asks you to install it, and cannot install anything itself."
+          description="Starts a prompt in the open task's agent. It writes the plugin, and you decide whether to install it."
         >
-          <Button size="sm" disabled={busy()} onPress={() => void createPlugin()}>Create a plugin</Button>
+          <Button size="sm" disabled={busy()} onPress={() => void createPlugin()}>Ask an agent</Button>
         </SettingRow>
       </SettingsSection>
     </>

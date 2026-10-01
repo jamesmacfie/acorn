@@ -7,13 +7,14 @@ import { integrationsKey } from '../../../infra/queries'
 import { createCredentialForm } from '../../integrations/credentialForm'
 import { createDeviceFlow } from '../../integrations/deviceFlow'
 import CopyButton from '../../../kit/components/inputs/CopyButton'
-import { Alert, Button, Card, EmptyState, Input } from '../../../kit/components/primitives'
+import { Alert, Button, Card, EmptyState } from '../../../kit/components/primitives'
+import { Text } from '../../../kit/components/content/Text'
 import { Inline } from '../../../kit/components/layout/Inline'
-import { SettingRow } from '../../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../../kit/components/layout/SettingsSection'
 import { useSettingsDetail } from '../settingsDetail'
 import { useUnsavedChanges } from '../unsavedChanges'
 import { ConnectionLogo } from './ConnectionLogo'
+import { CredentialFields } from './CredentialFields'
 import { galleryCards, providerAsks, type GalleryCard } from './connections'
 
 // Add connection: a gallery of every provider this node can connect, built from the descriptors the
@@ -39,6 +40,8 @@ export type AddConnectionProps = {
   openConnection: (connection: Integration) => void
   /** The list page the gallery was opened from, for the back link. */
   listLabel: string
+  /** The gallery's title: "Add connection" from Services, "Add an API key" from AI models. */
+  title: string
   onClose: () => void
 }
 
@@ -80,21 +83,21 @@ export function AddConnection(props: AddConnectionProps) {
   // One detail registration for both steps, so the header names the step on screen and its back link
   // goes one step back: from a provider's steps to the gallery, from the gallery to the list.
   const hostDrawsBack = useSettingsDetail(
-    () => (chosen() ? `Connect ${chosen()?.label}` : 'Add connection'),
+    () => (chosen() ? `Connect ${chosen()?.label}` : props.title),
     () => (chosen() ? backToGallery() : props.onClose()),
-    () => (chosen() ? 'Add connection' : props.listLabel),
+    () => (chosen() ? props.title : props.listLabel),
   )
 
   return (
     <>
       <Show when={!hostDrawsBack}>
-        <Inline><Button variant="bare" size="sm" onPress={() => (chosen() ? backToGallery() : props.onClose())}>‹ {chosen() ? 'Add connection' : props.listLabel}</Button></Inline>
+        <Inline><Button variant="bare" size="sm" onPress={() => (chosen() ? backToGallery() : props.onClose())}>‹ {chosen() ? props.title : props.listLabel}</Button></Inline>
       </Show>
       <Show
         when={chosen()}
         fallback={
-          <SettingsSection id="gallery" label="Providers" description="Pick one to see what it asks for.">
-            <Show when={cards().length} fallback={<EmptyState align="start">No provider on this node can be connected. A plugin adds them.</EmptyState>}>
+          <SettingsSection id="gallery" label="Providers">
+            <Show when={cards().length} fallback={<EmptyState align="start" size="sm">No services can be connected here. Plugins add them.</EmptyState>}>
               <div class="connection-gallery">
                 <For each={cards()}>
                   {(card) => (
@@ -121,40 +124,28 @@ export function AddConnection(props: AddConnectionProps) {
             id="steps"
             label={provider().connection.kind === 'device-flow' ? 'Sign in' : 'Credentials'}
             description={provider().connection.kind === 'device-flow'
-              ? `${provider().label} shows a page where you enter a code from here.`
-              : `acorn checks them with ${provider().label} before it keeps them.`}
+              ? `${provider().label} opens a page in your browser where you enter a code.`
+              : `acorn checks with ${provider().label} before it saves anything.`}
           >
             <Show
               when={provider().connection.kind === 'device-flow'}
               fallback={
                 <>
-                  <For each={form.fields()}>
-                    {(field) => (
-                      <SettingRow label={field.label} description={field.hint} layout="stacked">
-                        <Input
-                          label={field.label}
-                          type={field.type}
-                          assist={false}
-                          placeholder={field.placeholder}
-                          value={form.value(field.id)}
-                          onInput={(value) => form.setValue(field.id, value)}
-                          onSubmit={() => void form.submit()}
-                        />
-                      </SettingRow>
-                    )}
-                  </For>
-                  <Inline>
-                    <Button variant="solid" tone="accent" busy={form.busy()} disabled={!form.complete()} onPress={() => void form.submit()}>Connect</Button>
-                    <Button variant="ghost" onPress={backToGallery} disabled={form.busy()}>Cancel</Button>
-                  </Inline>
+                  <CredentialFields form={form}>
+                    <Show when={form.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
+                    <Inline gap="row">
+                      <Button variant="solid" tone="accent" busy={form.busy()} disabled={!form.complete()} onPress={() => void form.submit()}>Connect</Button>
+                      <Button variant="ghost" onPress={backToGallery} disabled={form.busy()}>Cancel</Button>
+                    </Inline>
+                  </CredentialFields>
                 </>
               }
             >
               <Show
                 when={deviceFlow.device()}
                 fallback={
-                  <Inline>
-                    <Button onPress={() => void deviceFlow.start()} disabled={deviceFlow.busy()}>
+                  <Inline gap="row">
+                    <Button variant="solid" tone="accent" onPress={() => void deviceFlow.start()} disabled={deviceFlow.busy()}>
                       {deviceFlow.busy() ? 'Starting…' : `Connect ${provider().label}`}
                     </Button>
                     <Button variant="ghost" onPress={backToGallery}>Cancel</Button>
@@ -163,23 +154,23 @@ export function AddConnection(props: AddConnectionProps) {
               >
                 {(started) => (
                   <div class="integration-device">
-                    <p class="integration-add-hint muted">Enter this code at the provider, then leave this page open.</p>
+                    <Text emphasis="muted" wrap>Enter this code on the {provider().label} page. Keep this page open until it finishes.</Text>
                     <div class="integration-device-code copyable">
                       <code>{started().userCode}</code>
                       <CopyButton text={() => started().userCode} title="Copy the code" />
                     </div>
                     {/* A real link, not a fetch: the shell opens it in the owner's browser. Safe under the
                         CSP because it is a navigation, not a frame or a connect-src. */}
-                    <Show when={safeVerificationUrl(started().verificationUri)} fallback={<Alert>The provider returned an unsafe sign-in address. Cancel and retry.</Alert>}>
-                      {(url) => <a class="ui-btn" href={url().href} target="_blank" rel="noopener noreferrer">Open {url().host}</a>}
+                    <Show when={safeVerificationUrl(started().verificationUri)} fallback={<Alert>{provider().label} sent a sign-in address acorn won't open. Cancel and try again.</Alert>}>
+                      {(url) => <Button href={url().href}>Open {url().host}</Button>}
                     </Show>
-                    <p class="integration-add-hint muted">Waiting for approval…</p>
-                    <Button variant="ghost" tone="danger" onPress={deviceFlow.cancel}>Cancel</Button>
+                    <Text emphasis="muted">Waiting for approval…</Text>
+                    <Button variant="ghost" onPress={deviceFlow.cancel}>Cancel</Button>
                   </div>
                 )}
               </Show>
             </Show>
-            <Show when={form.error() || deviceFlow.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
+            <Show when={deviceFlow.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
           </SettingsSection>
         )}
       </Show>

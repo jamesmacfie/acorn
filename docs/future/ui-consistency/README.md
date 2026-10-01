@@ -1,7 +1,7 @@
 # UI consistency: the rest of the pass
 
-**Status:** in progress. Eleven of twenty-one batches shipped on branch `ui-inconsistency`, uncommitted
-when this was written. Nine area batches and the final sweep remain. Written 2026-10-01.
+**Status:** in progress. Twelve of twenty-one batches shipped: eleven on branch `ui-inconsistency`, and
+B06 on branch `more-ui`, uncommitted. Eight area batches and the final sweep remain. Written 2026-10-01.
 Line numbers in these files are from 2026-10-01 and may have moved.
 
 This programme is a UX and UI consistency pass over the acorn desktop app. The worry behind it was that
@@ -103,28 +103,22 @@ up. Headings that restated their page were renamed. Ids in prose became names.
 None of the 99 remaining findings was fully done by an earlier batch, so every one has a file. Where an
 earlier batch did part of one, its file says so under **Already done** and drops that part.
 
+**B06, integrations and plugins.** Tools and permissions shows each tool's first sentence and puts the
+rest behind help, and its tiers line up as md checkboxes. Lists of things on the integration and plugin
+pages show status as a toned badge word. Price tables fit 720 with the id under the name, and **Reset**
+shows only on a changed row. Add connection and Replace key share one page form. A plugin's page has
+three tabs with the settings pages folded into Overview, and its versions are facts. The MCP pages link
+to each other with ghost buttons, the acorn MCP server text moved to Tools and permissions, and config
+servers are rows with an **On**, **Off**, or **Invalid** badge. The HTTP kinds read **Text**,
+**Secret**, and **Command**. Services lost its AI models section, and the gallery titles itself for
+the page that opened it. Rail and surfaces says only a row's exception. Copy across Sentry export,
+Review after archive, custom agents, and Workflows was rewritten. See [deferred.md](./deferred.md)
+§ B06 for what changed from the plan.
+
 ## What remains, in order
 
 Run the batches in this order. Each depends on the kit batches; B07b depends on B07a, B08b on B08a, and
 B10b on B10a.
-
-### B06. Settings: integrations and plugins
-
-- [06-1. Tools and permissions shows people text written for the model](./b06-integrations/06-1-tool-descriptions-for-the-model.md)
-- [06-3. Lists of things take seven shapes, and status shows five ways](./b06-integrations/06-3-one-list-row.md)
-- [06-4. Limits and cost: the price tables leave the page](./b06-integrations/06-4-limits-and-cost-tables.md)
-- [06-5. Five add-and-edit forms, three field layouts, three button orders](./b06-integrations/06-5-add-and-edit-forms.md)
-- [06-6. A plugin's page puts its tabs in the middle, and one tab is often empty](./b06-integrations/06-6-plugin-page-layout.md)
-- [06-8. MCP: two pages that explain each other, and a hand-built server list](./b06-integrations/06-8-mcp-pages.md)
-- [06-9. The HTTP variable editor uses raw kind words and a far-away add button](./b06-integrations/06-9-http-variable-editor.md)
-- [06-10. Services and AI models: a section that only points away, and a page with the wrong title](./b06-integrations/06-10-services-and-ai-models.md)
-- [06-11. The Add connection gallery: titles at three heights, and faint text](./b06-integrations/06-11-add-connection-gallery.md)
-- [06-12. Links to another settings page come in four looks](./b06-integrations/06-12-links-to-other-pages.md)
-- [06-14. Rail and surfaces repeats its section's sentence on every row](./b06-integrations/06-14-rail-and-surfaces.md)
-- [06-17. The custom agent form: small selects, a typed icon name, and an echoing section](./b06-integrations/06-17-custom-agent-form.md)
-- [06-18. Smaller defects on the integration pages](./b06-integrations/06-18-smaller-defects.md)
-
-Rebuild the findings, http, sentry-telemetry, and model-providers bundles to see their changes.
 
 ### B07a. Workflows: editor
 

@@ -58,8 +58,8 @@ afterEach(() => {
 describe('the harnesses and defaults page', () => {
   it('says which harnesses this machine can run', async () => {
     await settle()
-    expect(row('Claude Code')?.textContent).toContain('Installed, 2.1.0.')
-    expect(row('Codex')?.textContent).toContain('Not installed on this machine.')
+    expect(row('Claude Code')?.textContent).toContain('Version 2.1.0.')
+    expect(row('Codex')?.textContent).toContain('Not installed')
   })
 
   it('draws the startup-context switch on for an untouched preference and writes a change to it', async () => {

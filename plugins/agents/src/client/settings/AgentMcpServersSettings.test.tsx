@@ -48,7 +48,7 @@ afterEach(() => {
 
 describe('the MCP servers page', () => {
   it('lists servers, says /mcp changes an open session, and opens one in the same pane', () => {
-    expect(host.querySelector('[data-settings-section="servers"]')?.textContent).toContain('type /mcp in its composer')
+    expect(host.querySelector('[data-settings-section="servers"]')?.textContent).toContain('type /mcp in its message box')
     expect(host.textContent).toContain('npx -y linear-mcp')
     button('Edit')!.click()
     expect(host.querySelector('[data-settings-section="servers"]')).toBeNull()

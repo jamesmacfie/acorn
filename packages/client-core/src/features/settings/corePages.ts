@@ -79,7 +79,7 @@ const projectDetail: SearchDeclaration = {
 const agentTools: SearchDeclaration = {
   keywords: ['permissions', 'agent tools', 'mcp tools', 'allow', 'deny', 'execute', 'preview browser', 'owner', 'plugin tools'],
   sections: [
-    { id: 'tiers', label: 'Tiers', rows: ['Read tools', 'Write tools', 'Execute tools'] },
+    { id: 'tiers', label: 'Tiers', rows: ['Read tools', 'Write tools', 'Execute tools'], keywords: ['acorn mcp server', 'claude mcp remove', 'codex mcp remove'] },
     { id: 'tools', label: 'Tools', keywords: ['by owner', 'by tier'] },
   ],
 }
@@ -87,25 +87,23 @@ const mcp: SearchDeclaration = {
   keywords: ['.mcp.json', 'claude.json', 'cursor', 'servers', 'model context protocol'],
   sections: [
     { id: 'files', label: 'Config files', rows: ['Project', 'Starter file'] },
-    { id: 'acorn-server', label: 'acorn MCP server' },
   ],
 }
 // A connection's own page is a detail of the list, drawn once per connection, so its sections are
 // declared on the list page: search lands on the list, where the connection is one click away. A
 // connection's name, indexed by the settings view, opens its page directly.
 const services: SearchDeclaration = {
-  keywords: ['integrations', 'connection', 'credential', 'api key', 'token', 'replace key', 'rotate', 'disconnect', 'provider', 'linear', 'github', 'rollbar', 'sentry', 'sign in again'],
+  keywords: ['integrations', 'connection', 'credential', 'token', 'replace key', 'rotate', 'disconnect', 'provider', 'linear', 'github', 'rollbar', 'sentry', 'sign in again'],
   sections: [
     { id: 'connections', label: 'Connections', keywords: ['add connection', 'rename', 'test', 'turn off', 'disable', 'disconnect', 'follow', 'project map', 'where it shows up', 'needs you'] },
-    { id: 'models', label: 'AI models', rows: ['Keys for generating text'] },
   ],
 }
 const aiModels: SearchDeclaration = {
-  keywords: ['model', 'default model', 'llm', 'anthropic', 'openai', 'claude', 'codex', 'commit message', 'sql generation', 'generate'],
+  keywords: ['model', 'api key', 'keys for generating text', 'default model', 'llm', 'anthropic', 'openai', 'claude', 'codex', 'commit message', 'sql generation', 'generate'],
   sections: [
     { id: 'generate', label: 'Generating text', rows: ['Generate with'], keywords: ['default model', 'this device'] },
     { id: 'keys', label: 'API keys', keywords: ['add a key', 'provider key', 'replace key'] },
-    { id: 'clis', label: 'Agent CLIs', keywords: ['installed', 'not found', 'path'] },
+    { id: 'clis', label: 'Agent CLIs', keywords: ['installed', 'not installed', 'path'] },
   ],
 }
 const schedules: SearchDeclaration = {

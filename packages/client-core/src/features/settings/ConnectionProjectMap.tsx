@@ -120,12 +120,12 @@ export default function ConnectionProjectMap(props: {
   return (
     <div class="integration-map">
       <SettingRow
-        label={props.project || props.workspace ? connectionName(props.connection) : 'Followed projects'}
+        label={props.project || props.workspace ? connectionName(props.connection) : 'Projects'}
         description={props.project
           ? undefined
           : props.workspace
             ? 'Pick All projects to show it across this workspace, or one project to show it only there.'
-            : 'Pick a workspace to follow a project everywhere in it, or one repository to follow it there alone.'}
+            : 'Follow a project in a whole workspace, or in one project only.'}
         help={props.project ? "Projects followed by the whole workspace show here too. Change those on the workspace's page." : undefined}
         layout="stacked"
         savedAt={save.savedAt()}
@@ -201,7 +201,7 @@ export default function ConnectionProjectMap(props: {
           <Button disabled={locked() || !externalId() || (!props.project && !target())} onPress={add}>Follow</Button>
         </div>
         <Show when={props.manage}>
-          {(manage) => <div><Button variant="bare" size="sm" onPress={manage()}>Manage {connectionName(props.connection)}</Button></div>}
+          {(manage) => <div><Button variant="ghost" size="sm" onPress={manage()}>Manage {connectionName(props.connection)}</Button></div>}
         </Show>
       </SettingRow>
     </div>

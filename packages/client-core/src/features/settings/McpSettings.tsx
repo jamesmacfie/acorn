@@ -5,8 +5,11 @@ import { projectsOptions, tasksOptions } from '../../infra/queries'
 import type { SettingsPageContext } from '../../host/registries/shell/settings'
 import { activeTaskId } from '../tasks/tasks'
 import { mcpApi } from './mcpClient'
-import { Button, Select } from '../../kit/components/primitives'
-import { Link } from '../../kit/components/content/Link'
+import { Badge, Button, EmptyState, Select } from '../../kit/components/primitives'
+import { Text } from '../../kit/components/content/Text'
+import { Inline } from '../../kit/components/layout/Inline'
+import { SectionHeader } from '../../kit/components/layout/SectionHeader'
+import { formatPath } from '../../kit/lib/rendering/formatPath'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 
@@ -18,6 +21,23 @@ import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 // project whether or not a task is open. It starts on the open task's project when there is one. The
 // servers acorn itself adds are on the agents plugin's MCP servers page, which this page links to,
 // because acorn can add a server but cannot remove one a CLI loads by itself.
+const STATUS = {
+  enabled: { word: 'On', tone: 'ok' },
+  disabled: { word: 'Off', tone: 'neutral' },
+  invalid: { word: 'Invalid', tone: 'danger' },
+} as const
+
+// A command is often two absolute paths, which wrap over several lines in a row's description. Each
+// path is cut to its last two folders, and the whole command waits behind the help mark.
+const shortCommand = (command: string) => command.split(/\s+/).map((part) => (part.includes('/') || part.includes('\\') ? formatPath(part) : part)).join(' ')
+const serverHelp = (s: McpServerSummary): string | undefined => {
+  const lines = [
+    s.command && shortCommand(s.command) !== s.command ? `Runs ${s.command}` : '',
+    s.env && Object.keys(s.env).length ? `Environment: ${Object.entries(s.env).map(([k, v]) => `${k}=${v}`).join(' ')}` : '',
+  ].filter(Boolean)
+  return lines.length ? lines.join('. ') : undefined
+}
+
 export default function McpSettings(props: { context?: SettingsPageContext }) {
   const projects = createQuery(() => projectsOptions(true))
   const tasks = createQuery(() => tasksOptions(true))
@@ -58,7 +78,7 @@ export default function McpSettings(props: { context?: SettingsPageContext }) {
     try {
       const res = await mcpApi.createStarter(id)
       if (res.ok) setCreated(`Created .mcp.json in ${project()?.name ?? 'the project'}'s folder.`)
-      else setCreateError(res.reason ?? 'Could not create.')
+      else setCreateError(res.reason ?? "Couldn't create the file.")
     } catch (failure) {
       setCreateError(failure instanceof Error ? failure.message : String(failure))
     }
@@ -70,18 +90,18 @@ export default function McpSettings(props: { context?: SettingsPageContext }) {
       <SettingsSection
         id="files"
         label="Config files"
-        description="The MCP servers your agents load by themselves, read from the project folder's .mcp.json and .cursor/mcp.json and from ~/.claude.json. acorn never starts these; the agent does, and nothing in acorn can switch one off. Secret values are masked."
-        actions={<Button size="sm" onPress={() => void refetch()}>Rescan</Button>}
+        description="Servers your agents load from their own config files. acorn can't turn these off."
+        help="acorn reads .mcp.json and .cursor/mcp.json in the project folder, and ~/.claude.json. Secret values are hidden."
+        actions={
+          <>
+            <Show when={props.context}>
+              {(context) => <Button size="sm" variant="ghost" onPress={() => context().navigate('agent-mcp-servers')}>MCP servers</Button>}
+            </Show>
+            <Button size="sm" onPress={() => void refetch()}>Rescan</Button>
+          </>
+        }
       >
-        <Show when={props.context}>
-          {(context) => (
-            <p class="muted">
-              The servers acorn adds to every session, whichever harness runs it, are on{' '}
-              <Link onPress={() => context().navigate('agent-mcp-servers')}>MCP servers</Link>.
-            </p>
-          )}
-        </Show>
-        <SettingRow label="Project" description="Whose files to read. A task's worktree loads the same committed files.">
+        <SettingRow label="Project" help="Tasks on this project load the same files from their worktree.">
           <Select
             label="Project"
             value={projectId() ?? ''}
@@ -91,50 +111,41 @@ export default function McpSettings(props: { context?: SettingsPageContext }) {
           />
         </SettingRow>
         <Show when={project() && !project()?.path}>
-          <p class="muted">{project()?.name} has no folder on this node yet, so only ~/.claude.json is read.</p>
+          <Text emphasis="muted" wrap>{project()?.name} has no folder here, so acorn reads only ~/.claude.json.</Text>
         </Show>
         <Show when={readError()}>{(message) => <p class="settings-error" role="alert">{message()}</p>}</Show>
-        <Show when={(configs() ?? []).length} fallback={<Show when={!readError()}><p class="muted">No MCP config files found.</p></Show>}>
+        <Show when={(configs() ?? []).length} fallback={<Show when={!readError()}><EmptyState align="start" size="sm">No MCP config files found.</EmptyState></Show>}>
           <For each={configs() ?? []}>
             {(cfg) => (
-              <SettingRow label={cfg.file} layout="stacked">
-                <For each={cfg.servers}>
+              <>
+                <SectionHeader level="sub"><Text tip={cfg.file}>{formatPath(cfg.file)}</Text></SectionHeader>
+                <For each={cfg.servers} fallback={<EmptyState align="start" size="sm">No servers in this file.</EmptyState>}>
                   {(s: McpServerSummary) => (
-                    <div class="mcp-server">
-                      <span class="mcp-server-name">{s.name}</span>
-                      <span class="mcp-server-transport muted">{s.transport}</span>
-                      <span class="mcp-server-status" classList={{ 'mcp-invalid': s.status === 'invalid', 'mcp-disabled': s.status === 'disabled' }}>
-                        {s.status}
-                      </span>
-                      <span class="mcp-server-cmd muted" title={s.command ?? s.url}>{s.command ?? s.url ?? ''}</span>
-                      <Show when={s.env && Object.keys(s.env).length}>
-                        <span class="mcp-server-env muted">env: {Object.entries(s.env ?? {}).map(([k, v]) => `${k}=${v}`).join(' ')}</span>
-                      </Show>
-                    </div>
+                    <SettingRow
+                      label={s.name}
+                      description={s.command ? shortCommand(s.command) : s.url ?? undefined}
+                      help={serverHelp(s)}
+                    >
+                      <Inline>
+                        <Badge size="xs">{s.transport === 'unknown' ? 'Unknown' : s.transport}</Badge>
+                        <Badge tone={STATUS[s.status].tone}>{STATUS[s.status].word}</Badge>
+                      </Inline>
+                    </SettingRow>
                   )}
                 </For>
-                <Show when={!cfg.servers.length}>
-                  <span class="muted">No servers declared.</span>
-                </Show>
-              </SettingRow>
+              </>
             )}
           </For>
         </Show>
         <SettingRow
           label="Starter file"
-          description="Adds an empty .mcp.json to the project's folder. Commit it, and a task on a new branch loads it too."
+          description="Adds an empty .mcp.json to the project folder. Commit it so new tasks load it too."
           error={createError() || undefined}
         >
           <Button size="sm" disabled={!project()?.path} onPress={() => void createStarter()}>Create .mcp.json</Button>
           <Show when={created()}><span class="muted">{created()}</span></Show>
         </SettingRow>
       </SettingsSection>
-
-      <SettingsSection
-        id="acorn-server"
-        label="acorn MCP server"
-        description="Exposes the current task (PR, linked issues, context) as tools to your agents. Auto-registered via each agent's own CLI (`claude mcp add` / `codex mcp add`) whenever a Claude Code / Codex terminal launches — no setup needed. To opt out, remove the `acorn` server with `claude mcp remove` / `codex mcp remove`."
-      />
     </>
   )
 }

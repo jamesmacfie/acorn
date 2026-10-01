@@ -601,6 +601,17 @@ as Add connection or Add a node.
   of 3". A flow of two screens needs no count, because its title changes and the back link returns to
   the first screen.
 
+Two shapes cover every form on a settings page:
+
+- **The page form.** `Field`s in a `Stack gap="stack"`, label over control, md controls. Any error
+  sits between the last field and the buttons, and the buttons are the left `Inline` above. Add
+  connection and Replace key share their fields through
+  `features/settings/connections/CredentialFields.tsx`. New MCP server and New custom agent take the
+  same shape.
+- **The boxed form.** The same fields and footer inside a `Card`, for a form that opens within a
+  section rather than replacing the page: the Nodes pairing card and the run target form. A flow of
+  three screens adds the "Step 2 of 3" line at the top of the card.
+
 ### Workspaces and projects
 
 Overview (`features/workspaces/WorkspaceProjectAssignments.tsx`) is every project on the node in one

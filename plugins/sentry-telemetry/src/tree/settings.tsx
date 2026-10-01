@@ -30,11 +30,11 @@ const RATES = [
 ]
 
 const KINDS: Array<{ id: keyof SentryKindSwitches; label: string; hint: string }> = [
-  { id: 'error', label: 'Errors', hint: 'A caught or uncaught failure, as a Sentry issue.' },
-  { id: 'span', label: 'Traces', hint: 'Requests, commands, page changes and schedule runs, as transactions.' },
-  { id: 'log', label: 'Logs', hint: 'Lines written by core and by plugins, as structured logs.' },
-  { id: 'metric', label: 'Metrics', hint: 'Counters, gauges and the hot-seam histograms, as trace metrics.' },
-  { id: 'event', label: 'Events', hint: 'Things that happened with no duration, as logs at info.' },
+  { id: 'error', label: 'Errors', hint: 'Sent as Sentry issues.' },
+  { id: 'span', label: 'Traces', hint: 'Requests, commands, page changes, and schedule runs.' },
+  { id: 'log', label: 'Logs', hint: 'Log lines from acorn and its plugins.' },
+  { id: 'metric', label: 'Metrics', hint: 'Counts and timings from acorn.' },
+  { id: 'event', label: 'Events', hint: 'One-off events, sent as info logs.' },
 ]
 
 /** The nearest offered rate, so a value written by an older build still shows a selected row. */
@@ -79,9 +79,9 @@ export default function SentrySettingsPage(props: { bridge: AcornBridge }) {
       <SettingsSection
         id="sending"
         label="What to send"
-        description="Nothing is sent until telemetry is on in Settings → Telemetry and a Sentry DSN is connected in Settings → Services. Both, not either."
+        description="acorn sends nothing until you turn on Telemetry and connect Sentry in Services."
       >
-        <SettingRow label="How many traces to send" description="Decided per trace, so a transaction keeps its own spans." error={errorOn('rate')}>
+        <SettingRow label="How many traces to send" error={errorOn('rate')}>
           <Select
             label="How many traces to send"
             options={RATES}
@@ -104,7 +104,7 @@ export default function SentrySettingsPage(props: { bridge: AcornBridge }) {
       <SettingsSection id="detail" label="How much detail">
         <SettingRow
           label="Stack traces on errors"
-          description="Paths are collapsed to ~ and to the data root before they leave this machine."
+          description="acorn replaces your home folder with ~ in file paths before sending them."
           error={errorOn('stacks')}
         >
           <Checkbox
@@ -116,7 +116,7 @@ export default function SentrySettingsPage(props: { bridge: AcornBridge }) {
         </SettingRow>
         <SettingRow
           label="Task ids as tags"
-          description="Lets a Sentry issue be traced back to the task it happened in. Ids only, never a task's contents."
+          description="Links a Sentry issue to its task. Only the id is sent, never the task's contents."
           error={errorOn('taskIds')}
         >
           <Checkbox

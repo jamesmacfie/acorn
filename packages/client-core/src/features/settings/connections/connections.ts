@@ -26,20 +26,21 @@ export const needsYouFirst = (connections: readonly Integration[]): Integration[
   [...connections].sort((a, b) => Number(b.status === 'needs-auth') - Number(a.status === 'needs-auth'))
 
 /** A list row's description: the provider and account when the name does not already say them, then
- *  how the connection is doing. */
-export function connectionRowText(connection: Integration, provider: PublicIntegrationProvider | undefined): string {
+ *  the reason when something is wrong. The row's badge says the status itself. */
+export function connectionRowText(connection: Integration, provider: PublicIntegrationProvider | undefined): string | undefined {
   const where = [provider?.label ?? connection.providerId, connection.account?.label].filter(Boolean).join(' · ')
-  const status = connectionStatusText(connection, provider)
-  return where && where !== connectionName(connection) ? `${where}. ${status}` : status
+  const parts = [where && where !== connectionName(connection) ? `${where}.` : '']
+  if (connection.status === 'needs-auth' || connection.status === 'degraded') parts.push(connectionStatusText(connection, provider))
+  return parts.filter(Boolean).join(' ') || undefined
 }
 
-/** The dot beside a connection: amber for one that needs its owner or did not answer, grey for one that
- *  is off. */
-export const connectionTone = (connection: Integration): 'ok' | 'warn' | 'muted' =>
-  connection.status === 'connected' ? 'ok' : connection.status === 'disabled' ? 'muted' : 'warn'
+/** The badge beside a connection: danger for one that needs its owner, amber for one that did not
+ *  answer, plain for one that is off. */
+export const connectionTone = (connection: Integration): 'ok' | 'warn' | 'danger' | 'neutral' =>
+  connection.status === 'connected' ? 'ok' : connection.status === 'disabled' ? 'neutral' : connection.status === 'needs-auth' ? 'danger' : 'warn'
 
 const STATUS_LABELS = { 'needs-auth': 'Needs you', degraded: 'Not answering', disabled: 'Off', connected: 'Connected' } as const
-/** The dot's own label, for a screen reader and a tooltip. */
+/** The badge's word. */
 export const connectionStatusLabel = (connection: Integration): string => STATUS_LABELS[connection.status]
 
 /** One sentence about how a connection is doing, for its row and its page. */
@@ -48,12 +49,12 @@ export function connectionStatusText(connection: Integration, provider: PublicIn
   switch (connection.status) {
     case 'needs-auth':
       return connection.lastError === 'provider_secret_unreadable'
-        ? 'acorn could not read the stored credential. Nothing new arrives until it is replaced.'
-        : `${label} refused the credential. Nothing new arrives until it is replaced.`
+        ? "acorn couldn't read the saved key. Replace it to get updates again."
+        : `${label} rejected the key. Replace it to get updates again.`
     case 'degraded':
-      return `${label} did not answer the last check. acorn keeps trying.`
+      return `${label} didn't answer the last check. acorn keeps trying.`
     case 'disabled':
-      return 'Turned off. acorn fetches nothing from it until it is on again.'
+      return "Off. acorn doesn't fetch anything from it until you turn it on."
     default:
       return 'Connected.'
   }

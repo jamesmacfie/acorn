@@ -6,7 +6,7 @@ import { prefsOptions } from '../../infra/queries'
 import { savePref } from './savePref'
 import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { TOOL_TIER_DEFAULTS, toolPermissionsSchema, type ToolPermissions } from '@acorn/protocol/toolPermissions.ts'
-import { Alert, Button, Checkbox, Chip, SegmentedControl } from '../../kit/components/primitives'
+import { Alert, Badge, Button, Checkbox, SegmentedControl } from '../../kit/components/primitives'
 import { Inline } from '../../kit/components/layout/Inline'
 import { SectionHeader } from '../../kit/components/layout/SectionHeader'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
@@ -24,11 +24,20 @@ import type { SettingsNavigate } from '../../host/registries/shell/settings'
 // the ones ./corePages.ts declares for search.
 type ToolPerms = ToolPermissions
 
-const TIERS: { risk: ToolRisk; label: string; blurb: string }[] = [
-  { risk: 'read', label: 'Read', blurb: 'Inspect context, notes, memory, git and the PR. No side effects.' },
-  { risk: 'write', label: 'Write', blurb: 'Create or edit notes and propose memory (proposals stay human-gated).' },
-  { risk: 'execute', label: 'Execute', blurb: 'Drive the preview browser and run targets in the worktree. Off until you turn it on, including for tools added by a later release.' },
+const TIERS: { risk: ToolRisk; label: string; blurb: string; help?: string }[] = [
+  { risk: 'read', label: 'Read', blurb: 'Look at the task, notes, memory, git, and the pull request. Changes nothing.' },
+  { risk: 'write', label: 'Write', blurb: 'Write notes and suggest memory for you to review.' },
+  { risk: 'execute', label: 'Execute', blurb: 'Use the preview browser and start run targets. Off until you turn it on.', help: 'Execute tools added in a later version of acorn start off too.' },
 ]
+
+/** A tool's description is written for the model. The row shows its first sentence and puts the rest
+ *  behind the help mark. The split wants a capital after the period, so "url?" or "e.g." mid-sentence
+ *  does not end it. A person-facing summary on the tool itself is the real fix (deferred). */
+export function splitToolDescription(text: string): { summary: string; rest: string } {
+  const end = /\.\s+(?=[A-Z])/.exec(text)
+  if (!end) return { summary: text.trim(), rest: '' }
+  return { summary: text.slice(0, end.index + 1), rest: text.slice(end.index + end[0].length).trim() }
+}
 
 type Grouping = 'owner' | 'tier'
 // Core's tools are acorn's own. A node from before the catalog named owners reports none, and its
@@ -100,7 +109,8 @@ export default function AgentToolsSettings(props: { navigate?: SettingsNavigate 
       <SettingsSection
         id="tiers"
         label="Tiers"
-        description="Which tools the acorn MCP server exposes to agents, by how much a tool can do. Changes apply on the next availability evaluation; live sessions receive a tool-list update. Proposed memory always stays behind the human review gate regardless of these switches. A custom agent's Acorn tools setting can narrow this further, never widen it."
+        description="To remove acorn's tools from a terminal agent, run claude mcp remove acorn or codex mcp remove acorn."
+        help="acorn gives agents these tools through its own MCP server, which Claude Code and Codex terminals add on their own. Running sessions pick up a change right away. Memory an agent suggests always waits for your review. A custom agent can be limited further, but never given more."
       >
         <For each={TIERS}>
           {(tier) => {
@@ -109,15 +119,17 @@ export default function AgentToolsSettings(props: { navigate?: SettingsNavigate 
               <Show
                 when={tier.risk !== 'read'}
                 fallback={
-                  <SettingRow label={`${tier.label} tools`} description={tier.blurb}>
-                    <span class="muted">Always available</span>
+                  <SettingRow label={`${tier.label} tools`} description={`${tier.blurb} Always on.`}>
+                    {/* A checkbox that cannot change, so the three tiers line up. */}
+                    <Checkbox size="md" ariaLabel={`${tier.label} tools`} title="Always on" checked disabled />
                   </SettingRow>
                 }
               >
-                <SettingRow label={`${tier.label} tools`} description={tier.blurb} error={tierSave.error()}>
+                <SettingRow label={`${tier.label} tools`} description={tier.blurb} help={tier.help} error={tierSave.error()}>
                   {/* A checkbox rather than a switch: a tier with some tools on and some off is a
                       third state, and a switch has only two. */}
                   <Checkbox
+                    size="md"
                     ariaLabel={`${tier.label} tools`}
                     indeterminate={tierState(tier.risk) === 'mixed'}
                     checked={tierState(tier.risk) !== 'off'}
@@ -135,7 +147,7 @@ export default function AgentToolsSettings(props: { navigate?: SettingsNavigate 
       <SettingsSection
         id="tools"
         label="Tools"
-        description="Each tool on its own. A tool's switch wins over its tier's."
+        description="A tool's own switch overrides its tier."
         actions={
           <SegmentedControl
             size="sm"
@@ -146,7 +158,7 @@ export default function AgentToolsSettings(props: { navigate?: SettingsNavigate 
           />
         }
       >
-        <Show when={catalog.isError}><Alert>Could not read this node's agent tools.</Alert></Show>
+        <Show when={catalog.isError}><Alert>Couldn't read this node's agent tools.</Alert></Show>
         <For each={groups()}>
           {(group) => (
             <>
@@ -154,7 +166,7 @@ export default function AgentToolsSettings(props: { navigate?: SettingsNavigate 
                 level="sub"
                 count={group.tools.length}
                 actions={grouping() === 'owner' && group.key !== 'core' && props.navigate
-                  ? <Button variant="bare" size="sm" onPress={() => openPluginPage(props.navigate!, group.key, 'node')}>Manage plugin</Button>
+                  ? <Button variant="ghost" size="sm" onPress={() => openPluginPage(props.navigate!, group.key, 'node')}>Manage plugin</Button>
                   : undefined}
               >
                 {group.label}
@@ -162,19 +174,21 @@ export default function AgentToolsSettings(props: { navigate?: SettingsNavigate 
               <For each={group.tools}>
                 {(t) => {
                   const save = createSettingSave()
+                  const text = splitToolDescription(t.description)
                   return (
                     <SettingRow
                       label={t.name}
-                      description={t.availability ? `${t.description} ${t.availability}` : t.description}
+                      description={text.summary}
+                      help={[text.rest, t.availability].filter(Boolean).join(' ') || undefined}
                       error={save.error()}
                     >
                       <Inline>
                         {/* By tier, the owner is the row's link to that plugin's page under Installed. */}
                         <Show
                           when={grouping() === 'tier' && ownerOf(t) !== 'core' && props.navigate}
-                          fallback={<Chip size="xs">{grouping() === 'owner' ? tierLabel(t.risk) : ownerLabel(ownerOf(t))}</Chip>}
+                          fallback={<Badge size="xs">{grouping() === 'owner' ? tierLabel(t.risk) : ownerLabel(ownerOf(t))}</Badge>}
                         >
-                          <Button variant="bare" size="sm" tip={`Manage the ${ownerLabel(ownerOf(t))} plugin`} onPress={() => openPluginPage(props.navigate!, ownerOf(t), 'node')}>
+                          <Button variant="ghost" size="sm" tip={`Manage ${ownerLabel(ownerOf(t))}`} onPress={() => openPluginPage(props.navigate!, ownerOf(t), 'node')}>
                             {ownerLabel(ownerOf(t))}
                           </Button>
                         </Show>

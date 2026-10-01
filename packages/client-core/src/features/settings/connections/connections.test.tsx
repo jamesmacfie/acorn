@@ -69,16 +69,17 @@ const labels = (section: string) => [...host.querySelectorAll(`[data-settings-se
 const press = (text: string) => [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent?.trim() === text)!.click()
 
 describe('Services', () => {
-  it('lists a refused connection first with a dot, and its page leads with the fix', () => {
+  it('lists a refused connection first with a badge, and its page leads with the fix', () => {
     dispose = render(() => <ServicesSettings context={context} />, host)
     // The model key is AI models', not this page's.
     expect(labels('connections')).toEqual(['Linear · Acme', 'GitHub · someone'])
     const first = host.querySelector('[data-settings-section="connections"] .ui-setting-row')!
-    expect(first.querySelector('.ui-dot')?.getAttribute('data-tone')).toBe('warn')
+    expect(first.querySelector('.ui-badge')?.textContent).toBe('Needs you')
+    expect(first.querySelector('.ui-badge')?.getAttribute('data-tone')).toBe('danger')
 
     host.querySelector<HTMLButtonElement>('[aria-label="Manage Linear · Acme"]')!.click()
     const alert = host.querySelector('.ui-alert')!
-    expect(alert.textContent).toContain('Linear refused the credential')
+    expect(alert.textContent).toContain('Linear rejected the key')
     // The fix sits above everything else the page draws.
     expect(alert.compareDocumentPosition(host.querySelector('[data-settings-section="connection"]')!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     press('Replace key')

@@ -18,7 +18,7 @@ request.
   request** already matched.
 - K1a gave every delete a "{Verb} {thing}?" label (**Delete row?**, **Delete request?**, **Delete
   variable?**).
-- B06's [06-10](../b06-integrations/06-10-services-and-ai-models.md) gives `ModelBackendPicker` visible
+- B06's 06-10 gives `ModelBackendPicker` visible
   labels, which reaches Generate SQL.
 
 ## The fix

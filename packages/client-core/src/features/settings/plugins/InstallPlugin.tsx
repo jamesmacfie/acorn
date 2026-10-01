@@ -91,23 +91,22 @@ export function InstallPlugin(props: {
       <Show when={!hostDrawsBack}>
         <Inline><Button variant="bare" size="sm" onPress={props.onClose}>‹ Installed</Button></Inline>
       </Show>
-      <SettingsSection id="install" label="Install a plugin">
+      <SettingsSection id="install" label="Package">
         <SettingRow
           label="Install on"
-          description={target() === 'node'
-            ? "Its server code runs in an isolated, permission-scoped realm on the node. This device asks again, showing its enforced grants, before any of its interface code runs here."
-            : 'A client-only plugin runs from a bundle this device holds. It cannot have server code, and every new bundle asks for trust.'}
+          help={target() === 'node'
+            ? "Its server code runs on the node with only the permissions it asks for. This computer asks you again before it runs any of the plugin's screens."
+            : 'A plugin on this computer has no server code. You approve every new version.'}
         >
           <Select
             label="Install on"
-            width="auto"
             value={target()}
             options={[{ value: 'node', label: `Node: ${props.nodeLabel}` }, { value: 'device', label: 'This device' }]}
             onChange={(value) => pickTarget(value as InstallTarget)}
           />
         </SettingRow>
         <SettingRow label="Source" layout="stacked">
-          <Select label="Source" width="auto" value={kind()} options={kinds()} onChange={(value) => setKind(value as SourceKind)} />
+          <Select label="Source" value={kind()} options={kinds()} onChange={(value) => setKind(value as SourceKind)} />
           <Input label="Package" value={spec()} placeholder={PLACEHOLDER[kind()]} disabled={busy()} onInput={setSpec} />
           <Show when={canBrowse()}>
             <Button variant="ghost" disabled={busy()} onPress={() => void pickFolder().then((path) => { if (path) setSpec(path) })}>Choose…</Button>
@@ -117,13 +116,13 @@ export function InstallPlugin(props: {
             fact (docs/security.md § Installing from a folder). */}
         <Show when={kind() === 'path' && target() === 'node'}>
           <Alert tone="warn">
-            A folder is linked, not copied. Whatever is in it when the node next starts is what runs, and acorn cannot pin
-            those bytes the way it pins a downloaded package.
+            acorn links to this folder instead of copying it. Whatever is in it when the node starts is what runs, so acorn
+            can't check it the way it checks a download.
           </Alert>
         </Show>
         <Show when={error()}><Alert>{error()}</Alert></Show>
-        <Inline>
-          <Button submit disabled={busy() || !spec().trim()}>{busy() ? 'Installing…' : 'Install'}</Button>
+        <Inline gap="row">
+          <Button submit variant="solid" tone="accent" busy={busy()} disabled={!spec().trim()}>Install</Button>
           <Button variant="ghost" disabled={busy()} onPress={props.onClose}>Cancel</Button>
         </Inline>
       </SettingsSection>

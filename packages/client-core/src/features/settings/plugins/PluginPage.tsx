@@ -16,7 +16,8 @@ import { commandRegistry } from '../../../host/registries/commands/commands'
 import { keybindingRegistry } from '../../../host/registries/commands/keybindings'
 import { exclusiveSlotOffers } from '../../../host/registries/extensionPoints/exclusiveSlots'
 import { CORE_EXCLUSIVE_SLOTS } from '@acorn/protocol/extensionPoints.ts'
-import { Alert, Button, Checkbox, StatusDot } from '../../../kit/components/primitives'
+import { Alert, Badge, Button, Checkbox } from '../../../kit/components/primitives'
+import { Facts } from '../../../kit/components/content/Facts'
 import { Text } from '../../../kit/components/content/Text'
 import { Inline } from '../../../kit/components/layout/Inline'
 import { SettingRow } from '../../../kit/components/layout/SettingRow'
@@ -26,18 +27,18 @@ import { TabPanel, Tabs } from '../../../kit/components/layout/Tabs'
 import { createRailVisibility, pluginSources } from '../../tabs/railVisibility'
 import { useSettingsDetail } from '../settingsDetail'
 import { createSettingSave } from '../settingSave'
-import { pluginName, pluginOrigin, pluginRow, statusOf, type InstalledPlugin } from './installed'
+import { pluginName, pluginRow, statusOf, type InstalledPlugin } from './installed'
 import { removeDevicePlugin, setDevicePluginEnabled, setNodePluginEnabled } from './pluginActions'
 import './plugins.css'
 
 // One plugin's page under Settings > Plugins > Installed (docs/plugins/activation.md § What the owner
-// sees). What used to be crammed into one row of the list, spread over four tabs: what the plugin adds,
-// where its settings are, what it may do and what this device decided about it, and which version runs.
+// sees). What used to be crammed into one row of the list, spread over three tabs: whether it is on and
+// what it adds (its settings pages among them), what it may do and what this device decided about it,
+// and which version runs.
 // Uninstalling sits in the danger zone under them, where the shell's one confirmation names what goes.
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
-  { id: 'settings', label: 'Settings' },
   { id: 'permissions', label: 'Permissions' },
   { id: 'versions', label: 'Versions' },
 ] as const
@@ -110,31 +111,29 @@ export function PluginPage(props: PluginPageProps) {
       <Show when={!hostDrawsBack}>
         <Inline><Button variant="bare" size="sm" onPress={props.onBack}>‹ Installed</Button></Inline>
       </Show>
-      {/* The one place the page shows the id, which is what the command line and config files use. */}
-      <SettingsSection id="plugin" label="Status" description={`${props.plugin.id}${row().installed?.version ? ` ${row().installed?.version}` : ''}, ${pluginOrigin(props.plugin)}.`}>
-        <SettingRow label="Enabled" description={props.plugin.kind === 'node' ? 'Takes effect when the node next starts.' : 'Takes effect at once on this device.'} error={enableSave.error()}>
-          <Show when={togglable()} fallback={<Text emphasis="muted">Required. acorn needs it to run.</Text>}>
-            <Checkbox switch ariaLabel={`Enable ${pluginName(props.plugin)}`} checked={!row().disabled} disabled={busy()} onChange={setEnabled} />
-          </Show>
-        </SettingRow>
-        <Show when={status().tone !== 'ok'}>
-          <Alert
-            tone={status().tone === 'danger' ? 'danger' : status().needsYou ? 'warn' : 'muted'}
-            variant="banner"
-            actions={status().line === 'waiting' ? <Button size="sm" onPress={() => setTab('permissions')}>Review…</Button> : undefined}
-          >
-            {status().text}
-          </Alert>
-        </Show>
-        <Show when={error()}><Alert>{error()}</Alert></Show>
-      </SettingsSection>
+      <Show when={error()}><Alert>{error()}</Alert></Show>
 
       <Tabs tabs={TABS} active={tab()} onChange={(id) => setTab(id as Tab)} idPrefix={ID_PREFIX} ariaLabel={`About ${pluginName(props.plugin)}`} />
       <TabPanel idPrefix={ID_PREFIX} id="overview" active={tab()}>
-        <Stack gap="section"><Overview plugin={props.plugin} navigate={props.navigate} elsewhere={elsewhere()} /></Stack>
-      </TabPanel>
-      <TabPanel idPrefix={ID_PREFIX} id="settings" active={tab()}>
-        <Stack gap="section"><PluginSettingsPages plugin={props.plugin} navigate={props.navigate} elsewhere={elsewhere()} /></Stack>
+        <Stack gap="section">
+          <SettingsSection id="plugin" label="Status">
+            <SettingRow label="Enabled" description={props.plugin.kind === 'node' ? 'Takes effect when the node next starts.' : 'Applies right away on this computer.'} error={enableSave.error()}>
+              <Show when={togglable()} fallback={<Text emphasis="muted">Required. acorn needs it to run.</Text>}>
+                <Checkbox switch ariaLabel={`Enable ${pluginName(props.plugin)}`} checked={!row().disabled} disabled={busy()} onChange={setEnabled} />
+              </Show>
+            </SettingRow>
+            <Show when={status().tone !== 'ok'}>
+              <Alert
+                tone={status().tone === 'danger' ? 'danger' : status().needsYou ? 'warn' : 'muted'}
+                variant="banner"
+                actions={status().line === 'waiting' ? <Button size="sm" onPress={() => setTab('permissions')}>Review…</Button> : undefined}
+              >
+                {status().text}
+              </Alert>
+            </Show>
+          </SettingsSection>
+          <Overview plugin={props.plugin} navigate={props.navigate} elsewhere={elsewhere()} />
+        </Stack>
       </TabPanel>
       <TabPanel idPrefix={ID_PREFIX} id="permissions" active={tab()}>
         <Stack gap="section">
@@ -152,10 +151,11 @@ export function PluginPage(props: PluginPageProps) {
 
 type Actions = { busy: boolean; run: (work: () => Promise<void>) => Promise<void> }
 
-const ELSEWHERE = 'Read from the node this window runs on, not the node in the header. Switch the app to that node to see what the plugin adds there.'
+const ELSEWHERE = 'This shows what the plugin adds on the node this window uses, not the one in the header. To see the other, switch the window to that node.'
 
-// What the plugin put into acorn, each linking to where it is changed. Read from the registries the
-// plugin registered into, so it says what is on this device now rather than what a manifest promised.
+// What the plugin put into acorn, each linking to where it is changed: rail sources, its settings pages,
+// surfaces it offers to draw, commands, agent tools, and events. Read from the registries the plugin
+// registered into, so it says what is on this device now rather than what a manifest promised.
 function Overview(props: { plugin: InstalledPlugin; navigate: SettingsNavigate; elsewhere: boolean }) {
   const visibility = createRailVisibility()
   // One per source, so a failed switch is said on its own row only.
@@ -174,6 +174,8 @@ function Overview(props: { plugin: InstalledPlugin; navigate: SettingsNavigate; 
     return declared ? agentToolGrants(declared).length : 0
   }
   const emits = () => pluginRow(props.plugin).emits ?? []
+  const pages = () => settingsRegistry.entries().filter((page) => settingsRegistry.ownerOf(page.id) === props.plugin.id)
+  const surfaces = () => CORE_EXCLUSIVE_SLOTS.flatMap((slot) => exclusiveSlotOffers(slot).filter((offer) => offer.pluginId === props.plugin.id))
   const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
 
   return (
@@ -182,66 +184,56 @@ function Overview(props: { plugin: InstalledPlugin; navigate: SettingsNavigate; 
         {(source) => (
           <SettingRow
             label={`Rail source: ${source.label}`}
-            description={source.showInRailByDefault === false ? 'Hidden by default. The command palette can still open it.' : 'The command palette opens it whether or not its icon shows.'}
+            description={source.showInRailByDefault === false && !visibility.shown(source.id) ? 'Hidden until you show it.' : undefined}
             error={railSave(source.id).error()}
           >
             <Checkbox
               switch
-              label="Show in left rail"
+              ariaLabel={`Show ${source.label} in left rail`}
               checked={visibility.shown(source.id)}
               onChange={(on) => railSave(source.id).run(() => visibility.setShown(source.pluginId, source.id, on, { throwOnFailure: true }))}
             />
           </SettingRow>
         )}
       </For>
-      <Show when={commands().length || shortcuts().length}>
-        <SettingRow label="Commands and shortcuts" description={`${plural(commands().length, 'command')}, ${plural(shortcuts().length, 'shortcut')}.`}>
-          <Button variant="bare" size="sm" onPress={() => props.navigate('shortcuts')}>Keyboard shortcuts</Button>
-        </SettingRow>
-      </Show>
-      <Show when={tools()}>
-        <SettingRow label="Agent tools" description={`${plural(tools(), 'tool')} for agent sessions.`}>
-          <Button variant="bare" size="sm" onPress={() => props.navigate('agent-tools')}>Tools and permissions</Button>
-        </SettingRow>
-      </Show>
-      <Show when={emits().length}>
-        <SettingRow label="Events it announces" description="Other plugins may listen for these." layout="stacked">
-          <ul class="plugin-emits">
-            <For each={emits()}>{(event) => <li><code>{event.verb}</code><span>{event.description}</span></li>}</For>
-          </ul>
-        </SettingRow>
-      </Show>
-      <Show when={!sources().length && !commands().length && !shortcuts().length && !tools() && !emits().length}>
-        <Text emphasis="muted">Nothing it adds is on this device right now. A plugin that is off or waiting for approval registers nothing here.</Text>
-      </Show>
-    </SettingsSection>
-  )
-}
-
-// The plugin's own pages, which stay the plugin's UI, and any core surface it offered to draw.
-function PluginSettingsPages(props: { plugin: InstalledPlugin; navigate: SettingsNavigate; elsewhere: boolean }) {
-  const pages = () => settingsRegistry.entries().filter((page) => settingsRegistry.ownerOf(page.id) === props.plugin.id)
-  const surfaces = () => CORE_EXCLUSIVE_SLOTS.flatMap((slot) => exclusiveSlotOffers(slot).filter((offer) => offer.pluginId === props.plugin.id))
-  return (
-    <SettingsSection id="pages" label="Settings pages" description={props.elsewhere ? ELSEWHERE : undefined}>
-      <For each={pages()} fallback={<Text emphasis="muted">This plugin has no settings page.</Text>}>
+      {/* A workspace or project page is a tab on each workspace's or project's own page, not a page of
+          its own to open. */}
+      <For each={pages()}>
         {(page) => (
-          // A workspace or project page is a tab on each workspace's or project's own page, not a page of
-          // its own to open.
           <Show
             when={isStandaloneSettingsPage(page)}
             fallback={<SettingRow label={page.title ?? page.label} description={`A tab on each ${settingsScopeOf(page)}'s settings page.`} />}
           >
-            <SettingRow label={page.title ?? page.label} description={SETTINGS_CATEGORY_LABELS[settingsCategoryOf(page)]}>
+            <SettingRow label={page.title ?? page.label} description={`Settings page in ${SETTINGS_CATEGORY_LABELS[settingsCategoryOf(page)]}.`}>
               <Button size="sm" variant="ghost" onPress={() => props.navigate(page.id)}>Open</Button>
             </SettingRow>
           </Show>
         )}
       </For>
       <Show when={surfaces().length}>
-        <SettingRow label="Replaced surfaces" description={`Offers to draw ${surfaces().map((offer) => offer.label).join(', ')} instead of acorn.`}>
+        <SettingRow label="Replaced surfaces" description={`Can replace acorn's ${surfaces().map((offer) => offer.label).join(', ')}.`}>
           <Button size="sm" variant="ghost" onPress={() => props.navigate('rail-surfaces#surfaces')}>Rail and surfaces</Button>
         </SettingRow>
+      </Show>
+      <Show when={commands().length || shortcuts().length}>
+        <SettingRow label="Commands and shortcuts" description={`${plural(commands().length, 'command')}, ${plural(shortcuts().length, 'shortcut')}.`}>
+          <Button variant="ghost" size="sm" onPress={() => props.navigate('shortcuts')}>Keyboard shortcuts</Button>
+        </SettingRow>
+      </Show>
+      <Show when={tools()}>
+        <SettingRow label="Agent tools" description={plural(tools(), 'agent tool')}>
+          <Button variant="ghost" size="sm" onPress={() => props.navigate('agent-tools')}>Tools and permissions</Button>
+        </SettingRow>
+      </Show>
+      <Show when={emits().length}>
+        <SettingRow label="Events it announces" help="Other plugins can react to these." layout="stacked">
+          <ul class="plugin-emits">
+            <For each={emits()}>{(event) => <li><code>{event.verb}</code><span>{event.description}</span></li>}</For>
+          </ul>
+        </SettingRow>
+      </Show>
+      <Show when={!sources().length && !pages().length && !surfaces().length && !commands().length && !shortcuts().length && !tools() && !emits().length}>
+        <Text emphasis="muted" wrap>It isn't adding anything right now. A plugin that's off or waiting for approval adds nothing.</Text>
       </Show>
     </SettingsSection>
   )
@@ -314,12 +306,12 @@ function Permissions(props: PluginPageProps & Actions & { devGrant: PluginHostSt
         )}
       </Show>
       <SettingsSection id="grants" label="What it may do">
-        <For each={lines()} fallback={<Text emphasis="muted">{row().installed ? 'It declares no permissions.' : 'A built-in plugin ships with acorn and runs with acorn\'s own access.'}</Text>}>
-          {(line) => <SettingRow label={line.text}><Show when={line.high}><StatusDot tone="warn" label="Broad access" /></Show></SettingRow>}
+        <For each={lines()} fallback={<Text emphasis="muted">{row().installed ? "It doesn't ask for any permissions." : 'A built-in plugin ships with acorn and runs with acorn\'s own access.'}</Text>}>
+          {(line) => <SettingRow label={line.text}><Show when={line.high}><Badge tone="warn">Broad access</Badge></Show></SettingRow>}
         </For>
       </SettingsSection>
-      <SettingsSection id="approvals" label="Approvals on this device" description="Each bundle this device runs was approved here, by its exact bytes.">
-        <For each={decisions()} fallback={<Text emphasis="muted">{row().installed?.bundled || (props.plugin.kind === 'node' && !row().installed) ? 'Built in. Its interface ships with acorn, so there is nothing to approve.' : 'No decision recorded yet.'}</Text>}>
+      <SettingsSection id="approvals" label="Approvals on this computer" help="You approve each version of a plugin before this computer runs it.">
+        <For each={decisions()} fallback={<Text emphasis="muted">{row().installed?.bundled || (props.plugin.kind === 'node' && !row().installed) ? "Built in, so there's nothing to approve." : 'No approvals.'}</Text>}>
           {(ack) => (
             <SettingRow label={`${ack.version}: ${ack.decision === 'accepted' ? 'approved' : 'rejected'}`}>
               <Button size="sm" variant="ghost" disabled={props.busy || !!props.devGrant} onPress={() => void forget(ack.hash, ack.decision === 'accepted')}>
@@ -334,16 +326,16 @@ function Permissions(props: PluginPageProps & Actions & { devGrant: PluginHostSt
           <SettingRow
             label={props.devGrant ? 'In development' : 'Off'}
             description={props.devGrant
-              ? 'This device trusts every new bundle of this plugin without asking. End it when you stop working on the plugin.'
+              ? 'This computer runs each new version of this plugin without asking. Turn it off when you finish working on the plugin.'
               : props.plugin.kind === 'device'
-                ? 'Development mode trusts every new bundle without asking, for a plugin you are writing.'
-                : 'Development mode trusts every new bundle without asking. It starts when you approve an agent\'s request to install a plugin it is writing.'}
+                ? "For a plugin you're writing: runs each new version without asking."
+                : "Runs each new version without asking. It turns on when you let an agent install a plugin it's writing."}
           >
             <Show
               when={props.devGrant}
-              fallback={<Show when={props.plugin.kind === 'device'}><Button size="sm" variant="ghost" disabled={props.busy} onPress={() => void setDevMode(true)}>Dev trust</Button></Show>}
+              fallback={<Show when={props.plugin.kind === 'device'}><Button size="sm" variant="ghost" disabled={props.busy} onPress={() => void setDevMode(true)}>Turn on</Button></Show>}
             >
-              <Button size="sm" disabled={props.busy} onPress={() => void setDevMode(false)}>End dev mode</Button>
+              <Button size="sm" disabled={props.busy} onPress={() => void setDevMode(false)}>Turn off</Button>
             </Show>
           </SettingRow>
         </SettingsSection>
@@ -373,19 +365,29 @@ function Versions(props: PluginPageProps & Actions) {
   })
   const source = () => (props.plugin.kind === 'device' ? props.plugin.entry.sourceLabel : installed()?.source)
   const offeredBy = () => (props.plugin.kind === 'device' ? props.plugin.entry.nodeIds : [])
+  // A built-in's source is the app itself, which the node words for a log rather than for a person.
+  const sourceText = () => (props.plugin.kind === 'node' && installed()?.bundled ? 'Built in' : source() ?? '')
   return (
-    <SettingsSection id="versions" label="Versions">
-      <SettingRow label="Installed" description={installed() ? `${installed()?.version}, for plugin API ${installed()?.apiVersion}` : 'Ships with this version of acorn.'} />
-      <Show when={row().active && row().active?.version !== installed()?.version}>
-        <SettingRow label="Running" description={`${row().active?.version}. The installed version starts when the node restarts.`} />
-      </Show>
-      <Show when={source()}>{(text) => <SettingRow label="Source" description={text()} />}</Show>
-      <Show when={installed()?.installedAt}>{(at) => <SettingRow label="Installed on" description={new Date(at()).toLocaleString()} />}</Show>
-      <Show when={offeredBy().length}>
-        <SettingRow label="Also offered by" description={offeredBy().join(', ')} />
-      </Show>
+    <SettingsSection
+      id="versions"
+      label="Installed version"
+      help={installed() ? `Built for plugin API ${installed()?.apiVersion}.` : 'Ships with this version of acorn.'}
+    >
+      {/* Facts, not setting rows: nothing here is a setting (B05's column rule). */}
+      <Facts
+        grouping="rows"
+        items={[
+          { label: 'Version', value: installed()?.version ?? 'Built in' },
+          ...(row().active && row().active?.version !== installed()?.version
+            ? [{ label: 'Running', value: `${row().active?.version}, until the node restarts` }]
+            : []),
+          ...(source() ? [{ label: 'Source', value: sourceText() }] : []),
+          ...(installed()?.installedAt ? [{ label: 'Installed on', value: new Date(installed()!.installedAt!).toLocaleString() }] : []),
+          ...(offeredBy().length ? [{ label: 'Also offered by', value: offeredBy().join(', ') }] : []),
+        ]}
+      />
       <Show when={updatable()}>
-        <SettingRow label="Update" description="Fetches the newest version from its source. A new bundle asks for trust again.">
+        <SettingRow label="Update" description="Gets the newest version from where it was installed. You approve it before it runs.">
           <Button size="sm" variant="ghost" disabled={props.busy || !!(props.plugin.kind === 'node' && props.plugin.row.pendingReview)} onPress={() => void update()}>Update</Button>
         </SettingRow>
       </Show>

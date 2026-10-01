@@ -91,11 +91,12 @@ describe('the agent pricing settings page', () => {
     expect(buttonNamed(host, 'Save pricing')).toBeUndefined()
   })
 
-  it('saves a price when its field is committed, and Reset stores the built-in one again', async () => {
+  it('saves a price when its field is committed, and Reset on the changed row stores the built-in one again', async () => {
     const host = draw()
     const firstPrice = () => bodyRows(host)[0].querySelector<HTMLInputElement>('input[type="number"]')!
     const before = firstPrice().value
-    expect(buttonNamed(bodyRows(host)[0], 'Reset').disabled).toBe(true)
+    // An untouched row offers no Reset.
+    expect(buttonNamed(bodyRows(host)[0], 'Reset')).toBeUndefined()
 
     commit(firstPrice(), '99')
     await settle()

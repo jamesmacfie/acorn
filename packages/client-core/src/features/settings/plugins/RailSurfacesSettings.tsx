@@ -15,7 +15,6 @@ import { availableSources } from '../../tabs/railSources'
 import { createRailVisibility, pluginSources } from '../../tabs/railVisibility'
 import { createSettingSave, type SettingSave } from '../settingSave'
 import { savePref } from '../savePref'
-import './plugins.css'
 
 // Settings > Plugins > Rail and surfaces: what plugins put in this device's chrome
 // (docs/frontend.md § Rail source visibility). A switch for every plugin source's left-rail icon, so a
@@ -40,6 +39,12 @@ function RailSources() {
   // Whether the source could open now. Its icon waits for that as well as for the switch, and the switch
   // keeps its value in the meantime.
   const available = () => new Set(availableSources(integrations.data?.integrations).map((source) => source.id))
+  // A connection that works, for the one reason a row can name. A source can also wait on a platform
+  // capability, a workspace that follows none of the provider's projects, or its own `when`, and the
+  // row says nothing then rather than blaming the connection.
+  const connected = (providerId: string) => (integrations.data?.integrations ?? [])
+    .some((row) => row.providerId === providerId && row.status !== 'disabled' && row.status !== 'needs-auth')
+  const providerLabel = (providerId: string) => integrations.data?.providers.find((provider) => provider.id === providerId)?.label ?? providerId
   type PluginRailSource = ReturnType<typeof sources>[number]
   const saves = new Map<string, SettingSave>()
   const saveFor = (source: PluginRailSource) => {
@@ -48,21 +53,21 @@ function RailSources() {
     if (!save) saves.set(key, save = createSettingSave())
     return save
   }
-  const description = (source: PluginRailSource) => [
-    `From the ${pluginLabel(source.pluginId)} plugin.`,
-    source.showInRailByDefault === false ? 'Hidden until you show it.' : '',
-    available().has(source.id)
-      ? 'The command palette opens it either way.'
-      : 'Its icon appears once the source is available, such as when its connection is signed in.',
-  ].filter(Boolean).join(' ')
+  // Only the exception, so a row that behaves as the section says has no line at all.
+  const description = (source: PluginRailSource): string | undefined => {
+    if (!available().has(source.id) && source.providerId && integrations.data && !connected(source.providerId)) {
+      return `Shows once you connect ${providerLabel(source.providerId)}.`
+    }
+    return source.showInRailByDefault === false && !visibility.shown(source.id) ? 'Hidden until you show it.' : undefined
+  }
 
   return (
     <SettingsSection
       id="rail"
       label="Left rail"
-      description="Which plugin sources have an icon in the left rail. A hidden source still works: its commands, panes and notifications stay, and the palette opens it."
+      description="Choose which icons show in the left rail. A hidden one still works from the command palette."
     >
-      <For each={sources()} fallback={<Text emphasis="muted">No plugin adds a source to the left rail.</Text>}>
+      <For each={sources()} fallback={<Text emphasis="muted">No plugins add icons to the left rail.</Text>}>
         {(source) => (
           <SettingRow label={source.label} description={description(source)} error={saveFor(source).error()}>
             <Checkbox
@@ -96,14 +101,20 @@ function ReplacedSurfaces() {
     <SettingsSection
       id="surfaces"
       label="Replaced surfaces"
-      description="Some plugins offer to draw one of acorn's own surfaces. Nothing is replaced until you pick it here, and acorn draws its own again if that plugin is turned off or its surface fails."
+      help="Some plugins can draw one of acorn's own areas, such as the top bar. Nothing changes until you pick one here. If the plugin stops working, acorn goes back to its own."
     >
-      <Show when={rows().length} fallback={<Text emphasis="muted">No plugin offers to draw one of acorn's surfaces.</Text>}>
+      <Show when={rows().length} fallback={<Text emphasis="muted">No plugins can replace any of acorn's areas.</Text>}>
         <For each={rows()}>
           {(row) => (
             <SettingRow
               label={CORE_SLOT_LABEL[row.slot]}
-              error={saves[row.slot].error()}
+              description={hides(row.slot, row.offers)}
+              // A replacement that fell back is the one case where the setting and the screen disagree,
+              // and the owner has no other way to find out why.
+              error={saves[row.slot].error()
+                ?? (choice(row.slot) !== CORE_SLOT_PROVIDER && exclusiveSlotFailed(row.slot, choice(row.slot))
+                  ? "That plugin's version failed, so acorn's own is showing."
+                  : undefined)}
               onReset={choice(row.slot) === CORE_SLOT_PROVIDER ? undefined : () => void pick(row.slot, CORE_SLOT_PROVIDER)}
             >
               <Select
@@ -113,27 +124,26 @@ function ReplacedSurfaces() {
                   { value: CORE_SLOT_PROVIDER, label: "acorn's own" },
                   ...row.offers.map((offer) => ({
                     value: offer.pluginId,
-                    label: `${offer.label} (${pluginLabel(offer.pluginId)})${!offer.placesNestedSlot && row.slot === 'rail' ? ' — hides the task list' : ''}${!offer.placesNestedSlot && row.slot === 'topbar' ? ' — hides plugin status items' : ''}`,
+                    label: `${offer.label}, from ${pluginLabel(offer.pluginId)}`,
                   })),
                 ]}
                 onChange={(value) => void pick(row.slot, value)}
               />
-              <For each={row.offers.filter((offer) => !offer.placesNestedSlot && (row.slot === 'rail' || row.slot === 'topbar'))}>
-                {(offer) => <span class="muted" role="note">
-                  {offer.label} {row.slot === 'rail' ? 'hides the task list' : 'hides plugin status items'}.
-                </span>}
-              </For>
-              {/* A replacement that fell back is the one case where the setting and the screen
-                  disagree, and the owner has no other way to find out why. */}
-              <Show when={choice(row.slot) !== CORE_SLOT_PROVIDER && exclusiveSlotFailed(row.slot, choice(row.slot))}>
-                <span class="plugin-failed" role="status">that surface failed — acorn's own is showing</span>
-              </Show>
             </SettingRow>
           )}
         </For>
       </Show>
     </SettingsSection>
   )
+}
+
+// What picking an offer takes away with it: a rail or top bar that does not place the nested slot drops
+// the task list or the plugin status items acorn draws there.
+const hides = (slot: CoreExclusiveSlot, offers: ReturnType<typeof exclusiveSlotOffers>): string | undefined => {
+  if (slot !== 'rail' && slot !== 'topbar') return undefined
+  const lines = offers.filter((offer) => !offer.placesNestedSlot)
+    .map((offer) => `${offer.label} ${slot === 'rail' ? 'hides the task list' : 'hides plugin status items'}.`)
+  return lines.join(' ') || undefined
 }
 
 // Core's own name for each designated surface, because the label says which of acorn's surfaces is

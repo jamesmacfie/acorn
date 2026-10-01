@@ -9,16 +9,19 @@
 //             request references it. Its output is never stored.
 import { createEffect, createResource, createSignal, Index, Show } from 'solid-js'
 import {
-  Button, Checkbox, ConfirmButton, Heading, Icon, Inline, Input, Select, Stack, Text, Toolbar,
+  Button, Checkbox, ConfirmButton, Heading, Icon, Inline, Input, Select, Stack, Text,
 } from '@acorn/plugin-api/ui/tree'
 import { variableKinds, type HttpVariable, type VariableKind } from '../shared/model'
 import type { HttpClient } from './httpClient'
 
 const KIND_HINT: Record<VariableKind, string> = {
   value: 'Used exactly as typed.',
-  secret: 'Encrypted at rest. Leave blank when editing to keep the stored value.',
-  command: 'Run in the task worktree when a request uses it. The last line of output is the value.',
+  secret: 'Stored encrypted. Leave it blank to keep the saved value.',
+  command: "Runs in the task's worktree when a request uses it. The last line it prints is the value.",
 }
+
+// The stored kind words stay as they are; only what the select shows changes.
+const KIND_LABEL: Record<VariableKind, string> = { value: 'Text', secret: 'Secret', command: 'Command' }
 
 const PLACEHOLDER: Record<VariableKind, string> = {
   value: 'http://localhost:3000',
@@ -107,13 +110,13 @@ export default function HttpVariables(props: { client: HttpClient; projectId: st
                 value={row().kind}
                 label="Kind"
                 onChange={(value: string) => editRow(index, { kind: value as VariableKind, value: '' })}
-                options={[...variableKinds.map((k) => ({ value: k, label: k }))]}
+                options={variableKinds.map((k) => ({ value: k, label: KIND_LABEL[k] }))}
               />
               <Input
                 size="sm"
                 type={row().kind === 'secret' ? 'password' : 'text'}
                 value={row().value}
-                placeholder={row().kind === 'secret' && row().hasStoredSecret ? 'stored — leave blank to keep' : PLACEHOLDER[row().kind]}
+                placeholder={row().kind === 'secret' && row().hasStoredSecret ? 'Saved. Leave blank to keep it.' : PLACEHOLDER[row().kind]}
                 onChange={(value: string) => editRow(index, { value })}
               />
               <Button size="sm" busy={busy() === (row().id ?? row().name)} onPress={() => void save(index)}>
@@ -138,11 +141,12 @@ export default function HttpVariables(props: { client: HttpClient; projectId: st
         )}
       </Index>
 
-      <Toolbar variant="actions" size="sm">
+      {/* Under the list and on its start edge, where the next row will appear. */}
+      <Inline>
         <Button size="sm" variant="ghost" onPress={() => setRows((r) => [...r, blankRow()])}>
-          + Variable
+          <Icon name="plus" /> Add variable
         </Button>
-      </Toolbar>
+      </Inline>
     </Stack>
   )
 }
