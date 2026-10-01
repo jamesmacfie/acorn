@@ -4,6 +4,7 @@ import type {
   AgentArtifact,
   AgentDeleteResult,
   AgentEventPage,
+  AgentFootprint,
   AgentProviderDescriptor,
   AgentRequest,
   AgentSession,
@@ -16,17 +17,19 @@ import type {
   EnqueueAgentTurnInput,
   ImportAgentTranscriptInput,
 } from '../../shared/schemas'
+import type { AgentSessionMcp } from '../../shared/mcpServers'
+import { MAX_INLINE_IMAGE_BYTES } from './inlineImage'
 
 const ROOT = '/v1/p/agents'
 const sessionRoute = (sessionId: string, suffix = '') =>
   `${ROOT}/sessions/${encodeURIComponent(sessionId)}${suffix}`
 
-const jsonWrite = <T>(url: string, method: string, body?: unknown, idempotent = false): Promise<T> =>
+const jsonWrite = <T>(url: string, method: string, body?: unknown, idempotent: boolean | string = false): Promise<T> =>
   writeJson<T>(url, {
     method,
     headers: {
       ...(body === undefined ? {} : { 'content-type': 'application/json' }),
-      ...(idempotent ? { 'idempotency-key': crypto.randomUUID() } : {}),
+      ...(idempotent ? { 'idempotency-key': typeof idempotent === 'string' ? idempotent : crypto.randomUUID() } : {}),
     },
     body: body === undefined ? undefined : JSON.stringify(body),
   })
@@ -34,6 +37,10 @@ const jsonWrite = <T>(url: string, method: string, body?: unknown, idempotent = 
 export const managedAgentApi = {
   providers: (force = false) =>
     readJson<AgentProviderDescriptor[]>(`${ROOT}/providers${force ? '?force=true' : ''}`),
+  // Settings > Storage and memory. At a named node, because the page says which node it shows.
+  footprint: (options: { nodeId?: string } = {}) => readJson<AgentFootprint>(`${ROOT}/footprint`, options),
+  stopIdle: (options: { nodeId?: string } = {}) =>
+    writeJson<{ stopped: number }>(`${ROOT}/stop-idle`, { method: 'POST', ...options }),
   async uploadAttachment(taskId: string, file: File): Promise<AgentAttachment> {
     // The parts are described rather than encoded: main builds the real multipart body, so nothing here
     // hand-rolls a boundary and the upload rides the same pinned connection as every other request.
@@ -50,6 +57,8 @@ export const managedAgentApi = {
   // Bytes, not a URL, for the reason artifactContent gives below.
   attachmentContent: (attachmentId: string) =>
     readBytes(`${ROOT}/attachments/${encodeURIComponent(attachmentId)}/content`, 'Unable to read attachment.'),
+  attachmentPreview: (attachmentId: string) =>
+    readBytes(`${ROOT}/attachments/${encodeURIComponent(attachmentId)}/content`, 'Unable to read attachment preview.', { maxResponseBytes: MAX_INLINE_IMAGE_BYTES }),
   artifacts: (sessionId: string) =>
     readJson<AgentArtifact[]>(sessionRoute(sessionId, '/artifacts')),
   artifact: (artifactId: string) =>
@@ -59,6 +68,8 @@ export const managedAgentApi = {
   // the device bearer. The caller turns this into a blob URL for the download.
   artifactContent: (artifactId: string) =>
     readBytes(`${ROOT}/artifacts/${encodeURIComponent(artifactId)}/content`, 'Unable to download artifact.'),
+  artifactPreview: (artifactId: string) =>
+    readBytes(`${ROOT}/artifacts/${encodeURIComponent(artifactId)}/content`, 'Unable to read artifact preview.', { maxResponseBytes: MAX_INLINE_IMAGE_BYTES }),
   // `nodeId` and `signal` are the fleet escape hatch (client-core's node/fanout.ts). Every other method
   // here addresses the ambient active node, which is right for a surface bound to one task; these two
   // feed Fleet home and the aggregated Agent Center, whose job is to ask several nodes at once.
@@ -83,8 +94,8 @@ export const managedAgentApi = {
     if (filter.workspaceId) params.set('workspaceId', filter.workspaceId)
     return readJson<AgentSession[]>(`${ROOT}/sessions/search?${params}`, options)
   },
-  createSession: (input: CreateAgentSessionInput) =>
-    jsonWrite<AgentSession>(`${ROOT}/sessions`, 'POST', input, true),
+  createSession: (input: CreateAgentSessionInput, idempotencyKey?: string) =>
+    jsonWrite<AgentSession>(`${ROOT}/sessions`, 'POST', input, idempotencyKey ?? true),
   importTranscript: (input: ImportAgentTranscriptInput) =>
     jsonWrite<AgentSession>(`${ROOT}/transcript-imports`, 'POST', input),
   // `fold=1`: this reader takes one record per tool call and pages on from `foldedThroughSeq`
@@ -93,8 +104,10 @@ export const managedAgentApi = {
     readJson<AgentSessionSnapshot>(sessionRoute(sessionId, `?afterSeq=${afterSeq}&limit=${limit}&fold=1`)),
   events: (sessionId: string, afterSeq: number, limit = 2_000) =>
     readJson<AgentEventPage>(sessionRoute(sessionId, `/events?afterSeq=${afterSeq}&limit=${limit}&fold=1`)),
-  enqueue: (sessionId: string, input: Omit<EnqueueAgentTurnInput, 'idempotencyKey'>) =>
-    jsonWrite<AgentTurn>(sessionRoute(sessionId, '/turns'), 'POST', input, true),
+  enqueue: (sessionId: string, input: Omit<EnqueueAgentTurnInput, 'idempotencyKey'>, idempotencyKey?: string) =>
+    jsonWrite<AgentTurn>(sessionRoute(sessionId, '/turns'), 'POST', input, idempotencyKey ?? true),
+  implementPlan: (sessionId: string, itemId: string) =>
+    jsonWrite<AgentTurn>(sessionRoute(sessionId, '/implement-plan'), 'POST', { itemId }),
   patchQueuedTurn: (sessionId: string, turnId: string, patch: { input?: AgentTurn['input']; ordinal?: number }) =>
     jsonWrite<AgentTurn>(
       sessionRoute(sessionId, `/turns/${encodeURIComponent(turnId)}`),
@@ -122,6 +135,9 @@ export const managedAgentApi = {
     jsonWrite<AgentSession>(sessionRoute(sessionId, '/fork'), 'POST', title ? { title } : {}),
   compact: (sessionId: string) =>
     jsonWrite<{ ok: true }>(sessionRoute(sessionId, '/compact'), 'POST'),
+  mcp: (sessionId: string) => readJson<AgentSessionMcp>(sessionRoute(sessionId, '/mcp')),
+  setMcp: (sessionId: string, enabled: string[]) =>
+    jsonWrite<AgentSessionMcp>(sessionRoute(sessionId, '/mcp'), 'PUT', { enabled }),
   regenerateTitle: (sessionId: string) =>
     jsonWrite<AgentSession>(sessionRoute(sessionId, '/regenerate-title'), 'POST'),
   handoff: (sessionId: string) =>

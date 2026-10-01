@@ -29,7 +29,7 @@ const modes = {
     send: 'sync', status: 'sync', worktreeStatus: 'sync', repoConfigTrustNotice: 'sync',
     notice: 'sync', on: 'sync',
   },
-  telemetry: { event: 'sync', count: 'sync', gauge: 'sync', error: 'sync', measure: 'sync', startSpan: 'sync' },
+  telemetry: { enabled: 'sync', event: 'sync', count: 'sync', gauge: 'sync', error: 'sync', measure: 'sync', startSpan: 'sync' },
   log: { debug: 'sync', info: 'sync', warn: 'sync', error: 'sync' },
   core: {
     agentToolProvenance: { verify: 'async' },
@@ -38,13 +38,13 @@ const modes = {
     proc: { brokerEnv: 'sync', runProcess: 'async', runProcessOrThrow: 'async' },
     secrets: { use: 'async', useOptional: 'async', seal: 'async', reveal: 'async' },
     tasks: {
-      load: 'async', root: 'async', resolveCwd: 'async', runConfig: 'async', active: 'async',
+      load: 'async', root: 'async', requireRoot: 'async', resolveCwd: 'async', runConfig: 'async', active: 'async',
       workspaceId: 'async', workspaceIdOrNull: 'async', idsForWorkspace: 'async', links: 'async',
       pulls: 'async', attachPull: 'async', adoptPullNumbers: 'async', createChild: 'async', cancel: 'async',
     },
     context: { injectionEnabled: 'async', assemble: 'async' },
     models: { generateText: 'async', available: 'async' },
-    data: { connect: 'async', disconnect: 'async', query: 'async', catalog: 'async', schema: 'async' },
+    data: { configured: 'async', connect: 'async', disconnect: 'async', query: 'async', catalog: 'async', schema: 'async' },
     prefs: { read: 'async', write: 'async' },
     identity: { active: 'sync' },
     projects: {
@@ -59,6 +59,9 @@ const modes = {
 } & { core: { [K in keyof CoreServices]: Methods<NonNullable<CoreServices[K]>> } }
 
 export function hostFunctionMode(path: string): Mode {
+  // The provider fetch handler is the second argument to providers.integration. Its request context
+  // lends a provider-owned item store synchronously; the store's reads still cross as async RPC.
+  if (path === 'remote.sync.args[1].args[1].providers.items') return 'sync'
   const prefix = path.startsWith('plugin.init.args[0].') ? 'plugin.init.args[0].'
     : path.startsWith('plugin.ready.args[0].') ? 'plugin.ready.args[0].' : null
   if (!prefix) return 'async'

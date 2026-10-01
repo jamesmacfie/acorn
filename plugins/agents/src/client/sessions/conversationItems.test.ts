@@ -223,6 +223,28 @@ describe('conversation projection', () => {
     expect(items[1].event.type === 'file_change' && items[1].event.path).toBe('src/b.ts')
   })
 
+  it('keeps one row per edit and file, holding the latest report of it', () => {
+    // Claude sends an excerpt when the call starts and the real hunks once it has run; Codex streams
+    // patch updates and re-sends the whole turn's diff each time it grows.
+    const items = buildConversationItems([
+      event(1, { type: 'file_change', path: 'a.ts', patch: '@@ -1 +1 @@\n-a\n+b', changeId: 'toolu_1', snippet: true }),
+      event(2, { type: 'file_change', patch: 'diff --git a/a.ts b/a.ts', changeId: 'turn:t1', summary: 'All changes this turn' }),
+      event(3, { type: 'file_change', path: 'b.ts', patch: '@@ -1 +1 @@\n-c\n+d', changeId: 'toolu_1' }),
+      event(4, { type: 'file_change', path: 'a.ts', patch: '@@ -9 +9 @@\n-a\n+b', changeId: 'toolu_1' }),
+      event(5, { type: 'file_change', patch: 'diff --git a/b.ts b/b.ts', changeId: 'turn:t1', summary: 'All changes this turn' }),
+      // Stored before change ids existed: each one is its own row, as it always was.
+      event(6, { type: 'file_change', summary: 'Codex updated files.' }),
+      event(7, { type: 'file_change', summary: 'Codex updated files.' }),
+    ])
+    expect(items.map((item) => item.event.type === 'file_change' && [item.event.path, item.event.patch])).toEqual([
+      ['a.ts', '@@ -9 +9 @@\n-a\n+b'],
+      [undefined, 'diff --git a/b.ts b/b.ts'],
+      ['b.ts', '@@ -1 +1 @@\n-c\n+d'],
+      [undefined, undefined],
+      [undefined, undefined],
+    ])
+  })
+
   it('keeps an orphan visible at the top level', () => {
     // A truncated replay can start mid-stream, with a subagent's tool call arriving before any card to
     // hang it on. Dropping it would silently lose work the agent really did.

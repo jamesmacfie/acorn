@@ -1,15 +1,18 @@
 import { agentTelemetry, claimAgentSelection } from './agentTelemetry'
 import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'solid-js'
-import { Alert, EmptyState, IconButton, Text, type TimelineControls } from '@acorn/plugin-api/ui'
+import { Alert, EmptyState, IconButton, Only, Text, type TimelineControls } from '@acorn/plugin-api/ui'
 import { wsOnReconnect } from '@acorn/plugin-api/client'
 import AgentTranscript from './AgentTranscript'
 import AgentComposer from '../composer/AgentComposer'
 import QueuedAgentTurns from '../composer/QueuedAgentTurns'
+import AgentMcpPanel from './AgentMcpPanel'
+import ManagedChildRows from './ManagedChildRows'
 import { agentSessionIsStarting } from '../composer/agentComposerState'
 import { latestAutomaticTaskContext } from '../composer/automaticTaskContext'
 import { managedAgentStore } from './managedStore'
 import { clearFocusedManagedRequest, clearManagedSubagent, focusedManagedRequest, selectedManagedSubagent } from './managedSelection'
 import type { AgentConversationProps } from '../../contract/conversation'
+import TerminalConversationShortcuts from './TerminalConversationShortcuts'
 
 // One session's conversation: its transcript, its queue, and the box you answer it in.
 //
@@ -30,27 +33,36 @@ export default function AgentConversation(props: AgentConversationProps & {
    *  whichever effect happened to run first. */
   autoFocus?: boolean
 }) {
-  const [error, setError] = createSignal('')
-  // The transcript view controls, sitting above the composer because that is where the reader's hands
-  // are. They reach into the transcript, which is a sibling: the scroll jumps come back up from the kit
-  // Timeline through `onControls`, the filter and collapse-all push back down as a signal and a counter.
-  const [scrollControls, setScrollControls] = createSignal<TimelineControls>()
-  const [chatsOnly, setChatsOnly] = createSignal(false)
-  const [collapseTick, setCollapseTick] = createSignal(0)
-  // A memo, not an inline getter. `on()` re-runs its callback on every notification without comparing
-  // the input, and `loadSnapshot` ends in `upsertSession`, which replaces the row a caller may have
-  // derived this id from. That was an infinite reload loop in the pane model this came out of.
-  //
-  // Falling back to the step's own session is what lets a caller draw a step that is still running.
-  // The node writes `config.workflowStepId` when it starts the session
-  // (../../server/sessions/sessionExecute.ts) and broadcasts the row whenever it changes,
-  // and this client holds an app-lifetime subscription to that, so the lookup is a scan of a roster
-  // that is already in memory.
+  // The transcript, its effects and its local controls belong to one session. Keep that owner keyed
+  // when a pane stays mounted and changes selection; otherwise Solid reuses the old conversation's
+  // reactive subtree while its snapshot and cleanup effects are changing underneath it.
   const sessionId = createMemo(() => props.sessionId
     ?? (props.workflowStepId
       ? managedAgentStore.sessions().find((item) => item.config.workflowStepId === props.workflowStepId)?.id
       : undefined)
     ?? '')
+  return (
+    <Show when={sessionId()} keyed fallback={<EmptyState size="sm">{props.noSession ?? 'No session to show.'}</EmptyState>}>
+      {(id) => <SessionConversation sessionId={id} conversation={props} />}
+    </Show>
+  )
+}
+
+function SessionConversation(input: {
+  sessionId: string
+  conversation: AgentConversationProps & { autoFocus?: boolean }
+}) {
+  const props = input.conversation
+  const sessionId = () => input.sessionId
+  const [error, setError] = createSignal('')
+  // Opened by `/mcp` in the composer. Per conversation, which is per session: this owner is keyed by it.
+  const [mcpOpen, setMcpOpen] = createSignal(false)
+  // The transcript actions reach into a sibling: scroll jumps come up from the kit Timeline through
+  // `onControls`, while the filter and collapse-all push down as a signal and a counter. The desktop
+  // draws buttons above the composer; the terminal registers shortcuts for the same actions.
+  const [scrollControls, setScrollControls] = createSignal<TimelineControls>()
+  const [chatsOnly, setChatsOnly] = createSignal(false)
+  const [collapseTick, setCollapseTick] = createSignal(0)
   const snapshot = createMemo(() => managedAgentStore.snapshots()[sessionId()])
   const stored = createMemo(() => managedAgentStore.sessions().find((item) => item.id === sessionId()))
   // The store's row where there is one, the snapshot's where the roster has not caught up. Both are the
@@ -116,6 +128,14 @@ export default function AgentConversation(props: AgentConversationProps & {
 
   return (
     <Show when={sessionId()} fallback={<EmptyState size="sm">{props.noSession ?? 'No session to show.'}</EmptyState>}>
+      <Only hosts={['tui']}>
+        <TerminalConversationShortcuts
+          top={() => scrollControls()?.toTop()}
+          bottom={() => scrollControls()?.toBottom()}
+          toggleChats={() => setChatsOnly((on) => !on)}
+          collapseTools={() => setCollapseTick((tick) => tick + 1)}
+        />
+      </Only>
       <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
       <Show
         when={snapshot()}
@@ -138,6 +158,7 @@ export default function AgentConversation(props: AgentConversationProps & {
               onControls={setScrollControls}
               onExitSubagent={() => clearManagedSubagent(sessionId())}
               onRequestResolved={reload}
+              onPlanImplemented={reload}
             />
             <QueuedAgentTurns
               sessionId={sessionId()}
@@ -158,8 +179,13 @@ export default function AgentConversation(props: AgentConversationProps & {
         {(current) => (
           <>
             <Show when={props.note}>{(line) => <Text emphasis="muted" wrap>{line()}</Text>}</Show>
+            <ManagedChildRows parentSessionId={current().id} parentTaskId={current().taskId} />
+            <Show when={mcpOpen()}>
+              <AgentMcpPanel sessionId={current().id} onClose={() => setMcpOpen(false)} />
+            </Show>
             <AgentComposer
               session={current()}
+              onMcp={() => setMcpOpen(true)}
               disabled={props.composerDisabled || current().controller !== 'acorn'
                 || current().runtimeState === 'archived'}
               submitDisabled={agentSessionIsStarting(current())}
@@ -168,7 +194,7 @@ export default function AgentConversation(props: AgentConversationProps & {
               // The transcript view controls, on the composer's own top row so they line up with the
               // model and effort selects. They act on the sibling transcript; the composer only hosts them.
               viewControls={(
-                <>
+                <Only hosts={['dom']}>
                   <IconButton
                     icon="arrow-up-to-line"
                     label="Scroll to the top of the transcript"
@@ -194,7 +220,7 @@ export default function AgentConversation(props: AgentConversationProps & {
                     tip="Collapse all"
                     onPress={() => setCollapseTick((tick) => tick + 1)}
                   />
-                </>
+                </Only>
               )}
               onSessionUpdated={managedAgentStore.upsertSession}
               onSent={reload}

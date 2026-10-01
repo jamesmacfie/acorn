@@ -18,6 +18,10 @@ export default {
     immediate(ctx.extensionPoints.declare('probe:point', 'Probe'), 'extensionPoints.declare')
     immediate(ctx.hooks.declare({ id: 'probe' }), 'hooks.declare')
     immediate(ctx.providers.connection({ id: 'probe' }), 'providers.connection')
+    immediate(ctx.providers.integration({ id: 'probe' }, async (_request, context) => {
+      const items = context.providers.items('probe')
+      return Response.json(await items.listByIdentifier(['ENG-42']))
+    }), 'providers.integration')
     immediate(ctx.providers.model({
       providerId: 'probe', recommendedModelId: 'probe-model',
       generateText: async ({ secret, input }) => ({ text: `${secret}:${input.prompt}`, modelId: 'probe-model' }),

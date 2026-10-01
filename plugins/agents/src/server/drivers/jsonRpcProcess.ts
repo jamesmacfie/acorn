@@ -86,6 +86,12 @@ export class JsonRpcProcess {
     return this.#closed
   }
 
+  // The provider's process id, so the runtime can measure its process tree
+  // (../sessions/footprint.ts). Undefined when the spawn failed.
+  get pid(): number | undefined {
+    return this.#child.pid
+  }
+
   async request<T = unknown>(method: string, params: JsonObject = {}, timeoutMs = this.#requestTimeoutMs): Promise<T> {
     if (this.#closed) throw new Error('Agent protocol process is closed.')
     const id = this.#nextId++

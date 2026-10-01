@@ -37,6 +37,11 @@
     "lint": {
       "dependsOn": ["topo"]
     },
+    // agent-cost consumes the published SDK declarations from dist, so a clean checkout must
+    // build that workspace dependency before type-checking the plugin.
+    "@acorn/plugin-agent-cost#lint": {
+      "dependsOn": ["topo", "acorn-plugin-sdk#build"]
+    },
     "test": {
       "dependsOn": ["topo"]
     },

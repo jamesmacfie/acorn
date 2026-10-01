@@ -66,7 +66,7 @@ for file placement and naming.
    through positional `Index` rows.
 6. `packages/client-core/src/kit/components/content/Timeline.tsx` owns the scroll element,
    following mode, resize handling, and a window-lifetime map of numeric offsets. `Card` in
-   `packages/client-core/src/kit/components/primitives.tsx` performs request-card focus and reveal.
+   `packages/client-core/src/kit/components/content/Card.tsx` performs request-card focus and reveal.
 
 Task navigation deliberately disposes UI. `apps/desktop/src/client/App.tsx` keys task views by
 task ID; `packages/client-core/src/features/tasks/TaskPaneHost.tsx` renders the visible panes.
@@ -116,7 +116,7 @@ the new offset for any scroll event other than an exact echo of its last assigne
 not restrict saved reading-position changes to reader navigation, and its helper resumed following
 whenever `nearBottom` was true, including after a browser clamp caused by a shrinking list. Both are
 fixed: the rule is `placeAfterScroll` in
-`packages/client-core/src/kit/lib/readingPlace.ts`, and a scroll with no gesture behind it changes
+`packages/client-core/src/kit/lib/timeline/readingPlace.ts`, and a scroll with no gesture behind it changes
 nothing.
 
 Two diagnostics confirmed the state transitions with simulated geometry:
@@ -348,7 +348,7 @@ Keep the existing rule that a subagent view hides the parent composer and preser
 Persist only serializable view facts; component closures and DOM nodes remain disposable.
 
 Tool renderers can come from the `agents:tool-card` extension point. Inspect
-`packages/protocol/src/extensionPoints.ts` and the Slot implementation before selecting the controlled
+`packages/protocol/src/chrome/extensionPoints.ts` and the Slot implementation before selecting the controlled
 disclosure API. The shipped `AgentToolCardProps` includes a default, not a full retained-state
 protocol. Extend that seam with validated serializable state and an allowed action/reporting path
 if contributed cards own disclosure. Update both compiled and loaded render paths. Do not pass a

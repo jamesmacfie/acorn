@@ -268,6 +268,8 @@ export default function PluginFrame(props: PluginFrameProps) {
       />
   }
 
+  // Register cleanup while this component owns a Solid root. The load event has no reactive owner.
+
   return (
     <Show
       when={!misbehaving() && !silent()}

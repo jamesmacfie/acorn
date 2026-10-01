@@ -28,11 +28,11 @@ import type { Node } from '../tree/node'
 /**
  * What this app asks of a viewport.
  *
- * `viewportBox` below installs every one of these on the node, so the key tables and `./showing.tsx`
+ * `viewportBox` below installs every one of these on the node, so the key tables and `./showing/diffPane.tsx`
  * reach a viewport through this shape rather than through whatever drew it. `scrollChildIntoView`
  * goes on the node beside them for the one caller that reaches a viewport through the tree rather
  * than through this component, which is the store's reveal
- * (../keys/regions.ts § revealInViewports, ./showing.tsx § DiffPane).
+ * (../keys/regions.ts § revealInViewports, ./showing/diffPane.tsx § DiffPane).
  */
 export type Viewport = {
   scrollBy: (delta: number, unit?: 'viewport') => void
@@ -93,7 +93,7 @@ type ViewportProps = {
   /** Called after this viewport moves its own offset, for a caller that windows its content and so
    *  has to know where the offset now is. The wheel does not come through here: it is caught on a box
    *  *around* this one, where it arrives after the offset has moved rather than before
-   *  (./showing.tsx § DiffPane, ../tree/hit.ts § wheelAt). */
+   *  (./showing/diffPane.tsx § DiffPane, ../tree/hit.ts § wheelAt). */
   onScroll?: () => void
 }
 
@@ -151,7 +151,7 @@ function viewportBox(props: ViewportProps): JSX.Element {
 
   /** Nought to the last screenful, and nothing outside it. Clamped on the way in rather than on the
    *  way out, so `scrollTop` is a number a caller can window its own content against
-   *  (./showing.tsx § DiffPane). */
+   *  (./showing/diffPane.tsx § DiffPane). */
   const clamp = (to: number): number => {
     const most = Math.max(0, total() - fits())
     return Math.max(0, Math.min(Math.round(to), most))

@@ -1,17 +1,16 @@
 #!/usr/bin/env node
 // `npm create acorn-plugin`: the front door for an author with no checkout of this repository. See
-// docs/plugin-authoring.md § Start from the scaffold for the no-bundler profile, and for why the
+// docs/plugin-authoring/start-from-the-scaffold.md for the no-bundler profile, and for why the
 // emitted bridge is a copy rather than a dependency.
-import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 /**
  * The plugin API major this scaffold writes into `apiVersion`. Hardcoded because this package is
- * published standalone and can't import the constant; see docs/plugin-authoring.md § Start from the
- * scaffold for how index.test.ts keeps the copy honest.
+ * published standalone and can't import the constant. The scaffold tests compare it with the host.
  */
-export const API_VERSION = '1'
+export const API_VERSION = '2'
 export const BASELINE = 'acorn-1'
 
 /**
@@ -70,8 +69,7 @@ function manifest(id, name, rectangle = false) {
         node: './node/index.js',
         client: './client.js',
         // `api: []` is correct, not an omission: a frame's own `/v1/p/<id>/` namespace needs no scope.
-        // Add one of the six grantable scopes only when you call a core route. `core: ['tasks']` is
-        // here because server/routes.js resolves a task.
+        // Add a grantable scope only when you call a core route. The starter's route resolves a task.
         permissions: {
           api: [],
           events: [],
@@ -91,31 +89,14 @@ function manifest(id, name, rectangle = false) {
             }],
           }
           : {
-            // Two of the five extension kinds, so the scaffold shows both halves of the cooperative
-            // seam working (docs/plugins.md § Cooperative extension points).
-            //
-            // A `remote` contribution draws: your worker emits a tree of acorn's own components into a
-            // slot the agents plugin opened, and `remote` is the key you registered with `mountTree`.
-            // An `annotation` contribution says something true about a row somebody else drew: no UI,
-            // a route the host batches keys to. Both name the owner out loud, which is the disclosure.
-            extensions: [
-              {
-                id: `${id}.tool-card`,
-                point: 'agents:tool-card',
-                label: `${name} tool calls`,
-                remote: 'toolCard',
-                matches: ['execute'],
-              },
-              {
-                id: `${id}.diff-note`,
-                point: 'changes:diff-line',
-                label: `${name} notes`,
-                items: `/v1/p/${id}/marks`,
-              },
-            ],
+            // The starter owns a pane, so its UI can be opened without another plugin's context.
+            frames: [{
+              target: 'pane', id, label: name, glyph: 'puzzle', order: 800,
+              layout: 'single', regions: { body: { kind: 'remote', entry: 'pane' } },
+            }],
             commands: [{
-              id: 'greeting', kind: 'action', title: `${name}: send greeting`,
-              action: { verb: 'runNodeAction', path: `/v1/p/${id}/greeting` },
+              id: 'open', kind: 'action', title: `Open ${name}`, category: 'pane',
+              action: { verb: 'openPane', pane: id },
             }],
           },
       },
@@ -128,9 +109,7 @@ function manifest(id, name, rectangle = false) {
 function nodeIndex(id) {
   return `import { handle } from '../server/routes.js'
 
-// Relative paths and \`node:\` builtins only. An installed plugin is a bare directory with no
-// node_modules beside it. A bare specifier that resolves in a dev checkout (Node walks ancestor
-// directories) fails on every machine that installs this, so "it worked in dev" proves nothing.
+// Development reload starts a fresh worker and re-evaluates imported modules too.
 export default {
   // Must equal the manifest id. The host binds every namespace from the manifest, so a mismatch is a
   // package that disagrees with itself and the load fails.
@@ -163,41 +142,23 @@ export default {
 
 function nodeRoutes() {
   return `/**
- * One route handler. The three annotations are what carry the types across the file boundary from
- * index.js, so the whole node half checks with \`checkJs\` and nothing here has to be TypeScript.
- *
  * @param {Request} request
  * @param {import('acorn-plugin-types').PluginRequestContext} context
  * @param {import('acorn-plugin-types').CoreServices} core
  */
 export async function handle(request, context, core) {
   const { pathname, searchParams } = new URL(request.url)
-
-  if ((request.method === 'GET' || request.method === 'POST') && pathname === '/greeting') {
-    const taskId = searchParams.get('taskId')
-    // core.tasks answers with a TaskRef projection: id, title, projectId, branch, worktreePath,
-    // pullNumber, never the database row. A column rename in acorn cannot silently break you.
-    const task = taskId ? await core.tasks.load(taskId) : null
-    return Response.json({
-      text: task ? \`Hello from \${task.title}\` : 'Hello from the node',
-      who: context.userId,
-    })
+  if (request.method !== 'GET' || pathname !== '/greeting') {
+    return new Response('not found', { status: 404 })
   }
 
-  // The annotation half of the scaffold's manifest: what this plugin has to say about lines of the
-  // changes pane's diff. The host POSTs the keys on screen — a batch, not one call per row — and
-  // wants a mark back for the ones you know something about, keyed the way the owner declared.
-  // Silence is a real answer: return no items and nothing is drawn.
-  if (request.method === 'POST' && pathname === '/marks') {
-    const body = /** @type {{ keys?: { file: string; line: number; side: string }[] }} */ (await request.json())
-    return Response.json({
-      items: (body.keys ?? [])
-        .filter((key) => key.line % 10 === 0)
-        .map((key) => ({ key, severity: 'info', text: 'Every tenth line, from the scaffold.' })),
-    })
-  }
-
-  return new Response('not found', { status: 404 })
+  // Core returns a TaskRef projection, not a database row.
+  const taskId = searchParams.get('taskId')
+  const task = taskId ? await core.tasks.load(taskId) : null
+  return Response.json({
+    text: task ? \`Hello from \${task.title}\` : 'Hello from the node',
+    who: context.userId,
+  })
 }
 `
 }
@@ -347,7 +308,7 @@ An acorn plugin. No build step: these files are what runs.
 \`\`\`text
 acorn-plugin.json   the manifest — the only file the loader trusts about this directory
 node/index.js       default-exports the NodePlugin
-server/routes.js    imported with a relative specifier
+server/routes.js    owns the starter route
 client.js           one file, plain JS, no imports
 \`\`\`
 
@@ -357,6 +318,9 @@ This scaffold's \`client.js\` is a **tree**, which is the default and what most 
 runs in a Web Worker with no DOM at all and names acorn's own components, which the host mounts. You
 give up drawing your own pixels and you get the shell's keyboard handling, focus, ARIA and the
 reader's chosen style pack, for free and forever.
+
+Open a task, then run **Open ${name}** from the command palette to show the starter pane. Its button
+calls \`/v1/p/${id}/greeting\` through the bridge and updates the tree with the Node's answer.
 
 \`npm create acorn-plugin ${id} -- --rectangle\` emits the other one: a **frame**, a sandboxed iframe
 whose pixels are yours. You write the markup and the CSS, and you get a rectangle.
@@ -379,17 +343,15 @@ package is installed. There is no build step either way: these files are still w
 **Settings → Plugins → Install**, source kind *path*, with this directory's absolute path.
 
 A local path is **symlinked**, not copied, so you edit in place and the next boot runs what you
-edited. It is allowed on development builds only — a packaged app refuses one outright. Installing
-reports \`installed-restart-required\`: a plugin's routes, tables and jobs wire at init, so restart the
-node (Settings → Plugins → Restart) before it is live. Then accept the bundle when the device asks —
+edited. Installing reports \`installed-restart-required\`: a plugin's routes, tables and jobs wire at
+init, so restart the node (Settings → Plugins → Restart) before it is live. Then accept the bundle when the device asks —
 each device asks its own owner before running client bytes, keyed by \`(pluginId, hash)\`, so rewriting
 \`client.js\` re-prompts.
 
 If an **agent** is writing this plugin, it never reaches the install route: it asks with the
 \`plugin_request\` tool and you approve in the shell. Approving with \`dev: true\` turns the loop into
-edit → reload instead of edit → prompt → restart. Note that a reload re-evaluates **only the entry
-module**, so a change in \`server/routes.js\` still needs a restart — a plugin being iterated on hard
-wants its node half in one file.
+edit → reload instead of edit → prompt → restart. Reload starts a fresh Node worker, so edits to
+\`node/index.js\` or \`server/routes.js\` take effect together.
 
 ## Change it
 
@@ -400,7 +362,8 @@ wants its node half in one file.
 - **Your routes are confined to \`/v1/p/${id}/\`**, at parse time and again at runtime.
 - **The id is permanent.** It is the route namespace, the renderer route prefix, the persisted layout
   key and the SQLite filename. Renaming is "new plugin, plus a data migration, plus a tombstone".
-- **\`apiVersion\` must match the loading node exactly.** A mismatch is a \`failed\` roster row that says so.
+- **\`apiVersion\` must cover the loading node's major.** \`"2"\` covers major 2; a tested plugin can
+  declare a range such as \`"1 || 2"\`. A range that excludes the host is a \`failed\` roster row.
 
 The full contract is \`docs/plugin-authoring.md\` in the acorn repository. An agent should call the
 \`plugin_authoring\` tool first — it answers with that guide plus the connected node's *current*
@@ -434,33 +397,77 @@ const slots = new Map()
 addEventListener('message', (event) => {
   if (!event.data || typeof event.data !== 'object') return
   if (event.data.acornBridge !== PLUGIN_BRIDGE_VERSION) return
-  // The bridge is ports[0] — api, state, events, toasts. Take it when you need it; this template draws
-  // from its props alone. The tree channel is ports[1].
-  const bridge = event.ports[0]
-  if (bridge) {
-    bridge.onmessage = (message) => {
-      // The host arms a 10-second deadline on the bridge and shows a placeholder if nothing answers,
-      // which is what a bundle that throws at module scope looks like from outside.
-      if (message.data && message.data.kind === 'ready') bridge.postMessage({ kind: 'connected' })
+  const bootstrap = event.ports[0]
+  if (bootstrap) {
+    // This port only acknowledges worker startup. Each mounted pane gets its own scoped bridge below.
+    bootstrap.onmessage = (message) => {
+      if (message.data?.kind === 'ready') bootstrap.postMessage({ kind: 'connected' })
     }
-    bridge.start?.()
+    bootstrap.start?.()
   }
   treePort = event.ports[1]
   if (!treePort) return
   treePort.onmessage = (message) => onTreeMessage(message.data)
   treePort.start?.()
-  treePort.postMessage({ kind: 'tree:ready', version: 1, entries: ['toolCard'] })
+  treePort.postMessage({ kind: 'tree:ready', version: 1, entries: ['pane'], scopedBridge: true })
 })
+
+function connectBridge(port) {
+  let requestSeq = 0
+  let closed = false
+  const pending = new Map()
+  port.onmessage = (event) => {
+    if (closed) return
+    const message = event.data
+    if (!message || typeof message !== 'object') return
+    if (message.kind === 'ready') port.postMessage({ kind: 'connected' })
+    if (typeof message.id === 'number') {
+      const waiting = pending.get(message.id)
+      pending.delete(message.id)
+      if (waiting) {
+        if (message.ok) waiting.resolve(message.body)
+        else waiting.reject(new Error(\`\${message.error.code}: \${message.error.message}\`))
+      }
+    }
+  }
+  port.start?.()
+  const cancelPending = () => {
+    for (const waiting of pending.values()) waiting.reject(new Error('Bridge disconnected'))
+    pending.clear()
+  }
+  return {
+    get: (path) => new Promise((resolve, reject) => {
+      if (closed) return reject(new Error('Bridge disconnected'))
+      const id = ++requestSeq
+      pending.set(id, { resolve, reject })
+      port.postMessage({ kind: 'api', method: 'GET', path, id })
+    }),
+    cancelPending,
+    close: () => {
+      if (closed) return
+      closed = true
+      cancelPending()
+      port.onmessage = null
+      port.close()
+    },
+  }
+}
 
 function onTreeMessage(message) {
   if (!message || typeof message !== 'object') return
   switch (message.kind) {
     // A second mount for the same slot is a props update, not a new tree.
     case 'tree:mount':
-      return mount(message.slot, message.props)
-    case 'tree:unmount':
+      return mount(message.slot, message.props, message.context, message.bridgePort)
+    case 'tree:unmount': {
+      const mounted = slots.get(message.slot)
+      if (mounted) {
+        mounted.active = false
+        mounted.bridge.close()
+      }
       slots.delete(message.slot)
       return
+    }
     case 'tree:event': {
       const slot = slots.get(message.slot)
       if (slot) {
@@ -487,7 +494,7 @@ function text(value) {
   return el('#text', { value: String(value) })
 }
 
-function mount(slot, props) {
+function mount(slot, props, context, bridgePort) {
   const handlers = new Map()
   let handlerSeq = 0
   // A function cannot cross a port, so it crosses as an id and the host quotes the id back. Only the
@@ -499,19 +506,48 @@ function mount(slot, props) {
     return { $handler: id }
   }
 
-  const tool = (props && props.tool) || {}
+  const previous = slots.get(slot)
+  if (previous) {
+    previous.active = false
+    if (bridgePort) previous.bridge.close()
+    else previous.bridge.cancelPending()
+  }
+  const bridge = bridgePort ? connectBridge(bridgePort) : previous?.bridge
+  const mountedContext = context ?? previous?.context
+  if (!bridge) {
+    treePort.postMessage({ kind: 'tree:failed', slot, message: 'Pane has no scoped bridge' })
+    return
+  }
+  const mounted = { active: true, handlers, rootId: '', bridge, context: mountedContext }
+
+  const greeting = text('Ask the Node for a greeting')
+  const showGreeting = (value) => {
+    if (!mounted.active || slots.get(slot) !== mounted) return
+    treePort.postMessage({ kind: 'tree:batch', slot, ops: [{ op: 'text', id: greeting.id, value }] })
+  }
   const tree = el('Card', {}, [
     el('Stack', { gap: 'row' }, [
-      el('Badge', { tone: tool.status === 'failed' ? 'danger' : 'ok' }, [text(tool.status || 'running')]),
-      el('CodeBlock', { maxHeight: 'block' }, [text(tool.output || '')]),
-      el('Button', { variant: 'bare', onPress: on(() => console.log('${id}: pressed')) }, [text('${name}')]),
+      el('Heading', {}, [text('${name}')]),
+      greeting,
+      el('Button', { variant: 'solid', onPress: on(() => {
+        const query = mountedContext?.taskId ? \`?taskId=\${encodeURIComponent(mountedContext.taskId)}\` : ''
+        void bridge.get(\`/v1/p/${id}/greeting\${query}\`)
+          .then((body) => showGreeting(body.text))
+          .catch((error) => showGreeting(String(error)))
+      }) }, [text('Say hello')]),
     ]),
   ])
 
-  slots.set(slot, { handlers: handlers })
-  // One batch, applied by the host atomically or not at all. Redrawing means sending patch, text,
-  // insert, move and remove for what changed, rather than the whole tree again.
-  treePort.postMessage({ kind: 'tree:batch', slot: slot, ops: [{ op: 'insert', parent: null, index: 0, node: tree }] })
+  mounted.rootId = tree.id
+  slots.set(slot, mounted)
+  // The host applies a batch atomically. Replace the root if the same slot mounts with new props.
+  treePort.postMessage({
+    kind: 'tree:batch', slot,
+    ops: [
+      ...(previous ? [{ op: 'remove', id: previous.rootId }] : []),
+      { op: 'insert', parent: null, index: 0, node: tree },
+    ],
+  })
 }
 `
 }
@@ -558,4 +594,4 @@ async function main(argv) {
 }
 
 // Importable from a test without running.
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) await main(process.argv.slice(2))
+if (process.argv[1] && import.meta.url === pathToFileURL(realpathSync(process.argv[1])).href) await main(process.argv.slice(2))

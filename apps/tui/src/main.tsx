@@ -47,13 +47,24 @@ let leaving = false
 // `supervise.ts`, and read at print time because it grows for the life of the run (./boot.ts).
 const platform = installPlatform(opened, () => void quit())
 
+// This is a live client running under Node. Query Core may have been imported by a static boot
+// dependency before the platform installed `window`, so its module-time server detection can be
+// stale even though Solid's web entry is the client build. Set the runtime explicitly before any
+// query observer mounts.
+const { environmentManager } = await import('@tanstack/solid-query')
+environmentManager.setIsServer(() => false)
+
 // Nothing that reaches the node may be imported before the seam exists: an import is evaluated once,
 // and a module that reads `window.acorn` at its top level would read it before the line above ran.
 const { selectActiveNode, setActiveNode } = await import('@acorn/client-core/infra/node/activeNode.ts')
 const { clientFor, nodeState, setCacheStorage } = await import('@acorn/client-core/infra/node/fleet.ts')
 const { fileCacheStorage } = await import('./node/cache')
 const { markNodeRecovered, setNodeStarting } = await import('./chrome/nodeState')
+const { refreshNodeQueries } = await import('./chrome/recovery')
 const { watchPluginChanges } = await import('@acorn/client-core/host/plugins/reload.ts')
+const { startDeviceConfigSync } = await import('@acorn/client-core/infra/persistence/deviceConfigSync.ts')
+const { themeColorTokens } = await import('@acorn/client-core/infra/styles/themeColorTokens.ts')
+const { paletteFor, reportsTruecolor, setPalette } = await import('./appearance')
 const { watchTaskChanges } = await import('@acorn/client-core/features/tasks/watchTaskChanges.ts')
 const { watchConnectionChanges } = await import('@acorn/client-core/features/integrations/watchConnectionChanges.ts')
 const { watchProjectChanges } = await import('@acorn/client-core/features/projects/watchProjectChanges.ts')
@@ -83,7 +94,10 @@ setCacheStorage(fileCacheStorage())
 // every request to the machine's own node. It also makes `activeCacheId()` and the client below the
 // same partition, which is what the watchers write into.
 setActiveNode(opened.nodeId)
-await selectActiveNode()
+// A data root can already hold node.json before its first Node handshake (an agent fixture does).
+// On that path the local fleet has no row yet. Selecting against it would clear the known node id
+// and leave every query with no target even after the handshake fills the fleet.
+if (!opened.starting) await selectActiveNode()
 
 // One client and one persister per node, and this host reads the same pair every other host does
 // (docs/caching.md § Renderer query cache). `App` used to mint a second `QueryClient` of its own, so
@@ -95,6 +109,12 @@ const cacheLease = persistence.acquire()
 // Await the shared public restore before this host draws its first shell.
 await cacheLease.restored
 bootMark('cache restored')
+const stopDeviceConfig = await startDeviceConfigSync(() => client, (config) => {
+  // A terminal has no OS light/dark signal. In follow-system mode, use the configured light pick.
+  // Without a selected theme, retain the terminal's own palette.
+  const id = config.themeFollowSystem ? config.themeLight : config.theme
+  setPalette(paletteFor(id ? themeColorTokens(id) ?? {} : {}, reportsTruecolor()))
+})
 
 // The shell, and not one line earlier: a module that reaches the node must not be evaluated before
 // `installPlatform` has run, or `send` finds no transport and falls back to global `fetch` with a
@@ -122,7 +142,7 @@ bootMark('App imported')
 // same single byte for Return with Ctrl and Return without it, so the chord does not exist to be
 // bound. Disambiguation is the one flag that fixes it, and it fixes the same ambiguity for a lone
 // Escape, which the parser otherwise has to wait out
-// (docs/tui.md § The adapter, ./kit/asking.tsx § Composer).
+// (docs/tui.md § The adapter, ./kit/asking/composition.tsx § Composer).
 //
 // Nothing here focuses anything. Focus is the region store's and the surface has no second opinion
 // about it: a click is a hit test into the store (./keys/regions.ts § Clicks are hit tests).
@@ -173,6 +193,15 @@ async function fillIn(): Promise<void> {
   installPluginWorkers()
   installRoster()
   bootMark('roster registered')
+  const [{ TrustPrompt }, { setTrustPromptComponent }] = await Promise.all([
+    import('./plugins/TrustPrompt'),
+    import('./plugins/trustPromptLoader'),
+  ])
+  setTrustPromptComponent(() => TrustPrompt)
+  // Device installation pulls custody and source resolution into its command handlers. Register it
+  // after the first frame with the rest of the plugin work, not in Shell's eager chrome graph.
+  const { registerDevicePluginCommands } = await import('./plugins/commands')
+  stopDeviceCommands = registerDevicePluginCommands().dispose
 
   // Every task write on the node broadcasts `tasks:changed`, and this turns that into one invalidation
   // of the client the shell reads — which it now is (docs/plugins.md § Hearing a core event). The
@@ -193,7 +222,7 @@ async function fillIn(): Promise<void> {
     createEffect(() => {
       const current = ++refresh
       if (nodeState(opened.nodeId) === 'offline') return
-      void client.invalidateQueries({ refetchType: 'active' }).then(() => {
+      void refreshNodeQueries(client).then(() => {
         if (current === refresh && nodeState(opened.nodeId) === 'online') markNodeRecovered(opened.nodeId)
       })
     })
@@ -236,7 +265,10 @@ const engine = installKeymap(renderer)
 
 // The terminal comes back first, then the node drains. A node that started here gets its bounded
 // SIGTERM drain; one this TUI only attached to is left running, because whoever started it owns it.
+let stopDeviceCommands: (() => void) | undefined
 async function quit(code = 0): Promise<never> {
+  stopDeviceCommands?.()
+  stopDeviceConfig()
   if (leaving) return await new Promise<never>(() => {}) // a second Ctrl+C during the drain waits
   leaving = true
   renderer.destroy()
@@ -274,14 +306,15 @@ process.once('SIGTERM', () => void quit())
 // (./chrome/nodeState.ts).
 if (opened.starting) {
   setNodeStarting(true)
-  void opened.starting.then(
-    () => setNodeStarting(false),
-    (error: unknown) => {
-      setNodeStarting(false)
-      log.error(`acorn could not start a node: ${error instanceof Error ? error.message : String(error)}`)
-      void quit(1)
-    },
-  )
+  void opened.starting.then(async () => {
+    await selectActiveNode()
+    await refreshNodeQueries(client)
+    setNodeStarting(false)
+  }).catch((error: unknown) => {
+    setNodeStarting(false)
+    log.error(`acorn could not start a node: ${error instanceof Error ? error.message : String(error)}`)
+    void quit(1)
+  })
 }
 
 // The tree mounts on the screen's root node rather than on the surface around it

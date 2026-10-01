@@ -120,3 +120,22 @@ it('keeps a failed virtual scratch creation and its error recoverable on return'
   expect(api.create).toHaveBeenCalledTimes(1)
   expect(api.write).toHaveBeenCalledWith({ scope: 'task', taskId: 'scratch-failed' }, 'created', 'retry virtual text')
 })
+
+it('executes confirmed deletion once after pending saves and retains a failed document', async () => {
+  const { model } = await mount('confirmed-removal')
+  await model.open('task', 'ordinary')
+  let finish!: (value: { ok: boolean }) => void
+  api.write = vi.fn(() => new Promise<{ ok: boolean }>(resolve => { finish = resolve }))
+  api.remove = vi.fn(async () => ({ error: 'delete offline' }))
+  model.onBodyInput('unsent body')
+  const removal = model.remove('task', 'ordinary')
+  await tick()
+  expect(api.write).toHaveBeenCalledOnce()
+  expect(api.remove).not.toHaveBeenCalled()
+  finish({ ok: true })
+  await removal
+  expect(api.remove).toHaveBeenCalledExactlyOnceWith({ scope: 'task', taskId: 'confirmed-removal' }, 'ordinary')
+  expect(model.selected()?.slug).toBe('ordinary')
+  expect(model.body()).toBe('unsent body')
+  expect(model.actionError()).toBe('delete offline')
+})

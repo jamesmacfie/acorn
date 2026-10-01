@@ -5,39 +5,40 @@ import { AGENTS_SESSION_CONTROL, AGENTS_SESSION_EXECUTE } from '@acorn/plugin-ag
 import { NOTES_STORE } from '@acorn/plugin-notes/contract/store.ts'
 import { GITHUB_MIRROR } from '@acorn/plugin-github/contract/mirror.ts'
 import { TERMINAL_RUN_TARGETS } from '@acorn/plugin-terminal/contract/runTargets.ts'
-import { buildHeadlessArgv, buildSessionEnv, describeError, type InternalEnvFactory, type NodePlugin, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
+import { BridgeError, buildHeadlessArgv, buildSessionEnv, describeError, type InternalEnvFactory, type NodePlugin, requireProfile, resolveCommand, runHeadless } from '@acorn/plugin-api/node'
 import { eq } from 'drizzle-orm'
-import { loadWorkflowFiles } from '../server/workflowFiles'
-import { defsForProject, getDef, listDefs, mergedList } from '../server/workflowDefs'
-import { workflowFileAuthoring } from '../server/workflowFileAuthoring'
-import { destinationQuery, validateWorkflowDestination } from '../server/workflowDestination'
-import { workflowDraftQueries } from '../server/workflowDraftQueries'
-import { workflowPublication } from '../server/workflowPublication'
-import { publishedWorkflow } from '../server/workflowPublicationStore'
-import { generateWorkflowRequest } from '../server/generateWorkflowRequest'
-import { authorWorkflowConversation } from '../server/workflowAuthoringConversation'
-import { WorkflowDispatcher } from '../server/workflowDispatch'
-import { WorkflowProcessingStore } from '../server/workflowProcessingStore'
-import { workflowSelectionPage, workflowRecordAttemptPage, workflowRecordSnapshot } from '../server/workflowProcessingReadModel'
-import { prepareWorkflowReprocess } from '../server/workflowReprocess'
-import { WorkflowRunner, type RunnerDeps, type WorkflowDef } from '../server/workflowRunner'
+import { loadWorkflowFiles } from '../server/definitions/files'
+import { defsForProject, getDef, listDefs, mergedList } from '../server/definitions/store'
+import { workflowFileAuthoring } from '../server/files/authoring'
+import { destinationQuery, validateWorkflowDestination } from '../server/validation/destination'
+import { workflowDraftQueries } from '../server/publication/draftQueries'
+import { workflowPublication } from '../server/publication/service'
+import { publishedWorkflow } from '../server/publication/store'
+import { generateWorkflowRequest } from '../server/authoring/generationRequest'
+import { authorWorkflowConversation } from '../server/authoring/conversation'
+import { WorkflowDispatcher } from '../server/dispatch/dispatcher'
+import { inlinePrompt } from '../server/runs/deps'
+import { WorkflowProcessingStore } from '../server/processing/store'
+import { workflowSelectionPage, workflowRecordAttemptPage, workflowRecordSnapshot } from '../server/processing/readModel'
+import { prepareWorkflowReprocess } from '../server/processing/reprocess'
+import { WorkflowRunner, type RunnerDeps, type WorkflowDef } from '../server/runs/runner'
 import { WORKFLOWS_NOTICES, type WorkflowNotices } from '../contract/notices'
 import { WORKFLOWS_RUNNER } from '../contract/runner'
 import { WORKFLOW_GATES } from '../contract/events'
 import { WORKFLOW_REVIEW_INPUT } from '../contract/reviewInput'
-import { workflowReviewInput } from '../server/workflowReviewInput'
+import { workflowReviewInput } from '../server/runs/read/reviewInput'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
-import { encodeToolCeiling } from '../server/workflowTools'
-import { validateWorkflow } from '../server/workflowValidation'
-import { workflowRunsForTask } from '../server/workflowRunReadModel'
-import { workflowTaskResolutionScope } from '../server/workflowResolution'
+import { encodeToolCeiling } from '../server/steps/tools'
+import { validateWorkflow } from '../server/validation/definition'
+import { workflowRunById, workflowRunsForTask, workflowStepStatuses } from '../server/runs/read/readModel'
+import { workflowTaskResolutionScope } from '../server/definitions/resolution'
 import { WORKFLOW_ROUTE, workflow } from '../server/routes/workflow'
 import { WORKFLOW_DEFS_ROUTE, workflowDefsRoutes } from '../server/routes/defs'
 import { workflowRuns, workflowSteps } from './schema'
-import { workflowRunList, workflowStepProjections, workflowTaskNavigation } from '../server/workflowRunProjection'
-import { WorkflowStartService } from '../server/workflowStartService'
-import { assertWorkflowDataScope } from '../server/workflowDataSteps'
-import { parseWorkflowScheduleTarget, WorkflowScheduleService, type WorkflowScheduleScheduler } from '../server/workflowSchedules'
+import { workflowRunList, workflowStepProjections, workflowTaskNavigation } from '../server/runs/read/projection'
+import { WorkflowStartService } from '../server/runs/admission'
+import { assertWorkflowDataScope } from '../server/steps/data'
+import { parseWorkflowScheduleTarget, WorkflowScheduleService, type WorkflowScheduleScheduler } from '../server/schedules/service'
 import { WORKFLOW_SCHEDULES_ROUTE, workflowScheduleRoutes } from '../server/routes/schedules'
 
 export type WorkflowsPluginDeps = {
@@ -116,6 +117,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       let dispatcher: WorkflowDispatcher
       let scheduleService: WorkflowScheduleService | null = null
       const runner = new WorkflowRunner(store, {
+        invalidStepKind: (id, problems) => ctx.log.warn(`Workflow step '${id}' was rejected: ${problems.join('; ')}`),
         dataAccess: async (taskId, signal) => {
           const task = await core.tasks.load(taskId)
           const project = task?.projectId ? await core.projects.byId(task.projectId) : null
@@ -153,6 +155,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
             profileId: opts.profileId,
             title: `Workflow: ${def.name}`,
             prompt: opts.prompt,
+            context: opts.context,
             schema: opts.schema,
             model: opts.model,
             configOptions: def.configOptions,
@@ -171,7 +174,9 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           const { cwd } = task ? await core.tasks.resolveCwd(task, undefined) : { cwd: homedir() }
           const project = task?.projectId ? await core.projects.byId(task.projectId) : null
           const profile = requireProfile(opts.profileId)
-          const argv = opts.mode === 'ai' ? profile.aiArgv?.(resolveCommand(profile), opts) : buildHeadlessArgv(profile.id, resolveCommand(profile), opts)
+          // A command line takes one prompt, so the context goes into it as headed sections.
+          const oneShot = { ...opts, prompt: inlinePrompt(opts.prompt, opts.context) }
+          const argv = opts.mode === 'ai' ? profile.aiArgv?.(resolveCommand(profile), oneShot) : buildHeadlessArgv(profile.id, resolveCommand(profile), oneShot)
           if (!argv) {
             return {
               status: 'error',
@@ -372,7 +377,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           return {
             ...files,
             // A file wins an id collision, the rule the merged rail list applies as well.
-            workflows: [...files.workflows, ...rows.filter((row) => !ids.has(row.id)).map((row) => ({ ...row.def, id: row.id, source: 'database' as const }))],
+            workflows: [...files.workflows, ...rows.filter((row) => !ids.has(row.id)).map((row) => ({ ...row.def, id: row.id, source: 'database' as const, publishedRevision: row.revision }))],
           }
         },
         catalog: (projectId) => starts.catalogForProject(projectId),
@@ -381,12 +386,14 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         startById: (taskId, defId, inputs, allowDatabaseDefinitions) =>
           starts.startById(taskId, defId, inputs, allowDatabaseDefinitions),
         runs: (taskId) => workflowRunsForTask(store, taskId),
+        run: (runId) => workflowRunById(store, runId),
         // This plugin's contribution to the merged run list (@acorn/protocol/runs.ts). A projection,
         // not the rows: the merged list is display-shaped and deliberately narrow, and a caller that
         // wants a run's steps comes back to this plugin addressing it by id.
         allRuns: () => workflowRunList(store),
         taskNavigation: () => workflowTaskNavigation(store),
         steps: (runId) => workflowStepProjections(runner, runId),
+        stepStatuses: (runId) => workflowStepStatuses(store, runId),
         records: async (runId, selectionId, after, limit, stepId, filter) =>
           workflowSelectionPage(store, runId, selectionId, after, limit, stepId, filter),
         recordAttempts: async (runId, recordId, after, limit) => workflowRecordAttemptPage(store, runId, recordId, after, limit),
@@ -396,9 +403,16 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           await deps.reconciled
           return new WorkflowProcessingStore(store, dispatcher).reprocess({ sourceRunId: runId, recordId, digest, requestId })
         },
-        gate: async (runId, stepId, approved) => {
+        gate: async (runId, stepId, approved, values) => {
           await deps.reconciled // an approval resumes a step the restart sweep could otherwise clobber
-          await runner.resolveGate(runId, stepId, approved)
+          const resolution = await runner.resolveGate(runId, stepId, approved, values)
+          if (resolution.outcome === 'not-found') throw new BridgeError(404, 'not_found', 'No such gate in this run.')
+          if (resolution.outcome === 'already-resolved') throw new BridgeError(409, 'gate-resolved', 'This gate was already answered.')
+          // One line per field, so the message names every problem. The run pane runs the same check
+          // before it sends, so it has each one under its field already.
+          if (resolution.outcome === 'invalid') {
+            throw new BridgeError(400, 'gate-invalid', Object.entries(resolution.problems).map(([field, problem]) => `${field}: ${problem}`).join('\n'))
+          }
           return { ok: true }
         },
         cancel: async (runId) => {
@@ -537,7 +551,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
             }),
           }
         },
-        // Wiring only; the two calls and the repair pass are in ../server/generateWorkflowRequest.ts.
+        // Wiring only; the two calls and the repair pass are in ../server/authoring/generationRequest.ts.
         // The runner's validation catalog rather than the pure one built from the kinds alone: it
         // carries each contributed kind's own `validate`, without which a workspace definition with a
         // broken step passes the example filter and teaches the model the mistake.
@@ -608,7 +622,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
 
       // reconcile() is not called here. It has to run after the listener binds and before the
       // composition root resolves `deps.reconciled`, so the root drives it through this capability
-      // (server/workflowRunner.ts explains the ordering).
+      // (server/runs/runner.ts explains the ordering).
       ctx.capabilities.provide(WORKFLOWS_RUNNER, {
         reconcile: async () => {
           const recovered = await dispatcher.reconcile()

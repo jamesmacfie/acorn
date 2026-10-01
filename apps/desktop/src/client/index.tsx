@@ -1,7 +1,7 @@
 /* @refresh reload */
 import { PaneModelHost } from '@acorn/client-core/host/registries/panes/PaneModelHost.tsx'
 import { reportResponsiveness } from '@acorn/client-core/infra/platform'
-import { startResponsivenessMonitor } from '@acorn/client-core/infra/telemetry'
+import { startPageFacts, startResponsivenessMonitor } from '@acorn/client-core/infra/telemetry'
 import { render } from 'solid-js/web'
 import { applyNodePlugins } from './activate'
 import { createEffect, createRoot, Show } from 'solid-js'
@@ -20,6 +20,7 @@ import { watchConnectionChanges } from '@acorn/client-core/features/integrations
 import { watchProjectChanges } from '@acorn/client-core/features/projects/watchProjectChanges.ts'
 import { watchWorkspaceChanges } from '@acorn/client-core/features/workspaces/watchWorkspaceChanges.ts'
 import { watchNodeEvents } from '@acorn/client-core/infra/node/watchNodeEvents.ts'
+import { startDeviceConfigSync } from '@acorn/client-core/infra/persistence/deviceConfigSync.ts'
 import { emitError, flushTelemetry, startClientTelemetry } from '@acorn/client-core/infra/telemetry/emitter.ts'
 import { postTelemetryBatch } from '@acorn/client-core/infra/telemetry/post.ts'
 import { bootMark, emitBootSpans } from './boot'
@@ -32,6 +33,10 @@ const noop = () => null
 startClientTelemetry({ runtime: 'renderer', post: postTelemetryBatch('renderer') })
 const stopResponsiveness = startResponsivenessMonitor(reportResponsiveness)
 window.addEventListener('pagehide', stopResponsiveness, { once: true })
+// Counts about the page every thirty seconds while collecting, read against the memory the shell
+// measures from outside (docs/shell.md § What the shell reports).
+const stopPageFacts = startPageFacts(() => clientFor(activeCacheId()).client)
+window.addEventListener('pagehide', stopPageFacts, { once: true })
 
 // The two failures nothing in the app catches. Before this the renderer had neither handler, so an
 // error thrown outside a component's boundary was a line in a devtools console nobody had open.
@@ -127,6 +132,7 @@ createRoot(() => {
 // appeared for the rest of the session. The watcher also keeps them reconciled afterwards: a node that
 // reloads a plugin in place broadcasts `plugins:changed` (docs/plugins.md § The dev loop).
 watchPluginChanges()
+void startDeviceConfigSync(() => clientFor(activeCacheId()).client)
 
 // The same shape for the task list: every task write on the node broadcasts `tasks:changed`, and this
 // window invalidates its cached list whether or not it was the one that wrote
@@ -134,7 +140,7 @@ watchPluginChanges()
 watchTaskChanges()
 
 // …and for connected accounts. A credential that stops working demotes itself on the node mid-request,
-// so Settings → Integrations and the Sources rail hear about it here rather than at the next 401
+// so Settings → Services and the Sources rail hear about it here rather than at the next 401
 // (docs/plugins.md § Hearing a core event).
 watchConnectionChanges()
 // The rest of the core catalogue (docs/plugins.md § Hearing a core event): projects invalidate their query;

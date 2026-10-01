@@ -22,6 +22,34 @@
       "when": 1790294661704,
       "tag": "0006_damp_nekra",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1790544685744,
+      "tag": "0007_tan_marvel_boy",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1790654999915,
+      "tag": "0008_amusing_praxagora",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1790713493469,
+      "tag": "0009_blushing_banshee",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1790745196602,
+      "tag": "0010_unknown_sunspot",
+      "breakpoints": true
     }
   ]
 }

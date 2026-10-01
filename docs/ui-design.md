@@ -18,27 +18,29 @@ The shell owns navigation chrome and modal prompts. Plugins supply feature conte
 and slots. A child webview is positioned over a pane host by the shell; page content never
 owns the surrounding chrome.
 
-The terminal draws the same hierarchy at a quarter of the size, and where it differs it differs
-because there are no pixels to spend (`apps/tui/src/chrome/`):
+The terminal draws the same hierarchy with fewer cells, and its chrome arranges the shared content
+for keyboard navigation (`apps/tui/src/chrome/`):
 
 ```text
-Topbar:   one line. Workspace, task count, the open branch, the node's state as a dot
-Rail:     a column of tasks, browse sources under a rule; two cells of marks below 100 columns
-Main:     one pane, with a strip of pane labels above it
-Overlays: the palette, the cheat sheet and a quit confirmation, drawn where the pane is
+Topbar:   one line. Workspace, project, task count, branch, and node state
+Left:     Menu sources, Browse list, and workspace Tasks in one column
+Main:     one pane or source detail, with a strip of pane labels above it
+Overlays: palette, cheat sheet, pickers, inbox, trust, and quit confirmation
 Footer:   one line. What the keyboard will do, and the node's state when it needs a sentence
 ```
 
 Three differences are worth naming. There is one pane rather than a row of them, because two panes at
 80 columns are two 40-column panes and the kit's own floor is 80, so `nextPane` switches which pane is
 drawn instead of walking to the next one. The region cycle is the whole screen rather than the focused
-pane, for the same reason: rail, pane strip, the pane's own regions, and back. And an overlay hides the
+pane, for the same reason: Menu, Browse, Tasks, pane strip, the pane's own regions, and back. And an overlay hides the
 pane rather than replacing it, so opening the palette does not tear down the pane's queries and its
 model.
 
-The rail's task list goes through the same `rail.taskList` exclusive slot the desktop's does, so a
-plugin that offers to replace it replaces it on both hosts. The topbar and the pane strip are bespoke
-on both until `docs/future/client-plugins/04-replaceable-surfaces.md` gives them contracts.
+The desktop topbar, left rail, pane switcher, and rail task list each have a core provider in an
+exclusive slot. A selected plugin provider can draw one of these surfaces using the host's data and
+verbs. The rail provider places the host's task-list slot; the topbar provider places the host's
+right-side status slot. Settings warns when a provider declares that it omits either placement.
+The terminal currently hosts `rail.taskList`; its own chrome stays native to cells.
 
 The topbar spans the window. The rails and the panes all begin under its bottom border, so that
 border is one unbroken line across the app: the left TabRail is the first thing in `.shell-body`, the
@@ -63,6 +65,10 @@ column. `Toolbar`'s `size="sm"` is for a strip *inside* the contents — a filte
 status line under a body — and picking it for chrome is what left the browser preview's address bar
 at half the height of the agents header one pane over. Tab strips are the deliberate exception at
 `--tab-h`: a strip under a pane header should read as subordinate to it, not as a second header.
+When a `Tabs` or `DocumentTabs` strip is itself the header, `level="pane"` gives it `--pane-head-h`.
+Both heights include the bottom divider; the tab controls subtract its width so adjacent headers
+end on the same line. The editor's file navigation and document strip, the host's `tabs` layout,
+and the terminal drawer use the pane level.
 
 ### Rail controls and status markers
 
@@ -99,10 +105,17 @@ and activity, because it sits under the main glyph rather than in a corner. Two 
 opposite ends of a task's life: a pulsing dot while its setup script prepares the new worktree, and a
 spinner while teardown removes it.
 
-Core's markers come from `tasks/railStatus.ts`. Plugins publish theirs through
-`features/tabs/railMarkers.ts` ([plugins.md § Rail markers](./plugins.md)); contributed priorities are
-clamped below core's, so a plugin can order its own markers among themselves but can never push a
-core lifecycle state out of its corner. Placement requests are preferences, never guarantees.
+Core's markers come from `tasks/railStatus.ts`. Compiled plugins publish theirs through
+`features/tabs/railMarkers.ts` ([plugins.md § Rail markers](./plugins.md)). Loaded plugins publish task
+facts through the generic `core:task` annotation point, and the host converts each accepted fact to a
+marker. The plugin supplies severity, bounded text, and an optional host-resolved icon; it supplies no
+placement, color, geometry, or action. For the batched request and lifecycle contract, see
+[Task annotations](./plugins/cooperative-extension-points.md#task-annotations).
+
+Contributed priorities are clamped below core's, so a plugin can order its own markers among
+themselves but can never push a core lifecycle state out of its corner. Placement requests are
+preferences, never guarantees. The annotation path does not change this desktop allocator: four
+corners may carry pixels, and the complete ordered legend carries every accepted state.
 
 A CSS selector in a feature or plugin stylesheet that positions a rail marker is the regression
 signal that placement escaped the host.
@@ -135,6 +148,11 @@ provider. `spin` turns the mark, for a state that is in flight. It carries no re
 unlike `.spin`: on a state icon the turn is the whole signal that something is running, and a 12px
 rotation is not the motion that setting exists to stop.
 
+The terminal host uses the same icon names and tones but maps selected names to one-cell text marks
+in `apps/tui/src/kit/glyphs.ts`. Its `spin` prop uses the TUI's shared braille tick. An unmapped name
+or literal draws nothing, so new marks need an explicit terminal mapping when they carry meaning in
+both hosts.
+
 ### A button whose face is a mark
 
 Reach for `IconButton`, not a `Button` with `iconOnly` written out. It takes an `icon` name, a
@@ -147,13 +165,9 @@ those had lost the `size` along the way and drew a third larger than the rest. A
 reached `Icon` at all and typed a character in: the browser preview's chrome was `‹ › ↻ ⌂`, which is
 four glyphs that no style pack, tone or spin can touch.
 
-`label` is required rather than optional because a mark has no text in it. A button whose only child
-is a glyph announced itself to a screen reader as "‹", and on a terminal it is the fallback for a
-name that has no glyph yet.
-
-On the terminal the node paints the mark, one cell, which a plain `Button` cannot do: `Button` prints
-`label` for any child it cannot read text off, so the four transcript controls came to about fifty
-cells of an eighty-cell pane and the GitHub browse header clipped "Reviews" to "Revi".
+`label` is required because a mark has no text in it. A button whose only child is a glyph announced
+itself to a screen reader as "‹". The terminal's `IconButton` writes the label as its control text;
+its `icon` name does not use the status glyph mapping above.
 
 The `brand:` prefix exists so the two families can never collide (Lucide has grown brand-shaped
 names before and will again) and so brand marks stay out of the Lucide name list
@@ -291,6 +305,11 @@ to. The control rides the divider rather than sitting in the list's header, beca
 form the header belongs to a `ListColumn` the caller built and this node has nothing to put a button
 into, and because a collapsed column has no header left to sit in.
 
+When its contents have no readable rail form, the kit's `ListDetail` can take
+`collapseContent="empty"`. It hides the list's contents while collapsed but keeps them mounted, so
+inputs, search results and scroll state are still there when the reader expands it. The expand
+control stays on the divider. The editor uses this for its file tree and search panel.
+
 The divider and the control on it are one node, `CollapseEdge`, and both tiers draw it: the kit's
 `ListDetail` and the host's `list-detail` layout. They each wrote their own at first, and the two
 buttons drifted apart, one with a border and one without. A split that does not collapse still gets
@@ -300,12 +319,14 @@ Collapsing is a bargain, and the other half of it is the rows. A column at 48px 
 mark, so every row in it takes a `collapsed` slot: the run state for an agent, an avatar over a
 number for a pull request, a state icon over a key for a ticket. The slot's presence is what
 collapses the row, and the caller passes it from the same signal the column reads
-(`kit/lib/collapseState.ts`), so the two cannot disagree. Leading, body, meta and trailing give way
+(`kit/lib/layout/collapseState.ts`), so the two cannot disagree. Leading, body, meta and trailing give way
 to it, along with depth, nesting and revealed controls, which are about a width the row no longer
-has. The name comes back as the tooltip, from the `title` the row already carried.
+has. The name comes back as the tooltip, from the `title` the row already carried. A row's own
+`tip` and `tipAt` are its tooltip at full width, and in a rail `tipAt` stays as the name's second
+line. A row with a `tip` drops the browser's `title` tooltip so the two never open together.
 
 The slot has the row's existing height to work in and never more. A virtualized list takes its row
-height from `--row-h-virt` read off the document root (`kit/lib/metrics.ts`), so a per-column
+height from `--row-h-virt` read off the document root (`kit/lib/layout/metrics.ts`), so a per-column
 override is invisible to the virtualizer and a taller collapsed row tears the scroll range.
 
 Opt in on both tiers, and for the same reason. The kit node is told with `collapseKey` because it
@@ -373,7 +394,7 @@ never swallows a click on the app behind it, and each toast re-enables its own.
 The command palette and the file finder share one surface, `PaletteSurface`, rather than the
 near-duplicate `.palette-*` and `.finder-*` rule sets that used to exist side by side.
 
-Modal dismissal (Escape, backdrop click, Tab focus containment) is `kit/lib/dismissable.ts`, a hook
+Modal dismissal (Escape, backdrop click, Tab focus containment) is `kit/lib/controls/dismissable.ts`, a hook
 returning handlers rather than a component; markup stays at the call site. Nine call sites
 hand-wrote this before it existed, five of them with only a backdrop click and nothing else, so Tab
 walked straight out of the dialog into the page behind it and Escape did nothing. `Modal` uses it
@@ -417,7 +438,7 @@ the edge. A legend entry mirrors one active rail status marker, placed or crowde
 both reports current state and teaches what each glyph on the rail means.
 
 A sandboxed plugin frame has its own document, so the shell's tooltip singleton cannot see elements
-inside it and `data-tip` would otherwise be silently inert there. `kit/lib/frameTips.ts` mounts the same
+inside it and `data-tip` would otherwise be silently inert there. `kit/lib/controls/frameTips.ts` mounts the same
 delegated listener and bubble markup into a frame's document, the way frames already mount their
 own copy of the shared CSS. It stays framework-free and importless on purpose: it is reached from
 `@acorn/plugin-api/ui/sdk`, which bundles into a plugin's frame and must not drag a slice of the
@@ -425,7 +446,7 @@ shell, or a second copy of Solid, across that boundary.
 
 ## Drag-to-resize
 
-`kit/lib/split.ts`'s `createSplitDrag` is the drag-resize hook behind the pane row divider, the terminal
+`kit/lib/layout/split.ts`'s `createSplitDrag` is the drag-resize hook behind the pane row divider, the terminal
 drawer's height handle, and the splits the host layouts draw. Three hand-rolled splitters existed
 before it, and none had a keyboard contract. A plugin never calls it: where a split is between two
 *regions* the layout owns the handle ([docs/panes.md § Layout model](./panes.md#layout-model)), and
@@ -464,7 +485,7 @@ set, and the layer priorities are in
   the keyboard will do right here.
 - F6 and Shift+F6 move between the regions of a pane; Ctrl+Option+Left and Ctrl+Option+Right move
   between panes.
-- Pane chords are contribution-owned and user-overridable through Settings → Shortcuts.
+- Pane chords are contribution-owned and user-overridable through Settings → Keyboard shortcuts.
 - Typing fields, editors, terminals, and contenteditable elements stop global shortcuts unless the
   action is explicitly text-safe. That exemption is a property of the intent now, not of whoever
   remembered to declare it: `dismiss`, `commit`, and the four region and pane moves reach a focused
@@ -477,7 +498,7 @@ set, and the layer priorities are in
 
 There is one menu. `kit/components/overlays/Menu.tsx` owns the surface — `role="menu"`/`menuitem`, close-on-select, Escape,
 outside-click, and focus returning to where it came from — and both ways of opening it mount that same
-surface (`MenuSurface`) over the same hook (`kit/lib/anchor.ts`). The roving focus is not its own: a menu is
+surface (`MenuSurface`) over the same hook (`kit/lib/controls/anchor.ts`). The roving focus is not its own: a menu is
 a collection, so the arrows, Home, End, the page keys and `j`/`k` arrive as intents from
 `keys/collection.ts`, the same ones a list of rows gets. A
 button anchors it to a rect; a right-click anchors it to a point, which is the only difference. A
@@ -519,7 +540,7 @@ plus the button's own `aria-expanded`. The last one is not redundant: the surfac
 while the menu is open, `:focus-within` on the row is false and the trigger would otherwise fade out
 from under the menu it opened.
 
-Both `Menu.tsx` and its anchoring hook (`kit/lib/anchor.ts`) replaced hand-rolled implementations that
+Both `Menu.tsx` and its anchoring hook (`kit/lib/controls/anchor.ts`) replaced hand-rolled implementations that
 had each solved less of the problem: TabRail's task menu had neither outside-click nor Escape nor
 roles, terminal's profile menu had no portal at all so an overflow ancestor clipped it, and
 AccountMenu and NotificationBell each hand-rolled their own outside-click listener. `anchor.ts` owns
@@ -539,7 +560,7 @@ item that toggles something, whose press has to leave the list open to show the 
 
 Arm-to-confirm is `Menu.Item`'s own `confirm` prop, not a `ConfirmButton` dropped into the list. The
 item keeps its place, reads `Discard?` between the first press and the second, and only then calls
-`onSelect` (`createArmedConfirm`, `kit/lib/confirm.ts`). A button among menu items is the wrong
+`onSelect` (`createArmedConfirm`, `kit/lib/controls/confirm.ts`). A button among menu items is the wrong
 height and carries no `.ui-menu-item`, so the roving focus walks straight past it and the keyboard
 cannot reach the one row in the menu that matters most. Changes' Discard and Force push were both
 that shape and are both items now.
@@ -584,6 +605,13 @@ renders `listbox` or `tree` with `aria-activedescendant`, a tab strip renders `t
 renders `dialog` with `aria-modal` and hands focus back to its opener. Hover is never load-bearing:
 anything a pointer can reach, focus can reach, so a `RowActions` that appears on hover appears on
 focus too.
+
+Desktop tab lists stay on one row and scroll horizontally when their labels exceed the available
+width. The selected tab is brought into view; controls beside the list stay visible. GitHub, Docker,
+HTTP, Rollbar, Linear, and host `tabs` layouts use the kit's `Tabs` for content selection. Editor and
+terminal document tabs keep their close and status controls, and Home dashboard tabs keep inline
+rename and per-tab actions; all three tab types share the same scroll rule. The rail and pane
+switcher are navigation controls with separate layout contracts.
 
 A long list says `virtual` on its `Rows` and changes nothing else. The scroller, the row placement and
 the density number all become the kit's, and the collection stays keyed over the whole list rather than
@@ -697,15 +725,28 @@ The DOM `Fold` mounts its body on first open and retains it thereafter. Native `
 only hides an already-rendered body; deferring that first mount avoids building hidden transcripts
 and code blocks while preserving child state on subsequent toggles.
 
+`Timeline` draws whatever turns its caller hands it and keeps the reader's place by turn identity.
+A caller with a long list draws part of it through `createTimelineWindow` and passes the window to
+the Timeline: `hidden` (older turns not drawn, which puts **Show earlier (N)** above the first turn),
+`onShowEarlier`, `reveal` (asked before a hidden reading place is swapped for a neighbour), and
+`onTrim` (called while following the live end, never past a turn holding the selection or focus).
+`Timeline.Turn` takes a stable `key`, and `position` and `setSize` for `aria-posinset` and
+`aria-setsize`, so a screen reader hears a turn's place in the whole list. Its child may be a function
+of `near`, which turns true once the turn comes within a screen of the viewport and stays true; a
+caller builds an expensive body there and a summary until then. `reveal` returns a value, so it only
+works for a caller in the host's realm, not across a sandboxed tree. Timeline turns are not given CSS
+containment (`content-visibility`): paint containment would clip a card's focus ring at the turn's
+edge, and no real-WebKit run has accepted it.
+
 | Node | Focus | At 80×24 |
 | --- | --- | --- |
 | `Stack` | none | children on successive lines, `gap` as 0 or 1 blank lines. `grow` means the stack is the region rather than a run of content in one: it takes what is left of the box, so a scroller or a canvas inside it has a height to work against |
 | `Inline` | none | children on one line separated by a space; wraps to a `Stack` when too wide |
 | `Section` | conditional | label in grey uppercase, children below |
-| `Fold` | stop | `▸ label` or `▾ label`, children indented two cells |
-| `Card` | conditional | a box-drawing frame, or a blank line above and below in compact density |
-| `Timeline` | collection | cards in sequence, a grey rule between turns. `follow` makes it the scroller and holds it on the last turn until the reader scrolls away, which is what leaves a pane's header and composer pinned around it; without `follow` it is a plain column and whatever is around it scrolls. `place` and `onChange` are dropped, and `Timeline.Turn` ignores its `key`: the reader is not put back on the turn they left, because a viewport here knows its own offset and nothing about where each turn sits, so a redrawn list opens at the newest turn. `Timeline.Turn` is a node of its own on both hosts |
-| `Tabs` | collection | `Tab  [Tab]  Tab` on one line, the selected one in brackets. A tab's `icon` becomes the glyph in front of its label, and drops out where the name has no glyph; its `title` has nowhere to hover |
+| `Fold` | stop | `▸ label` or `▾ label`, children indented two cells by default; `contentIndent="none"` aligns child content with the header |
+| `Card` | conditional | a box-drawing frame that fits its pane; a toned card uses a coloured `▍` left edge for its full height while the other edges stay neutral. Compact density keeps that left edge without the frame |
+| `Timeline` | collection | cards in sequence, a grey rule between turns. `follow` makes it the scroller and holds it on the last turn until the reader scrolls away, which is what leaves a pane's header and composer pinned around it; without `follow` it is a plain column and whatever is around it scrolls. `place` and `onChange` are dropped, and `Timeline.Turn` ignores its `key`: the reader is not put back on the turn they left, because a viewport here knows its own offset and nothing about where each turn sits, so a redrawn list opens at the newest turn. `hidden` draws the same **Show earlier** button above the turns, `reveal` and `onTrim` are ignored, and a `near` child is told it is near at once. `Timeline.Turn` is a node of its own on both hosts |
+| `Tabs` | collection | `Tab  [Tab]  Tab` on one line, the selected one in brackets. Its text label carries the meaning; `icon` is omitted and `title` has nowhere to hover |
 | `Toolbar` | none | children on one line where they fit and wrapped onto the next where they do not, because a bar written for a window is drawn here in a pane column and a row that shrinks its children cuts their labels to nothing |
 | `Modal` | trap | a centred box with its title; Escape dismisses, which `keys/keys.test.tsx` drives. `Modal.Body` and `Modal.Actions` answer to their flat spellings too, on both hosts |
 | `ModalBody` | none | the lines between the title rule and the actions line |
@@ -718,9 +759,11 @@ and code blocks while preserving child state on subsequent toggles.
 | `Sections` | collection | reduced: a strip of tabs over one panel — the header first, then each section, then `main` below 120 cells, where a diff in half the width is a diff wrapped at 45 columns. `h` and `l` walk the strip. A section's `meta` is not drawn: a strip has room for a label and a count |
 | `SplitHandle` | stop | absent: a terminal split moves by a key, not a grip |
 | `DocumentTabs` | collection | one line of tab labels with a `×` on the current one |
-| `SectionHeader` | none | a bold line with its actions right-aligned |
+| `SectionHeader` | none | a bold heading with actions on the next line, so a long action label cannot erase the heading |
 | `TabPanel` | none | the rows under the tab strip |
 | `ToolbarSpacer` | none | the padding that pushes what follows to the right edge |
+| `SettingsSection` | none | the label in bold, the description in grey under it, then its rows; the danger zone's label is in the danger colour instead of a frame. `actions` draw on the line under the label |
+| `SettingRow` | none | reduced: one line, the label then the control, and `stacked` puts the control on the next line. The description in grey under it, **Saved** in green or the error in red. `onReset` adds `•` to the label and a `Reset` button. A row with `from` draws `From <where>` and no control, so the value this machine holds is not shown. A row with `scope="device"` draws `(this device)` after its label |
 
 ### Showing
 
@@ -732,7 +775,7 @@ and code blocks while preserving child state on subsequent toggles.
 | `Rows` | collection | its items on successive lines; `virtual` is the window of rows that fit, and it follows the active row because there is no pointer to scroll with |
 | `Row` | item | one line: status glyph, title, meta right-aligned. `variant="stacked"` puts the second child on a second line, as it does on the DOM. `reveal` has no meaning, because there is no hover, so the trailing controls always show. `collapsed` is ignored for the same reason its column's `collapseKey` is: the full row draws, and no name is lost |
 | `TreeRow` | item | `Row` indented `depth` cells with `▸` or `▾` |
-| `RowActions` | none | the row's actions as glyphs at the right end, always drawn, never on hover |
+| `RowActions` | none | the row's actions at the right end, always drawn with their control labels, never on hover |
 | `Badge` | none | `[text]` in the tone's colour |
 | `Chip` | conditional | `(text)`, with a trailing `×` when removable |
 | `ChipRow` | collection | chips on one line, wrapping |
@@ -744,7 +787,7 @@ and code blocks while preserving child state on subsequent toggles.
 | `TableRow` | conditional | reduced: one line, cells separated by `│`, truncated by column priority; a tab stop only when it has an action |
 | `TableCell` | none | reduced: the cell's text in its column's width, ellipsised where it does not fit; `header` makes it bold |
 | `Grid` | collection | reduced: as `Table`, with a row-range indicator instead of a scrollbar |
-| `Graph` | collection | reduced: the indented list, one line per card — glyph, label, `⇐ n` where the card waits on more than one, detail at the far end — indented by rank and capped at four levels. No positions and no wires: a picture is what this host cannot draw, and the ranks are what the picture was saying. Where an edge can be authored, a picker under the list draws one out of the selected card |
+| `Graph` | collection | reduced: the indented list, one line per card — label, `⇐ n` where the card waits on more than one, detail at the far end — indented by rank and capped at four levels. No positions and no wires: a picture is what this host cannot draw, and the ranks are what the picture was saying. Where an edge can be authored, a picker under the list draws one out of the selected card |
 | `Meter` | none | `████░░░░ 62%`; `mark` takes over the cell it falls in, as `███▲░░░░`, rather than a row of its own |
 | `CodeBlock` | none | monospace lines, a grey rule above and below |
 | `Log` | stop | monospace lines, find as a bottom line |
@@ -752,6 +795,7 @@ and code blocks while preserving child state on subsequent toggles.
 | `DiffPane` | none | reduced: unified only, `+`/`-` in colour, annotations as indented lines under their row; windowed, so a long patch draws the rows around the viewport and not all of them |
 | `DiffLine` | none | reduced: one line, `+`/`-`/space in the gutter, no intra-line highlight |
 | `FileHead` | none | reduced: the path in bold with `+n −m` right-aligned |
+| `StackedDiff` | none | reduced: the `FileHead` line, then each hunk header and `DiffLine` below it |
 | `NonCodeRow` | none | reduced: a grey line saying what is not being shown, such as `binary file` |
 | `SplitCell` | none | absent: side-by-side needs 160 cells, so a terminal diff is unified |
 | `EmptyState` | none | centred grey text |
@@ -759,7 +803,7 @@ and code blocks while preserving child state on subsequent toggles.
 | `Spinner` | none | reduced: a braille spinner, or `…` where motion is off |
 | `Kbd` | none | `⌘K` or `ctrl+k`, per host |
 | `UserAvatar` | none | reduced: initials in brackets; no image |
-| `Icon` | none | reduced: a glyph from a small name table, an emoji as itself, or nothing for a name the table has no glyph for |
+| `Icon` | none | a one-cell mapped mark; unmapped names and desktop hover `title` draw nothing |
 
 ### Asking
 
@@ -767,22 +811,27 @@ and code blocks while preserving child state on subsequent toggles.
 | --- | --- | --- |
 | `Button` | stop | `[ label ]`, or `[l]abel` with a mnemonic. An icon-only button draws its `label`, because a glyph child has no text to read off it |
 | `ConfirmButton` | stop | `[ Delete? ]` after the first press; the armed button is the prompt |
-| `IconButton` | stop | reduced: one cell, the mark itself, per `apps/tui/src/kit/glyphs.ts`. A name with no glyph yet falls back to the `label`, which is wide on purpose — the width is what says which name to add to the map |
+| `IconButton` | stop | its text `label` is the control, since the terminal has no Lucide or SVG rendering |
 | `Input` | stop | a field taking the room its row has left; owns keys while focused |
 | `Textarea` | stop | a boxed multi-line field; owns keys. `rows` is a floor rather than a fixed height, so an empty field still stands its ground and a full one grows past it; the frame lights in the accent tone while the keys are inside. A caller drawing its own frame, such as `Composer`, turns this one off |
-| `Select` | stop | `[ value ▾ ]`, opening a `Menu` |
+| `Select` | stop | `[ value ▾ ]`, or `value▾` for a bare control, opening a `Menu` |
 | `Checkbox` | stop | `[x] label`; Space toggles |
 | `SegmentedControl` | collection | `( a \| [b] \| c )`, the selected one in brackets |
 | `ToggleButton` | stop | `[x] label` |
 | `Picker` | stop | a field that opens a `Menu` filtered by typing |
-| `PickerRow` | item | one line in that menu: glyph, label, grey hint |
+| `PickerRow` | item | one line in that menu: label and grey hint; a leading icon is omitted |
 | `Composer` | stop | a boxed field with a `> ` prompt; commit submits |
 | `MentionTextarea` | stop | reduced: a `Textarea` with the mention menu below it; no inline highlight of the token |
 | `KeyValueEditor` | none | a two-column table with editable cells, each cell a stop |
 | `FindBar` | stop | `/ query  3/12` on one line |
 | `Field` | none | the label above its child |
-| `CopyButton` | stop | fallback: the button copies over OSC 52 where the terminal takes it, and prints the value on its own line to copy by hand where it does not |
+| `CopyButton` | stop | a labeled Copy control sends OSC 52 where the terminal takes it, and prints the value on its own line to copy by hand where it does not |
 | `ModelBackendPicker` | stop | two `Select`s over the backends a Generate control can spend: a stored key, or an installed agent CLI |
+
+`modelProviderFailure` is a pure presentation helper at `@acorn/plugin-api/ui/model-provider-failure`,
+also exported by `@acorn/plugin-api/ui` and `@acorn/plugin-api/ui/tree`. Generate controls use it for
+shared provider error codes, then supply their own fallback for failures specific to the action. It
+adds no kit node or host behavior.
 
 ### Pixels, and the host wrappers
 

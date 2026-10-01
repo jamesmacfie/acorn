@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto'
-import { existsSync, statSync } from 'node:fs'
+import { existsSync, realpathSync, statSync } from 'node:fs'
 import { basename, isAbsolute, join } from 'node:path'
-import { and, asc, eq, inArray, ne, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import type { AppDatabase } from './db'
 import { schema } from './db'
 import { git } from './core/git'
@@ -14,6 +14,17 @@ import { broadcastProjectChanged, broadcastTasksChanged, broadcastWorkspaceChang
 // folder changes underneath us.
 
 export type ProjectRow = typeof schema.projects.$inferSelect
+
+async function projectAtPath(db: AppDatabase, path: string, exceptId?: string): Promise<ProjectRow | undefined> {
+  const canonicalPath = realpathSync(path)
+  const registered = await db.select().from(schema.projects)
+  return registered.find((row) => {
+    if (!row.path || row.id === exceptId) return false
+    if (row.path === path) return true
+    try { return realpathSync(row.path) === canonicalPath }
+    catch { return false }
+  })
+}
 
 // Cross-plugin project identity, a projection rather than ProjectRow (docs/plugins.md §
 // Activation): a plugin may resolve scope and filesystem ownership, but never receives core's
@@ -123,7 +134,7 @@ export async function createProject(
 
   // Re-adding the same folder returns the existing project rather than minting a twin: the picker
   // flow is idempotent, and two rows over one folder would fight over config.
-  const [already] = await db.select().from(schema.projects).where(eq(schema.projects.path, input.path))
+  const already = await projectAtPath(db, input.path)
   if (already) return { ok: true, project: already }
 
   let workspaceId = input.workspaceId
@@ -224,10 +235,7 @@ export async function patchProject(db: AppDatabase, id: string, patch: PatchProj
     // a deferred GitHub import). Same checks as createProject, then a facet probe.
     if (!isAbsolute(patch.path)) return { ok: false, reason: 'Path must be absolute.' }
     if (!isDir(patch.path)) return { ok: false, reason: 'Directory does not exist.' }
-    const [alreadyMapped] = await db
-      .select({ id: schema.projects.id })
-      .from(schema.projects)
-      .where(and(eq(schema.projects.path, patch.path), ne(schema.projects.id, id)))
+    const alreadyMapped = await projectAtPath(db, patch.path, id)
     if (alreadyMapped) return { ok: false, reason: 'Another project already uses that path.' }
     set.path = patch.path
   }

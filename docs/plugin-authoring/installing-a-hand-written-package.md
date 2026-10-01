@@ -14,7 +14,7 @@ audited. For a hand-written directory the source form is a local path:
 
 `linkLocal` (`server/plugins/installer.ts`) **symlinks** the directory rather than copying it, which is what
 makes the loop worth having: you edit in place and the next boot runs what you edited. This works on
-every build, packaged included — Settings → Plugins → *Local folder* has a **Choose…** button when the
+every build, packaged included — **Settings > Plugins > Installed > Install…** offers **Local folder** with a **Choose…** button when the
 target node is this machine. The path must be absolute. Uninstall unlinks rather than following the
 symlink into your working tree.
 
@@ -25,7 +25,7 @@ what it deliberately does not claim.
 
 Installing writes a lockfile and reports `installed-restart-required`. A loaded plugin's routes,
 tables and jobs wire at init, so a package is not live until the node re-runs it: restart the node,
-and under the desktop use Settings → Plugins → Restart, which also reloads the renderer because frame
+and under the desktop use **Restart node** in **Settings > Plugins > Installed**, which also reloads the renderer because frame
 contributions resolve once per session.
 
 If the package has a client file, each device asks its own owner before running those bytes, keyed by
@@ -61,7 +61,7 @@ default scaffold, which inlines the tree protocol.
   "name": "Hello Acorn",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "1",
+  "apiVersion": "2",
   "node": "./node/index.js",
   "client": "./client.js",
   "permissions": {
@@ -134,7 +134,8 @@ export async function handle(request, context, core) {
 ```js
 // The bridge handshake, inlined. @acorn/plugin-api/ui/sdk is what a bundled frame imports;
 // a single-file frame has no way to resolve a bare specifier, so it sends the same messages
-// by hand. packages/client-core/src/host/frames/sdk.ts is the reference for the semantics.
+// by hand. packages/client-core/src/host/frames/sdk/connection.ts defines the handshake;
+// packages/client-core/src/host/frames/sdk/bridgePort.ts defines request behavior.
 
 const pending = new Map()
 let port = null

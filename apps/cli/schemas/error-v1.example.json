@@ -1,0 +1,4 @@
+{
+  "apiVersion": "acorn.cli/v1",
+  "error": { "code": "not_found", "message": "No resource has ID unknown." }
+}

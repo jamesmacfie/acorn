@@ -1,5 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest'
+import { Hono } from 'hono'
 import type { Env } from '../bindings'
+import type { AppEnv } from '../middleware/auth'
 import { registerRoute, removePluginRoutes } from '../routes/registry'
 import { clearRunSources, readRuns, registerRunSource } from './registry'
 
@@ -24,7 +26,7 @@ const run = (id: string, over: Record<string, unknown> = {}) =>
 
 describe('the merged run list', () => {
   afterEach(() => {
-    for (const plugin of ['alpha', 'beta']) {
+    for (const plugin of ['alpha', 'beta', 'gamma']) {
       clearRunSources(plugin)
       removePluginRoutes(plugin)
     }
@@ -36,6 +38,15 @@ describe('the merged run list', () => {
     const { runs, failed } = await readRuns(env)
     expect(runs.map((row) => [row.pluginId, row.id])).toEqual([['beta', 'b1'], ['alpha', 'a1'], ['beta', 'b2']])
     expect(failed).toEqual([])
+  })
+
+  it('reads a built-in Hono run source under the service principal', async () => {
+    const router = new Hono<AppEnv>().get('/runs', (c) => c.json({ runs: [run('g1', {
+      detail: c.get('principal')?.kind === 'internal' ? 'service' : 'wrong-principal',
+    })] }))
+    registerRoute({ plugin: 'gamma', prefix: '', router })
+    registerRunSource({ pluginId: 'gamma', runs: '/v1/p/gamma/runs' })
+    expect(await readRuns(env)).toMatchObject({ runs: [{ pluginId: 'gamma', id: 'g1', detail: 'service' }], failed: [] })
   })
 
   it('never lets a source name itself', async () => {

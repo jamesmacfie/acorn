@@ -1,12 +1,20 @@
 mod app_scheme;
 mod commands;
+mod cli_install;
 mod crash;
+mod dev_server;
+mod footprint;
 mod helper;
 mod keychain;
 mod menu;
+#[cfg(target_os = "macos")]
+mod notifications;
 mod plugin_scheme;
 mod reset_stage;
 mod webviews;
+mod webview_target;
+#[cfg(feature = "agent-automation")]
+mod webview_diagnostics;
 
 #[cfg(all(feature = "agent-automation", not(debug_assertions)))]
 compile_error!(
@@ -71,10 +79,6 @@ pub fn run() {
     // Read before the app runs, because the scheme handler cannot ask for state it does not have.
     let frames: Arc<RwLock<Option<Frames>>> = Arc::new(RwLock::new(None));
     let scheme_frames = frames.clone();
-    // The app scheme needs the same handle: a loaded plugin's tree worker is that plugin's bundle,
-    // served from this origin because a worker script must be same-origin with the document that
-    // starts it. See src/app_scheme.rs, `plugin_worker_hash`.
-    let worker_frames = frames.clone();
     let scheme_reset_mode = reset_mode;
 
     let mut builder = tauri::Builder::default();
@@ -118,13 +122,12 @@ pub fn run() {
                 Some(origin) => Source::DevServer(origin.clone()),
                 None => Source::Files(client_root(ctx.app_handle())),
             };
-            let frames = worker_frames.clone();
             let port = scheme_port.clone();
             std::thread::spawn(move || {
-                let response = if scheme_reset_mode && request.uri().path() == "/reset" {
+                let response = if scheme_reset_mode && app_scheme::is_app_authority(request.uri()) && request.uri().path() == "/reset" {
                     reset_stage::page()
                 } else {
-                    app_scheme::serve(&source, frames.read().unwrap().as_ref(), *port.read().unwrap(), &request)
+                    app_scheme::serve(&source, *port.read().unwrap(), &request)
                 };
                 responder.respond(response)
             });
@@ -141,21 +144,28 @@ pub fn run() {
             commands::pick_files,
             commands::save_file,
             commands::reveal_data_folder,
+            commands::open_config_file,
             commands::force_quit,
             commands::quit_approved,
             commands::show_notification,
             commands::set_badge,
             commands::set_window_background,
+            cli_install::cli_install_status,
+            cli_install::cli_install,
             reset_stage::reset_export,
             reset_stage::reset_complete,
+            #[cfg(feature = "agent-automation")]
+            webview_diagnostics::webview_diagnostics,
+            #[cfg(feature = "agent-automation")]
+            webview_diagnostics::webview_trial_delay,
             webviews::webview_ensure,
             webviews::webview_bounds,
             webviews::webview_show,
             webviews::webview_hide,
-            webviews::webview_hide_family,
             webviews::webview_load,
             webviews::webview_command,
             webviews::webview_evict,
+            webviews::webview_evict_previews,
         ])
         .menu(menu::build)
         .on_menu_event(|app, event| menu::on_menu_event(app.app_handle(), event.id().as_ref()))
@@ -181,6 +191,9 @@ pub fn run() {
                     println!("[shell] helper ready on {} under Node {}", helper.ready.port, helper.ready.node_version);
                     if let Some(shell) = handle.try_state::<Shell>() {
                         *shell.helper.lock().unwrap() = Some(helper);
+                    }
+                    if let Some(origin) = dev_server.as_deref() {
+                        dev_server::wait_for_entry(origin);
                     }
                     open_window(&handle)?;
                 }
@@ -222,11 +235,6 @@ pub fn run() {
                 if let Some(webview) = app.get_webview("main") {
                     let _ = webview.set_focus();
                 }
-            }
-            // The click on a system notification, as near as desktop Tauri gets to one
-            // (src/commands.rs, `window_focused`).
-            RunEvent::WindowEvent { label, event: tauri::WindowEvent::Focused(true), .. } if label == "main" => {
-                commands::window_focused(app)
             }
             RunEvent::Exit => {
                 // Before the helper, so no child webview is left composited over a window whose
@@ -321,7 +329,7 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
                 env_files: env_files(app, &data_dir, packaged)?,
                 version: app.package_info().version.to_string(),
                 is_packaged: packaged,
-                app_origin: APP_ORIGIN.to_string(),
+                app_origin: renderer_origin(cfg!(windows) || cfg!(target_os = "android")).to_string(),
             },
         },
         move |signal| match signal {
@@ -330,6 +338,7 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
             // src/webviews.rs. Never forwarded to the renderer.
             Signal::TunnelOpened { port, secret } => handle.state::<Webviews<tauri::Wry>>().tunnel_opened(port, secret),
             Signal::TunnelClosed { port } => handle.state::<Webviews<tauri::Wry>>().tunnel_closed(port),
+            Signal::FootprintRequest => footprint::answer(&handle),
             Signal::Ready(_) => {}
         },
     )?;
@@ -337,6 +346,7 @@ fn boot(app: &tauri::AppHandle) -> Result<(Helper, Frames), String> {
     app.manage(Shell {
         helper: Mutex::new(None),
         data_dir,
+        user_data_dir,
         quit_approved: AtomicBool::new(false),
         quit_pending: AtomicBool::new(false),
     });
@@ -372,15 +382,17 @@ fn env_files(app: &tauri::AppHandle, data_dir: &Path, packaged: bool) -> Result<
 /// binary beside this executable rather than under the other resources. On macOS that is
 /// `Contents/MacOS`, which `resource_dir()` does not name. Getting it wrong is invisible until
 /// somebody installs the app, which is what `scripts/verify-bundle.mjs` catches.
-fn bundled_node() -> PathBuf {
-    std::env::current_exe().ok().and_then(|exe| exe.parent().map(|dir| dir.join("node"))).unwrap_or_else(|| PathBuf::from("node"))
+pub(crate) fn bundled_node() -> PathBuf {
+    let name = if cfg!(windows) { "node.exe" } else { "node" };
+    std::env::current_exe().ok().and_then(|exe| exe.parent().map(|dir| dir.join(name))).unwrap_or_else(|| PathBuf::from(name))
 }
 
 /// The bundled runtime in a dev build, named the way `bundle.externalBin` names it, so dev and
 /// packaged disagree about the path and nothing else.
-fn bundled_node_for_host() -> PathBuf {
+pub(crate) fn bundled_node_for_host() -> PathBuf {
     let triple = std::env::var("ACORN_TARGET_TRIPLE").unwrap_or_else(|_| format!("{}-{}", std::env::consts::ARCH, host_suffix()));
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries").join(format!("node-{triple}"))
+    let extension = if triple.contains("-windows-") { ".exe" } else { "" };
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries").join(format!("node-{triple}{extension}"))
 }
 
 fn host_suffix() -> &'static str {
@@ -416,7 +428,7 @@ fn open_window(app: &tauri::AppHandle) -> tauri::Result<()> {
         // node, so nothing legitimate navigates this frame off its own origin. See docs/shell.md,
         // "The plugin frame origin".
         .on_navigation(|url| {
-            if url.as_str().starts_with(APP_ORIGIN) || url.scheme() == PLUGIN_SCHEME {
+            if is_renderer_url(url) || is_plugin_url(url) {
                 return true;
             }
             eprintln!("[shell] blocked navigation: {url}");
@@ -433,9 +445,37 @@ fn open_reset_window(app: &tauri::AppHandle, fixture: bool) -> tauri::Result<()>
         .inner_size(640.0, 260.0)
         // Fixture checks use an ephemeral profile, so they cannot clear an installed app's origin.
         .incognito(fixture)
-        .on_navigation(|url| url.path() == "/reset" && url.as_str().starts_with(APP_ORIGIN))
+        .on_navigation(|url| url.path() == "/reset" && is_renderer_url(url))
         .build()?;
     Ok(())
+}
+
+fn is_renderer_url(url: &tauri::Url) -> bool {
+    is_renderer_url_for(url, cfg!(windows) || cfg!(target_os = "android"))
+}
+
+fn renderer_origin(mapped_schemes: bool) -> &'static str {
+    if mapped_schemes { "http://app.localhost" } else { APP_ORIGIN }
+}
+
+fn is_renderer_url_for(url: &tauri::Url, mapped_schemes: bool) -> bool {
+    let original = url.scheme() == APP_SCHEME && url.host_str() == Some("acorn");
+    let mapped = mapped_schemes && matches!(url.scheme(), "http" | "https") && url.host_str() == Some("app.localhost");
+    (original || mapped) && url.port().is_none() && url.username().is_empty() && url.password().is_none()
+}
+
+fn is_plugin_url(url: &tauri::Url) -> bool {
+    is_plugin_url_for(url, cfg!(windows) || cfg!(target_os = "android"))
+}
+
+fn is_plugin_url_for(url: &tauri::Url, mapped_schemes: bool) -> bool {
+    let host = match url.scheme() {
+        PLUGIN_SCHEME => url.host_str(),
+        "http" | "https" if mapped_schemes => url.host_str().and_then(|host| host.strip_prefix("app-plugin.")),
+        _ => None,
+    };
+    host.is_some_and(|hash| hash.len() == 64 && hash.bytes().all(|b| b.is_ascii_hexdigit() && !b.is_ascii_uppercase()))
+        && url.port().is_none() && url.username().is_empty() && url.password().is_none()
 }
 
 /// The renderer bridge, plus the one value it cannot ask for asynchronously. A missing bundle is not
@@ -498,12 +538,50 @@ fn show_recovery(app: &tauri::AppHandle, reason: Option<&str>) {
 mod tests {
     use super::*;
 
-    /// The origin the window loads and the origin the helper checks on the WebSocket upgrade are one
-    /// constant, not two spellings.
+    /// Wry maps the app scheme to HTTP on Windows. The helper must check the browser's origin.
     #[test]
     fn the_window_url_is_the_origin_the_helper_checks() {
         assert!(format!("{APP_ORIGIN}/").starts_with(APP_ORIGIN));
         assert_eq!(APP_ORIGIN, "app://acorn");
+        assert_eq!(renderer_origin(false), APP_ORIGIN);
+        assert_eq!(renderer_origin(true), "http://app.localhost");
+        assert!(is_renderer_url_for(&renderer_origin(true).parse().unwrap(), true));
+    }
+
+    #[test]
+    fn the_runtime_paths_use_the_host_executable_extension() {
+        let name = if cfg!(windows) { "node.exe" } else { "node" };
+        assert_eq!(bundled_node().file_name().unwrap(), name);
+        let staged = bundled_node_for_host();
+        assert_eq!(staged.extension().is_some_and(|ext| ext == "exe"), cfg!(windows));
+    }
+
+    #[test]
+    fn navigation_accepts_only_exact_renderer_and_hash_plugin_origins() {
+        const HASH: &str = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef";
+        for (url, native, mapped) in [
+            ("app://acorn/index.html", true, true),
+            ("http://app.localhost/index.html", false, true),
+            ("https://app.localhost/index.html", false, true),
+            ("app://acorn.evil/index.html", false, false),
+            ("app://acorn:123/index.html", false, false),
+            ("http://app.localhost.evil/index.html", false, false),
+        ] {
+            let url: tauri::Url = url.parse().unwrap();
+            assert_eq!(is_renderer_url_for(&url, false), native, "{url}");
+            assert_eq!(is_renderer_url_for(&url, true), mapped, "{url}");
+        }
+        for (url, native, mapped) in [
+            (format!("app-plugin://{HASH}/worker.html"), true, true),
+            (format!("http://app-plugin.{HASH}/worker.html"), false, true),
+            (format!("https://app-plugin.{HASH}/worker.html"), false, true),
+            ("app-plugin://acorn/worker.html".to_string(), false, false),
+            (format!("http://app-plugin.{HASH}.evil/worker.html"), false, false),
+        ] {
+            let url: tauri::Url = url.parse().unwrap();
+            assert_eq!(is_plugin_url_for(&url, false), native, "{url}");
+            assert_eq!(is_plugin_url_for(&url, true), mapped, "{url}");
+        }
     }
 
     #[test]

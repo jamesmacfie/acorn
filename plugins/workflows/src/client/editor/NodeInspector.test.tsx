@@ -81,6 +81,7 @@ describe('a contributed kind draws its own form', () => {
     pluginId: 'terminal',
     describe: {
       label: 'Run a command',
+      description: 'Run a command.', icon: 'terminal', output: { description: 'Command output.' },
       fields: [
         { id: 'command', label: 'Command', type: 'textarea', required: true },
         { id: 'timeoutMs', label: 'Timeout', type: 'number', min: 1000, max: 600000 },
@@ -109,12 +110,21 @@ describe('a contributed kind draws its own form', () => {
   })
 })
 
+it('keeps a missing plugin step and its raw settings visible', () => {
+  mount({ baseline: 'acorn-1', formatVersion: 1, name: 'w', steps: [
+    { name: 'send', kind: 'mail:send', after: [], with: { recipient: 'team' } },
+  ] }, [], 'send')
+  expect(host.textContent).toContain("Plugin 'mail' does not provide workflow step 'mail:send'")
+  expect((host.querySelector('textarea[aria-label="Settings"]') as HTMLTextAreaElement)?.value).toContain('"recipient": "team"')
+})
+
 describe('a select with an options route', () => {
   const kind: WorkflowCatalog['kinds'][number] = {
     id: 'terminal:run-target',
     pluginId: 'terminal',
     describe: {
       label: 'Start a run target',
+      description: 'Start a run target.', icon: 'play', output: { description: 'Target result.' },
       fields: [{ id: 'target', label: 'Run target', type: 'select', optionsRoute: '/v1/p/terminal/tasks/{taskId}/run-targets' }],
     },
   }
@@ -139,7 +149,7 @@ describe('a kind that runs an agent', () => {
   const kind: WorkflowCatalog['kinds'][number] = {
     id: 'agent',
     pluginId: null,
-    describe: { label: 'Ask an agent', runsAgent: true, fields: [{ id: 'prompt', label: 'Prompt', type: 'prompt' }] },
+    describe: { label: 'Ask an agent', description: 'Ask an agent.', icon: 'bot', output: { description: 'Agent answer.' }, runsAgent: true, fields: [{ id: 'prompt', label: 'Prompt', type: 'prompt' }] },
   }
 
   it('draws the harness, every option that harness advertises, and where it runs', () => {
@@ -165,7 +175,7 @@ describe('a kind that runs an agent', () => {
   })
 
   it('does not draw agent fields for a kind that does not run one', () => {
-    const gate: WorkflowCatalog['kinds'][number] = { id: 'gate-human', pluginId: null, describe: { label: 'Wait for a person', fields: [] } }
+    const gate: WorkflowCatalog['kinds'][number] = { id: 'gate-human', pluginId: null, describe: { label: 'Wait for a person', description: 'Wait for approval.', icon: 'hand', output: { description: 'Approval outcome.' }, fields: [] } }
     mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'review', kind: 'gate-human', after: [] }] }, [gate], 'review')
     expect(labels('button.ui-select')).not.toContain('Harness')
   })
@@ -173,8 +183,8 @@ describe('a kind that runs an agent', () => {
 
 describe('runtime workflow fields', () => {
   const kinds: WorkflowCatalog['kinds'] = [
-    { id: 'workflow', pluginId: null, describe: { label: 'Run a workflow', fields: [{ id: 'childWorkflow', label: 'Child workflow', type: 'child-workflow' }] } },
-    { id: 'workflow-map', pluginId: null, describe: { label: 'Map to workflows', fields: [{ id: 'childWorkflow', label: 'Child workflow', type: 'child-workflow' }] } },
+    { id: 'workflow', pluginId: null, describe: { label: 'Run a workflow', description: 'Run a child workflow.', icon: 'workflow', output: { description: 'Child result.' }, fields: [{ id: 'childWorkflow', label: 'Child workflow', type: 'child-workflow' }] } },
+    { id: 'workflow-map', pluginId: null, describe: { label: 'Map to workflows', description: 'Run child workflows.', icon: 'git-fork', output: { description: 'Child results.' }, fields: [{ id: 'childWorkflow', label: 'Child workflow', type: 'child-workflow' }] } },
   ]
 
   it('offers the scoped child target and its declared required input', () => {
@@ -263,5 +273,34 @@ describe('typed data fields', () => {
     await settle()
     expect(document.body.textContent).toContain('Workflow inputs')
     expect(document.body.textContent).toContain('ref')
+  })
+})
+
+describe('a human gate', () => {
+  const gateDef = (form?: unknown): WorkflowDef => ({
+    baseline: 'acorn-1', formatVersion: 1, name: 'W',
+    steps: [
+      { id: 'draft', name: 'draft', prompt: 'Draft it.', schema: { type: 'object', properties: { title: { type: 'string' } } } },
+      { id: 'approve', name: 'approve', kind: 'gate-human', after: ['draft'], ...(form ? { form } : {}) },
+    ],
+  } as WorkflowDef)
+  const press = (label: string) => [...host.querySelectorAll('button')].find((el) => el.textContent?.trim() === label)!.click()
+
+  it('adds a form, and lists each field with where its proposal comes from', async () => {
+    mount(gateDef(), [], 'approve')
+    await settle()
+    press('Add a form')
+    expect(noActions.setStep).toHaveBeenLastCalledWith('approve', { form: { fields: [{ name: 'value', schema: { type: 'string' } }] } })
+
+    dispose?.()
+    host.remove()
+    mount(gateDef({
+      fields: [{ name: 'title', label: 'Title', schema: { type: 'string' } }, { name: 'note', schema: { type: 'string' } }],
+      values: { title: { address: { from: 'step', stepId: 'draft', pointer: '/title' } } },
+    }), [], 'approve')
+    await settle()
+    expect(host.textContent).toContain('Title: draft/title')
+    expect(host.textContent).toContain('note: left for the reviewer to fill')
+    expect(host.textContent).toContain('values.title')
   })
 })

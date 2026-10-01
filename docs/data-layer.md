@@ -6,8 +6,8 @@ owning package contains the schema and migration chain.
 
 ## Shared typed values
 
-`packages/protocol/src/dataValues.ts`, `packages/protocol/src/dataSchemas.ts`, and
-`packages/protocol/src/dataBindings.ts` own the version 1 typed-data contract. Node and client
+`packages/protocol/src/data/values/dataValues.ts`, `packages/protocol/src/data/values/dataSchemas.ts`, and
+`packages/protocol/src/data/values/dataBindings.ts` own the version 1 typed-data contract. Node and client
 plugin facades export its parsers and types. `acorn-plugin-types` publishes matching declarations
 for installed plugins; its contract test checks assignability in both directions.
 
@@ -126,11 +126,30 @@ These plugins own SQLite files and migrations:
 | `plugins/database.sqlite` | project-scoped saved SQL queries, and the per-task scratch document behind the pane's editor (a loaded plugin, same binding as `http.sqlite` below) |
 | `plugins/browser.sqlite` | browser captures and screenshot bytes |
 | `plugins/findings.sqlite` | immutable observations and candidate revisions, durable preparation jobs and lifecycle checkpoints, grouping outcomes, suppressions, review history, and notification receipts |
-| `plugins/github.sqlite` | repository/PR mirror, PR children, GitHub freshness, viewed files, pinned repos |
+| `plugins/github.sqlite` | repository/PR mirror, PR children in provider order, PR file patch state and digest, GitHub freshness and files completeness, viewed files, pinned repos |
 | `plugins/http.sqlite` | project-scoped requests and variables, encrypted request fields (a loaded plugin, so this file is bound from its manifest id and its chain ships inside the package) |
 | `plugins/memory.sqlite` | project-scoped derived memory index, proposals, FTS |
 | `plugins/terminal.sqlite` | terminal session metadata; PTY output is not persisted there |
 | `plugins/workflows.sqlite` | Workflow drafts and immutable revisions, dependency/publication journals, recoverable repository-file drafts and write journals, runs, steps, gates, dispatches, approved schedule bindings and occurrences, processing scopes, selections, record states, attempts, and committed source boundaries |
+
+The GitHub mirror replaces a pull request's detail, and separately its files, in one `db.batch`
+each, together with that resource's `sync_state` row. Every PR child table has a `position` column:
+the row's zero-based place in GitHub's order for that pull, which reads order by. `review_threads`
+counts across every comment of every thread, so one ordering recovers both the thread order and the
+comment order. `pr_files` also holds `patch_state` and `patch_key`, the digest the patch body is
+stored under. `sync_state` has four nullable columns, `incomplete_cause`, `received`,
+`reported_total`, and `upstream_limit`, that only a files resource sets, and only when GitHub's
+3,000-file ceiling cut the list short. The mirror's second migration empties the PR child tables and
+drops the `pr:` and `files:` sync rows, so every pull refetches once after the upgrade.
+
+The diff viewer's documents are generated data, and none of it is a table
+([diff-rendering.md](./diff-rendering.md) § The document). A pull request's segment descriptors are a
+blob per patch, keyed by the patch digest and the diff-document version, written beside the patch
+body before the swap; `pr_files.patch_key` is what makes them valid, and a new version of the
+segmenter reads a different key and cuts again. Segment rows are never stored: they are cut from the
+patch body when asked for. A compare preview stores its patch bodies the same way and nothing else.
+A working tree's documents are process memory in the Changes plugin, valid for the digest the last
+document gave each file and lost on restart.
 
 Docker, editor, Linear, Rollbar, model providers, preview, onboarding, and the built-in agents
 profiles use core services or provider registries without their own database file. Notes has no
@@ -278,7 +297,7 @@ The answer is a registry, not a table. A plugin
 declares a `GET` route that lists its own runs (`ctx.runs.register({ runs })`); core calls each one
 with no client attached, parses the answer, stamps who answered, and merges
 (`node-core/server/runs/registry.ts`, `@acorn/protocol/runs.ts`). `GET /v1/core/runs` is the merged
-read and Settings → Runs draws it. No migration, no ownership move, and neither producer knows the
+read and Settings → Run history draws it. No migration, no ownership move, and neither producer knows the
 other exists. A task-confined caller uses this merged route and receives only its task's rows. The
 workflow source route is a node-internal aggregation seam and rejects a direct task-confined read.
 
@@ -309,8 +328,8 @@ Machine-scoped entities include workspaces, tasks, notes, memories, terminal met
 project configuration. Identity-scoped records use the node's boot-bound opaque owner id. Provider
 account changes must not alter the owner's settings, integrations, or saved requests.
 
-The shared `blobs/` directory is content-addressed. It stores immutable patch bodies, file bodies,
-attachments, and artifacts by SHA. Plugin rows may retain a blob until the owning record is deleted.
+The shared `blobs/` directory is content-addressed. It stores immutable patch bodies and their diff
+document descriptors by patch digest, and file bodies, attachments, and artifacts by SHA. Plugin rows may retain a blob until the owning record is deleted.
 Worktrees are ordinary filesystem directories under the root and are not a database cache.
 
 ## Preferences and client persistence
@@ -338,6 +357,14 @@ reset in [local development](./local-development.md) before starting a Node with
 The reset preserves a private recovery copy and never removes repositories or worktrees.
 
 Native SQLite access is centralized, and both plugin tiers reach it through `ctx.storage.open()`.
+Loaded storage connections install a native authorization policy before executing migration history
+or plugin SQL. It refuses cross-file attachment and export, limits PRAGMAs and virtual table modules,
+and keeps temporary SQL storage in memory. The connection wrapper exposes no policy setter. The
+loader's host fallback applies the same policy and refuses arbitrary backup destinations. A runtime
+without SQLite authorization support refuses loaded storage rather than opening an unconfined
+connection; the bundled Node 24 runtime supports it. See
+[Node plugin storage security](./security/node-plugin-security.md#storage) for the boundary and
+compatibility contract.
 The filename is bound to the plugin id. A loaded plugin opens that handle inside its isolated worker,
 whose filesystem grant names only that database, WAL, and SHM paths; a built-in opens it in the host.
 Only the source of the chain differs: a loaded plugin's manifest names a directory confined to its
@@ -360,7 +387,15 @@ and `pluginMigrationsChain` only validates that a Drizzle chain exists there.
 The host opens a built-in's file lazily on first use. For a loaded plugin with migrations, the loader
 privately prepares the three exact SQLite paths before starting the worker so it can grant files
 without granting the shared `plugins/` directory; the worker still opens the database lazily on first
-use. Each tier holds one handle and closes it immediately after that plugin's `dispose()`, so a plugin's
+use. Preparation refuses a linked `plugins/` directory and checks that each state file is regular
+before opening it. POSIX hosts also use no-follow and nonblocking flags. Preparation checks the
+opened descriptor and, on POSIX hosts, sets its private mode through that descriptor. Windows
+preparation retains the directory and regular-file checks but relies on the data root's access
+control list for privacy; POSIX mode bits do not restrict Windows access.
+Worker and host native opens check existing database, WAL, and SHM files before handing their paths
+to SQLite; absent sidecars remain valid. Exact grants include both lexical and canonical spellings
+for data-root aliases. These checks do not remove the path replacement race before SQLite opens.
+Each tier holds one handle and closes it immediately after that plugin's `dispose()`, so a plugin's
 dispose is about the resources the plugin itself owns and a plugin whose only resource was the database
 needs no dispose at all. Both tiers use `CoreServices` for core-owned operations. `apps/node/test/integration/plugins/httpLoaded.test.ts` covers what
 happens when a loaded plugin's chain grows between versions, where the update applies at the next
@@ -393,6 +428,13 @@ operation into a fresh, initialized data root. Before copying archive members, r
 files and refuses a missing or different `acorn-1` baseline on either the backup or target root.
 The archive itself carries `baseline: "acorn-1"` beside its format version.
 
+Archive output is precreated at mode `0600` inside a private `0700` sibling directory on the
+chosen destination's filesystem. The archive is renamed over the chosen destination only after
+successful completion, so replacement also repairs a permissive prior archive. A failed or
+interrupted archive preserves the prior backup and removes partial output. No global umask is
+changed. These are POSIX permissions; Windows operators must restrict the destination directory
+with an NTFS ACL.
+
 The archive holds `core.sqlite` and every `plugins/*.sqlite`: the workspace and task model, repo
 configuration, agent transcripts, notes, memories, and the HTTP client's saved requests. Secrets are
 blanked rather than removed, so an `integrations` row survives with empty `encrypted_credentials`. A
@@ -419,6 +461,47 @@ correctness, and space is what a long-lived node accumulates.
   node-local.
 - Audit rows: 90 days, pruned by the `core:audit-prune` schedule, daily at 03:20 node-local.
 - Terminal replay: bounded per session.
+- Agent tool calls and file changes: a newer update supersedes the rows before it, and those are
+  deleted in the same transaction, so a call keeps two rows
+  ([client surfaces](./managed-agents/client-surfaces.md) § The transcript store). Rows stored before
+  that are compacted once, in the background after boot. Every other agent event is kept for the life
+  of its session, unless its task is archived and the owner set a limit (next item).
+- Agent history of archived tasks: kept forever unless the owner picks 30 days, 90 days, or 1 year
+  under **Keep agent history for archived tasks** in Settings > Agents > Harnesses and defaults. Past
+  the limit, the `agents:archived-history-prune` schedule, daily at 03:50 node-local, deletes each session's events and
+  their search rows, turns, requests, attachment references, and artifacts, and the attachment and
+  artifact files nothing else uses. The session row stays with a note in place of its transcript. The
+  archive date comes from core's `tasks.archived_at`, read through `ctx.core.tasks.archivedBefore`, and a
+  restored task has none. The removed history is gone from archive search and from the restored task,
+  and nothing brings it back. The owner has to choose this, because both of those are real costs
+  ([managed-agents.md § Operations and failure](./managed-agents.md#operations-and-failure) has what
+  is kept, what is skipped, and how the work is split into small steps).
 - Logs: size and age policy owned by the Node runtime.
 - Plugin databases: retained while a plugin is disabled, and deletion is explicit.
 - Provider mirrors and blobs: refetchable and prunable according to their cache policies.
+
+Deleting rows does not shrink a database file. The freed pages go on SQLite's free list and new rows
+reuse them, so the file stops growing until they are used up. No database here uses auto-vacuum, and
+nothing runs a VACUUM. Turning on incremental auto-vacuum takes a full VACUUM first, and a full VACUUM
+rewrites the whole file under an exclusive lock, which on the synchronous driver stops the node for its
+duration. On a copy of the 1.3 GB agents database, after its first compaction, it took 11 seconds and
+brought the file to 852 MB. SQLite also allows a VACUUM to renumber the rowids of a table whose key
+is text, and the agents search index finds its rows by rowid
+([client surfaces](./managed-agents/client-surfaces.md) § Transcript search). To get the space back,
+stop the node and run `VACUUM` on the file.
+
+### What the node reports
+
+Settings > Machines > Storage and memory shows the numbers for the node the settings header's node
+switcher names. `GET /v1/core/storage`, device
+only, answers `NodeStorageReport` (`@acorn/protocol/api.ts`): the node process's resident memory, the
+core database, each plugin database, and the blob cache. A database's size includes its `-wal` and
+`-shm` files, because the WAL can be as large as the database between checkpoints. A plugin's
+package folder under `plugins/` is not a database and is not counted. Worktrees are left out, because
+walking them costs more than the answer is worth. Every size comes from `stat`, and the disk half is
+measured at most every 30 seconds, so a page asking every five seconds does not walk the blob cache
+each time (`server/storage/footprint.ts`). The same measurement feeds the one line the node logs at
+startup. A plugin adds its own numbers to the page through the `core:storage` point; the agents
+plugin reports its processes and its attachment and artifact folders
+([managed-agents.md § Operations and failure](./managed-agents.md#operations-and-failure)). The page
+reports and does not delete: nothing on it prunes a database or the blob cache.

@@ -1,7 +1,8 @@
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
-import { decodeIdFrame, type WsSendOptions } from '@acorn/protocol/ws.ts'
+import { evictPreviews, evictWebview, onWebviewState, webviewOperation, type WebviewState } from './webviewTransport'
 import type { NodeTransportError } from '@acorn/protocol/broker.ts'
+import { decodeIdFrame, type WsSendOptions } from '@acorn/protocol/ws.ts'
 import { apiRouteNamespace } from '@acorn/protocol/telemetry.ts'
 import {
   decodeBytes,
@@ -66,6 +67,7 @@ const statusListeners = new Set<(status: unknown) => void>()
 const transportErrorListeners = new Set<(nodeId: string, error: NodeTransportError) => void>()
 const pendingTransportErrors = new Map<string, NodeTransportError>()
 let eventInterest: string | null | undefined
+const configListeners = new Set<(state: unknown) => void>()
 let nextId = 1
 let socket: Promise<WebSocket> | null = null
 let liveSocket: WebSocket | null = null
@@ -127,6 +129,7 @@ const receive = (message: HelperMessage, receipt?: ReplyReceipt): void => {
       if (!transportErrorListeners.size) pendingTransportErrors.set(message.nodeId, message.error)
       else for (const cb of transportErrorListeners) cb(message.nodeId, message.error)
     }
+    else if (message.push === 'config-changed') for (const cb of configListeners) cb(message.state)
     // The node this renderer was talking to has been replaced by a restart or crash recovery. Its
     // endpoint, certificate and token are all new, so everything in memory is about a process that is
     // gone. Electron reloads the window from main; here the page reloads itself.
@@ -225,7 +228,6 @@ const onEvent = <T>(name: string, handler: (payload: T) => void): (() => void) =
 // Both seam groups project onto one Rust command set. Preview keys are `preview:<taskId>`; plugin
 // surfaces already arrive as `plugin:...` keys and pass through unchanged.
 
-type WebviewState = { key: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
 type WebviewBlocked = { key: string; url: string; host: string }
 
 const previewKey = (taskId: string): string => `preview:${taskId}`
@@ -233,14 +235,7 @@ const previewKey = (taskId: string): string => `preview:${taskId}`
 // Rect fields cross as-is: the renderer measures its pane in CSS pixels and Rust positions the child
 // webview in logical ones, which are the same unit on both sides of the boundary.
 const setBounds = (key: string, rect: { x: number; y: number; width: number; height: number }): void =>
-  void invoke('webview_bounds', { key, rect })
-
-// One listener per group rather than one per surface: a Tauri event listener is a round trip to
-// register, and the renderer already fans these out by key.
-const onWebviewState = (cb: (state: WebviewState) => void, matches: (key: string) => boolean): (() => void) =>
-  onEvent<WebviewState>('acorn:webview-state', (state) => {
-    if (matches(state.key)) cb(state)
-  })
+  void webviewOperation(key, 'webview_bounds', { rect }).catch(() => undefined)
 
 const toWireBody = (body: unknown): WireFetchBody | undefined => {
   const value = body as { kind: 'bytes'; bytes: Uint8Array } | { kind: 'form'; parts: Record<string, unknown>[] } | undefined
@@ -278,6 +273,11 @@ const acorn = {
         .then((approved) => invoke('quit_approved', { approved }))
         .catch(() => invoke('quit_approved', { approved: false }))
     }),
+  openConfigFile: () => invoke<void>('open_config_file'),
+  cli: {
+    status: () => invoke<{ available: boolean; installed: boolean; location: string | null; message: string }>('cli_install_status'),
+    install: () => invoke<{ available: boolean; installed: boolean; location: string | null; message: string }>('cli_install'),
+  },
 
   nodeFetch: async (nodeId: string, request: unknown) => {
     const { body, ...rest } = request as { body?: unknown }
@@ -323,8 +323,17 @@ const acorn = {
   plugins: {
     state: () => call('plugins-state'),
     cachePut: (request: unknown) => call('plugins-cache-put', request),
+    install: (request: unknown) => call('plugins-install', request),
+    remove: (request: unknown) => call<void>('plugins-remove', request),
     trustRecord: (request: unknown) => call<void>('plugins-trust-record', request),
+    trustForget: (request: unknown) => call<void>('plugins-trust-forget', request),
     devGrant: (request: unknown) => call<void>('plugins-dev-grant', request),
+  },
+  config: {
+    read: () => call('config-read'),
+    write: (patch: unknown) => call('config-write', patch),
+    onChange: (cb: (state: unknown) => void) => { configListeners.add(cb); return () => void configListeners.delete(cb) },
+    location: () => call('config-location'),
   },
 
   // The recovery screen's two native actions. Both are Rust's, not the helper's: they are reachable
@@ -356,22 +365,22 @@ const acorn = {
   // the client's and plays whether or not the OS agreed to show a banner.
   notify: {
     show: (request: { title: string; body?: string; tag: string }) => invoke<boolean>('show_notification', request),
-    // `tauri-plugin-notification` gives desktop no activation callback, so Rust approximates one from
-    // a window focus soon after a banner (src-tauri/src/commands.rs).
+    // Native notification clicks only. Window focus never requests navigation.
     onActivate: (cb: (tag: string) => void) => onEvent<string>('acorn:notification-activated', cb),
     setBadge: (count: number | null) => void invoke('set_badge', { count }),
   },
 
   // The browser preview pane. `show` is exclusive because one task's preview is on screen at a time,
-  // and `hide` names no task because what the caller means is "no preview right now".
+  // and cleanup hides only its task so a late hide cannot cover the incoming task.
   preview: {
-    ensure: (taskId: string, url: string) => invoke<boolean>('webview_ensure', { key: previewKey(taskId), url }),
+    ensure: (taskId: string, url: string) => webviewOperation<boolean>(previewKey(taskId), 'webview_ensure', { url }),
     setBounds: (taskId: string, rect: { x: number; y: number; width: number; height: number }) => setBounds(previewKey(taskId), rect),
-    show: (taskId: string) => void invoke('webview_show', { key: previewKey(taskId), exclusive: true }),
-    hide: () => void invoke('webview_hide_family', { prefix: 'preview:' }),
-    load: (taskId: string, url: string) => void invoke('webview_load', { key: previewKey(taskId), url }),
-    command: (taskId: string, action: string) => void invoke('webview_command', { key: previewKey(taskId), action }),
-    evict: (taskId: string) => void invoke('webview_evict', { key: previewKey(taskId) }),
+    show: (taskId: string) => void webviewOperation(previewKey(taskId), 'webview_show', { exclusive: true }).catch(() => undefined),
+    hide: (taskId: string) => void webviewOperation(previewKey(taskId), 'webview_hide').catch(() => undefined),
+    load: (taskId: string, url: string) => void webviewOperation(previewKey(taskId), 'webview_load', { url }).catch(() => undefined),
+    command: (taskId: string, action: string) => void webviewOperation(previewKey(taskId), 'webview_command', { action }).catch(() => undefined),
+    evict: (taskId: string) => evictWebview(previewKey(taskId)),
+    evictAll: evictPreviews,
     onEvent: (cb: (state: { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }) => void) =>
       onWebviewState(({ key, ...rest }) => cb({ taskId: key.slice('preview:'.length), ...rest }), (key) => key.startsWith('preview:')),
   },
@@ -380,13 +389,13 @@ const acorn = {
   // `ensure` and is checked again in Rust, which is the second of the two independent checks
   // docs/shell.md § Host-owned webviews asks for.
   webview: {
-    ensure: (key: string, url: string, hosts: readonly string[]) => invoke<boolean>('webview_ensure', { key, url, hosts: [...hosts] }),
+    ensure: (key: string, url: string, hosts: readonly string[]) => webviewOperation<boolean>(key, 'webview_ensure', { url, hosts: [...hosts] }),
     setBounds,
-    show: (key: string) => void invoke('webview_show', { key, exclusive: false }),
-    hide: (key: string) => void invoke('webview_hide', { key }),
-    load: (key: string, url: string) => invoke<boolean>('webview_load', { key, url }),
-    command: (key: string, action: string) => invoke<boolean>('webview_command', { key, action }),
-    evict: (key: string) => void invoke('webview_evict', { key }),
+    show: (key: string) => void webviewOperation(key, 'webview_show', { exclusive: false }).catch(() => undefined),
+    hide: (key: string) => void webviewOperation(key, 'webview_hide').catch(() => undefined),
+    load: (key: string, url: string) => webviewOperation<boolean>(key, 'webview_load', { url }),
+    command: (key: string, action: string) => webviewOperation<boolean>(key, 'webview_command', { action }),
+    evict: (key: string) => evictWebview(key),
     onEvent: (cb: (state: WebviewState) => void) => onWebviewState(cb, (key) => key.startsWith('plugin:')),
     onBlocked: (cb: (state: WebviewBlocked) => void) => onEvent<WebviewBlocked>('acorn:webview-blocked', cb),
   },

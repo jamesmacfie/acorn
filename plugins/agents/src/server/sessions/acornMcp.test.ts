@@ -8,8 +8,13 @@ const mcp = {
   name: 'acorn-dev',
   launcher: { command: '/opt/acorn/node', args: ['/opt/acorn/mcp.js'], env: { ACORN_MCP_NAME: 'acorn-dev' } },
 }
-const sessionEnv = { ACORN_API_TOKEN: 'signed', ACORN_API_URL: 'https://127.0.0.1:4317' }
-const session = (profileId: string) => ({ id: 'session-1', profileId })
+const sessionEnv = {
+  ACORN_API_TOKEN: 'signed',
+  ACORN_API_URL: 'https://127.0.0.1:4317',
+  ACORN_TASK_ID: 'task-1',
+  ACORN_SESSION_ID: 'session-1',
+}
+const session = (profileId: string) => ({ profileId })
 
 const profile = (id: string, extra: Partial<AgentProfileContribution> = {}): (() => void) =>
   agentProfileRegistry.register({
@@ -32,15 +37,17 @@ describe('acorn hands a harness its own tool server through one door', () => {
     registered.push(profile('deepseek:deepseek'))
 
     expect(acornMcpServers(mcp, session('deepseek:deepseek'), sessionEnv)).toEqual([{
+      transport: 'stdio',
       name: 'acorn-dev',
       command: '/opt/acorn/node',
       args: ['/opt/acorn/mcp.js'],
       // Spelled out, not inherited: an agent may scrub credential-shaped names out of what it passes
-      // its own children, and this server is useless without the token.
+      // its own children, and this server is useless without the token and the task.
       env: {
         ACORN_MCP_NAME: 'acorn-dev',
         ACORN_API_TOKEN: 'signed',
         ACORN_API_URL: 'https://127.0.0.1:4317',
+        ACORN_TASK_ID: 'task-1',
         ACORN_SESSION_ID: 'session-1',
       },
     }])

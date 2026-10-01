@@ -15,7 +15,13 @@ from its content-addressed cache with `connect-src 'none'`: the frame has no net
 `window.acorn`, and no reach into the shell. Its only I/O is one `MessagePort`, where every call
 is checked against the manifest's declared scopes by an allowlist naming each path and method
 (`packages/client-core/src/host/frames/`, `scopes.ts` is the choke point). The host pins which
-Node the frame talks to; the frame cannot name one. A `refPanel` frame is one of the two surfaces whose
+Node the frame talks to; the frame cannot name one.
+
+The bridge parses a request path before authorization and forwards that same canonical path with its
+query string. Paths whose route changes during URL parsing, encoded path separators, and fragments are
+refused, so a plugin-owned route cannot normalize into a core or another plugin's route.
+
+A `refPanel` frame is one of the two surfaces whose
 surrounding chrome the host draws rather than the plugin (`overlay` is the other): an iframe cannot
 `Portal` out of the box its consumer placed it in, and the bridge's close verb does not reach a
 reference panel — it is granted to importers and overlays only — so the manifest adapter
@@ -72,16 +78,36 @@ missing from the SDK facade is a method no plugin can reach, however permissive 
 underneath, and `put` was missing for exactly that reason until http (whose own updates take a
 full-replacement body) could not call its own routes from its own frame. `frames/verbs.ts` is what
 makes that class of bug a compile error now: it derives the wire union, the author-facing surface
-(`sdk.ts`) and the host-facing surface (`PluginFrame.tsx`, through `FrameServices`) from one verb list,
+(`bridgeTypes.ts`) and the host-facing surface (`PluginFrame.tsx`, through `FrameServices`) from one verb list,
 with two `Covers<>` assertions that fail the build the moment a verb lands on the wire without a row on
 either surface, or gains a surface row the wire does not carry.
 
-Three verbs are named in that file as asking nothing of the services bag: `cancel`, which makes the
-broker drop its own record of an in-flight request, `connected`, which is the frame's evidence that
+Three verbs are named in that file as asking nothing of the services bag: `cancel`, which releases
+a request's reply ID and aborts its API signal, `connected`, which is the frame's evidence that
 it evaluated, and `telemetry`, which the broker emits through the emitter it already holds for its
 own histograms ([telemetry.md](../telemetry.md) § A frame's own records). A record is not an effect
 on the shell, so routing it through `FrameServices` would mean threading an implementation through
 `PluginFrame.tsx` and the worker path to buy nothing.
+
+### Request lifetime
+
+The bridge reserves a request ID until its API, state, document, or webview handler settles or the
+request is cancelled.
+A non-cancel message that reuses a live ID closes the bridge before dispatch. The host sends no reply
+for the duplicate because that reply could settle the original SDK promise. Completed or cancelled
+IDs can be reused. A completion may reply or release its reservation only while it owns that exact ID.
+
+Cancellation and disposal suppress late replies. API calls receive an abort signal. State writes,
+document flushes, and native webview commands have no abort interface, so cancellation does not undo
+an effect already issued. Cancellation releases the reply ID for reuse, but the operation counts
+against the cap on outstanding work until its handler settles, even if an API service ignores abort.
+Disposal aborts every active API signal, clears reply ownership and work accounting for the closed
+bridge, and suppresses late completions without waiting for native effects.
+
+The host closes a bridge after more than 1,000 messages in a ten-second window, or when any message
+arrives while 100 handlers are outstanding on that live bridge, including cancelled handlers that
+have not settled. The latter also applies to cancellation at the cap.
+The SDK uses distinct request IDs, including for cancellation messages.
 
 ### Binary bridge calls
 
@@ -168,6 +194,11 @@ applies whole or not at all, and a worker that stops answering is terminated and
 place it contributed.
 The wire is `@acorn/protocol/tree/`, the host is `client-core/src/host/tree/`, and
 `docs/shell.md § The plugin worker` has the sandbox.
+
+The worker belongs to one accepted `(pluginId, hash)` pair, while authority belongs to each mounted
+tree. The host supplies a separate bridge port and context for every mount, routes selection and
+surface actions to that mount, and stops the worker immediately if trust for its pair is revoked.
+An older SDK can mount one tree per worker so its single bridge never grants another tree's scope.
 
 Two things a tree is not for. Anything that must react per keystroke — a live filter over a large list,
 a query editor with completions — is a message hop per key and should be a frame. And a surface whose

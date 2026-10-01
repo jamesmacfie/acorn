@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
-import { AcornBridgeError, connect, mountFrame, openLinkOnClick, _resetConnection, type AcornBridge } from './sdk'
+import { AcornBridgeError, connect, mountFrame, mountTree, openLinkOnClick, _resetConnection, type AcornBridge } from './sdk'
 
 // The SDK runs inside a frame, so there is no window here to run it in: the suite is plain Node
 // (packages/client-core/vitest.config.ts). What it needs is exactly what a frame gives it: something
@@ -99,6 +99,65 @@ describe('connect', () => {
     // MessagePort delivery is asynchronous and can miss a single event-loop turn under the full
     // suite's process load. Wait for the contract rather than treating one zero-delay timer as it.
     await vi.waitFor(() => expect(sent).toEqual([{ kind: 'connected' }]))
+  })
+})
+
+describe('tree mount bridges', () => {
+  it('pins each mount to its own context, requests and selection, then rejects calls on unmount', async () => {
+    const tree = new MessageChannel()
+    const first = new MessageChannel()
+    const second = new MessageChannel()
+    const drawn = new Map<string, AcornBridge>()
+    const seen = [[], []] as Record<string, unknown>[][]
+    const firstContext = { ...CONTEXT, surface: 'task', taskId: 'task-a' }
+    const secondContext = { ...CONTEXT, surface: 'project', projectId: 'project-b' }
+    first.port1.onmessage = (event: MessageEvent) => seen[0]!.push(event.data as Record<string, unknown>)
+    second.port1.onmessage = (event: MessageEvent) => seen[1]!.push(event.data as Record<string, unknown>)
+    tree.port1.onmessage = () => {}
+    host(() => undefined)
+
+    mountTree({ pane: (bridge) => { drawn.set(bridge.context.surface, bridge) } })
+    for (const listener of windowListeners) listener({ data: HELLO, ports: [channel.port2, tree.port2] })
+    push({ kind: 'ready', context: CONTEXT })
+    await vi.waitFor(() => expect(sent).toContainEqual({ kind: 'connected' }))
+
+    first.port1.postMessage({ kind: 'ready', context: firstContext })
+    second.port1.postMessage({ kind: 'ready', context: secondContext })
+    tree.port1.postMessage({ kind: 'tree:mount', slot: 's1', entry: 'pane', props: {}, bridgePort: first.port2 }, [first.port2])
+    tree.port1.postMessage({ kind: 'tree:mount', slot: 's2', entry: 'pane', props: {}, bridgePort: second.port2 }, [second.port2])
+    await vi.waitFor(() => expect(drawn.size).toBe(2))
+    expect(drawn.get('task')?.context.taskId).toBe('task-a')
+    expect(drawn.get('project')?.context.projectId).toBe('project-b')
+
+    const one = drawn.get('task')!
+    const two = drawn.get('project')!
+    const selected = [vi.fn(), vi.fn()]
+    one.onSelect(selected[0]!)
+    two.onSelect(selected[1]!)
+    second.port1.postMessage({ kind: 'select', item: 'issue-2' })
+    await vi.waitFor(() => expect(selected[1]).toHaveBeenCalledWith('issue-2'))
+    expect(selected[0]).not.toHaveBeenCalled()
+
+    const firstController = new AbortController()
+    const removeAbort = vi.spyOn(firstController.signal, 'removeEventListener')
+    const firstCall = one.api.get('/v1/p/example/one', { signal: firstController.signal })
+    const secondCall = two.api.get('/v1/p/example/two')
+    await vi.waitFor(() => expect(seen.every((messages) => messages.some((message) => message.kind === 'api'))).toBe(true))
+    const firstRequest = seen[0]!.find((message) => message.kind === 'api')!
+    const secondRequest = seen[1]!.find((message) => message.kind === 'api')!
+    expect(firstRequest.path).toBe('/v1/p/example/one')
+    expect(secondRequest.path).toBe('/v1/p/example/two')
+    second.port1.postMessage({ id: secondRequest.id, ok: true, status: 200, body: 'second' })
+    await expect(secondCall).resolves.toBe('second')
+    tree.port1.postMessage({ kind: 'tree:unmount', slot: 's1' })
+    await expect(firstCall).rejects.toMatchObject({ code: 'unmounted' })
+    expect(removeAbort).toHaveBeenCalledWith('abort', expect.any(Function))
+    await expect(one.api.get('/after')).rejects.toMatchObject({ code: 'unmounted' })
+
+    tree.port1.postMessage({ kind: 'tree:unmount', slot: 's2' })
+    tree.port1.close()
+    first.port1.close()
+    second.port1.close()
   })
 })
 
@@ -234,6 +293,19 @@ describe('api calls', () => {
     expect(sent.at(-1)).toMatchObject({ kind: 'cancel' })
   })
 
+  it('removes the abort listener after a request settles', async () => {
+    host((message) => message.kind === 'api' ? { id: message.id, ok: true, status: 200, body: 'done' } : undefined)
+    const acorn = await handshake()
+    const controller = new AbortController()
+    const remove = vi.spyOn(controller.signal, 'removeEventListener')
+
+    await expect(acorn.api.get('/v1/p/example/result', { signal: controller.signal })).resolves.toBe('done')
+    expect(remove).toHaveBeenCalledWith('abort', expect.any(Function))
+    controller.abort()
+    await new Promise((resolve) => setTimeout(resolve, 5))
+    expect(sent.some((message) => message.kind === 'cancel')).toBe(false)
+  })
+
   it('rejects immediately for a signal that is already aborted', async () => {
     host(() => undefined)
     const acorn = await handshake()
@@ -338,6 +410,8 @@ describe('state and ui', () => {
     expect(sent.at(-1)).toMatchObject({ op: 'openPane', paneId: 'board' })
     await acorn.ui.openDestination('memory-review', 'candidate-1', 'revision-2')
     expect(sent.at(-1)).toMatchObject({ op: 'openDestination', destinationId: 'memory-review', resourceId: 'candidate-1', subresourceId: 'revision-2' })
+    await acorn.ui.openTask('task-9')
+    expect(sent.at(-1)).toMatchObject({ op: 'openTask', taskId: 'task-9' })
     await acorn.ui.openUrl('https://github.com/runn/acorn/pull/1')
     expect(sent.at(-1)).toMatchObject({ op: 'openUrl', url: 'https://github.com/runn/acorn/pull/1' })
     await acorn.ui.done()

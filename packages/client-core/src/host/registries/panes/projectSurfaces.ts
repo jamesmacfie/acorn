@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js'
-import { Registry } from '../../../kit/lib/registry'
+import { Registry } from '../../../kit/lib/state/registry'
 
 // A plugin surface that lives at project scope: drawn beside its own rail Source's list, addressed by
 // a URL, and never inside a task's layout. docs/panes.md § Pane scope covers why this needed its own

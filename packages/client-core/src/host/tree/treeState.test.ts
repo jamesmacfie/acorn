@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
-import { createTreeState } from './treeState'
+import { createTreeScheduler, createTreeState } from './treeState'
 
 // The pre-flight check in treeState.ts, which decides whether a whole batch may be applied
 // (docs/plugins.md § The tree contract). The drawing half is TreeHost.test.tsx and Slot.test.tsx;
@@ -17,6 +17,37 @@ const host = () => {
 
 type TreeNode = Extract<TreeMutation, { op: 'insert' }>['node']
 const leaf = (id: string, children: TreeNode[] = []): TreeNode => ({ id, type: 'Text', props: {}, children })
+
+describe('remote tree scheduling', () => {
+  it('flushes a hidden window without an animation frame and bounds a stalled visible frame', () => {
+    vi.useFakeTimers()
+    try {
+      const frame = vi.fn(() => 1)
+      const cancelFrame = vi.fn()
+      let hidden = true
+      const scheduler = createTreeScheduler(frame, cancelFrame, () => hidden)
+      const flush = vi.fn()
+      scheduler.schedule(flush)
+      expect(frame).not.toHaveBeenCalled()
+      vi.runOnlyPendingTimers()
+      expect(flush).toHaveBeenCalledTimes(1)
+
+      hidden = false
+      scheduler.schedule(flush)
+      expect(frame).toHaveBeenCalledTimes(1)
+      vi.advanceTimersByTime(100)
+      expect(flush).toHaveBeenCalledTimes(2)
+      expect(cancelFrame).toHaveBeenCalledWith(1)
+
+      const cancelled = scheduler.schedule(flush)
+      scheduler.cancel(cancelled)
+      vi.runOnlyPendingTimers()
+      expect(flush).toHaveBeenCalledTimes(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
 
 describe('a remove takes its whole subtree with it', () => {
   it('refuses a later op addressing a grandchild of a removed node', () => {

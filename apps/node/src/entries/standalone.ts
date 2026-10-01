@@ -22,6 +22,8 @@ import { buildPluginDeps } from '../composition/pluginDeps'
 import { buildPluginStateBridge, effectiveDisabled } from '../composition/pluginState'
 import { assembleNodeGraph, drainNode, reconcileBundledPackages, reconcileNode } from '../composition/composition'
 import { setWorktreesRoot } from '@acorn/node-core/server/worktrees'
+import { closeSync, readFileSync, writeSync } from 'node:fs'
+import { installBackgroundLog } from './background'
 
 // This file is the one place under `apps/node/src` that still calls `console.log`, and it is in the
 // console rule's baseline on purpose (tools/arch/boundaries.test.ts). Two things it writes are not
@@ -35,6 +37,11 @@ import { setTelemetryDataRoot } from '@acorn/node-core/server/telemetry'
 
 // Before anything can throw. A crash during boot is otherwise a silent death with no record
 // (../composition/crash.ts).
+const background = process.env.ACORN_CLI_BACKGROUND === '1'
+if (background) {
+  if (!process.env.ACORN_CLI_LOG_PATH || !process.env.ACORN_CLI_SERVICE_ID) throw new Error('Missing background service configuration')
+  installBackgroundLog(process.env.ACORN_CLI_LOG_PATH)
+}
 installCrashHandlers()
 
 const log = createLogger('node')
@@ -49,7 +56,7 @@ const root = openDataRoot(process.env.ACORN_DATA_DIR || devDataDir())
 // machine); silent under a service manager (server/transport/advertise.ts).
 await confirmAdvertiseHost(root)
 const capabilities = new CapabilityRegistry()
-const runtime = makeRuntime(root, undefined, capabilities)
+const runtime = makeRuntime(root, undefined, capabilities, background ? process.env.ACORN_CLI_SERVICE_ID : undefined)
 const disabledPlugins = disabledPluginsStore(root.dir)
 // The disabled-plugin list a standalone node reads (docs/node-distribution.md § Plugins). There is
 // no start-config override here: only the supervised host passes one.
@@ -107,11 +114,11 @@ const schedulerCapability = capabilities.provide(SCHEDULER, scheduler)
 const plugins = await initPlugins(graph.plugins, { capabilities, core, env: runtime, dataDir: root.dir, disabled: disabled(), loaded: graph.loaded })
 const pluginStateCapability = capabilities.provide(
   PLUGIN_STATE,
-  buildPluginStateBridge({
+  await buildPluginStateBridge({
     dataDir: root.dir,
     db: runtime.DB,
     roster: () => plugins.roster,
-    booted: () => graph.installed.map((entry) => ({ id: entry.manifest.id, version: entry.manifest.version })),
+    booted: () => graph.installed,
     loadFailures: () => graph.failures,
     disabled,
     setDisabled: (names) => disabledPlugins.set(names),
@@ -200,12 +207,12 @@ const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
 // SIGUSR1 reopens the pairing window (docs/node-distribution.md § Runtime): no token, no second
 // port, and it needs shell access on this machine, the same "the owner is present" property pairing
 // itself relies on.
-process.on('SIGUSR1', () => printPairingBanner(runtime.PAIRING_CODES.issue()))
+if (!background) process.on('SIGUSR1', () => printPairingBanner(runtime.PAIRING_CODES.issue()))
 process.once('SIGINT', (signal) => void shutdown(signal))
 process.once('SIGTERM', (signal) => void shutdown(signal))
 
-console.log(
-  JSON.stringify({
+const previousToken = background ? readPrivateToken() : process.env.ACORN_DEVICE_TOKEN
+const handshake = JSON.stringify({
     baseline: ACORN_BASELINE,
     nodeId: root.nodeId,
     // The handshake's protocol number (docs/api-reference.md § Versioning): a launcher can refuse a
@@ -214,9 +221,18 @@ console.log(
     endpoint: listener.endpoint.origin,
     fingerprint: listener.fingerprint,
     certPem: listener.certPem,
-    deviceToken: await resolveDeviceToken(runtime.DEVICES, process.env.ACORN_DEVICE_TOKEN, 'Standalone node launcher'),
-  }),
-)
+    deviceToken: await resolveDeviceToken(runtime.DEVICES, previousToken || undefined, 'Standalone node launcher'),
+  })
+if (background) {
+  writeSync(3, `${handshake}\n`)
+  closeSync(3)
+}
+else console.log(handshake)
+
+function readPrivateToken(): string {
+  try { return readFileSync(4, 'utf8').trim() }
+  finally { closeSync(4) }
+}
 
 // The first advertised host, or the loopback origin when there is none. One line, beside the banner
 // that makes the same choice for the same reason.
@@ -252,4 +268,4 @@ function printPairingBanner(code: string | null): void {
   console.log('')
 }
 
-printPairingBanner(alreadyPaired === 0 ? runtime.PAIRING_CODES.issue() : null)
+if (!background) printPairingBanner(alreadyPaired === 0 ? runtime.PAIRING_CODES.issue() : null)

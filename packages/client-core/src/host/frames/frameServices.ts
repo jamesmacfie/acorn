@@ -10,6 +10,8 @@ import { openInAppUrl } from '../registries/panes/contentLinks'
 import { keybindingRegistry, resolveFrameKeybinding, resolveKeybindings } from '../registries/commands/keybindings'
 import { saveJsonPref } from '../../features/settings/savePref'
 import { activeTaskId } from '../../features/tasks/tasks'
+import { activateTaskSignals, pathForTask } from '../../features/tasks/activate'
+import { taskById } from '../../features/tasks/taskLookup'
 import type { FrameBinding, FrameServices } from './broker'
 import { isSubscribable } from './channels'
 import { onPluginFrame } from '../plugins/pluginChannel'
@@ -165,6 +167,19 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
       const taskId = props.binding.taskId
       if (taskId) openTarget(taskId, target)
     },
+    // The same activate-then-navigate every task link in the shell runs (host/chrome/actions.ts).
+    //
+    // The lookup is the active node's task cache, so a surface bound to another node gets
+    // `not_found` rather than a node switch. Switch first, as the attention inbox does, if a plugin
+    // surface on a remote node ever needs this.
+    openTask: (taskId) => {
+      const task = taskById(taskId)
+      if (!task) return undefined
+      return () => {
+        activateTaskSignals(task)
+        host.navigate(pathForTask(task))
+      }
+    },
     // A link clicked inside a frame's rendered content, resolved on the host's side of the port through
     // the same content-link ladder and rung-preference rule every shell surface follows
     // (docs/plugins.md § Loaded plugins: the client half).
@@ -198,15 +213,13 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
     // there is no scope to declare, because the grant is structural. The indirection through the
     // accessor is what makes the two regions' mount order a non-issue: the frame can connect before the
     // editor has loaded its document, and its first `document.read()` still lands on the real thing.
-    ...(props.document
-      ? {
-        document: {
-          read: () => props.document?.()?.read() ?? '',
-          write: (text: string) => props.document?.()?.write(text),
-          flush: async () => void (await props.document?.()?.flush()),
-        },
-      }
-      : {}),
+    get document() {
+      // A composed region has a structural grant, but the sibling editor may arrive later or go
+      // away first. Read the accessor for each request so a missing editor cannot read as an empty
+      // document or silently discard a write.
+      const document = props.document?.()
+      return document ?? undefined
+    },
     webviewNavigate: (url) => props.webview?.navigate(url) ?? Promise.resolve(false),
     webviewCommand: (action) => props.webview?.command(action) ?? Promise.resolve(false),
     keydown: (chord) => {

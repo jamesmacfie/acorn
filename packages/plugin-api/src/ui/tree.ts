@@ -11,13 +11,13 @@ export {
   solidTree, KIT_NODE_COMPONENTS,
   Stack, Inline, Section, Fold, Card, Timeline, Tabs, Toolbar, Modal, ModalBody,
   ModalActions, Menu, Popover, ListDetail, ListColumn, DetailColumn, SplitHandle, DocumentTabs,
-  SectionHeader, TabPanel, ToolbarSpacer, Text, Link, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip,
+  SectionHeader, TabPanel, ToolbarSpacer, SettingsSection, SettingRow, Text, Link, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip,
   ChipRow, StatusDot, Facts, DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Meter, CodeBlock, Log, Markdown, DiffPane,
-  DiffLine, FileHead,
+  DiffLine, FileHead, StackedDiff,
   NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon, Button, IconButton, Input, Textarea,
   Select, Checkbox, SegmentedControl, ToggleButton, Picker, PickerRow, Composer, MentionTextarea,
   KeyValueEditor, FindBar, Field, ConfirmButton, CopyButton, ModelBackendPicker, Rectangle, Only,
-  Fallback,
+  Fallback, Slot,
 } from '@acorn/client-core/host/frames/remoteSolid.ts'
 // The universal-renderer surface. Solid's JSX preset emits calls to these by name; you do not write
 // them, and their names are Solid's rather than acorn's.
@@ -30,6 +30,7 @@ export type { KitNodeProps } from '@acorn/client-core/host/frames/remoteSolid.ts
 // components compiled for a document, and a tree bundle must not pull one in: its own build compiles
 // JSX into acorn's nodes, so a shell component reaching it would come out the far side as a tree.
 export { createArmedConfirm } from '@acorn/client-core/kit/lib/confirm'
+export { modelProviderFailure } from '@acorn/client-core/kit/lib/modelProviderFailure'
 // Which model a backend starts on, for a tree that draws a `ModelBackendPicker` node and has to
 // seed it. A pure function, and its own module for exactly this reason.
 export { defaultModelIdFor } from '@acorn/client-core/features/settings/default-model'

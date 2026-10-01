@@ -6,8 +6,8 @@ import { projectsOptions } from '../../infra/queries'
 import { isValidBranch, slugifyBranch } from '@acorn/protocol/branch.ts'
 import { sourceRegistry } from '../../host/registries/sources/sources'
 import { Tabs } from '../../kit/components/layout/Tabs'
-import { createDismissable } from '../../kit/lib/dismissable'
-import { Alert, Button, Select } from '../../kit/components/primitives'
+import { createDismissable } from '../../kit/lib/controls/dismissable'
+import { Alert, Button, Checkbox, Input, Select } from '../../kit/components/primitives'
 import { taskBridge } from '../tasks/taskBridge'
 import { defaultBranchForTask } from '../tasks/defaultBranch'
 
@@ -59,6 +59,7 @@ export function PromoteToTaskModal(props: {
   const [title, setTitle] = createSignal('')
   const [branch, setBranch] = createSignal('')
   const [branchTouched, setBranchTouched] = createSignal(false)
+  const [skipSetup, setSkipSetup] = createSignal(false)
   const [attachId, setAttachId] = createSignal(props.attachTasks[0]?.id ?? '')
   const [error, setError] = createSignal('')
   const [busy, setBusy] = createSignal(false)
@@ -121,7 +122,7 @@ export function PromoteToTaskModal(props: {
       if (!current) {
         const base = await Promise.resolve(promotion().prepare(props.item, context))
         const seed: TaskSeed = isGitProject
-          ? { ...base, title: title().trim(), branch: b }
+          ? { ...base, title: title().trim(), branch: b, skipSetup: skipSetup() }
           : { ...base, title: title().trim(), branch: undefined }
         const task = await promotion().create(seed)
         current = { mode: 'new', task, linked: false }
@@ -186,23 +187,25 @@ export function PromoteToTaskModal(props: {
           <Show when={mode() === 'new'}>
             <form id="promote-panel-new" role="tabpanel" class="integration-key-row" style={formStyle} onSubmit={submitNew}>
               <p class="muted">New task in {project()?.name ?? 'this project'}.</p>
-              <input class="ui-input" type="text" placeholder="Task title" value={title()} disabled={!!prepared()} onInput={(e) => setTitle(e.currentTarget.value)} />
+              <Input placeholder="Task title" value={title()} disabled={!!prepared()} onInput={(value) => setTitle(value)} />
               <Show when={project()?.vcs === 'git'}>
-                <input
-                  class="ui-input"
-                  type="text"
+                <Input
                   placeholder="branch (from title)"
                   title="Branch name — defaults to a slug of the title"
                   value={branchTouched() || branch().trim() ? branch() : defaultBranch()}
                   disabled={!!prepared()}
-                  onInput={(e) => {
-                    // Read and store the edit before switching the value expression to the touched
-                    // branch. Solid updates synchronously, so flipping the flag first would restore
-                    // the seeded value before `currentTarget.value` was read.
-                    const value = e.currentTarget.value
+                  onInput={(value) => {
                     setBranch(value)
                     setBranchTouched(true)
                   }}
+                />
+                <Checkbox
+                  size="sm"
+                  label="Skip setup script"
+                  title="Do not run this project's setup script for this task"
+                  checked={skipSetup()}
+                  disabled={!!prepared()}
+                  onChange={setSkipSetup}
                 />
               </Show>
               <div class="close-actions">

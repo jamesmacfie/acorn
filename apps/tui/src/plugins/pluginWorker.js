@@ -3,29 +3,43 @@
 // A terminal has no iframe, so rung 0 of docs/security.md § The containment ladder is a
 // `node:worker_threads` worker started under `--permission` with read access to two files and nothing
 // else — this one and the bundle. The permission model covers the filesystem, child processes, native
-// addons and workers; it does not cover the network, so the two lines that matter here are the module
-// hook and the deleted globals. Between them a bundle reaches the host over its port or not at all,
+// addons and workers. Node 22 and 24 do not cover the network, so the builtin policy and deleted
+// globals apply before bundle evaluation. A bundle reaches the host through its scoped ports,
 // which is the same choke point the DOM worker has under `connect-src 'none'`.
 //
 // Plain JavaScript, not TypeScript, and no imports from the rest of this app: it is loaded by path
 // from a worker with almost no filesystem, so it has to be one file the runtime can read on its own.
-import { registerHooks } from 'node:module'
+import { builtinModules, registerHooks, syncBuiltinESMExports } from 'node:module'
 import { parentPort, workerData } from 'node:worker_threads'
 
-// Everything a bundle could reach the network, the filesystem or another process with that
-// `--permission` does not already refuse. `node:module` is on the list so a bundle cannot register a
-// hook of its own and undo this one; `node:worker_threads` so it cannot start a second worker to run
-// outside the deny list it inherited nothing of.
-const DENIED = new Set([
-  'net', 'http', 'https', 'http2', 'tls', 'dgram', 'dns', 'quic',
-  'child_process', 'worker_threads', 'cluster', 'module', 'vm', 'inspector', 'repl',
-])
+// The trusted factory derives this set from protocol's shared builtin family policy. Unknown,
+// internal and privileged builtins are absent; the client receives no sockets or exec permission.
+// Keeping the policy input in workerData lets this bootstrap remain one readable file.
+const allowedBuiltins = new Set(workerData.builtins)
+const knownBuiltins = new Set(builtinModules)
+const builtinAllowed = (specifier) => allowedBuiltins.has(specifier.replace(/^node:/, ''))
 registerHooks({
   resolve(specifier, context, next) {
-    if (DENIED.has(specifier.replace(/^node:/, ''))) throw new Error(`acorn: a plugin worker may not import '${specifier}'`)
-    return next(specifier, context)
+    if ((specifier.startsWith('node:') || knownBuiltins.has(specifier)) && !builtinAllowed(specifier)) {
+      throw new Error(`acorn: a plugin worker may not import '${specifier}'`)
+    }
+    const resolved = next(specifier, context)
+    if (resolved.url.startsWith('node:') && !builtinAllowed(resolved.url)) {
+      throw new Error(`acorn: a plugin worker may not import '${specifier}'`)
+    }
+    return resolved
   },
 })
+
+// This synchronous accessor bypasses module resolution hooks. Capture it privately and apply the
+// same policy before plugin evaluation, including bare names and builtin subpaths.
+const getBuiltinModule = process.getBuiltinModule.bind(process)
+process.getBuiltinModule = (specifier) => {
+  if (!builtinAllowed(specifier)) throw new Error(`acorn: a plugin worker may not load builtin '${specifier}'`)
+  return getBuiltinModule(specifier)
+}
+// Update named exports even if trusted bootstrap code loaded node:process before the replacement.
+syncBuiltinESMExports()
 
 // The network, as globals. Deleted rather than left to fail later, so a bundle that probes for them
 // takes the branch it would take in a frame under `connect-src 'none'`.

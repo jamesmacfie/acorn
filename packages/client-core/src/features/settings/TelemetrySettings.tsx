@@ -1,13 +1,16 @@
 import { For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { prefsOptions, telemetrySummaryOptions } from '../../infra/queries'
-import { formatRelativeTime } from '../../kit/lib/formatRelativeTime'
-import { Checkbox, Field } from '../../kit/components/primitives'
+import { nodePrefsOptions, telemetrySummaryOptions } from '../../infra/queries'
+import { formatRelativeTime } from '../../kit/lib/rendering/formatRelativeTime'
+import { Checkbox } from '../../kit/components/primitives'
+import { SettingRow } from '../../kit/components/layout/SettingRow'
+import { SettingsSection } from '../../kit/components/layout/SettingsSection'
+import { createSettingSave } from './settingSave'
 import { saveTelemetryOn, telemetryOn } from './telemetrySetting'
 import './settings.css'
 
 // Settings → Telemetry: the one switch, and an honest account of what it turns on
-// (docs/telemetry.md § The switch).
+// (docs/telemetry.md § The switch). Per node, following the settings header's node switcher.
 //
 // One control on a page of its own rather than a row buried under Appearance, because this is the
 // page a person opens to answer "what is this app sending". The page says what collection is for and
@@ -27,34 +30,41 @@ import './settings.css'
  *  plus a handful of plugins across the five kinds, short enough that the page stays a page. */
 const ROWS_SHOWN = 12
 
-export default function TelemetrySettings() {
+export default function TelemetrySettings(props: { nodeId: string | null }) {
   const qc = useQueryClient()
-  const prefs = createQuery(() => prefsOptions(true))
+  // The named node's own rows, whichever node the settings header points at. The switch is a node
+  // preference, so there is no device value to merge in.
+  const prefs = createQuery(() => nodePrefsOptions(props.nodeId))
   const on = () => telemetryOn(prefs.data)
-  const summary = createQuery(() => telemetrySummaryOptions(true))
+  const summary = createQuery(() => telemetrySummaryOptions(true, props.nodeId))
   const rows = () => summary.data?.records ?? []
   const total = () => rows().reduce((sum, row) => sum + row.count, 0)
+  const save = createSettingSave()
 
   return (
     <>
-      <Field
+      <SettingsSection
+        id="collection"
         label="Collection"
-        hint="Off unless you turn it on. The node re-reads this within five seconds, and every window and terminal paired with it follows."
-        group
+        description="Off unless you turn it on. The node re-reads this within five seconds, and every window and terminal paired with it follows."
       >
-        <Checkbox
+        <SettingRow
           label="Collect timings, logs and errors on this node"
-          checked={on()}
-          onChange={(next) => void saveTelemetryOn(qc, next)}
-        />
-      </Field>
+          // Until the node answers, the switch would show Off as a guess and a click would write it.
+          error={save.error() ?? (prefs.isError ? 'Could not read this node\'s setting.' : undefined)}
+        >
+          <Checkbox
+            switch
+            ariaLabel="Collect timings, logs and errors on this node"
+            checked={on()}
+            disabled={!prefs.isSuccess}
+            onChange={(next) => save.run(() => saveTelemetryOn(qc, next, props.nodeId))}
+          />
+        </SettingRow>
+      </SettingsSection>
 
-      <Field
-        label="What this node has collected"
-        hint="Since the node started. Counts, never the records themselves."
-        group
-      >
-        <Show when={summary.data} fallback={<p class="muted">Asking the node.</p>}>
+      <SettingsSection id="collected" label="What this node has collected" description="Since the node started. Counts, never the records themselves.">
+        <Show when={summary.data} fallback={<p class="muted">{summary.isError ? 'The node did not answer.' : 'Asking the node.'}</p>}>
           {(data) => (
             <>
               <p class="muted">
@@ -86,24 +96,24 @@ export default function TelemetrySettings() {
             </>
           )}
         </Show>
-      </Field>
+      </SettingsSection>
 
-      <Field label="What a record can hold" group>
+      <SettingsSection id="records" label="What a record can hold">
         <p class="muted">
           A record carries a name, a duration, and a short list of scalar attributes: which route, which
           plugin, which pane, and whether it worked. Prompts, agent output, file contents, diffs,
           terminal bytes, request bodies and query text are never included, and absolute paths are cut
           back to your home directory and the data root before a record is kept.
         </p>
-      </Field>
+      </SettingsSection>
 
-      <Field label="Where it goes" group>
+      <SettingsSection id="destination" label="Where it goes">
         <p class="muted">
           Nowhere on its own. Records are held on the node and handed to whichever plugin you have given
           the telemetry permission to. With no such plugin installed, nothing is collected and nothing
           leaves this machine.
         </p>
-      </Field>
+      </SettingsSection>
     </>
   )
 }

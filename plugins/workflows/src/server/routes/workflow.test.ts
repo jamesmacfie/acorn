@@ -2,14 +2,14 @@ import { Hono } from 'hono'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AppEnv } from '@acorn/plugin-api/testkit'
 import { requireUser } from '@acorn/plugin-api/testkit'
-import { ProviderOperationError } from '@acorn/plugin-api/node'
+import { BridgeError, ProviderOperationError } from '@acorn/plugin-api/node'
 import { workflow, setWorkflowBridge, type WorkflowBridge } from './workflow'
 import { setWorkflowDefsBridge, workflowDefsRoutes, type WorkflowDefsBridge } from './defs'
 import type { Env } from '@acorn/plugin-api/testkit'
 
 // Workflow start/gate execute an agent step, so the route test proves body validation, auth, and
 // the bridge-unavailable 503 (the privileged-boundary contract). The runner logic is tested in
-// ../workflowRunner.test.ts.
+// the run and dispatch tests.
 
 const req = (url: string, method = 'GET', body?: unknown) =>
   new Request(`http://acorn.test${url}`, {
@@ -38,7 +38,9 @@ const fake = (over: Partial<WorkflowBridge> = {}): WorkflowBridge => ({
   start: async () => ({ runId: 'run1' }),
   startById: async () => ({ runId: 'run1' }),
   runs: async () => [],
+  run: async () => null,
   steps: async () => [],
+  stepStatuses: async () => ({ steps: [], truncated: false }),
   gate: async () => ({ ok: true }),
   cancel: async () => ({ ok: true }),
   kill: async () => ({ ok: true }),
@@ -111,6 +113,22 @@ describe('workflow routes', () => {
     expect(gated).toEqual({ runId: 'run1', stepId: 'step1', approved: true })
   })
 
+  it('carries approved form values, and refuses values on a rejection before the bridge', async () => {
+    const seen: unknown[] = []
+    setWorkflowBridge(fake({ gate: async (_runId, _stepId, approved, values) => (seen.push({ approved, values }), { ok: true }) }))
+    const app = authed()
+    expect((await app.fetch(req('/api/workflows/runs/run1/gate', 'POST', { stepId: 's', approved: true, values: { title: 'Edited', notify: true } }), {} as Env)).status).toBe(200)
+    expect((await app.fetch(req('/api/workflows/runs/run1/gate', 'POST', { stepId: 's', approved: false, values: { title: 'x' } }), {} as Env)).status).toBe(400)
+    expect(seen).toEqual([{ approved: true, values: { title: 'Edited', notify: true } }])
+  })
+
+  it('answers 409 when another device already answered the gate', async () => {
+    setWorkflowBridge(fake({ gate: async () => { throw new BridgeError(409, 'gate-resolved', 'This gate was already answered.') } }))
+    const res = await authed().fetch(req('/api/workflows/runs/run1/gate', 'POST', { stepId: 'step1', approved: false }), {} as Env)
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toMatchObject({ code: 'gate-resolved', message: 'This gate was already answered.' })
+  })
+
   it('cancels runs and kills steps', async () => {
     const calls: string[] = []
     setWorkflowBridge(
@@ -170,36 +188,42 @@ describe('workflow routes', () => {
     expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', { def, defId: 'repo:ship' }), {} as Env)).status).toBe(400)
   })
 
-  // A row skips the repo trust snapshot because it has no committed bytes to hash. An agent inside the
-  // task may still start a file, which the snapshot does cover.
-  it('lets a task-confined caller start a file by id but never a row', async () => {
-    const started: string[] = []
-    setWorkflowBridge(fake({ startById: async (_t, defId) => (started.push(defId), { runId: 'run1' }) }))
-    const app = asTask1()
-    expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', { defId: 'repo:ship' }), {} as Env)).status).toBe(200)
-    expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', { defId: 'user:ship' }), {} as Env)).status).toBe(200)
-    expect((await app.fetch(req('/api/tasks/task1/workflows', 'POST', { defId: 'a-row-uuid' }), {} as Env)).status).toBe(403)
-    expect(started).toEqual(['repo:ship', 'user:ship'])
+  it.each([
+    ['task process', { kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1' }],
+    ['restricted session', { kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1', sessionId: 'restricted', toolCeiling: { maxRisk: 'read' } }],
+    ['workflow session', { kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1', sessionId: 'workflow-step' }],
+    ['service process', { kind: 'internal', userId: 'james', scope: 'service' }],
+  ])('refuses root starts from a %s before reading the body or calling the bridge', async (_label, principal) => {
+    const start = vi.fn()
+    const startById = vi.fn()
+    setWorkflowBridge(fake({ start, startById }))
+    const app = as(principal)
+    const path = '/api/tasks/task1/workflows'
+    const requests = [
+      ...['repo:ship', 'user:ship', 'a-row-uuid'].map(defId => req(path, 'POST', { defId })),
+      req(path, 'POST', { def: { name: 'Parent', steps: [{ kind: 'workflow', childWorkflow: { ref: { source: 'database', id: 'owner-draft' } } }] } }),
+      req(path, 'POST', {}),
+      new Request(`http://acorn.test${path}`, { method: 'POST', body: '{malformed' }),
+    ]
+    for (const request of requests) {
+      const response = await app.fetch(request, {} as Env)
+      expect(response.status).toBe(403)
+      expect(await response.json()).toMatchObject({ error: { code: 'interactive_user_required' } })
+      expect(request.bodyUsed).toBe(false)
+    }
+    expect(start).not.toHaveBeenCalled()
+    expect(startById).not.toHaveBeenCalled()
+    setWorkflowBridge(null)
+    expect((await app.fetch(req(path, 'POST', { defId: 'repo:ship' }), {} as Env)).status).toBe(403)
   })
 
-  it('keeps database child definitions behind the device gate', async () => {
-    const allowed: boolean[] = []
-    setWorkflowBridge(fake({ startById: async (_taskId, _defId, _inputs, allowDatabaseDefinitions) => {
-      allowed.push(allowDatabaseDefinitions)
-      return { runId: 'run1' }
-    } }))
-    const parent = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
-      name: 'Parent',
-      steps: [{
-        name: 'child',
-        kind: 'workflow',
-        childWorkflow: { ref: { source: 'database', id: 'owner-draft' } },
-      }],
-    }
-    expect((await asTask1().fetch(req('/api/tasks/task1/workflows', 'POST', { def: parent }), {} as Env)).status).toBe(403)
-    expect((await asTask1().fetch(req('/api/tasks/task1/workflows', 'POST', { defId: 'repo:ship' }), {} as Env)).status).toBe(200)
-    expect((await authed().fetch(req('/api/tasks/task1/workflows', 'POST', { defId: 'repo:ship' }), {} as Env)).status).toBe(200)
-    expect(allowed).toEqual([false, true])
+  it.each(['repo:ship', 'user:ship', 'published-row'])('lets a device start %s with database children permitted', async defId => {
+    const startById = vi.fn(async () => ({ runId: 'run1' }))
+    setWorkflowBridge(fake({ startById }))
+    const response = await authed().fetch(req('/api/tasks/task1/workflows', 'POST', { defId }), {} as Env)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ runId: 'run1' })
+    expect(startById).toHaveBeenCalledExactlyOnceWith('task1', defId, undefined, true)
   })
 
   it('hands a task-confined caller the file layers alone', async () => {
@@ -230,10 +254,14 @@ describe('a task-scoped credential is confined to its own runs', () => {
       cancel: async (runId) => (calls.push(`cancel:${runId}`), { ok: true }),
       kill: async (runId) => (calls.push(`kill:${runId}`), { ok: true }),
       steps: async () => (calls.push('steps'), []),
+      stepStatuses: async () => (calls.push('stepStatuses'), { steps: [], truncated: false }),
+      run: async () => (calls.push('run'), { id: 'run1' } as never),
     }))
     const app = asTask1()
     for (const runId of ['run2', 'nope']) {
+      expect((await app.fetch(req(`/api/workflows/runs/${runId}`), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/workflows/runs/${runId}/steps`), {} as Env)).status).toBe(404)
+      expect((await app.fetch(req(`/api/workflows/runs/${runId}/step-statuses`), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/workflows/runs/${runId}/gate`, 'POST', { stepId: 's', approved: true }), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/workflows/runs/${runId}/cancel`, 'POST'), {} as Env)).status).toBe(404)
       expect((await app.fetch(req(`/api/workflows/runs/${runId}/kill`, 'POST', { stepId: 's' }), {} as Env)).status).toBe(404)
@@ -244,13 +272,43 @@ describe('a task-scoped credential is confined to its own runs', () => {
     expect(calls).toEqual(['cancel:run1'])
   })
 
-  // Retry is the one run action a confined caller may not take, even on its own run: an agent could
-  // otherwise loop a failed step straight past the rail that stopped it.
+  it('reads its own run and treats unknown and foreign IDs the same', async () => {
+    const run = vi.fn(async () => ({ id: 'run1', taskId: 'task1', name: 'Review', status: 'done' } as never))
+    setWorkflowBridge(fake({ run }))
+    const app = asTask1()
+    expect(await (await app.fetch(req('/api/workflows/runs/run1'), {} as Env)).json()).toMatchObject({ id: 'run1', taskId: 'task1' })
+    const unknown = await app.fetch(req('/api/workflows/runs/nope'), {} as Env)
+    const foreign = await app.fetch(req('/api/workflows/runs/run2'), {} as Env)
+    expect(unknown.status).toBe(404)
+    expect(foreign.status).toBe(404)
+    expect(await unknown.json()).toEqual(await foreign.json())
+    expect(run).toHaveBeenCalledTimes(1)
+  })
+
+  it('returns compact statuses under the same run guard', async () => {
+    setWorkflowBridge(fake({ stepStatuses: async () => ({ steps: [{ id: 's1', status: 'waiting-gate' }], truncated: false }) }))
+    expect(await (await asTask1().fetch(req('/api/workflows/runs/run1/step-statuses'), {} as Env)).json()).toEqual({ steps: [{ id: 's1', status: 'waiting-gate' }], truncated: false })
+  })
+
+  // Retry and gate are the run actions a confined caller may not take, even on its own run. Both move
+  // a run past a check that exists to stop the agent: a retry would loop a failed step straight past
+  // the rail that stopped it, and a gate answer would turn a human gate into no gate. Cancel and
+  // kill stay open because both only stop work.
   it('cannot retry even its own run', async () => {
     const calls: string[] = []
     setWorkflowBridge(fake({ retry: async (runId) => (calls.push(`retry:${runId}`), { ok: true }) }))
     const res = await asTask1().fetch(req('/api/workflows/runs/run1/retry', 'POST', { stepId: 's' }), {} as Env)
     expect(res.status).toBe(403)
+    expect(calls).toEqual([])
+  })
+
+  it('cannot approve or reject a gate even on its own run', async () => {
+    const calls: string[] = []
+    setWorkflowBridge(fake({ gate: async (runId) => (calls.push(`gate:${runId}`), { ok: true }) }))
+    for (const approved of [true, false]) {
+      const res = await asTask1().fetch(req('/api/workflows/runs/run1/gate', 'POST', { stepId: 's', approved }), {} as Env)
+      expect(res.status).toBe(403)
+    }
     expect(calls).toEqual([])
   })
 

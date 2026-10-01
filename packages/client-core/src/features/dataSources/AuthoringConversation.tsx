@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, onCleanup, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { AuthoringContextEntry, AuthoringTurnRequest, AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import type { QueryScope } from '@acorn/protocol/dataQueries.ts'
@@ -24,7 +24,9 @@ type Saved = {
 }
 
 const clipped = (value: unknown): string => {
-  const encoded = JSON.stringify(value)
+  // An added path has no `before` and a removed one no `after`, and JSON.stringify(undefined) is
+  // undefined, not a string.
+  const encoded = JSON.stringify(value) ?? 'nothing'
   return encoded.length > 500 ? `${encoded.slice(0, 497)}…` : encoded
 }
 
@@ -37,6 +39,8 @@ export type AuthoringConversationProps = {
   base: unknown
   label: string
   disabled?: boolean
+  /** Drawn without its own fold, for a host that already frames it, such as a modal with a title. */
+  bare?: boolean
   /** Narrow injection seam for the component's own tests and embedding hosts. */
   sendTurn?(request: AuthoringTurnRequest, signal: AbortSignal): Promise<AuthoringTurnResult>
   onApply(proposal: Extract<AuthoringTurnResult, { state: 'proposal' }>): Promise<string | undefined> | string | undefined
@@ -57,6 +61,15 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
   const [error, setError] = createSignal('')
   const [status, setStatus] = createSignal('')
   let controller: AbortController | undefined
+  // Set while the reply boundary below shows its fallback. A boundary stays on its fallback until
+  // reset, so every change of reply resets it after the new reply is in place.
+  let resetReply: (() => void) | undefined
+  const showReply = (next: AuthoringTurnResult | undefined): void => {
+    setPending(next)
+    const reset = resetReply
+    resetReply = undefined
+    reset?.()
+  }
 
   const pick = createMemo(() => choice() ?? effectiveModelPick(backends(), readGeneratePick(prefs.data)))
   const backendId = () => pick()?.backendId ?? ''
@@ -77,7 +90,7 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
     try {
       const value = JSON.parse(localStorage.getItem(key) ?? 'null') as Saved | null
       setContext(value?.context ?? [])
-      setPending(value?.pending)
+      showReply(value?.pending)
       setSamplesEnabled(value?.samplesEnabled ?? false)
       if (value?.backendId) setChoice({ backendId: value.backendId, modelId: value.modelId ?? '' })
     } catch { localStorage.removeItem(key) }
@@ -105,7 +118,7 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
             signal: controller.signal, timeoutMs: TIMEOUT_MS,
           })
       setContext(result.context)
-      setPending(result)
+      showReply(result)
       setInstruction('')
       setStatus(result.state === 'proposal' ? 'Proposal ready for review.' : result.state === 'clarification' ? 'Waiting for your answer.' : result.reason)
     } catch (failure) {
@@ -119,19 +132,19 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
   const reject = (): void => {
     const current = pending()
     setContext(value => [...value, { role: 'user', content: current?.state === 'proposal' ? 'Rejected that proposal.' : 'Dismissed that question.' }])
-    setPending(undefined)
+    showReply(undefined)
     setStatus('Draft unchanged.')
   }
   const apply = async (proposal: Extract<AuthoringTurnResult, { state: 'proposal' }>): Promise<void> => {
     setError('')
     const problem = await props.onApply(proposal)
     if (problem) { setError(problem); return }
-    setPending(undefined)
+    showReply(undefined)
     setContext(value => [...value, { role: 'user', content: 'Applied the reviewed proposal.' }])
     setStatus('Applied as one undoable draft edit.')
   }
 
-  return <Fold label={`AI authoring · ${props.label}`} level="group" defaultOpen>
+  const body = (
     <Stack gap="row">
       <ModelBackendPicker backends={backends()} backendId={backendId()} modelId={modelId()} onChange={next => {
         setChoice(next)
@@ -153,6 +166,14 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
       </Inline>
       <Show when={status()}>{value => <Text emphasis="muted" wrap>{value()}</Text>}</Show>
       <Show when={error()}>{value => <Alert tone="warn">{value()}</Alert>}</Show>
+      {/* The reply is model-shaped data, and a throw while drawing it would otherwise leave the whole
+          dialog frozen with no message. */}
+      <ErrorBoundary fallback={(failure, reset) => { resetReply = reset; return <Alert tone="warn" title="The reply could not be shown">
+          <Stack gap="row">
+            <Text wrap>{failure instanceof Error ? failure.message : String(failure)}</Text>
+            <Inline gap="inline"><Button size="sm" variant="bare" onPress={reject}>Dismiss</Button></Inline>
+          </Stack>
+        </Alert> }}>
       <Show when={clarification()}>{value => <Alert title={value().question}>
           <Inline gap="inline" wrap>
             <For each={value().choices}>{option => <Button size="sm" onPress={() => void submit(`Selected ${option.id}: ${option.label}`)}>{option.label}</Button>}</For>
@@ -173,6 +194,8 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
           </Stack>
         </Alert>}</Show>
       <Show when={stopped()}>{value => <Alert tone="warn">{value().reason}</Alert>}</Show>
+      </ErrorBoundary>
     </Stack>
-  </Fold>
+  )
+  return props.bare ? body : <Fold label={`AI authoring · ${props.label}`} level="group" defaultOpen>{body}</Fold>
 }

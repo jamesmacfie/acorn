@@ -117,10 +117,13 @@ describe('archiveTask teardown ordering', () => {
       ...deps(),
       captureReviewInput: async () => { order.push(`capture:${existsSync(worktree)}`) },
       runTeardown: async (script, cwd, env) => { order.push(`teardown:${existsSync(worktree)}`); return runTeardownProcess(script, cwd, env) },
+      taskArchiving: async (taskId) => { order.push(`archiving:${taskId}:${existsSync(worktree)}`) },
       dropTaskSessions: async () => { order.push(`drop:${existsSync(worktree)}`) },
     })
     expect(res).toEqual({ ok: true })
-    expect(order).toEqual(['capture:true', 'teardown:true', 'drop:false'])
+    // The archiving hook runs on every archive, after teardown and while the worktree still exists,
+    // because the agents plugin stops processes that are writing into it.
+    expect(order).toEqual(['capture:true', 'teardown:true', 'archiving:task1:true', 'drop:false'])
   })
 
   it('archives but reports when review input capture fails', async () => {

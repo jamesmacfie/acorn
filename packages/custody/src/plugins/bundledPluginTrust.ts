@@ -1,8 +1,8 @@
-import { readdirSync, readFileSync } from 'node:fs'
+import { readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { pluginAgentToolGrants, pluginContextSectionGrants, pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginNavigationDestinationGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/plugin/grants.ts'
-import { resolveInRoot } from '@acorn/node-core/server/core/fs.ts'
-import { readPluginManifest } from '@acorn/node-core/server/plugins'
+import { pluginAgentToolGrants, pluginContextSectionGrants, pluginCustomAgentGrants, pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginNavigationDestinationGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/plugin/grants.ts'
+import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
+import { readPluginManifest, readPluginFile, MAX_CLIENT_BUNDLE_BYTES } from '@acorn/node-core/server/plugins'
 import type { PluginCache } from './pluginCache'
 import type { PluginAck, PluginTrustStore } from './pluginTrustStore'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
@@ -47,19 +47,17 @@ export function trustBundledClientPlugins(
   cache: PluginCache,
   trust: PluginTrustStore,
 ): string[] {
-  const packages = new Map<string, { manifest: NonNullable<ReturnType<typeof readPluginManifest>>; client: string }>()
+  const packages = new Map<string, { manifest: NonNullable<ReturnType<typeof readPluginManifest>>; dir: string }>()
   for (const id of packageDirectories(bundledRoot)) {
     const dir = join(bundledRoot, id)
     const manifest = readPluginManifest(dir)
     if (!manifest || manifest.id !== id || !manifest.client) continue
-    const client = resolveInRoot(dir, manifest.client)
-    if (!client) continue
-    packages.set(id, { manifest, client })
+    packages.set(id, { manifest, dir })
   }
   if (!packages.size) return []
   try {
-    const cached = cache.putBundledBatch(Array.from(packages, ([pluginId, { manifest, client }]) => ({
-      pluginId, version: manifest.version, read: () => readFileSync(client),
+    const cached = cache.putBundledBatch(Array.from(packages, ([pluginId, { manifest, dir }]) => ({
+      pluginId, version: manifest.version, read: () => readPluginFile(dir, manifest.client!, MAX_CLIENT_BUNDLE_BYTES),
     })))
     const acks: PluginAck[] = []
     for (const result of cached) {
@@ -75,6 +73,7 @@ export function trustBundledClientPlugins(
           hash: result.hash,
           nodeId: `bundled:acorn-${appVersion}`,
           version: manifest.version,
+          declaration: clientDeclaration(manifest),
           permissions: manifest.permissions,
           webviews: pluginWebviewGrants(manifest.contributions),
           keyClaims: pluginKeyClaimGrants(manifest.contributions),
@@ -85,6 +84,7 @@ export function trustBundledClientPlugins(
           harnesses: pluginHarnessGrants(manifest.contributions),
           agentTools: pluginAgentToolGrants(manifest.contributions),
           contextSections: pluginContextSectionGrants(manifest.contributions),
+          customAgents: pluginCustomAgentGrants(manifest.contributions),
           decision: 'accepted',
           decidedAt: Date.now(),
         })

@@ -3,11 +3,14 @@ import type { CommandSettingOption } from '@acorn/protocol/commands.ts'
 import { PrefKeys, savePref, termFontSize } from '@acorn/plugin-api/client'
 import { resolveTerminalFontSize, TERMINAL_FONT_SIZE_OPTIONS } from './preferences'
 
-// The three terminal preferences a person can change, as one reader and one writer each.
+// The two terminal preferences a person can change, as one reader and one writer each. Whether a new
+// agent session is sent the task's context was a third; it is core's preference, and its switch and
+// accessor moved to the agents plugin's Harnesses and defaults page
+// (plugins/agents/src/client/settings/startupContext.ts).
 //
-// Settings → Terminal had all three inline. A value with two persistence paths starts disagreeing
+// Settings → Terminal had them inline. A value with two persistence paths starts disagreeing
 // with itself, so the defaulting, the option lists and the writes live here and every caller uses
-// them. There is no `setting` command over these three yet, and that is the point of extracting the
+// them. There is no `setting` command over these two yet, and that is the point of extracting the
 // accessor before there is: one registered later cannot become a second writer
 // (docs/terminal.md § From the command palette).
 //
@@ -38,10 +41,3 @@ export const saveTerminalFontSize = (qc: QueryClient, value: string): Promise<bo
 
 export const terminalFontSizeChoices = (): CommandSettingOption[] =>
   TERMINAL_FONT_SIZE_OPTIONS.map((size) => ({ value: String(size), label: `${size}px${size === 15 ? ' (default)' : ''}` }))
-
-// Opt-out: absent means on, matching `contextInjectionEnabled` in
-// core/server/worktrees/taskWorktree.ts, which is the thing that acts on it.
-export const startupContextInjection = (prefs: TerminalPrefs): boolean =>
-  (prefs?.[PrefKeys.startupContextInjection] ?? 'true') !== 'false'
-export const saveStartupContextInjection = (qc: QueryClient, on: boolean): Promise<boolean> =>
-  savePref(qc, PrefKeys.startupContextInjection, on ? 'true' : 'false')

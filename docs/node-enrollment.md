@@ -72,7 +72,7 @@ development control plane are.
 
 ## The payload
 
-Version 1. The schema is `packages/protocol/src/enrollment.ts` and the published form is
+Version 1. The schema is `packages/protocol/src/device/enrollment.ts` and the published form is
 [docs/schemas/enrollment-v1.json](./schemas/enrollment-v1.json), generated from it and pinned by
 `packages/node-core/src/server/enrollmentSchema.test.ts`.
 
@@ -116,7 +116,7 @@ one, so a control plane built against v1 keeps reading v1.
 ## The attachment record
 
 One optional object on `node.json`, and the only thing a control plane leaves behind on a node
-(`nodeAttachmentSchema` in `packages/protocol/src/node.ts`):
+(`nodeAttachmentSchema` in `packages/protocol/src/device/node.ts`):
 
 ```json
 {

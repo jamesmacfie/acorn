@@ -17,6 +17,7 @@ vi.mock('../../features/notifications/notifications', async (importOriginal) => 
 vi.mock('../../features/settings/savePref', () => ({ savePref: mocks.savePref }))
 
 import { createAppStartupRestore } from './appStartup'
+import { hydrateWorkspaceHistory, noteWorkspaceVisit, previousWorkspaceId, workspaceHistory } from '../../features/workspaces/lastWorkspace'
 
 const TASK = { id: 'task-1', projectId: 'project-1', title: 'A task' } as Task
 const PROJECT = { id: 'project-1', name: 'A project' } as Project
@@ -40,6 +41,7 @@ const boot = (prefs: Record<string, string>, workspaces: () => Workspace[] | und
 // saved id over, and not before the workspaces it names are known.
 describe('launch workspace restore', () => {
   beforeEach(() => {
+    hydrateWorkspaceHistory({ recent: [] })
     // jsdom has no `matchMedia`, and the theme pass reads one to follow the system's light/dark.
     vi.stubGlobal('matchMedia', () => ({ matches: false, addEventListener: () => {}, removeEventListener: () => {} }))
     vi.clearAllMocks()
@@ -56,6 +58,48 @@ describe('launch workspace restore', () => {
     expect(startup.restored()).toBe(true)
     expect(startup.lastWorkspaceId()).toBe('workspace-2')
     startup.dispose()
+  })
+
+  it('restores the visit order before reopening the workspace', () => {
+    const startup = boot({
+      last_workspace: 'workspace-2',
+      // The pair saved before the order was a list still reads.
+      workspace_history: JSON.stringify({ current: 'workspace-2', previous: 'workspace-1' }),
+    }, () => [WORKSPACE])
+
+    expect(startup.restored()).toBe(true)
+    expect(workspaceHistory()).toEqual({ recent: ['workspace-2', 'workspace-1'] })
+    expect(previousWorkspaceId()).toBe('workspace-1')
+    startup.dispose()
+  })
+
+  it('drops malformed shortcut history without losing workspace restore', () => {
+    const startup = boot({ last_workspace: 'workspace-2', workspace_history: '{bad' }, () => [WORKSPACE])
+
+    expect(startup.lastWorkspaceId()).toBe('workspace-2')
+    expect(previousWorkspaceId()).toBe(null)
+    startup.dispose()
+  })
+
+  it('saves the new order after a workspace switch', () => {
+    vi.useFakeTimers()
+    try {
+      const startup = boot({
+        last_workspace: 'workspace-2',
+        workspace_history: JSON.stringify({ recent: ['workspace-2', 'workspace-1'] }),
+      }, () => [WORKSPACE])
+
+      noteWorkspaceVisit('workspace-1')
+      vi.advanceTimersByTime(500)
+      expect(mocks.savePref).toHaveBeenCalledWith(
+        expect.any(QueryClient), 'workspace_history',
+        JSON.stringify({ recent: ['workspace-1', 'workspace-2'] }),
+        { surfaceFailure: true },
+      )
+      startup.dispose()
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 

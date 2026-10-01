@@ -4,9 +4,15 @@ import { writePrivateAtomic } from '@acorn/node-core/server/storage'
 import { join } from 'node:path'
 import { z } from 'zod'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
-import { corePluginBundleRoute } from '@acorn/protocol/api.ts'
+import { corePluginBundleByHashRoute, corePluginBundleRoute } from '@acorn/protocol/api.ts'
 import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
+import { withPluginPackage, readPluginFile, MAX_PLUGIN_MANIFEST_BYTES, PluginPackageFileError } from '@acorn/node-core/server/plugins'
+import { hasNodeHalf, bundleSourceSchema } from '@acorn/protocol/plugin/bundles.ts'
+import type { PluginInstallSource } from '@acorn/protocol/api.ts'
+import { describePluginSource } from '@acorn/protocol/plugin/source.ts'
+import { installSchema } from './pluginRequests'
+import { NodeResponseTooLargeError } from '../broker/nodeRequest'
 
 const log = createLogger('plugins')
 
@@ -25,8 +31,8 @@ const INDEX_FILE = 'index.json'
 const HASH_RE = /^[0-9a-f]{64}$/
 
 // Matches the node's own ceiling, node-core MAX_CLIENT_BUNDLE_BYTES. Enforced again here because the
-// node that answers is not necessarily one this device trusts yet, and a response arrives fully
-// buffered in main's heap.
+// node that answers is not necessarily one this device trusts yet. The same limit is passed to the
+// broker transport, which rejects before retaining excess response bytes.
 export const MAX_BUNDLE_BYTES = 8 * 1024 * 1024
 
 // How long an unreferenced bundle survives. Generous on purpose. The cache is a few hundred kilobytes
@@ -40,6 +46,10 @@ const entrySchema = z.strictObject({
   // Every node that has offered this bundle. Two nodes carrying the same plugin version serve
   // byte-identical bundles, so they share one cache entry.
   nodeIds: z.array(z.string().min(1)),
+  source: bundleSourceSchema.optional(),
+  installSource: installSchema.shape.source.optional(),
+  sourceLabel: z.string().optional(),
+  manifest: z.unknown().optional(),
   firstSeen: z.number().int(),
   lastSeen: z.number().int(),
 })
@@ -47,7 +57,7 @@ export type PluginCacheEntry = z.infer<typeof entrySchema>
 
 const indexSchema = z.strictObject({ version: z.literal(1), entries: z.record(z.string(), entrySchema) })
 
-export type PutFailure = 'unreachable' | 'not-found' | 'too-large' | 'hash-mismatch'
+export type PutFailure = 'unreachable' | 'not-found' | 'too-large' | 'hash-mismatch' | 'has-node-half' | 'invalid-manifest' | 'plugin-id-mismatch'
 export type PutResult = { hash: string } | { error: PutFailure }
 
 type BundledClientBundle = { pluginId: string; version: string; read: () => Uint8Array }
@@ -55,7 +65,7 @@ type BundledPutResult = { pluginId: string; hash: string } | { pluginId: string;
 
 // Just enough of NodeBroker to fetch. Narrow so the tests can exercise the hashing rules without a
 // TLS server.
-export type BundleFetcher = { fetch(nodeId: string, request: NodeFetchRequest): Promise<NodeFetchResponse> }
+export type BundleFetcher = { fetch(nodeId: string, request: NodeFetchRequest, limits?: { maxResponseBytes?: number }): Promise<NodeFetchResponse> }
 
 export class PluginCache {
   #entries: Record<string, PluginCacheEntry> | null = null
@@ -133,11 +143,22 @@ export class PluginCache {
     try {
       response = await this.broker.fetch(nodeId, {
         requestId: `plugin-bundle-${pluginId}-${claim.hash.slice(0, 12)}`,
-        path: corePluginBundleRoute(pluginId),
+        path: corePluginBundleByHashRoute(pluginId, claim.hash),
         method: 'GET',
         headers: {},
-      })
+      }, { maxResponseBytes: MAX_BUNDLE_BYTES })
+      if (response.status === 404) {
+        // A node from before the hash-addressed route only has /client.js. The device still hashes
+        // what arrives and refuses anything other than this exact claim below.
+        response = await this.broker.fetch(nodeId, {
+          requestId: `plugin-bundle-legacy-${pluginId}-${claim.hash.slice(0, 12)}`,
+          path: corePluginBundleRoute(pluginId),
+          method: 'GET',
+          headers: {},
+        }, { maxResponseBytes: MAX_BUNDLE_BYTES })
+      }
     } catch (error) {
+      if (error instanceof NodeResponseTooLargeError) return { error: 'too-large' }
       log.warn(`could not fetch ${pluginId} from ${nodeId}: ${describeError(error).message}`, { 'plugin.id': pluginId, 'node.id': nodeId })
       return { error: 'unreachable' }
     }
@@ -162,11 +183,65 @@ export class PluginCache {
         version: claim.version,
         bytes: response.body.byteLength,
         nodeIds: [...new Set([...(existing?.nodeIds ?? []), nodeId])],
+        source: existing?.source ?? { kind: 'node', nodeId },
+        ...(existing?.installSource ? { installSource: existing.installSource } : {}),
+        ...(existing?.sourceLabel ? { sourceLabel: existing.sourceLabel } : {}),
+        ...(existing?.manifest ? { manifest: existing.manifest } : {}),
         firstSeen: existing?.firstSeen ?? now,
         lastSeen: now,
       },
     })
     return { hash }
+  }
+
+  /** Validate the package before any entry is added. A folder is re-read for every update. */
+  async putFromSource(source: PluginInstallSource, expectedPluginId?: string): Promise<{ hash: string; pluginId: string; version: string } | { error: PutFailure }> {
+    try {
+      return await withPluginPackage(this.userDataDir, source, (root, manifest) => {
+        const rawManifest: unknown = JSON.parse(readPluginFile(root, 'acorn-plugin.json', MAX_PLUGIN_MANIFEST_BYTES).toString('utf8'))
+        if (expectedPluginId && manifest.id !== expectedPluginId) return { error: 'plugin-id-mismatch' as const }
+        if (hasNodeHalf(rawManifest)) return { error: 'has-node-half' as const }
+        if (!manifest.client) return { error: 'invalid-manifest' as const }
+        const bytes = readPluginFile(root, manifest.client, MAX_BUNDLE_BYTES)
+        const hash = createHash('sha256').update(bytes).digest('hex')
+        this.writeBundle(hash, bytes)
+        const now = Date.now()
+        const existing = this.entries()[hash]
+        this.writeIndex({ ...this.entries(), [hash]: {
+          pluginId: manifest.id,
+          version: manifest.version,
+          bytes: bytes.byteLength,
+          nodeIds: existing?.nodeIds ?? [],
+          source: { kind: 'device' },
+          installSource: source,
+          sourceLabel: describePluginSource(source),
+          manifest: rawManifest,
+          firstSeen: existing?.firstSeen ?? now,
+          lastSeen: now,
+        } })
+        this.removeDevice(manifest.id, hash)
+        return { hash, pluginId: manifest.id, version: manifest.version }
+      })
+    } catch (error) {
+      if (error instanceof PluginPackageFileError && error.kind === 'too-large') return { error: 'too-large' }
+      log.warn(`device plugin install failed: ${describeError(error).message}`)
+      throw error
+    }
+  }
+
+  removeDevice(pluginId: string, keepHash?: string): void {
+    const entries = { ...this.entries() }
+    for (const [hash, entry] of Object.entries(entries)) {
+      if (hash === keepHash || entry.pluginId !== pluginId || entry.source?.kind !== 'device') continue
+      if (entry.nodeIds.length) {
+        const { installSource: _installSource, sourceLabel: _sourceLabel, manifest: _manifest, ...rest } = entry
+        entries[hash] = { ...rest, source: { kind: 'node', nodeId: entry.nodeIds[0]! } }
+      } else {
+        delete entries[hash]
+        rmSync(join(this.dir, `${hash}.js`), { force: true })
+      }
+    }
+    this.writeIndex(entries)
   }
 
   // A node still offers this bundle. Keeps the eviction clock honest for a plugin installed and
@@ -194,7 +269,7 @@ export class PluginCache {
     const cutoff = Date.now() - EVICT_AFTER_MS
     let dropped = 0
     for (const [hash, entry] of Object.entries(entries)) {
-      if (entry.nodeIds.length > 0 || entry.lastSeen >= cutoff) continue
+      if (entry.source?.kind === 'device' || entry.nodeIds.length > 0 || entry.lastSeen >= cutoff) continue
       delete entries[hash]
       dropped++
     }

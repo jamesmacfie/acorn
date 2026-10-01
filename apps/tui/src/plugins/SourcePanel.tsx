@@ -10,6 +10,7 @@ import { createFleetQuery } from '@acorn/client-core/infra/node'
 import { chromeDeps, chromeKey, readRailItems, scopedSourceItemsPath } from '@acorn/client-core/host/chrome'
 import { runChromeAction } from '@acorn/client-core/host/chrome'
 import { decodeProjectSurfaceItem, projectSurfaceRegistry } from '@acorn/client-core/host/registries/panes'
+import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import type { SourcePanel } from '@acorn/client-core/host/chrome'
 import { Alert, Badge, EmptyState, Icon, Row, Rows } from '../kit/showing'
 import { Input } from '../kit/asking'
@@ -17,6 +18,7 @@ import { Line } from '../kit/cells'
 import { bindKeys } from '../keys/install'
 import { focusedRenderable, focusRenderable, moveStop, stopsIn, walkStops } from '../keys/regions'
 import { STOP } from '../keys/tiers'
+import { openPromotion } from '../chrome/promotionStore'
 
 // A descriptor source's rail list, in cells.
 //
@@ -33,10 +35,9 @@ import { STOP } from '../keys/tiers'
 // main one (docs/tui.md § The screen), which is why this exports a `regions` pair rather than a
 // component.
 //
-// Two parts of the DOM panel are not here, and they are omissions rather than gaps in the seam: the
-// create-task menu on a row, and the dashboard panels beside the list. Each is a surface of its own on
-// this host and neither is what a rail list is for. The third, the title filter, is below: a list of a
-// hundred issues is a list nobody can page through.
+// The desktop's dashboard panels beside the list are not here: they need a separate cell surface.
+// Row promotion uses the host task picker below. The title filter remains in the list, because a
+// hundred issues without a way to narrow them is a list nobody can page through.
 
 /** One row's secondary text: the aligned fields where a source sends them, the pre-joined line where
  *  it sends that instead. The DOM reserves a track per field so the Nth lines up down the list; in
@@ -68,7 +69,7 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
     ({ projectId }) => chromeKey(props.pluginId, props.descriptor.id, projectId),
     (node, { projectId }, signal) => readRailItems(
       props.pluginId,
-      scopedSourceItemsPath(props.descriptor.items, projectId),
+      scopedSourceItemsPath(props.descriptor.items!, projectId),
       node,
       signal,
     ),
@@ -86,16 +87,19 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
   })
   const unavailable = () => result().unavailable[0]
 
-  const select = (id: string): void => {
+  const select = (id: string, activate = false): void => {
     const item = items().find((entry) => entry.id === id)
     if (!item || !props.descriptor.onSelect) return
+    // Arrow movement changes the focused row. Only navigation may run on selection; commands that
+    // create a task or write to the Node require Enter on the focused row.
+    if (!activate && props.descriptor.onSelect.verb !== 'navigate') return
     void runChromeAction(props.descriptor.onSelect, {
       pluginId: props.pluginId,
       nodeId,
       item,
-      // No promote on this host: the create-task modal is a surface of its own and this panel does not
-      // draw one. A verb that asks for it is a no-op rather than a crash.
-      promote: () => {},
+      ...(sourceRegistry.get(props.descriptor.id)?.promotion
+        ? { promote: (row: PluginRailItem) => openPromotion({ pluginId: props.descriptor.id, item: row, projectId: params.projectId ?? null }) }
+        : {}),
       ...(params.projectId ? { projectId: params.projectId } : {}),
       navigate,
     })
@@ -166,7 +170,14 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
             ariaLabel={props.descriptor.label}
             items={items().map((item) => ({ key: item.id, item }))}
             onSelect={select}
-            onActivate={select}
+            onActivate={(id) => select(id, true)}
+            onMenu={(id) => {
+              const item = items().find((entry) => entry.id === id)
+              if (item?.task && props.descriptor.onSelect?.verb !== 'createTask'
+                && sourceRegistry.get(props.descriptor.id)?.promotion) {
+                openPromotion({ pluginId: props.descriptor.id, item, projectId: params.projectId ?? null })
+              }
+            }}
           >
             {(entry, item) => (
               <Row
@@ -183,6 +194,10 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
               </Row>
             )}
           </Rows>
+          <Show when={items().some((item) => item.task) && props.descriptor.onSelect?.verb !== 'createTask'
+            && sourceRegistry.get(props.descriptor.id)?.promotion}>
+            <Line role="muted">Shift+F10: create or link task</Line>
+          </Show>
         </Show>
       </Show>
     </box>

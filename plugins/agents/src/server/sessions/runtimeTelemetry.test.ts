@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestNodeContext, schema, type TestNodeContext } from '@acorn/plugin-api/testkit'
 import type { PluginTelemetry, TelemetryRecord } from '@acorn/plugin-api/node'
 import { AgentDriverRegistry } from '../drivers/registry'
@@ -37,7 +37,7 @@ describe('what a session reports', () => {
   let ctx: TestNodeContext
   let runtime: ManagedAgentRuntime | null
 
-  const build = (registry: AgentDriverRegistry, telemetry?: PluginTelemetry): ManagedAgentRuntime =>
+  const build = (registry: AgentDriverRegistry, telemetry?: PluginTelemetry, footprintSampleMs?: number): ManagedAgentRuntime =>
     new ManagedAgentRuntime({
       db: ctx.storage.open(),
       dataDir: ctx.dataDir,
@@ -47,6 +47,7 @@ describe('what a session reports', () => {
       currentUserId: () => null,
       registry,
       ...(telemetry ? { telemetry } : {}),
+      ...(footprintSampleMs ? { footprintSampleMs } : {}),
     })
 
   beforeEach(() => {
@@ -116,5 +117,37 @@ describe('what a session reports', () => {
       idempotencyKey: randomUUID(),
     })
     expect((await runtime.wait(session.id, 0, 'turn_completed', 2_000)).session.runtimeState).toBe('ready')
+  })
+
+  describe('provider processes, counted on a timer', () => {
+    const gauges = () => ctx.recorded.flatMap((record) =>
+      record.kind === 'metric' && record.name.startsWith('agent.processes.') ? [[record.name, record.value, record.attrs.owner]] : [])
+
+    it('reports live, idle and summed memory as gauges this plugin owns', async () => {
+      runtime = build(new AgentDriverRegistry(), ctx.telemetry, 20)
+      vi.spyOn(runtime, 'processFootprint').mockResolvedValue({ live: 2, idle: 1, memoryBytes: 331 })
+      // The timer keeps running while this waits, so only the first sample is compared.
+      await vi.waitFor(() => expect(gauges().slice(0, 3)).toEqual([
+        ['agent.processes.live', 2, 'agents'],
+        ['agent.processes.idle', 1, 'agents'],
+        ['agent.processes.memory', 331, 'agents'],
+      ]))
+    })
+
+    it('leaves memory out when the process table could not be read', async () => {
+      runtime = build(new AgentDriverRegistry(), ctx.telemetry, 20)
+      vi.spyOn(runtime, 'processFootprint').mockResolvedValue({ live: 1, idle: 0, memoryBytes: null })
+      await vi.waitFor(() => expect(gauges().length).toBeGreaterThanOrEqual(2))
+      expect(gauges().map(([name]) => name)).not.toContain('agent.processes.memory')
+    })
+
+    it('does not list processes at all while nothing is collecting', async () => {
+      const off: PluginTelemetry = { ...ctx.telemetry, enabled: () => false }
+      runtime = build(new AgentDriverRegistry(), off, 20)
+      const footprint = vi.spyOn(runtime, 'processFootprint')
+      await new Promise((done) => setTimeout(done, 100))
+      expect(footprint).not.toHaveBeenCalled()
+      expect(gauges()).toEqual([])
+    })
   })
 })

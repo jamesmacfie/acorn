@@ -26,9 +26,8 @@
 //     lends the plaintext for the length of one call. `ctx.core.secrets` is never touched, so
 //     claiming it would overstate.
 //   exec: false — nothing here spawns anything.
-//   net — disclosure rather than enforcement, and the honest thing to say is a pattern. A DSN names
-//     its own host, so `o<org>.ingest.<region>.sentry.io` is where a sentry.io project lives and a
-//     self-hosted install is wherever the owner runs it.
+//   net — the worker enforces these patterns for Sentry-hosted ingestion. A DSN names its own host,
+//     so `o<org>.ingest.<region>.sentry.io` is covered by one subdomain label under each pattern.
 export default {
   name: 'Sentry (telemetry export)',
   // The Sentry mark, as one SVG path's `d` in a 24 box. The host validates the grammar and registers
@@ -56,8 +55,15 @@ export default {
       id: 'sentry-telemetry',
       label: 'Sentry export',
       glyph: 'brand:sentry-telemetry',
-      group: 'general',
-      order: 68,
+      category: 'machines',
+      settingsScope: 'node',
+      order: 50,
+      // For search. The sections are the ones src/tree/settings.tsx draws.
+      keywords: ['sentry', 'telemetry', 'export', 'sample rate', 'dsn'],
+      sections: [
+        { id: 'sending', label: 'What to send', keywords: ['sample rate', 'traces', 'errors', 'logs', 'metrics', 'events'] },
+        { id: 'detail', label: 'How much detail', keywords: ['stack traces', 'task ids', 'tags'] },
+      ],
       // One tree fills the page, so the layout is the trivial one. Naming it is still what says
       // "draw this from my tree" rather than "give me a rectangle", and it is what the surface
       // inherits its focus group and padding from (docs/panes.md § Layout model).

@@ -91,7 +91,7 @@ describe('plugin reload', () => {
       binding,
     })
 
-    expect(outcome).toEqual({ ok: false, error: 'the new bundle is broken' })
+    expect(outcome).toEqual({ ok: false, error: 'the new bundle is broken', retained: true })
     // Fully live means all three: the route still serves, the tool is still the old one and there is
     // exactly one of each. A candidate that had written through would have left duplicates.
     expect(await (await request(`/v1/p/${PLUGIN}`)).text()).toBe('v1')

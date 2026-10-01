@@ -1,15 +1,15 @@
 // Settings → Sentry export: what this plugin sends, once a DSN exists and the core switch is on.
 //
 // It holds only what core's one switch does not. Whether anything is collected at all belongs to
-// Settings → Telemetry, and where it goes belongs to the connection in Settings → Integrations.
+// Settings → Telemetry, and where it goes belongs to the connection in Settings → Services.
 // This page is the sink's own three questions: how much, which kinds, and how much detail
 // (docs/telemetry.md § The switch).
 //
 // Every control writes the whole settings object back through `bridge.state`, which is the
 // `plugin:sentry-telemetry:settings` preference row the node half reads on each flush. There is no
 // save button, because there is nothing here that is only half true between two keystrokes.
-import { createResource, createSignal, Show } from 'solid-js'
-import { Alert, Checkbox, Field, Heading, Select, Stack, Text } from '@acorn/plugin-api/ui/tree'
+import { createResource, createSignal } from 'solid-js'
+import { Checkbox, Select, SettingRow, SettingsSection } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import {
   DEFAULT_SETTINGS,
@@ -43,71 +43,90 @@ const rateValue = (rate: number): string =>
     Math.abs(Number(option.value) - rate) < Math.abs(Number(best.value) - rate) ? option : best,
   RATES[0]).value
 
+/** Which row a write came from, so its error is drawn beside that row and nowhere else. */
+type RowId = 'rate' | keyof SentryKindSwitches | 'stacks' | 'taskIds'
+
 export default function SentrySettingsPage(props: { bridge: AcornBridge }) {
   const [loaded] = createResource(() => props.bridge.state.get<unknown>(SETTINGS_KEY))
   // Seeded from the load and then edited in place. The resource is read once: a re-read on every
   // change would put the round trip between the click and the checkbox moving.
   const [edited, setEdited] = createSignal<SentrySettings | null>(null)
-  const [error, setError] = createSignal<string | null>(null)
+  const [failure, setFailure] = createSignal<{ row: RowId; message: string } | null>(null)
   const settings = (): SentrySettings => edited() ?? (loaded.state === 'ready' ? parseSettings(loaded()) : DEFAULT_SETTINGS)
+  const errorOn = (row: RowId) => {
+    const failed = failure()
+    return failed?.row === row ? failed.message : undefined
+  }
 
-  async function write(next: SentrySettings) {
+  // Every control here is a switch or a select, so it shows its own state. A failed write puts the
+  // previous value back, which leaves the control saying what is stored, and names the failure on
+  // the row it came from.
+  async function write(row: RowId, next: SentrySettings) {
+    const previous = settings()
     setEdited(next)
-    setError(null)
+    setFailure(null)
     try {
       await props.bridge.state.set(SETTINGS_KEY, next)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save these settings')
+      setEdited(previous)
+      setFailure({ row, message: err instanceof Error ? err.message : 'Could not save these settings' })
     }
   }
 
+  // The host's header already names the page, so the tree starts at its first section.
   return (
-    <Stack gap="section">
-      <Stack gap="row">
-        <Heading level={3}>Sentry export</Heading>
-        <Text tone="muted" wrap>
-          Nothing is sent until telemetry is on in Settings → Telemetry and a Sentry DSN is connected
-          in Settings → Integrations. Both, not either.
-        </Text>
-      </Stack>
-
-      <Show when={error()}>{(message) => <Alert tone="danger">{message()}</Alert>}</Show>
-
-      <Field label="How many traces to send" hint="Decided per trace, so a transaction keeps its own spans.">
-        <Select
-          options={RATES}
-          value={rateValue(settings().sampleRate)}
-          onChange={(value: string) => void write({ ...settings(), sampleRate: Number(value) })}
-        />
-      </Field>
-
-      <Stack gap="row">
-        <Text weight="strong">What to send</Text>
-        {KINDS.map((kind) => (
-          <Checkbox
-            label={kind.label}
-            hint={kind.hint}
-            checked={settings().kinds[kind.id]}
-            onChange={(checked: boolean) => void write({ ...settings(), kinds: { ...settings().kinds, [kind.id]: checked } })}
+    <>
+      <SettingsSection
+        id="sending"
+        label="What to send"
+        description="Nothing is sent until telemetry is on in Settings → Telemetry and a Sentry DSN is connected in Settings → Services. Both, not either."
+      >
+        <SettingRow label="How many traces to send" description="Decided per trace, so a transaction keeps its own spans." error={errorOn('rate')}>
+          <Select
+            label="How many traces to send"
+            options={RATES}
+            value={rateValue(settings().sampleRate)}
+            onChange={(value: string) => void write('rate', { ...settings(), sampleRate: Number(value) })}
           />
+        </SettingRow>
+        {KINDS.map((kind) => (
+          <SettingRow label={kind.label} description={kind.hint} error={errorOn(kind.id)}>
+            <Checkbox
+              switch
+              ariaLabel={kind.label}
+              checked={settings().kinds[kind.id]}
+              onChange={(checked: boolean) => void write(kind.id, { ...settings(), kinds: { ...settings().kinds, [kind.id]: checked } })}
+            />
+          </SettingRow>
         ))}
-      </Stack>
+      </SettingsSection>
 
-      <Stack gap="row">
-        <Text weight="strong">How much detail</Text>
-        <Checkbox
+      <SettingsSection id="detail" label="How much detail">
+        <SettingRow
           label="Stack traces on errors"
-          hint="Paths are collapsed to ~ and to the data root before they leave this machine."
-          checked={settings().stacks}
-          onChange={(checked: boolean) => void write({ ...settings(), stacks: checked })}
-        />
-        <Checkbox
+          description="Paths are collapsed to ~ and to the data root before they leave this machine."
+          error={errorOn('stacks')}
+        >
+          <Checkbox
+            switch
+            ariaLabel="Stack traces on errors"
+            checked={settings().stacks}
+            onChange={(checked: boolean) => void write('stacks', { ...settings(), stacks: checked })}
+          />
+        </SettingRow>
+        <SettingRow
           label="Task ids as tags"
-          hint="Lets a Sentry issue be traced back to the task it happened in. Ids only, never a task's contents."
-          checked={settings().taskIds}
-          onChange={(checked: boolean) => void write({ ...settings(), taskIds: checked })}
-        />
-      </Stack>
-    </Stack>
+          description="Lets a Sentry issue be traced back to the task it happened in. Ids only, never a task's contents."
+          error={errorOn('taskIds')}
+        >
+          <Checkbox
+            switch
+            ariaLabel="Task ids as tags"
+            checked={settings().taskIds}
+            onChange={(checked: boolean) => void write('taskIds', { ...settings(), taskIds: checked })}
+          />
+        </SettingRow>
+      </SettingsSection>
+    </>
   )
 }

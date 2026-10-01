@@ -110,14 +110,39 @@ functions. `Dynamic` therefore updates labels and descriptor props in place inst
 roster/trust refresh as a new component and remounting the list, which would discard its caret,
 virtual window and query subscriptions.
 
+### A loaded document region
+
+Loaded pane registration is shared by desktop and terminal. For a manifest `document` region it uses
+`client-core/host/frames/documentSurface.ts` to select the host's editor, just as a `remote` region
+selects the host's tree renderer. The desktop uses CodeMirror. The terminal supplies
+`apps/tui/src/plugins/DocumentSurface.tsx`, an editable text field for a writable route and a text
+view for a read-only route. It resolves and bounds the declared document route, reads and saves through
+the Node API, and hands the sibling plugin tree a live `read`/`write`/`flush` handle. A pane-scoped
+shortcut pressed in the field flushes before it dispatches the command. Syntax highlighting and
+completion popups are desktop editor features; the terminal field is plain text.
+
 ### What is drawn bespoke
 
 The rail's task list goes through the same `rail.taskList` exclusive slot the desktop's does, so a
 plugin that offers to replace it replaces it on both hosts. `ExclusiveSlotHost` is host-supplied like
 the component table, because the DOM's copy reaches for `Dynamic` from `solid-js/web` and pulling that
 in would put a second Solid renderer in the graph to render one child. The arbitration rule in
-`exclusiveSlots.ts` is shared unchanged. The topbar and the pane strip are bespoke until the
-client-plugins programme gives each a contract.
+`exclusiveSlots.ts` is shared unchanged. The topbar and pane strip remain terminal-owned drawings;
+the desktop's `rail`, `topbar`, and `pane.switcher` replacement contracts apply only to providers
+that declare support for the host's form factor.
+
+#### Task markers
+
+The task list consumes the allocator's complete ordered marker legend rather than its four-corner
+desktop placement. A terminal row shows its count instead of replacing Lucide icon names with
+ambiguous symbols. It says `N marks` where seven cells fit and `+N` in a narrow rail. The full
+ordered legend remains available from the row.
+
+Focus the task row and press `Shift+F10` or the menu key to open the host-owned **Task markers**
+modal. Its virtual list contains every marker label, including labels represented by `+N`. The plugin
+supplies no action or terminal UI. This projection does not change the desktop allocator or its
+corner assignments. Loaded task marks arrive through the same `core:task` annotation point as the
+desktop; see [Task annotations](../plugins/cooperative-extension-points.md#task-annotations).
 
 The palette is a `Modal` over the same session the desktop's runs on
 (`client-core/host/registries/commands/sessionStore.ts`). The query, the order, the cursor, the frame stack
@@ -164,7 +189,8 @@ emulator decides. OSC 9 for iTerm2, Ghostty, WezTerm and Warp, OSC 99 for kitty,
 wrapped in a tmux DCS passthrough with every ESC doubled when `TMUX` is set, and title and body
 stripped of anything that could end the sequence early. A terminal on none of those lists gets the
 BEL and nothing else. `ACORN_TUI_NOTIFY` is the switch, in the `ACORN_TUI_OSC52` pattern: `off`,
-`bell`, `terminal`, or `both`, which is the default. There is no settings page here to hold it.
+`bell`, `terminal`, or `both`, which is the default. Settings › General › Notifications shows the
+value and where it came from, and changing it means changing the variable ([tui.md](../tui.md) § Settings).
 
 Whether the terminal is the window the reader is looking at comes from DEC 1004: the parser turns
 `ESC [ I` and `ESC [ O` into a `focus` and a `blur` event, `apps/tui/src/main.tsx` feeds them to
@@ -211,6 +237,12 @@ that takes the keys off whatever had them. Neither restores what you were lookin
 settle, so the caret lands on the first row of the roster that replaced the old one rather than on
 whatever survived the switch. The command chord opens the palette from anywhere except an entered PTY.
 
+With a task open, `t` opens its terminal sessions. The palette offers the same route when the active
+Node has the Terminal plugin. The task rail may shorten a title to preserve its marker count; a line
+across the screen repeats the selected task's complete title, wrapping when needed. A source row with
+a promotion contract offers `Shift+F10` to create a task or attach to an active one. The source owns
+the seed and link operation; the terminal supplies the task choices and reports write errors.
+
 A pane opens with the keys already somewhere, because there is no click to put them there. And a
 region opens on its list where it has one rather than on the first field above it, because the first
 thing focused is the thing the bare keys drive and landing in a filter box means `j` types a `j`.
@@ -229,9 +261,9 @@ owns the shape.
 ### The sandbox
 
 A `node:worker_threads` worker started with `execArgv: ['--permission', '--allow-fs-read=<bootstrap>',
-'--allow-fs-read=<bundle>']`, receiving the same two ports the DOM's Web Worker does: the bridge port
-carrying the SDK verbs and the three host pushes, and the tree port carrying `tree:mount`,
-`tree:batch` and the rest. `workerHost.ts`'s `_setWorkerFactory` is the seam, and
+'--allow-fs-read=<bundle>']`, receiving the tree port for `tree:mount`, `tree:batch`, and the rest,
+plus a scoped bridge port for each mounted tree's SDK verbs. Host selection and surface actions target
+one mount; appearance updates reach every live mount. `workerHost.ts`'s `_setWorkerFactory` is the seam, and
 `apps/tui/src/plugins/workerFactory.ts` is what it substitutes. Everything else in that file — slot
 bookkeeping, the 30-second grace, the heartbeat, the fail-fanout — is shared.
 
@@ -240,11 +272,21 @@ child process per plugin with the two ports over an IPC channel. Measured on Nod
 applies the permission model to the thread: the worker is denied a read the parent is allowed. So there
 is no child process, and the TUI process itself runs with no permission flags at all.
 
-**Node's permission model does not cover the network**, which is the one thing the DOM worker's CSP
-gave away free. `apps/tui/src/plugins/pluginWorker.js` runs before a stranger's module scope, installs
-a `module.registerHooks` resolver refusing fourteen builtins, and deletes five globals. `module` is on
-that list so a bundle cannot register a hook of its own and undo this one, and `worker_threads` so it
-cannot start a thread that inherited none of it.
+**Client workers receive an empty environment.** `env: {}` is supplied at worker creation, before
+bundle evaluation. Accepting client bytes grants no access to the workstation's exported variables,
+including environment grants a plugin declares for its separate Node half.
+
+**Node 22 and 24's permission model does not cover the network.** The trusted factory applies the
+shared builtin family policy in `packages/protocol/src/plugin/nodeBuiltins.ts` with sockets and exec
+disabled, then passes the permitted public builtin names to the standalone bootstrap. Before bundle
+evaluation, `apps/tui/src/plugins/pluginWorker.js` enforces that set through `module.registerHooks`
+for imports and CommonJS require, wraps `process.getBuiltinModule` with the same check, and deletes
+five network globals. Builtin subpaths receive their family's policy; unknown, internal, network and
+privileged families are refused. `module` is unavailable, so a bundle cannot register its own hook
+or construct another require function. `worker_threads` is unavailable too. Harmless builtins remain
+usable, and filesystem access still needs the two exact Node permission grants above. The bootstrap
+needs no additional readable policy file or bundle chunk. Node 26 adds its independent network
+permission check; the client builtin policy applies on every supported branch.
 
 The batch rules are shared rather than copied. `client-core/host/tree/treeState.ts` holds the store,
 the pre-flight check, `apply()`, the prop sanitiser and the coalescer with no JSX in them, and each
@@ -272,6 +314,12 @@ Bytes are hashed on arrival and a mismatch is refused and never re-keyed, which 
 The schemas are `@acorn/protocol`'s; no custody type is defined in this package. Device provenance is
 natural here and `{ path }` is an allowed source form, though nothing offers it yet: a person at a
 terminal installing a plugin is installing it here.
+
+The shared distribution snapshot selects only the active runtime of the current Node after custody
+accepts its exact bytes. Installed updates remain separate offers. A stale or unreachable Node retains
+its last roster for explanation while withholding its loaded UI. TUI custody can forget one recorded
+decision for reconsideration, and ending development mode withdraws its auto-accepted hashes through
+the same shared reconciliation as desktop.
 
 No module outside `packages/client-core/src/host/plugins/host.ts` calls `pluginCustody()`, and this
 host does not add a second caller.
@@ -303,13 +351,13 @@ lives.
 | Kind or slot | Desktop | Terminal | Where the answer lives |
 | --- | --- | --- | --- |
 | `rows` (`pane.footer`) | A strip of rows under the pane's frame | A `Rows` collection at the end of the pane, one per contributor, headed by its label and the contributing plugin's id | `apps/tui/src/kit/host.tsx` § `ExtensionRows`, drawn by `apps/tui/src/plugins/ExtendedPane.tsx` |
-| `annotation` | Marks inside the diff row, under the code | The same marks on the line below the code, indented past the gutter | `apps/tui/src/kit/showing.tsx` § `AnnotatedDiffLine` |
+| `annotation` | Marks inside the diff row, under the code; `core:task` marks become rail markers | Diff marks appear below the code; task rows show a count and offer `Shift+F10` inspection of the full legend | `apps/tui/src/kit/showing/diffRows.tsx` § `AnnotatedDiffLine`; § Task markers above |
 | `remote` (a `Slot`) | The contributor's tree, in the owner's surface | The same tree, in the same place, drawn from the same batch | `apps/tui/src/kit/host.tsx` § `Slot` |
 | `rectangle` (`pane.inline-*`) | Another plugin's iframe | One muted line naming the point | § Rectangles |
 | `hook` | Runs on the node | Runs on the node | Nothing to draw on either host |
 | `pane.aside` | A dashboard grid the user composed, beside the pane | One muted line naming the point | [future/dashboards/README.md](../future/dashboards/README.md) |
 | `rail.taskList` (exclusive slot) | The replacement draws in place of core's list | The same, through the same arbitration | `apps/tui/src/chrome/slot.tsx` |
-| `overlay`, `drawer`, `task.footer`, `task.switcher.extra`, `topbar.*` | Host UI slots a plugin fills | Not drawn | [future/client-plugins/04-replaceable-surfaces.md](../future/client-plugins/04-replaceable-surfaces.md) |
+| `overlay`, `drawer`, `task.footer`, `task.switcher.extra`, `topbar.*` | Host UI slots a plugin fills | Not drawn | [Plugin extension points](../plugins.md) |
 
 The last row costs five first-party registrations, and two of them draw nothing: github's and agents'
 `overlay` entries are where a command that needs the router or a query client gets mounted, and
@@ -332,14 +380,15 @@ plugin registers at boot, so it works here.
 curves on the desktop, and here it draws the indented list the workflows editor drew before the
 canvas existed: the same cards in the same reading order with the same selection, indented by rank
 instead of placed by coordinate, and `⇐ n` on a card that waits on more than one. Both hosts take the
-ranks from the same `kit/lib/graphLayout.ts`, so neither can put a card under the wrong one. Positions
+ranks from the same `kit/lib/layout/graphLayout.ts`, so neither can put a card under the wrong one. Positions
 and wires are not drawn, and the one affordance that would otherwise go with them — dragging an edge
 into place — is a picker under the list instead. A plugin writes the same `Graph` for both.
 
 **A contribution is as reachable as the nodes it draws.** A contributor that draws a `Button` inside a
 `Slot` is a stop, reached with `↓` from the strip above it and pressed with Enter, inside the region
 its host registered. A contributor that draws only `Text` is not a stop, and `↓` walks past it. The
-kit decides which is which, on both hosts, and a plugin cannot say otherwise (`focusRoles.ts`).
+kit decides which is which on both hosts. A plugin cannot change the
+`packages/client-core/src/kit/tokens/focusRoles.ts` table.
 
 **A plugin's own chord is pressed with Ctrl here.** A manifest chord is `meta+ctrl+alt+shift+key` and
 `meta` is the platform command key, which a terminal emulator keeps for itself. The command layer
@@ -356,7 +405,7 @@ A `Card` that takes an `onPress` is one stop and the walk does not go inside it,
 with its own controls in it reaches the card and nothing else. No first-party pane draws one; a card
 that holds controls holds them instead of a press.
 
-Two things nothing draws yet rather than draws worse. There is no settings surface, so the four
-plugins that register a settings page contribute nothing through it, and `workflows` contributes
-nothing at all. And the rail's drawer sources are the rail's browse sources, not the terminal plugin's
-profiles.
+The four plugins that register a settings page draw it in the Settings route, except the terminal
+plugin's drawer page, which the route lists and points at the desktop ([tui.md](../tui.md) § Settings).
+One thing nothing draws rather than draws worse: the rail's drawer sources are the rail's browse
+sources, not the terminal plugin's profiles.

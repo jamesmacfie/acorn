@@ -11,9 +11,10 @@
     "dev:agent:smoke": "node scripts/agent/session.mjs --smoke",
     "dev:agent:ui": "node scripts/agent/ui.mjs",
     "build": "pnpm run stage && pnpm run build:renderer && pnpm run check:renderer-budget && pnpm run check:runtime-syntax",
-    "dist": "pnpm run build && CI=true tauri build --config '{\"build\":{\"beforeBuildCommand\":\"\"}}' && pnpm run verify:bundle",
-    "stage": "pnpm run build:service && pnpm run build:bundled-plugins && pnpm run build:helper && pnpm run build:bridge && node scripts/stage.mjs",
+    "dist": "node scripts/dist.mjs",
+    "stage": "pnpm run build:service && pnpm run build:cli && pnpm run build:bundled-plugins && pnpm run build:helper && pnpm run build:bridge && node scripts/stage.mjs",
     "build:service": "pnpm --filter @acorn/node build",
+    "build:cli": "pnpm --filter @acorn/cli build",
     "build:bundled-plugins": "node scripts/build-bundled-plugins.mjs",
     "build:helper": "vite build --config vite.helper.config.ts",
     "build:bridge": "vite build --config vite.bridge.config.ts",
@@ -22,7 +23,8 @@
     "check:runtime-syntax": "node scripts/check-runtime-syntax.mjs",
     "verify:bundle": "node scripts/verify-bundle.mjs",
     "lint": "tsc --noEmit",
-    "test": "pnpm run stage && pnpm run build:renderer && vitest run && cargo test --manifest-path src-tauri/Cargo.toml",
+    "test": "pnpm run stage && pnpm run build:renderer && vitest run --exclude test/boot.test.ts && pnpm run test:boot && cargo test --manifest-path src-tauri/Cargo.toml",
+    "test:boot": "vitest run --project shell test/boot.test.ts",
     "tauri": "tauri"
   },
   "//dev:no-watch": "`tauri dev` rebuilds and relaunches the app whenever a file under src-tauri changes, which takes the window away from whoever is using it. This is the same dev run with the watcher off: the app keeps running while the Rust changes, and you pick the new binary up by restarting with `dev`. The renderer's own hot reload is Vite's and is unaffected either way.",
@@ -53,12 +55,13 @@
     "idb-keyval": "^6.2.5",
     "jose": "^6.2.3",
     "lucide-static": "^1.27.0",
+    "node-forge": "1.4.0",
     "node-pty": "^1.0.0",
     "openai": "^6.48.0",
     "pg": "^8.22.0",
     "playwright-core": "^1.61.1",
     "shiki": "^4.2.0",
-    "smol-toml": "^1.7.0",
+    "smol-toml": "^1.7.1",
     "solid-js": "catalog:",
     "ws": "^8.21.0",
     "zod": "catalog:"
@@ -91,6 +94,6 @@
     "typescript": "^6.0.3",
     "vite": "^8.0.16",
     "vite-plugin-solid": "^2.11.12",
-    "vitest": "^4.1.9"
+    "vitest": "^4.1.11"
   }
 }

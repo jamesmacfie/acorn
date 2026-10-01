@@ -144,12 +144,13 @@ const turn = (mode: string): AgentTurn => ({
   completedAt: null,
 })
 
-async function start(mode: string | null = null, resumed = false) {
+async function start(mode: string | null = null, resumed = false, config: Record<string, unknown> = {}) {
   const events: AgentNormalizedEvent[] = []
   const driverEvents: AgentDriverEvent[] = []
   const { CodexAgentDriver } = await import('./codexDriver')
+  const base = session(mode, resumed)
   const handle = await new CodexAgentDriver().start({
-    session: session(mode, resumed),
+    session: { ...base, config: { ...base.config, ...config } },
     cwd: '/tmp',
     env: {},
     mcpServers: [],
@@ -163,6 +164,9 @@ async function start(mode: string | null = null, resumed = false) {
   return { driverEvents, events, handle }
 }
 
+const requestIds = (events: AgentNormalizedEvent[]): string[] =>
+  events.flatMap((event) => event.type === 'request' ? [event.requestId] : [])
+
 describe('Codex collaboration modes', () => {
   beforeEach(() => {
     wire.requests.length = 0
@@ -175,6 +179,20 @@ describe('Codex collaboration modes', () => {
     }
     wire.onRequest = undefined
     wire.onNotification = undefined
+  })
+
+  // The same text on start and on resume, from the snapshot the session was created with.
+  it('gives a custom agent’s instructions to the thread as developer instructions', async () => {
+    const customAgent = { id: 'a1', name: 'Bug reviewer', instructions: 'Review for correctness only.' }
+    await (await start(null, false, { customAgent })).handle.stop()
+    expect(wire.requests.find((request) => request.method === 'thread/start')?.params)
+      .toMatchObject({ developerInstructions: 'Review for correctness only.' })
+    await (await start(null, true, { customAgent })).handle.stop()
+    expect(wire.requests.find((request) => request.method === 'thread/resume')?.params)
+      .toMatchObject({ developerInstructions: 'Review for correctness only.' })
+    wire.requests.length = 0
+    await (await start()).handle.stop()
+    expect(wire.requests.find((request) => request.method === 'thread/start')?.params).not.toHaveProperty('developerInstructions')
   })
 
   it('advertises the modes provider capability', async () => {
@@ -290,7 +308,7 @@ describe('Codex collaboration modes', () => {
   })
 
   it('completes the request_user_input response on the app-server wire', async () => {
-    const { handle } = await start('plan')
+    const { events, handle } = await start('plan')
     wire.onRequest?.({
       id: 42,
       method: 'item/tool/requestUserInput',
@@ -298,10 +316,30 @@ describe('Codex collaboration modes', () => {
         questions: [{ id: 'scope', header: 'Scope', question: 'Which scope?', options: null }],
       },
     })
-    await handle.resolveRequest('42', { answers: { scope: 'All files' } })
+    await handle.resolveRequest(requestIds(events)[0]!, { answers: { scope: 'All files' } })
     expect(wire.responses).toEqual([{
       id: 42,
       result: { answers: { scope: { answers: ['All files'] } } },
     }])
+  })
+
+  // Each app-server process numbers its requests from 0, so a resumed session asks a second
+  // request 0. Reusing that number would attach the new question to the one already answered.
+  it('gives a request Codex numbered again after a restart its own id', async () => {
+    const ask = () => wire.onRequest?.({
+      id: 0,
+      method: 'item/tool/requestUserInput',
+      params: { questions: [{ id: 'scope', header: 'Scope', question: 'Which scope?', options: null }] },
+    })
+    const first = await start('plan')
+    ask()
+    const second = await start('plan', true)
+    ask()
+    const [before] = requestIds(first.events)
+    const [after] = requestIds(second.events)
+    expect(before).not.toBe('0')
+    expect(after).not.toBe(before)
+    await second.handle.resolveRequest(after!, { answers: { scope: 'All files' } })
+    expect(wire.responses).toEqual([{ id: 0, result: { answers: { scope: { answers: ['All files'] } } } }])
   })
 })

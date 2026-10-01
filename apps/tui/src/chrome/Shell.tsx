@@ -8,8 +8,10 @@ import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import { PrefKeys } from '@acorn/client-core/infra/persistence'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
-import { registerCommands } from '@acorn/client-core/host/registries/commands'
+import { isTerminalOpen, setTerminalOpen } from '@acorn/client-core/features/tasks/tasks.ts'
+import { clientEvents, registerCommands } from '@acorn/client-core/host/registries/commands'
 import { registerKeybindings } from '@acorn/client-core/host/registries/commands'
+import { registerNoticeTargetHandler } from '@acorn/client-core/features/notifications'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import { pendingTrust } from '@acorn/client-core/host/plugins/distribution.ts'
 import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
@@ -33,11 +35,22 @@ import { PaneBody, PaneStrip } from './PaneRow'
 import { Footer } from './Footer'
 import { Notifications } from './Notifications'
 import { Inbox, initInbox } from './Inbox'
-import { TrustPrompt } from '../plugins/TrustPrompt'
+import { trustPromptComponent } from '../plugins/trustPromptLoader'
 import { Palette } from './Palette'
 import { createShellPalette } from './paletteSession'
 import { registerNavigationCommands } from './navigationCommands'
 import { CheatSheet } from './CheatSheet'
+import type { SetupStep } from './Setup'
+import { SetupHost } from './SetupHost'
+import { PromotionHost } from './PromotionHost'
+import { promotionRequest } from './promotionStore'
+import { SessionsHost } from './SessionsHost'
+import { FileDialog } from './FileDialog'
+import { activeFilePrompt } from './filePrompt'
+import { SettingsHost } from './SettingsHost'
+import { closeSettings, openSettings } from './settingsStore'
+import { Confirmation } from './Confirmation'
+import { activeConfirmation } from './confirmStore'
 
 // The arrangement: topbar, rail beside the pane, notifications, footer, and whatever overlay is on
 // top of it all.
@@ -80,8 +93,31 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // One way to lose the left column: a reader asked, on `ctrl+b`. There used to be a second —
   // collapsing to a two-cell strip
   // of marks below 100 columns — and it went with the icons: the strip only ever said anything
-  // because each row had a glyph in it, and most of those glyphs drew nothing (../kit/glyphs.ts).
+  // because each row had a glyph in it, and many of those glyphs drew nothing.
   const [hidden, setHidden] = createSignal(false)
+  const [setupStep, setSetupStep] = createSignal<SetupStep>('workspace')
+  const openSetup = (step: SetupStep = 'workspace') => { setSetupStep(step); openOverlay('setup') }
+
+  // An empty node has no project or task that the rail can create. Wait for the Node's real roster
+  // before offering setup: the cached startup path may briefly look empty while the Node boots.
+  let offeredSetup = false
+  createEffect(() => {
+    if (!model.ready() || offeredSetup) return
+    offeredSetup = true
+    if (model.workspaces().every((workspace) => workspace.projects.length === 0)) openSetup()
+  })
+  // Agent handoff and terminal commands both set the shared per-task drawer flag. On this host the
+  // flag opens a full screen session view instead of a desktop drawer; closing it returns to the
+  // pane without stopping the Node-owned PTY.
+  createEffect(() => {
+    const taskId = model.task()?.id
+    if (taskId && isTerminalOpen(taskId)) openOverlay('sessions')
+    else closeOverlay('sessions')
+  })
+  createEffect(() => {
+    if (activeFilePrompt()) openOverlay('file')
+    else closeOverlay('file')
+  })
 
   const source = () => sourceRegistry.get(selectedSource() ?? '')
 
@@ -121,7 +157,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // node has gone behind the overlay. Asking for a pass is the whole fix, because the pass already
   // walks the parents before it decides (../keys/regions.ts § The landing rule, § onScreen).
   createEffect(() => {
-    if (topOverlay()) scheduleSettle()
+    if (topOverlay() || activeConfirmation()) scheduleSettle()
   })
 
   // One tick for every spinner on screen (../kit/tick.ts).
@@ -173,6 +209,13 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     const commands = registerCommands([
       { id: 'core.palette.open', title: 'Commands', category: 'navigation', run: () => palette.openRoot() },
       { id: 'core.shortcuts.cheat-sheet', title: 'Help', hint: 'what the keyboard does right here', category: 'navigation', palette: true, run: () => openOverlay('help') },
+      { id: 'core.settings.open', title: 'Open settings', hint: 'every settings page, grouped as on the desktop', category: 'navigation', palette: true, run: () => openSettings() },
+      { id: 'core.setup.open', title: 'Set up acorn', hint: 'workspaces, projects, tasks, and providers', category: 'workspace', palette: true, run: () => openSetup() },
+      { id: 'core.task.create', title: 'New task', hint: 'create a task in a project', category: 'task', palette: true, run: () => openSetup('task') },
+      { id: 'core.terminal.sessions', title: 'Open terminal sessions', hint: 'start or resume a task terminal', category: 'task', palette: true, requires: { plugin: 'terminal' }, when: () => !!model.task(), run: () => {
+        const task = model.task()
+        if (task) setTerminalOpen(task.id, true)
+      } },
       // Chord-only. The overlay pickers stay — `w` and `p` are how a reader switches without opening
       // the palette at all — but the palette's own row for each is the search under Go to, and two rows
       // saying "Switch workspace" is one too many (./navigationCommands.ts).
@@ -196,12 +239,33 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       { id: 'core.goto.workspace-last', command: 'core.goto.workspace-last', description: 'Last workspace', category: 'Global', defaultChord: ';', when: 'global' },
       { id: 'core.rail.toggle', command: 'core.rail.toggle', description: 'Rail', category: 'Global', defaultChord: 'ctrl+b', when: 'global' },
       { id: 'core.notifications.open', command: 'core.notifications.open', description: 'Notifications', category: 'Global', defaultChord: 'n', when: 'global' },
+      { id: 'core.terminal.sessions', command: 'core.terminal.sessions', description: 'Terminal sessions', category: 'Task', defaultChord: 't', when: 'task' },
       { id: 'core.quit', command: 'core.quit', description: 'Quit', category: 'Global', defaultChord: 'q', when: 'global' },
     ])
     // Go to task, switch workspace, go to project and switch node, as one group of searches. Switching
     // node was one command per paired node until 2026-09-03, which put the whole roster in the root.
     const navigation = registerNavigationCommands(model)
     onCleanup(() => { navigation.dispose(); bindings.dispose(); commands.dispose() })
+  })
+
+  // Settings: core's pages from the table the desktop draws from, beside the pages the roster's plugins
+  // register, and the ways in besides the palette. A plugin or a notice asks for a page by id, the
+  // same request the desktop's shell answers (./settingsPages.tsx, ./settingsStore.ts).
+  //
+  // The desktop's palette rows for each page and section are not registered here. Every one of them
+  // carries the Settings breadcrumb and a low order, so they ranked level with or above this shell's
+  // own commands: `notifications` opened the settings page instead of the inbox, and `new task` opened
+  // Keyboard shortcuts. **Open settings** is the one row, and the route's lists reach every page.
+  //
+  // The pages register behind a loader, because the table and the page graph are not needed to draw the
+  // first frame. The registry is a signal, so the route and anything reading it fill in when they land.
+  onMount(() => {
+    let unregister: (() => void) | undefined
+    let live = true
+    void import('./settingsPages').then(({ registerCoreSettingsPages }) => { if (live) unregister = registerCoreSettingsPages() })
+    const offEvent = clientEvents.on('presentation:open-settings', ({ tab }) => openSettings(tab))
+    const offTarget = registerNoticeTargetHandler('settings', (_taskId, target) => openSettings(target.resourceId))
+    onCleanup(() => { live = false; offTarget(); offEvent(); unregister?.() })
   })
 
   return (
@@ -220,10 +284,10 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
           `display: none`, so the row gives up its height and the overlay below takes it.
           That is what a cell host has instead of a floating layer, and it is the same thing
           `TabPanel` does for a hidden tab. */}
-      <box flexDirection="row" flexGrow={1} visible={!topOverlay()}>
+      <box flexDirection="row" flexGrow={1} visible={!topOverlay() && !activeConfirmation()}>
         {/* No rule between the column and the pane: each panel draws its own frame, and a rule beside
             a border is two lines saying one thing (../panel.tsx). */}
-        <Show when={!hidden()}><Rail model={model} cells={railCells(cells())} /></Show>
+        <Show when={!hidden()}><Rail model={model} cells={railCells(cells())} nodeId={props.nodeId} /></Show>
         <box flexDirection="column" flexGrow={1}>
           {/* The strip is a region only while a task gives it something to draw. Keeping the ref
               outside this Show left an empty, focusable box in the source-view Tab cycle. */}
@@ -247,7 +311,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
               already has for the same reason (../layouts/index.ts, findings.md § A pending `lazy()`
               region is an empty string). It carries the error boundary too, so a surface that
               throws says what it threw rather than leaving the main panel blank (../panel.tsx). */}
-          <PanelBody name="main">
+          <PanelBody name="main" nodeId={props.nodeId} region={SOURCE}>
             <Switch fallback={<EmptyState title="Nothing open">Choose a task in the rail.</EmptyState>}>
               {/* A source that declared regions has its list in the Browse panel already, so the
                   main panel is its detail alone. One that did not keeps its whole surface here,
@@ -267,18 +331,29 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
           own content height (../kit/grouping.tsx). */}
       <Show when={topOverlay()}>
         {(name) => (
-          <box flexDirection="column" flexGrow={1}>
+          <box flexDirection="column" flexGrow={1} visible={!activeConfirmation()}>
             <Switch>
               <Match when={name() === 'palette'}><Palette session={palette} /></Match>
               <Match when={name() === 'help'}><CheatSheet /></Match>
               <Match when={name() === 'workspace'}><WorkspacePicker model={model} /></Match>
               <Match when={name() === 'project'}><ProjectPicker model={model} /></Match>
               <Match when={name() === 'quit'}><QuitConfirm onQuit={props.onQuit} /></Match>
-              <Match when={name() === 'trust'}><TrustPrompt /></Match>
+              <Match when={name() === 'trust'}><Dynamic component={trustPromptComponent() ?? undefined} /></Match>
               <Match when={name() === 'notifications'}><Inbox model={model} /></Match>
+              <Match when={name() === 'setup'}><SetupHost model={model} nodeId={props.nodeId} initialStep={setupStep()} onClose={() => closeOverlay('setup')} /></Match>
+              <Match when={name() === 'settings'}><SettingsHost nodeId={props.nodeId} onClose={closeSettings} onSetup={() => openSetup()} /></Match>
+              <Match when={name() === 'promotion'}><Show when={promotionRequest()}>{(request) => <PromotionHost request={request()} />}</Show></Match>
+              <Match when={name() === 'sessions'}><Show when={model.task()}>{(task) => <SessionsHost task={task()} onClose={() => closeOverlay('sessions')} />}</Show></Match>
+              <Match when={name() === 'file'}><Show when={activeFilePrompt()}>{(prompt) => <FileDialog prompt={prompt()} />}</Show></Match>
             </Switch>
           </box>
         )}
+      </Show>
+      {/* The confirmation goes over whatever has the screen, and that stays mounted and hidden under it,
+          the way the main row stays under an overlay. So the page that asked is still there, with its
+          state, when the answer lands (./confirmStore.ts). */}
+      <Show when={activeConfirmation()} keyed>
+        {(request) => <box flexDirection="column" flexGrow={1}><Confirmation request={request} /></box>}
       </Show>
       <Notifications />
       <Footer nodeId={props.nodeId} />
@@ -340,7 +415,7 @@ function QuitConfirm(props: { onQuit: () => void }) {
 function ProjectPicker(props: { model: ShellModel }) {
   const close = () => closeOverlay('project')
   const projects = () => props.model.workspace()?.projects ?? []
-  // Kept rather than rebuilt, for the reason the rail's are (../kit/showing.tsx § keyedRows).
+  // Kept rather than rebuilt, for the reason the rail's are (../kit/showing/collection.tsx § keyedRows).
   const rows = keyedRows(projects, (project) => ({ key: project.id, ...project }))
   return (
     <Modal onDismiss={close} title="Project" size="sm">

@@ -1,9 +1,14 @@
 import type { JSX } from 'solid-js'
-import type { CodeRow, DiffFile, DiffThread } from '../../kit/diff/diffModel'
+import type { DiffDocumentTopology, DiffSearchPage, DiffSearchRequest, DiffSegmentPayload, DiffSegmentRequest } from '@acorn/diff-document/document'
+import type { CodeRow, DiffThread } from '../../kit/diff/diffModel'
 import type { DiffViewScope } from './viewState'
 
 /** Which column a comment is anchored to. The renderer's own vocabulary, matching buildRenderableRows. */
 export type CommentSide = 'LEFT' | 'RIGHT'
+
+/** A line the source draws something under, known before any row is built. `old` is a deleted line's
+ *  number, `new` any other line's. */
+export type DiffLineAnchor = { path: string; side: 'old' | 'new'; line: number }
 
 /**
  * Everything DiffPane needs from whoever owns the diff.
@@ -13,48 +18,45 @@ export type CommentSide = 'LEFT' | 'RIGHT'
  * plain accessors and callbacks, and an omitted optional member hides its affordance rather than
  * needing a stub. A source with no `fileText` renders gaps that cannot be expanded; a source with no
  * `reply` gets thread rows whose reply box is disabled.
+ *
+ * The diff itself arrives as a document (docs/diff-rendering.md § The source port): a topology that
+ * lays out every file and segment without any source text, and segments of plain rows the viewer asks
+ * for as the reader comes near them. The source never hands over a whole patch.
  */
 export type DiffSource = {
   /** Session-scoped identity for the remembered scroll offset and collapsed files. */
   scope: DiffViewScope
-  /** Changed files in display order. Undefined until the first load resolves. */
-  files: () => DiffFile[] | undefined
+  /** The document's layout. Undefined until the first load resolves. A new revision keeps every
+   *  segment whose content key is unchanged and reloads only the ones that moved. */
+  topology: () => DiffDocumentTopology | undefined
   loading: () => boolean
   /**
-   * Which files are being shown. When this changes, parse state, expanded gaps, collapsed files and
-   * the remembered scroll offset are all dropped, because they described a different diff.
+   * Which files are being shown. When this changes, expanded gaps, collapsed files and the remembered
+   * scroll offset are all dropped, because they described a different diff. A working tree keeps this
+   * steady while its files' content moves, so an agent saving a file mid-review does not throw the
+   * reader back to the top; a pull request's moves with every new commit.
    */
   signature: () => string
-  /**
-   * What those files currently say, when that can move without the set changing. Defaults to
-   * `signature`.
-   *
-   * A change here re-reads the patches and leaves the scroll offset and the collapsed files alone,
-   * because the reader is still looking at the same thing. A working tree needs the two apart: an
-   * agent saving a file mid-review moves the content every poll, and treating that as a new diff
-   * would throw the reader back to the top each time. A pull request does not: a new commit is both.
-   */
-  contentSignature?: () => string
-  /**
-   * One file's part of `contentSignature`. With it, a content change re-reads only the files whose key
-   * moved, so a poll that finds nothing new reads nothing; without it, every file in the set is read
-   * again. Only consulted when `contentSignature` moves and `signature` did not.
-   */
-  contentKey?: (path: string) => string
   /** The file to scroll to. Empty means "wherever the remembered position was". */
   selectedPath: () => string
-  /** Inline conversations, interleaved into the rows by path and line. */
+  /** Inline conversations, placed under the line they are anchored to. Complete when the topology is:
+   *  a thread that appears later is counted as late topology by the health probe. */
   threads?: () => DiffThread[] | undefined
   /** Mention candidates for the comment composers. */
   mentions?: () => string[]
-  /** A patch body already in hand, or null when it has to be fetched. */
-  cachedFile: (path: string) => DiffFile | null
-  /** Bodies still missing after cachedFile. Omit when every patch arrives with the file list. */
-  fetchPatches?: (paths: string[], signal: AbortSignal | undefined) => Promise<DiffFile[]>
+  /**
+   * Plain rows for these segments, in any order. Asked for only near the viewport, a few at a time,
+   * never for the whole document. Rejects when the segments can no longer be produced, such as a
+   * working tree that moved under them; the viewer shows the segment as failed with a Retry, and the
+   * source is expected to refresh its topology.
+   */
+  loadSegments: (requests: DiffSegmentRequest[], signal: AbortSignal) => Promise<DiffSegmentPayload[]>
+  /** One page of find results across the whole document, as segment and row positions. */
+  search: (request: DiffSearchRequest, signal: AbortSignal) => Promise<DiffSearchPage>
   /**
    * The new side of a file, whole, to fill a gap the reader expands. Omit and gaps render inert.
    *
-   * Both halves of the argument come from the source's own `DiffFile`, so a source addresses the
+   * Both halves of the argument come from the source's own topology file, so a source addresses the
    * content however it likes: GitHub passes a blob sha and ignores the path, and the changes pane
    * passes the staging area and reads the path out of the working tree.
    */
@@ -76,19 +78,17 @@ export type DiffSource = {
   /** Namespace for the per-line composer drafts, so two surfaces never share one. */
   draftPrefix: string
   /**
-   * Extra content under a code row, drawn inside the virtualized row so its height is measured.
-   * This is the seam for an annotation the shell has no concept of, such as the changes pane's
-   * review notes.
+   * Content the source draws under code lines, such as the changes pane's review notes. `anchors`
+   * names every line that has some, up front, so the document can reserve for them before their
+   * segments load; `render` draws one line's, inside its segment so the height is measured.
    */
-  lineExtra?: (row: CodeRow) => JSX.Element
-  /** Whether lineExtra would draw anything for this row. Read on every row, so keep it cheap. */
-  hasLineExtra?: (row: CodeRow) => boolean
-  /**
-   * Changes whenever an annotation appears, goes, or changes height. A row is measured when it
-   * mounts, so without this a note added to a row already on screen would grow it while the
-   * virtualizer still held the one-line estimate, and the rows below it would overlap.
-   */
-  lineExtraSignature?: () => string
+  lineExtra?: { anchors: () => readonly DiffLineAnchor[]; render: (row: CodeRow) => JSX.Element }
+  /** A task-owned agent conversation anchored to a diff line. */
+  inlineChat?: {
+    anchors: () => readonly DiffLineAnchor[]
+    render: (row: CodeRow) => JSX.Element
+    open: (row: CodeRow) => void
+  }
   /**
    * A click on a code line, for a source with a modifier-key affordance of its own. Unified mode
    * only: a split band holds two rows and cannot say which one the click landed on.

@@ -1,8 +1,8 @@
-import { X509Certificate } from 'node:crypto'
+import { createPrivateKey, X509Certificate } from 'node:crypto'
 import { mkdtempSync, rmSync, statSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { ensureCert, type NodeCertificate } from './tls'
 
 const roots: string[] = []
@@ -32,9 +32,26 @@ describe('the node TLS identity (docs/security.md § Transport and authenticatio
     const cert = ensureCert(dir)
     expect(cert.keyPem).toContain('PRIVATE KEY')
     expect(cert.certPem).toContain('BEGIN CERTIFICATE')
-    expect(mode(join(dir, 'tls'))).toBe('700')
-    expect(mode(join(dir, 'tls/key.pem'))).toBe('600')
-    expect(mode(join(dir, 'tls/cert.pem'))).toBe('600')
+    // Windows uses the data root's inherited ACL rather than POSIX permission bits.
+    if (process.platform !== 'win32') {
+      expect(mode(join(dir, 'tls'))).toBe('700')
+      expect(mode(join(dir, 'tls/key.pem'))).toBe('600')
+      expect(mode(join(dir, 'tls/cert.pem'))).toBe('600')
+    }
+  })
+
+  it('provisions a fresh identity without host executables on PATH', () => {
+    vi.stubEnv('PATH', '')
+    try {
+      const cert = ensureCert(root())
+      const parsed = new X509Certificate(cert.certPem)
+      expect(parsed.checkPrivateKey(createPrivateKey(cert.keyPem))).toBe(true)
+      expect(parsed.verify(parsed.publicKey)).toBe(true)
+      expect(parsed.publicKey.asymmetricKeyType).toBe('rsa')
+      expect(parsed.publicKey.asymmetricKeyDetails?.modulusLength).toBe(2048)
+    } finally {
+      vi.unstubAllEnvs()
+    }
   })
 
   // The fingerprint IS the node's identity: a second call that minted a fresh pair would look to every
@@ -53,13 +70,23 @@ describe('the node TLS identity (docs/security.md § Transport and authenticatio
     expect(parsed.fingerprint256.replace(/:/g, '').toLowerCase()).toBe(minted.fingerprint)
   })
 
-  // These three extensions are why the file is generated with explicit -addext rather than OpenSSL 3's
-  // -x509 defaults, and each one buys something specific downstream.
+  it.each(['key.pem', 'cert.pem'])('recovers an interrupted generation missing %s', (missing) => {
+    const dir = root()
+    const first = ensureCert(dir)
+    rmSync(join(dir, 'tls', missing))
+    const recovered = ensureCert(dir)
+    expect(recovered.fingerprint).not.toBe(first.fingerprint)
+    expect(new X509Certificate(recovered.certPem).checkPrivateKey(createPrivateKey(recovered.keyPem))).toBe(true)
+    expect(ensureCert(dir).fingerprint).toBe(recovered.fingerprint)
+  })
+
   it('carries the loopback SAN, CA:TRUE and a long validity', () => {
     const parsed = new X509Certificate(minted.certPem)
     // The SAN is what lets a spawned Node child validate the hostname instead of disabling verification.
     expect(parsed.subjectAltName).toContain('127.0.0.1')
     expect(parsed.subjectAltName).toContain('localhost')
+    expect(parsed.checkIP('127.0.0.1')).toBe('127.0.0.1')
+    expect(parsed.checkHost('localhost')).toBe('localhost')
     // CA:TRUE is what lets the same file serve as a NODE_EXTRA_CA_CERTS trust anchor.
     expect(parsed.ca).toBe(true)
     // Rotation means re-pairing every device, so this outlives any plausible install.

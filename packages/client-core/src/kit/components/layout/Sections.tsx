@@ -1,5 +1,6 @@
 import { For, Show, type JSX } from 'solid-js'
-import { DetailColumn, ListColumn, ListDetail, SectionHeader } from '../primitives'
+import { DetailColumn, ListColumn, ListDetail } from './ListDetail'
+import { SectionHeader } from './SectionHeader'
 import { Fold } from './Fold'
 
 // One surface as a header, a set of named sections, and the one thing that gets the room: the shape
@@ -42,14 +43,21 @@ export function Sections(props: {
   id: string
   /** Names the column of sections. It is a landmark; name it. */
   ariaLabel?: string
-  /** What the surface is about, above the sections and always drawn. The terminal's first tab. */
+  /** What the surface is about, above the sections. The terminal's first tab; on desktop it stays
+   *  mounted when the section column is collapsed. */
   header?: KitSection
   sections: readonly KitSection[]
   /** The region the surface exists to show: a diff, a log, a preview. */
   main?: KitSection
 }) {
   return (
-    <ListDetail split listWidth="wide">
+    <ListDetail
+      split
+      listWidth="wide"
+      listLabel={props.ariaLabel}
+      collapseKey={props.main ? `sections:${props.id}` : undefined}
+      collapseTo="edge"
+    >
       {/* No header on the column: the surface opens with its own heading, which names the column
           better than a label would. The same call github's PR surfaces made before this node. */}
       <ListColumn scroll label={props.ariaLabel}>

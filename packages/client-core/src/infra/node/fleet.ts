@@ -9,6 +9,7 @@ import { createLogger, describeError } from '../telemetry/logger'
 import { queryCacheLifecycle, type CacheStorage, type QueryCacheLifecycle } from '../persistence/queryCacheLifecycle'
 import { registerQueryOwner } from './queryOwnership'
 export type { CacheStorage } from '../persistence/queryCacheLifecycle'
+import { dropSegmentCache } from '../../features/diff/segmentCaches'
 
 // The fleet store: which nodes this client knows, what state each connection is in, and one query
 // cache per node (docs/architecture-overview.md § Client state and fleet behavior,
@@ -250,6 +251,7 @@ export function dropNode(nodeId: string): Promise<void> {
   const cache = caches.get(nodeId)
   caches.delete(nodeId)
   if (cache) void cache.persistence.retire().catch(() => {})
+  if (cache) dropSegmentCache(cache.client)
   cache?.client.clear()
   setNodes((current) => current.filter((node) => node.nodeId !== nodeId))
   setStatuses((current) => {
@@ -285,6 +287,42 @@ export async function retryCacheRetirement(nodeId: string): Promise<void> {
   } finally {
     lease.release()
   }
+}
+
+/**
+ * Settings > Storage and memory's Clear cache: forget what this client cached for a node that stays
+ * connected (docs/caching.md § Renderer query cache).
+ *
+ * Not `dropNode`, which also takes the node out of the fleet list and its status map, and deletes the
+ * QueryClient the mounted provider is still holding. This keeps the client and empties it: entries
+ * nothing is drawing are removed, the saved snapshot is deleted, and what is on screen is refetched.
+ * The on-screen rows stay drawn until their refetch lands, rather than the window going blank. The
+ * persister writes a new snapshot with just those entries within five seconds.
+ *
+ * The resident diff segments are left alone. They are never saved, their memory is bounded, and their
+ * `clear` is written for a node that is gone: it drops the claims a mounted diff pane holds.
+ */
+export async function clearNodeCache(nodeId: string): Promise<void> {
+  const cache = clientFor(nodeId)
+  await cache.persistence.clearInactive()
+  if (caches.get(nodeId) === cache && !cache.persistence.retired()) {
+    void cache.client.invalidateQueries({ type: 'active' })
+  }
+}
+
+/** The saved snapshot for a node: its size as UTF-8 and how many entries it holds, or null when there
+ *  is none. Read from the store rather than from memory, because that is what the next launch restores. */
+export async function persistedCacheSize(nodeId: string): Promise<{ bytes: number; entries: number } | null> {
+  const text = await cacheStorage.getItem(cacheKeyFor(nodeId))
+  if (!text) return null
+  let entries = 0
+  try {
+    const parsed = JSON.parse(text) as { clientState?: { queries?: unknown[] } }
+    entries = parsed.clientState?.queries?.length ?? 0
+  } catch {
+    // A snapshot that does not parse still takes the space. The persister discards it on restore.
+  }
+  return { bytes: new TextEncoder().encode(text).byteLength, entries }
 }
 
 // Test seam: the maps and signals above outlive a single test file otherwise.

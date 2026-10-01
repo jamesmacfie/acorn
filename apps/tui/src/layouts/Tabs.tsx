@@ -65,7 +65,7 @@ export function Tabs(props: LayoutProps) {
             // The panel is a region of its own here, unlike a `Sections` panel, so the strip owns
             // one box and that box is where Down lands and where Escape climbs from. It is framed by
             // `Panel` rather than drawn by a `TabPanel`, so the strip is told about it here instead
-            // (../kit/grouping.tsx § Which panels a strip owns).
+            // (../kit/grouping/panelRegistry.ts § registerPanel).
             onBox={(box) => {
               registerPanel(props.stateKey, box)
               regionFocus({ paneId: props.stateKey, regionId: 'panel' }, 1)(box)

@@ -1,9 +1,11 @@
-import { noteBundleAccepted, resolvePendingTrust, type PluginTrustRequest } from '../plugins/distribution'
+import { refreshPluginTrust, type PluginTrustRequest } from '../plugins/distribution'
 import {
   agentToolGrants,
   agentToolPermissionLines,
   contextSectionGrants,
   contextSectionPermissionLines,
+  customAgentGrants,
+  customAgentPermissionLines,
   extensionGrants,
   extensionPermissionLines,
   harnessGrants,
@@ -23,7 +25,7 @@ import {
   webviewPermissionLines,
 } from './permissions'
 import { recordPluginTrust } from '../plugins/host'
-import { syncPluginContributions } from '../plugins/syncContributions'
+import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
 
 // What the trust prompt says, and what answering it does (PluginTrustDialog.tsx draws it).
 //
@@ -59,13 +61,13 @@ export type TrustTier = { key: TierKey; lines: TrustLine[] }
 export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[] {
   const installed = request?.row.installed
   if (!request || !installed) return []
-  const previous = request.previous
+  const previous = request.previous?.partial ? undefined : request.previous
   const groups: { key: TierKey; now: readonly PermissionLine[]; was: readonly PermissionLine[] | null }[] = [
     {
       key: 'enforced',
       now: [
         ...uiPermissionLines(installed.permissions, request.row.name),
-        ...nodePermissionLines(installed.permissions),
+        ...(request.source?.kind === 'device' ? [] : nodePermissionLines(installed.permissions)),
         ...keyClaimPermissionLines(keyClaimGrants(installed.contributions)),
         ...navigationDestinationPermissionLines(navigationDestinationGrants(installed.contributions)),
         // Both directions of the cooperative seam plus any core-surface offer. `request.row.name` is the
@@ -103,12 +105,15 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
         // deadline, but what runs on archive is the plugin's own node code.
         ...taskCheckPermissionLines(taskCheckGrants(installed.contributions)),
         ...contextSectionPermissionLines(contextSectionGrants(installed.contributions)),
+        // Beside the context sections: both are words the plugin puts in front of an agent.
+        ...customAgentPermissionLines(customAgentGrants(installed.contributions)),
       ],
       was: previous
         ? [
           ...schedulePermissionLines(previous.schedules ?? []),
           ...taskCheckPermissionLines(previous.taskChecks ?? []),
           ...contextSectionPermissionLines(previous.contextSections ?? []),
+          ...customAgentPermissionLines(previous.customAgents ?? []),
         ]
         : null,
     },
@@ -118,7 +123,7 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
       was: previous ? webviewPermissionLines(previous.webviews ?? []) : null,
     },
   ]
-  return groups.map(({ key, now, was }) => {
+  return groups.filter(({ key }) => request.source?.kind !== 'device' || key !== 'declared').map(({ key, now, was }) => {
     const before = was ? new Set(was.map((entry) => entry.key)) : null
     return {
       key,
@@ -142,7 +147,9 @@ export async function recordTrustDecision(request: PluginTrustRequest, decision:
     pluginId: request.row.name,
     hash: request.hash,
     nodeId: request.nodeId,
+    source: request.source ?? { kind: 'node', nodeId: request.nodeId },
     version: installed.version,
+    declaration: clientDeclaration(installed),
     permissions: installed.permissions,
     webviews: webviewGrants(installed.contributions),
     keyClaims: keyClaimGrants(installed.contributions),
@@ -165,16 +172,10 @@ export async function recordTrustDecision(request: PluginTrustRequest, decision:
     harnesses: harnessGrants(installed.contributions),
     agentTools: agentToolGrants(installed.contributions),
     contextSections: contextSectionGrants(installed.contributions),
+    customAgents: customAgentGrants(installed.contributions),
     decision,
   })
-  resolvePendingTrust(request.row.name, request.hash)
-  // An acceptance is what lets the plugin's surfaces exist at all (frames/register.ts gates on it), so
-  // register them now rather than at the next boot. A rejection needs no counterpart: nothing was
-  // registered to take away.
-  if (decision === 'accepted') {
-    noteBundleAccepted(request.row.name, request.hash)
-    // Both passes, because a bundle-bearing plugin's chrome is gated on the same acceptance as its
-    // rectangles, so it appears with the rest of its surfaces rather than at the next boot.
-    syncPluginContributions()
-  }
+  // The host's durable write succeeded. One snapshot read now changes the accepted selection and
+  // pending queue together; its commit listener updates both contribution registries.
+  await refreshPluginTrust()
 }

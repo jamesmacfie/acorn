@@ -35,7 +35,7 @@ prints to stderr. That is a developer at a terminal, not an export.
 ## The five kinds
 
 Every record is a flat object with a `kind` and an `attrs` map, declared in
-`packages/protocol/src/telemetry.ts`. Times are milliseconds since the epoch and durations are
+`packages/protocol/src/runtime/telemetry.ts`. Times are milliseconds since the epoch and durations are
 milliseconds. Ids are lowercase hex, 32 characters for a trace and 16 for a span, which are the W3C
 sizes, so a `traceparent` header round-trips with no conversion.
 
@@ -80,7 +80,8 @@ says it happened.
 Attributes are the only place a fact about one record goes. Keys are dotted and lowercase, at most
 64 characters. A string value is cut at 512, a record keeps at most 32 attributes, and a log body is
 cut at 2,000 characters. The collector truncates rather than dropping, and counts truncations as
-`telemetry.truncated`, so a chatty seam is visible instead of quietly losing its tail.
+`telemetry.truncated`, so a chatty seam is visible instead of quietly losing its tail. Attribute keys
+and string values pass through the same pattern scrubber. Keys and values use one-line formatting.
 
 Two keys are reserved and stamped by the host. An emitter that sets one is ignored, not refused,
 because a plugin should not be able to fail its own route by mislabelling a span.
@@ -88,7 +89,7 @@ because a plugin should not be able to fail its own route by mislabelling a span
 | Key | Values | Set where |
 | --- | --- | --- |
 | `owner` | `core` or a plugin id | The seam that knows. The plugin host binds it into `ctx.telemetry` and `ctx.log`; the request middleware derives it from `/v1/p/<id>` in the path; the scheduler from the schedule key; the hook runner from the handler's registration |
-| `runtime` | `node`, `renderer`, `tui`, `helper` or `shell` | Whichever runtime built the batch. The node stamps its own; a posted batch names the sender, and cannot say `node` |
+| `runtime` | `node`, `renderer`, `tui`, `helper` or `shell` | Whichever runtime built the batch. The node stamps its own; a posted batch names the sender, and cannot say `node`. The helper posts two batches for other runtimes: the shell's crash record, and the renderer's memory, which the shell measures from outside ([shell.md](./shell.md) § What the shell reports) |
 
 The conventional ones, set by the seam that has the fact: `seam`, `route`, `method`, `status`,
 `request.id`, `task.id`, `schedule.key`, `schedule.reason`, `hook.point`, `hook.handler`,
@@ -223,7 +224,7 @@ route under one.
 
 Two compiled plugins already do this, and core adds nothing plugin-shaped for either: workflows
 raises `workflow.run` and `workflow.step` ([workflows.md](./workflows.md) § What a run reports),
-and agents raises `agent.session` and `agent.turn`
+and agents raises `agent.session` and `agent.turn`, plus the `agent.processes.*` gauges
 ([managed-agents.md](./managed-agents.md) § What a session reports).
 
 A plugin's client half has no `ctx.telemetry`, because a client context is contribution points and
@@ -279,7 +280,7 @@ registrations it rolls back.
 `plugins/sentry-telemetry` is the one that ships, and it is the thing this whole document was built
 for. It is a loaded plugin in the bundled roster, so it is installed on every machine and does
 nothing at all until two things are true: the switch above is on, and a Sentry DSN is connected in
-Settings → Integrations. [integrations.md](./integrations.md) § Sentry owns the connection and the
+Settings → Services. [integrations.md](./integrations.md) § Sentry owns the connection and the
 two-plugin split.
 
 Its own settings page holds what the one switch does not, and every choice there is the sink's
@@ -379,6 +380,18 @@ the data-root path, which is what "open the data folder" means in a terminal.
 timed out`, which is what the hand-written prefix printed before. Attributes render as `key=value`
 on the end of the line, so a line stays one line and stays greppable.
 
+The Node logger scrubs its tag, message, attribute keys, and string values before writing stderr or
+emitting a telemetry record, including when collection is off. Tags keep at most 512 characters,
+messages keep 2,000, and attributes use the collector's field and count limits. Stderr shows at most
+200 characters per string attribute and 4,000 UTF-8 bytes for the complete line, without splitting a
+multibyte character. Tabs and line breaks become spaces. The performance printer also scrubs its
+text and metric names before stderr. The collector applies attribute hygiene to direct emitters and
+posted records, then stamps the host-owned `owner` and `runtime` attributes.
+
+Pattern redaction recognizes known credential shapes and collapses the configured home and data
+roots. It cannot recognize every credential or make arbitrary private content safe to log. A boundary
+that knows a credential's value must withhold that content or apply exact redaction there.
+
 Everything goes to stderr, `info` and `debug` included, because stdout is a wire in the standalone
 entry and in the desktop helper. `console.error` and `console.warn` rather than
 `process.stderr.write`, because thirty-one node tests spy on those two and a logger writing
@@ -464,7 +477,7 @@ asked for it.
 ### An owner on a contribution that never declared one
 
 Eight client contribution types carry no plugin id: a pane, a source, a slot, a reference panel, a
-settings page, and the rest. `Registry` in `packages/client-core/src/kit/lib/registry.ts` keeps the
+settings page, and the rest. `Registry` in `packages/client-core/src/kit/lib/state/registry.ts` keeps the
 owner in a side-map instead, filled by the three passes that know it, and `ownerOf(id)` answers for
 the seams. A field on each type would have meant changing every registration site to add something
 only telemetry reads.
@@ -497,6 +510,10 @@ bridge both use it to group `/v1/p/<plugin>` requests by plugin without recordin
 | Every plugin channel frame | `host/plugins/pluginChannel.ts` | histogram `plugin.frame` |
 | Every contribution that throws while rendering | `kit/components/content/ContributionBoundary.tsx` | a handled error with its stack, contribution id, and owner |
 | Every place a followed timeline puts the reader | `kit/components/content/Timeline.tsx` | event `ui.scroll.place` with the cause, the turn the reader is anchored to, the offsets it moved between, the list and viewport heights, and whether it was following. `opened` is a list mounting or swapping, which is the only trace a remount leaves; `unasked` is a move neither the reader nor the timeline made; `took` is the reader's place changing without the reader, which happens only when the turn they were on has left the list |
+| Every large diff or timeline becoming ready or going away | `kit/lib/telemetry/surfaceHealth.ts`, installed by `infra/telemetry/emitter.ts` | histograms `ui.surface.*`, labelled only by surface kind and checkpoint. See [Rendered-surface health](#rendered-surface-health) |
+| Page counts, every 30 seconds while visible | `infra/telemetry/pageFacts.ts` | gauges `ui.page.*`. See [Memory over a day](#memory-over-a-day) |
+| Every diff segment cache access and change | `features/diff/segmentCache.ts` and `segmentLoader.ts` | histograms `diff.segment_cache.hit` and `.miss` (segments that entered a pane's range, found or not), `.insert` (segments per batch), `.evict`, `.evicted_rows` and `.evicted_bytes` labelled only by `reason` (`budget`, `superseded` or `node-drop`), `.oversize`, and the resident `.documents`, `.segments`, `.rows`, `.plain_bytes` and `.enrichment_bytes` after each insert. No key, path, revision or text. See [diff-rendering.md](./diff-rendering.md) § Resident segments |
+| A diff pane's first plain rows | `features/diff/DiffPane.tsx` | histogram `diff.first_plain`, the milliseconds from mount to the first segment on screen, labelled only by `cache` (`hit` or `miss`) |
 | Every delivered notice | `features/notifications/deliver.ts` | event `notice.delivered` with the kind and whether it landed read |
 | The boot account | `apps/desktop/src/client/boot.ts` | span `renderer.boot` from navigation to `nodeReady`, with a `renderer.boot.mark` child per mark. Built after the fact, once the switch is on and the node is ready, because the switch is not known while the marks are taken |
 | Uncaught error, unhandled rejection | `apps/desktop/src/client/index.tsx` | a fatal, unhandled error with its stack |
@@ -504,7 +521,7 @@ bridge both use it to group `/v1/p/<plugin>` requests by plugin without recordin
 
 `kit/` is the exception to the console rule's remedy. It may import `kit/` and the highlighter and
 nothing else, because it is what `@acorn/plugin-api/ui` re-exports, so a boundary in there cannot
-reach the emitter. `kit/lib/contributionErrors.ts` is the seam: the boundary reports through it, and
+reach the emitter. `kit/lib/telemetry/contributionErrors.ts` is the seam: the boundary reports through it, and
 the client's telemetry start-up installs the handler.
 
 ### The page change is a signal write, not a navigation
@@ -519,6 +536,112 @@ spans would report one click as a navigation to nothing followed by a navigation
 region that is still fetching at that second frame is not covered by this; `pane.region` measures
 that to content.
 
+### Rendered-surface health
+
+A large diff or timeline keeps numbers about itself, so a regression in how much it mounts, measures,
+queues, or holds can be shown without hand-added logging. One registry owns them:
+`packages/client-core/src/kit/lib/telemetry/surfaceHealth.ts`. A surface registers when it mounts, hands over a
+reader, and disposes the registration when it unmounts. Two surfaces register today:
+
+- The shared diff viewer, as `diff` (`packages/client-core/src/features/diff/diffHealth.ts`). Its
+  layout counts measurement and corrections in `features/diff/diffLayout.ts` and
+  `kit/diff/measureScheduler.ts`.
+- Every `Timeline`, as `timeline` (`packages/client-core/src/kit/components/content/Timeline.tsx`).
+  A caller passes `total`, the number of turns in its list, drawn or not, and `hidden`, the older turns
+  its window is not drawing. The agent transcript passes its projected card count and its window's
+  start.
+
+The reader runs only when someone asks for a snapshot. An open surface pays nothing between
+requests. Disposal takes one final reading after the surface's own cleanups have run and keeps it as
+that kind's `retired` entry. That reading shows whether observers, frames, and queued work reached
+zero, without waiting on garbage collection.
+
+| Group | Fields | Meaning |
+| --- | --- | --- |
+| `topology` | `files`, `segments`, `fixedRows`, `dynamicBlocks`, `ready`, `lateSourceBlocks` | The document as a whole. Fixed rows are code and structural rows with exact heights. Segments are the diff document's bounded pieces. Dynamic blocks are the source's threads a diff places in some segment, and the projected turns in a timeline. `ready` means the source-owned structure is complete: for a diff, its topology and its threads have both arrived. `lateSourceBlocks` counts source threads that arrived after that. |
+| `mounted` | `segments`, `fixedRows`, `dynamicBlocks`, `blankBlocks`, `uncoveredRanges`, `bodies` | What is in the DOM now: segment items in the virtual range, and the rows drawn in them. A blank block is a visible mounted item with neither a placeholder nor content. An uncovered range is visible space that no mounted item covers, measured from real rects. `bodies` is deferred content a timeline has built: disclosures that have been opened, and turn bodies drawn once their turn came near the viewport. |
+| `work` | `queuedSegments`, `queuedEnrichment`, `furthestQueueDistance`, `unvisitedSegments`, `scheduledFrames`, `heldPublications`, `prepareMs` | Work still owed. For a diff, queued and loading segments, segments loaded but not yet coloured, and how far, in segments, the furthest queued one is from the ones on screen, never by path. `unvisitedSegments` counts held segments the reader has never had on screen, which is the runway the loader keeps and should stay a few segments. `prepareMs` sums the time spent building segments' rows and applying their colour. |
+| `measurement` | `candidates`, `reads`, `commits`, `maxCommitsInFrame`, `readMs`, `commitMs`, `fixedRebuilds`, `activeObservers`, `observedElements` | Size reads and the geometry commits they caused, counted since mount. A candidate is a dirty block a pass looked at, and a commit is one batch of changed heights. `commitMs` is the time spent applying commits. `fixedRebuilds` counts rebuilds of the exact fixed geometry, which only a change to the list of items may cause. Observers count up when created and down when disconnected, and observed elements are what they watch. |
+| `correction` | `count`, `failed`, `substituted`, `maxPixels`, `maxAnchorDrift` | Scroll writes made to keep a reading place. `failed` counts corrections whose anchor had gone and that fell back to the live end. `substituted` counts places whose anchor had gone and a neighbour stood in. `maxAnchorDrift` is the furthest the browser left the view from the place it was put back at. |
+| `resident` | `documents`, `segments`, `rows`, `estimatedBytes`, `plainBytes`, `enrichmentBytes`, `hits`, `misses`, `inserts`, `evictions`, `oversize`, `rowCeiling`, `byteCeiling` | Parsed content held in memory. For a diff, this is the node's segment cache, shared by every diff on the node: the distinct patches, segments, and rows it holds, its estimated bytes split into plain rows and colour, and the two ceilings they are held under. `inserts`, `evictions`, and `oversize` count since the cache was made. `hits` and `misses` are this pane's own since mount: segments that came into its range already held, or that it had to ask for. The bytes are the cache's budget estimate, not the heap. |
+| `window` | `hiddenEarlier`, `expansions`, `trims`, `pinned` | A timeline drawn through a fixed window (`kit/lib/timeline/timelineWindow.ts`). `hiddenEarlier` is the older turns not drawn now. `expansions` counts the window growing since mount, whether from **Show earlier**, a reveal, or a caller drawing everything. `trims` counts the window handing its oldest turns back while the reader followed the live end. `pinned` is how many turns the last trim kept past its page because they held the reader's selection or focus. |
+
+A field a surface has no concept of stays zero. The timeline has no segments and rebuilds no fixed
+geometry. The diff has no window and builds no deferred bodies. The diff has no live end, so it
+never fails a correction; it substitutes instead. `heldPublications` is always zero for the diff now: nothing is held
+back during a scroll, because a segment publishes when it arrives and it only arrives if it is near.
+
+The snapshot holds numbers, one boolean, and the two kind labels. The registry copies only the fields
+the template names and only when they are finite numbers, so a reader that returned a path, a line
+of code, a comment, or an ID would lose it before it left. `surfaceHealth.test.ts` and the diff
+probe test feed canary strings through both paths and check that none comes out.
+
+Telemetry gets a fixed handful of these numbers as histograms at two checkpoints: a diff's `ready`,
+and any surface's `teardown`. The seams are `ui.surface.topology.fixed_rows`,
+`ui.surface.mounted.fixed_rows`, `ui.surface.mounted.dynamic_blocks`,
+`ui.surface.measurement.max_commits_in_frame`, `ui.surface.measurement.active_observers`,
+`ui.surface.correction.max_pixels`, `ui.surface.work.prepare_ms`, and
+`ui.surface.resident.estimated_bytes`. Their only labels are `surface` and `checkpoint`.
+
+The whole snapshot is a local read on the performance timeline. Dispatch an `acorn:surface-health`
+event on `window`, then read the `detail` of the one `acorn:surface.health` mark:
+
+```js
+dispatchEvent(new Event('acorn:surface-health'))
+performance.getEntriesByName('acorn:surface.health').at(-1).detail
+```
+
+The desktop answers that request from boot, whatever the `acorn.perf` switch says
+(`packages/client-core/src/infra/telemetry/surfaceHealth.ts`). It does not wait for that switch
+because the automation window shares WebKit storage with a developer's own app, so turning the
+switch on for one would turn it on for both. Each answer replaces the previous
+mark, so a long automated loop leaves one entry. Nothing is put on `window`, and no HTTP route
+exposes it. The large-surface flow reads it this way ([local-development.md](./local-development.md)
+§ Large-surface flow).
+
+What the numbers say about the diff: its topology is complete before any row loads, its queue is
+only ever the segments on screen and the two either side, and a pane left open settles with nothing
+queued, so the queue distance stays at a few segments however large the document is.
+
+#### Timeline
+
+Read a timeline's numbers this way:
+
+- `topology.dynamicBlocks` is the caller's logical turns and `mounted.dynamicBlocks` the turns in the
+  DOM. With a window, the two differ by `window.hiddenEarlier`. The large-surface flow counts a
+  timeline as mounted when every turn is drawn or hidden, and asserts the 400-turn ceiling on open.
+- A followed transcript opens on 200 turns and trims back to 200 once it draws 400 while following, so
+  `mounted.dynamicBlocks` stays under 400 unless the reader pressed **Show earlier**, went to the top,
+  or held a selection or focus. `window.pinned` says how many turns a hold kept.
+- `mounted.bodies` grows as disclosures open and as deferred turn bodies come near, never with the
+  length of the list.
+- `correction.substituted` counts reading places whose turn left the list, so a neighbour stood in. A
+  turn the window hides is revealed instead and never counts here. `maxAnchorDrift` is the distance a
+  correction was left from its place when the list refused to move any further.
+- `measurement.activeObservers` is 2 on a followed timeline, plus 1 while any turn has a deferred body,
+  and 0 after teardown.
+
+#### Diff measurement
+
+The diff measures only its dynamic blocks, threads and whatever a line draws under itself, through one
+observer ([diff-rendering.md](./diff-rendering.md) § Row geometry). Read its numbers this way:
+
+- `activeObservers` is 1 while the pane is mounted and 0 after, and `observedElements` is the
+  scroller plus the mounted blocks, so it tracks `mounted.dynamicBlocks` rather than the document.
+- `candidates` and `reads` grow with blocks mounted and resized, not with rows. A read that finds the
+  height the geometry holds commits nothing.
+- `maxCommitsInFrame` stays at 1: a pass that would be a frame's second commit waits for the next.
+- `fixedRebuilds` rises when the list of items changes (the first topology, a collapsed file, an
+  opened gap, the other projection) and never when a block resizes.
+- `correction.count` and `maxPixels` are the scroll writes that kept the reader's row in place as
+  blocks above it changed height. A commit while the reader scrolls never needs one, because blocks
+  above the reader wait until the scroll settles. `substituted` rises when a collapsed file takes the
+  reader's item away. `maxAnchorDrift` should stay under a pixel; more means the browser refused a
+  correction the layout asked for.
+- `mounted.blankBlocks` and `uncoveredRanges` are measured from real rects, so a fixed row height
+  that `diff.css` stopped honouring shows up there first: the layout does not measure code rows, and
+  a row one pixel taller than it counts leaves items overlapping.
+
 ## The terminal client, the helper, and the shell
 
 Three runtimes carry no plugins and report anyway. Each has its own section in the document that
@@ -530,7 +653,7 @@ reports. In short:
 | --- | --- | --- | --- |
 | Terminal client | client-core's, with `runtime: 'tui'` | client-core's poster, over the platform seam | `tui.frame` and `tui.key` histograms, a `tui.boot` span, and every renderer seam it shares |
 | Desktop helper | the node's collector, in the helper's process | its own poster, over the broker with the device token | `helper.boot` spans, `broker.*` health, `node.crash`, and its log lines |
-| Rust shell | none. A panic hook writes a file | the helper reads and forwards it on the next boot | one fatal error with `runtime: shell` |
+| Rust shell | none. A panic hook writes a file, and the helper asks for memory numbers | the helper forwards the file on the next boot, and posts the numbers when they arrive | one fatal error with `runtime: shell`, and the renderer's and the helper's `runtime.memory.footprint` |
 
 Two things are worth reading across from here.
 
@@ -580,12 +703,14 @@ Fixed operation/outcome labels keep the number of series bounded.
 | Was the response cheap to fetch but expensive to process? | `api.request` carries `responseBytes`; `api.response.bytes` and `api.decode` measure JSON reads after transport delivery. |
 | Is history size driving the cost? | `agents.snapshot.merge`, `agents.snapshot.index`, `agents.transcript.project`, `agents.transcript.visible`, with event/item counts. `agents.center.rows`, `agents.center.filter`, and `agents.sidebar.rows` cover roster work. |
 | Are cheap updates repeating too often? | `agents.snapshot.load` and `agents.roster.load` distinguish inflight/cache hits from misses, and a snapshot read that resumed from the events the store holds reports `resume`. Session updates, appended events, cache actions, `rows.reconcile`, `rows.item.mount`, and `pane.region.mount` count churn. `ui.interaction.work` reports up to five most frequently observed operations per interaction with trace IDs and call counts. |
-| Is rendering the content expensive? | `agents.transcript.cards` emits one initial `ui.render.batch` span with visible-card count, summed factory time, and wall time to the turn checkpoint. `markdown.parse`, `markdown.render`, `highlight.html.render`, and their character counts/cache outcomes cover shared markdown and code fences. `diff.parse`, `diff.rows`, file/row counts, `diff.hydrator.reset` (a whole diff read again), and `diff.hydrator.refresh` (how many files one content change read again) cover diff preparation. `editor.language.load`, `editor.state.create`, `editor.view.create`, and document character counts cover the shared editor; `editor.state.skipped` counts responses discarded after the pane unmounts. |
+| Is rendering the content expensive? | `agents.transcript.cards` emits one initial `ui.render.batch` span with visible-card count, summed factory time, and wall time to the turn checkpoint. `markdown.parse`, `markdown.render`, `highlight.html.render`, and their character counts/cache outcomes cover shared markdown and code fences. `diff.segments.load` (one batch of segments from the source), `diff.segments.enrich` (one segment's colour), the `diff.segments.requested` batch size, and the `diff.files` and `diff.document.segments` counts at each revision cover diff preparation; the parse itself is on the node. `editor.language.load`, `editor.state.create`, `editor.view.create`, and document character counts cover the shared editor; `editor.state.skipped` counts responses discarded after the pane unmounts. |
+| Does a large diff or timeline do work in proportion to its size? | `ui.surface.*` at a diff's `ready` and every surface's `teardown`, and the exact local snapshot in [Rendered-surface health](#rendered-surface-health): mounted versus total rows, queue distance, commits per frame, observers left at teardown. |
 | Is a worker falling behind or falling back? | `highlight.pending`, `highlight.queue.wait`, `highlight.worker.execute`, `highlight.timeout`, `highlight.result`, and `highlight.fallback`; `highlight.main_thread` measures the fallback. Worker execution includes grammar-loading waits; queue time is measured from posting to worker receipt. |
 | Is the client cache responsible? | `cache.read`, `cache.deserialize`, `cache.serialize`, `cache.write`, cache character/entry counts, and `cache.restore_to_hydrated` on the desktop. `cache.updates` labels only the fixed query-cache action, never query keys. |
 | Is a plugin flooding the UI? | Existing `tree.apply` plus `tree.queue.wait`, `tree.batch.operations`, `tree.batch.merged`, `tree.nodes`, and `tree.batch.refused`, attributed to the owning plugin. |
 | Is terminal output flooding its parser? | `terminal.output.size`, `terminal.pending.size`, `terminal.write` (through xterm's completion callback), and `terminal.fit`. Sizes count supplied string code units or binary bytes, without copying output to measure it. |
-| Is the backend or helper under pressure? | `runtime.event_loop.p95`, `runtime.event_loop.max`, `runtime.event_loop.utilization`, `runtime.cpu`, `runtime.memory.rss`, and `runtime.memory.heap`. CPU is consumed CPU time / elapsed time; memory is bytes. |
+| Is the backend or helper under pressure? | `runtime.event_loop.p95`, `runtime.event_loop.max`, `runtime.event_loop.utilization`, `runtime.cpu`, `runtime.memory.rss`, and `runtime.memory.heap`. CPU is consumed CPU time / elapsed time; memory is bytes. `runtime.suspended` is time the process was not running, kept apart from delay. |
+| Where is the memory going? | See [Memory over a day](#memory-over-a-day): `runtime.memory.footprint` for the renderer and the helper, the `ui.page.*` counts beside it, and `agent.processes.*` on the node. |
 
 A measured client operation taking at least 100 ms can also produce a detailed span under its
 original interaction, capped at 20 exemplars per flush. Histograms retain every sample even after
@@ -605,6 +730,16 @@ owner and operation during one JavaScript turn produce one span rather than one 
 `work.ms` is the sum of time inside the wrapped factories, while `wall.ms` includes other synchronous
 work between the first factory and the microtask checkpoint. The agent transcript uses it only for
 its initial visible cards; streaming additions stay off the instrumentation path.
+
+The node and the helper share one runtime pressure sampler, in
+`packages/node-core/src/server/telemetry/runtimePressure.ts`. It reads a five-second window. On
+macOS the monotonic clock keeps running while the machine sleeps, so a sleep or a dark wake reaches
+the delay histogram as one long stall, and comparing it with the wall clock shows nothing. Only
+running code can hold the event loop, so a window whose longest delay exceeds its active time by
+more than a second, or whose idle time runs more than a second past the interval, is treated as a
+suspend. That window reports `runtime.suspended`, the lost time to within one window, instead of the delay,
+utilization and CPU numbers, which it would distort. A real block is active time and still reports,
+however long it is. A block and a suspend in the same window report only the suspend.
 
 The desktop responsiveness pulse crosses the platform seam and the authenticated helper socket once
 per second while the window is focused and visible, and immediately when the interaction changes.
@@ -630,6 +765,39 @@ Local tests exercise a renderer that never answers, recovery, sleep, consent cha
 transport, cancellation, delayed readiness, bounded workload series, slow trace attribution, and
 highlight fallback without content. Before relying on Sentry, perform the live ingestion smoke in
 Verification below, then reproduce opening a large agent history with collection enabled.
+
+### Memory over a day
+
+The desktop renderer is the WebKit web content process, and most of what it holds is WebKit's own
+memory rather than the page's JavaScript heap. The page cannot read that process's memory, so these
+gauges come from three places and are meant to be read against each other. All of them are gauges,
+so each keeps its name in Sentry with no `.p50` or `.max` suffix.
+
+| Metric | Unit | Attributes | Rate | Where |
+| --- | --- | --- | --- | --- |
+| `runtime.memory.footprint` | bytes | `runtime: renderer`, `owner: core` | 30 s | The shell reads the main window's web content process. macOS only |
+| `runtime.memory.footprint` | bytes | `runtime: helper`, `owner: core` | 30 s | The shell reads the helper's process. macOS only |
+| `ui.page.elements` | count | `runtime: renderer`, `owner: core` | 30 s, visible window only | `document.getElementsByTagName('*').length` |
+| `ui.page.timeline_turns` | count | the same | the same | Drawn timeline turns, most of them agent transcript turns |
+| `ui.page.query_entries` | count | the same | the same | Query cache entries for the active node |
+| `ui.page.diff_cache.rows`, `ui.page.diff_cache.bytes` | count, bytes | the same | the same | The active node's diff segment cache, when a diff has been opened. The bytes are the cache's own estimate, not the heap |
+| `ui.page.workers.tree`, `.highlight`, `.word_diff` | count | the same | the same | Live plugin tree workers, and the highlighter and word-diff workers, each 0 or 1. A worker module that has not loaded reports nothing |
+| `agent.processes.live`, `.idle` | count | `runtime: node`, `owner: agents` | 60 s | Provider processes, and those the idle rules would stop now |
+| `agent.processes.memory` | bytes (the record names no unit) | the same | 60 s | Resident bytes summed over each provider's process tree. Left out when `ps` fails |
+
+The footprint is the physical footprint, which is what `footprint` and Activity Monitor's Memory
+column show. Resident size undercounts on macOS because compressed pages leave it. That makes the
+footprint and `runtime.memory.rss` two different measures, and the helper reports both. The node has
+no footprint: only the shell can read one, and a batch the helper posts cannot claim the node's
+runtime. Agent memory is resident size, because it is counted with `ps`.
+
+The shell looks up the web content process's pid on every sample, so a renderer WebKit replaced
+after a crash is measured under its new pid. A sample taken while the replacement is starting has no
+process to read and reports nothing.
+
+The helper asks the shell only while the switch is on, the page counts only while it is on and the
+window is visible, and the agent count skips its `ps` while it is off. Off, each costs one boolean
+read per tick. No count carries a name, a path, a key, or a query.
 
 ## What this is not
 

@@ -2,6 +2,9 @@
 // @acorn/plugin-api/ui: nothing here is safe to bundle into an isolated plugin frame.
 export { registerKeybindings } from '@acorn/client-core/host/registries/commands'
 export { registerWillHandler } from '@acorn/client-core/host/registries/shell/willPhase.tsx'
+// The shell's one confirmation: a danger zone's delete, uninstall, unpair and revoke, said as what
+// goes and what stays.
+export { confirmAction } from '@acorn/client-core/host/registries/shell/willPhase.tsx'
 export type { Concern } from '@acorn/client-core/host/registries/shell/willPhase.tsx'
 // The ASCII splash. A kit node in substance (no imports, props in), kept on the host surface because the
 // onboarding overlay is its one plugin consumer.
@@ -62,3 +65,7 @@ export { selectPaneTab } from '@acorn/client-core/host/layouts/state.ts'
 // Another plugin's rectangle, beside or below this one's pane (the `rectangle` kind). The iframe twin
 // of `Slot`, for the surfaces that own pixels.
 export { InlineSlot } from '@acorn/client-core/host/frames'
+
+// The compiled composer control around its owner's model choices. Its `above` and `children` props
+// carry JSX, so it composes kit nodes in the host rather than adding a remote-tree node.
+export { default as ModelPickerPopover } from '@acorn/client-core/features/settings/models/ModelPickerPopover.tsx'

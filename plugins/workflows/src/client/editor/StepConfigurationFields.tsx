@@ -4,6 +4,7 @@ import type { AgentProviderDescriptor } from '@acorn/plugin-agents/contract/wire
 import { For, Show } from 'solid-js'
 import type { StepField, WorkflowCatalog, WorkflowDef, WorkflowStepDef } from '../../shared/workflowContracts'
 import { BUILTIN_STEP_DESCRIPTIONS, readStepField } from '../../shared/stepFields'
+import { unavailableCatalogKind } from '../../shared/stepKindAvailability'
 import { workflowBindingOrigins } from './bindingOrigins'
 import ConditionEditor from './ConditionEditor'
 import FieldControl from './FieldControl'
@@ -39,7 +40,9 @@ export default function StepConfigurationFields(props: {
 
   return (
     <Show when={described()} fallback={(
-      <Field label="Settings" hint="This step kind has not described its form, so its settings are raw JSON." group>
+      <Field label="Settings" hint={unavailableCatalogKind(kind(), props.catalog)
+        ? 'Plugin unavailable. Saved settings remain as raw JSON until it returns.'
+        : 'This step kind has not described its form, so its settings are raw JSON.'} group>
         <Textarea size="sm" rows={6} mono assist={false} label="Settings" disabled={props.disabled}
           value={JSON.stringify(props.step.with ?? {}, null, 2)}
           onChange={(value) => {
@@ -54,7 +57,7 @@ export default function StepConfigurationFields(props: {
       {(description) => (
         <For each={description().fields}>
           {(field) => (
-            <Show when={!field.type.startsWith('workflow-') && field.type !== 'child-workflow'}>
+            <Show when={!field.type.startsWith('workflow-') && field.type !== 'child-workflow' && field.type !== 'gate-form'}>
               <Show when={field.type === 'prompt'} fallback={(
                 <Show when={['schema', 'query', 'record', 'condition'].includes(field.id)} fallback={(
                   <FieldControl field={field} pluginId={pluginId()} projectId={props.projectId}

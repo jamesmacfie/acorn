@@ -5,13 +5,14 @@ import { useQueryClient } from '@tanstack/solid-query'
 import type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
 import { TREE_LIMITS, batchBytes } from '@acorn/protocol/tree/messages.ts'
 import { answerOwnerInvoke, unknownHostOp, unsupportedOverlay, type OwnerActions } from './hostRequests'
-import { postSelect, postSurfaceAction, type FrameBinding } from '../frames/broker'
+import type { FrameBinding } from '../frames/broker'
 import { closePluginOverlayFrom, openPluginOverlayInvocation } from '../frames/overlays'
 import { createTreeBridgeFactory } from './bridgeFactory'
 import { eligiblePlugins, isTaskPane } from '../plugins/contributions'
 import { qualifiedContributionId } from '../plugins/contributionIds'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { createLogger } from '../../infra/telemetry/logger'
+import { watchAppearance } from '../../kit/tokens/appearance'
 import { clientEvents, consumePaneIntent } from '../registries/commands/clientEvents'
 import { TreeHost } from './TreeHost'
 import type { RemoteContribution } from './treeRegistry'
@@ -97,7 +98,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   // on `<body>` and a tree could never open its companion overlay from a click at all. Capturing,
   // because the target is inside the host's own components and may stop the bubble.
   let lastGestureAt = 0
-  const markGesture = (): void => { lastGestureAt = Date.now() }
+  const markGesture = (event: Event): void => { if (event.isTrusted) lastGestureAt = Date.now() }
 
   const contribution = componentProps.contribution
   const scope = (): TreeScope => componentProps.scope?.() ?? {}
@@ -156,7 +157,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     hash: contribution.hash,
     authority: treeAuthorityKey(contribution.hash, qc, bound, legacyContext, componentProps.document),
     context: legacyContext,
-    hasFocus: () => container !== undefined && container.contains(document.activeElement),
+    hasFocus: () => (container !== undefined && container.contains(document.activeElement)) || (lastGestureAt > 0 && Date.now() - lastGestureAt <= GESTURE_WINDOW_MS),
     onRefused: refuse,
     connect: createTreeBridgeFactory(
       { binding: bound, hash: contribution.hash, ...(documentGrant ? { document: documentGrant } : {}) },
@@ -164,7 +165,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     ),
   })
 
-  // ── What this tree may ask the host for (../frames/sdk.ts § TreeMount.host) ───────────────────────
+  // ── What this tree may ask the host for (../frames/sdk/treeChannel.ts § TreeMount.host) ───────────────
   //
   // Two operations, each with its own grant, and both answered here rather than on the bridge. The
   // bridge belongs to the bundle; this belongs to one mounted contribution, which is the only scope in
@@ -240,38 +241,41 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   })
 
   const transport = worker.transport(slot)
+  const pushAppearance = (): void => worker.appearance(slot, {
+    theme: document.documentElement.dataset.theme ?? 'light',
+    style: document.documentElement.dataset.style ?? 'terminal',
+    tokens: {},
+  })
+  pushAppearance()
+  const unwatchAppearance = watchAppearance(pushAppearance)
   // Mount is also update: the first call starts the tree, every later one carries new props. Solid's
   // effect gives the "later one" for free, because `props()` is the caller's accessor.
   createEffect(() => worker.mount(slot, contribution.entry, componentProps.props()))
 
-  // The three pushes that are not tree mutations. They ride the bridge rather than the tree channel,
-  // because they are the same messages a frame gets and the plugin listens for them with the same
-  // `bridge.onSelect` and `bridge.onSurfaceAction` either way (frames/sdk.ts).
+  // These pushes go to this slot's bridge, never the bundle's bootstrap bridge.
   //
   // A rail row picked while the pane is already open. `defer`, because the selection that opened the
   // pane crossed in the mount props and posting it again would restart a load already in flight.
   createEffect(on(() => scope().item, (next, previous) => {
-    const port = worker.bridgePort(slot)
-    if (!port || !next || next === previous) return
-    postSelect(port, next)
+    if (!next || next === previous) return
+    worker.select(slot, next)
   }, { defer: true }))
   const unselect = clientEvents.on('presentation:pane-intent', (event) => {
-    const port = worker.bridgePort(slot)
-    if (!port || event.taskId !== scope().taskId || event.paneId !== contribution.id) return
+    if (event.taskId !== scope().taskId || event.paneId !== contribution.id) return
     if (event.intent.kind !== 'plugin:select') return
     // Consumed here so the retained copy does not reach a later remount as a stale selection.
     consumePaneIntent(event.taskId, event.paneId)
-    postSelect(port, event.intent.item)
+    worker.select(slot, event.intent.item)
   })
   // A surface-scoped command the host resolved on this tree's behalf: the chord landed in the sibling
   // editor of a composed pane, or the row was picked in the palette.
   const unaction = clientEvents.on('plugin:surface-action', (event) => {
-    const port = worker.bridgePort(slot)
-    if (!port || event.pluginId !== contribution.pluginId || event.surface !== contribution.id) return
-    postSurfaceAction(port, event.command)
+    if (event.pluginId !== contribution.pluginId || event.surface !== contribution.id) return
+    worker.surfaceAction(slot, event.command)
   })
 
   onCleanup(() => {
+    unwatchAppearance()
     detachGestures()
     unaction()
     unselect()

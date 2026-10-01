@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PrefKeys } from './prefKeys'
-import { isDevicePref, mergePrefs, readDevicePrefs, writeDevicePref } from './devicePrefs'
+import { isDevicePref, mergePrefs, readDevicePrefs, writeDevicePref, setDevicePluginIds, removeDevicePluginPrefs } from './devicePrefs'
 
 const store = new Map<string, string>()
 const layoutKey = `${PrefKeys.taskLayoutsScoped}:node-a/task-1`
 beforeEach(() => {
   store.clear()
+  setDevicePluginIds([])
   ;(globalThis as { localStorage?: unknown }).localStorage = {
     get length() { return store.size },
     key: (index: number) => [...store.keys()][index] ?? null,
@@ -20,6 +21,20 @@ afterEach(() => {
 })
 
 describe('isDevicePref', () => {
+  it('claims only installed device plugin prefixes', () => {
+    setDevicePluginIds(['device-board'])
+    expect(isDevicePref('plugin:device-board:layout')).toBe(true)
+    expect(isDevicePref('plugin:node-board:layout')).toBe(false)
+    writeDevicePref('plugin:device-board:layout', '{"x":1}')
+    writeDevicePref('plugin:node-board:layout', 'foreign')
+    expect(readDevicePrefs()['plugin:device-board:layout']).toBe('{"x":1}')
+    expect(readDevicePrefs()['plugin:node-board:layout']).toBeUndefined()
+    setDevicePluginIds([])
+    expect(readDevicePrefs()['plugin:device-board:layout']).toBeUndefined()
+    setDevicePluginIds(['device-board'])
+    removeDevicePluginPrefs('device-board')
+    expect(readDevicePrefs()['plugin:device-board:layout']).toBeUndefined()
+  })
   it('claims presentation and window state', () => {
     // `changes_view` is in here with `theme` and `diff_view`: how the Changes pane draws its file
     // list — flat or nested, sorted how, grouped by what — is about the person reading it, not about

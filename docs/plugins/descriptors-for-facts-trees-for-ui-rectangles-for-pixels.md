@@ -310,6 +310,13 @@ shape vocabulary its pane header and task sidebar already use.
 
 `markers()` runs inside the consuming render, so it may read signals the plugin already owns.
 Registering through `ctx` rather than the registry directly is what lets the host take the markers back
-out when the plugin is disabled. Loaded plugins cannot publish markers yet; the design for a batched,
-node-scoped manifest contribution is in `docs/future/rail-tab.md`, and it waits for a loaded plugin
-with a status worth publishing.
+out when the plugin is disabled.
+
+A loaded plugin publishes task status through an `extensions` entry aimed at the generic
+`core:task` annotation point. Its node route answers one batched POST for the visible task ids with
+data-only marks, and the host converts those marks to the same rail-marker descriptions above. The
+plugin supplies no placement, color, CSS, JSX, or action. The host clears its marks on freshness,
+lifecycle, and node changes, and preserves other contributors when one fails. Source and pane markers
+remain compiled contributions until an owner declares a real annotation point for one of those
+surfaces. For the request and response contract, see
+[Task annotations](cooperative-extension-points.md#task-annotations).

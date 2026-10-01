@@ -5,7 +5,7 @@
 import { spawn as ptySpawn, type IPty } from 'node-pty'
 import type { CompiledPluginBroadcast } from '@acorn/plugin-api/node'
 import { isDockerRef } from '../shared/model'
-import type { DockerClientFrame } from '../shared/wsFrames'
+import { parseDockerFrame } from './wsFramePolicy'
 import { dockerEnv } from './cli'
 import { getDockerService } from './dockerService'
 import { SharedDockerStreams } from './sharedStreams'
@@ -26,90 +26,95 @@ export function registerDockerWsChannel(events: CompiledPluginBroadcast): void {
   const execSubs = new Map<object, Map<string, IPty>>()
 
   const stopAll = (conn: object) => {
-    for (const handle of streamSubs.get(conn)?.values() ?? []) handle.stop()
+    const streams = streamSubs.get(conn)
     streamSubs.delete(conn)
-    for (const pty of execSubs.get(conn)?.values() ?? []) pty.kill()
+    const execs = execSubs.get(conn)
     execSubs.delete(conn)
+    for (const handle of streams?.values() ?? []) { try { handle.stop() } catch {} }
+    for (const pty of execs?.values() ?? []) { try { pty.kill() } catch {} }
   }
 
   events.channel('docker', {
     onFrame(rawFrame, send, conn) {
-      // The one cast, at the front door. Core hands over an open envelope and this plugin owns what
-      // is inside it (../shared/wsFrames.ts). Every field read below is still guarded, because the
-      // sender is a peer over JSON and a type proves nothing about that.
-      const frame = rawFrame as DockerClientFrame
-      switch (frame.channel) {
-        case 'docker:logs:attach':
-        case 'docker:stats:attach':
-        case 'docker:logs:detach':
-        case 'docker:stats:detach': {
-          const { id } = frame
-          if (typeof id !== 'string' || !isDockerRef(id)) return
-          const kind = frame.channel.startsWith('docker:logs') ? 'logs' as const : 'stats' as const
-          const key: StreamKey = `${kind}:${id}`
-          const mine = streamSubs.get(conn) ?? new Map<StreamKey, { stop(): void }>()
-          streamSubs.set(conn, mine)
-          if (frame.channel.endsWith(':detach')) {
-            mine.get(key)?.stop()
-            mine.delete(key)
-            if (!mine.size) streamSubs.delete(conn)
-            return
-          }
-          if (mine.has(key)) return // attach is idempotent per connection
-          let handle: ReturnType<SharedDockerStreams['attach']>
-          try { handle = shared.attach(
-            kind,
-            id,
-            send,
-            () => {
+      const frame = parseDockerFrame(rawFrame)
+      if (!frame) return
+      try {
+        switch (frame.channel) {
+          case 'docker:logs:attach':
+          case 'docker:stats:attach':
+          case 'docker:logs:detach':
+          case 'docker:stats:detach': {
+            const { id } = frame
+            if (typeof id !== 'string' || !isDockerRef(id)) return
+            const kind = frame.channel.startsWith('docker:logs') ? 'logs' as const : 'stats' as const
+            const key: StreamKey = `${kind}:${id}`
+            const mine = streamSubs.get(conn) ?? new Map<StreamKey, { stop(): void }>()
+            streamSubs.set(conn, mine)
+            if (frame.channel.endsWith(':detach')) {
+              mine.get(key)?.stop()
               mine.delete(key)
               if (!mine.size) streamSubs.delete(conn)
-            },
-          ) } catch (error) {
-            if (!mine.size) streamSubs.delete(conn)
-            throw error
+              return
+            }
+            if (mine.has(key)) return // attach is idempotent per connection
+            let handle: ReturnType<SharedDockerStreams['attach']>
+            try { handle = shared.attach(
+              kind,
+              id,
+              send,
+              () => {
+                mine.delete(key)
+                if (!mine.size) streamSubs.delete(conn)
+              },
+            ) } catch (error) {
+              if (!mine.size) streamSubs.delete(conn)
+              throw error
+            }
+            if (handle.active) mine.set(key, handle)
+            return
           }
-          if (handle.active) mine.set(key, handle)
-          return
-        }
-        case 'docker:exec:open': {
-          const { execId, ref, cols, rows } = frame
-          if (typeof execId !== 'string' || typeof ref !== 'string' || !isDockerRef(ref)) return
-          const mine = execSubs.get(conn) ?? new Map<string, IPty>()
-          execSubs.set(conn, mine)
-          if (mine.has(execId) || mine.size >= MAX_EXECS_PER_CONN) return
-          let pty: IPty
-          try {
-            pty = ptySpawn('docker', ['exec', '-it', ref, 'sh', '-c', EXEC_SHELL], {
-              name: 'xterm-256color',
-              cols: Math.max(2, Math.min(500, cols || 80)),
-              rows: Math.max(2, Math.min(300, rows || 24)),
-              env: dockerEnv() as Record<string, string>,
+          case 'docker:exec:open': {
+            const { execId, ref, cols, rows } = frame
+            if (typeof execId !== 'string' || typeof ref !== 'string' || !isDockerRef(ref)) return
+            const mine = execSubs.get(conn) ?? new Map<string, IPty>()
+            execSubs.set(conn, mine)
+            if (mine.has(execId) || mine.size >= MAX_EXECS_PER_CONN) return
+            let pty: IPty
+            try {
+              pty = ptySpawn('docker', ['exec', '-it', ref, 'sh', '-c', EXEC_SHELL], {
+                name: 'xterm-256color',
+                cols: Math.max(2, Math.min(500, cols || 80)),
+                rows: Math.max(2, Math.min(300, rows || 24)),
+                env: dockerEnv() as Record<string, string>,
+              })
+            } catch {
+              return send({ channel: 'docker:exec:exit', execId })
+            }
+            mine.set(execId, pty)
+            pty.onData((data) => send({ channel: 'docker:exec:out', execId, data }))
+            pty.onExit(() => {
+              mine.delete(execId)
+              send({ channel: 'docker:exec:exit', execId })
             })
-          } catch {
-            return send({ channel: 'docker:exec:exit', execId })
+            return
           }
-          mine.set(execId, pty)
-          pty.onData((data) => send({ channel: 'docker:exec:out', execId, data }))
-          pty.onExit(() => {
-            mine.delete(execId)
-            send({ channel: 'docker:exec:exit', execId })
-          })
-          return
+          case 'docker:exec:in':
+            execSubs.get(conn)?.get(frame.execId)?.write(frame.data)
+            return
+          case 'docker:exec:resize': {
+            const pty = execSubs.get(conn)?.get(frame.execId)
+            if (pty) pty.resize(Math.max(2, Math.min(500, frame.cols || 80)), Math.max(2, Math.min(300, frame.rows || 24)))
+            return
+          }
+          case 'docker:exec:kill':
+            execSubs.get(conn)?.get(frame.execId)?.kill()
+            return
+          default:
+            return
         }
-        case 'docker:exec:in':
-          execSubs.get(conn)?.get(frame.execId)?.write(frame.data)
-          return
-        case 'docker:exec:resize': {
-          const pty = execSubs.get(conn)?.get(frame.execId)
-          if (pty) pty.resize(Math.max(2, Math.min(500, frame.cols || 80)), Math.max(2, Math.min(300, frame.rows || 24)))
-          return
-        }
-        case 'docker:exec:kill':
-          execSubs.get(conn)?.get(frame.execId)?.kill()
-          return
-        default:
-          return
+      } catch {
+        // A PTY may exit between lookup and operation; disconnect still retires each owner.
+        return
       }
     },
     onDisconnect: stopAll,

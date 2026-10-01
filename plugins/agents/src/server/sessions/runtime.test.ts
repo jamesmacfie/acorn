@@ -9,7 +9,7 @@ import { agentProfileRegistry } from '@acorn/plugin-api/node'
 import { memoryIdentityStore } from '@acorn/plugin-api/testkit'
 import { createCoreServices, type CoreServices } from '@acorn/plugin-api/testkit'
 import { makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
-import type { AgentNormalizedEvent, AgentProviderDescriptor } from '../../contract/wire.ts'
+import type { AgentAppApproval, AgentNormalizedEvent, AgentProviderDescriptor } from '../../contract/wire.ts'
 import type {
   AgentDriver,
   AgentDriverSession,
@@ -21,6 +21,7 @@ import { FakeAgentDriver } from '../drivers/fake'
 import { ManagedAgentRuntime } from './runtime'
 import { writeAgentConcurrency } from '../concurrencyStore'
 import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../sessionDefaultsStore'
+import { saveCustomAgent } from '../customAgents'
 import type { AgentLifecycleFrame } from '../../contract/lifecycle'
 
 const ENCRYPTION_KEY = '11'.repeat(32)
@@ -95,6 +96,8 @@ class RequestDriver implements AgentDriver {
   readonly profileId = 'request-test'
   resolutions = 0
 
+  constructor(private readonly approval?: AgentAppApproval) {}
+
   async probe(): Promise<AgentProviderDescriptor> {
     return descriptor(this.providerId)
   }
@@ -102,6 +105,7 @@ class RequestDriver implements AgentDriver {
   async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
     const providerSessionRef = options.session.providerSessionRef ?? randomUUID()
     let ready = true
+    const approval = this.approval
     await options.onEvent({ type: 'session_metadata', providerSessionRef })
     await options.onEvent({ type: 'session_state', state: 'ready' })
     return {
@@ -117,6 +121,7 @@ class RequestDriver implements AgentDriver {
           kind: 'permission',
           title: 'Run the test command?',
           options: [{ id: 'allow-once', label: 'Allow once', kind: 'allow_once' }],
+          ...(approval ? { approval } : {}),
         })
         return { providerTurnRef: 'provider-turn-1' }
       },
@@ -361,6 +366,50 @@ class BackgroundSubagentDriver extends FakeAgentDriver {
   }
 }
 
+/** Holds a turn open until the provider is stopped, the way a real agent in the middle of a task does.
+ *  One instance serves every session, so it can say which sessions it was asked to stop and what each
+ *  start resumed. */
+class LongTurnDriver implements AgentDriver {
+  readonly providerId = 'long-turn'
+  readonly profileId = 'long-turn'
+  readonly starts: AgentDriverStartOptions[] = []
+  readonly stopped: string[] = []
+  holdTurns = true
+
+  async probe(): Promise<AgentProviderDescriptor> {
+    return descriptor(this.providerId)
+  }
+
+  async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
+    this.starts.push(options)
+    const providerSessionRef = options.session.providerSessionRef ?? randomUUID()
+    let active = false
+    let release: ((error: Error) => void) | null = null
+    await options.onEvent({ type: 'session_metadata', providerSessionRef })
+    await options.onEvent({ type: 'session_state', state: 'ready' })
+    return {
+      providerSessionRef,
+      get ready() {
+        return !active
+      },
+      sendTurn: async () => {
+        active = true
+        if (this.holdTurns) await new Promise<never>((_, reject) => { release = reject })
+        await options.onEvent({ type: 'assistant_message', text: 'Picked up where it left off.' })
+        await options.onEvent({ type: 'turn_completed', stopReason: 'end_turn' })
+        active = false
+        return {}
+      },
+      async cancel() {},
+      async resolveRequest() {},
+      stop: async () => {
+        this.stopped.push(options.session.id)
+        release?.(new Error('Agent protocol process stopped.'))
+      },
+    }
+  }
+}
+
 describe('managed agent runtime conformance', () => {
   // Two real databases, matching the shape of the thing under test. `testDb` is core's, holding the
   // workspace, project, and task rows seedTask writes, which the runtime reaches through CoreServices.
@@ -405,6 +454,30 @@ describe('managed agent runtime conformance', () => {
       aiArgv: (command, options) => ({ file: command, args: [options.prompt] }),
     })
   }
+
+  it('shows the worktree failure when a new session cannot get its task root', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    core.tasks.requireRoot = vi.fn().mockRejectedValue(new Error('Git could not create the worktree.'))
+    const registry = new AgentDriverRegistry()
+    registry.registerNative('fake', () => new FakeAgentDriver())
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+
+    await expect(runtime.acceptSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: {},
+    })).rejects.toThrow('Git could not create the worktree.')
+  })
 
   it('acknowledges an interactive session once durable while its provider keeps connecting', async () => {
     const seed = await seedTask(testDb, dataDir)
@@ -727,6 +800,54 @@ describe('managed agent runtime conformance', () => {
     await driver.push({ type: 'assistant_message', text: 'and one more' })
     expect(frames.filter((frame) => frame.channel === 'agent:session').map((frame) => frame.session!.attention))
       .toEqual(['none', 'unread'])
+  })
+
+  it('sends every tool update on the socket and stores the call as two rows', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    const driver = new TrailingEventDriver()
+    registry.registerNative('fake', () => driver)
+    const frames: AgentNormalizedEvent[] = []
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+      publish: (frame) => {
+        if (frame.channel === 'agent:event' && frame.event.event.type === 'tool') frames.push(frame.event.event)
+      },
+    })
+    const session = await runtime.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: {},
+    })
+    await runtime.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Exercise the protocol.' }],
+      source: 'interactive',
+      effectivePolicy: { providerDefault: true },
+      idempotencyKey: randomUUID(),
+    })
+    await runtime.wait(session.id, 0, 'turn_completed', 2_000)
+
+    const updates: AgentNormalizedEvent[] = [
+      { type: 'tool', tool: { id: 'cmd', title: 'Build', status: 'running', input: 'pnpm build' } },
+      { type: 'tool', tool: { id: 'cmd', title: '', output: 'one\n', outputAppend: true } },
+      { type: 'tool', tool: { id: 'cmd', title: '', output: 'two\n', outputAppend: true } },
+      { type: 'tool', tool: { id: 'cmd', title: '', status: 'completed' } },
+    ]
+    for (const update of updates) await driver.push(update)
+    expect(frames).toEqual(updates)
+    const stored = (await runtime.store.exportSnapshot(session.id)).events.filter((record) => record.event.type === 'tool')
+    expect(stored.map((record) => record.event)).toEqual([
+      updates[0],
+      { type: 'tool', tool: { id: 'cmd', title: 'Build', status: 'completed', input: 'pnpm build', output: 'one\ntwo\n' } },
+    ])
   })
 
   it('holds a settled session settled when the provider streams past its turn', async () => {
@@ -1270,6 +1391,68 @@ describe('managed agent runtime conformance', () => {
     expect(pinned.sessions.map((row) => row.id)).toEqual([session.id])
   })
 
+  it('stops the provider processes of an archived task and resumes them after a restore', async () => {
+    const archived = await seedTask(testDb, dataDir, 'archived')
+    const other = await seedTask(testDb, dataDir, 'other')
+    const registry = new AgentDriverRegistry()
+    const driver = new LongTurnDriver()
+    registry.registerNative('long-turn', () => driver)
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+    const create = (taskId: string) => runtime!.createSession({
+      taskId,
+      providerId: 'long-turn',
+      profileId: 'long-turn',
+      kind: 'interactive',
+      config: {},
+    })
+    const working = await create(archived.taskId)
+    const idle = await create(archived.taskId)
+    const bystander = await create(other.taskId)
+    const prompt = (sessionId: string, text: string) => runtime!.enqueueTurn(sessionId, {
+      input: [{ type: 'text', text }],
+      source: 'interactive',
+      effectivePolicy: { providerDefault: true },
+      idempotencyKey: randomUUID(),
+    })
+    const turn = await prompt(working.id, 'Keep going.')
+    await vi.waitFor(async () => expect((await runtime!.store.turn(turn.id))?.status).toBe('active'))
+    await vi.waitFor(async () => expect((await runtime!.store.requireSession(idle.id)).runtimeState).toBe('ready'))
+    await vi.waitFor(async () => expect((await runtime!.store.requireSession(bystander.id)).runtimeState).toBe('ready'))
+
+    await runtime.stopTaskSessions(archived.taskId)
+
+    expect([...driver.stopped].sort()).toEqual([working.id, idle.id].sort())
+    const stopped = await runtime.store.snapshot(working.id)
+    expect(stopped.session.runtimeState).toBe('stopped')
+    // Interrupted, not left active, and not retried when its send failed as the process went away.
+    expect(stopped.turns.map((row) => [row.id, row.status])).toEqual([[turn.id, 'interrupted']])
+    expect(stopped.events.at(-1)?.event).toEqual({
+      type: 'session_state',
+      state: 'stopped',
+      detail: 'The provider process stopped when this task was archived. Restore the task and send a prompt to resume.',
+    })
+    expect((await runtime.store.requireSession(idle.id)).runtimeState).toBe('stopped')
+    expect((await runtime.store.requireSession(bystander.id)).runtimeState).toBe('ready')
+
+    // Restored: the next prompt starts the provider again on the conversation it had.
+    driver.holdTurns = false
+    const startsBefore = driver.starts.length
+    await prompt(working.id, 'Carry on.')
+    const resumed = await runtime.wait(working.id, 0, 'turn_completed', 2_000)
+    expect(driver.starts.slice(startsBefore).map((start) => start.session.id)).toEqual([working.id])
+    expect(driver.starts.at(-1)!.session.providerSessionRef).toBe(stopped.session.providerSessionRef)
+    expect(resumed.turns.at(-1)?.status).toBe('completed')
+    expect(driver.stopped).not.toContain(bystander.id)
+  })
+
   it('counts queued turns onto list rows', async () => {
     const seed = await seedTask(testDb, dataDir)
     runtime = new ManagedAgentRuntime({
@@ -1394,6 +1577,51 @@ describe('managed agent runtime conformance', () => {
 
     expect(driver.resolutions).toBe(1)
     expect((await runtime.store.request(session.id, 'permission-1'))?.status).toBe('resolved')
+  })
+
+  // The answer is checked against the request the node stored, not against the client's buttons.
+  it('refuses a choice the request never offered and leaves the request open', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    const approval: AgentAppApproval = {
+      connector: 'Computer Use',
+      app: { id: 'com.acorn.desktop.agent-test', name: 'Acorn Agent Test' },
+      scopes: ['session'],
+    }
+    const driver = new RequestDriver(approval)
+    registry.registerNative(driver.providerId, () => driver)
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+    const session = await runtime.createSession({
+      taskId: seed.taskId,
+      providerId: driver.providerId,
+      profileId: driver.profileId,
+      kind: 'interactive',
+      config: {},
+    })
+    await runtime.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Ask first.' }],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: randomUUID(),
+    })
+    await runtime.wait(session.id, 0, 'attention', 2_000)
+    expect((await runtime.store.request(session.id, 'permission-1'))?.payload.approval).toEqual(approval)
+
+    await expect(runtime.resolveRequest(session.id, 'permission-1', { optionId: 'acceptAlways' }, randomUUID()))
+      .rejects.toThrow('That choice was not offered for this request.')
+    expect(driver.resolutions).toBe(0)
+    expect((await runtime.store.request(session.id, 'permission-1'))?.status).toBe('pending')
+
+    await runtime.resolveRequest(session.id, 'permission-1', { optionId: 'allow-once' }, randomUUID())
+    expect(driver.resolutions).toBe(1)
   })
 
   it('retries only a driver-classified transient turn with no accepted response', async () => {
@@ -1789,9 +2017,12 @@ describe('managed agent runtime conformance', () => {
     const owner = 'owner-defaults'
     await writeAgentSessionDefaults(core.prefs, owner, {
       continueAfterUsageLimit: true,
+      stopIdleAfterMinutes: 30,
+      keepArchivedHistoryDays: 0,
       followLastSession: false,
       pinned: { fake: { model: 'opus', reasoning: 'nonsense' } },
       last: {},
+      inline: { providerId: null, pinned: {} },
     })
     runtime = defaultsRuntime(owner)
 
@@ -1871,5 +2102,146 @@ describe('managed agent runtime conformance', () => {
       expect((session.config.configOptions as Array<{ id: string; currentValue: string }>)
         .find((option) => option.id === 'mode')?.currentValue).toBe('default')
     }
+  })
+
+  it('starts a custom agent on its own options over the owner’s defaults, and keeps what it started with', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const owner = 'owner-custom-agent'
+    await writeAgentSessionDefaults(core.prefs, owner, {
+      continueAfterUsageLimit: true,
+      stopIdleAfterMinutes: 30,
+      keepArchivedHistoryDays: 0,
+      followLastSession: false,
+      pinned: { fake: { model: 'opus', reasoning: 'medium' } },
+      last: {},
+      inline: { providerId: null, pinned: {} },
+    })
+    const agent = await saveCustomAgent(core.prefs, owner, null, {
+      name: 'Bug reviewer',
+      providerId: 'fake',
+      profileId: 'fake',
+      options: { reasoning: 'high', mode: 'plan' },
+      instructions: 'Review for correctness only.',
+      maxToolRisk: 'read',
+    })
+    runtime = defaultsRuntime(owner)
+
+    const session = await runtime.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      customAgentId: agent.id,
+      // A snapshot already in `config` is replaced by the one the node reads from the agent.
+      config: { configOptions: advertised(), customAgent: { id: agent.id, name: 'x', instructions: 'Stale.' } },
+    })
+
+    const value = (id: string) => (session.config.configOptions as Array<{ id: string; currentValue: string }>)
+      .find((option) => option.id === id)?.currentValue
+    // The agent names reasoning and mode; the model it leaves alone follows the owner's pin.
+    expect([value('model'), value('reasoning'), value('mode')]).toEqual(['opus', 'high', 'plan'])
+    expect(session.config.customAgent).toEqual({ id: agent.id, name: 'Bug reviewer', instructions: 'Review for correctness only.' })
+    expect(session.config.toolCeiling).toEqual({ maxRisk: 'read' })
+    // Starting from an agent is not the owner switching anything.
+    expect((await readAgentSessionDefaults(core.prefs, owner)).last).toEqual({})
+
+    // Editing the agent later leaves the running session's snapshot alone.
+    await saveCustomAgent(core.prefs, owner, agent.id, { ...agent, instructions: 'Something else.' })
+    expect((await runtime.store.requireSession(session.id)).config.customAgent)
+      .toMatchObject({ instructions: 'Review for correctness only.' })
+
+    // A fork carries the snapshot and the settings its source is running, and does not re-apply the
+    // agent's options over a switch made in the source.
+    await runtime.patchSession(session.id, { config: { ...(await runtime.store.requireSession(session.id)).config,
+      configOptions: (session.config.configOptions as Array<{ id: string }>).map((option) =>
+        option.id === 'reasoning' ? { ...option, currentValue: 'medium' } : option) } })
+    const replaced = await runtime.patchSession(session.id, { config: {
+      configOptions: (await runtime.store.requireSession(session.id)).config.configOptions,
+      customAgent: { id: 'forged', instructions: 'Changed instructions.' },
+    } })
+    expect(replaced.config.customAgent).toEqual(session.config.customAgent)
+    const fork = await runtime.fork(session.id)
+    expect(fork.config.customAgent).toMatchObject({ id: agent.id, instructions: 'Review for correctness only.' })
+    expect((fork.config.configOptions as Array<{ id: string; currentValue: string }>)
+      .find((option) => option.id === 'reasoning')?.currentValue).toBe('medium')
+
+    // An agent on another provider, or one that no longer exists, is refused rather than half-applied.
+    await expect(runtime.createSession({
+      taskId: seed.taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', customAgentId: 'missing', config: {},
+    })).rejects.toThrow('no longer exists')
+    const other = await saveCustomAgent(core.prefs, owner, null, { name: 'Elsewhere', providerId: 'codex', profileId: 'codex', options: {} })
+    await expect(runtime.createSession({
+      taskId: seed.taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', customAgentId: other.id, config: {},
+    })).rejects.toThrow("runs on 'codex'")
+  })
+
+  // docs/mcp.md § Your own servers. Which programs a session starts is the owner's setting: it comes from
+  // Settings at creation, only the MCP route changes it, and every start hands the harness the list.
+  it('starts a session with the servers switched on in Settings and restarts it when they change', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    const starts: AgentDriverStartOptions[] = []
+    class CaptureDriver extends FakeAgentDriver {
+      override async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
+        starts.push(options)
+        return super.start(options)
+      }
+    }
+    registry.registerNative('fake', () => new CaptureDriver())
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db,
+      dataDir,
+      core,
+      internalEnv: () => ({}),
+      secrets: SECRETS,
+      currentUserId: () => null,
+      registry,
+    })
+    await runtime.mcpServers.save('linear', {
+      transport: 'stdio',
+      command: 'npx',
+      args: ['linear-mcp'],
+      values: [{ name: 'LINEAR_API_KEY', value: 'lin_api_0123456789', secret: true }],
+      enabled: true,
+    })
+    await runtime.mcpServers.save('docs', { transport: 'http', url: 'https://docs.example/mcp', values: [], enabled: false })
+
+    // The request body names `docs`, and is ignored.
+    const session = await runtime.createSession({
+      taskId: seed.taskId,
+      providerId: 'fake',
+      profileId: 'fake',
+      kind: 'interactive',
+      config: { mcpServers: ['docs'] },
+    })
+    expect(session.config.mcpServers).toEqual(['linear'])
+    await runtime.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Use the tools.' }],
+      source: 'interactive',
+      effectivePolicy: { providerDefault: true },
+      idempotencyKey: randomUUID(),
+    })
+    await runtime.wait(session.id, 0, 'turn_completed', 2_000)
+    expect(starts.at(-1)!.mcpServers).toEqual([{
+      transport: 'stdio',
+      name: 'linear',
+      command: 'npx',
+      args: ['linear-mcp'],
+      env: { LINEAR_API_KEY: 'lin_api_0123456789' },
+    }])
+
+    // The general config patch cannot switch servers, the same way it cannot touch the tool ceiling.
+    const patched = await runtime.patchSession(session.id, { config: { ...session.config, mcpServers: ['docs'] } })
+    expect(patched.config.mcpServers).toEqual(['linear'])
+
+    await expect(runtime.setSessionMcpServers(session.id, ['nope'])).rejects.toThrow('MCP server not found: nope.')
+    const startsBefore = starts.length
+    const view = await runtime.setSessionMcpServers(session.id, ['docs'])
+    expect(view.servers).toEqual([
+      { name: 'docs', transport: 'http', enabled: true },
+      { name: 'linear', transport: 'stdio', enabled: false },
+    ])
+    await vi.waitFor(() => expect(starts.length).toBe(startsBefore + 1))
+    expect(starts.at(-1)!.mcpServers.map((server) => server.name)).toEqual(['docs'])
   })
 })

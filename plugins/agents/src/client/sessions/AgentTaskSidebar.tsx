@@ -1,8 +1,9 @@
 import { agentTelemetry, startAgentView } from './agentTelemetry'
 import { createMemo, createEffect, onCleanup, Show } from 'solid-js'
 import type { Task } from '@acorn/plugin-api/client'
+import type { AgentSession } from '../../contract/wire.ts'
 import {
-  EmptyState, Icon, Inline, Menu, paneCollapseKey, Row, RowActions, Rows, Section, SectionHeader,
+  EmptyState, Fold, Icon, IconButton, Inline, Menu, paneCollapseKey, Row, RowActions, Rows, Section, SectionHeader,
   sidebarCollapsed, Stack, Text,
 } from '@acorn/plugin-api/ui'
 import { managedAgentStore } from './managedStore'
@@ -14,13 +15,19 @@ import RuntimeStateIcon, { SubagentStateIcon } from './RuntimeStateIcon'
 import { attentionMark } from './stateTone'
 import { subagentSummary } from './subagentDisplay'
 import { canStopAgent } from './agentActivity'
-import { delegationSummary } from './sessionRoster'
+import { agentSessionRoster, delegationSummary } from './sessionRoster'
+import {
+  compareSessions, compareSubagents, SESSION_ORDER_CHOICES, sessionOrderFor, setSessionOrder, type SessionGroup,
+} from './sessionOrder'
+import { isStale } from '../inlineDiff/patchStatus.ts'
+import { eventTime } from './eventTime'
 import {
   clearManagedSubagent, openManagedSession, selectManagedSession, selectManagedSubagent,
   selectedManagedSubagent,
 } from './managedSelection'
 
-// The Agent pane's `list` region: what is running in this task, in two groups.
+// The Agent pane's `list` region: what is running in this task, grouped as requests that need you,
+// sessions you started, sessions a workflow started, and inline diff chats.
 //
 // Each group is a `Rows` collection, so the arrows, Home, End, type-ahead and the selection that
 // survives a refetch are the kit's and this file writes no key handling
@@ -28,10 +35,38 @@ import {
 // one, rather than a nested list, because stepping into a child run is a selection and not an
 // expansion.
 //
-// There is no third group. It merged this task's PTY sessions with its workflow steps, and opening a
-// step spawned a terminal on the harness's resume command. The run pane owns a run's steps now
+// Workflow runs lists a workflow's sessions, not its steps. An earlier group merged this task's PTY
+// sessions with its workflow steps, and opening a step spawned a terminal on the harness's resume
+// command. The run pane owns a run's steps now
 // (plugins/workflows runs/paneContribution.ts), and the terminal drawer owns PTY sessions, so the
 // rows had two better homes and one confusing one (docs/workflows.md § What workflows refuses).
+
+/** The order button in a group's header. The choice is this task's and this group's alone
+ *  (./sessionOrder.ts). */
+function OrderMenu(props: { taskId: string; group: SessionGroup; label: string }) {
+  const chosen = () => sessionOrderFor(props.taskId, props.group)
+  return (
+    <Menu
+      ariaLabel={`Order ${props.label}`}
+      placement="bottom-end"
+      trigger={({ open, toggle }) => (
+        <IconButton icon="arrow-up-down" label={`Order ${props.label}`} opens="menu" expanded={open()} onPress={toggle} />
+      )}
+    >
+      {(menu) => SESSION_ORDER_CHOICES.map((choice) => (
+        <Menu.Item
+          context={menu}
+          // The same chosen mark as the changes pane's view menu, because `Menu.Item` has no checked
+          // state (plugins/changes ChangesPane.tsx).
+          leading={<Icon name={chosen() === choice.value ? 'circle-dot' : 'circle'} title={chosen() === choice.value ? 'Chosen' : undefined} />}
+          onSelect={() => setSessionOrder(props.taskId, props.group, choice.value)}
+        >
+          {choice.label}
+        </Menu.Item>
+      ))}
+    </Menu>
+  )
+}
 
 /** The list column's header: how many sessions this task has. Its own region, so it stays put while
  *  the list under it scrolls (docs/panes.md § Layout model). */
@@ -40,12 +75,18 @@ export function AgentSidebarHeader(props: { task: Task; model: AgentPaneModel })
   return <SectionHeader count={model.taskSessions().length}>Agents</SectionHeader>
 }
 
+/** A session or subagent row's tooltip. `updatedAt` rather than the newest event's time: the node
+ *  rebroadcasts the row only when an event changes something else on it
+ *  (../../server/sessions/runtimeEngine.ts § listedRow), such as a turn ending or a subagent finishing,
+ *  so a running one reads as of its last state change. */
+const lastActive = (at: number) => `Last active ${eventTime(at).full}`
+
 export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
   // Collapsed, a row is its run state and nothing else. That glyph is already the row's leading mark
   // and already carries the queued count, so the rail says the same thing the full row's first inch
   // said: which of these is working, which is waiting on you, which is done. The title comes back as
-  // the tooltip, from `title` below (client-core kit/lib/collapseState.ts).
+  // the tooltip, from `title` below (client-core kit/lib/layout/collapseState.ts).
   const collapsed = sidebarCollapsed(paneCollapseKey(AGENT_PANE_ID))
   const view = startAgentView('agents.sidebar.open')
   onCleanup(view.dispose)
@@ -86,8 +127,27 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
 
   // Sessions and their subagents in one list, because they are one thing to walk with the arrows.
   // The key says which: `<session id>` or `<session id>/<subagent id>`.
+  // A subagent row carries its parent session, so it lands in the same group as its parent.
+  //
+  // Each group builds the roster from every session sorted by that group's order and then keeps its
+  // own rows, so a delegated child nests exactly as it did before there was a choice, and its
+  // siblings and subagents take the group's order with it.
+  const groupRows = (group: SessionGroup, keep: (session: AgentSession) => boolean) => {
+    const order = sessionOrderFor(props.task.id, group)
+    return agentSessionRoster(
+      [...model.taskSessions()].sort(compareSessions(order)),
+      managedAgentStore.delegations(),
+      compareSubagents(order),
+    ).filter((row) => keep(row.session)).map(({ key, label }) => ({ key, label }))
+  }
   const sessionRows = createMemo(() => agentTelemetry.measure('agents.sidebar.rows', () =>
-    model.sessionRoster().map(({ key, label }) => ({ key, label }))))
+    groupRows('managed', (session) => !session.origin && session.kind !== 'workflow')))
+  const workflowRows = createMemo(() => groupRows('workflow', (session) => !session.origin && session.kind === 'workflow'))
+  const workflowSessionCount = createMemo(() =>
+    model.taskSessions().filter((session) => !session.origin && session.kind === 'workflow').length)
+  const inlineSessions = createMemo(() => model.taskSessions().filter((session) => session.origin?.kind === 'inline-diff')
+    .sort(compareSessions(sessionOrderFor(props.task.id, 'inline'))))
+  const inlineNeedsYou = createMemo(() => inlineSessions().filter((session) => !['none', 'unread'].includes(session.attention)).length)
   createEffect(() => agentTelemetry.observe('agents.sidebar.row_count', sessionRows().length))
   const sessionOf = (key: string) => model.sessionRoster().find((candidate) => candidate.key === key) ?? null
   const selectedRowKey = createMemo(() => {
@@ -111,6 +171,126 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
     else selectManagedSession(props.task.id, found.session.id)
     selectManagedSubagent(found.session.id, found.subagent.id)
   }
+
+  // One renderer for both roster sections, so a workflow session's row, subagents and actions are
+  // the same as any other session's.
+  const SessionRows = (rowsProps: { id: string; ariaLabel: string; items: { key: string; label: string }[] }) => (
+    <Rows
+      id={rowsProps.id}
+      ariaLabel={rowsProps.ariaLabel}
+      items={rowsProps.items}
+      selected={selectedRowKey()}
+      onSelect={openRow}
+      onActivate={openRow}
+    >
+      {(item, itemProps, selected) => {
+        const found = () => sessionOf(item.key)
+        const session = () => found()?.session
+        const subagent = () => {
+          const entry = found()
+          return entry?.kind === 'provider-subagent' ? entry.subagent : undefined
+        }
+        const managedRow = () => {
+          const entry = found()
+          return entry?.kind === 'managed' ? entry : undefined
+        }
+        return (
+          <Show when={session()}>
+            {(current) => (
+              <Show
+                when={subagent()}
+                fallback={
+                  <Row
+                    item={itemProps}
+                    variant="stacked"
+                    density="compact"
+                    depth={found()?.depth}
+                    nested={(found()?.depth ?? 0) > 0}
+                    selected={selected()}
+                    title={current().title}
+                    tip={lastActive(current().updatedAt)}
+                    tipAt={current().updatedAt}
+                    collapsed={collapsed()
+                      ? <RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />
+                      : undefined}
+                    leading={<RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />}
+                    trailing={
+                      <>
+                        <Show when={!['none', 'unread'].includes(current().attention)}>
+                          <Icon {...attentionMark(current().attention)} />
+                        </Show>
+                        <RowActions ariaLabel="Session actions">
+                          {(menu) => (
+                            <>
+                              <Show when={canStopAgent(current())}>
+                                <Menu.Item context={menu} onSelect={() => model.sessionAction(current(), 'stop')}>
+                                  Stop
+                                </Menu.Item>
+                              </Show>
+                              <Menu.Item context={menu} onSelect={() => model.sessionAction(current(), 'rename')}>
+                                Rename session
+                              </Menu.Item>
+                              <Menu.Item context={menu} onSelect={() => model.sessionAction(current(), 'archive')}>
+                                Archive session…
+                              </Menu.Item>
+                            </>
+                          )}
+                        </RowActions>
+                      </>
+                    }
+                    onPress={() => openRow(item.key)}
+                  >
+                    <Text emphasis="strong">{current().title}</Text>
+                    <Inline gap="inline">
+                        <Show when={providerMarkName(current().providerId)}>
+                        {(mark) => <ProviderGlyph glyph={mark()} label={current().providerId} />}
+                      </Show>
+                      <Text emphasis="muted">
+                        {[current().providerId, sessionModelSummary(current()), current().runtimeState]
+                          .filter(Boolean).join(' · ')}
+                      </Text>
+                    </Inline>
+                    <Show when={managedRow()}>
+                      {(row) => (
+                        <Show when={delegationSummary(row())}>
+                          {(summary) => <Text emphasis="muted">{summary()}</Text>}
+                        </Show>
+                      )}
+                    </Show>
+                  </Row>
+                }
+              >
+                {(child) => (
+                  // The subagent roster, indented under the session that spawned it. Read straight
+                  // off the session row, which the WebSocket pushes whenever an event this node
+                  // records changes it, so these rows appear and settle live for every session in the task and
+                  // not only the one that happens to be open. Nothing extra is fetched
+                  // (docs/managed-agents.md § Subagents).
+                  <Row
+                    item={itemProps}
+                    variant="stacked"
+                    density="compact"
+                    depth={found()?.depth ?? 1}
+                    nested
+                    selected={selected()}
+                    title={child().title}
+                    tip={lastActive(child().updatedAt)}
+                    tipAt={child().updatedAt}
+                    collapsed={collapsed() ? <SubagentStateIcon status={child().status} /> : undefined}
+                    leading={<SubagentStateIcon status={child().status} />}
+                    onPress={() => openRow(item.key)}
+                  >
+                    <Text emphasis="strong">{child().title}</Text>
+                    <Text emphasis="muted">{subagentSummary(child(), sessionModelSummary(current()))}</Text>
+                  </Row>
+                )}
+              </Show>
+            )}
+          </Show>
+        )
+      }}
+    </Rows>
+  )
 
   return (
     <Stack gap="none">
@@ -168,129 +348,53 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
         </Section>
       </Show>
 
-      <Section label="Managed sessions">
+      <Section label="Managed sessions" actions={<OrderMenu taskId={props.task.id} group="managed" label="managed sessions" />}>
         <Show
           when={sessionRows().length}
           fallback={<EmptyState size="sm" align="start">No managed sessions</EmptyState>}
         >
-          <Rows
-            id={`agents:sessions:${props.task.id}`}
-            ariaLabel="Managed sessions"
-            items={sessionRows()}
-            selected={selectedRowKey()}
-            onSelect={openRow}
-            onActivate={openRow}
-          >
-            {(item, itemProps, selected) => {
-              const found = () => sessionOf(item.key)
-              const session = () => found()?.session
-              const subagent = () => {
-                const entry = found()
-                return entry?.kind === 'provider-subagent' ? entry.subagent : undefined
-              }
-              const managedRow = () => {
-                const entry = found()
-                return entry?.kind === 'managed' ? entry : undefined
-              }
-              return (
-                <Show when={session()}>
-                  {(current) => (
-                    <Show
-                      when={subagent()}
-                      fallback={
-                        <Row
-                          item={itemProps}
-                          variant="stacked"
-                          density="compact"
-                          depth={found()?.depth}
-                          nested={(found()?.depth ?? 0) > 0}
-                          selected={selected()}
-                          title={current().title}
-                          collapsed={collapsed()
-                            ? <RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />
-                            : undefined}
-                          leading={<RuntimeStateIcon state={current().runtimeState} queued={current().queuedTurns} />}
-                          trailing={
-                            <>
-                              <Show when={!['none', 'unread'].includes(current().attention)}>
-                                <Icon {...attentionMark(current().attention)} />
-                              </Show>
-                              <RowActions ariaLabel="Session actions">
-                                {(menu) => (
-                                  <>
-                                    <Show when={canStopAgent(current())}>
-                                      <Menu.Item context={menu} onSelect={() => model.sessionAction(current(), 'stop')}>
-                                        Stop
-                                      </Menu.Item>
-                                    </Show>
-                                    <Menu.Item context={menu} onSelect={() => model.sessionAction(current(), 'rename')}>
-                                      Rename session
-                                    </Menu.Item>
-                                    <Menu.Item context={menu} onSelect={() => model.sessionAction(current(), 'archive')}>
-                                      Archive session…
-                                    </Menu.Item>
-                                  </>
-                                )}
-                              </RowActions>
-                            </>
-                          }
-                          onPress={() => openRow(item.key)}
-                        >
-                          <Text emphasis="strong">{current().title}</Text>
-                          <Inline gap="inline">
-                            {/* A session a workflow started, said once on the row. Its steps live in
-                                the run pane; this is only how you tell the two kinds apart here. */}
-                            <Show when={current().kind === 'workflow'}>
-                              <Icon name="workflow" tone="muted" title="Started by a workflow" />
-                            </Show>
-                            <Show when={providerMarkName(current().providerId)}>
-                              {(mark) => <ProviderGlyph glyph={mark()} label={current().providerId} />}
-                            </Show>
-                            <Text emphasis="muted">
-                              {[current().providerId, sessionModelSummary(current()), current().runtimeState]
-                                .filter(Boolean).join(' · ')}
-                            </Text>
-                          </Inline>
-                          <Show when={managedRow()}>
-                            {(row) => (
-                              <Show when={delegationSummary(row())}>
-                                {(summary) => <Text emphasis="muted">{summary()}</Text>}
-                              </Show>
-                            )}
-                          </Show>
-                        </Row>
-                      }
-                    >
-                      {(child) => (
-                        // The subagent roster, indented under the session that spawned it. Read straight
-                        // off the session row, which the WebSocket pushes whenever an event this node
-                        // records changes it, so these rows appear and settle live for every session in the task and
-                        // not only the one that happens to be open. Nothing extra is fetched
-                        // (docs/managed-agents.md § Subagents).
-                        <Row
-                          item={itemProps}
-                          variant="stacked"
-                          density="compact"
-                          depth={found()?.depth ?? 1}
-                          nested
-                          selected={selected()}
-                          title={child().title}
-                          collapsed={collapsed() ? <SubagentStateIcon status={child().status} /> : undefined}
-                          leading={<SubagentStateIcon status={child().status} />}
-                          onPress={() => openRow(item.key)}
-                        >
-                          <Text emphasis="strong">{child().title}</Text>
-                          <Text emphasis="muted">{subagentSummary(child(), sessionModelSummary(current()))}</Text>
-                        </Row>
-                      )}
-                    </Show>
-                  )}
-                </Show>
-              )
-            }}
-          </Rows>
+          <SessionRows id={`agents:sessions:${props.task.id}`} ariaLabel="Managed sessions" items={sessionRows()} />
         </Show>
       </Section>
+      <Show when={workflowRows().length}>
+        <Fold label={`Workflow runs (${workflowSessionCount()})`} persistKey="agents.workflow-runs" defaultOpen
+          actions={<OrderMenu taskId={props.task.id} group="workflow" label="workflow runs" />}>
+          <SessionRows id={`agents:workflows:${props.task.id}`} ariaLabel="Workflow runs" items={workflowRows()} />
+        </Fold>
+      </Show>
+      <Show when={inlineSessions().length}>
+        <Fold label={`Inline chats (${inlineSessions().length})`} persistKey="agents.inline-chats"
+          actions={<OrderMenu taskId={props.task.id} group="inline" label="inline chats" />}
+          meta={inlineNeedsYou() ? <Text emphasis="muted">{inlineNeedsYou()} need you</Text> : undefined}>
+          <Rows
+            id={`agents:inline:${props.task.id}`}
+            ariaLabel="Inline chats"
+            items={inlineSessions().map((session) => ({ key: session.id, label: session.title }))}
+            selected={selectedRowKey()}
+            onSelect={(key) => openManagedSession(props.task.id, key)}
+            onActivate={(key) => openManagedSession(props.task.id, key)}
+          >
+            {(item, itemProps, selected) => {
+              const current = () => inlineSessions().find((session) => session.id === item.key)
+              return <Show when={current()}>{(session) => <Row
+                item={itemProps}
+                variant="stacked"
+                density="compact"
+                selected={selected()}
+                title={session().title}
+                tip={lastActive(session().updatedAt)}
+                tipAt={session().updatedAt}
+                leading={<RuntimeStateIcon state={session().runtimeState} queued={session().queuedTurns} />}
+                trailing={<Show when={!['none', 'unread'].includes(session().attention)}><Icon {...attentionMark(session().attention)} /></Show>}
+                onPress={() => openManagedSession(props.task.id, session().id)}
+              >
+                <Text emphasis="strong">{session().title}</Text>
+                <Text emphasis="muted">{session().origin?.path}:{session().origin?.line} · {session().origin && isStale(session().origin!) ? 'stale patch' : 'diff chat'}</Text>
+              </Row>}</Show>
+            }}
+          </Rows>
+        </Fold>
+      </Show>
     </Stack>
   )
 }

@@ -1,40 +1,24 @@
 import { createSignal, For, Show } from 'solid-js'
 import {
   Alert, Button, Chip, ChipRow, defaultModelIdFor, Modal, ModalActions, ModalBody,
-  ModelBackendPicker, Picker, Stack, Text, Textarea,
+  ModelBackendPicker, modelProviderFailure, Picker, Stack, Text, Textarea,
 } from '@acorn/plugin-api/ui/tree'
-import { AcornBridgeError } from '@acorn/plugin-api/ui/sdk'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { DbSavedQuery } from '../shared/database'
 import { GENERATE_MAX_PROMPT_CHARS } from '../shared/database'
-import type { createDatabaseClient } from './databaseClient'
+import type { DatabaseClient } from './databaseClient'
 
 // Describe a query in words, get SQL. The prompt is built on the node from the live schema, the repo's
 // schema notes and any saved queries picked as examples; the key never comes near this frame.
 //
-// The error mapping is the same as the compiled version's, over `AcornBridgeError` instead of `ApiError`:
-// the bridge reuses the HTTP error envelope verbatim, precisely so one branch on `code` works whether the
-// call was denied at the bridge or refused by the node.
-//
-// Exported and pure so the branches are a table test (./GenerateSqlModal.test.tsx). `backend` is only
-// read by the last of them.
+// The bridge preserves the HTTP error code, so the shared model-provider guidance works here too.
+// Errors specific to SQL generation keep the node's own message.
 export const errorMessage = (e: unknown, backend?: Pick<ModelBackend, 'kind' | 'label'>): string => {
-  if (e instanceof AcornBridgeError) {
-    if (e.code === 'provider_needs_auth') return 'The provider key was rejected — reconnect it in Settings → Integrations.'
-    if (e.code === 'provider_rate_limited') return 'The provider is rate-limiting requests — try again shortly.'
-    // A CLI generate fails as `provider_unavailable` too, and the node's own prose for it is about a
-    // provider that did not answer. The usual cause for a CLI is that it is installed but signed out,
-    // which no amount of retrying fixes: the next step is to run it once in a terminal.
-    if (e.code === 'provider_unavailable' && backend?.kind === 'harness') {
-      return `${backend.label} did not answer. Run it once in a terminal to check it is signed in.`
-    }
-    return e.message
-  }
-  return e instanceof Error ? e.message : String(e)
+  return modelProviderFailure(e, backend) ?? (e instanceof Error ? e.message : String(e))
 }
 
 export default function GenerateSqlModal(props: {
-  client: ReturnType<typeof createDatabaseClient>
+  client: Pick<DatabaseClient, 'generateSql'>
   taskId: string
   backends: ModelBackend[]
   queries: readonly DbSavedQuery[]
@@ -57,6 +41,11 @@ export default function GenerateSqlModal(props: {
   const [exampleIds, setExampleIds] = createSignal<string[]>([])
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
+
+  // A generation that has been sent cannot be cancelled. Keep its result in view until it lands.
+  const dismiss = () => {
+    if (!busy()) props.onDismiss()
+  }
 
   const chosen = () => props.queries.filter((q) => exampleIds().includes(q.id))
   const toggle = (q: DbSavedQuery) =>
@@ -85,7 +74,7 @@ export default function GenerateSqlModal(props: {
   return (
     // ⌘Enter used to be a `keydown` on the dialog. A DOM event does not cross to a sandbox with no
     // DOM, so the Generate button is the only way to fire it now.
-    <Modal title="Generate SQL" onDismiss={props.onDismiss}>
+    <Modal title="Generate SQL" onDismiss={dismiss}>
       <ModalBody>
         <Textarea
           mono
@@ -140,7 +129,7 @@ export default function GenerateSqlModal(props: {
         </Show>
       </ModalBody>
       <ModalActions>
-        <Button disabled={busy()} onPress={props.onDismiss}>Cancel</Button>
+        <Button disabled={busy()} onPress={dismiss}>Cancel</Button>
         <Button variant="solid" disabled={busy() || !prompt().trim()} onPress={() => void generate()}>
           {busy() ? 'Generating…' : 'Generate'}
         </Button>

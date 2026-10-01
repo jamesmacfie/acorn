@@ -28,6 +28,14 @@ graph and loses its preloads.
 appearance. It selects a Node-aware cache scope and keys task content by Node/task identity so a
 switch disposes the previous task scope.
 
+The top bar, left rail, pane switcher, and task list are exclusive slots. Each has a registered core
+provider and may have plugin offers; the device preference selects one. `App.tsx` builds the topbar's
+serializable workspace, project, breadcrumb, and fleet data, while `TabRail.tsx` builds the rail's
+available source list and markers. Host verbs keep navigation, source ordering, rail collapse, and
+preference writes outside plugin code. The rail and topbar each lend one opaque nested slot reference:
+`rail.taskList` and `topbar.right`. A remote tree can place only the reference it was given; the child
+surface cannot open another nested slot.
+
 **Four folders under `packages/client-core/src`, and the order is the dependency order.** `kit/` is
 the design system: components, role tokens, the diff toolkit, the key primitives. Props in, DOM out,
 and an arch test holds it there, because `kit/` is what `@acorn/plugin-api/ui` re-exports. `infra/`
@@ -142,10 +150,41 @@ per workspace, so a connected-but-unlinked source drew a row whose surface eithe
 another workspace's items. The mapping is read from core's own workspace rows rather than from the
 plugin, so the gate holds whatever a plugin's manifest says, and it does not apply until both the
 provider list and the mapping have loaded, so the rail does not flicker a row away and back on every
-workspace switch. Linking happens in Settings → Integrations, under the connection, which is
+workspace switch. Linking happens on a connection's page under Settings > Services, or on a workspace's page, which is
 also the only way back once a source is hidden. The gate asks only whether the workspace follows
 anything of that provider's, not whether the routed project does: a source that vanished as you moved
 between repositories in one workspace would read as a bug, so it stays and shows its own empty state.
+
+### Rail source visibility
+
+Whether a plugin's source has an icon in the desktop's left rail is the person's choice, and it is a
+presentation choice, not a gate. The four gates above answer "can this source open?" through
+`availableSources` (`packages/client-core/src/features/tabs/railSources.ts`), and nothing about
+visibility changes that answer. `features/tabs/railVisibility.ts` applies the choice only where
+`TabRail.tsx` projects its icon list. App's selected-source check still reads availability, so a hidden
+source that a command selects, such as Docker's **Open Docker**, stays open.
+
+- A source declares `showInRailByDefault: false` to start hidden, on a compiled `SourceContribution` or
+  a loaded source descriptor (`packages/protocol/src/plugin/manifest/chromeDescriptors.ts`). Absent
+  means shown. The source is registered either way.
+- The choice is one device preference, `rail_visibility`, a JSON map from
+  `<pluginId>:<sourceId>` to `true` or `false`, mirrored to `acorn.json` as `railVisibility`. The
+  owner comes from the source registry, never from anything the plugin declared. An absent entry reads
+  the source's default, and an entry for a source that is gone stays as inert data, so a plugin that
+  comes back with the same ids comes back as the person left it. The map is bounded when it is read. It
+  is a separate key from `rail_order`, so dragging and hiding never overwrite each other; a drag while a
+  source is hidden keeps the hidden source's slot.
+- Core's sources, Home among them, are always shown.
+- Hiding the source on screen goes back to Home. Showing one adds its icon and moves nothing.
+- Every hidden, available source gets a palette row, **Open <label>**, which the host registers and
+  removes as the source becomes available or not (`host/palette/sourceOpeners.ts`). It opens the source the
+  way its icon does and refuses with an error when the source needs a project and none is open. A
+  plugin that already registers `source.<id>.open` keeps its own row and gets no second one.
+- The switch is drawn in two places, both the host's: **Settings > Plugins > Rail and surfaces** lists
+  every plugin source, and the plugin strip above a plugin's own settings page draws one for each id
+  the page names in `railSourceVisibility`. Both read and write the one preference. The page's own code
+  never touches it, and a loaded frame cannot reach it through `state.set` or a route.
+- The terminal's source menu lists every available source whatever this preference says.
 
 A Fleet home node card can also carry a plugin's own number beside core's task count
 (`registries/rail/nodeStats.ts`). The card lives in client-core, which cannot import the agents or
@@ -160,6 +199,20 @@ the colour, the spin, and the tooltip legend
 consuming render, so a plugin reads signals it already owns and the rail re-renders when they change,
 rather than the host inventing a query observer per rail button. One throwing contribution is isolated;
 the rest of the control still draws.
+
+The marker's dot, tone, and legend display types live in `kit/tokens/rail.ts`. The tabs feature
+re-exports those types from its public contract, so kit tooltip rendering does not depend on a product
+feature and plugin imports keep the same names.
+
+Loaded task markers enter through `core:task`, the generic annotation point. The rail sends the whole
+visible task-id set once per contributor. Each contributor's request identity includes its descriptor
+registration, the active node, `chromeDeps(pluginId)`, and the visible keys. The shared chrome watcher
+already advances that freshness revision for plugin pushes, global status, and declared polling, so
+annotations add no per-row query, timer, observer, or subscription. A changed identity synchronously
+clears and aborts only that contributor, while an exact-generation guard rejects late answers. Chrome
+resync clears retained annotation state before registrations are replaced. Results merge in registered
+contributor order, independent of network completion order. For the budgets and response shape, see
+[Task annotations](./plugins/cooperative-extension-points.md#task-annotations).
 
 Workflow descendant grouping is a client-core task projection, not plugin-owned rail markup. Tasks
 created through the workflow child seam carry `workflows:child`; desktop and terminal rails use the
@@ -390,14 +443,290 @@ from one reading of what an agent session is doing, and one gate decides which c
 interrupting somebody for and which channels each wakes.
 [notifications.md](./notifications.md) owns that model.
 
+## Settings
+
+Settings is a full-window layer, `packages/client-core/src/features/settings/SettingsView.tsx`, that
+`apps/desktop/src/client/App.tsx` mounts over the shell, top bar included. It is not a route. A route
+change would unmount the task's panes, so the workspace stays mounted underneath: a terminal, an agent
+stream, or an editor keeps running and is where the person left it after Escape. ⌘,, the palette's
+**Open settings**, the top bar menu, `openSettings(target)` on a slot's context, and the
+`presentation:open-settings` event all open it. A target is `settings/<pageId>#<sectionId>`, and the
+prefix and the section are optional, so a bare page id works. With no target, settings reopens on the
+last page used, which is remembered in local storage and never sent to a node.
+
+The rail holds **Back to acorn**, a search field (`/` focuses it; see Search below), and nine closed
+groups: General, Workspaces and projects, Agents, Connections, Features, Automation,
+Machines, Plugins, and Advanced. The lists are in `packages/protocol/src/chrome/settingsPages.ts`. A page
+declares its group as `category` and what a change on it affects as `scope` (`device`, `node`,
+`workspace`, or `project`) on its `SettingsContribution`
+(`packages/client-core/src/host/registries/shell/settings.ts`). A missing `category` is `features`, a
+missing `scope` is `node`, and the older `group: 'workspace'` still means `scope: 'workspace'`. A
+plugin may use General, Agents, Connections, Features, Automation, and Machines. Core alone files
+pages under Workspaces and projects, Plugins, and Advanced, and a compiled plugin that names one of
+those, or an unknown scope, throws at registration. Workspaces are rows under Overview, each opening
+its workspace page, and a workspace's projects are rows under it while it is expanded (see Workspaces
+and projects below). The arrow keys
+move through the rail, Enter opens a page, and the rail's single Tab stop is the open page's row, so
+Tab moves into the page. A dot beside a row marks an attention row whose target is that settings page.
+A page's body is capped at 720 px unless it sets `fullWidth`. Below 900 px the rail is its own screen
+and a page opens over it with a back link.
+
+The header draws a breadcrumb, the page name, and a scope chip: **This device**, **Node: <label>**,
+**Workspace: <name>**, or **Project: <name>**, with the node named too when there is more than one.
+A page that reads and writes the node in `context.scope.nodeId` sets `followsNodeSwitcher`, and its
+chip becomes the node switcher when the fleet has two nodes or more. The switcher is local to
+settings: it starts on the active node each time settings opens and never changes `activeNodeId`,
+which would remount the shell on another node's cache. Switching it remounts the page, so nothing a
+page held for one node shows under another, and a form holding changes asks first. Installed, Security and backup, Audit log,
+Schedules, Run history, Telemetry, and Storage and memory follow it. Storage and memory hands the
+switcher's node to each section a plugin draws in its `core:storage` point, so the agents section reads
+that node too. Every other node page reads the active node, because
+a compiled plugin's page calls the ambient API client and a loaded frame is pinned to the active node
+(`host/frames/register.ts`), and its chip names that node as plain text rather than offering a
+switch the body would not honour.
+
+The page context is `{ scope: { nodeId, workspace?, project? }, navigate(target, opened?), workspace?,
+onWorkspaceDeleted }`. `navigate` asks first when a form holds changes, and `opened` runs only once
+the page is on screen. Every arrival on a page draws it afresh, so its own rail row, clicked from
+one of its items, goes back to its list. `workspace` repeats `scope.workspace` and stays until the next plugin API
+major. On a project's page `scope.project` is the project and `scope.workspace` is its workspace. A page that no longer passes its `requires` gate falls back to the first page, which says the
+page is no longer available on this node.
+
+### Search and deep links
+
+Search is built from declarations, never from rendered controls
+(`host/registries/shell/settingsSearch.ts`). A page declares `keywords` and `sections` on its
+contribution, at most 16 of each. A section is `{ id, label, keywords?, rows? }`: `id` matches a
+`SettingsSection` the page draws, and `rows` lists the labels of its rows. Core pages declare theirs
+with their placement in `packages/client-core/src/features/settings/corePages.ts`, the table the
+desktop's `apps/desktop/src/client/pageContributions.tsx` and the terminal client both register from,
+so a page is findable before its chunk has loaded. A loaded plugin's settings frame declares `keywords` and `sections`
+without `rows` (docs/plugin-authoring/the-manifest.md). The index adds the names of workspaces,
+projects, connections, nodes, and plugins, each landing on the page that holds it. The registry
+refuses a compiled page whose lists are past the limit, or whose section ids repeat or cannot be
+carried by a link.
+
+Results rank page names first, then section names, then row labels, then keywords, and within a
+rank a match at the start of the text before one at the start of a word before one anywhere. Each
+result reads **Page › Section**, names the row or keyword that matched, and carries a scope chip.
+Enter opens the first result. A result with a section scrolls to it and marks it for three seconds
+with an outline and a fill, which are there at once when motion is reduced; only the fade moves. A
+deep link, `settings/<pageId>#<sectionId>`, and a palette section row land the same way. Reopening
+settings on the remembered page does not scroll or mark anything. The palette's **Settings** group
+lists one row per page and then one per declared section, from the same index.
+
+A page that absorbs another keeps the old id working through `aliases` on its contribution. Each entry
+is `<oldId>` or `<oldId>#<sectionId>`, the section the old page's rows sit in. A deep link, a
+remembered page, or `openSettings` that names an old id lands on the page that lists it, at that
+section, and settings remembers the live id from then on (`resolveSettingsAlias` in
+`host/registries/shell/settings.ts`). An alias is read only when no page has the id, so it never takes
+a live page's place. Limits and cost is the example: `agent-concurrency` and `agent-pricing` land on
+its **Turns at once** and **Claude prices** sections.
+
+### Pages and the save model
+
+A page is `SettingsSection`s of `SettingRow`s, two kit nodes on `@acorn/plugin-api/ui` (docs/ui-design.md
+§ Every node at 80 by 24). A row is the label and one line of description on the left and the
+control on the right, or under them at the full width when `layout="stacked"`. The row draws the save
+state its caller hands it:
+
+- A switch or a select saves when it changes. `createSettingSave()` holds the row's `error`, and the
+  control's own state is the signal that the change landed.
+- A text field saves on blur or Enter. `createTextSetting({ value, save })` keeps what is typed as a
+  draft, commits it through `save`, and shows **Saved** for about two seconds (`savedAt`). A write that
+  fails or refuses the value keeps the draft in the field and puts the message on the row. A commit of
+  the stored value writes nothing.
+- Fields that only make sense together, such as a custom agent, a credential, an MCP server, or a new
+  schedule, are a form with **Save** and **Cancel**. The form calls `useUnsavedChanges(dirty)`, and
+  every way off the page asks first: Escape, a rail row, **Back to acorn**, the palette, and a deep
+  link all go through one `leave()` in `SettingsView.tsx`. No settings page has a Save button outside a
+  form.
+- A row given `onReset`, which a caller passes only while the value differs from a known default,
+  marks its label with a dot and offers **Reset**.
+- A row given `from`, such as `.acorn/config.toml`, says **From …** and turns its control inert in a
+  disabled fieldset, so the value this machine holds stays visible. Nothing draws **Managed by your
+  organisation**; the slot is reserved for that layer.
+- A row stored somewhere other than its page passes `scope="device"` and draws its own **This
+  device** chip beside the label, the one a device page's header shows. **Tool call display** on
+  Harnesses and defaults is the example: the page is the node's, and the row is this device's.
+- A row that only seeds new agent sessions says so and names the control that changes an open
+  session: **On for new sessions** with `/mcp` on MCP servers, and the composer's pickers on Harnesses
+  and defaults.
+- A detail page's delete, uninstall, unpair, or revoke sits in `SettingsSection tone="danger"` at the
+  bottom and asks through `confirmAction` (`host/registries/shell/willPhase.tsx`), the same dialog the
+  will events use. The dialog names what goes and what stays.
+
+A page that lists things, such as custom agents or MCP servers, opens one as a detail in the same pane,
+never in a modal. The detail calls `useSettingsDetail(title, back)`
+(`features/settings/settingsDetail.ts`), and the header does the rest: it shows the item as the title
+and the last breadcrumb, draws a back link to the page's list, and binds ⌘[ to it. Going back passes
+through `leave()`, so a form with unsaved changes asks first. A detail with steps of its own, such as
+Add connection's gallery and then one provider's form, passes a third argument, the label of where
+`back` goes, so the link names the step before rather than the list. The hook returns false when nothing is
+listening, which is what the same page drawn outside settings gets, and the page then draws its own
+back link and asks by itself.
+
+The helpers are in `features/settings/settingSave.ts`, `features/settings/unsavedChanges.ts`, and
+`features/settings/settingsDetail.ts`, on `@acorn/plugin-api/client` for compiled plugins. `savePref(..., { throwOnFailure: true })` throws
+instead of posting a background notice, so a row's error is said once, beside the row. A loaded
+plugin's tree keeps the same state in its own signals, because `savedAt` and `error` cross to a
+sandbox and a function does not.
+
+### Workspaces and projects
+
+Overview (`features/workspaces/WorkspaceProjectAssignments.tsx`) is every project on the node in one
+table, `features/workspaces/ProjectTable.tsx`, grouped under its workspace. A row's name and chevron
+open the project's page, and a group's name opens the workspace's page. Selecting rows, one by one,
+per group, or all at once, opens a bar under the table: **Move to workspace** (its last option
+creates the workspace), **Hide** or **Show**, and **Set colour**. The bar loops the one-project
+`PATCH` route rather than asking the node for a bulk route, and it reports each project that failed
+by name. A workspace's own page draws the same table for its projects.
+
+A workspace's page (`features/settings/WorkspaceSettings.tsx`) holds its name, its projects, the
+services it follows (each connection's project map drawn from the workspace's side,
+`features/settings/ProjectConnections.tsx`), and a danger zone that deletes it. A project's page (`features/settings/ProjectSettings.tsx`) has five
+tabs: **General** (name, folder, task tab colour, workspace, hidden, task branch prefix, and the
+danger zone), **Setup and scripts** (setup, its trigger, teardown, the dev script and restart command,
+and run targets), **Preview** (the URL mode and page rules), **Database** (the connection script and
+the query-generation schema), and **Connections** (each connection's project map drawn from this
+project's side, `features/settings/ConnectionProjectMap.tsx` with a `project`, each linking to the
+connection's page). Run targets are a table
+with a small Save and Cancel form under it (`features/settings/RunTargetsTable.tsx`); the stored value
+is still the JSON array the run-targets route checks. The Default workspace cannot be renamed or
+deleted from any page, because it is where a deleted workspace's projects land.
+
+The two pages are addressed by id: `settings/workspace/<workspaceId>` and
+`settings/project/<projectId>`, each taking `#<sectionId>`. The same key is the rail row, the
+remembered page, and the search result for that workspace's or project's name and sections. A section
+on a tab that is not showing lands by picking its tab first. A detail page has a back link above its
+breadcrumb, and ⌘[ follows it: a workspace goes back to Overview, and a project goes back to Overview
+when it was opened from there, otherwise to its workspace. The breadcrumb reads
+`Workspaces and projects › <workspace> › <project>`.
+
+A settings page registered with `scope: 'workspace'` or `scope: 'project'` has no rail row. It is a tab
+on every workspace's or project's page, after core's own tabs, and gets that workspace or project in
+its context (`settingsDetailTabs` in `host/registries/shell/settings.ts`). A loaded frame with
+`settingsScope: 'project'` gets the project id in its binding, like a project pane. Docker's tab is
+the example (`plugins/docker/src/client/DockerProjectSettings.tsx`). The workspace page draws a tab
+strip only when a plugin adds a tab.
+
+A value a project's committed `.acorn/config.toml` sets is read-only on the project page, labelled
+**From .acorn/config.toml**, with the file's value drawn above this machine's own. The node says which
+values those are: the project config read carries `repoConfig`, which is only what the file sets
+(`packages/node-core/src/server/runConfig.ts` § `readCommittedConfig`), so the page never parses repo
+files. Those values are the dev script and restart command when the file declares a `dev` run
+target, the database connection script, the preview mode and value, and the run targets, which the
+page lists read-only above this machine's own. A machine target with the same name as a repo target
+says the repo replaces it. The file wins whether or not it is trusted yet: trust decides whether a task
+may run it, not which value applies. A key the home `~/.acorn/config.toml` sets is not reported.
+
+### Agents
+
+The Agents group is seven pages. The agents plugin owns four of them
+(`plugins/agents/src/client/index.ts`):
+
+| Page | Owner | What it holds |
+| --- | --- | --- |
+| Harnesses and defaults (`agent-defaults`) | agents | Each harness and whether this machine can run it, usage limits, new-session defaults with the task-context switch, inline diff chats, and the device's **Tool call display** |
+| Custom agents | agents | A list, then one agent's editor with a danger zone |
+| Tools and permissions (`agent-tools`) | core | The three tiers, then every tool grouped by owner or by tier |
+| MCP servers (`agent-mcp-servers`) | agents | The servers acorn declares to every session, a list then one server's editor |
+| MCP config files (`mcp`) | core | The servers a CLI loads by itself, for the project picked on the page |
+| Limits and cost (`agent-limits`) | agents | Turns at once, then prices. `agent-concurrency` and `agent-pricing` are aliases |
+| Review after archive (`findings-settings`) | findings | The findings plugin's settings frame |
+
+The task-context switch writes core's `startup_context_injection` preference, which the memory
+plugin's launch-context handler reads on the node, so it sits with the other things a session starts
+with rather than on the terminal's page. The agents plugin reaches it through `PrefKeys` and
+`savePref` on the plugin API, the way any page writes a core preference
+(`plugins/agents/src/client/settings/startupContext.ts`). The two MCP pages link to each other,
+because acorn can add a server to a session but cannot remove one a CLI loads by itself
+(docs/mcp.md).
+
+### Connections
+
+The Connections group is two pages, both core's, in `features/settings/connections/` and
+`features/settings/models/AiModelsSettings.tsx`. [integrations.md](./integrations.md) § Settings says
+what each one holds.
+
+| Page | What it holds |
+| --- | --- |
+| Services (`integrations`) | Every connection that is not a model key, then one connection's page, and the Add connection gallery |
+| AI models (`ai-models`) | **Generate with**, a device row with its own chip, the model keys, and the agent CLIs this machine has |
+
+A connection's page and the gallery are details of the list (`useSettingsDetail`), drawn by
+`ConnectionsPage.tsx`, which both pages share. So a link to one from elsewhere in settings goes
+through `openConnectionPage` in `connections/connections.ts`: a detail request
+(`createDetailRequest` in `features/settings/settingsDetail.ts`) that is set only once settings has
+moved to the list page, and that the list takes when it draws. Someone who chooses to stay on a form
+with changes finds nothing opened later. A project's Connections tab, a workspace's page, and a search result for
+a connection's name all use it. A search object carries the opener as `open`
+(`host/registries/shell/settingsSearch.ts`), and the rail calls it instead of navigating.
+
+The `needs-auth` dot on Services or AI models comes from the attention source
+`core.connectionsNeedAuth`, registered by the shell in `apps/desktop/src/client/activate.ts`, through
+the same `waiting(pageId)` read as the dot on Installed.
+
+### Plugins
+
+The Plugins group is two pages, both core's. **Installed** (`plugins`) lists the node's plugins and
+this device's client-only ones, with **Needs you** and **This device** filters, and opens one plugin's
+page with **Overview**, **Settings**, **Permissions**, and **Versions** tabs. **Install…** is one flow
+for both targets. [plugins/activation.md § What the owner sees](./plugins/activation.md#what-the-owner-sees)
+owns what each shows. **Rail and surfaces** (`rail-surfaces`, device) holds the **Show in left rail**
+switch for every plugin source (see Rail source visibility above) and the replaced-surface picker.
+
+Any page inside settings opens one plugin's page with `openPluginPage(navigate, pluginId)`
+(`features/settings/plugins/installed.ts`), the same kind of detail request. The plugin strip's **Manage plugin** and a tool's owner on
+Tools and permissions use it.
+
+### The plugin strip
+
+Every page a plugin contributes carries the host's plugin strip (`features/settings/plugins/PluginStrip.tsx`),
+whether the page is compiled, a remote tree, or a frame. The settings view draws it for any page whose
+registry owner is a plugin, and a workspace's or project's page draws it at the top of a plugin's tab.
+It holds the plugin's name and origin, **Manage plugin**, a **Show in left rail** switch per source the
+page names in `railSourceVisibility`, the **Enabled** switch, and a status line for off, waiting for
+approval, failed, and offline. A plugin's page describes the active node, so the strip does too.
+
+Plugin content cannot hide or cover the strip, for four reasons:
+
+1. The strip is a DOM sibling that comes before the box the plugin's content is drawn in. On a plugin's
+   own page it sits between the header and `.settings-body`, outside the scrolling body, so the page
+   cannot scroll over it either.
+2. The box around plugin content, `.settings-body[data-plugin]` or `.settings-plugin-content`, sets
+   `contain: layout` and `isolation: isolate`. Anything inside, positioned or not, is placed and stacked
+   within that box.
+3. A compiled plugin draws only kit nodes, and no kit node takes a class or a style
+   ([ui-design/closed-kit.md](./ui-design/closed-kit.md)). A remote tree is kit nodes too.
+4. A frame is an iframe (`sandbox="allow-scripts allow-same-origin"`), which paints only inside its own
+   box.
+
+The strip's switches are drawn only for sources the plugin really registered, checked again against the
+source registry's owner. A page may name only its own plugin's sources: a compiled page that names
+another is refused when its plugin registers (`host/registries/extensionPoints/plugin.ts`), a core page
+may not name any, and a loaded frame's foreign id is reported by the node's manifest reader and dropped
+by `host/frames/register.ts`, keeping the page.
+
+### Keys inside settings
+
+While settings is open the task's own chords stand down: `App.tsx` passes `taskActive: false` to the
+dispatcher, and the region chords do nothing while focus is inside an `aria-modal` surface
+(`host/keys/install.ts`). Focus moves into the rail on open, Tab stays inside the layer, and focus
+returns to where it was on close, so keys typed in settings never reach a terminal underneath. Menus,
+select lists, and confirmations portal to the body and paint above the layer, and an open one takes
+the first Escape.
+
 ## Startup budget
 
 Both clients have a build check over what they load before they draw, and both fail the build two ways:
 over a byte ceiling, and on a **chunk name**.
 
 - **The renderer.** `apps/desktop/scripts/check-renderer-budget.mjs`, run from `@acorn/desktop`'s
-  `build`, sums every script and stylesheet a cold window loads: 776,000 B for scripts, 200,000 B
-  for styles. The script ceiling is the 2026-09-25 measurement, 738,695 B, plus about 5%. A change
+  `build`, sums every script and stylesheet a cold window loads: 906,000 B for scripts, 200,000 B
+  for styles. The script ceiling is the 2026-10-01 measurement, 862,188 B, plus about 5%. This includes
+  the security changes to frame request ownership and tree validation, which run before plugin
+  content is drawn. The previous ceiling used the 2026-09-29 measurement of 819,628 B. A change
   that needs more raises it in the same commit, with the reason in the commit message. It reads the graph from Vite's manifest, which `vite.config.ts` moves out of the shipped
   client folder to `dist/renderer-manifest.json`. The startup set is the static closure of the entry
   chunk plus the modules in the script's `STARTUP_IMPORTS` list, and every script and stylesheet
@@ -412,8 +741,10 @@ over a byte ceiling, and on a **chunk name**.
 - **The terminal client.** `apps/tui/scripts/check-startup-graph.mjs`, run from `@acorn/tui`'s `build`.
   That bundle sets `modulePreload: false` and has one entry, so there is no preload list to read; the
   analogue is the static import closure of the `App` chunk `main.js` reaches for first, and everything
-  in it is evaluated before the first cell is drawn. The ceiling is 1,130,000 B. The 2026-09-23
-  acceptance build measured 1,118,096 B across 123 eager chunks. The closure grew when the client
+  in it is evaluated before the first cell is drawn. The ceiling is 1,175,000 B. The 2026-09-28
+  security build measured 1,137,492 B across 131 eager chunks; validation at the Node and content
+  boundaries must load before untrusted content is drawn. The earlier 2026-09-23 acceptance build
+  measured 1,118,096 B across 123 eager chunks. The closure grew when the client
   took over its own painting: what
   used to be a 6 MB native library outside the bundle is about 98 KB inside it
   ([tui.md](./tui.md) § How a frame is drawn). Dropping a dependency moves this number by nothing —
@@ -495,13 +826,13 @@ which runs from the host asking for the region to the child's `onMount`, so a su
 measured to content rather than to the empty rectangle.
 
 **An owner without a field for one.** Eight contribution types carry no plugin id, so `Registry` in
-`kit/lib/registry.ts` keeps one in a side-map and `ownerOf(id)` answers for the seams. The three
+`kit/lib/state/registry.ts` keeps one in a side-map and `ownerOf(id)` answers for the seams. The three
 registration passes that know the owner fill it: `host/chrome/chromeRegister.ts`,
 `host/frames/register.ts` and `makeContext` in `host/registries/extensionPoints/plugin.ts`. Core
 registers without one and reads as `core`.
 
 `kit/` may import `kit/` and the highlighter and nothing else, so the error boundary in there cannot
-reach the emitter. `kit/lib/contributionErrors.ts` is the seam it reports through, and the client's
+reach the emitter. `kit/lib/telemetry/contributionErrors.ts` is the seam it reports through, and the client's
 telemetry start-up installs the handler, the same trade `host/frames/broker.ts` makes with its
 services.
 
@@ -519,7 +850,7 @@ successful server state. Secret fields are never persisted in renderer storage.
 
 Shared work hooks cover JSON decoding, query-cache serialization/restoration, markdown, row
 reconciliation/mounting, highlighting, diff preparation, tree backlog, and terminal write completion.
-The kit calls a host-installed callback in `kit/lib/workTelemetry.ts`; it never imports the collector.
+The kit calls a host-installed callback in `kit/lib/telemetry/workTelemetry.ts`; it never imports the collector.
 The desktop installs responsiveness monitoring in the renderer entrypoint, not the separately bundled
 preload bridge, so it observes the same consent and interaction state as the application.
 [Telemetry](telemetry.md#diagnosing-an-unresponsive-view) owns the vocabulary and diagnostic workflow.
@@ -540,3 +871,12 @@ TabRail memoizes the scalar stored `railOrder` value, parses it once per changed
 pin membership Set. Selection, same-value preference writes, and unrelated preferences reuse that
 projection. Row identity, reactive contributed markers, and the persisted representation remain the
 rail's existing contracts.
+
+## Preview pane lifetime
+
+The preview pane mounts its toolbar and observers for the selected task. The desktop shell retains
+its browser document when that pane unmounts. The bridge registers a native state listener before
+`ensure` requests a replay, so the toolbar resumes the browsing URL and history controls without a
+fresh navigation. Visibility changes hide or show the retained native page independently of home
+reconciliation. Pending URL reads preserve the record; resolution and capacity failures offer a retry.
+See [Host-owned webviews](./shell.md#host-owned-webviews) for ownership, policy, and recovery limits.

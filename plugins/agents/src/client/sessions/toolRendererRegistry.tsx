@@ -5,8 +5,9 @@ import { formatRelativeTime } from '@acorn/plugin-api/client'
 import { AGENT_TOOL_CARD_POINT, type AgentToolCardProps } from '@acorn/protocol/extensionPoints.ts'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { useAgentToolFold } from './toolFoldPrefs'
-import { WebToolBody, webSummary } from './webToolCard'
+import { WebStatusText, WebToolBody, webStatusIsNews, webSummary } from './webToolCard'
 import { eventTime } from './eventTime'
+import type { AgentToolCall } from '../../contract/wire.ts'
 
 /** What the built-in card draws with: the point's props plus host-only metadata and a callback.
  *  The callback lets "carry my last one forward" learn from this card too. It cannot cross a port,
@@ -40,13 +41,30 @@ function useOpenToolClock(open: () => boolean): () => number {
 // A call with no status reported yet is in flight; see AgentToolCall.status.
 const toolStatusLabel = (props: AgentToolRendererProps) => props.tool.status ?? 'running'
 
+// Claude's Skill call has a generic provider title, while its useful name is in the recorded input.
+// Read it at presentation time so older transcript rows get the same label without rewriting events.
+function skillLabel(tool: AgentToolCall): string | undefined {
+  if (tool.title !== 'Skill' || !tool.input) return undefined
+  try {
+    const input: unknown = JSON.parse(tool.input)
+    if (typeof input !== 'object' || input === null || Array.isArray(input)) return undefined
+    const skill = (input as Record<string, unknown>).skill
+    return typeof skill === 'string' && skill.trim() ? `Launching skill: ${skill.trim()}` : undefined
+  } catch {
+    return undefined
+  }
+}
+
+const toolLabel = (tool: AgentToolCall): string => skillLabel(tool) ?? (tool.title || 'Tool')
+
 /** The state half: a dot, and the word beside it while the call is not finished. The dot carries a
  *  finished call's state on its own, and the word beside it used to read as the entire card whenever
  *  a provider sent its updates without a title.
  *
  *  A web call adds its one-line summary here, in the fold's `meta` slot, rather than to the label: the
  *  label is the row's accessible name and it is what a reader scans a transcript by, so it stays the
- *  stable `Search web` while the query — which can be a paragraph — sits beside it. */
+ *  stable `Search web` while the query — which can be a paragraph — sits beside it. A fetched page
+ *  that answered outside 2xx adds its status after that, because a 404 finishes with a green dot. */
 const AgentToolState: Component<AgentToolRendererProps> = (props) => {
   const summary = () => (props.tool.web ? webSummary(props.tool.web) : undefined)
   return (
@@ -60,6 +78,9 @@ const AgentToolState: Component<AgentToolRendererProps> = (props) => {
         <Text emphasis="muted">{toolStatusLabel(props)}</Text>
       </Show>
       <Show when={summary()}>{(text) => <Text emphasis="muted">{text()}</Text>}</Show>
+      <Show when={webStatusIsNews(props.tool.web?.status) && props.tool.web?.status}>
+        {(status) => <WebStatusText status={status()} />}
+      </Show>
     </Inline>
   )
 }
@@ -69,7 +90,7 @@ const AgentToolState: Component<AgentToolRendererProps> = (props) => {
 const AgentToolHead: Component<AgentToolRendererProps> = (props) => (
   <Inline>
     <AgentToolState {...props} />
-    <Text>{props.tool.title || 'Tool'}</Text>
+    <Text>{toolLabel(props.tool)}</Text>
   </Inline>
 )
 
@@ -88,13 +109,17 @@ const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
   const [open, setOpen] = createSignal(props.defaultOpen)
   const clock = useOpenToolClock(open)
   const started = () => `${eventTime(props.createdAt).full} · ${formatRelativeTime(props.createdAt, clock())}`
+  const output = () => {
+    const text = props.tool.output
+    return text?.trim() === skillLabel(props.tool) ? undefined : text
+  }
   // The reader hit "collapse all" above the composer. `defer`, so mounting is not itself a collapse:
   // the seed above already decided how this card opens, and a new card arriving after a collapse
   // starts collapsed anyway.
   createEffect(on(() => fold.collapseSignal?.(), () => setOpen(false), { defer: true }))
   return (
     <Fold
-      label={props.tool.title || 'Tool'}
+      label={toolLabel(props.tool)}
       level="sub"
       meta={<AgentToolState {...props} />}
       open={open()}
@@ -112,7 +137,9 @@ const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
           <Stack gap="row">
             <Show when={props.tool.input}>{(input) => <CodeBlock wrap maxHeight="block">{input()}</CodeBlock>}</Show>
             <Text emphasis="muted">Started {started()}</Text>
-            <Show when={props.tool.output}>{(output) => <CodeBlock wrap maxHeight="block">{output()}</CodeBlock>}</Show>
+            <Show when={output()}>
+              {(output) => <CodeBlock wrap maxHeight="block">{output()}</CodeBlock>}
+            </Show>
             <For each={props.tool.paths ?? []}>{(path) => <Text emphasis="mono">{path}</Text>}</For>
           </Stack>
         }

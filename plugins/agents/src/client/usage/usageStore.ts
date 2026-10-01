@@ -8,10 +8,12 @@ export type AgentUsageStore = {
   snapshot: Accessor<AgentUsageSnapshot | null>
   loading: Accessor<boolean>
   refreshing: Accessor<boolean>
+  refreshingProviderId: Accessor<string | null>
   error: Accessor<string>
   init(): () => void
   ensure(): Promise<void>
   refresh(): Promise<void>
+  refreshProvider(providerId: string): Promise<void>
 }
 
 export function createAgentUsageStore(
@@ -21,25 +23,33 @@ export function createAgentUsageStore(
   const [snapshot, setSnapshot] = createSignal<AgentUsageSnapshot | null>(null)
   const [loading, setLoading] = createSignal(false)
   const [refreshing, setRefreshing] = createSignal(false)
+  const [refreshingProviderId, setRefreshingProviderId] = createSignal<string | null>(null)
   const [error, setError] = createSignal('')
   let consumers = 0
   let poll: ReturnType<typeof setInterval> | undefined
   let generation = 0
 
-  const load = async (force: boolean): Promise<void> => {
+  const load = async (force: boolean, providerId?: string): Promise<void> => {
+    if (force && refreshing()) return
     const mine = ++generation
-    if (force) setRefreshing(true)
+    if (force) {
+      setRefreshing(true)
+      setRefreshingProviderId(providerId ?? null)
+    }
     else if (!snapshot()) setLoading(true)
     setError('')
     try {
-      const result = await (force ? client.refresh() : client.read())
+      const result = await (providerId ? client.refreshProvider(providerId) : force ? client.refresh() : client.read())
       if (mine === generation) setSnapshot(result)
     } catch (cause) {
       if (mine === generation) setError(cause instanceof Error ? cause.message : 'Agent usage could not be loaded.')
     } finally {
+      if (force) {
+        setRefreshing(false)
+        setRefreshingProviderId(null)
+      }
       if (mine === generation) {
         setLoading(false)
-        setRefreshing(false)
       }
     }
   }
@@ -48,6 +58,7 @@ export function createAgentUsageStore(
     snapshot,
     loading,
     refreshing,
+    refreshingProviderId,
     error,
     init() {
       consumers += 1
@@ -68,6 +79,7 @@ export function createAgentUsageStore(
     },
     ensure: () => (snapshot() ? Promise.resolve() : load(false)),
     refresh: () => load(true),
+    refreshProvider: (providerId) => load(true, providerId),
   }
 }
 

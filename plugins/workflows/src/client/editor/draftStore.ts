@@ -5,7 +5,7 @@
 // catalog and provider reads the inspector draws from, the debounced validate, the dirty flag, and the
 // saves with their revision handling.
 import { createEffect, createMemo, createResource, createSignal, on, onCleanup } from 'solid-js'
-import { activeNodeId, debounce, deviceStorage } from '@acorn/plugin-api/client'
+import { activeNodeId, debounce, deviceStorage, wsOnPluginsChanged } from '@acorn/plugin-api/client'
 import { mergeWorkflow, type WorkflowMergeConflict } from '../../shared/workflowMerge'
 import type { WorkflowPublication } from '../../shared/workflowPublication'
 import type { WorkflowFileOperation, WorkflowFileTarget } from '../../shared/workflowFileAuthoring'
@@ -208,6 +208,9 @@ export function createDraftStore(input: { projectId: () => string; item: () => s
 
   const [catalog, { refetch: refetchCatalog }] = createResource(() => input.projectId() || 'none', async (projectId) =>
     workflowApi.catalog(projectId === 'none' ? undefined : projectId))
+  onCleanup(wsOnPluginsChanged(() => {
+    void Promise.resolve(refetchCatalog()).then(() => validate(draft().def, input.projectId())).catch(() => undefined)
+  }))
   const [providers] = createResource(async () => workflowApi.providers().catch(() => []))
 
   const guard = async <T>(work: () => Promise<T>): Promise<T | undefined> => {

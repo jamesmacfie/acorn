@@ -1,6 +1,6 @@
 export {
   asContextSection, formatOmitted, getContextSections, linkedIssuesSection,
-  registerContextSection, removeContextSections, truncateBytes,
+  pastedContent, registerContextSection, removeContextSections, truncateBytes,
 } from './contextSections.ts'
 export type { PluginContextSection } from './contextSections.ts'
 export { buildAgentTools, wireAgentTools } from './coreTools.ts'

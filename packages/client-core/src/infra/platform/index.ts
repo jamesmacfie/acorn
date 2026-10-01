@@ -9,8 +9,9 @@ import type {
   NodeStatus,
   NodeTransportError,
 } from '@acorn/protocol/broker.ts'
-import type { NodePluginPermissions, PluginAgentToolGrant, PluginContextSectionGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { NodePluginPermissions, PluginAgentToolGrant, PluginContextSectionGrant, PluginCustomAgentGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import type { WsClientFrame, WsSendOptions } from '@acorn/protocol/ws.ts'
+import type { DeviceConfig } from '@acorn/protocol/deviceConfig.ts'
 
 // The platform seam: the renderer's one door to whatever is hosting it. See
 // docs/architecture-overview.md § Node API and client flow for the seam's shape, its nullable
@@ -66,10 +67,21 @@ export type FleetBridge = {
 export type PluginCustody = {
   state(): Promise<PluginHostState>
   cachePut(request: { nodeId: string; pluginId: string; hash: string; version: string }): Promise<PluginPutResult>
+  install(request: { source: import('@acorn/protocol/api.ts').PluginInstallSource; expectedPluginId?: string }): Promise<PluginDeviceInstallResult>
+  remove(request: { pluginId: string }): Promise<void>
   trustRecord(request: PluginTrustDecision): Promise<void>
+  trustForget(request: { pluginId: string; hash: string }): Promise<void>
   // Enter or leave development mode for one plugin on one node. See docs/security.md § The dev
   // grant.
   devGrant(request: PluginDevGrantRequest): Promise<void>
+}
+
+export type DeviceConfigState = { config: DeviceConfig; error?: { message: string; line: number; column: number } }
+export type DeviceConfigBridge = {
+  read(): Promise<DeviceConfigState>
+  write(patch: Partial<DeviceConfig>): Promise<DeviceConfigState>
+  onChange(cb: (state: DeviceConfigState) => void): () => void
+  location(): Promise<string>
 }
 
 // Native actions with no in-page equivalent. Absent everywhere but a desktop shell; every consumer
@@ -82,6 +94,13 @@ export type DesktopExtras = {
   // its registered toggle command after this event arrives.
   onCommandPalette(cb: () => void): () => void
   onWillQuit(cb: () => boolean | Promise<boolean>): () => void
+  openConfigFile(): Promise<void>
+}
+
+export type CliInstallState = { available: boolean; installed: boolean; location: string | null; message: string }
+export type CliInstaller = {
+  status(): Promise<CliInstallState>
+  install(): Promise<CliInstallState>
 }
 
 // The native folder dialog. Its own group rather than part of `DesktopExtras`, because gating the
@@ -111,9 +130,9 @@ export type FileDialogs = {
 // caller gets a working verb. A host that installs this group takes over with the OS's own
 // notification centre and can draw a number on the app icon, which a page cannot.
 //
-// `tag` is the notice id, so an activation can find the notice it came from. `show` answers false
-// when nothing was shown — no permission, no notifier — so a caller can tell "the OS said no" from
-// "the OS is showing it".
+// `tag` is the notice id, so an activation can find the notice it came from. `show` answers whether
+// the notification was accepted for submission; an OS can still suppress its display. `onActivate`
+// reports an explicit notification click. Delivery and ordinary window focus never activate it.
 export type NotifyRequest = { title: string; body?: string; tag: string }
 export type Notify = {
   show(request: NotifyRequest): Promise<boolean>
@@ -126,16 +145,18 @@ export type Notify = {
 // that is not mounted behind the gate.
 export type RecoveryActions = { openDataFolder(): void; quit(): void }
 
-// Browser-preview surface: a host-owned WebContentsView per task, positioned over the pane's rect.
+// The shell retains one preview per local task. Node switches retire every preview. Ensure replays
+// browsing state after observer registration and reconciles configured home independently of it.
 export type PreviewState = { taskId: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }
 export type PreviewViews = {
   ensure(taskId: string, url: string): Promise<boolean>
   setBounds(taskId: string, rect: { x: number; y: number; width: number; height: number }): void
   show(taskId: string): void
-  hide(): void
+  hide(taskId: string): void
   load(taskId: string, url: string): void
   command(taskId: string, action: 'back' | 'forward' | 'reload' | 'stop' | 'devtools'): void
   evict(taskId: string): void
+  evictAll(): void
   onEvent(cb: (state: PreviewState) => void): () => void
 }
 
@@ -162,7 +183,11 @@ export type PluginTrustDecision = {
   pluginId: string
   hash: string
   nodeId: string
+  source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource
   version: string
+  // Canonical client authority from the declaration shown at consent time. A hash alone binds
+  // code bytes but cannot bind the API grants and contributions a Node attaches to those bytes.
+  declaration: string
   permissions: NodePluginPermissions
   webviews: PluginWebviewGrant[]
   keyClaims: PluginKeyClaimGrant[]
@@ -182,24 +207,30 @@ export type PluginTrustDecision = {
   // Task-scoped tools and bounded context carried by the installed manifest.
   agentTools: PluginAgentToolGrant[]
   contextSections: PluginContextSectionGrant[]
+  // Agents it adds to New, and what each one tells the sessions started from it.
+  customAgents: PluginCustomAgentGrant[]
   decision: 'accepted' | 'rejected'
 }
-export type PluginAckRecord = PluginTrustDecision & {
+export type PluginAckRecord = Omit<PluginTrustDecision, 'declaration'> & {
+  // Old on-disk approvals have no declaration. They cannot authorize a loaded UI until reviewed.
+  declaration?: string
   decidedAt: number
   // The decision was recorded but its disclosure snapshot could not be. See docs/security.md §
   // The dev grant for why such a row never becomes the baseline of a later "what changed" diff.
   partial?: true
+  dev?: true
 }
 // Which plugins this device is developing, and against which node. See docs/security.md § The dev
 // grant for why the key is the pair rather than the plugin id alone.
-export type PluginDevGrant = { pluginId: string; nodeId: string; path?: string; grantedAt: number }
-export type PluginDevGrantRequest = { pluginId: string; nodeId: string; path?: string; grant: boolean }
+export type PluginDevGrant = { pluginId: string; nodeId: string; source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource; path?: string; grantedAt: number }
+export type PluginDevGrantRequest = { pluginId: string; nodeId: string; source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource; path?: string; grant: boolean }
 export type PluginHostState = {
-  cached: Record<string, { pluginId: string; version: string; bytes: number }>
+  cached: Record<string, { pluginId: string; version: string; bytes: number; source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource; installSource?: import('@acorn/protocol/api.ts').PluginInstallSource; sourceLabel?: string; manifest?: unknown; nodeIds?: string[] }>
   acks: PluginAckRecord[]
   devGrants: PluginDevGrant[]
 }
-export type PluginPutResult = { hash: string } | { error: 'unreachable' | 'not-found' | 'too-large' | 'hash-mismatch' }
+export type PluginPutResult = { hash: string } | { error: 'unreachable' | 'not-found' | 'too-large' | 'hash-mismatch' | 'has-node-half' | 'invalid-manifest' | 'plugin-id-mismatch' }
+export type PluginDeviceInstallResult = { hash: string; pluginId: string; version: string } | { error: string }
 
 // ── The desktop implementation ────────────────────────────────────────────────────────────────
 
@@ -211,6 +242,8 @@ type AcornPreload = {
   onClosePane?: DesktopExtras['onClosePane']
   onCommandPalette?: DesktopExtras['onCommandPalette']
   onWillQuit?: DesktopExtras['onWillQuit']
+  openConfigFile?: DesktopExtras['openConfigFile']
+  cli?: CliInstaller
   reportResponsiveness?: (pulse: ResponsivenessPulse) => void
   nodeFetch?: NodeTransport['fetch']
   nodeAbort?: NodeTransport['abort']
@@ -231,6 +264,7 @@ type AcornPreload = {
   nodeTunnelOpen?: FleetBridge['tunnelOpen']
   nodeTunnelClose?: FleetBridge['tunnelClose']
   plugins?: PluginCustody
+  config?: DeviceConfigBridge
   recovery?: RecoveryActions
   folderPath?: FolderPicker
   files?: FileDialogs
@@ -329,11 +363,13 @@ export const fleetBridge = (): FleetBridge | null => {
 }
 
 export const pluginCustody = (): PluginCustody | null => acornGlobal()?.plugins ?? null
+export const cliInstaller = (): CliInstaller | null => acornGlobal()?.cli ?? null
+export const deviceConfigBridge = (): DeviceConfigBridge | null => acornGlobal()?.config ?? null
 export const desktopExtras = (): DesktopExtras | null => {
   const acorn = acornGlobal()
-  if (!acorn?.onClosePane || !acorn.onCommandPalette || !acorn.onWillQuit) return null
-  const { onClosePane, onCommandPalette, onWillQuit } = acorn
-  return { onClosePane, onCommandPalette, onWillQuit }
+  if (!acorn?.onClosePane || !acorn.onCommandPalette || !acorn.onWillQuit || !acorn.openConfigFile) return null
+  const { onClosePane, onCommandPalette, onWillQuit, openConfigFile } = acorn
+  return { onClosePane, onCommandPalette, onWillQuit, openConfigFile }
 }
 export const recoveryActions = (): RecoveryActions | null => acornGlobal()?.recovery ?? null
 export const previewViews = (): PreviewViews | null => acornGlobal()?.preview ?? null
@@ -401,8 +437,8 @@ const shownNotifications = new Map<string, Notification>()
 // itself, so this set stays empty there.
 const activationListeners = new Set<(tag: string) => void>()
 
-/** Raise one, through the host if it installed the group and through the page otherwise. False means
- *  nothing was shown: permission refused, or no notifier at all. Silent in both, always: the chime is
+/** Submit one, through the host if it installed the group and through the page otherwise. False means
+ *  submission failed: permission refused, or no notifier at all. Silent in both, always: the chime is
  *  the client's (features/notifications/chime.ts) and it plays whether or not a banner appeared. */
 export const showNotification = async (request: NotifyRequest): Promise<boolean> => {
   const host = acornGlobal()?.notify

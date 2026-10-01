@@ -1,4 +1,5 @@
 import { createRoot } from 'solid-js'
+import { withQueryClient } from './queryClient.helper'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { Task } from '@acorn/plugin-api/client'
 import type { AgentSession, AgentSessionSnapshot } from '../../contract/wire.ts'
@@ -69,7 +70,7 @@ describe('regenerating a session title', () => {
   it('offers the shared session action and replaces the cached title with the server result', async () => {
     await new Promise<void>((resolve, reject) => {
       createRoot((dispose) => {
-        const model = createAgentPaneModel({ id: original.taskId } as Task, { shown: () => true })
+        const model = withQueryClient(() => createAgentPaneModel({ id: original.taskId } as Task, { shown: () => true }))
         void model.sessionsLoaded
           .then(() => managedAgentStore.loadSnapshot(original.id))
           .then(() => {

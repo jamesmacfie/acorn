@@ -5,7 +5,7 @@ import AgentMarkdown from './ManagedAgentMarkdown'
 import { dispatchLayout, requestTerminalFocusIntent, setTerminalOpen } from '@acorn/plugin-api/client'
 import { AgentToolCallCard } from './toolRendererRegistry'
 import {
-  Alert, Button, Card, CodeBlock, Fold, Heading, Icon, IconButton, Inline, Menu, Row, Stack, Text,
+  Alert, Button, Card, CodeBlock, Fold, Heading, Icon, IconButton, Inline, Menu, Row, Stack, StackedDiff, Text,
 } from '@acorn/plugin-api/ui'
 import { SubagentStateIcon } from './RuntimeStateIcon'
 import { subagentSummary } from './subagentDisplay'
@@ -14,10 +14,14 @@ import { visibleConversationItems } from './conversationItems'
 import { asPlainText } from './copyFormats'
 import AgentRequestCard from './AgentRequestCard'
 import { askedQuestions } from './requestAnswers'
+import { appApprovalOf, approvalSentNote, approvalTarget, sentOptionId } from './appApproval'
 import AgentArtifactCard from './AgentArtifactCard'
 import AgentAttachmentCard from './AgentAttachmentCard'
 import { senderLabel } from './turnSender'
 import { eventTime } from './eventTime'
+import { patchFiles } from './patchFiles'
+import { managedAgentApi } from './managedClient'
+import type { CodexPlanHandoffState } from '../../shared/codexPlanHandoff'
 
 // One event of a session, as a card in the transcript's `Timeline`. Thirteen kinds, and the tool call
 // is the fourteenth: it is a `Slot`, so another plugin may draw it (./toolRendererRegistry.tsx).
@@ -36,6 +40,12 @@ const contextLine = (context: { used: number; size?: number }): string =>
 // entirely has no idea anything was attached.
 export const withoutAttachmentPlaceholders = (text: string): string =>
   text.replace(/^\[Attachment: [^\]\n]+\]$/gm, '').replace(/\n{3,}/g, '\n\n').trim()
+
+// The tags that mark another author's text for the model (a pull request body, a delegated agent's
+// report). They are for the model alone, and the reader never sees their ids.
+export const withoutPastedMarkers = (text: string): string => !text.includes('<pasted_content id=')
+  ? text
+  : text.replace(/^<\/?pasted_content id="[0-9a-f]+">$/gm, '').replace(/\n{3,}/g, '\n\n').trim()
 
 const PLAN_STATUS: Record<AgentPlanEntry['status'], { icon: string; tone: 'muted' | 'accent' | 'ok'; label: string }> = {
   pending: { icon: 'circle', tone: 'muted', label: 'Pending' },
@@ -84,9 +94,26 @@ export default function AgentEventCard(props: {
   /** Bring this request's card to the reader, for the notice or sidebar row that named it. */
   focusRequest?: boolean
   onRequestResolved?: () => void
+  planHandoffState?: CodexPlanHandoffState
+  onPlanImplemented?: () => void
 }) {
   const event = () => props.item.event
   const openChanges = () => dispatchLayout(props.taskId, { type: 'show', pane: 'changes' })
+  const [implementing, setImplementing] = createSignal(false)
+  const [planError, setPlanError] = createSignal('')
+  const implementPlan = async (itemId: string) => {
+    if (implementing()) return
+    setImplementing(true)
+    setPlanError('')
+    try {
+      await managedAgentApi.implementPlan(props.sessionId, itemId)
+      props.onPlanImplemented?.()
+    } catch (caught) {
+      setPlanError(caught instanceof Error ? caught.message : 'Unable to implement this plan.')
+    } finally {
+      setImplementing(false)
+    }
+  }
 
   return (
     <>
@@ -119,7 +146,7 @@ export default function AgentEventCard(props: {
                   <Text emphasis="eyebrow" tip={time().full} tipAt={props.item.createdAt}>{time().short}</Text>
                 </Inline>
                 <AgentMarkdown
-                  text={attachments().length ? withoutAttachmentPlaceholders(message().text) : message().text}
+                  text={withoutPastedMarkers(attachments().length ? withoutAttachmentPlaceholders(message().text) : message().text)}
                   taskId={props.taskId}
                 />
                 <Show when={attachments().length}>
@@ -281,17 +308,61 @@ export default function AgentEventCard(props: {
           </Stack>
         </Card>
       </Show>
+      <Show when={event().type === 'plan_proposal'}>
+        {(_shown) => {
+          const proposal = () => event() as Extract<ReturnType<typeof event>, { type: 'plan_proposal' }>
+          return (
+            <Card pad="sm">
+              <Stack gap="row">
+                <Text emphasis="eyebrow">Proposed plan</Text>
+                <AgentMarkdown text={proposal().text} taskId={props.taskId} />
+                <Show when={props.planHandoffState === 'actionable'}>
+                  <Button variant="solid" size="sm" disabled={implementing()}
+                    onPress={() => void implementPlan(proposal().itemId)}>
+                    {implementing() ? 'Starting implementation…' : 'Implement plan'}
+                  </Button>
+                </Show>
+                <Show when={props.planHandoffState === 'handled'}>
+                  <Text emphasis="muted">Implementation started</Text>
+                </Show>
+                <Show when={planError()}>{(message) => <Alert>{message()}</Alert>}</Show>
+              </Stack>
+            </Card>
+          )
+        }}
+      </Show>
       <Show when={event().type === 'file_change'}>
         {(_shown) => {
           const change = () => event() as Extract<ReturnType<typeof event>, { type: 'file_change' }>
+          // What this one step did, opened in place. Changes answers a different question, what is
+          // different in the worktree now, so it stays one press away inside the fold. A change with
+          // nothing to show, such as one stored before patches were kept, is still just the link.
           return (
-            <Row
-              leading={<Icon name="file-diff" />}
-              meta={<Text emphasis="muted">{change().summary ?? 'Open in Changes'} →</Text>}
-              onPress={openChanges}
-            >
-              Changed {change().path ?? 'files'}
-            </Row>
+            <Show when={change().patch || change().patchArtifactId} fallback={
+              <Row
+                leading={<Icon name="file-diff" />}
+                meta={<Text emphasis="muted">{change().summary ?? 'Open in Changes'} →</Text>}
+                onPress={openChanges}
+              >
+                Changed {change().path ?? 'files'}
+              </Row>
+            }>
+              <Fold label={change().path ? `Changed ${change().path}` : change().summary ?? 'Changed files'} level="sub">
+                <Stack gap="row">
+                  {/* Fold draws its body on first open, so no rows are built for a closed one. */}
+                  <Show when={change().patch} fallback={
+                    <Text emphasis="muted">This diff is too large to show here.</Text>
+                  }>
+                    <Index each={patchFiles(change().path, change().patch ?? '')}>
+                      {(file) => <StackedDiff path={file().path} patch={file().patch} lineNumbers={!change().snippet} />}
+                    </Index>
+                  </Show>
+                  <Inline>
+                    <Button variant="bare" size="sm" onPress={openChanges}>Open in Changes</Button>
+                  </Inline>
+                </Stack>
+              </Fold>
+            </Show>
           )
         }}
       </Show>
@@ -348,6 +419,18 @@ export default function AgentEventCard(props: {
             <Card pad="sm">
               <Stack gap="row">
                 <Heading level={3} eyebrow={asked().kind}>{asked().title}</Heading>
+                {/* Which app the answer was about, by the identifier it is keyed on, and for a saved
+                    grant who holds it. An older row has no approval and reads as it always did. */}
+                <Show when={appApprovalOf(asked().approval)}>
+                  {(approval) => (
+                    <Stack gap="row">
+                      <Text emphasis="muted" wrap>{`App: ${approvalTarget(approval())}`}</Text>
+                      <Show when={approvalSentNote(approval(), sentOptionId(props.request))}>
+                        {(note) => <Text emphasis="muted" wrap>{note()}</Text>}
+                      </Show>
+                    </Stack>
+                  )}
+                </Show>
                 <Show when={askedQuestions(asked(), props.request).length} fallback={
                   <Text emphasis="muted">No answer</Text>
                 }>
@@ -401,7 +484,11 @@ export default function AgentEventCard(props: {
         {/* The turn's own footer: what ended it on the left, how much of the model's context window it
             had used on the right. The figure is stamped onto the item by the fold, because the usage
             that carries it is a separate event and often arrives after this one
-            (./conversationItems.ts § stampTurnContext). */}
+            (./conversationItems.ts § stampTurnContext). A declined turn also says so in words, because
+            a safety refusal otherwise looks like a turn that finished with a short answer. */}
+        <Show when={(event() as Extract<ReturnType<typeof event>, { type: 'turn_completed' }>).stopReason === 'refusal'}>
+          <Alert tone="warn">The model declined this request. Rephrase it, or switch to another model and send it again.</Alert>
+        </Show>
         <Inline spread>
           <Text emphasis="muted">
             Turn complete

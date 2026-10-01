@@ -57,7 +57,7 @@ it('rotates held detection authority repeatedly without overlapping native repla
         const services: FrameServices = {
           fetch: async () => { held.calls.push(binding.nodeId); return { ok: true, status: 200, body: null } },
           fetchBytes: unavailable, subscribe: unavailable, stateGet: unavailable, stateSet: unavailable,
-          toast: unavailable, copy: unavailable, openPane: unavailable, openUrl: unavailable,
+          toast: unavailable, copy: unavailable, openPane: unavailable, openTask: unavailable, openUrl: unavailable,
           frameHasFocus: hasFocus, importerDone: unavailable, importerClose: unavailable, keydown: unavailable,
         }
         return createFrameBridge({ port, binding, context: legacyContext, services, onMisbehaving: unavailable })

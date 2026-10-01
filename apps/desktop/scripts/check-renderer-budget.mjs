@@ -27,15 +27,20 @@ const clientDir = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist
 const manifestPath = resolve(clientDir, '../renderer-manifest.json')
 const modulesPath = resolve(clientDir, '../renderer-modules.json')
 
-// `scripts` is the measured startup figure plus about 5%: 738,695 B on 2026-09-25, after unused kit
-// components stopped riding along (vite.config.ts). It was 1,250,000 B from 2026-08-31, which left
-// 390 KB of slack and let 226 KB of drift through without a word. A change that needs more raises it
-// in the same commit and says why in the commit message.
+// `scripts` is the measured startup figure plus about 5%: 862,188 B on 2026-10-01, after the security
+// changes to frame request ownership and tree validation. Those checks run before plugin content is
+// drawn. The previous 861,000 B ceiling used the 819,628 B measurement from 2026-09-29. It was 776,000 B
+// from 738,695 B measured on 2026-09-25, after unused kit components stopped riding along
+// (vite.config.ts). The growth since is mostly the plugin worker and frame hosts, which
+// host/plugins/distribution.ts loads at boot. It went unseen because CI failed earlier steps for the
+// whole stretch. Before that, 1,250,000 B from 2026-08-31 left 390 KB of slack and let 226 KB of drift
+// through without a word. A change that needs more raises it in the same commit and says why in the
+// commit message.
 //
 // `floor` is a lower bound, not a target. A startup set that small means the check is reading the
 // wrong graph, which is how it went blind in September, so it fails the build rather than passes it.
 const limits = {
-  scripts: 776_000,
+  scripts: 906_000,
   styles: 200_000,
   floor: 100_000,
 }

@@ -5,8 +5,14 @@ import { hasHostCapability } from './hostCapabilities'
 // of the file: a pane gated on a seam group has to disappear on a shell that ships without it, which
 // is a supported product state (../platform/contract.ts pins the no-preview shape).
 
-const disabled = vi.hoisted(() => ({ names: [] as string[] }))
-vi.mock('./nodePlugins', () => ({ disabledNodePlugins: () => disabled.names }))
+const state = vi.hoisted(() => ({ activeNode: 'node-a' as string | null, services: [] as string[], loaded: [] as string[] }))
+vi.mock('./activeNode', () => ({ activeNodeId: () => state.activeNode }))
+vi.mock('../../host/plugins/distribution', () => ({
+  distribution: () => ({ byNode: new Map([['node-a', {}]]) }),
+  pluginServiceAvailableOnNode: (_nodeId: string, pluginId: string) => state.services.includes(pluginId),
+  pluginEnabledOnNode: (_nodeId: string, pluginId: string) => state.loaded.includes(pluginId),
+}))
+vi.mock('./nodePlugins', () => ({ nodePlugins: () => null }))
 
 const host = (acorn: unknown): void => {
   vi.stubGlobal('window', { acorn })
@@ -19,7 +25,9 @@ const previewGroup = {
 
 afterEach(() => {
   vi.unstubAllGlobals()
-  disabled.names = []
+  state.activeNode = 'node-a'
+  state.services = []
+  state.loaded = []
 })
 
 describe('hasHostCapability', () => {
@@ -37,11 +45,16 @@ describe('hasHostCapability', () => {
     expect(hasHostCapability('desktop')).toBe(true)
   })
 
-  it('{ plugin } asks the node roster', () => {
+  it('{ plugin } requires an active node service; { loadedPlugin } requires its accepted selection', () => {
     host(undefined)
-    expect(hasHostCapability({ plugin: 'agents' })).toBe(true)
-    disabled.names = ['agents']
     expect(hasHostCapability({ plugin: 'agents' })).toBe(false)
+    state.services = ['agents']
+    expect(hasHostCapability({ plugin: 'agents' })).toBe(true)
+    state.loaded = ['board']
+    expect(hasHostCapability({ loadedPlugin: 'board' })).toBe(true)
+    state.activeNode = null
+    expect(hasHostCapability({ plugin: 'agents' })).toBe(false)
+    expect(hasHostCapability({ loadedPlugin: 'board' })).toBe(false)
   })
 
   it('{ seam } asks the platform seam, so a shell without preview views never offers the pane', () => {
@@ -58,7 +71,6 @@ describe('hasHostCapability', () => {
   it('an array means all of them', () => {
     host({ desktop: true, platform: 'darwin', preview: previewGroup })
     expect(hasHostCapability(['desktop', { seam: 'preview' }])).toBe(true)
-    disabled.names = ['preview']
     expect(hasHostCapability([{ seam: 'preview' }, { plugin: 'preview' }])).toBe(false)
   })
 })

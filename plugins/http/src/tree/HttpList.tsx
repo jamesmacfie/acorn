@@ -2,10 +2,11 @@
 // the way into the variables editor (docs/http-client.md § Client).
 //
 // A region rather than a column inside one tree. Everything it shares with the detail beside it — the
-// selection, the draft, the armed delete — is in ./panelModel.ts, which one worker holds for both.
+// selection and the draft — is in ./panelModel.ts, which one worker holds for both. The delete
+// confirmation stays on each row so it cannot follow selection to another request.
 import { For, Show } from 'solid-js'
 import {
-  Button, EmptyState, Icon, Inline, SectionHeader, Section, Stack, Text, Toolbar, TreeRow,
+  Button, ConfirmButton, EmptyState, Icon, Inline, SectionHeader, Section, Stack, Text, Toolbar, TreeRow,
 } from '@acorn/plugin-api/ui/tree'
 import type { HttpRequest } from '../shared/model'
 import type { HttpPanelModel } from './panelModel'
@@ -63,7 +64,6 @@ export default function HttpList(props: { model: HttpPanelModel }) {
 // The method chip's colour-per-verb went with the stylesheet: a plugin no longer names a colour, and
 // the kit has no role that means "POST". The verb is still the first thing on the row, in mono.
 function RequestRow(props: { model: HttpPanelModel; row: HttpRequest }) {
-  const armed = () => props.model.armedDelete.armed() === props.row.id
   return (
     <TreeRow
       depth={1}
@@ -80,16 +80,16 @@ function RequestRow(props: { model: HttpPanelModel; row: HttpRequest }) {
         {/* Two clicks, not a dialog. The label changes so the second click is not a surprise, and it is
             the affordance rather than a tooltip because a tooltip is not an answer to "did that do
             anything". */}
-        <Button
+        <ConfirmButton
           variant="bare"
           size="sm"
-          tone={armed() ? 'danger' : undefined}
-          title={armed() ? `Click again to delete "${props.row.name}"` : 'Delete'}
-          label={armed() ? 'Confirm delete' : 'Delete'}
-          onPress={() => void props.model.remove(props.row)}
+          title={`Delete ${props.row.name}`}
+          label="Delete"
+          confirmLabel="Confirm delete"
+          onConfirm={() => void props.model.remove(props.row)}
         >
-          <Show when={armed()} fallback={<Icon name="trash-2" />}>Delete?</Show>
-        </Button>
+          <Icon name="trash-2" />
+        </ConfirmButton>
       </Inline>
     </TreeRow>
   )

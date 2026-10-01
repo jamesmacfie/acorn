@@ -12,7 +12,9 @@ import type {
 import type { AgentDriverGeneratedArtifact } from './types'
 import type { JsonRpcNotification, JsonRpcServerRequest } from './jsonRpcProcess'
 import { formElicitationResponse, normalizeFormElicitation } from './formElicitation'
+import { appApprovalOptions, appApprovalResponse, codexAppApproval } from './codexAppApproval'
 import { webToolTitle } from './webActivity'
+import { diffHunks, hunksText } from './patchText'
 
 type JsonObject = Record<string, unknown>
 
@@ -207,6 +209,24 @@ function toolFromItem(item: JsonObject, completed: boolean): AgentToolCall | nul
   }
 }
 
+// One event per file in a `fileChange` item or a `patchUpdated` notification, both of which carry
+// `changes: [{ path, kind: { type }, diff }]`. An update's `diff` is already hunks. An added or deleted
+// file's `diff` is the file's whole text, so it is turned into hunks here.
+function codexFileChanges(changes: unknown, itemId: string | null): AgentNormalizedEvent[] {
+  if (!Array.isArray(changes)) return []
+  return changes.flatMap((entry) => {
+    const change = asObject(entry)
+    const path = stringValue(change?.path)
+    if (!change || !path) return []
+    const diff = stringValue(change.diff) ?? ''
+    const kind = stringValue(asObject(change.kind)?.type)
+    const patch = kind === 'add' ? hunksText(diffHunks('', diff))
+      : kind === 'delete' ? hunksText(diffHunks(diff, ''))
+      : diff
+    return [{ type: 'file_change' as const, path, patch, ...(itemId ? { changeId: itemId } : {}) }]
+  })
+}
+
 function planEntries(value: unknown): AgentPlanEntry[] {
   if (!Array.isArray(value)) return []
   return value.flatMap((entry, index) => {
@@ -269,19 +289,25 @@ export function normalizeCodexNotification(notification: JsonRpcNotification): A
     case 'item/completed': {
       const item = asObject(params.item)
       if (!item) return []
+      if (method === 'item/completed' && item.type === 'plan') {
+        const itemId = stringValue(item.id)
+        const providerTurnId = stringValue(params.turnId)
+        const text = stringValue(item.text)
+        return itemId && providerTurnId && text?.trim()
+          ? [{ type: 'plan_proposal', itemId, providerTurnId, text }]
+          : []
+      }
       const tool = toolFromItem(item, method === 'item/completed')
-      if (tool) {
-        return [
-          { type: 'tool', tool },
-          ...(method === 'item/completed' && item.type === 'fileChange'
-            ? [{ type: 'file_change' as const, summary: 'Codex updated files.' }]
-            : []),
-        ]
-      }
-      if (method === 'item/completed' && item.type === 'fileChange') {
-        return [{ type: 'file_change', summary: 'Codex updated files.' }]
-      }
-      return []
+      const changes = method === 'item/completed' && item.type === 'fileChange'
+        ? codexFileChanges(item.changes, stringValue(item.id))
+        : []
+      return [
+        ...(tool ? [{ type: 'tool' as const, tool }] : []),
+        // A completed item that names no file still gets a row, so the step is not silently missing.
+        ...(method === 'item/completed' && item.type === 'fileChange' && !changes.length
+          ? [{ type: 'file_change' as const, summary: 'Codex updated files.' }]
+          : changes),
+      ]
     }
     case 'item/commandExecution/outputDelta':
       return [{
@@ -296,13 +322,18 @@ export function normalizeCodexNotification(notification: JsonRpcNotification): A
         },
       }]
     case 'item/fileChange/patchUpdated':
+      return codexFileChanges(params.changes, stringValue(params.itemId))
+    // The whole turn's diff so far, sent again every time it grows. One id per turn, so the thread
+    // keeps only the latest (client/sessions/conversationItems.ts § fileChangeCards).
+    case 'turn/diff/updated': {
+      const turnId = stringValue(params.turnId)
       return [{
         type: 'file_change',
-        path: stringValue(params.path) ?? undefined,
-        patch: stringValue(params.patch) ?? stringValue(params.diff) ?? undefined,
+        patch: stringValue(params.diff) ?? '',
+        summary: 'All changes this turn',
+        ...(turnId ? { changeId: `turn:${turnId}` } : {}),
       }]
-    case 'turn/diff/updated':
-      return [{ type: 'file_change', patch: stringValue(params.diff) ?? '', summary: 'Turn diff updated.' }]
+    }
     case 'turn/plan/updated':
       return [{ type: 'plan', entries: planEntries(params.plan) }]
     case 'thread/tokenUsage/updated': {
@@ -408,11 +439,16 @@ export function normalizeCodexServerRequest(request: JsonRpcServerRequest): Agen
         : []
       return { type: 'request', requestId, kind: 'question', title: 'Codex has a question', questions }
     }
-    case 'mcpServer/elicitation/request':
-      return normalizeFormElicitation(requestId, {
+    case 'mcpServer/elicitation/request': {
+      const event = normalizeFormElicitation(requestId, {
         message: stringValue(request.params.message) ?? 'Input requested',
         requestedSchema: request.params.requestedSchema,
       })
+      const approval = codexAppApproval(request.params)
+      return approval && event.type === 'request'
+        ? { ...event, options: appApprovalOptions(approval), approval }
+        : event
+    }
     default:
       return null
   }
@@ -442,11 +478,15 @@ export function codexServerRequestResponse(request: JsonRpcServerRequest, resolu
         ])),
       }
     }
-    case 'mcpServer/elicitation/request':
+    case 'mcpServer/elicitation/request': {
+      // Rebuilt from the provider's own request, so the answer names the app and scopes it offered.
+      const approval = codexAppApproval(request.params)
+      if (approval) return appApprovalResponse(approval, resolution)
       return formElicitationResponse({
         message: stringValue(request.params.message) ?? 'Input requested',
         requestedSchema: request.params.requestedSchema,
       }, resolution)
+    }
     default:
       return row ?? {}
   }

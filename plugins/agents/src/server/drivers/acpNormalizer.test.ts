@@ -80,6 +80,64 @@ describe('ACP tool call normalization', () => {
   })
 })
 
+// Shapes from Claude's adapter 0.54.1 (dist/tools.js): `Edit` sends its old and new strings when the
+// call starts, `Write` sends the whole file with no old text, and the PostToolUse hook sends one block
+// per real hunk, with the hunk's first line in `locations`.
+describe('an ACP diff becomes a patch', () => {
+  const changes = (update: SessionUpdate) =>
+    normalizeAcpUpdate(update, 'Claude Code').filter((event) => event.type === 'file_change')
+
+  it('marks an edit’s excerpt, whose line numbers are not the file’s', () => {
+    expect(changes({
+      sessionUpdate: 'tool_call',
+      toolCallId: 'toolu_1',
+      title: 'Edit a.ts',
+      content: [{ type: 'diff', path: '/w/a.ts', oldText: 'keep\nold', newText: 'keep\nnew' }],
+      locations: [{ path: '/w/a.ts' }],
+    })).toEqual([{
+      type: 'file_change',
+      path: '/w/a.ts',
+      patch: '@@ -1,2 +1,2 @@\n keep\n-old\n+new',
+      changeId: 'toolu_1',
+      snippet: true,
+      summary: 'Claude Code updated a file.',
+      subagentId: undefined,
+    }])
+  })
+
+  it('reads a missing old text as a new file, numbered from its first line', () => {
+    const [change] = changes({
+      sessionUpdate: 'tool_call',
+      toolCallId: 'toolu_2',
+      title: 'Write b.ts',
+      content: [{ type: 'diff', path: '/w/b.ts', oldText: null, newText: 'one\ntwo\n' }],
+      locations: [{ path: '/w/b.ts' }],
+    })
+    expect(change).toMatchObject({ path: '/w/b.ts', patch: '@@ -0,0 +1,2 @@\n+one\n+two', changeId: 'toolu_2' })
+    expect(change).not.toHaveProperty('snippet')
+  })
+
+  it('places the finished edit’s hunks where they are in the file, as one change', () => {
+    const [change, ...rest] = changes({
+      sessionUpdate: 'tool_call_update',
+      toolCallId: 'toolu_1',
+      content: [
+        { type: 'diff', path: '/w/a.ts', oldText: 'k1\nold', newText: 'k1\nnew\nextra' },
+        { type: 'diff', path: '/w/a.ts', oldText: 'k2\nq', newText: 'k2\nr' },
+      ],
+      locations: [{ path: '/w/a.ts', line: 10 }, { path: '/w/a.ts', line: 40 }],
+    })
+    expect(rest).toEqual([])
+    // The second hunk's old side starts a line earlier, because the first one added a line.
+    expect(change).toMatchObject({
+      path: '/w/a.ts',
+      patch: '@@ -10,2 +10,3 @@\n k1\n-old\n+new\n+extra\n@@ -39,2 +40,2 @@\n k2\n-q\n+r',
+      changeId: 'toolu_1',
+    })
+    expect(change).not.toHaveProperty('snippet')
+  })
+})
+
 // Driven by a real capture rather than hand-written shapes. `_meta.claudeCode` is an extension bag, so
 // hand-writing what we hope is in it only tests our hopes; the fixture is what Claude Code 2.1.241
 // with adapter 0.54.1 actually sent for a two-subagent fan-out.
@@ -603,6 +661,14 @@ describe('Claude web activity, against the captured wire', () => {
     })
     expect(fetch.output).toContain('a session represents a conversation')
   })
+
+  it('keeps the status the page answered with, from the update that carries no request', () => {
+    expect(tools[4].web).toEqual({ status: { code: 200, text: 'OK' } })
+    expect(folded(webCapture.updates[2].toolCallId).web).toMatchObject({
+      action: { type: 'fetch_page', url: 'https://agentclientprotocol.com/protocol/overview' },
+      status: { code: 200, text: 'OK' },
+    })
+  })
 })
 
 describe('Claude web activity, unit cases', () => {
@@ -668,5 +734,57 @@ describe('Claude web activity, unit cases', () => {
         },
       },
     }).web?.results).toEqual([{ url: 'https://example.com/one', title: 'One' }])
+  })
+
+  it('reads a 404 off a fetch that the CLI reports as finished', () => {
+    // The shape Claude Code returned for https://httpbin.org/status/404 on 2026-09-28: not an error,
+    // no page, and the status only in the structured response.
+    expect(toolEvent({
+      sessionUpdate: 'tool_call_update',
+      toolCallId: 'fetch-1',
+      _meta: {
+        claudeCode: {
+          toolName: 'WebFetch',
+          toolResponse: { bytes: 0, code: 404, codeText: 'Not Found', result: 'The server returned HTTP 404 Not Found.', durationMs: 1168, url: 'https://httpbin.org/status/404' },
+        },
+      },
+    }).web).toEqual({ status: { code: 404, text: 'Not Found' } })
+  })
+})
+
+describe('Claude tool loading', () => {
+  const load = (update: Partial<SessionUpdate> & Record<string, unknown>) => toolEvent({
+    toolCallId: 'load-1',
+    ...update,
+    _meta: { claudeCode: { toolName: 'ToolSearch', ...(update._meta as object | undefined) } },
+  } as unknown as SessionUpdate)
+  const fold = (...updates: ReturnType<typeof load>[]) => {
+    const [item] = buildConversationItems(updates.map((tool, at) => ({
+      id: `e${at}`, sessionId: 's', turnId: 't', seq: at + 1, event: { type: 'tool', tool }, searchText: null, createdAt: 0,
+    })) as AgentEventRecord[])
+    if (item.event.type !== 'tool') throw new Error('expected a tool card')
+    return item.event.tool
+  }
+
+  it('names the row after the tools it loaded and has nothing to open onto', () => {
+    const card = fold(
+      load({ sessionUpdate: 'tool_call', title: 'ToolSearch', rawInput: {} }),
+      load({ sessionUpdate: 'tool_call_update', title: 'ToolSearch', rawInput: { query: 'select:WebFetch', max_results: 1 } }),
+      load({ sessionUpdate: 'tool_call_update', _meta: { toolResponse: { matches: ['WebFetch'], query: 'select:WebFetch', total_deferred_tools: 47 } } }),
+      load({ sessionUpdate: 'tool_call_update', status: 'completed', content: [{ type: 'content', content: { type: 'text', text: 'Tool: WebFetch' } }] }),
+    )
+    expect(card).toMatchObject({ title: 'Load tools: WebFetch', status: 'completed' })
+    expect(card.input).toBeUndefined()
+    expect(card.output).toBeUndefined()
+  })
+
+  it('says when nothing matched, and keeps the error of a load that failed', () => {
+    expect(load({ sessionUpdate: 'tool_call_update', _meta: { toolResponse: { matches: [], query: 'jupyter' } } }).title)
+      .toBe('Load tools: none found')
+    expect(load({
+      sessionUpdate: 'tool_call_update',
+      status: 'failed',
+      content: [{ type: 'content', content: { type: 'text', text: 'Tool search unavailable' } }],
+    }).output).toBe('Tool search unavailable')
   })
 })

@@ -37,12 +37,15 @@ export const canUseProviderCredential = (c: Context<AppEnv>): boolean =>
 // (docs/security.md § Credential handling). Without that comparison, a credential handed to task A's
 // agent drives task B's tools. The 'service' scope is unbound, because the node's own loopback calls
 // are not task-specific.
-export const mayActOnTask = (c: Context<AppEnv>, taskId: string): boolean => {
-  const principal = c.get('principal')
+export const principalMayActOnTask = (principal: Principal | null | undefined, taskId: string): boolean => {
   if (!principal) return false
   if (principal.kind === 'device' || principal.scope === 'service') return true
   return !!principal.taskId && principal.taskId === taskId
 }
+
+// Loaded routes carry the verified principal in PluginRequestContext instead of Hono variables.
+export const mayActOnTask = (c: Context<AppEnv>, taskId: string): boolean =>
+  principalMayActOnTask(c.get('principal'), taskId)
 
 // Is this principal confined to a single task? The companion to mayActOnTask, for the two things the
 // per-task boolean cannot express on its own:

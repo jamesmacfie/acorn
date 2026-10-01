@@ -72,7 +72,7 @@ Three of them are newer than the rest and worth naming:
 
 - **`ctx.runs`** — one call, `register({ runs })`, pointing at a `GET` on your own namespace that
   answers `{ runs }`. Register it if your plugin owns work that starts, takes time and ends; core
-  merges every plugin's answer into Settings → Runs. You keep your own table and your own surfaces.
+  merges every plugin's answer into Settings → Run history. You keep your own table and your own surfaces.
 - **`ctx.audit`** — `declare({ id, label })` and `record(action, entry?)`. Declare your verbs in
   `contributions.auditActions` by preference; the host qualifies each as `<yourId>:<action>` and
   refuses a `record` naming one you did not declare. Record what a person reviewing this machine would
@@ -87,6 +87,22 @@ Three of them are newer than the rest and worth naming:
 `projects:read` exposes `ctx.core.projects.byWorkspace(workspaceId)` as well as the project and
 checkout readers. Use it when a plugin must validate that a task-scoped record names a project in the
 same workspace. It does not grant project writes or raw filesystem access.
+
+### Contributing a workflow step
+
+Handle `workflows:step-kind` from your node entrypoint. The host qualifies your entry ID as
+`<yourPluginId>:<entryId>`, which is the `kind` a saved workflow uses. Provide a handler and a
+`describe` with a label, icon, description, field list, and output description. Add a `validate`
+callback only for checks the field rules cannot express. Fields read and write the step's `with`
+object; the handler receives its template strings already rendered. Return `status: 'done'` with
+`structured` for a typed result, or `status: 'failed'` with a clear error. Provide an output schema
+when the result has a stable shape. See [Contributed step kinds](../workflows.md#contributed-step-kinds)
+for the full contract and the HTTP plugin for a working example.
+
+If the handler needs another plugin, declare that plugin in `requires.plugins` and its capability in
+`permissions.node.capabilities`. Resolve the capability inside the handler through
+`ctx.capabilities.get(id)` or `require(id)` so a disabled or reloaded provider cannot leave a cached
+implementation. Keep the step's saved kind ID stable; a rename makes saved workflows unavailable.
 
 ### Contributing findings from an installed plugin
 
@@ -202,6 +218,13 @@ or a throwing sink cannot reach your code. You get a lot for free without callin
 host already times and stamps your routes, your schedules, your hook handlers and every dispatch it
 makes on your behalf.
 
+A value that costs something to take, such as a process list, can ask first, so the work is skipped
+rather than done and thrown away:
+
+```js
+if (ctx.telemetry.enabled()) ctx.telemetry.gauge('processes', (await listProcesses()).length)
+```
+
 Reading the stream is a different thing and a real grant. See § Permissions.
 
 #### When there is no `ctx` in reach
@@ -312,10 +335,10 @@ rather than trusted:
 - **Only acorn's components.** Every node name is one the host knows; anything else draws a labelled
   placeholder and records a row on your plugin's page, which is the forward-compatibility rule applied
   to nodes. `class`, `style`, `innerHTML` and `ref` never cross.
-- **Only acorn's events.** A function survives as a prop only under one of eleven names: `onPress`,
+- **Only acorn's events.** A function survives as a prop only under one of twelve names: `onPress`,
   `onChange`, `onSubmit`, `onSelect`, `onActivate`, `onToggle`, `onOpenChange`, `onExpand`,
-  `onDismiss`, `onPick`, `onRemove`. A raw key, pointer or paste handler is dropped — a terminal host
-  has none of them, and every one of the eleven maps onto a key there.
+  `onDismiss`, `onPick`, `onRemove`, `onConfirm`. A raw key, pointer or paste handler is dropped — a
+  terminal host has none of them, and every one of the twelve maps onto a key there.
 - **No element in a prop, and no callback in one.** A prop is JSON. A component that takes a JSX prop
   in the shell takes data over the wire instead: `Facts` takes strings, `Picker` takes `items`, and a
   split is a `ListDetail` with `ListColumn` and `DetailColumn` children.
@@ -375,11 +398,13 @@ an overlay in, so leave your static preview up there rather than showing a contr
 ### Reaching the bridge
 
 In-repo bundles import `connect()`, `mountFrame()` and `mountTree()` from `@acorn/plugin-api/ui/sdk`,
-and the tree path's nodes and `solidTree()` from `@acorn/plugin-api/ui/tree`. **A hand-written
+and the tree path's nodes and `solidTree()` from `@acorn/plugin-api/ui/tree`. `connect()` is for a
+frame. A tree uses the `bridge` its renderer is mounted with, because the host refuses requests on the
+bundle's shared port, which is what `connect()` returns in a worker. **A hand-written
 `client.js` cannot.** That is a bare specifier with no bundler to resolve it, and the origin would have
 nowhere to serve the resolved file from even if there were. Copying the SDK's source in is not an
-option either: `packages/client-core/src/host/frames/sdk.ts` is TypeScript and imports from
-`@acorn/protocol`, so it has the same problem one level down.
+option either: the implementation behind `packages/client-core/src/host/frames/sdk.ts` is TypeScript
+and imports from `@acorn/protocol`, so it has the same problem one level down.
 
 There are two answers, and which one you want is decided by a question this profile otherwise never
 asks you: **do you have a bundler?**
@@ -396,8 +421,8 @@ parts that are easy to get subtly wrong — abort signals, key-claim narrowing, 
 
 **If you do not**, which is the profile this document is about: **inline the handshake yourself.** It is
 about thirty lines, the protocol is versioned, and `npm create acorn-plugin` writes a working copy of it
-for you. Read `sdk.ts` for the semantics; it stays the reference implementation even when you are
-not importing it.
+for you. Read the SDK's `connection.ts`, `bridgePort.ts`, and `treeChannel.ts` for the semantics when
+you are not importing it.
 
 The sequence (`packages/protocol/src/plugin/bridge.ts`):
 
@@ -470,7 +495,7 @@ messages by hand:
 | `api.getBytes` / `api.postBytes` | The same call for a route whose body is bytes, on its own wire kind `api.bytes`. GET and POST, capped at 12 MiB each way, with an advisory `type` and `filename`. Reach for it instead of base64 whenever you are moving a file: the JSON verbs stringify everything, which costs a third more on the wire and a decode at each end. The path decision is identical, and another plugin's namespace is refused before the body is read. |
 | `events.on` | Subscribe to a channel the manifest declared: one of the shell's four, or your own `plugin:<your-id>:<verb>`. The payload is whatever your node half put on the frame beside `channel`. |
 | `state.get` / `state.set` | Durable storage keyed `(pluginId, key)` by the host, capped at 1 MiB per value. The same `plugin:<id>:*` namespace your node half's `prefs` facet is projected into — this is the supported node-half↔frame state channel. Distinct from the frame's own `localStorage`, which works but is keyed by bundle hash and so rotates with every update. |
-| `ui.toast` / `ui.copy` / `ui.openPane` / `ui.openDestination` / `ui.openUrl` / `ui.done` / `ui.close` | The closed effect set. `openDestination` maps a surface-local manifest declaration to one host target kind; the plugin supplies only resource IDs of at most 300 characters. `openUrl` is `https` only, honoured only while the frame holds focus and at most once per second, and you learn nothing back. `done` is importer-only; `close` is importers and overlays. An overlay a remote tree opened as its companion may pass `close` a JSON result under 64 KiB, which is what resolves that tree's `openOverlay` call; an importer supplying one is refused. |
+| `ui.toast` / `ui.copy` / `ui.openPane` / `ui.openDestination` / `ui.openTask` / `ui.openUrl` / `ui.done` / `ui.close` | The closed effect set. `openDestination` maps a surface-local manifest declaration to one host target kind; the plugin supplies only resource IDs of at most 300 characters. `openTask` goes to a task in the reader's task list. It needs the `core.tasks:read` scope, follows the same focus rule and shares the same one-per-second budget as `openUrl`, and rejects with `not_found` when the list does not have the task. `openUrl` is `https` only, honoured only while the frame holds focus and at most once per second, and you learn nothing back. `done` is importer-only; `close` is importers and overlays. An overlay a remote tree opened as its companion may pass `close` a JSON result under 64 KiB, which is what resolves that tree's `openOverlay` call; an importer supplying one is refused. |
 | `document.read` / `write` / `flush` | Only from a pane whose layout puts a document region beside your region. Nothing about the *editor* crosses — no cursor, no selection, no decorations. |
 | `webview.*` | `navigate`, `back`, `forward`, `reload`, plus navigation and blocked events. Controller-only: you cannot read the page or type into it. |
 | `keys.claim` | Narrow the manifest's declared chord set at runtime. It can never widen it. |

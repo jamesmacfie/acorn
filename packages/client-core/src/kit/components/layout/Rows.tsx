@@ -1,9 +1,9 @@
-import { measureWork } from '../../lib/workTelemetry'
+import { measureWork } from '../../lib/telemetry/workTelemetry'
 import { createEffect, createMemo, For, on, onCleanup, Show, createSignal, type JSX } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { createCollection, type CollectionItem, type ItemProps } from '../../keys/collection'
 import { watchAppearance } from '../../tokens/appearance'
-import { railRowHeight, rowHeight } from '../../lib/metrics'
+import { railRowHeight, rowHeight } from '../../lib/layout/metrics'
 
 // Rows: the run of `Row`s or `TreeRow`s, as a node.
 //

@@ -1,6 +1,7 @@
 import { spawn, type ChildProcess } from 'node:child_process'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createInterface } from 'node:readline'
 import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
@@ -8,6 +9,8 @@ import { fileURLToPath } from 'node:url'
 import { WebSocket } from 'ws'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { HELPER_PROTOCOL, type HelperMethod } from '../src/shell/wire'
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
+import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
 
 // The boot test (docs/testing.md § The desktop boot test): does the shell's world come up.
 //
@@ -28,11 +31,14 @@ import { HELPER_PROTOCOL, type HelperMethod } from '../src/shell/wire'
 // nothing in the boot path is unexercised.
 
 const PKG = resolve(dirname(fileURLToPath(import.meta.url)), '..')
-const STAGING = join(PKG, 'dist/helper')
+const resources = process.env.ACORN_BOOT_RESOURCES
+const STAGING = resources ? join(resources, 'helper') : join(PKG, 'dist/helper')
+const appOrigin = process.platform === 'win32' ? 'http://app.localhost' : 'app://acorn'
 
 const nodeBinary = (): string => {
+  if (process.env.ACORN_BOOT_NODE) return process.env.ACORN_BOOT_NODE
   const triple = /host: (\S+)/.exec(execFileSync('rustc', ['-vV'], { encoding: 'utf8' }))?.[1]
-  return join(PKG, 'src-tauri/binaries', `node-${triple}`)
+  return join(PKG, 'src-tauri/binaries', `node-${triple}${process.platform === 'win32' ? '.exe' : ''}`)
 }
 
 type Ready = { port: number; secret: string; nodeVersion: string; protocol: number }
@@ -47,6 +53,9 @@ let nextId = 1
 const bootMarks: string[] = []
 const markOffsets = new Map<string, number>()
 const markIndex = (label: string): number => bootMarks.indexOf(label)
+const devicePluginId = 'boot-probe'
+const deviceBundle = 'export default {}'
+const deviceHash = createHash('sha256').update(deviceBundle).digest('hex')
 
 // One round trip on the same channel the renderer uses. Not a shared client: the point is that the
 // wire works, so this test speaks it directly rather than through the bridge, which cannot run outside
@@ -70,12 +79,32 @@ beforeAll(async () => {
     if (!existsSync(required)) throw new Error(`${required} is missing — run \`pnpm run stage\` first.`)
   }
   dataDir = mkdtempSync(join(tmpdir(), 'acorn-tauri-boot-'))
+  // The cache predates this launch. The helper must retain device bytes without a node roster, and
+  // return an unacknowledged manifest so the renderer can queue its trust prompt at first paint.
+  const cacheDir = join(dataDir, 'shell', `${ACORN_BASELINE}-plugin-cache`)
+  mkdirSync(cacheDir, { recursive: true })
+  writeFileSync(join(cacheDir, `${deviceHash}.js`), deviceBundle)
+  writeFileSync(join(cacheDir, 'index.json'), JSON.stringify({ version: 1, entries: {
+    [deviceHash]: {
+      pluginId: devicePluginId, version: '1.0.0', bytes: Buffer.byteLength(deviceBundle),
+      nodeIds: [], source: { kind: 'device' }, sourceLabel: 'https://example.com/boot-probe.tgz',
+      manifest: {
+        id: devicePluginId, name: 'Boot Probe', version: '1.0.0', baseline: ACORN_BASELINE,
+        apiVersion: PLUGIN_API_MAJOR, client: 'client.js',
+      },
+      firstSeen: Date.now(), lastSeen: Date.now(),
+    },
+  } }))
 
   // stderr piped rather than inherited, because that is where the boot marks are and the order of
   // them is an assertion below. They are still echoed, so a failing run reads the same as before.
+  // First-run boot must work without host tools such as OpenSSL. Remove every spelling of PATH
+  // because Windows treats environment variable names as case-insensitive.
+  const bootEnv = Object.fromEntries(Object.entries(process.env).filter(([name]) => name.toUpperCase() !== 'PATH'))
   helper = spawn(nodeBinary(), [join(STAGING, 'helper.js')], {
+    cwd: dataDir,
     stdio: ['pipe', 'pipe', 'pipe'],
-    env: { ...process.env, ACORN_PERF: '1' },
+    env: { ...bootEnv, PATH: join(dataDir, 'no-host-tools'), ACORN_PERF: '1' },
   })
   createInterface({ input: helper.stderr! }).on('line', (line) => {
     console.error(line)
@@ -111,13 +140,14 @@ beforeAll(async () => {
       mcpEntry: join(STAGING, 'mcp.js'),
       envFiles: [],
       version: '0.0.0-test',
-      isPackaged: false,
-      appOrigin: 'app://acorn',
+      isPackaged: Boolean(resources),
+      ...(resources ? { bundledPluginsDir: join(resources, 'plugins') } : {}),
+      appOrigin,
     })}\n`,
   )
 
   ready = await readyLine
-  socket = new WebSocket(`ws://127.0.0.1:${ready.port}/helper?secret=${ready.secret}`, { origin: 'app://acorn' })
+  socket = new WebSocket(`ws://127.0.0.1:${ready.port}/helper?secret=${ready.secret}`, { origin: appOrigin })
   await new Promise((done, fail) => {
     socket.once('open', done)
     socket.once('error', fail)
@@ -155,6 +185,12 @@ afterAll(async () => {
 }, 30_000)
 
 describe('the Tauri shell boots its world', () => {
+  it('keeps a cached device bundle untrusted for the renderer to prompt', async () => {
+    const state = await call<{ cached: Record<string, { source?: { kind: string }; manifest?: { id: string } }>; acks: { pluginId: string }[] }>('plugins-state')
+    expect(state.cached[deviceHash]).toMatchObject({ source: { kind: 'device' }, manifest: { id: devicePluginId } })
+    expect(state.acks.some((ack) => ack.pluginId === devicePluginId)).toBe(false)
+  })
+
   it('runs the helper under the pinned Node runtime', () => {
     const pin = JSON.parse(readFileSync(resolve(PKG, '../../node-runtime.json'), 'utf8')) as { version: string }
     // The whole point of shipping a binary: `process.execPath` in the helper is what the node service,
@@ -176,13 +212,12 @@ describe('the Tauri shell boots its world', () => {
 
   it('starts the node within a generous bound', () => {
     // From the ready line to the node answering `service.start`: spawning it, evaluating the service
-    // bundle, and its whole boot to a bound listener. About 270 ms on an M2 Pro. The bound is wide on
-    // purpose, because a timing assertion on a shared CI runner is noisy. It is here to catch a
-    // dependency that adds seconds, and the printed number is the one to read
-    // (apps/node/externals.ts).
+    // bundle, and its whole boot to a bound listener. About 270 ms on an M2 Pro, but Windows CI
+    // measured 2,705-5,126 ms on 2026-10-01. Run this separately from the unit suites and leave
+    // room for shared-runner variation while catching startup regressions.
     const elapsed = markOffsets.get('service.start')! - markOffsets.get('ready line')!
     console.log(`[boot-test] node started ${elapsed}ms after the ready line`)
-    expect(elapsed).toBeLessThan(1_500)
+    expect(elapsed).toBeLessThan(process.platform === 'win32' ? 10_000 : 1_500)
   })
 
   it('adopts the local node into the fleet behind the ready line', async () => {
@@ -207,7 +242,15 @@ describe('the Tauri shell boots its world', () => {
   })
 
   it('refuses a socket without the secret', async () => {
-    const refused = new WebSocket(`ws://127.0.0.1:${ready.port}/helper?secret=wrong`, { origin: 'app://acorn' })
+    const refused = new WebSocket(`ws://127.0.0.1:${ready.port}/helper?secret=wrong`, { origin: appOrigin })
+    await expect(new Promise((done, fail) => {
+      refused.once('open', () => done('opened'))
+      refused.once('error', fail)
+    })).rejects.toThrow()
+  })
+
+  it('refuses a different origin even with the correct secret', async () => {
+    const refused = new WebSocket(`ws://127.0.0.1:${ready.port}/helper?secret=${ready.secret}`, { origin: 'http://example.com' })
     await expect(new Promise((done, fail) => {
       refused.once('open', () => done('opened'))
       refused.once('error', fail)

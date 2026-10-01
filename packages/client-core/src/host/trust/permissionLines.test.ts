@@ -403,7 +403,7 @@ describe('the cross-plugin grants', () => {
 
   it('says the exclusive slot is a choice, with no point kind to name', () => {
     const line = extensionPermissionLine({ kind: 'replaces', target: 'rail.taskList', label: 'Board task list' })
-    expect(line.text).toBe('Offer to replace acorn’s own rail.taskList — you choose in Settings')
+    expect(line.text).toBe('Draws the task list in the rail — you choose in Settings')
     expect(line.key).toBe('extension:replaces:rail.taskList')
   })
 })

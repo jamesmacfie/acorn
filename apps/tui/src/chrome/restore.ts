@@ -11,7 +11,7 @@
 
 import { createEffect } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
-import { createStartupRestore, lastWorkspaceSlice, type PersistedStateSlice, workspaceViewSlice } from '@acorn/client-core/infra/persistence'
+import { createStartupRestore, lastWorkspaceSlice, type PersistedStateSlice, workspaceHistorySlice, workspaceViewSlice } from '@acorn/client-core/infra/persistence'
 import { chosenWorkspace, setPlaceRestored } from './state'
 import type { ShellModel } from './model'
 
@@ -45,7 +45,7 @@ export function installRestore(
   prefs: () => Readonly<Record<string, string>> | undefined,
 ): void {
   const queryClient = useQueryClient()
-  const slices = [workspaceViewSlice, lastWorkspaceSlice(restoreLastWorkspace(model))] as readonly PersistedStateSlice<unknown>[]
+  const slices = [workspaceViewSlice, workspaceHistorySlice, lastWorkspaceSlice(restoreLastWorkspace(model))] as readonly PersistedStateSlice<unknown>[]
   const pass = createStartupRestore({
     queryClient,
     prefs,

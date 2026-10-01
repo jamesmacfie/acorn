@@ -7,7 +7,7 @@
 // set of plugins and this is one plugin's surface.
 import type { CompiledCoreServices, CoreServices } from '../core'
 import type { Env } from '../bindings'
-import type { NodePermissions, PluginAgentToolDescriptor, PluginAuditActionDescriptor, PluginCommandDescriptor, PluginContextSectionDescriptor, PluginExtensionDescriptor, PluginExtensionPointDescriptor, PluginFrameSurface, PluginHarnessDescriptor, PluginScheduleDescriptor, PluginTaskCheckDescriptor } from '../plugins/manifest'
+import type { NodePermissions, PluginAgentToolDescriptor, PluginAuditActionDescriptor, PluginCommandDescriptor, PluginContextSectionDescriptor, PluginExtensionDescriptor, PluginExtensionPointDescriptor, PluginCustomAgentDescriptor, PluginFrameSurface, PluginHarnessDescriptor, PluginScheduleDescriptor, PluginTaskCheckDescriptor } from '../plugins/manifest'
 import { scopeCapabilities, scopeCore } from '../plugins/permissions'
 import { registerAgentTool } from '../agentTools/registry'
 import { registerDataSource, registerDataSourceDiscovery } from '../dataSources/registry'
@@ -19,6 +19,7 @@ import { registerNodeAction } from '../nodeActions'
 import { registerNodeProvider } from '../nodeProviders/registry'
 import { registerRunSource } from '../runs/registry'
 import { AGENTS_HARNESS_REGISTRY, qualifiedHarnessId } from './harnesses'
+import { AGENTS_CUSTOM_AGENT_REGISTRY } from './customAgents'
 import { registerTaskCheck } from './taskChecks'
 import { registerSearchProvider } from './search'
 import { declareAuditAction, qualifiedAuditAction, recordAudit } from '../audit'
@@ -86,6 +87,8 @@ export type LoadedPluginBinding = {
   // And its managed agent harnesses, by the same route. The delivery seam also needs `dir` below, since
   // an adapter entry is a path inside the installed package.
   harnesses?: readonly PluginHarnessDescriptor[]
+  // And its custom agents, by the same route (./customAgents.ts).
+  customAgents?: readonly PluginCustomAgentDescriptor[]
   agentTools?: readonly PluginAgentToolDescriptor[]
   contextSections?: readonly PluginContextSectionDescriptor[]
   destinations?: readonly NonNullable<PluginFrameSurface['destinations']>[number][]
@@ -274,6 +277,16 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
           id: qualifiedHarnessId(plugin, harness.id),
           pluginId: plugin,
         })
+        recordUndo(() => handle.dispose())
+      },
+    },
+    // The same handover for a saved agent, and the id is minted the same way for the same reason: it
+    // is copied onto every session started from the agent.
+    customAgents: {
+      register: (agent) => {
+        const registry = options.capabilities.get(AGENTS_CUSTOM_AGENT_REGISTRY)
+        if (!registry) return
+        const handle = registry.register({ ...agent, id: qualifiedHarnessId(plugin, agent.id), pluginId: plugin })
         recordUndo(() => handle.dispose())
       },
     },
@@ -517,7 +530,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
   // every member below, and a logger that throws after a reload breaks the one rule telemetry has:
   // it never fails the thing it describes (docs/telemetry.md § Never fail what you measure). A
   // leaked handle writing a few more lines under a plugin's own name is the cheaper failure.
-  for (const group of ['routes', 'tools', 'schedules', 'dataSources', 'nodeActions', 'runs', 'taskChecks', 'search', 'harnesses', 'contextSections', 'audit', 'extensionPoints', 'hooks', 'providers', 'events', 'storage'] as const) {
+  for (const group of ['routes', 'tools', 'schedules', 'dataSources', 'nodeActions', 'runs', 'taskChecks', 'search', 'harnesses', 'customAgents', 'contextSections', 'audit', 'extensionPoints', 'hooks', 'providers', 'events', 'storage'] as const) {
     // Absent for the members a tier does not get (`undefined as never`), which is why this is a typeof
     // check per member rather than a list of names.
     const members = ctx[group] as Record<string, unknown> | undefined

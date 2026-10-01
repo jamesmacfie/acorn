@@ -89,5 +89,5 @@ export function createDocumentWorker<Request extends { id: number }, Response ex
     retire(current, 'degraded', 'reset')
     current = fresh()
   }
-  return { request, reset }
+  return { request, reset, workerCount: () => current.worker ? 1 : 0 }
 }

@@ -74,22 +74,21 @@ it('owns one modern bridge per slot, preserves props updates and reuses the warm
   c.release()
 })
 
-it('keeps equivalent legacy leases alive, isolates foreign authority and retains no legacy idle worker', async () => {
+it('gives equivalent and foreign legacy slots separate workers and retires each immediately', async () => {
   factory(false)
   const bundle = hash()
   const a = acquire(bundle), sibling = acquire(bundle), foreign = acquire(bundle, 'b')
   a.mount('a', 'panel', {}); sibling.mount('sibling', 'panel', {}); foreign.mount('foreign', 'panel', {})
   await settle()
-  expect(sandboxes).toHaveLength(2)
-  expect(a.bridgePort('a')).toBe(sibling.bridgePort('sibling'))
+  expect(sandboxes).toHaveLength(3)
+  expect(a.bridgePort('a')).not.toBe(sibling.bridgePort('sibling'))
   expect(foreign.bridgePort('foreign')).not.toBe(sibling.bridgePort('sibling'))
   a.release()
-  expect(sandboxes[0]!.closed).toBe(0)
+  expect(sandboxes.map((sandbox) => sandbox.closed)).toEqual([1, 0, 0])
   sibling.release()
-  expect(sandboxes[0]!.closed).toBe(1)
-  expect(sandboxes[1]!.closed).toBe(0)
+  expect(sandboxes.map((sandbox) => sandbox.closed)).toEqual([1, 1, 0])
   foreign.release()
-  expect(sandboxes[1]!.closed).toBe(1)
+  expect(sandboxes.map((sandbox) => sandbox.closed)).toEqual([1, 1, 1])
 })
 
 it('drops an admitted old-slot completion rather than publishing into a reused slot id', async () => {
@@ -152,7 +151,7 @@ it('ignores a captured error callback from a retired worker generation', async (
   owner.release(); replacement.release()
 })
 
-it('bounds retired classification hints and reuses live legacy authority after hint eviction', async () => {
+it('bounds retired classification hints and derives legacy mode from live slot workers after hint eviction', async () => {
   factory(false)
   const liveBundle = hash(), retiredBundle = hash()
   const active = acquire(liveBundle)
@@ -164,22 +163,22 @@ it('bounds retired classification hints and reuses live legacy authority after h
   for (const owner of historical) owner.release()
   const before = sandboxes.length
   const equivalent = acquire(liveBundle)
-  expect(sandboxes).toHaveLength(before)
-  expect(equivalent.bridgePort()).toBe(active.bridgePort())
+  expect(sandboxes).toHaveLength(before + 1)
+  expect(equivalent.bridgePort()).not.toBe(active.bridgePort())
   const foreign = acquire(liveBundle, 'foreign')
   expect(foreign.bridgePort()).not.toBeNull()
   expect(foreign.bridgePort()).not.toBe(active.bridgePort())
   const reprobe = acquire(retiredBundle)
   // This retired old hash no longer has a hint, so classification runs again without privileged
-  // bootstrap handles. Existing live contexts above needed no duplicate detection worker.
+  // bootstrap handles. Existing live contexts above classify their new slot workers without a detector.
   expect(reprobe.bridgePort()).toBeNull()
   await settle()
   expect(reprobe.bridgePort()).not.toBeNull()
   active.release(); equivalent.release(); foreign.release(); reprobe.release()
 })
 
-it.each(['spawn', 'bridge-channel', 'tree-channel', 'bridge', 'transfer'] as const)(
-  'retires every admitted startup handle exactly once when %s fails', (step) => {
+it.each(['spawn', 'bridge-channel', 'tree-channel', 'transfer'] as const)(
+  'retires every admitted startup handle exactly once when %s fails', async (step) => {
     const failure = new Error(`failed ${step}`)
     const closes: ReturnType<typeof vi.fn>[] = []
     let channels = 0
@@ -200,10 +199,16 @@ it.each(['spawn', 'bridge-channel', 'tree-channel', 'bridge', 'transfer'] as con
       if (step === 'spawn') throw failure
       return { onerror: null, postMessage: () => { if (step === 'transfer') throw failure }, terminate } as unknown as Worker
     })
-    expect(() => acquireTreeWorker({ pluginId: 'probe', hash: hash(), onRefused: () => {}, connect: (port) => {
-      if (step === 'bridge') throw failure
+    const refused = vi.fn()
+    const handle = acquireTreeWorker({ pluginId: 'probe', hash: hash(), onRefused: refused, connect: (port) => {
       return { dispose: () => { port.close(); throw new Error('cleanup must preserve original startup failure') } }
-    } })).toThrow(failure)
+    } })
+    const failed = vi.fn()
+    handle.transport('failed').onFailed(failed)
+    await settle()
+    expect(refused).toHaveBeenCalledWith(failure.message)
+    expect(failed).toHaveBeenCalledWith(failure.message)
+    handle.release()
     for (const close of closes) expect(close).toHaveBeenCalledTimes(1)
     expect(terminate).toHaveBeenCalledTimes(step === 'spawn' ? 0 : 1)
   },
@@ -237,9 +242,10 @@ it('supports multiple slots on one owner within the same early reservation budge
   expect(() => acquire(bundle, 'foreign')).toThrow('512')
   owner.unmount('slot-0')
   const sibling = acquire(bundle)
-  expect(sandboxes).toHaveLength(1)
-  owner.release(); sibling.release()
+  expect(sandboxes).toHaveLength(513)
   expect(sandboxes[0]!.closed).toBe(1)
+  owner.release(); sibling.release()
+  expect(sandboxes.every((sandbox) => sandbox.closed === 1)).toBe(true)
 })
 
 it.each([true, false])('owns only the latest pre-ready props (modern=%s)', async (modern) => {
@@ -249,10 +255,10 @@ it.each([true, false])('owns only the latest pre-ready props (modern=%s)', async
   for (let value = 0; value < 1000; value++) owner.mount('slot', 'panel', { value })
   await settle()
   const mounts = () => sandboxes[0]!.seen.filter((message) => (message as { kind: string }).kind === 'tree:mount')
-  expect(mounts()).toHaveLength(modern ? 0 : 1)
+  expect(mounts()).toHaveLength(0)
   sandboxes[0]!.tree.postMessage({ kind: 'tree:ready', version: 1, entries: ['panel'] })
   await settle()
-  expect(mounts()).toHaveLength(modern ? 1 : 2)
+  expect(mounts()).toHaveLength(1)
   expect(mounts().at(-1)).toMatchObject({ props: { value: 999 } })
   owner.release()
 })
@@ -279,4 +285,34 @@ it('keeps the existing failure deadline while native construction is deferred an
   await Promise.resolve()
   expect(owner.bridgePort('slot')).toBeNull()
   owner.release()
+})
+
+it('retires both modern mount endpoints when scoped bridge construction fails without killing siblings', async () => {
+  factory()
+  const channels: { port1: ReturnType<typeof vi.fn>; port2: ReturnType<typeof vi.fn> }[] = []
+  vi.stubGlobal('MessageChannel', function () {
+    const channel = new NativeMessageChannel()
+    const port1 = vi.fn(channel.port1.close.bind(channel.port1))
+    const port2 = vi.fn(channel.port2.close.bind(channel.port2))
+    channel.port1.close = port1
+    channel.port2.close = port2
+    channels.push({ port1, port2 })
+    return channel
+  })
+  const bundle = hash()
+  const failed = vi.fn()
+  const owner = acquireTreeWorker({ pluginId: 'probe', hash: bundle, context, onRefused: failed, connect: () => { throw new Error('bridge construction failed') } })
+  const sibling = acquire(bundle)
+  const failures: string[] = []
+  owner.transport('failed').onFailed((reason) => failures.push(reason))
+  owner.mount('failed', 'panel', {})
+  sibling.mount('live', 'panel', {})
+  await settle()
+  expect(failures).toEqual(['bridge construction failed'])
+  expect(channels[2]!.port1).toHaveBeenCalledOnce()
+  expect(channels[2]!.port2).toHaveBeenCalledOnce()
+  expect(owner.bridgePort('failed')).toBeNull()
+  expect(sibling.bridgePort('live')).not.toBeNull()
+  expect(sandboxes[0]!.closed).toBe(0)
+  owner.release(); sibling.release()
 })

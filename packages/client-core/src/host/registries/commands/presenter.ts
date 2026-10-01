@@ -1,4 +1,4 @@
-import type { Disposable } from '../../../kit/lib/registry'
+import type { Disposable } from '../../../kit/lib/state/registry'
 
 // Who draws a command that cannot be run.
 //

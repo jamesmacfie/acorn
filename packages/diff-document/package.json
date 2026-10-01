@@ -1,0 +1,21 @@
+{
+  "name": "@acorn/diff-document",
+  "version": "1.0.0",
+  "description": "The segmented diff document both runtimes read: patch parsing, bounded segments, projection counts, and search, with no I/O.",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./document": "./src/public.ts"
+  },
+  "scripts": {
+    "lint": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "gitdiff-parser": "^0.3.1"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.11"
+  }
+}

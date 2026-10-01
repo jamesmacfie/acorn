@@ -1,4 +1,4 @@
-import { Registry } from '../../../kit/lib/registry'
+import { Registry } from '../../../kit/lib/state/registry'
 import { openPane } from '../commands/clientEvents'
 import { paneAvailable, paneContribution } from './panes'
 import { openRefPanel } from './refPanels'
@@ -197,9 +197,8 @@ export function splitRefTokens(text: string, prefixes: ReadonlyMap<string, strin
 // minted here, and read by the Solid-rendered variant so both spellings cannot drift.
 export const REF_LINK_CLASS = 'ref-inline-link'
 
-/** The same split, applied to already-rendered HTML. github's PR bodies are `innerHTML` from GitHub's
- * sanitised markdown, opaque to the framework, and that consumer shape recurs anywhere a plugin renders
- * someone else's HTML, so it is a host helper rather than one plugin's DOM trick. */
+/** The same split, applied to provider HTML after the kit has copied only safe nodes into the host
+ * DOM. That subtree is opaque to Solid, so the host walks its text nodes here. */
 export function linkifyRefs(root: HTMLElement, prefixes: ReadonlyMap<string, string>): void {
   if (!prefixes.size) return
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)

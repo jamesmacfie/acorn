@@ -39,6 +39,8 @@ export function Fold(props: {
    *  must not open the fold. */
   actions?: JSX.Element
   level?: 'pane' | 'group' | 'sub'
+  /** Align child content with the fold header. The terminal host otherwise indents it two cells. */
+  contentIndent?: 'default' | 'none'
   /** Draw the whole section inset behind a left rule, so it reads as owned by what sits above it.
    *  A subagent's card under its parent's stream is the case that wanted this. */
   nested?: boolean
@@ -56,7 +58,7 @@ export function Fold(props: {
   // Closed transcripts can hold thousands of nested cards. Build them on first open, then retain
   // them so closing a section does not discard drafts, selection, or a child's own disclosure state.
   const visited = createMemo((previous) => previous || open(), false)
-  // Read once, for the reason on Row's parts (../primitives.tsx): testing a slot and then inserting it
+  // Read once, for the reason on Row's parts (./Row.tsx): testing a slot and then inserting it
   // ran the caller's JSX twice, and a transcript's tool card built its whole status line twice.
   const meta = children(() => props.meta)
   const actions = children(() => props.actions)

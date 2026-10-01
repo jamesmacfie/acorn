@@ -1,5 +1,5 @@
 export { PluginCache } from './pluginCache.ts'
 export type { BundleFetcher } from './pluginCache.ts'
-export { NO_DISCLOSURE, decisionSchema, devGrantSchema, disclosureSchema, putSchema } from './pluginRequests.ts'
+export { NO_DISCLOSURE, decisionSchema, devGrantSchema, disclosureSchema, putSchema, installSchema, removeSchema } from './pluginRequests.ts'
 export type { PluginsState } from './pluginRequests.ts'
 export { PluginTrustStore } from './pluginTrustStore.ts'

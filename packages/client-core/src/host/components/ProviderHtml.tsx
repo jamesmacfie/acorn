@@ -1,5 +1,6 @@
 import { createEffect } from 'solid-js'
 import { linkifyRefs } from '../registries/panes/contentLinks'
+import { sanitizedHtmlFragment } from '../../kit/lib/rendering/sanitizedHtml'
 
 // HTML a provider already rendered, drawn in the host's markdown skin.
 //
@@ -9,8 +10,8 @@ import { linkifyRefs } from '../registries/panes/contentLinks'
 // handling. That pass is host machinery — `linkifyRefs` lives in a registry and `ui/` may not import
 // one (docs/frontend.md § Registries and plugins) — which is why this is here and not in the kit.
 //
-// The trust boundary is unchanged: the string is whatever the provider's own renderer produced and
-// this writes it verbatim, exactly as the three hand-written `.ui-markdown` divs it replaces did.
+// Provider-rendered HTML is still untrusted. The kit copies only safe formatting and HTTPS links
+// into fresh nodes before this host-owned reference pass sees the DOM.
 
 export default function ProviderHtml(props: {
   html: string
@@ -25,7 +26,7 @@ export default function ProviderHtml(props: {
   onText?: (text: string) => void
 }) {
   let root: HTMLDivElement | undefined
-  // Assigning innerHTML replaces every text node underneath, which throws away the reader's
+  // Replacing the subtree throws away every text node underneath, which throws away the reader's
   // selection, and a prop is a getter rather than a memo, so this effect re-runs whenever anything
   // upstream ticks. Compare before writing (ui/Markdown.tsx has the same guard for the same reason).
   let written: string | undefined
@@ -36,7 +37,7 @@ export default function ProviderHtml(props: {
     if (!root) return
     if (html !== written) {
       written = html
-      root.innerHTML = html
+      root.replaceChildren(sanitizedHtmlFragment(html))
     }
     // Idempotent: the pass never descends into an anchor, so a re-run over already-linked content
     // finds nothing left to do.

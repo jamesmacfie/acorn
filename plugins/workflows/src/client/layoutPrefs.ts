@@ -4,7 +4,7 @@
 // saved to a repository is read on machines with different screens, and a committed x/y is noise in
 // every diff (docs/workflows.md § Authoring). They live under `plugin:workflows:layout:<defId>` in
 // device storage instead, which is the one guarded accessor for a per-device scrap and is a no-op on
-// a host with nowhere to keep one (client-core kit/lib/deviceStorage.ts).
+// a host with nowhere to keep one (client-core kit/lib/state/deviceStorage.ts).
 //
 // The graph view reads and writes these (./editor/GraphView.tsx), 400 ms after a drag stops. The two
 // operations that are easy to forget are here rather than there: a rename has to carry the position

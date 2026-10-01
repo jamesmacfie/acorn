@@ -76,6 +76,26 @@ describe('preview URL runtime', () => {
     })
   })
 
+  it('reports which tasks have preview set up without resolving a URL', async () => {
+    const service = core(null, null)
+    let targets: { id: string; command: string; running: boolean; urlCommand?: string }[] = [{ id: 'web', command: 'pnpm dev', running: false }]
+    const runtime = createPreviewUrlRuntime(service, () => ({ targets: async () => ({ targets, errors: [], layouts: [] }) } as never), vi.fn())
+    await expect(runtime.configured()).resolves.toEqual({ 'task-1': false, 'task-2': false })
+
+    // A URL the target discovers once it runs counts before it runs, so the pane is not tied to the
+    // dev server being up.
+    targets = [{ ...targets[0]!, urlCommand: 'echo http://localhost:3000' }]
+    await expect(runtime.configured()).resolves.toEqual({ 'task-1': true, 'task-2': true })
+    expect(service.proc.runProcess).not.toHaveBeenCalled()
+  })
+
+  it('counts project configuration and a picked recipe URL as set up', async () => {
+    const runtime = createPreviewUrlRuntime(core('script', 'pnpm preview-url'), () => undefined, vi.fn())
+    await expect(runtime.configured()).resolves.toEqual({ 'task-1': true, 'task-2': false })
+    await runtime.selectRecipe('task-2', 'http://localhost:9000')
+    await expect(runtime.configured()).resolves.toEqual({ 'task-1': true, 'task-2': true })
+  })
+
   it('runs script configuration on the node with task identity and uses its last output line', async () => {
     const service = core('script', 'pnpm preview-url')
     const runtime = createPreviewUrlRuntime(service, () => undefined, vi.fn())

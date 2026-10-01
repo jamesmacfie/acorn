@@ -2,7 +2,7 @@ import { render } from 'solid-js/web'
 import { Show } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { Alert } from '../../kit/components/primitives'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 import { commandRegistry, type CommandContribution, type CommandExecutionContext } from '../registries/commands/commands'
 import type { CommandSession } from '../registries/commands/sessionStore'
 import { createCommandPaletteView } from './paletteView'
@@ -170,6 +170,7 @@ describe('the keyboard', () => {
           return () => { emit = () => {} }
         },
         onWillQuit: () => () => {},
+        openConfigFile: async () => {},
       },
     })
     register(leaf('cmd.one', { title: 'One' }))

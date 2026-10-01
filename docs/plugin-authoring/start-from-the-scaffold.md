@@ -8,9 +8,17 @@ Create a package with a remote tree:
 npm create acorn-plugin my-widget
 ```
 
-The scaffold writes a manifest, a node entrypoint, a route module, and one client file. It inlines the
-bridge handshake and tree protocol, so no build step is required. The default example contributes a
-card to `agents:tool-card` and an annotation to `changes:diff-line`. Remove contributions you do not need.
+The scaffold writes a manifest, a node entrypoint, a route module, and one client file. It
+inlines the bridge handshake and tree protocol, so no build step is required. Open a task and run
+**Open My widget** from the command palette to show its pane. The button calls the Node route at
+`/v1/p/my-widget/greeting` through the bridge and updates the host-rendered tree with its answer.
+The route lives in `server/routes.js`, leaving the entrypoint focused on registration. Reload starts
+a fresh Node worker and re-evaluates its imported modules too.
+
+To extend another plugin's UI, declare an `extensions` entry for one of its published extension points.
+For example, `agents:tool-card` accepts a tree, while `changes:diff-line` accepts route-backed
+annotations. Add those after the plugin's own pane works. See [The manifest](./the-manifest.md) for
+the contribution shapes and host checks.
 
 For browser-specific UI, generate a frame instead:
 
@@ -55,6 +63,7 @@ follow [Install a package](./installing-a-hand-written-package.md).
 
 ## Scaffold verification
 
-`packages/create-acorn-plugin/index.test.ts` checks the API major, schema URL, manifest, and node
-entrypoint. It also type-checks the generated node files outside the repository against the standalone
-declarations. This catches dependencies that resolve only inside the workspace.
+The scaffold tests check the API major, schema URL, manifest, Node route reload, and both client
+handshakes. They also run the packed scaffold and type-check its Node files outside the repository
+against the packed declaration package. This catches dependencies that resolve only inside the
+workspace.

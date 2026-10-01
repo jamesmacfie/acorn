@@ -9,10 +9,15 @@ import {
   Button,
   DetailColumn,
   Icon,
+  IconButton,
   Inline,
   Link,
   ListColumn,
   ListDetail,
+  Menu,
+  Modal,
+  ModalActions,
+  ModalBody,
   Stack,
   Tabs,
   Text,
@@ -22,6 +27,7 @@ import {
 import { AuthoringConversation } from '@acorn/plugin-api/ui/data-sources'
 import { workflowsSurfacePath } from '../surfacePath'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
+import { unavailableCatalogKind, unavailableStepKindMessage } from '../../shared/stepKindAvailability'
 import { workflowApi } from '../workflowsClient'
 import {
   addNode,
@@ -40,7 +46,7 @@ import {
   type DraftSelection,
 } from './draft'
 import { createDraftStore, defRefKey, SOURCE_GLYPH } from './draftStore'
-import FilePublicationReview from './FilePublicationReview'
+import FileConflicts from './FileConflicts'
 import GraphView from './GraphView'
 import JsonTab from './JsonTab'
 import NodeInspector from './NodeInspector'
@@ -147,6 +153,9 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
     store.catalog()?.kinds.find((entry) => entry.id === kind)?.describe ?? BUILTIN_STEP_DESCRIPTIONS[kind]
   const missing = createMemo(() => missingRequiredFields(draft().def, describeFor))
   const problems = () => [...missing(), ...store.problems()]
+  const runnableDefinition = () => store.ref()?.source === 'database' ? store.publishedDef() : draft().def
+  const missingRunKind = () => runnableDefinition()?.steps.find((step) => unavailableCatalogKind(step.kind ?? 'agent', store.catalog()))
+  const missingDraftKind = () => draft().def.steps.find((step) => unavailableCatalogKind(step.kind ?? 'agent', store.catalog()))
   const counts = createMemo(() => {
     const def = draft().def
     const roots = def.steps.filter((step, index) => (step.after ? step.after.length === 0 : index === 0)).length
@@ -242,6 +251,57 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
     await queryClient.invalidateQueries({ queryKey: ['workflow-schedules'] })
   }
 
+  // Which review dialog is open. Preparing a publication or an export is what opens one, and the
+  // prepared operation outlives the dialog: dismissing it keeps the review on the node, and the strip
+  // under the header offers it again.
+  const [review, setReview] = createSignal<'publication' | 'files'>()
+  const pendingPublication = () => {
+    const operation = store.publication()
+    return operation && operation.state !== 'complete' ? operation : undefined
+  }
+  const pendingFiles = () => {
+    const operation = store.fileOperation()
+    return operation && operation.state !== 'complete' ? operation : undefined
+  }
+  const openPublication = async (): Promise<void> => {
+    await store.preparePublication()
+    if (pendingPublication()) setReview('publication')
+    else if (pendingFiles()) setReview('files')
+  }
+  const openExport = async (): Promise<void> => {
+    await store.prepareExport()
+    if (pendingFiles()) setReview('files')
+  }
+  const confirmPublication = async (): Promise<void> => {
+    await publish()
+    const operation = store.publication()
+    if (operation?.state !== 'complete') return
+    setReview(undefined)
+    const landed = operation.landed.find(write => write.kind === 'workflow' && write.id === store.ref()?.id)
+    toast(landed ? `Published revision ${landed.revision}.` : 'Published.')
+  }
+  const confirmFiles = async (): Promise<void> => {
+    await store.publishFiles()
+    if (store.fileOperation()?.state !== 'complete') return
+    setReview(undefined)
+    if (store.ref()?.source === 'database') toast('Exported. The files are not committed yet.')
+  }
+  const discardReview = async (): Promise<void> => {
+    await (review() === 'files' ? store.discardFiles() : store.discardPublication())
+    setReview(undefined)
+  }
+
+  const isDatabase = () => store.ref()?.source === 'database'
+  const runDisabled = () => (isDatabase() && !store.publishedRevision()) || !!missingRunKind()
+
+  // One bar: where you are and what this definition is on the left, what you can do to it on the
+  // right. The tab strip under it is only the choice of view. The actions used to sit in the tab
+  // strip as nine buttons of four different weights, which pushed the tabs into a corner and left
+  // Delete one unconfirmed press from the rest.
+  //
+  // Three actions stay on the bar because they are the loop: edit, publish, run. Save is there too,
+  // though the draft autosaves, because a reader who wants it written now should not have to wait.
+  // The rest are rare and go in the overflow menu.
   const header = (
     <Toolbar variant="actions" size="sm">
       <Link onPress={() => navigate(projectPath(props.projectId))}>← Workflows</Link>
@@ -255,14 +315,60 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       <Text emphasis="strong">{draft().def.name}</Text>
       <Show when={sourceGlyph()}>{(glyph) => <Icon name={glyph().icon} title={glyph().title} />}</Show>
       <Show when={!store.readOnly()}><Badge tone={store.dirty() ? 'warn' : undefined}>{store.saveState()}</Badge></Show>
+      {/* Where a run starts from. This badge replaced a warning strip that sat over every new draft
+          saying the same thing; an unpublished draft is a normal state, not a problem. */}
+      <Show when={isDatabase() && !store.loading()}>
+        <Badge>{store.publishedRevision() ? `Published r${store.publishedRevision()}` : 'Not published'}</Badge>
+      </Show>
       <ToolbarSpacer />
+      <Show when={canGenerate()}>
+        <Button size="sm" disabled={store.busy()} opens="dialog" onPress={() => setAuthoringOpen(true)}>
+          <Icon name="sparkles" /> AI authoring
+        </Button>
+      </Show>
+      <IconButton icon="undo-2" label="Undo" disabled={!store.canUndo()} onPress={store.undo} />
+      <IconButton icon="redo-2" label="Redo" disabled={!store.canRedo()} onPress={store.redo} />
+      <Show
+        when={!store.readOnly()}
+        fallback={<Button size="sm" busy={store.busy()} onPress={() => void copyToDatabase()}>Copy to database</Button>}
+      >
+        <Button size="sm" disabled={!canSave()} busy={store.busy()} onPress={() => void save()}>Save</Button>
+        <Button size="sm" opens="dialog" disabled={store.busy() || store.conflicts().length > 0} onPress={() => void openPublication()}>Publish…</Button>
+      </Show>
+      <Button
+        size="sm"
+        variant="solid"
+        opens="dialog"
+        disabled={runDisabled()}
+        tip={isDatabase() && !store.publishedRevision() ? 'Publish this workflow before running it.' : undefined}
+        onPress={run}
+      >
+        Run…
+      </Button>
+      <Show when={isDatabase() && !store.readOnly()}>
+        <Menu
+          ariaLabel="More workflow actions"
+          placement="bottom-end"
+          trigger={({ open, toggle }) => (
+            <IconButton icon="ellipsis" label="More actions" opens="menu" expanded={open()} onPress={toggle} />
+          )}
+        >
+          {(menu) => (
+            <>
+              <Menu.Item context={menu} disabled={!store.publishedRevision()} onSelect={schedule}>Schedule…</Menu.Item>
+              <Menu.Item context={menu} disabled={store.busy() || !store.publishedRevision()} onSelect={() => void openExport()}>
+                Export to repository…
+              </Menu.Item>
+              <Menu.Item context={menu} tone="danger" confirm="Delete this workflow?" disabled={store.busy()} onSelect={() => void remove()}>
+                Delete
+              </Menu.Item>
+            </>
+          )}
+        </Menu>
+      </Show>
     </Toolbar>
   )
 
-  // The strip is its own row rather than an item in the bar above, so the three tabs start at the pane's
-  // left edge and the buttons sit at its right. In the bar they were one item among ten, which packed
-  // the lot into the far corner and left half the width empty. `actions` is the kit's own trailing slot
-  // and both hosts draw it (client-core kit/components/layout/Tabs.tsx).
   const tabs = (
     <Tabs
       idPrefix="workflows-editor"
@@ -270,28 +376,6 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       active={tab()}
       tabs={[{ id: 'nodes', label: 'Outline' }, { id: 'graph', label: 'Graph' }, { id: 'json', label: 'Code' }]}
       onChange={(id) => setTab(id as 'nodes' | 'graph' | 'json')}
-      actions={(
-        <>
-          <Show when={canGenerate()}><Button size="sm" disabled={store.busy()} onPress={() => setAuthoringOpen(value => !value)}>AI authoring</Button></Show>
-          <Button size="sm" variant="bare" disabled={!store.canUndo()} onPress={store.undo}>Undo</Button>
-          <Button size="sm" variant="bare" disabled={!store.canRedo()} onPress={store.redo}>Redo</Button>
-          <Show
-            when={!store.readOnly()}
-            fallback={<Button size="sm" busy={store.busy()} onPress={() => void copyToDatabase()}>Copy to database</Button>}
-          >
-            <Button size="sm" variant="solid" disabled={!canSave()} busy={store.busy()} onPress={() => void save()}>Save</Button>
-            <Button size="sm" disabled={store.busy() || store.conflicts().length > 0} onPress={() => void store.preparePublication()}>Review publication</Button>
-            <Show when={store.ref()?.source === 'database'}>
-              <Button size="sm" disabled={store.busy() || !store.publishedRevision()} onPress={() => void store.prepareExport()}>Export to repository</Button>
-              <Button size="sm" variant="bare" disabled={store.busy()} onPress={() => void remove()}>Delete</Button>
-            </Show>
-          </Show>
-          <Show when={store.ref()?.source === 'database'}>
-            <Button size="sm" disabled={!store.publishedRevision()} onPress={schedule}>Schedule…</Button>
-          </Show>
-          <Button size="sm" disabled={store.ref()?.source === 'database' && !store.publishedRevision()} onPress={run}>Run published…</Button>
-        </>
-      )}
     />
   )
 
@@ -332,21 +416,11 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       {header}
       {tabs}
       <Show when={store.message()}>{(message) => <Alert tone="warn">{message()}</Alert>}</Show>
-      <Show when={store.ref()?.source === 'database' && !store.publishedRevision()}>
-        <Alert tone="warn" title="Run unavailable">
-          <Inline gap="inline" wrap>
-            <Text>Publish this workflow before running it.</Text>
-            <Button size="sm" disabled={store.busy()} onPress={() => void store.preparePublication()}>Review publication</Button>
-          </Inline>
-        </Alert>
-      </Show>
-      <Show when={store.ref()?.source === 'database' && store.publishedRevision() && store.dirty()}>
-        <Alert title={`Run uses published revision ${store.publishedRevision()}.`}>
-          Publish the current draft changes when they are ready to run.
-        </Alert>
+      <Show when={isDatabase() && missingDraftKind()}>
+        {(step) => <Alert tone="warn" title="Run unavailable">{unavailableStepKindMessage(step().kind ?? 'agent')}</Alert>}
       </Show>
       <Show when={store.loadError()}><Alert tone="danger">{String(store.loadError())}</Alert></Show>
-      <FilePublicationReview store={store} />
+      <FileConflicts store={store} />
       <For each={store.conflicts()}>{conflict => <Alert tone="warn" title={`Conflict: ${conflict.path}`}>
         <Stack gap="row">
           <Text wrap>{`Your change: ${JSON.stringify(conflict.local)}`}</Text>
@@ -357,28 +431,69 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
           </Inline>
         </Stack>
       </Alert>}</For>
-      <Show when={store.publication()}>{operation => <Alert tone={operation().state === 'complete' ? undefined : 'warn'} title={`Publication: ${operation().state}`}>
-        <Stack gap="row">
-          <For each={operation().writes}>{write => <Text>{`${write.name} · ${write.kind} · revision ${write.kind === 'workflow' ? write.revision : write.plan.intendedRevision}`}</Text>}</For>
-          <Show when={operation().consumers.length}><Text wrap>{`Affected: ${operation().consumers.map(consumer => consumer.name).join(', ')}`}</Text></Show>
-          <Show when={operation().error}><Text wrap>{operation().error}</Text></Show>
-          <Show when={operation().landed.length}><Text wrap>{`Published: ${operation().landed.map(write => `${write.kind} ${write.id} revision ${write.revision}`).join(', ')}`}</Text></Show>
-          <Show when={operation().state !== 'complete'}><Button disabled={store.busy()} onPress={() => void publish()}>{operation().state === 'prepared' ? 'Publish reviewed set' : 'Resume publication'}</Button></Show>
-          <Show when={operation().state !== 'complete' && !operation().landed.length}><Button disabled={store.busy()} onPress={() => void store.discardPublication()}>Discard review</Button></Show>
-        </Stack>
-      </Alert>}</Show>
+      {/* A review prepared earlier, or one dismissed without deciding. It stays on the node until it is
+          published or discarded, so the reader is told it is there rather than finding it by accident. */}
+      <Show when={!review() && (pendingPublication() || pendingFiles())}>
+        <Alert title="A review is waiting">
+          <Inline gap="inline" wrap>
+            <Text>{pendingPublication() ? 'This workflow has a publication that was not finished.' : 'An export to the repository was not finished.'}</Text>
+            <Button size="sm" opens="dialog" onPress={() => setReview(pendingPublication() ? 'publication' : 'files')}>Review</Button>
+          </Inline>
+        </Alert>
+      </Show>
+      <Show when={review() === 'publication' && pendingPublication()}>{operation => (
+        <Modal title="Publish workflow" size="md" onDismiss={() => setReview(undefined)}>
+          <ModalBody>
+            <Stack gap="row">
+              <Text wrap>Runs and schedules use the published revision. These definitions will be written:</Text>
+              <For each={operation().writes}>{write => <Text>{`${write.name} · ${write.kind} · revision ${write.kind === 'workflow' ? write.revision : write.plan.intendedRevision}`}</Text>}</For>
+              <Show when={operation().consumers.length}><Text wrap>{`Also affects: ${operation().consumers.map(consumer => consumer.name).join(', ')}`}</Text></Show>
+              <Show when={operation().landed.length}><Text wrap>{`Already published: ${operation().landed.map(write => `${write.kind} ${write.id} revision ${write.revision}`).join(', ')}`}</Text></Show>
+              <Show when={operation().error ?? store.message()}>{text => <Alert tone="warn">{text()}</Alert>}</Show>
+            </Stack>
+          </ModalBody>
+          <ModalActions>
+            <Show when={!operation().landed.length}><Button variant="bare" disabled={store.busy()} onPress={() => void discardReview()}>Discard review</Button></Show>
+            <Button variant="solid" busy={store.busy()} onPress={() => void confirmPublication()}>{operation().state === 'prepared' ? 'Publish' : 'Resume publishing'}</Button>
+          </ModalActions>
+        </Modal>
+      )}</Show>
+      <Show when={review() === 'files' && pendingFiles()}>{operation => (
+        <Modal title={isDatabase() ? 'Export to repository' : 'Publish to file'} size="md" onDismiss={() => setReview(undefined)}>
+          <ModalBody>
+            <Stack gap="row">
+              <Text wrap>These files will be written to the working tree and left uncommitted. Files already in the workspace are kept.</Text>
+              <For each={operation().writes}>{write => <Text wrap>{`${write.landed ? 'Written' : 'Pending'}: ${write.path}`}</Text>}</For>
+              <For each={operation().setup}>{item => <Text wrap>{item}</Text>}</For>
+              <Show when={operation().error ?? store.message()}>{text => <Alert tone="warn">{text()}</Alert>}</Show>
+            </Stack>
+          </ModalBody>
+          <ModalActions>
+            <Show when={!operation().writes.some(write => write.landed)}><Button variant="bare" disabled={store.busy()} onPress={() => void discardReview()}>Discard review</Button></Show>
+            <Button variant="solid" busy={store.busy()} onPress={() => void confirmFiles()}>{operation().state === 'prepared' ? 'Write files' : 'Resume writing files'}</Button>
+          </ModalActions>
+        </Modal>
+      )}</Show>
       <Show when={authoringOpen() && workspaceId()}>
-        <AuthoringConversation
-          endpoint="/v1/p/workflows/defs/authoring/turn"
-          target="workflow"
-          targetId={store.ref()?.id ?? `new:${props.projectId}`}
-          scope={{ workspaceId: workspaceId(), projectId: props.projectId }}
-          baseRevision={store.revision()}
-          base={draft().def}
-          label={draft().def.name}
-          disabled={store.readOnly() || store.busy()}
-          onApply={applyProposal}
-        />
+        {/* A dialog, not a strip over the editor: the conversation is a side trip from the draft, and
+            drawn inline it pushed the outline half off the screen. It keeps its thread on the device,
+            so closing it and opening it again picks up where it was. */}
+        <Modal title={`AI authoring · ${draft().def.name}`} size="lg" onDismiss={() => setAuthoringOpen(false)}>
+          <ModalBody>
+            <AuthoringConversation
+              bare
+              endpoint="/v1/p/workflows/defs/authoring/turn"
+              target="workflow"
+              targetId={store.ref()?.id ?? `new:${props.projectId}`}
+              scope={{ workspaceId: workspaceId(), projectId: props.projectId }}
+              baseRevision={store.revision()}
+              base={draft().def}
+              label={draft().def.name}
+              disabled={store.readOnly() || store.busy()}
+              onApply={applyProposal}
+            />
+          </ModalBody>
+        </Modal>
       </Show>
       <Show when={store.readOnly()}>
         <Show

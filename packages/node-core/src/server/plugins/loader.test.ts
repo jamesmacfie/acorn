@@ -1,12 +1,19 @@
 import { createHash } from 'node:crypto'
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PLUGIN_API_MAJOR } from './manifest'
-import { installedPluginInfo, loadExternalPlugins, pluginInstallDir, readClientBundle } from './loader'
+import { installedPluginInfo, loadExternalPlugins, pluginInstallDir, readClientBundle, snapshotActivePlugin } from './loader'
 import { PluginMigrationsError } from './migrations'
+import { Hono } from 'hono'
+import { testGate } from '../../testkit/auth'
+import type { AppEnv, Principal } from '../middleware/auth'
+import type { Env } from '../bindings'
+import type { PluginFetchHandler } from '../pluginHost/types'
+import { servePluginFetch } from '../pluginHost/fetchRoute'
 
 // A minimal ESM node half. Written as source rather than bundled, because the loader's contract is
 // "default-export something shaped like a NodePlugin from an ESM module" and nothing more.
@@ -144,22 +151,178 @@ describe('loaded-plugin migration ownership', () => {
     const dir = install(
       'keeper',
       manifest('keeper', { migrations: './migrations' }),
-      `export default { name: 'keeper', init: (ctx) => ctx.storage.open().$client.exec('CREATE TABLE realm_proof (id INTEGER)') }\n`,
+      `export default { name: 'keeper', init: (ctx) => ctx.storage.open().$client.exec('INSERT INTO realm_proof VALUES (1)') }\n`,
     )
-    chain(join(dir, 'migrations'))
-    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
-    expect(failures).toEqual([])
-    // The worker supplies storage itself; these facets are present on a real host context.
-    await loaded[0].plugin.init({ routes: {}, schedules: {}, providers: {}, events: {} } as never)
-    await loaded[0].plugin.dispose?.()
+    const migrations = chain(join(dir, 'migrations'))
+    writeFileSync(join(migrations, 'meta/_journal.json'), JSON.stringify({ version: '7', dialect: 'sqlite', entries: [
+      { idx: 0, version: '6', when: 1, tag: '0000_keeper', breakpoints: true },
+    ] }))
+    writeFileSync(join(migrations, '0000_keeper.sql'), 'CREATE TABLE realm_proof (id INTEGER)')
+    const databasePath = join(pluginInstallDir(root), 'keeper.sqlite')
+    for (let lifetime = 0; lifetime < 2; lifetime++) {
+      const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+      expect(failures).toEqual([])
+      // The worker supplies storage itself; these facets are present on a real host context.
+      try {
+        await loaded[0].plugin.init({ routes: {}, schedules: {}, providers: {}, events: {} } as never)
+        for (const suffix of ['', '-wal', '-shm']) expect(statSync(databasePath + suffix).mode & 0o777).toBe(0o600)
+      } finally { await loaded[0].plugin.dispose?.() }
+      // Closing the last handle retires its sidecars. Reload must recreate the exact granted files
+      // without granting their parent directory or losing permission on an aliased data root.
+      expect(existsSync(databasePath + '-wal')).toBe(false)
+      expect(existsSync(databasePath + '-shm')).toBe(false)
+    }
 
-    const db = new DatabaseSync(join(pluginInstallDir(root), 'keeper.sqlite'))
+    const db = new DatabaseSync(databasePath)
     expect(db.prepare("SELECT name FROM sqlite_master WHERE name = 'realm_proof'").get()).toBeTruthy()
+    expect(db.prepare('SELECT COUNT(*) AS count FROM realm_proof').get()).toEqual({ count: 2 })
     db.close()
   })
 })
 
 describe('the isolated node realm', () => {
+  it('uses package-scoped bootstrap grants while retaining plugin import provenance', async () => {
+    const metadata = fileURLToPath(new URL('../../../node_modules/@acorn/protocol/package.json', import.meta.url))
+    const policy = import.meta.resolve('@acorn/protocol/plugin/nodeBuiltins.ts')
+    install('bootstrap-alias', manifest('bootstrap-alias'), `
+      import { readFileSync } from 'node:fs'
+      let policyImportDenied = false
+      try { await import(${JSON.stringify(policy)}) } catch { policyImportDenied = true }
+      export default {
+        name: 'bootstrap-alias', init() {},
+        bootstrapPackage: JSON.parse(readFileSync(${JSON.stringify(metadata)}, 'utf8')).name,
+        runtimeGrants: process.execArgv,
+        policyImportDenied,
+      }
+    `)
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+    expect(failures).toEqual([])
+    try {
+      expect(loaded[0].plugin).toMatchObject({
+        bootstrapPackage: '@acorn/protocol', policyImportDenied: true,
+      })
+      const grants = (loaded[0].plugin as { runtimeGrants?: string[] }).runtimeGrants
+      expect(grants).toEqual(expect.any(Array))
+      expect(grants).not.toContain(`--allow-fs-read=${fileURLToPath(new URL('../../../node_modules', import.meta.url))}`)
+    } finally { await loaded[0].plugin.dispose?.() }
+  })
+
+  it.each<Principal>([
+    { kind: 'device', userId: 'synthetic-owner', deviceId: 'synthetic-device' },
+    { kind: 'internal', scope: 'service', userId: 'synthetic-owner' },
+    { kind: 'internal', scope: 'task', userId: 'synthetic-owner', taskId: 'synthetic-task' },
+  ])('forwards the verified $kind principal without transport credentials to the worker', async principal => {
+    install('request-reader', manifest('request-reader'), `export default {
+      name: 'request-reader', init(ctx) {
+        ctx.routes.fetch(async (request, context) => Response.json({
+          headers: Object.fromEntries(request.headers), principal: context.principal,
+          body: await request.text(), url: request.url,
+        }))
+      }
+    }`)
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+    expect(failures).toEqual([])
+    let handler!: PluginFetchHandler
+    try {
+      await loaded[0].plugin.init({ routes: { fetch: (fetch: PluginFetchHandler) => { handler = fetch } }, schedules: {}, providers: {}, events: {} } as never)
+      const app = new Hono<AppEnv>().use('*', ...testGate(principal)).post('/v1/p/request-reader/echo', c =>
+        servePluginFetch(c, { pluginId: 'request-reader', mount: '/v1/p/request-reader', fetch: handler }))
+      const response = await app.fetch(new Request('http://acorn.test/v1/p/request-reader/echo?mode=one', {
+        method: 'POST', body: 'synthetic request body', headers: {
+          Authorization: 'Bearer synthetic-device-secret', 'X-Acorn-Internal': 'synthetic-internal-secret',
+          Cookie: 'synthetic-cookie=secret', 'Proxy-Authorization': 'synthetic-proxy-secret', 'X-Application': 'retained',
+        },
+      }), {} as Env)
+      expect(response.status).toBe(200)
+      const seen = await response.json() as { headers: Record<string, string>; principal: Principal; body: string; url: string }
+      expect(seen.principal).toEqual(principal)
+      expect(seen.body).toBe('synthetic request body')
+      expect(seen.url).toBe('http://acorn.test/echo?mode=one')
+      expect(seen.headers['x-application']).toBe('retained')
+      for (const name of ['authorization', 'x-acorn-internal', 'cookie', 'proxy-authorization']) expect(seen.headers).not.toHaveProperty(name)
+    } finally { await loaded[0].plugin.dispose?.() }
+  })
+
+  it('refuses non-file dependency schemes while retaining package-local imports', async () => {
+    const dir = install('local-import', manifest('local-import'), `import { marker } from './local.js'; export default { name: 'local-import', marker, init() {} }`)
+    writeFileSync(join(dir, 'dist/local.js'), 'export const marker = 42')
+    install('non-file-import', manifest('non-file-import'), `import 'data:text/javascript,export default 42'; ${BUNDLE('non-file-import')}`)
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+    expect(loaded[0].plugin).toMatchObject({ name: 'local-import', marker: 42 })
+    expect(failures).toEqual([expect.objectContaining({ id: 'non-file-import', reason: expect.stringContaining('dependencies must be package files or approved builtins') })])
+    await loaded[0].plugin.dispose?.()
+  })
+
+  it('uses the same family policy for ESM, CommonJS, and builtin lookup', async () => {
+    install('classified', manifest('classified'), `
+      import { getBuiltinModule as namedAccessor } from 'node:process'
+      const require = globalThis[Symbol.for('acorn.plugin.safe-require.v1')]
+      const names = ['node:dns/promises', '_http_client', 'node:inspector/promises']
+      const denied = []
+      for (const name of names) {
+        try { require(name); denied.push(false) } catch { denied.push(true) }
+        try { process.getBuiltinModule(name); denied.push(false) } catch { denied.push(true) }
+        try { namedAccessor(name); denied.push(false) } catch { denied.push(true) }
+        try { await import(name); denied.push(false) } catch { denied.push(true) }
+      }
+      export default { name: 'classified', denied, init() {} }
+    `)
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+    expect(failures).toEqual([])
+    expect(loaded[0].plugin).toMatchObject({ denied: Array(12).fill(true) })
+    await loaded[0].plugin.dispose?.()
+  })
+
+  it('retains dependency provenance when a previously loaded package file is removed', async () => {
+    const dir = install('removed-parent', manifest('removed-parent'), `import { loadLater } from './later.js';
+      export default { name: 'removed-parent', init(ctx) {
+        ctx.routes.fetch(async () => {
+          try { await loadLater(); return Response.json({ allowed: true }) }
+          catch (error) { return Response.json({ error: error.message }) }
+        })
+      } }
+    `)
+    const later = join(dir, 'dist/later.js')
+    writeFileSync(later, "export const loadLater = () => import('data:text/javascript,export default 42')")
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+    expect(failures).toEqual([])
+    let handler!: PluginFetchHandler
+    try {
+      await loaded[0].plugin.init({ routes: { fetch: (fetch: PluginFetchHandler) => { handler = fetch } }, schedules: {}, providers: {}, events: {} } as never)
+      rmSync(later)
+      const response = await handler(new Request('http://acorn.test/'), {} as never)
+      expect(await response.json()).toEqual({ error: expect.stringContaining('dependencies must be package files or approved builtins') })
+    } finally { await loaded[0].plugin.dispose?.() }
+  })
+
+  it('applies wildcard network grants to one subdomain label', async () => {
+    install(
+      'networked',
+      manifest('networked', { permissions: { node: { net: ['*.ingest.us.sentry.io'] } } }),
+      `const accepted = (host) => {
+  try {
+    const pending = fetch('https://' + host + '/', { signal: AbortSignal.abort() })
+    void pending.catch(() => {})
+    return true
+  } catch { return false }
+}
+export default {
+  name: 'networked',
+  allowed: accepted('o42.ingest.us.sentry.io'),
+  parent: accepted('ingest.us.sentry.io'),
+  nested: accepted('other.o42.ingest.us.sentry.io'),
+  lookalike: accepted('o42.ingest.us.sentry.io.attacker.test'),
+  init() {},
+}
+`,
+    )
+
+    const { loaded, failures } = await loadExternalPlugins(root, { builtins: [] })
+
+    expect(failures).toEqual([])
+    expect(loaded[0].plugin).toMatchObject({ allowed: true, parent: false, nested: false, lookalike: false })
+  })
+
   it('does not inherit undeclared node environment values', async () => {
     vi.stubEnv('SESSION_ENC_KEY', 'must-not-leak')
     install(
@@ -271,7 +434,9 @@ export default { name: ${JSON.stringify(name)}, init() {} }
       manifest('socket-client', { permissions: { node: { sockets: true } } }),
       `const require = globalThis[Symbol.for('acorn.plugin.safe-require.v1')]
 const dns = require('node:dns')
-export default { name: 'socket-client', marker: typeof dns.lookup, init() {} }
+const promises = process.getBuiltinModule('node:dns/promises')
+const imported = await import('node:dns/promises')
+export default { name: 'socket-client', marker: typeof dns.lookup, promises: typeof promises.lookup, imported: typeof imported.lookup, init() {} }
 `,
     )
 
@@ -279,6 +444,8 @@ export default { name: 'socket-client', marker: typeof dns.lookup, init() {} }
 
     expect(failures).toEqual([])
     expect((loaded[0].plugin as { marker?: unknown }).marker).toBe('function')
+    expect(loaded[0].plugin).toMatchObject({ promises: 'function', imported: 'function' })
+    await loaded[0].plugin.dispose?.()
   })
 })
 
@@ -334,6 +501,16 @@ describe('the installed enumeration', () => {
     expect(served!.hash).not.toBe(installed[0].client!.hash)
   })
 
+  it('keeps an active declaration and its bytes together after the package changes', async () => {
+    const dir = install('ntfy', manifest('ntfy', { client: './dist/client.js' }), BUNDLE('ntfy'), 'export default { version: 1 }')
+    const { installed } = await loadExternalPlugins(root, { builtins: [] })
+    const active = await snapshotActivePlugin(installed[0]!)
+    writeFileSync(join(dir, 'dist', 'client.js'), 'export default { version: 2 }')
+    expect(active.identity).toMatchObject({ version: '1.0.0', activation: 'node', client: { hash: sha256('export default { version: 1 }') } })
+    expect(new TextDecoder().decode(active.bundle!.bytes)).toBe('export default { version: 1 }')
+    expect((await readClientBundle(installed, 'ntfy'))?.hash).toBe(sha256('export default { version: 2 }'))
+  })
+
   it('has nothing to serve for an unknown id or a package with no client half', async () => {
     install('plain', manifest('plain'), BUNDLE('plain'))
     const { installed } = await loadExternalPlugins(root, { builtins: [] })
@@ -367,7 +544,7 @@ describe('declared frame contributions', () => {
     // Present-and-empty rather than absent, so no adapter on the device has to distinguish "declared
     // none" from "did not know about this kind".
     expect(installedPluginInfo(installed[0]).contributions)
-      .toEqual({ frames: [], sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], agentTools: [], contextSections: [] })
+      .toEqual({ frames: [], sources: [], slots: [], commands: [], cliCommands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], customAgents: [], agentTools: [], contextSections: [] })
   })
 
   it('keeps keys it does not understand, so a manifest written for a newer acorn still loads', async () => {

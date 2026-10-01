@@ -18,12 +18,12 @@ const { paneRegistry } = await import('../registries/panes/panes')
 const { projectImporterRegistry } = await import('../registries/sources/projectImporters')
 const { projectSurfaceRegistry } = await import('../registries/panes/projectSurfaces')
 const { refPanelRegistry } = await import('../registries/panes/refPanels')
-const { settingsRegistry } = await import('../registries/shell/settings')
+const { settingsCategoryOf, settingsRegistry, settingsScopeOf } = await import('../registries/shell/settings')
 const { uiSlotRegistry } = await import('../registries/extensionPoints/slots')
 const { _resetPluginDistribution, _seedPluginDistribution } = await import('../plugins/distribution')
 const { surfaceFailures } = await import('../plugins/surfaceFailures')
 const { openPluginOverlay, closePluginOverlay } = await import('./overlays')
-const { exclusiveSlotOffers, exclusiveSlotRegistry, resolveExclusiveSlot, noteExclusiveSlotFailure, exclusiveSlotFailed } = await import('../registries/extensionPoints/exclusiveSlots')
+const { exclusiveSlotOffers, exclusiveSlotRegistry, registerCoreExclusiveSlot, resolveExclusiveSlot, noteExclusiveSlotFailure, exclusiveSlotFailed } = await import('../registries/extensionPoints/exclusiveSlots')
 const { _resetFrameContributions, frameBindingFor, syncFrameContributions } = await import('./register')
 
 // The frame host pass (docs/plugins.md § Frame contribution kind).
@@ -116,6 +116,59 @@ describe('syncFrameContributions', () => {
     })
   })
 
+  it('places a settings frame by its declared group, scope and glyph, and in Features when it declares none', () => {
+    seedTrusted(row('board', {
+      frames: [
+        surface({ target: 'settings', id: 'board-plain' }),
+        surface({ target: 'settings', id: 'board-agents', category: 'agents', settingsScope: 'device', glyph: 'bot' }),
+        // A newer node's vocabulary, or a group only core fills: the page stays, in its default place.
+        surface({ target: 'settings', id: 'board-odd', category: 'plugins', settingsScope: 'galaxy' }),
+        surface({ target: 'settings', id: 'board-workspace', group: 'workspace' }),
+      ],
+    }))
+    syncFrameContributions()
+
+    const placed = (id: string) => {
+      const page = settingsRegistry.get(id)!
+      return { category: settingsCategoryOf(page), scope: settingsScopeOf(page), icon: page.icon, follows: page.followsNodeSwitcher }
+    }
+    expect(placed('board-plain')).toEqual({ category: 'features', scope: 'node', icon: 'puzzle', follows: undefined })
+    expect(placed('board-agents')).toEqual({ category: 'agents', scope: 'device', icon: 'bot', follows: undefined })
+    expect(placed('board-odd')).toEqual({ category: 'features', scope: 'node', icon: 'puzzle', follows: undefined })
+    expect(placed('board-workspace').scope).toBe('workspace')
+  })
+
+  it('carries a settings frame\'s sections and keywords, and drops a list past the limit rather than the page', () => {
+    const words = Array.from({ length: 17 }, (_, index) => `word${index}`)
+    seedTrusted(row('board', {
+      frames: [
+        surface({ target: 'settings', id: 'board-search', keywords: ['cards'], sections: [{ id: 'columns', label: 'Columns', keywords: ['lanes'] }] }),
+        // Bytes a newer node accepted: this build's registry would refuse the page outright.
+        surface({ target: 'settings', id: 'board-long', keywords: words }),
+      ],
+    }))
+    syncFrameContributions()
+
+    expect(settingsRegistry.get('board-search')).toMatchObject({ keywords: ['cards'], sections: [{ id: 'columns', label: 'Columns', keywords: ['lanes'] }] })
+    expect(settingsRegistry.get('board-long')?.keywords).toBeUndefined()
+  })
+
+  it('keeps a settings frame\'s rail switches only for the plugin\'s own sources', () => {
+    seedTrusted(row('board', {
+      sources: [{ id: 'board', label: 'Board', glyph: 'puzzle', order: 50, items: '/v1/p/board/items' }],
+      frames: [
+        surface({ target: 'settings', id: 'board-settings', railSourceVisibility: ['board', 'home', 'github'] }),
+        surface({ target: 'settings', id: 'board-foreign', railSourceVisibility: ['github'] }),
+      ],
+    } as Partial<PluginContributions>))
+    syncFrameContributions()
+
+    // The node already reported the other two; the page stays and draws the one switch it may.
+    expect(settingsRegistry.get('board-settings')?.railSourceVisibility).toEqual(['board'])
+    expect(settingsRegistry.get('board-foreign')).toBeDefined()
+    expect(settingsRegistry.get('board-foreign')?.railSourceVisibility).toBeUndefined()
+  })
+
   it('carries a loaded task pane\'s archived-preview opt in into the pane registry', () => {
     seedTrusted(row('board', {
       frames: [surface({ target: 'pane', id: 'board-history', readsArchived: true })],
@@ -132,11 +185,13 @@ describe('syncFrameContributions', () => {
     seedTrusted(row('board', {
       frames: [surface({ target: 'coreSlot', id: 'board-rail', coreSlot: 'rail.taskList' })],
     }))
+    const core = registerCoreExclusiveSlot('rail.taskList', () => null)
     syncFrameContributions()
     expect(ids().panes).toEqual([])
     expect(exclusiveSlotOffers('rail.taskList').map((entry) => entry.pluginId)).toEqual(['board'])
-    expect(resolveExclusiveSlot('rail.taskList', undefined)).toBeNull()
+    expect(resolveExclusiveSlot('rail.taskList', undefined).pluginId).toBe('core')
     expect(resolveExclusiveSlot('rail.taskList', 'board')?.pluginId).toBe('board')
+    core.dispose()
   })
 
   it('refuses a coreSlot surface naming a core surface this shell has no host for', () => {
@@ -457,19 +512,19 @@ describe('unchanged declaration reconciliation', () => {
     syncFrameContributions()
     seedTrusted(row('first', { frames: [surface({ target: 'pane', id: 'two' })] }), row('second', { frames: [surface({ target: 'pane', id: 'one' })] }))
     syncFrameContributions()
-    expect(ids().panes.sort()).toEqual(['first.two', 'second.one'])
+    expect(ids().panes.sort()).toEqual(['one', 'two'])
     expect(surfaceFailures().filter((failure) => failure.pluginId === 'first' || failure.pluginId === 'second')).toEqual([])
   })
 
   it('retries a collision after its former provider is removed without another roster change', () => {
-    const external = paneRegistry.register({ id: 'second.shared', label: 'External', glyph: 'puzzle', order: 0, component: () => null })
+    const external = paneRegistry.register({ id: 'shared', label: 'External', glyph: 'puzzle', order: 0, component: () => null })
     const second = row('second', { frames: [surface({ target: 'pane', id: 'shared' })] })
     seedTrusted(second)
     syncFrameContributions()
     expect(surfaceFailures().some((failure) => failure.pluginId === 'second')).toBe(true)
     external.dispose()
     syncFrameContributions()
-    expect(ids().panes).toEqual(['second.shared'])
+    expect(ids().panes).toEqual(['shared'])
     expect(surfaceFailures().filter((failure) => failure.pluginId === 'second')).toEqual([])
   })
 
@@ -480,7 +535,7 @@ describe('unchanged declaration reconciliation', () => {
     syncFrameContributions()
     const pane = paneRegistry.entries()[0]
     const offer = exclusiveSlotRegistry.entries()[0]
-    noteExclusiveSlotFailure('rail.taskList', 'provider')
+    for (let attempt = 0; attempt < 3; attempt++) noteExclusiveSlotFailure('rail.taskList', 'provider')
     expect(exclusiveSlotFailed('rail.taskList', 'provider')).toBe(true)
     syncFrameContributions()
     expect(exclusiveSlotFailed('rail.taskList', 'provider')).toBe(false)

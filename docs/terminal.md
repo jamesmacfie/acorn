@@ -108,7 +108,7 @@ their byte limits.
 
 **Output crosses the wire as bytes.** `term:out` is the one channel on the authenticated socket that is
 not JSON. A frame is a fixed-width session id and then the pseudo-terminal's bytes verbatim
-(`packages/protocol/src/ws.ts` § The one binary frame), built once per broadcast rather than once per
+(`packages/protocol/src/transport/ws.ts` § The one binary frame), built once per broadcast rather than once per
 attached socket, and forwarded through the desktop broker without being read. The ids are UUIDs; an id
 that does not fit the field falls back to the JSON frame, so a stream owner with a different naming
 scheme still works. A binary frame carries no `seq` and consumes none, because sequence numbers belong
@@ -127,7 +127,7 @@ the drawer keeps the full rows and active tab. `term:status` remains a generic c
 handled by client-core.
 
 Every session, terminal or managed, reports its state from one shared vocabulary, `AgentState`
-(`packages/protocol/src/sessionActivity.ts`): `starting`, `working`, `waiting`, `idle`, and `blocked`. Every
+(`packages/protocol/src/agents/sessionActivity.ts`): `starting`, `working`, `waiting`, `idle`, and `blocked`. Every
 agent surface reuses it verbatim, so no other module redeclares it. A transport reports only the
 subset it can detect. A plain PTY session emits `working`, `idle`, `blocked`, or `unknown`, since a
 shell has no notion of `starting` or `waiting`. A managed or headless agent driver controls the
@@ -210,8 +210,18 @@ broker. It enforces task worktree confinement, allowlisted environment variables
 termination, bounded capture, and operation deadlines. Direct `spawn`/`execFile` use is limited to
 the reviewed `CHILD_PROCESS_OK` allowlist in `tools/arch/boundaries.test.ts:221`.
 
-Run targets are resolved from trusted `.acorn/config.toml`, repo settings, and task configuration. A
-run target is a terminal session; acorn does not allocate or proxy arbitrary ports. Preview uses the
+Run targets merge repository `.acorn/config.toml`, personal defaults, and project settings. Core
+returns `repoConfigHash` with the targets, parsed from the same captured repository bytes. Before a
+repository-authored start or restart, terminal passes that hash to `projects.assertConfigTrusted`.
+The gate requires both acknowledgement and an exact match with the selected snapshot. A missing or
+changed snapshot returns `needs-trust` before execution. Personal and project-settings targets retain
+their owner-authored execution path.
+
+Running instances retain their admitted command, URL command, stop command, and working directory.
+Status and default URL discovery use that captured URL command after repository edits. Fixed URLs
+remain usable without a running instance, and default target selection follows the resolved config.
+
+A run target is a terminal session; acorn does not allocate or proxy arbitrary ports. Preview uses the
 declared target/port configuration and the authenticated tunnel when necessary.
 
 Another plugin gets a turn before a process starts in a task's worktree. `terminal:before-run-target`
@@ -281,7 +291,8 @@ within five minutes or on reload.
 
 The agents plugin owns the managed session. Terminal publishes a narrow session-roster and handoff
 capability. Handoff transfers an exclusive controller lease. The managed composer is disabled while a
-raw TUI owns input, and resume returns control only after the provider reference is verified.
+raw TUI owns input. Returning to managed mode requires the linked terminal process to exit first;
+the Node then restores the managed provider session from its resumable reference.
 
 ## Sending text to an agent
 
@@ -394,10 +405,10 @@ the same file either way.
 
 That is what let two of the three callers cross. Docker's exec panel and the editor's `$EDITOR` window
 are both throwaway PTYs, both about fifteen lines now, and both work on a host with no browser in it.
-The terminal plugin's own drawer surface keeps its own xterm, because it is not throwaway: it carries
+The terminal plugin's own desktop drawer surface keeps its own xterm, because it is not throwaway: it carries
 the app's theme, the font-size preference, the WebGL renderer and the Shift+Enter rule, and none of
-those has a meaning in cells. The drawer has no home on the terminal client anyway, which is the other
-half of why it stayed ([tui.md](./tui.md) § Chrome).
+those has a meaning in cells. The terminal client presents the same Node sessions in its own cell
+view, described below ([tui.md](./tui.md) § Chrome).
 
 **The `$EDITOR` handoff needed nothing built.** The editor pane already has a terminal mode: one device
 preference swaps the CodeMirror rectangle for a throwaway PTY running the reader's own editor on the
@@ -413,6 +424,24 @@ takes a height and a maximized flag from the plugin, which owns the resize grip 
 That geometry was the plugin's own stylesheet until phase 9 of the layout programme. Where the rails
 are and how tall the top bar is are the shell's facts, and a plugin that writes them down is one
 shell change away from being wrong.
+
+### Native terminal client sessions
+
+The terminal client opens a task-scoped Sessions view from the task or palette. Terminal's activated
+session store remains the roster, and its existing HTTP verbs and `term` WebSocket channel remain the
+transport. The host renders a session picker, available profile choices, and one native `pty`
+rectangle. A new session starts in the task worktree as it does in the desktop drawer. Closing the
+view detaches the display and leaves the Node session running; reopening restores the task's last
+selected session. Resize travels from the rectangle to the Node. Enter gives the PTY the keyboard,
+Escape returns to the view, and `Ctrl+C` belongs to the PTY while entered.
+
+An agent handoff uses the same session row, including its managed-session lineage. The view can end
+the provider terminal with a second Enter confirmation and then return input control to managed mode.
+Return is disabled while the linked PTY is running, matching the Node's controller lease rule. The
+host calls the Agents plugin's public handoff client contract to update its session store after the
+Node accepts the transition.
+`plugins/terminal/src/contract/hostClient.ts` exposes Terminal's transport and roster to this host;
+other plugins keep using the narrower `sessionsClient.ts` contract.
 
 ## From the command palette
 
@@ -449,13 +478,15 @@ opened is stopped rather than started a second time. Starting opens the drawer, 
 refresh the session roster, and a node that refuses either reports its own reason with the frame still
 open. Those are the calls and the error copy the row source had.
 
-**The terminal's own preferences are still a page.** What the terminal button opens into, the terminal
-text size, and whether a new agent session is sent the task's startup context are not setting commands.
-On the desktop the palette reaches them through the **Settings → Terminal** row core generates from the
-settings registry, and that row opens the page rather than editing a value in the frame. Each of the
-three has one reader and one writer in `plugins/terminal/src/client/terminalPrefs.ts`, and the page and
-the drawer both call them, so the value has a single persistence path and a setting command registered
-later cannot become a second one.
+**The terminal's own preferences are still a page.** What the terminal button opens into and the
+terminal text size are not setting commands. On the desktop the palette reaches them through the
+**Settings → Terminal** row core generates from the settings registry, and that row opens the page
+rather than editing a value in the frame. Each of the two has one reader and one writer in
+`plugins/terminal/src/client/terminalPrefs.ts`, and the page and the drawer both call them, so the
+value has a single persistence path and a setting command registered later cannot become a second one.
+Whether an agent started in the drawer is sent the task's startup context is core's preference, and
+its switch is on Settings → Agents → Harnesses and defaults
+(`plugins/agents/src/client/settings/startupContext.ts`).
 
 **Creating a terminal was already a command before this group existed.** The shell owns
 `task.terminal.new-shell` under its own Terminal group, and the agents plugin owns the two harness

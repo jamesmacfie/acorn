@@ -45,7 +45,7 @@ import {
 const SINGLE = { h: '─', v: '│', tl: '┌', tr: '┐', bl: '└', br: '┘' } as const
 
 /** A scroll bar's two cells: the run the viewport covers, and the rest of the content under it. The
- *  same pair `../kit/showing.tsx` draws beside a virtual `Rows`, because there is one bar in this app
+ *  same pair `../kit/showing/collection.tsx` draws beside a virtual `Rows`, because there is one bar in this app
  *  and lazygit's is the shape a reader already knows (§ drawBar). */
 const THUMB = '█'
 const TRACK = '│'
@@ -186,19 +186,27 @@ function drawTitle(
 /** The edges a border draws, and a corner only where the two edges that meet it are both drawn. A
  *  `Rule` is one edge with no corners at all, which is how a single line becomes the divider between
  *  two regions. */
-function drawBorder(buffer: Buffer, clip: Clip, rect: Node['rect'], sides: Sides, style: Style): void {
+function drawBorder(
+  buffer: Buffer, clip: Clip, rect: Node['rect'], sides: Sides, style: Style,
+  leftAccent?: { glyph: string; color: Color },
+): void {
   if (rect.w <= 0 || rect.h <= 0) return
   const glyphs = SINGLE
   const right = rect.x + rect.w - 1
   const bottom = rect.y + rect.h - 1
   if (sides.top) for (let x = rect.x; x <= right; x += 1) put(buffer, clip, x, rect.y, glyphs.h, style)
   if (sides.bottom) for (let x = rect.x; x <= right; x += 1) put(buffer, clip, x, bottom, glyphs.h, style)
-  if (sides.left) for (let y = rect.y; y <= bottom; y += 1) put(buffer, clip, rect.x, y, glyphs.v, style)
+  if (sides.left && !leftAccent) for (let y = rect.y; y <= bottom; y += 1) put(buffer, clip, rect.x, y, glyphs.v, style)
   if (sides.right) for (let y = rect.y; y <= bottom; y += 1) put(buffer, clip, right, y, glyphs.v, style)
   if (sides.top && sides.left) put(buffer, clip, rect.x, rect.y, glyphs.tl, style)
   if (sides.top && sides.right) put(buffer, clip, right, rect.y, glyphs.tr, style)
   if (sides.bottom && sides.left) put(buffer, clip, rect.x, bottom, glyphs.bl, style)
   if (sides.bottom && sides.right) put(buffer, clip, right, bottom, glyphs.br, style)
+  // Draw last so the accent replaces the two left corners as well as every middle cell.
+  if (sides.left && leftAccent) {
+    const accentStyle: Style = { fg: toColor(leftAccent.color), attrs: 0 }
+    for (let y = rect.y; y <= bottom; y += 1) put(buffer, clip, rect.x, y, leftAccent.glyph, accentStyle)
+  }
 }
 
 /** A box, and every kind that is still a box: its background, its border, its caption, any run
@@ -213,7 +221,7 @@ function drawBox(node: Node, buffer: Buffer, clip: Clip): void {
   const sides = sidesOf(props.border)
   if (anySide(sides)) {
     const style: Style = { fg: toColor(props.borderColor), attrs: 0 }
-    drawBorder(buffer, own, node.rect, sides, style)
+    drawBorder(buffer, own, node.rect, sides, style, props.borderLeftAccent as { glyph: string; color: Color } | undefined)
     if (sides.top && typeof props.title === 'string') drawTitle(buffer, own, node, sides, props.title, style)
   }
 
@@ -253,9 +261,7 @@ function drawBox(node: Node, buffer: Buffer, clip: Clip): void {
  * settle. Overlaying it costs the rightmost column of a scrolling document and no oscillation. No
  * frame the old painter drew held a visible bar, so nothing measured the difference either way.
  *
- * The two characters and the thumb's size and place are `../kit/showing.tsx § THUMB`'s, which is the
- * bar a virtual `Rows` draws down its own edge. There is one bar in this app and it should look like
- * itself.
+ * The thumb and track match the virtual list in `../kit/showing/collection.tsx`.
  */
 function drawBar(node: Node, buffer: Buffer, clip: Clip): void {
   const content = node.children.find((child) => laysOut(child.kind))
@@ -296,7 +302,7 @@ const cellsOf = (value: unknown): number => Math.max(0, Math.trunc(Number(value)
  * for all of itself scrolls to nought.
  *
  * **The two colours are the component's, said out loud.** A field's text colour and its placeholder's
- * are both props here, for the reason `../kit/asking.tsx` already gives about the first: an edit
+ * are both props here, for the reason `../kit/asking/fieldRef.ts` already gives about the first: an edit
  * buffer that says neither draws opaque white and a hardcoded `#666666`, and neither is one of the
  * sixteen colours a terminal has or comes from any theme. So the kit names the slot and both painters
  * read it (docs/ui-design.md § Roles, and what each host makes of them).

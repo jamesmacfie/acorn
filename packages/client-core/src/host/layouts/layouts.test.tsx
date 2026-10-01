@@ -2,7 +2,7 @@ import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { LAYOUTS } from '.'
 import { _resetLayoutState } from './state'
-import { _resetSidebarCollapse } from '../../kit/lib/collapseState'
+import { _resetSidebarCollapse } from '../../kit/lib/layout/collapseState'
 import type { LayoutProps, Region } from './regions'
 
 // The seven layouts, rendered with placeholder regions (docs/panes.md § Layout model).

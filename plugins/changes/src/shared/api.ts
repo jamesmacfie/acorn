@@ -6,6 +6,7 @@
 // IndexedDB (docs/caching.md).
 
 import type { LocalStatus } from '@acorn/protocol/localGit.ts'
+import type { DiffSearchRequest, DiffSegmentDescriptor, DiffSegmentRequest } from '@acorn/diff-document/document'
 
 // Inline annotations on uncommitted changes, owned by this plugin rather than mirrored from GitHub.
 export type ReviewNote = {
@@ -34,8 +35,18 @@ export const localStatusRoute = (taskId: string) => `/v1/p/changes/tasks/${taskI
  *  what the pane renders before its first read returns. A function rather than a constant so no two
  *  callers share one `changes` array. */
 export const emptyLocalStatus = (): LocalStatus => ({ branch: null, upstream: null, ahead: null, behind: null, operation: null, changes: [] })
-export const localDiffRoute = (taskId: string, path: string, scope: 'unstaged' | 'staged') =>
-  `/v1/p/changes/tasks/${taskId}/local/diff?path=${encodeURIComponent(path)}&scope=${scope}`
+// The stacked diff as a document (docs/diff-rendering.md § The document). One staging area at a time:
+// the same path can be in both, and a document keys a file by its path. `key` is the pane's status key
+// for the file, which is how the node knows a file has not moved and need not be diffed again.
+export const localDocumentRoute = (taskId: string) => `/v1/p/changes/tasks/${taskId}/local/document`
+export const localSegmentsRoute = (taskId: string) => `/v1/p/changes/tasks/${taskId}/local/document/segments`
+export const localSearchRoute = (taskId: string) => `/v1/p/changes/tasks/${taskId}/local/document/search`
+export type LocalScope = 'unstaged' | 'staged'
+export type LocalDocumentRequest = { scope: LocalScope; files: { path: string; key: string }[] }
+/** Per file: the patch's digest, null for no diff, and how it cuts. The pane holds the rest. */
+export type LocalDocumentResponse = { files: { path: string; patchKey: string | null; segments: DiffSegmentDescriptor[] }[] }
+export type LocalSegmentsRequest = { scope: LocalScope; requests: DiffSegmentRequest[] }
+export type LocalSearchRequest = DiffSearchRequest & { scope: LocalScope; files: { path: string; patchKey: string }[] }
 // The new side of a file's diff, for filling a gap the reader expands. Scoped like the diff itself:
 // the index for a staged diff, the working tree for an unstaged one.
 export const localNewSideRoute = (taskId: string, path: string, scope: 'unstaged' | 'staged') =>

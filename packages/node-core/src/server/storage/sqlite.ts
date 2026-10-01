@@ -124,8 +124,18 @@ const timeStatement = (stmt: SqliteStatement, sql: string): SqliteStatement => {
   return timedStatement
 }
 
-export function openSqlite(path: string, options: { readonly?: boolean } = {}): SqliteDatabase {
+export function openSqlite(path: string, options: {
+  readonly?: boolean
+  initialize?: (database: DatabaseSync) => void
+  allowBackup?: boolean
+} = {}): SqliteDatabase {
   const db = new DatabaseSync(path, { ...OPEN_OPTIONS, readOnly: options.readonly ?? false })
+  try {
+    options.initialize?.(db)
+  } catch (error) {
+    db.close()
+    throw error
+  }
 
   // Depth-tracked, so a nested transaction becomes a SAVEPOINT instead of a second BEGIN, which
   // SQLite rejects. better-sqlite3 did this for us, and `batch()` in server/bindings.ts is a
@@ -170,6 +180,7 @@ export function openSqlite(path: string, options: { readonly?: boolean } = {}): 
     transaction,
     // SQLite's online-backup API, which is a module-level function here rather than a method.
     backup: async (destination) => {
+      if (options.allowBackup === false) throw new Error('Loaded plugin storage cannot export database files.')
       await sqliteBackup(db, destination)
     },
     close: () => db.close(),

@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto'
-import { request as httpRequest, type Agent as HttpAgent, type ClientRequest } from 'node:http'
+import { request as httpRequest, type Agent as HttpAgent, type ClientRequest, type IncomingMessage } from 'node:http'
 import { request as httpsRequest, type Agent as HttpsAgent } from 'node:https'
 import type { NodeFetchBody, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 
@@ -18,6 +18,67 @@ export type NodeRequestOptions = {
   body?: NodeFetchBody
   agent: HttpAgent | HttpsAgent
   signal: AbortSignal
+  // Internal caller limit. A renderer cannot raise the transport ceiling.
+  maxResponseBytes?: number
+}
+
+// Normal JSON, document, and diff reads fit below this. The broker currently returns a whole body
+// over its process boundary, so an unbounded response from a paired Node must never reach that path.
+export const MAX_NODE_RESPONSE_BYTES = 64 * 1024 * 1024
+
+export class NodeResponseTooLargeError extends Error {
+  constructor(readonly maxBytes: number) {
+    super(`The node response exceeds the ${maxBytes} byte limit.`)
+    this.name = 'NodeResponseTooLargeError'
+  }
+}
+
+// Shared by the pinned transport and the unverified probe. Content-Length is an early rejection,
+// not an authority: chunked and dishonest responses are counted before each chunk is retained.
+export function readBoundedResponse(res: IncomingMessage, maxBytes: number): Promise<Buffer<ArrayBuffer>> {
+  return new Promise((resolve, reject) => {
+    const declared = res.headers['content-length']
+    if (declared && /^\d+$/.test(declared) && BigInt(declared) > BigInt(maxBytes)) {
+      res.destroy()
+      reject(new NodeResponseTooLargeError(maxBytes))
+      return
+    }
+
+    const chunks: Buffer[] = []
+    let size = 0
+    const cleanup = () => {
+      res.off('data', onData)
+      res.off('end', onEnd)
+      res.off('error', onError)
+      res.off('close', onClose)
+    }
+    const onData = (chunk: Buffer) => {
+      if (chunk.length > maxBytes - size) {
+        cleanup()
+        res.destroy()
+        reject(new NodeResponseTooLargeError(maxBytes))
+        return
+      }
+      size += chunk.length
+      chunks.push(chunk)
+    }
+    const onEnd = () => {
+      cleanup()
+      resolve(Buffer.concat(chunks, size))
+    }
+    const onError = (error: Error) => {
+      cleanup()
+      reject(error)
+    }
+    const onClose = () => {
+      cleanup()
+      reject(new Error('The node closed the response before it finished.'))
+    }
+    res.on('data', onData)
+    res.once('end', onEnd)
+    res.once('error', onError)
+    res.once('close', onClose)
+  })
 }
 
 export function nodeRequest(options: NodeRequestOptions): Promise<NodeFetchResponse> {
@@ -49,9 +110,7 @@ export function nodeRequest(options: NodeRequestOptions): Promise<NodeFetchRespo
         },
       },
       (res) => {
-        const chunks: Buffer[] = []
-        res.on('data', (chunk: Buffer) => chunks.push(chunk))
-        res.on('end', () => {
+        void readBoundedResponse(res, Math.min(options.maxResponseBytes ?? MAX_NODE_RESPONSE_BYTES, MAX_NODE_RESPONSE_BYTES)).then((body) => {
           const headers: Record<string, string> = {}
           for (const [key, value] of Object.entries(res.headers)) {
             if (value === undefined) continue
@@ -59,10 +118,8 @@ export function nodeRequest(options: NodeRequestOptions): Promise<NodeFetchRespo
             // joining rather than dropping keeps it honest.
             headers[key] = Array.isArray(value) ? value.join(', ') : value
           }
-          const joined = Buffer.concat(chunks)
-          resolve({ status: res.statusCode ?? 0, headers, body: new Uint8Array(joined.buffer, joined.byteOffset, joined.byteLength) })
-        })
-        res.on('error', reject)
+          resolve({ status: res.statusCode ?? 0, headers, body: new Uint8Array(body.buffer, body.byteOffset, body.byteLength) })
+        }, reject)
       },
     )
 

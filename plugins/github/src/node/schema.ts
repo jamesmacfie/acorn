@@ -31,7 +31,7 @@ export const pullRequests = sqliteTable(
     state: text('state').notNull(), // open | closed | merged
     draft: integer('draft', { mode: 'boolean' }).notNull().default(false),
     title: text('title').notNull(),
-    body: text('body'), // sanitized bodyHTML from GraphQL (rendered via innerHTML)
+    body: text('body'), // provider-rendered bodyHTML; the client sanitizes it before display
     headSha: text('head_sha'), // head commit oid — commit_id for creating line comments
     headRef: text('head_ref'),
     baseRef: text('base_ref'),
@@ -52,6 +52,10 @@ export const pullRequests = sqliteTable(
 // --- PR-detail children: mirrored together from the GraphQL composite, replaced wholesale on
 // each sync. No per-row staleness; freshness is governed by sync_state(`pr:<repoId>:<number>`).
 // All user-scoped and keyed off the PR (userId, repoId, number) + a per-row discriminator.
+//
+// Every child table has a `position`: the row's zero-based place in the order GitHub returned it,
+// counted per PR. Reads order by it, never by SQLite's insertion order. What it counts is stated on
+// each table, because the connections differ.
 
 export const prFiles = sqliteTable(
   'pr_files',
@@ -63,7 +67,12 @@ export const prFiles = sqliteTable(
     status: text('status'), // changeType / GitHub status: added | modified | removed | renamed | …
     additions: integer('additions'),
     deletions: integer('deletions'),
-    sha: text('sha'), // blob sha — patch bodies live in the on-disk BLOBS cache keyed by this (docs/caching.md)
+    sha: text('sha'), // new-side blob sha, for whole-file context; not the patch's identity
+    position: integer('position').notNull(), // place in the REST files list, across every page
+    // 'available' | 'unavailable'. Available means patch_key names a body in the BLOBS cache;
+    // unavailable means GitHub sent no patch (binary, too large, a pure rename).
+    patchState: text('patch_state').notNull(),
+    patchKey: text('patch_key'), // 'sha256:<hex>' of the patch text (docs/caching.md)
   },
   (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.path] })],
 )
@@ -79,6 +88,7 @@ export const reviews = sqliteTable(
     state: text('state'), // APPROVED | CHANGES_REQUESTED | COMMENTED | DISMISSED | PENDING
     body: text('body'),
     submittedAt: integer('submitted_at'),
+    position: integer('position').notNull(), // place in the reviews connection
   },
   (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.id] })],
 )
@@ -93,6 +103,7 @@ export const comments = sqliteTable(
     author: text('author'),
     body: text('body'),
     createdAt: integer('created_at'),
+    position: integer('position').notNull(), // place in the issue comments connection
   },
   (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.id] })],
 )
@@ -108,6 +119,7 @@ export const prCommits = sqliteTable(
     author: text('author'),
     authorLogin: text('author_login'),
     committedAt: integer('committed_at'),
+    position: integer('position').notNull(), // place in the commits connection
   },
   (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.sha] })],
 )
@@ -130,6 +142,9 @@ export const reviewThreads = sqliteTable(
     author: text('author'),
     body: text('body'),
     createdAt: integer('created_at'),
+    // Across every comment of every thread: threads in connection order, then each thread's comments
+    // in theirs. One ordering recovers both the thread order and the order within a thread.
+    position: integer('position').notNull(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.id] })],
 )
@@ -142,6 +157,7 @@ export const prLabels = sqliteTable(
     number: integer('number').notNull(),
     name: text('name').notNull(),
     color: text('color'), // 6-hex, no leading #
+    position: integer('position').notNull(), // place in the labels connection
   },
   (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.name] })],
 )
@@ -153,6 +169,7 @@ export const reviewRequests = sqliteTable(
     repoId: integer('repo_id').notNull(),
     number: integer('number').notNull(),
     login: text('login').notNull(),
+    position: integer('position').notNull(), // place in the review requests connection, users only
   },
   (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.login] })],
 )
@@ -167,6 +184,8 @@ export const checks = sqliteTable(
     status: text('status'), // CheckRun.conclusion|status | StatusContext.state
     url: text('url'),
     runId: integer('run_id'), // CheckRun.checkSuite.workflowRun.databaseId — null for StatusContext; enables rerun-failed-jobs
+    // Place in the latest commit's contexts connection, after duplicate names keep their last entry.
+    position: integer('position').notNull(),
   },
   (t) => [primaryKey({ columns: [t.userId, t.repoId, t.number, t.name] })],
 )
@@ -178,6 +197,13 @@ export const syncState = sqliteTable(
     resource: text('resource').notNull(),
     etag: text('etag'),
     fetchedAt: integer('fetched_at').notNull(),
+    // Only a pull's files resource (`files:<repoId>:<number>`) sets these, and only when GitHub's
+    // 3,000-file ceiling cut the list short. All null means the resource is complete. They change in
+    // the same batch as the rows and fetched_at, so a failed refresh leaves the old values.
+    incompleteCause: text('incomplete_cause'), // 'upstream-cap'
+    received: integer('received'),
+    reportedTotal: integer('reported_total'), // null when GitHub gave no count
+    upstreamLimit: integer('upstream_limit'),
   },
   (t) => [primaryKey({ columns: [t.userId, t.resource] })],
 )

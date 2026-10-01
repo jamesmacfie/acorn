@@ -56,13 +56,21 @@ All but the audit prune are declared only when the composition root passes `env`
 which both Node hosts do; a scheduler built without one (a test) declares just the prune, because the
 other three reach out of the process.
 
-One plugin declares a schedule:
+The agents plugin declares two:
 
 - `agents:usage-refresh`: every 30 minutes, and off unless you turn it on. It re-probes the agent CLIs
   for plan usage so the numbers are fresh when you open the panel. Off by default because refreshing
   spawns those CLIs and the snapshot is an in-process cache nothing reads while no client is open. The
   cost is real and the value only reaches a person who is present, so it is the owner's call. Turning
   it on is the enable toggle on its row, and that survives restarts.
+- `agents:archived-history-prune`: daily at 03:50. It removes the agent history of tasks archived
+  longer than the owner keeps it ([data-layer.md § Retention](./data-layer.md#retention)). On by
+  default and a no-op by default, because the limit is the owner's **Keep agent history for archived
+  tasks** setting and that starts at Forever. It is a row because it is calendar-shaped work. Pausing
+  it also stops the pass, but the setting is the switch, because that is where the page says what
+  removal costs. It stops itself after four
+  minutes, below the 300-second ceiling, because a large first pass is not a failure and a timeout would
+  back it off like one. The next run carries on.
 
 ### How a plugin declares one
 
@@ -155,6 +163,8 @@ portable wall clock; the workflow target does so below.
 300s floor a schedule *is* a poll, and polling is the client's job for a person who is present. Same
 word for the same idea, different shape where the difference is real. It was called `ctx.pollers` until
 2026-08-27, which made one idea look like two.
+The renderer starts an eligible client schedule when its plugin becomes available, including when the
+Node's plugin roster arrives after the window opens. Disabling or unloading the plugin stops it.
 
 ## Policies
 
@@ -312,7 +322,7 @@ enumerates what the machine does unwatched, and creating one is a way to make co
 
 ## Settings
 
-Settings → Schedules, per node, sharing the picker with Plugins and Security — a schedule is a promise
+Settings → Schedules, per node, following the settings header's node switcher — a schedule is a promise
 one machine makes. One list, owner badge, cadence in words, last run with a status dot, next run, the
 run ring behind a disclosure, and the verbs: pause/resume, run now, and delete for user rows. A failed
 schedule shows its error inline; a backed-off one says when it will try again. A risky user schedule
@@ -331,8 +341,12 @@ of two.
 ## What deliberately is not a schedule
 
 The sweep was re-run across the tree and these stay on their own timers, because their lifetime is an
-object's rather than the clock's: the WS-hub sweep, the tunnel sweep, the MCP keepalive and the terminal
-idle watch. A settings row for "sweep this map while it exists" would be noise. The honest rule is not
+object's rather than the clock's: the WS-hub sweep, the tunnel sweep, the MCP keepalive, the terminal
+idle watch, and the agents plugin's sweep over its live provider processes. That last one has a limit
+the owner picks, but the limit is an agents setting
+([managed-agents.md § Operations and failure](./managed-agents.md#operations-and-failure)), and a
+pause on a schedule row would be a second switch for the same thing. A settings row for "sweep this
+map while it exists" would be noise. The honest rule is not
 "no `setInterval` outside the scheduler" but **no *calendar-shaped* work runs off a bespoke timer** —
 anything with a cadence a person might want to see, pause or retune is a row.
 
@@ -342,7 +356,11 @@ not anyone is.
 
 `pruneOrphanedGithubMirror` stays a boot-time call for the same reason: it repairs installations
 affected by a historic eviction bug and converges to zero, so it is startup reconciliation, not
-retention.
+retention. The agents plugin's ledger compaction is the same kind of repair. It folds tool calls stored
+before the ledger fold, marks each session when it is done, and so has nothing left to do once every
+session is marked. It starts after the runtime reconciles and runs in the background in small steps,
+because the first pass over a large database takes about half a minute
+([client surfaces](./managed-agents/client-surfaces.md) § The transcript store).
 
 ## Not built yet
 

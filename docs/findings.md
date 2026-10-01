@@ -41,7 +41,7 @@ candidate's sources into a new candidate without changing the observations. Bund
 project-scoped persistent attention through Memory. The optional **Notify me when a prepared review
 bundle is ready** setting additionally emits one informational notice per published bundle.
 Changing the configured review model emits `plugin:findings:settings-changed`, so an open Memory page
-can refresh its setup state without knowing anything about the settings modal.
+can refresh its setup state without knowing anything about the settings view.
 
 `findings:review-target` binds a display label, validation, and a revocable controller to the plugin that owns the
 destination. Its `submitProposal` operation creates an observation, candidate, and bundle in one
@@ -88,7 +88,7 @@ the observation format. The task does not wait for model generation. If neither 
 the checkpoint records unavailable input; earlier task observations can still be prepared. A failed
 capture does not stop archive and is reported as `reviewCaptureFailed`.
 
-Selecting a backend and target in Findings settings enables automatic review at archive. The shared
+Selecting a backend and target on the **Review after archive** settings page enables automatic review at archive. The shared
 picker retains the backend and model. Clearing the backend leaves capture active and review disabled.
 If the selected target unloads, preparation reports it as unavailable. A running job and its retry
 keep their selected target. The retained `automaticPreparation` preference field is compatibility

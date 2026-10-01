@@ -4,8 +4,19 @@ Design notes from the third-party-plugins session (2026-08-08). Nothing here is 
 records the analysis so a future project starts from conclusions instead of re-deriving them.
 The terminal client is the other non-desktop surface, and it shipped: [tui.md](../tui.md) owns it.
 It shares this file's reasoning about auth and custody and none of its browser constraints.
+The later [cloud-tasks programme](./cloud/README.md) chooses an administration-only web app first
+and brings the opaque relay forward for desktop and TUI access to private Nodes. Its relay timing
+and account scope supersede those proposals below; this file still owns the future browser
+workspace and mobile-client analysis.
 The three cheap preparation items at the bottom ARE worth doing early — they are annotated in
 the plugin docs (`docs/plugins.md`, `docs/security.md`).
+
+Browser-side plugin custody must implement the complete `PluginCustody` group, including device
+install and remove. It can use the fetch-injected source resolver, IndexedDB for bundles, and
+WebCrypto for hashing; a browser host offers no local-folder installation. GitHub, npm, and URL
+sources need CORS or the same proxy that TLS needs. Device bundles render in the same sandboxed
+opaque-origin iframe as Node bundles. A replaced rail or topbar is a desktop surface, so the mobile
+shell hides an offer whose `formFactor` excludes it.
 
 ## The shape of the demand
 

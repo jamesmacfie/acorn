@@ -14,6 +14,9 @@
   --diff-marker-w: 14px;
   --diff-btn-w: calc(16px + var(--space-2));
   --diff-chrome-w: calc(2 * var(--diff-gutter-w) + var(--diff-marker-w) + var(--diff-btn-w) + var(--pane-pad));
+  /* Where every card drawn inside the diff starts (review threads, the new-comment box, agent
+     chats): at the new-side line numbers, so they read as part of the diff rather than beside it. */
+  --diff-card-inset: var(--diff-gutter-w);
   /* Size container so file heads can be exactly one scrollport wide (100cqw) while the canvas
      underneath is --diff-cols wide. */
   container-type: inline-size;
@@ -24,11 +27,18 @@
    scrolls to, so the width goes back to being slightly jumpy for that one line rather than the
    text becoming unreachable. */
 .diff-rows { position: relative; width: 100%; min-width: calc(var(--diff-chrome-w) + var(--diff-cols, 0) * 1ch); }
-/* Read-only compare preview (create mode) and the changes pane: same rows in normal document flow
-   instead of the virtualizer's absolute positioning. In flow the rows really do size the canvas, so
-   ask them rather than the column count, since there is no virtual window here to make that unstable. */
-.compare-diff .diff-rows { position: static; min-width: max-content; }
-.compare-diff .diff-row { position: static; transform: none; }
+/* StackedDiff (kit/diff/DiffRows.tsx): the same rows in normal document flow instead of the
+   virtualizer's absolute positioning. In flow the rows really do size the canvas, so ask them rather
+   than the column count, since there is no virtual window here to make that unstable. */
+.diff-stacked .diff-rows { position: static; min-width: max-content; }
+.diff-stacked .diff-row { position: static; transform: none; }
+/* One virtual item: a file header, a segment of up to 64 rows, or a slice of an expanded gap. The
+   item is positioned; the rows inside it are in normal flow, so a segment is as tall as its rows and
+   any thread or note among them (docs/diff-rendering.md § Row geometry). */
+.diff-item { position: absolute; top: 0; left: 0; width: 100%; }
+.diff-item .diff-row, .diff-item .diff-split-band { position: relative; }
+/* A segment on screen whose rows are still loading holds its exact height and says so. */
+.diff-segment-pending { display: flex; align-items: flex-start; padding-top: 2px; background: var(--bg-subtle); }
 .diff-row {
   position: absolute;
   top: 0;
@@ -50,6 +60,15 @@
   padding-left: calc(2 * var(--diff-gutter-w) + var(--diff-marker-w));
 }
 .diff-line-extra:empty { display: none; }
+/* The negative margin backs the chat out of .diff-line-extra's indent to the card inset; notes and
+   marks in the same wrapper stay under the code. */
+.diff-inline-chat {
+  position: sticky;
+  left: var(--diff-card-inset);
+  width: calc(100cqw - var(--diff-card-inset) - var(--pane-pad));
+  margin: 6px 0 6px calc(var(--diff-card-inset) - 2 * var(--diff-gutter-w) - var(--diff-marker-w));
+  white-space: normal;
+}
 .diff-gutter { position: relative; flex: none; width: var(--diff-gutter-w); padding-right: var(--space-4); text-align: right; color: var(--text-faint); user-select: none; }
 .diff-marker { flex: none; width: var(--diff-marker-w); text-align: center; color: var(--text-faint); user-select: none; }
 /* `flex: 1 1 0` with `min-width: 0`, even though the text no longer wraps: the row is
@@ -86,12 +105,13 @@
 .diff-hunk { background: var(--hunk-bg); color: var(--hunk-text); padding-left: var(--pane-pad); font-weight: 500; }
 
 /* Clickable band that reveals hidden unchanged context (GitHub-style expand). Full-width in both
-   the flex unified row and the .diff-split-full wrapper. */
+   the flex unified row and the .diff-split-full wrapper. 4px above and below a 20px line is the 28px
+   the layout counts a gap row as (DIFF_GAP_ROW_HEIGHT); the geometry is exact, so this must be too. */
 .diff-gap {
   flex: 1 0 100%;
   display: block;
   width: 100%;
-  padding: 3px var(--pane-pad);
+  padding: 4px var(--pane-pad);
   border: none;
   background: var(--hunk-bg);
   color: var(--hunk-text);
@@ -175,7 +195,7 @@
 
 /* Inline review threads + new-line composer. Thread rows are full-width, variable-height blocks
    (measured by the virtualizer); the add-comment "+" reveals on row hover. */
-.diff-add-btn, .diff-open-btn {
+.diff-add-btn, .diff-open-btn, .diff-ask-btn {
   flex: none;
   width: 16px;
   height: 16px;
@@ -192,13 +212,16 @@
   visibility: hidden;
 }
 .diff-open-btn { position: absolute; top: 2px; left: 2px; margin-right: 0; text-align: center; }
-.diff-row:hover .diff-add-btn, .diff-row:hover .diff-open-btn,
-.diff-add-btn:focus-visible, .diff-open-btn:focus-visible { visibility: visible; }
-.diff-add-btn:hover, .diff-open-btn:hover { color: var(--text); background: var(--bg-hover); border-color: var(--accent); }
+.diff-ask-btn { position: absolute; top: 2px; left: 20px; margin-right: 0; text-align: center; }
+.diff-row:hover .diff-add-btn, .diff-row:hover .diff-open-btn, .diff-row:hover .diff-ask-btn,
+.diff-add-btn:focus-visible, .diff-open-btn:focus-visible, .diff-ask-btn:focus-visible { visibility: visible; }
+.diff-add-btn:hover, .diff-open-btn:hover, .diff-ask-btn:hover { color: var(--text); background: var(--bg-hover); border-color: var(--accent); }
 
-/* Thread / composer rows opt out of the single-line flex layout used by code rows. */
+/* Thread / composer rows opt out of the single-line flex layout used by code rows. `flow-root` keeps
+   the thread card's margins inside the row, so the row's own box is the space it takes: the layout
+   measures that box as the thread's height (features/diff/diffLayout.ts). */
 .diff-thread-row {
-  display: block;
+  display: flow-root;
   align-items: stretch;
   width: 100%;
   min-width: 100%;
@@ -211,9 +234,9 @@
    scrolls; the conversation stays where it can be read. */
 .diff-thread {
   position: sticky;
-  left: var(--pane-pad);
-  width: calc(100cqw - 2 * var(--pane-pad));
-  margin: 6px var(--pane-pad);
+  left: var(--diff-card-inset);
+  width: calc(100cqw - var(--diff-card-inset) - var(--pane-pad));
+  margin: 6px var(--pane-pad) 6px var(--diff-card-inset);
   padding: 9px var(--space-5);
   background: var(--bg);
   border: var(--surface-border);
@@ -225,6 +248,7 @@
 .diff-thread-head { display: flex; align-items: center; gap: var(--space-4); margin-bottom: var(--space-3); }
 .diff-thread-collapsed .diff-thread-head { margin-bottom: 0; }
 .diff-thread-status {
+  margin-right: auto;
   font-size: var(--fs-sm);
   text-transform: var(--label-transform);
   letter-spacing: var(--label-tracking);
@@ -238,7 +262,11 @@
 
 /* Reply box (thread) + new-line composer share the textarea + action styling. */
 .diff-reply, .diff-composer { display: flex; flex-direction: column; gap: var(--space-3); margin-top: var(--space-3); }
-.diff-composer { flex-basis: 100%; padding: 7px var(--pane-pad) 7px 68px; white-space: normal; }
+.diff-composer { flex-basis: 100%; padding: 7px var(--pane-pad) 7px var(--diff-card-inset); white-space: normal; }
+/* The composer keeps its full basis so it wraps under the code, which makes it canvas-wide. Its
+   contents are sticky-left and one scrollport wide, like .diff-thread. Left at the canvas width, a
+   wide file pushed the box's right edge, and the pane's resize handles, out of view. */
+.diff-row > .diff-composer > * { position: sticky; left: var(--diff-card-inset); width: calc(100cqw - var(--diff-card-inset) - var(--pane-pad)); }
 .diff-composer-actions { display: flex; gap: var(--space-3); }
 .diff-thread-err { font-size: var(--fs-sm); color: var(--del-marker); }
 
@@ -254,17 +282,29 @@
    ponytail: this is a `Toolbar` written out by hand, and it borrows `Toolbar`'s geometry rather
    than being one. Two things hold it back: `.layout-region-detail:has(> .diff-toolbar)` in
    shell.css is how the detail column recognises that it holds a diff and drops its padding, and
-   the find bar nested inside is itself a `Toolbar`, which would draw a second background and a
-   second divider inside this one. Untangle both and this becomes `<Toolbar>` with a spacer. */
+   the find bar nested inside is itself a `Toolbar`, whose strip is stripped below. Untangle both
+   and this becomes `<Toolbar>` with a spacer. */
 .diff-toolbar {
   display: flex;
   align-items: center;
   justify-content: flex-end;
+  /* Twice the find bar's own gap, so its controls read as one group and the view mode as another. */
+  gap: var(--space-6);
   min-height: var(--pane-head-h);
   padding: 0 var(--pane-pad);
   border-bottom: var(--chrome-divider);
   background: var(--bg);
 }
+/* The find bar is a cluster in this bar, not a strip of its own. `[data-size]` outweighs the
+   pane-edge padding rule in shell.css. */
+.diff-toolbar > .ui-toolbar[data-size='sm'] {
+  min-height: 0;
+  padding: 0;
+  background: none;
+  border-bottom: 0;
+}
+/* Left-aligned, so the find bar and the view mode keep the end of the bar. */
+.diff-file-filter { flex: 0 1 240px; min-width: 0; margin-right: auto; display: flex; }
 
 /* Word-level intra-line diff: changed spans within a paired delete/insert line get a stronger
    background plus an inherited marker glyph on the line, never colour alone. Layers over the line bg. */

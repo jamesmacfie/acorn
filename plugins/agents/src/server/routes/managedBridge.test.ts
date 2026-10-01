@@ -95,28 +95,36 @@ describe('the snapshot a client reads', () => {
       idempotencyKey: 'k1',
     })
     await store.recordEvent(session.id, turn.id, { type: 'tool', tool: { id: 'cmd', title: 'ls', status: 'running' } })
+    await store.recordEvent(session.id, turn.id, { type: 'assistant_message', text: 'Listing.' })
     for (let at = 1; at <= 5; at++) {
       await store.recordEvent(session.id, turn.id, {
         type: 'tool',
         tool: { id: 'cmd', title: '', output: `${at}\n`, outputAppend: true },
       })
     }
+    await store.recordEvent(session.id, turn.id, { type: 'assistant_message', text: 'Done.' })
 
+    // The ledger holds the call as its opener and its latest state (../sessions/ledgerFold.ts), and a
+    // reader that does not ask gets both as stored.
     const tools = (events: { event: { type: string } }[]) => events.filter((event) => event.event.type === 'tool')
-    expect(tools((await bridge().snapshot(session.id)).events)).toHaveLength(6)
-    expect(tools((await bridge().events(session.id)).events)).toHaveLength(6)
+    expect(tools((await bridge().snapshot(session.id)).events).map((event) => event.event)).toEqual([
+      { type: 'tool', tool: { id: 'cmd', title: 'ls', status: 'running' } },
+      { type: 'tool', tool: { id: 'cmd', title: 'ls', status: 'running', output: '1\n2\n3\n4\n5\n' } },
+    ])
+    expect(tools((await bridge().events(session.id)).events)).toHaveLength(2)
 
     const [folded] = tools((await bridge().snapshot(session.id, 0, 2_000, true)).events)
     expect(folded.event).toEqual({
       type: 'tool',
-      tool: { id: 'cmd', title: 'ls', status: 'running', output: '1\n2\n3\n4\n5\n', outputAppend: true },
+      tool: { id: 'cmd', title: 'ls', status: 'running', output: '1\n2\n3\n4\n5\n' },
     })
-    // A page of three rows ends on an update that folded into the first, so the next page starts past it.
+    // A page of three rows ends on the latest state, which folded into the first, so the next page
+    // starts past it.
     const page = await bridge().events(session.id, 0, 3, true)
-    expect(page.events).toHaveLength(1)
-    expect(page.events[0].foldedThroughSeq).toBe(3)
-    expect(page.nextCursor).toBe(3)
-    expect((await store.exportSnapshot(session.id)).events).toHaveLength(6)
+    expect(page.events).toHaveLength(2)
+    expect(page.events[0].foldedThroughSeq).toBe(7)
+    expect(page.nextCursor).toBe(7)
+    expect((await store.exportSnapshot(session.id)).events).toHaveLength(4)
   })
 
   it('leaves the search text out of both pages, and keeps it for export', async () => {

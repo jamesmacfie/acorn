@@ -2,7 +2,7 @@ import type { Component } from 'solid-js'
 import type { Task, TaskSeed } from '@acorn/protocol/api.ts'
 import type { ProviderCapabilityName } from '@acorn/protocol/integrations.ts'
 import type { HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
-import { Registry } from '../../../kit/lib/registry'
+import { Registry } from '../../../kit/lib/state/registry'
 
 export type SourcePromotionContext = {
   projectId: string
@@ -44,6 +44,9 @@ export type SourceContribution<Item = unknown> = {
   // An extra gate beyond `providerId`, for a source whose relevance is not an integration question.
   // Core's Fleet home is the one user of it (docs/frontend.md § Registries and plugins).
   when?: () => boolean
+  // Draw only while the active workspace has a git project. A workspace question rather than a `when`,
+  // because the active workspace is the rail's to know and `SourceScope` already carries its facts.
+  requiresGitProject?: boolean
   component?: Component
   /**
    * The surface as a list beside a detail, for a host that draws the two halves in different places.
@@ -61,8 +64,11 @@ export type SourceContribution<Item = unknown> = {
    *
    * Optional, and a source without it keeps every previous behaviour: `component` fills the surface
    * and a terminal's list panel stays empty.
+   *
+   * `scroll` asks for the padded, scrolling detail column (`DetailColumn scroll`). A detail that is a
+   * plain run of content needs it; one that draws its own split or scroller fills the column instead.
    */
-  regions?: { list: Component; detail: Component }
+  regions?: { list: Component; detail: Component; scroll?: boolean }
   // The task origins this source creates, as origin id → Lucide glyph (features/tasks/origin.ts). A
   // source whose origin is its own id needs nothing here; github's rail is `github` and the tasks it
   // makes carry `github-pr`, so it says so.
@@ -78,6 +84,10 @@ export type SourceContribution<Item = unknown> = {
   // never said it was project-aware almost certainly isn't. The shell shows the project picker only
   // for sources that declare it, so Home no longer offers a control that changes nothing there.
   projectScoped?: boolean
+  // Whether the desktop rail draws this source's icon before the user has chosen. Absent means `true`.
+  // Presentation only: the source still registers, still opens from a command, and the user's switch
+  // wins over it (features/tabs/railVisibility.ts). Core's own sources ignore it.
+  showInRailByDefault?: boolean
   // The owning plugin may declare the initial browse surface (docs/frontend.md § Registries and
   // plugins), so the shell does not need to know which provider is bundled first.
   isDefault?: boolean

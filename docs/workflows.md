@@ -1,5 +1,9 @@
 # Workflows
 
+The headless commands in [the CLI reference](./cli.md) list published definitions, start a run by
+its returned ID with typed JSON inputs, and inspect or wait on durable runs and steps. The Node
+continues to own definition resolution, trust, gates, recovery, and execution.
+
 Workflows are durable Node orchestration. A definition is either a committed
 `.acorn/workflows/*.toml` file or a `workflow_defs` row the owner typed in the app, and the two are
 read as one list. SQLite stores expanded runs, steps, gates, trigger cursors, and recovery state.
@@ -62,11 +66,15 @@ the palette searches.
 so starting a run from one hashes the snapshot and asks for an acknowledgement. A row was typed by
 the node's owner in this app, behind the device gate, so there are no committed bytes to hash and the
 snapshot check does not apply. That is the whole reason every route under `/v1/p/workflows/defs` is
-device-only, and the reason a start by id refuses a row to a task-confined caller: an agent inside a
-run may start a file, because the snapshot covers it, and may not start a row.
+device-only. Task credentials can list file definitions for their own task, but cannot read the
+database definitions or create a root run through HTTP.
 
 **Starting by id.** `POST /v1/p/workflows/tasks/:id/workflows` takes `{ defId }` and optional typed
-inputs. Inline definition bodies are refused. A `defId` of `repo:<fileId>` or `user:<fileId>` names a file the task's project loads;
+inputs and requires a device principal before reading the body. Task and service credentials are
+refused for every definition layer. A root start creates fresh tool authority, budget, deadline,
+and cancellation lineage; repository trust alone does not preserve the calling agent's limits.
+Trusted schedules and frozen child dispatch use their admission capabilities directly.
+Inline definition bodies are refused. A `defId` of `repo:<fileId>` or `user:<fileId>` names a file the task's project loads;
 anything else names a row. The node resolves it and applies the layer's own rule, which is stronger
 than trusting a `source` field in the request body.
 
@@ -216,10 +224,17 @@ template.
 
 ### A kind describes its own form
 
-A kind can carry a `describe`: a label, an icon, and its inputs as a list of fields. The host draws
-that form, on the desktop and in the terminal, so a plugin adds an editable step kind without
-shipping a component. `describe` is optional. A kind without one is listed by name with a raw JSON
-`with`.
+A kind provides a `describe` with a label, icon, description, fields, and output description. The
+host draws that form on desktop and in the terminal, so a plugin adds an editable step kind without
+shipping a component. An output schema and semantic validator are optional. Workflows excludes a
+contributed kind with incomplete metadata from the catalog, validation, and dispatch, and logs the
+rejected kind and missing fields. The plugin's other contributions remain active.
+
+A saved workflow keeps a missing kind's qualified ID and `with` settings. The editor identifies the
+contributing plugin, allows raw JSON editing, and reports why the workflow cannot run. Admission
+refuses a new run. An active run fails if its next step requires a kind that has disappeared. When the
+same kind returns, validation runs again against its current contract; a valid definition becomes
+runnable without rewriting the saved step.
 
 A field is `text`, `textarea`, `number`, `boolean`, `select`, or `prompt`. A `prompt` field is a
 textarea that accepts template references. A `select` either lists its `options` or names an
@@ -315,6 +330,9 @@ A task with at least one run has a **Workflows** pane
 newest first, then the selected run's nodes, and one node's detail beside them. The pane is hidden on
 a task that has never run a workflow, so the pane strip does not grow a button for every task; which
 tasks those are is one node-wide read the plugin keeps in memory (`runs/runStore.ts`).
+Every client-side start marks its task as soon as the node confirms a run ID. Opening a confirmed run
+from the recent-run list or a schedule does the same before navigating, so the pane is available while
+the node-wide read catches up. A read started before the confirmation cannot clear that hint.
 
 **Rows | Graph** in the Nodes header picks how the nodes are drawn: as the list, or as the same
 picture the editor authors on, coloured by status. The choice is remembered per device. The run's
@@ -336,7 +354,7 @@ The detail depends on the kind and the status:
 | `terminal:run-target` | "Starting…" | the URL | Open terminal |
 | `database:*` | "Reading…" | a table of the rows and the SQL behind it | none |
 | `http:request` | "Sending…" | the status, the headers under a disclosure, the body | none |
-| `gate-human` | "Waiting for you" | approved, or the state it reached | Approve; Reject |
+| `gate-human` | "Waiting for you", or the form filled with its proposal, each changed field marked **Edited** with **Reset** | approved, or the state it reached; with a form, the approved values with edits marked | Approve; Reject |
 | any, `failed` or `safety-rail` | | the error | Retry; Retry with edited prompt, for an agent kind |
 
 A step whose harness session was captured but that never became a managed session offers **Open in
@@ -499,6 +517,12 @@ starting, so nothing runs with an empty input (§ Authoring). The rail goes to W
 because the dialog is mounted once, in that source's list region, and one mount is what keeps the
 editor's **Run** and this row from putting two of them on screen.
 
+A gate with a form keeps its **Approve** beside the values, and disables it while any value fails the
+check the node runs, with a line naming each problem. Edits are held per step while the app is open
+and saved nowhere, so closing the app loses them and the proposal remains. When another device
+answered first, the pane shows "This gate was already answered." and refetches the node. For the
+form's contract, see [Workflow execution](./workflows/execution.md#human-gates).
+
 Approving a gate, cancelling a run and killing one stay in the run surface. Each needs the run's
 status and its consequences in front of the person doing it, and a row in a list carries neither.
 
@@ -595,9 +619,9 @@ terminal counterpart. The rail source has both.
 **A separate start dialog from the item menu.** Refused. The promote-to-task modal already knows how
 to create a task or attach to one, and two modals that create tasks drift apart.
 
-**Grouping workflow sessions in the agent sidebar.** Refused. The run pane owns steps, and a group in
-the sidebar would draw them a second way. A glyph on the row and a chip in the header are enough to
-get from a session to its run.
+**Drawing workflow steps in the agent sidebar.** Refused. The run pane owns steps, and the sidebar
+would draw them a second way. The sidebar's Workflow runs group lists the sessions a workflow started,
+one row per session, and the chip in the header gets from a session to its run.
 
 **Rerun from an arbitrary node.** Refused for this programme. Rerunning from a node that is done
 means unwinding its successors' handoffs and outputs, and deciding what a downstream node that
@@ -627,8 +651,8 @@ budget rather than reusing these session tools.
 that way, so the editor never offers to retarget one. Retry with an edited prompt patches one step of
 the frozen copy and keeps the original in the step's `inputs_json`.
 
-**A second run list.** Refused. The merged list at Settings → Runs stays as it is, the run pane is
-addressed by task, and `packages/protocol/src/runs.ts` already says when a core runs table would be
+**A second run list.** Refused. The merged list at Settings → Run history stays as it is, the run pane is
+addressed by task, and `packages/protocol/src/runtime/runs.ts` already says when a core runs table would be
 earned.
 
 **A separate agent-only batch runtime.** Refused. Structured agent output followed by

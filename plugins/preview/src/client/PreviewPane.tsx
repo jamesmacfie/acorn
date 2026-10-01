@@ -1,10 +1,17 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
-import { elementRectKey, previewViews, visibleElementRect } from '@acorn/plugin-api/client'
-import { EmptyState, IconButton, Input, Rectangle, Spinner, Text, Toolbar } from '@acorn/plugin-api/ui'
+import { elementRectKey, previewViews, toast, visibleElementRect } from '@acorn/plugin-api/client'
+import { Button, EmptyState, IconButton, Input, Rectangle, Spinner, Text, Toolbar } from '@acorn/plugin-api/ui'
 
 const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
 
-export default function PreviewPane(props: { taskId: string; url: string | null }) {
+export default function PreviewPane(props: {
+  taskId: string
+  url: string | null
+  remoteBlocked: boolean
+  resolving?: boolean
+  resolutionFailed?: boolean
+  retryResolution?: () => void
+}) {
   let host!: HTMLElement
   const preview = previewViews()
   const [loading, setLoading] = createSignal(false)
@@ -12,6 +19,12 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
   const [canBack, setCanBack] = createSignal(false)
   const [canFwd, setCanFwd] = createSignal(false)
   const [suppressed, setSuppressed] = createSignal(false)
+  const [ready, setReady] = createSignal(false)
+  const [failed, setFailed] = createSignal(false)
+  const [retry, setRetry] = createSignal(0)
+  type Request = { taskId: string; url: string; version: number }
+  const [requested, setRequested] = createSignal<Request | null>(null)
+  let attempted: Request | undefined
   let ensureVersion = 0
 
   // Where the view was last told to sit. The poll below asks the same question five times a second
@@ -56,10 +69,11 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
       syncRect()
       checkOcclusion()
     }, 200)
+    checkOcclusion()
     const offEvent = preview.onEvent((s) => {
       if (s.taskId !== props.taskId) return // only the active view drives the chrome
       setLoading(s.loading)
-      setAddr(s.url || props.url || '')
+      setAddr(s.url)
       setCanBack(s.canGoBack)
       setCanFwd(s.canGoForward)
     })
@@ -68,37 +82,62 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
       ro.disconnect()
       clearInterval(poll)
       offEvent()
-      preview.hide() // leaving the preview pane hides the native view; main keeps it alive
     })
   })
 
-  // Reconciles the task's shell-owned view against the host element (docs/shell.md § Host-owned
-  // webviews covers positioning and hide-on-cover). The shell owns home identity across client
-  // remounts, so a changed run target updates the view while an ordinary pane or task switch
-  // preserves whatever the user was browsing.
+  // Capture the outgoing task before props change. Cleanup never hides another task's page.
+  createEffect(() => {
+    const taskId = props.taskId
+    setAddr('')
+    setCanBack(false)
+    setCanFwd(false)
+    onCleanup(() => preview?.hide(taskId))
+  })
+
+  // Visibility does not reconcile a target or retry a failed navigation.
+  createEffect(() => {
+    const taskId = props.taskId
+    if (ready() && props.url && !props.remoteBlocked && !props.resolutionFailed && !suppressed()) {
+      placed = ''
+      syncRect()
+      preview?.show(taskId)
+    } else {
+      preview?.hide(taskId)
+    }
+  })
+
   createEffect(() => {
     const taskId = props.taskId
     const url = props.url
-    const covered = suppressed()
+    const blocked = props.remoteBlocked
+    const resolving = props.resolving
+    const resolutionFailed = props.resolutionFailed
+    retry()
     const version = ++ensureVersion
+    setRequested(null)
+    setReady(false)
+    setFailed(false)
     if (!preview || !host) return
-    if (!url) {
-      preview.hide()
+    if (blocked) {
+      preview.evict(taskId)
       return
     }
-    if (covered) {
-      preview.hide()
-    } else {
-      syncRect()
-    }
-    void preview.ensure(taskId, url).then((ready) => {
-      if (!ready || version !== ensureVersion) return
-      // A view the shell has just created is a 1x1 square in the corner, and the bounds call that
-      // ran before `ensure` found no view to move, so this one placement cannot be the one the
-      // memo above skips.
-      placed = ''
-      syncRect()
-      if (!suppressed()) preview.show(taskId)
+    // A configuration read is not an instruction to reset a retained page.
+    if (!url || resolving || resolutionFailed) return
+    setRequested({ taskId, url, version })
+  })
+
+  createEffect(() => {
+    const request = requested()
+    if (!preview || !request || suppressed() || attempted === request) return
+    attempted = request
+    const { taskId, url, version } = request
+    void preview.ensure(taskId, url).then((accepted) => {
+      if (version !== ensureVersion) return
+      setFailed(!accepted)
+      setReady(accepted)
+    }).catch(() => {
+      if (version === ensureVersion) setFailed(true)
     })
   })
 
@@ -107,15 +146,33 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
     if (preview && v) preview.load(props.taskId, withScheme(v))
   }
 
+  const copyAddr = () => {
+    void navigator.clipboard.writeText(addr())
+    toast('Copied the page address')
+  }
+
   return (
     <>
       {/* No "needs the desktop app" fallback: the pane's `requires: { seam: 'preview' }` means a host
           without the seam never offers it (./PreviewTaskPane.tsx). */}
-      <Show when={props.url} fallback={
+      <Show when={props.remoteBlocked}>
+        <EmptyState title="Preview unavailable on remote Nodes">
+          A page loaded here could reach services on this computer's network. Run Acorn on the Node
+          machine to inspect its preview.
+        </EmptyState>
+      </Show>
+      <Show when={!props.remoteBlocked && (failed() || props.resolutionFailed)}>
+        <EmptyState title="Could not open the preview">
+          Check the preview URL and available browser capacity, then retry.
+          <Button onPress={() => props.resolutionFailed ? props.retryResolution?.() : setRetry((value) => value + 1)}>Retry preview</Button>
+        </EmptyState>
+      </Show>
+      <Show when={!props.remoteBlocked && props.resolving && !props.url}><Spinner label="Resolving preview URL" /></Show>
+      <Show when={!props.remoteBlocked && !failed() && !props.resolutionFailed && props.url} fallback={props.remoteBlocked || props.resolving || failed() || props.resolutionFailed ? null :
         <EmptyState title="No preview URL yet">
-          Declare a run target with a <Text emphasis="mono">url</Text> — in{' '}
-          <Text emphasis="mono">.acorn/config.toml</Text> or the workspace's run targets — and start it
-          from the pane switcher's ▶ button, or set a preview URL in Settings → workspace.
+          Start the run target from the pane switcher's ▶ button. If it is already running, check its{' '}
+          <Text emphasis="mono">url</Text> in <Text emphasis="mono">.acorn/config.toml</Text> or the
+          preview URL in Settings → workspace.
         </EmptyState>
       }>
         {/* The browser chrome, as the kit's toolbar rather than a flex row of this plugin's own:
@@ -138,13 +195,14 @@ export default function PreviewPane(props: { taskId: string; url: string | null 
             onInput={(value) => setAddr(value)}
             onKeyDown={(event) => { if (event.key === 'Enter') go() }}
           />
+          <IconButton icon="copy" label="Copy the page address" disabled={!addr()} onPress={copyAddr} />
           <IconButton icon="code-xml" label="Toggle preview DevTools" onPress={() => preview?.command(props.taskId, 'devtools')} />
           <Show when={loading()}><Spinner label="Loading page" /></Show>
         </Toolbar>
       </Show>
       {/* A WebContentsView is somebody else's pixels, so it is a rectangle: the kit owns the box and
           the way in and out of it with the keyboard, and the shell positions the view over `mount`. */}
-      <Rectangle kind="webview" label="Preview" mount={(element) => { host = element }} />
+      <Rectangle kind="webview" label="Preview" hidden={props.remoteBlocked || !props.url || failed() || props.resolutionFailed} mount={(element) => { host = element }} />
     </>
   )
 }

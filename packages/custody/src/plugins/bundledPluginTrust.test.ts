@@ -78,7 +78,7 @@ describe('bundled plugin client trust', () => {
       pluginId: 'first', hash: firstHash, nodeId: 'node-a', version: '1',
       permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
       webviews: [], keyClaims: [], navigationDestinations: [], extensions: [], schedules: [], taskChecks: [],
-      harnesses: [], agentTools: [], contextSections: [], decision: 'rejected' as const, decidedAt: 100,
+      harnesses: [], agentTools: [], contextSections: [], customAgents: [], decision: 'rejected' as const, decidedAt: 100,
     }
     trust.record(rejected)
     trust.record({ ...rejected, pluginId: 'unrelated', hash: 'a'.repeat(64) })

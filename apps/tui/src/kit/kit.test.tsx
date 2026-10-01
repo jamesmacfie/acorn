@@ -8,16 +8,17 @@ import { NODE_SUPPORT } from '@acorn/client-core/kit/tokens'
 import { NODE_FOCUS } from '@acorn/client-core/kit/tokens'
 import { HeaderBodyFooter } from '../layouts/HeaderBodyFooter'
 import { renderCells, type Cells, type Frame } from './render'
+import { fixtureDocument } from '../fixture'
 import {
   Card, DetailColumn, DocumentTabs, Fold, Inline, ListColumn, ListDetail, Menu, Modal, ModalActions,
-  ModalBody, Popover, Section, SectionHeader, Sections, SplitHandle, Stack, TabPanel, Tabs, Timeline,
+  ModalBody, Popover, Section, SectionHeader, Sections, SettingRow, SettingsSection, SplitHandle, Stack, TabPanel, Tabs, Timeline,
   Toolbar,
   ToolbarSpacer,
 } from './grouping'
 import {
   Alert, Badge, Chip, ChipRow, CodeBlock, DescriptionList, DiffLine, DiffPane, EmptyState, Facts,
   FileHead, Grid, Heading, Icon, Kbd, Link, Log, Markdown, Meter, NonCodeRow, Row, RowActions, Rows,
-  Spinner, SplitCell, StatusDot, Table, TableCell, TableHead, TableRow, Text, TreeRow, UserAvatar,
+  Spinner, SplitCell, StackedDiff, StatusDot, Table, TableCell, TableHead, TableRow, Text, TreeRow, UserAvatar,
 } from './showing'
 import {
   Button, Checkbox, Composer, ConfirmButton, CopyButton, Field, FindBar, Input, KeyValueEditor,
@@ -62,7 +63,7 @@ const rowOf = (frame: Frame, value: string) => frame.lines.findIndex((line) => l
  *  screen at all: a caret is the terminal's own and draws no cell, so the only way to see where it is
  *  is to type at it and say which row the character appeared on (../paint/paint.ts § drawField). */
 /** The text inside a `Textarea`, which is two frames in: the panel each case is drawn in, and the
- *  field's own border inside it (./asking.tsx § Textarea). */
+ *  field's own border inside it (./asking/fields.tsx § Textarea). */
 const fieldLines = (frame: Frame, count: number): string[] =>
   frame.lines.slice(2, 2 + count).map((line) => line.replace(/^│+/, '').replace(/[│█]+$/, '').trimEnd())
 
@@ -132,7 +133,7 @@ const CASES: Case[] = [
   },
   {
     node: 'Tabs',
-    draws: 'Tab  [Tab]  Tab on one line, the selected one in brackets, a marked tab behind its glyph',
+    draws: 'Tab  [Tab]  Tab on one line, using text labels without icons',
     render: () => (
       <Tabs
         idPrefix="t"
@@ -144,7 +145,7 @@ const CASES: Case[] = [
     ),
     check: (frame) => {
       expect(lineWith(frame, 'one')).toContain('[two]')
-      expect(lineWith(frame, 'one')).toContain('⑂ one')
+      expect(lineWith(frame, 'one')).not.toContain('⑂')
     },
   },
   {
@@ -284,11 +285,44 @@ const CASES: Case[] = [
   },
   {
     node: 'SectionHeader',
-    draws: 'a bold line with its actions at the far end',
+    draws: 'a bold heading with its actions on the next line',
     render: () => <SectionHeader actions={<Button label="New" />}>Files</SectionHeader>,
     check: (frame) => {
-      const line = lineWith(frame, 'Files')
-      expect(line.trimEnd().endsWith('[New]')).toBe(true)
+      expect(rowOf(frame, '[New]')).toBe(rowOf(frame, 'Files') + 1)
+    },
+  },
+  {
+    node: 'SettingsSection',
+    draws: 'the label in bold, the description in grey under it, then the rows',
+    render: () => (
+      <SettingsSection id="general" label="General" description="How the drawer opens">
+        <Text>a row</Text>
+      </SettingsSection>
+    ),
+    check: (frame) => {
+      expect(rowOf(frame, 'How the drawer opens')).toBe(rowOf(frame, 'General') + 1)
+      expect(rowOf(frame, 'a row')).toBe(rowOf(frame, 'General') + 2)
+    },
+  },
+  {
+    node: 'SettingRow',
+    draws: 'the label then the control on one line, Saved after it, the error under it; a value set elsewhere draws where instead of a control; a device row says so',
+    size: { width: 60, height: 8 },
+    render: () => (
+      <Stack>
+        <SettingRow label="Port" savedAt={Date.now()} error={undefined}><Text>4000</Text></SettingRow>
+        <SettingRow label="Command" error="Could not save"><Text>pnpm dev</Text></SettingRow>
+        <SettingRow label="Setup" from=".acorn/config.toml"><Text>machine value</Text></SettingRow>
+        <SettingRow label="Tool call display" scope="device"><Text>Folded</Text></SettingRow>
+      </Stack>
+    ),
+    check: (frame) => {
+      expect(lineWith(frame, 'Port')).toContain('4000')
+      expect(lineWith(frame, 'Port')).toContain('Saved')
+      expect(rowOf(frame, 'Could not save')).toBe(rowOf(frame, 'Command') + 1)
+      expect(lineWith(frame, 'Setup')).toContain('From .acorn/config.toml')
+      lacks(frame, 'machine value')
+      expect(lineWith(frame, 'Tool call display')).toContain('(this device)')
     },
   },
   {
@@ -360,9 +394,9 @@ const CASES: Case[] = [
   },
   {
     node: 'RowActions',
-    draws: "the row's actions as glyphs, always drawn, never on hover",
-    render: () => <Row reveal trailing={<RowActions ariaLabel="Actions">{() => <Icon name="x" />}</RowActions>}>a row</Row>,
-    check: (frame) => expect(lineWith(frame, 'a row')).toContain('✕'),
+    draws: "the row's labeled actions, always drawn, never on hover",
+    render: () => <Row reveal trailing={<RowActions ariaLabel="Actions">{() => <IconButton icon="x" label="Close" />}</RowActions>}>a row</Row>,
+    check: (frame) => expect(lineWith(frame, 'a row')).toContain('Close'),
   },
   {
     node: 'Badge',
@@ -547,7 +581,10 @@ const CASES: Case[] = [
   {
     node: 'DiffPane',
     draws: 'reduced: unified only',
-    render: () => <DiffPane source={{ files: () => [noteFile], loading: () => false }} />,
+    render: () => {
+      const { topology, segments } = fixtureDocument([noteFile])
+      return <DiffPane source={{ topology: () => topology, loading: () => false, loadSegments: async () => segments }} />
+    },
     size: { width: 40, height: 10 },
     check: (frame) => {
       has(frame, 'src/login.ts')
@@ -572,6 +609,18 @@ const CASES: Case[] = [
       const line = lineWith(frame, 'src/login.ts')
       expect(line).toContain('+3')
       expect(line.trimEnd().endsWith('−1')).toBe(true)
+    },
+  },
+  {
+    node: 'StackedDiff',
+    draws: 'reduced: the header, then each hunk and line, stacked',
+    render: () => <StackedDiff path="src/a.ts" patch={'@@ -3,2 +3,2 @@\n keep\n-old\n+new'} />,
+    size: { width: 40, height: 6 },
+    check: (frame) => {
+      expect(lineWith(frame, 'src/a.ts')).toContain('+1')
+      has(frame, '@@ -3,2 +3,2 @@')
+      expect(lineWith(frame, '+new')).toContain('4')
+      has(frame, '-old')
     },
   },
   {
@@ -627,9 +676,10 @@ const CASES: Case[] = [
   },
   {
     node: 'Icon',
-    draws: 'reduced: a glyph from the name table, and nothing for a name with none',
-    render: () => <Inline><Icon name="check" /><Icon name="not-a-real-icon" /></Inline>,
+    draws: 'a mapped one-cell mark; an unknown name takes no space',
+    render: () => <Inline><Icon name="circle-check" title="Ready" /><Icon name="not-a-real-icon" /></Inline>,
     check: (frame) => {
+      lacks(frame, 'Ready')
       has(frame, '✓')
       lacks(frame, 'not-a-real-icon')
     },
@@ -644,19 +694,20 @@ const CASES: Case[] = [
   },
   {
     node: 'IconButton',
-    draws: 'one cell: the mark, not the words a bar has no room for',
+    draws: 'the action label instead of an icon',
     render: () => <IconButton icon="arrow-up-to-line" label="Go to top" />,
     check: (frame) => {
-      has(frame, '⇑')
-      expect(frame).not.toContain('Go to top')
+      has(frame, 'Go to top')
+      lacks(frame, '⇑')
     },
   },
   {
     node: 'ConfirmButton',
-    draws: 'the label at rest; the armed button is the prompt',
-    render: () => <ConfirmButton label="Delete" onConfirm={() => {}} />,
+    draws: 'the label at rest even with an icon child; the armed button is the prompt',
+    render: () => <ConfirmButton label="Delete" onConfirm={() => {}}><Icon name="trash-2" /></ConfirmButton>,
     check: (frame) => {
       has(frame, '[Delete]')
+      lacks(frame, '[object Object]')
       // Arming is a press, and a button becomes a focus stop in phase 2. The armed label is
       // `createArmedConfirm`'s, which client-core tests directly.
       lacks(frame, 'Delete?')
@@ -781,7 +832,7 @@ const CASES: Case[] = [
     node: 'CopyButton',
     draws: 'fallback: a control that copies where the terminal takes OSC 52, and prints otherwise',
     render: () => <CopyButton text={() => 'copied text'} />,
-    check: (frame) => has(frame, '⧉'),
+    check: (frame) => has(frame, 'Copy'),
   },
   {
     node: 'ModelBackendPicker',
@@ -884,6 +935,31 @@ const drawable = <T,>(rows: readonly (readonly [string, T])[]): (readonly [strin
   rows.filter(([title]) => !owed(title))
 
 describe('the kit in cells', () => {
+  it('keeps three bare selects on one narrow row', async () => {
+    const screen = await renderCells(() => (
+      <Inline wrap>
+        <Inline><Text>Mode</Text><Select kind="bare" value="default" options={[{ value: 'default', label: 'Default' }]} /></Inline>
+        <Inline><Text>Model</Text><Select kind="bare" value="fixture" options={[{ value: 'fixture', label: 'Fixture model' }]} /></Inline>
+        <Inline><Text>Effort</Text><Select kind="bare" value="high" options={[{ value: 'high', label: 'high' }]} /></Inline>
+      </Inline>
+    ), { width: 52, height: 3 })
+    try {
+      expect(screen.lines[0]).toContain('Mode Default▾ Model Fixture model▾ Effort high▾')
+    } finally {
+      screen.done()
+    }
+  })
+
+  it('masks password input in captured terminal cells', async () => {
+    const screen = await renderCells(() => <Input type="password" value="supersecret" />, { width: 24, height: 2 })
+    try {
+      expect(screen.text).toContain('***********')
+      expect(screen.text).not.toContain('supersecret')
+    } finally {
+      screen.done()
+    }
+  })
+
   it('has a case for every node in the kit, and no case for a node that is gone', () => {
     expect(CASES.map((entry) => entry.node).sort()).toEqual([...KIT_NODES].sort())
     // Anti-vacuity: two empty lists compare equal, and the kit is not empty.
@@ -920,6 +996,23 @@ describe('the kit in cells', () => {
   // The held half, as skips rather than as absences, so the report says which node is waiting and why
   // (§ HELD).
   if (held(cases).length) it.skip.each(held(cases))('%s', drawCase)
+
+  it('keeps a striped card inside a narrow pane and colors its left edge on every row', async () => {
+    const frame = await renderCells(() => (
+      <Card stripe="ok"><Text wrap>One long agent message that wraps across several rows.</Text></Card>
+    ), { width: 28, height: 9 })
+    try {
+      const cardLines = frame.lines.filter((line) => line.startsWith('▍'))
+      expect(cardLines.length).toBeGreaterThan(3)
+      expect(cardLines[0]).toHaveLength(28)
+      expect(cardLines[0].endsWith('┐')).toBe(true)
+      expect(cardLines.at(-1)?.endsWith('┘')).toBe(true)
+      expect(cardLines.slice(1, -1).every((line) => line.endsWith('│'))).toBe(true)
+      expect(frame.text).toContain('message')
+    } finally {
+      frame.done()
+    }
+  })
 
   it('draws loose text wherever it lands, in every shape that has thrown', async () => {
     // The class, not an instance. A run of text needs a `text` parent here and on the DOM a bare
@@ -1038,10 +1131,10 @@ const BEHAVIOURS: Behaviour[] = [
   },
   {
     node: 'IconButton',
-    does: 'presses on Enter like any other button, with the mark in place of a label',
+    does: 'presses on Enter like any other button, with a text label',
     render: (record) => <IconButton icon="arrow-up-to-line" label="Go to top" onPress={() => record('press')} />,
     drive: async (screen, pressed) => {
-      lit(screen, '⇑')
+      lit(screen, 'Go to top')
       await screen.press('RETURN')
       expect(pressed).toEqual(['press'])
     },
@@ -1356,6 +1449,16 @@ const BEHAVIOURS: Behaviour[] = [
       // with the text it was built with. Harmless — the value it reports is the value it was given —
       // and pre-existing, so it is not this phase's to change.
       expect(pressed.at(-1)).toBe('a')
+    },
+  },
+  {
+    node: 'Textarea',
+    does: 'submits with the commit chord when the caller supplies onCommit',
+    render: (record) => <Textarea value="question" onCommit={() => record('sent')} />,
+    size: { width: 30, height: 5 },
+    drive: async (screen, pressed) => {
+      await screen.press('RETURN', { ctrl: true })
+      expect(pressed).toEqual(['sent'])
     },
   },
   {
@@ -1729,7 +1832,7 @@ describe('every control is a stop', () => {
 // Two surfaces that looked the same behaved differently, because `Sections` handed its strip a list
 // of panels and a plugin drawing `Tabs` and `TabPanel` as siblings had no way to. The pairing is
 // `idPrefix` now, which both halves already carry, so the relation is drawn rather than passed
-// (./grouping.tsx § Which panels a strip owns, docs/tui.md § Focus regions).
+// (./grouping/panelRegistry.ts § registerPanel, docs/tui.md § Focus regions).
 
 /** `Tabs` and its `TabPanel`s as siblings, the way a plugin writes them. */
 function TwoPanels() {

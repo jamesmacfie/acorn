@@ -1,5 +1,5 @@
-// The node half of the plugin API. See docs/plugins.md § The plugin API for the re-export rule,
-// the surface snapshot, and what PLUGIN_API_MAJOR guards.
+// The node half of the private compiled-plugin facade. See docs/plugins/package-shape.md for its
+// export snapshot and for the separate loaded-plugin compatibility guard.
 //
 // Off this surface, and staying off:
 //   ctx.events.streams()/channel(), PTY and WS-channel ownership. Exactly one plugin may own those,
@@ -32,8 +32,8 @@ export type { TaskConcern } from '@acorn/node-core/server/pluginHost'
 // What `ctx.search.register` takes and what its `search` answers with (server/pluginHost/search.ts).
 export type { SearchProvider, SearchQuery } from '@acorn/node-core/server/pluginHost'
 export type { SearchHit } from '@acorn/protocol/search.ts'
-// The major this build of the API speaks. docs/plugins.md § The plugin API covers what it guards, and
-// why it is the one name kept without a consumer.
+// The major this host speaks to loaded plugins. Exported here for compiled callers, but the private
+// facade's snapshot does not govern when this number changes.
 //
 // The context types are not here: a plugin keeps `ctx` inside `init`/`activate` and passes `ctx.core`
 // onward, so `NodePluginContext` never has to be named.
@@ -51,10 +51,12 @@ export type { Extension, ExtensionPointId } from '@acorn/node-core/server/plugin
 // manifest-declared harness and neither package may import the other.
 export { AGENTS_HARNESS_REGISTRY } from '@acorn/node-core/server/pluginHost'
 export type { HarnessProbe, HarnessRegistry, ManifestHarness, ManifestHarnessSpawn } from '@acorn/node-core/server/pluginHost'
+export { AGENTS_CUSTOM_AGENT_REGISTRY } from '@acorn/node-core/server/pluginHost'
+export type { CustomAgentRegistry, ManifestCustomAgent } from '@acorn/node-core/server/pluginHost'
 
 // ── Route toolkit ─────────────────────────────────────────────────────────────────────────────
 export type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'
-export { isTaskConfined, mayActOnTask, ownerId, requireDevice, requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
+export { isTaskConfined, mayActOnTask, ownerId, principalMayActOnTask, requireDevice, requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 export { onServerError, respondError } from '@acorn/node-core/server/respond.ts'
 // The portable carrier a loaded plugin uses to run its own Hono router through
 // `ctx.routes.fetch` (docs/plugins.md § Loaded plugins).
@@ -193,14 +195,17 @@ export {
   PLUGIN_TOOL_TIMEOUT_MAX_MS,
 } from '@acorn/protocol/plugin/runtimeContributions.ts'
 export type { PluginAgentToolDescriptor, PluginContextSectionDescriptor } from '@acorn/protocol/plugin/runtimeContributions.ts'
+export type { PluginCliCommandDescriptor } from '@acorn/protocol/plugin/cliCommands.ts'
 // The context-section helpers, not the sections: `pr`, `notes` and `memory` are shaped by the plugins
-// that own their rows (docs/agent-tools.md § Context sections).
-export { formatOmitted, truncateBytes } from '@acorn/node-core/server/agentTools'
+// that own their rows (docs/agent-tools.md § Context sections). `pastedContent` is also how agents
+// marks another agent's report.
+export { formatOmitted, pastedContent, truncateBytes } from '@acorn/node-core/server/agentTools'
 export type { PluginContextSection } from '@acorn/node-core/server/agentTools'
 export type { InternalEnvFactory } from '@acorn/node-core/server/auth'
 
 // ── Blobs and the sync engine ─────────────────────────────────────────────────────────────────
-export { fileBodyBlobKey, patchBlobKey } from '@acorn/node-core/server/blobs.ts'
+export { diffDocumentBlobKey, fileBodyBlobKey, patchBlobKey } from '@acorn/node-core/server/blobs.ts'
+
 export { serveThenRevalidate } from '@acorn/node-core/server/sync/engine.ts'
 export type { Cached, RefreshResult, RouteFailure, RouteResult } from '@acorn/node-core/server/sync/engine.ts'
 

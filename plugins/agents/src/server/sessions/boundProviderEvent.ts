@@ -81,6 +81,7 @@ const WEB_LIMITS = {
   snippet: 2_000,
   domains: 20,
   prompt: 8_192,
+  statusText: 100,
 } as const
 
 /** The whole payload, serialized: the same 64 KiB the inline tool input and output budget uses.
@@ -138,6 +139,7 @@ const boundedWeb = (web: AgentWebActivity | undefined): AgentWebActivity | undef
   let bounded: AgentWebActivity = {
     action: boundedWebAction(web.action),
     results: web.results?.slice(0, WEB_LIMITS.results).map(boundedWebResult),
+    status: web.status && { code: web.status.code, text: sliceText(web.status.text, WEB_LIMITS.statusText) },
   }
   // Trailing sources first and last: a reader who has forty of them is not reading the fiftieth, and
   // dropping one costs less than shortening every snippet above it.
@@ -193,6 +195,13 @@ export function boundProviderEvent(
           text: entry.text.slice(0, 16_384),
         })),
       }
+    case 'plan_proposal':
+      return {
+        ...event,
+        itemId: event.itemId.slice(0, 2_000),
+        providerTurnId: event.providerTurnId.slice(0, 2_000),
+        text: event.text.slice(0, 128 * 1024),
+      }
     case 'request':
       return {
         ...event,
@@ -205,6 +214,14 @@ export function boundProviderEvent(
           label: option.label.slice(0, 500),
         })),
         questions: event.questions?.slice(0, 50).map(boundedQuestion),
+        // The driver already refuses an identity that does not fit (codexAppApproval.ts); these
+        // bounds only keep a future driver from widening a row.
+        approval: event.approval && {
+          connector: event.approval.connector.slice(0, 200),
+          app: { id: event.approval.app.id.slice(0, 500), name: event.approval.app.name.slice(0, 200) },
+          scopes: event.approval.scopes.slice(0, 2),
+          ...(event.approval.warning ? { warning: event.approval.warning.slice(0, 2_000) } : {}),
+        },
       }
     case 'request_resolved':
       return event
@@ -221,6 +238,8 @@ export function boundProviderEvent(
         path: sliceText(event.path, 4_096),
         summary: sliceText(event.summary, 16_384),
         subagentId: sliceText(event.subagentId, 2_000),
+        changeId: sliceText(event.changeId, 2_000),
+        patchArtifactId: sliceText(event.patchArtifactId, 2_000),
       }
     case 'terminal':
       return {

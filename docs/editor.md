@@ -1,5 +1,24 @@
 # A host-owned document surface
 
+Editor file access uses core's canonical task-root guard for reads and writes. Writes refuse dangling
+links before opening the file, so a missing outside target cannot be created through a link in the
+worktree. Ordinary new files beneath real in-root directories and safe internal aliases remain valid.
+For the path replacement limit, see [security controls](./security.md#process-path-and-configuration-controls).
+
+## Image previews in the editor pane
+
+The editor plugin keeps one tab model for worktree files. In graphical mode, opening a PNG, JPEG,
+GIF, WebP, AVIF, BMP, or ICO file shows a fitted image in the document area. Text files continue
+through CodeMirror. The image view is read-only, so it never enters the text pool or autosave path.
+The terminal host names the image instead of trying to draw pixels; its `$EDITOR` mode remains
+available.
+
+The pane reads image bytes through `GET /v1/p/editor/tasks/:id/editor/image?path=…`. This route
+uses the same task-root confinement as text reads, limits previews to 32 MiB, and responds with a
+fixed image content type, `nosniff`, and `no-store`. The client turns the bytes into a blob URL,
+releases that URL when the tab changes, and rereads the image when the window regains focus so edits
+made by an agent appear. SVG remains a text document because it can contain active content.
+
 Design notes from the http-migration session (2026-08-11), when measuring Monaco against the plugin
 frame contract ended two migrations; extended the same day when the composed-pane question was worked
 through and decided; and rewritten on 2026-08-31, when the engine behind the surface changed and the
@@ -410,7 +429,8 @@ pre-emptively.
 
 The two regions share no DOM and no JavaScript realm — the editor is in the shell, the frame is in a
 sandboxed iframe. All traffic goes through the host over the bridge that already exists (the
-`MessagePort` request/reply channel in `client-core/src/host/frames/sdk.ts`), in two directions.
+`MessagePort` request/reply channel in `packages/client-core/src/host/frames/sdk/bridgePort.ts`),
+in two directions.
 The host→frame push direction is also already established — `onSelect`, `events.on`, the webview
 listeners — so nothing below invents a channel; it adds message kinds to one.
 

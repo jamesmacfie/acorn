@@ -23,7 +23,7 @@ import {
   type PluginBridgeWebviewRequest,
 } from '@acorn/protocol/plugin/bridge.ts'
 import { MAX_PLUGIN_STATE_BYTES } from '@acorn/protocol/plugin/state.ts'
-import { NODE_CORE_FACETS } from '../plugins/permissions.ts'
+import { NODE_CORE_FACETS } from '../plugins/coreFacets.ts'
 import { registerContextSection, type ContextSectionContribution } from './contextSections.ts'
 import type { AgentToolContribution } from './registry.ts'
 
@@ -100,6 +100,7 @@ const UI_OPS = {
   copy: 'write text to the clipboard — `navigator.clipboard` does not work in a frame',
   openPane: 'open a pane by id',
   openDestination: 'open a manifest-declared cooperative destination with a bounded resource id',
+  openTask: 'go to a task by id. Needs core.tasks:read, a focused frame, and shares openUrl\'s once-a-second budget',
   openUrl: 'https only, focused frame only, at most once a second, and you learn nothing back',
   'importer.done': 'importer surfaces only: close and run the host refresh',
   'importer.close': 'importers and overlays: plain dismissal. An overlay a remote tree opened may pass a '
@@ -243,8 +244,10 @@ Declare loaded agent tools and task-context sections only in \`contributions.age
 turns the descriptor into the same tool registry or context assembler used by compiled plugins, and
 removes it on update/unload. Tool input is bounded JSON Schema, not Zod in your bundle. Context returns
 bounded data and compact reference text, never a renderer or callback.
-Node actions and managed-agent harnesses have no \`ctx\` member at all: declare them in the manifest,
-which is the only way in (a command with the \`runNodeAction\` verb, and \`contributions.harnesses\`).
+Node actions, managed-agent harnesses and custom agents have no \`ctx\` member at all: declare them in
+the manifest, which is the only way in (a command with the \`runNodeAction\` verb,
+\`contributions.harnesses\`, and \`contributions.customAgents\`). A custom agent is data: a name, a
+harness id, provider options, instructions the owner reads in full at install, and a \`maxToolRisk\`.
 
 Three of those are newer than the rest, so do not assume an example you have seen uses them:
 \`ctx.runs.register({ runs })\` points at a GET on your own namespace answering \`{ runs }\`, and core

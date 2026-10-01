@@ -1,5 +1,5 @@
 import { createSignal, For, Show } from 'solid-js'
-import { createDismissable } from '../../../kit/lib/dismissable'
+import { createDismissable } from '../../../kit/lib/controls/dismissable'
 import { collectConcerns, type Concern, DETAILS_MAX, type WillEventMap } from './willPhaseModel'
 import { Button, Checkbox } from '../../../kit/components/primitives'
 import { createLogger } from '../../../infra/telemetry/logger'
@@ -12,6 +12,10 @@ type Prompt = {
   title: string
   actionLabel: string
   message?: string
+  /** What the action leaves in place, said apart from what it removes. */
+  stays?: string
+  /** Cancel takes the focus rather than the action. */
+  danger?: boolean
   concerns: Concern[]
   resolve: (decision: WillDecision) => void
 }
@@ -29,6 +33,8 @@ export async function confirmWillEvent<K extends keyof WillEventMap>(options: {
   title: string
   actionLabel: string
   message?: string
+  /** What the action leaves in place, said apart from what it removes. */
+  stays?: string
   alwaysConfirm?: boolean
   concerns?: Concern[]
 }): Promise<WillDecision> {
@@ -38,8 +44,43 @@ export async function confirmWillEvent<K extends keyof WillEventMap>(options: {
     title: options.title,
     actionLabel: options.actionLabel,
     message: options.message,
+    ...(options.stays ? { stays: options.stays } : {}),
     concerns,
     resolve,
+  }))
+}
+
+/**
+ * The shell's one confirmation, for an action no will handler weighs in on: a danger zone's delete,
+ * uninstall, unpair or revoke, and leaving a settings form with unsaved changes. The same dialog as a
+ * will event's, so every "are you sure" in the app looks and answers alike. `goes` says what the action
+ * removes and `stays` what it leaves, as two sentences, because the second is the one people look for.
+ */
+export function confirmAction(options: {
+  title: string
+  actionLabel: string
+  goes: string
+  stays?: string
+  danger?: boolean
+}): Promise<boolean> {
+  // Back to where the person was, which inside settings is the button that asked. The dialog is drawn
+  // outside the settings layer, and a closed dialog leaves the focus on the body otherwise.
+  const opener = document.activeElement instanceof HTMLElement ? document.activeElement : undefined
+  return new Promise<boolean>((resolve) => setPrompt({
+    title: options.title,
+    actionLabel: options.actionLabel,
+    message: options.goes,
+    ...(options.stays ? { stays: options.stays } : {}),
+    ...(options.danger ? { danger: true } : {}),
+    concerns: [],
+    resolve: ({ confirmed }) => {
+      // WebKit does not focus a clicked button, so the opener can be the body; and a confirmed delete
+      // can take the opener away. Either way the focus goes to the layer the dialog was raised over,
+      // settings among them, so its Escape and ⌘[ keep working without a click first.
+      if (opener?.isConnected && opener !== document.body) opener.focus()
+      else [...document.querySelectorAll<HTMLElement>('[role="dialog"][aria-modal="true"]')].at(-1)?.focus()
+      resolve(confirmed)
+    },
   }))
 }
 
@@ -68,6 +109,7 @@ export function WillConfirmationHost() {
     current.resolve({ confirmed, checked })
   }
   const dismiss = createDismissable({ onDismiss: () => finish(false), container: () => dialog })
+  const dangerous = (current: Prompt) => !!current.danger || current.concerns.some((concern) => concern.severity === 'danger')
   return (
     <Show when={prompt()} keyed>
       {(current) => (
@@ -83,6 +125,7 @@ export function WillConfirmationHost() {
             <div class="overlay-title">{current.title}</div>
             <div class="overlay-body">
               <Show when={current.message}>{(message) => <p>{message()}</p>}</Show>
+              <Show when={current.stays}>{(stays) => <p class="muted">{stays()}</p>}</Show>
               <Show when={current.concerns.length}>
                 <ul class="will-concerns">
                   {current.concerns.map((concern) => (
@@ -114,8 +157,8 @@ export function WillConfirmationHost() {
                 </ul>
               </Show>
               <div class="close-actions">
-                <Button autofocus={current.concerns.some((concern) => concern.severity === 'danger')} onPress={() => finish(false)}>Cancel</Button>
-                <Button autofocus={!current.concerns.some((concern) => concern.severity === 'danger')} onPress={() => finish(true)}>{current.actionLabel}</Button>
+                <Button autofocus={dangerous(current)} onPress={() => finish(false)}>Cancel</Button>
+                <Button autofocus={!dangerous(current)} tone={current.danger ? 'danger' : undefined} onPress={() => finish(true)}>{current.actionLabel}</Button>
               </div>
             </div>
           </div>

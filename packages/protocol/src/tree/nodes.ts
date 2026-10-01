@@ -24,11 +24,11 @@ export const KIT_NODES = [
   'Stack', 'Inline', 'Section', 'Fold', 'Card', 'Timeline', 'Tabs', 'Toolbar',
   'Modal', 'ModalBody', 'ModalActions', 'Menu', 'Popover', 'ListDetail', 'ListColumn', 'DetailColumn',
   'Sections',
-  'SplitHandle', 'DocumentTabs', 'SectionHeader', 'TabPanel', 'ToolbarSpacer',
+  'SplitHandle', 'DocumentTabs', 'SectionHeader', 'TabPanel', 'ToolbarSpacer', 'SettingsSection', 'SettingRow',
   // Showing
   'Text', 'Link', 'Heading', 'Rows', 'Row', 'TreeRow', 'RowActions', 'Badge', 'Chip', 'ChipRow', 'StatusDot', 'Facts',
   'DescriptionList', 'Table', 'TableHead', 'TableRow', 'TableCell', 'Grid', 'Graph', 'Meter', 'CodeBlock', 'Log', 'Markdown', 'DiffPane', 'DiffLine',
-  'FileHead', 'NonCodeRow', 'SplitCell', 'EmptyState', 'Alert', 'Spinner', 'Kbd', 'UserAvatar', 'Icon',
+  'FileHead', 'StackedDiff', 'NonCodeRow', 'SplitCell', 'EmptyState', 'Alert', 'Spinner', 'Kbd', 'UserAvatar', 'Icon',
   // Asking
   'Button', 'IconButton', 'Input', 'Textarea', 'Select', 'Checkbox', 'SegmentedControl', 'ToggleButton', 'Picker',
   'PickerRow', 'Composer', 'MentionTextarea', 'KeyValueEditor', 'FindBar', 'Field', 'ConfirmButton',
@@ -47,6 +47,10 @@ export type KitNodeName = (typeof KIT_NODES)[number]
  *  the sandbox adapter, so the wire has a single node shape rather than two. */
 export const TEXT_NODE = '#text'
 
+/** Host-filled chrome mount. Recognised only inside a rail or topbar replacement with a minted ref;
+ * it is intentionally outside KIT_NODES, so ordinary plugin trees cannot create nested slots. */
+export const CHROME_SLOT_NODE = 'Slot'
+
 const kitNodeSet: ReadonlySet<string> = new Set<string>(KIT_NODES)
 export const isKitNode = (value: string): value is KitNodeName => kitNodeSet.has(value)
 
@@ -54,12 +58,12 @@ export const isKitNode = (value: string): value is KitNodeName => kitNodeSet.has
  * The closed set of events a node may send back.
  *
  * Never a key and never a pointer event: a terminal host has neither, and it must be able to map its
- * own keys onto the same eleven names. A prop whose name is in here carries a handler id; a prop
+ * own keys onto the same twelve names. A prop whose name is in here carries a handler id; a prop
  * whose name starts with `on` and is not in here is dropped.
  */
 export const KIT_EVENTS = [
   'onPress', 'onChange', 'onSubmit', 'onSelect', 'onActivate', 'onToggle', 'onOpenChange',
-  'onExpand', 'onDismiss', 'onPick', 'onRemove',
+  'onExpand', 'onDismiss', 'onPick', 'onRemove', 'onConfirm',
 ] as const
 export type KitEvent = (typeof KIT_EVENTS)[number]
 
@@ -100,4 +104,7 @@ export const ROLE_PROPS = {
 export const FORBIDDEN_PROPS = [
   'class', 'className', 'classList', 'style', 'ref', 'innerHTML', 'innerText', 'textContent',
   'dangerouslySetInnerHTML', 'children',
+  // `Row.item` and `SplitHandle.drag.handleProps` are host-minted collection/drag handles that kit
+  // components spread onto DOM elements. Nested JSON here would bypass every top-level prop check.
+  'item', 'drag',
 ] as const

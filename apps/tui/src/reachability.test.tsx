@@ -60,6 +60,23 @@ const SURFACES: Surface[] = [
     // hardest case for "the keys are somewhere a reader can see" (./chrome/CheatSheet.tsx).
     open: async (screen) => { await screen.press('?'); await screen.until('Keys') },
   },
+  {
+    name: 'settings',
+    until: '#42',
+    // The Settings route, on the one core page this host draws a form for: switches, a button, and the
+    // terminal's own alert row. It is an overlay scope, like the cheat sheet, holding a viewport.
+    open: async (screen) => {
+      await screen.press('k', { ctrl: true })
+      for (const letter of 'settings') await screen.press(letter)
+      await screen.press('RETURN')
+      await screen.until('Workspaces and projects')
+      await screen.press('RETURN')
+      await screen.until('Keyboard shortcuts')
+      await screen.press('ARROW_DOWN')
+      await screen.press('RETURN')
+      await screen.until('Terminal alerts')
+    },
+  },
 ]
 
 /**

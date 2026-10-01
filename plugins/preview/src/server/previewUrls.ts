@@ -41,6 +41,7 @@ const scriptUrl = async (core: PreviewCore, taskId: string, script: string): Pro
 
 export type PreviewUrlRuntime = {
   forTask(taskId: string): Promise<PreviewUrlState | null>
+  configured(): Promise<Record<string, boolean>>
   refresh(taskId: string): Promise<void>
   refreshProject(projectId: string): Promise<void>
   selectRecipe(taskId: string, url: string): Promise<void>
@@ -83,6 +84,21 @@ export function createPreviewUrlRuntime(
     return null
   }
 
+  // The same ladder as `resolve`, asking only whether each rung is filled in. It runs no script and
+  // needs no dev server, because it decides whether the pane is offered at all: an answer that went
+  // false while a dev server restarted would close the pane the reader was looking at.
+  const configuredFor = async (taskId: string): Promise<boolean> => {
+    if (recipeUrls.has(taskId)) return true
+    const listed = await runTargets()?.targets(taskId).catch(() => undefined)
+    if (listed && 'targets' in listed) {
+      const target = listed.targets.find((t) => t.default) ?? listed.targets[0]
+      if (target?.url || target?.urlCommand) return true
+    }
+    const task = await core.tasks.load(taskId)
+    const config = task ? (await core.projects.config(task.projectId))?.config : undefined
+    return !!config?.previewMode && !!config.previewValue?.trim()
+  }
+
   const forTask = async (taskId: string): Promise<PreviewUrlState | null> => {
     const state = await resolve(taskId)
     observed.set(taskId, state)
@@ -103,6 +119,10 @@ export function createPreviewUrlRuntime(
 
   return {
     forTask,
+    configured: async () => {
+      const tasks = await core.tasks.active()
+      return Object.fromEntries(await Promise.all(tasks.map(async (task) => [task.id, await configuredFor(task.id)] as const)))
+    },
     refresh,
     refreshProject: async (projectId) => {
       const tasks = await core.tasks.active()

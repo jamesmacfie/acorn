@@ -1,8 +1,12 @@
 // Typed wrapper over the /v1/p/http routes, over the frame bridge rather than core's fetch helpers.
 //
 // A frame has no network (`connect-src 'none'`), so there is no `readJson` and no CSRF envelope.
-// Every call is a message on the one MessagePort, and the host checks the path against this plugin's
-// own namespace before forwarding it (client-core/host/frames/scopes.ts).
+// Every call is a message on the mounted tree's bridge, and the host checks the path against this
+// plugin's own namespace before forwarding it (client-core/host/frames/scopes.ts).
+//
+// Built from the bridge the tree was mounted with, never from module-level `connect()`. In a tree
+// worker that one is the bundle's shared port, which the host refuses for any bundle whose SDK hands
+// each tree its own bridge (client-core/host/tree/workerHost.ts).
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import {
   httpRequestRoute,
@@ -61,3 +65,5 @@ export function decodeBody(bodyBase64: string): { text: string; bytes: Uint8Arra
   const bytes = Uint8Array.from(atob(bodyBase64), (ch) => ch.charCodeAt(0))
   return { text: new TextDecoder().decode(bytes), bytes }
 }
+
+export type HttpClient = ReturnType<typeof createHttpClient>

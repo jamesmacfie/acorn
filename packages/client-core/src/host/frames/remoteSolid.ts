@@ -19,8 +19,9 @@
 import { createRenderer } from 'solid-js/universal'
 import { createStore, reconcile } from 'solid-js/store'
 import type { JSX } from 'solid-js'
-import { KIT_NODES, type KitNodeName } from '@acorn/protocol/tree/nodes.ts'
-import type { AcornBridge, TreeMount, TreeRender } from './sdk'
+import { CHROME_SLOT_NODE, KIT_NODES, type KitNodeName } from '@acorn/protocol/tree/nodes.ts'
+import type { AcornBridge } from './sdk/bridgeTypes'
+import type { TreeMount, TreeRender } from './sdk/treeChannel'
 import {
   createNode, createText, firstChild, insertNode as attach, isTextNode, nextSibling, parentOf,
   removeNode, setProperty, setText, type RemoteNode,
@@ -53,7 +54,7 @@ export const {
  * Loose on purpose. The host validates every prop against the wire schema before it reaches a
  * component (@acorn/protocol/tree/props.ts), so a narrow type here would be a second, drifting copy
  * of a rule that is already enforced where it matters. What it does buy is the shape of the value: a
- * function survives only under one of the kit's eleven event names, and `class`, `style` and the rest
+ * function survives only under one of the kit's twelve event names, and `class`, `style` and the rest
  * of the DOM escape hatches are dropped before they cross.
  */
 export type KitNodeProps = Record<string, unknown> & { children?: unknown }
@@ -69,7 +70,7 @@ export type KitNodeProps = Record<string, unknown> & { children?: unknown }
  * would use on a DOM element — a prop that changes patches one node, and a list that grows inserts
  * one child.
  */
-const kitNode = (type: KitNodeName) => {
+const kitNode = (type: KitNodeName | typeof CHROME_SLOT_NODE) => {
   const node = (props: KitNodeProps): RemoteNode => {
     const own = createNode(type)
     spread(own, props, false)
@@ -86,15 +87,18 @@ export const KIT_NODE_COMPONENTS = Object.fromEntries(
   KIT_NODES.map((name) => [name, kitNode(name)]),
 ) as Record<KitNodeName, (props: KitNodeProps) => JSX.Element>
 
+/** Only a rail or topbar replacement receives a host-minted slotRef that this can place. */
+export const Slot = kitNode(CHROME_SLOT_NODE)
+
 // Destructured rather than written out one `export const` at a time, so the list cannot drift from
 // `KIT_NODES`: a name here that the kit does not have is a type error, and a name the kit has that is
 // missing here is caught by ./remoteSolid.test.ts.
 export const {
   Stack, Inline, Section, Fold, Card, Timeline, Tabs, Toolbar, Modal, ModalBody,
   ModalActions, Menu, Popover, ListDetail, ListColumn, DetailColumn, SplitHandle, DocumentTabs,
-  SectionHeader, TabPanel, ToolbarSpacer, Text, Link, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip,
+  SectionHeader, TabPanel, ToolbarSpacer, SettingsSection, SettingRow, Text, Link, Heading, Rows, Row, TreeRow, RowActions, Badge, Chip,
   ChipRow, StatusDot, Facts, DescriptionList, Table, TableHead, TableRow, TableCell, Grid, Meter, CodeBlock, Log, Markdown, DiffPane,
-  DiffLine, FileHead,
+  DiffLine, FileHead, StackedDiff,
   NonCodeRow, SplitCell, EmptyState, Alert, Spinner, Kbd, UserAvatar, Icon, Button, IconButton, Input, Textarea,
   Select, Checkbox, SegmentedControl, ToggleButton, Picker, PickerRow, Composer, MentionTextarea,
   KeyValueEditor, FindBar, Field, ConfirmButton, CopyButton, ModelBackendPicker, Rectangle, Only,

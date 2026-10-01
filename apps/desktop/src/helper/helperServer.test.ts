@@ -66,6 +66,12 @@ const stubHelper = (): Stub => {
         return node
       },
     },
+    config: {
+      path: '/tmp/acorn-helper-test.json',
+      read: () => ({ config: {} }),
+      write: (config: unknown) => ({ config }),
+      watch: () => () => {},
+    },
   } as unknown as Helper
   return { helper, remembered, upserted }
 }
@@ -95,6 +101,14 @@ afterEach(async () => {
 })
 
 const REQUEST = { sourceNodeId: 'local', providerId: 'cloud:nodes', providerNodeId: 'inst-42', label: 'Big box' }
+
+it('accepts a device configuration patch over the helper socket', async () => {
+  const { helper } = stubHelper()
+  const reply = await call(helper, 'config-write', { exclusiveSlots: { topbar: 'core' } })
+  expect(reply.ok).toBe(true)
+  expect(reply.ok === true && reply.value).toEqual({ config: { exclusiveSlots: { topbar: 'core' } } })
+  expect((await call(helper, 'config-write', 'not an object')).ok).toBe(false)
+})
 
 describe('node-adopt checks the vouched fingerprint against the certificate', () => {
   it('refuses a node presenting an identity the provider did not vouch for', async () => {
@@ -134,6 +148,67 @@ describe('node-adopt checks the vouched fingerprint against the certificate', ()
     expect(upserted).toHaveLength(1)
   })
 })
+
+it('refuses a multibyte secret safely and then accepts the valid secret and origin', async () => {
+  const { helper } = stubHelper()
+  const server = await startHelperServer(helper, { secret: 'a'.repeat(64), appOrigin: 'http://acorn.localhost' })
+  servers.push(server)
+  const refused = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${encodeURIComponent('é'.repeat(64))}`)
+  await new Promise<void>((resolve) => { refused.on('error', () => {}); refused.once('close', () => resolve()) })
+  const foreign = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${server.secret}`, { origin: 'http://foreign.invalid' })
+  await new Promise<void>((resolve) => { foreign.on('error', () => {}); foreign.once('close', () => resolve()) })
+  const valid = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${server.secret}`, { origin: 'http://acorn.localhost' })
+  await new Promise<void>((resolve, reject) => { valid.once('open', resolve); valid.on('error', reject) })
+  valid.close()
+})
+
+it('closes an oversized request with 1009 before dispatch, then shuts down promptly', async () => {
+  const { helper } = stubHelper()
+  const write = vi.spyOn(helper.config, 'write')
+  const server = await startHelperServer(helper, { secret: 'a'.repeat(64), appOrigin: 'http://acorn.localhost', maxRequestBytes: 64 })
+  servers.push(server)
+  const ws = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${server.secret}`)
+  ws.on('error', () => {})
+  await new Promise<void>((resolve) => ws.once('open', resolve))
+  const closed = new Promise<number>((resolve) => ws.once('close', (code) => resolve(code)))
+  ws.send(JSON.stringify({ id: 1, method: 'config-write', params: { value: 'x'.repeat(65) } }))
+  expect(await closed).toBe(1009)
+  expect(write).not.toHaveBeenCalled()
+})
+
+it('does not apply the incoming carrier limit to a larger helper reply', async () => {
+  const { helper } = stubHelper()
+  vi.spyOn(helper.config, 'read').mockReturnValue({ config: { testValue: 'x'.repeat(1000) } } as ReturnType<Helper['config']['read']>)
+  const server = await startHelperServer(helper, { secret: 'a'.repeat(64), appOrigin: 'http://acorn.localhost', maxRequestBytes: 64 })
+  servers.push(server)
+  const ws = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${server.secret}`)
+  ws.on('error', () => {})
+  await new Promise<void>((resolve) => ws.once('open', resolve))
+  const replied = new Promise<string>((resolve) => ws.once('message', (data) => resolve(String(data))))
+  ws.send(JSON.stringify({ id: 1, method: 'config-read' }))
+  expect((await replied).length).toBeGreaterThan(1000)
+  ws.close()
+})
+
+it('terminates an oversized peer still waiting in its closing handshake during helper disposal', async () => {
+  const { helper } = stubHelper()
+  const server = await startHelperServer(helper, { secret: 'a'.repeat(64), appOrigin: 'http://acorn.localhost', maxRequestBytes: 64 })
+  servers.push(server)
+  const ws = new WebSocket(`ws://127.0.0.1:${server.port}/helper?secret=${server.secret}`)
+  ws.on('error', () => {})
+  await new Promise<void>((resolve) => ws.once('open', resolve))
+  const closing = vi.spyOn(WebSocket.prototype, 'close')
+  try {
+    ws.pause()
+    ws.send('x'.repeat(65))
+    await vi.waitFor(() => expect(closing.mock.calls.some(([code]) => code === 1009)).toBe(true))
+    await server.close()
+  } finally {
+    closing.mockRestore()
+    ws.resume()
+    ws.terminate()
+  }
+}, 2_000)
 
 
 // The helper forwards the active node's frames and nobody else's.

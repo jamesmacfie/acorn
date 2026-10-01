@@ -1,13 +1,14 @@
 # Docker
 
-The Docker plugin exposes Node-local Docker state through the shared process broker. Docker itself is
+The Docker plugin exposes Node-local Docker state through a bounded CLI adapter using the shared
+broker's environment filter. Docker itself is
 authoritative; acorn caches short-lived projections and never stores the full inventory as application
 data.
 
 ## Surfaces
 
 - Docker Source: Compose projects, containers, images, volumes, and networks.
-- Task pane: containers matched by Compose project, worktree, labels, or branch slug.
+- Task pane: containers associated with the host-stored task worktree by daemon metadata.
 - Logs, stats, inspect, and exec.
 - Start/stop/restart/pause/unpause/remove, Compose lifecycle, and prune.
 - Task badges, summaries, and archive-time teardown prompts.
@@ -62,14 +63,23 @@ is about to be destroyed is on screen.
 
 ## Matching
 
-Matching configuration is declarative: project names, labels, and name patterns are stored in the
-Node configuration. The matcher derives task association from the repo/worktree and Compose metadata.
-It does not persist a second container inventory.
+Task listings and cleanup require the daemon's `com.docker.compose.project.working_dir` metadata to
+equal or sit beneath the host-stored task worktree path. Matching uses normalized absolute path
+components, with POSIX, Windows drive and UNC forms supported. Relative paths, traversal, invalid
+paths, sibling prefixes, missing roots and missing working-directory metadata confer no association.
+Daemon path strings are compared directly; they are not resolved against this Node's filesystem.
+
+The device-only task summary can additionally suggest containers using declarative project, label and
+branch-name hints from the layered home/repository configuration. Explicit foreign or invalid
+working-directory metadata always defeats those hints. Suggested containers do not gain access
+through task-addressed listing or cleanup. Repository configuration reads require a regular file
+canonically within the checkout, accept internal aliases, and cap input at 1 MiB. Unsafe, oversized or
+malformed files contribute no hints. No second container inventory is persisted.
 
 ## Execution
 
-All Docker commands use fixed argument arrays through CoreServices' process broker. The Node caps
-output and operation time, reports each teardown failure, and does not claim a multi-resource action
+All Docker commands use fixed argument arrays and the shared broker's environment filter. The Node caps
+output and operation time, propagates teardown failures, and does not claim a multi-resource action
 succeeded when one part failed. Events and log/stat streams use `/v1/events` with reconnect/refetch
 behavior.
 
@@ -88,6 +98,31 @@ desired subscription on `docker:stream-end`, so reconnect can retry a still-open
 
 Compose files and commands that execute developer code pass the repository configuration trust gate.
 The declarative matcher does not, by itself, execute anything.
+
+Global HTTP lifecycle and Compose actions require owner device authority. Docker WebSocket streams
+and exec permit device and service principals; task-confined sockets cannot open Docker channels.
+Explicit global actions can manage resources outside any task. Task credentials can list and tear down only their
+own task through the host task-scope gate. Declarative hints do not authorize these actions. Run
+targets that execute repository commands use the separate repository configuration trust gate.
+
+Every exec frame validates its payload before native PTY calls. Exec IDs contain one to 128 string
+characters, input is a UTF-8 string of at most 64 KiB, and dimensions must be finite integers when
+present. Missing or zero dimensions default to 80 columns and 24 rows. Integer dimensions clamp to
+2–500 columns and 2–300 rows. Docker refs retain their 256-character argument-safe grammar.
+Malformed frames are ignored. Native write, resize, kill, and cleanup failures stay within the
+connection, and disconnect attempts every stream and exec teardown independently.
+
+Manual task teardown and archive cleanup refresh daemon metadata and target full immutable container
+IDs associated with that task root. Active containers are stopped (paused containers are first
+unpaused), and associated Compose containers are then removed without force or volume deletion.
+Loose associated containers are only stopped. Cleanup never runs project-wide `compose down` and
+leaves networks and volumes for explicit owner management, so a shared project name cannot widen the
+operation. The archive checkbox counts only associated active containers. Partial failures invalidate
+the inventory cache and propagate to the caller without reporting success.
+
+Working-directory labels are daemon metadata, not cryptographic ownership or isolation from a caller
+who already controls Docker. Static path validation also does not eliminate concurrent filesystem
+replacement during repository configuration reads.
 
 ## Availability
 

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
-import type { Disposable } from '../../../kit/lib/registry'
+import type { Disposable } from '../../../kit/lib/state/registry'
 import {
   _resetClientTelemetry,
   flushTelemetry,

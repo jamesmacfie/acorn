@@ -156,19 +156,61 @@ owner declares what its items are keyed by; the contributor answers with marks f
   "items": "/v1/p/coverage/lines" }
 ```
 
-The host POSTs the keys on screen in one request and B answers marks:
+The host POSTs the visible keys to each contributor in one request, and B answers marks:
 
 ```
 POST /v1/p/coverage/lines  { "keys": [{ "file": "src/auth.ts", "line": 42, "side": "new" }, …] }
 → { "items": [{ "key": {…}, "severity": "info" | "warn" | "danger", "text": "Not covered by any test", "icon": "shield-off" }] }
 ```
 
-Batched, so a plugin with two thousand marks answers one request. Display strings only, capped by the
-host, the same rule `PluginExtensionItem` has. The lookup is minted from the **owner's** declared
-fields in the owner's order, so a contributor cannot widen its own match by inventing a field.
-Provenance is stamped on every mark and drawn beside it. A contributor that fails draws nothing for
-itself and leaves the others alone: a mark is a note under somebody else's row, and one plugin's outage
-must not blank the row.
+Batched, so a plugin with 2,000 marks answers one request. An annotation response contains scalar key
+fields, one of three severities, up to 200 characters of text, and an optional host-resolved icon.
+It contains no markup, CSS, geometry, color, or action. The lookup is minted from the **owner's**
+declared fields in the owner's order, so a contributor cannot widen its own match by inventing a
+field. The host stamps provenance on every mark and draws it beside the mark.
+
+Annotation state belongs to one contributor at one point. Its request identity contains the point
+registration, the contributor descriptor registration, the active node scope, that plugin's chrome
+freshness revision, and the visible-key signature. A changed identity aborts the previous read and
+removes that contributor's retained marks in the same turn. The exact request generation owns its
+answer, so a late response cannot restore stale marks even when the contributor ignores its
+`AbortSignal`. The host merges completed partitions in registered contributor order rather than
+response order. A failed contributor stays empty and leaves every other contributor's marks intact.
+Reload, disable, removal, and node changes clear retained annotation state before replacement
+registrations can reuse public ids.
+
+The generic transport inspects at most 4,096 raw rows from one contributor response. It drops
+malformed rows independently and emits one overflow summary for rows beyond that ceiling. A point
+owner may set a smaller accepted-mark limit after validation. These are separate limits because a
+diff may legitimately ask about 2,000 visible lines.
+
+#### Task annotations
+
+`core:task` is the core-owned annotation point for loaded-plugin task status. Its key is
+`{ "task": "<task-id>" }`. A contributor declares an `items` extension and serves the ordinary
+batched annotation POST. The host makes one request per contributor and visible task-id set. It does
+not create a request, timer, observer, or subscription for each task row.
+
+`core:task` accepts at most 256 valid marks from one contributor in one request. The desktop converts
+accepted marks to ordinary rail markers: severity chooses the semantic tone, the optional icon is
+resolved by the host, and a missing icon becomes a status dot. The desktop allocator still assigns
+only its four corners; every accepted mark remains in the ordered tooltip legend and accessible
+description. The terminal projection uses that complete ordered legend and discloses any glyphs that
+do not fit. See [Rail controls and status markers](../ui-design.md#rail-controls-and-status-markers)
+and [Terminal chrome and plugins](../tui/chrome-and-plugins.md#task-markers).
+
+This loaded path is task-only. A real plugin that needs source or pane status must first define an
+owner-declared annotation point for that surface. It must not add a rail-specific manifest
+contribution.
+
+#### Storage and memory sections
+
+`core:storage` is the core-owned `remote` point on Settings > Storage and memory, in `stack` mode with
+room for four. A plugin that holds memory or disk on the node draws its own section there, beside
+core's numbers, and reads them from its own route. The contributor is mounted with `nodeId`, the node
+the page shows. Core declares the point where the page is drawn
+(`client-core/features/settings/StorageSettings.tsx`) and never calls a plugin's route. The agents
+plugin is the one contributor today, with a compiled component.
 
 ### Remote trees
 
@@ -197,8 +239,9 @@ A contributor names the point, the entry its bundle registered with `mountTree`,
 
 The host grafts the contributor's subtree at the slot node. Neither plugin sees the other's nodes, and
 the contributor's code has exactly the permissions its own manifest declares — sitting inside A's pane
-grants it nothing of A's. **One level only**: a contributor's tree is a stream of kit node names, and
-`Slot` is not one of them, so a grafted subtree has no way to open a slot of its own.
+grants it nothing of A's. **One level only**: a contributor receives no host-minted chrome slot
+reference, so a grafted subtree cannot open a slot of its own. The `Slot` tree node used by rail and
+topbar replacements accepts only that opaque reference and is outside the general kit vocabulary.
 
 **The first-party remote points, and what each hands over.** Props are the owner's own data in the
 owner's own words, which is why no two of these agree on a shape:
@@ -402,7 +445,7 @@ Talking across the box is a hook with one handler, so there is one concept and n
 an iframe. Past `max` the host draws a count of what was left out — a count and no names, because the
 owner set the ceiling and listing the losers would invite a person to fix somebody else's arithmetic.
 
-When two contributors match the same key in `replace` mode, the user picks in Settings → Plugins and
+When two contributors match the same key in `replace` mode, the user picks in **Settings > Advanced > Extension points** and
 **the owner's default draws until they do**. A pick naming a plugin that has stopped matching falls
 back to the owner's default rather than to the runner-up: silently promoting the other candidate would
 mean the box changed hands because somebody uninstalled something. An override is an offer, not a
@@ -438,7 +481,7 @@ of thing, reads as newly requested rather than sliding past unremarked.
 ### Seeing what matched
 
 Silent-when-absent is right for a user and the worst possible thing for an author: a typo in `point`
-produces an empty pane and no error. **Settings → Plugins** lists every point on this node, its kind
+produces an empty pane and no error. **Settings > Advanced > Extension points** lists every point on this node, its kind
 and mode, and who fills it; every contribution whose point nobody declares, with a nearest-name
 suggestion; and, for a tied `replace` slot, the picker that settles it. It reads the same registries the
 hosts read and adds no bridge verb, so it can never disagree with what is on screen.

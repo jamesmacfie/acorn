@@ -4,10 +4,15 @@ import type { WorkflowInput } from '../../shared/workflowContracts'
 import TypedValueField from './TypedValueField'
 import { INPUT_NAME_RE } from './draft'
 
+/** The list of typed values a workflow is started with. A human gate's form reuses it for its
+ *  fields, which are declared the same way, so the wording and the cap are props. */
 export default function InputsInspector(props: {
   inputs: readonly WorkflowInput[]
   disabled?: boolean
   onChange: (inputs: WorkflowInput[]) => void
+  intro?: string
+  addLabel?: string
+  max?: number
 }) {
   const patch = (at: number, change: Partial<WorkflowInput>): void =>
     props.onChange(props.inputs.map((input, index) => (index === at ? { ...input, ...change } : input)))
@@ -21,8 +26,7 @@ export default function InputsInspector(props: {
   return (
     <Stack gap="stack">
       <Text emphasis="muted" wrap>
-        What the run is started with. A prompt reaches one as ${'{'}inputs.name{'}'}, and so does any
-        string in a step's own settings.
+        {props.intro ?? `What the run is started with. A prompt reaches one as \${inputs.name}, and so does any string in a step's own settings.`}
       </Text>
       {/* `Index`, so editing one input's description does not remount the row under the caret. */}
       <Index each={props.inputs}>
@@ -34,7 +38,7 @@ export default function InputsInspector(props: {
                   invalid={!INPUT_NAME_RE.test(input().name)} value={input().name}
                   onInput={(value) => patch(at, { name: value })} />
               </Field>
-              <Field label="Description" hint="Shown beside the box when a run is started." group>
+              <Field label="Description" hint="Shown beside the box." group>
                 <Input size="sm" label="Description" disabled={props.disabled} value={input().description ?? ''}
                   onInput={(value) => patch(at, { description: value || undefined })} />
               </Field>
@@ -60,8 +64,8 @@ export default function InputsInspector(props: {
           </Fold>
         )}
       </Index>
-      <Show when={!props.disabled}>
-        <Inline gap="inline"><Button size="sm" onPress={add}>Add an input</Button></Inline>
+      <Show when={!props.disabled && (props.max == null || props.inputs.length < props.max)}>
+        <Inline gap="inline"><Button size="sm" onPress={add}>{props.addLabel ?? 'Add an input'}</Button></Inline>
       </Show>
     </Stack>
   )

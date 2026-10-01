@@ -14,6 +14,7 @@ export type QueryCacheLifecycle = {
   persister: Persister
   acquire(): QueryCacheLease
   flush(): Promise<void>
+  clearInactive(): Promise<void>
   retire(): Promise<void>
   retired(): boolean
 }
@@ -124,6 +125,15 @@ export function queryCacheLifecycle(options: {
     persister,
     retired: () => retired,
     flush,
+    clearInactive: async () => {
+      // Restore must finish before removal, and a capture must finish before deletion. Later
+      // captures read only the remaining active queries and follow deletion on the same queue.
+      await restoring
+      await capturing?.catch(() => {})
+      if (retired) { await retirement; return }
+      client.removeQueries({ type: 'inactive' })
+      await remove()
+    },
     acquire: () => {
       leases++
       if (!restoring) {

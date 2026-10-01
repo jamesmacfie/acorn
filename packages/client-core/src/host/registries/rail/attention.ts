@@ -1,4 +1,4 @@
-import { Registry } from '../../../kit/lib/registry'
+import { Registry } from '../../../kit/lib/state/registry'
 
 // The attention inbox's contribution point (docs/frontend.md § Shell state distinguishes it from a
 // notice).

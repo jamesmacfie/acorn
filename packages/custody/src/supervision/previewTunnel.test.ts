@@ -88,6 +88,32 @@ const secretValue = (port: number): string => {
 }
 
 describe('the tunnel listener demands its secret', () => {
+  it('splits the authorized head and following TCP bytes into ordered bounded messages', async () => {
+    tunnels.dispose()
+    tunnels = new PreviewTunnels(() => ({ endpoint, token: 'dummy', certPem, fingerprint }), undefined, { maxMessageBytes: 16 })
+    const port = await tunnels.open(TARGET)
+    const head = request(secretHeader(port))
+    const payload = head + 'abcdefghijklmnopqrstuvwxyz'.repeat(4)
+    const { alive } = await speak(port, payload)
+    expect(alive).toBe(true)
+    expect(delivered.join('')).toBe(payload)
+    expect(delivered.length).toBeGreaterThan(2)
+    expect(delivered.every((chunk) => Buffer.byteLength(chunk) <= 16)).toBe(true)
+  })
+
+  it('closes an oversized Node reply with 1009 and removes the local TCP connection', async () => {
+    tunnels.dispose()
+    tunnels = new PreviewTunnels(() => ({ endpoint, token: 'dummy', certPem, fingerprint }), undefined, { maxMessageBytes: 16 })
+    let code!: (value: number) => void
+    const closed = new Promise<number>((resolve) => { code = resolve })
+    wss.once('connection', (ws) => {
+      ws.once('close', code)
+      ws.once('message', () => ws.send('x'.repeat(17)))
+    })
+    const port = await tunnels.open(TARGET)
+    expect((await speak(port, request(secretHeader(port)))).alive).toBe(false)
+    expect(await closed).toBe(1009)
+  })
   it('pipes a connection that presents it, head bytes and all', async () => {
     const port = await tunnels.open(TARGET)
     const { alive } = await speak(port, request(secretHeader(port)))

@@ -9,7 +9,8 @@ This programme is separate from the performance plans retired in September 2026.
 
 Start with [unit 09](./09-agent-client.md). Assign one specialist at a time, review its result, then
 advance in the order below. Each assignment includes the detailed coordinator brief, evidence
-references, contracts to preserve, and acceptance checks. Revalidate the merged source first;
+references, contracts to preserve, and acceptance checks. Read [the main integration review](../../../plans/performance/merge-main-review.md) for unresolved
+verification failures deferred at the user's request. Revalidate the merged source first;
 main has independent fixes and architectural changes since the audit. If a dependency changes,
 record the reason and adjust the order without undoing completed work.
 
@@ -64,6 +65,15 @@ real Tauri Changes empty state and plain Shell prompt are visually checked, and 
 fixture PID is absent after shutdown. This does not establish loaded-diff native latency, reliable
 repeated focus, two-Node composition, day-long stability, or completion of the remaining programme.
 The [native validation notes](../../../plans/performance/native-validation-notes.md) own those limits.
+
+## Main-merge context
+
+Re-read [simple memory](../memory/README.md), [agent-built apps](../dynamic-ui/README.md), and
+[the terminal review](../tui-review/README.md) when their owners overlap a performance assignment.
+These proposals are context, not authorization to build them. Main also contains resident diff
+segments, provider idle handling, and native preview retention beyond the audit snapshot. Reproduce
+remaining costs before applying an older proposed fix. Historical measurements stay attached to the
+source versions that produced them.
 
 ## Deliver each unit
 

@@ -47,9 +47,9 @@ for (const entry of ctx.extensionPoints.handlers(WORKFLOW_STEP_KIND)) { /* … *
 ctx.extensionPoints.handle(WORKFLOW_STEP_KIND, { id: 'request', value: { handler, validate } })
 ```
 
-**A point's value may carry a description the host draws.** A step kind's value is
-`{ handler, validate?, describe? }`, and `describe` is the kind's form as data: a label, an icon, and
-a closed list of fields. The host renders it on both hosts and applies the field rules first:
+**A point's value may carry a description the host draws.** A workflow step kind's value is
+`{ handler, validate?, describe }`, and `describe` declares its label, icon, description, fields,
+and output description. The host renders it on both hosts and applies the field rules first:
 `required`, `min`, `max`, and a static select's membership. Then it calls the plugin's own
 `validate`. That splits
 the work the way it should be split: the contributor keeps every judgement that needs its own code,
@@ -166,11 +166,12 @@ What a handler answers:
 The owner draws the refusal in its own UI with the provenance the host stamped. Whether "push anyway"
 exists is the owner's decision: the hook says no, and the owner says what no means.
 
-**The hooks open today.** Core owns three, because core owns the choke point:
+**The hooks open today.** Core owns four, because core owns the choke point:
 
 | Owner | Hook | Allows | Who wants it |
 | --- | --- | --- | --- |
 | core | `core:worktree-created` | observe, transform | setup scripts. The terminal plugin's handler is the first, and used to be a single-slot capability |
+| core | `core:task-archiving` | observe, transform | stopping work the task owns before its worktree goes. Runs on every archive, after the teardown script. The agents plugin's handler stops the task's provider processes |
 | core | `core:before-tool-call` | observe, veto | approval gates beyond the built-in tiers. `onTimeout: deny`, alone among these: a gate that opens when its keeper stops answering is not one |
 | core | `core:before-snapshot` | observe, transform, veto | budget shaping, PII stripping. The payload is section names, so a handler drops a section and nothing else |
 | changes | `changes:before-commit` | observe, transform, veto | commit lint, message helpers |
@@ -198,7 +199,9 @@ node-emitted and never renderer-local.
 
 **Two seams that are hook-shaped and are not hooks.** [Task checks](client-authoring-and-the-ui-kit.md#task-checks) already do what
 `before-archive` would, and more: a check answers with a *concern* and an opt-in cleanup plan, which a
-`{ ok, reason }` verdict cannot express. Converting it would have deleted the checkbox. And the
+`{ ok, reason }` verdict cannot express. Converting it would have deleted the checkbox.
+`core:task-archiving` is not that hook either. It has no veto, and it exists for work that must stop
+whatever the owner ticks, which a check's opt-in cleanup cannot promise. And the
 `routeCapability` seams in `server/bridge.ts` are single-provider service bridges — `scheduler.list()`,
 `sessions.archive()` — which is RPC rather than a decision; a chain in front of one would answer a
 question nobody asked.
@@ -257,8 +260,9 @@ own invention, and still never sees a device token
 ([security.md](../security.md) § The control plane).
 
 Confirmation for the four verbs is the client's, drawn from the `ToolRisk` tiers `nodeActions`
-already uses (`NODE_LIFECYCLE_RISK` in `packages/protocol/src/nodeProviders.ts`): `create`, `start`
-and `stop` are `write`, and `destroy` is `execute` and asks twice. Core decides those tiers, not the
+already uses (`NODE_LIFECYCLE_RISK` in `packages/protocol/src/device/nodeProviders.ts`): `create`, `start`
+and `stop` are `write`, and `destroy` is `execute` and asks first, in the shell's one confirmation,
+which names what goes and what stays. Core decides those tiers, not the
 provider — a provider that could call its own destroy `read` would be choosing how loudly acorn warns
 about it.
 
@@ -293,24 +297,34 @@ replacement for one of acorn's own designated surfaces:
 ```
 
 **Registering seizes nothing.** Three plugins may all offer to replace the rail's task list and the
-rail keeps drawing its own. The user picks a provider in **Settings → Plugins → replaced surfaces**,
+rail keeps drawing its own. The user picks a provider in **Settings > Plugins > Rail and surfaces > Replaced surfaces**,
 and that choice is a device preference — which list a person looks at is a property of the screen they
 are looking at.
 
-The picker lives in Settings → Plugins, not Appearance, because of what the choice is about.
+The picker lives under **Settings > Plugins > Rail and surfaces**, not Appearance, because of what the choice is about.
 Appearance's colour and shape axes exist whether or not anything is installed; this picker's options
 are named after installed plugins and exist only because something is installed. It is hidden
 entirely when nobody has offered a replacement, since a select with one option cannot do anything and
 a permanent "no plugin replaces your task list" row would be chrome earning nothing.
 
-**Core is the fallback in the strong sense**: not "when nothing is set" but whenever anything at all is
-off. Nobody chosen, the chosen plugin not installed on this node, installed but disabled or untrusted,
-or its surface threw while rendering — all four draw core's own implementation, and the settings row
-says so when the last one is why. A provider that threw gets another attempt at the next contribution
-sync, which is the one moment its bytes can have changed.
+The designated surfaces are `rail.taskList`, `pane.switcher`, `rail`, and `topbar`. Core is registered as
+the provider for each. `pane.switcher`, `rail`, and `topbar` require a `single` layout with one remote
+tree region; these surfaces receive changing host data and verbs that cannot be passed to an iframe.
+The tree receives data only. It invokes named host actions to change panes, choose a source, switch a
+workspace or node, or navigate. A device plugin can offer these client surfaces without a Node half.
 
-`rail.taskList` is the only designated surface, and the list grows the way every other vocabulary in
-this document does: when a second surface has both a reason and a fallback worth writing.
+The rail receives sources after the host's capability, integration, workspace-link, and contribution
+gates. Its `slots.taskList` value is an opaque host-minted reference. A tree places it with a `Slot`
+node whose `slotRef` prop is that value. The topbar similarly receives `slots.right` for plugin status
+items. Neither nested occupant receives another reference. A chrome surface may declare
+`placesSlots: ["rail.taskList"]` or `placesSlots: ["topbar.right"]` respectively. Settings warns when
+the declaration omits its nested slot, since selecting that provider hides task navigation or status
+items. The host checks the reference when the tree renders; a declaration alone creates no slot.
+
+**Core is the fallback in the strong sense**: nobody chosen, an absent or disabled plugin, an
+untrusted bundle, or a failing component or worker restores core immediately. A failing provider is
+skipped after three failures in the session until the contribution set is synchronized again. The
+notice names the plugin, and the settings row shows when the selected provider is unavailable.
 
 ## There is no uncooperative extension
 

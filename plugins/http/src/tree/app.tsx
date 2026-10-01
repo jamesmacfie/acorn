@@ -1,6 +1,6 @@
 import { createHttpClient } from './httpClient'
 import { createResource, createSignal, Match, Show, Switch, type JSX } from 'solid-js'
-import { EmptyState, Heading, Select, Stack, Text } from '@acorn/plugin-api/ui/tree'
+import { EmptyState, Heading, Select, SettingRow, SettingsSection, Stack, Text } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import { projectRoute, projectsRoute, type Project, type ProjectsResponse } from '@acorn/protocol/api.ts'
 import HttpDetail from './HttpDetail'
@@ -16,7 +16,7 @@ import { httpPanelModel } from './panelModel'
 //   pane (task)     `taskId` + `projectId`.
 //   pane (project)  `projectId` and no task, mounted beside the rail list at /p/:projectId. Lets a rail
 //                   row click open something outside a task.
-//   settings        neither. The settings modal only knows a workspace, so that surface picks a
+//   settings        neither. A settings page knows at most a workspace, so that surface picks a
 //                   project first, and it is a renderer of its own rather than a fourth branch here.
 //
 // The two panes are `list-detail`, so the host draws the split, the divider and the drag handle and
@@ -83,7 +83,7 @@ export function HttpDetailApp(props: HttpPaneProps & { bridge: AcornBridge }) {
 }
 
 // The variables settings surface. A picker rather than an inferred project: variables belong to a
-// project and the settings modal is workspace-shaped.
+// project and a settings page is workspace-shaped at most.
 export function HttpSettingsApp(props: { bridge: AcornBridge }) {
   const client = createHttpClient(props.bridge.api)
   const [projects] = createResource(() => props.bridge.api.get<ProjectsResponse>(projectsRoute))
@@ -91,20 +91,23 @@ export function HttpSettingsApp(props: { bridge: AcornBridge }) {
   const visible = () => (projects()?.projects ?? []).filter((candidate) => !candidate.hidden)
   const chosen = () => visible().find((candidate) => candidate.id === selected())
 
+  // One section, the one the manifest declares for search. The project row picks which list to edit
+  // rather than writing a setting, so it has no save state. The variable editor under it is shared
+  // with the panel's Variables view, and each variable in it is a small form with its own Save: a
+  // variable's name, kind and value only make sense together, and changing the kind clears the value.
   return (
-    <Stack gap="section">
-      <Text tone="muted" wrap>
-        Variables for the API panel, saved per project. Pick a project to edit its variables.
-      </Text>
-      <Select
-        label="Project"
-        value={selected()}
-        onChange={(value: string) => setSelected(value)}
-        options={[{ value: '', label: 'Choose a project…' }, ...visible().map((candidate) => ({ value: candidate.id, label: candidate.name }))]}
-      />
+    <SettingsSection id="variables" label="Variables" description="Variables for the API panel, saved per project. Pick a project to edit its variables.">
+      <SettingRow label="Project">
+        <Select
+          label="Project"
+          value={selected()}
+          onChange={(value: string) => setSelected(value)}
+          options={[{ value: '', label: 'Choose a project…' }, ...visible().map((candidate) => ({ value: candidate.id, label: candidate.name }))]}
+        />
+      </SettingRow>
       <Show when={chosen()}>
         {(candidate) => <HttpVariables client={client} projectId={candidate().id} projectName={nameOf(candidate())} />}
       </Show>
-    </Stack>
+    </SettingsSection>
   )
 }

@@ -1,7 +1,8 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
-import { type AppEnv, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
+import { BridgeError, type AppEnv, respondError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 import type { EditorLineMarkerSet } from '../../contract/lineMarkers'
+import { imageTypeForPath } from '../../contract/imagePreview'
 
 // Editor pane: read, write, and list files on the task's worktree. Task-scoped HTTP behind the
 // EditorBridge (../editor.ts). The bridge confines every relative path to the worktree root
@@ -15,6 +16,7 @@ export type EditorBridge = {
   list(taskId: string, relPath: string): Promise<EditorEntry[]>
   files(taskId: string): Promise<string[]>
   read(taskId: string, relPath: string): Promise<string> // throws BridgeError(403/404) on escape/missing
+  readImage(taskId: string, relPath: string): Promise<Uint8Array>
   lineMarkers(taskId: string, relPath: string): Promise<EditorLineMarkerSet[]>
   write(taskId: string, relPath: string, content: string): Promise<EditorWriteResult>
 }
@@ -35,6 +37,25 @@ export const editor = new Hono<AppEnv>()
     const path = c.req.query('path')
     if (!path) return respondError(c, 400, 'bad_request')
     return viaBridge(c, EDITOR, async (b) => ({ text: await b.read(c.req.param('id'), path) }))
+  })
+  .get('/:id/editor/image', async (c) => {
+    const path = c.req.query('path')
+    if (!path) return respondError(c, 400, 'bad_request')
+    const type = imageTypeForPath(path)
+    if (!type) return respondError(c, 422, 'unsupported_image')
+    const bridge = routeCapabilityFor(c, EDITOR)
+    if (!bridge) return respondError(c, 503, 'bridge-unavailable')
+    try {
+      const bytes = await bridge.readImage(c.req.param('id'), path)
+      return c.body(Uint8Array.from(bytes), 200, {
+        'content-type': type,
+        'x-content-type-options': 'nosniff',
+        'cache-control': 'private, no-store',
+      })
+    } catch (error) {
+      if (error instanceof BridgeError) return respondError(c, error.status, error.code, error.message ? [error.message] : undefined)
+      throw error
+    }
   })
   .get('/:id/editor/line-markers', (c) => {
     const path = c.req.query('path')

@@ -39,7 +39,7 @@ export { openTarget } from '@acorn/client-core/features/notifications'
 export type { PaneIntent } from '@acorn/client-core/host/registries/commands'
 // prune candidate: the raw socket. Plugins should be reaching for registerWsChannel (below) or a
 // ctx-provided subscription rather than attaching to the shared client themselves.
-export { registerWsBinaryHandler, wsConnect, wsOnNotice, wsOnReconnect, wsOnStatus, wsOnWorkflowStepChanged, wsOnWorkflowStepEvent, wsSend, wsSendToNode } from '@acorn/client-core/infra/node/wsClient.ts'
+export { registerWsBinaryHandler, wsConnect, wsOnNotice, wsOnPluginsChanged, wsOnReconnect, wsOnStatus, wsOnWorkflowStepChanged, wsOnWorkflowStepEvent, wsSend, wsSendToNode } from '@acorn/client-core/infra/node/wsClient.ts'
 export type { WorkflowNotice } from '@acorn/client-core/infra/node/wsClient.ts'
 export { registerWsChannel } from '@acorn/client-core/infra/node'
 // A compiled plugin hearing the same `plugin:<id>:<verb>` broadcasts its loaded frames can declare.
@@ -186,7 +186,7 @@ export type { Project, ProjectPatch, ProjectSeed } from '@acorn/protocol/api.ts'
 export { activeNodeId, nodeReady, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 export { createFleetQuery } from '@acorn/client-core/infra/node'
 export { nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
-export { closeTunnelsForTask, tunnelUrl } from '@acorn/client-core/infra/node'
+export { closeTunnelsForTask, previewUrlForClient, remotePreviewBlocked, tunnelUrl } from '@acorn/client-core/infra/node'
 
 // ── Agent context and references ──────────────────────────────────────────────────────────────
 export { contextSnapshot } from '@acorn/client-core/features/agent'
@@ -224,6 +224,12 @@ export {
 } from '@acorn/client-core/features/settings'
 export type { ModelPick } from '@acorn/client-core/features/settings'
 export { openRepoConfigTrust } from '@acorn/client-core/features/settings'
+// The settings save model, for a page drawn with `SettingRow` (docs/frontend.md § Settings): the
+// Saved signal and the error for a switch or select, a text field that keeps what was typed when its
+// write fails, the question a Save-and-Cancel form asks before settings drops its changes, and the
+// header's name and back link for one item a list page has open.
+export { createSettingSave, createTextSetting, useSettingsDetail, useUnsavedChanges } from '@acorn/client-core/features/settings'
+export type { SettingSave, TextSetting } from '@acorn/client-core/features/settings'
 
 // ── Integrations, notifications, palette ──────────────────────────────────────────────────────
 export { createDeviceFlow } from '@acorn/client-core/features/integrations'
@@ -274,7 +280,7 @@ export { getHighlighter, tokenizeAnsiLines } from '@acorn/client-core/infra/high
 export { debounce } from '@acorn/client-core/kit/lib'
 export { persistDraft, readDraft, writeDraft } from '@acorn/client-core/kit/lib'
 export { formatRelativeTime } from '@acorn/client-core/kit/lib'
-export { bytesOf, formatSize } from '@acorn/client-core/kit/lib'
+export { bytesOf, formatBytes, formatSize } from '@acorn/client-core/kit/lib'
 export { latestOnly } from '@acorn/client-core/kit/lib'
 export { onClosePaneWhen, onClosePaneWithin } from '@acorn/client-core/host/keys'
 
@@ -297,3 +303,5 @@ export type { DataSourceRef, DataSourceDescriptor, DataSourceRegistration, DataS
 export type { QueryScope, QueryContent, QueryReference, QueryConsumer, QueryRevision, QueryDraft, QueryBindingContext, QueryBindings, ResolvedQuery, QueryRecovery, QuerySaveState } from '@acorn/protocol/dataQueries.ts'
 export { queryContentSchema, queryReferenceSchema, queryScopeSchema } from '@acorn/protocol/dataQueries.ts'
 export { resolveDataBinding, resolveQueryParameters, resolveQueryContent } from '@acorn/protocol/dataQueryResolution.ts'
+export type { PaneSwitcherData, PaneSwitcherPane, PaneSwitcherProps } from '@acorn/protocol/paneSwitcher.ts'
+export type { RailData, RailProps, TopbarData, TopbarProps, SlotRef } from '@acorn/protocol/chrome.ts'

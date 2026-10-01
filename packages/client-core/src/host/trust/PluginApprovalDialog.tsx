@@ -8,11 +8,12 @@ import {
   installNodePlugin,
   refreshNodePlugins,
   reloadNodePlugin,
+  reviewNodePlugin,
   uninstallNodePlugin,
   updateNodePlugin,
 } from '../../infra/node/nodePlugins'
 import Icon from '../../kit/components/content/Icon'
-import { createDismissable } from '../../kit/lib/dismissable'
+import { createDismissable } from '../../kit/lib/controls/dismissable'
 import { Alert, Badge, Button } from '../../kit/components/primitives'
 import { closePluginApproval, describePluginRequest, pluginApprovalTask, pluginRequestOutcomeMessage } from './approval'
 import { syncPluginDistribution } from '../plugins/distribution'
@@ -118,33 +119,37 @@ export default function PluginApprovalDialog() {
         return
       }
       if (current.action === 'update') {
-        const result = await updateNodePlugin(current.pluginId!, {}, nodeId() ?? undefined)
+        const result = await updateNodePlugin(current.pluginId!, { reviewRequestId: current.requestId }, nodeId() ?? undefined)
         setLanded({ pluginId: result.id, version: result.toVersion })
       } else {
-        const result = await installNodePlugin(current.source!, {}, nodeId() ?? undefined)
+        const result = await installNodePlugin(current.source!, { reviewRequestId: current.requestId }, nodeId() ?? undefined)
         setLanded({ pluginId: result.id, version: result.version })
       }
       await refetch()
       setScreen('review')
     })
 
-  // The second No. Nothing has run (install never starts a plugin), so removing the package leaves the
+  // The second No. Nothing has run (the durable gate blocks boot and reload), so removing the package leaves the
   // node exactly as it was, minus a directory. Its database is kept, which is what every other uninstall
   // path in the product does by default.
   const removeIt = () =>
     run(async () => {
-      const current = request()
       const target = landed()
-      if (!current || !target) return
-      await uninstallNodePlugin(target.pluginId, {}, nodeId() ?? undefined)
-      await finish(current, 'denied', pluginRequestOutcomeMessage(current, { decision: 'denied', removed: true }))
+      const pending = reviewRow()?.pendingReview
+      if (!target || !pending || !('reviewId' in pending)) return
+      await reviewNodePlugin(target.pluginId, pending, 'denied', nodeId() ?? undefined)
+      reset()
+      await refetch()
+      if (!request()) closePluginApproval()
     })
 
   const enableIt = () =>
     run(async () => {
       const current = request()
       const target = landed()
-      if (!current || !target) return
+      const pending = reviewRow()?.pendingReview
+      if (!current || !target || !pending || !('reviewId' in pending)) return
+      await reviewNodePlugin(target.pluginId, pending, 'approved', nodeId() ?? undefined)
       // The dev grant is recorded before the distribution pass, because the pass is what fetches the
       // bundle and the helper applies the grant as the bytes land. The other order would
       // queue a trust prompt for the first bundle and auto-trust every one after it.
@@ -160,16 +165,17 @@ export default function PluginApprovalDialog() {
       // A dev-mode plugin should not need a restart to be worth iterating on, which is the whole point of
       // the reload path. A built-in or a client-only package has nothing to reload and answers 400; that
       // is not a failure of the approval, so the restart banner covers it instead.
-      let reloaded = false
       if (current.dev) {
         try {
-          reloaded = (await reloadNodePlugin(target.pluginId, nodeId() ?? undefined)).state === 'reloaded'
+          await reloadNodePlugin(target.pluginId, nodeId() ?? undefined)
         } catch {
-          reloaded = false
+          // The approval is complete; a failed hot reload leaves restart as the activation path.
         }
       }
       await refreshNodePlugins(nodeId() ?? undefined)
-      await finish(current, 'approved', pluginRequestOutcomeMessage(current, { decision: 'approved', version: target.version, reloaded }))
+      reset()
+      await refetch()
+      if (!request()) closePluginApproval()
     })
 
   let dialog!: HTMLElement
@@ -177,10 +183,8 @@ export default function PluginApprovalDialog() {
   // stays in the node's queue, the bell still points at it, and an owner who wants to read the package
   // before answering is not trapped in a modal.
   //
-  // Escaping the review screen leaves the package installed and unreviewed, which lands the owner exactly
-  // where a hand-typed install in Settings → Plugins leaves them: its client half still faces the
-  // per-hash prompt, and its node half starts at the next node restart. That is the pre-existing floor,
-  // not a hole this dialog opened, and it is why the screen is an improvement rather than a fence.
+  // Escaping review leaves the candidate held by the Node's durable marker. Settings → Plugins can
+  // resume the review after reconnect or restart; neither boot nor reload imports it meanwhile.
   const dismiss = createDismissable({ onDismiss: () => { reset(); closePluginApproval() }, container: () => dialog })
 
   return (

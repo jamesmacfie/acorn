@@ -1,5 +1,5 @@
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
-import { acornMcp, agentProfileRegistry, AGENTS_HARNESS_REGISTRY, getProfile, type InternalEnvFactory, type NodePlugin, resolveCommand } from '@acorn/plugin-api/node'
+import { acornMcp, agentProfileRegistry, AGENTS_CUSTOM_AGENT_REGISTRY, AGENTS_HARNESS_REGISTRY, getProfile, type InternalEnvFactory, type NodePlugin, resolveCommand } from '@acorn/plugin-api/node'
 import { TERMINAL_SESSIONS } from '@acorn/plugin-terminal/contract/sessions.ts'
 import { join } from 'node:path'
 import { AGENTS_SESSION_CONTROL, AGENTS_SESSION_EXECUTE } from '../contract/sessionExecute'
@@ -18,18 +18,23 @@ import { createSessionControl } from '../server/sessions/sessionControl'
 import { agentUsageCollectors } from '../server/usage/collectors'
 import { readAgentConcurrency, writeAgentConcurrency } from '../server/concurrencyStore'
 import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../server/sessionDefaultsStore'
+import { contributedCustomAgent, customAgentRegistry, deleteCustomAgent, readCustomAgents, saveCustomAgent } from '../server/customAgents'
 import { collectClaudeUsage } from '../server/usage/claudeUsage'
 import { collectCodexUsage } from '../server/usage/codexUsage'
 import { createAgentUsageService } from '../server/usage/service'
 import { managedAgents, MANAGED_AGENTS } from '../server/routes/managed'
 import { managedAgentsBridge } from '../server/routes/managedBridge'
 import { agentUsage, AGENT_USAGE } from '../server/routes/usage'
+import { agentMcpServers, AGENT_MCP_SERVERS } from '../server/routes/mcpServers'
+import { claudeHandoffMcp, codexHandoffMcp } from '../server/profiles/mcpCommands'
+import { sessionMcpSelection } from '../shared/mcpServers'
 import { aiderProfile, claudeCodeProfile, codexProfile } from '../server/profiles/index'
 import { AgentDelegationStore } from '../server/delegation/store'
 import { AgentDelegationService } from '../server/delegation/service'
 import { delegationTools } from '../server/delegation/tools'
 import { createSessionSourceHandler } from '../server/data/sessionSourceHandler'
 import { sessionSource } from '../shared/sessionSource'
+import { removeExpiredHistory } from '../server/sessions/historyRetention'
 
 let builtInProfileDisposables: (() => void)[] | null = null
 export function registerBuiltInProfiles(): void {
@@ -93,7 +98,9 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
   let delegation: AgentDelegationService | null = null
   let managedRoute: { dispose(): void } | null = null
   let usageRoute: { dispose(): void } | null = null
+  let mcpServersRoute: { dispose(): void } | null = null
   let harnessRoute: { dispose(): void } | null = null
+  let customAgentRoute: { dispose(): void } | null = null
   let draftAttachmentsRoute: { dispose(): void } | null = null
   let lifecycleCapabilities: Array<{ dispose(): void }> = []
   return {
@@ -163,6 +170,9 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           if (frame.channel === 'plugin:agents:turn-changed' && frame.source === 'delegation') {
             delegation?.reports.deliverSafely(frame.turnId)
           }
+          if (frame.channel === 'plugin:agents:request-changed' && frame.status === 'pending') {
+            delegation?.reports.deliverRequestSafely(frame.sessionId, frame.requestId)
+          }
         },
         startTerminalHandoff: async (session) => {
           if (!session.providerSessionRef) throw new Error('The provider session cannot be resumed in a terminal.')
@@ -173,11 +183,18 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           const sessions = ctx.capabilities.get(TERMINAL_SESSIONS)
           if (!sessions) throw new Error('Terminal engine is unavailable.')
           const resume = profile.resumeArgv(resolveCommand(profile), session.providerSessionRef)
+          // The session's MCP servers go with it, because `--resume` alone starts without them
+          // (docs/mcp.md § Your own servers). A contributed harness has no terminal spelling for them yet.
+          const mcp = await runtime!.mcpServers.resolve(sessionMcpSelection(session.config), 'agent MCP server: continue in a terminal')
+          const handoff = profile.id === claudeCodeProfile.id
+            ? claudeHandoffMcp(mcp.servers)
+            : profile.id === codexProfile.id ? codexHandoffMcp(mcp.servers, mcp.secrets) : { args: [], env: {} }
           const terminal = await sessions.create({
             taskId: session.taskId,
             profileId: session.profileId,
             title: `${session.title} · terminal`,
-            command: [resume.file, ...resume.args].map(shellQuote).join(' '),
+            command: [resume.file, ...resume.args, ...handoff.args].map(shellQuote).join(' '),
+            env: handoff.env,
             agentSessionId: session.id,
           })
           return terminal.id
@@ -189,6 +206,18 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           if (!sessions) return false
           return (await sessions.list()).some((terminal) =>
             terminal.agentSessionId === sessionId && terminal.status === 'running')
+        },
+      })
+      // Archiving a task stops its provider processes, because otherwise they live until the node exits
+      // (docs/managed-agents.md § Operations and failure). A handler on core's hook rather than a task
+      // check, because a check's cleanup runs only if the client asks for it. `transform` so core
+      // waits for the stop before it removes the worktree. The payload comes back untouched.
+      ctx.hooks.handle('core:task-archiving', {
+        id: 'stop-sessions',
+        mode: 'transform',
+        run: async (payload) => {
+          await runtime?.stopTaskSessions(payload.taskId as string)
+          return { payload }
         },
       })
       ctx.routes.fetch(createSessionSourceHandler(runtime), { prefix: '/data/sessions' })
@@ -241,11 +270,19 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           await writeAgentSessionDefaults(core.prefs, userId, merged)
           return merged
         },
+        customAgents: (userId) => readCustomAgents(core.prefs, userId),
+        saveCustomAgent: (userId, id, input) => saveCustomAgent(core.prefs, userId, id, input),
+        deleteCustomAgent: (userId, id) => deleteCustomAgent(core.prefs, userId, id),
       })
 
       // agents.harnessRegistry (docs/managed-agents.md § Harnesses). The plugin host resolves this per
       // contributed harness, so a node with agents disabled drops them and re-enabling redelivers.
       harnessRoute = ctx.capabilities.provide(AGENTS_HARNESS_REGISTRY, createHarnessRegistry())
+      // agents.customAgentRegistry (docs/managed-agents.md § Custom agents), delivered the same way, and
+      // held in memory only, so a disabled plugin's agents leave New with it.
+      customAgentRoute = ctx.capabilities.provide(AGENTS_CUSTOM_AGENT_REGISTRY, {
+        register: (agent) => ({ dispose: customAgentRegistry.register(contributedCustomAgent(agent)) }),
+      })
 
       ctx.routes.register(managedAgents, { prefix: '', note: 'managed agent sessions, turns, attachments, artifacts' })
 
@@ -258,7 +295,26 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         label: 'Agent sessions',
         search: (query) => runtime!.store.searchTaskSessions(query.text, query.taskIds, query.limit),
       })
-      ctx.routes.register(agentUsage, { prefix: '', note: '/usage, /pricing, /concurrency, /session-defaults — account-scoped provider usage, dispatch limits, and new-session defaults' })
+      ctx.routes.register(agentUsage, { prefix: '', note: '/usage, /pricing, /concurrency, /session-defaults, /custom-agents — account-scoped provider usage, dispatch limits, new-session defaults, and saved agents' })
+
+      // Settings → MCP servers (docs/mcp.md § Your own servers). The test reveals the server's secrets
+      // the way a session start does, and redacts them out of whatever the server printed.
+      mcpServersRoute = ctx.capabilities.provide(AGENT_MCP_SERVERS, {
+        list: () => runtime!.mcpServers.list(),
+        save: (name, input) => runtime!.mcpServers.save(name, input),
+        remove: (name) => runtime!.mcpServers.remove(name),
+        test: async (name) => {
+          const resolved = await runtime!.mcpServers.resolve([name], 'agent MCP server: test the connection')
+          if (resolved.unavailable.length) return { ok: false, error: 'A stored secret could not be opened. Enter it again and save.' }
+          const [server] = resolved.servers
+          if (!server) return null
+          // Loaded on first use: the MCP client and its transports are a large part of a boot graph that
+          // only this button needs (apps/node/scripts/check-service-budget.mjs).
+          const { probeMcpServer } = await import('../server/mcpProbe')
+          return probeMcpServer(server, resolved.secrets)
+        },
+      })
+      ctx.routes.register(agentMcpServers, { prefix: '', note: '/mcp-servers — the MCP servers acorn declares to agent sessions' })
 
       // Unattended usage collection, off by default (docs/schedules.md § What is registered today).
       ctx.schedules.register({
@@ -276,6 +332,22 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           const snapshot = await ctx.capabilities.require(AGENT_USAGE).read({ userId, force: true })
           return `${snapshot.providers.filter((provider) => !provider.error).length} of ${snapshot.providers.length} providers answered`
         },
+      })
+
+      // The owner's "Keep agent history for archived tasks" (docs/data-layer.md § Retention). Daily,
+      // and a no-op until the owner picks a limit, so the setting is the one switch that matters.
+      ctx.schedules.register({
+        scheduleId: 'archived-history-prune',
+        name: 'Remove agent history of long-archived tasks',
+        cadence: { daily: '03:50' },
+        timeout: 300,
+        run: (signal) => removeExpiredHistory({
+          runtime: runtime!,
+          prefs: core.prefs,
+          userId: ctx.core.identity.active(),
+          archivedBefore: (before) => ctx.core.tasks.archivedBefore(before),
+          signal,
+        }),
       })
 
       // agents.sessionExecute (contract/sessionExecute.ts). The workflow runner resolves this at call
@@ -306,7 +378,9 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       managedRoute?.dispose()
       draftAttachmentsRoute?.dispose()
       usageRoute?.dispose()
+      mcpServersRoute?.dispose()
       harnessRoute?.dispose()
+      customAgentRoute?.dispose()
       for (const capability of lifecycleCapabilities) capability.dispose()
       lifecycleCapabilities = []
       for (const dispose of builtInProfileDisposables ?? []) dispose()

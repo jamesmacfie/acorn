@@ -1,5 +1,6 @@
 import { Show, type JSX } from 'solid-js'
-import { isExternal } from '../primitives'
+import { isExternal } from './isExternal'
+import { safeContentHref } from '@acorn/protocol/externalUrl.ts'
 
 /* Link: a run of words inside a sentence that acts.
 
@@ -21,9 +22,10 @@ export function Link(props: {
   onPress?: () => void
   children: JSX.Element
 }) {
+  const safeHref = () => safeContentHref(props.href)
   return (
     <Show
-      when={props.href}
+      when={safeHref()}
       fallback={
         <button type="button" class="ui-link" onClick={() => props.onPress?.()}>
           {props.children}

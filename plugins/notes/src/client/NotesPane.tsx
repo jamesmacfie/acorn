@@ -2,7 +2,7 @@ import { Show } from 'solid-js'
 import { bytesOf, formatSize, openInAppUrl, openPane, type Task } from '@acorn/plugin-api/client'
 import { SCRATCHPAD_SLUG } from '@acorn/protocol/notes.ts'
 import {
-  Alert, Button, Checkbox, EmptyState, IconButton, Input, Markdown, Row, Rows, Section, Stack, Text,
+  Alert, Button, Checkbox, ConfirmButton, EmptyState, Icon, IconButton, Input, Markdown, Row, Rows, Section, Stack, Text,
   Textarea, ToggleButton, Toolbar,
 } from '@acorn/plugin-api/ui'
 import type { NotesModel } from './notesModel'
@@ -41,7 +41,6 @@ export function NotesList(props: { task: Task; model: NotesModel }) {
   )
 
   const NoteRow = (rowProps: { scope: NoteScope; note: NoteSummary; item?: Parameters<Parameters<typeof Rows>[0]['children']>[1] }) => {
-    const armed = () => model().deleteArmed.armed() === `${rowProps.scope}:${rowProps.note.slug}`
     return (
       <Row
         item={rowProps.item}
@@ -53,12 +52,15 @@ export function NotesList(props: { task: Task; model: NotesModel }) {
         leading={<IncludeBox scope={rowProps.scope} note={rowProps.note} />}
         meta={authorBadge(rowProps.note.author)}
         trailing={
-          <IconButton
-            icon={armed() ? 'circle-help' : 'x'}
-            title={armed() ? `Click again to remove “${rowProps.note.slug}”` : 'Delete note'}
+          <ConfirmButton
+            variant="bare"
+            size="sm"
+            iconOnly
             label="Delete note"
-            onPress={() => void model().remove(rowProps.scope, rowProps.note.slug)}
-          />
+            title={`Delete ${rowProps.note.title}`}
+            confirmLabel="Confirm delete"
+            onConfirm={() => void model().remove(rowProps.scope, rowProps.note.slug)}
+          ><Icon name="x" /></ConfirmButton>
         }
       >
         {rowProps.note.title}

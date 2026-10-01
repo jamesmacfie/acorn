@@ -24,7 +24,7 @@ import { clearExtensionPoints } from './extensionPoints'
 import { clearAuditActions } from '../audit'
 import { resolveInRoot } from '../core/fs'
 import { dispatchPluginRoute } from './dispatch'
-import type { ManifestHarnessSpawn } from './harnesses'
+import { qualifiedHarnessId, type ManifestHarnessSpawn } from './harnesses'
 import { runPluginScheduleRoute } from './scheduleRun'
 import { runPluginTaskApply, runPluginTaskCheck } from './taskCheckRun'
 import { disposeUnstartedPlugin } from '../plugins/isolation'
@@ -109,7 +109,7 @@ export type PluginFailure = { name: string; error: string; at: number; stage: 'i
 // The new instance, as the caller took it off disk. The host does no filesystem work: the loader owns
 // importing a bundle and confining its migrations chain (server/plugins/reload.ts drives both).
 export type PluginReloadRequest = { plugin: NodePlugin; binding: LoadedPluginBinding }
-export type PluginReloadOutcome = { ok: true } | { ok: false; error: string }
+export type PluginReloadOutcome = { ok: true } | { ok: false; error: string; retained?: boolean }
 
 export type PluginHostResult = {
   enabled: readonly string[]
@@ -345,6 +345,25 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     }
   }
 
+  // What a loaded plugin's manifest declared as custom agents, handed on the same way (./customAgents.ts).
+  // A harness id that names one of this manifest's own harnesses is qualified here, because the plugin
+  // cannot know the id the host minted for it; any other id is passed on as written.
+  const registerManifestCustomAgents = (ctx: HostPluginContext, name: string, binding?: LoadedPluginBinding): void => {
+    const own = new Set((binding?.harnesses ?? []).map((harness) => harness.id))
+    for (const descriptor of binding?.customAgents ?? []) {
+      ctx.customAgents.register({
+        id: descriptor.id,
+        name: descriptor.name,
+        ...(descriptor.glyph ? { glyph: descriptor.glyph } : {}),
+        ...(descriptor.description ? { description: descriptor.description } : {}),
+        providerId: own.has(descriptor.harness) ? qualifiedHarnessId(name, descriptor.harness) : descriptor.harness,
+        options: descriptor.options,
+        ...(descriptor.instructions ? { instructions: descriptor.instructions } : {}),
+        ...(descriptor.maxToolRisk ? { maxToolRisk: descriptor.maxToolRisk } : {}),
+      })
+    }
+  }
+
   // A loaded plugin's schedulable actions, synthesised from the manifest's commands whose verb is
   // `runNodeAction`, the only verb that means anything with nobody watching.
   //
@@ -486,6 +505,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   for (const { plugin, ctx, loaded } of running) {
     if (!started.includes(plugin)) continue
     registerManifestHarnesses(ctx, plugin.name, loaded)
+    registerManifestCustomAgents(ctx, plugin.name, loaded)
   }
 
   // The second pass, after every init: a plugin that must read another plugin's contributions runs here
@@ -603,22 +623,24 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       pending,
     })
 
+    let candidateStage: 'init' | 'ready' = 'init'
     try {
       // Buffered like everything else: the previous instance's schedules are still on the scheduler
       // under the same keys, and registering now throws on the duplicate.
       registerManifestSchedules(candidateCtx, name, next.binding)
       registerManifestTaskChecks(candidateCtx, name, next.binding)
       registerManifestHooks(candidateCtx, name, next.binding)
-      // Not buffered: the registry is keyed by plugin id, so the candidate's declaration overwrites the
-      // previous instance's, and a failed reload leaves the fresh manifest's verbs in place, which is
-      // what the settings page shows anyway.
-      registerEmits(next.plugin, next.binding, (undo) => void candidateUndos.push(undo))
       registerManifestHarnesses(candidateCtx, name, next.binding)
+      registerManifestCustomAgents(candidateCtx, name, next.binding)
       registerManifestDataSources(candidateCtx, next.binding)
       registerManifestNodeActions(candidateCtx, next.binding)
       registerManifestAuditActions(candidateCtx, next.binding)
       registerManifestRuntimeContributions(candidateCtx, name, next.binding)
       await next.plugin.init(candidateCtx)
+      // Ready belongs to the candidate window too. If it throws after the old instance is disposed,
+      // the host can no longer truthfully report that the old runtime is still active.
+      candidateStage = 'ready'
+      await next.plugin.ready?.(candidateCtx)
     } catch (error) {
       // Nothing to roll back. The buffer was never replayed, so the previous instance is still serving,
       // and the candidate's database handle is the only thing it opened.
@@ -634,9 +656,9 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       }
       revokePluginContext(candidateCtx)
       const message = error instanceof Error ? error.message : String(error)
-      pluginLog(name).error(`reload init failed; the previous instance is still serving: ${describeError(error).message}`)
-      markFailed(name, 'init', message)
-      return { ok: false, error: message }
+      pluginLog(name).error(`reload ${candidateStage} failed; the previous instance is still serving: ${describeError(error).message}`)
+      markFailed(name, candidateStage, message)
+      return { ok: false, error: message, retained: true }
     }
 
     // ── Commit ─────────────────────────────────────────────────────────────────────────────────────
@@ -644,6 +666,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     // database only after (agents flushes, workflows aborts and database drains through that handle),
     // and revoke its context last so a leaked reference fails loudly.
     clearRegistrations(name)
+    registerEmits(next.plugin, next.binding, (undo) => void candidateUndos.push(undo))
     const previous = started.find((plugin) => plugin.name === name)
     if (previous) {
       try {
@@ -683,7 +706,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       revokePluginContext(candidateCtx)
       forget(name)
       markFailed(name, 'init', message)
-      return { ok: false, error: message }
+      return { ok: false, error: message, retained: false }
     }
 
     // The committed instance's undos become the host's, or the next reload's clearRegistrations has
@@ -704,18 +727,6 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     }
     if (candidate.db) opened.set(name, candidate.db)
 
-    if (next.plugin.ready) {
-      try {
-        await next.plugin.ready(candidateCtx)
-      } catch (error) {
-        // Contained exactly as a ready failure at boot is, through the same rollback.
-        await contain(next.plugin, 'ready', error)
-        revokePluginContext(candidateCtx)
-        forget(name)
-        markFailed(name, 'ready', error instanceof Error ? error.message : String(error))
-        return { ok: false, error: error instanceof Error ? error.message : String(error) }
-      }
-    }
     markActive(name)
     return { ok: true }
   }

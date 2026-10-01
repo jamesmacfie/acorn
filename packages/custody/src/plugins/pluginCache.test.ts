@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -16,6 +17,9 @@ vi.mock('node:fs', async (importOriginal) => {
   const actual = await importOriginal<typeof import('node:fs')>()
   return { ...actual, renameSync: vi.fn(actual.renameSync) }
 })
+import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
+import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
+import { NodeResponseTooLargeError } from '../broker/nodeRequest'
 
 // Nothing to mock: the cache takes userDataDir as a parameter, the way fleetStore does, and touches
 // no shell API. That is what makes the hashing rules, the part that carries the security property,
@@ -26,14 +30,16 @@ const sha256 = (text: string) => createHash('sha256').update(Buffer.from(text)).
 
 let dir = ''
 let served: { status: number; body: string | Uint8Array<ArrayBuffer> } | Error = { status: 200, body: BUNDLE }
-let requests: Array<{ nodeId: string; request: NodeFetchRequest }> = []
+let legacyServed: typeof served | null = null
+let requests: Array<{ nodeId: string; request: NodeFetchRequest; limits: { maxResponseBytes?: number } | undefined }> = []
 
 const broker = {
-  fetch: async (nodeId: string, request: NodeFetchRequest): Promise<NodeFetchResponse> => {
-    requests.push({ nodeId, request })
-    if (served instanceof Error) throw served
-    const body = typeof served.body === 'string' ? new TextEncoder().encode(served.body) : served.body
-    return { status: served.status, headers: {}, body }
+  fetch: async (nodeId: string, request: NodeFetchRequest, limits?: { maxResponseBytes?: number }): Promise<NodeFetchResponse> => {
+    requests.push({ nodeId, request, limits })
+    const answer = request.path.endsWith('/client.js') && legacyServed ? legacyServed : served
+    if (answer instanceof Error) throw answer
+    const body = typeof answer.body === 'string' ? new TextEncoder().encode(answer.body) : answer.body
+    return { status: answer.status, headers: {}, body }
   },
 }
 
@@ -44,6 +50,7 @@ const cacheDir = () => join(dir, 'acorn-1-plugin-cache')
 beforeEach(() => {
   dir = mkdtempSync(join(tmpdir(), 'acorn-plugin-cache-'))
   served = { status: 200, body: BUNDLE }
+  legacyServed = null
   requests = []
   vi.mocked(writePrivateAtomic).mockClear()
   vi.mocked(renameSync).mockClear()
@@ -60,7 +67,8 @@ describe('fetching a bundle from a node', () => {
   it('stores under the hash of the bytes and reports it', async () => {
     const store = cache()
     expect(await store.putFromNode('node-a', 'sparkline', claim())).toEqual({ hash: sha256(BUNDLE) })
-    expect(requests[0].request.path).toBe('/v1/core/plugins/sparkline/client.js')
+    expect(requests[0].request.path).toBe(`/v1/core/plugins/sparkline/bundles/${sha256(BUNDLE)}`)
+    expect(requests[0].limits).toEqual({ maxResponseBytes: MAX_BUNDLE_BYTES })
     expect(store.has(sha256(BUNDLE))).toBe(true)
     expect(readFileSync(join(cacheDir(), `${sha256(BUNDLE)}.js`), 'utf8')).toBe(BUNDLE)
     expect(store.list()[sha256(BUNDLE)]).toMatchObject({ pluginId: 'sparkline', version: '1.2.0', bytes: BUNDLE.length, nodeIds: ['node-a'] })
@@ -71,6 +79,22 @@ describe('fetching a bundle from a node', () => {
     // The offline-first property. Nothing has connected in this second store's lifetime.
     expect(cache().has(sha256(BUNDLE))).toBe(true)
     expect(cache().list()[sha256(BUNDLE)].pluginId).toBe('sparkline')
+  })
+
+  it('uses the legacy route for an older node and still verifies its bytes', async () => {
+    served = { status: 404, body: '' }
+    legacyServed = { status: 200, body: BUNDLE }
+    expect(await cache().putFromNode('old-node', 'sparkline', claim())).toEqual({ hash: sha256(BUNDLE) })
+    expect(requests.map(({ request }) => request.path)).toEqual([
+      `/v1/core/plugins/sparkline/bundles/${sha256(BUNDLE)}`,
+      '/v1/core/plugins/sparkline/client.js',
+    ])
+    expect(requests.map(({ limits }) => limits)).toEqual([
+      { maxResponseBytes: MAX_BUNDLE_BYTES },
+      { maxResponseBytes: MAX_BUNDLE_BYTES },
+    ])
+    legacyServed = { status: 200, body: 'other bytes' }
+    expect(await cache().putFromNode('old-node', 'changed', claim(sha256('different')))).toEqual({ error: 'hash-mismatch' })
   })
 
   it('does not re-fetch a bundle it already holds', async () => {
@@ -89,6 +113,106 @@ describe('fetching a bundle from a node', () => {
     served = { status: 404, body: '' }
     expect(await store.putFromNode('node-a', 'sparkline', claim())).toEqual({ error: 'not-found' })
     expect(store.list()).toEqual({})
+  })
+})
+
+describe('installing a device bundle', () => {
+  const packageFolder = () => {
+    const folder = join(dir, 'package')
+    mkdirSync(folder)
+    writeFileSync(join(folder, 'client.js'), BUNDLE)
+    writeFileSync(join(folder, 'acorn-plugin.json'), JSON.stringify({
+      id: 'sparkline', name: 'Sparkline', version: '1.2.0', baseline: ACORN_BASELINE,
+      apiVersion: PLUGIN_API_MAJOR, client: 'client.js',
+    }))
+    return folder
+  }
+
+  it('hashes a folder bundle and re-reads it on update', async () => {
+    const folder = packageFolder()
+    const store = cache()
+    expect(await store.putFromSource({ path: folder })).toEqual({ hash: sha256(BUNDLE), pluginId: 'sparkline', version: '1.2.0' })
+    expect(store.list()[sha256(BUNDLE)]).toMatchObject({ source: { kind: 'device' }, installSource: { path: folder } })
+    writeFileSync(join(folder, 'client.js'), 'export default 2')
+    const updated = await store.putFromSource({ path: folder })
+    expect(updated).toMatchObject({ hash: sha256('export default 2') })
+    expect(store.has(sha256(BUNDLE))).toBe(false)
+    store.removeDevice('sparkline')
+    expect(store.list()).toEqual({})
+  })
+
+  it('refuses a manifest with node execution before writing a bundle', async () => {
+    const folder = packageFolder()
+    const manifest = JSON.parse(readFileSync(join(folder, 'acorn-plugin.json'), 'utf8')) as Record<string, unknown>
+    manifest.node = 'node.js'
+    writeFileSync(join(folder, 'acorn-plugin.json'), JSON.stringify(manifest))
+    writeFileSync(join(folder, 'node.js'), 'export default {}')
+    const store = cache()
+    expect(await store.putFromSource({ path: folder })).toEqual({ error: 'has-node-half' })
+    expect(store.list()).toEqual({})
+  })
+
+  it('checks a config offer or update identity before changing the cache', async () => {
+    const folder = packageFolder()
+    const store = cache()
+    expect(await store.putFromSource({ path: folder }, 'sparkline')).toMatchObject({ pluginId: 'sparkline' })
+    const before = store.list()
+    const manifest = JSON.parse(readFileSync(join(folder, 'acorn-plugin.json'), 'utf8')) as Record<string, unknown>
+    manifest.id = 'different-plugin'
+    writeFileSync(join(folder, 'acorn-plugin.json'), JSON.stringify(manifest))
+    writeFileSync(join(folder, 'client.js'), 'export default "different-plugin"')
+
+    expect(await store.putFromSource({ path: folder }, 'sparkline')).toEqual({ error: 'plugin-id-mismatch' })
+    expect(store.list()).toEqual(before)
+    expect(store.has(sha256('export default "different-plugin"'))).toBe(false)
+  })
+
+  it('accepts a remote-tree source and refuses a source that needs a Node route', async () => {
+    const folder = packageFolder()
+    const file = join(folder, 'acorn-plugin.json')
+    const manifest = JSON.parse(readFileSync(file, 'utf8')) as Record<string, unknown>
+    manifest.contributions = { sources: [{ id: 'sparkline', label: 'Sparkline', order: 50, tree: { list: 'list', detail: 'detail' } }] }
+    writeFileSync(file, JSON.stringify(manifest))
+    const store = cache()
+    expect(await store.putFromSource({ path: folder })).toMatchObject({ pluginId: 'sparkline' })
+    manifest.contributions = { sources: [{ id: 'sparkline', label: 'Sparkline', order: 50, items: '/v1/p/sparkline/items' }] }
+    writeFileSync(file, JSON.stringify(manifest))
+    expect(await store.putFromSource({ path: folder })).toEqual({ error: 'has-node-half' })
+  })
+
+  it('reports a manifest parse failure to the install caller', async () => {
+    const folder = packageFolder()
+    writeFileSync(join(folder, 'acorn-plugin.json'), '{ broken json')
+    await expect(cache().putFromSource({ path: folder })).rejects.toThrow()
+  })
+
+  it('shares archive special-file refusal before adding a device bundle', async () => {
+    if (process.platform === 'win32') return
+    const folder = packageFolder()
+    execFileSync('/usr/bin/mkfifo', [join(folder, 'pipe')], { timeout: 2000 })
+    const archive = join(folder, '..', 'special.tgz')
+    execFileSync('/usr/bin/tar', ['-czf', archive, '-C', folder, '.'], { timeout: 2000 })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(new Uint8Array(readFileSync(archive)))))
+    const store = cache()
+    try {
+      await expect(store.putFromSource({ url: 'https://example.test/special.tgz' })).rejects.toThrow(/unsupported/)
+      expect(store.list()).toEqual({})
+      expect(readdirSync(dir).filter((name) => name.startsWith('.staging-'))).toEqual([])
+    } finally { vi.unstubAllGlobals() }
+  })
+
+  it('rejects an oversized local manifest before caching', async () => {
+    const folder = packageFolder()
+    writeFileSync(join(folder, 'acorn-plugin.json'), ' '.repeat(256 * 1024 + 1))
+    const store = cache()
+    await expect(store.putFromSource({ path: folder })).rejects.toThrow(/byte limit/)
+    expect(store.list()).toEqual({})
+  })
+
+  it('refuses a client bundle over the size limit', async () => {
+    const folder = packageFolder()
+    writeFileSync(join(folder, 'client.js'), Buffer.alloc(MAX_BUNDLE_BYTES + 1))
+    expect(await cache().putFromSource({ path: folder })).toEqual({ error: 'too-large' })
   })
 })
 
@@ -115,6 +239,11 @@ describe('trust binds to bytes, not to the listing', () => {
     const huge = new Uint8Array(MAX_BUNDLE_BYTES + 1)
     served = { status: 200, body: huge }
     expect(await cache().putFromNode('node-a', 'sparkline', claim(createHash('sha256').update(huge).digest('hex')))).toEqual({ error: 'too-large' })
+  })
+
+  it('reports a transport refusal as too large rather than unreachable', async () => {
+    served = new NodeResponseTooLargeError(MAX_BUNDLE_BYTES)
+    expect(await cache().putFromNode('node-a', 'sparkline', claim())).toEqual({ error: 'too-large' })
   })
 })
 

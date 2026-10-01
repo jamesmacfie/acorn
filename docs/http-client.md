@@ -38,6 +38,17 @@ sends with `fetch` under its own bounded time and response-size limits (`plugins
 A request times out after 30 seconds and a response body over 5 MB is capped while streaming, so a
 large or endless response cannot be buffered whole before the cap applies.
 
+URL, scheme, and header validation failures name the invalid field without quoting resolved content.
+They remain `SendError` preparation failures, which the route returns as 422 and the workflow handler
+persists as a failed step. Command-variable failures report their status, deadline, or output limit,
+and withhold raw command stderr, spawn diagnostics, and thrown command messages.
+
+For request URLs, request timelines, and transport diagnostics, the executor redacts resolved secret
+variables and command outputs in raw, URI-component, form URL-encoded, and lowercase forms. These
+cover common transport encodings and ASCII case normalization; they do not cover arbitrary
+derived encodings. Complete HTTP response bodies and response headers remain deliberate response
+data and can contain values returned by the chosen endpoint.
+
 Variables resolve in one pass, lowest precedence first: task builtins, then project variables, then
 per-request overrides. Only the names a request actually references get resolved, because a command
 variable's value comes from running its shell command, and an override present at send time replaces
@@ -98,7 +109,7 @@ Three frame surfaces from one bundle, chosen by `bridge.context`:
 | --- | --- |
 | `http` (task pane) | The panel for a task: its ad-hoc requests above the project tree, with `{{worktree}}`/`{{branch}}`/`{{taskId}}` resolving against that task |
 | `http-project` (project pane) | The same panel with no task, drawn beside the rail list at `/p/:projectId`, addressed by `/p/:projectId/x/http/requests/:requestId` |
-| `http-variables` (settings) | Project variables, behind a project picker, because variables are project-scoped and the settings modal only knows a workspace |
+| `http-variables` (settings) | Project variables, behind a project picker. It is one node page under Features, **API requests**, not a tab on each project's page |
 
 All three give tabs, request history, variables, auth helpers, curl import/export, response inspection,
 and memory-only drafts. Node freshness/offline status follows the shared client model; a failed send

@@ -7,7 +7,7 @@
 import { isThemeColorValue, THEME_PALETTE_TOKENS } from '@acorn/protocol/themeTokens.ts'
 import type { PluginThemeDescriptor } from '@acorn/protocol/plugin/contract.ts'
 import { themeRegistry } from '../registries/shell/themes'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 
 /** `plugin:<pluginId>:<themeId>`, the shape bb uses (docs/ui-design.md § Plugin themes). No built-in
  * id contains a colon, so a plugin theme can never collide with one. */
@@ -74,7 +74,6 @@ function flush(): void {
   element.textContent = pluginThemeStyleSheet()
 }
 
-/**
 /**
  * Validate, generate, install and register one plugin theme. The returned disposable removes the
  * generated CSS as well as the picker entry: the chrome pass disposes then re-registers on every sync,

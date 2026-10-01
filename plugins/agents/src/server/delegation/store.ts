@@ -39,6 +39,7 @@ export type AgentSpawnProvisioning = {
   toolCeiling: ToolCeiling
   resultSchema?: object
   configOptions?: Record<string, string>
+  customAgentId?: string
 }
 
 export type AgentDelegationVisibility = {

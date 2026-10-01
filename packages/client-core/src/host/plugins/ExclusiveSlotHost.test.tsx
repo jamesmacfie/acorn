@@ -1,9 +1,13 @@
 import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Disposable } from '../../kit/lib/registry'
-import { clearExclusiveSlotFailures, exclusiveSlotFailed, exclusiveSlotRegistry } from '../registries/extensionPoints/exclusiveSlots'
+import type { Disposable } from '../../kit/lib/state/registry'
+import { clearExclusiveSlotFailures, exclusiveSlotFailed, exclusiveSlotRegistry, registerCoreExclusiveSlot } from '../registries/extensionPoints/exclusiveSlots'
 import ExclusiveSlotHost from './ExclusiveSlotHost'
+import { TreeHost, type TreeTransport } from '../tree/TreeHost'
+
+vi.mock('../../features/notifications/notifications', () => ({ pushNotice: vi.fn() }))
+vi.mock('../../features/tasks/tasks', () => ({ activeTaskId: () => null }))
 
 // The one site where a plugin draws in place of a core surface, and the one site that guarantees core
 // gets it back. The arbitration rule itself is unit-tested next door in `exclusiveSlots.test.ts`;
@@ -33,6 +37,8 @@ const mount = (element: () => unknown) => {
 }
 
 const core = () => <span data-mark="core" />
+let coreDraw = core
+let coreProvider: Disposable
 
 const offer = (pluginId: string, component: () => unknown) =>
   registered.push(
@@ -50,12 +56,15 @@ const offer = (pluginId: string, component: () => unknown) =>
 beforeEach(() => {
   vi.spyOn(console, 'error').mockImplementation(() => {})
   prefs.value = undefined
+  coreDraw = core
+  coreProvider = registerCoreExclusiveSlot('rail.taskList', () => coreDraw())
 })
 
 afterEach(() => {
   dispose?.()
   host?.remove()
   for (const handle of registered.splice(0)) handle.dispose()
+  coreProvider.dispose()
   clearExclusiveSlotFailures()
   vi.restoreAllMocks()
 })
@@ -64,7 +73,7 @@ describe('ExclusiveSlotHost', () => {
   it('draws core when nobody is chosen', () => {
     offer('rival', () => <span data-mark="rival" />)
 
-    mount(() => <ExclusiveSlotHost slot="rail.taskList" core={core} />)
+    mount(() => <ExclusiveSlotHost slot="rail.taskList" />)
 
     expect(host.querySelector('[data-mark]')?.getAttribute('data-mark')).toBe('core')
   })
@@ -73,7 +82,7 @@ describe('ExclusiveSlotHost', () => {
     offer('rival', () => <span data-mark="rival" />)
     prefs.value = JSON.stringify({ 'rail.taskList': 'rival' })
 
-    mount(() => <ExclusiveSlotHost slot="rail.taskList" core={core} />)
+    mount(() => <ExclusiveSlotHost slot="rail.taskList" />)
 
     expect(host.querySelector('[data-mark]')?.getAttribute('data-mark')).toBe('rival')
   })
@@ -83,15 +92,8 @@ describe('ExclusiveSlotHost', () => {
     offer('rival', () => <span data-mark="rival" />)
     prefs.value = JSON.stringify({ 'rail.taskList': 'rival' })
 
-    mount(() => (
-      <ExclusiveSlotHost
-        slot="rail.taskList"
-        core={() => {
-          evaluated()
-          return core()
-        }}
-      />
-    ))
+    coreDraw = () => { evaluated(); return core() }
+    mount(() => <ExclusiveSlotHost slot="rail.taskList" />)
 
     // `core` is a function, not a JSX prop, so a replaced surface costs nothing. If this ever fires,
     // every user who replaced the task list is paying for two of them.
@@ -104,20 +106,66 @@ describe('ExclusiveSlotHost', () => {
     })
     prefs.value = JSON.stringify({ 'rail.taskList': 'rival' })
 
-    mount(() => <ExclusiveSlotHost slot="rail.taskList" core={core} />)
+    mount(() => <ExclusiveSlotHost slot="rail.taskList" />)
 
     // The flip is out of band: a render must not write a signal it is being rendered from, so the
     // boundary queues a microtask and core draws on the next tick.
     await Promise.resolve()
     expect(host.querySelector('[data-mark]')?.getAttribute('data-mark')).toBe('core')
     // Recorded in the registry as well as locally, so Settings can say the choice is not in effect.
+    expect(exclusiveSlotFailed('rail.taskList', 'rival')).toBe(false)
+  })
+
+  it('restores core when the selected remote tree worker fails', async () => {
+    let fail: ((message: string) => void) | undefined
+    const transport: TreeTransport = {
+      onBatch: () => () => {},
+      onFailed: (listener) => { fail = listener; return () => {} },
+      send: () => {},
+    }
+    offer('rival', () => <TreeHost pluginId="rival" transport={transport} />)
+    prefs.value = JSON.stringify({ 'rail.taskList': 'rival' })
+    mount(() => <ExclusiveSlotHost slot="rail.taskList" />)
+    fail?.('worker stopped')
+    await Promise.resolve()
+    expect(host.querySelector('[data-mark]')?.getAttribute('data-mark')).toBe('core')
+  })
+
+  it('stops mounting a provider after three failures in the session', async () => {
+    const broken = vi.fn(() => { throw new Error('broken') })
+    offer('rival', broken)
+    prefs.value = JSON.stringify({ 'rail.taskList': 'rival' })
+    for (let attempt = 0; attempt < 3; attempt++) {
+      mount(() => <ExclusiveSlotHost slot="rail.taskList" />)
+      expect(host.querySelector('[data-mark]')?.getAttribute('data-mark')).toBe('core')
+      await Promise.resolve()
+      dispose()
+      host.remove()
+    }
     expect(exclusiveSlotFailed('rail.taskList', 'rival')).toBe(true)
+    const drawsBeforeDisabledMount = broken.mock.calls.length
+    mount(() => <ExclusiveSlotHost slot="rail.taskList" />)
+    expect(host.querySelector('[data-mark]')?.getAttribute('data-mark')).toBe('core')
+    expect(broken).toHaveBeenCalledTimes(drawsBeforeDisabledMount)
+  })
+
+  it('retries a failed provider after contribution state is synchronized', async () => {
+    offer('rival', () => { throw new Error('old bundle failed') })
+    prefs.value = JSON.stringify({ 'rail.taskList': 'rival' })
+    mount(() => <ExclusiveSlotHost slot="rail.taskList" />)
+    await Promise.resolve()
+    expect(host.querySelector('[data-mark]')?.getAttribute('data-mark')).toBe('core')
+
+    registered.pop()!.dispose()
+    offer('rival', () => <span data-mark="recovered" />)
+    clearExclusiveSlotFailures()
+    expect(host.querySelector('[data-mark]')?.getAttribute('data-mark')).toBe('recovered')
   })
 
   it('draws core when the chosen plugin has gone', () => {
     prefs.value = JSON.stringify({ 'rail.taskList': 'uninstalled' })
 
-    mount(() => <ExclusiveSlotHost slot="rail.taskList" core={core} />)
+    mount(() => <ExclusiveSlotHost slot="rail.taskList" />)
 
     expect(host.querySelector('[data-mark]')?.getAttribute('data-mark')).toBe('core')
   })
@@ -127,7 +175,7 @@ describe('ExclusiveSlotHost', () => {
     Object.defineProperty(prefs, 'value', { get: choice, configurable: true })
     offer('rival', () => <span data-mark="rival" />)
 
-    mount(() => <ExclusiveSlotHost slot="rail.taskList" core={core} />)
+    mount(() => <ExclusiveSlotHost slot="rail.taskList" />)
     expect(host.querySelector('[data-mark]')?.getAttribute('data-mark')).toBe('core')
 
     setChoice(JSON.stringify({ 'rail.taskList': 'rival' }))

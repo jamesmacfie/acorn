@@ -27,7 +27,7 @@ import { initClientPlugins } from '@acorn/client-core/host/registries/extensionP
 // (measured 2026-09-03).
 //
 // Registering after the frame is safe because every contribution registry is a Solid signal
-// (client-core kit/lib/registry.ts): the shell draws its chrome, this lands, and the rail, the pane
+// (client-core kit/lib/state/registry.ts): the shell draws its chrome, this lands, and the rail, the pane
 // strip and the palette fill from the same reactivity that already handles a loaded plugin arriving
 // from a node seconds later. What must NOT move behind the frame is the four host seams in `App.tsx`
 // — the layout table above all, which a pane needs before it can draw at all.

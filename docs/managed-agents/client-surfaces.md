@@ -4,6 +4,11 @@ Part of [managed-agents.md](../managed-agents.md).
 
 ## Client surfaces
 
+The agents client claims the `agent` WebSocket channel when its first frame subscriber attaches and
+releases it when the last subscriber leaves. Plugin activation holds an application-lifetime
+subscription for agent attention. Loading a lazy surface, including an inline diff card, does not
+register a channel.
+
 The Agent pane is a `list-detail` layout (docs/panes.md § Layout model). The list column is the task's
 roster, with a header region of its own so the count stays put while the list scrolls; the detail
 column is the open session. The roster is managed sessions, delegated children, and provider-native
@@ -14,11 +19,26 @@ stylesheet: every surface here is a tree of kit nodes, so the same source draws 
 through the remote root when a harness plugin is loaded rather than compiled
 (docs/ui-design.md § The closed kit).
 
+The header waits for nothing but the module and the session list. The pane's model is built inside
+the first region that asks for it, which is this header, so anything the model reads while it is built
+holds the header back. It used to read the harness list that way, and the header took as long as the
+Node's providers probe, 205 ms typically and 805 ms at the 95th percentile. The harness list is now the
+shared `['agents', 'providers']` query (`plugins/agents/src/client/providersClient.ts`), fresh for a
+minute, so a second task reads it from memory. The model reads its data only once the query has an
+answer. Until then the New menu and the empty state say they are checking which agents this Node can
+run. The menu's Refresh button asks the Node for a fresh probe and writes the answer into the query.
+
 The detail column has a header, a transcript and a composer without a second set of regions. The
 transcript is a `Timeline` with `follow` set, which means the kit owns the scroll: it stays on the
 newest turn until the reader scrolls away from it, picks the bottom up again when they scroll back,
 and gives a reader the place they left when they come back to a session. The bar above it and the
 composer below it are pinned by being that scroller's siblings.
+
+The conversation is keyed by the resolved session id. The Agent pane keeps its detail region mounted
+while the reader chooses another row in the same task, and the Workflows pane can resolve a step's
+session after it has mounted. A different id disposes the prior transcript, snapshot subscription,
+pending reveal, and local view controls before mounting the new one. Drafts and reading places remain
+in their session-keyed stores, so returning to a session restores those separately.
 
 Immediately after the title, the header hosts the `agents:session-header` remote `stack` point. Its
 props are a public projection rather than the ledger itself: task and session ids, provider id,
@@ -44,9 +64,77 @@ The timeline is not virtualised, and that is the kit's rule rather than this pan
 this transcript used to run called `measure()` on every new event, which clears the item size cache,
 so every row fell back to the estimate, the canvas height jumped, and the rows re-measured, on every
 event. It also rebuilt its rows from `getVirtualItems()`, which hands back fresh objects on each
-scroll, replacing the DOM under any text selection. If a session ever feels slow to open, render the
-last N behind a "show earlier" control: a fixed window has no measurement feedback loop. Two more
-guardrails hold in the same place. A card seeds its fold state at mount and then leaves it alone, so
+scroll, replacing the DOM under any text selection.
+
+**A long session is drawn through a fixed window instead.** The projection covers every event, and the
+transcript draws the newest 200 cards of it, with **Show earlier (N)** above the first card
+(`createTimelineWindow`, `packages/client-core/src/kit/lib/timeline/timelineWindow.ts`, from
+`@acorn/plugin-api/ui`). The window counts cards and never measures one, so it has no feedback loop.
+The canonical 7,012-event session projects to 3,387 cards. Drawing all of them built about 30,000
+elements in about 840 ms in jsdom before anything painted. The window builds about 1,800 elements in
+about 60 ms (2026-09-26, jsdom, no real-window timing). Its rules:
+
+- The window is held by its oldest drawn card, so a streamed card joins it and never pushes a card
+  out. **Show earlier** adds 200 older cards and keeps the card the reader was looking at at the
+  same offset.
+- **Go to top** above the composer draws every card, then jumps to the oldest. That is the explicit
+  way to reach the start in one step, and to let the page's own find see the whole session. Until the
+  reader asks, the page's find cannot match a hidden card, and the count on **Show earlier** says so.
+- A remembered reading place in a hidden card, and a request a notice or the sidebar names, reveal
+  the page that holds the card before anything is focused or scrolled. Only a card that has left the
+  list for good hands the reader a neighbour, and the Timeline's health counts that as a
+  substitution. A named request is revealed once per view, so a later trim can drop it again.
+- While the reader follows the live end, the Timeline trims back to 200 once it draws 400, which is
+  once a page of new cards rather than once an event. It never trims a card holding the selection or
+  focus, and it never trims while the reader is away from the live end. The trim runs in the frame
+  after the list grows, not inside the resize callback, so the browser never reports a resize loop.
+- Switching session or subagent starts that list on its own newest page. The window is not kept per
+  session.
+- Each card carries `aria-posinset` and `aria-setsize` for its place in the whole session, so a screen
+  reader hears "3,188 of 3,387" rather than "1 of 200".
+
+The terminal client draws the same window and the same control and never trims.
+
+The window shipped because of a count, not a timing. At `canonical` the transcript mounted 3,387
+turns, eight times the 400-turn ceiling the large-surface flow asserts ([testing.md](../testing.md)
+§ Large-surface fixture), and stable keys and lazy bodies alone did not reduce card construction. The
+200-card page comes from that jsdom construction count. No WebKit sample has refined it.
+
+What the transcript refuses, and what would reopen it:
+
+- **A variable-height virtualizer.** The last one cleared its measurement cache on every event and
+  replaced the DOM under a selection. Reopen it only if a product requirement rejects **Show
+  earlier**, and a prototype keeps selection, focus, reading place, streaming and measurement intact
+  on the `canonical` fixture in the real window.
+- **Dropping old events or cards to meet a budget.** The projection stays complete. The window changes
+  which cards are mounted and always offers a way to draw the hidden ones.
+- **`content-visibility` on turns.** It was tried in the real window on 2026-09-30, on the
+  `canonical` fixture, with `content-visibility: auto; contain-intrinsic-block-size: auto 48px` on
+  `.ui-timeline-turn`, and backed out. The accessibility tree is what rules it out. WebKit lays out no
+  text in a skipped turn, so its static text reaches the macOS accessibility API empty: 410 of 445
+  text elements in the drawn window, against 21 without it. A screen reader reads blank cards for
+  everything off screen, and no stylesheet rule changes that. Paint containment also clips the focus
+  rings drawn outside a turn's edge. A named card's reveal fails too. Drawing the cards near the new
+  position resizes the list before the scroll event arrives, so the Timeline still reads the reader
+  as following and pins them back to the newest turn. The Timeline now checks for a move before a
+  resize pins, so that one would not recur ([closed-kit.md](../ui-design/closed-kit.md)); the
+  accessibility tree still rules the property out. Selection, page find, the reading place and
+  following the newest turn all held. The gain was small at the window's size. With 200 cards drawn,
+  their first style and layout went from about 10 ms to about 7 ms, and a full relayout from about
+  3 ms to under 1 ms. With all 3,387 drawn, after **Go to top**, those were about 190 ms to 137 ms,
+  and 48 ms to 10 ms. Reopen it only if WebKit exposes skipped text to accessibility.
+
+Known limits of the window:
+
+- Turning **Chats only** off keeps the oldest drawn card, so the window can grow to about 600 cards
+  until the next trim.
+- After **Go to top** on a stopped session, returning to the live end does not trim. A trim runs only
+  when the list grows, and a stopped session does not grow.
+- A reading place stores its turn's index among the drawn turns. When that turn has gone for good,
+  the neighbour is picked from what is drawn, which can differ from the logical neighbour after the
+  window changed.
+
+Two more guardrails hold in the same place. A card seeds its fold state at mount and then leaves it alone, so
 a call finishing does not slam its card shut, and the sidebar's rows are keyed by session id rather
 than by object identity, so the roster rebuilding on every socket frame does not replace the row
 somebody is reading.
@@ -60,13 +148,15 @@ selection reads back the same text. Written that way rather than as an element-i
 it fails for any reason a selection can break, not only for the one it was written after.
 
 - Agent Center aggregates sessions, search, provider health, attention, transcript import, and launch.
+  Its header places the active, attention, and session counts side by side. Provider health appears
+  in compact cards with each name and status dot; the fleet scope also explains remote refresh timing.
   Its archived filter offers **Restore** on a session someone archived on its own. A session retired
   because its task was archived has no such button: it comes back when the task is restored, because
   retirement is worked out when the list is read (docs/workspaces-and-tasks.md § Restoring a task).
 - On an archived task, which only the archive page's preview shows, the Agent pane is read-only: the
   transcripts draw, the composer is off, and there is no new-session picker.
 - A provider draws as its own mark wherever it is named: the onboarding cards, the New picker, each
-  block in Settings -> Agent defaults, and the session icon in Agent Center. The name comes off the
+  harness row and block in Settings -> Harnesses and defaults, and the session icon in Agent Center. The name comes off the
   descriptor's `glyph`, so a contributed harness gets the same treatment by pointing that field at a
   mark it registers. The two built-in ones are `brand:agents/claude` and `brand:agents/codex`, drawn
   by `ProviderGlyph.tsx` and coloured from the mark (docs/ui-design.md section Brand colour). The
@@ -97,6 +187,15 @@ it fails for any reason a selection can break, not only for the one it was writt
   place. A call's parameters and output sit behind a disclosure toggle, and a call with nothing to show
   for either renders as a flat row instead, so no card opens onto nothing. A provider reports a status
   only when it changes, so an update carrying nothing but output leaves the last reported status alone.
+- Claude's `Skill` call uses the skill name in its recorded JSON input for the built-in card's label:
+  **Launching skill: readable** rather than **Skill**. Opening the card shows the original JSON.
+  If the provider's output repeats that same sentence, the expanded body omits the duplicate. This is
+  a presentation rule, so previously recorded calls gain the label without changing stored events.
+- Claude's `ToolSearch` call, which loads a tool's definition before its first use, renders as a flat
+  row named after what it loaded: **Load tools: WebFetch** rather than **ToolSearch**. Its JSON
+  input and its `Tool: WebFetch` output both restate that name, so the ACP normalizer drops them
+  unless the call failed. The names come from the structured response's `matches`, so this is a
+  normalizer rule rather than a presentation one, and calls recorded before it keep their old card.
 - Whether that toggle starts open is the reader's setting, **Tool call display** in Settings -> Agent
   defaults: start collapsed, start expanded, or carry the reader's last toggle forward. It is a device
   preference (`agent_tool_fold`), so it sits on that page beside settings the node keeps. The default is
@@ -107,6 +206,11 @@ it fails for any reason a selection can break, not only for the one it was writt
 - On the desktop, a closed disclosure defers its contents until first opened. Opening a task's
   Agent pane therefore does not render hidden tool output or the nested transcript of a completed
   subagent. Once opened, those contents stay mounted across toggles so their local state survives.
+  The Timeline's health counts built bodies apart from cards (`mounted.bodies`,
+  [telemetry.md](../telemetry.md) § Rendered-surface health). A compiled contributor's card, such as
+  `changes`' file tool card, uses the same disclosure and defers the same way. A loaded plugin's remote
+  tree is the exception: the worker builds its whole tree, closed body included, for every card the
+  window draws, because the host cannot see inside it to defer anything.
 - **The card body is a slot.** Three things can draw it, in order: a compiled plugin's renderer that
   matched the call, then a loaded plugin's remote tree that declared the call's tool name, then the
   built-in card. A compiled renderer wins because it draws in the transcript's own realm and costs
@@ -136,6 +240,18 @@ it fails for any reason a selection can break, not only for the one it was writt
   transcript folds snapshots from one turn into the card the first one opened; a new turn starts a new
   card. Each step has one structured status marker and renders its text through the transcript Markdown
   policy, in a status-and-text grid that keeps wrapped lines inside the card.
+- **A file change opens in place to show that step's diff.** People open these rows to ask what that
+  step just did, which the Changes pane cannot answer: it shows what is different in the worktree now.
+  So a change that carries a patch is a fold. Closed, it names the file. Open, it draws the diff with
+  `StackedDiff`, the kit's read-only diff, stacked, in plain text, with no comments and no gap expansion,
+  and an **Open in Changes** button for the whole picture. The rows are built on first open, so a long
+  thread of closed changes costs nothing. A change whose line numbers came from an excerpt draws them
+  blank. A patch that went to an artifact says the diff is too large to show and keeps the button. A
+  change with no patch, including every one stored before patches were kept, is still the flat row
+  that opens Changes. The transcript folds a change's reports by change id and path, like a tool call's
+  updates, so Codex's whole-turn diff is one row per turn and not one per update
+  ([managed-agents.md](../managed-agents.md) § File changes). The terminal client draws the same card
+  through its own `StackedDiff`.
 - Usage folds the same way, one line per turn. A turn's last usage update can arrive after the turn is
   marked complete and so carries no turn id; it updates the line it belongs to rather than starting
   another. That is how a cost joins a line that started with only a context count. **The fold happens
@@ -149,8 +265,8 @@ it fails for any reason a selection can break, not only for the one it was writt
   is now defensive: a replayed page, an imported transcript or an older node still folds the way it
   always did.
 - **Tool calls fold on the Node too, for a reader that asks.** A call arrives as a run of updates on
-  one id, and `tool` is about half of all rows, most of a long session. When the client sends
-  `fold=1`, the snapshot route and the event pages behind it fold each call's updates within the page
+  one id. The ledger stores it as two rows, its opener and its latest state (§ The transcript store
+  below). When the client sends `fold=1`, the snapshot route and the event pages behind it fold each call's updates within the page
   onto the record that opened it, by the rule in `plugins/agents/src/shared/toolFold.ts`, which
   `conversationItems.ts` imports too. The surviving record keeps the opener's id, sequence and
   subagent attribution, and it carries `foldedThroughSeq`, the last row it absorbed. A call that spans
@@ -188,6 +304,13 @@ it fails for any reason a selection can break, not only for the one it was writt
   anybody has answered yet and what they said both live on the row and keep changing long after the
   event is written. An answer to a question the harness marked secret reads as "Answer hidden", since
   the thread is durable and searchable in a way a prompt answered and gone was not.
+- An app-access approval names its app by the name a person reads and the identifier the grant is
+  keyed on, and says what each scope means before any button (`client/sessions/appApproval.ts`). The
+  buttons are the stored options, so **Always allow** appears only when the provider offered it. Once
+  answered, the record keeps the app and identifier. After **Always allow** it also says that the
+  provider saves the grant and where to revoke it, because a sent answer is not proof of a saved grant
+  ([managed-agents.md § App-access approval](../managed-agents.md#app-access-approval)). The desktop
+  and the terminal draw the same card.
 - **Chats only keeps the requests.** The toggle above the composer drops the tool calls, the reasoning
   and the notes, and a question the agent asked with the answer sitting on it is the same conversation
   as a message. During planning it is most of the conversation, so leaving it out gave a reader a
@@ -196,6 +319,13 @@ it fails for any reason a selection can break, not only for the one it was writt
   survives the toggle is the questions and whatever is still blocking.
 - The task sidebar keeps its own "Needs you" list, which is the way to reach a blocked session the
   reader is not looking at. Picking a row opens that session and brings its card into view.
+- Managed sessions, Workflow runs, and Inline chats each have an order button in their header:
+  running first, name, newest first (the default), or latest activity. The choice is saved per task
+  and per group as the `agents.session-order` state slice (plugins/agents sessions/sessionOrder.ts).
+  Subagents and delegated children follow their group's order and have no control of their own.
+  Latest activity reads the session's `lastEventAt`, not `updatedAt`, because opening or renaming a
+  session also moves `updatedAt`. The node leaves `lastEventAt` out of the row-change check (as it
+  does `updatedAt`), so the order re-sorts when a turn starts or ends, not on every streamed chunk.
 - A subagent shows up twice: as one card in its parent's transcript, holding everything that subagent
   did, and as one indented row under its session in the task Agent sidebar. The card is seeded expanded
   while the subagent is working and collapsed if it had already settled when the card was first drawn,
@@ -237,7 +367,8 @@ it fails for any reason a selection can break, not only for the one it was writt
   two share every property that decides where a glyph lands, and above 20,000 characters the mirror is
   dropped and the field paints itself. A command or skill is coloured only when the session advertises
   that name, so `9/11` stays prose and a misspelled `/reviw` stays visibly plain. File mentions come
-  from the same walk that builds the turn's file parts, so what is coloured is what is sent.
+  from the same worktree file list that builds the turn's file parts, so what is coloured is what is
+  sent. An `@` token with no exact file match stays plain message text and does not block sending.
 - Typing any of the three sigils opens the same dropdown: `@` lists worktree files, `/` the commands
   and `$` the skills the session advertises. Rows are `PickerRow`, the row the context picker draws,
   so a name sits over its description rather than sharing a line with it. The list scrolls once it
@@ -323,6 +454,17 @@ events a second per streaming session, because the Node coalesces text deltas at
   a card can have gained a row without its key or its sequence span moving. The turn and request maps
   are memoised on their arrays, which the store replaces only when a turn or a request changes.
 
+**A frame costs about a millisecond, so frames are not batched.** In the plugin's jsdom tier, with
+the canonical session in the real store and the real transcript drawing 200 of its 3,387 cards, a
+streamed message delta took 0.8 ms at the median and 1.3 ms at the 95th percentile, and stayed near
+1 ms as one reply grew to 40 KB. A tool update took 0.5 ms. The store write itself was under 0.05 ms.
+The one expensive frame is an event seated behind the tail, which rebuilds the projection and wakes
+every drawn card: about 20 ms. The node commits a session's events in order, so a live frame does not
+arrive that way. Sentry agrees: over three days, the slowest agent frame in the median five-second
+window took 1 ms, and in 95% of windows it took 36 ms or less. Frames of 100 ms or more are a tail
+under 1% of frames. Batching frames into one write per animation frame would not change that, because
+one session's frames arrive about 40 ms apart and a batch would nearly always hold one frame.
+
 A snapshot read and the socket can disagree about a usage line, because both sides fold it and both
 keep the first update's id: a frame can land while the request is in flight. `managedSnapshot.ts`
 unions the two payloads, socket first, so no reported field is lost either way.
@@ -343,8 +485,12 @@ those loads used to fetch the whole ledger again. The store keeps a mark per hel
 `completeThrough`: every event at or below that sequence is held, or folded into a row that is. A
 load sets it to where its walk ended. A streamed event moves it only when it is the next sequence, so
 a frame the socket lost leaves the mark at the gap and the frames after it cannot hide it. The next
-load asks the snapshot route for events after the mark and pages on from there. The ledger only
-appends, so nothing below the mark can have changed. The turns, the requests, and the row still come
+load asks the snapshot route for events after the mark and pages on from there. Nothing below the mark
+can have changed in a way the reader would draw: the ledger appends, and the one row it deletes is a
+tool call's or a file change's superseded row, only once a newer row carries the card's whole state
+(below). The retention pass is the exception. It deletes every row of a long-archived task's session
+and appends a note past them, so a window holding that session draws the old rows until it reloads
+([managed-agents.md § Operations and failure](../managed-agents.md#operations-and-failure)). The turns, the requests, and the row still come
 back whole, because some of their changes reach the socket as no frame at all: a turn queued from
 another window, a request that a stop expired. So a resumed read answers what a full read would. When
 it brings no events, the held array passes through unchanged and is not indexed again. A shown
@@ -363,11 +509,53 @@ it, and so do its composer draft, its reading place and its live event sequence.
 dropped session appends nothing, and an `error` frame for one reads nothing. Opening it again is a
 first visit: the read starts from the beginning.
 
+**A tool call is stored as two rows: the one that opened it and one with its latest state.** A
+harness reports a call as a run of updates on one id, and each used to be a row. A measured database
+held 196,000 tool rows for 39,000 calls, 300 MB of JSON, and every reader folds them into one card
+anyway. The updates are partial: a field left out means unchanged, and Codex streams output as
+appends. So when an update arrives, `recordEvent` folds the card's stored rows and the update with
+`mergeToolCall`, writes the result at the next sequence with no `outputAppend`, and deletes the row it
+supersedes, all in the event's own transaction (`server/sessions/ledgerFold.ts`). A file change with a
+change id is stored the same way, with its latest report as the state. One without a change id is
+never folded by the transcript, so it is not folded here either.
+
+Each reader stays correct for a reason of its own:
+
+- **Resuming after the mark.** The new row is past every mark, so a reader resuming from its mark gets
+  it, and it replaces every field the reader's card could hold. An update in place would have sat
+  below the mark and never reached it, which is why the fold writes a new row.
+- **Reading from the start, and the `fold=1` pages.** They see the opener and the latest row, which
+  fold to the card they always drew. The opener stays because every reader puts a card where its
+  first row landed, keys it by that row's id, and files it in the subagent stream that row names.
+  Deleting it would move a call to where its last update landed on the next reload.
+- **The socket.** Each update still goes out as the provider reported it, at the sequence its row
+  took, so frames stay the size of the change and `completeThrough` still moves one sequence at a
+  time. A snapshot read that lands after a frame replaces it by id (`managedSnapshot.ts`), and the
+  stored row folds to the same card.
+- **The walk and `lastEventSeq`.** Sequences now have gaps, and nothing reads them as contiguous. The
+  deleted row is never the session's newest, so the walk still ends on `lastEventSeq`.
+- **Export, the wait route, workflows and delegation.** They read the rows as stored. The markdown
+  export folds tool rows so each call is one line with its last status. The others read messages,
+  turn ends and errors, which are never folded.
+
+Rows stored before the fold are put into this shape once, in the background after boot
+(`server/sessions/ledgerCompaction.ts`). Each card keeps its opener and its last row, rewritten in
+place to the folded state, and loses every row between. Rewriting the last row is safe for the same
+reason the new row is: it folds to the same card over whatever prefix a reader holds. The pass works in
+small transactions and yields between them, marks each session on `ledger_compacted_at` when done, and
+reads only unmarked sessions, so it finishes once. On the 1.3 GB database it was written for, it
+removed 118,500 rows in 34 seconds, and the median step held the node for about 3 ms. The longest,
+one card of about a thousand rows, held it for about 190 ms. It then merges the search index, because
+each deleted row left a tombstone there. The file does not shrink; see docs/data-layer.md § Retention.
+
 ### Transcript search
 
 `agent_events_fts` is a SQLite full-text index over `agent_events.search_text`, kept in step by triggers
 written by hand into the migrations (docs/data-layer.md § Migrations). Agent Center's search and the
-archive page's search provider (docs/plugins.md § Search providers) both read it.
+archive page's search provider (docs/plugins.md § Search providers) both read it. When the retention
+pass removes a session's history, the delete trigger takes its rows out of the index, so archive search
+stops finding it. The session's title still matches, and so does the note left in its place
+(docs/data-layer.md § Retention).
 
 **The search text stays on the node.** An event record's `searchText` is the index's input, and no
 client reads it. On a tool row it repeats the title, input and output the event already carries, which
@@ -388,7 +576,10 @@ Each fragment rewrites its message's search row, so indexing a message costs its
 fragment count. That is small for replies of a few kilobytes. Indexing when the stream closes is the
 upgrade if very long replies make writes slow.
 
-**Tool text ranks below the conversation.** Tool events are about two thirds of the indexed rows and
+**A tool call is indexed once, on its latest row.** That row holds the whole call, so the opener gives
+up its search text when the first update folds onto it. A file change does the same.
+
+**Tool text ranks below the conversation.** Tool events were about two thirds of the indexed rows and
 about 1 KB each, and file dumps and command output buried the conversation. They go in their own `tool`
 column, and the table's stored rank weighs a word there at 0.3 of the same word in `content`. Searching
 for a command someone ran still works.
@@ -398,6 +589,12 @@ FTS5 cannot look up, so every update or delete scanned the whole index. Inserts 
 deletes also check `event_id`, so an event table whose rowids a VACUUM renumbered repairs itself on the
 next write instead of failing it.
 
-The index still stores its own copy of the text, about 300 MB on the measured database. Pointing it at
-`agent_events` as external content would save that, but external content is keyed by rowid, and this
-table's rowids are not stable across a VACUUM because its key is text.
+The index still stores its own copy of the text: 203 MB on the measured database once the tool rows
+were folded, down from 326 MB. Pointing it at `agent_events` as external content would save that, and
+it was considered and left alone. External content is keyed by rowid, and SQLite allows a VACUUM to
+renumber the rowids of a table whose key is text, as this one's is. The current table survives that,
+because it stores `event_id` and every delete checks it. An external-content table cannot check: its
+matches would read the wrong rows, and a delete that names values the index does not hold corrupts it.
+Making the rowid stable means rebuilding `agent_events` with an integer key, and the switch means
+reindexing every row inside a migration, which blocks boot. The content and tool columns would also
+need a view, because the triggers split them on the event type.

@@ -3,9 +3,9 @@
   "description": "The acorn monorepo: an agent workspace built as a desktop shell, a Node service, and a tree of plugins.",
   "private": true,
   "packageManager": "pnpm@11.0.0",
-  "//engines": "The same floor the packed standalone artifact declares (scripts/pack-node.mjs). Two things need it: the node:sqlite surface the DB shim uses, and apps/node/scripts/build-plugin.mjs importing a .ts file directly, which relies on Node's own type stripping.",
+  "//engines": "The security floor for Node's permission model, shared with node-runtime.json and @acorn/protocol/nodeRuntime.ts. scripts/pack-node.mjs copies this range into the standalone artifact.",
   "engines": {
-    "node": ">=22.18 <23 || >=24.4"
+    "node": ">=22.23.2 <23 || >=24.18.1 <25 || >=26.5.1 <27"
   },
   "scripts": {
     "build": "turbo run build",
@@ -19,6 +19,9 @@
     "dev:agent": "pnpm --filter @acorn/desktop dev:agent",
     "dev:agent:smoke": "pnpm --filter @acorn/desktop dev:agent:smoke",
     "dev:agent:ui": "pnpm --filter @acorn/desktop dev:agent:ui",
+    "dev:tui:agent": "node scripts/agent-tui.mjs",
+    "dev:tui:agent:ui": "pnpm --filter @acorn/tui agent:ui",
+    "dev:tui:agent:flow": "node apps/tui/scripts/agent/flow-cli.mjs",
     "dev:no-watch": "pnpm --filter @acorn/desktop dev:no-watch",
     "dev:node": "pnpm --filter @acorn/node dev:node",
     "dev:plugin": "pnpm --filter @acorn/node dev:plugin",
@@ -28,7 +31,28 @@
     "pack:node": "node scripts/pack-node.mjs",
     "rebuild:node": "node scripts/rebuild-node-abi.mjs",
     "release": "pnpm dist",
-    "test": "node scripts/rebuild-node-abi.mjs && turbo run test --continue --concurrency=6"
+    "test": "node scripts/rebuild-node-abi.mjs && turbo run test --continue --concurrency=${ACORN_TEST_CONCURRENCY:-6}",
+    "test:coverage": "node scripts/test-coverage.mjs"
+  },
+  "//overrides": "Runtime security floors, copied into the standalone npm manifest by scripts/pack-node.mjs. tools/arch/dependencySecurity.test.ts verifies pnpm uses the same policy.",
+  "overrides": {
+    "@hono/node-server": ">=2.0.11",
+    "dompurify": ">=3.4.12",
+    "fast-uri": "4.1.5",
+    "hono": "4.13.5",
+    "ip-address": "10.7.1",
+    "qs": "6.16.0"
+  },
+  "//acornStandalone": "The packed npm manifest uses the tested Node-compatible keymap release. Its unused optional Solid adapter peer follows our direct Solid range; no global peer bypass or downgrade.",
+  "acornStandalone": {
+    "dependencyPins": {
+      "@opentui/keymap": "0.5.9"
+    },
+    "peerOverrides": {
+      "@opentui/keymap": {
+        "solid-js": "$solid-js"
+      }
+    }
   },
   "devDependencies": {
     "drizzle-kit": "^0.31.10",

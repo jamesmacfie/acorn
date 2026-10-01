@@ -1,4 +1,5 @@
 import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
+import type { DiffReadingPlace } from './diffLayout'
 
 // Session-only view position for a diff surface, so returning to one lands where you left it.
 // A task's diff is a different scope from the same files opened outside a task, even when both show
@@ -12,12 +13,16 @@ export type DiffViewScope = {
   taskId?: string
 }
 
-export type DiffScrollPosition = {
-  top: number
+/**
+ * Where the reader was, by identity: an item of the document and a point in its code rows, or a
+ * dynamic block and an offset into it (./diffLayout.ts). Not a pixel offset, which a thread measured
+ * above the reader or a narrower pane would make wrong. Valid for the projection and the file set it
+ * was taken in; a place whose item has gone lands on that file's header.
+ */
+export type DiffScrollState = {
+  place: DiffReadingPlace
+  /** Horizontal scroll, in pixels: code does not wrap, so nothing above the reader can move it. */
   left: number
-}
-
-export type DiffScrollState = DiffScrollPosition & {
   viewMode: 'unified' | 'split'
   filesSignature: string
 }
@@ -32,6 +37,9 @@ export type DiffCollapsedFiles = {
 type DiffViewState = {
   scroll?: DiffScrollState
   collapsed?: DiffCollapsedFiles
+  /** The toolbar's file filter as typed. Not tied to the files signature: it is text rather than a
+      decision about particular files, so it still means the same thing after new commits. */
+  fileFilter?: string
 }
 
 const viewStates = new Map<string, DiffViewState>()
@@ -56,6 +64,14 @@ export const rememberDiffCollapsed = (scope: DiffViewScope, collapsed: DiffColla
 
 export const diffCollapsed = (scope: DiffViewScope): DiffCollapsedFiles | undefined =>
   viewStates.get(diffScopeKey(scope))?.collapsed
+
+export const rememberDiffFileFilter = (scope: DiffViewScope, fileFilter: string): void => {
+  const key = diffScopeKey(scope)
+  viewStates.set(key, { ...viewStates.get(key), fileFilter })
+}
+
+export const diffFileFilter = (scope: DiffViewScope): string =>
+  viewStates.get(diffScopeKey(scope))?.fileFilter ?? ''
 
 export function evictDiffViewStates(taskId: string): void {
   const prefix = `task:${taskId}:`

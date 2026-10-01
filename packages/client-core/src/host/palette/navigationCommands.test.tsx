@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { projectsKey, tasksKey, type Task } from '@acorn/protocol/api.ts'
 import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 
 // Go to task, and the one thing about it that is not obvious: the node comes first.
 //

@@ -11,6 +11,7 @@ export const PrefKeys = {
   // Visual style, the appearance axis orthogonal to theme. One key rather than four, because there is
   // no OS signal to follow and nobody wants square panes by day and rounded by night.
   style: 'style',
+  devicePluginsDisabled: 'device_plugins_disabled',
   // Retired, and read by nothing. The desktop used to reopen from these three, which disagreed with
   // each other (docs/state-ownership.md). Still listed as device keys so a leftover in `localStorage`
   // stays there instead of being drained to the node.
@@ -21,6 +22,9 @@ export const PrefKeys = {
   // (infra/persistence/stateSlices.ts). The node's, not the device's: the terminal has no
   // `localStorage`, so a device key would be written nowhere and read back as nothing.
   lastWorkspace: 'last_workspace',
+  // The two-workspace shortcut's pair. Both hosts persist it through the same app-scoped Node
+  // preference path as lastWorkspace, including when the previous workspace is on another Node.
+  workspaceHistory: 'workspace_history',
   taskLayouts: 'task_layouts',
   notices: 'notices',
   editorOpenFiles: 'editor_open_files',
@@ -28,6 +32,11 @@ export const PrefKeys = {
   keybindings: 'keybindings',
   diffView: 'diff_view',
   railOrder: 'rail_order',
+  // Which plugin sources the desktop rail draws, as `{ "<pluginId>:<sourceId>": shown }`
+  // (features/tabs/railVisibility.ts). Apart from `rail_order` so a drag and a switch never overwrite
+  // each other's write, and the device's for the same reason `rail_order` is.
+  railVisibility: 'rail_visibility',
+  leftCollapsed: 'left_collapsed',
   terminalRailDefault: 'term_rail_default',
   terminalHeight: 'term_height',
   terminalFontSize: 'term_font_size',

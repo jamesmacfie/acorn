@@ -37,6 +37,7 @@ const services = (over: Partial<FrameServices> = {}): FrameServices => ({
   copy: vi.fn(),
   openPane: vi.fn(),
   openTarget: vi.fn(),
+  openTask: vi.fn(() => vi.fn()),
   openUrl: vi.fn(),
   frameHasFocus: vi.fn(() => true),
   importerDone: vi.fn(),
@@ -105,6 +106,34 @@ describe('the handshake', () => {
   })
 })
 
+describe('a tree bundle bootstrap bridge', () => {
+  it('denies effects until its one legacy slot has authority', async () => {
+    let authorized = false
+    const svc = services()
+    const channel = new MessageChannel()
+    const received: PluginBridgeMessage[] = []
+    channel.port2.onmessage = (event: MessageEvent) => received.push(event.data as PluginBridgeMessage)
+    const bridge = createFrameBridge({
+      port: channel.port1 as unknown as MessagePort, binding: BINDING, services: svc,
+      context: CONTEXT, authorize: () => authorized, onMisbehaving: () => {},
+    })
+    channel.port2.postMessage({ id: 1, kind: 'api', method: 'GET', path: tasksRoute })
+    await vi.waitFor(() => expect(received).toHaveLength(2))
+    expect(received[1]).toMatchObject({ id: 1, ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    expect(svc.fetch).not.toHaveBeenCalled()
+    authorized = true
+    channel.port2.postMessage({ id: 2, kind: 'api', method: 'GET', path: tasksRoute })
+    await vi.waitFor(() => expect(received).toHaveLength(3))
+    expect(svc.fetch).toHaveBeenCalledTimes(1)
+    authorized = false
+    channel.port2.postMessage({ id: 3, kind: 'ui', op: 'openPane', paneId: 'board' })
+    await vi.waitFor(() => expect(received).toHaveLength(4))
+    expect(svc.openPane).not.toHaveBeenCalled()
+    bridge.dispose()
+    channel.port2.close()
+  })
+})
+
 describe('forwarded keybindings', () => {
   it('sends a normalized chord to the host dispatcher without requiring a reply id', async () => {
     const h = withBridge()
@@ -138,6 +167,27 @@ describe('api calls', () => {
     expect(replyTo(h, 2)).toMatchObject({ id: 2, ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
     // The assertion that matters: a denial is not a discarded response.
     expect(h.svc.fetch).not.toHaveBeenCalled()
+  })
+
+  it('denies encoded traversal into the core preview script route before transport', async () => {
+    const h = withBridge({ api: [] })
+    h.send({
+      id: 101,
+      kind: 'api',
+      method: 'POST',
+      path: '/v1/p/board/%2e%2e/%2e%2e/core/tasks/task-1/preview-url',
+      body: { script: 'echo should-not-run' },
+    })
+    await h.settled(2)
+    expect(replyTo(h, 101)).toMatchObject({ id: 101, ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    expect(h.svc.fetch).not.toHaveBeenCalled()
+  })
+
+  it('forwards the same canonical route and query it authorized', async () => {
+    const h = withBridge({ api: [] })
+    h.send({ id: 102, kind: 'api', method: 'GET', path: '/v1/p/board/cards/a%20b?q=%2e%2e' })
+    await h.settled(2)
+    expect(h.svc.fetch).toHaveBeenCalledWith('GET', '/v1/p/board/cards/a%20b?q=%2e%2e', undefined, expect.anything())
   })
 
   it('denies the project config write even to a frame holding core.projects:write', async () => {
@@ -178,6 +228,28 @@ describe('api calls', () => {
     await new Promise((r) => setTimeout(r, 5))
     expect(seenSignal?.aborted).toBe(true)
     expect(replyTo(h, 7)).toBeUndefined()
+  })
+
+  it('aborts both transport kinds when the frame unmounts', async () => {
+    const signals: AbortSignal[] = []
+    const fetch: FrameServices['fetch'] = async (_method, _path, _body, signal) => {
+      signals.push(signal)
+      return new Promise(() => {})
+    }
+    const fetchBytes: FrameServices['fetchBytes'] = async (_method, _path, _body, signal) => {
+      signals.push(signal)
+      return new Promise(() => {})
+    }
+    const h = withBridge(undefined, services({ fetch, fetchBytes }))
+    h.send({ id: 70, kind: 'api', method: 'GET', path: tasksRoute })
+    h.send({ id: 71, kind: 'api.bytes', method: 'GET', path: '/v1/p/board/files/a' })
+    await vi.waitFor(() => expect(signals).toHaveLength(2))
+
+    h.dispose()
+    harness = null
+    expect(signals.every((signal) => signal.aborted)).toBe(true)
+    expect(replyTo(h, 70)).toBeUndefined()
+    expect(replyTo(h, 71)).toBeUndefined()
   })
 
   it('rejects a request with no method or path', async () => {
@@ -389,6 +461,58 @@ describe('ui verbs', () => {
     expect(svc.copy).not.toHaveBeenCalled()
   })
 
+  it('replies to openTask before it moves the reader, because the move can unmount the asker', async () => {
+    // Leaving a rail source for a task disposes the source's trees, and a reply posted after that is
+    // dropped, which would leave the plugin's promise pending for good. Node's MessageChannel drops a
+    // queued message on close too, so the order is read off the host's own port rather than the far end.
+    const order: string[] = []
+    const channel = new MessageChannel()
+    const port = channel.port1
+    const postMessage = port.postMessage.bind(port)
+    port.postMessage = (message: { id?: number }) => {
+      if (message.id === 60) order.push('reply')
+      postMessage(message)
+    }
+    const svc = services({ openTask: vi.fn(() => () => void order.push('move')) })
+    const bridge = createFrameBridge({ port: port as unknown as MessagePort, binding: BINDING, services: svc, context: CONTEXT, onMisbehaving: () => {} })
+    channel.port2.postMessage({ id: 60, kind: 'ui', op: 'openTask', taskId: 'task-9' })
+    for (let tick = 0; tick < 200 && order.length < 2; tick++) await new Promise((r) => setTimeout(r, 1))
+    bridge.dispose()
+    channel.port2.close()
+    expect(svc.openTask).toHaveBeenCalledWith('task-9')
+    expect(order).toEqual(['reply', 'move'])
+  })
+
+  it('answers not_found for a task the list does not have', async () => {
+    const h = withBridge({}, services({ openTask: vi.fn(() => undefined) }))
+    h.send({ id: 61, kind: 'ui', op: 'openTask', taskId: 'task-missing' })
+    await h.settled(2)
+    expect(replyTo(h, 61)).toMatchObject({ ok: false, error: { code: 'not_found' } })
+  })
+
+  it('refuses openTask without the task read scope, without focus, or inside the navigation gap', async () => {
+    const unscoped = withBridge({ api: [] })
+    unscoped.send({ id: 62, kind: 'ui', op: 'openTask', taskId: 'task-9' })
+    await unscoped.settled(2)
+    expect(replyTo(unscoped, 62)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    expect(unscoped.svc.openTask).not.toHaveBeenCalled()
+    unscoped.dispose()
+
+    const unfocused = withBridge({}, services({ frameHasFocus: vi.fn(() => false) }))
+    unfocused.send({ id: 63, kind: 'ui', op: 'openTask', taskId: 'task-9' })
+    await unfocused.settled(2)
+    expect(replyTo(unfocused, 63)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    unfocused.dispose()
+
+    // One budget with openUrl: both move the reader.
+    const h = withBridge()
+    h.send({ id: 64, kind: 'ui', op: 'openUrl', url: 'https://github.com/runn/acorn/pull/1' })
+    h.send({ id: 65, kind: 'ui', op: 'openTask', taskId: 'task-9' })
+    await h.settled(3)
+    expect(replyTo(h, 65)).toMatchObject({ ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    expect(h.svc.openTask).not.toHaveBeenCalled()
+  })
+
   it('rejects a verb outside the closed set', async () => {
     const h = withBridge()
     h.send({ id: 24, kind: 'ui', op: 'eval', code: 'nope' })
@@ -567,6 +691,13 @@ describe('byte requests', () => {
     )
   })
 
+  it('forwards an authorized byte route with its query string intact', async () => {
+    const h = withBridge({ api: [] })
+    h.send({ id: 104, kind: 'api.bytes', method: 'GET', path: '/v1/p/board/files/a%20b?size=small' })
+    await h.settled(2)
+    expect(h.svc.fetchBytes).toHaveBeenCalledWith('GET', '/v1/p/board/files/a%20b?size=small', undefined, expect.anything())
+  })
+
   // The one that matters. `image-markup` needs attachment content, and the temptation is to let it call
   // the agents routes directly. It cannot, and the check happens before the body is looked at, so a
   // 12 MiB POST at somebody else's namespace is refused without being read.
@@ -575,6 +706,14 @@ describe('byte requests', () => {
     h.send({ id: 32, kind: 'api.bytes', method: 'GET', path: '/v1/p/agents/attachments/a1/content' })
     await h.settled(2)
     expect(replyTo(h, 32)).toMatchObject({ id: 32, ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
+    expect(h.svc.fetchBytes).not.toHaveBeenCalled()
+  })
+
+  it('refuses encoded traversal on the byte path before transport', async () => {
+    const h = withBridge({ api: [] })
+    h.send({ id: 103, kind: 'api.bytes', method: 'GET', path: '/v1/p/board/%2e%2e/%2e%2e/core/tasks/task-1/preview-url' })
+    await h.settled(2)
+    expect(replyTo(h, 103)).toMatchObject({ id: 103, ok: false, error: { code: PLUGIN_BRIDGE_DENIED } })
     expect(h.svc.fetchBytes).not.toHaveBeenCalled()
   })
 

@@ -2,8 +2,10 @@ import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Task } from '@acorn/protocol/api.ts'
 import { paneRegistry, type PaneContribution } from '../../host/registries/panes/panes'
-import type { Disposable } from '../../kit/lib/registry'
+import type { Disposable } from '../../kit/lib/state/registry'
 import TaskPaneHost from './TaskPaneHost'
+
+vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))
 
 // The busiest host in the shell: it decides which panes a task shows, drops the ones this task or
 // this environment cannot offer, and contains a pane that throws. The layout reducer has its own unit

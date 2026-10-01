@@ -217,7 +217,10 @@ restores the prior set; successful update and unload cannot leave a stale tool o
 
 The same registry is projected into:
 
-1. `GET /v1/core/agent-tools` for the Settings → Agent tools catalog.
+1. `GET /v1/core/agent-tools` for the Settings → Tools and permissions catalog. Each entry names its
+   `owner`, the plugin id that contributed it or `core`, so the page can group a plugin's tools
+   together. The page shows the three tiers first, then every tool grouped by owner or by tier, and a
+   row names the other grouping in a chip.
 2. `/v1/core/tasks/:id/tools` and `/v1/core/tasks/:id/tools/:name` for the renderer.
 3. The stdio MCP server for a spawned agent.
 
@@ -242,7 +245,7 @@ A tier the owner has never touched falls back to `TOOL_TIER_DEFAULTS`
 (`@acorn/protocol/toolPermissions.ts`): `read` and `write` allowed, **`execute` denied**. That is the
 state every installation is in for a tool that ships in a later release, which is why the fallback
 matters more than it looks. Adding an execute tool used to grant it to everyone on upgrade with nothing
-shown to the owner; now it is inert until someone turns the tier on in Settings → Agent tools. The
+shown to the owner; now it is inert until someone turns the tier on in Settings → Tools and permissions. The
 node's `isToolPermitted` and the settings page read the same constant, so what the page draws is what
 the wire enforces.
 
@@ -254,11 +257,21 @@ definitions.
 
 | Tool | Input | Result |
 | --- | --- | --- |
-| `agent_spawn` | `title`, `prompt`, optional `profileId`, `isolation`, `resultSchema`, `configOptions`, and `toolCeiling` | Stable spawn, task, session, and initial-turn IDs; depth; provisioning state; and cursor |
+| `agent_spawn` | `title`, `prompt`, optional `profileId` or `agent`, `isolation`, `resultSchema`, `configOptions`, and `toolCeiling` | Stable spawn, task, session, and initial-turn IDs; depth; provisioning state; and cursor |
 | `agent_prompt` | `sessionId`, `prompt`, and optional `resultSchema` and `configOptions` | Durable turn ID, queue state and ordinal, session state, and cursor |
 | `agent_wait` | `sessionId`, `afterSeq`, one of `ready`, `attention`, `turn_completed`, or `stopped`, and `timeoutMs` | Whether the condition matched or timed out, plus state, attention, and the latest sequence |
 | `agent_read` | `sessionId`, `afterSeq`, and `limit` | A bounded page of folded assistant messages, diagnostics, errors, and validated structured output |
 | `agent_cancel` | `sessionId` and an optional `turnId` | The cancelled turn and resulting session state |
+
+An agent learns how to use these tools only from their descriptions and the `describe()` text on each
+field in `plugins/agents/src/shared/delegationSchemas.ts`, which the MCP schema carries. When a rule
+below changes, change that text too.
+
+`agent_spawn` can start a custom agent by passing its name or id as `agent`
+([managed-agents.md](./managed-agents.md) § Custom agents). The agent picks the harness, so naming a
+different `profileId` beside it is refused. The agent's options apply first and the call's
+`configOptions` go on top, and its tool ceiling narrows between the caller's and the call's own. The
+child's system prompt gets the agent's instructions the same way an interactive session does.
 
 `agent_spawn` defaults to shared-task isolation and starts the first turn before returning. Worktree
 isolation creates a selectable child task, but the managed session remains the execution authority.
@@ -288,6 +301,9 @@ A managed owner does not have to stay in its turn to wait. When a turn it gave a
 Agents plugin queues one `delegation_report` turn on the owner with the child's final message, and
 withdraws it if the owner reads that result with `agent_read` first. See
 [managed-agents.md](./managed-agents.md#reports-back-to-the-owner).
+If a delegated turn pauses on a permission, question, or elicitation request, the owner receives an
+informational report. A human opens the child session and resolves the request there; these tools do
+not approve or answer child requests.
 
 ## Context sections
 
@@ -301,7 +317,11 @@ A section is also *shaped* by the plugin that owns its rows, not just registered
 `plugins/github/src/server/contextSection.ts`, `notes` and `memory` in the same file under their own
 packages. Core offers `truncateBytes` and `formatOmitted` through `@acorn/plugin-api/node` so a
 section's own `format` applies the same ceiling arithmetic core applies to items, and keeps the
-assembly, the declared order and the 512 KiB budget.
+assembly, the declared order and the 512 KiB budget. It also offers `pastedContent`, which wraps text
+the reader didn't write in `<pasted_content>` tags that Claude Code's system prompt explains: follow
+instructions inside only where the reader's own message asks. `pr` wraps the pull request body with
+it. The tag id is a hash of the text rather than a random value, because context is assembled again on
+every read and compared for changes.
 
 Core's own `issues` section registers at module scope in `contextSections.ts`, not through
 `wireAgentTools`. `wireAgentTools` is not called on every boot shape: the standalone Node
@@ -427,6 +447,12 @@ drives an installed Chrome. The browser itself is in no bundle, and the tools re
 unavailable on a machine without one. The plugin is compiled rather than loaded because
 `playwright-core` carries native bits a hash-addressed loaded bundle cannot.
 
+The Node retains at most eight task contexts and closes the oldest before opening a replacement.
+Concurrent requests for one task share its pending allocation. Release cancels pending creation;
+shutdown waits for late allocations to close. A failed context close retains its capacity until cleanup
+succeeds or the browser disconnects. Console messages and page errors share a recent-output budget:
+200 entries, 8 KiB of UTF-8 per entry, and 256 KiB in total. Oversized entries show a truncation marker.
+
 Rich results are audit-ready by construction. A screenshot is a row in the plugin's own table, keyed
 to the task and capped per task, and the tool result is a URL handle rather than inline base64, so it
 outlives the transcript. An audit trail of tool usage belongs at the registry dispatch seam, where
@@ -434,7 +460,9 @@ every call already passes, not inside this plugin.
 
 The insert and newest-20 retention sweep complete before
 `plugin:browser:captures-changed { taskId }` is published. `browser.captures` then lists ordered
-metadata for that task; pixels stay behind the authenticated capture route. The older
+metadata for that task; pixels stay behind the authenticated capture route. Task credentials can read
+only their own task's capture bytes; device and service credentials can read any task's captures.
+Foreign and unknown capture IDs both return an empty 404 response. The older
 `capture-created` frame remains for one compatibility period, but new consumers use the collection
 event so a missed frame or retention deletion self-heals on re-read.
 

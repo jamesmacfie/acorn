@@ -7,11 +7,13 @@ function managedState(session: AgentSession): AttentionState {
     case 'permission':
     case 'question':
     case 'workflow_gate': return 'blocked'
-    case 'completed': return 'finished'
-    case 'error': return 'error'
   }
-  if (session.runtimeState === 'failed') return 'error'
-  return ['ready', 'stopped', 'archived'].includes(session.runtimeState) ? 'idle' : 'working'
+  const settled = ['ready', 'stopped', 'archived'].includes(session.runtimeState)
+  // A workflow step that fails is the run's failure to report (run-failed), not an agent's.
+  if (session.kind === 'workflow') return settled || session.runtimeState === 'failed' ? 'idle' : 'working'
+  if (session.attention === 'completed') return 'finished'
+  if (session.attention === 'error' || session.runtimeState === 'failed') return 'error'
+  return settled ? 'idle' : 'working'
 }
 
 export const fromManagedSession = (session: AgentSession, nodeId: string): AttentionSnapshot => ({

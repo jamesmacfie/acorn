@@ -40,8 +40,9 @@ it('pins delayed real editors to each registered provider and permanently fences
     document: { kind: 'document', languageId: 'plaintext', read: '/v1/p/database/tasks/:taskId/scratch', write: '/v1/p/database/tasks/:taskId/scratch' },
     frame: { kind: 'remote', entry: 'panel' },
   } } as const
-  const row = { name: 'database', running: true, disabled: false, installed: { version: '1', apiVersion: PLUGIN_API_MAJOR, permissions: { api: [], events: [] }, client: { hash, bytes: 1 }, contributions: { frames: [surface] } } } as unknown as NodePluginRow
+  const row = { name: 'database', state: 'active', running: true, disabled: false, installed: { version: '1', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR, permissions: { api: [], events: [] }, client: { hash, bytes: 1 }, contributions: { frames: [surface] } } } as unknown as NodePluginRow
   _seedPluginDistribution([['node-a', [row]], ['node-b', [row]]], [`database ${hash}`])
+  setActiveNode('node-a')
   syncFrameContributions()
   const layouts: { show(value: boolean): void }[] = []
   const Layout = (props: LayoutProps) => {
@@ -70,7 +71,7 @@ it('pins delayed real editors to each registered provider and permanently fences
   }
   await vi.waitFor(() => expect(regions).toHaveLength(2))
   setActiveNode('ambient-other')
-  expect(regions[0].services.document!.read()).toBe('')
+  expect(regions[0].services.document).toBeUndefined()
   layouts.forEach((layout) => layout.show(true))
   await vi.waitFor(() => expect(io.reads).toHaveLength(2))
   expect(io.reads.map((read) => read.node)).toEqual(['node-a', 'node-b'])

@@ -11,8 +11,12 @@ import type { Renderable } from '../tree/compat'
 import type { KeyEvent } from '../keyEvent'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { registerCommands } from '@acorn/client-core/host/registries/commands'
+import { railMarkerRegistry } from '@acorn/client-core/host/registries/rail'
+import { extensionRegistry } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'
+import { clearAnnotations } from '@acorn/client-core/host/annotations/annotations.ts'
+import type { PluginAnnotationMark } from '@acorn/protocol/extensionPoints.ts'
 import { keyedRows } from '../kit/showing'
-import { recordedRequests } from '../fixture'
+import { recordedRequests, TASK } from '../fixture'
 import { renderFixture } from '../harness'
 import { activeHints } from './bindings'
 
@@ -79,10 +83,12 @@ describe('the shell', () => {
     screen.done()
 
     const lines = frame.split('\n')
-    // The topbar: the workspace, how many tasks are in it, and the branch of the one that is open.
+    // The task shares the topbar with the workspace, count, and branch; Menu starts on row two.
     expect(lines[0]).toContain('acorn')
     expect(lines[0]).toContain('1 task')
     expect(lines[0]).toContain('fix-login')
+    expect(lines[0]).toContain('Task: fix-login')
+    expect(lines[1]).toContain('Menu')
     // The pane strip, with the pane it is showing marked.
     expect(frame).toContain('[Notes]')
     // The pane itself, which is the notes pane and knows nothing about any of this.
@@ -90,6 +96,19 @@ describe('the shell', () => {
     // The footer, drawn from the keymap's active layers.
     expect(lines[lines.length - 2]).toContain('j/k move')
     for (const line of lines) expect(line.length).toBeLessThanOrEqual(80)
+  }, 30_000)
+
+  it('keeps a long task title inside the single topbar row', async () => {
+    const screen = await renderFixture({
+      pane: 'notes',
+      cache: (client) => client.setQueryData(tasksKey, [{ ...TASK, title: 'A task title '.repeat(20) }]),
+    })
+    const lines = (await screen.frame()).split('\n')
+    screen.done()
+
+    expect(lines[0]).toContain('Task: A task title')
+    expect(lines[1]).toContain('Menu')
+    expect(lines[0].length).toBeLessThanOrEqual(80)
   }, 30_000)
 
   it('holds together at 120 by 40, where the rail keeps its names', async () => {
@@ -101,6 +120,80 @@ describe('the shell', () => {
     expect(frame).toContain('fix-login')
     expect(frame).toContain('[Notes]')
     for (const line of frame.split('\n')) expect(line.length).toBeLessThanOrEqual(120)
+  }, 30_000)
+
+  it('discloses task markers beyond the visible glyph budget and lets the keyboard inspect every label', async () => {
+    const registration = railMarkerRegistry.register({
+      id: 'fixture-many-markers',
+      order: 500,
+      markers: (target) => target.kind === 'task'
+        ? Array.from({ length: 5 }, (_, index) => ({
+          id: `marker-${index}`,
+          label: `Marker ${index + 1}`,
+          dotTone: 'warn' as const,
+          placements: ['top-end', 'top-start', 'bottom-end', 'bottom-start'] as const,
+        }))
+        : [],
+    })
+    const screen = await renderFixture({
+      width: 80,
+      height: 24,
+      pane: 'notes',
+      cache: (client) => client.setQueryData(tasksKey, [{ ...TASK, title: 'Annotation lifecycle smoke' }]),
+    })
+    try {
+      expect(await screen.frame()).toContain('+5')
+      await screen.press('F10', { shift: true })
+      expect(await screen.until('Marker 1')).toContain('Marker 1')
+      await screen.press('END')
+      expect(await screen.until('Marker 5')).toContain('Marker 5')
+    } finally {
+      screen.done()
+      registration.dispose()
+    }
+  }, 30_000)
+
+  it('projects late annotation markers and a replacement contributor after a lifecycle clear', async () => {
+    let answer!: (marks: PluginAnnotationMark[]) => void
+    let registration = extensionRegistry.register({
+      id: 'fixture:late-task-markers',
+      pluginId: 'fixture',
+      point: 'core:task',
+      label: 'Late task markers',
+      order: 500,
+      carrier: 'items',
+      marks: async () => new Promise<PluginAnnotationMark[]>((resolve) => { answer = resolve }),
+    })
+    const screen = await renderFixture({ width: 80, height: 24, pane: 'notes' })
+    try {
+      expect(await screen.frame()).not.toContain('+6')
+      answer(Array.from({ length: 6 }, (_, index) => ({
+        key: { task: TASK.id },
+        severity: 'warn' as const,
+        text: `Late marker ${index + 1}`,
+      })))
+      expect(await screen.until('+6')).toContain('+6')
+
+      clearAnnotations()
+      registration.dispose()
+      registration = extensionRegistry.register({
+        id: 'fixture:late-task-markers',
+        pluginId: 'fixture',
+        point: 'core:task',
+        label: 'Replacement task markers',
+        order: 500,
+        carrier: 'items',
+        marks: async () => Array.from({ length: 10 }, (_, index) => ({
+          key: { task: TASK.id },
+          severity: 'info' as const,
+          text: `Replacement marker ${index + 1}`,
+        })),
+      })
+      expect(await screen.until('+10')).toContain('+10')
+    } finally {
+      screen.done()
+      registration.dispose()
+    }
   }, 30_000)
 
   it('opens on the first Menu source, with the keys on that row', async () => {
@@ -133,7 +226,7 @@ describe('the shell', () => {
 
     // One way to lose the column, and it is a chord: the two-cell strip of marks that used to replace
     // it below 100 cells went with the icons, because the strip only said anything when every row had
-    // a glyph and most of those glyphs drew nothing (../kit/glyphs.ts).
+    // a mark and many of those marks drew nothing.
     await screen.press('b', { ctrl: true })
     const hidden = await screen.frame()
     expect(hidden).not.toContain('Browse')
@@ -553,7 +646,7 @@ describe('the footer asks the keymap once per change', () => {
 //
 // `<For>` keys by object identity, so a rail that maps its tasks into fresh wrappers on every change
 // destroys and rebuilds every row renderable — including the rows that did not change
-// (../kit/showing.tsx § keyedRows).
+// (../kit/showing/collection.tsx § keyedRows).
 
 describe('the rail keeps the rows a change did not touch', () => {
   it('hands the same wrapper back for an unchanged task, and the same array when nothing moved', () => {

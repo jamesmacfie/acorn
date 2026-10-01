@@ -2,7 +2,7 @@ import { Agent as HttpAgent } from 'node:http'
 import { Agent as HttpsAgent } from 'node:https'
 import { WebSocket } from 'ws'
 import { nodeRequest } from './nodeRequest'
-import { decodeIdFrame, WS_PATH, WS_VIEWERS_HEADER, wsViewerIdSchema, type WsClientFrame, type WsSendOptions } from '@acorn/protocol/ws.ts'
+import { MAX_NODE_WS_MESSAGE_BYTES, decodeIdFrame, WS_PATH, WS_VIEWERS_HEADER, wsViewerIdSchema, type WsClientFrame, type WsSendOptions } from '@acorn/protocol/ws.ts'
 import { NODE_PROTOCOL_VERSION, nodeInfoSchema } from '@acorn/protocol/node.ts'
 import {
   type NodeConnectionState,
@@ -44,6 +44,11 @@ const MISSED_PONGS_BEFORE_DEAD = 2
 // Short, because this sits in front of the socket on every connect and a slow node must not delay
 // the reconnect. Timing out here reads as "no clear answer" and the socket opens.
 const PROTOCOL_PROBE_TIMEOUT_MS = 5_000
+const PROTOCOL_PROBE_MAX_BYTES = 16 * 1024
+// ws enforces this while assembling (including inflated messages), before toString/JSON.parse or
+// the helper IPC boundary can make another copy. A malicious node must not pick the allocation size.
+export { MAX_NODE_WS_MESSAGE_BYTES } from '@acorn/protocol/ws.ts'
+const MAX_NODE_HTTP_SOCKETS = 4
 
 // A node plus the material only main may hold: the bearer, and the certificate to pin against.
 export type BrokerNode = NodeRecord & { token: string; certPem?: string }
@@ -104,8 +109,8 @@ export class NodeBroker {
   upsert(node: BrokerNode): void {
     this.remove(node.nodeId)
     const agent = node.endpoint.startsWith('https:')
-      ? new HttpsAgent({ keepAlive: true, ...this.pinning(node) })
-      : new HttpAgent({ keepAlive: true })
+      ? new HttpsAgent({ keepAlive: true, maxSockets: MAX_NODE_HTTP_SOCKETS, ...this.pinning(node) })
+      : new HttpAgent({ keepAlive: true, maxSockets: MAX_NODE_HTTP_SOCKETS })
     const connection: Connection = {
       node,
       agent,
@@ -170,6 +175,7 @@ export class NodeBroker {
         headers: {},
         agent: connection.agent,
         signal: AbortSignal.timeout(PROTOCOL_PROBE_TIMEOUT_MS),
+        maxResponseBytes: PROTOCOL_PROBE_MAX_BYTES,
       })
       if (response.status !== 200) return null
       const payload: unknown = JSON.parse(new TextDecoder().decode(response.body))
@@ -214,14 +220,24 @@ export class NodeBroker {
 
   // --- HTTP ---
 
-  async fetch(nodeId: string, request: NodeFetchRequest): Promise<NodeFetchResponse> {
+  async fetch(nodeId: string, request: NodeFetchRequest, limits: { maxResponseBytes?: number } = {}): Promise<NodeFetchResponse> {
     const connection = this.connections.get(nodeId)
     if (!connection) throw new Error(`Unknown node ${nodeId}`)
+    // Types do not validate a helper message at runtime. In particular `//host/path` is accepted by
+    // startsWith('/') but changes the origin when joined with the node endpoint. Never send the
+    // paired-node bearer to an authority chosen by a path from the renderer.
+    if (!request.path.startsWith('/') || request.path.startsWith('//') || request.path.includes('\\') || request.path.includes('#')) {
+      throw new Error('Node request path must stay on the paired node.')
+    }
+    const target = new URL(request.path, connection.node.endpoint)
+    if (target.origin !== new URL(connection.node.endpoint).origin) {
+      throw new Error('Node request path must stay on the paired node.')
+    }
 
     return this.requests.fetch(nodeId, request, connection, {
       result: (response) => this.noteHttpResult(connection, response),
       failure: (error) => this.noteHttpFailure(connection, error),
-    })
+    }, limits)
   }
 
   abort(requestId: string): void { this.requests.abort(requestId) }
@@ -265,6 +281,8 @@ export class NodeBroker {
     const ws = new WebSocket(url, {
       headers: { authorization: `Bearer ${connection.node.token}`, ...(connection.viewers.multiplexed ? { [WS_VIEWERS_HEADER]: '1' } : {}) },
       agent: connection.agent,
+      maxPayload: MAX_NODE_WS_MESSAGE_BYTES,
+      perMessageDeflate: false,
     })
     connection.ws = ws
 
@@ -459,6 +477,15 @@ export class NodeBroker {
   }
 
   private noteSocketError(connection: Connection, error: unknown): void {
+    if ((error as { code?: unknown } | null)?.code === 'WS_ERR_UNSUPPORTED_MESSAGE_LENGTH') {
+      // A peer violating the message ceiling can otherwise make us receive and reject another
+      // allocation on every reconnect. Keep it offline until the owner reconnects this node.
+      connection.closed = true
+      connection.ws?.terminate()
+      this.setState(connection, 'offline', { code: 'unreachable' })
+      log.warn(`${connection.node.nodeId} sent a WebSocket message over the client limit`, { 'node.id': connection.node.nodeId })
+      return
+    }
     if (isPinMismatch(error)) {
       // A changed fingerprint is a hard security stop, never an auto-retrust. See docs/security.md.
       // Stop reconnecting so the UI has to involve the owner.

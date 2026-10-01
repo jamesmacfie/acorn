@@ -3,6 +3,8 @@ import { prefsKey, prefsRoute } from '@acorn/protocol/api.ts'
 import { writeJson } from '../../infra/node/apiClient'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { queryOwner } from '../../infra/node/queryOwnership'
+import { deviceConfigBridge } from '../../infra/platform'
+import { configPatchForPref } from '../../infra/persistence/deviceConfigPrefs'
 import { pushBackgroundError } from '../notifications/notifications'
 import { isDevicePref, writeDevicePref } from '../../infra/persistence/devicePrefs'
 import { persistedStateRegistry, utf8Bytes } from '../../infra/persistence/persistedState'
@@ -32,17 +34,42 @@ const writes = new WeakMap<QueryClient, Map<string, PrefWriteState>>()
 
 // The query cache is the one client-side writer: update it optimistically so every reactive reader
 // moves together, serialize server writes per key, and roll back only if this attempt is still the
-// visible value. A failure always becomes a notice, because most callers fire and forget.
+// visible value. A failure becomes a notice, because most callers fire and forget. A settings row
+// passes `throwOnFailure` instead: it shows the error beside the field that failed, and a notice as well
+// would say the same thing twice.
+//
+// A row usually writes through an accessor, such as `saveFixedTheme` or `saveNotificationSettings`,
+// that the palette's commands share and that takes no options. `withFailuresThrown` reaches through
+// them: a write started inside it throws. It holds only while the accessor runs up to its first await,
+// which is where every accessor calls this function, and it is read here before anything is awaited.
+let throwingCallers = 0
+export function withFailuresThrown<T>(write: () => T): T {
+  throwingCallers += 1
+  try {
+    return write()
+  } finally {
+    throwingCallers -= 1
+  }
+}
+
+/** Whether the write starting now should throw its failure to the caller. For a writer that catches on
+ *  its own, read before its first await. */
+export const failuresThrown = (): boolean => throwingCallers > 0
+
+export type SavePrefOptions = { surfaceFailure?: boolean; skipConfigWrite?: boolean; throwOnFailure?: boolean }
+
 export async function savePref(
   qc: QueryClient,
   key: string,
   value: string,
-  options: { surfaceFailure?: boolean } = {},
+  requested: SavePrefOptions = {},
 ): Promise<boolean> {
+  const options = { ...requested, throwOnFailure: requested.throwOnFailure ?? throwingCallers > 0 }
   const descriptor = persistedStateRegistry.entries().find((slice) =>
     key === slice.key || (slice.scope !== 'app' && key.startsWith(`${slice.key}:`)),
   )
   if (descriptor?.maxBytes != null && utf8Bytes(value) > descriptor.maxBytes) {
+    if (options.throwOnFailure) throw new Error(`The value is larger than ${descriptor.maxBytes} bytes.`)
     if (options.surfaceFailure === false) log.error(`${key}: value exceeds ${descriptor.maxBytes} bytes`, undefined, { 'pref.key': key })
     else pushBackgroundError('', `Could not save ${descriptor.id}`, `Persisted value exceeds ${descriptor.maxBytes} bytes.`)
     return false
@@ -58,6 +85,16 @@ export async function savePref(
   if (isDevicePref(key)) {
     writeDevicePref(key, value)
     qc.setQueryData<Record<string, string>>(prefsKey, (old) => ({ ...old, [key]: value }))
+    const patch = options.skipConfigWrite ? null : configPatchForPref(key, value)
+    if (patch) {
+      try { await deviceConfigBridge()?.write(patch) }
+      catch (error) {
+        if (options.throwOnFailure) throw error
+        if (options.surfaceFailure === false) log.error(`could not write acorn.json for ${key}`, error, { 'pref.key': key })
+        else pushBackgroundError('', 'Could not write acorn.json', error instanceof Error ? error.message : String(error))
+        return false
+      }
+    }
     return true
   }
 
@@ -97,6 +134,7 @@ export async function savePref(
         return next
       })
     }
+    if (options.throwOnFailure) throw error
     if (options.surfaceFailure === false) log.error(key, error, { 'pref.key': key })
     else pushBackgroundError('', `Could not save ${key}`, error instanceof Error ? error.message : String(error))
     return false
@@ -109,5 +147,5 @@ export const saveJsonPref = <T>(
   queryClient: QueryClient,
   key: string,
   value: T,
-  options?: { surfaceFailure?: boolean },
+  options?: SavePrefOptions,
 ): Promise<boolean> => savePref(queryClient, key, JSON.stringify(value), options)

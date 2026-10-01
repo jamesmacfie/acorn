@@ -8,7 +8,8 @@ import { pluginPermissionsSchema } from '@acorn/protocol/plugin/contract.ts'
 import { cadenceSchema } from '@acorn/protocol/schedules.ts'
 import { writePrivateAtomic } from '@acorn/node-core/server/storage'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
-import { pluginExtensionGrantSchema } from './grantSchemas'
+import { pluginCustomAgentGrantSchema, pluginExtensionGrantSchema } from './grantSchemas'
+import { bundleSourceSchema, type BundleSource } from '@acorn/protocol/plugin/bundles.ts'
 
 const log = createLogger('plugins')
 
@@ -22,6 +23,9 @@ const log = createLogger('plugins')
 // chmod after write.
 
 const TRUST_FILE = `${ACORN_BASELINE}-plugin-trust.json`
+const sourceOf = (source: BundleSource | string): BundleSource => typeof source === 'string' ? { kind: 'node', nodeId: source } : source
+const sameSource = (left: BundleSource, right: BundleSource): boolean =>
+  left.kind === right.kind && (left.kind === 'device' || (right.kind === 'node' && left.nodeId === right.nodeId))
 
 const webviewGrantSchema = z.strictObject({
   surface: z.string().min(1).max(64),
@@ -90,8 +94,12 @@ const ackSchema = z.strictObject({
   // The node that served these bytes, so the prompt can name it and a later audit can answer "where
   // did this come from". Not part of the key, because the same bundle from a second node is the same
   // code.
-  nodeId: z.string().min(1),
+  nodeId: z.string().default(''),
+  source: bundleSourceSchema.optional(),
   version: z.string().min(1),
+  // Older records lack this binding and must be reviewed again before selection. The string is
+  // produced by the shared protocol projection, not accepted from the Node as an authority claim.
+  declaration: z.string().min(1).max(1_000_000).optional(),
   // Parsed, not cast. This is the disclosure the owner consents to, so it has to be provably the
   // same shape the node parsed off disk. See @acorn/protocol/plugin/contract.ts.
   permissions: pluginPermissionsSchema,
@@ -116,6 +124,9 @@ const ackSchema = z.strictObject({
   harnesses: z.array(harnessGrantSchema).max(4).default([]),
   agentTools: z.array(agentToolGrantSchema).max(16).default([]),
   contextSections: z.array(contextSectionGrantSchema).max(8).default([]),
+  // Default keeps acknowledgements written before custom agents existed readable. An old
+  // acknowledgement says the accepted bundle added no agent, which was true.
+  customAgents: z.array(pluginCustomAgentGrantSchema).max(8).default([]),
   decision: z.enum(['accepted', 'rejected']),
   decidedAt: z.number().int(),
   // Set when the disclosure behind the decision could not be fully parsed, because a node ran a newer
@@ -139,7 +150,8 @@ type PluginAckResult = { ack: PluginAck } | { ack: PluginAck; error: unknown }
 // mode".
 const devGrantSchema = z.strictObject({
   pluginId: z.string().min(1),
-  nodeId: z.string().min(1),
+  nodeId: z.string().default(''),
+  source: bundleSourceSchema.optional(),
   // Where the agent iterates, when the install was a local-path one. Display only, because it is the
   // node's filesystem and nothing here resolves it.
   path: z.string().min(1).max(1024).optional(),
@@ -168,8 +180,8 @@ export class PluginTrustStore {
     return [...this.#grants!]
   }
 
-  devGrantFor(pluginId: string, nodeId: string): PluginDevGrant | undefined {
-    return this.listDevGrants().find((grant) => grant.pluginId === pluginId && grant.nodeId === nodeId)
+  devGrantFor(pluginId: string, source: BundleSource | string): PluginDevGrant | undefined {
+    return this.listDevGrants().find((grant) => grant.pluginId === pluginId && sameSource(grant.source ?? { kind: 'node', nodeId: grant.nodeId }, sourceOf(source)))
   }
 
   /** Put a plugin into development mode on this device. Upsert, so re-approving does not stack rows. */
@@ -177,15 +189,25 @@ export class PluginTrustStore {
     const parsed = devGrantSchema.parse(grant)
     this.write(
       this.list(),
-      [...this.listDevGrants().filter((existing) => !(existing.pluginId === parsed.pluginId && existing.nodeId === parsed.nodeId)), parsed],
+      [...this.listDevGrants().filter((existing) => !(existing.pluginId === parsed.pluginId && sameSource(existing.source ?? { kind: 'node', nodeId: existing.nodeId }, parsed.source ?? { kind: 'node', nodeId: parsed.nodeId }))), { ...parsed, source: parsed.source ?? { kind: 'node', nodeId: parsed.nodeId } }],
     )
   }
 
   /** End development mode. See docs/security.md, "The dev grant". */
-  revokeDev(pluginId: string, nodeId: string): void {
+  revokeDev(pluginId: string, source: BundleSource | string): void {
+    const provenance = sourceOf(source)
     this.write(
-      this.list().filter((ack) => !(ack.dev && ack.pluginId === pluginId && ack.nodeId === nodeId)),
-      this.listDevGrants().filter((grant) => !(grant.pluginId === pluginId && grant.nodeId === nodeId)),
+      this.list().filter((ack) => !(ack.dev && ack.pluginId === pluginId && sameSource(ack.source ?? { kind: 'node', nodeId: ack.nodeId }, provenance))),
+      this.listDevGrants().filter((grant) => !(grant.pluginId === pluginId && sameSource(grant.source ?? { kind: 'node', nodeId: grant.nodeId }, provenance))),
+    )
+  }
+
+  /** Uninstall ends future automatic trust, but does not erase decisions already made for bytes. */
+  forgetDevGrant(pluginId: string, source: BundleSource | string): void {
+    const provenance = sourceOf(source)
+    this.write(
+      this.list(),
+      this.listDevGrants().filter((grant) => !(grant.pluginId === pluginId && sameSource(grant.source ?? { kind: 'node', nodeId: grant.nodeId }, provenance))),
     )
   }
 
@@ -193,6 +215,16 @@ export class PluginTrustStore {
   // answer and is remembered, so a plugin the owner turned away does not ask again every boot.
   decisionFor(pluginId: string, hash: string): PluginAck | undefined {
     return this.list().find((ack) => ack.pluginId === pluginId && ack.hash === hash)
+  }
+
+  /** Withdraw one exact decision. The caller controls whether the now-undecided offer is prompted
+   * immediately or deferred for this session. Other versions keep their independent decisions. */
+  forgetDecision(pluginId: string, hash: string): void {
+    if (!this.decisionFor(pluginId, hash)) return
+    this.write(
+      this.list().filter((ack) => !(ack.pluginId === pluginId && ack.hash === hash)),
+      this.listDevGrants(),
+    )
   }
 
   // The most recent bundle of this plugin the owner accepted, when it is not the one being asked
@@ -223,6 +255,7 @@ export class PluginTrustStore {
     for (const ack of input) {
       try {
         const parsed = ackSchema.parse(ack)
+        parsed.source ??= { kind: 'node', nodeId: parsed.nodeId }
         const stored = acks.find((existing) => existing.pluginId === parsed.pluginId && existing.hash === parsed.hash)
         if (stored && isDeepStrictEqual({ ...stored, decidedAt: 0 }, { ...parsed, decidedAt: 0 })) {
           results.push({ ack: stored })
@@ -247,10 +280,16 @@ export class PluginTrustStore {
    * Always `partial`, because there is no disclosure behind it. See docs/security.md, "The dev
    * grant".
    */
-  recordDevAccept(input: { pluginId: string; hash: string; nodeId: string; version: string }): boolean {
-    if (!this.devGrantFor(input.pluginId, input.nodeId)) return false
+  recordDevAccept(input: { pluginId: string; hash: string; nodeId: string; source?: BundleSource; version: string }): boolean {
+    const source = input.source ?? { kind: 'node', nodeId: input.nodeId }
+    if (!this.devGrantFor(input.pluginId, source)) return false
+    // A per-source development grant cannot overwrite a later manual decision on the globally
+    // keyed bundle. This matters when another node offers the same bytes and the owner reviews it.
+    const existing = this.decisionFor(input.pluginId, input.hash)
+    if (existing && !existing.dev) return false
     this.record({
       ...input,
+      source,
       permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false } },
       webviews: [],
       keyClaims: [],
@@ -261,6 +300,7 @@ export class PluginTrustStore {
       harnesses: [],
       agentTools: [],
       contextSections: [],
+      customAgents: [],
       decision: 'accepted',
       decidedAt: Date.now(),
       partial: true,
@@ -318,7 +358,7 @@ export class PluginTrustStore {
     let dropped = 0
     for (const entry of file.data.acks) {
       const parsed = ackSchema.safeParse(entry)
-      if (parsed.success) acks.push(parsed.data)
+      if (parsed.success) acks.push({ ...parsed.data, source: parsed.data.source ?? { kind: 'node', nodeId: parsed.data.nodeId } })
       else dropped++
     }
     if (dropped) {
@@ -329,7 +369,7 @@ export class PluginTrustStore {
     const grants: PluginDevGrant[] = []
     for (const entry of file.data.devGrants) {
       const parsed = devGrantSchema.safeParse(entry)
-      if (parsed.success) grants.push(parsed.data)
+      if (parsed.success) grants.push({ ...parsed.data, source: parsed.data.source ?? { kind: 'node', nodeId: parsed.data.nodeId } })
     }
     this.#acks = acks
     this.#grants = grants

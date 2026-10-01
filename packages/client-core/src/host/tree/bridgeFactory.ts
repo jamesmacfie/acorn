@@ -10,11 +10,12 @@ export function createTreeBridgeFactory(
   context: PluginFrameContext,
   refused: (reason: string) => void,
 ) {
-  return (port: MessagePort, frameHasFocus: () => boolean, legacyContext = context) => createFrameBridge({
+  return (port: MessagePort, frameHasFocus: () => boolean, legacyContext = context, authorize?: () => boolean) => createFrameBridge({
     port,
     binding: props.binding,
     services: createFrameServices(props, { ...host, frameHasFocus }),
     context: legacyContext,
+    ...(authorize ? { authorize } : {}),
     onMisbehaving: (reason) => refused(`misbehaved on the bridge: ${reason}`),
   })
 }

@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://acorn.local/schemas/cli/error-v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["apiVersion", "error"],
+  "properties": {
+    "apiVersion": { "const": "acorn.cli/v1" },
+    "error": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string" }, "message": { "type": "string" },
+        "requestId": { "type": "string" }, "retryable": { "type": "boolean" }
+      }
+    }
+  }
+}

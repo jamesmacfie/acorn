@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createMemo, For, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, Show } from 'solid-js'
 import { Dynamic } from '../tree/renderer'
 import { activeTaskId, selectedSource, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
@@ -7,13 +7,16 @@ import { markersFor } from '@acorn/client-core/host/registries/rail'
 import { resolveRailMarkers } from '@acorn/client-core/features/tabs'
 import { requestTaskAnnotations } from '@acorn/client-core/host/annotations/taskAnnotations.ts'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
-import { Icon, keyedRows, Row, Rows, StatusDot } from '../kit/showing'
+import { keyedRows, Row, Rows } from '../kit/showing'
 import { Line } from '../kit/cells'
 import { Panel, PanelBody } from '../panel'
+import { Modal, ModalBody } from '../kit/grouping'
 import { regionFocus } from '../keys/regions'
 import { ExclusiveSlot } from './slot'
+import { registerCoreExclusiveSlot } from '@acorn/client-core/host/registries/extensionPoints'
 import { BROWSE, MENU, TASKS } from './topology'
 import type { ShellModel } from './model'
+import { setHighlightedTaskId } from './state'
 import { workflowTaskHierarchy } from '@acorn/client-core/features/tasks'
 import { expandedWorkflowRoots, toggleWorkflowRoot } from '@acorn/client-core/features/tasks'
 
@@ -66,28 +69,32 @@ const MENU_ORDER = -130
 const BROWSE_ORDER = -120
 const TASKS_ORDER = -110
 
-function Marks(props: { markers: ReturnType<typeof markersFor> }) {
-  const placed = () => resolveRailMarkers(props.markers).placed
-  return (
-    <box flexDirection="row">
-      <For each={placed()}>
-        {(marker) => (
-          <Show when={marker.icon} fallback={<StatusDot tone={marker.dotTone === 'bad' ? 'danger' : marker.dotTone === 'ok' ? 'ok' : marker.dotTone === 'warn' ? 'warn' : 'muted'} />}>
-            {(icon) => <Icon name={icon()} tone={marker.tone === 'neutral' ? undefined : marker.tone} />}
-          </Show>
-        )}
-      </For>
-    </box>
-  )
+function Marks(props: { markers: ReturnType<typeof markersFor>; cells: number }) {
+  const legend = () => resolveRailMarkers(props.markers).legend
+  const label = () => {
+    const count = legend().length
+    if (!count) return ''
+    return props.cells >= 7 ? `${count} marks` : `+${count}`
+  }
+  return <Show when={label()}>{(text) => <Line role="muted">{text()}</Line>}</Show>
 }
 
-function TaskList(props: { model: ShellModel }) {
+function TaskList(props: { model: ShellModel; markerCells: number }) {
   // What other plugins have to say about the rows on screen: one request for the whole list, re-asked
   // when the list changes. Nothing here reads the answers — they come back as markers.
   createEffect(() => requestTaskAnnotations(props.model.tasks().map((task) => task.id)))
+  const [inspecting, setInspecting] = createSignal<string | null>(null)
+  const inspectedMarkers = createMemo(() => {
+    const taskId = inspecting()
+    return taskId ? resolveRailMarkers(markersFor({ kind: 'task', id: taskId })).legend : []
+  })
+  const inspectedRows = createMemo(() => inspectedMarkers().map((marker, index) => ({
+    key: String(index),
+    label: marker.l,
+  })))
 
   // Kept rather than rebuilt, so a `tasks:changed` costs the rows that changed rather than all of
-  // them (../kit/showing.tsx § keyedRows).
+  // them (../kit/showing/collection.tsx § keyedRows).
   const hierarchy = createMemo(() => workflowTaskHierarchy(props.model.tasks(), expandedWorkflowRoots(), activeTaskId()))
   const depthByTask = createMemo(() => new Map(
     hierarchy().map((entry) => [entry.task.id, entry.depth]),
@@ -106,11 +113,16 @@ function TaskList(props: { model: ShellModel }) {
   )
 
   return (
+    <>
     <Rows
       virtual
       id="chrome.rail.tasks"
       ariaLabel="Tasks"
       items={rows()}
+      onSelect={setHighlightedTaskId}
+      onMenu={(id) => {
+        if (resolveRailMarkers(markersFor({ kind: 'task', id })).legend.length) setInspecting(id)
+      }}
       onActivate={(id) => {
         const task = props.model.tasks().find((row) => row.id === id)
         const group = hierarchy().find(entry => entry.task.id === id)
@@ -118,14 +130,14 @@ function TaskList(props: { model: ShellModel }) {
         else if (task) activateTaskSignals(task)
       }}
     >
-      {/* No leading icon. A task's glyph is a Lucide name and this host draws a name it has no
-          character for as nothing, so the column was a ragged left edge: two blanks and one mark
-          (../kit/glyphs.ts). The marks on the right carry the state that mattered. */}
+      {/* The task title carries the identity. The count at the right exposes annotations; the
+          marker modal contains their labels. Neither needs a replacement for a Lucide icon. */}
       {(row, item) => (
         <Row
           item={item}
           selected={!selectedSource() && row.task.id === activeTaskId()}
-          trailing={<Marks markers={markersFor({ kind: 'task', id: row.task.id })} />}
+          keepTrailing
+          trailing={<Marks markers={markersFor({ kind: 'task', id: row.task.id })} cells={props.markerCells} />}
         >
           {row.depth
             ? `${'  '.repeat(row.depth - 1)}↳ ${row.task.title}`
@@ -135,10 +147,35 @@ function TaskList(props: { model: ShellModel }) {
         </Row>
       )}
     </Rows>
+    <Show when={inspecting()}>
+      <Modal onDismiss={() => setInspecting(null)} title="Task markers" size="sm">
+        <ModalBody>
+          <box height={3} flexShrink={0}>
+            <Rows virtual id="chrome.rail.task-markers" ariaLabel="Task markers" items={inspectedRows()}>
+              {(marker, item) => <Row item={item}>{marker.label}</Row>}
+            </Rows>
+          </box>
+        </ModalBody>
+      </Modal>
+    </Show>
+    </>
   )
 }
 
-export function Rail(props: { model: ShellModel; cells: number }) {
+type TaskListSlotValue = {
+  model: ShellModel
+  markerCells: number
+}
+
+// The terminal can mount more than one shell during tests or a renderer handoff. Core is one
+// provider in the shared registry; the current shell model and available marker width travel as
+// host-owned slot data.
+registerCoreExclusiveSlot('rail.taskList', (props) => {
+  const value = props.value as TaskListSlotValue
+  return <TaskList model={value.model} markerCells={value.markerCells} />
+})
+
+export function Rail(props: { model: ShellModel; cells: number; nodeId: string }) {
   // Three panels and nothing else: which sources this workspace has, and which of them the session
   // starts on, are both the model's (./model.ts § defaultSource). A component that draws is a
   // component that cannot race the thing it draws.
@@ -190,7 +227,7 @@ export function Rail(props: { model: ShellModel; cells: number }) {
         <Show
           when={source()?.regions?.list}
           fallback={
-            <PanelBody name="browse">
+            <PanelBody name="browse" nodeId={props.nodeId}>
               <Line role="muted">{source() ? 'Nothing to list here.' : 'Choose a source.'}</Line>
             </PanelBody>
           }
@@ -210,7 +247,7 @@ export function Rail(props: { model: ShellModel; cells: number }) {
               {/* A source's list region is a `lazy()` and it can throw, and `PanelBody` is what this
                   panel draws for each of those rather than the blank frame both used to leave
                   (../panel.tsx). */}
-              <PanelBody name="browse"><Dynamic component={list()} /></PanelBody>
+              <PanelBody name="browse" nodeId={props.nodeId}><Dynamic component={list()} /></PanelBody>
             </box>
           )}
         </Show>
@@ -226,7 +263,10 @@ export function Rail(props: { model: ShellModel; cells: number }) {
           { x: RAIL, enterMainOnActivate: true },
         )}
       >
-        <ExclusiveSlot slot="rail.taskList" core={() => <TaskList model={props.model} />} />
+        <ExclusiveSlot
+          slot="rail.taskList"
+          value={{ model: props.model, markerCells: Math.max(2, props.cells - 22) } satisfies TaskListSlotValue}
+        />
       </Panel>
     </box>
   )

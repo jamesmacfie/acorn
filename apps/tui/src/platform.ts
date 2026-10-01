@@ -1,13 +1,16 @@
 import { NodeBroker } from '@acorn/custody/broker'
+import { DeviceConfigStore } from '@acorn/custody/config'
 import { toNodeRecord } from '@acorn/custody/broker'
 import { probeNode, pairWithNode } from '@acorn/custody/broker/nodePairing.ts'
 import type { NodePairRequest, NodeProbeResult, NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 import type { OpenedNode } from './node/open'
 import { startNode } from './node/supervise'
-import { dataRootDir } from './node/paths'
-import { createPluginCustody } from './plugins/custody'
+import { configDir, dataRootDir } from './node/paths'
+import { createPluginCustody, forgetNodePluginProvenance } from './plugins/custody'
+import { installDevicePreferenceStorage } from './plugins/devicePreferenceStorage'
 import { setTerminalBadge, showInTerminal } from './kit/notify'
 import { createLogger } from '@acorn/client-core/infra/telemetry'
+import { pickLocalFile, saveLocalFile } from './chrome/filePrompt'
 
 const log = createLogger('fleet')
 
@@ -29,6 +32,8 @@ const log = createLogger('fleet')
 export type Platform = { broker: NodeBroker; dispose(): Promise<void> }
 
 export function installPlatform(opened: OpenedNode, quit: () => void): Platform {
+  installDevicePreferenceStorage()
+  const configFile = new DeviceConfigStore(configDir())
   const { fleet } = opened
   let supervised = opened.supervised
   let stop = opened.stop
@@ -139,6 +144,7 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
       }
       broker.remove(nodeId)
       fleet.forget(nodeId)
+      forgetNodePluginProvenance(nodeId)
     },
     nodeReconnect: (nodeId: string) => connect(nodeId),
     nodeRestartLocal: async (): Promise<void> => {
@@ -186,6 +192,16 @@ export function installPlatform(opened: OpenedNode, quit: () => void): Platform 
     // file under the TUI's config directory, hashed here rather than by a helper because there is no
     // helper (./plugins/custody.ts). The broker is the fetcher, which is why this is built after it.
     plugins: createPluginCustody(broker),
+    config: {
+      read: async () => configFile.read(),
+      write: async (patch: Parameters<DeviceConfigStore['write']>[0]) => configFile.write(patch),
+      onChange: (cb: Parameters<DeviceConfigStore['watch']>[0]) => configFile.watch(cb),
+      location: async () => configFile.path,
+    },
+
+    // A typed local path is the terminal equivalent of the desktop's file dialog. The bridge
+    // returns bytes, so the Node may be remote and never needs the host filesystem path.
+    files: { pick: pickLocalFile, save: saveLocalFile },
 
     // A terminal has no file manager to reveal a path in, so "open the data folder" is the path
     // itself. It prints on the way out rather than now, because the renderer owns the screen until

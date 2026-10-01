@@ -17,7 +17,7 @@ export type RuntimeDeps = {
   // omitted them compiled fine and silently ran a cloned repository's committed command with no
   // review. The type carries the gate now, and a caller that cannot answer has to say so out loud.
   loadTargets(taskId: string): Promise<
-    | { targets: RunTarget[]; cwd: string; errors?: { source: string; message: string }[]; layouts?: LayoutRecipe[]; repoTargetIds: string[] }
+    | { targets: RunTarget[]; cwd: string; errors?: { source: string; message: string }[]; layouts?: LayoutRecipe[]; repoTargetIds: string[]; repoConfigHash: string | null }
     | { error: string }
   >
   // Spawn the target's command as a terminal session in cwd (ACORN_* env rides spawnOne). → session id.
@@ -35,8 +35,8 @@ export type RuntimeDeps = {
   // Run a short-lived script (stop / url_command) in cwd; ok + trimmed stdout.
   runScript(taskId: string, script: string, cwd: string): Promise<{ ok: boolean; output?: string; reason?: string }>
   // Throws when the repo's configuration has not been acknowledged (server/repoConfigTrust.ts). Required
-  // for the same reason `repoTargetIds` is.
-  authorizeRepoConfig(taskId: string): Promise<void>
+  // for the same reason `repoTargetIds` is. The expected hash must match the current approved snapshot.
+  authorizeRepoConfig(taskId: string, expectedHash: string): Promise<void>
   // A declared target started or stopped through this service (docs/plugins.md § Hearing a core event
   // § Run target state). Optional so callers that only need the read model need not observe it.
   onChange?(taskId: string, targetId: string, running: boolean): void
@@ -68,7 +68,7 @@ type RunResult = { ok: boolean; reason?: string; sessionId?: string }
 type Instance = { sessionId: string; target: RunTarget; cwd: string }
 
 export class RuntimeService {
-  private instances = new Map<string, Instance>() // `${taskId}\0${targetId}`
+  private instances = new Map<string, Instance>() // `${taskId}\u0000${targetId}`
   private instanceKeysBySession = new Map<string, string>()
   private lastExitCodes = new Map<string, number | null>()
   private disposed = false
@@ -100,7 +100,7 @@ export class RuntimeService {
     }
   }
 
-  private key = (taskId: string, targetId: string) => `${taskId}\0${targetId}`
+  private key = (taskId: string, targetId: string) => `${taskId}\u0000${targetId}`
 
   private operate(taskId: string, targetId: string, kind: 'start' | 'stop' | 'restart', run: () => Promise<RunResult>): Promise<RunResult> {
     if (this.disposed) return Promise.resolve({ ok: false, reason: 'Run target service disposed.' })
@@ -147,7 +147,10 @@ export class RuntimeService {
     if ('error' in cfg) return { ok: false, reason: cfg.error }
     const target = cfg.targets.find((t) => t.id === targetId)
     if (!target) return { ok: false, reason: `No run target '${targetId}'.` }
-    if (cfg.repoTargetIds.includes(targetId)) await this.deps.authorizeRepoConfig(taskId)
+    if (cfg.repoTargetIds.includes(targetId)) {
+      if (!cfg.repoConfigHash) throw Object.assign(new Error('Repo configuration must be reviewed and trusted before it can run.'), { code: 'needs-trust' })
+      await this.deps.authorizeRepoConfig(taskId, cfg.repoConfigHash)
+    }
     this.assertLive()
     // Another plugin's turn before a process starts in this worktree (docs/plugins.md § Hooks). Observe
     // and veto only: the design sketched a transform over the target's environment, and a payload is
@@ -227,7 +230,10 @@ export class RuntimeService {
     if ('error' in cfg) return { ok: false, reason: cfg.error }
     const target = cfg.targets.find((t) => t.id === targetId)
     if (!target) return { ok: false, reason: `No run target '${targetId}'.` }
-    if (cfg.repoTargetIds.includes(targetId)) await this.deps.authorizeRepoConfig(taskId)
+    if (cfg.repoTargetIds.includes(targetId)) {
+      if (!cfg.repoConfigHash) throw Object.assign(new Error('Repo configuration must be reviewed and trusted before it can run.'), { code: 'needs-trust' })
+      await this.deps.authorizeRepoConfig(taskId, cfg.repoConfigHash)
+    }
     this.assertLive()
     if (target.restart) {
       const inst = this.instances.get(this.key(taskId, targetId))
@@ -278,7 +284,8 @@ export class RuntimeService {
     // A fixed URL is always usable; a discovered one needs the instance up.
     if (target.url) return target.url
     if (!inst || !this.deps.isRunning(inst.sessionId)) return undefined
-    const url = await resolveTargetUrl(target, (script) => this.deps.runScript(taskId, script, inst.cwd))
+    // Execute only the command captured at admission, even if this target was edited on disk.
+    const url = await resolveTargetUrl(inst.target, (script) => this.deps.runScript(taskId, script, inst.cwd))
     return !this.disposed && this.instances.get(this.key(taskId, target.id)) === inst && this.deps.isRunning(inst.sessionId)
       ? url : undefined
   }

@@ -1,0 +1,98 @@
+{
+  "light": {
+    "--text": "#242424",
+    "--text-muted": "#747474",
+    "--accent": "#242424",
+    "--add-marker": "#1a7f37",
+    "--warn": "#9a6700",
+    "--del-marker": "#cf222e"
+  },
+  "dark": {
+    "--text": "#dddddd",
+    "--text-muted": "#8d8d8d",
+    "--accent": "#dddddd",
+    "--add-marker": "#3fb950",
+    "--warn": "#d29922",
+    "--del-marker": "#f85149"
+  },
+  "solarized-light": {
+    "--text": "#586e75",
+    "--text-muted": "#839496",
+    "--accent": "#268bd2",
+    "--add-marker": "#859900",
+    "--warn": "#b58900",
+    "--del-marker": "#dc322f"
+  },
+  "solarized-dark": {
+    "--text": "#93a1a1",
+    "--text-muted": "#839496",
+    "--accent": "#268bd2",
+    "--add-marker": "#859900",
+    "--warn": "#b58900",
+    "--del-marker": "#dc322f"
+  },
+  "monokai": {
+    "--text": "#f8f8f2",
+    "--text-muted": "#a59f85",
+    "--accent": "#f92672",
+    "--add-marker": "#a6e22e",
+    "--warn": "#e6db74",
+    "--del-marker": "#f92672"
+  },
+  "nord": {
+    "--text": "#eceff4",
+    "--text-muted": "#9aa5b8",
+    "--accent": "#88c0d0",
+    "--add-marker": "#a3be8c",
+    "--warn": "#ebcb8b",
+    "--del-marker": "#bf616a"
+  },
+  "catppuccin-latte": {
+    "--text": "#4c4f69",
+    "--text-muted": "#6c6f85",
+    "--accent": "#1e66f5",
+    "--add-marker": "#40a02b",
+    "--warn": "#df8e1d",
+    "--del-marker": "#d20f39"
+  },
+  "catppuccin-frappe": {
+    "--text": "#c6d0f5",
+    "--text-muted": "#a5adce",
+    "--accent": "#8caaee",
+    "--add-marker": "#a6d189",
+    "--warn": "#e5c890",
+    "--del-marker": "#e78284"
+  },
+  "catppuccin-macchiato": {
+    "--text": "#cad3f5",
+    "--text-muted": "#a5adcb",
+    "--accent": "#8aadf4",
+    "--add-marker": "#a6da95",
+    "--warn": "#eed49f",
+    "--del-marker": "#ed8796"
+  },
+  "catppuccin-mocha": {
+    "--text": "#cdd6f4",
+    "--text-muted": "#a6adc8",
+    "--accent": "#89b4fa",
+    "--add-marker": "#a6e3a1",
+    "--warn": "#f9e2af",
+    "--del-marker": "#f38ba8"
+  },
+  "one-dark": {
+    "--text": "#abb2bf",
+    "--text-muted": "#8b93a1",
+    "--accent": "#61afef",
+    "--add-marker": "#98c379",
+    "--warn": "#e5c07b",
+    "--del-marker": "#e06c75"
+  },
+  "dracula": {
+    "--text": "#f8f8f2",
+    "--text-muted": "#a9abc0",
+    "--accent": "#bd93f9",
+    "--add-marker": "#50fa7b",
+    "--warn": "#f1fa8c",
+    "--del-marker": "#ff5555"
+  }
+}

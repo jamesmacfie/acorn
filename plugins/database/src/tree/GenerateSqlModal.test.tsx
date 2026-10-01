@@ -1,6 +1,11 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { AcornBridgeError } from '@acorn/plugin-api/ui/sdk'
-import { errorMessage } from './GenerateSqlModal'
+import { createRemoteRoot } from '@acorn/plugin-api/testkit/client'
+import { solidTree } from '@acorn/plugin-api/ui/tree'
+import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
+import GenerateSqlModal, { errorMessage } from './GenerateSqlModal'
+
+const generateSql = vi.fn()
 
 // What a failed generate reads as. A table rather than a render: the mapping is a pure function and
 // each row is one sentence. A `.test.tsx` because the module it comes from draws kit nodes, and only
@@ -11,7 +16,7 @@ const failed = (code: string, message = 'raw') =>
 
 describe('what a failed generate reads as', () => {
   it('sends a rejected key back to Settings', () => {
-    expect(errorMessage(failed('provider_needs_auth'))).toContain('reconnect it in Settings')
+    expect(errorMessage(failed('provider_needs_auth'))).toContain('Reconnect it in Settings')
   })
 
   it('says to wait when the provider is rate-limiting', () => {
@@ -24,7 +29,7 @@ describe('what a failed generate reads as', () => {
     expect(errorMessage(failed('provider_unavailable'), { kind: 'harness', label: 'Claude Code' }))
       .toBe('Claude Code did not answer. Run it once in a terminal to check it is signed in.')
     expect(errorMessage(failed('provider_unavailable', 'The provider did not answer.'), { kind: 'connection', label: 'Anthropic' }))
-      .toBe('The provider did not answer.')
+      .toBe('The provider did not answer. Try again shortly.')
   })
 
   it('falls back to the node prose, and then to whatever was thrown', () => {
@@ -32,4 +37,58 @@ describe('what a failed generate reads as', () => {
     expect(errorMessage(new Error('Boom.'))).toBe('Boom.')
     expect(errorMessage('not an error at all')).toBe('not an error at all')
   })
+})
+
+it('keeps the dialog open until an in-flight generation writes its result', async () => {
+  let complete: (result: { sql: string }) => void = () => {}
+  generateSql.mockImplementation(() => new Promise((resolve) => { complete = resolve }))
+  const root = createRemoteRoot(() => {})
+  const onDismiss = vi.fn()
+  const onGenerated = vi.fn()
+  solidTree(GenerateSqlModal)({} as AcornBridge, {
+    entry: 'generate',
+    root,
+    props: () => ({
+      client: { generateSql },
+      taskId: 'task-1',
+      backends: [{ id: 'harness:test', kind: 'harness', label: 'Test', models: [], defaultModelId: '' }],
+      queries: [],
+      onDismiss,
+      onGenerated,
+    }),
+    onProps: () => {},
+    onUnmount: () => {},
+    host: {
+      invoke: () => Promise.reject(new Error('this fixture answers no host requests')),
+      openOverlay: () => Promise.reject(new Error('this fixture answers no host requests')),
+    },
+  })
+  const nodes = () => {
+    const found: typeof root.node.children = []
+    const visit = (node: typeof root.node) => {
+      found.push(node)
+      node.children.forEach(visit)
+    }
+    root.node.children.forEach(visit)
+    return found
+  }
+  const textarea = nodes().find((node) => node.type === 'Textarea')
+  expect(textarea).toBeDefined()
+  ;(textarea?.props.onChange as (value: string) => void)('Show the latest orders')
+  const submit = nodes().filter((node) => node.type === 'Button').at(-1)
+  expect(submit).toBeDefined()
+  ;(submit?.props.onPress as () => void)()
+  await Promise.resolve()
+
+  const modal = nodes().find((node) => node.type === 'Modal')
+  ;(modal?.props.onDismiss as () => void)()
+  expect(onDismiss).not.toHaveBeenCalled()
+  expect(onGenerated).not.toHaveBeenCalled()
+
+  complete({ sql: 'SELECT * FROM orders;' })
+  await Promise.resolve()
+  await Promise.resolve()
+  expect(onGenerated).toHaveBeenCalledWith('SELECT * FROM orders;')
+  expect(onDismiss).toHaveBeenCalledTimes(1)
+  root.dispose()
 })

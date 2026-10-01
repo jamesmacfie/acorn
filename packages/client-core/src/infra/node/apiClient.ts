@@ -57,6 +57,8 @@ type SendOptions = {
   // which is less than one model call is allowed to take, so a caller that knows it is slow has to say
   // so. Unset keeps the broker's default.
   timeoutMs?: number
+  /** A lower response ceiling for a preview that would otherwise allocate up to the broker maximum. */
+  maxResponseBytes?: number
   // Who this request is for. `core` unless a plugin's frame asked for it, in which case the host
   // passes the plugin id (host/frames/frameServices.ts) so the span says whose request was slow.
   owner?: string
@@ -195,6 +197,7 @@ async function deliver(
       headers,
       ...(body ? { body } : {}),
       ...(options.timeoutMs === undefined ? {} : { timeoutMs: options.timeoutMs }),
+      ...(options.maxResponseBytes === undefined ? {} : { maxResponseBytes: options.maxResponseBytes }),
     })
     return toApiResponse(res)
   } finally {
@@ -270,8 +273,8 @@ export async function readJson<T>(url: string, options: ReadOptions = {}): Promi
 // The one non-JSON read: a download. Under app:// a route builder's URL resolves against the protocol
 // handler rather than a node, so it cannot be an `href` or `src`. A download comes back as bytes and
 // becomes a blob URL on this side.
-export async function readBytes(url: string, fallback = 'download failed'): Promise<{ bytes: Uint8Array; type: string; filename: string | null }> {
-  const res = await send(url)
+export async function readBytes(url: string, fallback = 'download failed', options: { maxResponseBytes?: number } = {}): Promise<{ bytes: Uint8Array; type: string; filename: string | null }> {
+  const res = await send(url, options)
   if (!res.ok) raise(res, fallback)
   return {
     bytes: res.body,

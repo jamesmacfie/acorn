@@ -17,10 +17,22 @@ The Node resolves a task's connection URL from trusted repository configuration,
 executable repository configuration and requires the exact config-trust acknowledgement. The
 connection URL is never sent to the renderer or stored in plugin rows.
 
+The pane is offered only on a task that has one of those sources. `CoreServices.data.configured`
+checks whether a connection script is set, the worktree `.env` names `DATABASE_URL`, or the Node's
+environment does. It runs no script and opens no socket, so it says there is a database to try, not
+that it is up. The plugin's `/available` route answers it for every active task, and the manifest
+names that route as the pane's `availability` (docs/panes.md § Contributions). A task-scoped caller
+gets `403`, because the answer lists every task.
+
 Pools are task-scoped and owned by `CoreServices.data`. Core resolves the URL, opens the `pg` socket,
 normalizes cells, enforces timeouts and row caps, and closes the task pools the plugin opened when the
 plugin is disposed. The loaded plugin receives no URL, driver, socket, project-config grant,
 `DATABASE_URL` environment grant, or process broker.
+
+HTTP routes compare task IDs in CLI bodies, palette queries, and context requests with the verified
+principal carried by the host. A task credential can address only its signed task. Missing or foreign
+query scope returns `404 not_found` before task lookup, saved-query reads, SQL, or auto-connect.
+Device and service credentials retain access to any task; an absent task returns the same `404`.
 
 The plugin declares `secrets: false`, and that is not an oversight: because the URL is resolved per
 connect and never persisted, there is no credential at rest for the host secret service to hold.
@@ -39,6 +51,9 @@ The editor's text is a per-task scratch document (`db_scratch`), because a host-
 surface is a route that reads it plus a route that writes it. The host owns the dirty state, the
 autosave debounce, ⌘S, and the scroll position, so a half-written query survives closing the pane.
 What you meant to keep still goes through **Save**, into the project-scoped saved queries.
+In the terminal client the document region is an editable cell field above the plugin's frame.
+It autosaves and accepts Ctrl+S, uses the same scratch route, and gives the frame the same document handle; SQL syntax colours
+and completion popups are absent there.
 
 `⌘Enter` runs the query. The chord is pressed with focus in the host's editor, so the host resolves it
 against the manifest's surface-scoped keybinding, flushes the document, and then delivers the command
@@ -55,6 +70,10 @@ The model-provider capability is optional. If no compatible provider is connecte
 keeps manual SQL available and hides **Generate**. The frame learns which connections exist from a
 route on this plugin's node half over `CoreServices.models.available`, ids and labels only. A frame
 has no way to read core's connection roster, and it should not get one.
+
+Once the reader starts SQL generation, the modal stays open until the request settles. Dismissing it
+while the model is working would let the response replace the host-owned editor after the reader had
+returned to it. A failed request leaves the prompt and error visible for another attempt.
 
 ## From the command palette
 
@@ -121,6 +140,15 @@ cannot be parameterized, so every identifier a route builds SQL from is checked 
 introspected schema (`assertTable`, `assertColumns` in `server/database.ts`) and double-quoted before
 use. Arbitrary SQL typed into the editor runs verbatim: it is the reader's own database, and writes
 are the point of the pane.
+
+## CLI query
+
+The loaded plugin also declares `acorn plugin database query`. Its `/cli/query` route calls the
+same `database.query` capability described below, so the CLI receives a bounded read-only result
+instead of reaching the pane's arbitrary SQL editor route. Input is a JSON object with `nodeId`,
+`taskId`, `sql`, and optional `maxRows` up to 200. The Node checks task scope before dispatch.
+See [CLI commands](./cli.md) for an invocation and [command authoring](./plugin-authoring/cli-commands.md)
+for the descriptor contract.
 
 ## Workflow steps
 

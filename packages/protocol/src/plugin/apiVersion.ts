@@ -5,7 +5,7 @@
 // need more than type stripping to run.
 //
 // See docs/plugins.md § Activation for what bumping this number costs.
-export const PLUGIN_API_MAJOR = '1'
+export const PLUGIN_API_MAJOR = '2'
 
 // What a manifest may write in `apiVersion`: one major ('4'), a list ('3 || 4'), or an inclusive span
 // ('2-4'). Mixed lists of both are fine ('2 || 4-6').
@@ -14,8 +14,8 @@ export const PLUGIN_API_MAJOR = '1'
 // every plugin built for the old one stops loading and no single build can work on both sides of the
 // move. An author who has checked their plugin against two majors can now say so and ship once.
 //
-// Majors only. There is no minor and no patch in this number: it names a surface, and every other
-// compatibility question the surface snapshot answers (packages/plugin-api/src/surface.test.ts).
+// Majors only. The published name guard in tools/arch/publishedPluginSurface.test.ts tracks the
+// SDK and declaration surfaces; the private facade has its own independent snapshot.
 export const PLUGIN_API_RANGE_RE = /^\d{1,4}(-\d{1,4})?(\s*\|\|\s*\d{1,4}(-\d{1,4})?)*$/
 
 /** Whether a manifest's declared range covers this build's major. `false` for anything that is not a

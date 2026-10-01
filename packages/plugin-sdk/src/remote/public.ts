@@ -47,6 +47,8 @@ export declare const DocumentTabs: (props: KitNodeProps) => JSX.Element
 export declare const SectionHeader: (props: KitNodeProps) => JSX.Element
 export declare const TabPanel: (props: KitNodeProps) => JSX.Element
 export declare const ToolbarSpacer: (props: KitNodeProps) => JSX.Element
+export declare const SettingsSection: (props: KitNodeProps) => JSX.Element
+export declare const SettingRow: (props: KitNodeProps) => JSX.Element
 export declare const Text: (props: KitNodeProps) => JSX.Element
 export declare const Link: (props: KitNodeProps) => JSX.Element
 export declare const Heading: (props: KitNodeProps) => JSX.Element
@@ -72,6 +74,7 @@ export declare const Markdown: (props: KitNodeProps) => JSX.Element
 export declare const DiffPane: (props: KitNodeProps) => JSX.Element
 export declare const DiffLine: (props: KitNodeProps) => JSX.Element
 export declare const FileHead: (props: KitNodeProps) => JSX.Element
+export declare const StackedDiff: (props: KitNodeProps) => JSX.Element
 export declare const NonCodeRow: (props: KitNodeProps) => JSX.Element
 export declare const SplitCell: (props: KitNodeProps) => JSX.Element
 export declare const EmptyState: (props: KitNodeProps) => JSX.Element
@@ -98,6 +101,8 @@ export declare const CopyButton: (props: KitNodeProps) => JSX.Element
 export declare const ModelBackendPicker: (props: KitNodeProps) => JSX.Element
 export declare const Only: (props: KitNodeProps) => JSX.Element
 export declare const Fallback: (props: KitNodeProps) => JSX.Element
+/** Places the one host-filled slot reference a selected rail or topbar replacement receives. */
+export declare const Slot: (props: { slotRef: string }) => JSX.Element
 /** Every node above, keyed by name, for code that picks one at runtime. */
 export declare const KIT_NODE_COMPONENTS: Record<string, (props: KitNodeProps) => JSX.Element>
 
