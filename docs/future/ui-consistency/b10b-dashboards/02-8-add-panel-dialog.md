@@ -60,8 +60,8 @@ may come from another device.
 ## Risk and checks
 
 - Before you start, read `SaveState` and the AI authoring request to confirm what the AI receives.
-- `AuthoringConversation.tsx` is shared with the workflow editor. B07b changes its layout
-  ([07-18](../b07b-workflow-runs/07-18-dialogs.md)); coordinate if both land
-  together.
+- `AuthoringConversation.tsx` is shared with the workflow editor. B07b gave it `onClose`, which draws
+  it as a modal body and footer with **Send** in the footer, and `describePath`. The panel editor still
+  uses the fold form; see [deferred.md](../deferred.md) § B07b.
 - Screens: the Add panel dialog before and after choosing a source, and the board view.
 - Tests: the client-core dashboards tests.

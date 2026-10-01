@@ -1,7 +1,8 @@
 # UI consistency: the rest of the pass
 
-**Status:** in progress. Thirteen of twenty-one batches shipped: eleven on branch `ui-inconsistency`,
-and B06 and B07a on branch `more-ui`, uncommitted. Seven area batches and the final sweep remain. Written 2026-10-01.
+**Status:** in progress. Fourteen of twenty-one batches shipped: eleven on branch `ui-inconsistency`,
+and B06, B07a, and B07b on branch `more-ui`, merged to main. Six area batches and the final sweep
+remain. Written 2026-10-01.
 Line numbers in these files are from 2026-10-01 and may have moved.
 
 This programme is a UX and UI consistency pass over the acorn desktop app. The worry behind it was that
@@ -130,39 +131,22 @@ port and edge control are 20, the edge control draws `x` and names cards, and zo
 bar that heads a scrolling detail column sits on its top edge. See [deferred.md](./deferred.md)
 § B07a.
 
+**B07b, workflow runs, the rail, and dialogs.** The run pane names steps, reads statuses as words
+(**Needs you**, **Stopped at a limit**) from one map, and names a contributed kind from the node's
+catalog. A step's controls sit in its header bar, the error alert takes the step's status as its title,
+and the footer is a status bar with a ghost **Cancel run** or a refresh icon. **List** and **Graph**
+moved to the Runs header, and **Steps** is a group label. The gate form puts each field's description
+and problem on the field, has md **Approve** and a confirming ghost **Reject**, and its clock keeps
+counting while it waits. The inputs editor has a **Label** field. Opening a run from the rail, a
+schedule, or **Run…** lands on that run in its task. The rail reads **Workflows** with help, problem
+files are rows that open their editor, collapsed rows show initials, and run rows show a toned glyph,
+a status word, and an age. Publish lists by name, schedule's timezone is a filtered select, AI
+authoring has a footer with **Send**, and `GenerateModal.tsx` is gone. Record history folds its
+provenance, and the bell drops "Workflow '…'". See [deferred.md](./deferred.md) § B07b.
+
 ## What remains, in order
 
-Run the batches in this order. Each depends on the kit batches; B07b depends on B07a, B08b on B08a, and
-B10b on B10a.
-
-### B07a. Workflows: editor (shipped)
-
-- [07-2. The workflow editor's header is a 26-pixel row with no bar](./b07a-workflow-editor/07-2-editor-header.md)
-- [07-5. The graph: tiny targets, text that shrinks past reading, and ids for names](./b07a-workflow-editor/07-5-graph-small-part.md)
-- [07-6. The inspector has no header, and its small fields stretch across the column](./b07a-workflow-editor/07-6-inspector.md)
-- [07-7. Every group in the inspector is an uppercase fold](./b07a-workflow-editor/07-7-folds.md)
-- [07-8. The inspector says the same thing three or four times](./b07a-workflow-editor/07-8-say-it-once.md)
-- [07-9. Outline rows are five lines tall, and a straight chain becomes a staircase](./b07a-workflow-editor/07-9-outline-rows.md)
-- [07-10. Problems show before anyone types, twice, in one run-on line](./b07a-workflow-editor/07-10-problems-footer.md)
-- [07-15. The workflow forms disagree with each other](./b07a-workflow-editor/07-15-forms-agree.md)
-- [07-16. The Add step menu is one flat list in id order](./b07a-workflow-editor/07-16-menus.md)
-- [07-17. Text buttons 11 pixels high, a typed "+", and a code action row on the edge](./b07a-workflow-editor/07-17-buttons.md)
-- [07-19. Three status marks in the editor header](./b07a-workflow-editor/07-19-save-and-publish-marks.md)
-
-Use the published workflow **Release check**, and add a throwaway workflow to reach every step kind;
-delete it through the editor after.
-
-### B07b. Workflows: rail, runs, and dialogs
-
-- [07-1. The run pane lists steps by their internal id](./b07b-workflow-runs/07-1-steps-by-name.md)
-- [07-3. Run surfaces print the machine's status and kind words](./b07b-workflow-runs/07-3-status-words.md)
-- [07-11. After Run…, nothing says where the run went, and the rail's run rows go nowhere](./b07b-workflow-runs/07-11-opening-a-run.md)
-- [07-12. The Workflows rail list: mid-list pane headers and problem rows that say nothing](./b07b-workflow-runs/07-12-rail-list.md)
-- [07-13. The run pane puts its controls in three places, and its footer is a label](./b07b-workflow-runs/07-13-run-pane-controls.md)
-- [07-14. The gate approval form: small buttons, a raw field name, and loose problems](./b07b-workflow-runs/07-14-gate-form.md)
-- [07-18. Workflow dialogs: Publish, Run, Schedule, and AI authoring](./b07b-workflow-runs/07-18-dialogs.md)
-- [07-20. One idea, several words: step, node, root, posture, tree](./b07b-workflow-runs/07-20-one-word-per-idea.md)
-- [07-21. Smaller workflow defects](./b07b-workflow-runs/07-21-smaller-defects.md)
+Run the batches in this order. Each depends on the kit batches; B08b depends on B08a, and B10b on B10a.
 
 ### B08a. Task panes: Changes and the diff
 

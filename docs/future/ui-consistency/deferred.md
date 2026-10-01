@@ -27,7 +27,7 @@ own item.
   listener must survive virtual row reuse.
 - **07-5 (part).** Graph selection that edits, zoom controls and keys, edge labels, and the run graph's
   placement. New feature. The zoom-floor clamp and port sizes ship in
-  [07-5](./b07a-workflow-editor/07-5-graph-small-part.md).
+  07-5.
 - **07-21c (part).** An If step gets two fixed branch rows (**If** and **Otherwise**), each a step
   picker, in place of the decide step's verdict editor. New feature. The condition editor's "name the If
   and Otherwise destinations below" line waits for it.
@@ -234,7 +234,7 @@ dialog on `Modal`.
 
 ### K4b
 
-- **`GenerateModal.tsx` skipped,** because B07b deletes it ([07-18](./b07b-workflow-runs/07-18-dialogs.md)).
+- **`GenerateModal.tsx` skipped,** because B07b deleted it (07-18).
 - **The terminal host's own "Discard unsaved changes?"** (`apps/tui/src/chrome/Settings.tsx`) keeps its
   question mark. The desktop dialogs dropped theirs.
 - **03-25, no live check.** A reference panel needs a pull request with a linked item.
@@ -359,6 +359,51 @@ dialog on `Modal`.
   **Not saved** with the node unreachable, the Publish badge after publishing, and the start and
   schedule dialogs. The session had no workflows, so one throwaway was made and deleted. Each was
   read from code, and the inspector, editor, and graph order have tests.
+
+### B07b
+
+- **07-1, the outline tip was already fixed.** B07a's outline row names a step's parents by name.
+- **07-3, one status map.** `statusLabel` in `runs/runDisplay.ts` covers step, run, merged-list, and
+  child-dispatch statuses, and the record history reads it too. Settings › Run history and Agent
+  Center still print their own words.
+- **07-3, kind names come from the catalog.** The run pane model reads the node's step catalog once, so
+  `terminal:command` reads **Run a command**.
+- **07-11, changed from the plan.** `openWorkflowRun` opens the pane with a `workflows:show-run` intent,
+  as the agents center does, rather than a `?pane=workflows&item=` address. **Run…** in the editor passes
+  `onStarted`, and the start dialog opens the run when nothing is passed. The pane model also had a
+  race: an intent named a run before the pane listed it, and the newest-run fallback took the selection
+  back. It now re-reads the list and holds the fallback while the read is out.
+- **07-12, problem rows open the editor.** The editor shows the parse error, but it also draws an empty
+  "Untitled workflow" with **Run…** enabled. That is the editor's handling of a broken file, not this
+  finding, and is left as found.
+- **07-12, tips on every run row.** Rows carry the task name and the error as a `tip`. No flashing was
+  seen in the window with three rows; judge it again with a long list.
+- **07-13, the footer.** A list footer that holds only a bar had a 14-pixel pad and a rule under it.
+  `shell.css` seats such a bar on the column's bottom edge.
+- **07-13, the step bar stays in its `Stack`.** It already draws flush with the column top in the window.
+- **07-14, no page measure.** The run pane's detail region is drawn by the host and takes no
+  `measure`, so the gate's input still spans the column. Capping it needs a pane-layout option.
+- **07-14, a plain gate.** A gate with no form also moved its **Approve** and **Reject** under "Waiting
+  for you.", so every gate answers under what it approves.
+- **07-18, no kit change.** `Select` already grows a filter past eight options, so the timezone is a
+  `Select` over `Intl.supportedValuesOf('timeZone')`.
+- **07-18, AI authoring.** `AuthoringConversation`'s `bare` became `onClose`: with it, the view draws a
+  modal body and footer with **Close** (or **Cancel** while a turn is out) and **Send**. A new
+  `describePath` names a change's target, and the workflow editor passes step names. The badge beside
+  **Send** that repeated the chosen backend is gone. The dashboards panel editor keeps the fold form.
+  `generateReason` had no caller outside its test, so it went with `GenerateModal.tsx`.
+- **07-20.** The schedule dialog's limit is **Workflow timeout in minutes**, the Definition inspector's
+  name, and the summary reads "Up to {n} tasks, {n} at a time, {n} minutes."
+- **07-21a, changed from the plan.** `uniqueStepName` names a new step in words ("Run a command 2") when
+  the definition carries step ids, and keeps the slug for an older one. Its unused `STEP_NAME_RE` is
+  gone.
+- **07-21d, held.** Field hints feed the AI authoring prompt (`generate/kinds.ts`), so the env hint
+  stays with the held step blurbs.
+- **07-21g.** The record source reads `pluginLabel` and the source id. A source's own display name is
+  not on the selection's provenance.
+- **Not checked live:** a For each run's record history, child run cards and lineage, an agent step,
+  the files export dialog, and an approved gate. The fixture has none of them. Each was read from code,
+  and the relationships, record history, and node detail have tests.
 
 ## Notes for later sessions
 
