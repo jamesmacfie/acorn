@@ -18,6 +18,10 @@
     "plugins/vitest.shared.ts",
     "plugins/drizzle.shared.ts"
   ],
+  // Turborepo's strict env mode hands a task only the variables named here, so the worker cap the
+  // root `pnpm test` sets would never reach Vitest without this line. Passed through rather than
+  // hashed: the worker count changes how fast a suite runs, not what it checks.
+  "globalPassThroughEnv": ["VITEST_MAX_WORKERS"],
   "tasks": {
     // Transit node. Workspace packages are consumed as SOURCE and have no `build` script, so a
     // `dependsOn: ["^build"]` resolves to nothing and a change in @acorn/node-core would NOT

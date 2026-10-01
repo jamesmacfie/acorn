@@ -20,9 +20,24 @@ concurrency, and reports every package rather than cancelling the rest on the fi
 rather than `turbo run test` directly: the bound is what keeps the suite honest. Many of these tests
 spawn a real subprocess, mint a certificate, or run git, and turning the bound off oversubscribes the
 machine badly enough that they time out while passing in isolation. The bound is six packages at a
-time. Set `ACORN_TEST_CONCURRENCY` to change it. CI sets it to one. Each package's Vitest already
-starts a worker per core, and six packages at once on a four-core runner made tests 10 to 15 times
-slower than they run locally.
+time. Set `ACORN_TEST_CONCURRENCY` to change it. CI sets it to one. Left alone, each package's
+Vitest starts a worker per core, and six packages at once on a four-core runner made tests 10 to 15
+times slower than they run locally.
+
+The script also caps each package's Vitest at three workers through `VITEST_MAX_WORKERS`, which
+overrides any `maxWorkers` in a package's config. On a 12-core machine, six uncapped packages ran
+about 66 workers at once. The full suite took 476 seconds, with 19 tests failing on timeouts. Capped
+at three, it took 241 seconds, with six failing. A cap of four took 259 seconds. Set
+`VITEST_MAX_WORKERS` to try another value. Running one package's suite on its own, with
+`pnpm --filter <package> test` or `vitest run`, leaves the cap off and uses every core.
+
+Every package's Vitest config turns on `experimental.fsModuleCache`. Vitest then keeps each compiled
+module in `node_modules/.experimental-vitest-cache` at the repo root, keyed on the file's path, its
+content, and the config, and clears the whole cache when `pnpm-lock.yaml` changes. A change to a core
+package reruns most suites, but only the edited files need compiling again. On its own, the agents
+plugin's suite took 20 seconds without the cache and 15 with a warm one. The option is experimental.
+If a run reports a module that doesn't match its source, run `npx vitest --clearCache` in any package
+and try again.
 
 The TUI suite also limits its internal test forks to two. Package concurrency alone does not bound
 Vitest workers; cold shell transforms across many forks can exceed fixture deadlines under load.

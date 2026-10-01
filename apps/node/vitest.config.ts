@@ -4,6 +4,7 @@ import { defineConfig } from 'vitest/config'
 // integration suites in test/ that boot the registries this package populates.
 export default defineConfig({
   test: {
+    experimental: { fsModuleCache: true },
     environment: 'node',
     include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
     // No setupFiles. Registering the built-in agent profiles globally used to import a plugin's node
