@@ -1,3 +1,4 @@
+import { Portal } from 'solid-js/web'
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
@@ -556,7 +557,7 @@ export default function TabRail() {
       <Show when={archiveErr()}><Alert>{archiveErr()}</Alert></Show>
       <Show when={draft()}>
         {(d) => (
-          <div class="overlay-backdrop" onClick={draftDismiss.onBackdropClick}>
+          <Portal><div class="overlay-backdrop" onClick={draftDismiss.onBackdropClick}>
             <div ref={draftDialog} class="overlay" role="dialog" aria-modal="true" onClick={draftDismiss.onContainerClick} onKeyDown={draftDismiss.onKeyDown}>
               <div class="overlay-title">{d().mode === 'new' ? 'New task' : 'Rename task'}</div>
               <div class="overlay-body">
@@ -610,7 +611,7 @@ export default function TabRail() {
                 </form>
               </div>
             </div>
-          </div>
+          </div></Portal>
         )}
       </Show>
     </div>

@@ -5,6 +5,7 @@ import PluginFrame from './PluginFrame'
 import type { FrameBinding } from './broker'
 import { displayHost, pluginWebviewKey, resolvePluginWebviewUrl } from './webviewModel'
 import { Alert, Button, EmptyState, Spinner } from '../../kit/components/primitives'
+import { observeNativePage } from '../../infra/platform/nativePages'
 import { elementRectKey, visibleElementRect } from '../../infra/platform/webviewGeometry'
 
 export type PluginWebviewProps = {
@@ -41,13 +42,6 @@ export default function PluginWebview(props: PluginWebviewProps) {
     placed = next
     native.setBounds(key(), rect)
   }
-  const checkOcclusion = () => {
-    if (!host) return
-    const rect = visibleElementRect(host)
-    if (rect.width === 0 || rect.height === 0) return setSuppressed(true)
-    const top = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)
-    setSuppressed(!(top === host || host.contains(top)))
-  }
   const acceptState = (state: { key: string; url: string; loading: boolean; canGoBack: boolean; canGoForward: boolean }) => {
     if (state.key !== key()) return
     const previousUrl = url()
@@ -60,24 +54,18 @@ export default function PluginWebview(props: PluginWebviewProps) {
 
   onMount(() => {
     if (!native) return
-    const resize = new ResizeObserver(() => {
-      syncRect()
-      checkOcclusion()
+    const stopPage = observeNativePage(host, (rect, covered) => {
+      setSuppressed(covered)
+      const next = elementRectKey(rect)
+      if (next !== placed) { placed = next; native.setBounds(key(), rect) }
     })
-    resize.observe(host)
-    resize.observe(document.documentElement)
-    const poll = setInterval(() => {
-      syncRect()
-      checkOcclusion()
-    }, 200)
     const offEvent = native.onEvent(acceptState)
     const offBlocked = native.onBlocked((state) => {
       if (state.key === key()) setBlocked(state.host || state.url)
     })
     onCleanup(() => {
       ensureVersion += 1
-      resize.disconnect()
-      clearInterval(poll)
+      stopPage()
       offEvent()
       offBlocked()
       if (ensuredKey) {
