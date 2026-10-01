@@ -29,8 +29,10 @@ import { pullSource } from '../shared/pullSource'
 import { createPullSourceHandler } from '../server/data/pullSourceHandler'
 import { EDITOR_LINE_MARKERS } from '@acorn/plugin-editor/contract/lineMarkers.ts'
 import { pullRequestEditorLineMarkers } from '../server/editorLineMarkers'
+import { startPullDiscovery } from '../server/pullDiscovery'
 
 export const githubPlugin = (): NodePlugin => {
+  let discovery: ReturnType<typeof startPullDiscovery> | null = null
   return {
     name: 'github',
     label: 'GitHub',
@@ -111,6 +113,7 @@ export const githubPlugin = (): NodePlugin => {
       ctx.routes.register(githubImport(store, ctx.core), { prefix: '', note: 'POST /import — import mirrored repositories into core projects' })
 
       for (const tool of githubAgentTools(store, ctx.core, ctx.providers, () => ctx.events.status(), emit)) ctx.tools.register(tool)
+      discovery = startPullDiscovery(ctx)
 
       ctx.capabilities.provide(GITHUB_MIRROR, {
         repositories: async (userId) => (await readCachedRepos(store, userId)).map(toPublicRepo),
@@ -131,7 +134,9 @@ export const githubPlugin = (): NodePlugin => {
       ))
 
     },
-    // No dispose. The only resource this plugin holds is its SQLite handle, and the host drains that
-    // before the data root's lock is dropped.
+    dispose: async () => {
+      await discovery?.dispose()
+      discovery = null
+    },
   }
 }
