@@ -1,4 +1,5 @@
 import { For, Show } from 'solid-js'
+import { useRequiredError } from './FieldControl'
 import { Chip, ChipRow, Field, Text, Textarea } from '@acorn/plugin-api/ui'
 
 // A prompt, with the references it may use offered as chips.
@@ -17,16 +18,20 @@ export default function PromptField(props: {
   references: readonly string[]
   onChange: (value: string) => void
 }) {
-  const missing = () => props.required && !props.value.trim()
+  const required = useRequiredError(() => !!props.required && !props.value.trim())
+  const change = (value: string): void => {
+    required.touch()
+    props.onChange(value)
+  }
   const append = (token: string): void => {
     const current = props.value
-    props.onChange(current && !current.endsWith('\n') ? `${current}\n${token}` : `${current}${token}`)
+    change(current && !current.endsWith('\n') ? `${current}\n${token}` : `${current}${token}`)
   }
   return (
     <Field
       label={props.label}
       hint={props.hint}
-      error={missing() ? 'This one has to be filled in.' : undefined}
+      error={required.error()}
       group
     >
       <Textarea
@@ -34,10 +39,11 @@ export default function PromptField(props: {
         grow
         label={props.label}
         disabled={props.disabled}
-        invalid={missing()}
+        invalid={!!required.error()}
         value={props.value}
         placeholder="What this step should do."
-        onInput={props.onChange}
+        onBlur={required.touch}
+        onInput={change}
       />
       <Show when={!props.disabled && props.references.length}>
         <ChipRow>

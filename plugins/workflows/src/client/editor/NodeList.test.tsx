@@ -34,8 +34,6 @@ describe('the node list', () => {
         catalog={undefined}
         onSelect={onSelect}
         onAdd={vi.fn()}
-        onRemove={vi.fn()}
-        onMove={vi.fn()}
       />
     ), host)
 

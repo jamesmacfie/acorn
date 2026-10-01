@@ -8,7 +8,7 @@ const store = vi.hoisted(() => ({
   sessions: [] as unknown[], snapshots: {} as Record<string, unknown>, recentSessions: [] as unknown[],
 }))
 vi.mock('../sessions/managedStore.ts', () => ({
-  managedAgentStore: {
+  managedAgentStore: { captureRead: () => ({ nodeId: null, check: () => {} }),
     sessionsForTask: () => store.sessions,
     snapshots: () => store.snapshots,
     hold: () => () => undefined,

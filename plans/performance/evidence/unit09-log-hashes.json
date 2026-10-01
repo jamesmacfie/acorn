@@ -1,0 +1,42 @@
+{
+  "unit09-lint-final.log": {
+    "rawSha256": "14a600a519740303afa9294cc30314fbd3eed83161bd4e3c0ec7e69d86d37f5b",
+    "normalizedSha256": "10d60d6921baf5134a311ca3f0a9e3098a9a98588176ca119ad39cb77f2b3253"
+  },
+  "unit09-tests-final.log": {
+    "rawSha256": "69b6f8a166f965d928a5ec8380dd84e088a35b948db91771553ca48024520a5a",
+    "normalizedSha256": "cc4150f54536ba7d23693a47649e94503ea38829f8bc8f7468512b30faf711a6"
+  },
+  "unit09-focused.log": {
+    "rawSha256": "38c47613e41baf41df1302e4ae7ad9a0fdeec7d1c2acab3165a98a349e9d3792",
+    "normalizedSha256": "de4b4ce7d38f439f899132a5080cf872263637d2d18364c705f445754edbc728"
+  },
+  "unit09-accepted.log": {
+    "rawSha256": "c1a5a93364b63748b1c5e1aa6624a459516bdb3cb51976017903c52efe85e7cc",
+    "normalizedSha256": "cf2fa9dca029e8c83fae6cfa178aff79e73b320f415ee0b29e4f52bed1f2c8be"
+  },
+  "unit09-media-final.log": {
+    "rawSha256": "2c162164b476783308d09a784d0fbcea50de25d5e6b22ee0969a3e748db97a5f",
+    "normalizedSha256": "3547ebc074a0aac14ca6b8f71b0d6d7e435f818beabae32bea04dc2d7c8061d6"
+  },
+  "unit09-agents-lint-final.log": {
+    "rawSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92",
+    "normalizedSha256": "8366207267355d3e3d5bf3bf6e8c94c5f93f6078c34f08973fa2b38cdda6cc92"
+  },
+  "unit09-tui-before-budget.log": {
+    "rawSha256": "8de45de7f79b4082391b591e89ecfcf972359323cbe23894de9cd0e034fd4bd5",
+    "normalizedSha256": "8de45de7f79b4082391b591e89ecfcf972359323cbe23894de9cd0e034fd4bd5"
+  },
+  "unit09-tui-before-build.log": {
+    "rawSha256": "a3ec42a7c455eb621496a449c23b5479bb184cd01091c5fad6159c078c6f9a40",
+    "normalizedSha256": "0d81f16b5df9932438f301889f926577eee543bd671781bf995f124ab088bf35"
+  },
+  "unit09-tui-launch.log": {
+    "rawSha256": "d2125f8efe1b7f1bb2daecb203cad2112a5b458c443870eff9e8b4979ceadb92",
+    "normalizedSha256": "6d2f03ee98ec3b9406dbe64e3074a900ec4a6e773a0b813bcf0da7ca08b7091e"
+  },
+  "unit09-tui-accepted-flow.log": {
+    "rawSha256": "d58d52d1db6d8f1e8f8241eed502ad4f4f7196e3140494dc33c3bf0a42980056",
+    "normalizedSha256": "d58d52d1db6d8f1e8f8241eed502ad4f4f7196e3140494dc33c3bf0a42980056"
+  }
+}

@@ -1,6 +1,6 @@
 # 07-16. The Add step menu is one flat list in id order
 
-**Status:** not started. Batch B07a. Written 2026-10-01. Line numbers are from 2026-10-01 and may
+**Status:** done 2026-10-02 on `more-ui`. Batch B07a. Written 2026-10-01. Line numbers are from 2026-10-01 and may
 have moved.
 
 **Add** lists 17 step kinds in one run, sorted by plugin then kind id, so the order reads "Ask an

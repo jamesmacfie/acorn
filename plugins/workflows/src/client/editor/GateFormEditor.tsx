@@ -1,7 +1,7 @@
 import { For, Show } from 'solid-js'
 import { dataBindingSchema, type DataBinding } from '@acorn/protocol/dataBindings.ts'
 import { TypedBindingPicker } from '@acorn/plugin-api/ui/data-sources'
-import { Button, Fold, Inline, Stack, Text } from '@acorn/plugin-api/ui'
+import { Button, Icon, Inline, SectionHeader, Stack } from '@acorn/plugin-api/ui'
 import type { WorkflowCatalog, WorkflowDef, WorkflowGateForm, WorkflowStepDef, WorkflowValueBinding } from '../../shared/workflowContracts'
 import { GATE_FORM_MAX_FIELDS } from '../../shared/gateForm'
 import { workflowBindingOrigins } from './bindingOrigins'
@@ -35,35 +35,29 @@ export default function GateFormEditor(props: {
     props.onChange({ fields: form()?.fields ?? [], values: Object.keys(values).length ? values : undefined })
   }
 
-  return <Fold label="Form" level="group" defaultOpen>
-    <Stack gap="stack">
-      <Text emphasis="muted" wrap>
-        Fields the reviewer checks and corrects before approving. A later step reads the approved values
-        under /values.
-      </Text>
+  // Form sections are subheadings with their fields under them, not folds (docs/ui-design.md
+  // § Shell hierarchy): the form is the point of a gate, so it is never hidden.
+  return <Stack gap="stack">
+      <SectionHeader level="sub" help="The reviewer checks these values and can correct them before approving. Later steps can use what they approve.">Form</SectionHeader>
       <Show when={form()} fallback={(
         <Show when={!props.disabled}>
           <Inline gap="inline">
-            <Button size="sm" onPress={() => props.onChange({ fields: [{ name: 'value', schema: { type: 'string' } }] })}>Add a form</Button>
+            <Button size="sm" onPress={() => props.onChange({ fields: [{ name: 'value', schema: { type: 'string' } }] })}><Icon name="plus" /> Add a form</Button>
           </Inline>
         </Show>
       )}>
         {(current) => <>
           <InputsInspector inputs={current().fields} disabled={props.disabled} onChange={setFields}
-            intro="The values the reviewer sees. Remove every field to go back to a plain gate."
+            intro="Remove every field to go back to a plain gate."
             addLabel="Add a field" max={GATE_FORM_MAX_FIELDS} />
-          <Fold label="Proposed from" level="group" defaultOpen>
-            <Stack gap="row">
-              <For each={current().fields}>{field =>
-                <TypedBindingPicker label={field.label || field.name} origins={origins()}
-                  destination={field.schema ?? { type: 'string' }} disabled={props.disabled}
-                  value={typedBinding(current().values?.[field.name])}
-                  onChange={binding => setBinding(field.name, binding)} />}
-              </For>
-            </Stack>
-          </Fold>
+          <SectionHeader level="sub">Filled in from</SectionHeader>
+          <For each={current().fields}>{field =>
+            <TypedBindingPicker label={field.label || field.name} origins={origins()}
+              destination={field.schema ?? { type: 'string' }} disabled={props.disabled}
+              value={typedBinding(current().values?.[field.name])}
+              onChange={binding => setBinding(field.name, binding)} />}
+          </For>
         </>}
       </Show>
     </Stack>
-  </Fold>
 }

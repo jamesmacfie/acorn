@@ -17,9 +17,9 @@ const RANK_GAP = 60
 /** Horizontal pitch between lanes (card width plus a gutter). */
 const LANE_PITCH = 236
 
-/** How far a reader may zoom out and in. Below the floor a label is unreadable; above the ceiling a
- *  card is bigger than it is on the page and nothing is gained. */
-export const GRAPH_ZOOM_MIN = 0.35
+/** How far a reader may zoom out and in. Below the floor a label is unreadable (at 0.6 a 12px label
+ *  draws at 7px); above the ceiling a card is bigger than it is on the page and nothing is gained. */
+export const GRAPH_ZOOM_MIN = 0.6
 export const GRAPH_ZOOM_MAX = 1.5
 
 export type GraphPoint = { x: number; y: number }

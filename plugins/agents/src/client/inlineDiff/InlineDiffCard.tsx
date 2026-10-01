@@ -105,6 +105,7 @@ export default function InlineDiffCard(props: Props) {
   const submit = async () => {
     const question = draft().trim()
     if (!question || busy()) return
+    const owner = managedAgentStore.captureRead()
     setBusy(true)
     setError('')
     try {
@@ -122,22 +123,26 @@ export default function InlineDiffCard(props: Props) {
         if (access() === 'read-only' && readonlyProfile() && permission) values[permission.id] = readonlyProfile()!.value
         const origin = { ...props.origin, access: access() }
         target = await managedAgentStore.startInlineSession(props.origin.taskId, chosen, origin, values, attempt.createKey)
+        owner.check()
         setSessionId(target.id)
         void saveInlineChoices(chosen, model()).catch(() => undefined)
       }
       let prompt = attempt.prompt
       if (!prompt) {
-        const current = await managedAgentApi.snapshot(target.id)
+        const current = await managedAgentApi.snapshot(target.id, 0, 2_000, owner)
+        owner.check()
         const firstTurn = current.turns.length === 0
         const context = firstTurn ? await props.loadContext().catch(() => props.origin.quote) : ''
+        owner.check()
         const instruction = target.origin?.access === 'read-only' ? 'Please answer without changing files or running write commands.\n\n' : ''
         prompt = firstTurn
           ? `Question about ${props.origin.path}:${props.origin.line} (${props.origin.side} side, patch ${props.origin.patchKey}):\n\n${context}\n\n${instruction}Question:\n${question}`
           : `${instruction}${question}`
         setPendingAttempt({ ...attempt, prompt })
       }
-      await managedAgentApi.enqueue(target.id, { input: [{ type: 'text', text: prompt }], source: 'interactive', effectivePolicy: {} }, attempt.sendKey)
-      setDraft('')
+      await managedAgentApi.enqueue(target.id, { input: [{ type: 'text', text: prompt }], source: 'interactive', effectivePolicy: {} }, attempt.sendKey, owner)
+      owner.check()
+      if (draft().trim() === question) setDraft('')
       setPendingAttempt(null)
       void managedAgentStore.loadSnapshot(target.id).catch(() => undefined)
     } catch (cause) {

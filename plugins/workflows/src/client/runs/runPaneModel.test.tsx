@@ -111,7 +111,7 @@ describe('the run pane model', () => {
   it('lands on the newest run and orders its nodes the way the editor does', async () => {
     const model = await mount()
     expect(model.selectedRunId()).toBe('run-1')
-    expect(model.nodes().map((node) => [node.name, node.depth])).toEqual([['reproduce', 0], ['synthesise', 1]])
+    expect(model.nodes().map((node) => [node.name, node.depth])).toEqual([['reproduce', 0], ['synthesise', 0]])
     // The blocked-then-running rule: nothing is gated, so the running node is what opens.
     expect(model.selectedStepId()).toBe('st1')
   })

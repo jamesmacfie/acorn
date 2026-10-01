@@ -66,6 +66,7 @@ config_options = { model = "claude-opus-5", reasoning = "high" }
 allow = ["read_tool"]
 [steps.budget]
 max_turns = 2
+max_wall_time_ms = 30000
 
 [[steps]]
 id = "recent-changes"
