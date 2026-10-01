@@ -18,6 +18,7 @@ export type RunSessionGlue = {
   onExit(listener: (sessionId: string, exitCode: number | null) => void): () => void
   exitCode(sessionId: string): number | null | undefined
   killSession(sessionId: string): void
+  retireSession(sessionId: string): void
 }
 
 // Runtime service: run targets as terminal sessions in the task worktree (docs/terminal-and-agents.md
@@ -58,6 +59,7 @@ export function createRuntimeService(
     onExit: glue.onExit,
     exitCode: glue.exitCode,
     killSession: glue.killSession,
+    retireSession: glue.retireSession,
     runScript,
     authorizeRepoConfig: (taskId, expectedHash) => core.projects.assertConfigTrusted(taskId, expectedHash),
     onChange,

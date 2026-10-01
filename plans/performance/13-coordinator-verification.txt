@@ -1,0 +1,22 @@
+Independent coordinator replay, October 1, 2026.
+Source baseline: f8e4b59c. Application source unchanged.
+
+rtk proxy env ACORN_PERF_TAG=coordinator-before pnpm exec vitest run --config plans/performance/13-node-probe.config.ts
+Result: 5 files, 9 characterization cases passed in 2.99 seconds (tests 722 ms).
+
+rtk proxy env ACORN_PERF_TAG=coordinator-before pnpm exec vitest run --config plans/performance/13-renderer-probe.config.ts
+Result: 4 files, 7 characterization cases passed in 6.01 seconds (tests 2.37 seconds).
+
+rtk proxy node --import tsx plans/performance/13-docker-spawn-probe.mjs coordinator-before
+Reproduced 32 error/close events, zero exit/end events, 32 retained failed stream children,
+and refusal of attach 33. Fixtures disposed. No Docker daemon connection.
+
+rtk proxy node --import tsx plans/performance/13-tunnel-probe.mjs coordinator-before
+Granted automatic local-listener escalation. Reproduced 24 listeners with cap 16,
+pending close/dispose publication, and same-key eight-call joining to one listener.
+All listeners closed; no external connection, preview page or remote Node dialled.
+
+Evidence: 13-*-coordinator-before.json. Original before-v2/before artifacts preserved.
+Passing characterizations reproduce current defects; they are not intended-behavior acceptance.
+PG drivers, CLI/config, and UI transports are fixtures where the report states that. jsdom/V8
+CPU is not native WebKit latency, and sampled heap is not a retained leak or physical footprint.

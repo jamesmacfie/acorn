@@ -18,6 +18,8 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
 | [dashboards/](./dashboards/README.md) | Remaining taskless database and write-back proposals. Shared data discovery and authoring now belong to workflow v2. | Redesign shipped; overlapping proposals superseded, 2026-09-13. |
+| [performance/](./performance/README.md) | Remaining sequential performance assignments, paired evidence, resource ownership, and sustained-use validation. | Units 01–08 reviewed; units 09–28 and final validation deferred, 2026-10-01. |
+
 | [dynamic-ui/](./dynamic-ui/README.md) | Agent-built apps: task apps drawn as transcript cards and panes in host components, published to the project, edited through drafts, and exported as plugins. A spike and five phases. | Proposed, 2026-10-01; nothing built. |
 | [memory/](./memory/README.md) | Simple memory: direct agent writes, the memory index in every session's system prompt, undo instead of review, and the removal of Findings. Four phases. | Proposed, 2026-10-01; nothing built. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
@@ -34,7 +36,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [kimi.md](./kimi.md) | Kimi Code CLI as a contributed tier 1 harness: the manifest, the four declarations to get right, and the Kimi usage API research behind the optional probes. | Proposal, 2026-09-18. Not started. |
 | [message.md](./message.md) | Delivery record for delegated-session messaging, with reference-app research and the optional queued-report merge. | Owner reports, blocked-request wakes, and live child rows shipped by 2026-09-26; merging awaits evidence of noise. |
 | [mods.md](./mods.md) | What acorn takes from Claude Code's function hooks: the comparison, and a veto-only `agents:before-permission` hook over every harness's permission requests. | Proposal, 2026-09-29. Not started. |
-| [native-overlay-layer.md](./native-overlay-layer.md) | Product requirements for native desktop overlays above live preview and plugin webviews, with composition, input, security, and acceptance gates. | Proposal, 2026-10-01. Not implemented. |
 | [outdated-review-comments.md](./outdated-review-comments.md) | Hide outdated GitHub review threads from the code pane while preserving conversation history, location metadata, and refresh correctness. | Product requirements, 2026-10-01. Not implemented. |
 | [pluginsearch.md](./pluginsearch.md) | Search within Linear, Rollbar, and GitHub lists beyond the loaded rows while retaining project mappings and state. | Proposal, 2026-09-24. Not started. |
 | [remote.md](./remote.md) | Web client, mobile PWA, and a relay service. | Preparation items shipped; the rest waits on a web client. |

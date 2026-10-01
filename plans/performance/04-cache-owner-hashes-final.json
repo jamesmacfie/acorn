@@ -1,0 +1,44 @@
+{
+  "before": {
+    "root": "/tmp/acorn-perf-original-f8e4b59c",
+    "hashes": {
+      "packages/client-core/src/infra/node/fleet.ts": "18ab88f4ed8961dc525af10d2e07c9e360eafdaf9b8e71d2e45c5b4e445dd3b8",
+      "packages/client-core/src/infra/node/queryOwnership.ts": null,
+      "packages/client-core/src/infra/node/apiClient.ts": "62954216f9665fc0a443cc9351a3bc0cfcc618ee067f72c18983e7de6884f8ee",
+      "packages/client-core/src/infra/persistence/queryPersistence.ts": "ed63f9c250120b544f2857cc28b82b0acd0c4d18a6d84328306e48f8f58a0112",
+      "packages/client-core/src/infra/persistence/queryCacheLifecycle.ts": null,
+      "packages/client-core/src/infra/persistence/QueryCacheProvider.tsx": null,
+      "packages/client-core/src/infra/persistence/public.ts": "6b5a30b33ddc11089524a157c337c18599a40555e26237ef1d3e781f987572b2",
+      "packages/client-core/src/infra/persistence/startupRestore.ts": "4c6383bf4fd652573c99175c7c418c51e0a30d179734d8c8bda7a1f9e0c4a2ad",
+      "packages/client-core/src/infra/persistence/persistedState.ts": "ed6b603d88a2979d53ad0481804b33ca08bcc9704c3d03c7915369a75cf67b7d",
+      "packages/client-core/src/infra/persistence/devicePrefs.ts": "4ef1f631d2d9c9a35ab591b742d26076a880e07bd996f7fedcfc9ac7b6a15222",
+      "packages/client-core/src/features/settings/savePref.ts": "7daa4f918f14516929cadf8d3839e5af0f63a7473699b854e39d18693fc3c014",
+      "apps/desktop/src/client/index.tsx": "2af2f96fb20f5d30db682c531bc3acc1d888683c61ace2688fe9bc09a3148ee9",
+      "apps/tui/src/main.tsx": "861ceb0b280c574df858bc28dff3b1448bf02ec472109189e4353b782cd99a38",
+      "apps/tui/src/node/cache.ts": "1843ba70ee0129a2a769e1f3624d7d733e29f48e032433bb321d7b3d6ad40d6f",
+      "packages/client-core/package.json": "31ea027e9dad3050d39a9ed43af824cf820e91154462d3da627be805a587b544",
+      "pnpm-lock.yaml": "27e45d0a1a6c9fadc1b764093fdc2e6e6ce97e0da9af119bfa28a98d4b7e040c"
+    }
+  },
+  "after": {
+    "root": "/Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance",
+    "hashes": {
+      "packages/client-core/src/infra/node/fleet.ts": "79b1c3790d1ac314c38506f817dbb989c95753d930fdcf2b805868eccedcd2f6",
+      "packages/client-core/src/infra/node/queryOwnership.ts": "810130c5b46ad54dbe148f358b87b2071c2394c7ef6acc5a718df3aee22f83ae",
+      "packages/client-core/src/infra/node/apiClient.ts": "ad8ef6ea7bf97c04592ed5763054dc40da1d31584a4e570a220a84723b6336f9",
+      "packages/client-core/src/infra/persistence/queryPersistence.ts": "ed63f9c250120b544f2857cc28b82b0acd0c4d18a6d84328306e48f8f58a0112",
+      "packages/client-core/src/infra/persistence/queryCacheLifecycle.ts": "9c7bba1685bce7cb6bae5012be7ccb46e8bf4da47eccd36cd5ae076e74810723",
+      "packages/client-core/src/infra/persistence/QueryCacheProvider.tsx": "cbc9433d1cbd149f962f0bef75d87839c26b2ad53534bccf42466c38e2d71b52",
+      "packages/client-core/src/infra/persistence/public.ts": "66c2fa493ca30b34091989c602f0e58a3e509f9c6c2ed1374c76e8e9076224be",
+      "packages/client-core/src/infra/persistence/startupRestore.ts": "739f34098e49e879759354d347c35514fb54bf4fa5f142708d35e1b04212d162",
+      "packages/client-core/src/infra/persistence/persistedState.ts": "feeca1c53babd38a5eff6762b735ef088776c12472d40f567a392dab7a42f45c",
+      "packages/client-core/src/infra/persistence/devicePrefs.ts": "9f96bc3d695ac7402a1869f853ba624c53b1f01f50ae4c27280323e5a49c1995",
+      "packages/client-core/src/features/settings/savePref.ts": "cbca7345020d5b00f7f783897ddcf1fe05b1ecbfae8327061cec7d5f9e809c1b",
+      "apps/desktop/src/client/index.tsx": "724c1fe818d1d921efda83dbac5e7e158b630beef5218b1ba1e83dcd754bbc7a",
+      "apps/tui/src/main.tsx": "724b2d573508a5687790e8b8436487897d6a6fc9c3ab53821e164524fe92f9ed",
+      "apps/tui/src/node/cache.ts": "6d6c167d5953d59579b0306c2a0fc7eec0037d1cd91e7c591b70d6b90537f685",
+      "packages/client-core/package.json": "d79dea257018a1f96edb7bae82d2165ba6276b134c2aa58d9179e822e8c6cce7",
+      "pnpm-lock.yaml": "17ef452021bd503ff19a9cb97f1f1f2cf8586a06e8d6e387aefb8b0fa69eee57"
+    }
+  }
+}

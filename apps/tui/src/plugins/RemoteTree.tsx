@@ -1,17 +1,17 @@
 /** @jsxImportSource @acorn/tui/jsx */
+import { queryOwner } from '@acorn/client-core/infra/node'
 import { createEffect, createMemo, on, onCleanup } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
 import type { Renderable } from '../tree/compat'
 import type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
-import { createFrameBridge, type FrameBinding } from '@acorn/client-core/host/frames/broker.ts'
-import { createFrameServices } from '@acorn/client-core/host/frames/frameServices.ts'
+import type { FrameBinding } from '@acorn/client-core/host/frames/broker.ts'
 import { eligiblePlugins, isTaskPane } from '@acorn/client-core/host/plugins'
 import { recordSurfaceFailure } from '@acorn/client-core/host/plugins'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { clientEvents, consumePaneIntent } from '@acorn/client-core/host/registries/commands'
-import { acquireTreeWorker } from '@acorn/client-core/host/tree/workerHost.ts'
+import { acquireTreeWorker, treeAuthorityKey, treeModelAuthorityKey, treeDocumentGrant } from '@acorn/client-core/host/tree/workerHost.ts'
 import {
-  answerOwnerInvoke, unknownHostOp, unsupportedOverlay, type OwnerActions,
+  createTreeBridgeFactory, answerOwnerInvoke, unknownHostOp, unsupportedOverlay, type OwnerActions,
 } from '@acorn/client-core/host/tree'
 import type { RemoteContribution } from '@acorn/client-core/host/tree'
 import { toast } from '@acorn/client-core/features/notifications'
@@ -31,8 +31,10 @@ export type RemoteTreeProps = {
   contribution: RemoteContribution
   /** What this tree is for. Reactive: a second mount for the same slot is a props update. */
   props: () => unknown
-  /** The task or project this tree is inside. This slot's own bridge reads it on each call. */
+  /** The task or project this tree is inside. Task and project authority is captured at construction; item props remain reactive. */
   scope?: () => { taskId?: string; projectId?: string; item?: string }
+  /** Immutable opening selection shared by this composed owner's regions. */
+  openingItem?: string
   /** The sibling host editor's document, for a tree that is one region of a composed pane. An accessor
    *  because the two regions mount independently; its absence is the whole permission check for the
    *  `document` verb, exactly as it is on the desktop. */
@@ -43,6 +45,13 @@ export type RemoteTreeProps = {
   actions?: () => OwnerActions
   declaredActions?: () => readonly string[]
 }
+
+const treeRefusal = (contribution: RemoteContribution) => (reason: string): void => {
+  recordSurfaceFailure(contribution.pluginId, contribution.id, new Error(reason))
+}
+const copy = (text: string): void => { if (!copyToTerminal(text)) toast(`Copy by hand: ${text}`) }
+const openExternal = (url: string): void => toast(`Open in a browser: ${url}`)
+const navigate = (): void => {}
 
 let slotSeq = 0
 
@@ -56,9 +65,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
 
   const contribution = componentProps.contribution
   const scope = () => componentProps.scope?.() ?? {}
-  const refuse = (reason: string): void => {
-    recordSurfaceFailure(contribution.pluginId, contribution.id, new Error(reason))
-  }
+  const refuse = treeRefusal(contribution)
 
   const holdsFocus = (): boolean => {
     let at: Renderable | null | undefined = focusedRenderable()
@@ -69,60 +76,62 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
     return false
   }
 
+  const registeredNode = queryOwner(qc)
+  const nodeId = registeredNode === undefined ? activeNodeId() : registeredNode
+  const boundScope = scope()
   const binding = (): FrameBinding => {
     const owner = eligiblePlugins().find((entry) => entry.pluginId === contribution.pluginId)
     return {
       pluginId: contribution.pluginId,
       surface: contribution.id,
       target: 'remote',
-      nodeId: activeNodeId() ?? '',
-      api: owner?.installed.permissions.api ?? [],
-      events: owner?.installed.permissions.events ?? [],
+      nodeId: nodeId ?? '',
+      api: [...(owner?.installed.permissions.api ?? [])],
+      events: [...(owner?.installed.permissions.events ?? [])],
       panes: (owner?.installed.contributions.frames ?? []).filter(isTaskPane).map((frame) => frame.id),
       claimsKeys: [],
-      get taskId() {
-        return scope().taskId
-      },
-      get projectId() {
-        return scope().projectId
-      },
+      taskId: boundScope.taskId,
+      projectId: boundScope.projectId,
     }
   }
 
-  const contextFor = (bound: FrameBinding): PluginFrameContext => {
-    const opened = scope().item
-      ?? (bound.taskId ? consumePaneIntent(bound.taskId, contribution.id) : undefined)
-    const item = typeof opened === 'string' ? opened : opened?.kind === 'plugin:select' ? opened.item : undefined
-    return {
-      surface: bound.surface, target: 'remote', nodeId: bound.nodeId,
-      ...(bound.taskId ? { taskId: bound.taskId } : {}),
-      ...(bound.projectId ? { projectId: bound.projectId } : {}),
-      ...(item ? { item } : {}),
-      theme: 'terminal', style: 'terminal', claimsKeys: [],
-    }
+  const bound = binding()
+  // The row that opened this pane, when a row did. Retained by `openPane` until the pane consumes
+  // it, so a tree mounting for the first time gets its selection in `context` rather than racing
+  // its own mount against an event that has already fired — the same split a frame region makes
+  // (../frames/PluginFrame.tsx). A routed item wins, because for a project-scoped surface it IS the
+  // current selection rather than a one-shot.
+  const opened = scope().item
+    ?? (bound.taskId ? consumePaneIntent(bound.taskId, contribution.id, 'plugin:select') : undefined)
+  const item = typeof opened === 'string' ? opened : opened?.kind === 'plugin:select' ? opened.item : undefined
+  const context: PluginFrameContext = {
+    surface: bound.surface,
+    target: 'remote',
+    nodeId: bound.nodeId,
+    ...(bound.taskId ? { taskId: bound.taskId } : {}),
+    ...(bound.projectId ? { projectId: bound.projectId } : {}),
+    ...(item ? { item } : {}),
+    // This host has one appearance and it is the reader's own terminal: no stylesheet, no tokens,
+    // and no theme id to resolve until the appearance layer publishes its colours as data
+    // (../appearance.ts, docs/tui.md).
+    theme: 'terminal',
+    style: 'terminal',
+    claimsKeys: [],
   }
-
-  const connectBridge = (port: MessagePort, bound: FrameBinding, context: PluginFrameContext, authorize?: () => boolean) =>
-    createFrameBridge({
-      port, binding: bound,
-      services: createFrameServices(
-        { binding: bound, hash: contribution.hash, ...(componentProps.document ? { document: componentProps.document } : {}) },
-        {
-          qc, frameHasFocus: holdsFocus, navigate: () => {},
-          copy: (text) => { if (!copyToTerminal(text)) toast(`Copy by hand: ${text}`) },
-          openExternal: (url) => toast(`Open in a browser: ${url}`),
-        },
-      ),
-      context,
-      ...(authorize ? { authorize } : {}),
-      onMisbehaving: (reason) => refuse(`misbehaved on the bridge: ${reason}`),
-    })
-
+  const documentGrant = treeDocumentGrant(componentProps.document)
+  context.authority = treeModelAuthorityKey(contribution.hash, qc, bound, context, componentProps.document)
+  const legacyContext = componentProps.openingItem === undefined ? context : { ...context, item: componentProps.openingItem }
   const worker = acquireTreeWorker({
-    pluginId: contribution.pluginId, hash: contribution.hash, onRefused: refuse,
-    connect: (port, authorize) => connectBridge(port, binding(), {
-      surface: '', target: 'remote', nodeId: '', theme: 'terminal', style: 'terminal', claimsKeys: [],
-    }, authorize),
+    pluginId: contribution.pluginId,
+    hash: contribution.hash,
+    authority: treeAuthorityKey(contribution.hash, qc, bound, legacyContext, componentProps.document),
+    context: legacyContext,
+    hasFocus: holdsFocus,
+    onRefused: refuse,
+    connect: createTreeBridgeFactory(
+      { binding: bound, hash: contribution.hash, ...(documentGrant ? { document: documentGrant } : {}) },
+      { qc, navigate, copy, openExternal }, context, refuse,
+    ),
   })
 
   // The fifth answer a terminal gives differently. An owner action is host-agnostic and goes through
@@ -145,11 +154,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   const transport = worker.transport(slot)
   worker.appearance(slot, { theme: 'terminal', style: 'terminal', tokens: {} })
   // Mount is also update: the first call starts the tree, every later one carries new props.
-  createEffect(() => worker.mount(slot, contribution.entry, componentProps.props(), () => {
-    const bound = binding()
-    const context = contextFor(bound)
-    return { context, connect: (port: MessagePort) => connectBridge(port, bound, context) }
-  }))
+  createEffect(() => worker.mount(slot, contribution.entry, componentProps.props()))
 
   // Selection and actions go to this slot's bridge, as they do in the DOM host.
   createEffect(on(() => scope().item, (next, previous) => {

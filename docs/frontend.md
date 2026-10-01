@@ -424,7 +424,11 @@ The terminal drawer is a task surface and is available when the desktop terminal
 
 Overlays are shell-owned: command palette, settings, onboarding, notices, confirmations, and secret
 entry are not rendered by arbitrary pane content. The shell positions native preview views over a
-renderer pane host and hides them while overlays cover them.
+renderer pane host. `observeNativePage` owns shared page geometry, native overlay presentation, and
+the overlap fallback for both preview and loaded-plugin pages. The optional `rendererLayer.update`
+platform group sends geometry and input policy to the shell. The live Solid tree retains content,
+callbacks, drafts, and query ownership; no second renderer or cache receives them. For the shell
+contract and platform matrix, see [Native overlays](./native-overlays.md).
 
 Focus is shell state too. `client-core/host/keys/focusRegions.ts` holds which region of which pane the keyboard
 is in and what each region last had focused, and it is the one place `focusedPane` is written and the
@@ -854,6 +858,23 @@ The kit calls a host-installed callback in `kit/lib/telemetry/workTelemetry.ts`;
 The desktop installs responsiveness monitoring in the renderer entrypoint, not the separately bundled
 preload bridge, so it observes the same consent and interaction state as the application.
 [Telemetry](telemetry.md#diagnosing-an-unresponsive-view) owns the vocabulary and diagnostic workflow.
+
+
+### Node shell navigation lifetime
+
+The desktop's keyed QueryCacheProvider contains PaneModelHost before the Router. The query provider
+owns persistence independently; PaneModelHost leases the selected Node generation for detached pane
+models. `setActiveNode` declares transport interest even for an equivalent selection, then batches a
+changed signal, device memory, and `runtime:node-switched`. Event listeners see the new Node before
+incoming reactive construction while the outgoing DOM still exists. Scope eviction carries `from`
+and `to`; owners retire the captured outgoing generation rather than reading an ambient cleanup
+scope. Individual region/pane removal preserves its model. Provider destruction retires observers
+and drawn marks. The explicit host wrapper is available for the TUI composition programme.
+
+TabRail memoizes the scalar stored `railOrder` value, parses it once per changed value, and shares a
+pin membership Set. Selection, same-value preference writes, and unrelated preferences reuse that
+projection. Row identity, reactive contributed markers, and the persisted representation remain the
+rail's existing contracts.
 
 ## Preview pane lifetime
 

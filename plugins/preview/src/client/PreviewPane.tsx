@@ -1,5 +1,5 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
-import { elementRectKey, previewViews, toast, visibleElementRect } from '@acorn/plugin-api/client'
+import { elementRectKey, observeNativePage, previewViews, toast, visibleElementRect } from '@acorn/plugin-api/client'
 import { Button, EmptyState, IconButton, Input, Rectangle, Spinner, Text, Toolbar } from '@acorn/plugin-api/ui'
 
 const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
@@ -27,8 +27,7 @@ export default function PreviewPane(props: {
   let attempted: Request | undefined
   let ensureVersion = 0
 
-  // Where the view was last told to sit. The poll below asks the same question five times a second
-  // and the answer is usually the same one, which is not worth a message across the seam.
+  // Geometry changes cross the seam only when the visible rectangle changes.
   let placed = ''
 
   const syncRect = () => {
@@ -40,36 +39,14 @@ export default function PreviewPane(props: {
     preview.setBounds(props.taskId, r)
   }
 
-  const checkOcclusion = () => {
-    if (!host) return
-    const r = visibleElementRect(host)
-    if (r.width === 0 || r.height === 0) return setSuppressed(true)
-    const top = document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)
-    setSuppressed(!(top === host || host.contains(top)))
-  }
 
   onMount(() => {
     if (!preview) return
-    const ro = new ResizeObserver(() => {
-      syncRect()
-      checkOcclusion()
+    const stopPage = observeNativePage(host, (rect, covered) => {
+      setSuppressed(covered)
+      const next = elementRectKey(rect)
+      if (next !== placed) { placed = next; preview.setBounds(props.taskId, rect) }
     })
-    // The box and the page. A window resize moves the box in viewport coordinates even when the box
-    // itself does not change size, and the shell positions the view in those coordinates — so the
-    // page is observed too, in place of the `window` resize listener this used to carry.
-    ro.observe(host)
-    ro.observe(document.documentElement)
-    // Size is observed above; nothing reports that the box has *moved*. An ancestor scrolling, a
-    // fixed rail arriving beside the panes, a stylesheet landing a frame late in dev — each leaves
-    // the view sitting where the box used to be, and somebody else's pixels over the tab rails is
-    // what that looks like. So the question is asked again on the tick the occlusion check already
-    // runs on. The ceiling is a fifth of a second of lag behind a fast drag, and the observer above
-    // still covers everything that does change size.
-    const poll = setInterval(() => {
-      syncRect()
-      checkOcclusion()
-    }, 200)
-    checkOcclusion()
     const offEvent = preview.onEvent((s) => {
       if (s.taskId !== props.taskId) return // only the active view drives the chrome
       setLoading(s.loading)
@@ -79,8 +56,7 @@ export default function PreviewPane(props: {
     })
     onCleanup(() => {
       ensureVersion += 1 // invalidate any in-flight ensure before it can re-show this disposed pane
-      ro.disconnect()
-      clearInterval(poll)
+      stopPage()
       offEvent()
     })
   })

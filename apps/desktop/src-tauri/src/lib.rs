@@ -15,6 +15,7 @@ mod webviews;
 mod webview_target;
 #[cfg(feature = "agent-automation")]
 mod webview_diagnostics;
+mod overlays;
 
 #[cfg(all(feature = "agent-automation", not(debug_assertions)))]
 compile_error!(
@@ -158,6 +159,9 @@ pub fn run() {
             webview_diagnostics::webview_diagnostics,
             #[cfg(feature = "agent-automation")]
             webview_diagnostics::webview_trial_delay,
+            overlays::overlay_debug_focus,
+            overlays::overlay_begin,
+            overlays::overlay_update,
             webviews::webview_ensure,
             webviews::webview_bounds,
             webviews::webview_show,
@@ -412,13 +416,13 @@ fn open_window(app: &tauri::AppHandle) -> tauri::Result<()> {
     // lights. `commands::set_window_background` is the other half, because only the page knows the
     // colour. See docs/shell.md, "The renderer bridge".
     #[cfg(target_os = "macos")]
-    let builder = builder.title_bar_style(tauri::TitleBarStyle::Transparent);
+    let builder = builder.title_bar_style(tauri::TitleBarStyle::Transparent).transparent(true);
     builder
         .title("acorn")
         .inner_size(1440.0, 900.0)
         // The colour until the page reports its own, one paint later: the default theme's `--bg`
         // (client-core styles/tokens-theme.css). Wrong for any other theme, and only for that paint.
-        .background_color(tauri::webview::Color(0x12, 0x12, 0x12, 0xff))
+        .background_color(tauri::webview::Color(0x12, 0x12, 0x12, if cfg!(target_os = "macos") { 0 } else { 0xff }))
         // This is the preload. It runs before any page script, so the host global is installed before
         // the shell mounts and the platform string the seam reads synchronously is already there. A
         // `<script>` tag in the HTML could only approximate both.
@@ -487,7 +491,7 @@ fn bridge_script(app: &tauri::AppHandle) -> String {
         eprintln!("[shell] could not read the renderer bridge at {}: {error}", path.display());
         String::new()
     });
-    format!("globalThis.__ACORN_PLATFORM__ = {:?};\n{bridge}", tauri_platform())
+    format!("globalThis.__ACORN_PLATFORM__ = {:?}; globalThis.__ACORN_NATIVE_OVERLAYS__ = {};\n{bridge}", tauri_platform(), std::env::var("ACORN_NATIVE_OVERLAYS").as_deref() != Ok("0"))
 }
 
 fn tauri_platform() -> &'static str {

@@ -1,0 +1,37 @@
+[
+  {
+    "path": "packages/client-core/src/infra/highlight/worker.ts",
+    "bytes": 6424,
+    "sha256": "e821da9d11b80f2621fc1d8358b0c9325c6e6e4286d1d0e51553f2eadf604b86"
+  },
+  {
+    "path": "packages/client-core/src/infra/highlight/wordDiffWorker.ts",
+    "bytes": 2639,
+    "sha256": "d3f282aa879f792fdfe41b9592d81235415472cdbb58112496d1ee3ad6a4da1a"
+  },
+  {
+    "path": "packages/client-core/src/infra/highlight/shiki.ts",
+    "bytes": 5232,
+    "sha256": "d3b2a50e3976a9b7c143140fce69409c0809a3531c89a2f969955a2b8740d6fb"
+  },
+  {
+    "path": "packages/client-core/src/features/diff/DiffCanvas.tsx",
+    "bytes": 13143,
+    "sha256": "3f25cb1e33233607bd29d81cd0ef7c5d1a1a4c05e362598548fe51e85f83461a"
+  },
+  {
+    "path": "packages/client-core/src/features/diff/DiffPane.tsx",
+    "bytes": 26630,
+    "sha256": "c54fea1d6d7b83d5b2c4cb078726adc60f5df7ed4e7b81a2509d7aeb97b776c4"
+  },
+  {
+    "path": "packages/client-core/src/kit/components/content/Markdown.tsx",
+    "bytes": 9132,
+    "sha256": "829ca13c03f556d45afe4726db5e05a9d035ebb47e6c57edca8480d45a58af7e"
+  },
+  {
+    "path": "packages/client-core/src/kit/keys/collectionIntents.ts",
+    "bytes": 9066,
+    "sha256": "3dbdf3091bccea8409e131c1ef5e7a49d1af391abaefddb6195650cb4fde6eca"
+  }
+]

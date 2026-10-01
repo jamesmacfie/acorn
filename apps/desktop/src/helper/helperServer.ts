@@ -16,11 +16,11 @@ import {
 } from '@acorn/protocol/broker.ts'
 import { coreNodeAdoptRoute } from '@acorn/protocol/api.ts'
 import { nodeAdoptResultSchema } from '@acorn/protocol/nodeProviders.ts'
-import { encodeIdFrame, type WsClientFrame } from '@acorn/protocol/ws.ts'
+import { encodeIdFrame, wsFrameSchema, wsSubscriptionIntentSchema } from '@acorn/protocol/ws.ts'
 import type { Helper } from '@acorn/custody/runtime'
 import { toNodeRecord } from '@acorn/custody/broker'
 import { pairWithNode, probeNode } from '@acorn/custody/broker/nodePairing.ts'
-import { MAX_HELPER_REQUEST_BYTES, decodeBytes, encodeBytes, type HelperMessage, type HelperMethod, type HelperPush, type HelperRequest, type WireFetchRequest } from '../shell/wire'
+import { MAX_HELPER_REQUEST_BYTES, decodeBytes, type HelperMessage, type HelperMethod, type HelperPush, type HelperRequest, type WireFetchRequest } from '../shell/wire'
 import {
   decisionSchema,
   devGrantSchema,
@@ -34,6 +34,7 @@ import {
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 
 import { createRendererWatchdog } from './rendererWatchdog'
+import { RendererConnection } from './rendererConnection'
 
 const log = createLogger('helper')
 
@@ -62,11 +63,11 @@ export type HelperServer = {
   // method on the server rather than captured at construction for the same reason Electron holds its
   // push target as a function of the window: there may be no renderer yet, and there may be a
   // different one later.
-  push(message: HelperPush): void
+  push(message: HelperPush, viewerId?: string): void
   // Terminal output, forwarded as the one binary frame this wire carries. Separate from `push`
   // because it is not a JSON message and never becomes one: it arrives from the node already tagged
   // with its session id, and this end tags the node id around it (../shell/wire.ts § The binary push).
-  pushBytes(nodeId: string, frame: Uint8Array): void
+  pushBytes(nodeId: string, frame: Uint8Array, viewerId?: string): void
   close(): Promise<void>
 }
 
@@ -96,6 +97,7 @@ const toFetchRequest = (wire: WireFetchRequest): unknown => {
 export function startHelperServer(helper: Helper, options: { secret: string; appOrigin: string; maxRequestBytes?: number }): Promise<HelperServer> {
   const { secret, appOrigin } = options
   const sockets = new Set<WebSocket>()
+  const connections = new Map<WebSocket, RendererConnection>()
   const watchdogs = new Map<WebSocket, ReturnType<typeof createRendererWatchdog>>()
   const send = (socket: WebSocket, payload: string | Uint8Array): void => {
     if (socket.readyState !== socket.OPEN) return
@@ -105,36 +107,28 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
   const watchdogTimer = setInterval(() => { for (const watchdog of watchdogs.values()) watchdog.tick() }, 1000)
   watchdogTimer.unref()
 
-  // Which node the renderer is actually looking at. The broker opens a socket to every paired node and
-  // pushes every frame here, and the renderer drops whatever is not the active node on arrival
-  // (@acorn/client-core/infra/node/wsClient.ts) — so an N-node fleet used to pay two process
-  // boundaries, a JSON stringify and a JSON parse per frame to deliver frames that were then thrown
-  // away.
-  //
-  // Nobody has to tell us: every request the renderer makes names the node it is addressing, so the
-  // last one named is the active one. A node switch changes the fact with the renderer's first request
-  // to the new node. The one frame that might be dropped in the gap between the switch and that request
-  // is a `<noun>:changed` ping, and the switch's own refetch covers it. The renderer-side filter stays
-  // as a belt.
-  let addressed: string | null = null
-
-  const push = (message: HelperMessage): void => {
-    // `node-status` from every node, always: the fleet list draws a row per node and a node coming back
-    // online is exactly what the renderer is watching for on the ones it is not looking at.
-    if ('push' in message && message.push === 'node-frame' && addressed !== null && message.nodeId !== addressed) return
-    const payload = JSON.stringify(message)
-    for (const socket of sockets) send(socket, payload)
+  const push = (message: HelperMessage, viewerId?: string): void => {
+    let payload: string | undefined
+    for (const [socket, owner] of connections) {
+      if (viewerId && owner.viewerId !== viewerId) continue
+      if ('push' in message && message.push === 'node-frame' && !owner.interestedIn(message.nodeId)) continue
+      send(socket, payload ??= JSON.stringify(message))
+    }
   }
   const stopConfigWatch = helper.config.watch((state) => push({ push: 'config-changed', state }))
 
   // The same filter as `push` above, and the same reason: an N-node fleet used to deliver every node's
   // terminal output to a renderer that drops all but the active one's. Tagged with the node id rather
   // than wrapped in JSON, so what came off the node's socket is copied once and forwarded.
-  const pushBytes = (nodeId: string, frame: Uint8Array): void => {
-    if (addressed !== null && nodeId !== addressed) return
-    const tagged = encodeIdFrame(nodeId, frame)
-    if (!tagged) return // a node id this frame cannot spell; the renderer hears nothing rather than nonsense
-    for (const socket of sockets) send(socket, tagged)
+  const pushBytes = (nodeId: string, frame: Uint8Array, viewerId?: string): void => {
+    let tagged: Uint8Array | null | undefined
+    for (const [socket, owner] of connections) {
+      if (viewerId && owner.viewerId !== viewerId) continue
+      if (!owner.interestedIn(nodeId) || socket.readyState !== socket.OPEN) continue
+      tagged ??= encodeIdFrame(nodeId, frame)
+      if (!tagged) return // a node id this frame cannot spell; the renderer hears nothing rather than nonsense
+      send(socket, tagged)
+    }
   }
 
   // Bring a remembered node's connection up (or back up). Idempotent, so this doubles as the Reconnect
@@ -151,39 +145,29 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
   // fingerprint confirmation to be a step instead of a parameter the renderer could skip.
   let pending: Awaited<ReturnType<typeof probeNode>> | null = null
 
-  const handlers: Record<HelperMethod, (params: unknown) => unknown | Promise<unknown>> = {
+  const handlers: Record<HelperMethod, (params: unknown, owner: RendererConnection) => unknown | Promise<unknown>> = {
     'config-read': () => helper.config.read(),
     // DeviceConfigStore validates the merged document, including the schema's refinement. Zod
     // cannot derive .partial() from a refined object, so only assert the patch's wire shape here.
     'config-write': (raw) => helper.config.write(z.record(z.string(), z.unknown()).parse(raw) as Partial<DeviceConfig>),
     'config-location': () => helper.config.path,
     'renderer-pulse': () => undefined,
-    'node-fetch': async (raw) => {
+    'node-interest': (raw, owner) => {
+      const { nodeId } = z.strictObject({ nodeId: z.string().min(1).nullable() }).parse(raw)
+      owner.select(nodeId)
+    },
+    'node-fetch': async (raw, owner) => {
       const { nodeId, request } = z.object({ nodeId: z.string().min(1), request: z.unknown() }).parse(raw)
-      addressed = nodeId
       const parsed = nodeFetchRequestSchema.parse(toFetchRequest(request as WireFetchRequest))
-      try {
-        const response = await helper.broker.fetch(nodeId, parsed, { maxResponseBytes: parsed.maxResponseBytes })
-        return { status: response.status, headers: response.headers, body: encodeBytes(response.body) }
-      } catch (error) {
-        // A request the renderer itself cancelled is not a handler failure; 499 says the caller has
-        // already stopped caring. The broker renames its own timeout abort so the two stay apart.
-        if ((error as { name?: unknown } | null)?.name === 'AbortError') return { status: 499, headers: {}, body: '' }
-        throw error
-      }
+      return owner.fetch(nodeId, parsed)
     },
-    'node-abort': (raw) => {
+    'node-abort': (raw, owner) => {
       const { requestId } = z.object({ requestId: z.string().min(1) }).parse(raw)
-      helper.broker.abort(requestId)
+      owner.abort(requestId)
     },
-    'node-send': (raw) => {
-      const { nodeId, frame } = z.object({ nodeId: z.string().min(1), frame: z.unknown() }).parse(raw)
-      addressed = nodeId
-      // Structural check only: the frame vocabulary is a
-      // TypeScript union rather than a Zod schema, the node validates its own inbound frames, and all
-      // the helper needs to know is that this is a channel-tagged object it can forward.
-      if (!frame || typeof frame !== 'object' || typeof (frame as { channel?: unknown }).channel !== 'string') return
-      helper.broker.send(nodeId, frame as WsClientFrame)
+    'node-send': (raw, owner) => {
+      const { nodeId, frame, intent, cleanup } = z.strictObject({ nodeId: z.string().min(1), frame: wsFrameSchema, intent: wsSubscriptionIntentSchema.optional(), cleanup: z.boolean().optional() }).parse(raw)
+      owner.send(nodeId, frame, { ...(intent ? { intent } : {}), ...(cleanup === undefined ? {} : { cleanup }) })
     },
     // Membership from the fleet store, connection state from the broker: a node whose token could not
     // be remembered has no connection but must still be listed, or it can never be re-paired.
@@ -284,6 +268,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
           .catch((error: unknown) => log.warn(`could not revoke this device on ${nodeId}: ${describeError(error).message}`, { 'node.id': nodeId }))
       }
       helper.broker.remove(nodeId)
+      for (const owner of connections.values()) owner.forget(nodeId)
       helper.fleet.forget(nodeId)
       helper.pluginCache.forgetNode(nodeId)
       // A pipe to a node we have just stopped trusting must not outlive the pairing.
@@ -364,16 +349,21 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
   }
 
   const serve = async (socket: WebSocket, raw: unknown): Promise<void> => {
+    const owner = connections.get(socket)
+    if (!owner || owner.closed) return
     const request = raw as HelperRequest
     // No id, nothing to answer, so this is the only case that goes unanswered.
     if (!request || typeof request.id !== 'number') return
     const receivedAt = Date.now()
     const handlerFrom = performance.now()
-    const reply = (message: object): void => send(socket, JSON.stringify({
+    const reply = (message: object): void => {
+      if (owner.closed || socket.readyState !== socket.OPEN) return
+      send(socket, JSON.stringify({
       id: request.id,
       ...message,
       timing: { receivedAt, repliedAt: Date.now(), handlerMs: performance.now() - handlerFrom },
-    }))
+      }))
+    }
     // `hasOwn`, not `in`: `method` came off the wire, and `in` would happily resolve `toString` off
     // the prototype and call it with whatever params came with it.
     if (!Object.hasOwn(handlers, request.method)) {
@@ -383,7 +373,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
     }
     try {
       if (request.method === 'renderer-pulse') watchdogs.get(socket)?.receive(request.params)
-      reply({ ok: true, value: (await handlers[request.method](request.params)) ?? null })
+      reply({ ok: true, value: (await handlers[request.method](request.params, owner)) ?? null })
     } catch (error) {
       reply({ ok: false, error: error instanceof Error ? error.message : String(error) })
     }
@@ -406,10 +396,11 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
       }
       wss.handleUpgrade(request, socket, head, (ws) => {
         sockets.add(ws)
+        connections.set(ws, new RendererConnection(helper.broker))
         watchdogs.set(ws, createRendererWatchdog())
-        const cleanup = (): void => { sockets.delete(ws); watchdogs.delete(ws) }
+        const cleanup = (): void => { connections.get(ws)?.close(); connections.delete(ws); sockets.delete(ws); watchdogs.delete(ws) }
         ws.on('close', cleanup)
-        ws.on('error', () => watchdogs.delete(ws))
+        ws.on('error', cleanup)
         socket.off('error', onPeerError)
         ws.on('message', (data) => {
           let parsed: unknown
@@ -443,6 +434,7 @@ export function startHelperServer(helper: Helper, options: { secret: string; app
         pushBytes,
         close: () =>
           new Promise<void>((done) => {
+            for (const owner of connections.values()) owner.close()
             for (const socket of wss.clients) socket.terminate()
             wss.close()
             ;(http as Server).close(() => done())

@@ -272,7 +272,9 @@ A loaded plugin's server code runs in a dedicated permission-scoped worker realm
 `permissions.node` block shapes the owner-bound context sent over RPC and the worker's network and
 child-process grants. The worker can read its package and, when it owns migrations, its exact SQLite
 files; it cannot directly load `node:sqlite`, open core or peer databases, create raw sockets, load
-native addons, or start nested workers.
+native addons, or start nested workers. The RPC transport is imported when the async isolation
+factory creates the first external Node plugin, before it acquires a worker; bundled-only startup
+does not evaluate that transport.
 
 Every surface renders those host and runtime grants as *enforced*. Plugin-authored schedule and task
 check behavior stays *declared*: acorn controls when and where it executes, but cannot verify intent.

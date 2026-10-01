@@ -149,7 +149,9 @@ export default function Markdown(props: {
       // Caught per fence: a grammar that fails to load leaves that block plain rather than taking the
       // rest of the message's colour with it, and an unhandled rejection here reaches the host.
       const pending = fences.map((fence) =>
-        highlightToHtml(fence.code.textContent ?? '', fence.grammar).catch(() => null))
+        fence.block.live
+          ? highlightToHtml(fence.code.textContent ?? '', fence.grammar, () => fence.block.live).catch(() => null)
+          : Promise.resolve(null))
       for (const [at, { wrap, block }] of fences.entries()) {
         const html = await pending[at]
         if (!html || !block.live) continue

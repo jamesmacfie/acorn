@@ -4,7 +4,7 @@ import { pluginAgentToolGrants, pluginContextSectionGrants, pluginCustomAgentGra
 import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
 import { readPluginManifest, readPluginFile, MAX_CLIENT_BUNDLE_BYTES } from '@acorn/node-core/server/plugins'
 import type { PluginCache } from './pluginCache'
-import type { PluginTrustStore } from './pluginTrustStore'
+import type { PluginAck, PluginTrustStore } from './pluginTrustStore'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 
 const log = createLogger('plugins')
@@ -47,37 +47,62 @@ export function trustBundledClientPlugins(
   cache: PluginCache,
   trust: PluginTrustStore,
 ): string[] {
-  const accepted: string[] = []
+  const packages = new Map<string, { manifest: NonNullable<ReturnType<typeof readPluginManifest>>; dir: string }>()
   for (const id of packageDirectories(bundledRoot)) {
     const dir = join(bundledRoot, id)
     const manifest = readPluginManifest(dir)
     if (!manifest || manifest.id !== id || !manifest.client) continue
-    try {
-      const hash = cache.putBundled(id, manifest.version, readPluginFile(dir, manifest.client, MAX_CLIENT_BUNDLE_BYTES))
-      trust.record({
-        pluginId: id,
-        hash,
-        nodeId: `bundled:acorn-${appVersion}`,
-        version: manifest.version,
-        declaration: clientDeclaration(manifest),
-        permissions: manifest.permissions,
-        webviews: pluginWebviewGrants(manifest.contributions),
-        keyClaims: pluginKeyClaimGrants(manifest.contributions),
-        navigationDestinations: pluginNavigationDestinationGrants(manifest.contributions),
-        extensions: pluginExtensionGrants(id, manifest.contributions),
-        schedules: pluginScheduleGrants(manifest.contributions),
-        taskChecks: pluginTaskCheckGrants(manifest.contributions),
-        harnesses: pluginHarnessGrants(manifest.contributions),
-        agentTools: pluginAgentToolGrants(manifest.contributions),
-        contextSections: pluginContextSectionGrants(manifest.contributions),
-        customAgents: pluginCustomAgentGrants(manifest.contributions),
-        decision: 'accepted',
-        decidedAt: Date.now(),
-      })
-      accepted.push(id)
-    } catch (error) {
-      log.error(`bundled client for ${id} could not be trusted: ${describeError(error).message}`, { 'plugin.id': id })
-    }
+    packages.set(id, { manifest, dir })
   }
-  return accepted
+  if (!packages.size) return []
+  try {
+    const cached = cache.putBundledBatch(Array.from(packages, ([pluginId, { manifest, dir }]) => ({
+      pluginId, version: manifest.version, read: () => readPluginFile(dir, manifest.client!, MAX_CLIENT_BUNDLE_BYTES),
+    })))
+    const acks: PluginAck[] = []
+    for (const result of cached) {
+      const id = result.pluginId
+      if ('error' in result) {
+        log.error(`bundled client for ${id} could not be trusted: ${describeError(result.error).message}`, { 'plugin.id': id })
+        continue
+      }
+      try {
+        const { manifest } = packages.get(id)!
+        acks.push({
+          pluginId: id,
+          hash: result.hash,
+          nodeId: `bundled:acorn-${appVersion}`,
+          version: manifest.version,
+          declaration: clientDeclaration(manifest),
+          permissions: manifest.permissions,
+          webviews: pluginWebviewGrants(manifest.contributions),
+          keyClaims: pluginKeyClaimGrants(manifest.contributions),
+          navigationDestinations: pluginNavigationDestinationGrants(manifest.contributions),
+          extensions: pluginExtensionGrants(id, manifest.contributions),
+          schedules: pluginScheduleGrants(manifest.contributions),
+          taskChecks: pluginTaskCheckGrants(manifest.contributions),
+          harnesses: pluginHarnessGrants(manifest.contributions),
+          agentTools: pluginAgentToolGrants(manifest.contributions),
+          contextSections: pluginContextSectionGrants(manifest.contributions),
+          customAgents: pluginCustomAgentGrants(manifest.contributions),
+          decision: 'accepted',
+          decidedAt: Date.now(),
+        })
+      } catch (error) {
+        log.error(`bundled client for ${id} could not be trusted: ${describeError(error).message}`, { 'plugin.id': id })
+      }
+    }
+    const accepted: string[] = []
+    for (const result of trust.recordBatch(acks)) {
+      if ('error' in result) {
+        log.error(`bundled client for ${result.ack.pluginId} could not be trusted: ${describeError(result.error).message}`, { 'plugin.id': result.ack.pluginId })
+      } else accepted.push(result.ack.pluginId)
+    }
+    return accepted
+  } catch (error) {
+    // Neither store publishes changed rows before its atomic commit succeeds. A pass with a failed
+    // commit can retry on the next launch without acknowledging an uncommitted cache entry.
+    log.error(`bundled client metadata could not be committed: ${describeError(error).message}`)
+    return []
+  }
 }

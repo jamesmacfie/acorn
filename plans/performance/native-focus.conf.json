@@ -1,0 +1,29 @@
+{
+  "productName": "Acorn Performance Automation",
+  "identifier": "com.acorn.performance.automation",
+  "build": {
+    "beforeBuildCommand": ""
+  },
+  "app": {
+    "security": {
+      "capabilities": [
+        "default",
+        {
+          "identifier": "performance-main-window-activation",
+          "description": "Allows the isolated performance automation driver to show and focus its own main window.",
+          "webviews": ["main"],
+          "permissions": [
+            "core:window:allow-show",
+            "core:window:allow-unminimize",
+            "core:window:allow-set-focus",
+            "core:app:allow-app-show"
+          ]
+        }
+      ]
+    }
+  },
+  "bundle": {
+    "targets": ["app"],
+    "createUpdaterArtifacts": false
+  }
+}

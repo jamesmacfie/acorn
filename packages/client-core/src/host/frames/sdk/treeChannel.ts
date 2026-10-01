@@ -91,10 +91,10 @@ type MountedSlot = {
   dispose: (() => void)[]
   /** Host requests this slot is waiting on, by request id (`TreeMount.host`). */
   pending: Map<number, Pending>
-  bridgePort: MessagePort
+  bridgePort: MessagePort | null
 }
 
-export function runTreeChannel(port: MessagePort, renderers: Record<string, TreeRender>): void {
+export function runTreeChannel(port: MessagePort, renderers: Record<string, TreeRender>, fallbackBridge?: AcornBridge): void {
   const slots = new Map<string, MountedSlot>()
   // One sequence for the whole channel, and a pending map per slot. The host quotes the id back beside
   // the slot it arrived on, so two trees can have a request in flight under the same number and neither
@@ -114,35 +114,40 @@ export function runTreeChannel(port: MessagePort, renderers: Record<string, Tree
     for (const dispose of slot.dispose) {
       try { dispose() } catch (error) { console.error('[acorn] tree teardown threw:', error) }
     }
+    slot.onProps.length = 0
+    slot.dispose.length = 0
     slot.root.dispose()
-    disposeBridgePort(slot.bridgePort)
+    if (slot.bridgePort) disposeBridgePort(slot.bridgePort)
   }
 
-  const ask = <T>(slotId: string, op: 'owner.invoke' | 'overlay.open', name: string, payload: unknown): Promise<T> =>
+  const ask = <T>(slotId: string, expected: MountedSlot, op: 'owner.invoke' | 'overlay.open', name: string, payload: unknown): Promise<T> =>
     new Promise<T>((resolve, reject) => {
       const slot = slots.get(slotId)
-      if (!slot) {
+      if (!slot || slot !== expected) {
         reject(new AcornBridgeError({ code: 'unmounted', message: 'this tree is not mounted', retryable: false, requestId: '' }))
         return
       }
       const id = ++requestSeq
       slot.pending.set(id, { resolve: resolve as (value: unknown) => void, reject })
-      port.postMessage({ kind: 'tree:host-request', slot: slotId, id, op, name, ...(payload === undefined ? {} : { payload }) })
+      try { port.postMessage({ kind: 'tree:host-request', slot: slotId, id, op, name, ...(payload === undefined ? {} : { payload }) }) }
+      catch (error) { slot.pending.delete(id); reject(error) }
     })
 
   const mount = (id: string, entry: string, props: unknown, bridgePort?: MessagePort): void => {
     const existing = slots.get(id)
     if (existing) {
+      bridgePort?.close()
       existing.props = props
       for (const listener of existing.onProps) listener(props)
       return
     }
     const render = renderers[entry]
     if (!render) {
+      bridgePort?.close()
       port.postMessage({ kind: 'tree:failed', slot: id, message: `no renderer named '${entry}'` })
       return
     }
-    if (!bridgePort || typeof bridgePort.postMessage !== 'function') {
+    if ((!bridgePort || typeof bridgePort.postMessage !== 'function') && fallbackBridge?.treeBridgeMode !== 'legacy') {
       port.postMessage({ kind: 'tree:failed', slot: id, message: 'this tree has no scoped bridge' })
       return
     }
@@ -169,10 +174,11 @@ export function runTreeChannel(port: MessagePort, renderers: Record<string, Tree
       onProps: [],
       dispose: [],
       pending: new Map(),
-      bridgePort,
+      bridgePort: bridgePort ?? null,
     }
     slots.set(id, slot)
-    void attach(bridgePort).then((bridge) => {
+    const mountedBridge = bridgePort ? attach(bridgePort, { mode: 'mount' }) : Promise.resolve(fallbackBridge!)
+    void mountedBridge.then((bridge) => {
       if (slots.get(id) !== slot) return
       try {
         render(bridge, {
@@ -182,8 +188,8 @@ export function runTreeChannel(port: MessagePort, renderers: Record<string, Tree
           onProps: (listener) => slot.onProps.push(listener),
           onUnmount: (dispose) => slot.dispose.push(dispose),
           host: {
-            invoke: <TResult,>(action: string, payload?: unknown) => ask<TResult>(id, 'owner.invoke', action, payload),
-            openOverlay: <TResult,>(overlayId: string, input?: unknown) => ask<TResult | null>(id, 'overlay.open', overlayId, input),
+            invoke: <TResult,>(action: string, payload?: unknown) => ask<TResult>(id, slot, 'owner.invoke', action, payload),
+            openOverlay: <TResult,>(overlayId: string, input?: unknown) => ask<TResult | null>(id, slot, 'overlay.open', overlayId, input),
           },
         })
       } catch (error: unknown) {
@@ -202,7 +208,7 @@ export function runTreeChannel(port: MessagePort, renderers: Record<string, Tree
     if (!message || typeof message !== 'object') return
     switch (message.kind) {
       case 'tree:mount':
-        if (typeof message.slot === 'string' && typeof message.entry === 'string') mount(message.slot, message.entry, message.props, message.bridgePort)
+        if (typeof message.slot === 'string' && typeof message.entry === 'string') mount(message.slot, message.entry, message.props, message.bridgePort ?? event.ports?.[0])
         return
       case 'tree:unmount':
         if (typeof message.slot === 'string') drop(message.slot)

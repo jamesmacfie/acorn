@@ -1,0 +1,52 @@
+{
+  "benchmark": "remoteRoot handler ownership",
+  "node": "v24.11.0",
+  "cases": [
+    {
+      "mode": "removed-node",
+      "checkpoints": [
+        {
+          "changes": 1000,
+          "retainedSyntheticPayloads": 1000,
+          "heapGrowthBytes": 4599144
+        },
+        {
+          "changes": 5000,
+          "retainedSyntheticPayloads": 5000,
+          "heapGrowthBytes": 22685312
+        },
+        {
+          "changes": 10000,
+          "retainedSyntheticPayloads": 10000,
+          "heapGrowthBytes": 45089792
+        }
+      ],
+      "oldHandlerStillDispatches": true,
+      "retainedPayloadsAfterDispose": 0,
+      "heapGrowthBytesAfterDispose": 855616
+    },
+    {
+      "mode": "replaced-handler",
+      "checkpoints": [
+        {
+          "changes": 1000,
+          "retainedSyntheticPayloads": 1000,
+          "heapGrowthBytes": 4473856
+        },
+        {
+          "changes": 5000,
+          "retainedSyntheticPayloads": 5000,
+          "heapGrowthBytes": 22588088
+        },
+        {
+          "changes": 10000,
+          "retainedSyntheticPayloads": 10000,
+          "heapGrowthBytes": 44941768
+        }
+      ],
+      "oldHandlerStillDispatches": true,
+      "retainedPayloadsAfterDispose": 0,
+      "heapGrowthBytesAfterDispose": 748976
+    }
+  ]
+}

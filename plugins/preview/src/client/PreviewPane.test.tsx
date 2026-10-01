@@ -14,9 +14,18 @@ const views = vi.hoisted(() => ({
   onEvent: vi.fn((_listener: (state: object) => void) => () => {}),
 }))
 
+const page = vi.hoisted(() => ({ update: undefined as ((rect: { x: number; y: number; width: number; height: number }, covered: boolean) => void) | undefined }))
+
+const coverPage = (covered: boolean) => page.update?.({ x: 0, y: 0, width: 300, height: 200 }, covered)
+
 vi.mock('@acorn/plugin-api/client', () => ({
   elementRectKey: () => '0:0:300:200',
   previewViews: () => views,
+  observeNativePage: (_element: HTMLElement, update: (rect: { x: number; y: number; width: number; height: number }, covered: boolean) => void) => {
+    page.update = update
+    update({ x: 0, y: 0, width: 300, height: 200 }, false)
+    return () => { page.update = undefined }
+  },
   visibleElementRect: () => ({ x: 0, y: 0, width: 300, height: 200 }),
 }))
 
@@ -84,22 +93,17 @@ it('restores toolbar state after subscribing without waiting for page navigation
 
 it('does not retry failed ensures during overlay visibility changes and offers an explicit retry', async () => {
   views.ensure.mockResolvedValue(false)
-  vi.useFakeTimers()
-  try {
     dispose = render(() => <PreviewPane taskId="task-1" url="http://localhost:5173" remoteBlocked={false} />, host)
     await settled()
     expect(host.textContent).toContain('Could not open the preview')
-    document.elementFromPoint = () => document.body
-    vi.advanceTimersByTime(200)
-    document.elementFromPoint = () => host.querySelector('.ui-rect-mount')
-    vi.advanceTimersByTime(200)
+    coverPage(true)
+    coverPage(false)
     expect(views.ensure).toHaveBeenCalledOnce()
     views.ensure.mockResolvedValue(true)
     Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'Retry preview')!.click()
     await settled()
     expect(views.ensure).toHaveBeenCalledTimes(2)
     expect(host.textContent).not.toContain('Could not open the preview')
-  } finally { vi.useRealTimers() }
 })
 
 it('hides only the disposed task and rejects a late ensure completion', async () => {
@@ -147,19 +151,14 @@ it('accepts only the latest target completion when the configured port changes',
 })
 
 it('defers a changed configured home until the overlay uncovers the pane', async () => {
-  vi.useFakeTimers()
-  try {
     const [url, setUrl] = createSignal('http://localhost:5173')
     dispose = render(() => <PreviewPane taskId="task-1" url={url()} remoteBlocked={false} />, host)
     await settled()
-    document.elementFromPoint = () => document.body
-    vi.advanceTimersByTime(200)
+    coverPage(true)
     setUrl('http://localhost:5174')
     expect(views.ensure).toHaveBeenCalledOnce()
-    document.elementFromPoint = () => host.querySelector('.ui-rect-mount')
-    vi.advanceTimersByTime(200)
+    coverPage(false)
     await settled()
     expect(views.ensure).toHaveBeenCalledTimes(2)
     expect(views.ensure).toHaveBeenLastCalledWith('task-1', 'http://localhost:5174')
-  } finally { vi.useRealTimers() }
 })

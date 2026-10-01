@@ -56,6 +56,8 @@ export type CollectionIntentOptions = {
 
 export type CollectionIntents = {
   active: () => string | null
+  /** Resolve against a single operation's enabled snapshot. */
+  activeIn?: (list: readonly CollectionItem[]) => string | null
   selected: () => string | null
   /** Every item that is not disabled, in order. */
   enabled: () => readonly CollectionItem[]
@@ -68,7 +70,6 @@ export type CollectionIntents = {
 export function createCollectionIntents(options: CollectionIntentOptions): CollectionIntents {
   const horizontal = () => options.orientation === 'horizontal'
   const enabled = () => options.items().filter((item) => !item.disabled)
-  const has = (key: string | null | undefined) => !!key && enabled().some((item) => item.key === key)
 
   const selected = (): string | null =>
     options.selected ? options.selected() ?? null : collectionState(options.id()).selected
@@ -76,12 +77,15 @@ export function createCollectionIntents(options: CollectionIntentOptions): Colle
   // The stored place, then whatever is picked, then the top. Falling back to the selection is what
   // makes the first arrow press mean "the next one" rather than "the second one", which is what a
   // native select does and what a tab strip has to do to keep its one tab stop on the open tab.
-  const active = (): string | null => {
+  const activeIn = (list: readonly CollectionItem[]): string | null => {
+    const has = (key: string | null | undefined) => !!key && list.some((item) => item.key === key)
     const stored = collectionState(options.id()).active
     if (has(stored)) return stored
     const picked = selected()
-    return has(picked) ? picked : enabled()[0]?.key ?? null
+    return has(picked) ? picked : list[0]?.key ?? null
   }
+
+  const active = () => activeIn(enabled())
 
   const pick = (key: string) => {
     if (!options.selected) setSelectedItem(options.id(), key)
@@ -99,7 +103,8 @@ export function createCollectionIntents(options: CollectionIntentOptions): Colle
     const list = enabled()
     if (!list.length) return false
     if (absolute) return goTo(absolute === 'first' ? list[0].key : list[list.length - 1].key)
-    const at = list.findIndex((item) => item.key === active())
+    const current = activeIn(list)
+    const at = list.findIndex((item) => item.key === current)
     // Wraps, because a list you cannot fall off the end of is a list you never have to look at.
     return goTo(list[(((at < 0 ? 0 : at) + delta) + list.length) % list.length].key)
   }
@@ -119,14 +124,14 @@ export function createCollectionIntents(options: CollectionIntentOptions): Colle
   const page = (delta: number): boolean => {
     const list = enabled()
     if (!list.length) return false
-    const at = list.findIndex((item) => item.key === active())
+    const current = activeIn(list)
+    const at = list.findIndex((item) => item.key === current)
     const to = Math.min(Math.max((at < 0 ? 0 : at) + delta, 0), list.length - 1)
     if (to === at) return false
     return goTo(list[to].key)
   }
 
   const handle = (intent: Intent): boolean => {
-    const current = active()
     switch (intent) {
       case 'next': return move(1)
       case 'prev': return move(-1)
@@ -139,28 +144,36 @@ export function createCollectionIntents(options: CollectionIntentOptions): Colle
       // says `false` gets its key back, which is how Right on a leaf reaches the tier that crosses a
       // column instead of being swallowed by a fold that did not happen
       // (docs/tui.md § The five key groups).
-      case 'expand':
+      case 'expand': {
         if (horizontal()) return move(1)
+        const current = active()
         if (!current || !options.onExpand) return false
         return options.onExpand(current, true) ?? true
-      case 'collapse':
+      }
+      case 'collapse': {
         if (horizontal()) return move(-1)
+        const current = active()
         if (!current || !options.onExpand) return false
         return options.onExpand(current, false) ?? true
-      case 'activate':
+      }
+      case 'activate': {
+        const current = active()
         if (!current || !options.onItem(current)) return false
         pick(current)
         options.onActivate?.(current)
         return true
-      case 'menu':
+      }
+      case 'menu': {
+        const current = active()
         if (!current || !options.onItem(current) || !options.onMenu) return false
         options.onMenu(current)
         return true
+      }
       default: return false
     }
   }
 
-  return { active, selected, enabled, goTo, move, handle }
+  return { active, activeIn, selected, enabled, goTo, move, handle }
 }
 
 /**
@@ -171,7 +184,7 @@ export function createCollectionIntents(options: CollectionIntentOptions): Colle
  * enumerate that — so it is a function each host calls from its own raw key path.
  */
 export function createTypeAhead(
-  collection: Pick<CollectionIntents, 'active' | 'enabled' | 'goTo'>,
+  collection: Pick<CollectionIntents, 'active' | 'activeIn' | 'enabled' | 'goTo'>,
   resetMs = 700,
 ): (character: string) => boolean {
   let typed = ''
@@ -180,9 +193,11 @@ export function createTypeAhead(
     const now = Date.now()
     typed = now - typedAt > resetMs ? character : typed + character
     typedAt = now
-    const list = collection.enabled().filter((item) => item.label)
+    const enabled = collection.enabled()
+    const list = enabled.filter((item) => item.label)
     if (!list.length) return false
-    const at = list.findIndex((item) => item.key === collection.active())
+    const current = collection.activeIn ? collection.activeIn(enabled) : collection.active()
+    const at = list.findIndex((item) => item.key === current)
     const rotated = [...list.slice(at + 1), ...list.slice(0, at + 1)]
     const match = rotated.find((item) => item.label!.toLowerCase().startsWith(typed.toLowerCase()))
     return match ? collection.goTo(match.key) : false

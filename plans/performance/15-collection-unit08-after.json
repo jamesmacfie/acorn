@@ -1,0 +1,101 @@
+{
+  "fixture": "Actual shared collectionIntents; synthetic stable list, disabled getter counts full enabled scans; near-tail next/page/type-ahead",
+  "cases": [
+    {
+      "count": 100,
+      "next": {
+        "disabledReads": 100,
+        "cpuMs": 0.219,
+        "wallMs": 0.21341699999999264
+      },
+      "page": {
+        "disabledReads": 100,
+        "cpuMs": 0.06,
+        "wallMs": 0.059291999999999234
+      },
+      "type": {
+        "disabledReads": 100,
+        "cpuMs": 0.09,
+        "wallMs": 0.09054199999999923
+      },
+      "plainItems": {
+        "next": {
+          "cpuMs": 0.061,
+          "wallMs": 0.042374999999992724
+        },
+        "page": {
+          "cpuMs": 0.034,
+          "wallMs": 0.03299999999998704
+        },
+        "type": {
+          "cpuMs": 0.039,
+          "wallMs": 0.04012500000001751
+        }
+      }
+    },
+    {
+      "count": 1000,
+      "next": {
+        "disabledReads": 1000,
+        "cpuMs": 0.23,
+        "wallMs": 0.16191700000001674
+      },
+      "page": {
+        "disabledReads": 1000,
+        "cpuMs": 0.144,
+        "wallMs": 0.08675000000002342
+      },
+      "type": {
+        "disabledReads": 1000,
+        "cpuMs": 0.34,
+        "wallMs": 0.16595799999998917
+      },
+      "plainItems": {
+        "next": {
+          "cpuMs": 0.108,
+          "wallMs": 0.053832999999997355
+        },
+        "page": {
+          "cpuMs": 0.043,
+          "wallMs": 0.0418340000000228
+        },
+        "type": {
+          "cpuMs": 0.281,
+          "wallMs": 0.09416699999999878
+        }
+      }
+    },
+    {
+      "count": 5000,
+      "next": {
+        "disabledReads": 5000,
+        "cpuMs": 0.35,
+        "wallMs": 0.3473340000000178
+      },
+      "page": {
+        "disabledReads": 5000,
+        "cpuMs": 0.819,
+        "wallMs": 0.3083750000000123
+      },
+      "type": {
+        "disabledReads": 5000,
+        "cpuMs": 0.548,
+        "wallMs": 0.5465839999999957
+      },
+      "plainItems": {
+        "next": {
+          "cpuMs": 0.198,
+          "wallMs": 0.19695799999999508
+        },
+        "page": {
+          "cpuMs": 0.188,
+          "wallMs": 0.18637499999999818
+        },
+        "type": {
+          "cpuMs": 0.939,
+          "wallMs": 0.3497920000000079
+        }
+      }
+    }
+  ]
+}

@@ -5,12 +5,11 @@ available to the renderer and to task-scoped MCP tools.
 
 ## Notes
 
-Notes are Markdown content at task, workspace, and global scope. The notes plugin owns revisions,
-CRUD, context projection, agent read/append tools, and import/export. The Node stores each note as a
+Notes are Markdown content at task, workspace, and global scope. The notes plugin owns CRUD, context projection, agent read/append tools, and import/export. The Node stores each note as a
 plain file with YAML-ish frontmatter at `<data-root>/notes/<workspaceId>/<slug>.md` (task notes get a
 reserved workspace key), so an owner can read or edit one by hand. Writes are atomic, temp file then
-rename, so a crash never leaves a partial note. Notes has no SQLite file; autosave sends an expected
-revision and surfaces a conflict rather than overwriting a newer edit.
+rename, so a crash never leaves a partial note. Notes has no SQLite file or expected-revision HTTP contract. Concurrent external writers can
+replace content; atomic rename protects file integrity, not cross-client conflict detection.
 
 The HTTP surface is `/v1/p/notes/tasks/:id/notes` and
 `/v1/p/notes/workspaces/:wsId/notes` (including their read/write, title, inclusion, and delete
@@ -18,10 +17,33 @@ subroutes). Workspace and global notes require a device principal; a task-scoped
 can reach only its own task notes.
 
 The Notes pane provides a task-first scratchpad, scope navigation, include-in-context controls,
-debounced saves, conflict recovery, and Markdown import/export. A task's scratchpad starts virtual,
+debounced saves, failed-edit recovery, and Markdown import/export. A task's scratchpad starts virtual,
 nothing is written until the first keystroke, and the library groups notes by scope with agent and
 seeded notes badged in place. Notes written by an agent are attributed to the task/session and still
-follow the same revision rules.
+use the same file store.
+
+
+A model captures its QueryClient's originating Node once, including explicit null for a serving
+origin. Lists, workspace lookup, reads, scratch creation, and every mutation keep that target.
+Selection memory is keyed by Node and task. Held reads and creation results publish only into the
+still-current selection; focus and refresh callbacks stop at retirement. Scratch creation may finish
+and save the originating document after retirement without selecting it in a new view.
+
+`noteDrafts.ts` owns body/title recovery by Node, full scope address, and slug. Saves serialize with
+title, inclusion, and deletion operations on the same document; repeated save requests coalesce into
+one active write operation and a latest dirty follow-up. Each acknowledgement clears only the local
+edit revision it sent. These revisions are client bookkeeping and are not server conflict tokens.
+Body and title debounces both flush before navigation and on model retirement. Edits made while a
+navigation read is held flush again before its successful selection is published; failed reads keep
+the prior editable document.
+
+Dirty text is immediately owned in memory with no size or draft-count cap. Device recovery writes
+batch at 250 ms and flush on navigation, retirement, write acknowledgement, or failure. Abrupt process
+loss can lose the unflushed interval. Blocked/quota-exhausted device storage retains the in-memory
+copy for this renderer, but cannot provide restart recovery. Returning to the document overlays its
+unacknowledged body/title and reports the saved error. There is no background offline replay; a new
+edit or explicit save retries against that same Node. Clean owners leave the recovery map when their
+view and queued operations release them.
 
 Four `notes_*` agent tools (list, read, write, append) let an agent read and log notes without going
 through the HTTP surface a device principal uses. Every write through these tools is stamped

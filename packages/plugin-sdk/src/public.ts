@@ -4,6 +4,9 @@
 /** What this frame was opened to look at. A snapshot, not reactive: the host recreates a frame when
  * its subject changes, so nothing here updates in place. */
 export type PluginFrameContext = {
+  /** Opaque host-owned equivalent model/grant affinity; excludes the opening item. Not a credential. */
+  authority?: string
+
   /** The contribution id this frame is rendering, as declared in the manifest. */
   surface: string
   /** Which kind of surface this is. It grants nothing (the bridge's allowlist is keyed on the
@@ -44,6 +47,8 @@ export declare class AcornBridgeError extends Error {
 /** The whole surface a sandboxed frame has. There is no second door: no `window.acorn`, no network
  * (`connect-src 'none'`), no host DOM. */
 export type AcornBridge = {
+  /** Tree authority mode; absent on frame bridges and SDKs predating this field. */
+  readonly treeBridgeMode?: 'mount' | 'legacy' | 'bootstrap'
   /** What this frame was opened to look at. Throws if read before `connect()` resolves. */
   readonly context: PluginFrameContext
   /** Five JSON methods and two byte methods, matching what the host's route table accepts. Your own

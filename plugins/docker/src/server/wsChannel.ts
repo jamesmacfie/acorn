@@ -7,8 +7,8 @@ import type { CompiledPluginBroadcast } from '@acorn/plugin-api/node'
 import { isDockerRef } from '../shared/model'
 import { parseDockerFrame } from './wsFramePolicy'
 import { dockerEnv } from './cli'
-import { parseStatsLine } from './parse'
 import { getDockerService } from './dockerService'
+import { SharedDockerStreams } from './sharedStreams'
 
 type StreamKey = string // `${kind}:${ref}`
 const MAX_EXECS_PER_CONN = 8
@@ -21,6 +21,7 @@ const EXEC_SHELL = 'command -v bash >/dev/null && exec bash || exec sh'
 // on a re-init.
 export function registerDockerWsChannel(events: CompiledPluginBroadcast): void {
   const service = getDockerService(events.send)
+  const shared = new SharedDockerStreams(service)
   const streamSubs = new Map<object, Map<StreamKey, { stop(): void }>>()
   const execSubs = new Map<object, Map<string, IPty>>()
 
@@ -52,23 +53,24 @@ export function registerDockerWsChannel(events: CompiledPluginBroadcast): void {
             if (frame.channel.endsWith(':detach')) {
               mine.get(key)?.stop()
               mine.delete(key)
+              if (!mine.size) streamSubs.delete(conn)
               return
             }
             if (mine.has(key)) return // attach is idempotent per connection
-            const handle = service.openStream(
+            let handle: ReturnType<SharedDockerStreams['attach']>
+            try { handle = shared.attach(
               kind,
               id,
-              (line) => {
-                if (kind === 'logs') return send({ channel: 'docker:log', id, data: line })
-                const sample = parseStatsLine(line)
-                if (sample) send({ channel: 'docker:stats', id, sample })
-              },
+              send,
               () => {
                 mine.delete(key)
-                send({ channel: 'docker:stream-end', id, kind })
+                if (!mine.size) streamSubs.delete(conn)
               },
-            )
-            mine.set(key, handle)
+            ) } catch (error) {
+              if (!mine.size) streamSubs.delete(conn)
+              throw error
+            }
+            if (handle.active) mine.set(key, handle)
             return
           }
           case 'docker:exec:open': {
@@ -111,8 +113,7 @@ export function registerDockerWsChannel(events: CompiledPluginBroadcast): void {
             return
         }
       } catch {
-        // A PTY may exit between lookup and write/resize/kill. A native race belongs to this
-        // connection; disconnect still attempts every remaining resource independently.
+        // A PTY may exit between lookup and operation; disconnect still retires each owner.
         return
       }
     },

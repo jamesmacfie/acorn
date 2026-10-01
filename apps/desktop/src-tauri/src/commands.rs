@@ -205,7 +205,7 @@ pub fn set_badge(app: AppHandle, count: Option<i64>) {
 /// implement, and the window layer is the one that matters here.
 #[tauri::command]
 pub fn set_window_background(app: AppHandle, red: u8, green: u8, blue: u8) {
-    if let Some(window) = app.get_webview_window("main") {
+    if let Some(window) = app.get_window("main") {
         let _ = window.set_background_color(Some(tauri::webview::Color(red, green, blue, 0xff)));
     }
 }

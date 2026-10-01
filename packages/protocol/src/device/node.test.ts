@@ -37,6 +37,18 @@ describe('the handshake tolerates a newer node', () => {
     expect(parsed.success).toBe(true)
   })
 
+  it.each([null, 'unknown', { viewers: '1' }, { viewers: -1 }, { viewers: 1.5 }])('ignores malformed optional event transport without changing identity (%j)', (eventTransport) => {
+    const parsed = nodeInfoSchema.parse({ baseline: 'acorn-1', protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: FINGERPRINT, eventTransport })
+    expect(parsed.eventTransport).toBeUndefined()
+    expect(parsed.protocolVersion).toBe(NODE_PROTOCOL_VERSION)
+    expect(parsed.fingerprint).toBe(FINGERPRINT)
+  })
+
+  it('tolerates a later event feature version without making it version 1', () => {
+    const parsed = nodeInfoSchema.parse({ baseline: 'acorn-1', protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: FINGERPRINT, eventTransport: { viewers: 2, future: true } })
+    expect(parsed.eventTransport?.viewers).toBe(2)
+  })
+
   it('still refuses a body that is missing what pairing actually needs', () => {
     // Tolerant of additions is not tolerant of anything: `fingerprint` is the identity a client pins
     // against, and an absent pin is the one thing that must never parse into a usable value.

@@ -1,0 +1,12 @@
+{
+  "fixture": "Actual EditorPane under universal terminal kit, one remembered 1.5M-character file, no graphical EditorView or PTY launched",
+  "reads": 1,
+  "markerReads": 1,
+  "pooledFiles": 1,
+  "savedDocuments": 1,
+  "characters": 1500000,
+  "terminalFrame": "[Files]  Search                 │   remembered.txt ×        [ ] $EDITOR  → agent\n                                 ┌─Editor──────────────────────────────────────┐\n                                 │the file opens here                          │\n                                 │                                             │\n                                 │                                             │\n                                 │                                             │\n                                 │                                             │\n                                 │                                             │\n                                 │                                             │\n                                 │                                             │\n                                 │                                             │\n                                 │                                             │\n                                 │                                             │\n                                 │                                             │\n                                 │                                             │\n                                 │                                             │\n                                 │                                             │\n                                 │                                             │\n                                 │                                             │\n                                 │                                             │\n                                 │                                             │\n                                 │                                             │\n                                 │                                             │\n                                 └─────────────────────────────────────────────┘\n",
+  "wallMs": 49.90108299999997,
+  "cpuMs": 39.881,
+  "pooledFilesAfterUnmount": 1
+}

@@ -1,0 +1,268 @@
+{
+  "unit": "06",
+  "sourceFrozenAt": "2026-10-01",
+  "productionSources": [
+    {
+      "path": "apps/tui/src/plugins/RemoteTree.tsx",
+      "sha256": "e87ff71d715f436c8bfc83fc3a1bb9f536e6e027982f8894909fa3239839a6bc",
+      "bytes": 9640
+    },
+    {
+      "path": "apps/tui/src/plugins/pluginWorker.js",
+      "sha256": "de4c5f1711a666726b2fd399a7cbc033055b61fa38d3ea05430f32aa54e98291",
+      "bytes": 5509
+    },
+    {
+      "path": "apps/tui/src/plugins/workerFactory.ts",
+      "sha256": "618eb74b2822bdfa1e771a4e08f53d1a5773864cc667db9bab6ec7b259dcc836",
+      "bytes": 7462
+    },
+    {
+      "path": "packages/client-core/src/host/chrome/chromeRegister.ts",
+      "sha256": "b1b17debacd73978d1540a34ca16ff0726fb9a64e9c6357dbd09b6dc1b9c2b0c",
+      "bytes": 28467
+    },
+    {
+      "path": "packages/client-core/src/host/frames/PluginFrame.tsx",
+      "sha256": "ed94ac0fced3847c337dbe0334dbd94f833eaeda0a88a18c4b6ef81c0751633b",
+      "bytes": 15136
+    },
+    {
+      "path": "packages/client-core/src/host/frames/broker.ts",
+      "sha256": "935669d5011163629f68912a729e4da0cc281d707997c23a553a95750f68fca4",
+      "bytes": 33727
+    },
+    {
+      "path": "packages/client-core/src/host/frames/register.ts",
+      "sha256": "a1745c21c024599ba8030574efa020344976bee887c344c36b8452900824207d",
+      "bytes": 38945
+    },
+    {
+      "path": "packages/client-core/src/host/frames/remoteRoot.ts",
+      "sha256": "b6517f5b1e9b07d3b864c1367ac5b3a0bb4725bf3a012e8c8cffcd6252e062e2",
+      "bytes": 11483
+    },
+    {
+      "path": "packages/client-core/src/host/frames/sdk.ts",
+      "sha256": "cbf9f310948a8479aeb8ede0196693b1e6a97cffee4fbef9d5f576b3f5a0738e",
+      "bytes": 46110
+    },
+    {
+      "path": "packages/client-core/src/host/plugins/registrationSnapshot.ts",
+      "sha256": "fe5b93d67f682321f93978ca248bd0a3aa7125c4023dfce3d644b1750b1aa711",
+      "bytes": 940
+    },
+    {
+      "path": "packages/client-core/src/host/plugins/surfaceFailures.ts",
+      "sha256": "20fb96bf765062b91bd2697fcea04d8fc91119186d5b42ef1f86abb27be1984f",
+      "bytes": 2307
+    },
+    {
+      "path": "packages/client-core/src/host/plugins/syncContributions.ts",
+      "sha256": "de65a98d21fbf91aa47a26a267f8c8dfecf97528c5b25b285152e71ba088f7b1",
+      "bytes": 802
+    },
+    {
+      "path": "packages/client-core/src/host/registries/commands/clientEvents.ts",
+      "sha256": "129fe21df2b555b391ec61c0114b6516939bd38635b58b024ed76d6d81deea07",
+      "bytes": 9328
+    },
+    {
+      "path": "packages/client-core/src/host/registries/extensionPoints/exclusiveSlots.ts",
+      "sha256": "0ceba3e444002b6ffaf557c622b55467f53b41cfe333eae9eb3af261f400e4db",
+      "bytes": 5169
+    },
+    {
+      "path": "packages/client-core/src/host/tree/RemoteTree.tsx",
+      "sha256": "612273916756451fff8c3fc2c10ffe6a1dfb4a4a273cebec018e556033fd3a9b",
+      "bytes": 16464
+    },
+    {
+      "path": "packages/client-core/src/host/tree/bridgeAuthority.ts",
+      "sha256": "26e85637155f3cd16be9b0f9fdfb91448f3f94c15689b0d8cc2246f7901ed7e8",
+      "bytes": 3183
+    },
+    {
+      "path": "packages/client-core/src/host/tree/bridgeFactory.ts",
+      "sha256": "e081349d3d69b884ca05edc9c9863224573203bb1af0fe1d69fa87354ee05987",
+      "bytes": 996
+    },
+    {
+      "path": "packages/client-core/src/host/tree/public.ts",
+      "sha256": "d9f94506eeba73f6aa3f4a18fdf659e21e7410d8784b8ef14c0118142f1050f3",
+      "bytes": 736
+    },
+    {
+      "path": "packages/client-core/src/host/tree/table.ts",
+      "sha256": "8d7320d03f39c0886e13a42b5244a9f4303e1c69222d2c3dd64ccf52ce5fdb23",
+      "bytes": 1939
+    },
+    {
+      "path": "packages/client-core/src/host/tree/workerHost.ts",
+      "sha256": "780c5fd02294c0aa7627523ba34ee0daca0e5c8a5f9c636e009ae371155e63fa",
+      "bytes": 22916
+    },
+    {
+      "path": "packages/plugin-sdk/src/public.ts",
+      "sha256": "c59345cdf7b8e80181c31123b8496998a4faff84150d9e4f9429676d1a92c7c5",
+      "bytes": 16139
+    },
+    {
+      "path": "packages/protocol/src/plugin/bridge.ts",
+      "sha256": "d6f7b2f6370c047e24ce40e6421d2878511090fe3aef8284f8bc5fe5654772f3",
+      "bytes": 17749
+    },
+    {
+      "path": "packages/protocol/src/tree/messages.ts",
+      "sha256": "a5f480e0c623371e94dbfaa9b8f384e4da63e0b9cc770e1b5ea2b6773bc36c1d",
+      "bytes": 8585
+    },
+    {
+      "path": "plugins/database/src/tree/DatabasePanel.tsx",
+      "sha256": "59c59c1089c60dadf170058aae153ebf57af913cee6778e5d8ad2277c9e4581d",
+      "bytes": 23135
+    },
+    {
+      "path": "plugins/database/src/tree/GenerateSqlModal.tsx",
+      "sha256": "75985206042c7f1b6554712a1b15492bb37ecfe51454103be3d81713dd7b5fd2",
+      "bytes": 6843
+    },
+    {
+      "path": "plugins/database/src/tree/SaveQueryModal.tsx",
+      "sha256": "fd1a41aa3c168f8b13f41dc6c76f313062204b07cdc0fcefa6cb41d426e47d8d",
+      "bytes": 3387
+    },
+    {
+      "path": "plugins/database/src/tree/databaseClient.ts",
+      "sha256": "d62aeed180f1fcf466fd296633f6296981f12e57c25d84020604bc39da396b1f",
+      "bytes": 4555
+    },
+    {
+      "path": "plugins/http/src/tree/HttpDetail.tsx",
+      "sha256": "f69c454deca799fdb934ed9f11ead522bd05edf1c47e38730309263575c7532a",
+      "bytes": 4446
+    },
+    {
+      "path": "plugins/http/src/tree/HttpVariables.tsx",
+      "sha256": "67a6883256f4442f79c2b9abca4d84743ea63df65a01010197d5c870b809696b",
+      "bytes": 7074
+    },
+    {
+      "path": "plugins/http/src/tree/app.tsx",
+      "sha256": "015f137a772660ae8af9abe9d669631bd13780284275980403b72f786de4ed9a",
+      "bytes": 5509
+    },
+    {
+      "path": "plugins/http/src/tree/httpClient.ts",
+      "sha256": "bb2ef9a5150623f891d1520b18a5fbfbcf68cd94879670c84eec83db82522255",
+      "bytes": 2994
+    },
+    {
+      "path": "plugins/http/src/tree/panelModel.ts",
+      "sha256": "ed9c531b7b2fc09cfd75a7d01437f4c3b1e072b548b13a8bf3cb56f63bb88fd2",
+      "bytes": 14987
+    }
+  ],
+  "probes": [
+    {
+      "path": "plans/performance/bench-client-remote-handlers.mjs",
+      "sha256": "0ff2a0ad5973c8973d21eacd791c57fba08cb984e4db1522ba3dad31b553d7e3",
+      "bytes": 2615
+    },
+    {
+      "path": "plans/performance/unit06-desktop.config.ts",
+      "sha256": "16a618715470ba04230c16d4fc488733441968c1a33f1ecbf5a2626bafcd150f",
+      "bytes": 1070
+    },
+    {
+      "path": "plans/performance/unit06-frame.config.ts",
+      "sha256": "75998a8e21353d9cdfeb9f649dc0198b7304d4970d28b462ed093528555b68a9",
+      "bytes": 1344
+    },
+    {
+      "path": "plans/performance/unit06-noisy-factory-probe.test.ts",
+      "sha256": "bc4ee367499a7ab46df5d4ec283c3626c0ebe5080edcadc234e4c48d00ca180a",
+      "bytes": 3215
+    },
+    {
+      "path": "plans/performance/unit06-noisy.config.ts",
+      "sha256": "696704ec1c2c05a4f056a34d2325caff295fcf8a3e0e81879cd8093ab359ab3a",
+      "bytes": 2135
+    },
+    {
+      "path": "plans/performance/unit06-owner-probe.test.tsx",
+      "sha256": "cb0c9933bbc7a71128446206f89ecd15099dc27e989aeaa0c70c19e595755c35",
+      "bytes": 12543
+    },
+    {
+      "path": "plans/performance/unit06-owner.config.ts",
+      "sha256": "dcc3a799593ee4887aedac31e042e1fa315565ce8417f7ab4a32bf4f50e33ac9",
+      "bytes": 2175
+    },
+    {
+      "path": "plans/performance/unit06-resource-probe.test.tsx",
+      "sha256": "39c29a8d57373bcfb6721df498f7f890754f1474f6c8f0d0c00bd2c2649216a5",
+      "bytes": 7241
+    },
+    {
+      "path": "plans/performance/unit06-resource.config.ts",
+      "sha256": "8646022777b166d93b2c08d7cadb0e1a1c03a3b2f1e7959ead349913a7b3022e",
+      "bytes": 1562
+    },
+    {
+      "path": "plans/performance/unit06-sdk-entry.ts",
+      "sha256": "5ebc66f1ea75044ec1b71960e007daef8b852b5dd5246aaf37532505dbf03fea",
+      "bytes": 2764
+    },
+    {
+      "path": "plans/performance/unit06-sdk.config.ts",
+      "sha256": "c1e3f2eb41f9844fb7bbc1c36188cdfa32d6040061d74ad4210e02ec0c673dfa",
+      "bytes": 753
+    },
+    {
+      "path": "plans/performance/unit06-tui-owner-probe.test.tsx",
+      "sha256": "53456cc3a0852cd92e1e01e742b5c0234e762c390e50e53aae6b065e8344f450",
+      "bytes": 11892
+    },
+    {
+      "path": "plans/performance/unit06-tui-owner.config.mts",
+      "sha256": "8a1136354f3d232882e65121bd40f51c49ee01bc9782e30d66bcd100e6eb4f79",
+      "bytes": 1234
+    }
+  ],
+  "sdkBundleArtifacts": [
+    {
+      "path": "/tmp/acorn-perf-unit06-modern-bundle/bundle.mjs",
+      "sha256": "38f55be7e24a0fe3f6132c42e0ab0f409e60deada69abdabb61c89077cba4a1e",
+      "bytes": 31127
+    },
+    {
+      "path": "/tmp/acorn-perf-unit06-legacy-bundle/bundle.mjs",
+      "sha256": "6be0d579b283c9cc52baf2e0a0e8c0c49bc80f13ceb2ad7b1fabe67aa5f5679a",
+      "bytes": 27450
+    },
+    {
+      "path": "/tmp/acorn-perf-unit06-legacy-bundle-delayed/bundle.mjs",
+      "sha256": "141118959ee8e4bd3aa4e773c6ae3acc9b4bb55181d6459a9530c722e1d86c05",
+      "bytes": 27593
+    },
+    {
+      "path": "/tmp/acorn-perf-unit06-legacy-sdk/remote.js",
+      "sha256": "3b1c82a8d9d2a4c46b6aa0aadad3f3f9b1b8c789a8426b6490931ac81cf929c9",
+      "bytes": 4155
+    },
+    {
+      "path": "/tmp/acorn-perf-unit06-legacy-sdk/sdk.js",
+      "sha256": "ce4e3acd9359af9daefdd9ced8445b0d076e92fcd82a4a18b2d6ca1022661aec",
+      "bytes": 25318
+    },
+    {
+      "path": "/tmp/acorn-perf-unit06-legacy-sdk/remoteRoot-Cuh339BV.js",
+      "sha256": "3a8ce0d044986516c92899f9ebbcd3165e29b302479480e96d2d76a6daed96ae",
+      "bytes": 7577
+    }
+  ],
+  "beforeSourceManifest": "plans/performance/evidence/unit06-before-source-hashes.json",
+  "beforeSdkManifest": "plans/performance/evidence/unit06-legacy-sdk-hashes.json",
+  "note": "Final ownership probes use true module-level await connect/API. Earlier prototype/source-final artifacts before that fixture change remain historical and are not paired with these bundle hashes."
+}

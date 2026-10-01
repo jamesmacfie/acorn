@@ -128,6 +128,8 @@ try {
   net = 'no net'
 }
 addEventListener('message', (event) => {
+  // Complete the legacy SDK acknowledgement before serving the tree.
+  event.ports[0].postMessage({ kind: 'connected' })
   const tree = event.ports[1]
   tree.postMessage({ kind: 'tree:ready', version: 1, entries: ['main'] })
   tree.onmessage = (message) => {

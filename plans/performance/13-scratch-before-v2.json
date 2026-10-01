@@ -1,0 +1,19 @@
+{
+  "owner": "actual portable Database scratch route and disposable plugin SQLite; no PostgreSQL",
+  "documentByteCap": 2097152,
+  "unicode": {
+    "characters": 2097152,
+    "bytes": 4194304,
+    "writeStatus": 200,
+    "readBytes": 4194304,
+    "hostByteGateWouldRefuse": true
+  },
+  "ascii": {
+    "acceptedStatus": 200,
+    "acceptedBytes": 2097152,
+    "editedBytes": 2097153,
+    "editedStatus": 400,
+    "storedBytesAfterFailedEdit": 2097152,
+    "editRetainedAtNode": false
+  }
+}

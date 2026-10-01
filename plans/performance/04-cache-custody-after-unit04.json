@@ -1,0 +1,20 @@
+{
+  "root": "/Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance",
+  "hashes": {
+    "infra/node/fleet.ts": "138c797cbdeaaf29a466dd8840720a9681b178a525310a990109b30d4a9d5dd1",
+    "infra/node/apiClient.ts": "3f725a9aa08bad8a6ba352061b02f08cf58d698457eedd0ed1b936405bae5a3e",
+    "features/settings/savePref.ts": "cbca7345020d5b00f7f783897ddcf1fe05b1ecbfae8327061cec7d5f9e809c1b",
+    "infra/persistence/startupRestore.ts": "739f34098e49e879759354d347c35514fb54bf4fa5f142708d35e1b04212d162",
+    "infra/persistence/persistedState.ts": "feeca1c53babd38a5eff6762b735ef088776c12472d40f567a392dab7a42f45c"
+  },
+  "originTarget": "A",
+  "failedAValue": "A-confirmed",
+  "failedBValue": "B-confirmed",
+  "reversionWrites": [],
+  "gates": {
+    "originA": true,
+    "independentFailedA": true,
+    "independentFailedB": true,
+    "noStaleReversion": true
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "expectedStartupFailure": true,
+  "before": true,
+  "sdk": "legacy",
+  "listeningBarrier": false,
+  "failure": "Error: probe deadline: {\"messages\":[{\"worker\":0,\"phase\":\"generic-listener\"},{\"worker\":0,\"phase\":\"listening\"}],\"workers\":[{\"threadId\":1}],\"calls\":[]}",
+  "workers": 1,
+  "messages": [
+    {
+      "worker": 0,
+      "phase": "generic-listener"
+    },
+    {
+      "worker": 0,
+      "phase": "listening"
+    }
+  ],
+  "calls": []
+}

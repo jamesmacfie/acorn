@@ -226,7 +226,9 @@ export function createFrameBridge(input: {
     for (const controller of activeWork) controller.abort()
     activeWork.clear()
     inFlight.clear()
-    for (const detach of detachers.splice(0)) detach()
+    for (const detach of detachers.splice(0)) {
+      try { detach() } catch { /* One failed subscriber cannot retain the port and other owners. */ }
+    }
     subscribed.clear()
     port.onmessage = null
     port.close()

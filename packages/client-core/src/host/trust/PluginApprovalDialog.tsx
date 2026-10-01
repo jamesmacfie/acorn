@@ -1,3 +1,4 @@
+import { Portal } from 'solid-js/web'
 import { createResource, createSignal, For, Show } from 'solid-js'
 import { corePluginsRoute, type NodePluginState, type PluginApprovalRequest } from '@acorn/protocol/api.ts'
 import { readJson } from '../../infra/node/apiClient'
@@ -188,6 +189,7 @@ export default function PluginApprovalDialog() {
   const dismiss = createDismissable({ onDismiss: () => { reset(); closePluginApproval() }, container: () => dialog })
 
   return (
+    <Portal>
     <Show when={request()}>
       {(current) => (
           <div class="overlay-backdrop" onClick={dismiss.onBackdropClick}>
@@ -292,5 +294,6 @@ export default function PluginApprovalDialog() {
           </div>
       )}
     </Show>
+    </Portal>
   )
 }

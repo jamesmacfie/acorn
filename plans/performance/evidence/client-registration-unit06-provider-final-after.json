@@ -1,0 +1,117 @@
+{
+  "benchmark": "unchanged loaded contribution reconciliation",
+  "plugins": 20,
+  "checkpoints": [
+    {
+      "unchangedPass": 1,
+      "ms": 0.4650420000000395,
+      "cpuUs": {
+        "user": 849,
+        "system": 76
+      },
+      "registryObserverRuns": 0,
+      "paneListMounts": 0,
+      "paneListUnmounts": 0
+    },
+    {
+      "unchangedPass": 2,
+      "ms": 0.3324169999998503,
+      "cpuUs": {
+        "user": 367,
+        "system": 21
+      },
+      "registryObserverRuns": 0,
+      "paneListMounts": 0,
+      "paneListUnmounts": 0
+    },
+    {
+      "unchangedPass": 3,
+      "ms": 0.3324169999998503,
+      "cpuUs": {
+        "user": 325,
+        "system": 10
+      },
+      "registryObserverRuns": 0,
+      "paneListMounts": 0,
+      "paneListUnmounts": 0
+    },
+    {
+      "unchangedPass": 4,
+      "ms": 0.33787499999994,
+      "cpuUs": {
+        "user": 660,
+        "system": 28
+      },
+      "registryObserverRuns": 0,
+      "paneListMounts": 0,
+      "paneListUnmounts": 0
+    },
+    {
+      "unchangedPass": 5,
+      "ms": 0.32533300000000054,
+      "cpuUs": {
+        "user": 491,
+        "system": 26
+      },
+      "registryObserverRuns": 0,
+      "paneListMounts": 0,
+      "paneListUnmounts": 0
+    },
+    {
+      "unchangedPass": 6,
+      "ms": 0.28837499999985994,
+      "cpuUs": {
+        "user": 288,
+        "system": 2
+      },
+      "registryObserverRuns": 0,
+      "paneListMounts": 0,
+      "paneListUnmounts": 0
+    },
+    {
+      "unchangedPass": 7,
+      "ms": 0.3107919999999922,
+      "cpuUs": {
+        "user": 277,
+        "system": 35
+      },
+      "registryObserverRuns": 0,
+      "paneListMounts": 0,
+      "paneListUnmounts": 0
+    },
+    {
+      "unchangedPass": 8,
+      "ms": 0.35599999999999454,
+      "cpuUs": {
+        "user": 318,
+        "system": 58
+      },
+      "registryObserverRuns": 0,
+      "paneListMounts": 0,
+      "paneListUnmounts": 0
+    },
+    {
+      "unchangedPass": 9,
+      "ms": 0.3251669999999649,
+      "cpuUs": {
+        "user": 654,
+        "system": 28
+      },
+      "registryObserverRuns": 0,
+      "paneListMounts": 0,
+      "paneListUnmounts": 0
+    },
+    {
+      "unchangedPass": 10,
+      "ms": 0.28375000000005457,
+      "cpuUs": {
+        "user": 285,
+        "system": 9
+      },
+      "registryObserverRuns": 0,
+      "paneListMounts": 0,
+      "paneListUnmounts": 0
+    }
+  ],
+  "registryObserverSawEmptyRoster": false
+}

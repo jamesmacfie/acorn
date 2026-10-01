@@ -1,9 +1,10 @@
+import { Portal } from 'solid-js/web'
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { integrationsOptions, prefsOptions, projectsOptions, tasksKey, tasksOptions, workspacesOptions, type Project, type Task } from '../../infra/queries'
 import { archiveTask, createTask, patchTask } from '../tasks/taskMutations'
-import { applyRailOrder, applySourceOrder, isPinned, moveTask, parseRailOrder, pinTask, unpinTask, type RailDropPosition, type RailOrder } from './railOrder'
+import { applyRailOrder, applySourceOrder, moveTask, parseRailOrder, pinTask, unpinTask, type RailDropPosition, type RailOrder } from './railOrder'
 import { checksState } from '../../kit/lib/rendering/displayMeta'
 import { createDismissable } from '../../kit/lib/controls/dismissable'
 import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
@@ -70,7 +71,9 @@ export default function TabRail() {
 
   // Rail order: pin-to-top plus drag-reorder in a dedicated pref, never tasks.sort. The pure model
   // lives in railOrder.ts.
-  const railOrder = () => parseRailOrder(prefs.data?.[PrefKeys.railOrder])
+  const rawRailOrder = createMemo(() => prefs.data?.[PrefKeys.railOrder])
+  const railOrder = createMemo(() => parseRailOrder(rawRailOrder()))
+  const pinnedTasks = createMemo(() => new Set(railOrder().pinned))
   const saveOrder = async (o: RailOrder) => {
     await saveJsonPref(queryClient, PrefKeys.railOrder, o)
   }
@@ -193,7 +196,7 @@ export default function TabRail() {
     title: w.title,
     origin: w.origin,
     projectId: w.projectId,
-    pinned: isPinned(railOrder(), w.id),
+    pinned: pinnedTasks().has(w.id),
     branch: w.branch,
   })
   const taskById = (id: string) => (query.data ?? []).find((task) => task.id === id)
@@ -382,7 +385,7 @@ export default function TabRail() {
                 status: st(),
                 archiving: isArchiving(w.id),
                 settingUp: isSettingUp(w.id),
-                pinned: isPinned(railOrder(), w.id),
+                pinned: pinnedTasks().has(w.id),
               }),
               ...markersFor({ kind: 'task', id: w.id }),
             ]
@@ -554,7 +557,7 @@ export default function TabRail() {
       <Show when={archiveErr()}><Alert>{archiveErr()}</Alert></Show>
       <Show when={draft()}>
         {(d) => (
-          <div class="overlay-backdrop" onClick={draftDismiss.onBackdropClick}>
+          <Portal><div class="overlay-backdrop" onClick={draftDismiss.onBackdropClick}>
             <div ref={draftDialog} class="overlay" role="dialog" aria-modal="true" onClick={draftDismiss.onContainerClick} onKeyDown={draftDismiss.onKeyDown}>
               <div class="overlay-title">{d().mode === 'new' ? 'New task' : 'Rename task'}</div>
               <div class="overlay-body">
@@ -608,7 +611,7 @@ export default function TabRail() {
                 </form>
               </div>
             </div>
-          </div>
+          </div></Portal>
         )}
       </Show>
     </div>
