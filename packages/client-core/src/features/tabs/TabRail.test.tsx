@@ -8,7 +8,8 @@ import { railMarkerRegistry } from '../../host/registries/rail/railMarkerFeed'
 import type { Disposable } from '../../kit/lib/state/registry'
 import { activeTaskId, setActiveTaskId, setSelectedSource } from '../tasks/tasks'
 
-const { createTaskMock } = vi.hoisted(() => ({ createTaskMock: vi.fn() }))
+const { createTaskMock, readJsonMock } = vi.hoisted(() => ({ createTaskMock: vi.fn(), readJsonMock: vi.fn() }))
+vi.mock('../../infra/node/apiClient', () => ({ readJson: readJsonMock }))
 vi.mock('../tasks/taskMutations', () => ({
   archiveTask: vi.fn(),
   createTask: createTaskMock,
@@ -66,6 +67,12 @@ const registered: Disposable[] = []
 beforeEach(() => {
   vi.useFakeTimers()
   createTaskMock.mockReset()
+  readJsonMock.mockReset()
+  readJsonMock.mockImplementation(async (url: string) => {
+    if (url.includes('worktree-availability')) return { available: true }
+    if (url.endsWith('/worktrees')) return []
+    throw new Error('No live Node in this test.')
+  })
   localStorage.clear()
   host = document.createElement('div')
   document.body.append(host)
@@ -340,10 +347,66 @@ describe('new task setup choice', () => {
     title.dispatchEvent(new InputEvent('input', { bubbles: true }))
     checkbox()!.click()
     expect(checkbox()?.checked).toBe(true)
+    await vi.waitFor(() => expect([...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find((button) => button.textContent === 'Create task')?.disabled).toBe(false))
     ;[...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find((button) => button.textContent === 'Create task')!.click()
     await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ skipSetup: true })))
 
     host.querySelector<HTMLButtonElement>('.tabrail-bottom')!.click()
     expect(checkbox()?.checked).toBe(false)
+  })
+})
+
+describe('new task worktree validation', () => {
+  it('allows creation when the availability request fails', async () => {
+    setActiveTaskId('t1')
+    mount(undefined, true)
+    readJsonMock.mockRejectedValue(new Error('Worktree lookup is unavailable.'))
+    createTaskMock.mockResolvedValue(task('created', 'Cannot check'))
+    host.querySelector<HTMLButtonElement>('.tabrail-bottom')!.click()
+    const label = [...document.querySelectorAll<HTMLLabelElement>('[role="dialog"] label')].find((field) => field.textContent === 'Title')!
+    const title = document.getElementById(label.htmlFor) as HTMLInputElement
+    title.value = 'Cannot check'
+    title.dispatchEvent(new InputEvent('input', { bubbles: true }))
+    const submit = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find((button) => button.textContent === 'Create task')!
+    await vi.waitFor(() => expect(submit.disabled).toBe(false))
+    expect(document.querySelector('[role="dialog"] [role="alert"]')).toBeNull()
+    submit.click()
+    await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ branch: 'cannot-check' })))
+  })
+
+  it('keeps the generated branch, blocks click and Enter on a conflict, and clears the error after a rename', async () => {
+    setActiveTaskId('t1')
+    mount([{ ...task('t1', 'Taken'), branch: 'taken' }], true)
+    readJsonMock.mockImplementation(async (url: string) => {
+      if (url.includes('worktree-availability')) return url.endsWith('branch=taken')
+        ? { available: false, reason: 'This branch name already exists in another worktree' }
+        : { available: true }
+      if (url.endsWith('/worktrees')) return []
+      throw new Error('No live Node in this test.')
+    })
+    host.querySelector<HTMLButtonElement>('.tabrail-bottom')!.click()
+    const input = (label: string) => {
+      const field = [...document.querySelectorAll<HTMLLabelElement>('[role="dialog"] label')].find((candidate) => candidate.textContent === label)!
+      return document.getElementById(field.htmlFor) as HTMLInputElement
+    }
+    const fill = (field: HTMLInputElement, value: string) => {
+      field.value = value
+      field.dispatchEvent(new InputEvent('input', { bubbles: true }))
+    }
+    const submit = () => [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find((button) => button.textContent === 'Create task')!
+    fill(input('Title'), 'Taken')
+    await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')?.textContent).toContain('This branch name already exists in another worktree'))
+    expect(input('Branch').value).toBe('taken')
+    expect(submit().disabled).toBe(true)
+    submit().click()
+    input('Title').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    expect(createTaskMock).not.toHaveBeenCalled()
+
+    fill(input('Branch'), 'available-name')
+    await vi.waitFor(() => expect(submit().disabled).toBe(false))
+    expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain('This branch name already exists in another worktree')
+    createTaskMock.mockResolvedValue(task('created', 'Taken'))
+    submit().click()
+    await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ branch: 'available-name' })))
   })
 })

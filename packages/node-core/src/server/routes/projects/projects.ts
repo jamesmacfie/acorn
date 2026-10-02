@@ -13,6 +13,7 @@ import type { AppEnv } from '../../middleware/auth'
 import { respondError } from '../../respond'
 import { isTaskConfined } from '../../middleware/requireUser'
 import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
+import { worktreeAvailability } from '../../worktrees/worktreeAvailability'
 
 // /v1/core/projects, the first-class folder-project surface (docs/workspaces-and-tasks.md).
 // Unlike the removed pair-keyed route, this demands nothing of the folder: facets are detected, not
@@ -123,6 +124,15 @@ export const projects = new Hono<AppEnv>()
     const row = await getProject(getDb(c.env), c.req.param('id'))
     if (!row) return respondError(c, 404, 'not_found', ['No such project.'])
     return c.json(await unclaimedWorktrees(getDb(c.env), row))
+  })
+  .get('/:id/worktree-availability', async (c) => {
+    if (isTaskConfined(c)) return respondError(c, 403, 'forbidden')
+    const branch = c.req.query('branch')?.trim()
+    if (!branch) return respondError(c, 400, 'bad_request', ['A branch name is required.'])
+    const db = getDb(c.env)
+    const project = await getProject(db, c.req.param('id'))
+    if (!project) return respondError(c, 404, 'not_found', ['No such project.'])
+    return c.json(await worktreeAvailability(db, project, branch))
   })
   .get('/:id/mcp', async (c) => {
     const row = await getProject(getDb(c.env), c.req.param('id'))

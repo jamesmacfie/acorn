@@ -34,6 +34,10 @@ export const setWorktreesRoot = (dir: string): void => {
 }
 export const getWorktreesRoot = (): string => worktreesRoot
 
+export function projectWorktreeIdentity(project: ProjectRow): { owner: string; repo: string } {
+  return { owner: project.githubOwner ?? 'p', repo: project.githubName ?? slugifyProjectName(project.name) }
+}
+
 export const isDir = (p: string): boolean => {
   try {
     return statSync(p).isDirectory()
@@ -259,8 +263,7 @@ export async function resolveTaskCwd(
   const inflight = inflightCreates.get(t.id)
   if (inflight) return inflight
   const create = (async () => {
-    const owner = project?.githubOwner ?? 'p'
-    const repo = project?.githubName ?? slugifyProjectName(project?.name ?? 'project')
+    const { owner, repo } = projectWorktreeIdentity(project!)
     const wt = await ensureWorktree(
       worktreesRoot,
       checkout,

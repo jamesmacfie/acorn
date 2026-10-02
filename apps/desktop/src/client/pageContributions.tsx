@@ -67,7 +67,7 @@ export const settingsPageContributions: SettingsContribution[] = [
   ...(import.meta.env.DEV
     ? [{
       id: 'gallery', label: 'Style gallery', category: 'advanced' as const, scope: 'device' as const, icon: 'swatch-book', order: 40,
-      fullWidth: true, component: () => <StyleGallery />,
+      component: () => <StyleGallery />,
     }]
     : []),
 ]

@@ -96,21 +96,28 @@ It refuses if a later logged mutation or an external edit changed the memory.
 
 ### The Memory page and transcript
 
-The project rail's **Memory** page groups project and private memories, newest update first. Its
-filter calls the same Node scan as `memory_search`, matching every term across names, descriptions,
-and bodies, with up to 10 results. Select a memory to read its body, type, scope, timestamp, and last
-author. Agent changes link to their originating task and session.
+The project rail's **Memory** page is a list beside a detail, drawn the way GitHub and Workflows
+are: the source hands over `regions`, so the desktop draws one split and the terminal puts the list
+in its Browse panel. The list has a **This project** tab and an **All projects** tab for private
+memory, each newest update first. Its filter calls the same Node scan as `memory_search`, matching
+every term across names, descriptions, and bodies, with up to 10 results. Select a memory to read its
+body, type, scope, timestamp, and last author in the detail column. Agent changes link to their
+originating session. With nothing selected, the detail column shows the overview: **Recent changes**,
+**What agents see**, and **Import memory**. Close the reader to return to it.
 
-**Add memory** accepts a name, description, type, scope, and body. **Edit** uses the hash captured when
+**New** in the list header opens a form in the detail column. It accepts a name, description, type,
+scope, and body, and opens the saved memory. **Edit** uses the hash captured when
 the draft opens. A conflicting write preserves the draft and displays the current body with
 **Reload current version**. Changing a name or scope creates the destination and deletes the source
 under the store lock. A destination name collision refuses the move. Each address retains its own
-history and change entry. **Delete** retains the previous content; a deleted memory stays reachable
+history and change entry. **Delete** and **Restore** each ask for a second press. **Delete** retains
+the previous content; a deleted memory stays reachable
 from the feed. **History** lists up to 20 retained versions with timestamps and authors; **Restore**
 checks the current hash before replacing the memory.
 
 **Recent changes** shows the 50 most recent mutations across this project and private scope. Each
-entry identifies the action, name, author, and time. Agent entries link to the task and session.
+entry identifies the action, name, author, and time. An agent entry links to its session, or to its
+task when no session is recorded.
 **Undo** appears when the entry is the last mutation at that address, its hash matches the file, and
 its prior version is available. The page refreshes its library, reader, feed, history, and context
 preview on `plugin:memory:memories-changed`.

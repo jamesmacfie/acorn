@@ -178,6 +178,9 @@ export const projectRunTargetsRoute = (id: string) => `${projectRoute(id)}/run-t
 // dialog's "Existing worktree" tab.
 export const projectWorktreesRoute = (id: string) => `${projectRoute(id)}/worktrees`
 export type ProjectWorktree = { path: string; branch: string }
+export const projectWorktreeAvailabilityRoute = (id: string, branch: string) =>
+  `${projectRoute(id)}/worktree-availability?branch=${encodeURIComponent(branch)}`
+export type WorktreeAvailability = { available: true } | { available: false; reason: string }
 // The MCP config files the agents in this project load, and the empty .mcp.json Settings can seed
 // (docs/mcp.md § Configuration).
 export const projectMcpRoute = (id: string) => `${projectRoute(id)}/mcp`

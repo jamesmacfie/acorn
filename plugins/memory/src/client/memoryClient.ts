@@ -4,7 +4,7 @@ import { readJson, writeJson } from '@acorn/plugin-api/client'
 import type { MemoryRow, MemoryType } from '../contract/library'
 export type { MemoryRow, MemoryType } from '../contract/library'
 
-// Shared type and scope labels for the add form and Memory page.
+// The memory words every surface shares: the page, the palette, and the transcript card.
 export const MEMORY_TYPE_LABEL: Record<MemoryType, string> = {
   project: 'Project', convention: 'Convention', architecture: 'Architecture', decision: 'Decision', fix: 'Fix',
   reference: 'Reference', feedback: 'Feedback', task: 'Task', user: 'About you',
@@ -12,6 +12,15 @@ export const MEMORY_TYPE_LABEL: Record<MemoryType, string> = {
 export const MEMORY_TYPE_OPTIONS = (['user', 'feedback', 'project', 'reference'] as MemoryType[]).map((value) => ({ value, label: MEMORY_TYPE_LABEL[value] }))
 export const MEMORY_SCOPE_LABEL: Record<'project' | 'private', string> = { project: 'This project', private: 'All projects' }
 export const MEMORY_SCOPE_OPTIONS = (['project', 'private'] as const).map((value) => ({ value, label: MEMORY_SCOPE_LABEL[value] }))
+// Documents and versions carry the type as a plain string, and an older file may hold any word.
+export const memoryTypeLabel = (type: string): string => MEMORY_TYPE_LABEL[type as MemoryType] ?? type
+export const MEMORY_ACTION_LABEL: Record<MemoryChange['action'], string> = { write: 'Saved', delete: 'Deleted', restore: 'Restored' }
+// A change's `by`, or a file's `updatedBy`, which writes an agent as `agent:<session>`.
+export const memoryAuthorLabel = (by: string | undefined): string =>
+  by?.startsWith('agent') ? 'An agent' : by === 'import' ? 'Import' : 'You'
+// With the time, unlike most dates in the app: one memory's versions are often minutes apart.
+export const memoryDate = (at: string | number): string =>
+  new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 
 export type MemoryApi = {
   list(projectId?: string): Promise<MemoryRow[] | { error: string }>
