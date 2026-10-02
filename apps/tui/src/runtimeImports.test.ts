@@ -32,4 +32,12 @@ describe('check-runtime-imports', () => {
     expect(code).toBe(1)
     expect(output).toContain('acorn-package-that-does-not-exist (imported by lazy.js)')
   })
+
+  it('checks every static import and re-export on a minified line', () => {
+    writeFileSync(join(dist, 'main.js'), 'import{readFileSync as r}from"node:fs";import"acorn-missing-static";export{x}from"acorn-missing-export";')
+    const result = run(dist)
+    expect(result.code).toBe(1)
+    expect(result.output).toContain('acorn-missing-static (imported by main.js)')
+    expect(result.output).toContain('acorn-missing-export (imported by main.js)')
+  })
 })

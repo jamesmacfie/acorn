@@ -3,7 +3,7 @@ import { PaneModelHost } from '@acorn/client-core/host/registries/panes/PaneMode
 import { reportResponsiveness } from '@acorn/client-core/infra/platform'
 import { startPageFacts, startResponsivenessMonitor } from '@acorn/client-core/infra/telemetry'
 import { render } from 'solid-js/web'
-import { applyNodePlugins } from './activate'
+import { applyNodePlugins, startClientPlugins } from './activate'
 import { createEffect, createRoot, Show } from 'solid-js'
 import { QueryCacheProvider } from '@acorn/client-core/infra/persistence/QueryCacheProvider.tsx'
 import { Route, Router } from '@solidjs/router'
@@ -98,11 +98,7 @@ createRoot(() => {
   })
 })
 
-// Which of that node's plugins are on. Not awaited either, and it will usually fail on a cold start,
-// because it is a request to a node that is still booting: `applyNodePlugins` swallows a read failure
-// and leaves the full contribution set active rather than costing the owner their UI, and App.tsx
-// re-runs it when the node reports itself online. That is what activate.ts's own comment says the
-// whole design is for — register everything and correct later, never wait.
+// Waits for post-paint registration. A failed node read remains retryable when App sees it online.
 void applyNodePlugins(activeNodeId() ?? undefined).then(() => bootMark('plugins applied'))
 
 // The node's arrival is behind the loader's first paint. Startup work can still have asked for data
@@ -192,7 +188,23 @@ bootMark('tree built')
 // macOS pauses `requestAnimationFrame` while the window is occluded, so this mark is the compositor's
 // and not the renderer's: a launch watched from behind another window prints every other mark and not
 // this one, which is why `tree built` above exists (docs/local-development.md § Timing a cold start).
-requestAnimationFrame(() => bootMark('first paint'))
+// A task queued from rAF lets this paint finish before importing and registering the roster.
+// Occluded windows do not receive rAF on macOS, so they get a bounded fallback as well.
+let pluginsStarted = false
+const fillIn = () => {
+  if (pluginsStarted) return
+  pluginsStarted = true
+  clearTimeout(pluginFallback)
+  void startClientPlugins().then(() => {
+    bootMark('roster registered')
+    return applyNodePlugins(activeNodeId() ?? undefined)
+  })
+}
+const pluginFallback = setTimeout(fillIn, 250)
+requestAnimationFrame(() => {
+  bootMark('first paint')
+  setTimeout(fillIn, 0)
+})
 createRoot((dispose) => {
   createEffect(() => {
     if (!nodeReady()) return

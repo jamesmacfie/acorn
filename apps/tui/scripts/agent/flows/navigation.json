@@ -11,7 +11,7 @@
     { "action": "checkpoint", "label": "agent" },
     { "action": "press", "key": "Tab" },
     { "action": "press", "key": "Right" },
-    { "action": "wait", "text": "uncommitted", "timeoutMs": 30000 },
+    { "action": "wait", "text": "Refresh changes", "timeoutMs": 30000 },
     { "action": "checkpoint", "label": "changes" },
     { "action": "press", "key": "w" },
     { "action": "wait", "text": "Side project" },

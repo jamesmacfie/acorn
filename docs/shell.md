@@ -848,6 +848,9 @@ Loading packages as separate files was most of the node's and the helper's start
 Node to resolve. Both builds write the licence text of every package they bundled beside their
 output, as `THIRD-PARTY-NOTICES.txt` and `helper-THIRD-PARTY-NOTICES.txt`, so it ships in the
 helper resources and the standalone tarball.
+The helper's production SSR bundle explicitly enables Oxc minification in
+`apps/desktop/vite.helper.config.ts`; SSR builds otherwise leave it disabled. The 2026-10-02 build
+measured 269,402 B after narrowing custody's Node-core imports and enabling minification.
 `apps/desktop/scripts/stage.mjs` puts the service, every core and plugin migration chain, the plugin
 frame stylesheet, and the pinned Node runtime where the bundler will find them. The runtime is
 fetched from nodejs.org and verified against that release's `SHASUMS256.txt` rather than copied from

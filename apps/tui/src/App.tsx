@@ -15,7 +15,7 @@ import { ExtendedPane } from './plugins/ExtendedPane'
 import { setRemoteTree } from '@acorn/client-core/host/tree'
 import { setDocumentSurface } from '@acorn/client-core/host/frames/documentSurface.ts'
 import { LAYOUTS } from './layouts'
-import { RemoteTree } from './plugins/RemoteTree'
+import { RemoteTree } from './plugins/remoteTreeLoader'
 import { Shell } from './chrome/Shell'
 
 // The composition root's client half: the host seams and the shell under the one query client

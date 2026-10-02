@@ -1,5 +1,7 @@
 import { initClientPlugins } from '@acorn/client-core/host/registries/extensionPoints'
 import { disabledNodePlugins, refreshNodePlugins } from '@acorn/client-core/infra/node'
+import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
+import { createSignal } from 'solid-js'
 import { pluginFailureAttention, pluginWaitingAttention } from '@acorn/client-core/infra/node'
 import { attentionRegistry } from '@acorn/client-core/host/registries/rail'
 import { noticeKindContributions } from '@acorn/client-core/features/notifications'
@@ -16,7 +18,7 @@ import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import { uiSlotRegistry } from '@acorn/client-core/host/registries/extensionPoints/uiSlots.tsx'
 import { taskStatusScheduleContribution } from '@acorn/client-core/features/tasks'
 import { settingsPageContributions } from './pageContributions'
-import { clientPlugins } from './plugins'
+import { createPluginStartup } from './pluginStartup'
 import { activateScopedStateEviction } from './scopedEviction'
 import { shellSlotContributions } from './slotContributions'
 import { coreSourceContributions } from './sourceContributions'
@@ -55,36 +57,29 @@ registerNoticeTargetHandler('settings', (_taskId, target) => {
   clientEvents.emit('presentation:open-settings', { tab: target.resourceId })
 })
 activateScopedStateEviction()
-// The first activation runs with nothing disabled, and that is not a placeholder: the list belongs to
-// a node, and at module-evaluation time no node has answered yet. `applyNodePlugins` below is called
-// once before the first render and again on every node switch.
-//
-// Registering everything first, rather than blocking here, trades a different failure for a better
-// one. A plugin that never registers cannot be brought back by anything short of a second activation,
-// so the worst case of registering everything first is a contribution that disappears a moment later;
-// the worst case of waiting is a shell that will not paint because a node is slow to answer.
-const activated = initClientPlugins(clientPlugins)
-if (activated.skipped.length) log.info(`plugins disabled: ${activated.skipped.join(', ')}`)
+// Core registration stays eager; the compiled roster and its implementation closure load after the
+// shell paints. Restore waits for this signal so pane defaults cannot replace persisted layouts.
+const [clientPluginsReady, setClientPluginsReady] = createSignal(false)
+export { clientPluginsReady }
 
-// Re-run the host with whatever the active node reports. This is the client-side disable: the host
-// takes each plugin's previous contributions back before re-registering, so one call replaces a
-// predicate threaded through nine registry accessors (node/nodePlugins.ts explains the trade at
-// length). A node that disables nothing, the usual answer, matches the pass above, and the host
-// returns without touching a registry or running any `activate` again.
-//
-// `applied` makes it idempotent per node, so App.tsx can call it from a plain mount effect (which
-// fires for the first node too, right after index.tsx already did) without disposing and
-// re-registering every contribution a second time mid-paint.
-let applied: string | null = null
+const startup = createPluginStartup({
+  load: async () => (await import('./plugins')).clientPlugins,
+  register: (plugins, disabled) => {
+    const result = initClientPlugins(plugins, { disabled })
+    if (result.skipped.length) log.info(`plugins disabled: ${result.skipped.join(', ')}`)
+  },
+  refresh: async (nodeId) => {
+    const state = await refreshNodePlugins(nodeId)
+    return state ? state.plugins.filter((plugin) => plugin.disabled).map((plugin) => plugin.name) : null
+  },
+  activeNode: activeNodeId,
+  disabled: disabledNodePlugins,
+  onReady: () => setClientPluginsReady(true),
+})
+
+export const startClientPlugins = async (): Promise<void> => { await startup.initialize() }
 
 export async function applyNodePlugins(nodeId?: string): Promise<void> {
-  const target = nodeId ?? null
-  if (target !== null && applied === target) return
-  const state = await refreshNodePlugins(nodeId)
-  // Only mark it applied once the node has actually answered. A read failure leaves `applied` alone so the
-  // next mount retries, rather than pinning the full contribution set for the session.
-  if (state) applied = target
-  const disabled = disabledNodePlugins()
-  const result = initClientPlugins(clientPlugins, { disabled })
-  if (result.skipped.length) log.info(`plugins disabled by this node: ${result.skipped.join(', ')}`)
+  const target = nodeId ?? activeNodeId()
+  if (target) await startup.apply(target)
 }

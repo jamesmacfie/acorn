@@ -24,13 +24,14 @@ const PROJECT = { id: 'project-1', name: 'A project' } as Project
 const WORKSPACE = { id: 'workspace-2', name: 'Two', isDefault: false, sort: 0, projects: [{ id: 'project-1', name: 'A project', sort: 0 }] } as Workspace
 
 // A whole boot, minus the parts a restore never reads.
-const boot = (prefs: Record<string, string>, workspaces: () => Workspace[] | undefined) => createRoot((dispose) => ({
+const boot = (prefs: Record<string, string>, workspaces: () => Workspace[] | undefined, contributionsReady = () => true) => createRoot((dispose) => ({
   dispose,
   ...createAppStartupRestore({
     queryClient: new QueryClient(),
     prefs: () => prefs,
     prefsSettled: () => true,
     cacheRestoring: () => false,
+    contributionsReady,
     projects: () => [PROJECT],
     tasks: () => [TASK],
     workspaces,
@@ -48,6 +49,18 @@ describe('launch workspace restore', () => {
     mocks.savePref.mockResolvedValue(true)
   })
   afterEach(() => vi.unstubAllGlobals())
+
+  it('holds workspace restoration until the host has registered its compiled contributions', () => {
+    const [ready, setReady] = createSignal(false)
+    const startup = boot({ last_workspace: 'workspace-2' }, () => [WORKSPACE], ready)
+    expect(startup.restored()).toBe(false)
+    expect(startup.lastWorkspaceId()).toBe('')
+    expect(mocks.emit).not.toHaveBeenCalledWith('boot:restored', expect.anything())
+    setReady(true)
+    expect(startup.restored()).toBe(true)
+    expect(startup.lastWorkspaceId()).toBe('workspace-2')
+    startup.dispose()
+  })
 
   it('hands over the saved workspace once the workspaces have loaded', () => {
     const [workspaces, setWorkspaces] = createSignal<Workspace[] | undefined>(undefined)

@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { writePrivateAtomic } from '@acorn/node-core/server/storage'
+import { writePrivateAtomic } from '@acorn/node-core/server/storage/dataRoot.ts'
 import { configDir } from '../node/paths'
 
 /** The terminal host's file-backed implementation of the device preference storage client-core uses.

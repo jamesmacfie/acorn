@@ -1,14 +1,10 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
-// The eager-graph walk, checked against a fixture dist whose closure is known by construction, so the
-// assertion is about the walk and not about whatever the bundle weighs today
-// (../scripts/check-startup-graph.mjs, docs/frontend.md § Startup budget).
 const SCRIPT = resolve(import.meta.dirname, '../scripts/check-startup-graph.mjs')
-
 const run = (dist: string): { code: number; output: string } => {
   try {
     return { code: 0, output: execFileSync('node', [SCRIPT, '--dist', dist], { encoding: 'utf8', stdio: 'pipe' }) }
@@ -18,63 +14,70 @@ const run = (dist: string): { code: number; output: string } => {
   }
 }
 
-describe('check-startup-graph', () => {
+describe('complete terminal startup budget', () => {
   let dist: string
-  const chunk = (name: string, body: string) => writeFileSync(join(dist, 'chunks', name), body)
-
+  let chunks: Record<string, { imports: string[]; dynamicImports: string[]; modules: string[] }>
+  let roots: string[]
+  const chunk = (file: string, bytes = 100, imports: string[] = [], modules: string[] = [], dynamicImports: string[] = []) => {
+    writeFileSync(join(dist, file), 'x'.repeat(bytes))
+    chunks[file] = { imports, modules, dynamicImports }
+  }
+  const check = () => {
+    writeFileSync(join(dist, 'startup-graph.json'), JSON.stringify({ entry: 'main.js', roots, chunks }))
+    return run(dist)
+  }
   beforeEach(() => {
     dist = mkdtempSync(join(tmpdir(), 'tui-startup-'))
     mkdirSync(join(dist, 'chunks'))
+    chunks = {}
+    roots = ['main.js', 'chunks/App-a.js']
+    chunk('main.js')
+    chunk('chunks/App-a.js')
   })
   afterEach(() => rmSync(dist, { recursive: true, force: true }))
 
-  it('sums the static closure and leaves what only a dynamic import reaches out of it', () => {
-    // 4 chunks on disk, 3 in the closure: `App` reaches `rail` and `kit`, and `heavy` only behind an
-    // `import()`. Sizes are padded so the total is unmistakable.
-    chunk('App-aaaa.js', `import "./rail-bbbb.js";\nconst open = () => import("./heavy-dddd.js");\n${'/'.repeat(100)}`)
-    chunk('rail-bbbb.js', `import { k } from "./kit-cccc.js";\n${'/'.repeat(100)}`)
-    chunk('kit-cccc.js', `export const k = 1;\n${'/'.repeat(100)}`)
-    chunk('heavy-dddd.js', 'x'.repeat(500_000))
-
-    const { code, output } = run(dist)
+  it('counts the launcher, awaited dynamic roots and shared static chunks exactly once', () => {
+    chunk('main.js', 100, ['chunks/shared.js'], [], ['chunks/App-a.js', 'chunks/cache.js', 'chunks/roster.js'])
+    chunk('chunks/App-a.js', 100, ['chunks/shared.js'])
+    chunk('chunks/cache.js', 200, ['chunks/shared.js'])
+    chunk('chunks/shared.js', 300)
+    chunk('chunks/roster.js', 900_000)
+    roots.push('chunks/cache.js')
+    const { code, output } = check()
     expect(code).toBe(0)
-    expect(output).toContain('3 chunks')
-    expect(output).toMatch(/eager closure from App-aaaa\.js: 3 chunks, \d+B of \d+B built/)
-    expect(output).not.toContain('heavy-dddd.js')
+    expect(output).toContain('4 chunks, 700B of 900700B built')
   })
 
-  it('fails, naming the chunk, when a denylisted name is reached statically', () => {
-    chunk('App-aaaa.js', 'import "./viewState-bbbb.js";\n')
-    chunk('viewState-bbbb.js', 'export const v = 1;\n')
-    const { code, output } = run(dist)
-    expect(code).toBe(1)
-    expect(output).toContain('viewState-bbbb.js')
+  it('keeps a static edge even when the same chunk also has a dynamic edge', () => {
+    chunk('main.js', 100, ['chunks/big.js'], [], ['chunks/big.js'])
+    chunk('chunks/big.js', 800_000)
+    expect(check().output).toContain('over its 720000B ceiling')
   })
 
-  it('fails on the pull-request model, which phase 0 allowed and phase 1 removed', () => {
-    chunk('App-aaaa.js', 'import "./prModel-bbbb.js";\n')
-    chunk('prModel-bbbb.js', 'export const p = 1;\n')
-    const { code, output } = run(dist)
-    expect(code).toBe(1)
-    expect(output).toContain('prModel-bbbb.js')
+  it('counts launcher-only bytes that an App-only walk would miss', () => {
+    chunk('main.js', 800_000)
+    expect(check().code).toBe(1)
   })
 
-  it('excuses nothing', () => {
-    // The allowance list is the one thing in the script that can turn a red graph green, so it is
-    // asserted rather than trusted. It held `prModel` while phase 1 was owed and has been empty since.
-    expect(readFileSync(SCRIPT, 'utf8')).toContain('const KNOWN = []')
+  it.each(['viewState', 'prModel', 'RemoteTree', 'TreeHost', 'roster'])('rejects %s merged into an unrelated startup chunk', (name) => {
+    chunk('chunks/App-a.js', 100, [], [`apps/tui/src/plugins/${name}.tsx`])
+    const result = check()
+    expect(result.code).toBe(1)
+    expect(result.output).toContain(`${name}.tsx (in chunks/App-a.js)`)
   })
 
-  it('fails over the byte ceiling', () => {
-    chunk('App-aaaa.js', `import "./big-bbbb.js";\n`)
-    chunk('big-bbbb.js', 'x'.repeat(1_500_000))
-    const { code, output } = run(dist)
-    expect(code).toBe(1)
-    expect(output).toContain('over its 1175000B ceiling')
+  it('rejects an external ORM import and reports other external packages without claiming their bytes', () => {
+    chunk('main.js', 100, ['ws', 'drizzle-orm/sqlite-core'])
+    const result = check()
+    expect(result.code).toBe(1)
+    expect(result.output).toContain('external runtime imports (bytes not counted): drizzle-orm/sqlite-core, ws')
+    expect(result.output).toContain('Denylisted startup dependencies: drizzle-orm/sqlite-core')
   })
 
-  it('refuses to guess when there is no single App chunk to walk from', () => {
-    chunk('main-aaaa.js', 'export const m = 1;\n')
-    expect(run(dist).output).toContain('expected exactly one')
+  it('refuses a manifest that omits the launcher or names a missing chunk', () => {
+    roots = ['chunks/App-a.js']
+    expect(check().output).toContain('must include main.js')
+    roots.push('main.js', 'chunks/missing.js')
+    expect(check().output).toContain('missing startup chunk chunks/missing.js')
   })
 })

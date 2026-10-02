@@ -1,13 +1,13 @@
 import { createHash } from 'node:crypto'
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
-import { writePrivateAtomic } from '@acorn/node-core/server/storage'
+import { writePrivateAtomic } from '@acorn/node-core/server/storage/dataRoot.ts'
 import { join } from 'node:path'
 import { z } from 'zod'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { corePluginBundleByHashRoute, corePluginBundleRoute } from '@acorn/protocol/api.ts'
 import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
-import { withPluginPackage, readPluginFile, MAX_PLUGIN_MANIFEST_BYTES, PluginPackageFileError } from '@acorn/node-core/server/plugins'
+import { readPluginFile, MAX_PLUGIN_MANIFEST_BYTES, PluginPackageFileError } from '@acorn/node-core/server/plugins/packageFiles.ts'
 import { hasNodeHalf, bundleSourceSchema } from '@acorn/protocol/plugin/bundles.ts'
 import type { PluginInstallSource } from '@acorn/protocol/api.ts'
 import { describePluginSource } from '@acorn/protocol/plugin/source.ts'
@@ -197,6 +197,7 @@ export class PluginCache {
   /** Validate the package before any entry is added. A folder is re-read for every update. */
   async putFromSource(source: PluginInstallSource, expectedPluginId?: string): Promise<{ hash: string; pluginId: string; version: string } | { error: PutFailure }> {
     try {
+      const { withPluginPackage } = await import('@acorn/node-core/server/plugins/installer.ts')
       return await withPluginPackage(this.userDataDir, source, (root, manifest) => {
         const rawManifest: unknown = JSON.parse(readPluginFile(root, 'acorn-plugin.json', MAX_PLUGIN_MANIFEST_BYTES).toString('utf8'))
         if (expectedPluginId && manifest.id !== expectedPluginId) return { error: 'plugin-id-mismatch' as const }

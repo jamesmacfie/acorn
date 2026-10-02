@@ -6,10 +6,11 @@ import { wsChannelPrefixes } from '@acorn/client-core/infra/node'
 // being claimed (a typo, or a plugin whose client half forgot to register) fails here rather than
 // showing up as a pane that never updates.
 //
-// Importing activate.ts boots the graph; the assertion is on what claimed a prefix.
+// Core registers eagerly; compiled plugins register in the post-paint pass.
 describe('registered ws channel prefixes', () => {
   it('are exactly the eighteen the app expects', async () => {
-    await import('../../src/client/activate')
+    const { startClientPlugins } = await import('../../src/client/activate')
+    await startClientPlugins()
     // term, workflow, plugins, tasks, connection, head, run, agent-session, project, terminal,
     // workspace, workspace-projects, worktree and ws are core's (client-core/infra/node/wsClient.ts):
     // term is transport on both ends,

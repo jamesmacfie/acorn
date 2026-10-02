@@ -23,6 +23,7 @@ export default defineConfig({
     copyPublicDir: false,
     target: 'node24',
     ssr: true,
+    minify: 'oxc',
     // The notices file is an asset, and an SSR build drops emitted assets without this.
     ssrEmitAssets: true,
     rollupOptions: {

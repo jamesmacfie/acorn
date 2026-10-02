@@ -3,14 +3,14 @@ import { mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, statSync, wr
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { writePrivateAtomic } from '@acorn/node-core/server/storage'
+import { writePrivateAtomic } from '@acorn/node-core/server/storage/dataRoot.ts'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/api.ts'
 import { PluginCache } from './pluginCache'
 import { PluginTrustStore } from './pluginTrustStore'
 import { BUNDLED_TRUST_OPT_OUT, trustBundledClientPlugins, trustsBundledClientPlugins } from './bundledPluginTrust'
 
-vi.mock('@acorn/node-core/server/storage', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@acorn/node-core/server/storage')>()
+vi.mock('@acorn/node-core/server/storage/dataRoot.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@acorn/node-core/server/storage/dataRoot.ts')>()
   return { ...actual, writePrivateAtomic: vi.fn(actual.writePrivateAtomic) }
 })
 

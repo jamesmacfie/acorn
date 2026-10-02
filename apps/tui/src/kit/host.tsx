@@ -12,7 +12,7 @@ import {
 import { chromeDeps, chromeKey } from '@acorn/client-core/host/chrome'
 import { createSlotChoice, resolveSlot } from '@acorn/client-core/host/tree'
 import type { OverlayPalette } from '@acorn/client-core/host/palette'
-import { RemoteTree } from '../plugins/RemoteTree'
+import { RemoteTree } from '../plugins/remoteTreeLoader'
 import { htmlLines } from './markdown'
 import { Line } from './cells'
 import { Badge, Icon, Lines, Row, Rows } from './showing'
@@ -42,7 +42,7 @@ export { confirmAction } from '../chrome/confirmStore'
 export { slotFills } from '@acorn/client-core/host/tree'
 export { requestAnnotations, annotationsFor } from '@acorn/client-core/host/annotations/annotations.ts'
 export { selectPaneTab } from '@acorn/client-core/host/layouts/state.ts'
-export { RemoteTree } from '../plugins/RemoteTree'
+export { RemoteTree } from '../plugins/remoteTreeLoader'
 export type { RemoteTreeProps } from '../plugins/RemoteTree'
 // The `wizard` layout for a surface that is a wizard and is not a pane. The same component the layout
 // table hands the pane registry, so onboarding's overlay and a `wizard` pane are arranged alike.

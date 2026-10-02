@@ -49,6 +49,9 @@ export type AppStartupOptions = {
   // cache; only the restore waits.
   prefsSettled: Accessor<boolean>
   cacheRestoring: Accessor<boolean>
+  // Hosts may draw before their compiled contributions arrive. Restore still needs the complete
+  // initial slice and pane registry before it selects a workspace or mounts a default pane model.
+  contributionsReady?: Accessor<boolean>
   projects: Accessor<Project[] | undefined>
   tasks: Accessor<Task[] | undefined>
   workspaces: Accessor<Workspace[] | undefined>
@@ -74,7 +77,7 @@ export function createAppStartupRestore(options: AppStartupOptions): { restored:
   const { restored } = createStartupRestore({
     queryClient: options.queryClient,
     prefs: options.prefs,
-    ready: () => !options.cacheRestoring() && options.prefsSettled() && options.projects() !== undefined
+    ready: () => (options.contributionsReady?.() ?? true) && !options.cacheRestoring() && options.prefsSettled() && options.projects() !== undefined
       && options.tasks() !== undefined && options.workspaces() !== undefined,
     slices: () => [...persistedStateRegistry.entries(), ...shellSlices],
   })

@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { lockedBy } from '@acorn/node-core/server/storage'
-import { certificateFingerprint } from '@acorn/node-core/server/transport'
+import { lockedBy } from '@acorn/node-core/server/storage/dataRoot.ts'
+import { certificateFingerprint } from '@acorn/node-core/server/transport/tls.ts'
 import { nodeIdentitySchema } from '@acorn/protocol/node.ts'
 
 export type RunningNode = { pid: number; nodeId: string; endpoint: string; fingerprint: string; certPem: string }
