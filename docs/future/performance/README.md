@@ -28,7 +28,7 @@ all selected fixes and includes the two-Node and native/TUI composition checks.
 | 11 | [Agent queue implementation record](../../../plans/performance/implementation-11-agent-queue.md) | Through 10 | Implemented |
 | 12 | [Streamed search implementation record](../../../plans/performance/implementation-12-agent-search.md) | Through 11 | Implemented |
 | 13 | [Agent wait facts and complete result capture](./13-agent-results.md) | Through 12 | Pending |
-| 14 | [Git observations, filesystem admission, and exact paths](./14-git-filesystem.md) | Through 13 | Pending |
+| 14 | [Git filesystem implementation record](../../../plans/performance/implementation-14-git-filesystem.md) | Through 13 | Implemented; native Changes verification blocked by service bundle size gate |
 | 15 | [PR markers implementation record](../../../plans/performance/implementation-15-pr-markers.md) | Through 14 | Implemented; native verification blocked by service bundle size gate |
 | 16 | [Editor custody implementation record](../../../plans/performance/implementation-16-editor-custody.md) | Through 15 | Implemented; unit 15 identity integrated, native verification remains open |
 | 17 | [Editor search, file tree viewport, and host admission](./17-editor-search-tree.md) | Through 16 | Pending |

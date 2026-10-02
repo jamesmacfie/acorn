@@ -203,12 +203,24 @@ list, so two clients over four worktrees used to be 16 `git status` processes pe
 two seconds: concurrent callers join the run in flight, and a caller just behind one gets what that
 run produced. The changes pane's local-changes read takes the same output, which is why the command
 carries `--branch` that only the rail needs. The pane's other reads of the tree, its two
-`git diff --numstat` line counts and the `rev-parse --git-dir` behind its merge and rebase banner, go
+`git diff --numstat -z` line counts and the `rev-parse --git-dir` behind its merge and rebase banner, go
 through the same window by argument list (`worktreeGitText`), so two clients on one task cost one of
 each per window rather than one per client. The node drops every entry for a path when it writes under
 it, runs in flight included, which covers a stage, a commit, a discard, a push, an editor save, a
 worktree created, and a terminal session's command going quiet. A change made outside acorn shows up
 on the next poll past the window.
+One shared expiry timer removes completed stdout when its two-second window ends, including paths
+that nobody requests again. Failed reads leave no cached entry. Invalidation retires running entries
+without cancelling their admitted callers, and a late completion cannot repopulate a retired entry.
+Fresh reads bypass both the window and running reads, then publish their answer for subsequent reads.
+
+The status sweep admits a HEAD observation generation for each authorized task before its Git wait.
+Only that task's newest generation can publish `head:changed`; an obsolete caller still receives its
+original status response. Initial HEAD observations seed silently, and an unknown HEAD preserves the
+last successful observation. Archive claims, project deletion, missing directories, complete roster
+pruning, and worktree-root initialization retire observations. A task-confined roster cannot prune
+other authorized tasks. Four workers admit the sweep's Git reads, and the client drives its clock.
+
 There is no filesystem watcher. One would be a handle per directory where recursive `fs.watch` is
 missing, a second source of truth about "dirty" beside git's, and a stream of events to debounce into
 this same coalesced read. It is worth building only when a change made outside acorn has to appear in

@@ -32,6 +32,52 @@ export type WorktreeStatus = { dirty: boolean; count: number; branch: string | n
 // path drops every read of it at once, the status and the changes pane's line counts together.
 type Read = { text: string | null; at: number; running: Promise<string | null> | null }
 const reads = new Map<string, Map<string, Read>>()
+let expiryTimer: ReturnType<typeof setTimeout> | undefined
+let expiryAt = Infinity
+
+function removeRead(path: string, key: string, read: Read): void {
+  const entries = reads.get(path)
+  if (entries?.get(key) !== read) return
+  entries.delete(key)
+  if (!entries.size) reads.delete(path)
+}
+
+// One clock for completed stdout, regardless of the number of paths or commands. Running reads
+// keep their admitted callers, but only the entry still owned by the cache can retain its answer.
+function scheduleExpiry(at: number): void {
+  if (at >= expiryAt) return
+  if (expiryTimer) clearTimeout(expiryTimer)
+  expiryAt = at
+  expiryTimer = setTimeout(() => {
+    expiryTimer = undefined
+    expiryAt = Infinity
+    const now = Date.now()
+    let next = Infinity
+    for (const [path, entries] of reads) {
+      for (const [key, read] of entries) {
+        if (read.text === null) continue
+        const expires = read.at + WORKTREE_STATUS_TTL_MS
+        if (expires <= now) removeRead(path, key, read)
+        else next = Math.min(next, expires)
+      }
+    }
+    scheduleExpiry(next)
+  }, Math.max(0, at - Date.now()))
+  expiryTimer.unref()
+}
+
+function rescheduleExpiry(): void {
+  if (expiryTimer) clearTimeout(expiryTimer)
+  expiryTimer = undefined
+  expiryAt = Infinity
+  let next = Infinity
+  for (const entries of reads.values()) {
+    for (const read of entries.values()) {
+      if (read.text !== null) next = Math.min(next, read.at + WORKTREE_STATUS_TTL_MS)
+    }
+  }
+  scheduleExpiry(next)
+}
 
 const run = async (path: string, args: readonly string[], timeoutMs: number): Promise<string | null> => {
   try {
@@ -62,9 +108,13 @@ export async function worktreeGitText(path: string, args: readonly string[], opt
   const read: Read = { text: null, at: 0, running: null }
   read.running = run(path, args, opts.timeoutMs ?? 10_000).then((text) => {
     read.running = null
+    if (reads.get(path)?.get(key) !== read) return text
     if (text !== null) {
       read.text = text
       read.at = Date.now()
+      scheduleExpiry(read.at + WORKTREE_STATUS_TTL_MS)
+    } else {
+      removeRead(path, key, read)
     }
     return text
   })
@@ -125,12 +175,14 @@ export async function worktreeStatus(path: string, opts?: { fresh?: boolean }): 
 export function invalidateWorktreeStatus(path?: string): void {
   if (path === undefined) {
     reads.clear()
+    rescheduleExpiry()
     return
   }
   reads.delete(path)
+  rescheduleExpiry()
 }
 
 /** Test seam: the maps are module singletons whose lifetime is the node's. */
 export function _resetWorktreeStatus(): void {
-  reads.clear()
+  invalidateWorktreeStatus()
 }

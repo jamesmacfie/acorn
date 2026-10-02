@@ -1,0 +1,4 @@
+64902dc9ae594949df38a5c959113b2442b2e3f9c52f632d6fdd9d84ede410a8  packages/node-core/src/server/worktrees/taskWorktree.ts
+97d18666c0031dffb12bba2808d51273970a30457b5b2378b653794fed0497ec  packages/node-core/src/server/worktrees/worktreeStatus.ts
+dde7ca52b0a610f5ec7e426811f309c41f1e83f9fe23adfdbf2e93c47a297a6a  plugins/changes/src/server/localDiff.ts
+427f682e19593f8e51a05367f40b4f37397dbf5e407a6d7aa5cd2c26533cad08  plans/performance/11-git-probe.mjs

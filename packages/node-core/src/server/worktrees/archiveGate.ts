@@ -3,12 +3,15 @@
 // Archive cannot mark the database row archived before teardown succeeds, but leaving the row active
 // lets a pane resolve and recreate the worktree while it is being removed. This process-local gate
 // closes that interval without adding a persisted lifecycle state that would need crash recovery.
+import { retireTaskHead } from './taskHeadObserver'
+
 const archiving = new Set<string>()
 
 /** Claims one task for archive. False means another archive already owns it. */
 export function beginTaskArchive(taskId: string): boolean {
   if (archiving.has(taskId)) return false
   archiving.add(taskId)
+  retireTaskHead(taskId)
   return true
 }
 

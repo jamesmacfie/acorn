@@ -5,6 +5,7 @@ import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import type { AppDatabase } from './db'
 import { schema } from './db'
 import { git } from './core/git'
+import { retireTaskHead } from './worktrees/taskHeadObserver'
 import { broadcastProjectChanged, broadcastTasksChanged, broadcastWorkspaceChanged } from './notify'
 
 // A project is a folder on this machine (server/db/schema.ts `projects`; docs/workspaces-and-tasks.md
@@ -259,6 +260,7 @@ export async function deleteProject(db: AppDatabase, id: string): Promise<void> 
     await db.delete(schema.taskPulls).where(inArray(schema.taskPulls.taskId, taskIds))
     await db.delete(schema.taskLinks).where(inArray(schema.taskLinks.taskId, taskIds))
     await db.delete(schema.tasks).where(inArray(schema.tasks.id, taskIds))
+    for (const taskId of taskIds) retireTaskHead(taskId)
   }
   await db.delete(schema.projects).where(eq(schema.projects.id, id))
   // The rail's task list just lost a batch of tasks in this project (./notify.ts §
