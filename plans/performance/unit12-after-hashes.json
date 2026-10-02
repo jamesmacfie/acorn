@@ -1,0 +1,13 @@
+{
+  "plugins/agents/src/server/sessions/sessionRepository.ts": "30fd5492d8a777582b25d27c9402aa899620f5b2df4c5f2fde706d5aba263a71",
+  "plugins/agents/src/server/sessions/store.ts": "2da7f1c46bd828b20f98a7b7d6adac45a6a95e8f4ad6053545440d23df113de8",
+  "plugins/agents/src/server/sessions/searchProjection.ts": "d0ba5332cab5caef709c53e7790ec46bce683833e1fa382f5e3557afc3ddc54e",
+  "plugins/agents/src/server/sessions/searchSchema.ts": "fafa259f51f637c38c60e9fa546e0c20ff2f8f368abdc26fb733ad02801bf8ee",
+  "plugins/agents/src/server/sessions/sessionSearch.ts": "c15dc5c4fc5f1b791db963ea45381c4fb99fc8be68539958ffb55bf4789b3f02",
+  "plugins/agents/src/server/sessions/runtimeEngine.ts": "80022341fe8b8804dc3636d21c34fbde8e21cff8efb1f3f732dcf2d3438afd80",
+  "plugins/agents/src/server/routes/managedBridge.ts": "2649b0da38fc6a0b3f5e266ce062ede96b920c7f959e0a49b82a7f79c03e7aeb",
+  "plugins/agents/migrations/0012_agent_search_progress.sql": "dfe789d5db3a214bc3f3ee366719e02f64997cef15b091f323d74f16d3d8e95d",
+  "plugins/agents/migrations/meta/_journal.json": "5128bd85ce7e26532325000af00319a239245459b2efbf69f03035aa89043a90",
+  "plans/performance/unit12-search-probe.test.ts": "87e73c439823b2a29a37489883f13a20c471df787533d50bb66637cfa11d61c7",
+  "plans/performance/unit12-probe.config.ts": "c9029f8f9f0e39647c1937399358322aabaf6d8bc5af0aa94ae5b73d4e06c8ff"
+}

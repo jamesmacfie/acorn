@@ -1,0 +1,14 @@
+node:internal/fs/promises:1564
+  return await PromisePrototypeThen(
+         ^
+
+Error: EEXIST: file already exists, mkdir '/Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plans/performance/evidence/unit29-pinned-20261002'
+    at async mkdir (node:internal/fs/promises:1564:10)
+    at async file:///Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plans/performance/unit29-preparation.mjs:14:1 {
+  errno: -17,
+  code: 'EEXIST',
+  syscall: 'mkdir',
+  path: '/Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plans/performance/evidence/unit29-pinned-20261002'
+}
+
+Node.js v24.21.0

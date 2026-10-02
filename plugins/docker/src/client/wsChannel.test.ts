@@ -86,4 +86,37 @@ describe('docker ws channel', () => {
 
     expect(framesSent()).toContainEqual({ channel: 'docker:logs:attach', id: 'c1' })
   })
+  it('retires A before same-ID B attaches and keeps delayed A cleanup harmless', () => {
+    const a: unknown[] = [], b: unknown[] = []
+    const offA = channel.wsDockerAttach('logs', 'same', event => a.push(event))
+    const execA = channel.wsDockerExecOpen('exec', 'same', 80, 24, event => a.push(event))
+    setActiveNode('b')
+    expect(bridge.sent.slice(-2)).toEqual([
+      { nodeId: 'n1', frame: { channel: 'docker:logs:detach', id: 'same' } },
+      { nodeId: 'n1', frame: { channel: 'docker:exec:kill', execId: 'exec' } },
+    ])
+    const offB = channel.wsDockerAttach('logs', 'same', event => b.push(event))
+    const execB = channel.wsDockerExecOpen('exec', 'same', 80, 24, event => b.push(event))
+    offA(); execA()
+    bridge.emitFrame({ channel: 'docker:log', id: 'same', data: 'A late' }, 'n1')
+    bridge.emitFrame({ channel: 'docker:log', id: 'same', data: 'B' }, 'b')
+    bridge.emitFrame({ channel: 'docker:exec:out', execId: 'exec', data: 'B exec' }, 'b')
+    expect(a).toEqual([{ kind: 'end' }, { kind: 'exit' }])
+    expect(b).toEqual([{ kind: 'log', data: 'B' }, { kind: 'out', data: 'B exec' }])
+    offB(); execB()
+    expect(bridge.sent.at(-1)?.nodeId).toBe('b')
+  })
+
+  it('keeps the surviving same-Node viewer attached', () => {
+    const first = channel.wsDockerAttach('logs', 'same', () => {})
+    const events: unknown[] = []
+    const second = channel.wsDockerAttach('logs', 'same', event => events.push(event))
+    first()
+    expect(framesSent().filter((frame: any) => frame.channel === 'docker:logs:detach')).toHaveLength(0)
+    bridge.emitFrame({ channel: 'docker:log', id: 'same', data: 'still live' })
+    expect(events).toEqual([{ kind: 'log', data: 'still live' }])
+    second()
+    expect(framesSent().filter((frame: any) => frame.channel === 'docker:logs:detach')).toHaveLength(1)
+  })
+
 })

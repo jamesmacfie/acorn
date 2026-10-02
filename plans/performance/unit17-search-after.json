@@ -1,0 +1,70 @@
+{
+  "owner": "plugins/editor/src/server/search.ts searchInFiles",
+  "fixture": "real bundled ripgrep on one disposable ASCII file",
+  "rows": [
+    {
+      "lines": 2000,
+      "fileBytes": 416000,
+      "value": {
+        "files": 1,
+        "hits": 2000,
+        "truncated": false,
+        "responseBytes": 504956
+      },
+      "nodeCpuMs": 12.002,
+      "wallMs": 21.854375000000005,
+      "heapDeltaBytes": 296888,
+      "spawned": [
+        {
+          "command": "rg",
+          "stdoutBytes": 786961,
+          "pid": 23281,
+          "aliveAfterClose": false
+        }
+      ]
+    },
+    {
+      "lines": 8000,
+      "fileBytes": 1664000,
+      "value": {
+        "files": 1,
+        "hits": 2000,
+        "truncated": true,
+        "responseBytes": 504955
+      },
+      "nodeCpuMs": 10.733,
+      "wallMs": 14.101417000000026,
+      "heapDeltaBytes": 35640,
+      "spawned": [
+        {
+          "command": "rg",
+          "stdoutBytes": 983040,
+          "pid": 23283,
+          "aliveAfterClose": false
+        }
+      ]
+    },
+    {
+      "lines": 100000,
+      "fileBytes": 20800000,
+      "value": {
+        "files": 1,
+        "hits": 2000,
+        "truncated": true,
+        "responseBytes": 504955
+      },
+      "nodeCpuMs": 8.989,
+      "wallMs": 62.19241699999998,
+      "heapDeltaBytes": 39288,
+      "spawned": [
+        {
+          "command": "rg",
+          "stdoutBytes": 917504,
+          "pid": 23289,
+          "aliveAfterClose": false
+        }
+      ]
+    }
+  ],
+  "expected": "Accepted search bounds production/parse work at the response cap and surfaces overflow/invalid query errors instead of claiming no matches."
+}

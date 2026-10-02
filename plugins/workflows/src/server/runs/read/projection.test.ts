@@ -15,7 +15,7 @@ describe('workflow task navigation projection', () => {
       parentRunId: depth ? rootRunId : null, parentStepId: null, depth, createdAt: 1, updatedAt: 2,
     })
     await database.db.insert(schema.workflowRuns).values([
-      run('root', 0, 'root'), run('child', 1, 'root'), run('unpriced', 0, 'unpriced'),
+      run('root', 0, 'root'), run('child', 1, 'root'), run('unpriced', 0, 'unpriced'), run('zero', 0, 'zero'),
     ])
     await database.db.insert(schema.workflowSteps).values({
       id: 'old-step', runId: 'unpriced', idx: 0, name: 'Old step', kind: 'agent', mode: 'headless',
@@ -25,12 +25,38 @@ describe('workflow task navigation projection', () => {
       { id: 'root-turn', rootRunId: 'root', runId: 'root', stepId: 'one', state: 'settled', costUsd: 0.1, createdAt: 1 },
       { id: 'child-turn', rootRunId: 'root', runId: 'child', stepId: 'two', state: 'settled', costUsd: 0.2, createdAt: 1 },
       { id: 'reserved', rootRunId: 'root', runId: 'child', stepId: 'three', state: 'reserved', costUsd: 0, createdAt: 1 },
+      { id: 'zero-turn', rootRunId: 'zero', runId: 'zero', stepId: 'one', state: 'settled', costUsd: 0, createdAt: 1 },
     ])
 
     const rows = (await workflowRunList(database.db)).runs
     expect(rows.find((row) => row.id === 'root')?.costUsd).toBeCloseTo(0.3)
     expect(rows.find((row) => row.id === 'child')?.costUsd).toBeCloseTo(0.2)
     expect(rows.find((row) => row.id === 'unpriced')?.costUsd).toBeNull()
+    expect(rows.find((row) => row.id === 'zero')?.costUsd).toBe(0)
+    expect(rows.find((row) => row.id === 'child')).toMatchObject({ startedAt: 1, endedAt: 2, status: 'done' })
+  })
+
+  it('keeps insertion order for tied descendant timestamps and falls back when reprocess sources disappear', async () => {
+    const run = (id: string, taskId: string, status: string, parentRunId: string | null, rootRunId: string, trigger = 'manual') => ({
+      id, taskId, name: id, status, trigger, defJson: '{}', parentRunId, rootRunId, createdAt: 1, updatedAt: 2,
+    })
+    database.db.insert(schema.workflowRuns).values([
+      run('root', 'root-task', 'running', null, 'root'),
+      run('z-first', 'child-task', 'gated', 'root', 'root'),
+      run('a-second', 'child-task', 'done', 'root', 'root'),
+      run('orphan', 'orphan-task', 'failed', 'missing', 'missing'),
+      run('reprocess', 'reprocess-task', 'cancelling', null, 'reprocess', 'reprocess'),
+    ]).run()
+    database.db.insert(schema.workflowDispatches).values({
+      id: 'dispatch', callerKey: 'reprocess', payloadFingerprint: 'fingerprint', payloadJson: '{}',
+      parentTaskId: 'gone', taskId: 'reprocess-task', runId: 'reprocess', rootRunId: 'reprocess',
+      parentRunId: 'gone', parentStepId: 'loop', state: 'run-started', createdAt: 1, updatedAt: 2,
+    }).run()
+    expect(await workflowTaskNavigation(database.db)).toEqual({ groups: [
+      { rootTaskId: 'root-task', descendants: 1, running: 0, attention: 1 },
+      { rootTaskId: 'reprocess-task', descendants: 1, running: 1, attention: 0 },
+    ] })
+    expect((await workflowRunList(database.db)).runs.map(run => run.id)).toEqual(['root', 'z-first', 'a-second', 'orphan', 'reprocess'])
   })
 
   it('aggregates latest descendant attention under the original root, including reprocess roots', async () => {

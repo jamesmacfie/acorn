@@ -120,11 +120,12 @@ try {
     const body = `${'x'.repeat(1023)}\n`.repeat(17 * 1024) + 'FINAL_SENTINEL\n'
     fs.writeFileSync(join(dir, 'large-untracked.txt'), body)
     fs.writeFileSync(join(dir, 'tracked.txt'), body)
-    const untracked = await changes.localDiff(dir, 'large-untracked.txt', 'unstaged')
+    const untracked = await changes.localDiff(dir, 'large-untracked.txt', 'unstaged').then(v => ({ success: true, patch: v.patch }), e => ({ success: false, error: e.message }))
     const tracked = await changes.localDiff(dir, 'tracked.txt', 'unstaged').then(v => ({ success: true, bytes: Buffer.byteLength(v.patch) }), e => ({ success: false, error: e.message }))
     const raw = await gitOwner.git(['diff', '--no-index', '--', '/dev/null', 'large-untracked.txt'], { cwd: dir })
     result = { fileBytes: Buffer.byteLength(body), gitMaxOutputBytes: gitOwner.GIT_MAX_OUTPUT_BYTES,
-      untrackedSuccess: true, untrackedPatchBytes: Buffer.byteLength(untracked.patch), untrackedIncludesFinalLine: untracked.patch.includes('FINAL_SENTINEL'),
+      untrackedSuccess: untracked.success, untrackedError: untracked.error,
+      untrackedPatchBytes: untracked.success ? Buffer.byteLength(untracked.patch) : null, untrackedIncludesFinalLine: untracked.success ? untracked.patch.includes('FINAL_SENTINEL') : null,
       rawExitCode: raw.code, rawTruncated: raw.truncated, tracked,
       expected: 'An oversized untracked patch reports the same explicit cap error as an oversized tracked patch.' }
   } else if (kind === 'markers') {

@@ -24,6 +24,8 @@ const queries: DbSavedQuery[] = [
 
 const runQuery = vi.fn()
 const readScratch = vi.fn(async () => 'SELECT generated;')
+const flush = vi.fn(async () => {})
+const read = vi.fn(async () => '')
 let saved: () => Promise<DbSavedQuery[]> = async () => queries
 
 vi.mock('./databaseClient', () => ({ createDatabaseClient: () => ({
@@ -46,32 +48,34 @@ const settle = async () => {
   for (let at = 0; at < 4; at++) await new Promise<void>((resolve) => setTimeout(resolve, 0))
 }
 
-type Harness = { written: string[]; select: (item: string) => void; dispose: () => void }
+type Harness = { written: string[]; select: (item: string) => void; execute: () => void; pressExecute: () => void; text: () => string; dispose: () => void }
 
 const mount = (item?: string): Harness => {
   const ops: TreeMutation[] = []
   const root = createRemoteRoot((batch) => ops.push(...batch))
   const written: string[] = []
+  let onAction: (command: string) => void = () => {}
   let onSelect: (item: string) => void = () => {}
   const bridge = {
     context: { surface: 'database', target: 'remote', nodeId: 'node-a', ...(item ? { item } : {}) },
     document: {
-      read: async () => '',
+      read: () => read(),
       write: async (text: string) => void written.push(text),
-      flush: async () => {},
+      flush: () => flush(),
     },
     onSelect: (handler: (item: string) => void) => {
       onSelect = handler
       return () => {}
     },
-    onSurfaceAction: () => () => {},
+    onSurfaceAction: (handler: (command: string) => void) => { onAction = handler; return () => {} },
   } as unknown as AcornBridge
+  let unmount = () => {}
   solidTree(DatabasePaneApp)(bridge, {
     entry: 'panel',
     root,
     props: () => ({ taskId: 'task-1' }),
     onProps: () => {},
-    onUnmount: () => {},
+    onUnmount: (dispose) => { unmount = dispose },
     // This tree asks its host for nothing, so both throw: a fixture that silently answered
     // would hide a component that started asking.
     host: {
@@ -79,16 +83,30 @@ const mount = (item?: string): Harness => {
       openOverlay: () => Promise.reject(new Error('this fixture answers no host requests')),
     },
   })
-  return { written, select: (next) => onSelect(next), dispose: () => root.dispose() }
+  const pressExecute = () => {
+    const nodes: typeof root.node.children = []
+    const visit = (node: typeof root.node) => { nodes.push(node); node.children.forEach(visit) }
+    root.node.children.forEach(visit)
+    const button = nodes.find((node) => node.type === 'Button' && node.children.some((child) => child.props.value === 'Run'))
+    if (!button) throw new Error('Run button missing')
+    ;(button.props.onPress as () => void)()
+  }
+  const text = () => {
+    const visit = (node: typeof root.node): string => String(node.props.value ?? '') + node.children.map(visit).join('')
+    return visit(root.node)
+  }
+  return { written, text, select: (next) => onSelect(next), execute: () => onAction('execute'), pressExecute, dispose: () => { unmount(); root.dispose() } }
 }
 
-describe('what the palette hands the Database pane', () => {
-  beforeEach(() => {
+beforeEach(() => {
     runQuery.mockClear()
-    readScratch.mockClear()
+    readScratch.mockReset().mockResolvedValue('SELECT generated;')
+    flush.mockReset().mockResolvedValue(undefined)
+    read.mockReset().mockResolvedValue('')
     saved = async () => queries
   })
 
+describe('what the palette hands the Database pane', () => {
   it('loads a saved query’s SQL into the editor and does not run it', async () => {
     const pane = mount()
     await settle()
@@ -134,4 +152,52 @@ describe('what the palette hands the Database pane', () => {
     expect(readScratch).not.toHaveBeenCalled()
     pane.dispose()
   })
+})
+
+it.each(['button', 'action'])('%s execute waits for flush and propagates failures without executing stale SQL', async (entry) => {
+  const pane = mount()
+  try {
+    await settle()
+    read.mockResolvedValue('SELECT on_screen;')
+    let reject!: (cause: Error) => void
+    flush.mockImplementationOnce(() => new Promise((_resolve, fail) => { reject = fail }))
+    const execute = () => entry === 'button' ? pane.pressExecute() : pane.execute()
+    execute()
+    await settle()
+    expect(runQuery).not.toHaveBeenCalled()
+    reject(new Error('offline'))
+    await settle()
+    expect(pane.text()).toContain('offline')
+    expect(runQuery).not.toHaveBeenCalled()
+    runQuery.mockResolvedValue({ columns: [], rows: [], rowCount: 0, command: 'SELECT', ms: 1 })
+    execute()
+    await settle()
+    expect(runQuery).toHaveBeenCalledExactlyOnceWith('task-1', 'SELECT on_screen;')
+    read.mockRejectedValueOnce(new Error('retired'))
+    execute()
+    await settle()
+    expect(runQuery).toHaveBeenCalledTimes(1)
+    expect(pane.text()).toContain('retired')
+  } finally { pane.dispose() }
+})
+
+it('ignores held scratch reads after later selection or pane retirement', async () => {
+  let complete!: (text: string) => void
+  readScratch.mockImplementationOnce(() => new Promise((resolve) => { complete = resolve }))
+  const pane = mount()
+  await settle()
+  pane.select(SCRATCH_SELECT_ID)
+  await settle()
+  pane.select('q-2')
+  await settle()
+  complete('SELECT obsolete;')
+  await settle()
+  expect(pane.written).toEqual(['SELECT 2;'])
+  readScratch.mockImplementationOnce(() => new Promise((resolve) => { complete = resolve }))
+  pane.select(SCRATCH_SELECT_ID)
+  await settle()
+  pane.dispose()
+  complete('SELECT retired;')
+  await settle()
+  expect(pane.written).toEqual(['SELECT 2;'])
 })

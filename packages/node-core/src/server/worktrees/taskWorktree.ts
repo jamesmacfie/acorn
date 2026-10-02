@@ -16,7 +16,9 @@ import { getProjectConfig } from '../projectConfig'
 import { readRepoConfigSnapshot, type RepoConfigSnapshot } from '../repoConfigSnapshot'
 import { copyWorktreeFiles, ensureWorktree, listWorktrees, staleWorktreeReason, worktreeBranch, worktreePorcelain } from './worktrees'
 import { isTaskArchiving } from './archiveGate'
-import { broadcastHeadChanged, broadcastTasksChanged } from '../notify'
+import { broadcastTasksChanged } from '../notify'
+import { admitTaskHead, noticeTaskHead, pruneTaskHeads, resetTaskHeads, retireTaskHead, taskHeadScope } from './taskHeadObserver'
+import { invalidateWorktreeStatus } from './worktreeStatus'
 import { runHook } from '../pluginHost/hooks'
 import { BridgeError } from '../bridge'
 import { createLogger, describeError } from '../telemetry/logger'
@@ -26,6 +28,8 @@ const log = createLogger('worktrees')
 // Set once by registerTerminalChannel, where workspace worktrees are created (docs/workspaces-and-tasks.md).
 let worktreesRoot = ''
 export const setWorktreesRoot = (dir: string): void => {
+  resetTaskHeads()
+  invalidateWorktreeStatus()
   worktreesRoot = dir
 }
 export const getWorktreesRoot = (): string => worktreesRoot
@@ -122,12 +126,15 @@ export async function unclaimedWorktrees(db: AppDatabase, project: ProjectRow): 
 // paths, which is a layout disclosure, and each row costs a `git status`, so a confined caller polling
 // this would otherwise make the node do work for tasks it may not see.
 export async function computeTaskStatuses(db: AppDatabase, only?: (taskId: string) => boolean): Promise<TaskStatus[]> {
+  const scope = taskHeadScope()
   const all = await db
     .select({ id: schema.tasks.id, projectId: schema.tasks.projectId, worktreePath: schema.tasks.worktreePath })
     .from(schema.tasks)
     .where(and(eq(schema.tasks.status, 'active'), isNotNull(schema.tasks.worktreePath)))
   const visible = all.filter((row) => !isTaskArchiving(row.id))
+  pruneTaskHeads(new Set(visible.map((row) => row.id)), scope)
   const rows = only ? visible.filter((row) => only(row.id)) : visible
+  const generations = rows.map((row) => admitTaskHead(row.id, scope))
 
   // `git status` is async but still CPU/disk work. An unbounded Promise.all made every task start a
   // process at once, producing a periodic resource spike that grew with the task roster.
@@ -139,35 +146,18 @@ export async function computeTaskStatuses(db: AppDatabase, only?: (taskId: strin
       const row = rows[index]!
       const path = row.worktreePath!
       if (!isDir(path)) {
+        retireTaskHead(row.id, generations[index]!)
+        invalidateWorktreeStatus(path)
         results[index] = { taskId: row.id, worktreePath: path, dirty: false, dirtyCount: 0, missing: true, branch: null, head: null }
         continue
       }
       const { dirty, count, branch, head } = await worktreePorcelain(path)
       results[index] = { taskId: row.id, worktreePath: path, dirty, dirtyCount: count, missing: false, branch, head }
-      noticeHead(row.id, row.projectId, branch, head, dirty)
+      noticeTaskHead(row.id, generations[index]!, row.projectId, branch, head, dirty)
     }
   }
   await Promise.all(Array.from({ length: Math.min(4, rows.length) }, worker))
   return results
-}
-
-// The last HEAD this node saw per task, so the status poll doubles as the HEAD observer
-// (docs/plugins.md § Hearing a core event). Nothing in the tree hooks HEAD directly, and a
-// commit from a PTY, an agent, or an outside editor has no hook to catch, so the poll that already
-// runs `git status` on every active worktree is the one honest place to notice. The first sighting
-// of a task seeds the map without a frame: a fresh node has nothing to compare against, and
-// `reconcileWorktrees` seeds every task at boot for that reason.
-//
-// ponytail: the poll is the client's 10 s clock plus a re-pull on every `term:status` ping, so an
-// in-app commit (changes pane, which pings status) is noticed within one round trip and an
-// out-of-app one within ten seconds — but only while a client is attached. A node-side clock is the
-// upgrade if a headless node ever needs to hear its own commits.
-const lastHeads = new Map<string, string>()
-function noticeHead(taskId: string, projectId: string, branch: string | null, head: string | null, dirty: boolean): void {
-  if (!head) return
-  const previous = lastHeads.get(taskId)
-  lastHeads.set(taskId, head)
-  if (previous && previous !== head) broadcastHeadChanged({ projectId, taskId, branch, head, dirty })
 }
 
 // Startup reconciliation (docs/workspaces-and-tasks.md): flag any persisted worktree whose directory is gone

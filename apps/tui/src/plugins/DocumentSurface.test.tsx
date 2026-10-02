@@ -1,5 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { expect, test, vi } from 'vitest'
+import { MAX_DOCUMENT_BYTES } from '@acorn/protocol/plugin/bridge.ts'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import type { DocumentSurfaceProps } from '@acorn/client-core/host/frames/documentSurface.ts'
 import { commandRegistry, keybindingRegistry } from '@acorn/client-core/host/registries/commands'
@@ -87,4 +88,53 @@ test('an unreadable document reports the error and never hands the plugin an emp
   } finally {
     screen.done()
   }
+})
+
+test('a failed terminal draft survives a Node switch and remount while its retired handle loses authority', async () => {
+  api.read.mockReset().mockResolvedValue({ text: 'SELECT stored;' })
+  api.write.mockReset().mockRejectedValue(new Error('offline'))
+  let handle: Parameters<NonNullable<DocumentSurfaceProps['onHandle']>>[0] = null
+  const options = (nodeId = 'node-a') => ({ ...props((next) => { handle = next }), nodeId, scope: { taskId: 'tui-failed-recovery' } })
+  const mount = async (nodeId = 'node-a') => renderCells(() => <QueryClientProvider client={new QueryClient()}>
+    <DocumentSurface {...options(nodeId)} />
+  </QueryClientProvider>)
+  const first = await mount()
+  await vi.waitFor(() => expect(handle).not.toBeNull())
+  const retired = handle!
+  retired.write('SELECT unsent;')
+  await expect(retired.flush()).rejects.toThrow('offline')
+  first.done()
+  expect(() => retired.read()).toThrow('retired')
+  expect(() => retired.write('SELECT wrong_node;')).toThrow('retired')
+  await expect(retired.flush()).rejects.toThrow('retired')
+  await Promise.resolve()
+  const other = await mount('node-b')
+  try {
+    await vi.waitFor(() => expect(handle).not.toBeNull())
+    expect(handle!.read()).toBe('SELECT stored;')
+  } finally { other.done() }
+  await Promise.resolve()
+  const reopened = await mount()
+  try {
+    await vi.waitFor(() => expect(handle).not.toBeNull())
+    expect(handle!.read()).toBe('SELECT unsent;')
+    api.write.mockResolvedValue({})
+    await handle!.flush()
+    expect(api.write).toHaveBeenLastCalledWith('/v1/p/database/tasks/tui-failed-recovery/scratch', expect.objectContaining({ nodeId: 'node-a', body: JSON.stringify({ text: 'SELECT unsent;' }) }))
+  } finally { reopened.done() }
+})
+
+test('an oversized stored terminal document exposes recovery instructions and never writes an empty buffer', async () => {
+  api.read.mockReset().mockResolvedValue({ text: 'é'.repeat(MAX_DOCUMENT_BYTES) })
+  api.write.mockReset()
+  const onHandle = vi.fn()
+  const screen = await renderCells(() => <QueryClientProvider client={new QueryClient()}>
+    <DocumentSurface {...props(onHandle)} scope={{ taskId: 'tui-legacy-oversize' }} />
+  </QueryClientProvider>)
+  try {
+    await vi.waitFor(async () => expect((await screen.frame()).text).toContain('Document exceeds 2 MiB'))
+    expect(onHandle).not.toHaveBeenCalled()
+    expect(api.write).not.toHaveBeenCalled()
+  } finally { screen.done() }
+  expect(api.write).not.toHaveBeenCalled()
 })

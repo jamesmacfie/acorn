@@ -26,6 +26,9 @@ export type GitOptions = {
   signal?: AbortSignal
   env?: Record<string, string>
   stdin?: string
+  // For commands such as diff --no-index, where 1 means a complete answer with differences.
+  // Output, deadline, cancellation, and spawn failures still throw.
+  allowedExitCodes?: readonly number[]
 }
 
 const spec = (args: readonly string[], opts: GitOptions) => ({
@@ -96,10 +99,10 @@ export const gitOrThrow = (args: readonly string[], opts: GitOptions): Promise<P
   measure('core', seam(args), async () => {
     const command = spec(args, opts)
     try {
-      return await runProcessOrThrow(command)
+      return await runProcessOrThrow(command, opts.allowedExitCodes)
     } catch (error) {
       if (!(error instanceof ProcessError) || !xcodeLicenseBlocked(error.result)) throw error
-      return runProcessOrThrow({ ...command, file: commandLineToolsGit })
+      return runProcessOrThrow({ ...command, file: commandLineToolsGit }, opts.allowedExitCodes)
     }
   })
 

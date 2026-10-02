@@ -78,7 +78,7 @@ export type ManagedAgentsBridge = {
   handoffToTerminal(sessionId: string): Promise<AgentSession>
   resumeManaged(sessionId: string): Promise<AgentSession>
   exportSession(sessionId: string, format: 'json' | 'markdown'): Promise<string>
-  wait(sessionId: string, afterSeq: number, until: 'ready' | 'attention' | 'turn_completed' | 'stopped', timeoutMs: number): Promise<AgentSessionSnapshot>
+  wait(sessionId: string, afterSeq: number, until: 'ready' | 'attention' | 'turn_completed' | 'stopped', timeoutMs: number, signal?: AbortSignal): Promise<AgentSessionSnapshot>
   search(
     query: string,
     filter?: { taskId?: string; workspaceId?: string; limit?: number },
@@ -396,5 +396,5 @@ export const managedAgents = new Hono<AppEnv>()
     const parsed = agentWaitQuerySchema.safeParse(c.req.query())
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, MANAGED_AGENTS, (bridge) =>
-      bridge.wait(c.req.param('sessionId'), parsed.data.afterSeq, parsed.data.until, parsed.data.timeoutMs))
+      bridge.wait(c.req.param('sessionId'), parsed.data.afterSeq, parsed.data.until, parsed.data.timeoutMs, c.req.raw.signal))
   })

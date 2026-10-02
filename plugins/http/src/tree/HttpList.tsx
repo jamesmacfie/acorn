@@ -42,6 +42,13 @@ export default function HttpList(props: { model: HttpPanelModel }) {
       </Toolbar>
 
       <Stack gap="row">
+        <Show when={model().recoveries().length}>
+          <Section label="Recover unsaved edits">
+            <For each={model().recoveries()}>{(entry) =>
+              <Button variant="bare" size="sm" onPress={() => model().recover(entry.key)}>{entry.name}</Button>
+            }</For>
+          </Section>
+        </Show>
         <Show when={model().taskId}>
           <Section label="This task" help="Requests you make here stay with this task until you save them to the project.">
             <Show

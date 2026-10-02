@@ -107,6 +107,7 @@ export function dockerBridge(core: DockerCoreServices, broadcast?: (frame: WsSer
     }),
     taskSummary: () => run(async () => {
       const [tasks, cs] = await Promise.all([core.tasks.active(), service.containers()])
+      if (!cs.length) return []
       const out: DockerTaskSummary[] = []
       for (const task of tasks) {
         const overrides = await loadDockerOverrides(task.worktreePath) // 30s-cached per path

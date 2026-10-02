@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, mkdirSync, mkdtempSync, rmSync, statSync, symlinkSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import gitdiffParser from 'gitdiff-parser'
@@ -63,10 +63,10 @@ describe('parsePorcelainV2 (pure)', () => {
   })
   it('merges numstat per scope', () => {
     const { changes } = parsePorcelainV2('1 .M N... 100644 100644 100644 abc def a.ts')
-    const merged = mergeNumstat(changes, '3\t1\ta.ts', false)
+    const merged = mergeNumstat(changes, '3\t1\ta.ts\0', false)
     expect(merged[0]).toMatchObject({ additions: 3, deletions: 1 })
     // Binary files report '-'.
-    expect(mergeNumstat(changes, '-\t-\ta.ts', false)[0]).toMatchObject({ additions: null, deletions: null })
+    expect(mergeNumstat(changes, '-\t-\ta.ts\0', false)[0]).toMatchObject({ additions: null, deletions: null })
   })
 })
 
@@ -117,7 +117,7 @@ describe('an unmerged file', () => {
 
   it('takes no line counts, even when git offers some', () => {
     const { changes } = parsePorcelainV2(LINE)
-    expect(mergeNumstat(changes, '9\t9\tsrc/clash.ts', false)[0]).toMatchObject({ additions: null, deletions: null })
+    expect(mergeNumstat(changes, '9\t9\tsrc/clash.ts\0', false)[0]).toMatchObject({ additions: null, deletions: null })
   })
 })
 
@@ -233,6 +233,94 @@ describe('local diff over a real worktree', () => {
     const [file] = gitdiffParser.parse(synth('new.md', patch))
     expect(file.hunks[0].changes.every((c) => c.type === 'insert')).toBe(true)
     expect(file.hunks[0].changes).toHaveLength(2)
+  })
+
+  it('keeps quoted Unicode and control filenames exact through status, keys, stage, unstage, and discard', async () => {
+    const names = ['café.txt', '🌳.txt', '\ufeffmark.txt', '\ufffdmark.txt', 'tab\tname.txt', 'line\nname.txt', 'quote"name.txt', 'back\\slash.txt', 'literal {old => new}.txt']
+    for (const name of names) writeFileSync(join(dir, name), 'base\n')
+    const first = await localStatus(dir)
+    expect(first.changes.map((c) => c.path).sort()).toEqual([...names].sort())
+    expect(first.changes.every((c) => c.contentKey !== undefined)).toBe(true)
+    expect((await localStatus(dir)).changes).toEqual(first.changes)
+    for (const name of names) {
+      expect((await localDiff(dir, name, 'unstaged')).patch).toBe('@@ -0,0 +1 @@\n+base\n')
+    }
+    expect(await stageFiles(dir, names)).toEqual({ ok: true })
+    expect((await localStatus(dir)).changes.every((c) => c.staged && c.additions === 1 && c.deletions === 0)).toBe(true)
+    for (const name of names) {
+      expect((await localDiff(dir, name, 'staged')).patch).toContain('+base\n')
+    }
+    git('commit', '-qm', 'quoted files')
+    for (const name of names) writeFileSync(join(dir, name), 'edited\nfinal\n')
+    // Invalidate the shared text through the same production mutation seam used by the pane.
+    await unstageFiles(dir, names)
+    const changed = await localStatus(dir)
+    expect(changed.changes.map((c) => c.path).sort()).toEqual([...names].sort())
+    expect(changed.changes.every((c) => c.additions === 2 && c.deletions === 1 && c.contentKey !== undefined)).toBe(true)
+    expect(await stageFiles(dir, names)).toEqual({ ok: true })
+    expect(await unstageFiles(dir, names)).toEqual({ ok: true })
+    for (const name of names) expect(await discardFile(dir, name, false)).toEqual({ ok: true })
+    expect((await localStatus(dir)).changes).toEqual([])
+  })
+
+  it('matches renamed numstat pairs without conflating real arrow and brace filenames', async () => {
+    const oldPath = 'src/a.ts'
+    const newPath = 'src/{old => new}\t\n café.ts'
+    git('mv', oldPath, newPath)
+    writeFileSync(join(dir, newPath), 'line1\nline2\nline3\nextra\n')
+    const literal = 'src/a.ts => src/{old => new}\t\n café.ts'
+    // A separate filename with the same rendered arrow notation must keep its own counts.
+    mkdirSync(join(dir, 'src', 'a.ts => src'), { recursive: true })
+    writeFileSync(join(dir, literal), 'one\ntwo\n')
+    await stageFiles(dir, [newPath, literal])
+    const { changes } = await localStatus(dir)
+    expect(changes.find((c) => c.path === newPath)).toMatchObject({ oldPath, staged: true, additions: 1, deletions: 0 })
+    expect(changes.find((c) => c.path === literal)).toMatchObject({ staged: true, additions: 2, deletions: 0 })
+    expect((await localDiff(dir, newPath, 'staged')).patch).toContain('+extra\n')
+  })
+
+  it('rejects a 17 MiB untracked patch with the tracked patch output-cap error', async () => {
+    const body = `${'x'.repeat(1023)}\n`.repeat(17 * 1024) + 'FINAL_SENTINEL\n'
+    writeFileSync(join(dir, 'oversized.txt'), body)
+    writeFileSync(join(dir, 'src/a.ts'), body)
+    const error = 'git produced more than 16777216 bytes of output'
+    await expect(localDiff(dir, 'oversized.txt', 'unstaged')).rejects.toThrow(error)
+    await expect(localDiff(dir, 'src/a.ts', 'unstaged')).rejects.toThrow(error)
+  })
+
+  it('preserves complete UTF-8 untracked patches and their final newline state', async () => {
+    writeFileSync(join(dir, 'utf8.txt'), 'café🌳\n')
+    expect((await localDiff(dir, 'utf8.txt', 'unstaged')).patch).toBe('@@ -0,0 +1 @@\n+café🌳\n')
+    writeFileSync(join(dir, 'utf8.txt'), 'café🌳')
+    expect((await localDiff(dir, 'utf8.txt', 'unstaged')).patch).toBe('@@ -0,0 +1 @@\n+café🌳\n\\ No newline at end of file\n')
+  })
+
+  it.runIf(process.platform === 'linux')('refuses undecodable filesystem names rather than deriving a guessed path', async () => {
+    const badPath = Buffer.concat([Buffer.from(`${dir}/bad-`), Buffer.from([255]), Buffer.from('.txt')])
+    writeFileSync(badPath, 'fixture\n')
+    await expect(localStatus(dir)).rejects.toThrow('Unsupported Git path encoding.')
+  })
+
+  it('keeps submodule changes on the unknown-key fallback while stamping ordinary deletions', async () => {
+    const nested = mkdtempSync(join(tmpdir(), 'acorn-diff-submodule-'))
+    const g = (...args: string[]) => execFileSync('git', ['-C', nested, ...args], { stdio: 'pipe' })
+    try {
+      g('init', '-q', '-b', 'main')
+      g('config', 'user.name', 'Fixture')
+      g('config', 'user.email', 'fixture@example.test')
+      writeFileSync(join(nested, 'nested.txt'), 'base\n')
+      g('add', '.')
+      g('commit', '-qm', 'base')
+      git('-c', 'protocol.file.allow=always', 'submodule', 'add', '-q', nested, 'vendor')
+      git('commit', '-qm', 'submodule')
+      writeFileSync(join(dir, 'vendor/nested.txt'), 'edited\n')
+      rmSync(join(dir, 'src/a.ts'))
+      await unstageFiles(dir, ['src/a.ts'])
+      const { changes } = await localStatus(dir)
+      expect(changes.find((c) => c.path === 'vendor')).toMatchObject({ status: 'modified', staged: false })
+      expect(changes.find((c) => c.path === 'vendor')?.contentKey).toBeUndefined()
+      expect(changes.find((c) => c.path === 'src/a.ts')).toMatchObject({ status: 'deleted', contentKey: expect.stringMatching(/ gone$/) })
+    } finally { rmSync(nested, { recursive: true, force: true }) }
   })
 
   it('staged scope diffs the index; renames carry oldPath', async () => {
@@ -392,12 +480,15 @@ describe('local diff over a real worktree', () => {
   })
 
   it('sees a merge in flight through the worktree\'s real git directory', async () => {
+    const path = 'src/clash\t\n café.ts'
+    git('mv', 'src/a.ts', path)
+    git('commit', '-qm', 'quoted path')
     // A conflicting commit on each side of a fork, so `git merge` stops mid-flight.
     git('checkout', '-q', '-b', 'other')
-    writeFileSync(join(dir, 'src', 'a.ts'), 'line1\nTHEIRS\nline3\n')
+    writeFileSync(join(dir, path), 'line1\nTHEIRS\nline3\n')
     git('commit', '-q', '-am', 'theirs')
     git('checkout', '-q', 'main')
-    writeFileSync(join(dir, 'src', 'a.ts'), 'line1\nOURS\nline3\n')
+    writeFileSync(join(dir, path), 'line1\nOURS\nline3\n')
     git('commit', '-q', '-am', 'ours')
     try {
       git('merge', 'other')
@@ -407,12 +498,12 @@ describe('local diff over a real worktree', () => {
 
     const status = await localStatus(dir)
     expect(status.operation).toBe('merge')
-    const clash = status.changes.find((c) => c.path === 'src/a.ts')
-    expect(clash).toEqual({ path: 'src/a.ts', status: 'conflicted', staged: false, additions: null, deletions: null, contentKey: expect.any(String) })
+    const clash = status.changes.find((c) => c.path === path)
+    expect(clash).toEqual({ path, status: 'conflicted', staged: false, additions: null, deletions: null, contentKey: expect.any(String) })
 
     // Git's own answer to "stage a conflict" is "mark it resolved".
-    expect(await stageFiles(dir, ['src/a.ts'])).toEqual({ ok: true })
-    expect((await localStatus(dir)).changes.find((c) => c.path === 'src/a.ts')).toMatchObject({ status: 'modified', staged: true })
+    expect(await stageFiles(dir, [path])).toEqual({ ok: true })
+    expect((await localStatus(dir)).changes.find((c) => c.path === path)).toMatchObject({ status: 'modified', staged: true })
   })
 
   // The pane re-reads a file's patch only when this key moves (DiffSource.contentKey), so it has to
@@ -443,6 +534,20 @@ describe('local diff over a real worktree', () => {
       const before = await keyOf('src/a.ts', false)
       chmodSync(join(dir, 'src', 'a.ts'), 0o755)
       expect(await keyOf('src/a.ts', false)).not.toBe(before)
+    })
+
+    it('moves for an edit that restores the file size and mtime', async () => {
+      const file = join(dir, 'src/a.ts')
+      writeFileSync(file, 'line1\nEDITED\nline3\n')
+      // An exactly representable mtime lets the test distinguish ctime from timestamp rounding.
+      utimesSync(file, 1_600_000_000, 1_600_000_000)
+      const before = statSync(file)
+      const key = await keyOf('src/a.ts', false)
+      writeFileSync(file, 'line1\nEDITEX\nline3\n')
+      utimesSync(file, before.atime, before.mtime)
+      expect(statSync(file).size).toBe(before.size)
+      expect(statSync(file).mtimeMs).toBe(before.mtimeMs)
+      expect(await keyOf('src/a.ts', false)).not.toBe(key)
     })
 
     it('follows the index for staging, and survives a commit that leaves the working-tree patch alone', { timeout: 15_000 }, async () => {

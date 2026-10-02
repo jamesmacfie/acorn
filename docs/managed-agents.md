@@ -115,8 +115,29 @@ the current title and adds nothing to the transcript.
 `plugins/agents/src/server/sessions/runtime.ts` coordinates session commands with the provider
 engine. `sessionTitleGeneration.ts` owns title requests and cancellation,
 `sessionDefaultsCommands.ts` applies saved provider options, and `transcriptCommands.ts` imports,
-verifies, and exports transcripts. `sessionWait.ts` checks live frames against the durable snapshot.
+verifies, and exports transcripts. `sessionWait.ts` checks live frames against scalar durable wait facts.
 The runtime keeps the public methods and durable store boundary.
+
+### Bounded waits
+
+The wait route retains `session`, `turns`, `requests`, and an event prefix capped at 500 rows. Its
+additive `wait` field carries `until`, `afterSeq`, `matched`, a qualifying `terminal` fact, and
+`eventsThroughSeq` with `eventsComplete`. The facts and returned snapshot share one SQLite
+transaction. Older Nodes and ordinary snapshots omit this field. A truncated prefix does not
+mean that completion is absent. Delegation uses the authoritative fact and retains its
+`matched`, `timedOut`, `state`, `attention`, and `lastSeq` tool result fields.
+
+A `turn_completed` wait matches a committed `turn_completed` or `error` event strictly after its
+cursor, including one beyond the returned prefix. An earlier completed turn or a ready session
+does not satisfy it. Ready, attention, and stopped waits use the current session row. Attention
+excludes `none` and `unread`; stopped includes `stopped`, `failed`, and `archived`.
+
+Each waiter owns one active scalar check and one dirty follow-up. It subscribes before reading,
+rechecks setup, and ignores frames from other sessions. Timeout returns the authoritative snapshot;
+the condition can match by the time that final read commits. Caller cancellation, target deletion,
+storage failure, and engine shutdown reject the wait. Settlement removes the listener, deadline,
+and abort handlers; held reads cannot settle a replacement waiter. An HTTP wait forwards its
+request's abort signal without cancelling the session's work.
 
 ### Cross-plugin lifecycle
 

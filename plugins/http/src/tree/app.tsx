@@ -78,7 +78,7 @@ export function HttpDetailApp(props: HttpPaneProps & { bridge: AcornBridge }) {
 // The variables settings surface. A picker rather than an inferred project: variables belong to a
 // project and a settings page is workspace-shaped at most.
 export function HttpSettingsApp(props: { bridge: AcornBridge }) {
-  const client = createHttpClient(props.bridge.api)
+  const client = createHttpClient(props.bridge.api, props.bridge.context.authority ? JSON.stringify([props.bridge.context.nodeId, props.bridge.context.authority]) : undefined, props.bridge.context.nodeId)
   const [projects] = createResource(() => props.bridge.api.get<ProjectsResponse>(projectsRoute))
   const [selected, setSelected] = createSignal('')
   const visible = () => (projects()?.projects ?? []).filter((candidate) => !candidate.hidden)

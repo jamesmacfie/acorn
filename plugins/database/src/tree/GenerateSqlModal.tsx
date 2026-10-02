@@ -23,7 +23,7 @@ export default function GenerateSqlModal(props: {
   backends: ModelBackend[]
   queries: readonly DbSavedQuery[]
   onDismiss: () => void
-  onGenerated: (sql: string) => void
+  onGenerated: (sql: string) => void | Promise<void>
 }) {
   const [prompt, setPrompt] = createSignal('')
   // The first backend, not the shared "Generate with" default the commit wand and the workflow
@@ -62,7 +62,7 @@ export default function GenerateSqlModal(props: {
         prompt: prompt().trim(),
         ...(exampleIds().length ? { queryIds: exampleIds() } : {}),
       })
-      props.onGenerated(res.sql)
+      await props.onGenerated(res.sql)
       props.onDismiss()
     } catch (e) {
       setError(errorMessage(e, props.backends.find((backend) => backend.id === backendId())))

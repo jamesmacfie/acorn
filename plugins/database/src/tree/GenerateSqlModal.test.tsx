@@ -39,12 +39,16 @@ describe('what a failed generate reads as', () => {
   })
 })
 
-it('keeps the dialog open until an in-flight generation writes its result', async () => {
+it.each(['accepted', 'refused'])('keeps the dialog open until host replacement is %s', async (outcome) => {
   let complete: (result: { sql: string }) => void = () => {}
   generateSql.mockImplementation(() => new Promise((resolve) => { complete = resolve }))
   const root = createRemoteRoot(() => {})
   const onDismiss = vi.fn()
-  const onGenerated = vi.fn()
+  let accept!: () => void
+  let refuse!: (cause: Error) => void
+  const replacement = new Promise<void>((resolve, reject) => { accept = resolve; refuse = reject })
+  const onGenerated = vi.fn(() => replacement)
+  let unmount = () => {}
   solidTree(GenerateSqlModal)({} as AcornBridge, {
     entry: 'generate',
     root,
@@ -57,7 +61,7 @@ it('keeps the dialog open until an in-flight generation writes its result', asyn
       onGenerated,
     }),
     onProps: () => {},
-    onUnmount: () => {},
+    onUnmount: (dispose) => { unmount = dispose },
     host: {
       invoke: () => Promise.reject(new Error('this fixture answers no host requests')),
       openOverlay: () => Promise.reject(new Error('this fixture answers no host requests')),
@@ -89,6 +93,16 @@ it('keeps the dialog open until an in-flight generation writes its result', asyn
   await Promise.resolve()
   await Promise.resolve()
   expect(onGenerated).toHaveBeenCalledWith('SELECT * FROM orders;')
-  expect(onDismiss).toHaveBeenCalledTimes(1)
+  expect(onDismiss).not.toHaveBeenCalled()
+  if (outcome === 'accepted') {
+    accept()
+    await vi.waitFor(() => expect(onDismiss).toHaveBeenCalledTimes(1))
+  } else {
+    refuse(new Error('Document changed while loading'))
+    await vi.waitFor(() => expect(nodes().some((node) => String(node.props.value ?? '').includes('Document changed while loading'))).toBe(true))
+    expect(onDismiss).not.toHaveBeenCalled()
+    expect(nodes().find((node) => node.type === 'Textarea')?.props.value).toBe('Show the latest orders')
+  }
+  unmount()
   root.dispose()
 })

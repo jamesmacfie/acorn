@@ -1,9 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { and, asc, desc, eq, gt, inArray, isNotNull, isNull, like, lt, ne, notInArray, or, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, getTableColumns, gt, inArray, isNotNull, isNull, like, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import * as schema from '../../node/schema'
-import type { AgentEventPage, AgentEventRecord, AgentProviderDescriptor, AgentSession, AgentSessionList, AgentSessionSnapshot, AgentTurn } from '../../contract/wire.ts'
+import type { AgentEventPage, AgentEventRecord, AgentProviderDescriptor, AgentSession, AgentSessionList, AgentSessionSnapshot, AgentTurn, AgentWaitCondition, AgentWaitFacts } from '../../contract/wire.ts'
+import { readWaitFacts } from './waitFacts'
+import { readExecutionCapture } from './executionCapture'
 import type { CreateAgentSessionInput, EnqueueAgentTurnInput } from '../../shared/schemas'
-import { mapAgentEvent, mapAgentRequest, mapAgentSession, mapAgentTurn } from './rowMapping'
+import { clientEventRecord, mapAgentEvent, mapAgentRequest, mapAgentSession, mapAgentTurn } from './rowMapping'
 import { AgentSessionRepository } from './sessionRepository'
 import { isActiveSubagent } from './stateMachine'
 import { DEFAULT_SESSION_TITLE, deterministicSessionTitle } from './sessionTitle'
@@ -19,6 +21,11 @@ export type EnqueueTurnOutcome = {
 import { sessionCursor, type SessionListFilter } from '../../shared/sessionList'
 
 const now = (): number => Date.now()
+
+const eventReadColumns = (client: boolean) => ({
+  ...getTableColumns(schema.agentEvents),
+  ...(client ? { searchText: sql<null>`NULL` } : {}),
+})
 
 export class AgentStore extends AgentSessionRepository {
 
@@ -227,60 +234,95 @@ export class AgentStore extends AgentSessionRepository {
   }
 
   async snapshot(sessionId: string, afterSeq = 0, eventLimit = 500): Promise<AgentSessionSnapshot> {
-    const session = await this.requireSession(sessionId)
-    const [turnRows, eventRows, requestRows] = await Promise.all([
-      this.db.select().from(schema.agentTurns).where(eq(schema.agentTurns.sessionId, sessionId)).orderBy(asc(schema.agentTurns.ordinal)),
-      this.db
-        .select()
-        .from(schema.agentEvents)
-        .where(and(eq(schema.agentEvents.sessionId, sessionId), gt(schema.agentEvents.seq, afterSeq)))
-        .orderBy(asc(schema.agentEvents.seq))
-        .limit(Math.min(Math.max(eventLimit, 1), 2_000)),
-      this.db.select().from(schema.agentRequests).where(eq(schema.agentRequests.sessionId, sessionId)).orderBy(asc(schema.agentRequests.createdAt)),
-    ])
-    return {
-      session,
-      turns: turnRows.map(mapAgentTurn),
-      events: eventRows.map(mapAgentEvent),
-      requests: requestRows.map(mapAgentRequest),
-    }
+    await this.requireSession(sessionId)
+    return this.readSnapshot(sessionId, afterSeq, Math.min(Math.max(eventLimit, 1), 2_000), false)
+  }
+
+  async clientSnapshot(sessionId: string, afterSeq = 0, eventLimit = 500): Promise<AgentSessionSnapshot> {
+    return this.readSnapshot(sessionId, afterSeq, Math.min(Math.max(eventLimit, 1), 2_000), true)
+  }
+
+  async waitFacts(sessionId: string, afterSeq: number, until: AgentWaitCondition): Promise<AgentWaitFacts> {
+    return this.db.transaction((tx) => readWaitFacts(tx, sessionId, afterSeq, until))
+  }
+
+  async waitSnapshot(sessionId: string, afterSeq: number, until: AgentWaitCondition): Promise<AgentSessionSnapshot> {
+    await this.requireSession(sessionId)
+    return this.readSnapshot(sessionId, afterSeq, 500, false, until)
+  }
+
+  async executionSnapshot(sessionId: string, turnIds: readonly string[]): Promise<AgentSessionSnapshot> {
+    const projection = await this.ensureSearchProjection()
+    return this.db.transaction((tx) => {
+      projection.catchUp(tx, sessionId)
+      return readExecutionCapture(tx, sessionId, turnIds)
+    })
   }
 
   async exportSnapshot(sessionId: string): Promise<AgentSessionSnapshot> {
-    const session = await this.requireSession(sessionId)
-    const [turnRows, eventRows, requestRows] = await Promise.all([
-      this.db.select().from(schema.agentTurns).where(eq(schema.agentTurns.sessionId, sessionId)).orderBy(asc(schema.agentTurns.ordinal)),
-      this.db.select().from(schema.agentEvents).where(eq(schema.agentEvents.sessionId, sessionId)).orderBy(asc(schema.agentEvents.seq)),
-      this.db.select().from(schema.agentRequests).where(eq(schema.agentRequests.sessionId, sessionId)).orderBy(asc(schema.agentRequests.createdAt)),
-    ])
-    return {
-      session,
-      turns: turnRows.map(mapAgentTurn),
-      events: eventRows.map(mapAgentEvent),
-      requests: requestRows.map(mapAgentRequest),
-    }
+    return this.readSnapshot(sessionId, 0, undefined, false)
+  }
+
+  private async readSnapshot(sessionId: string, afterSeq: number, limit: number | undefined, client: boolean, until?: AgentWaitCondition): Promise<AgentSessionSnapshot> {
+    const projection = client ? null : await this.ensureSearchProjection()
+    return this.db.transaction((tx) => {
+      projection?.catchUp(tx, sessionId)
+      const session = tx.select().from(schema.agentSessions).where(eq(schema.agentSessions.id, sessionId)).get()
+      if (!session) throw new Error(`Managed agent session not found: ${sessionId}`)
+      const events = tx.select(eventReadColumns(client)).from(schema.agentEvents)
+        .where(and(eq(schema.agentEvents.sessionId, sessionId), gt(schema.agentEvents.seq, afterSeq)))
+        .orderBy(asc(schema.agentEvents.seq))
+      const rows = limit === undefined ? events.all() : events.limit(limit).all()
+      const mappedSession = mapAgentSession(session)
+      return {
+        session: mappedSession,
+        turns: tx.select().from(schema.agentTurns).where(eq(schema.agentTurns.sessionId, sessionId))
+          .orderBy(asc(schema.agentTurns.ordinal)).all().map(mapAgentTurn),
+        events: rows.map((row) => client ? clientEventRecord(mapAgentEvent(row)) : mapAgentEvent(row)),
+        requests: tx.select().from(schema.agentRequests).where(eq(schema.agentRequests.sessionId, sessionId))
+          .orderBy(asc(schema.agentRequests.createdAt)).all().map(mapAgentRequest),
+        ...(until ? { wait: {
+          ...readWaitFacts(tx, sessionId, afterSeq, until, mappedSession),
+          eventsThroughSeq: session.lastEventSeq,
+          eventsComplete: !tx.select({ seq: schema.agentEvents.seq }).from(schema.agentEvents)
+            .where(and(eq(schema.agentEvents.sessionId, sessionId), gt(schema.agentEvents.seq, rows.at(-1)?.seq ?? afterSeq)))
+            .limit(1).get(),
+        } } : {}),
+      }
+    })
   }
 
   async eventsForTurn(turnId: string, limit = 2_000): Promise<AgentEventRecord[]> {
-    const rows = await this.db
-      .select()
-      .from(schema.agentEvents)
-      .where(eq(schema.agentEvents.turnId, turnId))
-      .orderBy(asc(schema.agentEvents.seq))
-      .limit(Math.min(Math.max(limit, 1), 10_000))
-    return rows.map(mapAgentEvent)
+    const projection = await this.ensureSearchProjection()
+    return this.db.transaction((tx) => {
+      const turn = tx.select({ sessionId: schema.agentTurns.sessionId }).from(schema.agentTurns)
+        .where(eq(schema.agentTurns.id, turnId)).get()
+      if (turn) projection.catchUp(tx, turn.sessionId)
+      else projection.catchUp(tx)
+      return tx.select().from(schema.agentEvents).where(eq(schema.agentEvents.turnId, turnId))
+        .orderBy(asc(schema.agentEvents.seq)).limit(Math.min(Math.max(limit, 1), 10_000)).all().map(mapAgentEvent)
+    })
   }
 
   async eventPage(sessionId: string, afterSeq = 0, limit = 500): Promise<AgentEventPage> {
-    const bounded = Math.min(Math.max(limit, 1), 2_000)
-    const rows = await this.db
-      .select()
-      .from(schema.agentEvents)
-      .where(and(eq(schema.agentEvents.sessionId, sessionId), gt(schema.agentEvents.seq, afterSeq)))
-      .orderBy(asc(schema.agentEvents.seq))
-      .limit(bounded + 1)
-    const page = rows.slice(0, bounded).map(mapAgentEvent)
-    return { events: page, nextCursor: rows.length > bounded ? page.at(-1)?.seq ?? null : null }
+    return this.readEventPage(sessionId, afterSeq, limit, false)
+  }
+
+  async clientEventPage(sessionId: string, afterSeq = 0, limit = 500): Promise<AgentEventPage> {
+    return this.readEventPage(sessionId, afterSeq, limit, true)
+  }
+
+  private async readEventPage(sessionId: string, afterSeq: number, limit: number, client: boolean): Promise<AgentEventPage> {
+    const projection = client ? null : await this.ensureSearchProjection()
+    return this.db.transaction((tx) => {
+      projection?.catchUp(tx, sessionId)
+      const bounded = Math.min(Math.max(limit, 1), 2_000)
+      const rows = tx.select(eventReadColumns(client)).from(schema.agentEvents)
+        .where(and(eq(schema.agentEvents.sessionId, sessionId), gt(schema.agentEvents.seq, afterSeq)))
+        .orderBy(asc(schema.agentEvents.seq)).limit(bounded + 1).all()
+      const page = rows.slice(0, bounded).map((row) => client ? clientEventRecord(mapAgentEvent(row)) : mapAgentEvent(row))
+      return { events: page, nextCursor: rows.length > bounded ? page.at(-1)?.seq ?? null : null }
+    })
   }
 
   /** Recompute a session's queued-turn count and store it on the row. Called after every change that

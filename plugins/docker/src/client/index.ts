@@ -3,7 +3,8 @@ import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { dockerAgentContextContribution } from './agentContextContribution'
 import { dockerCommands } from './commands'
 import { dockerPrefsSlice } from './dockerPrefs'
-import { dockerTaskScheduleContribution } from './dockerStore'
+import { retireDockerClient } from './dockerScope'
+import { disposeDockerStore, dockerTaskScheduleContribution } from './dockerStore'
 import { dockerPaneContribution } from './paneContribution'
 import { dockerFooterSlotContribution, dockerRailMarkerContribution } from './slotContribution'
 import { dockerSourceContribution } from './sourceContribution'
@@ -14,6 +15,7 @@ const DockerProjectSettings = lazy(() => import('./DockerProjectSettings'))
 
 export const dockerClientPlugin: ClientPlugin = {
   name: 'docker',
+  activate: () => () => { retireDockerClient(); disposeDockerStore() },
   init: (ctx) => {
     // The other feeder (docs/ui-design.md § Icons): a loaded plugin declares its mark in the manifest
     // and the host registers it, so every `brand:docker` glyph string below reads the same either

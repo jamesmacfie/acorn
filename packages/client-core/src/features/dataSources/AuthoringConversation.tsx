@@ -4,7 +4,9 @@ import type { AuthoringContextEntry, AuthoringTurnRequest, AuthoringTurnResult }
 import type { QueryScope } from '@acorn/protocol/dataQueries.ts'
 import { modelBackendsOptions, prefsOptions } from '../../infra/queries'
 import { writeJson } from '../../infra/node/apiClient'
-import { activeCacheId } from '../../infra/node/activeNode'
+import { activeCacheId, activeNodeId } from '../../infra/node/activeNode'
+import { queryOwner } from '../../infra/node/queryOwnership'
+import { ORIGIN_NODE_ID } from '../../infra/node/fleet'
 import { effectiveModelPick, readGeneratePick, saveGeneratePick, type ModelPick } from '../settings/models/generatePick'
 import ModelBackendPicker from '../settings/models/ModelBackendPicker'
 import { Alert, Button, Checkbox, Field, Textarea } from '../../kit/components/primitives'
@@ -58,10 +60,13 @@ export type AuthoringConversationProps = {
 
 export default function AuthoringConversation(props: AuthoringConversationProps) {
   const queryClient = useQueryClient()
+  const registered = queryOwner(queryClient)
+  const nodeId = registered === undefined ? activeNodeId() : registered
+  const cacheId = registered === undefined ? activeCacheId() : registered ?? ORIGIN_NODE_ID
   const backendQuery = createQuery(() => modelBackendsOptions(true))
   const prefs = createQuery(() => prefsOptions(true))
   const backends = () => backendQuery.data?.backends ?? []
-  const storageKey = createMemo(() => `acorn:ai-authoring:v1:${activeCacheId()}:${props.target}:${props.targetId}`)
+  const storageKey = createMemo(() => `acorn:ai-authoring:v1:${cacheId}:${props.target}:${props.targetId}`)
   const [context, setContext] = createSignal<AuthoringContextEntry[]>([])
   const [pending, setPending] = createSignal<AuthoringTurnResult>()
   const [instruction, setInstruction] = createSignal('')
@@ -105,11 +110,12 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
     } catch { localStorage.removeItem(key) }
   })
   createEffect(() => { context(); pending(); samplesEnabled(); choice(); save() })
-  onCleanup(() => controller?.abort())
+  onCleanup(() => { controller?.abort(); controller = undefined })
 
   const submit = async (answer = instruction().trim()): Promise<void> => {
     if (!answer || !backendId() || busy()) return
-    controller = new AbortController()
+    const request = new AbortController()
+    controller = request
     setBusy(true)
     setError('')
     setStatus('Checking available sources, fields, and options…')
@@ -121,20 +127,20 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
         instruction: answer, context: context(), samplesEnabled: samplesEnabled(),
       }
       const result = props.sendTurn
-        ? await props.sendTurn(body, controller.signal)
+        ? await props.sendTurn(body, request.signal)
         : await writeJson<AuthoringTurnResult>(props.endpoint, {
             method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body),
-            signal: controller.signal, timeoutMs: TIMEOUT_MS,
+            signal: request.signal, timeoutMs: TIMEOUT_MS, nodeId,
           })
+      if (request.signal.aborted || controller !== request) return
       setContext(result.context)
       showReply(result)
       setInstruction('')
       setStatus(result.state === 'proposal' ? 'Proposal ready for review.' : result.state === 'clarification' ? 'Waiting for your answer.' : result.reason)
     } catch (failure) {
-      if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : 'AI authoring failed.')
+      if (!request.signal.aborted && controller === request) setError(failure instanceof Error ? failure.message : 'AI authoring failed.')
     } finally {
-      setBusy(false)
-      controller = undefined
+      if (controller === request) { setBusy(false); controller = undefined }
     }
   }
 

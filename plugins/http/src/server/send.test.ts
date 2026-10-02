@@ -1,3 +1,5 @@
+import { createServer } from 'node:http'
+import type { Socket } from 'node:net'
 import { execFileSync } from 'node:child_process'
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -8,7 +10,8 @@ import { memoryIdentityStore } from '@acorn/plugin-api/testkit'
 import { createCoreServices } from '@acorn/plugin-api/testkit'
 import type { HttpSendInput } from '../shared/model'
 import { httpVariables } from '../node/schema'
-import { SendError, buildRequest, describeFetchFailure, readCapped, referencedVariableNames, resolveVars, send, type SendCoreServices } from './send'
+import { SendError, buildRequest, describeFetchFailure, referencedVariableNames, resolveVars, send, type SendCoreServices } from './send'
+import { readCapped } from './responseBody'
 import { protectHttpValue } from './storage'
 import { SecretService } from '@acorn/plugin-api/testkit'
 
@@ -477,5 +480,64 @@ describe('send — transport outcomes', () => {
     expect(String(fetcher.mock.calls[0]?.[0])).toContain('server-only-secret')
     expect(JSON.stringify(result)).not.toContain('server-only-secret')
     expect(JSON.stringify(result)).toContain('••••••')
+  })
+})
+
+
+describe('send caller cancellation', () => {
+  it('checks retirement after a held task lookup before admitting more work', async () => {
+    const fx = fixture(), controller = new AbortController()
+    let finish!: (value: undefined) => void
+    const projects = vi.spyOn(fx.core.projects, 'byId')
+    vi.spyOn(fx.core.tasks, 'load').mockImplementation(() => new Promise((resolve) => { finish = resolve }))
+    const fetcher = vi.fn(); vi.stubGlobal('fetch', fetcher)
+    try {
+      const call = send(fx.db, fx.core, USER, 'project', input({ executionTaskId: 'task' }), controller.signal)
+      const rejected = expect(call).rejects.toMatchObject({ name: 'AbortError' })
+      controller.abort(); finish(undefined); await rejected
+      expect(projects).not.toHaveBeenCalled()
+      expect(fetcher).not.toHaveBeenCalled()
+    } finally { fx.cleanup(); vi.unstubAllGlobals(); vi.restoreAllMocks() }
+  })
+
+  it.each(['headers', 'body'])('retires a real loopback response during its %s wait', async (phase) => {
+    const fx = fixture(), controller = new AbortController(), sockets = new Set<Socket>()
+    let reached!: () => void, closed!: () => void
+    const entered = new Promise<void>((resolve) => { reached = resolve })
+    const retired = new Promise<void>((resolve) => { closed = resolve })
+    const server = createServer((_request, response) => {
+      if (phase === 'body') { response.writeHead(200); response.write('partial') }
+      reached()
+      response.on('close', closed)
+    })
+    server.on('connection', (socket) => { sockets.add(socket); socket.on('close', () => sockets.delete(socket)) })
+    await new Promise<void>((resolve, reject) => { server.once('error', reject); server.listen(0, '127.0.0.1', resolve) })
+    try {
+      const port = (server.address() as { port: number }).port
+      const call = send(fx.db, fx.core, USER, 'project', input({ url: `http://127.0.0.1:${port}` }), controller.signal)
+      const rejected = expect(call).rejects.toMatchObject({ name: 'AbortError' })
+      await entered; controller.abort(); await rejected; await retired
+    } finally {
+      for (const socket of sockets) socket.destroy()
+      await new Promise<void>((resolve) => server.close(() => resolve()))
+      fx.cleanup()
+    }
+  })
+
+  it('cancels and releases a held reader once, retaining exact-cap completion semantics', async () => {
+    const controller = new AbortController(), cancel = vi.fn(() => new Promise<void>(() => {}))
+    const stream = new ReadableStream<Uint8Array>({ cancel })
+    const response = new Response(stream)
+    const read = readCapped(response, controller.signal)
+    const rejected = expect(read).rejects.toMatchObject({ name: 'AbortError' })
+    controller.abort(); await rejected
+    expect(cancel).toHaveBeenCalledOnce()
+    expect(stream.locked).toBe(false)
+    for (const extra of [0, 1]) {
+      const bytes = new Uint8Array(5 * 1024 * 1024 + extra)
+      const capped = await readCapped(new Response(bytes))
+      expect(capped.bytes.byteLength).toBe(5 * 1024 * 1024)
+      expect(capped.truncated).toBe(extra === 1)
+    }
   })
 })

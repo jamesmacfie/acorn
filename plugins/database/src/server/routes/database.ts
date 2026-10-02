@@ -24,6 +24,7 @@ import {
   respondError,
 } from '@acorn/plugin-api/node'
 import type { CommandInputResult } from '@acorn/protocol/commands.ts'
+import { MAX_DOCUMENT_BYTES } from '@acorn/protocol/plugin/bridge.ts'
 import { MAX_COMPLETION_ITEMS } from '@acorn/protocol/documentSurface.ts'
 import type { PluginCompletionResponse, PluginDocumentBody } from '@acorn/protocol/documentSurface.ts'
 import { defaultModelIdFor } from '@acorn/protocol/modelProviders.ts'
@@ -71,9 +72,11 @@ const savedQueryBody = z.object({
 })
 // The document surface's write body. The host defines this shape, and the cap matches the one it
 // enforces on the way in and the bridge enforces on the way back.
-const scratchBody = z.object({ text: z.string().max(2 * 1024 * 1024) })
+const documentText = z.string().refine((text) => Buffer.byteLength(text, 'utf8') <= MAX_DOCUMENT_BYTES,
+  `SQL scratch is capped at ${MAX_DOCUMENT_BYTES} UTF-8 bytes. The previous document is unchanged.`)
+const scratchBody = z.object({ text: documentText })
 const completionsBody = z.object({
-  text: z.string().max(2 * 1024 * 1024),
+  text: documentText,
   position: z.object({ line: z.number().int().min(1), column: z.number().int().min(1) }),
 })
 const contextCaptureBody = z.object({ taskId: z.string().min(1), optionIds: z.array(z.string()).optional() })
@@ -131,6 +134,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
   // contract is that this has committed before the reader is told it worked
   // (docs/database.md § From the command palette, step 5).
   const writeScratch = async (taskId: string, sql: string): Promise<void> => {
+    documentText.parse(sql)
     const at = Date.now()
     await db
       .insert(dbScratch)
@@ -202,14 +206,16 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
     // owns the editor, its theme, workers, autosave, and the flush before unmount.
     .get('/tasks/:taskId/scratch', async (c) => {
       const taskId = id(c)
+      if (!principalMayActOnTask(requestContext(c).principal, taskId)) return respondError(c, 404, 'not_found')
       if (!await taskOf(taskId)) return respondError(c, 404, 'not_found')
       const [row] = await db.select().from(dbScratch).where(eq(dbScratch.taskId, taskId)).limit(1)
       return c.json({ text: row?.sql ?? '' } satisfies PluginDocumentBody)
     })
     .put('/tasks/:taskId/scratch', async (c) => {
       const p = scratchBody.safeParse(await c.req.json().catch(() => null))
-      if (!p.success) return respondError(c, 400, 'bad_request')
+      if (!p.success) return respondError(c, 400, 'bad_request', p.error.issues.map((issue) => issue.message))
       const taskId = id(c)
+      if (!principalMayActOnTask(requestContext(c).principal, taskId)) return respondError(c, 404, 'not_found')
       // The taskId is a plain ID into core's tables, so core validates it. Checked on the write as
       // well as the read: an autosave for an archived task should not create a row nothing reads.
       if (!await taskOf(taskId)) return respondError(c, 404, 'not_found')
@@ -348,7 +354,9 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
             maxOutputTokens: GENERATE_MAX_OUTPUT_TOKENS,
           },
         })
-        await writeScratch(taskId, stripSqlFences(result.text))
+        const sql = documentText.safeParse(stripSqlFences(result.text))
+        if (!sql.success) return respondError(c, 400, 'bad_request', sql.error.issues.map((issue) => issue.message))
+        await writeScratch(taskId, sql.data)
         // The row the success action carries. Its id is the sentinel the pane reads as "re-read the
         // scratch document", not a saved query's id, so a pane that is already open shows the new SQL
         // instead of quietly keeping what was in the editor (../../shared/database.ts).
@@ -396,7 +404,9 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
             maxOutputTokens: GENERATE_MAX_OUTPUT_TOKENS,
           },
         })
-        return c.json({ sql: stripSqlFences(result.text), providerId: result.providerId, modelId: result.modelId } satisfies DbGenerateResult)
+        const sql = documentText.safeParse(stripSqlFences(result.text))
+        if (!sql.success) return respondError(c, 400, 'bad_request', sql.error.issues.map((issue) => issue.message))
+        return c.json({ sql: sql.data, providerId: result.providerId, modelId: result.modelId } satisfies DbGenerateResult)
       } catch (error) {
         if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
         return respondError(c, 502, 'provider_unavailable')

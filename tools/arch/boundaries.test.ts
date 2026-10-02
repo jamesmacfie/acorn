@@ -297,7 +297,7 @@ describe('architecture boundaries', () => {
       'plugins/agents/src/server/drivers/authProbe.ts',
       'plugins/docker/src/server/cli.ts',
       'plugins/docker/src/server/dockerService.ts', // `docker logs -f` / `stats` streams
-      'plugins/editor/src/server/search.ts', // ripgrep, streamed
+      'plugins/editor/src/server/searchProcess.ts', // ripgrep, streamed
     ])
     const importers = [...new Set(
       // Build tooling excluded: apps/desktop/scripts/ runs at package time and never ships.
@@ -616,8 +616,9 @@ describe('architecture boundaries', () => {
       // (settings/models/ModelPickerPopover.tsx), merged in from main the same day. One more for
       // Storage and memory (settings/StorageSettings.tsx), a lazy chunk the desktop registers like the
       // others, merged in from perf the same day. One more on 2026-10-02 for `kit/lib/formatChord`, so a
-      // remote tree can write a `tipKey` without the renderer-only barrel.
-      '@acorn/client-core': 165, // PaneModelHost and QueryCacheProvider are renderer composition seams.
+      // remote tree can write a `tipKey` without the renderer-only barrel. One more the same day for
+      // `features/editor/documentCustody.ts`, merged in from perf.
+      '@acorn/client-core': 166, // PaneModelHost and QueryCacheProvider are renderer composition seams.
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 10,

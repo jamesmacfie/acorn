@@ -172,7 +172,7 @@ export type PluginBridgeUiRequest =
 // rule sends anything richer to an LSP-shaped route instead.
 export type PluginBridgeDocumentRequest =
   | { id: number; kind: 'document'; op: 'read' }
-  | { id: number; kind: 'document'; op: 'write'; text: string }
+  | { id: number; kind: 'document'; op: 'write'; text: string; expectedText?: string }
   | { id: number; kind: 'document'; op: 'flush' }
 
 /** The ceiling on a document in either direction: what the host will load into an editor, and what a

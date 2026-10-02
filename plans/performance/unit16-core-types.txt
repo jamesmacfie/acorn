@@ -1,0 +1,4 @@
+.                                        |  WARN  Unsupported engine: wanted: {"node":">=22.23.2 <23 || >=24.18.1 <25 || >=26.5.1 <27"} (current: {"node":"v24.11.0","pnpm":"11.0.0"})
+apps/tui                                 |  WARN  Unsupported engine: wanted: {"node":">=22.23.2 <23 || >=24.18.1 <25 || >=26.5.1 <27"} (current: {"node":"v24.11.0","pnpm":"11.0.0"})
+$ node scripts/icon-census.mjs --check && node scripts/theme-cell-tokens.mjs --check && tsc --noEmit
+[icon-census] 122 eager icons, 22781B, 1 no longer referenced

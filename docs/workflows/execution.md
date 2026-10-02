@@ -21,6 +21,14 @@ step outcomes. `dispatch/` reserves and waits for child workflows. `processing/`
 attempts and incremental checkpoints. `schedules/` owns scheduled admission. `routes/` exposes
 the Node capabilities without owning execution state.
 
+Run lists and task navigation select scalar fields from SQLite. Navigation retains every historical
+descendant when choosing the latest run per task. Equal update timestamps keep insertion order.
+Reprocess roots use the source dispatch's original root when that lineage remains available.
+Task run history retains the frozen definition for the graph and reads compact parent and root
+lineage separately. Equal creation timestamps keep insertion order. Usage is grouped by run and root;
+an absent admission remains unknown, while a recorded zero remains zero. Execution graphs and
+authority stay in durable rows for execution and recovery.
+
 ### The graph
 
 A step declares `after`, the IDs of the steps it waits on. A step with no `after` key waits on the
@@ -114,6 +122,20 @@ file. Effort names don't mean the same amount of thinking on every model: Anthro
 longer and costs more than it did.
 
 ### A turn that ends early
+
+Managed execution flushes accepted buffered deltas, then captures every retained canonical event belonging to the step's target turns
+before parsing the final assistant response. It reads pages of 500 rows in one SQLite transaction,
+with a fixed committed session sequence ceiling. A later turn cannot extend that read. Ordinary
+client snapshots retain their page cap. Workflow result parsing retains the complete response
+instead of applying the delegation summary's text bound. The assistant message's established
+replacement, append, and outer-whitespace trimming rules still apply.
+
+Live forwarding subscribes before enqueue and holds events until the accepted turn ID is known.
+It forwards each canonical sequence once. Final capture supplies the complete event list to the
+outcome and does not replay it through the callback. Cancellation and timeout capture committed
+partial text and tool events. Usage and cost reflect the last target turn at capture time; execution
+does not wait for missing provider usage. Later usage remains in the durable ledger, and a usage
+event explicitly bound to a turn updates that turn without mutating an already returned capture.
 
 A managed step is a turn, and the step's result is that turn's final message. A model can end a turn
 on a progress report instead of the finished work, so acorn guards the step three ways
@@ -291,3 +313,20 @@ diagnostic; they do not execute. Ordinary graph convergence uses `after` edges.
 
 This replay protection is limited to one root run. Starting a fresh root can process the same
 business item again; cross-run business deduplication is deliberately not part of workflow dispatch.
+
+
+### Client run refreshes and live output
+
+A run pane captures the Node from its QueryClient. Each run-list and selected-step read has one
+active snapshot and a dirty follow-up flag. An invalidation during the follow-up schedules another
+read. Commands wait for a snapshot taken after the command. Step-status frames update the displayed
+row without fetching and survive a snapshot that started before the frame.
+
+The selected run owns live events, command tails, and status edges. Selecting another run retires
+those dictionaries. Unsent gate form fields retain the pane model lifetime across selections. The host retains one task model per pane and retires it with the task or Node shell. Returning reads
+the durable step results, including full
+canonical command output. The command tail holds the exact last 4,000 characters of stdout and
+stderr together. Stream chunks do not also occupy the generic event ring. Other event types,
+including managed-agent and unknown events, retain the 200-event window. The detail view reports how
+many earlier events left that window. These display limits do not shorten durable results or events
+sent to other consumers.

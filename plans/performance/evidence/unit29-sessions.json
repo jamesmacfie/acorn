@@ -1,0 +1,107 @@
+{
+  "note": "Disposable agent session manifests only. No profile, credentials, logs, or process arguments are read. Foreign sessions are not stopped.",
+  "sessions": [
+    {
+      "session": "perf-focus-after08",
+      "status": "stopped",
+      "launcherAlive": false,
+      "appAlive": false
+    },
+    {
+      "session": "perf-focus-after06",
+      "status": "stopped",
+      "launcherAlive": false,
+      "appAlive": false
+    },
+    {
+      "session": "perf-focus-pre05",
+      "status": "stopped",
+      "launcherAlive": false,
+      "appAlive": false
+    },
+    {
+      "session": "workflow-custody-unit25",
+      "status": "failed",
+      "launcherAlive": false,
+      "appAlive": false
+    },
+    {
+      "session": "unit16-editor",
+      "status": "failed",
+      "launcherAlive": false,
+      "appAlive": false
+    },
+    {
+      "session": "unit20-http",
+      "status": "failed",
+      "launcherAlive": false,
+      "appAlive": false
+    },
+    {
+      "session": "git-filesystem-unit14",
+      "status": "failed",
+      "launcherAlive": false,
+      "appAlive": false
+    },
+    {
+      "session": "perf-agent-client-09",
+      "status": "stopped",
+      "launcherAlive": false,
+      "appAlive": false
+    },
+    {
+      "session": "perf-visible-before",
+      "status": "stopped",
+      "launcherAlive": false,
+      "appAlive": false
+    },
+    {
+      "session": "perf-focus-after05",
+      "status": "stopped",
+      "launcherAlive": false,
+      "appAlive": false
+    },
+    {
+      "session": "unit17-editor",
+      "status": "failed",
+      "launcherAlive": false,
+      "appAlive": false
+    },
+    {
+      "session": "unit15-markers",
+      "status": "failed",
+      "launcherAlive": false,
+      "appAlive": false
+    },
+    {
+      "session": "perf-focus-before",
+      "status": "stopped",
+      "launcherAlive": false,
+      "appAlive": false
+    },
+    {
+      "session": "perf-docker-19",
+      "status": "failed",
+      "launcherAlive": false,
+      "appAlive": false
+    },
+    {
+      "session": "perf-baseline",
+      "status": "stopped",
+      "launcherAlive": false,
+      "appAlive": false
+    },
+    {
+      "session": "tui/unit17-tree",
+      "status": "failed",
+      "launcherAlive": false,
+      "appAlive": false
+    },
+    {
+      "session": "tui/perf-agent-client-tui-09",
+      "status": "stopped",
+      "launcherAlive": false,
+      "appAlive": false
+    }
+  ]
+}

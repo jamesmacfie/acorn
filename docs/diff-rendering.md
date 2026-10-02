@@ -99,13 +99,30 @@ else.
 Behind the changes pane's document is one resource, `LocalStatus`, which carries the branch, its
 upstream, and how far the branch is each way alongside the file list, so no two regions of the panel
 can describe different trees. It is one `git status --porcelain=v2 --branch --untracked-files=all`
-call plus two numstats and a filesystem check for a half-finished merge or rebase, and the node shares
-all of it across clients for two seconds ([workspaces-and-tasks.md](./workspaces-and-tasks.md)
+call plus two numstats and a filesystem check for a half-finished merge or rebase. The node shares
+the Git stdout across clients for two seconds ([workspaces-and-tasks.md](./workspaces-and-tasks.md)
 § Worktree status reads). Two reads would
 disagree for a poll interval, which is why the header's count, the groups, the branch bar's counts
 and the banner all derive from this one record. The last flag is what makes an untracked directory
 arrive as the files inside it: git's default collapses one to a single `dir/` entry, and a row named
 after a directory has no patch to show and no file to discard.
+
+The Node decodes porcelain's C-quoted path bytes, including octal UTF-8, before deriving content keys
+or passing paths to stage, unstage, discard, or diff. Both numstat reads use NUL-delimited records,
+so tabs, newlines, and literal arrows or braces retain their identity, including both rename paths.
+Malformed escapes and unsupported path encodings fail explicitly. The string-path boundary rejects
+undecodable bytes and ambiguous replacement characters rather than guessing a filesystem name.
+Path validation and root confinement still apply after decoding.
+
+Each status reader takes fresh operation-marker checks and fresh disk stamps. Eight workers per reader
+admit the stamps in porcelain order; they include mode, size, mtime, and ctime. Readers share Git text,
+but each reader stamps its own projection. Staged entries use object keys, deleted files use a stable
+gone stamp, and entries with unknown identity retain the patch refresh fallback.
+
+Tracked and untracked patches fail explicitly when Git exceeds its 16 MiB output cap. Untracked
+`diff --no-index` accepts complete results with exit zero or one through `gitOrThrow`'s
+`allowedExitCodes` option. Spawn, cancellation, timeout, and truncation failures still throw through
+the process seam. Supported patches preserve their complete bytes and final lines.
 
 Three members exist for what a caller draws that the viewer has no concept of. `threads` are inline
 conversations, complete when the topology is, and placed by their line number. `lineExtra` puts

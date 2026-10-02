@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { defRefKey, parseDefRef } from './draftStore'
+import { defRefKey, parseDefRef } from './draftAddress'
 
 // The address of an open definition, round-tripped. Solid Router hands a path parameter back exactly
 // as it sits in the URL, so the `:` that `workflowsSurfacePath` escapes arrives as `%3A`. Reading that

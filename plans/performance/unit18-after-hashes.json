@@ -1,0 +1,11 @@
+{
+  "sha256": {
+    "packages/node-core/src/server/core/data.ts": "736c810afe62341ad3239663090b74c459d4d336566646bcc7549f10802f6516",
+    "packages/node-core/src/server/core/dataPools.ts": "d57aaa007fc994cbb11a7537fa6c1e3024637077ec4b1b76e1799d05222c4d6b",
+    "packages/node-core/src/server/core/dataCatalog.ts": "bc19a17cd92b55cd7be08ab3e08bf49d8535b9abcde5c06663029834d3e2fc7e",
+    "plugins/database/src/server/database.ts": "c4245c28534bec374b9e83969393bd97c1a12e85b06e789b722c10e795b196b3",
+    "plans/performance/18-data-probe.test.ts": "8d98c50fcededd2960d0ae9091390a0ef50740e509ca16e22f4c527638bda742",
+    "plans/performance/18-postgres-probe.test.ts": "63bc4538e63573ec132803df616118ef465e682dc8d4b566427fdc542c410104",
+    "plans/performance/18-node-probe.config.ts": "067dfc9db9316fa8facb3867dede600545cadcdfeca2a6727718ac1aff1c0524"
+  }
+}

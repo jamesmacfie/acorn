@@ -123,8 +123,8 @@ export type AcornBridge = {
     /** The editor's current text, including edits not yet written to the plugin's own route. */
     read(): Promise<string>
     /** Replace it. Goes through the model, so it joins the undo stack and schedules the host's autosave
-     * exactly as typing would. */
-    write(text: string): Promise<void>
+     * exactly as typing would. With expectedText, a changed document rejects with conflict. */
+    write(text: string, options?: { expectedText: string }): Promise<void>
     /** Write anything pending to the plugin's declared write route and wait for it. Rarely needed by
      * hand: the host already flushes before it delivers a surface action. */
     flush(): Promise<void>

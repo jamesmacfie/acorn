@@ -8,7 +8,6 @@ import type { AgentRuntimeState } from '../../contract/wire.ts'
 import type { RunStatus } from '@acorn/protocol/runs.ts'
 import { foldToolEvents } from '../../shared/toolFold'
 import { foldUsageEvents } from '../../shared/usageFold'
-import { clientEventRecord } from '../sessions/rowMapping'
 import type { ManagedAgentRuntime } from '../sessions/runtime'
 import type { AgentDelegationService } from '../delegation/service'
 import type { ManagedAgentsBridge } from './managed'
@@ -117,16 +116,16 @@ export function managedAgentsBridge(
     // `store.snapshot` still answers workflow execution and the wait route with every row
     // (../../shared/usageFold.ts says why, ../sessions/sessionExecute.ts is the caller that needs them).
     // Usage folds for every reader, since applying a usage row twice changes nothing; tool calls only
-    // for one that asks (./managed.ts, `fold=1`). Neither page carries `searchText` (clientEventRecord).
+    // for one that asks (./managed.ts, `fold=1`). The client read paths already omit `searchText`.
     snapshot: (sessionId, afterSeq, eventLimit, foldTools) => guarded(async () => {
-      const snapshot = await runtime.store.snapshot(sessionId, afterSeq, eventLimit)
+      const snapshot = await runtime.store.clientSnapshot(sessionId, afterSeq, eventLimit)
       const events = foldUsageEvents(snapshot.events)
-      return { ...snapshot, events: (foldTools ? foldToolEvents(events) : events).map(clientEventRecord) }
+      return { ...snapshot, events: foldTools ? foldToolEvents(events) : events }
     }),
     events: (sessionId, afterSeq, limit, foldTools) => guarded(async () => {
-      const page = await runtime.store.eventPage(sessionId, afterSeq, limit)
+      const page = await runtime.store.clientEventPage(sessionId, afterSeq, limit)
       const events = foldTools ? foldToolEvents(foldUsageEvents(page.events)) : page.events
-      return { ...page, events: events.map(clientEventRecord) }
+      return { ...page, events }
     }),
     enqueueTurn: (sessionId, input) => guarded(() => runtime.enqueueTurn(sessionId, input)),
     implementCodexPlan: (sessionId, itemId) => guarded(() => runtime.implementCodexPlan(sessionId, itemId)),
@@ -145,8 +144,8 @@ export function managedAgentsBridge(
     handoffToTerminal: (sessionId) => guarded(() => runtime.handoffToTerminal(sessionId)),
     resumeManaged: (sessionId) => guarded(() => runtime.resumeManaged(sessionId)),
     exportSession: (sessionId, format) => guarded(() => runtime.exportSession(sessionId, format)),
-    wait: (sessionId, afterSeq, until, timeoutMs) =>
-      guarded(() => runtime.wait(sessionId, afterSeq, until, timeoutMs)),
+    wait: (sessionId, afterSeq, until, timeoutMs, signal) =>
+      guarded(() => runtime.wait(sessionId, afterSeq, until, timeoutMs, signal)),
     search: (query, filter) => guarded(() => runtime.store.searchSessions(query, filter)),
   }
 }

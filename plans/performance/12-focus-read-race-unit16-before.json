@@ -1,0 +1,15 @@
+{
+  "fixture": "real focus listener, held synthetic read, real typing transaction",
+  "before": {
+    "text": "UNSENT HUMAN EDIT\nbaseline a.txt\n",
+    "dirty": true
+  },
+  "after": {
+    "text": "EXTERNAL DISK REVISION\n",
+    "dirty": false
+  },
+  "subsequentlyWritten": [
+    "EXTERNAL DISK REVISION\n"
+  ],
+  "expected": "Reload rechecks document revision/dirty status before applying and preserves the human edit."
+}

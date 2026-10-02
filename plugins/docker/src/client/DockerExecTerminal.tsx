@@ -5,18 +5,23 @@
 // The emulator is the host's. This file says what the channel is and nothing about how it is drawn, so
 // the same source execs into a container from a browser and from a terminal, where the box is cells
 // (docs/terminal.md § Client).
+import { useQueryClient } from '@tanstack/solid-query'
+import { queryOwner } from '@acorn/plugin-api/client'
 import { attachPty, Rectangle, type PtyIo } from '@acorn/plugin-api/ui'
+import { captureDockerScope } from './dockerScope'
 import { wsDockerExecInput, wsDockerExecOpen, wsDockerExecResize } from './wsChannel'
 
 export default function DockerExecTerminal(props: { containerRef: string; label: string }) {
+  const owner = captureDockerScope(queryOwner(useQueryClient()))
+  const ref = props.containerRef
   const execId = crypto.randomUUID()
   const io: PtyIo = {
-    open: ({ cols, rows }, onEvent) => wsDockerExecOpen(execId, props.containerRef, cols, rows, (event) => {
+    open: ({ cols, rows }, onEvent) => wsDockerExecOpen(execId, ref, cols, rows, (event) => {
       if (event.kind === 'out') onEvent({ kind: 'out', data: event.data })
       else onEvent({ kind: 'exit', code: null })
-    }),
-    input: (data) => wsDockerExecInput(execId, data),
-    resize: ({ cols, rows }) => wsDockerExecResize(execId, cols, rows),
+    }, owner),
+    input: (data) => wsDockerExecInput(execId, data, owner),
+    resize: ({ cols, rows }) => wsDockerExecResize(execId, cols, rows, owner),
     farewell: '[session ended]',
   }
 

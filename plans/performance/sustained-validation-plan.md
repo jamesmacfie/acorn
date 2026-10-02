@@ -76,3 +76,15 @@ Close owned sessions/listeners and stop every fixture app, Node, database, HTTP 
 worker, and descendant. Verify recorded PIDs and port owners are gone. Run final diff/contract/docs
 checks and summarize accepted improvements, measured regressions/tradeoffs, conditional findings,
 and remaining evidence limits. Retain sanitized artifacts and a command/result index for review.
+
+## Verify before building
+
+- Confirm every selected implementation unit has review and a reproducible evidence record.
+- Rebuild final artifacts, verify source/build hashes, and stop older fixture sessions first.
+- Check actual native and document focus rather than inferring it from screenshots.
+- Establish exact ownership for both authenticated disposable Nodes and all fixture processes.
+- Compare equivalent warmed active owners and settlement windows at every sample.
+- Preserve dirty work, offline content, and canonical results when investigating growth.
+
+The [unit 29 validation record](./implementation-29-sustained-validation.md) tracks preparation,
+command results, and outstanding acceptance prerequisites.

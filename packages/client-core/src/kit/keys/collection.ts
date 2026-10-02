@@ -108,11 +108,10 @@ export function createCollection(options: CollectionOptions): Collection {
     // focus it on the next frame, by which time it exists.
     land: (key) => {
       const element = elements.get(key)
-      if (element) element.focus()
-      else if (options.scrollToKey) {
+      if (options.scrollToKey) {
         options.scrollToKey(key)
         requestAnimationFrame(() => elements.get(key)?.focus())
-      }
+      } else element?.focus()
     },
     onItem: (key) => elements.get(key) === document.activeElement,
   })
@@ -137,8 +136,8 @@ export function createCollection(options: CollectionOptions): Collection {
     if (!keys.enabled().some((item) => item.key === key)) return
     setActiveItem(options.id(), key)
     const element = elements.get(key)
-    if (element) element.scrollIntoView({ block: 'nearest' })
-    else options.scrollToKey?.(key)
+    if (options.scrollToKey) options.scrollToKey(key)
+    else element?.scrollIntoView({ block: 'nearest' })
   }
   // Registered for the life of the node, and taken back out with it: a stale entry would scroll a
   // collection that is no longer on screen.

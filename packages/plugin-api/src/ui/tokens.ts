@@ -9,5 +9,5 @@ export { border, radius, ROLE_ENUMS, size, space, text, tone } from '@acorn/clie
 export type { Border, Radius, RoleName, Size, Space, TextRole, Tone } from '@acorn/client-core/kit/tokens'
 
 // The support matrix, and the two types `Only` and `Fallback` are written against.
-export { NODE_SUPPORT } from '@acorn/client-core/kit/tokens'
+export { HOST, NODE_SUPPORT } from '@acorn/client-core/kit/tokens'
 export type { Host, KitNode, SupportLevel } from '@acorn/client-core/kit/tokens'

@@ -17,12 +17,15 @@ import type { WorkflowCatalog, WorkflowDef, WorkflowGateForm } from '../../share
 import { isWorkflowStepEvent } from '../../shared/stepEvents'
 import { graphOrder } from '../editor/graphOrder'
 import { rowIdentity, stepIdentity } from '../../shared/workflowIdentity'
-import { workflowApi } from '../workflowsClient'
+import { useQueryClient } from '@tanstack/solid-query'
+import { activeNodeId, queryOwner } from '@acorn/plugin-api/client'
+import { createWorkflowApi } from '../workflowsClient'
+import { workflowRefreshQueue } from '../refreshQueue'
 import { kindLabel } from './runDisplay'
 
 export const WORKFLOWS_PANE_ID = 'workflows'
 
-/** The last 200 events per step and the last 4,000 characters of its output. A command that prints a
+/** The selected run keeps 200 non-stream events per step and 4,000 output characters. A command that prints a
  *  megabyte is still a step whose tail you want to read; the whole stream is on the row. */
 const EVENT_CAP = 200
 const TAIL_CHARS = 4000
@@ -54,6 +57,13 @@ const LIVE_RUN = new Set(['running', 'gated', 'cancelling'])
 export const isLiveRun = (run: WorkflowRunRow | undefined): boolean => !!run && LIVE_RUN.has(run.status)
 
 export function createRunPaneModel(task: Task) {
+  const queryClient = useQueryClient()
+  const registered = queryOwner(queryClient)
+  const nodeId = registered === undefined ? activeNodeId() : registered
+  const api = createWorkflowApi(queryClient)
+  let disposed = false
+  const live = () => !disposed && (nodeId === null || activeNodeId() === nodeId)
+  onCleanup(() => { disposed = true })
   const [error, setError] = createSignal('')
   const [busy, setBusy] = createSignal(false)
   const [selectedRunId, setSelectedRunId] = createSignal<string>()
@@ -61,17 +71,55 @@ export function createRunPaneModel(task: Task) {
   // Keyed by step, because the pane keeps what a node said while you look at its sibling.
   const [events, setEvents] = createSignal<Record<string, unknown[]>>({})
   const [tails, setTails] = createSignal<Record<string, string>>({})
+  const [dropped, setDropped] = createSignal<Record<string, number>>({})
+  let stepVersion = 0
+  let statusEdges: Record<string, { version: number; status: string; at: number }> = {}
   const [now, setNow] = createSignal(Date.now())
   // A gate form's edits in progress, per step. Held while the app is open and saved nowhere, so
   // closing the app loses them and the frozen proposal remains.
   const [gateDrafts, setGateDrafts] = createSignal<Record<string, Record<string, DataValue | undefined>>>({})
 
-  const [runs, { refetch: refetchRuns }] = createResource<WorkflowRunProjection[]>(() => workflowApi.runs(task.id), { initialValue: [] })
-  const [steps, { refetch: refetchSteps, mutate: mutateSteps }] = createResource(
-    () => selectedRunId(),
-    (runId) => workflowApi.steps(runId),
-    { initialValue: [] },
-  )
+  const [runs, setRuns] = createSignal<WorkflowRunProjection[]>([])
+  const [steps, mutateSteps] = createSignal<WorkflowStepProjection[]>([])
+  const runsQueue = workflowRefreshQueue(async () => {
+    const rows = await api.runs(task.id)
+    if (live()) setRuns(rows)
+  })
+  let stepsQueue: ReturnType<typeof workflowRefreshQueue> | undefined
+  // Coalesced reads share one promise, so the list counts as loading until the last of them settles.
+  const [runsLoading, setRunsLoading] = createSignal(false)
+  const refetchRuns = () => {
+    setRunsLoading(true)
+    const pending = runsQueue.refresh()
+    void pending.finally(() => setRunsLoading(false)).catch(() => undefined)
+    return pending
+  }
+  const refetchSteps = () => stepsQueue?.refresh() ?? Promise.resolve()
+  onCleanup(() => { runsQueue.stop(); stepsQueue?.stop() })
+  void refetchRuns().catch(() => undefined)
+  createEffect(() => {
+    const runId = selectedRunId()
+    mutateSteps([])
+    setEvents({})
+    setTails({})
+    setDropped({})
+    statusEdges = {}
+    if (!runId) return
+    let current = true
+    const queue = workflowRefreshQueue(async () => {
+      const version = stepVersion
+      const rows = await api.steps(runId)
+      if (current && live()) mutateSteps(rows.map(row => {
+        const edge = statusEdges[row.id]
+        return edge && edge.version > version
+          ? { ...row, status: edge.status as WorkflowStepProjection['status'], updatedAt: edge.at }
+          : row
+      }))
+    })
+    stepsQueue = queue
+    void queue.refresh().catch(() => undefined)
+    onCleanup(() => { current = false; queue.stop() })
+  })
 
   const selectedRun = createMemo(() => runs().find((run) => run.id === selectedRunId()))
   const selectedStep = createMemo(() => steps().find((step) => step.id === selectedStepId()))
@@ -79,7 +127,7 @@ export function createRunPaneModel(task: Task) {
   // The newest run, until somebody says otherwise. Also the recovery when the selected run is gone.
   // Not while the list is being read: a run that just started is named before it is listed.
   createEffect(() => {
-    if (runs.loading || runs().some((run) => run.id === selectedRunId())) return
+    if (runsLoading() || runs().some((run) => run.id === selectedRunId())) return
     const newest = runs()[0]
     if (newest) setSelectedRunId(newest.id)
   })
@@ -100,7 +148,7 @@ export function createRunPaneModel(task: Task) {
   // once per pane; until it answers, or if it fails, the kind's id stands in.
   const [catalog] = createResource(async (): Promise<WorkflowCatalog | undefined> => {
     try {
-      return await workflowApi.catalog(task.projectId)
+      return await api.catalog(task.projectId)
     } catch {
       return undefined
     }
@@ -143,6 +191,7 @@ export function createRunPaneModel(task: Task) {
 
   const selectRun = (runId: string): void => {
     if (runId === selectedRunId()) return
+    setBusy(false)
     setSelectedRunId(runId)
     setSelectedStepId(undefined)
     setError('')
@@ -153,15 +202,21 @@ export function createRunPaneModel(task: Task) {
   // A status edge moves one glyph and reads nothing (`workflow:step-changed`). A run beginning or
   // ending re-reads, because it changes rows this client never saw.
   onCleanup(wsOnWorkflowStepChanged(({ runId, stepId, status }) => {
-    if (runId !== selectedRunId()) return
+    if (!live() || runId !== selectedRunId()) return
+    statusEdges[stepId] = { version: ++stepVersion, status, at: Date.now() }
     mutateSteps((current) => current.map((step) =>
       step.id === stepId ? { ...step, status: status as WorkflowStepProjection['status'], updatedAt: Date.now() } : step))
   }))
 
   onCleanup(wsOnWorkflowStepEvent(({ runId, stepId, event }) => {
-    if (runId !== selectedRunId()) return
-    setEvents((current) => ({ ...current, [stepId]: [...(current[stepId] ?? []), event].slice(-EVENT_CAP) }))
-    if (!isWorkflowStepEvent(event) || (event.type !== 'stdout' && event.type !== 'stderr')) return
+    if (!live() || runId !== selectedRunId()) return
+    if (!isWorkflowStepEvent(event) || (event.type !== 'stdout' && event.type !== 'stderr')) {
+      if ((events()[stepId]?.length ?? 0) === EVENT_CAP) {
+        setDropped(current => ({ ...current, [stepId]: (current[stepId] ?? 0) + 1 }))
+      }
+      setEvents((current) => ({ ...current, [stepId]: [...(current[stepId] ?? []), event].slice(-EVENT_CAP) }))
+      return
+    }
     const text = event.text
     setTails((current) => {
       const next = (current[stepId] ?? '') + text
@@ -169,23 +224,24 @@ export function createRunPaneModel(task: Task) {
     })
   }))
 
-  const refresh = (): void => {
-    void refetchRuns()
-    void refetchSteps()
+  const refresh = async (): Promise<void> => {
+    if (!live()) return
+    await Promise.all([refetchRuns(), refetchSteps()])
   }
+  const invalidate = () => { void refresh().catch(() => undefined) }
 
   onCleanup(onPluginFrame('workflows', pluginChannel('workflows', 'run-changed'), (payload) => {
     const changed = payload as Partial<{ taskId: string; runId: string }>
     if (changed.taskId !== task.id && changed.runId !== selectedRunId()) return
-    refresh()
+    invalidate()
   }))
   onCleanup(onPluginFrame('workflows', pluginChannel('workflows', 'child-changed'), (payload) => {
     const changed = payload as Partial<WorkflowChildRunSummary & { ownerTaskId: string }>
     if (changed.ownerTaskId !== task.id && changed.ownerTaskId !== selectedRun()?.parentTaskId) return
-    refresh()
+    invalidate()
   }))
   // Events announce edges, not history. Re-read both resources after a reconnect or a shed frame.
-  onCleanup(wsOnReconnect(refresh))
+  onCleanup(wsOnReconnect(invalidate))
 
   // ── Somebody else pointed at a run ────────────────────────────────────────────────────────────
   //
@@ -213,17 +269,21 @@ export function createRunPaneModel(task: Task) {
   // Each one refetches rather than guessing: the node answers `{ ok }` and the rows it moved are the
   // truth. In flight, every control is disabled, so a double press cannot approve twice.
   const act = async (fallback: string, run: () => Promise<{ ok?: boolean; error?: string }>): Promise<void> => {
+    if (!live()) return
+    const runId = selectedRunId()
+    const current = () => live() && selectedRunId() === runId
     setBusy(true)
     setError('')
     try {
       const answer = await run()
-      if (answer?.error) setError(answer.error)
+      if (current() && answer?.error) setError(answer.error)
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : fallback)
+      if (current()) setError(caught instanceof Error ? caught.message : fallback)
     } finally {
-      setBusy(false)
-      void refetchSteps()
-      void refetchRuns()
+      if (current()) {
+        await refresh().catch(() => undefined)
+        if (current()) setBusy(false)
+      }
     }
   }
 
@@ -248,6 +308,7 @@ export function createRunPaneModel(task: Task) {
     setError,
     /** What this step has said, newest last. Whatever the vocabulary does not name is kept as JSON. */
     eventsFor: (stepId: string): readonly unknown[] => events()[stepId] ?? [],
+    droppedEventsFor: (stepId: string): number => dropped()[stepId] ?? 0,
     /** The captured output of a command step while it runs, as lines. */
     tailFor: (stepId: string): readonly string[] => {
       const tail = tails()[stepId]
@@ -265,22 +326,22 @@ export function createRunPaneModel(task: Task) {
       const run = selectedRunId()
       const step = selectedStepId()
       if (!run || !step) return Promise.resolve()
-      return act('That gate could not be resolved.', () => workflowApi.gate(run, step, approved, values))
+      return act('That gate could not be resolved.', () => api.gate(run, step, approved, values))
     },
     cancel: () => {
       const run = selectedRunId()
       if (!run) return Promise.resolve()
-      return act('That run could not be cancelled.', () => workflowApi.cancel(run))
+      return act('That run could not be cancelled.', () => api.cancel(run))
     },
     kill: (stepId: string) => {
       const run = selectedRunId()
       if (!run) return Promise.resolve()
-      return act('That step could not be stopped.', () => workflowApi.kill(run, stepId))
+      return act('That step could not be stopped.', () => api.kill(run, stepId))
     },
     retry: (stepId: string, prompt?: string) => {
       const run = selectedRunId()
       if (!run) return Promise.resolve()
-      return act('That step could not be retried.', () => workflowApi.retry(run, stepId, prompt))
+      return act('That step could not be retried.', () => api.retry(run, stepId, prompt))
     },
   }
 }

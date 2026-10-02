@@ -1,3 +1,4 @@
+import { createHash, webcrypto } from 'node:crypto'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
@@ -5,6 +6,7 @@ import { EditorView } from '@codemirror/view'
 import { prefsKey } from '@acorn/protocol/api.ts'
 import type { Task } from '@acorn/plugin-api/client'
 import { paneCollapseKey, Rectangle, sidebarCollapse } from '@acorn/plugin-api/ui'
+import { setActiveNode } from '@acorn/plugin-api/testkit/client'
 
 // The editor pane against a real CodeMirror, in jsdom. What is stubbed is the worktree behind it and
 // the two sidebar panels, because neither is what this file is about; the editor, its per-file state,
@@ -28,10 +30,10 @@ const write = vi.fn(async (_taskId: string, path: string, content: string) => {
 })
 const read = vi.fn(async (_taskId: string, path: string) => disk.get(path) ?? '')
 const readImage = vi.fn(async (_taskId: string, _path: string) => ({ bytes: Uint8Array.from([0x52, 0x49, 0x46, 0x46]), type: 'image/webp' }))
-const lineMarkers = vi.fn(async (_taskId: string, _path: string) => [
+const lineMarkers = vi.fn(async (_taskId: string, _path: string, revision: string) => ({ revision, markers: [
   { kind: 'pull-request' as const, ranges: [{ from: 1, to: 1 }] },
   { kind: 'uncommitted' as const, ranges: [{ from: 1, to: 1 }] },
-])
+] }))
 // The checkout path, which the pane now reads through the query cache. A test that wants to see what
 // the pane does *while* that request is outstanding replaces this with a promise it holds open.
 let root: () => Promise<string | null> = async () => '/worktree'
@@ -45,7 +47,7 @@ vi.mock('./editorClient', async (importOriginal) => ({
     files: async () => [...disk.keys()],
     read: (taskId: string, path: string) => read(taskId, path),
     readImage: (taskId: string, path: string) => readImage(taskId, path),
-    lineMarkers: (taskId: string, path: string) => lineMarkers(taskId, path),
+    lineMarkers: (taskId: string, path: string, revision: string) => lineMarkers(taskId, path, revision),
     write: (taskId: string, path: string, content: string) => write(taskId, path, content),
   }),
 }))
@@ -68,6 +70,7 @@ vi.mock('./EditorTerminal', () => ({
 const { default: EditorPane } = await import('./EditorPane')
 const { editorOpen, openFiles } = await import('./editorState')
 const { saveEditorMode } = await import('./editorPrefs')
+const { editorViewState } = await import('./editorViewState')
 
 // A task per test. The per-file document pool is held by the host per (pane, task) and outlives a
 // mount on purpose, so two tests sharing a task id would share the first one's open documents.
@@ -78,6 +81,8 @@ const task = (): Task => ({ id: taskId }) as unknown as Task
 const cleanups: (() => void)[] = []
 let queryClient = new QueryClient()
 beforeEach(() => {
+  setActiveNode(null)
+  vi.stubGlobal('crypto', webcrypto)
   taskId = `t${++tasks}`
   root = async () => '/worktree'
   // The worktree, back as it was: one test quits `$EDITOR` over a file and another asserts what the
@@ -88,6 +93,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanups.splice(0).forEach((dispose) => dispose())
   write.mockClear()
+  write.mockImplementation(async (_taskId, path, content) => { disk.set(path, content); return { ok: true } })
   read.mockClear()
   readImage.mockClear()
   lineMarkers.mockClear()
@@ -95,6 +101,7 @@ afterEach(() => {
   quitEditor = undefined
   sidebarCollapse(paneCollapseKey('editor'))[1](false)
   localStorage.clear()
+  setActiveNode(null)
 })
 
 // The pane reads the editor-mode preference off the prefs query, so it needs a client with the cache
@@ -131,6 +138,213 @@ const showing = async (view: () => EditorView, text: string) =>
   vi.waitFor(() => expect(view().state.doc.toString()).toContain(text))
 
 describe('the editor pane', () => {
+  const saveChord = (view: EditorView) => view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', {
+    key: 's', code: 'KeyS', keyCode: 83, ctrlKey: true, bubbles: true,
+  }))
+
+  it('skips clean writes, retains a refused close, and closes after retry', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    saveChord(view)
+    await Promise.resolve()
+    expect(write).not.toHaveBeenCalled()
+    write.mockRejectedValueOnce(new Error('formatter veto'))
+    view.dispatch({ changes: { from: 0, insert: '// unsent\n' } })
+    host.querySelector<HTMLButtonElement>('[aria-label="Close a.ts"]')!.click()
+    await vi.waitFor(() => expect(host.textContent).toContain('formatter veto'))
+    expect(openFiles(taskId)).toMatchObject([{ path: 'a.ts', dirty: true }])
+    expect(view.state.doc.toString()).toContain('// unsent')
+    host.querySelector<HTMLButtonElement>('[aria-label="Close a.ts"]')!.click()
+    await vi.waitFor(() => expect(openFiles(taskId)).toHaveLength(0))
+    expect(disk.get('a.ts')).toContain('// unsent')
+  })
+
+  it('keeps a later edit and its tab when close waits on an earlier revision', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    let resolve!: (result: { ok: true }) => void
+    write.mockImplementationOnce(() => new Promise((done) => { resolve = done }))
+    view.dispatch({ changes: { from: 0, insert: '// first\n' } })
+    host.querySelector<HTMLButtonElement>('[aria-label="Close a.ts"]')!.click()
+    await vi.waitFor(() => expect(write).toHaveBeenCalledTimes(1))
+    view.dispatch({ changes: { from: 0, insert: '// later\n' } })
+    resolve({ ok: true })
+    await vi.waitFor(() => expect(openFiles(taskId)[0]?.dirty).toBe(true))
+    expect(openFiles(taskId)[0]?.path).toBe('a.ts')
+    expect(view.state.doc.toString()).toContain('// later')
+  })
+
+  it('rejects a held focus reload after typing and does not save an acknowledged reload', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    let resolve!: (text: string) => void
+    read.mockImplementationOnce(() => new Promise((done) => { resolve = done }))
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(resolve).toBeDefined())
+    view.dispatch({ changes: { from: 0, insert: '// human edit\n' } })
+    resolve('external text')
+    await Promise.resolve()
+    expect(view.state.doc.toString()).toContain('// human edit')
+    saveChord(view)
+    await vi.waitFor(() => expect(openFiles(taskId)[0]?.dirty).toBe(false))
+    write.mockClear()
+    read.mockResolvedValueOnce('acknowledged external text')
+    window.dispatchEvent(new Event('focus'))
+    await showing(() => view, 'acknowledged external text')
+    view.contentDOM.dispatchEvent(new Event('blur', { bubbles: true }))
+    saveChord(view)
+    expect(write).not.toHaveBeenCalled()
+  })
+
+  it('opens text before held markers and refuses fabricated editable text after a failed load', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    let resolve!: (markers: Awaited<ReturnType<typeof lineMarkers>>) => void
+    lineMarkers.mockImplementationOnce(() => new Promise((done) => { resolve = done }))
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    await vi.waitFor(() => expect(resolve).toBeDefined())
+    read.mockRejectedValueOnce(new Error('unsupported UTF-8'))
+    editorOpen(taskId, 'binary.dat', false)
+    await vi.waitFor(() => expect(host.textContent).toContain('unsupported UTF-8'))
+    expect(view.state.readOnly).toBe(true)
+    saveChord(view)
+    expect(write).not.toHaveBeenCalled()
+    resolve({ revision: '', markers: [] })
+  })
+
+  it('rejects a different disk body without clearing matching displayed markers', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    const marked = () => view.contentDOM.querySelector('.cm-line-pull-request')
+    await vi.waitFor(() => expect(marked()).not.toBeNull())
+    const calls = lineMarkers.mock.calls.length
+    lineMarkers.mockResolvedValueOnce({ revision: 'different-body', markers: [] })
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(lineMarkers.mock.calls.length).toBeGreaterThan(calls))
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(marked()).not.toBeNull()
+  })
+
+  it('requests the exact displayed UTF-8 body including BOM, Unicode, and CRLF', async () => {
+    const body = '\ufeff😀 café\r\nsecond\n'
+    disk.set('exact.txt', body)
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'exact.txt', false)
+    await showing(() => view, 'second')
+    expect(view.state.doc.toString()).toBe(body)
+    await vi.waitFor(() => expect(lineMarkers).toHaveBeenCalledWith(taskId, 'exact.txt', createHash('sha256').update(body).digest('hex')))
+  })
+
+  it('requires the cached document body when returning to a tab after disk changes', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    await vi.waitFor(() => expect(view.contentDOM.querySelector('.cm-line-pull-request')).not.toBeNull())
+    editorOpen(taskId, 'b.ts', false)
+    await showing(() => view, 'const b = 2')
+    await vi.waitFor(() => expect(lineMarkers.mock.calls.some(([, path]) => path === 'b.ts')).toBe(true))
+    disk.set('a.ts', 'external body\n')
+    const { markerRevision } = await import('./markerRevision')
+    lineMarkers.mockResolvedValueOnce({ revision: await markerRevision(disk.get('a.ts')!), markers: [] })
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 3_000)
+    const calls = lineMarkers.mock.calls.length
+    try {
+      editorOpen(taskId, 'a.ts', false)
+      await showing(() => view, 'const a = 1')
+      await vi.waitFor(() => expect(lineMarkers.mock.calls.length).toBeGreaterThan(calls))
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      expect(view.contentDOM.querySelector('.cm-line-pull-request')).not.toBeNull()
+    } finally { clock.mockRestore() }
+  })
+
+  it.each(['edit', 'save', 'reload', 'node-switch', 'dispose'])('rejects held markers across %s', async (action) => {
+    const mounted = mount()
+    const view = await editor(mounted.host)
+    let release!: () => void
+    lineMarkers.mockImplementationOnce((_task, _path, revision) => new Promise((resolve) => {
+      release = () => resolve({ revision, markers: [{ kind: 'pull-request', ranges: [{ from: 1, to: 1 }] }] })
+    }))
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    await vi.waitFor(() => expect(release).toBeDefined())
+    if (action === 'dispose') mounted.unmount()
+    else if (action === 'node-switch') setActiveNode('other-node')
+    else if (action === 'reload') {
+      disk.set('a.ts', 'external body\n')
+      lineMarkers.mockResolvedValueOnce({ revision: '', markers: [] })
+      window.dispatchEvent(new Event('focus'))
+      await showing(() => view, 'external body')
+    } else {
+      view.dispatch({ changes: { from: 0, insert: '// typed\n' } })
+      if (action === 'save') {
+        lineMarkers.mockResolvedValueOnce({ revision: '', markers: [] })
+        saveChord(view)
+        await vi.waitFor(() => expect(openFiles(taskId)[0]?.dirty).toBe(false))
+      }
+    }
+    release()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(mounted.host.querySelector('.cm-line-pull-request')).toBeNull()
+  })
+
+
+  it('retires superseded previews and held reads without losing a promoted tab', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    for (let i = 0; i < 24; i++) {
+      disk.set(`preview-${i}.txt`, `preview ${i}`)
+      editorOpen(taskId, `preview-${i}.txt`, true)
+      await showing(() => view, `preview ${i}`)
+    }
+    expect(openFiles(taskId).map((file) => file.path)).toEqual(['a.ts', 'preview-23.txt'])
+    expect(editorViewState(taskId, 'preview-0.txt')).toBeUndefined()
+    let resolve!: (text: string) => void
+    read.mockImplementationOnce(() => new Promise((done) => { resolve = done }))
+    editorOpen(taskId, 'discarded.txt', true)
+    await vi.waitFor(() => expect(resolve).toBeDefined())
+    editorOpen(taskId, 'b.ts', true)
+    await showing(() => view, 'const b = 2')
+    resolve('discarded response')
+    await Promise.resolve()
+    expect(openFiles(taskId).some((file) => file.path === 'discarded.txt')).toBe(false)
+    expect(view.state.doc.toString()).toContain('const b = 2')
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+  })
+
+  it('restores dirty text, undo, and cursor after model retirement and failed persistence', async () => {
+    const first = mount()
+    const view = await editor(first.host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    view.dispatch({ changes: { from: 0, insert: '// recovery\n' }, selection: { anchor: 5 } })
+    write.mockRejectedValue(new Error('offline'))
+    const { paneModel } = await import('@acorn/plugin-api/client')
+    paneModel('editor', 'other-task', () => ({}))
+    first.unmount()
+    await Promise.resolve()
+    read.mockRejectedValue(new Error('still offline'))
+    const second = mount(true)
+    const reopened = await editor(second.host)
+    await showing(() => reopened, '// recovery')
+    expect(reopened.state.selection.main.anchor).toBe(5)
+    reopened.contentDOM.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', keyCode: 90, ctrlKey: true, bubbles: true }))
+    await vi.waitFor(() => expect(reopened.state.doc.toString()).not.toContain('// recovery'))
+  })
+
   it('uses the shared collapse control and keeps the sidebar panels mounted in an empty rail', async () => {
     const { host } = mount()
     await editor(host)
@@ -155,9 +369,11 @@ describe('the editor pane', () => {
     editorOpen(taskId, 'a.ts', false)
     await showing(() => view, 'const a = 1')
 
-    const firstLine = view.contentDOM.querySelector('.cm-line')
-    expect(firstLine?.classList.contains('cm-line-pull-request')).toBe(true)
-    expect(firstLine?.classList.contains('cm-line-uncommitted')).toBe(true)
+    await vi.waitFor(() => {
+      const firstLine = view.contentDOM.querySelector('.cm-line')
+      expect(firstLine?.classList.contains('cm-line-pull-request')).toBe(true)
+      expect(firstLine?.classList.contains('cm-line-uncommitted')).toBe(true)
+    })
   })
 
   it('selects a tab and its file-tree row before the document read finishes', async () => {

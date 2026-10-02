@@ -4,8 +4,10 @@
 // A `header-body` pane: the chips are the header and do not scroll, the detail is the body and does
 // (docs/panes.md § Layout model). The two regions share a selection, so it lives in ./dockerViewState
 // rather than in either of them.
-import { createEffect, createResource, createRoot, createSignal, For, on, onCleanup, Show } from 'solid-js'
-import { onScopeEvicted } from '@acorn/plugin-api/client'
+import { useQueryClient } from '@tanstack/solid-query'
+import { captureDockerScope, dockerScopeKey, onDockerRetired } from './dockerScope'
+import { createEffect, createMemo, createResource, createRoot, createSignal, For, on, onCleanup, Show } from 'solid-js'
+import { queryOwner, onScopeEvicted } from '@acorn/plugin-api/client'
 import type { Task } from '@acorn/protocol/api.ts'
 import type { DockerContainerSummary } from '../shared/model'
 import { fetchTaskContainers } from './dockerClient'
@@ -24,8 +26,8 @@ const roots = new Map<string, { model: TaskContainers; dispose: () => void }>()
 
 type TaskContainers = ReturnType<typeof linkedContainers>
 
-function linkedContainers(taskId: string) {
-  const [linked, { refetch }] = createResource(() => taskId, fetchTaskContainers)
+function linkedContainers(taskId: string, nodeId: string | null) {
+  const [linked, { refetch }] = createResource(() => taskId, id => fetchTaskContainers(id, nodeId))
   const [selected, setSelected] = createSignal<string | null>(dockerSelection(taskId) ?? null)
 
   // Land selection on the first container (and heal it when the selected one disappears).
@@ -41,28 +43,35 @@ function linkedContainers(taskId: string) {
   return { linked, refetch, selected, setSelected }
 }
 
-const model = (taskId: string): TaskContainers => {
-  const held = roots.get(taskId)
+const model = (taskId: string, nodeId: string | null): TaskContainers => {
+  const key = JSON.stringify([nodeId, taskId])
+  const held = roots.get(key)
   if (held) return held.model
   // One task is on screen at a time; anything else here is a task somebody navigated away from.
-  for (const [id, entry] of roots) if (id !== taskId) { entry.dispose(); roots.delete(id) }
-  const entry = createRoot((dispose) => ({ model: linkedContainers(taskId), dispose }))
-  roots.set(taskId, entry)
+  for (const [id, entry] of roots) if (id !== key) { entry.dispose(); roots.delete(id) }
+  const entry = createRoot((dispose) => ({ model: linkedContainers(taskId, nodeId), dispose }))
+  roots.set(key, entry)
   return entry.model
 }
 
 onScopeEvicted((event) => {
   if (event.scope !== 'task') return
-  roots.get(event.taskId)?.dispose()
-  roots.delete(event.taskId)
+  roots.get(dockerScopeKey(event.taskId))?.dispose()
+  roots.delete(dockerScopeKey(event.taskId))
+})
+
+onDockerRetired(() => {
+  for (const entry of roots.values()) entry.dispose()
+  roots.clear()
 })
 
 const chipLabel = (c: DockerContainerSummary): string => c.composeService ?? c.name
 
 export function DockerChips(props: { task: Task }) {
-  const state = () => model(props.task.id)
+  const owner = captureDockerScope(queryOwner(useQueryClient()))
+  const state = createMemo(() => model(props.task.id, owner.nodeId))
   const off = wsOnDockerChanged((scopes) => {
-    if (scopes.includes('containers')) void state().refetch()
+    if (owner.current() && scopes.includes('containers')) void state().refetch()
   })
   onCleanup(off)
 
@@ -85,7 +94,8 @@ export function DockerChips(props: { task: Task }) {
 }
 
 export function DockerTaskDetail(props: { task: Task }) {
-  const state = () => model(props.task.id)
+  const owner = captureDockerScope(queryOwner(useQueryClient()))
+  const state = createMemo(() => model(props.task.id, owner.nodeId))
   return (
     <Show
       when={state().selected()}
@@ -95,7 +105,7 @@ export function DockerTaskDetail(props: { task: Task }) {
         </EmptyState>
       }
     >
-      {(id) => <ContainerDetail target={id()} taskId={props.task.id} onRemoved={() => void state().refetch()} />}
+      {(id) => <ContainerDetail target={id()} taskId={props.task.id} onRemoved={() => { if (owner.current()) void state().refetch() }} />}
     </Show>
   )
 }

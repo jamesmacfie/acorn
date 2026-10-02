@@ -583,6 +583,16 @@ export function createFrameBridge(input: {
             reply(failed(id, 'bad_request', `documents are capped at ${MAX_DOCUMENT_BYTES} bytes`))
             return
           }
+          if (data.expectedText !== undefined) {
+            if (typeof data.expectedText !== 'string') {
+              reply(failed(id, 'bad_request', 'expectedText must be text'))
+              return
+            }
+            if (doc.read() !== data.expectedText) {
+              reply(failed(id, 'conflict', 'The document changed while loading. Select the query again to replace it.'))
+              return
+            }
+          }
           doc.write(text)
           reply({ id, ok: true, status: 200, body: null })
           return

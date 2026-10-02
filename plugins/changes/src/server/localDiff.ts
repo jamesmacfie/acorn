@@ -7,6 +7,8 @@
 import { lstat, readFile } from 'node:fs/promises'
 import { isAbsolute, join } from 'node:path'
 import { git, gitOrThrow, gitText, invalidateWorktreeStatus, resolveInRoot, worktreeGitText, worktreeStatusText } from '@acorn/plugin-api/node'
+import { decodeGitPath, parseNumstat } from './gitPaths'
+import { stampLocalChanges } from './localStamps'
 import type { LocalChange, LocalStatus } from '@acorn/protocol/localGit.ts'
 import type { CommitOptions, HeadCommit, PullOptions, PushOptions } from '../shared/api'
 
@@ -34,8 +36,8 @@ const statusFor = (xy: string, index: boolean): LocalChangeStatus => {
 export type ParsedPorcelain = Omit<LocalStatus, 'operation'>
 
 // Pure parser for `git status --porcelain=v2 --branch` output taken without `-z`, so git C-quotes
-// unusual paths and this accepts them as-is. A file changed in both the index and the worktree yields
-// two entries, one per scope, matching the staged and unstaged groups the pane shows.
+// unusual paths; decode those bytes before deriving keys or passing paths to Git. A file changed
+// in both the index and the worktree yields two entries, one per scope, matching the pane's groups.
 //
 // The four `# branch.*` headers come back too. `branch.upstream` and `branch.ab` are absent when the
 // branch has no upstream, which is why `upstream`, `ahead` and `behind` are null rather than zero
@@ -53,7 +55,7 @@ export function parsePorcelainV2(stdout: string): ParsedPorcelain {
     if (!line) continue
     const kind = line[0]
     if (kind === '?') {
-      out.push({ path: line.slice(2), status: 'untracked', staged: false, additions: null, deletions: null, contentKey: '' })
+      out.push({ path: decodeGitPath(line.slice(2)), status: 'untracked', staged: false, additions: null, deletions: null, contentKey: '' })
       continue
     }
     if (kind !== '1' && kind !== '2' && kind !== 'u') continue
@@ -67,20 +69,23 @@ export function parsePorcelainV2(stdout: string): ParsedPorcelain {
     const key = (text: string) => (keyed ? text : undefined)
     const [mH, mI, mW, hH, hI] = parts.slice(3, 8)
     if (kind === '1') {
-      const path = parts.slice(8).join(' ')
+      const path = decodeGitPath(parts.slice(8).join(' '))
       if (xy[0] !== '.') out.push({ path, status: statusFor(xy, true), staged: true, additions: null, deletions: null, contentKey: key(`${mH} ${mI} ${hH} ${hI}`) })
       if (xy[1] !== '.') out.push({ path, status: statusFor(xy, false), staged: false, additions: null, deletions: null, contentKey: key(`${mI} ${mW} ${hI}`) })
     } else if (kind === '2') {
       // `2 XY sub mH mI mW hH hI Xscore path\torigPath`
       const pathField = parts.slice(9).join(' ')
-      const [path, origPath] = pathField.split('\t')
+      const fields = pathField.split('\t')
+      if (fields.length !== 2) throw new Error('Malformed Git rename record.')
+      const path = decodeGitPath(fields[0]!)
+      const origPath = decodeGitPath(fields[1]!)
       if (xy[0] !== '.') out.push({ path, oldPath: origPath, status: statusFor(xy, true), staged: true, additions: null, deletions: null, contentKey: key(`${mH} ${mI} ${hH} ${hI} ${origPath}`) })
       if (xy[1] !== '.') out.push({ path, oldPath: origPath, status: statusFor(xy, false), staged: false, additions: null, deletions: null, contentKey: key(`${mI} ${mW} ${hI}`) })
     } else {
       // Unmerged. Its own status, not a modification: git's answer to "stage it" is "mark it
       // resolved", and there is no half of it that can be in the index while the rest is not.
       // `u XY sub m1 m2 m3 mW h1 h2 h3 path`: three stages and the disk, which the stat finishes.
-      const path = parts.slice(10).join(' ')
+      const path = decodeGitPath(parts.slice(10).join(' '))
       out.push({ path, status: 'conflicted', staged: false, additions: null, deletions: null, contentKey: key(parts.slice(3, 10).join(' ')) })
     }
   }
@@ -95,21 +100,13 @@ export function parsePorcelainV2(stdout: string): ParsedPorcelain {
 
 // Pure: merge numstat (adds/dels per path) into changes for one scope.
 export function mergeNumstat(changes: LocalChange[], numstat: string, staged: boolean): LocalChange[] {
-  const stats = new Map<string, { a: number | null; d: number | null }>()
-  for (const line of numstat.split('\n')) {
-    if (!line.trim()) continue
-    const [a, d, ...rest] = line.split('\t')
-    const path = rest.join('\t')
-    // A rename shows as "old => new" in the numstat path field only with -M; keep the raw path as
-    // the map key either way.
-    stats.set(path, { a: a === '-' ? null : Number(a), d: d === '-' ? null : Number(d) })
-  }
+  const stats = new Map(parseNumstat(numstat).map((record) => [JSON.stringify([record.oldPath ?? null, record.path]), record.counts]))
   return changes.map((c) => {
     if (c.staged !== staged) return c
     // A conflicted file is in neither diff, and `git diff --numstat` reports the merge markers as
     // changed lines if it is asked. The row says "conflicted" and no count at all.
     if (c.status === 'conflicted') return c
-    const s = stats.get(c.path) ?? (c.oldPath ? stats.get(`${c.oldPath} => ${c.path}`) : undefined)
+    const s = stats.get(JSON.stringify([c.oldPath ?? null, c.path])) ?? stats.get(JSON.stringify([null, c.path]))
     return s ? { ...c, additions: s.a, deletions: s.d } : c
   })
 }
@@ -148,34 +145,12 @@ export async function localStatus(worktree: string): Promise<LocalStatus> {
   // are decoration, so the list renders without them.
   const operation = gitOperation(worktree)
   const [unstaged, staged] = await Promise.all([
-    worktreeGitText(worktree, ['diff', '--numstat'], { timeoutMs: 15_000 }),
-    worktreeGitText(worktree, ['diff', '--staged', '--numstat'], { timeoutMs: 15_000 }),
+    worktreeGitText(worktree, ['diff', '--numstat', '-z'], { timeoutMs: 15_000 }),
+    worktreeGitText(worktree, ['diff', '--staged', '--numstat', '-z'], { timeoutMs: 15_000 }),
   ])
   const counted = mergeNumstat(mergeNumstat(parsed.changes, unstaged ?? '', false), staged ?? '', true)
-  const changes = await Promise.all(counted.map(async (change) => {
-    if (change.staged || change.contentKey == null) return change
-    const stamp = await diskStamp(worktree, change)
-    return { ...change, contentKey: stamp == null ? undefined : `${change.contentKey} ${stamp}`.trim() }
-  }))
+  const changes = await stampLocalChanges(worktree, counted)
   return { ...parsed, changes, operation: await operation }
-}
-
-// The disk half of an unstaged entry's `contentKey`. Git names no object for a file it has not
-// hashed, so a stat stands in for one, the way git's own index uses one. Taken fresh on every read
-// rather than inside the two-second window, so an edit is never hidden behind a cached answer, and the
-// ctime is in it because nothing can set a ctime back: an edit that keeps the size and restores the
-// mtime still moves the key.
-async function diskStamp(worktree: string, change: LocalChange): Promise<string | undefined> {
-  try {
-    const full = resolveInRoot(worktree, change.path)
-    if (!full) return undefined
-    const stat = await lstat(full)
-    return `${stat.mode} ${stat.size} ${stat.mtimeMs} ${stat.ctimeMs}`
-  } catch {
-    // Gone is a steady answer for a deletion. Anything else, such as a path git C-quoted, leaves no
-    // key, and the pane goes back to re-reading that one file every poll.
-    return change.status === 'deleted' ? 'gone' : undefined
-  }
 }
 
 // Everything before the first hunk header is git's file header. The client re-synthesizes its
@@ -201,10 +176,9 @@ export async function localDiff(worktree: string, path: string, scope: LocalScop
   // Untracked files aren't in the index, so this renders an all-additions patch via --no-index.
   const tracked = (await git(['ls-files', '--error-unmatch', '--', literalPath(path)], { cwd: worktree, timeoutMs: 10_000 })).code === 0
   if (!tracked && scope === 'unstaged') {
-    // --no-index exits 1 on "differences found", which counts as success for a diff. The broker
-    // returns the exit code as data, so this needs no catch that inspects an exec error's shape.
-    const result = await git(['diff', '--no-index', '--no-color', '--', '/dev/null', path], { cwd: worktree, timeoutMs: 15_000 })
-    if (result.code !== 0 && result.code !== 1) throw new Error(result.stderr.trim() || 'git diff failed')
+    // --no-index exits 1 on "differences found". Accept that complete answer through the process
+    // seam, which still refuses truncation, timeout, cancellation, and spawn failure.
+    const result = await gitOrThrow(['diff', '--no-index', '--no-color', '--', '/dev/null', path], { cwd: worktree, timeoutMs: 15_000, allowedExitCodes: [0, 1] })
     return { patch: stripToHunks(result.stdout) }
   }
   // `--no-color`, because `color.ui=always` would hide the hunk headers from stripToHunks.

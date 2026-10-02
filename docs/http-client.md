@@ -35,8 +35,15 @@ key is unavailable. A command variable stores its command metadata, not its gene
 
 The Node resolves interpolation once, validates the resulting URL and scheme and the headers, then
 sends with `fetch` under its own bounded time and response-size limits (`plugins/http/src/server/send.ts`).
-A request times out after 30 seconds and a response body over 5 MB is capped while streaming, so a
-large or endless response cannot be buffered whole before the cap applies.
+One 30-second deadline covers variable resolution, fetch, and response reads. A response body over
+5 MiB is capped while streaming; a completed body of exactly 5 MiB is not marked truncated.
+
+Selection changes, a replacement send, and retirement of the invoking region cancel through the
+SDK's API signal, host broker, portable Request, and isolated worker. The same signal retires all
+owned command-variable processes through `core.proc` and closes a held response reader once.
+Noncancelable task, project, database, and secret reads check retirement before admitting more work.
+Cancellation cannot undo an HTTP mutation already transmitted. Navigation and recovery never replay
+outbound sends.
 
 URL, scheme, and header validation failures name the invalid field without quoting resolved content.
 They remain `SendError` preparation failures, which the route returns as 422 and the workflow handler
@@ -189,5 +196,34 @@ equivalent lease if their admitted lease retires, at most once per available bri
 replayed. The first bridge is reserved before resource construction, with rollback on construction
 failure. The latest inactive model keeps its warm draft without retaining bridges or subscriptions.
 
-Ordered draft save, error recovery, and concurrent mutation reconciliation remain separate concerns;
-the lease model does not add a persisted draft recovery contract.
+### Draft recovery and acknowledgements
+
+Full request drafts live in a worker memory registry outside the drawn tree and disposable subject
+root. Identity includes Node, immutable authority, project, task, and saved request ID; each unsaved
+request has a distinct local identity. A saved request restores its own edits when opened. The list's
+**Recover unsaved edits** section opens other dirty drafts explicitly. Starting another request or
+copying a saved request preserves dirty prior drafts. There is no draft size or count cap.
+
+Save and delete capture the originating region, request identity, selection generation, and submitted
+edit revision. Writes to one HTTP record run in order across project, task, and settings models on the same Node. Creation is single-flight: another submitted save
+waits for the ID and updates that row. An older acknowledgement can advance the saved baseline but
+cannot replace text entered afterward or select an unrelated request. Failed or retired saves retain
+full drafts; retirement settles local status without acknowledging a successful write. An explicit
+successful deletion discards its submitted draft, while edits entered during deletion remain an
+unsaved recovery. Copy and curl export use the displayed full draft.
+
+Variable editors retain full drafts under their equivalent authority and project. Held saves and
+deletes reconcile by row identity and revision, and project changes retire their operations. Failed
+refreshes retain last-known request and variable rows. A retired grant is never stored for a retry;
+recovery requires a mounted equivalent grant, and saving remains an explicit action.
+
+Recovery lasts for the worker lifetime, including equivalent warm remounts and replacement of its
+latest inactive subject root. Worker eviction, plugin replacement, and application exit lose unsaved
+memory. Drafts can contain credentials, so recovery does not write plaintext to device storage.
+Legacy `http-draft:*` storage remains swept: its keys cannot establish exact Node and grant identity.
+
+Response decoding uses the native byte decoder when available and an indexed portable fallback.
+Both preserve `atob` input acceptance and UTF-8 replacement behavior, including BOM handling and
+binary bytes. The response view retains base64, decoded bytes, and text; the optimization removes
+transient iterator work, not those retained representations. Raw, formatted JSON, headers, timeline,
+and copy continue to use the complete capped response.

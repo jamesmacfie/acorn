@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import { z } from 'zod'
 import { BridgeError, type AppEnv, respondError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
-import type { EditorLineMarkerSet } from '../../contract/lineMarkers'
+import type { EditorLineMarkerSet, EditorLineMarkerSnapshot } from '../../contract/lineMarkers'
 import { imageTypeForPath } from '../../contract/imagePreview'
 
 // Editor pane: read, write, and list files on the task's worktree. Task-scoped HTTP behind the
@@ -10,7 +10,8 @@ import { imageTypeForPath } from '../../contract/imagePreview'
 // a 403 and an unmapped repo is a 404. See server/routes/editor.test.ts.
 
 export type EditorEntry = { name: string; dir: boolean }
-export type EditorWriteResult = { ok: boolean; reason?: string }
+import type { EditorWriteResult } from '../../contract/api'
+export type { EditorWriteResult } from '../../contract/api'
 export type EditorBridge = {
   root(taskId: string): Promise<string | null>
   list(taskId: string, relPath: string): Promise<EditorEntry[]>
@@ -18,6 +19,7 @@ export type EditorBridge = {
   read(taskId: string, relPath: string): Promise<string> // throws BridgeError(403/404) on escape/missing
   readImage(taskId: string, relPath: string): Promise<Uint8Array>
   lineMarkers(taskId: string, relPath: string): Promise<EditorLineMarkerSet[]>
+  markerSnapshot?(taskId: string, relPath: string, revision: string): Promise<EditorLineMarkerSnapshot>
   write(taskId: string, relPath: string, content: string): Promise<EditorWriteResult>
 }
 
@@ -60,7 +62,11 @@ export const editor = new Hono<AppEnv>()
   .get('/:id/editor/line-markers', (c) => {
     const path = c.req.query('path')
     if (!path) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, EDITOR, (b) => b.lineMarkers(c.req.param('id'), path))
+    const revision = c.req.query('revision')
+    if (revision !== undefined && !/^[a-f0-9]{64}$/.test(revision)) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, EDITOR, async (b) => revision === undefined
+      ? b.lineMarkers(c.req.param('id'), path)
+      : b.markerSnapshot?.(c.req.param('id'), path, revision) ?? { revision: null, markers: [] })
   })
   .put('/:id/editor/file', async (c) => {
     const parsed = writeBody.safeParse(await c.req.json().catch(() => null))

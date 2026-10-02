@@ -1,0 +1,57 @@
+{
+  "case": "scans",
+  "node": "v24.11.0",
+  "platform": "darwin",
+  "result": {
+    "syntheticDelayedGit": true,
+    "rows": 16,
+    "all": {
+      "label": "one-full-sweep",
+      "wallMs": 864.9553329999999,
+      "nodeCpuMs": 31.034,
+      "commands": 16,
+      "commandKinds": {
+        "status": 16
+      },
+      "peakGit": 4,
+      "statCalls": 0,
+      "peakPendingLstat": 0,
+      "sampledHeapGrowthBytes": 0,
+      "value": 16
+    },
+    "same": {
+      "label": "two-full-sweeps",
+      "wallMs": 880.660292,
+      "nodeCpuMs": 29.256,
+      "commands": 16,
+      "commandKinds": {
+        "status": 16
+      },
+      "peakGit": 4,
+      "statCalls": 0,
+      "peakPendingLstat": 0,
+      "sampledHeapGrowthBytes": 0,
+      "value": [
+        16,
+        16
+      ]
+    },
+    "disjoint": {
+      "label": "two-disjoint-authorized-sweeps",
+      "wallMs": 446.39850000000024,
+      "nodeCpuMs": 19.768,
+      "commands": 16,
+      "commandKinds": {
+        "status": 16
+      },
+      "peakGit": 8,
+      "statCalls": 0,
+      "peakPendingLstat": 0,
+      "sampledHeapGrowthBytes": 0,
+      "value": [
+        8,
+        8
+      ]
+    }
+  }
+}

@@ -3,7 +3,7 @@
 // (./DockerProjectSettings.tsx). The sections match the ones `./index.ts` declares for search.
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createResource } from 'solid-js'
-import { createSettingSave, prefsOptions } from '@acorn/plugin-api/client'
+import { createSettingSave, prefsOptions, queryOwner } from '@acorn/plugin-api/client'
 import type { DockerInfo } from '../shared/model'
 import { fetchDockerInfo } from './dockerClient'
 import { defaultDockerPrefs, readDockerPrefs, saveDockerPref, type DockerPrefs } from './dockerPrefs'
@@ -24,7 +24,7 @@ export default function DockerSettings() {
   const prefs = createQuery(() => prefsOptions(true))
   const current = () => readDockerPrefs(prefs.data)
 
-  const [info] = createResource(fetchDockerInfo)
+  const [info] = createResource(() => fetchDockerInfo(queryOwner(qc)))
   // Through the shared merge: both switches share one key, so an unmerged write would drop the other
   // one (./dockerPrefs.ts). One save state per switch, so an error lands on the row that failed.
   const saves = { confirmDestructive: createSettingSave(), showStopped: createSettingSave() }

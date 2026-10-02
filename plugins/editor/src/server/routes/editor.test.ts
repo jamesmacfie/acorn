@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, truncateSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, truncateSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
@@ -105,8 +106,43 @@ describe('editor routes over a real worktree', () => {
 
   it('writes within the worktree', async () => {
     const res = await authed().fetch(req('/api/tasks/task1/editor/file', 'PUT', { path: 'sub/a.ts', content: 'export const a = 2\n' }), {} as Env)
-    expect(await res.json()).toEqual({ ok: true })
+    expect(await res.json()).toMatchObject({ ok: true, text: expect.any(String), revision: expect.stringMatching(/^[a-f0-9]{64}$/) })
     expect(readFileSync(join(work, 'sub', 'a.ts'), 'utf8')).toBe('export const a = 2\n')
+  })
+
+  it('round-trips Unicode, BOM, genuine replacement characters, and a complete 17 MiB file', async () => {
+    const bridge = editorBridge({ tasks: createTaskService(t.db), fs: coreFs })
+    const text = '\ufeff😀 café\r\n\ufffd\n' + 'a'.repeat(17 * 1024 * 1024) + '\nEND'
+    writeFileSync(join(work, 'large.txt'), text)
+    expect(await bridge.read('task1', 'large.txt')).toBe(text)
+    const result = await bridge.write('task1', 'large.txt', text)
+    expect(result).toMatchObject({ ok: true, text })
+    expect(readFileSync(join(work, 'large.txt')).equals(Buffer.from(text))).toBe(true)
+  })
+
+  it('visibly rejects invalid UTF-8 and binary data without changing source bytes', async () => {
+    const app = authed()
+    for (const [name, bytes] of [['invalid.txt', Buffer.from([0xc3, 0x28])], ['binary.txt', Buffer.from([65, 0, 66])]] as const) {
+      writeFileSync(join(work, name), bytes)
+      const result = await app.fetch(req(`/api/tasks/task1/editor/read?path=${name}`), {} as Env)
+      expect(result.status).toBe(422)
+      expect(await result.json()).toMatchObject({ error: { code: 'unsupported_text' } })
+      expect(readFileSync(join(work, name))).toEqual(bytes)
+    }
+  })
+
+  it('acknowledges the exact formatter body and preserves hook veto and invalidation', async () => {
+    let changes = 0
+    const core = { tasks: createTaskService(t.db), fs: coreFs }
+    const formatted = editorBridge(core, () => { changes++ }, { run: async (_id, payload) => ({ ok: true, payload: { ...payload, text: 'formatted\n' } }) })
+    const result = await formatted.write('task1', 'hello.txt', 'submitted')
+    expect(result).toMatchObject({ ok: true, text: 'formatted\n', revision: expect.stringMatching(/^[a-f0-9]{64}$/) })
+    expect(readFileSync(join(work, 'hello.txt'), 'utf8')).toBe('formatted\n')
+    expect(changes).toBe(1)
+    const vetoed = editorBridge(core, () => { changes++ }, { run: async (_id, payload) => ({ ok: false, payload, by: 'formatter', reason: 'veto' }) })
+    expect(await vetoed.write('task1', 'hello.txt', 'rejected')).toEqual({ ok: false, reason: 'formatter: veto' })
+    expect(readFileSync(join(work, 'hello.txt'), 'utf8')).toBe('formatted\n')
+    expect(changes).toBe(1)
   })
 
   it('returns image bytes with their type while rejecting unsupported paths and oversized images', async () => {
@@ -145,6 +181,63 @@ describe('editor routes over a real worktree', () => {
     ])
   })
 
+  it('pairs exact UTF-8 marker bodies and isolates failed and legacy providers', async () => {
+    const text = '\ufeff😀 café\r\nsecond\n'
+    writeFileSync(join(work, 'markers.txt'), text)
+    const revision = createHash('sha256').update(text).digest('hex')
+    setEditorBridge(editorBridge({ tasks: createTaskService(t.db), fs: coreFs }, undefined, undefined, () => [
+      { kind: 'pull-request', read: async () => [{ from: 2, to: 2 }] },
+      { kind: 'uncommitted', read: async () => { throw new Error('optional failure') } },
+    ]))
+    const app = authed()
+    const route = '/api/tasks/task1/editor/line-markers?path=markers.txt&revision='
+    expect(await (await app.fetch(req(route + revision), {} as Env)).json()).toEqual({
+      revision, markers: [{ kind: 'pull-request', ranges: [{ from: 2, to: 2 }] }],
+    })
+    expect(await (await app.fetch(req(route + '0'.repeat(64)), {} as Env)).json()).toEqual({ revision: null, markers: [] })
+    expect((await app.fetch(req(route + 'invalid'), {} as Env)).status).toBe(400)
+    expect((await app.fetch(req('/api/tasks/task1/editor/line-markers?path=escape%2Fsecret.txt&revision=' + revision), {} as Env)).status).toBe(403)
+  })
+
+  it.each(['same-size-restored-mtime', 'write-and-restore', 'root-change'])('rejects %s during provider work and admits a fresh retry', async (mode) => {
+    const path = join(work, 'held-markers.txt')
+    const original = 'first\nsecond\n'
+    writeFileSync(path, original)
+    const stamp = statSync(path)
+    const revision = createHash('sha256').update(original).digest('hex')
+    let release!: () => void
+    let entered!: () => void
+    const started = new Promise<void>((resolve) => { entered = resolve })
+    const hold = new Promise<void>((resolve) => { release = resolve })
+    let root = work
+    const core = { tasks: { ...createTaskService(t.db), root: async () => root }, fs: coreFs }
+    const bridge = editorBridge(core, undefined, undefined, () => [{
+      kind: 'pull-request', read: async (_task, _path, source) => {
+        expect(source?.root).toBe(root)
+        entered()
+        await hold
+        return [{ from: 2, to: 2 }]
+      },
+    }])
+    const response = bridge.markerSnapshot!('task1', 'held-markers.txt', revision)
+    await started
+    if (mode === 'root-change') {
+      root = outside
+      writeFileSync(join(outside, 'held-markers.txt'), original)
+    } else {
+      writeFileSync(path, 'other\nsecond\n')
+      if (mode === 'write-and-restore') writeFileSync(path, original)
+      utimesSync(path, stamp.atime, stamp.mtime)
+    }
+    release()
+    expect(await response).toEqual({ revision: null, markers: [] })
+    root = work
+    writeFileSync(path, original)
+    expect(await bridge.markerSnapshot!('task1', 'held-markers.txt', revision)).toEqual({
+      revision, markers: [{ kind: 'pull-request', ranges: [{ from: 2, to: 2 }] }],
+    })
+  })
+
   it('rejects path traversal on read (403) and write ({ok:false}) — outside file untouched', async () => {
     const app = authed()
     expect((await app.fetch(req('/api/tasks/task1/editor/read?path=../../../etc/passwd'), {} as Env)).status).toBe(403)
@@ -172,7 +265,7 @@ describe('editor routes over a real worktree', () => {
     expect(await refused.json()).toMatchObject({ ok: false })
     expect(existsSync(outsideTarget)).toBe(false)
     const written = await app.fetch(req('/api/tasks/task1/editor/file', 'PUT', { path: 'sub/new.txt', content: 'ordinary content' }), {} as Env)
-    expect(await written.json()).toEqual({ ok: true })
+    expect(await written.json()).toMatchObject({ ok: true, text: expect.any(String), revision: expect.stringMatching(/^[a-f0-9]{64}$/) })
     expect(readFileSync(join(work, 'sub/new.txt'), 'utf8')).toBe('ordinary content')
   })
 

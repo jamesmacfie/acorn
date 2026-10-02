@@ -1,0 +1,31 @@
+{
+  "version": 15,
+  "syntheticOnly": true,
+  "port": 63628,
+  "catalog": {
+    "readers": 8,
+    "tables": 100,
+    "statements": 1,
+    "elapsedMs": 7.955290999999761
+  },
+  "originalCatalog": {
+    "readers": 8,
+    "tables": 100,
+    "statements": 1608,
+    "elapsedMs": 202.09537499999988
+  },
+  "permissionLimitedTables": 3,
+  "failedCatalogRetry": true,
+  "concurrentDrop": true,
+  "coldReaders": {
+    "readers": 20,
+    "backendConnections": 4
+  },
+  "backendConnectionsAfterDisconnect": 0,
+  "cleanup": {
+    "serverPid": 71828,
+    "pidGone": true,
+    "socketGone": true,
+    "postmasterFileGone": true
+  }
+}

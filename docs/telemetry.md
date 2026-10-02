@@ -27,7 +27,10 @@ true by construction rather than by care. With no sink there is no timer and no 
 The collector re-reads the preference on its own five-second tick rather than being told, because
 `PUT /v1/core/prefs` writes the table directly and has nothing to notify. A switch flipped in
 Settings is seen within five seconds. The tick reads consent before handing over its buffered
-window; observing off discards pending records and histograms.
+window; observing off discards pending records and histograms. Overlapping reads join within one
+collector lifecycle. Restart, stop, last-sink retirement, and explicit preference updates invalidate
+older answers. `startTelemetry` returns a disposable preference-reader lease; disposing it detaches
+only that boot's reader, preserving other subscribers and the last accepted preference.
 
 `ACORN_PERF=1` is the third way in. It turns the collector on with no sink and no preference, and
 prints to stderr. That is a developer at a terminal, not an export.
@@ -69,11 +72,18 @@ WebSocket frames, and, in later phases, terminal frames, bridge messages and key
 histogram carries six numbers, `count`, `sum`, `min`, `max`, `p50` and `p95`, and costs one record
 every five seconds however hot the seam is.
 
-One histogram per owner, seam and label set. Two samples share a row only when all three match,
-which is what lets `ws.frame` carry the channel and `proc.spawn` the binary's name without one
-channel's label describing another's timings. A window holds at most 200 of them; past that a
-sample keeps its count and loses its labels, so the totals stay exact and `telemetry.truncated`
-says it happened.
+Each emitter admits at most 200 histogram series per flush window, across all names, owners,
+label sets, and units. Node durations use milliseconds; client workload samples keep their own
+units. Samples share a series only when those dimensions and the typed label values match.
+Label order does not matter. Delimiters inside names or labels cannot merge distinct series.
+
+At capacity, admitted series keep exact count, sum, minimum, and maximum. A distinct series is
+refused without stripping labels or merging its samples into another operation. The fixed count
+metric `telemetry.histogram.refused` reports refused samples separately from histogram totals,
+record drops, and attribute truncations. It consumes no histogram slot and saturates at
+`Number.MAX_SAFE_INTEGER`. Flushing resets admission capacity and the pending refusal count.
+Consent-off discards pending histograms and diagnostics. Client retries preserve the flushed
+refusal record with its original window, subject to the record queue's independent bound.
 
 ## The attribute vocabulary
 
@@ -351,7 +361,9 @@ somebody watches.
 
 Counters, not records. The ring is 5,000 deep and a sink may have drained it a second ago, so a
 page built on the ring would answer "what is this collecting" with whatever the last five seconds
-held. Each count is one map increment where the record is pushed.
+held. Each count is one map increment where the record is pushed. Metric record counts describe
+records, not histogram samples. The refusal metric is one record carrying the number of refused
+samples; the summary's `dropped` and `truncated` counters retain their separate meanings.
 
 The page is where "the switch alone collects nothing" stops being a claim. With the preference on
 and no sink subscribed it says so in those words, and the count stays at zero.
@@ -666,10 +678,21 @@ collector it can never collect with. That is written down rather than hidden, an
 custody report in the helper and report nowhere in the terminal client.
 
 **A switch read over the wire.** The preference lives on the node, and the helper has no database.
-It asks over the broker, once a minute while off and every five seconds once on, and tells the
-collector the answer through `setTelemetryPref` rather than waiting for the collector's own tick.
-Without that, the first five seconds after the switch turns on would build nothing, and a helper's
-boot spans are all inside those five seconds.
+It asks over the broker once a minute while off. While on, the collector's five-second tick joins
+the helper's preference read. Adoption-triggered reads join the same pending read for that Node.
+The answer updates consent and flushes the buffered window only while its adoption remains live.
+
+Each helper request captures its Node at admission. Adoption changes and consent revocation cancel
+only that generation's request IDs and discard its queue. Successful encoded batches commit
+individually; a failed post retries only failed and unattempted batches, up to 500 held records.
+Re-enable cannot replay a prior consent window. Requests have a 10-second deadline.
+
+Disposal removes the helper's sink, preference-reader lease, polling, and footprint sampling.
+It joins an admitted helper post and attempts the final buffered window once, with a five-second
+total deadline. Failed final delivery never restores a queue. Repeated disposal and late answers
+cannot recreate subscriptions or timers. Other collector subscribers keep their own lifecycle.
+Shell crash files retain validation, deletion, redaction at Node ingestion, and best-effort delivery;
+renderer footprint and shell crash posts have no retry queue.
 
 ## Other runtimes
 

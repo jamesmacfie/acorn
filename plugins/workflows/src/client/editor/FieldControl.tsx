@@ -2,7 +2,8 @@ import { createContext, createResource, createSignal, Show, useContext } from 's
 import { activeTaskId } from '@acorn/plugin-api/client'
 import { Checkbox, Field, Input, Select, Textarea } from '@acorn/plugin-api/ui'
 import type { StepField } from '../../shared/workflowContracts'
-import { workflowApi } from '../workflowsClient'
+import { useQueryClient } from '@tanstack/solid-query'
+import { createWorkflowApi } from '../workflowsClient'
 
 // One field of a step kind's `describe`, as the matching kit control
 // (docs/workflows.md § Contributed step kinds).
@@ -52,6 +53,7 @@ function RouteSelect(props: {
   disabled?: boolean
   onChange: (value: string) => void
 }) {
+  const workflowApi = createWorkflowApi(useQueryClient())
   const route = () => fieldOptionsRoute(props.field.optionsRoute ?? '', props.pluginId, {
     projectId: props.projectId,
     taskId: activeTaskId() ?? undefined,

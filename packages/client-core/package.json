@@ -15,6 +15,7 @@
     "./features/diff/DiffPane.tsx": "./src/features/diff/DiffPane.tsx",
     "./features/diff/lineContext.ts": "./src/features/diff/lineContext.ts",
     "./features/editor": "./src/features/editor/public.ts",
+    "./features/editor/documentCustody.ts": "./src/features/editor/documentCustody.ts",
     "./features/editor/documentModel.ts": "./src/features/editor/documentModel.ts",
     "./features/fleet/FleetHome.tsx": "./src/features/fleet/FleetHome.tsx",
     "./features/fleet/NodeChip.tsx": "./src/features/fleet/NodeChip.tsx",

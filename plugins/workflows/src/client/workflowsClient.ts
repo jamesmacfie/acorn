@@ -1,3 +1,4 @@
+import type { AuthoringTurnRequest, AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 // The workflow control client, and the routes it drives.
 //
@@ -8,7 +9,8 @@ import type { DataValue } from '@acorn/protocol/dataValues.ts'
 //
 // Commands use HTTP. Workflow notices and step events use the shared WebSocket.
 
-import { openRepoConfigTrust, readJson, writeJson } from '@acorn/plugin-api/client'
+import type { QueryClient } from '@tanstack/solid-query'
+import { activeNodeId, queryOwner, openRepoConfigTrust, readJson as readWorkflowJson, writeJson as writeWorkflowJson } from '@acorn/plugin-api/client'
 import type { AgentProviderDescriptor } from '@acorn/plugin-agents/contract/wire.ts'
 import type { RunRowInput } from '@acorn/protocol/runs.ts'
 import type { WorkflowDefRow, WorkflowDefSummary, WorkflowRunRow, WorkflowStepRow } from '../contract/wire.ts'
@@ -75,106 +77,123 @@ export const agentProvidersRoute = '/v1/p/agents/providers'
 
 type Defs = { workflows: WorkflowDefSummary[]; errors: { source: string; message: string }[] }
 
-const post = <T>(path: string, body: unknown, method: 'POST' | 'PUT' = 'POST') =>
-  writeJson<T>(path, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+type At = { nodeId?: string | null; signal?: AbortSignal }
 
-// A read addressed at one node rather than the active one. The attention inbox fans out over the
-// whole fleet, so its source must say which node it is asking (client-core registries/attention.ts).
-type At = { nodeId?: string; signal?: AbortSignal }
-
-export const workflowApi = {
-  schedules: () => readJson<WorkflowScheduleView[]>(workflowSchedulesRoute),
-  schedule: (id: string) => readJson<WorkflowScheduleView>(workflowScheduleRoute(id)),
-  scheduleDefaults: () => readJson<{ timezone: string }>(`${workflowSchedulesRoute}/defaults`),
-  prepareSchedule: (input: WorkflowScheduleDraftInput) => post<WorkflowSchedulePreparation>(`${workflowSchedulesRoute}/prepare`, input),
-  saveSchedule: (input: WorkflowScheduleDraftInput) => post<WorkflowScheduleView>(workflowSchedulesRoute, input),
-  approveSchedule: (id: string, firstCheck: WorkflowScheduleFirstCheck, freshEpoch: boolean) =>
-    post<WorkflowScheduleView>(`${workflowScheduleRoute(id)}/approve`, { firstCheck, freshEpoch }),
-  pauseSchedule: (id: string, paused: boolean) => post<WorkflowScheduleView>(`${workflowScheduleRoute(id)}/pause`, { paused }),
-  runScheduleNow: (id: string) => post<WorkflowScheduleView>(`${workflowScheduleRoute(id)}/run`, {}),
-  deleteSchedule: (id: string) => writeJson<{ deleted: true }>(workflowScheduleRoute(id), { method: 'DELETE' }),
-  files: (request: import('../shared/workflowFileAuthoring').WorkflowFileRequest) => post<import('../shared/workflowFileAuthoring').WorkflowFileResult>(`${workflowDefsRoute}/files`, request),
-  preparePublication: (input: import('../shared/workflowPublication').WorkflowPublicationSelection) => post<import('../shared/workflowPublication').WorkflowPublication>(`${workflowDefsRoute}/publications/prepare`, input),
-  publish: (id: string) => post<import('../shared/workflowPublication').WorkflowPublication>(`${workflowDefsRoute}/publications/${encodeURIComponent(id)}/publish`, {}),
-  discardPublication: (id: string) => post<{ ok: boolean }>(`${workflowDefsRoute}/publications/${encodeURIComponent(id)}/discard`, {}),
-  publications: (workspaceId: string) => readJson<import('../shared/workflowPublication').WorkflowPublication[]>(`${workflowDefsRoute}/publications?workspaceId=${encodeURIComponent(workspaceId)}`),
-  defs: (taskId: string) => readJson<Defs>(workflowTaskDefsRoute(taskId)),
-  runs: (taskId: string) => readJson<WorkflowRunProjection[]>(workflowRunsRoute(taskId)),
-  steps: (runId: string, at: At = {}) => readJson<WorkflowStepProjection[]>(workflowStepsRoute(runId), at),
-  // A 409 means another device answered first, and a 400 names each form field the node refused.
-  gate: (runId: string, stepId: string, approved: boolean, values?: Record<string, DataValue | undefined>) =>
-    post<{ ok: boolean }>(workflowGateRoute(runId), { stepId, approved, ...(values ? { values } : {}) }),
-  cancel: (runId: string) => writeJson<{ ok: boolean }>(workflowCancelRoute(runId), { method: 'POST' }),
-  kill: (runId: string, stepId: string) => post<{ ok: boolean }>(workflowKillRoute(runId), { stepId }),
-  // A failed or safety-railed node, back to pending, and the run back to running. Device-only on the
-  // node: a retry that an agent could ask for is a loop around the rail that stopped it.
-  retry: (runId: string, stepId: string, prompt?: string) =>
-    post<{ ok: boolean; error?: string }>(workflowRetryRoute(runId), { stepId, ...(prompt ? { prompt } : {}) }),
-  records: (runId: string, input: { selectionId?: string; stepId?: string; after?: number; limit?: number; filter?: WorkflowRecordFilter } = {}) => {
-    const query = new URLSearchParams()
-    if (input.selectionId) query.set('selectionId', input.selectionId)
-    if (input.stepId) query.set('stepId', input.stepId)
-    if (input.after !== undefined) query.set('after', String(input.after))
-    if (input.limit !== undefined) query.set('limit', String(input.limit))
-    if (input.filter && input.filter !== 'all') query.set('filter', input.filter)
-    const suffix = query.size ? `?${query}` : ''
-    return readJson<WorkflowRecordPage>(`${workflowRecordsRoute(runId)}${suffix}`)
-  },
-  record: (runId: string, recordId: string) =>
-    readJson<{ snapshot: DataValue; provenance: WorkflowRecordPage['provenance']; record: WorkflowRecordPage['records'][number] | null } | null>(workflowRecordRoute(runId, recordId)),
-  recordAttempts: (runId: string, recordId: string, after?: string) => {
-    const query = new URLSearchParams({ limit: '20' })
-    if (after) query.set('after', after)
-    return readJson<{ attempts: WorkflowRecordAttempt[]; next: string | null }>(`${workflowRecordRoute(runId, recordId)}/attempts?${query}`)
-  },
-  prepareReprocess: (runId: string, recordId: string) =>
-    post<{ recordId: string; digest: string; previousAttemptId: string; title: string }>(`${workflowRecordRoute(runId, recordId)}/prepare-reprocess`, {}),
-  reprocess: (runId: string, recordId: string, digest: string, requestId: string) =>
-    post<{ selectionId: string; taskId: string; runId: string; state: string }>(`${workflowRecordRoute(runId, recordId)}/reprocess`, { digest, requestId }),
-  runForSession: (sessionId: string) =>
-    readJson<{ run: WorkflowRunRow; step: WorkflowStepRow } | null>(workflowSessionRunRoute(sessionId)),
-  // Keeps the {runId?, error?} contract the palette expects. A thrown HTTP error becomes {error}.
-  // `body` is either the whole definition or `{ defId }`; the node resolves the second itself, which
-  // is what lets it apply the repo trust snapshot to a committed file.
-  start: async (taskId: string, body: { def: unknown } | { defId: string }, inputs?: Record<string, DataValue>): Promise<{ runId?: string; error?: string }> => {
-    const execute = () => post<{ runId?: string; error?: string }>(workflowStartRoute(taskId), { ...body, ...(inputs ? { inputs } : {}) })
-    try {
-      const result = await execute()
-      if (result.error === 'needs-trust') openRepoConfigTrust(taskId, execute)
-      return result
-    } catch (e) {
-      return { error: e instanceof Error ? e.message : 'Failed to start workflow.' }
-    }
-  },
-  // The merged list for a workspace: rows, every project's committed files, and the user layer.
-  defsList: (workspaceId: string) => readJson<Defs>(`${workflowDefsRoute}?workspaceId=${encodeURIComponent(workspaceId)}`),
-  // A row by id, or a committed file addressed as `repo:<fileId>` / `user:<fileId>`. A file answers
-  // with `revision: 0`, which is how the editor knows it is read-only.
-  def: (id: string, projectId?: string) =>
-    readJson<WorkflowDefRow>(`${workflowDefRoute(encodeURIComponent(id))}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`),
-  catalog: (projectId?: string) =>
-    readJson<WorkflowCatalog>(`${workflowCatalogRoute}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`),
-  providers: () => readJson<AgentProviderDescriptor[]>(agentProvidersRoute),
-  // Every run on this node, as this plugin's contribution to the merged run list. The rail narrows it
-  // to the workspace's tasks, because the route is node-wide by construction (@acorn/protocol/runs.ts).
-  allRuns: (at: At = {}) => readJson<{ runs: RunRowInput[] }>(workflowAllRunsRoute, at),
-  taskNavigation: () => readJson<{ groups: WorkflowTaskGroup[] }>(workflowTaskNavigationRoute),
-  // A select field's own options, from the route its `describe` named. The host substitutes the two
-  // placeholders and the contributing plugin answers `{ options }` (docs/workflows.md § Contributed
-  // step kinds).
-  fieldOptions: (route: string) => readJson<{ options: { value: string; label: string; description?: string }[] }>(route),
-  createDef: (input: { workspaceId: string; projectId?: string; def: unknown }) => post<WorkflowDefRow>(workflowDefsRoute, input),
-  updateDef: (id: string, def: unknown, revision: number) => post<WorkflowDefRow>(workflowDefRoute(id), { def, revision }, 'PUT'),
-  deleteDef: (id: string) => writeJson<{ ok: boolean }>(workflowDefRoute(id), { method: 'DELETE' }),
-  validateDef: (def: unknown, projectId?: string) => post<{ problems: string[] }>(workflowDefValidateRoute, { def, projectId }),
-  saveDefToRepo: (id: string, opts: { taskId?: string; keepRow?: boolean }) => post<{ path: string }>(workflowSaveToRepoRoute(id), opts),
-  modelBackends: () => readJson<ModelBackend[]>(workflowModelBackendsRoute),
-  // The one call here that says how long it may take, because the broker's default kills it first.
-  generateDef: (input: WorkflowGenerateRequest) =>
-    writeJson<WorkflowGenerateResult>(workflowDefGenerateRoute, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(input),
-      timeoutMs: GENERATE_TIMEOUT_MS,
-    }),
+/** Capture the QueryClient's Node. A registered null is the browser origin. */
+export function createWorkflowApi(queryClient?: QueryClient) {
+  const registered = queryClient ? queryOwner(queryClient) : undefined
+  return workflowApiAt(registered === undefined ? activeNodeId() : registered)
 }
+
+function workflowApiAt(nodeId?: string | null) {
+  const readJson: typeof readWorkflowJson = (path, options) =>
+    readWorkflowJson(path, { ...options, ...(nodeId !== undefined ? { nodeId } : {}) })
+  const writeJson: typeof writeWorkflowJson = (path, options) =>
+    writeWorkflowJson(path, { ...options, ...(nodeId !== undefined ? { nodeId } : {}) })
+  const post = <T>(path: string, body: unknown, method: 'POST' | 'PUT' = 'POST') =>
+    writeJson<T>(path, { method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+  return {
+    schedules: () => readJson<WorkflowScheduleView[]>(workflowSchedulesRoute),
+    schedule: (id: string) => readJson<WorkflowScheduleView>(workflowScheduleRoute(id)),
+    scheduleDefaults: () => readJson<{ timezone: string }>(`${workflowSchedulesRoute}/defaults`),
+    prepareSchedule: (input: WorkflowScheduleDraftInput) => post<WorkflowSchedulePreparation>(`${workflowSchedulesRoute}/prepare`, input),
+    saveSchedule: (input: WorkflowScheduleDraftInput) => post<WorkflowScheduleView>(workflowSchedulesRoute, input),
+    approveSchedule: (id: string, firstCheck: WorkflowScheduleFirstCheck, freshEpoch: boolean) =>
+      post<WorkflowScheduleView>(`${workflowScheduleRoute(id)}/approve`, { firstCheck, freshEpoch }),
+    pauseSchedule: (id: string, paused: boolean) => post<WorkflowScheduleView>(`${workflowScheduleRoute(id)}/pause`, { paused }),
+    runScheduleNow: (id: string) => post<WorkflowScheduleView>(`${workflowScheduleRoute(id)}/run`, {}),
+    deleteSchedule: (id: string) => writeJson<{ deleted: true }>(workflowScheduleRoute(id), { method: 'DELETE' }),
+    files: (request: import('../shared/workflowFileAuthoring').WorkflowFileRequest) => post<import('../shared/workflowFileAuthoring').WorkflowFileResult>(`${workflowDefsRoute}/files`, request),
+    preparePublication: (input: import('../shared/workflowPublication').WorkflowPublicationSelection) => post<import('../shared/workflowPublication').WorkflowPublication>(`${workflowDefsRoute}/publications/prepare`, input),
+    publish: (id: string) => post<import('../shared/workflowPublication').WorkflowPublication>(`${workflowDefsRoute}/publications/${encodeURIComponent(id)}/publish`, {}),
+    discardPublication: (id: string) => post<{ ok: boolean }>(`${workflowDefsRoute}/publications/${encodeURIComponent(id)}/discard`, {}),
+    publications: (workspaceId: string) => readJson<import('../shared/workflowPublication').WorkflowPublication[]>(`${workflowDefsRoute}/publications?workspaceId=${encodeURIComponent(workspaceId)}`),
+    defs: (taskId: string) => readJson<Defs>(workflowTaskDefsRoute(taskId)),
+    runs: (taskId: string) => readJson<WorkflowRunProjection[]>(workflowRunsRoute(taskId)),
+    steps: (runId: string, at: At = {}) => readJson<WorkflowStepProjection[]>(workflowStepsRoute(runId), at),
+    // A 409 means another device answered first, and a 400 names each form field the node refused.
+    gate: (runId: string, stepId: string, approved: boolean, values?: Record<string, DataValue | undefined>) =>
+      post<{ ok: boolean }>(workflowGateRoute(runId), { stepId, approved, ...(values ? { values } : {}) }),
+    cancel: (runId: string) => writeJson<{ ok: boolean }>(workflowCancelRoute(runId), { method: 'POST' }),
+    kill: (runId: string, stepId: string) => post<{ ok: boolean }>(workflowKillRoute(runId), { stepId }),
+    // A failed or safety-railed node, back to pending, and the run back to running. Device-only on the
+    // node: a retry that an agent could ask for is a loop around the rail that stopped it.
+    retry: (runId: string, stepId: string, prompt?: string) =>
+      post<{ ok: boolean; error?: string }>(workflowRetryRoute(runId), { stepId, ...(prompt ? { prompt } : {}) }),
+    records: (runId: string, input: { selectionId?: string; stepId?: string; after?: number; limit?: number; filter?: WorkflowRecordFilter } = {}) => {
+      const query = new URLSearchParams()
+      if (input.selectionId) query.set('selectionId', input.selectionId)
+      if (input.stepId) query.set('stepId', input.stepId)
+      if (input.after !== undefined) query.set('after', String(input.after))
+      if (input.limit !== undefined) query.set('limit', String(input.limit))
+      if (input.filter && input.filter !== 'all') query.set('filter', input.filter)
+      const suffix = query.size ? `?${query}` : ''
+      return readJson<WorkflowRecordPage>(`${workflowRecordsRoute(runId)}${suffix}`)
+    },
+    record: (runId: string, recordId: string) =>
+      readJson<{ snapshot: DataValue; provenance: WorkflowRecordPage['provenance']; record: WorkflowRecordPage['records'][number] | null } | null>(workflowRecordRoute(runId, recordId)),
+    recordAttempts: (runId: string, recordId: string, after?: string) => {
+      const query = new URLSearchParams({ limit: '20' })
+      if (after) query.set('after', after)
+      return readJson<{ attempts: WorkflowRecordAttempt[]; next: string | null }>(`${workflowRecordRoute(runId, recordId)}/attempts?${query}`)
+    },
+    prepareReprocess: (runId: string, recordId: string) =>
+      post<{ recordId: string; digest: string; previousAttemptId: string; title: string }>(`${workflowRecordRoute(runId, recordId)}/prepare-reprocess`, {}),
+    reprocess: (runId: string, recordId: string, digest: string, requestId: string) =>
+      post<{ selectionId: string; taskId: string; runId: string; state: string }>(`${workflowRecordRoute(runId, recordId)}/reprocess`, { digest, requestId }),
+    runForSession: (sessionId: string) =>
+      readJson<{ run: WorkflowRunRow; step: WorkflowStepRow } | null>(workflowSessionRunRoute(sessionId)),
+    // Keeps the {runId?, error?} contract the palette expects. A thrown HTTP error becomes {error}.
+    // `body` is either the whole definition or `{ defId }`; the node resolves the second itself, which
+    // is what lets it apply the repo trust snapshot to a committed file.
+    start: async (taskId: string, body: { def: unknown } | { defId: string }, inputs?: Record<string, DataValue>): Promise<{ runId?: string; error?: string }> => {
+      const execute = () => post<{ runId?: string; error?: string }>(workflowStartRoute(taskId), { ...body, ...(inputs ? { inputs } : {}) })
+      try {
+        const result = await execute()
+        if (result.error === 'needs-trust') openRepoConfigTrust(taskId, execute)
+        return result
+      } catch (e) {
+        return { error: e instanceof Error ? e.message : 'Failed to start workflow.' }
+      }
+    },
+    // The merged list for a workspace: rows, every project's committed files, and the user layer.
+    defsList: (workspaceId: string) => readJson<Defs>(`${workflowDefsRoute}?workspaceId=${encodeURIComponent(workspaceId)}`),
+    // A row by id, or a committed file addressed as `repo:<fileId>` / `user:<fileId>`. A file answers
+    // with `revision: 0`, which is how the editor knows it is read-only.
+    def: (id: string, projectId?: string) =>
+      readJson<WorkflowDefRow>(`${workflowDefRoute(encodeURIComponent(id))}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`),
+    catalog: (projectId?: string) =>
+      readJson<WorkflowCatalog>(`${workflowCatalogRoute}${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`),
+    providers: () => readJson<AgentProviderDescriptor[]>(agentProvidersRoute),
+    // Every run on this node, as this plugin's contribution to the merged run list. The rail narrows it
+    // to the workspace's tasks, because the route is node-wide by construction (@acorn/protocol/runs.ts).
+    allRuns: (at: At = {}) => readJson<{ runs: RunRowInput[] }>(workflowAllRunsRoute, at),
+    taskNavigation: () => readJson<{ groups: WorkflowTaskGroup[] }>(workflowTaskNavigationRoute),
+    // A select field's own options, from the route its `describe` named. The host substitutes the two
+    // placeholders and the contributing plugin answers `{ options }` (docs/workflows.md § Contributed
+    // step kinds).
+    fieldOptions: (route: string) => readJson<{ options: { value: string; label: string; description?: string }[] }>(route),
+    createDef: (input: { workspaceId: string; projectId?: string; def: unknown }) => post<WorkflowDefRow>(workflowDefsRoute, input),
+    updateDef: (id: string, def: unknown, revision: number) => post<WorkflowDefRow>(workflowDefRoute(id), { def, revision }, 'PUT'),
+    deleteDef: (id: string) => writeJson<{ ok: boolean }>(workflowDefRoute(id), { method: 'DELETE' }),
+    validateDef: (def: unknown, projectId?: string) => post<{ problems: string[] }>(workflowDefValidateRoute, { def, projectId }),
+    saveDefToRepo: (id: string, opts: { taskId?: string; keepRow?: boolean }) => post<{ path: string }>(workflowSaveToRepoRoute(id), opts),
+    authoringTurn: (request: AuthoringTurnRequest, signal: AbortSignal) =>
+      writeJson<AuthoringTurnResult>(`${workflowDefsRoute}/authoring/turn`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(request),
+        signal, timeoutMs: 11 * 60_000,
+      }),
+    modelBackends: () => readJson<ModelBackend[]>(workflowModelBackendsRoute),
+    // The one call here that says how long it may take, because the broker's default kills it first.
+    generateDef: (input: WorkflowGenerateRequest) =>
+      writeJson<WorkflowGenerateResult>(workflowDefGenerateRoute, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(input),
+        timeoutMs: GENERATE_TIMEOUT_MS,
+      }),
+  }
+}
+
+// Event-driven callers without a model retain active-Node routing.
+export const workflowApi = workflowApiAt()

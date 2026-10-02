@@ -1,0 +1,1249 @@
+{
+  "hashes": {
+    "plugins/workflows/src/server/runs/read/projection.ts": "617779d50bc39fe91d0c73ab804b2c80b357f30945f4a6bf7afae92a35d5f75a",
+    "plugins/workflows/src/server/runs/read/readModel.ts": "3d05eb3abe5663037b417a00b6f9ae25f63bb5c8548d825dda9ab4ddb241d533",
+    "probe": "f2c5ba0881418ed00f697a0aec441030e8c5fe46e5e394f1de9169f156ebd875"
+  },
+  "baselineCommit": "4b8a611af8a474d3ddeb2aeab0e1be9df45a2e04",
+  "case": "workflow",
+  "node": "v24.11.0",
+  "platform": "darwin",
+  "result": {
+    "roots": 10,
+    "historicalChildren": 1000,
+    "latestDescendantTasks": 200,
+    "defJsonBytes": 8284,
+    "graphJsonBytes": 24607,
+    "navigation": {
+      "plans": [
+        {
+          "query": "select \"id\", \"task_id\", \"name\", \"status\", \"posture\", \"trigger\", \"def_json\", \"resolved_graph_json\", \"root_run_id\", \"parent_run_id\", \"parent_step_id\", \"depth\", \"invocation_key\", \"payload_fingerprint\", \"effective_tools_json\", \"effective_budget_json\", \"requires_repo_trust\", \"deadline_at\", \"error\", \"created_at\", \"updated_at\" from \"workflow_runs\" where (\"workflow_runs\".\"parent_run_id\" is not null or \"workflow_runs\".\"trigger\" = ?) order by \"workflow_runs\".\"updated_at\" desc",
+          "plan": [
+            {
+              "id": 3,
+              "parent": 0,
+              "notused": 216,
+              "detail": "SCAN workflow_runs"
+            },
+            {
+              "id": 33,
+              "parent": 0,
+              "notused": 0,
+              "detail": "USE TEMP B-TREE FOR ORDER BY"
+            }
+          ]
+        },
+        {
+          "query": "select \"id\", \"task_id\", \"name\", \"status\", \"posture\", \"trigger\", \"def_json\", \"resolved_graph_json\", \"root_run_id\", \"parent_run_id\", \"parent_step_id\", \"depth\", \"invocation_key\", \"payload_fingerprint\", \"effective_tools_json\", \"effective_budget_json\", \"requires_repo_trust\", \"deadline_at\", \"error\", \"created_at\", \"updated_at\" from \"workflow_runs\" where \"workflow_runs\".\"id\" in (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+          "plan": [
+            {
+              "id": 3,
+              "parent": 0,
+              "notused": 79,
+              "detail": "SEARCH workflow_runs USING INDEX sqlite_autoindex_workflow_runs_1 (id=?)"
+            }
+          ]
+        }
+      ],
+      "name": "task-navigation",
+      "wallMs": 248.34366599999998,
+      "cpuMs": 190.062,
+      "sqlStatements": 2,
+      "sqlVerbs": {
+        "SELECT": 2
+      },
+      "selectedRows": 1010,
+      "selectedStringBytes": 33292920,
+      "selectedBinaryBytes": 0,
+      "selectedValueBytes": 33292920,
+      "answer": {
+        "groups": [
+          {
+            "rootTaskId": "root-0-task",
+            "descendants": 20,
+            "running": 0,
+            "attention": 20
+          },
+          {
+            "rootTaskId": "root-1-task",
+            "descendants": 20,
+            "running": 0,
+            "attention": 20
+          },
+          {
+            "rootTaskId": "root-2-task",
+            "descendants": 20,
+            "running": 0,
+            "attention": 20
+          },
+          {
+            "rootTaskId": "root-3-task",
+            "descendants": 20,
+            "running": 0,
+            "attention": 20
+          },
+          {
+            "rootTaskId": "root-4-task",
+            "descendants": 20,
+            "running": 0,
+            "attention": 20
+          },
+          {
+            "rootTaskId": "root-5-task",
+            "descendants": 20,
+            "running": 0,
+            "attention": 20
+          },
+          {
+            "rootTaskId": "root-6-task",
+            "descendants": 20,
+            "running": 0,
+            "attention": 20
+          },
+          {
+            "rootTaskId": "root-7-task",
+            "descendants": 20,
+            "running": 0,
+            "attention": 20
+          },
+          {
+            "rootTaskId": "root-8-task",
+            "descendants": 20,
+            "running": 0,
+            "attention": 20
+          },
+          {
+            "rootTaskId": "root-9-task",
+            "descendants": 20,
+            "running": 0,
+            "attention": 20
+          }
+        ]
+      }
+    },
+    "runList": {
+      "plans": [
+        {
+          "query": "select \"id\", \"task_id\", \"name\", \"status\", \"posture\", \"trigger\", \"def_json\", \"resolved_graph_json\", \"root_run_id\", \"parent_run_id\", \"parent_step_id\", \"depth\", \"invocation_key\", \"payload_fingerprint\", \"effective_tools_json\", \"effective_budget_json\", \"requires_repo_trust\", \"deadline_at\", \"error\", \"created_at\", \"updated_at\" from \"workflow_runs\" order by \"workflow_runs\".\"created_at\" desc limit ?",
+          "plan": [
+            {
+              "id": 6,
+              "parent": 0,
+              "notused": 216,
+              "detail": "SCAN workflow_runs"
+            },
+            {
+              "id": 37,
+              "parent": 0,
+              "notused": 0,
+              "detail": "USE TEMP B-TREE FOR ORDER BY"
+            }
+          ]
+        },
+        {
+          "query": "select \"root_run_id\", sum(\"cost_usd\") from \"workflow_turn_admissions\" where \"workflow_turn_admissions\".\"root_run_id\" in (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) group by \"workflow_turn_admissions\".\"root_run_id\"",
+          "plan": [
+            {
+              "id": 7,
+              "parent": 0,
+              "notused": 128,
+              "detail": "SEARCH workflow_turn_admissions USING INDEX workflow_turn_admissions_root_created_idx (root_run_id=?)"
+            }
+          ]
+        },
+        {
+          "query": "select \"run_id\", sum(\"cost_usd\") from \"workflow_turn_admissions\" where \"workflow_turn_admissions\".\"run_id\" in (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) group by \"workflow_turn_admissions\".\"run_id\"",
+          "plan": [
+            {
+              "id": 7,
+              "parent": 0,
+              "notused": 128,
+              "detail": "SEARCH workflow_turn_admissions USING INDEX workflow_turn_admissions_run_created_idx (run_id=?)"
+            }
+          ]
+        }
+      ],
+      "name": "node-run-list",
+      "wallMs": 34.69783300000017,
+      "cpuMs": 32.692,
+      "sqlStatements": 3,
+      "sqlVerbs": {
+        "SELECT": 3
+      },
+      "selectedRows": 100,
+      "selectedStringBytes": 3296500,
+      "selectedBinaryBytes": 0,
+      "selectedValueBytes": 3296500,
+      "answer": {
+        "runs": [
+          {
+            "id": "root-0-child-99",
+            "title": "child-99",
+            "status": "waiting",
+            "startedAt": 101,
+            "endedAt": null,
+            "taskId": "root-0-childtask-19",
+            "costUsd": null
+          },
+          {
+            "id": "root-1-child-99",
+            "title": "child-99",
+            "status": "waiting",
+            "startedAt": 101,
+            "endedAt": null,
+            "taskId": "root-1-childtask-19",
+            "costUsd": null
+          },
+          {
+            "id": "root-2-child-99",
+            "title": "child-99",
+            "status": "waiting",
+            "startedAt": 101,
+            "endedAt": null,
+            "taskId": "root-2-childtask-19",
+            "costUsd": null
+          },
+          {
+            "id": "root-3-child-99",
+            "title": "child-99",
+            "status": "waiting",
+            "startedAt": 101,
+            "endedAt": null,
+            "taskId": "root-3-childtask-19",
+            "costUsd": null
+          },
+          {
+            "id": "root-4-child-99",
+            "title": "child-99",
+            "status": "waiting",
+            "startedAt": 101,
+            "endedAt": null,
+            "taskId": "root-4-childtask-19",
+            "costUsd": null
+          },
+          {
+            "id": "root-5-child-99",
+            "title": "child-99",
+            "status": "waiting",
+            "startedAt": 101,
+            "endedAt": null,
+            "taskId": "root-5-childtask-19",
+            "costUsd": null
+          },
+          {
+            "id": "root-6-child-99",
+            "title": "child-99",
+            "status": "waiting",
+            "startedAt": 101,
+            "endedAt": null,
+            "taskId": "root-6-childtask-19",
+            "costUsd": null
+          },
+          {
+            "id": "root-7-child-99",
+            "title": "child-99",
+            "status": "waiting",
+            "startedAt": 101,
+            "endedAt": null,
+            "taskId": "root-7-childtask-19",
+            "costUsd": null
+          },
+          {
+            "id": "root-8-child-99",
+            "title": "child-99",
+            "status": "waiting",
+            "startedAt": 101,
+            "endedAt": null,
+            "taskId": "root-8-childtask-19",
+            "costUsd": null
+          },
+          {
+            "id": "root-9-child-99",
+            "title": "child-99",
+            "status": "waiting",
+            "startedAt": 101,
+            "endedAt": null,
+            "taskId": "root-9-childtask-19",
+            "costUsd": null
+          },
+          {
+            "id": "root-0-child-98",
+            "title": "child-98",
+            "status": "waiting",
+            "startedAt": 100,
+            "endedAt": null,
+            "taskId": "root-0-childtask-18",
+            "costUsd": null
+          },
+          {
+            "id": "root-1-child-98",
+            "title": "child-98",
+            "status": "waiting",
+            "startedAt": 100,
+            "endedAt": null,
+            "taskId": "root-1-childtask-18",
+            "costUsd": null
+          },
+          {
+            "id": "root-2-child-98",
+            "title": "child-98",
+            "status": "waiting",
+            "startedAt": 100,
+            "endedAt": null,
+            "taskId": "root-2-childtask-18",
+            "costUsd": null
+          },
+          {
+            "id": "root-3-child-98",
+            "title": "child-98",
+            "status": "waiting",
+            "startedAt": 100,
+            "endedAt": null,
+            "taskId": "root-3-childtask-18",
+            "costUsd": null
+          },
+          {
+            "id": "root-4-child-98",
+            "title": "child-98",
+            "status": "waiting",
+            "startedAt": 100,
+            "endedAt": null,
+            "taskId": "root-4-childtask-18",
+            "costUsd": null
+          },
+          {
+            "id": "root-5-child-98",
+            "title": "child-98",
+            "status": "waiting",
+            "startedAt": 100,
+            "endedAt": null,
+            "taskId": "root-5-childtask-18",
+            "costUsd": null
+          },
+          {
+            "id": "root-6-child-98",
+            "title": "child-98",
+            "status": "waiting",
+            "startedAt": 100,
+            "endedAt": null,
+            "taskId": "root-6-childtask-18",
+            "costUsd": null
+          },
+          {
+            "id": "root-7-child-98",
+            "title": "child-98",
+            "status": "waiting",
+            "startedAt": 100,
+            "endedAt": null,
+            "taskId": "root-7-childtask-18",
+            "costUsd": null
+          },
+          {
+            "id": "root-8-child-98",
+            "title": "child-98",
+            "status": "waiting",
+            "startedAt": 100,
+            "endedAt": null,
+            "taskId": "root-8-childtask-18",
+            "costUsd": null
+          },
+          {
+            "id": "root-9-child-98",
+            "title": "child-98",
+            "status": "waiting",
+            "startedAt": 100,
+            "endedAt": null,
+            "taskId": "root-9-childtask-18",
+            "costUsd": null
+          },
+          {
+            "id": "root-0-child-97",
+            "title": "child-97",
+            "status": "waiting",
+            "startedAt": 99,
+            "endedAt": null,
+            "taskId": "root-0-childtask-17",
+            "costUsd": null
+          },
+          {
+            "id": "root-1-child-97",
+            "title": "child-97",
+            "status": "waiting",
+            "startedAt": 99,
+            "endedAt": null,
+            "taskId": "root-1-childtask-17",
+            "costUsd": null
+          },
+          {
+            "id": "root-2-child-97",
+            "title": "child-97",
+            "status": "waiting",
+            "startedAt": 99,
+            "endedAt": null,
+            "taskId": "root-2-childtask-17",
+            "costUsd": null
+          },
+          {
+            "id": "root-3-child-97",
+            "title": "child-97",
+            "status": "waiting",
+            "startedAt": 99,
+            "endedAt": null,
+            "taskId": "root-3-childtask-17",
+            "costUsd": null
+          },
+          {
+            "id": "root-4-child-97",
+            "title": "child-97",
+            "status": "waiting",
+            "startedAt": 99,
+            "endedAt": null,
+            "taskId": "root-4-childtask-17",
+            "costUsd": null
+          },
+          {
+            "id": "root-5-child-97",
+            "title": "child-97",
+            "status": "waiting",
+            "startedAt": 99,
+            "endedAt": null,
+            "taskId": "root-5-childtask-17",
+            "costUsd": null
+          },
+          {
+            "id": "root-6-child-97",
+            "title": "child-97",
+            "status": "waiting",
+            "startedAt": 99,
+            "endedAt": null,
+            "taskId": "root-6-childtask-17",
+            "costUsd": null
+          },
+          {
+            "id": "root-7-child-97",
+            "title": "child-97",
+            "status": "waiting",
+            "startedAt": 99,
+            "endedAt": null,
+            "taskId": "root-7-childtask-17",
+            "costUsd": null
+          },
+          {
+            "id": "root-8-child-97",
+            "title": "child-97",
+            "status": "waiting",
+            "startedAt": 99,
+            "endedAt": null,
+            "taskId": "root-8-childtask-17",
+            "costUsd": null
+          },
+          {
+            "id": "root-9-child-97",
+            "title": "child-97",
+            "status": "waiting",
+            "startedAt": 99,
+            "endedAt": null,
+            "taskId": "root-9-childtask-17",
+            "costUsd": null
+          },
+          {
+            "id": "root-0-child-96",
+            "title": "child-96",
+            "status": "waiting",
+            "startedAt": 98,
+            "endedAt": null,
+            "taskId": "root-0-childtask-16",
+            "costUsd": null
+          },
+          {
+            "id": "root-1-child-96",
+            "title": "child-96",
+            "status": "waiting",
+            "startedAt": 98,
+            "endedAt": null,
+            "taskId": "root-1-childtask-16",
+            "costUsd": null
+          },
+          {
+            "id": "root-2-child-96",
+            "title": "child-96",
+            "status": "waiting",
+            "startedAt": 98,
+            "endedAt": null,
+            "taskId": "root-2-childtask-16",
+            "costUsd": null
+          },
+          {
+            "id": "root-3-child-96",
+            "title": "child-96",
+            "status": "waiting",
+            "startedAt": 98,
+            "endedAt": null,
+            "taskId": "root-3-childtask-16",
+            "costUsd": null
+          },
+          {
+            "id": "root-4-child-96",
+            "title": "child-96",
+            "status": "waiting",
+            "startedAt": 98,
+            "endedAt": null,
+            "taskId": "root-4-childtask-16",
+            "costUsd": null
+          },
+          {
+            "id": "root-5-child-96",
+            "title": "child-96",
+            "status": "waiting",
+            "startedAt": 98,
+            "endedAt": null,
+            "taskId": "root-5-childtask-16",
+            "costUsd": null
+          },
+          {
+            "id": "root-6-child-96",
+            "title": "child-96",
+            "status": "waiting",
+            "startedAt": 98,
+            "endedAt": null,
+            "taskId": "root-6-childtask-16",
+            "costUsd": null
+          },
+          {
+            "id": "root-7-child-96",
+            "title": "child-96",
+            "status": "waiting",
+            "startedAt": 98,
+            "endedAt": null,
+            "taskId": "root-7-childtask-16",
+            "costUsd": null
+          },
+          {
+            "id": "root-8-child-96",
+            "title": "child-96",
+            "status": "waiting",
+            "startedAt": 98,
+            "endedAt": null,
+            "taskId": "root-8-childtask-16",
+            "costUsd": null
+          },
+          {
+            "id": "root-9-child-96",
+            "title": "child-96",
+            "status": "waiting",
+            "startedAt": 98,
+            "endedAt": null,
+            "taskId": "root-9-childtask-16",
+            "costUsd": null
+          },
+          {
+            "id": "root-0-child-95",
+            "title": "child-95",
+            "status": "waiting",
+            "startedAt": 97,
+            "endedAt": null,
+            "taskId": "root-0-childtask-15",
+            "costUsd": null
+          },
+          {
+            "id": "root-1-child-95",
+            "title": "child-95",
+            "status": "waiting",
+            "startedAt": 97,
+            "endedAt": null,
+            "taskId": "root-1-childtask-15",
+            "costUsd": null
+          },
+          {
+            "id": "root-2-child-95",
+            "title": "child-95",
+            "status": "waiting",
+            "startedAt": 97,
+            "endedAt": null,
+            "taskId": "root-2-childtask-15",
+            "costUsd": null
+          },
+          {
+            "id": "root-3-child-95",
+            "title": "child-95",
+            "status": "waiting",
+            "startedAt": 97,
+            "endedAt": null,
+            "taskId": "root-3-childtask-15",
+            "costUsd": null
+          },
+          {
+            "id": "root-4-child-95",
+            "title": "child-95",
+            "status": "waiting",
+            "startedAt": 97,
+            "endedAt": null,
+            "taskId": "root-4-childtask-15",
+            "costUsd": null
+          },
+          {
+            "id": "root-5-child-95",
+            "title": "child-95",
+            "status": "waiting",
+            "startedAt": 97,
+            "endedAt": null,
+            "taskId": "root-5-childtask-15",
+            "costUsd": null
+          },
+          {
+            "id": "root-6-child-95",
+            "title": "child-95",
+            "status": "waiting",
+            "startedAt": 97,
+            "endedAt": null,
+            "taskId": "root-6-childtask-15",
+            "costUsd": null
+          },
+          {
+            "id": "root-7-child-95",
+            "title": "child-95",
+            "status": "waiting",
+            "startedAt": 97,
+            "endedAt": null,
+            "taskId": "root-7-childtask-15",
+            "costUsd": null
+          },
+          {
+            "id": "root-8-child-95",
+            "title": "child-95",
+            "status": "waiting",
+            "startedAt": 97,
+            "endedAt": null,
+            "taskId": "root-8-childtask-15",
+            "costUsd": null
+          },
+          {
+            "id": "root-9-child-95",
+            "title": "child-95",
+            "status": "waiting",
+            "startedAt": 97,
+            "endedAt": null,
+            "taskId": "root-9-childtask-15",
+            "costUsd": null
+          },
+          {
+            "id": "root-0-child-94",
+            "title": "child-94",
+            "status": "waiting",
+            "startedAt": 96,
+            "endedAt": null,
+            "taskId": "root-0-childtask-14",
+            "costUsd": null
+          },
+          {
+            "id": "root-1-child-94",
+            "title": "child-94",
+            "status": "waiting",
+            "startedAt": 96,
+            "endedAt": null,
+            "taskId": "root-1-childtask-14",
+            "costUsd": null
+          },
+          {
+            "id": "root-2-child-94",
+            "title": "child-94",
+            "status": "waiting",
+            "startedAt": 96,
+            "endedAt": null,
+            "taskId": "root-2-childtask-14",
+            "costUsd": null
+          },
+          {
+            "id": "root-3-child-94",
+            "title": "child-94",
+            "status": "waiting",
+            "startedAt": 96,
+            "endedAt": null,
+            "taskId": "root-3-childtask-14",
+            "costUsd": null
+          },
+          {
+            "id": "root-4-child-94",
+            "title": "child-94",
+            "status": "waiting",
+            "startedAt": 96,
+            "endedAt": null,
+            "taskId": "root-4-childtask-14",
+            "costUsd": null
+          },
+          {
+            "id": "root-5-child-94",
+            "title": "child-94",
+            "status": "waiting",
+            "startedAt": 96,
+            "endedAt": null,
+            "taskId": "root-5-childtask-14",
+            "costUsd": null
+          },
+          {
+            "id": "root-6-child-94",
+            "title": "child-94",
+            "status": "waiting",
+            "startedAt": 96,
+            "endedAt": null,
+            "taskId": "root-6-childtask-14",
+            "costUsd": null
+          },
+          {
+            "id": "root-7-child-94",
+            "title": "child-94",
+            "status": "waiting",
+            "startedAt": 96,
+            "endedAt": null,
+            "taskId": "root-7-childtask-14",
+            "costUsd": null
+          },
+          {
+            "id": "root-8-child-94",
+            "title": "child-94",
+            "status": "waiting",
+            "startedAt": 96,
+            "endedAt": null,
+            "taskId": "root-8-childtask-14",
+            "costUsd": null
+          },
+          {
+            "id": "root-9-child-94",
+            "title": "child-94",
+            "status": "waiting",
+            "startedAt": 96,
+            "endedAt": null,
+            "taskId": "root-9-childtask-14",
+            "costUsd": null
+          },
+          {
+            "id": "root-0-child-93",
+            "title": "child-93",
+            "status": "waiting",
+            "startedAt": 95,
+            "endedAt": null,
+            "taskId": "root-0-childtask-13",
+            "costUsd": null
+          },
+          {
+            "id": "root-1-child-93",
+            "title": "child-93",
+            "status": "waiting",
+            "startedAt": 95,
+            "endedAt": null,
+            "taskId": "root-1-childtask-13",
+            "costUsd": null
+          },
+          {
+            "id": "root-2-child-93",
+            "title": "child-93",
+            "status": "waiting",
+            "startedAt": 95,
+            "endedAt": null,
+            "taskId": "root-2-childtask-13",
+            "costUsd": null
+          },
+          {
+            "id": "root-3-child-93",
+            "title": "child-93",
+            "status": "waiting",
+            "startedAt": 95,
+            "endedAt": null,
+            "taskId": "root-3-childtask-13",
+            "costUsd": null
+          },
+          {
+            "id": "root-4-child-93",
+            "title": "child-93",
+            "status": "waiting",
+            "startedAt": 95,
+            "endedAt": null,
+            "taskId": "root-4-childtask-13",
+            "costUsd": null
+          },
+          {
+            "id": "root-5-child-93",
+            "title": "child-93",
+            "status": "waiting",
+            "startedAt": 95,
+            "endedAt": null,
+            "taskId": "root-5-childtask-13",
+            "costUsd": null
+          },
+          {
+            "id": "root-6-child-93",
+            "title": "child-93",
+            "status": "waiting",
+            "startedAt": 95,
+            "endedAt": null,
+            "taskId": "root-6-childtask-13",
+            "costUsd": null
+          },
+          {
+            "id": "root-7-child-93",
+            "title": "child-93",
+            "status": "waiting",
+            "startedAt": 95,
+            "endedAt": null,
+            "taskId": "root-7-childtask-13",
+            "costUsd": null
+          },
+          {
+            "id": "root-8-child-93",
+            "title": "child-93",
+            "status": "waiting",
+            "startedAt": 95,
+            "endedAt": null,
+            "taskId": "root-8-childtask-13",
+            "costUsd": null
+          },
+          {
+            "id": "root-9-child-93",
+            "title": "child-93",
+            "status": "waiting",
+            "startedAt": 95,
+            "endedAt": null,
+            "taskId": "root-9-childtask-13",
+            "costUsd": null
+          },
+          {
+            "id": "root-0-child-92",
+            "title": "child-92",
+            "status": "waiting",
+            "startedAt": 94,
+            "endedAt": null,
+            "taskId": "root-0-childtask-12",
+            "costUsd": null
+          },
+          {
+            "id": "root-1-child-92",
+            "title": "child-92",
+            "status": "waiting",
+            "startedAt": 94,
+            "endedAt": null,
+            "taskId": "root-1-childtask-12",
+            "costUsd": null
+          },
+          {
+            "id": "root-2-child-92",
+            "title": "child-92",
+            "status": "waiting",
+            "startedAt": 94,
+            "endedAt": null,
+            "taskId": "root-2-childtask-12",
+            "costUsd": null
+          },
+          {
+            "id": "root-3-child-92",
+            "title": "child-92",
+            "status": "waiting",
+            "startedAt": 94,
+            "endedAt": null,
+            "taskId": "root-3-childtask-12",
+            "costUsd": null
+          },
+          {
+            "id": "root-4-child-92",
+            "title": "child-92",
+            "status": "waiting",
+            "startedAt": 94,
+            "endedAt": null,
+            "taskId": "root-4-childtask-12",
+            "costUsd": null
+          },
+          {
+            "id": "root-5-child-92",
+            "title": "child-92",
+            "status": "waiting",
+            "startedAt": 94,
+            "endedAt": null,
+            "taskId": "root-5-childtask-12",
+            "costUsd": null
+          },
+          {
+            "id": "root-6-child-92",
+            "title": "child-92",
+            "status": "waiting",
+            "startedAt": 94,
+            "endedAt": null,
+            "taskId": "root-6-childtask-12",
+            "costUsd": null
+          },
+          {
+            "id": "root-7-child-92",
+            "title": "child-92",
+            "status": "waiting",
+            "startedAt": 94,
+            "endedAt": null,
+            "taskId": "root-7-childtask-12",
+            "costUsd": null
+          },
+          {
+            "id": "root-8-child-92",
+            "title": "child-92",
+            "status": "waiting",
+            "startedAt": 94,
+            "endedAt": null,
+            "taskId": "root-8-childtask-12",
+            "costUsd": null
+          },
+          {
+            "id": "root-9-child-92",
+            "title": "child-92",
+            "status": "waiting",
+            "startedAt": 94,
+            "endedAt": null,
+            "taskId": "root-9-childtask-12",
+            "costUsd": null
+          },
+          {
+            "id": "root-0-child-91",
+            "title": "child-91",
+            "status": "waiting",
+            "startedAt": 93,
+            "endedAt": null,
+            "taskId": "root-0-childtask-11",
+            "costUsd": null
+          },
+          {
+            "id": "root-1-child-91",
+            "title": "child-91",
+            "status": "waiting",
+            "startedAt": 93,
+            "endedAt": null,
+            "taskId": "root-1-childtask-11",
+            "costUsd": null
+          },
+          {
+            "id": "root-2-child-91",
+            "title": "child-91",
+            "status": "waiting",
+            "startedAt": 93,
+            "endedAt": null,
+            "taskId": "root-2-childtask-11",
+            "costUsd": null
+          },
+          {
+            "id": "root-3-child-91",
+            "title": "child-91",
+            "status": "waiting",
+            "startedAt": 93,
+            "endedAt": null,
+            "taskId": "root-3-childtask-11",
+            "costUsd": null
+          },
+          {
+            "id": "root-4-child-91",
+            "title": "child-91",
+            "status": "waiting",
+            "startedAt": 93,
+            "endedAt": null,
+            "taskId": "root-4-childtask-11",
+            "costUsd": null
+          },
+          {
+            "id": "root-5-child-91",
+            "title": "child-91",
+            "status": "waiting",
+            "startedAt": 93,
+            "endedAt": null,
+            "taskId": "root-5-childtask-11",
+            "costUsd": null
+          },
+          {
+            "id": "root-6-child-91",
+            "title": "child-91",
+            "status": "waiting",
+            "startedAt": 93,
+            "endedAt": null,
+            "taskId": "root-6-childtask-11",
+            "costUsd": null
+          },
+          {
+            "id": "root-7-child-91",
+            "title": "child-91",
+            "status": "waiting",
+            "startedAt": 93,
+            "endedAt": null,
+            "taskId": "root-7-childtask-11",
+            "costUsd": null
+          },
+          {
+            "id": "root-8-child-91",
+            "title": "child-91",
+            "status": "waiting",
+            "startedAt": 93,
+            "endedAt": null,
+            "taskId": "root-8-childtask-11",
+            "costUsd": null
+          },
+          {
+            "id": "root-9-child-91",
+            "title": "child-91",
+            "status": "waiting",
+            "startedAt": 93,
+            "endedAt": null,
+            "taskId": "root-9-childtask-11",
+            "costUsd": null
+          },
+          {
+            "id": "root-0-child-90",
+            "title": "child-90",
+            "status": "waiting",
+            "startedAt": 92,
+            "endedAt": null,
+            "taskId": "root-0-childtask-10",
+            "costUsd": null
+          },
+          {
+            "id": "root-1-child-90",
+            "title": "child-90",
+            "status": "waiting",
+            "startedAt": 92,
+            "endedAt": null,
+            "taskId": "root-1-childtask-10",
+            "costUsd": null
+          },
+          {
+            "id": "root-2-child-90",
+            "title": "child-90",
+            "status": "waiting",
+            "startedAt": 92,
+            "endedAt": null,
+            "taskId": "root-2-childtask-10",
+            "costUsd": null
+          },
+          {
+            "id": "root-3-child-90",
+            "title": "child-90",
+            "status": "waiting",
+            "startedAt": 92,
+            "endedAt": null,
+            "taskId": "root-3-childtask-10",
+            "costUsd": null
+          },
+          {
+            "id": "root-4-child-90",
+            "title": "child-90",
+            "status": "waiting",
+            "startedAt": 92,
+            "endedAt": null,
+            "taskId": "root-4-childtask-10",
+            "costUsd": null
+          },
+          {
+            "id": "root-5-child-90",
+            "title": "child-90",
+            "status": "waiting",
+            "startedAt": 92,
+            "endedAt": null,
+            "taskId": "root-5-childtask-10",
+            "costUsd": null
+          },
+          {
+            "id": "root-6-child-90",
+            "title": "child-90",
+            "status": "waiting",
+            "startedAt": 92,
+            "endedAt": null,
+            "taskId": "root-6-childtask-10",
+            "costUsd": null
+          },
+          {
+            "id": "root-7-child-90",
+            "title": "child-90",
+            "status": "waiting",
+            "startedAt": 92,
+            "endedAt": null,
+            "taskId": "root-7-childtask-10",
+            "costUsd": null
+          },
+          {
+            "id": "root-8-child-90",
+            "title": "child-90",
+            "status": "waiting",
+            "startedAt": 92,
+            "endedAt": null,
+            "taskId": "root-8-childtask-10",
+            "costUsd": null
+          },
+          {
+            "id": "root-9-child-90",
+            "title": "child-90",
+            "status": "waiting",
+            "startedAt": 92,
+            "endedAt": null,
+            "taskId": "root-9-childtask-10",
+            "costUsd": null
+          }
+        ]
+      }
+    },
+    "taskRead": {
+      "plans": [
+        {
+          "query": "select \"id\", \"task_id\", \"name\", \"status\", \"posture\", \"trigger\", \"def_json\", \"resolved_graph_json\", \"root_run_id\", \"parent_run_id\", \"parent_step_id\", \"depth\", \"invocation_key\", \"payload_fingerprint\", \"effective_tools_json\", \"effective_budget_json\", \"requires_repo_trust\", \"deadline_at\", \"error\", \"created_at\", \"updated_at\" from \"workflow_runs\" where \"workflow_runs\".\"task_id\" = ?",
+          "plan": [
+            {
+              "id": 3,
+              "parent": 0,
+              "notused": 61,
+              "detail": "SEARCH workflow_runs USING INDEX workflow_runs_task_created_idx (task_id=?)"
+            }
+          ]
+        },
+        {
+          "query": "select \"id\", \"task_id\", \"name\", \"status\", \"posture\", \"trigger\", \"def_json\", \"resolved_graph_json\", \"root_run_id\", \"parent_run_id\", \"parent_step_id\", \"depth\", \"invocation_key\", \"payload_fingerprint\", \"effective_tools_json\", \"effective_budget_json\", \"requires_repo_trust\", \"deadline_at\", \"error\", \"created_at\", \"updated_at\" from \"workflow_runs\" where \"workflow_runs\".\"id\" in (?)",
+          "plan": [
+            {
+              "id": 3,
+              "parent": 0,
+              "notused": 39,
+              "detail": "SEARCH workflow_runs USING INDEX sqlite_autoindex_workflow_runs_1 (id=?)"
+            }
+          ]
+        },
+        {
+          "query": "select \"id\", \"root_run_id\", \"run_id\", \"step_id\", \"state\", \"cost_usd\", \"input_tokens\", \"output_tokens\", \"error\", \"created_at\", \"settled_at\" from \"workflow_turn_admissions\" where \"workflow_turn_admissions\".\"root_run_id\" in (?)",
+          "plan": [
+            {
+              "id": 3,
+              "parent": 0,
+              "notused": 62,
+              "detail": "SEARCH workflow_turn_admissions USING INDEX workflow_turn_admissions_root_created_idx (root_run_id=?)"
+            }
+          ]
+        }
+      ],
+      "name": "one-child-task-history",
+      "wallMs": 0.7310420000001159,
+      "cpuMs": 0.804,
+      "sqlStatements": 3,
+      "sqlVerbs": {
+        "SELECT": 3
+      },
+      "selectedRows": 6,
+      "selectedStringBytes": 197756,
+      "selectedBinaryBytes": 0,
+      "selectedValueBytes": 197756,
+      "answer": [
+        {
+          "id": "root-0-child-80",
+          "taskId": "root-0-childtask-0",
+          "name": "child-80",
+          "status": "gated",
+          "posture": "gated",
+          "trigger": "manual",
+          "defJson": "{\"baseline\":\"acorn-1\",\"formatVersion\":1,\"name\":\"Synthetic workflow\",\"steps\":[],\"padding\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\"}",
+          "rootRunId": "root-0",
+          "parentRunId": "root-0",
+          "parentStepId": null,
+          "depth": 1,
+          "invocationKey": null,
+          "payloadFingerprint": null,
+          "error": null,
+          "createdAt": 82,
+          "updatedAt": 82,
+          "rootTaskId": "root-0-task",
+          "rootRunName": "root-0",
+          "parentTaskId": "root-0-task",
+          "parentRunName": "root-0",
+          "usage": null
+        },
+        {
+          "id": "root-0-child-60",
+          "taskId": "root-0-childtask-0",
+          "name": "child-60",
+          "status": "done",
+          "posture": "gated",
+          "trigger": "manual",
+          "defJson": "{\"baseline\":\"acorn-1\",\"formatVersion\":1,\"name\":\"Synthetic workflow\",\"steps\":[],\"padding\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\"}",
+          "rootRunId": "root-0",
+          "parentRunId": "root-0",
+          "parentStepId": null,
+          "depth": 1,
+          "invocationKey": null,
+          "payloadFingerprint": null,
+          "error": null,
+          "createdAt": 62,
+          "updatedAt": 62,
+          "rootTaskId": "root-0-task",
+          "rootRunName": "root-0",
+          "parentTaskId": "root-0-task",
+          "parentRunName": "root-0",
+          "usage": null
+        },
+        {
+          "id": "root-0-child-40",
+          "taskId": "root-0-childtask-0",
+          "name": "child-40",
+          "status": "done",
+          "posture": "gated",
+          "trigger": "manual",
+          "defJson": "{\"baseline\":\"acorn-1\",\"formatVersion\":1,\"name\":\"Synthetic workflow\",\"steps\":[],\"padding\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\"}",
+          "rootRunId": "root-0",
+          "parentRunId": "root-0",
+          "parentStepId": null,
+          "depth": 1,
+          "invocationKey": null,
+          "payloadFingerprint": null,
+          "error": null,
+          "createdAt": 42,
+          "updatedAt": 42,
+          "rootTaskId": "root-0-task",
+          "rootRunName": "root-0",
+          "parentTaskId": "root-0-task",
+          "parentRunName": "root-0",
+          "usage": null
+        },
+        {
+          "id": "root-0-child-20",
+          "taskId": "root-0-childtask-0",
+          "name": "child-20",
+          "status": "done",
+          "posture": "gated",
+          "trigger": "manual",
+          "defJson": "{\"baseline\":\"acorn-1\",\"formatVersion\":1,\"name\":\"Synthetic workflow\",\"steps\":[],\"padding\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\"}",
+          "rootRunId": "root-0",
+          "parentRunId": "root-0",
+          "parentStepId": null,
+          "depth": 1,
+          "invocationKey": null,
+          "payloadFingerprint": null,
+          "error": null,
+          "createdAt": 22,
+          "updatedAt": 22,
+          "rootTaskId": "root-0-task",
+          "rootRunName": "root-0",
+          "parentTaskId": "root-0-task",
+          "parentRunName": "root-0",
+          "usage": null
+        },
+        {
+          "id": "root-0-child-0",
+          "taskId": "root-0-childtask-0",
+          "name": "child-0",
+          "status": "done",
+          "posture": "gated",
+          "trigger": "manual",
+          "defJson": "{\"baseline\":\"acorn-1\",\"formatVersion\":1,\"name\":\"Synthetic workflow\",\"steps\":[],\"padding\":\"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\"}",
+          "rootRunId": "root-0",
+          "parentRunId": "root-0",
+          "parentStepId": null,
+          "depth": 1,
+          "invocationKey": null,
+          "payloadFingerprint": null,
+          "error": null,
+          "createdAt": 2,
+          "updatedAt": 2,
+          "rootTaskId": "root-0-task",
+          "rootRunName": "root-0",
+          "parentTaskId": "root-0-task",
+          "parentRunName": "root-0",
+          "usage": null
+        }
+      ]
+    },
+    "expected": "Task navigation selects compact scalar columns and groups latest child rows per task, never frozen execution bodies; projected groups remain exact."
+  }
+}

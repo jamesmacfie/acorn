@@ -2,6 +2,7 @@ import { getTableColumns, sql } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import { agentEvents } from '../node/schema'
+import { AgentSearchProjection } from './sessions/searchProjection'
 
 // FTS5 schema drift guard. See docs/data-layer.md § Migrations for why this table and its triggers are
 // hand-written into the migration instead of the Drizzle schema.
@@ -69,5 +70,19 @@ describe('agent_events_fts schema drift guard', () => {
       sql`SELECT event_id FROM agent_events_fts WHERE agent_events_fts MATCH ${'"needle"'}`,
     )
     expect(swept).toEqual([])
+  })
+
+  it('repairs missing derived objects with the same schema as the migration', () => {
+    const objects = () => t.db.all<{ name: string; sql: string }>(sql`
+      SELECT name, sql FROM sqlite_master
+      WHERE name LIKE 'agent_search_%' OR name LIKE 'agent_events_fts_%' AND type = 'trigger'
+      ORDER BY name
+    `).map((row) => ({ name: row.name, sql: row.sql.replaceAll('`', '').replace(/\s+/g, ' ').trim() }))
+    const migrated = objects()
+    for (const row of migrated.filter((row) => row.name !== 'agent_search_dirty')) t.db.run(sql.raw(`DROP TRIGGER ${row.name}`))
+    t.db.run(sql`DROP TABLE agent_search_dirty`)
+    new AgentSearchProjection(t.db)
+    expect(objects()).toEqual(migrated)
+    expect(t.db.all(sql`SELECT name FROM pragma_table_info('agent_search_dirty')`)).toEqual([{ name: 'session_id' }, { name: 'from_seq' }])
   })
 })

@@ -1,0 +1,62 @@
+{
+  "case": "paths",
+  "node": "v24.11.0",
+  "platform": "darwin",
+  "result": {
+    "actualNames": [
+      "plain.txt",
+      "café.txt",
+      "tab\tname.txt",
+      "quote\"name.txt",
+      "space name.txt"
+    ],
+    "expected": "Every actual filename is returned exactly, has a stable key, and has a nonempty patch.",
+    "rows": [
+      {
+        "returnedPath": "\"caf\\303\\251.txt\"",
+        "actualPathExists": false,
+        "contentKeyPresent": false,
+        "stableKey": true,
+        "effectiveKeyChangesWithPoll": true,
+        "patchBytes": 0,
+        "gitCommands": 2
+      },
+      {
+        "returnedPath": "plain.txt",
+        "actualPathExists": true,
+        "contentKeyPresent": true,
+        "stableKey": true,
+        "effectiveKeyChangesWithPoll": false,
+        "patchBytes": 33,
+        "gitCommands": 2
+      },
+      {
+        "returnedPath": "\"quote\\\"name.txt\"",
+        "actualPathExists": false,
+        "contentKeyPresent": false,
+        "stableKey": true,
+        "effectiveKeyChangesWithPoll": true,
+        "patchBytes": 0,
+        "gitCommands": 2
+      },
+      {
+        "returnedPath": "space name.txt",
+        "actualPathExists": true,
+        "contentKeyPresent": true,
+        "stableKey": true,
+        "effectiveKeyChangesWithPoll": false,
+        "patchBytes": 33,
+        "gitCommands": 2
+      },
+      {
+        "returnedPath": "\"tab\\tname.txt\"",
+        "actualPathExists": false,
+        "contentKeyPresent": false,
+        "stableKey": true,
+        "effectiveKeyChangesWithPoll": true,
+        "patchBytes": 0,
+        "gitCommands": 2
+      }
+    ]
+  }
+}

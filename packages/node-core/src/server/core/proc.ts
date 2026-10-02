@@ -263,14 +263,15 @@ export class ProcessError extends Error {
 // For the majority of call sites, which want stdout or an exception. `stderr` is truncated in the message
 // because it can be long, and because a failing command's stderr is the one place a credential passed on
 // a command line would surface.
-export async function runProcessOrThrow(spec: ProcSpec): Promise<ProcResult> {
+export async function runProcessOrThrow(spec: ProcSpec, allowedExitCodes: readonly number[] = [0]): Promise<ProcResult> {
   const result = await runProcess(spec)
   if (result.spawnError) throw new ProcessError(result, `${spec.file}: ${result.spawnError}`)
   if (result.timedOut) throw new ProcessError(result, `${spec.file} timed out after ${spec.timeoutMs ?? DEFAULT_TIMEOUT_MS}ms`)
+  if (result.aborted) throw new ProcessError(result, `${spec.file} aborted`)
   if (result.truncated) {
     throw new ProcessError(result, `${spec.file} produced more than ${spec.maxOutputBytes ?? DEFAULT_MAX_OUTPUT_BYTES} bytes of output`)
   }
-  if (result.code !== 0) {
+  if (result.code === null || !allowedExitCodes.includes(result.code)) {
     throw new ProcessError(result, `${spec.file} exited ${result.code ?? result.signal}: ${result.stderr.trim().slice(0, 500)}`)
   }
   return result

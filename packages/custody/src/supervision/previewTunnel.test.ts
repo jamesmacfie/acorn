@@ -1,10 +1,10 @@
 import { mkdtempSync, rmSync } from 'node:fs'
 import { createServer as createHttpsServer, type Server as HttpsServer } from 'node:https'
-import { createConnection, type AddressInfo, type Socket } from 'node:net'
+import { createConnection, type AddressInfo, type Socket, Server } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { WebSocketServer } from 'ws'
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { ensureCert } from '@acorn/node-core/server/transport'
 import { PreviewTunnels, type TunnelEvents } from './previewTunnel'
 
@@ -223,4 +223,119 @@ describe('headersFor', () => {
     tunnels.closeFor({ taskId: 'task-1' })
     expect(tunnels.headersFor(`http://127.0.0.1:${port}/`)).toBeNull()
   })
+})
+
+const portClosed = async (port: number): Promise<void> => {
+  await vi.waitFor(async () => {
+    const reachable = await new Promise<boolean>((resolve) => {
+      const socket = createConnection({ host: '127.0.0.1', port })
+      socket.once('connect', () => { socket.destroy(); resolve(true) })
+      socket.once('error', () => { socket.destroy(); resolve(false) })
+    })
+    expect(reachable).toBe(false)
+  })
+}
+
+it('reserves the 16 limit before concurrent binds and shares same-key admission', async () => {
+  const results = await Promise.allSettled(Array.from({ length: 24 }, (_, i) => tunnels.open({ ...TARGET, taskId: `task-${i}` })))
+  const ports = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : [])
+  expect(new Set(ports).size).toBe(16)
+  expect(results.filter((result) => result.status === 'rejected')).toHaveLength(8)
+  tunnels.dispose()
+  await Promise.all(ports.map(portClosed))
+
+  const owner = new PreviewTunnels(() => ({ endpoint, token: 'synthetic', certPem, fingerprint }))
+  try {
+    const joined = await Promise.all(Array.from({ length: 8 }, () => owner.open(TARGET)))
+    expect(new Set(joined).size).toBe(1)
+    owner.dispose()
+    await portClosed(joined[0]!)
+    await expect(owner.open(TARGET)).rejects.toThrow('disposed')
+  } finally { owner.dispose() }
+})
+
+it.each(['close', 'dispose'] as const)('retires a pending %s without publishing its secret', async (action) => {
+  const opened = vi.fn()
+  const owner = new PreviewTunnels(() => ({ endpoint, token: 'synthetic' }), { opened, closed: vi.fn() })
+  const servers: Server[] = []
+  const original = Server.prototype.listen
+  const listen = vi.spyOn(Server.prototype, 'listen').mockImplementation(function (this: Server, ...args: Parameters<Server['listen']>) {
+    servers.push(this)
+    return original.apply(this, args)
+  })
+  try {
+    const pending = owner.open(TARGET)
+    const settled = expect(pending).rejects.toThrow('closed before opening')
+    if (action === 'close') owner.closeFor(TARGET)
+    else owner.dispose()
+    await settled
+    await new Promise((resolve) => setImmediate(resolve))
+    expect(opened).not.toHaveBeenCalled()
+    expect(servers).toHaveLength(1)
+    expect(servers[0]!.listening).toBe(false)
+    expect(servers[0]!.address()).toBeNull()
+    if (action === 'close') {
+      const port = await owner.open(TARGET)
+      owner.dispose()
+      await portClosed(port)
+    }
+  } finally { owner.dispose(); listen.mockRestore() }
+})
+
+it('a failed bind releases admission for a healthy same-key retry', async () => {
+  const listen = vi.spyOn(Server.prototype, 'listen').mockImplementationOnce(() => { throw new Error('synthetic bind failure') })
+  try {
+    await expect(tunnels.open(TARGET)).rejects.toThrow('synthetic bind failure')
+    const port = await tunnels.open(TARGET)
+    expect(tunnels.headersFor(`http://127.0.0.1:${port}`)).not.toBeNull()
+    tunnels.dispose()
+    await portClosed(port)
+  } finally { listen.mockRestore() }
+})
+
+it('late listener errors and old socket closes cannot retire a same-key replacement', async () => {
+  const listeners: Server[] = []
+  const original = Server.prototype.listen
+  const listen = vi.spyOn(Server.prototype, 'listen').mockImplementation(function (this: Server, ...args: Parameters<Server['listen']>) {
+    listeners.push(this)
+    return original.apply(this, args)
+  })
+  try {
+    const oldPort = await tunnels.open(TARGET)
+    const socket = createConnection({ host: '127.0.0.1', port: oldPort })
+    clients.push(socket)
+    await new Promise<void>((resolve, reject) => { socket.once('connect', resolve); socket.once('error', reject) })
+    const closed = new Promise<void>((resolve) => socket.once('close', () => resolve()))
+    tunnels.closeFor(TARGET)
+    const port = await tunnels.open(TARGET)
+    await closed
+    listeners[0]!.emit('error', new Error('late retired error'))
+    expect(await tunnels.open(TARGET)).toBe(port)
+    expect((await speak(port, request(secretHeader(port)))).alive).toBe(true)
+    tunnels.dispose()
+    await Promise.all([oldPort, port].map(portClosed))
+  } finally { listen.mockRestore() }
+})
+
+it('keeps same-ID tasks on independent Nodes alive when one Node closes', async () => {
+  const first = await tunnels.open(TARGET)
+  const second = await tunnels.open({ ...TARGET, nodeId: 'n2' })
+  tunnels.closeFor({ nodeId: 'n1', taskId: TARGET.taskId })
+  await portClosed(first)
+  expect(await tunnels.open({ ...TARGET, nodeId: 'n2' })).toBe(second)
+})
+
+it('reaps an idle listener after 60 seconds and permits reopening', async () => {
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+  try {
+    const port = await tunnels.open(TARGET)
+    await vi.advanceTimersByTimeAsync(59_999)
+    expect(tunnels.headersFor(`http://127.0.0.1:${port}`)).not.toBeNull()
+    await vi.advanceTimersByTimeAsync(1)
+    expect(tunnels.headersFor(`http://127.0.0.1:${port}`)).toBeNull()
+    vi.useRealTimers()
+    await portClosed(port)
+    const reopened = await tunnels.open(TARGET)
+    expect(tunnels.headersFor(`http://127.0.0.1:${reopened}`)).not.toBeNull()
+  } finally { vi.useRealTimers() }
 })

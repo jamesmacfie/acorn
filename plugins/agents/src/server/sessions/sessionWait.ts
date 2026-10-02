@@ -3,59 +3,92 @@ import type { WaitCondition } from './runtimeEngine'
 import type { AgentStore } from './store'
 
 type WaitDependencies = {
-  store: Pick<AgentStore, 'snapshot'>
-  conditionMet(snapshot: AgentSessionSnapshot, until: WaitCondition): boolean
+  store: Pick<AgentStore, 'waitFacts' | 'waitSnapshot'>
   subscribe(listener: (frame: AgentWsFrame) => void): () => void
+  shutdown: AbortSignal
 }
 
-/** Waits on live frames while using the durable snapshot as the return authority. */
-export async function waitForSessionSnapshot(
+/** One check owns each waiter. Frames during a read request one follow-up check. */
+export function waitForSessionSnapshot(
   deps: WaitDependencies,
   sessionId: string,
   afterSeq: number,
   until: WaitCondition,
   timeoutMs: number,
+  signal?: AbortSignal,
 ): Promise<AgentSessionSnapshot> {
-  const initial = await deps.store.snapshot(sessionId, afterSeq)
-  if (deps.conditionMet(initial, until) || timeoutMs === 0) return initial
   return new Promise((resolve, reject) => {
     let settled = false
-    const finish = (snapshot: AgentSessionSnapshot) => {
-      if (settled) return
-      settled = true
-      clearTimeout(timeout)
+    let expired = timeoutMs === 0
+    let active = false
+    let dirty = false
+    let initial = true
+    let off = () => {}
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const signals = [deps.shutdown, ...(signal ? [signal] : [])]
+    const cleanup = () => {
+      clearTimeout(timer)
       off()
-      resolve(snapshot)
+      for (const item of signals) item.removeEventListener('abort', abort)
     }
     const fail = (error: unknown) => {
       if (settled) return
       settled = true
-      clearTimeout(timeout)
-      off()
+      cleanup()
       reject(error)
     }
-    const check = () => {
-      void deps.store.snapshot(sessionId, afterSeq).then((snapshot) => {
-        if (deps.conditionMet(snapshot, until)) finish(snapshot)
-      }, fail)
-    }
-    const timeout = setTimeout(() => {
+    const abort = () => fail(signals.find((item) => item.aborted)?.reason)
+    const finish = (snapshot: AgentSessionSnapshot) => {
       if (settled) return
       settled = true
+      cleanup()
+      resolve(snapshot)
+    }
+    const check = async () => {
+      if (active || settled || expired) return
+      active = true
+      try {
+        do {
+          dirty = false
+          const facts = await deps.store.waitFacts(sessionId, afterSeq, until)
+          if (settled || expired) return
+          // Retain the setup recheck even when the initial reader yields after its transaction.
+          if (initial) { initial = false; dirty = true }
+          if (dirty) continue
+          if (facts.matched) {
+            const snapshot = await deps.store.waitSnapshot(sessionId, afterSeq, until)
+            if (settled || expired) return
+            if (!dirty && snapshot.wait?.matched) { finish(snapshot); return }
+            dirty = true
+          }
+        } while (dirty && !settled && !expired)
+      } catch (error) { if (!expired) fail(error) }
+      finally { active = false }
+    }
+    const timeout = () => {
+      if (settled) return
+      expired = true
       off()
-      void deps.store.snapshot(sessionId, afterSeq).then(resolve, reject)
-    }, timeoutMs)
-    const off = deps.subscribe((frame) => {
-      if (
-        (frame.channel === 'agent:event' && frame.event.sessionId !== sessionId)
-        || (frame.channel === 'agent:session' && frame.session.id !== sessionId)
-        || (frame.channel === 'agent:turn' && frame.turn.sessionId !== sessionId)
-        || (frame.channel === 'agent:request' && frame.request.sessionId !== sessionId)
-        || frame.channel === 'agent:deleted'
-      ) return
-      check()
+      // A held check cannot extend the deadline or overwrite this final read.
+      void deps.store.waitSnapshot(sessionId, afterSeq, until).then(finish, fail)
+    }
+    for (const item of signals) item.addEventListener('abort', abort, { once: true })
+    if (signals.some((item) => item.aborted)) { abort(); return }
+    // Subscribe before the first read, closing the initial read/listener gap as well.
+    off = deps.subscribe((frame) => {
+      const target = frame.channel === 'agent:event' ? frame.event.sessionId
+        : frame.channel === 'agent:session' ? frame.session.id
+        : frame.channel === 'agent:turn' ? frame.turn.sessionId
+        : frame.channel === 'agent:request' ? frame.request.sessionId : frame.sessionId
+      if (target !== sessionId || settled || expired) return
+      if (frame.channel === 'agent:deleted') { fail(new Error(`Managed agent session not found: ${sessionId}`)); return }
+      dirty = true
+      void check()
     })
-    // Recheck after subscribing to cover events committed between the first read and registration.
-    check()
+    if (expired) timeout()
+    else {
+      timer = setTimeout(timeout, timeoutMs)
+      void check()
+    }
   })
 }

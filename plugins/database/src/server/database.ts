@@ -67,15 +67,26 @@ export function databaseBridge(
   // The pane still has an explicit Connect state. The core service can connect on demand for headless
   // consumers, so this adapter records which tasks this pane instance has deliberately opened.
   const connected = new Set<string>()
+  const tasks = new Map<string, object>()
+  let disposed = false
+  let disposal: Promise<void> | undefined
+  const operation = (taskId: string) => {
+    if (disposed) throw new Error('Database plugin disposed.')
+    const generation = tasks.get(taskId) ?? {}
+    tasks.set(taskId, generation)
+    return () => !disposed && tasks.get(taskId) === generation
+  }
 
-  const requireConnection = (taskId: string): boolean => connected.has(taskId)
+  const requireConnection = (taskId: string): boolean => !disposed && connected.has(taskId)
   const liveCatalog = (taskId: string) => core.data.catalog(taskId)
 
   return {
     configured: (taskId) => core.data.configured(taskId),
     connect: async (taskId) => {
       try {
+        const valid = operation(taskId)
         const result = await core.data.connect(taskId)
+        if (!valid()) throw new Error('Database connection retired.')
         connected.add(taskId)
         return { ok: true, database: result.database }
       } catch (error) {
@@ -104,7 +115,9 @@ export function databaseBridge(
     rows: async (taskId, schema, name, offset) => {
       if (!requireConnection(taskId)) return { error: 'Not connected.' }
       try {
+        const valid = operation(taskId)
         const table = findTable(await liveCatalog(taskId), schema, name)
+        if (!valid()) throw new Error('Database connection retired.')
         const primaryKeys = table.columns.filter((column) => column.isPk).map((column) => column.name)
         const relation = `${qid(table.schema)}.${qid(table.name)}`
         const order = primaryKeys.length ? ` ORDER BY ${primaryKeys.map(qid).join(', ')}` : ''
@@ -131,13 +144,14 @@ export function databaseBridge(
     query: async (taskId, sql, options) => {
       if (!requireConnection(taskId)) return { error: 'Not connected.' }
       try {
+        const valid = operation(taskId)
         const result = await core.data.query(taskId, sql, {
           maxRows: ROW_CAP,
           // The interactive SQL pane is intentionally writable. Headless consumers such as workflow
           // steps opt into core's read-only transaction through this private adapter option.
           readOnly: options?.readOnly ?? false,
         })
-        if (!new Set(['SELECT', 'INSERT', 'UPDATE', 'DELETE']).has(result.command.toUpperCase())) {
+        if (valid() && !new Set(['SELECT', 'INSERT', 'UPDATE', 'DELETE']).has(result.command.toUpperCase())) {
           emit?.({ channel: pluginChannel('database', 'schema-changed'), taskId })
         }
         return {
@@ -155,7 +169,9 @@ export function databaseBridge(
     update: async (taskId, schema, name, column, value, pk) => {
       if (!requireConnection(taskId)) return { ok: false, error: 'Not connected.' }
       try {
+        const valid = operation(taskId)
         const table = findTable(await liveCatalog(taskId), schema, name)
+        if (!valid()) throw new Error('Database connection retired.')
         const primaryKeys = Object.keys(pk)
         if (!primaryKeys.length) return { ok: false, error: 'This table has no primary key — editing is disabled.' }
         assertColumns(table, [column, ...primaryKeys])
@@ -174,7 +190,9 @@ export function databaseBridge(
     insert: async (taskId, schema, name, values) => {
       if (!requireConnection(taskId)) return { ok: false, error: 'Not connected.' }
       try {
+        const valid = operation(taskId)
         const table = findTable(await liveCatalog(taskId), schema, name)
+        if (!valid()) throw new Error('Database connection retired.')
         const columns = Object.keys(values)
         if (!columns.length) return { ok: false, error: 'No values to insert.' }
         assertColumns(table, columns)
@@ -193,7 +211,9 @@ export function databaseBridge(
     remove: async (taskId, schema, name, pk) => {
       if (!requireConnection(taskId)) return { ok: false, error: 'Not connected.' }
       try {
+        const valid = operation(taskId)
         const table = findTable(await liveCatalog(taskId), schema, name)
+        if (!valid()) throw new Error('Database connection retired.')
         const primaryKeys = Object.keys(pk)
         if (!primaryKeys.length) return { ok: false, error: 'This table has no primary key — delete is disabled.' }
         assertColumns(table, primaryKeys)
@@ -211,7 +231,9 @@ export function databaseBridge(
 
     schema: async (taskId) => {
       try {
+        const valid = operation(taskId)
         const result = await core.data.schema(taskId)
+        if (!valid()) throw new Error('Database connection retired.')
         // Auto schema introspection may have opened the host pool for a headless workflow. Track the
         // task even for configured text so a later query and plugin disposal use one lifecycle.
         connected.add(taskId)
@@ -236,13 +258,19 @@ export function databaseBridge(
 
     disconnect: async (taskId) => {
       connected.delete(taskId)
+      tasks.delete(taskId)
       await core.data.disconnect(taskId)
       return { ok: true }
     },
 
-    dispose: async () => {
-      await Promise.all([...connected].map((taskId) => core.data.disconnect(taskId)))
+    dispose: () => {
+      if (disposal) return disposal
+      disposed = true
+      const owned = [...tasks.keys()]
       connected.clear()
+      tasks.clear()
+      disposal = Promise.all(owned.map((taskId) => core.data.disconnect(taskId))).then(() => {})
+      return disposal
     },
   }
 }

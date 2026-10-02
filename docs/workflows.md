@@ -101,6 +101,16 @@ Unavailable storage displays **Not saved**; an unacknowledged durable copy displ
 device**. Reopening compares the local copy with the Node version. Stable IDs align step lists;
 conflicting fields, concurrent structural edits, and delete-versus-edit require an explicit choice.
 
+The editor captures its QueryClient's Node for definition, file, catalog, provider, validation, and
+publication requests. Contributed field choices and AI authoring use that owner too. AI conversation
+recovery keys retain the captured Node, and navigation retires the dialog and its pending reply. Cleanup flushes pending edits through that captured API. A save acknowledges
+its submitted definition and base revision. Later edits remain dirty and recoverable. Writes to the
+same entity run serially; pending saves coalesce to the last submitted edit. Late responses cannot
+change a replacement definition's revision, history, conflicts, or save status. Publication and export
+wait for their captured save before preparing a review. Navigation retires validation and review
+results from the departed definition.
+
+
 `POST /defs/publications/prepare` freezes a reviewed dependency-first write set. The request selects
 the root draft revision and optional changed child/query draft revisions. Required unpublished
 dependencies are included; unrelated edits to published dependencies are not adopted. Metadata-dependent
@@ -831,6 +841,14 @@ and a separate retained-snapshot read. Pages contain at most 100 rows and do not
 or named outputs. Detail and attempt payloads bound every preview. Skipped rows retain links to their
 preceding attempt. The processing ledger does not prune record identity or automatically archive
 tasks.
+
+Selection pages compute global category counts and eligible positions from compact decision,
+dispatch-state, and run-status fields before loading page details. Only the admitted page reads
+record snapshots, dispatch payloads, run errors, and step previews. Step results use a bounded
+UTF-8 byte prefix before the JavaScript preview slice, preserving Unicode, embedded NULs, and
+structured-versus-plain selection. Snapshot parsing, named outputs, and attempt history read their
+complete inputs. A missing run retains the dispatch-state fallback, and an active skipped row
+retains its prior attempt's status and retry target.
 
 ## Scheduled roots
 

@@ -1,3 +1,5 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
+import { createComponent } from 'solid-js'
 import { createRoot } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WorkflowStepRow } from '../../contract/wire.ts'
@@ -11,22 +13,26 @@ const runsCalls = vi.fn()
 const stepsCalls = vi.fn()
 let runRows: WorkflowRunProjection[] = []
 let stepRows: WorkflowStepRow[] = []
+let holdSteps = false
+let stepReleases: (() => void)[] = []
 
 vi.mock('../workflowsClient', () => ({
-  workflowApi: {
+  createWorkflowApi: () => ({
     runs: async (taskId: string) => {
       runsCalls(taskId)
       return runRows
     },
     steps: async (runId: string) => {
       stepsCalls(runId)
-      return stepRows.filter((step) => step.runId === runId)
+      const snapshot = stepRows.filter((step) => step.runId === runId)
+      if (holdSteps) await new Promise<void>(resolve => stepReleases.push(resolve))
+      return snapshot
     },
     gate: async () => ({ ok: true }),
     cancel: async () => ({ ok: true }),
     kill: async () => ({ ok: true }),
     retry: async () => ({ ok: true }),
-  },
+  }),
 }))
 
 type StepChanged = (frame: { runId: string; stepId: string; status: string }) => void
@@ -89,13 +95,18 @@ const mount = async () => {
   let model!: ReturnType<typeof createRunPaneModel>
   createRoot((disposeRoot) => {
     dispose = disposeRoot
-    model = createRunPaneModel({ id: 'task-1' } as never)
+    createComponent(QueryClientProvider, { client: new QueryClient(), get children() {
+      model = createRunPaneModel({ id: 'task-1' } as never)
+      return null
+    } })
   })
   await settle()
   return model
 }
 
 beforeEach(() => {
+  holdSteps = false
+  stepReleases = []
   runsCalls.mockClear()
   stepsCalls.mockClear()
   runRows = [run({})]
@@ -185,8 +196,8 @@ describe('the run pane model', () => {
     for (let at = 0; at < 20; at++) onStepEvent?.({ runId: 'run-1', stepId: 'st1', event: { type: 'stdout', text: 'x'.repeat(500) } })
     const tail = model.tailFor('st1').join('\n')
     expect(tail.length).toBe(4000)
-    // The event ring is separate from the tail and keeps its cap too.
-    expect(model.eventsFor('st1')).toHaveLength(20)
+    // Stream chunks have only one disposable representation.
+    expect(model.eventsFor('st1')).toHaveLength(0)
   })
 
   it('keeps an event it does not recognise', async () => {
@@ -225,4 +236,80 @@ describe('the run pane model', () => {
     await settle()
     expect(model.selectedRunId()).toBe('run-0')
   })
+})
+
+
+it('joins 30 child edges and preserves a status edge arriving after the snapshot', async () => {
+  const model = await mount()
+  holdSteps = true
+  const before = stepsCalls.mock.calls.length
+  for (let i = 0; i < 30; i++) onChildChanged?.({ ownerTaskId: 'task-1' })
+  expect(stepsCalls.mock.calls.length - before).toBe(1)
+  onStepChanged?.({ runId: 'run-1', stepId: 'st1', status: 'done' })
+  stepReleases.shift()!(); await settle()
+  expect(model.steps()[0].status).toBe('done')
+  expect(stepsCalls.mock.calls.length - before).toBe(2)
+  onChildChanged?.({ ownerTaskId: 'task-1' })
+  stepReleases.shift()!(); await settle()
+  expect(stepsCalls.mock.calls.length - before).toBe(3)
+  holdSteps = false; stepReleases.shift()!(); await settle()
+})
+
+it('stops obsolete follow-ups after selecting another run or disposing', async () => {
+  runRows = [run({}), run({ id: 'run-0' })]
+  stepRows.push(step({ id: 'old-step', runId: 'run-0' }))
+  const model = await mount()
+  holdSteps = true
+  onChildChanged?.({ ownerTaskId: 'task-1' })
+  onChildChanged?.({ ownerTaskId: 'task-1' })
+  model.selectRun('run-0'); await settle()
+  expect(stepReleases.length).toBe(2)
+  stepReleases.shift()!(); await settle()
+  expect(model.steps()).toEqual([])
+  stepReleases.shift()!(); await settle()
+  expect(model.steps()[0].id).toBe('old-step')
+  onChildChanged?.({ ownerTaskId: 'task-1' })
+  onChildChanged?.({ ownerTaskId: 'task-1' })
+  const before = stepsCalls.mock.calls.length
+  dispose!(); dispose = undefined
+  stepReleases.shift()!(); await settle()
+  expect(stepsCalls.mock.calls.length).toBe(before)
+})
+
+it('waits for a post-command authoritative refresh after a pending stale wave', async () => {
+  const model = await mount()
+  holdSteps = true
+  onChildChanged?.({ ownerTaskId: 'task-1' })
+  let completed = false
+  const command = model.cancel().then(() => { completed = true })
+  await settle()
+  stepRows = [step({ status: 'done' })]
+  stepReleases.shift()!(); await settle()
+  expect(completed).toBe(false)
+  expect(stepReleases.length).toBe(1)
+  holdSteps = false; stepReleases.shift()!(); await command
+  expect(model.steps()[0].status).toBe('done')
+  expect(completed).toBe(true)
+})
+
+it('retires live dictionaries on selection and restores full durable output on return', async () => {
+  const output = 'canonical'.repeat(10000)
+  runRows = [run({}), run({ id: 'run-0' })]
+  stepRows[0] = step({ resultJson: JSON.stringify({ stdout: output }) })
+  const model = await mount()
+  model.setGateDraft('st1', { answer: 'unsent form' })
+  onStepEvent?.({ runId: 'run-1', stepId: 'st1', event: { type: 'stdout', text: output } })
+  onStepEvent?.({ runId: 'run-1', stepId: 'st1', event: { type: 'managed-agent', sessionId: 'session' } })
+  for (let i = 0; i < 205; i++) onStepEvent?.({ runId: 'run-1', stepId: 'st2', event: { type: 'unknown', value: i } })
+  expect(model.eventsFor('st1')).toEqual([{ type: 'managed-agent', sessionId: 'session' }])
+  expect(model.tailFor('st1').join('')).toBe(output.slice(-4000))
+  expect(model.eventsFor('st2')).toHaveLength(200)
+  expect(model.droppedEventsFor('st2')).toBe(5)
+  model.selectRun('run-0'); await settle()
+  expect(model.eventsFor('st1')).toEqual([])
+  expect(model.tailFor('st1')).toEqual([])
+  model.selectRun('run-1'); await settle()
+  expect(JSON.parse(model.steps()[0].resultJson!).stdout).toBe(output)
+  expect(model.droppedEventsFor('st2')).toBe(0)
+  expect(model.gateDraft('st1')).toEqual({ answer: 'unsent form' })
 })

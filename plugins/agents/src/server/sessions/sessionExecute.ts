@@ -11,6 +11,7 @@ import { managedProviderForProfile, type AgentSessionExecute, type AgentSessionE
 import type { ManagedAgentRuntime } from './runtime'
 import { assistantResult, parseStructuredResult, promptWithResultContract } from './resultContract'
 import { contextBlock } from '../drivers/contextBlock'
+import { ExecutionEvents } from './executionEvents'
 
 // The profile-to-driver map moved to ../../contract/sessionExecute.ts, so a caller can ask before it
 // calls whether a profile has a managed path at all. Re-exported here for the callers already on it.
@@ -68,7 +69,7 @@ function resultFromSnapshot(
   const turn = snapshot.turns.find((candidate) => candidate.id === turnId)
   if (!turn || !['completed', 'failed', 'cancelled', 'interrupted'].includes(turn.status)) return null
   const events = turnEvents(snapshot, turnIds)
-  const result = assistantResult(snapshot.events.filter((record) => record.turnId === turnId))
+  const result = assistantResult(snapshot.events.filter((record) => record.turnId === turnId), Infinity)
   const structuredOutput = result ? parseStructuredResult(result, schema) : null
   // Usage and cost are the last turn's alone. A step that needed a continuation under-reports by the
   // earlier turn, which is not summed because Codex reports cumulative totals and Claude does not.
@@ -166,109 +167,113 @@ export function createSessionExecute(runtime: ManagedAgentRuntime): AgentSession
     if (!providerId) return null
     const session = await sessionFor(runtime, request, providerId)
     await applyRequestedConfig(runtime, session.id, request.configOptions)
-    const beforeSeq = session.lastEventSeq
-    const first = await runtime.enqueueTurn(session.id, {
-      input: stepInput(request),
-      source: 'workflow',
-      effectivePolicy: {
-        // Codex reads the model and the effort off the policy at turn time; the Claude driver takes
-        // them only through the session config above. Both are written so the two drivers see one
-        // request, and `configOptions` wins over the older `model` field where a file sets both.
-        model: request.configOptions?.model ?? request.model,
-        ...(request.configOptions?.reasoning ? { effort: request.configOptions.reasoning } : {}),
-        ...(request.configOptions ? { configOptions: request.configOptions } : {}),
-        workflowRunId: request.runId,
-        workflowStepId: request.stepId,
-        schema: request.schema,
-        toolCeiling: request.tools ?? {},
-      },
-      idempotencyKey: `workflow-turn:${request.stepId ?? randomUUID()}:${beforeSeq}`,
-    })
-    const turnIds = [first.id]
-    const currentTurnId = () => turnIds[turnIds.length - 1]!
-    // The events the loop below waits past. It moves on with each continuation, because a wait for
-    // `turn_completed` after `beforeSeq` is already met by the turn that needed continuing.
-    let waitSeq = beforeSeq
-    let lastForwardedSeq = beforeSeq
-    const unsubscribe = runtime.subscribe((frame) => {
-      if (frame.channel !== 'agent:event' || frame.event.sessionId !== session.id || !turnIds.includes(frame.event.turnId ?? '')) return
-      if (frame.event.seq <= lastForwardedSeq) return
-      lastForwardedSeq = frame.event.seq
-      // The session id rides along, because the caller's row has nowhere else to learn it: the outcome
-      // below carries it, and that arrives when the step is over. A workflow step wants it while it is
-      // still running, so the run can hand a reader the conversation.
-      request.onEvent?.({
-        type: 'managed-agent',
-        sessionId: session.id,
-        sequence: frame.event.seq,
-        event: frame.event.event,
-      })
-    })
-    const startedAt = Date.now()
-    const timeoutMs = request.timeoutMs ?? HEADLESS_TIMEOUT_MS
-    let cancelled = request.signal?.aborted ?? false
-    const abort = () => {
-      cancelled = true
-      void runtime.cancelTurn(session.id, currentTurnId())
-    }
-    request.signal?.addEventListener('abort', abort, { once: true })
+    const beforeSeq = (await runtime.store.requireSession(session.id)).lastEventSeq
+    const forwarding = new ExecutionEvents(session.id, beforeSeq, request.onEvent)
+    const unsubscribe = runtime.subscribe((frame) => forwarding.receive(frame))
     try {
-      for (;;) {
-        if (cancelled) {
-          const snapshot = await runtime.store.snapshot(session.id, beforeSeq)
-          return (
-            resultFromSnapshot(snapshot, turnIds, request.schema) ?? {
-              status: 'cancelled',
+      const first = await runtime.enqueueTurn(session.id, {
+        input: stepInput(request),
+        source: 'workflow',
+        effectivePolicy: {
+          // Codex reads the model and the effort off the policy at turn time; the Claude driver takes
+          // them only through the session config above. Both are written so the two drivers see one
+          // request, and `configOptions` wins over the older `model` field where a file sets both.
+          model: request.configOptions?.model ?? request.model,
+          ...(request.configOptions?.reasoning ? { effort: request.configOptions.reasoning } : {}),
+          ...(request.configOptions ? { configOptions: request.configOptions } : {}),
+          workflowRunId: request.runId,
+          workflowStepId: request.stepId,
+          schema: request.schema,
+          toolCeiling: request.tools ?? {},
+        },
+        idempotencyKey: `workflow-turn:${request.stepId ?? randomUUID()}:${beforeSeq}`,
+      })
+      const turnIds = [first.id]
+      forwarding.acceptTurn(first.id)
+      const currentTurnId = () => turnIds[turnIds.length - 1]!
+      // The events the loop below waits past. It moves on with each continuation, because a wait for
+      // `turn_completed` after `beforeSeq` is already met by the turn that needed continuing.
+      let waitSeq = beforeSeq
+      const startedAt = Date.now()
+      const timeoutMs = request.timeoutMs ?? HEADLESS_TIMEOUT_MS
+      let cancelled = request.signal?.aborted ?? false
+      let cancellation: Promise<void> | undefined
+      let cancellingTurnId: string | undefined
+      const abort = () => {
+        cancelled = true
+        cancellingTurnId = currentTurnId()
+        cancellation = runtime.cancelTurn(session.id, cancellingTurnId)
+        // The loop joins the cancellation before capturing. Suppress an unhandled rejection meanwhile.
+        void cancellation.catch(() => {})
+      }
+      request.signal?.addEventListener('abort', abort, { once: true })
+      try {
+        for (;;) {
+          if (cancelled) {
+            await cancellation
+            if (cancellingTurnId !== currentTurnId()) await runtime.cancelTurn(session.id, currentTurnId())
+            const snapshot = await runtime.captureExecution(session.id, turnIds)
+            return (
+              resultFromSnapshot(snapshot, turnIds, request.schema) ?? {
+                status: 'cancelled',
+                exitCode: null,
+                capture: {
+                  result: assistantResult(snapshot.events.filter((record) => record.turnId === currentTurnId()), Infinity),
+                  structuredOutput: null,
+                  sessionId: snapshot.session.providerSessionRef,
+                  costUsd: null,
+                  usage: undefined,
+                  events: turnEvents(snapshot, turnIds),
+                },
+                stderrTail: '',
+                agentSessionId: session.id,
+              }
+            )
+          }
+          const elapsed = Date.now() - startedAt
+          if (elapsed >= timeoutMs) {
+            await runtime.cancelTurn(session.id, currentTurnId())
+            const snapshot = await runtime.captureExecution(session.id, turnIds)
+            return {
+              status: 'timeout',
               exitCode: null,
               capture: {
-                result: null,
+                result: assistantResult(snapshot.events.filter((record) => record.turnId === currentTurnId()), Infinity),
                 structuredOutput: null,
                 sessionId: snapshot.session.providerSessionRef,
                 costUsd: null,
                 usage: undefined,
                 events: turnEvents(snapshot, turnIds),
               },
-              stderrTail: '',
+              stderrTail: `Managed workflow turn exceeded ${timeoutMs}ms.`,
               agentSessionId: session.id,
             }
-          )
-        }
-        const elapsed = Date.now() - startedAt
-        if (elapsed >= timeoutMs) {
-          await runtime.cancelTurn(session.id, currentTurnId())
-          const snapshot = await runtime.store.snapshot(session.id, beforeSeq)
-          return {
-            status: 'timeout',
-            exitCode: null,
-            capture: {
-              result: assistantResult(snapshot.events),
-              structuredOutput: null,
-              sessionId: snapshot.session.providerSessionRef,
-              costUsd: null,
-              usage: undefined,
-              events: turnEvents(snapshot, turnIds),
-            },
-            stderrTail: `Managed workflow turn exceeded ${timeoutMs}ms.`,
-            agentSessionId: session.id,
           }
+          try {
+            await runtime.wait(session.id, waitSeq, 'turn_completed', Math.min(1_000, timeoutMs - elapsed), request.signal)
+          } catch (error) {
+            if (!cancelled) throw error
+            continue
+          }
+          const snapshot = await runtime.captureExecution(session.id, turnIds)
+          if (cancelled) continue
+          const result = resultFromSnapshot(snapshot, turnIds, request.schema)
+          if (!result) continue
+          if (result.status !== 'malformed' || turnIds.length > MAX_CONTINUATIONS || cancelled) return result
+          waitSeq = snapshot.session.lastEventSeq
+          forwarding.beginEnqueue()
+          const next = await runtime.enqueueTurn(session.id, {
+            input: [{ type: 'text', text: continuationPrompt(request.schema) }],
+            source: 'workflow',
+            effectivePolicy: { ...first.effectivePolicy, continuationOf: first.id },
+            idempotencyKey: `workflow-continue:${first.id}:${turnIds.length}`,
+          })
+          turnIds.push(next.id)
+          forwarding.acceptTurn(next.id)
         }
-        const settled = await runtime.wait(session.id, waitSeq, 'turn_completed', Math.min(1_000, timeoutMs - elapsed))
-        const snapshot = waitSeq === beforeSeq ? settled : await runtime.store.snapshot(session.id, beforeSeq)
-        const result = resultFromSnapshot(snapshot, turnIds, request.schema)
-        if (!result) continue
-        if (result.status !== 'malformed' || turnIds.length > MAX_CONTINUATIONS || cancelled) return result
-        waitSeq = snapshot.session.lastEventSeq
-        const next = await runtime.enqueueTurn(session.id, {
-          input: [{ type: 'text', text: continuationPrompt(request.schema) }],
-          source: 'workflow',
-          effectivePolicy: { ...first.effectivePolicy, continuationOf: first.id },
-          idempotencyKey: `workflow-continue:${first.id}:${turnIds.length}`,
-        })
-        turnIds.push(next.id)
+      } finally {
+        request.signal?.removeEventListener('abort', abort)
       }
-    } finally {
-      unsubscribe()
-      request.signal?.removeEventListener('abort', abort)
-    }
+    } finally { unsubscribe() }
   }
 }

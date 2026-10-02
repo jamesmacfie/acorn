@@ -11,13 +11,21 @@ export type EditorLineMarkerSet = {
   ranges: EditorLineRange[]
 }
 
+/** Exact UTF-8 disk body for which these optional annotations were observed. */
+export type EditorLineMarkerSnapshot = {
+  revision: string | null
+  markers: EditorLineMarkerSet[]
+}
+
 /**
  * One optional source of line provenance. Providers own their source data and return positions in the
  * current working-tree document, so the editor never needs to know which plugin supplied them.
  */
 export type EditorLineMarkerProvider = {
   kind: EditorLineMarkerKind
-  read(taskId: string, path: string): Promise<EditorLineRange[]>
+  // The editor supplies an already confined root. Providers still resolve their own authority
+  // and reject a different root; older loaded providers can ignore the optional third argument.
+  read(taskId: string, path: string, source?: { root: string }): Promise<EditorLineRange[]>
 }
 
 export const EDITOR_LINE_MARKERS = extensionPointId<EditorLineMarkerProvider>('editor:line-markers')

@@ -780,17 +780,24 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     return this.transcripts.export(sessionId, format)
   }
 
+  async captureExecution(sessionId: string, turnIds: readonly string[]): Promise<AgentSessionSnapshot> {
+    // Join accepted buffered deltas, including cancellation paths with no terminal provider event.
+    await this.providerEvents.flush(sessionId)
+    return this.store.executionSnapshot(sessionId, turnIds)
+  }
+
   async wait(
     sessionId: string,
     afterSeq: number,
     until: WaitCondition,
     timeoutMs: number,
+    signal?: AbortSignal,
   ): Promise<AgentSessionSnapshot> {
     return waitForSessionSnapshot({
       store: this.store,
-      conditionMet: (snapshot, condition) => this.conditionMet(snapshot, condition),
       subscribe: (listener) => this.subscribe(listener),
-    }, sessionId, afterSeq, until, timeoutMs)
+      shutdown: this.shutdown.signal,
+    }, sessionId, afterSeq, until, timeoutMs, signal)
   }
 }
 export type { AgentRuntimeOptions }

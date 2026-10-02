@@ -80,3 +80,17 @@ describe('search route (POST /api/tasks/:id/search)', () => {
     expect((await res.json()).error.code).toBe('bridge-unavailable')
   })
 })
+
+describe('search error responses', () => {
+  afterEach(() => setSearchBridge(null))
+  it.each([
+    ['invalid_query', 400], ['unavailable_root', 404], ['cancelled', 409],
+    ['timeout', 504], ['launch_failed', 500], ['overflow', 500], ['invalid_output', 500],
+  ])('preserves %s across the bridge as HTTP %i', async (code, status) => {
+    // A worker reconstructs a plain Error with its machine code.
+    setSearchBridge({ findInFiles: async () => { throw Object.assign(new Error('Search failed'), { code }) } })
+    const response = await authed().fetch(jsonReq('/api/tasks/task/search', 'POST', { query: 'needle' }), {} as Env)
+    expect(response.status).toBe(status)
+    expect((await response.json()).error.code).toBe(code)
+  })
+})

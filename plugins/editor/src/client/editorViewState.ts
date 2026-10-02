@@ -4,23 +4,26 @@ import type { EditorViewState } from '@acorn/plugin-api/ui/editor'
 // Where the reader was in each open file. Selection and scroll, as data this plugin owns, rather
 // than an editor library's opaque blob (docs/editor.md § View state).
 const viewStates = new Map<string, EditorViewState>()
-const viewKey = (taskId: string, path: string): string => `${activeNodeId() ?? ''}/${taskId}:${path}`
+const viewKey = (taskId: string, path: string, nodeId: string | null): string => `${nodeId ?? ''}/${taskId}:${path}`
 
-export const rememberEditorViewState = (taskId: string, path: string, state: EditorViewState): void => {
-  viewStates.set(viewKey(taskId, path), state)
+export const rememberEditorViewState = (taskId: string, path: string, state: EditorViewState, nodeId = activeNodeId()): void => {
+  viewStates.set(viewKey(taskId, path, nodeId), state)
 }
 
-export const editorViewState = (taskId: string, path: string): EditorViewState | undefined =>
-  viewStates.get(viewKey(taskId, path))
+export const editorViewState = (taskId: string, path: string, nodeId = activeNodeId()): EditorViewState | undefined =>
+  viewStates.get(viewKey(taskId, path, nodeId))
 
-export function evictEditorViewStates(taskId: string): void {
-  // Every node's entries for this task id, not just the active node's. Archival is final, and a key
-  // left behind under another node's prefix is never reached again.
-  const suffix = `/${taskId}:`
-  for (const key of viewStates.keys()) if (key.includes(suffix)) viewStates.delete(key)
+export const forgetEditorViewState = (taskId: string, path: string, nodeId = activeNodeId()): void => {
+  viewStates.delete(viewKey(taskId, path, nodeId))
 }
 
-// Keyed by a node-minted task id; must not outlive a node switch (docs/state.md § Scope rules).
+export function evictEditorViewStates(taskId: string, nodeId = activeNodeId()): void {
+  // A matching task ID on another Node has independent view state.
+  const suffix = `${nodeId ?? ''}/${taskId}:`
+  for (const key of viewStates.keys()) if (key.startsWith(suffix)) viewStates.delete(key)
+}
+
+// Test reset; ordinary Node switches retain independently keyed view state.
 export function clearEditorViewStates(): void {
   viewStates.clear()
 }
@@ -29,5 +32,4 @@ export function clearEditorViewStates(): void {
 // (docs/state.md § Scope rules).
 onScopeEvicted((e) => {
   if (e.scope === 'task') evictEditorViewStates(e.taskId)
-  else if (e.scope === 'node-switched') clearEditorViewStates()
 })

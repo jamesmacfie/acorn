@@ -1,0 +1,10 @@
+.                                        |  WARN  Unsupported engine: wanted: {"node":">=22.23.2 <23 || >=24.18.1 <25 || >=26.5.1 <27"} (current: {"node":"v24.11.0","pnpm":"11.0.0"})
+apps/tui                                 |  WARN  Unsupported engine: wanted: {"node":">=22.23.2 <23 || >=24.18.1 <25 || >=26.5.1 <27"} (current: {"node":"v24.11.0","pnpm":"11.0.0"})
+
+ RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/tools/arch
+
+
+ Test Files  2 passed (2)
+      Tests  59 passed (59)
+   Start at  16:21:06
+   Duration  3.09s (transform 88ms, setup 0ms, import 995ms, tests 2.25s, environment 0ms)

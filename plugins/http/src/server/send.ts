@@ -19,6 +19,7 @@ import {
   formatSize,
 } from '../shared/model'
 import { openHttpValue } from './storage'
+import { readCapped } from './responseBody'
 
 // Resolve the execution task and worktree, find the project's fallback checkout, open stored values,
 // and run command variables through the host process broker.
@@ -26,7 +27,6 @@ export type SendCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'secret
 
 // Caps. The response cap protects the client (the body is base64'd into JSON); the command cap
 // bounds a variable script that decides to print a file.
-const MAX_BODY_BYTES = 5 * 1024 * 1024
 const REQUEST_TIMEOUT_MS = 30_000
 const COMMAND_TIMEOUT_MS = 15_000
 const COMMAND_MAX_BUFFER = 1 << 20
@@ -75,22 +75,24 @@ async function resolveVarsWithSensitivity(
   userId: string,
   projectId: string,
   input: HttpSendInput,
+  signal: AbortSignal,
 ): Promise<ResolvedVariables> {
+  signal.throwIfAborted()
   const vars: Record<string, string> = {}
 
   // Builtins from the task, so a request can point at this task's worktree/branch.
   let cwd: string | null = null
   let taskInfo: SessionTaskInfo | null = null
   if (input.executionTaskId) {
-    const task = await core.tasks.load(input.executionTaskId)
+    const task = await checked(core.tasks.load(input.executionTaskId), signal)
     if (!task) throw new SendError('The task used to send this request no longer exists')
-    const project = task.projectId ? await core.projects.byId(task.projectId) : null
+    const project = task.projectId ? await checked(core.projects.byId(task.projectId), signal) : null
     if (task.projectId !== projectId) {
       throw new SendError(`The selected task belongs to ${project?.name ?? task.projectId ?? 'another project'}, not this project`)
     }
     // taskRoot is null until a worktree exists (and always under dev:node); fall back to the
     // project checkout, exactly as resolveDbUrl and the preview resolver do.
-    cwd = (await core.tasks.root(input.executionTaskId)) ?? null
+    cwd = (await checked(core.tasks.root(input.executionTaskId), signal)) ?? null
     if (project) {
       vars.projectId = project.id
       vars.project = project.name
@@ -100,21 +102,23 @@ async function resolveVarsWithSensitivity(
     vars.taskId = task.id
     if (project) taskInfo = { projectId: project.id, projectName: project.name, github: project.github, branch: task.branch, title: task.title }
   }
-  if (!cwd) cwd = (await core.projects.byId(projectId))?.path ?? null
+  if (!cwd) cwd = (await checked(core.projects.byId(projectId), signal))?.path ?? null
   if (cwd) vars.worktree = cwd
 
   const rows = await db
     .select()
     .from(httpVariables)
     .where(and(eq(httpVariables.userId, userId), eq(httpVariables.projectId, projectId)))
+  signal.throwIfAborted()
   const referenced = referencedVariableNames(input)
   const enabled = rows.filter((r) => r.enabled && referenced.has(r.name) && !(r.name in input.vars))
 
   const opened = new Map<string, string>()
   for (const row of enabled) {
     try {
-      opened.set(row.id, await openHttpValue(row.value, row.encrypted, core.secrets))
+      opened.set(row.id, await checked(openHttpValue(row.value, row.encrypted, core.secrets), signal))
     } catch {
+      signal.throwIfAborted()
       throw new SendError(`Variable "${row.name}" could not be decrypted — re-enter its value`)
     }
   }
@@ -128,17 +132,21 @@ async function resolveVarsWithSensitivity(
   if (commands.length) {
     if (!cwd) throw new SendError('Command variables need a project checkout — set the project path first')
     const env = buildSessionEnv({ taskId: input.executionTaskId ?? '', cwd, task: taskInfo })
-    const results = await Promise.all(
-      commands.map(async (row) => {
+    const group = new AbortController()
+    const commandSignal = AbortSignal.any([signal, group.signal])
+    const pending = commands.map(async (row) => {
         try {
           // bash -lc, not /bin/sh -c: a login shell picks up nvm/rbenv/direnv shims, which is what
           // makes `op read …` or `mise exec …` work the way it does in the user's own terminal.
           // The host broker runs outside this plugin's permission-scoped worker. A child spawned in
           // the worker inherits its Node permissions and cannot load a CLI outside the plugin bundle.
+          commandSignal.throwIfAborted()
           const result = await core.proc.runProcess({
             file: 'bash', args: ['-lc', opened.get(row.id)!], cwd, env,
-            timeoutMs: COMMAND_TIMEOUT_MS, maxOutputBytes: COMMAND_MAX_BUFFER,
+            timeoutMs: COMMAND_TIMEOUT_MS, maxOutputBytes: COMMAND_MAX_BUFFER, signal: commandSignal,
           })
+          commandSignal.throwIfAborted()
+          if (result.aborted) throw new SendError(`Variable "${row.name}": command canceled`)
           if (result.spawnError) throw new SendError(`Variable "${row.name}": command could not start`)
           if (result.timedOut) throw new SendError(`Variable "${row.name}": command timed out after ${COMMAND_TIMEOUT_MS / 1000} seconds`)
           if (result.truncated) throw new SendError(`Variable "${row.name}": command produced more than ${COMMAND_MAX_BUFFER} bytes of output`)
@@ -150,11 +158,18 @@ async function resolveVarsWithSensitivity(
           if (line === null) throw new SendError(`Variable "${row.name}": command produced no output`)
           return [row.name, line] as const
         } catch (err) {
+          commandSignal.throwIfAborted()
           if (err instanceof SendError) throw err
           throw new SendError(`Variable "${row.name}": command failed`)
         }
-      }),
-    )
+      })
+    let results: (readonly [string, string])[]
+    try { results = await Promise.all(pending) }
+    finally {
+      group.abort()
+      await Promise.allSettled(pending)
+    }
+    signal.throwIfAborted()
     for (const [name, value] of results) vars[name] = value
   }
 
@@ -179,8 +194,9 @@ export async function resolveVars(
   userId: string,
   projectId: string,
   input: HttpSendInput,
+  signal = new AbortController().signal,
 ): Promise<Record<string, string>> {
-  return (await resolveVarsWithSensitivity(db, core, userId, projectId, input)).values
+  return (await resolveVarsWithSensitivity(db, core, userId, projectId, input, signal)).values
 }
 
 // --- execution ----------------------------------------------------------------------------
@@ -257,8 +273,32 @@ export async function send(
   userId: string,
   projectId: string,
   input: HttpSendInput,
+  caller = new AbortController().signal,
 ): Promise<SendResult> {
-  const resolved = await resolveVarsWithSensitivity(db, core, userId, projectId, input)
+  const deadline = new AbortController()
+  const timer = setTimeout(() => deadline.abort(new DOMException('Request timed out', 'TimeoutError')), REQUEST_TIMEOUT_MS)
+  const signal = AbortSignal.any([caller, deadline.signal])
+  try { return await sendWithinDeadline(db, core, userId, projectId, input, signal, caller) }
+  catch (error) {
+    caller.throwIfAborted()
+    if (deadline.signal.aborted) throw new SendError(`Request timed out after ${REQUEST_TIMEOUT_MS / 1000} seconds.`)
+    throw error
+  }
+  finally { clearTimeout(timer) }
+}
+
+async function checked<T>(pending: PromiseLike<T>, signal: AbortSignal): Promise<T> {
+  signal.throwIfAborted()
+  const result = await pending
+  signal.throwIfAborted()
+  return result
+}
+
+async function sendWithinDeadline(
+  db: PluginDatabase, core: SendCoreServices, userId: string, projectId: string,
+  input: HttpSendInput, signal: AbortSignal, caller: AbortSignal,
+): Promise<SendResult> {
+  const resolved = await resolveVarsWithSensitivity(db, core, userId, projectId, input, signal)
   let prepared: ReturnType<typeof buildRequest>
   try {
     prepared = buildRequest(input, resolved.values)
@@ -278,9 +318,10 @@ export async function send(
       body,
       // redirect: 'follow' (docs/http-client.md § Sending).
       redirect: 'follow',
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      signal,
     })
   } catch (err) {
+    caller.throwIfAborted()
     const durationMs = Date.now() - started
     const described = describeFetchFailure(err, target)
     const failure = {
@@ -297,7 +338,7 @@ export async function send(
     }
   }
 
-  const { bytes, truncated } = await readCapped(res)
+  const { bytes, truncated } = await readCapped(res, signal)
   const durationMs = Date.now() - started
 
   return {
@@ -342,40 +383,6 @@ function errorNodes(value: unknown): unknown[] {
     if (Array.isArray(record.errors)) pending.push(...record.errors)
   }
   return out
-}
-
-// Reads the body a chunk at a time so a huge or endless response cannot exhaust memory
-// (docs/http-client.md § Sending).
-export async function readCapped(res: Response): Promise<{ bytes: Uint8Array; truncated: boolean }> {
-  if (!res.body) return { bytes: new Uint8Array(0), truncated: false }
-  const chunks: Uint8Array[] = []
-  let total = 0
-  let truncated = false
-  const reader = res.body.getReader()
-  try {
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      if (!value) continue
-      if (total + value.byteLength > MAX_BODY_BYTES) {
-        chunks.push(value.subarray(0, MAX_BODY_BYTES - total))
-        total = MAX_BODY_BYTES
-        truncated = true
-        break
-      }
-      chunks.push(value)
-      total += value.byteLength
-    }
-  } finally {
-    await reader.cancel().catch(() => {})
-  }
-  const bytes = new Uint8Array(total)
-  let at = 0
-  for (const c of chunks) {
-    bytes.set(c, at)
-    at += c.byteLength
-  }
-  return { bytes, truncated }
 }
 
 function buildTimeline(

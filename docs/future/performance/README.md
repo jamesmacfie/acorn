@@ -2,12 +2,13 @@
 
 Date: October 2, 2026. Status: deferred for a later session.
 The implementation checkpoint is commit `61b9994c`: units 01–08 are implemented and reviewed.
-All 16 investigations are complete. Units 09–11 are implemented. Units 12–28 and sustained-use validation remain unimplemented.
+All 16 investigations are complete. The table below tracks implementations, remaining assignments,
+and verification limits.
 This programme is separate from the performance plans retired in September 2026.
 
 ## Resume here
 
-Start with [unit 12](./12-agent-search.md). Assign one specialist at a time, review its result, then
+Use the table below to select the next pending unit. Assign one specialist at a time, review its result, then
 advance in the order below. Each assignment includes the detailed coordinator brief, evidence
 references, contracts to preserve, and acceptance checks. Read [the main integration review](../../../plans/performance/merge-main-review.md) for unresolved
 verification failures deferred at the user's request. Revalidate the merged source first;
@@ -15,7 +16,7 @@ main has independent fixes and architectural changes since the audit. If a depen
 record the reason and adjust the order without undoing completed work.
 
 Read [the implementation contract](./contract.md) and [the conditional work and refusals](./refused.md).
-The final assignment is [sustained-use validation](./29-sustained-validation.md). It belongs after
+The final assignment is [sustained-use validation](../../../plans/performance/implementation-29-sustained-validation.md). It belongs after
 all selected fixes and includes the two-Node and native/TUI composition checks.
 
 ## Sequential assignments
@@ -25,24 +26,24 @@ all selected fixes and includes the two-Node and native/TUI composition checks.
 | 09 | [Managed agent client implementation record](../../../plans/performance/implementation-09-agent-client.md) | 01–08 | Implemented |
 | 10 | [Managed agent process implementation record](../../../plans/performance/implementation-10-agent-processes.md) | Through 09 | Implemented |
 | 11 | [Agent queue implementation record](../../../plans/performance/implementation-11-agent-queue.md) | Through 10 | Implemented |
-| 12 | [Streamed search projection and recovery](./12-agent-search.md) | Through 11 | Pending |
-| 13 | [Agent wait facts and complete result capture](./13-agent-results.md) | Through 12 | Pending |
-| 14 | [Git observations, filesystem admission, and exact paths](./14-git-filesystem.md) | Through 13 | Pending |
-| 15 | [Shared pull request comparisons and marker identity](./15-pr-markers.md) | Through 14 | Pending |
-| 16 | [Editor saves, document custody, reloads, and text fidelity](./16-editor-custody.md) | Through 15 | Pending |
-| 17 | [Editor search, file tree viewport, and host admission](./17-editor-search-tree.md) | Through 16 | Pending |
-| 18 | [Database pool ownership, catalog, and row normalization](./18-database.md) | Through 17 | Pending |
-| 19 | [Docker process ownership, log tails, and Node scope](./19-docker.md) | Through 18 | Pending |
-| 20 | [HTTP decoding, draft custody, and cancellation](./20-http.md) | Through 19 | Pending |
-| 21 | [SQL scratch limits and oversized draft recovery](./21-sql-recovery.md) | Through 20 | Pending |
-| 22 | [Preview listener admission, retirement, and URL resolution](./22-preview.md) | Through 21 | Pending |
+| 12 | [Streamed search implementation record](../../../plans/performance/implementation-12-agent-search.md) | Through 11 | Implemented |
+| 13 | [Agent results implementation record](../../../plans/performance/implementation-13-agent-results.md) | Through 12 | Implemented |
+| 14 | [Git filesystem implementation record](../../../plans/performance/implementation-14-git-filesystem.md) | Through 13 | Implemented; native Changes verification blocked by service bundle size gate |
+| 15 | [PR markers implementation record](../../../plans/performance/implementation-15-pr-markers.md) | Through 14 | Implemented; native verification blocked by service bundle size gate |
+| 16 | [Editor custody implementation record](../../../plans/performance/implementation-16-editor-custody.md) | Through 15 | Implemented; unit 15 identity integrated, native verification remains open |
+| 17 | [Editor search and tree implementation record](../../../plans/performance/implementation-17-editor-search-tree.md) | Through 16 | Implemented; native and PTY driver verification blocked by service bundle budget |
+| 18 | [Database implementation record](../../../plans/performance/implementation-18-database.md) | Through 17 | Implemented; PostgreSQL 14/15 gates pass |
+| 19 | [Docker implementation record](../../../plans/performance/implementation-19-docker.md) | Through 18 | Implemented; native verification blocked by service bundle size gate |
+| 20 | [HTTP implementation record](../../../plans/performance/implementation-20-http.md) | Through 19 | Implemented; native verification blocked by service bundle size gate |
+| 21 | [SQL recovery implementation record](../../../plans/performance/implementation-21-sql-recovery.md) | Through 20 | Implemented; native and PTY checks blocked by service bundle size gate |
+| 22 | [Preview implementation record](../../../plans/performance/implementation-22-preview.md) | Through 21 | Implemented; native verification blocked by service bundle size gate |
 | 23 | [Memory delta indexing and fresh reconciliation](./23-memory.md) | Through 22 | Pending |
-| 24 | [Workflow history and processing read projections](./24-workflow-reads.md) | Through 23 | Pending |
-| 25 | [Workflow authoring custody, refreshes, and stream copies](./25-workflow-custody.md) | Through 24 | Pending |
+| 24 | [Workflow read implementation record](../../../plans/performance/implementation-24-workflow-reads.md) | Through 23 | Implemented; native verification blocked by bundle size gate |
+| 25 | [Workflow custody implementation record](../../../plans/performance/implementation-25-workflow-custody.md) | Through 24 | Implemented; native verification blocked by service bundle size gate |
 | 26 | [Terminal client viewport, wrapping, painting, and logs](./26-tui-rendering.md) | Through 25 | Pending |
 | 27 | [Terminal client selected Node and lifecycle composition](./27-tui-composition.md) | Through 26 | Pending |
-| 28 | [Telemetry retirement and total histogram bounds](./28-telemetry.md) | Through 27 | Pending |
-| 29 | [Sustained-use and final performance validation](./29-sustained-validation.md) | Through 28 | Pending |
+| 28 | [Telemetry implementation record](../../../plans/performance/implementation-28-telemetry.md) | Through 27 | Implemented; sustained-use acceptance remains separate |
+| 29 | [Sustained-use validation record](../../../plans/performance/implementation-29-sustained-validation.md) | Through 28 | Preparation recorded; final acceptance blocked |
 
 The order encodes important dependencies: client origin/draft custody before agent process work;
 process ownership before queue admission; raw/search completeness before wait/result projection;

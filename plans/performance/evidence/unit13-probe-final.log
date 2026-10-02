@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance
+
+
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
+   Start at  19:30:56
+   Duration  1.50s (transform 734ms, setup 0ms, import 1.23s, tests 177ms, environment 0ms)
+

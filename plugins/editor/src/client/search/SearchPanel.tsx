@@ -1,5 +1,6 @@
-import { createEffect, createMemo, createResource, createSignal, on, Show } from 'solid-js'
-import { debounce } from '@acorn/plugin-api/client'
+import { useQueryClient } from '@tanstack/solid-query'
+import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'solid-js'
+import { activeNodeId, queryOwner, debounce } from '@acorn/plugin-api/client'
 import { Alert, CopyButton, EmptyState, Input, Row, Rows, SectionHeader, Stack, TabPanel, Text, ToggleButton, Toolbar } from '@acorn/plugin-api/ui'
 import { requestEditorReveal } from '../editorState'
 import { findInFiles, type SearchHit } from './searchClient'
@@ -28,14 +29,47 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
     pushDebounced(v)
   }
 
-  const [results] = createResource(
-    () => {
-      const q = debounced().trim()
-      if (!q) return null
-      return { taskId: props.taskId, q, opts: { caseSensitive: caseSensitive(), wholeWord: wholeWord(), regex: regex() } }
-    },
-    (src) => findInFiles(src.taskId, src.q, src.opts),
-  )
+  const queryClient = useQueryClient()
+  const registeredNode = queryOwner(queryClient)
+  const nodeId = registeredNode === undefined ? activeNodeId() : registeredNode
+  const [results, setResults] = createSignal<Awaited<ReturnType<typeof findInFiles>>>()
+  const [loading, setLoading] = createSignal(false)
+  const [error, setError] = createSignal('')
+  let disposed = false
+  let generation = 0
+  let controller: AbortController | undefined
+  createEffect(() => {
+    const taskId = props.taskId
+    const input = query()
+    const q = debounced().trim()
+    const opts = { caseSensitive: caseSensitive(), wholeWord: wholeWord(), regex: regex() }
+    const revision = ++generation
+    controller?.abort()
+    controller = undefined
+    setLoading(false)
+    setError('')
+    if (!q || input.trim() !== q) {
+      if (!input.trim()) setResults(undefined)
+      return
+    }
+    const owned = new AbortController()
+    controller = owned
+    setLoading(true)
+    void findInFiles(taskId, q, opts, { nodeId, signal: owned.signal }).then((result) => {
+      if (!disposed && revision === generation) setResults(result)
+    }).catch((cause: unknown) => {
+      if (!disposed && revision === generation && !owned.signal.aborted)
+        setError(cause instanceof Error ? cause.message : 'Search failed.')
+    }).finally(() => {
+      if (!disposed && revision === generation) setLoading(false)
+    })
+  })
+  onCleanup(() => {
+    disposed = true
+    generation++
+    pushDebounced.cancel()
+    controller?.abort()
+  })
 
   const files = () => results()?.files ?? []
   const totalHits = createMemo(() => files().reduce((n, f) => n + f.hits.length, 0))
@@ -51,12 +85,13 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
   // cannot take focus.
   let input: HTMLInputElement | undefined
   createEffect(on(() => props.active, (active) => {
-    if (active) queueMicrotask(() => input?.focus())
+    if (active) queueMicrotask(() => { if (!disposed && props.active) input?.focus() })
   }))
 
   const status = () => {
     if (!debounced().trim()) return "Type to search this task's files."
-    if (results.loading) return 'Searching…'
+    if (error()) return error()
+    if (loading()) return 'Searching…'
     const hits = `${totalHits()} result${totalHits() === 1 ? '' : 's'}`
     const where = `${files().length} file${files().length === 1 ? '' : 's'}`
     return `${hits} in ${where}`
@@ -91,7 +126,7 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
         </Show>
       </Toolbar>
 
-      <Show when={files().length} fallback={<EmptyState busy={results.loading} size="sm" align="start">{status()}</EmptyState>}>
+      <Show when={files().length} fallback={<EmptyState busy={loading()} size="sm" align="start">{status()}</EmptyState>}>
         {/* One collection per file rather than one for the whole result set: a hit's key has to be
             stable across a refetch, and `path:line:col` is the only thing about a hit that is. */}
         <Stack gap="none">

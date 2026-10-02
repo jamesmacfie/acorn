@@ -688,6 +688,19 @@ describe('agent delegation service', () => {
     )).rejects.toMatchObject({ kind: 'conflict' })
   })
 
+  it('uses authoritative wait facts when completion falls outside the snapshot prefix', async () => {
+    const { parent, child } = await spawnChild()
+    vi.mocked(runtime.wait).mockImplementation((id, cursor, until) => sessions.waitSnapshot(id, cursor, until))
+    for (let n = 0; n < 2_001; n++) await sessions.recordEvent(child.sessionId!, child.turnId, {
+      type: 'diagnostic', level: 'info', message: 'progress',
+    })
+    await sessions.recordEvent(child.sessionId!, child.turnId, { type: 'turn_completed' })
+    const result = await service.wait({ sessionId: child.sessionId!, afterSeq: 0, until: 'turn_completed', timeoutMs: 0 }, context(parent.taskId, parent.id, 'complete-wait'))
+    expect(result).toMatchObject({ matched: true, timedOut: false, lastSeq: 2_002, state: 'ready', attention: 'completed' })
+    const later = await service.wait({ sessionId: child.sessionId!, afterSeq: 2_002, until: 'turn_completed', timeoutMs: 0 }, context(parent.taskId, parent.id, 'later-wait'))
+    expect(later).toMatchObject({ matched: false, timedOut: true, lastSeq: 2_002 })
+  })
+
   it('cancels a named queued turn idempotently without deleting its prior events', async () => {
     const { parent, child } = await spawnChild()
     await sessions.recordEvent(child.sessionId!, child.turnId, {

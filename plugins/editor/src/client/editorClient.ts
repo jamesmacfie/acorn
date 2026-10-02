@@ -11,11 +11,11 @@ import {
   editorRootRoute,
   editorWriteRoute,
   type EditorEntry,
-  type EditorLineMarkerSet,
+  type EditorLineMarkerSnapshot,
   type EditorWriteResult,
 } from '../contract/api'
 import type { QueryClient } from '@tanstack/solid-query'
-import { readBytes, readJson, writeJson } from '@acorn/plugin-api/client'
+import { activeNodeId, queryOwner, readBytes, readJson, writeJson } from '@acorn/plugin-api/client'
 import { MAX_IMAGE_PREVIEW_BYTES } from '../contract/imagePreview'
 
 export type { EditorEntry } from '../contract/api'
@@ -26,26 +26,35 @@ export type EditorApi = {
   files(taskId: string): Promise<string[]>
   read(taskId: string, relPath: string): Promise<string>
   readImage(taskId: string, relPath: string): Promise<{ bytes: Uint8Array; type: string }>
-  lineMarkers(taskId: string, relPath: string): Promise<EditorLineMarkerSet[]>
+  lineMarkers(taskId: string, relPath: string, revision: string): Promise<EditorLineMarkerSnapshot | null>
   write(taskId: string, relPath: string, content: string): Promise<EditorWriteResult>
 }
 
-const api: EditorApi = {
-  root: (taskId) => readJson<{ root: string | null }>(editorRootRoute(taskId)).then((r) => r.root),
-  list: (taskId, relPath) => readJson<EditorEntry[]>(editorListRoute(taskId, relPath)),
-  files: (taskId) => readJson<string[]>(editorFilesRoute(taskId)),
-  read: (taskId, relPath) => readJson<{ text: string }>(editorReadRoute(taskId, relPath)).then((r) => r.text),
-  readImage: (taskId, relPath) => readBytes(editorImageRoute(taskId, relPath), 'Unable to read image.', { maxResponseBytes: MAX_IMAGE_PREVIEW_BYTES }),
-  lineMarkers: (taskId, relPath) => readJson<EditorLineMarkerSet[]>(editorLineMarkersRoute(taskId, relPath)),
+export const editorApi = (queryClient?: QueryClient): EditorApi => {
+  const registered = queryClient ? queryOwner(queryClient) : undefined
+  const nodeId = registered === undefined ? activeNodeId() : registered
+  return {
+  root: (taskId) => readJson<{ root: string | null }>(editorRootRoute(taskId), { nodeId }).then((r) => r.root),
+  list: (taskId, relPath) => readJson<EditorEntry[]>(editorListRoute(taskId, relPath), { nodeId }),
+  files: (taskId) => readJson<string[]>(editorFilesRoute(taskId), { nodeId }),
+  read: (taskId, relPath) => readJson<{ text: string }>(editorReadRoute(taskId, relPath), { nodeId }).then((r) => r.text),
+  readImage: (taskId, relPath) => readBytes(editorImageRoute(taskId, relPath), 'Unable to read image.', { nodeId, maxResponseBytes: MAX_IMAGE_PREVIEW_BYTES }),
+  lineMarkers: async (taskId, relPath, revision) => {
+    const result = await readJson<EditorLineMarkerSnapshot | unknown[]>(editorLineMarkersRoute(taskId, relPath, revision), { nodeId })
+    // An old Node ignores the added query parameter and returns an unverifiable array.
+    return !Array.isArray(result) && result.revision === revision ? result : null
+  },
   write: (taskId, relPath, content) =>
     writeJson<EditorWriteResult>(editorWriteRoute(taskId), {
       method: 'PUT',
+      nodeId,
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ path: relPath, content }),
-    }),
+    }).then((result) => result.ok && typeof result.text !== 'string'
+      ? { ok: false, reason: 'The Node did not acknowledge the saved text. Update the Node before closing this document.' }
+      : result),
 }
-
-export const editorApi = (): EditorApi => api
+}
 
 /** The task's checkout path, in the query cache so a hover can warm it and a remount can skip it. */
 export const editorRootKey = (taskId: string): readonly unknown[] => ['editor', 'root', taskId]
@@ -62,6 +71,7 @@ export const EDITOR_ROOT_STALE_MS = 60_000
 
 /** Warm the checkout path for a task the reader is pointing at. Best-effort, like every prefetch. */
 export const prefetchEditorRoot = (queryClient: QueryClient, taskId: string): void => {
+  const api = editorApi(queryClient)
   void queryClient.prefetchQuery({
     queryKey: editorRootKey(taskId),
     queryFn: () => api.root(taskId),

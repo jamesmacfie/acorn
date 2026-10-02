@@ -1,4 +1,5 @@
 import { readFileSync, rmSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { join } from 'node:path'
 import {
   TELEMETRY_PREF_KEY,
@@ -12,6 +13,7 @@ import { emitMetric, flushTelemetry, onTelemetryBatch, setTelemetryPref, startTe
 import { createLogger } from '@acorn/node-core/server/telemetry'
 import type { NodeBroker } from './broker/nodeBroker'
 import { helperBootSpans } from './bootMarks'
+import { helperTelemetryRequests, type HelperTelemetryRequests } from './telemetryRequests'
 
 // How the desktop helper reports, and how the Rust shell's last words get out
 // (docs/telemetry.md § Other runtimes, docs/shell.md § What the helper reports).
@@ -68,7 +70,8 @@ export type HelperTelemetry = {
   dispose(): void
 }
 
-type Request = (path: string, init: { method: string; body?: string }) => Promise<{ status: number; text: string }>
+type Adoption = { id: string; requests: HelperTelemetryRequests; enabled: boolean }
+const FINAL_DELIVERY_MS = 5_000
 
 export function startHelperTelemetry(options: {
   broker: NodeBroker
@@ -80,61 +83,74 @@ export function startHelperTelemetry(options: {
   /** The platform the shell can measure on. Only macOS can, so only there is it asked. */
   platform?: NodeJS.Platform
 }): HelperTelemetry {
-  let nodeId: string | null = null
+  let owner: Adoption | null = null
+  let retired = false
   let counter = 0
-
-  // One round trip to the local node, with the device token the broker already attaches. It throws
-  // until a node has been adopted, which on a cold boot is a second or two after this module starts.
-  const ask: Request = async (path, init) => {
-    const id = nodeId
-    if (!id) throw new Error('no node')
-    const response = await options.broker.fetch(id, {
-      requestId: `helper-telemetry-${(counter += 1)}`,
-      path,
-      method: init.method,
-      headers: init.body === undefined ? {} : { 'content-type': 'application/json' },
-      ...(init.body === undefined ? {} : { body: { kind: 'bytes' as const, bytes: new TextEncoder().encode(init.body) } }),
-    })
-    return { status: response.status, text: new TextDecoder().decode(response.body) }
-  }
-
-  const readPref = async (): Promise<string | null> => {
-    const { status, text } = await ask(prefsRoute, { method: 'GET' })
-    if (status !== 200) return null
-    const rows = JSON.parse(text) as Record<string, string>
-    return rows[TELEMETRY_PREF_KEY] ?? null
-  }
+  const requestPrefix = `helper-telemetry-${randomUUID()}`
+  let pollTimer: ReturnType<typeof setTimeout> | null = null
+  let finalTimer: ReturnType<typeof setTimeout> | null = null
+  let polling: { owner: Adoption; promise: Promise<void> } | null = null
+  const adopt = (id: string): Adoption => ({
+    id, enabled: false,
+    requests: helperTelemetryRequests(options.broker, id, () => `${requestPrefix}-${++counter}`),
+  })
+  const live = (target: Adoption): boolean => owner === target && !retired
+  const canPost = (target: Adoption): boolean => owner === target && target.enabled
 
   // ── Posting ──
 
   let held: TelemetryRecord[] = []
-  let posting = false
+  let posting: Adoption | null = null
 
-  const post = async (runtime: PostedTelemetryRuntime, records: readonly TelemetryRecord[]): Promise<void> => {
+  const post = async (target: Adoption, runtime: PostedTelemetryRuntime, records: readonly TelemetryRecord[]): Promise<void> => {
     for (const body of encodeTelemetryBatches(runtime, records)) {
-      const { status } = await ask(coreTelemetryRoute, { method: 'POST', body })
+      if (!canPost(target)) return
+      const { status } = await target.requests.ask(coreTelemetryRoute, { method: 'POST', body })
       if (status !== 202) throw new Error(`the node answered ${status}`)
     }
   }
 
-  const drain = async (): Promise<void> => {
-    if (posting || held.length === 0) return
-    const records = held
+  const finishFinalDelivery = (target: Adoption): void => {
+    if (!retired || owner !== target) return
+    if (finalTimer) clearTimeout(finalTimer)
+    finalTimer = null
+    target.enabled = false
+    target.requests.close()
     held = []
-    posting = true
+  }
+
+  const drain = async (): Promise<void> => {
+    const target = owner
+    if (!target || !canPost(target) || posting === target) return
+    if (held.length === 0) return finishFinalDelivery(target)
+    const bodies = encodeTelemetryBatches('helper', held)
+    held = []
+    posting = target
+    let next = 0
     try {
-      await post('helper', records)
+      // Commit successful batches individually: a later failure retries only undelivered batches.
+      for (; next < bodies.length; next += 1) {
+        if (!canPost(target)) break
+        const { status } = await target.requests.ask(coreTelemetryRoute, { method: 'POST', body: bodies[next] })
+        if (status !== 202) throw new Error(`the node answered ${status}`)
+      }
     } catch {
-      // The node is restarting, which is the case this queue exists for. Oldest first on the way
-      // back, and the cap drops the front rather than the tail so a long outage keeps what happened
-      // at the start of it.
-      held = [...records, ...held].slice(-QUEUE_MAX)
+      if (live(target) && target.enabled) {
+        const remaining = bodies.slice(next).flatMap(body => (JSON.parse(body) as { records: TelemetryRecord[] }).records)
+        held = [...remaining, ...held].slice(-QUEUE_MAX)
+      }
     } finally {
-      posting = false
+      if (posting === target) posting = null
+      // Shutdown joins an admitted post, then attempts the final queued window once. No retries.
+      if (retired && canPost(target)) {
+        if (held.length) void drain()
+        else finishFinalDelivery(target)
+      }
     }
   }
 
   const sink = (batch: { records: TelemetryRecord[] }): void => {
+    if (retired || !owner?.enabled) return
     held = [...held, ...batch.records].slice(-QUEUE_MAX)
     void drain()
   }
@@ -154,7 +170,9 @@ export function startHelperTelemetry(options: {
     footprintTimer = null
   }
 
-  const apply = (on: boolean): void => {
+  const apply = (target: Adoption, on: boolean): void => {
+    if (!live(target)) return
+    target.enabled = on
     // Told rather than left to the collector's own five-second tick, because everything worth
     // reporting about a boot happens inside those five seconds.
     setTelemetryPref(on)
@@ -170,14 +188,18 @@ export function startHelperTelemetry(options: {
         bootSpansSent = true
         helperBootSpans()
       }
-      void forwardShellCrash()
+      void forwardShellCrash(target)
       return
     }
-    if (!on && subscription) {
+    if (on) void drain()
+    if (!on) {
       stopFootprint()
-      subscription.dispose()
+      subscription?.dispose()
       subscription = null
       held = []
+      // Revoke requests as well as buffered records. Re-enable gets a distinct consent owner.
+      target.requests.close()
+      owner = adopt(target.id)
     }
   }
 
@@ -194,19 +216,44 @@ export function startHelperTelemetry(options: {
    * seconds away and says more.
    */
   const footprint = (sample: FootprintSample): void => {
-    if (!subscription) return
+    const target = owner
+    if (retired || !target || !subscription || !target.enabled) return
     if (sample.helper !== null) emitMetric('core', { name: FOOTPRINT, type: 'gauge', value: sample.helper, unit: 'byte' })
     if (sample.renderer === null) return
     const record: TelemetryRecord = {
       kind: 'metric', at: Date.now(), name: FOOTPRINT, type: 'gauge', value: sample.renderer, unit: 'byte', attrs: { owner: 'core' },
     }
-    void post('renderer', [record]).catch(() => {})
+    void post(target, 'renderer', [record]).catch(() => {})
   }
 
-  const poll = async (): Promise<void> => {
-    if (!nodeId) return
-    const value = await readPref().catch(() => null)
-    apply(value === '1')
+  const schedulePoll = (): void => {
+    if (pollTimer) clearTimeout(pollTimer)
+    if (retired || !owner || owner.enabled) return
+    pollTimer = setTimeout(() => void poll(), PREF_POLL_MS)
+    pollTimer.unref?.()
+  }
+  const poll = (): Promise<void> => {
+    const target = owner
+    if (retired || !target) return Promise.resolve()
+    if (polling?.owner === target) return polling.promise
+    const promise = (async () => {
+      let value: string | null = null
+      try {
+        const { status, text } = await target.requests.ask(prefsRoute, { method: 'GET' })
+        if (status === 200) value = (JSON.parse(text) as Record<string, string>)[TELEMETRY_PREF_KEY] ?? null
+      } catch { /* An unavailable Node does not authorize collection. */ }
+      if (live(target)) {
+        apply(target, value === '1')
+        // The remote consent answer precedes the flush, just as the Node's database read does.
+        if (target.enabled) flushTelemetry()
+      }
+    })().finally(() => {
+      if (polling?.promise !== promise) return
+      polling = null
+      schedulePoll()
+    })
+    polling = { owner: target, promise }
+    return promise
   }
 
   // ── The shell's crash file ──
@@ -222,7 +269,7 @@ export function startHelperTelemetry(options: {
    * from the batch onto every record in it and this helper's own records are not the shell's. Only
    * the helper can speak for the shell, which is why nothing else may claim that runtime.
    */
-  async function forwardShellCrash(): Promise<void> {
+  async function forwardShellCrash(target: Adoption): Promise<void> {
     const path = join(options.userDataDir, CRASH_FILE)
     let raw: string
     try {
@@ -247,7 +294,7 @@ export function startHelperTelemetry(options: {
     const parsed = telemetryRecordSchema.safeParse({ kind: 'error', ...(typeof body === 'object' && body !== null ? body : {}) })
     if (!parsed.success) return void log.warn('the shell left a crash record this build cannot read')
     try {
-      await post('shell', [parsed.data])
+      await post(target, 'shell', [parsed.data])
       log.warn('the shell panicked on its last run; the record has been reported')
     } catch {
       // The node is not up yet. The file is gone, so this one is lost, and the alternative is
@@ -257,27 +304,49 @@ export function startHelperTelemetry(options: {
 
   // ── Lifecycle ──
 
-  startTelemetry({ node: 'helper', version: options.version, readPref })
-
-  const timer = setInterval(() => void poll(), PREF_POLL_MS)
-  // Unref'd like the collector's own: a helper with nothing left to do must be allowed to exit.
-  timer.unref?.()
+  // Both polling paths join the same remote read. Its application and flush stay with that
+  // adoption. Retiring the reader lease leaves other subscribers and their preference untouched.
+  const collector = startTelemetry({ node: 'helper', version: options.version, readPref: async () => {
+    const target = owner
+    await poll()
+    return target && live(target) && target.enabled ? '1' : null
+  } })
 
   return {
     setNode: (id) => {
-      nodeId = id
+      if (retired) return
+      if (pollTimer) clearTimeout(pollTimer)
+      stopFootprint()
+      subscription?.dispose()
+      subscription = null
+      owner?.requests.close()
+      held = []
+      setTelemetryPref(false)
+      owner = id ? adopt(id) : null
+      polling = null
       void poll()
     },
     footprint,
     dispose: () => {
-      clearInterval(timer)
+      if (retired) return
+      if (pollTimer) clearTimeout(pollTimer)
       stopFootprint()
-      // One last flush, so the boot spans and whatever the shutdown produced are not lost to a
-      // window that had four seconds left on it.
+      collector.dispose()
+      // The final synchronous flush enters this owner's queue before retiring its sink.
       flushTelemetry()
-      void drain()
+      retired = true
       subscription?.dispose()
       subscription = null
+      const target = owner
+      if (!target) return
+      if (!target.enabled) { target.requests.close(); return }
+      target.requests.cancelReads()
+      polling = null
+      // At most five seconds for admitted posts and one final attempt. Failed deliveries cannot
+      // recreate the queue, and the deadline cancels only requests admitted by this owner.
+      finalTimer = setTimeout(() => finishFinalDelivery(target), FINAL_DELIVERY_MS)
+      finalTimer.unref?.()
+      void drain()
     },
   }
 }

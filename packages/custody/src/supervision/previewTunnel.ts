@@ -47,6 +47,10 @@ const HEAD_TIMEOUT_MS = 2_000
 const MAX_HEAD_BYTES = 8 * 1024
 
 type Entry = {
+  id: string
+  retired: boolean
+  pending: Promise<number>
+  reject: (error: Error) => void
   server: Server
   port: number
   sockets: Set<Socket>
@@ -91,8 +95,7 @@ const partsOf = (id: string): { nodeId: string; taskId: string } => {
 
 export class PreviewTunnels {
   private readonly entries = new Map<string, Entry>()
-  // Dedupes overlapping opens for the same key: docs/shell.md § Host-owned webviews.
-  private readonly opening = new Map<string, Promise<number>>()
+  private disposed = false
 
   constructor(
     private readonly resolve: (nodeId: string) => TunnelNode | null,
@@ -101,66 +104,58 @@ export class PreviewTunnels {
   ) {}
 
   async open(target: TunnelKey): Promise<number> {
+    if (this.disposed) throw new Error('Preview tunnels are disposed.')
     const id = key(target)
     const existing = this.entries.get(id)
-    if (existing) return existing.port
-    const inFlight = this.opening.get(id)
-    if (inFlight) return inFlight
-
-    const pending = this.listen(id, target).finally(() => this.opening.delete(id))
-    this.opening.set(id, pending)
-    return pending
-  }
-
-  private async listen(id: string, target: TunnelKey): Promise<number> {
+    if (existing) return existing.pending
     if (this.entries.size >= MAX_TUNNELS) throw new Error('Too many preview tunnels are open.')
-    // Resolved here only to fail early with a clear message. Every connection re-resolves, because a
-    // restart or a re-pair can change the endpoint, the token, and the certificate.
     if (!this.resolve(target.nodeId)) throw new Error('That node is not paired.')
 
-    const sockets = new Set<Socket>()
-    // Secret generation: docs/shell.md § Host-owned webviews.
-    const secret = randomBytes(32).toString('base64url')
+    let resolvePort!: (port: number) => void
+    let reject!: (error: Error) => void
+    const pending = new Promise<number>((resolve, fail) => { resolvePort = resolve; reject = fail })
     const server = createServer((socket) => {
-      const entry = this.entries.get(id)
-      if (entry?.idle) {
-        clearTimeout(entry.idle)
-        entry.idle = null
-      }
-      sockets.add(socket)
+      if (entry.retired) { socket.destroy(); return }
+      if (entry.idle) { clearTimeout(entry.idle); entry.idle = null }
+      entry.sockets.add(socket)
       socket.on('error', () => socket.destroy())
       socket.on('close', () => {
-        sockets.delete(socket)
-        this.armIdle(id)
+        entry.sockets.delete(socket)
+        this.armIdle(entry)
       })
-      // Re-resolved per connection, for the reason open() gives above.
+      // Resolve fresh pins and credentials for every accepted connection.
       const node = this.resolve(target.nodeId)
       if (!node?.certPem || !node.fingerprint) {
-        // No pinned certificate, no tunnel. Every other path to a node goes through the pinned
-        // agent, and a raw byte pipe is the last place to make an exception.
         log.warn(`${id}: no pinned certificate for this node; refusing`, { 'tunnel.id': id })
         socket.destroy()
         return
       }
-      // The credential check runs before anything dials the node, so an unauthorized connection
-      // costs one destroyed socket rather than an upgrade against the owner's device token.
-      this.authorize(socket, secret, id, (head) => this.pipe(socket, node, target, id, head))
+      this.authorize(socket, entry.secret, id, (head) => this.pipe(socket, node, target, entry, head))
     })
-    // Loopback bind: docs/shell.md § Host-owned webviews.
-    const port = await new Promise<number>((resolvePort, reject) => {
-      server.once('error', reject)
-      server.listen(0, '127.0.0.1', () => resolvePort((server.address() as { port: number }).port))
-    })
+    const entry: Entry = {
+      id, server, port: 0, retired: false, pending, reject,
+      sockets: new Set(), websockets: new Set(), idle: null,
+      secret: randomBytes(32).toString('base64url'),
+    }
+    // Admission includes pending binds and happens before listen can yield.
+    this.entries.set(id, entry)
     server.on('error', (error) => {
-      // A dead listener left in the map would make a later open() hand back a port nothing is
-      // listening on.
       log.warn(`listener for ${id} failed: ${describeError(error).message}`, { 'tunnel.id': id })
-      this.closeEntry(id)
+      reject(error)
+      this.closeEntry(entry)
     })
-    this.entries.set(id, { server, port, sockets, websockets: new Set(), idle: null, secret })
-    this.events?.opened(port, secret)
-    this.armIdle(id)
-    return port
+    server.once('listening', () => {
+      if (entry.retired) { server.close(); return }
+      entry.port = (server.address() as { port: number }).port
+      this.events?.opened(entry.port, entry.secret)
+      this.armIdle(entry)
+      resolvePort(entry.port)
+    })
+    try { server.listen(0, '127.0.0.1') } catch (error) {
+      reject(error instanceof Error ? error : new Error(String(error)))
+      this.closeEntry(entry)
+    }
+    return pending
   }
 
   // See docs/shell.md, "Host-owned webviews", for how the secret reaches the webview without the
@@ -176,7 +171,7 @@ export class PreviewTunnels {
     if (parsed.hostname !== '127.0.0.1') return null
     const port = Number(parsed.port)
     for (const entry of this.entries.values()) {
-      if (entry.port === port) return { [TUNNEL_HEADER]: entry.secret }
+      if (entry.port > 0 && entry.port === port) return { [TUNNEL_HEADER]: entry.secret }
     }
     return null
   }
@@ -220,37 +215,40 @@ export class PreviewTunnels {
   // Closes every tunnel for a node, once it is unpaired, revoked, or restarted, or for a task whose
   // pane was unmounted or archived.
   closeFor(match: { nodeId?: string; taskId?: string }): void {
-    for (const id of [...this.entries.keys()]) {
-      const { nodeId, taskId } = partsOf(id)
+    for (const entry of this.entries.values()) {
+      const { nodeId, taskId } = partsOf(entry.id)
       if (match.nodeId && nodeId !== match.nodeId) continue
       if (match.taskId && taskId !== match.taskId) continue
-      this.closeEntry(id)
+      this.closeEntry(entry)
     }
   }
 
   dispose(): void {
+    this.disposed = true
     this.closeFor({})
   }
 
-  private closeEntry(id: string): void {
-    const entry = this.entries.get(id)
-    if (!entry) return
-    this.entries.delete(id)
-    this.events?.closed(entry.port)
+  private closeEntry(entry: Entry): void {
+    if (entry.retired) return
+    entry.retired = true
+    if (this.entries.get(entry.id) === entry) this.entries.delete(entry.id)
+    entry.reject(new Error('Preview tunnel was closed before opening.'))
+    if (entry.port > 0) this.events?.closed(entry.port)
     if (entry.idle) clearTimeout(entry.idle)
     for (const socket of entry.sockets) socket.destroy()
     for (const ws of entry.websockets) ws.terminate()
     entry.server.close()
   }
 
-  private armIdle(id: string): void {
-    const entry = this.entries.get(id)
-    if (!entry || entry.sockets.size > 0 || entry.idle) return
-    entry.idle = setTimeout(() => this.closeEntry(id), IDLE_MS)
+  private armIdle(entry: Entry): void {
+    if (entry.retired || entry.port === 0 || entry.sockets.size > 0 || entry.idle) return
+    entry.idle = setTimeout(() => this.closeEntry(entry), IDLE_MS)
     entry.idle.unref?.()
   }
 
-  private pipe(socket: Socket, node: TunnelNode, target: TunnelKey, id: string, head: Buffer): void {
+  private pipe(socket: Socket, node: TunnelNode, target: TunnelKey, entry: Entry, head: Buffer): void {
+    if (entry.retired) { socket.destroy(); return }
+    const id = entry.id
     const url = new URL('/v1/tunnel', node.endpoint)
     url.protocol = 'wss:'
     url.searchParams.set('task', target.taskId)
@@ -263,9 +261,8 @@ export class PreviewTunnels {
       ...pinnedTlsOptions(node.fingerprint, node.certPem),
     })
     ws.binaryType = 'nodebuffer'
-    const entry = this.entries.get(id)
-    entry?.websockets.add(ws)
-    ws.once('close', () => entry?.websockets.delete(ws))
+    entry.websockets.add(ws)
+    ws.once('close', () => entry.websockets.delete(ws))
 
     // Paused immediately. The socket is accepted before the WebSocket handshake finishes, so the
     // first bytes of the request would otherwise be dropped, and pausing pushes backpressure onto the

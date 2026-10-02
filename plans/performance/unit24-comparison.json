@@ -1,0 +1,212 @@
+[
+  {
+    "case": "workflow",
+    "name": "task-navigation",
+    "completeAnswerEqual": true,
+    "rows": [
+      1010,
+      1010
+    ],
+    "valueBytes": [
+      33292920,
+      55770
+    ],
+    "cpuMs": [
+      190.062,
+      14.552
+    ],
+    "wallMs": [
+      248.34366599999998,
+      11.137083000000075
+    ]
+  },
+  {
+    "case": "workflow",
+    "name": "node-run-list",
+    "completeAnswerEqual": true,
+    "rows": [
+      100,
+      100
+    ],
+    "valueBytes": [
+      3296500,
+      5300
+    ],
+    "cpuMs": [
+      32.692,
+      9.5
+    ],
+    "wallMs": [
+      34.69783300000017,
+      8.250250000000051
+    ]
+  },
+  {
+    "case": "workflow",
+    "name": "one-child-task-history",
+    "completeAnswerEqual": true,
+    "rows": [
+      6,
+      6
+    ],
+    "valueBytes": [
+      197756,
+      41782
+    ],
+    "cpuMs": [
+      0.804,
+      0.634
+    ],
+    "wallMs": [
+      0.7310420000001159,
+      0.5760000000000218
+    ]
+  },
+  {
+    "case": "processing",
+    "name": "first-50-all",
+    "completeAnswerEqual": true,
+    "rows": [
+      2401,
+      551
+    ],
+    "valueBytes": [
+      22407792,
+      560287
+    ],
+    "cpuMs": [
+      63.157,
+      13.293
+    ],
+    "wallMs": [
+      45.758124999999836,
+      9.418709000000035
+    ]
+  },
+  {
+    "case": "processing",
+    "name": "first-50-failed",
+    "completeAnswerEqual": true,
+    "rows": [
+      2401,
+      551
+    ],
+    "valueBytes": [
+      22407792,
+      560467
+    ],
+    "cpuMs": [
+      39.942,
+      6.363
+    ],
+    "wallMs": [
+      34.59354099999996,
+      5.132834000000003
+    ]
+  },
+  {
+    "case": "processing",
+    "name": "later-all-49",
+    "completeAnswerEqual": true,
+    "rows": [
+      2401,
+      551
+    ],
+    "valueBytes": [
+      22407792,
+      560447
+    ],
+    "cpuMs": [
+      42.706,
+      5.465
+    ],
+    "wallMs": [
+      35.93233299999997,
+      4.800458000000049
+    ]
+  },
+  {
+    "case": "processing",
+    "name": "later-failed-99",
+    "completeAnswerEqual": true,
+    "rows": [
+      2401,
+      551
+    ],
+    "valueBytes": [
+      22407792,
+      561347
+    ],
+    "cpuMs": [
+      33.982,
+      9.642
+    ],
+    "wallMs": [
+      33.559584000000086,
+      6.179124999999999
+    ]
+  },
+  {
+    "case": "processing",
+    "name": "later-attention--1",
+    "completeAnswerEqual": true,
+    "rows": [
+      2401,
+      301
+    ],
+    "valueBytes": [
+      22407792,
+      9897
+    ],
+    "cpuMs": [
+      38.617,
+      1.865
+    ],
+    "wallMs": [
+      34.94891699999994,
+      1.5909580000000005
+    ]
+  },
+  {
+    "case": "processing",
+    "name": "full-snapshot-and-named-outputs",
+    "completeAnswerEqual": true,
+    "rows": [
+      9,
+      9
+    ],
+    "valueBytes": [
+      74787,
+      74787
+    ],
+    "cpuMs": [
+      2.177,
+      2.388
+    ],
+    "wallMs": [
+      2.0718329999999696,
+      2.3730829999999514
+    ]
+  },
+  {
+    "case": "processing",
+    "name": "full-attempt-history",
+    "completeAnswerEqual": true,
+    "rows": [
+      10,
+      10
+    ],
+    "valueBytes": [
+      74822,
+      74822
+    ],
+    "cpuMs": [
+      3.45,
+      3.954
+    ],
+    "wallMs": [
+      1.3826249999999618,
+      1.352125000000001
+    ]
+  }
+]

@@ -80,12 +80,13 @@ export type AgentCancelResult = {
 const operationKey = (context: ToolContext, tool: 'agent_prompt' | 'agent_cancel'): string =>
   `${context.taskId}:${context.sessionId}:${tool}:${context.callId}`
 
-const waitConditionMet = (snapshot: AgentSessionSnapshot, until: AgentWaitInput['until']): boolean => {
+const waitConditionMet = (snapshot: AgentSessionSnapshot, until: AgentWaitInput['until'], afterSeq: number): boolean => {
+  if (snapshot.wait?.until === until && snapshot.wait.afterSeq === afterSeq) return snapshot.wait.matched
   if (until === 'ready') return snapshot.session.runtimeState === 'ready'
   if (until === 'attention') return !['none', 'unread'].includes(snapshot.session.attention)
   if (until === 'stopped') return ['stopped', 'failed', 'archived'].includes(snapshot.session.runtimeState)
   return snapshot.events.some((record) =>
-    record.event.type === 'turn_completed' || record.event.type === 'error')
+    record.seq > afterSeq && (record.event.type === 'turn_completed' || record.event.type === 'error'))
 }
 
 const ownerOf = (caller: Caller) => caller.managedSession
@@ -253,7 +254,7 @@ export class AgentDelegationService {
     await this.reconciled
     await this.ownedSession(context, input.sessionId)
     const snapshot = await this.runtime.wait(input.sessionId, input.afterSeq, input.until, input.timeoutMs)
-    const matched = waitConditionMet(snapshot, input.until)
+    const matched = waitConditionMet(snapshot, input.until, input.afterSeq)
     return {
       sessionId: input.sessionId,
       until: input.until,

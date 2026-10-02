@@ -25,8 +25,19 @@ names that route as the pane's `availability` (docs/panes.md § Contributions). 
 gets `403`, because the answer lists every task.
 
 Pools are task-scoped and owned by `CoreServices.data`. Core resolves the URL, opens the `pg` socket,
-normalizes cells, enforces timeouts and row caps, and closes the task pools the plugin opened when the
-plugin is disposed. The loaded plugin receives no URL, driver, socket, project-config grant,
+normalizes cells, and enforces timeouts and row caps. Concurrent implicit readers share one pending
+connection. Explicit **Connect** requests resolve the source in sequence, so each refresh reads the
+script or `.env` again. A successful refresh replaces the task pool. A failed refresh leaves a
+previously established pool available.
+
+Each granted data service holds its own claim on the shared task pool. The Database plugin records
+pending connections before awaiting them. **Disconnect** and plugin disposal revoke that plugin's
+claim and explicit connection state, including pending operations. Another granted consumer or a
+headless core caller can retain the pool independently of whether a pane is drawn. Releasing the last
+claim retires the pool; the unscoped core service's disconnect retires every claim for the task.
+Retirement refuses readers waiting for admission, and lets already admitted queries finish their
+transaction and release their client before closing the pool. Late connection completions cannot
+restore a retired plugin's state. The loaded plugin receives no URL, driver, socket, project-config grant,
 `DATABASE_URL` environment grant, or process broker.
 
 HTTP routes compare task IDs in CLI bodies, palette queries, and context requests with the verified
@@ -57,14 +68,21 @@ and completion popups are absent there.
 
 `⌘Enter` runs the query. The chord is pressed with focus in the host's editor, so the host resolves it
 against the manifest's surface-scoped keybinding, flushes the document, and then delivers the command
-to the plugin's frame. The statement that runs is always the one on screen.
+to the plugin's frame. The **Execute** button also flushes before reading the live document. Either path reports a failed save or read and does not run SQL. Execute uses the complete trimmed document, with no selection-based execution or automatic retry.
 
 Table and column completions come from the plugin's own node route. The host forwards a position and
 renders what comes back. Every judgement about SQL lives in `src/server/completions.ts`: after `FROM`
-offer tables, after `alias.` offer that table's columns. The introspected catalog is cached per task
-inside the core data service and dropped on connect, on disconnect, and after any statement whose
-command was not a plain read or write, so a migration run in the editor does not leave stale columns
-in the popup.
+offer tables, after `alias.` offer that table's columns. The introspected catalog is cached per task pool
+inside the core data service. A cold catalog wave shares one SQL statement among concurrent readers.
+Its table and column visibility comes from `information_schema`; primary-key membership comes from
+`pg_index`. A successful connection refresh, pool retirement, or statement whose final command was
+not a plain read or write invalidates the catalog. A held wave fails after invalidation and cannot
+publish into the replacement cache. Failed waves can be retried. There is no timed cache expiry, so
+DDL performed outside this service requires **Connect** to refresh the catalog.
+
+Core applies the returned row cap before converting cells. Columns, total row count, the final
+statement's command, truncation status, and elapsed time retain their driver semantics. The cap
+reduces conversion work, but the driver still buffers the full result.
 
 The model-provider capability is optional. If no compatible provider is connected, the database pane
 keeps manual SQL available and hides **Generate**. The frame learns which connections exist from a
@@ -193,3 +211,39 @@ scope gate.
 Task IDs and worktree paths are revalidated by the Node. The database plugin does not expose
 credentials through its routes, and task-scoped agent tools cannot use the interactive database UI
 without the explicit tool permission and task scope.
+
+## Scratch limits and recovery
+
+Scratch writes, completion requests, and generated SQL use the shared 2 MiB UTF-8 document limit.
+ASCII, multibyte characters, emoji, and combining marks count by encoded bytes. Empty scratch text
+is valid. The Node refuses oversized text before replacing `db_scratch`; it does not truncate SQL.
+Saved-query, prompt, and model-token limits remain separate contracts. Palette generation commits
+before returning its success selection; oversized output returns an error and preserves the row.
+The generation modal waits for the host to accept its replacement before dismissing.
+
+The host retains failed dirty text, including oversized edits. Closing and reopening the same
+Node/task document restores that draft; equal task IDs on another Node have independent custody.
+The desktop retains CodeMirror undo in memory. Device recovery storage can fail or run out of quota;
+keep acorn open until the draft saves or export its full text. A retired pane's handle cannot read,
+write, or flush the recovered draft through a replacement pane.
+
+A stored scratch row above the limit opens in a recovery state with no editable empty buffer or
+execution handle. In the desktop, choose **Export full text** to save every UTF-8 byte through the
+host file dialog. The same action exports a live unsent draft. Export reads only the document
+fetched through the pane's declared route on its captured Node; the plugin receives no file path or
+filesystem grant.
+
+For the terminal client or headless recovery, use the authenticated storage route on the original
+Node: `GET /v1/p/database/tasks/<taskId>/scratch` returns `{ text }`, including complete oversized SQL.
+Decode the JSON and save the `text` value as UTF-8. Use the Node's pinned transport and a device,
+service, or signed credential for that task. A task credential cannot read or replace another task's
+scratch row. This route needs no PostgreSQL connection or provider call.
+
+After preserving the export, submit an explicit valid replacement to the same route with `PUT` and
+a JSON body of `{ text }`, then reopen the pane. A refused replacement preserves the entire row.
+Export and pane retirement make no durable replacement. No migration rewrites oversized rows.
+
+Picking a saved query intentionally replaces the host text and joins desktop undo. A palette scratch
+reload, table browse, or modal generation captures the prior host text and replaces it only if that
+text still matches when the host admits the write. Later selections and retirement discard held
+loads. A conflict retains intervening edits and asks you to select or generate again.

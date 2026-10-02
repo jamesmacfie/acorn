@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/tools/arch
+
+
+ Test Files  1 passed (1)
+      Tests  3 passed (3)
+   Start at  19:30:17
+   Duration  361ms (transform 4ms, setup 0ms, import 16ms, tests 237ms, environment 0ms)
+

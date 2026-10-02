@@ -13,11 +13,9 @@
 // `EditorPane.tsx` compiles and runs unchanged and this host loses no feature. The CodeMirror types
 // are type-only imports and are erased, so nothing below puts a byte of the library in the bundle.
 //
-// The ceiling: CodeMirror itself still arrives, because `EditorPane.tsx` imports `basicSetup`,
-// `EditorState` and `EditorView` directly rather than through this facade. Nothing on this host calls
-// the code that uses them — `stateFor` runs only once `mountEditor` has a view, and the `editor`
-// rectangle never mounts one — so it is bytes in a lazy chunk rather than work. Routing those three
-// through the facade too is what would let this host drop the library, and nothing has asked for it.
+// Graphical engine imports and state construction belong to the DOM Rectangle's mount.
+// The terminal host retains the shared text custody API without importing grammars or views.
+export { documentCustody, recoverDocumentCustody, type DocumentCustody } from '@acorn/client-core/features/editor/documentCustody.ts'
 import type { LanguageId } from '@acorn/protocol/languageIds.ts'
 import type { Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'

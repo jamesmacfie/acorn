@@ -29,7 +29,6 @@ import { AuthoringConversation } from '@acorn/plugin-api/ui/data-sources'
 import { workflowsSurfacePath } from '../surfacePath'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 import { unavailableCatalogKind, unavailableStepKindMessage } from '../../shared/stepKindAvailability'
-import { workflowApi } from '../workflowsClient'
 import {
   addNode,
   addForEach,
@@ -73,7 +72,8 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [searchParams] = useSearchParams()
-  const store = createDraftStore({ projectId: () => props.projectId, item: () => props.item })
+  const store = createDraftStore({ projectId: () => props.projectId, item: () => props.item, queryClient })
+  const workflowApi = store.api
   const [tab, setTab] = createSignal<'nodes' | 'graph' | 'json'>('nodes')
   const workspaces = createQuery(() => workspacesOptions(true))
   const tasks = createQuery(() => tasksOptions(true))
@@ -118,8 +118,9 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       store.setMessage('Choose a workspace before creating a child workflow.')
       return
     }
+    const address = store.capture()
     const parent = store.ref()
-    if (!parent) return
+    if (!parent || !address) return
     let childId: string | undefined
     try {
       const row = await workflowApi.createDef({
@@ -127,6 +128,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
         def: childWorkflowDefinition(draft().def.name, itemSchema),
       })
       childId = row.id
+      if (!store.current(address)) { await workflowApi.deleteDef(row.id).catch(() => undefined); return }
       const current = draft().def.steps.find(step => (step.id ?? step.name) === stepId)
       if (!current) return
       apply(value => setStep(value, stepId, connectCreatedChild(current, row.id)))
@@ -136,11 +138,12 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       }
       childId = undefined
       await store.refetchCatalog()
+      if (!store.current(address)) return
       const returnTo = workflowsSurfacePath(props.projectId, defRefKey(parent))
       navigate(`${workflowsSurfacePath(props.projectId, defRefKey({ source: 'database', id: row.id }))}?returnTo=${encodeURIComponent(returnTo)}&returnStep=${encodeURIComponent(stepId)}`)
     } catch (error) {
       if (childId) await workflowApi.deleteDef(childId).catch(() => undefined)
-      store.setMessage(error instanceof Error ? error.message : "Couldn't create the child workflow.")
+      if (store.current(address)) store.setMessage(error instanceof Error ? error.message : "Couldn't create the child workflow.")
     }
   }
 
@@ -195,6 +198,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
   // editor-owned draft before it has a row: once there is work to preserve, authoring can propose an
   // edit without saving or publishing it.
   const applyProposal = async (proposal: Extract<AuthoringTurnResult, { state: 'proposal' }>): Promise<string | undefined> => {
+    const address = store.capture()
     const current = draft().def
     const base = proposal.base as typeof current
     const proposed = proposal.candidate as typeof current
@@ -205,6 +209,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
       return `You changed the workflow while AI was working. Sort out these steps first: ${[...new Set(merged.conflicts.map(conflict => conflictSubject(conflict.path, current)))].join(', ')}.`
     }
     const checked = await workflowApi.validateDef(merged.value, props.projectId)
+    if (!store.current(address) || draft().def !== current) return 'The workflow changed while validation was running.'
     if (checked.problems.length) return `AI's changes no longer fit your workflow: ${checked.problems.join(' ')}`
     const refused = store.applyText(toJson(merged.value))
     if (refused) return refused
@@ -502,7 +507,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
           </ModalActions>
         </Modal>
       )}</Show>
-      <Show when={authoringOpen() && workspaceId()}>
+      <Show when={authoringOpen() && !!workspaceId() && store.capture()} keyed>{address => <>
         {/* A dialog, not a strip over the editor: the conversation is a side trip from the draft, and
             drawn inline it pushed the outline half off the screen. It keeps its thread on the device,
             so closing it and opening it again picks up where it was. */}
@@ -511,18 +516,19 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
             onClose={() => setAuthoringOpen(false)}
             endpoint="/v1/p/workflows/defs/authoring/turn"
             target="workflow"
-            targetId={store.ref()?.id ?? `new:${props.projectId}`}
-            scope={{ workspaceId: workspaceId(), projectId: props.projectId }}
+            targetId={address.route}
+            scope={{ workspaceId: workspaceId(), projectId: address.projectId }}
+            sendTurn={(request, signal) => workflowApi.authoringTurn(request, signal)}
             baseRevision={store.revision()}
             base={draft().def}
             label={draft().def.name}
             disabled={store.readOnly() || store.busy()}
             describePath={(path, candidate) => changeSubject(path, [draft().def, candidate as { steps?: readonly { id?: string; name: string }[] }])}
-            onApply={applyProposal}
+            onApply={proposal => store.current(address) ? applyProposal(proposal) : 'The workflow selection changed.'}
           />
         </Modal>
-      </Show>
-      <Show when={store.readOnly()}>
+      </>}</Show>
+      <Show when={store.readOnly() && !store.loading()}>
         <Show
           when={store.unreadable()}
           fallback={<Alert>This workflow is a file in the repository. To change it here, make an editable copy.</Alert>}

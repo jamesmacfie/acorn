@@ -160,6 +160,12 @@ word for the same idea, different shape where the difference is real. It was cal
 2026-08-27, which made one idea look like two.
 The renderer starts an eligible client schedule when its plugin becomes available, including when the
 Node's plugin roster arrives after the window opens. Disabling or unloading the plugin stops it.
+Each contribution has one active refresh and one dirty follow-up flag. Timer, event, and visibility
+edges coalesce while a read is pending. An edge during the follow-up requires another pass. Hidden
+windows admit no reads. Node switches, capability withdrawal, and disposal retire pending follow-ups
+and subscriptions. Independent contributions and scheduler owners keep their own lifetimes.
+Synchronous throws and rejected operations are logged; a later edge can retry.
+
 
 ## Policies
 

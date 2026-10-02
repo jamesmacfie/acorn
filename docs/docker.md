@@ -33,6 +33,20 @@ for a plugin with a graph or a cost estimate to put beside the numbers. `docker:
 `annotation` point keyed by container id, drawn under the rows of the Source list. For more
 information, see the cooperative extension points in [the plugins doc](./plugins.md).
 
+Log buffers retain the exact last 512 × 1024 UTF-16 code units in bounded 4,096-unit blocks.
+Ingestion does not join the tail. The text accessor projects on demand and caches the result until
+another append or clear. Reactive consumers receive updates at most every 50 ms, with immediate
+publication on clear and stream end. Hidden surfaces keep receiving same-Node output. The eight-buffer
+LRU limit remains shared across views.
+
+Client live state belongs to a Node selection generation. Switching Nodes retires stream interests,
+exec PTYs, log buffers, and detached task roots before incoming regions attach. Cleanup addresses the
+originating Node without acquiring its event interest. Task selection and detail preferences are
+partitioned by Node. Reads and actions capture their Node and document identity before awaiting;
+stale completions cannot refresh another document, remove its selection, or focus its terminal.
+Failed observations preserve established inventory and task links. This state stays outside the
+persisted query cache. Plugin retirement disposes application refresh subscriptions.
+
 ## From the command palette
 
 Two rows, registered by the plugin in `plugins/docker/src/client/commands.ts`.
@@ -95,6 +109,16 @@ only for a new viewer. Stats replay contains the latest valid sample. A join nev
 subscribers or starts another CLI reader. Producer end reaches every surviving subscriber once and
 retires its sharing entry; construction failure unwinds the new entry. The client keeps its established
 desired subscription on `docker:stream-end`, so reconnect can retry a still-open surface.
+
+Stream children retire once on spawn error or stdio close. Normal exit continues draining stdout and
+stderr until close. Intentional stop and service disposal suppress end callbacks. Failed event
+watchers release their own generation and schedule one bounded retry; late cleanup cannot retire a
+replacement. Disposal cancels retries and debounced publications.
+
+Cold health readers share one CLI request. Health retains its 10-second settled lifetime and resource
+inventories retain five seconds, with eager invalidation on mutations and daemon events. Invalidation
+retires pending cache publication, so an earlier read returns its own result without replacing a
+later inventory wave. Empty authoritative inventories skip task matcher configuration reads.
 
 Compose files and commands that execute developer code pass the repository configuration trust gate.
 The declarative matcher does not, by itself, execute anything.

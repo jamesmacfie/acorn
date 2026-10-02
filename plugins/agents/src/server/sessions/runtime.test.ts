@@ -575,9 +575,9 @@ describe('managed agent runtime conformance', () => {
       effectivePolicy: {},
       idempotencyKey: 'wait-setup-race',
     })
-    const snapshot = runtime.store.snapshot.bind(runtime.store)
+    const snapshot = runtime.store.waitFacts.bind(runtime.store)
     let firstRead = true
-    runtime.store.snapshot = async (...args) => {
+    runtime.store.waitFacts = async (...args) => {
       const result = await snapshot(...args)
       if (firstRead) {
         firstRead = false

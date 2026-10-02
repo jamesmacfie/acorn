@@ -27,3 +27,12 @@ export type SearchResult = {
   files: FileHits[]
   truncated: boolean // hit the total-match cap, so the pane shows a "results truncated" note
 }
+
+export type SearchFailureCode = 'unavailable_root' | 'invalid_query' | 'launch_failed' | 'timeout' | 'overflow' | 'invalid_output' | 'cancelled' | 'execution_failed'
+
+export class SearchFailure extends Error {
+  constructor(readonly code: SearchFailureCode, message: string) {
+    super(message)
+    this.name = 'SearchFailure'
+  }
+}

@@ -6,9 +6,10 @@ import type { SearchOpts, SearchResult } from '../../shared/search'
 
 export type { FileHits, SearchHit, SearchOpts, SearchResult } from '../../shared/search'
 
-export function findInFiles(taskId: string, query: string, opts: SearchOpts): Promise<SearchResult> {
+export function findInFiles(taskId: string, query: string, opts: SearchOpts, options: { signal?: AbortSignal; nodeId?: string | null } = {}): Promise<SearchResult> {
   return writeJson<SearchResult>(searchRoute(taskId), {
     method: 'POST',
+    ...options,
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ query, opts }),
   })

@@ -3,6 +3,7 @@
 // Everything here is pure or a plain module-level map, because vitest runs in node with no Solid
 // plugin (docs/testing.md), so the logic worth pinning has to live outside the .tsx.
 import { MAX_DOCUMENT_BYTES } from '@acorn/protocol/plugin/bridge.ts'
+import { activeNodeId } from '../../infra/node/activeNode'
 import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
 
 // The shapes both ends read live on the wire (`@acorn/protocol/documentSurface.ts`), because a
@@ -84,11 +85,10 @@ export const rememberDocumentViewState = (nodeId: string, scopeId: string, uri: 
 export const documentViewState = (nodeId: string, scopeId: string, uri: string): unknown =>
   viewStates.get(viewKey(nodeId, scopeId, uri))
 
-/** Every node's entries for this scope, not just the active node's: archival is final, and a key left
- * behind under another node's prefix would never be reached again. */
-export function evictDocumentViewStates(scopeId: string): void {
-  const suffix = `/${scopeId}:`
-  for (const key of viewStates.keys()) if (key.includes(suffix)) viewStates.delete(key)
+/** Archival belongs to the originating Node; equal IDs on another Node are independent. */
+export function evictDocumentViewStates(scopeId: string, nodeId: string | null = activeNodeId()): void {
+  const suffix = `${nodeId ?? ''}/${scopeId}:`
+  for (const key of viewStates.keys()) if (key.startsWith(suffix)) viewStates.delete(key)
 }
 
 export function clearDocumentViewStates(): void {

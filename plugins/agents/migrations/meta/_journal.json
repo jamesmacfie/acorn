@@ -57,6 +57,13 @@
       "when": 1790884800000,
       "tag": "0011_agent_queue_heads",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1790971200000,
+      "tag": "0012_agent_search_progress",
+      "breakpoints": true
     }
   ]
 }

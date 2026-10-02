@@ -1,0 +1,83 @@
+{
+  "head": "4d8f99dafa5bfd0059a31ddd77126dcabadc43fd",
+  "routeSha256": "e8c871c257b5499146545bd70cf42ad740519c65faf112a26db85471b565f79c",
+  "date": "2026-10-02",
+  "runtime": {
+    "node": "v24.11.0",
+    "hostTests": "jsdom with repository Solid browser resolution and QueryClientProvider",
+    "routeTests": "loaded portable handler with disposable SQLite and synthetic model service"
+  },
+  "before": {
+    "routeTests": 47,
+    "passed": 41,
+    "failed": 6,
+    "failures": [
+      "multibyte one-byte-over accepted",
+      "emoji one-byte-over accepted",
+      "combining one-byte-over accepted",
+      "foreign scratch scope accepted by standalone portable handler",
+      "palette oversized generation accepted",
+      "modal oversized generation accepted"
+    ]
+  },
+  "after": {
+    "databaseTests": 107,
+    "databasePassed": 107,
+    "hostAndBridgeTests": 104,
+    "hostAndBridgePassed": 104,
+    "terminalTests": 4,
+    "terminalPassed": 4
+  },
+  "workloads": {
+    "capBytes": 2097152,
+    "legacyCharacters": 2097152,
+    "legacyUtf8Bytes": 4194304,
+    "dirtyEmojiUtf8Bytes": 2097153,
+    "patterns": [
+      "x",
+      "é",
+      "😀",
+      "e\\u0301"
+    ],
+    "legacyExport": "full decoded text compared for exact equality"
+  },
+  "sourceSha256": {
+    "apps/tui/src/plugins/DocumentSurface.tsx": "06b72bff15b03740b8191009936a3638abfd82f12789e296ad87158182641963",
+    "packages/client-core/src/features/editor/DocumentSurface.tsx": "80c8375db52f36c85a2ad2c877aadb9a56f78d0c3c62378e2c6ad279dd75e867",
+    "packages/client-core/src/features/editor/documentCustody.ts": "c65fba9165921fbd5b2d17bfb9dfd49c82fe80bf3f80d098d6737b27b49db9e9",
+    "packages/client-core/src/host/frames/broker.ts": "a25f602342ea475dd1766f4ea7c4cd26dfe1d6a62ed709373aaa2f94b0181d17",
+    "packages/client-core/src/host/frames/sdk/bridgePort.ts": "ec2b0b813135dfb32f240aa4e42000f2b0f1d534ea809ec33d3d0f754463459b",
+    "packages/client-core/src/host/frames/sdk/bridgeTypes.ts": "e06e25e1ce3edecd0853b9596e3f7f45e4a6afe5b994cc33f9f1e158f270d5dc",
+    "packages/protocol/src/plugin/bridge.ts": "3840a4a9d39f5a0a261f44f9a5b935a4b1dda16734dde4dffdaec937875b3e27",
+    "plugins/database/src/server/routes/database.ts": "36ab55a73dfe337527143e46b72fb348990879ebbe7a9bcca75b801dace89b93",
+    "plugins/database/src/tree/DatabasePanel.tsx": "845f9a2471ad69a101a7c34ab3a78ed71b195a0decad1dad14190fef09a1a669",
+    "plugins/database/src/tree/GenerateSqlModal.tsx": "0c2bf83b8b4a0be80ae92e576663cd6217a9793c338c74fb33ca115d21984f28"
+  },
+  "native": {
+    "graphBytes": 3076898,
+    "ceilingBytes": 3062000,
+    "desktop": "blocked before launch",
+    "pty": "blocked before launch",
+    "screenshots": "none; no native timing claim"
+  },
+  "testSha256": {
+    "plugins/database/src/server/routes/database.test.ts": "312c2bd1327e15f61abf1b62c3f58c45304b6210a4585a6e722eea0085f58b18",
+    "plugins/database/src/tree/DatabasePanel.test.tsx": "eeffb1dfce92b65ec205a84eb0914554ea062e8348b5fb3ff054afddb46dd515",
+    "plugins/database/src/tree/GenerateSqlModal.test.tsx": "a4b9ade196980832fe2aaaf758071292c04799021cd4592a0bb4de174fc6c6fd",
+    "packages/client-core/src/features/editor/DocumentSurface.test.tsx": "96648e3e751ef2a96abd4de64f85b450cddb6fc671f080d746e96212ef2411a6",
+    "packages/client-core/src/host/frames/broker.test.ts": "7c29828cf2b84bdd012063ade255c28ebdbd86fbf32d2d271fcc56efb5d320b7",
+    "apps/tui/src/plugins/DocumentSurface.test.tsx": "82e5edf892ca7def1a7defae0b9b91d9ac822d59da0d8e036acb91b73a3e7a29"
+  },
+  "cleanup": {
+    "desktopLauncherPid": 94956,
+    "tuiLauncherPid": 35368,
+    "bothAbsent": true,
+    "disposableSessionDirectoriesRemoved": true
+  },
+  "verification": {
+    "lint": "oxlint and 37 of 37 package checks pass",
+    "architecture": "59 tests pass",
+    "ownedDiffCheck": "pass",
+    "cumulativeDiffCheck": "concurrent HTTP panelModel trailing blank line"
+  }
+}

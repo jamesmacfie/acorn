@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentProviderDescriptor } from '@acorn/plugin-agents/contract/wire.ts'
@@ -10,7 +11,7 @@ import { RevealFieldErrors } from './FieldControl'
 // render can check (docs/workflows.md § Contributed step kinds).
 
 const fieldOptions = vi.fn<(route: string) => Promise<{ options: { value: string; label: string }[] }>>()
-vi.mock('../workflowsClient', () => ({ workflowApi: { fieldOptions: (route: string) => fieldOptions(route) } }))
+vi.mock('../workflowsClient', () => ({ createWorkflowApi: () => ({ fieldOptions: (route: string) => fieldOptions(route) }) }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   activeTaskId: () => 'task-1',
@@ -54,6 +55,7 @@ const mount = (def: WorkflowDef, kinds: WorkflowCatalog['kinds'], selected: stri
   host = document.createElement('div')
   document.body.append(host)
   dispose = render(() => (
+    <QueryClientProvider client={new QueryClient()}>
     <RevealFieldErrors.Provider value={() => reveal}>
       <NodeInspector
         draft={draft}
@@ -64,6 +66,7 @@ const mount = (def: WorkflowDef, kinds: WorkflowCatalog['kinds'], selected: stri
         actions={noActions}
       />
     </RevealFieldErrors.Provider>
+    </QueryClientProvider>
   ), host)
 }
 
