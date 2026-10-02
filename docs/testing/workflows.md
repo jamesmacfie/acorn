@@ -144,9 +144,9 @@ bindings rather than the prose.
 
 ## Dashboard checks
 
-The dashboards backlog keeps its own once-only verification pass in
-[docs/future/dashboards/README.md](../future/dashboards/README.md) § 0, because its items gate that
-folder's remaining work rather than a release.
+The dashboards programme keeps its own once-only check of the surfaces that shipped before workflow
+v2 in [workstream 1](../future/dashboards/01-trustworthy-results.md#verify-what-shipped), because its items
+gate that programme's work rather than a release.
 
 Workflow-v2 dashboard checks are split by owner:
 `packages/dashboards-core/src/typedProjection.test.ts` covers nested projection and independent exact-status mappings;

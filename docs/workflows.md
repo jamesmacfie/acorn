@@ -755,8 +755,9 @@ publication, and scheduled work.
 inline, and the workspace query library covers reuse.
 
 **A generic provider write-back contract.** Refused. Reads are shared through data sources. Writes go
-through contributed workflow actions. Dashboard write-back is a separate proposal in
-[docs/future/dashboards/write-back.md](./future/dashboards/write-back.md).
+through contributed workflow actions. Dashboard write-back is a separate proposal, a field mutation
+each source declares, in
+[docs/future/dashboards/07-write-back.md](./future/dashboards/07-write-back.md).
 
 ## Typed data and conditions
 

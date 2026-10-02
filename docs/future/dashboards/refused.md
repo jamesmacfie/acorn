@@ -1,93 +1,156 @@
-# What is refused, on the record
+# What the dashboards programme refuses
 
-> Scope update, 2026-09-13: [What workflows refuses](../../workflows.md#what-workflows-refuses) and
-> the [data sources](../../data-sources.md) contract supersede conflicting flat-field and gated
-> discovery assumptions below. Nested typed values and dynamic discovery have shipped.
-> Provider write-back and SQL execution remain separate.
+Status: proposed, 2026-10-02, revised the same day. Each entry says what was considered, why it is
+out, and what would make it worth revisiting. Four entries carry over from the August 2026 record and
+still hold. One, the refusal of joins, is replaced: its own revisit condition has been met. The earlier
+text is in git history.
 
-The guardrails on the backlog (`README.md`): what dashboards deliberately do not do. Each refusal
-carries its reasoning and what would have to change to revisit it — so a future session argues
-with the reasoning, not with silence. First recorded 2026-08-12; all of it still holds.
+## Plugin-drawn panels and a widget toolkit on the wire
 
-## No plugin-shipped panel components, no widget toolkit in the wire format
+A panel is composed by the person over typed records, and the host draws every pixel of it with its
+own views. A plugin never ships a panel component, and the wire never carries a widget vocabulary
+that the host would have to support forever.
 
-The refusal holds against what it was aimed at: a static schema the host renders from data, which
-would mean eternally versioning a widget toolkit in the wire format. Dashboards clear the bar because
-the host renders *its own* generic views over a record schema.
+This is not the same question as the remote component tree, where plugin code emits closed-kit nodes
+into a slot the owner opened. A slot's contents are chosen by the plugin. A panel's contents are
+chosen by the person. When a plugin needs UI the field types can't express, the answer is a remote
+tree in a pane the plugin owns, or a rectangle for pixels, never a panel type.
 
-The descriptor-versus-frame doctrine did change on 2026-08-28, and this refusal did not.
-There is a remote component tree now: plugin code in a sandbox emits a tree of closed-kit node names
-and the host mounts its own components. That is not a widget toolkit in the wire format, because the
-vocabulary is the kit that already exists and the logic stays in the plugin
-([docs/plugins.md](../../plugins.md) § Descriptors for facts, trees for UI, rectangles for pixels). It is also **not a dashboard
-panel**: a panel is user-composed over a typed record contract and a plugin has zero say over its
-pixels; a remote tree is plugin-authored UI in a slot the owner opened. The two do not meet. When a
-plugin needs UI the field-type vocabulary cannot express, the overflow path is a remote tree in a
-pane the plugin owns, or a rectangle for pixels; never a panel type.
+Revisit if a case appears where the person composes and the plugin draws, at the same time, in the
+same rectangle.
 
-Restated against the shipped tree, 2026-08-29. `remote` is now one of five extension kinds and a `Slot`
-is an ordinary node ([docs/plugins.md](../../plugins.md) § Cooperative extension points), which makes
-the distinction sharper rather than softer. A slot's occupant is chosen by the **owner's** declared
-arbitration over a key the owner passes; a panel's contents are chosen by the **person**, over a
-collection, in a grid they laid out. Those are different questions with different answers, and the fact
-that both now end in host-drawn components is exactly why neither is a widget toolkit. What would
-reopen this is unchanged: a case where the user is composing and the plugin is drawing, at the same
-time, in the same rectangle. Nobody has one.
+## New field types without a fight
 
-## No new field type without a fight
+Every field type is drawn for every provider forever. This programme adds none. Currency, percent,
+duration, and size are units on the number type. Calendar dates are a precision on the datetime type.
+Lists are a cardinality on any type. Tones and ranks are properties of declared choices.
 
-The field-type and role vocabularies are closed and budgeted
-(`docs/dashboards.md § The two vocabularies, and the budget`): Grafana ended a
-decade with eight field types. Every addition is rendered for every provider forever. The default
-answer to "we need a richer type" is a frame pane; the second answer is composing existing types;
-adding a type is the last answer and a protocol version event.
+Revisit when a real panel needs a value that no combination of type, unit, precision, and list can
+express, and treat the addition as a protocol version event.
 
-## No board-drag write-back yet
+## Dashboard machinery reachable from frames
 
-Dragging a kanban card is a mutation, and value mappings are many-to-one, so the inverse is
-ambiguous (`write-back.md`). Shipping read-only first is not a cut corner — it
-avoids designing a per-field mutation contract and its trust story under time pressure. The
-mapping config's persisted shape reserves room (per-(source, column) records that can grow a
-`writeValue`). Revisit when the read-only surface has real usage and the mutation contract can be
-designed against observed boards.
+Panel plans, placements, runs, identity answers, actions, and datasets are host-owned. They are never
+stored in a frame's preference namespace, never writable through the bridge, and never rendered inside
+a frame document. A frame that could edit a plan could point the host's chrome at routes of its
+choosing.
 
-Distinct from this and not refused: verb-shaped mutations via `runNodeAction` work today, and an
-action declares an optional `risk` tier that the **host** draws the confirmation from. The board-drag
-design reuses that rather than inventing a second prompt.
+Revisit never. Widen the placement constraint vocabulary instead.
 
-## No cross-collection joins
+## A per-plugin dashboard contribution
 
-A panel unions collections and maps fields; it does not join them ("show each PR with its linked
-Linear issue" as one row). Joins need key relationships the contract doesn't express, and
-Notion-family systems ship successfully without them. The existing
-`contentLinks`/`refResolvers` machinery already covers the adjacent need (linked references
-resolved and rendered on demand). Revisit if union + mapping demonstrably fails the todo-board
-class of use cases — and then consider a declared relation-by-role before a general join.
+A plugin does not ship a prebuilt dashboard surface that it owns. It can suggest starter plans,
+which the person accepts into their own panels, and from then on the person owns them. That keeps
+every panel the person's own composition and keeps the plugin a provider of records.
 
-## No sniffed wire shapes
+Revisit if starter plans prove unable to carry what plugins want to offer.
 
-`PluginRailItems` is sanitized field-by-field rather than schema-parsed; that pattern is not
-repeated. Collections get real Zod schemas in `@acorn/protocol` from day one
-(`docs/dashboards.md § Provenance, and what a row may not claim`) — the
-`agentContexts`/`refResolvers` template. This is a
-deliberate, argued exception to "reads are not validated": a loaded plugin's response is untrusted
-wire rendered under the host's chrome, exactly the boundary where all four existing exceptions
-sit.
+## Undeclared joins, fuzzy matching, and silent multiplication
 
-## No dashboard machinery reachable from frames
+The August record refused cross-source joins, with the revisit condition "if union and mapping
+demonstrably fail" and the note that a declared relation should come before a general join. The 30
+examples meet that condition: release checklists, mirrored issues, invoice matching, branch-to-pull
+request lookups, and budget lookups all need records from two sources in one row. Workstream 5
+therefore adds declared relations and a row model that says which source supplies the rows.
 
-Panel and dashboard definitions are host-owned config in core persistence — never in a frame's
-`state.get/set` prefs namespace, never writable through the bridge, and host panels never render
-inside a frame document — the host-drawn-region rule, now shipped and stated in
-`docs/plugins.md § Cooperative extension points`. A frame that could edit
-panel definitions could point the host's chrome at routes of its choosing; the composition layer
-stays entirely on the host side of the trust boundary. Revisit never; widen the placement
-constraint vocabulary instead.
+What stays refused is everything around them. There is no join on a key the author or the source
+hasn't declared, and no key that leaves out the scope that makes it unique. There is no matching on
+titles, labels, or names. There is no relation that can multiply rows without saying so: cardinality is
+declared and checked on every run, and a violation fails visibly. A relation never merges rows. Only an
+equivalence, a declared "same item in another system", does. And there is no relation that reads
+another plugin's storage instead of its source.
 
-## No per-plugin "dashboard" contribution kind
+Revisit the general join only if declared relations fail a class of real panels.
 
-A plugin does not ship a prebuilt dashboard ("install github, get a PR dashboard") as a distinct
-contribution — that is Backstage's model, and it forecloses nothing here since a plugin can achieve
-the effect via defaults. If pre-built starter panels prove wanted, the shape is a
-plugin-suggested *panel definition* the user accepts into their own composition — suggestions,
-not owned surfaces — so ownership of composed panels stays with the user.
+## Branching pipelines inside a panel
+
+Stages form one bounded, linear list. A panel can't split its rows into two independently processed
+branches and join them back. Conditional measures cover most of what a branch would do, such as overall
+run counts beside counts for a filtered subset, and relations cover combining sources. A branch is also
+where a plan stops being describable in a short list of sentences.
+
+Revisit if real panels keep needing two differently filtered views of the same rows that conditional
+measures can't express.
+
+## A formula language or SQL inside panels
+
+An open expression language makes plans uncheckable, gives the AI a way to produce plausible nonsense,
+and turns the editor into a text box. Workstream 5's compute stage offers a closed set of expressions,
+each with a form, a description, a validator, and evaluation cases, and repeated stages give that set
+room to work. Logic beyond it runs in a workflow or an agent that writes a dataset, where it is
+visible, testable, and scheduled.
+
+Revisit if the closed expression set keeps growing toward a language anyway, which would mean the
+dataset path isn't serving people.
+
+## Host fan-out across repositories or projects
+
+The host could run one query per repository and combine the results. It would multiply reads on every
+refresh, hit provider rate limits, and leave sorting and completeness across hundreds of reads
+unsolved. Sources accept lists of repositories or projects, or search the account's whole reach, and
+read them the way their provider does best. Raising the eight-query limit is refused for the same
+reason.
+
+Revisit if an important provider has no way to read several scopes at once, and then add fan-out
+inside that provider's adapter, not in the host.
+
+## Provider meaning in the panel engine
+
+The engine does not decide whether a pull request is ready to merge, whether a ticket is about to
+breach, or how a recurring meeting expands. Those depend on provider rules that the engine can't see
+and would get subtly wrong. Adapters compute them and expose the result, including "unknown". The
+engine does own comparisons across sources, such as overlapping meetings from two calendar providers,
+because no adapter can see across that boundary.
+
+Revisit never. Ask the adapter for a better field instead.
+
+## The AI deciding between accounts
+
+When a person has two Linear accounts, only the person knows which one a panel is about. The AI may
+propose which sources can answer a request, and it may use a person's only account for a source,
+naming it in the plan. When there is more than one, it asks with the person's real accounts as choices.
+
+Revisit if account names become unambiguous by construction, such as one account per provider per
+workspace.
+
+## Silent partial results
+
+A valid panel that answers half the request is worse than an error, because it looks finished. The
+AI's requirements list, the host's check of it, the independent requirements pass, and the
+host-written description exist so that a partial result always says what it leaves out. The run carries
+incomplete reads, uncovered windows, and dataset gaps forward, and history never stores a measure from
+an incomplete read.
+
+Revisit never.
+
+## Grading the AI by its own checklist
+
+The requirements list is written by the same model that wrote the plan, so it can't reveal what the
+model missed. Evaluation compares plans against requirements and expected results that people
+annotated, and acceptance adds requests nobody has seen.
+
+Revisit never.
+
+## A second execution path on the client
+
+The client renders runs and keeps a cache. It doesn't fetch sources and project them itself, because
+two implementations of one plan will disagree, and the sampler's answer has to mean what the screen
+says.
+
+Revisit if a view needs instant local reshaping, such as clicking a column header, and then keep that
+as view state over a finished run, not as a second execution of the plan.
+
+## Classifying messages or other content inside a panel
+
+Deciding whether a message is a direct question needs a model's judgement, evidence, and a way to
+correct mistakes. A panel can't hold any of that. A workflow or agent writes a dataset with the
+evidence and a correction field, and the panel reads it.
+
+Revisit never for panels. The dataset path carries this.
+
+## Panels across several Nodes
+
+A panel runs on the active Node. Combining Nodes needs identity, credentials, and freshness across
+machines, which belongs to the cloud programme.
+
+Revisit with [cloud](../cloud/README.md) team Nodes.

@@ -27,9 +27,10 @@ we start phase N" is almost always "now, and the real question is what else stop
 Startable today, in any order:
 
 - **Phase 3's remaining backlog** — the typed-collection contract, the panel grid and cross-source
-  mapping all shipped (owning doc: `docs/dashboards.md`). What is left is the deliverables in
-  `docs/future/dashboards/` — new placements, dynamic collections, board-drag write-back —
-  each independent of phase 2, each with its own verify-before-building list.
+  mapping all shipped (owning doc: `docs/dashboards.md`). What is left is the seven-workstream
+  programme in `docs/future/dashboards/`, rewritten 2026-10-02: a typed panel plan, a source-first
+  editor, identity and time, richer sources, row actions, composition, datasets, and gated
+  write-back. It is independent of phase 2, and each workstream has its own verify-before-building list.
 - **The signing design doc** — it does not exist, and writing it is not gated on phase 2.
 - **`bundle.md` steps 2–4** — the Linux node-pty prebuild in CI, the CI matrix and release upload for
   Linux and Windows, then the Windows `openssl` problem. Do that last one before anyone downloads a
@@ -81,8 +82,8 @@ composable panel grid, mapping/derived views/kanban — the user-composed todo b
 providers works end to end. It is the most visible form of "plugins composing without knowing each
 other".
 
-What remains is the backlog in `docs/future/dashboards/` (new placements, dynamic
-collections, board-drag write-back), independent of phases 1–2 here.
+What remains is the programme in `docs/future/dashboards/`, rewritten 2026-10-02 from 30 example
+panels, independent of phases 1–2 here.
 
 ## Phase 4 — distribution (owning docs: `docs/security.md § Supply chain`, `docs/future/bundle.md`)
 

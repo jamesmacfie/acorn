@@ -120,6 +120,9 @@ Start with the plugin map, then follow the authoring guide or API reference.
 
 - [Cloud tasks and control plane](./future/cloud/README.md) — proposed architecture, provider and
   security gates, and sequenced delivery plan for team-owned projects and ephemeral task Nodes.
+- [Dashboards programme](./future/dashboards/README.md) — seven proposed workstreams, delivered in
+  four milestones, that widen panels from 30 example requests: a typed panel plan, a source-first
+  editor, identity and time, richer sources, row actions, composition, datasets, and gated write-back.
 - [Terminal UI review](./future/tui-review/README.md) — live UX evidence, feature coverage, host
   projections, and acceptance gates for a standalone terminal client.
 - [Plugin list search proposal](./future/pluginsearch.md) — search beyond the loaded Linear,
