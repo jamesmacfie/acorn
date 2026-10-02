@@ -320,8 +320,8 @@ regions the host mounts apart.
 A pane or a region that puts a list beside a detail uses that node, not a hand-rolled grid. It
 owns the split, the drag handle, the three column widths (`narrow` for an identifier switcher, the
 default for a browse list, `wide` for a column that holds a document rather than a picker), the
-`--chrome-divider` between them, and each column's flex/overflow behaviour. GitHub and Workflows
-reach it through `SourceSurface`; Linear, Database, Rollbar, Docker, Editor and the workflow editor
+`--chrome-divider` between them, and each column's flex/overflow behaviour. GitHub, Workflows, and
+Memory reach it through `SourceSurface`; Linear, Database, Rollbar, Docker, Editor and the workflow editor
 use it directly, including the nested splits in GitHub and Rollbar. HTTP and the compiled task panes
 whose list and detail are separate host regions use the `list-detail` layout instead. Both paths own
 the same resize behaviour, so a plugin never supplies its own grid or pointer handlers.
@@ -332,7 +332,7 @@ A list column is flush and scrolls its own rows. A column holding a document ins
 column is a pull request, not a picker. Its rows, headers, fold summaries, and bars take that padding
 back, the same way chrome does in a pane body, so row text and fold labels start on the heading's
 edge. A detail column holding a form or a document can pass `measure="page"`, which stops its content
-at `--page-measure`, the settings page width, from the column's start edge. A bar, tab strip, or
+at `--page-measure`, 720 px, from the column's start edge. A bar, tab strip, or
 section header that is a direct child of the column still spans it, so put a detail's header bar
 there rather than inside the capped form. A bar that heads a scrolling detail column sits on the
 column's top edge, and the content under it starts a section gap below.

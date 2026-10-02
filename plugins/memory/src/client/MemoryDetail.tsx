@@ -1,19 +1,17 @@
-import { createEffect, on, createSignal, For, Show } from 'solid-js'
+import { createSignal, For, Match, Show, Switch } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
-import { Alert, Badge, Button, CodeBlock, Field, Fold, Heading, Inline, Input, Only, Select, Stack, Text, Textarea } from '@acorn/plugin-api/ui'
+import { Alert, Button, CodeBlock, ConfirmButton, EmptyState, Facts, Field, Fold, Heading, IconButton, Inline, Input, Markdown, Only, Select, Stack, Text, Textarea, Toolbar } from '@acorn/plugin-api/ui'
 import { createMemoryResource } from './memoryResource'
-import { memoryApi, MEMORY_SCOPE_LABEL, MEMORY_TYPE_LABEL, MEMORY_SCOPE_OPTIONS, MEMORY_TYPE_OPTIONS } from './memoryClient'
+import { memoryApi, memoryAuthorLabel, memoryDate, memoryTypeLabel, MEMORY_SCOPE_LABEL, MEMORY_SCOPE_OPTIONS, MEMORY_TYPE_OPTIONS } from './memoryClient'
+import { memoriesChanged, memoryRevision, selectMemory } from './memorySelection'
 import type { MemoryAddress } from '../shared/api'
-import type { MemoryRow } from '../contract/library'
 import MemoryTerminal from './MemoryTerminal'
 
-const authorLabel = (author: string) => author.startsWith('agent:') ? 'agent' : author
-
-export default function MemoryDetail(props: { address: MemoryAddress; row?: MemoryRow; projectId?: string; revision: number; onChanged: (address?: MemoryAddress) => void }) {
+// Mounted per memory (MemoryCenter.tsx keys it on the address), so a draft never outlives its memory.
+export default function MemoryDetail(props: { address: MemoryAddress; projectId?: string }) {
   const navigate = useNavigate()
-  const key = () => [props.address.scope, props.address.name, props.projectId, props.revision] as const
-  const { value: document, refetch, error: documentError } = createMemoryResource(key, () => memoryApi().get(props.address, props.projectId), null)
-  const { value: history, refetch: refreshHistory, error: historyError } = createMemoryResource(key, () => memoryApi().history(props.address, props.projectId), [])
+  const { value: document, error: documentError, loaded } = createMemoryResource(memoryRevision, () => memoryApi().get(props.address, props.projectId), null)
+  const { value: history, error: historyError, loaded: historyLoaded } = createMemoryResource(memoryRevision, () => memoryApi().history(props.address, props.projectId), [])
   const [editing, setEditing] = createSignal(false)
   const [terminal, setTerminal] = createSignal(false)
   const [name, setName] = createSignal('')
@@ -31,47 +29,94 @@ export default function MemoryDetail(props: { address: MemoryAddress; row?: Memo
     setName(current.name); setDescription(current.description); setType(current.type); setScope(current.scope)
     setBody(current.body); setHash(current.hash); setError(''); setEditing(true)
   }
-  createEffect(on(() => [props.address.name, props.address.scope, props.projectId], () => { setEditing(false); setTerminal(false); setError('') }))
   async function run(operation: () => Promise<unknown>, next?: MemoryAddress) {
     setBusy(true); setError('')
-    try { await operation(); setEditing(false); props.onChanged(next); await refetch(); await refreshHistory() }
-    catch (e) { setError(e instanceof Error ? e.message : 'Memory operation failed.'); await refetch(); await refreshHistory() }
-    finally { setBusy(false) }
+    try { await operation(); setEditing(false); if (next) selectMemory(next) }
+    catch (e) { setError(e instanceof Error ? e.message : "Couldn't change this memory.") }
+    finally { setBusy(false); memoriesChanged() }
   }
-  const lastWriter = () => document()?.updatedBy ?? props.row?.updatedBy ?? 'owner'
-  return <Stack gap="row">
-    <Heading level={2}>{props.address.name}</Heading>
-    <Show when={error() || documentError() || historyError()}><Alert>{error() || String(documentError() || historyError())}</Alert></Show>
-    <Show when={document()} fallback={<Text tone="muted">This memory was deleted. Its retained versions are available below.</Text>}>{(current) => <>
-      <Inline gap="inline">
-        <Badge>{MEMORY_TYPE_LABEL[current().type as keyof typeof MEMORY_TYPE_LABEL]}</Badge><Badge>{MEMORY_SCOPE_LABEL[current().scope]}</Badge>
-        <Text tone="muted">Updated {new Date(current().updatedAt || props.row?.updatedAt || 0).toLocaleString()} · {authorLabel(lastWriter())}</Text>
-        <Show when={current().sessionId && current().taskId}><Button variant="bare" onPress={() => navigate(`/t/${encodeURIComponent(current().taskId!)}?pane=agents&item=${encodeURIComponent(current().sessionId!)}`)}>Session</Button></Show>
-      </Inline>
-      <Show when={!editing()} fallback={<Stack gap="row">
-        <Field label="Name"><Input value={name()} onInput={setName} /></Field>
-        <Field label="Description"><Input value={description()} onInput={setDescription} /></Field>
-        <Inline even>
-          <Field label="Type"><Select value={type()} onChange={setType} options={MEMORY_TYPE_OPTIONS} /></Field>
-          <Field label="Scope"><Select value={scope()} onChange={(scope) => setScope(scope as 'project' | 'private')} options={MEMORY_SCOPE_OPTIONS.filter((option) => option.value === 'private' || props.projectId)} /></Field>
-        </Inline>
-        <Only hosts={['dom']}><Field label="Body"><Textarea mono rows={10} value={body()} onInput={setBody} /></Field></Only>
-        <Only hosts={['tui']}><CodeBlock wrap maxHeight="block">{body()}</CodeBlock><Button onPress={() => setTerminal(true)}>Edit body in $EDITOR</Button></Only>
-        <Show when={terminal()}><MemoryTerminal body={body()} onExit={(body) => { setTerminal(false); if (body !== undefined) setBody(body); else setError('Editor exited without a usable body.') }} /></Show>
-        <Show when={current().hash !== hash()}><Alert>Another writer changed this memory. Your draft is preserved; reload the current version to start a new edit.</Alert><CodeBlock wrap maxHeight="block">{current().body}</CodeBlock><Button onPress={begin}>Reload current version</Button></Show>
-        <Inline gap="row"><Button variant="solid" disabled={busy() || terminal() || current().hash !== hash()} onPress={() => void run(() => memoryApi().edit(props.address, { name: name(), description: description(), type: type(), body: body(), hash: hash() }, scope(), props.projectId), { name: name(), scope: scope(), projectId: scope() === 'project' ? props.projectId! : null })}>Save memory</Button><Button onPress={() => { setEditing(false); setError('') }}>Cancel</Button></Inline>
-      </Stack>}>
-        <Text>{current().description}</Text><CodeBlock wrap maxHeight="block">{current().body}</CodeBlock>
-        <Inline gap="row"><Button onPress={begin}>Edit</Button><Button disabled={busy()} onPress={() => void run(() => memoryApi().delete(props.address, current().hash, props.projectId))}>Delete</Button></Inline>
+  const save = () => run(
+    () => memoryApi().edit(props.address, { name: name(), description: description(), type: type(), body: body(), hash: hash() }, scope(), props.projectId),
+    { name: name(), scope: scope(), projectId: scope() === 'project' ? props.projectId! : null },
+  )
+  const sessionPath = () => {
+    const current = document()
+    return current?.taskId && current.sessionId
+      ? `/t/${encodeURIComponent(current.taskId)}?pane=agents&item=${encodeURIComponent(current.sessionId)}` : undefined
+  }
+  return <>
+    <Toolbar ariaLabel="Memory">
+      <Heading level={2}>{props.address.name}</Heading>
+      <Toolbar.Spacer />
+      <Show when={document() && !editing()}>
+        <Button size="sm" onPress={begin}>Edit</Button>
+        <ConfirmButton size="sm" tone="danger" label="Delete" confirmLabel="Delete memory?" disabled={busy()} onConfirm={() => void run(() => memoryApi().delete(props.address, document()!.hash, props.projectId))}>Delete</ConfirmButton>
       </Show>
-    </>}</Show>
-    <Fold label="History" count={history()?.length}>
-      <Stack gap="row">
-        <Show when={!history()?.length}><Text tone="muted">No earlier versions.</Text></Show>
-        <For each={history()}>{(version) => <Fold label={new Date(version.at).toLocaleString()} meta={<Text>{authorLabel(version.updatedBy)}</Text>}>
-          <Stack gap="row"><Text>{version.description} · {version.type}</Text><CodeBlock wrap maxHeight="block">{version.body}</CodeBlock><Button disabled={busy()} onPress={() => void run(() => memoryApi().restore(props.address, version.version, document()?.hash, props.projectId))}>Restore</Button></Stack>
-        </Fold>}</For>
-      </Stack>
-    </Fold>
-  </Stack>
+      <IconButton icon="x" label="Close" onPress={() => selectMemory(undefined)} />
+    </Toolbar>
+    <Stack gap="section">
+      <Show when={documentError() || historyError() || (!editing() && error())}>{(message) => <Alert>{message()}</Alert>}</Show>
+      <Switch>
+        <Match when={!loaded()}><EmptyState busy align="start" size="sm">Loading…</EmptyState></Match>
+        <Match when={!document()}><Text emphasis="muted">This memory was deleted. Its earlier versions are under History.</Text></Match>
+        {/* A page form: the fields, any error, then the solid primary and a ghost Cancel on the left. */}
+        <Match when={editing() && document()}>{(current) => (
+          <Stack gap="stack">
+            <Field label="Name"><Input value={name()} onInput={setName} /></Field>
+            <Field label="Description"><Input value={description()} onInput={setDescription} /></Field>
+            <Inline even>
+              <Field label="Type"><Select value={type()} onChange={setType} options={MEMORY_TYPE_OPTIONS} /></Field>
+              <Field label="Scope"><Select value={scope()} onChange={(scope) => setScope(scope as 'project' | 'private')} options={MEMORY_SCOPE_OPTIONS.filter((option) => option.value === 'private' || props.projectId)} /></Field>
+            </Inline>
+            <Only hosts={['dom']}><Field label="Body"><Textarea mono rows={12} value={body()} onInput={setBody} /></Field></Only>
+            <Only hosts={['tui']}><CodeBlock wrap maxHeight="block">{body()}</CodeBlock><Button onPress={() => setTerminal(true)}>Edit body in $EDITOR</Button></Only>
+            <Show when={terminal()}><MemoryTerminal body={body()} onExit={(body) => { setTerminal(false); if (body !== undefined) setBody(body); else setError("The editor closed without a body, so the draft didn't change.") }} /></Show>
+            <Show when={current().hash !== hash()}>
+              <Alert tone="warn" title="This memory changed while you were editing" actions={<Button size="sm" onPress={begin}>Reload current version</Button>}>
+                Your draft is kept. The current text is below. Reload it to start again from there.
+              </Alert>
+              <CodeBlock wrap maxHeight="block">{current().body}</CodeBlock>
+            </Show>
+            <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
+            <Inline gap="row">
+              <Button variant="solid" disabled={busy() || terminal() || current().hash !== hash()} onPress={() => void save()}>Save memory</Button>
+              <Button variant="ghost" onPress={() => { setEditing(false); setError('') }}>Cancel</Button>
+            </Inline>
+          </Stack>
+        )}</Match>
+        <Match when={document()}>{(current) => (
+          <Stack gap="stack">
+            <Text>{current().description}</Text>
+            <Facts size="sm" grouping="rows" items={[
+              { label: 'Type', value: memoryTypeLabel(current().type) },
+              { label: 'Scope', value: MEMORY_SCOPE_LABEL[current().scope] },
+              { label: 'Updated', value: memoryDate(current().updatedAt ?? 0) },
+              {
+                label: 'By',
+                value: <Inline gap="inline">
+                  <Text>{memoryAuthorLabel(current().updatedBy)}</Text>
+                  <Show when={sessionPath()}>{(path) => <Button size="xs" variant="ghost" onPress={() => navigate(path())}>Open session</Button>}</Show>
+                </Inline>,
+              },
+            ]} />
+            <Markdown text={current().body} />
+          </Stack>
+        )}</Match>
+      </Switch>
+      <Fold level="sub" label="History" count={historyLoaded() ? history().length : undefined}>
+        <Stack gap="row">
+          <Show when={!history().length}><Text emphasis="muted">No earlier versions.</Text></Show>
+          <For each={history()}>{(version) => (
+            <Fold level="sub" label={memoryDate(version.at)} meta={<Text emphasis="muted">{memoryAuthorLabel(version.updatedBy)}</Text>}>
+              <Stack gap="row">
+                <Text emphasis="muted">{memoryTypeLabel(version.type)} · {version.description}</Text>
+                <CodeBlock wrap maxHeight="block">{version.body}</CodeBlock>
+                <ConfirmButton size="sm" label="Restore" confirmLabel="Restore version?" disabled={busy()} onConfirm={() => void run(() => memoryApi().restore(props.address, version.version, document()?.hash, props.projectId))}>Restore</ConfirmButton>
+              </Stack>
+            </Fold>
+          )}</For>
+        </Stack>
+      </Fold>
+    </Stack>
+  </>
 }

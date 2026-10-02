@@ -35,12 +35,12 @@ export function MemoryToolCard(props: AgentToolCardProps) {
   const scope = () => String(output()?.scope ?? input()?.scope ?? 'project')
   const label = () => undone() ? `Undid ${scope()} memory ${name()}`
     : saved() ? `${props.tool.name === 'memory_delete' ? 'Deleted' : 'Saved'} ${scope()} memory ${name()}`
-      : `${props.tool.status === 'failed' ? 'Could not change' : 'Saving'} ${scope()} memory ${name()}`
+      : `${props.tool.status === 'failed' ? "Couldn't change" : 'Saving'} ${scope()} memory ${name()}`
   async function undo() {
     setBusy(true)
     setError(undefined)
     try { await memoryApi().undo(String(output()!.changeId)); setUndone(true) }
-    catch (e) { setError(e instanceof Error ? e.message : 'Could not undo memory.') }
+    catch (e) { setError(e instanceof Error ? e.message : "Couldn't undo the change.") }
     finally { setBusy(false) }
   }
   return <Card><Stack gap="row">

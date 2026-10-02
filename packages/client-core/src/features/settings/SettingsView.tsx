@@ -627,7 +627,7 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
         <Show when={current()}>
           {(resolved) => (
             <>
-              <header class="settings-header" data-width={resolved().page.fullWidth ? 'full' : undefined}>
+              <header class="settings-header">
                 <div class="settings-heading-text">
                   <div class="settings-back-to-rail">
                     <Button variant="ghost" size="sm" onPress={() => setPageOpen(false)}><Icon name="chevron-left" /> Settings</Button>
@@ -670,7 +670,7 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
                 {(owner) => <PluginStrip pluginId={owner} railSources={resolved().page.railSourceVisibility} navigate={context.navigate} />}
               </Show>
               <div class="settings-body" data-plugin={pluginOwner() ? '' : undefined}>
-                <div ref={pageElement} class="settings-page" data-width={resolved().page.fullWidth ? 'full' : undefined}>
+                <div ref={pageElement} class="settings-page">
                   {/* A plain wrapper carries the live region, so the line is announced when it appears. */}
                   <Show when={status()}><div role="status"><Text emphasis="muted" wrap>{status()}</Text></div></Show>
                   {/* Its own boundary, so a page's lazy chunk holds only the page and not the rail. */}

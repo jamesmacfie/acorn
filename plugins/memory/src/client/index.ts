@@ -4,7 +4,10 @@ import { memoryCommands } from './commands'
 import { AGENT_TOOL_CARD_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { MEMORY_SOURCE_ID } from '../shared/api'
 
-const MemoryCenter = lazy(() => import('./MemoryCenter'))
+// Two lazy chunks off one module, because a terminal draws the list and the detail in two panels
+// (client-core registries/sources.ts § regions).
+const MemoryList = lazy(() => import('./MemoryCenter').then((module) => ({ default: module.MemoryList })))
+const MemoryCenterDetail = lazy(() => import('./MemoryCenter').then((module) => ({ default: module.MemoryCenterDetail })))
 const MemoryToolCard = lazy(async () => ({ default: (await import('./MemoryToolCard')).MemoryToolCard }))
 
 export const memoryClientPlugin: ClientPlugin = {
@@ -23,7 +26,7 @@ export const memoryClientPlugin: ClientPlugin = {
       order: 70,
       glyph: 'brain',
       label: 'Memory',
-      component: MemoryCenter,
+      regions: { list: MemoryList, detail: MemoryCenterDetail, scroll: true, measure: 'page' },
       // The page shows memory for the selected project.
       projectScoped: true,
     })
